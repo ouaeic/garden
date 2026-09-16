@@ -1,27 +1,27 @@
 {
   "resident": {
     "shipped": {
-      "residentBytes": 69787,
+      "residentBytes": 69763,
       "toolCount": 41
     },
     "no-method": {
-      "residentBytes": 75816,
+      "residentBytes": 75792,
       "toolCount": 41
     },
     "no-skills": {
-      "residentBytes": 67403,
+      "residentBytes": 67379,
       "toolCount": 41
     },
     "core": {
-      "residentBytes": 38203,
+      "residentBytes": 38179,
       "toolCount": 20
     },
     "quoted-edit": {
-      "residentBytes": 69205,
+      "residentBytes": 69181,
       "toolCount": 41
     },
     "floor": {
-      "residentBytes": 17400,
+      "residentBytes": 17376,
       "toolCount": 5
     }
   }

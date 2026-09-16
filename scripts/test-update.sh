@@ -1733,7 +1733,7 @@ fi
 grep -q 'did not finish: release_step_runner_settings' <<EOF
 $failing_step_output
 EOF
-if [ "$(grep -c 'mkstemp failed' <<EOF
+if [ "$(grep -c '^mktemp:' <<EOF
 $failing_step_output
 EOF
 )" -ne 1 ]; then
