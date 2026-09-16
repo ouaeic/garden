@@ -92,6 +92,11 @@ export async function checkHumanInterventions({ context, origin, task, report })
     assert(box);
     await page.mouse.move(box.x + 30, box.y + 30);
     await page.mouse.down();
+    const focusedBox = await canvas.boundingBox();
+    assert(
+      focusedBox && Math.abs(focusedBox.y - box.y) < 1,
+      'Taking screen focus must not move the pointer target'
+    );
     await page.mouse.move(box.x + 70, box.y + 50, { steps: 5 });
     await page.mouse.move(box.x + 100, box.y + 30, { steps: 5 });
     await page.mouse.up();

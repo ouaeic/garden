@@ -703,7 +703,7 @@ export default function Screen({
           onPointerDown={(e) => {
             if (!controlling || state.holder === 'secure_input' || e.button !== 0) return;
             e.preventDefault();
-            e.currentTarget.focus();
+            e.currentTarget.focus({ preventScroll: true });
             e.currentTarget.setPointerCapture(e.pointerId);
             stroke.current = {
               pointerId: e.pointerId,
