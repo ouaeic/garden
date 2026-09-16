@@ -1,3 +1,4 @@
+import type { BrowserActionProgress } from './browser-action-journal.js';
 import { signatureControl } from './human-input.js';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
@@ -149,7 +150,6 @@ interface Session {
    * wrong page.
    */
   tabs: Map<string, Page>;
-  nextTabId: number;
   tabLifecycle?: BrowserTabs;
   tabSweep?: NodeJS.Timeout;
   caller?: { owner: 'agent' | 'user'; taskId: string | null };
@@ -2266,7 +2266,6 @@ export class BrowserManager {
         downloadPublication: Promise.resolve(),
         pendingDownloads: new Set(),
         tabs: new Map(),
-        nextTabId: 1,
         tabLifecycle: new BrowserTabs(),
         walls: new BotWallLedger()
       };
@@ -2275,8 +2274,7 @@ export class BrowserManager {
         owner: 'agent' | 'user' = 'user',
         taskId: string | null = null
       ) => {
-        const tabId = `tab-${session.nextTabId}`;
-        session.nextTabId += 1;
+        const tabId = `tab-${randomUUID()}`;
         session.tabs.set(tabId, candidate);
         this.#tabLifecycle(session).add(tabId, owner, taskId, this.#now());
         candidate.on('close', () => {
@@ -3368,7 +3366,8 @@ export class BrowserManager {
     action: BrowserAction,
     actor: 'agent' | 'user',
     consequentialApproved = false,
-    taskId: string | null = null
+    taskId: string | null = null,
+    progress?: BrowserActionProgress
   ) {
     const shared = await this.#sharedControl(workspaceId, root);
     shared?.authorize(actor);
@@ -3376,7 +3375,7 @@ export class BrowserManager {
     return this.#adopt(session, shared).submit(actor, (signal) =>
       this.#raceTakeover(
         signal,
-        this.#act(session, root, action, actor, consequentialApproved, signal, taskId)
+        this.#act(session, root, action, actor, consequentialApproved, signal, taskId, progress)
       )
     );
   }
@@ -3405,7 +3404,8 @@ export class BrowserManager {
     actor: 'agent' | 'user',
     consequentialApproved: boolean,
     signal: AbortSignal,
-    taskId: string | null
+    taskId: string | null,
+    progress?: BrowserActionProgress
   ) {
     session.caller = { owner: actor, taskId: actor === 'agent' ? taskId : null };
     return session.downloads.collect(async (receipts) => {
@@ -3427,7 +3427,9 @@ export class BrowserManager {
                 ` (batch step ${index + 1}, ${primitive.type})`
               );
             }
+            progress?.begin(index, primitive.type);
             const result = await this.#perform(session, root, primitive);
+            progress?.complete(index);
             steps.push({ index, type: primitive.type, ok: true, url: result.url });
           } catch (cause) {
             steps.push({
@@ -3456,7 +3458,9 @@ export class BrowserManager {
         await this.#guardStep(session, action);
         this.#enforce(await this.#classify(session, action), consequentialApproved, '');
       }
+      progress?.begin(0, action.type);
       const performed = await this.#perform(session, root, action);
+      progress?.complete(0);
       // `#perform` has already paid for the title of the tab it acted on, so the pane gets it for
       // nothing. The page's own `load` events cover a navigation nobody here asked for; this covers
       // the far more common case of one that something here did.

@@ -1,3 +1,4 @@
+import { registerBrowserActionRoutes } from './browser-action-routes.js';
 import { connectProcessSupervisor } from './process-supervisor.js';
 import { OwnerStroke } from '@athanor/contracts';
 import { ProjectUpdatesManager } from './project-updates.js';
@@ -284,12 +285,6 @@ export interface RunnerServerOptions {
   /** The desktop, so the stream route can be driven without an Xvfb and an ffmpeg on the box. */
   desktop?: DesktopManager | undefined;
 }
-
-/** Whether a browser action, or any step of a batch, writes a file into the workspace. */
-const writesWorkspaceFile = (action: BrowserAction): boolean =>
-  action.type === 'batch'
-    ? action.actions.some((step) => step.type === 'screenshot')
-    : action.type === 'screenshot';
 
 export const buildServer = async (config: RunnerConfig, options: RunnerServerOptions = {}) => {
   const app = Fastify({ logger: false, bodyLimit: config.MAX_FILE_BYTES });
@@ -1890,28 +1885,12 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
     }
   );
 
-  app.post<{ Params: { workspaceId: string } }>(
-    '/v1/workspaces/:workspaceId/browser/action',
-    async (request) => {
-      requireScope(request, 'browser.control');
-      const root = workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId);
-      await ensureWorkspace(root);
-      const action = BrowserAction.parse(request.body);
-      // A screenshot is a workspace write wearing an action's name, so it is held to what the
-      // print route is held to: the write scope, and a host disk with room for the file.
-      if (writesWorkspaceFile(action)) {
-        requireScope(request, 'files.write');
-        await assertHostStorageWrite(root, 0, probeHostStorage);
-      }
-      return browser.act(
-        request.params.workspaceId,
-        root,
-        action,
-        request.capability.role === 'user' ? 'user' : 'agent',
-        request.capability.scopes.includes('browser.consequential'),
-        request.capability.role === 'agent' ? request.capability.sub : null
-      );
-    }
+  registerBrowserActionRoutes(
+    app,
+    config.WORKSPACE_ROOT,
+    browser,
+    config.RUNNER_SHARED_SECRET,
+    probeHostStorage
   );
 
   app.get<{ Params: { workspaceId: string } }>(

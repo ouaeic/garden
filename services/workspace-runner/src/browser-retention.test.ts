@@ -83,6 +83,7 @@ const setup = async () => {
     root,
     context,
     session,
+    tabId: [...session.tabs.keys()][0]!,
     states,
     open,
     advance: () => {
@@ -267,12 +268,12 @@ it('keeps the human in control when the challenge has not cleared', async () => 
   await f.manager.setHolder(workspaceId, f.root, 'user');
   f.context.all[0]!.url.mockReturnValue('https://fixture.test/challenge');
   f.context.all[0]!.title.mockResolvedValue('Just a moment...');
-  await expect(f.manager.completeHandoff(workspaceId, f.root, 'tab-1')).rejects.toThrow(
+  await expect(f.manager.completeHandoff(workspaceId, f.root, f.tabId)).rejects.toThrow(
     BotWallError
   );
   expect(f.manager.sessions(workspaceId)?.holder).toBe('user');
   f.context.all[0]!.title.mockResolvedValue('Application received');
-  await f.manager.completeHandoff(workspaceId, f.root, 'tab-1');
+  await f.manager.completeHandoff(workspaceId, f.root, f.tabId);
   expect(f.manager.sessions(workspaceId)?.holder).toBe('agent');
 });
 
@@ -285,20 +286,20 @@ it('requires explicit owner completion for an embedded widget and revokes that r
     { url: () => 'https://www.google.com/recaptcha/api2/anchor?k=fixture' }
   ] as never);
   page.evaluate.mockImplementation(async () => token as never);
-  await expect(f.manager.completeHandoff(workspaceId, f.root, 'tab-1')).rejects.toThrow(
+  await expect(f.manager.completeHandoff(workspaceId, f.root, f.tabId)).rejects.toThrow(
     BotWallError
   );
   await f.manager.setHolder(workspaceId, f.root, 'user');
-  await f.manager.completeHandoff(workspaceId, f.root, 'tab-1');
+  await f.manager.completeHandoff(workspaceId, f.root, f.tabId);
   expect(f.manager.sessions(workspaceId)?.holder).toBe('agent');
-  await expect(f.manager.completeHandoff(workspaceId, f.root, 'tab-1')).resolves.toBeUndefined();
+  await expect(f.manager.completeHandoff(workspaceId, f.root, f.tabId)).resolves.toBeUndefined();
   token = 'synthetic-response-two';
-  await expect(f.manager.completeHandoff(workspaceId, f.root, 'tab-1')).rejects.toThrow(
+  await expect(f.manager.completeHandoff(workspaceId, f.root, f.tabId)).rejects.toThrow(
     BotWallError
   );
   await f.manager.setHolder(workspaceId, f.root, 'user');
   page.title.mockResolvedValue('Verify you are human');
-  await expect(f.manager.completeHandoff(workspaceId, f.root, 'tab-1')).rejects.toThrow(
+  await expect(f.manager.completeHandoff(workspaceId, f.root, f.tabId)).rejects.toThrow(
     BotWallError
   );
 });
@@ -307,14 +308,14 @@ it('cannot acknowledge a lost page or a different site after browser recovery', 
   const f = await setup();
   await f.manager.setHolder(workspaceId, f.root, 'user');
   await expect(
-    f.manager.completeHandoff(workspaceId, f.root, 'tab-1', 'https://fixture.test/challenge')
+    f.manager.completeHandoff(workspaceId, f.root, f.tabId, 'https://fixture.test/challenge')
   ).rejects.toThrow('Reopen');
   f.context.all[0]!.url.mockReturnValue('https://different.test/');
   await expect(
-    f.manager.completeHandoff(workspaceId, f.root, 'tab-1', 'https://fixture.test/challenge')
+    f.manager.completeHandoff(workspaceId, f.root, f.tabId, 'https://fixture.test/challenge')
   ).rejects.toThrow('Reopen');
   expect(f.manager.sessions(workspaceId)?.holder).toBe('user');
   f.context.all[0]!.url.mockReturnValue('https://fixture.test/complete');
-  await f.manager.completeHandoff(workspaceId, f.root, 'tab-1', 'https://fixture.test/challenge');
+  await f.manager.completeHandoff(workspaceId, f.root, f.tabId, 'https://fixture.test/challenge');
   expect(f.manager.sessions(workspaceId)?.holder).toBe('agent');
 });

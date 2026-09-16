@@ -1,3 +1,4 @@
+import { browserActionRequestId } from '../browser-action-receipts.js';
 import { type ParallelWebReadResult } from '@athanor/contracts';
 import { type ModelToolCall } from '@athanor/model-gateway';
 import { textValue } from '../values.js';
@@ -143,7 +144,7 @@ export async function executeSurfaceTool(
           ...(writes ? ['files.write'] : [])
         ],
         `${root}/browser/action`,
-        request
+        { ...request, requestId: browserActionRequestId(task.id, state, call.id) }
       );
     }
     case 'desktop_observe':

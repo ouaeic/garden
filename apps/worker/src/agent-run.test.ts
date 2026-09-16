@@ -1309,6 +1309,89 @@ describe('a tool call interrupted by a restart', () => {
     ).toBe(true);
   });
 
+  it.each(['completed', 'uncertain', 'missing'] as const)(
+    'recovers a %s browser receipt without repeating the action',
+    async (status) => {
+      const task = makeTask({
+        messages: [
+          { role: 'user', content: 'Submit the test application.' },
+          {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                id: 'browser-call',
+                name: 'browser_action',
+                arguments: { action: 'click', selector: '#submit' }
+              }
+            ]
+          }
+        ],
+        step: 0,
+        credits: 0,
+        turnToolResults: {},
+        inFlight: {
+          toolCallId: 'browser-call',
+          tool: 'browser_action',
+          startedAt: '2026-09-16T00:00:00.000Z'
+        }
+      });
+      const probe = probeStore(() => task);
+      const log: FetchLog = { calls: [], modelRequests: [] };
+      installFetch([textFrame('I will check the receipt page.')], log, {
+        route: (url) =>
+          url.includes('/browser/receipts/')
+            ? new Response(
+                JSON.stringify({
+                  receipt:
+                    status === 'missing'
+                      ? null
+                      : {
+                          requestId: url.split('/').at(-1),
+                          status,
+                          startedAt: '2026-09-16T00:00:00.000Z',
+                          steps: [{ index: 0, type: 'click', status: 'completed' }],
+                          ...(status === 'completed'
+                            ? {
+                                result: {
+                                  url: 'https://forms.invalid/receipt',
+                                  title: 'Application received',
+                                  tabId: 'tab-stable'
+                                }
+                              }
+                            : {})
+                        }
+                }),
+                { headers: { 'content-type': 'application/json' } }
+              )
+            : undefined
+      });
+      await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 3 }), masterKey, runnerSecret)
+        .run(task)
+        .catch(() => undefined);
+      expect(log.calls.filter((url) => url.includes('/browser/receipts/'))).toHaveLength(1);
+      expect(log.calls.some((url) => url.endsWith('/browser/action'))).toBe(false);
+      const messages = (log.modelRequests[0]?.messages ?? []) as Array<{
+        content: string;
+        tool_call_id?: string;
+      }>;
+      const answer = messages.find((message) => message.tool_call_id === 'browser-call');
+      expect(answer).toBeDefined();
+      if (status === 'completed') {
+        expect(answer!.content).toContain('Application received');
+        expect(answer!.content).not.toContain('Interrupted:');
+        expect(
+          probe.events.some((entry) =>
+            entry.summary.includes('Recovered the browser action receipt')
+          )
+        ).toBe(true);
+      } else {
+        expect(answer!.content).toContain('Interrupted:');
+        if (status === 'uncertain') expect(answer!.content).toContain('1 actions acknowledged');
+      }
+    }
+  );
+
   it('answers calls a mid-batch restart left dangling, so the next request is still valid', async () => {
     const task = makeTask({
       messages: [
