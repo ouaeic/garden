@@ -644,7 +644,11 @@ describe('a service the computer keeps running', () => {
       // The task that started it may still write: this is a narrowing of the owner's capability,
       // not a change to what a turn can do with its own session.
       expect(() =>
-        manager.action('workspace-1', 'task-1', started.sessionId, { action: 'write', data: 'x' })
+        manager.action('workspace-1', 'task-1', started.sessionId, {
+          action: 'write',
+          data: 'x',
+          ...manager.inputPlan('workspace-1', 'task-1', started.sessionId, 'x')
+        })
       ).not.toThrow();
       await manager.close();
     },

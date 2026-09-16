@@ -3745,6 +3745,12 @@ const devSocketAddresses = (text: string): string[] =>
  * and for the same reason: it belongs to no command at all.
  */
 export const callDestinations = (name: string, args: Record<string, unknown>): string[] => {
+  if (name === 'process' && args.action === 'write') {
+    const options = args.options as { inputDestinations?: unknown } | undefined;
+    return Array.isArray(options?.inputDestinations)
+      ? options.inputDestinations.filter((url): url is string => typeof url === 'string')
+      : [];
+  }
   if (name === 'parallel_web_read') return Array.isArray(args.urls) ? args.urls.map(String) : [];
   if (name === 'browser_action')
     return [

@@ -264,8 +264,8 @@ off and to continue from the first incomplete step rather than restart. Only if 
 itself fails does the owner see an error, and it names the step count and says the work is saved.
 Replying resumes the same task, on the same computer, with a fresh budget.
 
-Foreground commands have time and output bounds. Background processes return IDs that can be listed,
-polled, tailed, written to, or terminated. A tool call that was in flight when a worker restarted is
+Ordinary shell calls yield a managed job when the command does not finish during the initial wait.
+Processes return IDs that can be listed, polled, tailed, written to, or terminated. A tool call that was in flight when a worker restarted is
 never repeated automatically: the doubt is returned to the model as that call’s own result, and it
 must establish what actually happened before acting.
 
@@ -316,7 +316,9 @@ or redirect unless the model explicitly runs an interpreter and passes the scrip
 
 ### How long work is allowed to take
 
-A **foreground** command holds the turn open and is bounded by `MAX_EXECUTION_SECONDS`.
+An ordinary agent shell call uses managed execution, automatically yielding its session ID while
+the command continues. The agent can do independent work before waiting for completion. Internal
+**foreground** execution, including system-package installation, is bounded by `MAX_EXECUTION_SECONDS`.
 A **background session** returns a process id immediately and is bounded by
 `MAX_BACKGROUND_SECONDS`. A named **finite job** has a durable record and an optional deadline;
 omitting `timeoutSeconds` lets it run until completion or an explicit stop. A **declared service** has no deadline and restarts after every exit, including a successful
@@ -340,10 +342,22 @@ current workspace isolation. A failed recovery remains visible; it does not beco
 loop. `process(action=resume)` resolves and reviews the stored recovery command before a manual
 retry. Cancellation and an expired deadline do not grant another run.
 
-An ordinary background session has no durable record and does not come back after a runner restart.
+The independent process supervisor holds running jobs while the request-serving runner restarts.
+An ordinary background session has no durable record and does not come back after the supervisor stops.
 A computation session's in-memory interpreter state is also distinct from a finite job: use files and
 checkpointable stages when an analysis must recover after maintenance or a crash. Garden does not
 infer a checkpoint or reconstruct arbitrary program memory.
+
+Set `shell.pty` for a program that needs a terminal. It uses the same prepared sandbox command,
+resource controls and process supervision as a pipe command. Standard output and errors share the
+terminal stream. Read that output before sending exact input with `process(action=write)`; resize
+with `process(action=resize, options={columns, rows})`. Waiting for completion while the program
+needs input cannot advance it. System-package installation uses its noninteractive helper instead.
+
+Process input is scoped to its owning conversation and checked against the original command and
+its accumulated input. The approval binds the input revision and process generation, so a delayed
+answer cannot type into a restarted service. Large scripts and datasets belong in workspace files.
+Private credentials belong in the human handoff, never in model-visible terminal input.
 
 Computation receipts also carry the launched interpreter's version, platform and architecture,
 the submitted source and request hashes, and the preceding cell's identity. Declare `inputs` on a

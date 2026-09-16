@@ -278,6 +278,12 @@ export default function ProcessPanel({
                         Restarts: {process.job.restarts}.
                       </p>
                     )}
+                    {process.terminal && (
+                      <p>
+                        Interactive terminal · {process.terminal.columns} × {process.terminal.rows}.
+                        Standard output and errors share one stream.
+                      </p>
+                    )}
                     {process.job?.lastExit?.reason && <p>{process.job.lastExit.reason}</p>}
                     {sample?.children.length ? (
                       <ul className="process-children">

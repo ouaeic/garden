@@ -805,7 +805,22 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
         task.id,
         'exec',
         `${root}/processes/${encodeURIComponent(sessionId)}`,
-        { action, ...(call.arguments.data === undefined ? {} : { data: call.arguments.data }) }
+        {
+          action,
+          ...(call.arguments.data === undefined ? {} : { data: call.arguments.data }),
+          ...(['write', 'resize'].includes(action) &&
+          call.arguments.options &&
+          typeof call.arguments.options === 'object'
+            ? Object.fromEntries(
+                Object.entries(call.arguments.options).filter(([key]) =>
+                  (action === 'write'
+                    ? ['inputRevision', 'inputGeneration']
+                    : ['columns', 'rows']
+                  ).includes(key)
+                )
+              )
+            : {})
+        }
       );
     }
     case 'files_list':

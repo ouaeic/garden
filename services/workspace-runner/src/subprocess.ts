@@ -1,5 +1,8 @@
 import type { ChildProcess } from 'node:child_process';
-import { once } from 'node:events';
+import { once, type EventEmitter } from 'node:events';
+
+export type ProcessHandle = EventEmitter &
+  Pick<ChildProcess, 'pid' | 'exitCode' | 'signalCode' | 'kill'>;
 
 // A finished command can leave a grandchild holding the inherited pipes open, so
 // 'close' may never arrive. Wait for the flush, but never longer than this.
@@ -17,7 +20,7 @@ export const DEFAULT_FLUSH_GRACE_MS = 1_000;
  * background-process tests flaky. Nothing in production passes a value.
  */
 export const awaitChildExit = async (
-  child: ChildProcess,
+  child: ProcessHandle,
   flushGraceMs: number = DEFAULT_FLUSH_GRACE_MS
 ): Promise<{ exitCode: number | null; signal: NodeJS.Signals | null }> => {
   // Attached before the exit await so a spawn failure rejects here too instead of
@@ -41,7 +44,7 @@ export const awaitChildExit = async (
  * Signals the child's whole process group. Children are spawned detached so that a shell
  * or wrapper cannot orphan its own descendants when only the direct child is killed.
  */
-export const killProcessTree = (child: ChildProcess, signal: NodeJS.Signals): void => {
+export const killProcessTree = (child: ProcessHandle, signal: NodeJS.Signals): void => {
   const pid = child.pid;
   if (pid === undefined) return;
   try {

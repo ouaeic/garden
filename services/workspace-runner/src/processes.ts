@@ -1,6 +1,6 @@
 import { jobIdentity } from './job-identity.js';
 import { discardMissionInvocation, trackMissionInvocation } from './mission-processes.js';
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { spawnManagedProcess, type ManagedProcess } from './process-child.js';
 import { randomUUID } from 'node:crypto';
 import { scheduleDeadline } from './deadline.js';
 import { ProcessResources, processScanner, PROCESS_SAMPLE_MS } from './process-resources.js';
@@ -52,6 +52,7 @@ const BackgroundRequest = z
     env: z.record(z.string(), z.string()).default({}),
     timeoutSeconds: z.number().int().positive().optional(),
     stdin: z.string().max(10_000_000).optional(),
+    pty: z.boolean().optional(),
     network: z.boolean().default(false),
     maxOutputBytes: z
       .number()
@@ -83,7 +84,11 @@ interface Session {
   workspaceId: string;
   owner: string;
   command: string[];
-  child: ChildProcessWithoutNullStreams;
+  child: ManagedProcess;
+  launch: ServiceLaunch;
+  input: string;
+  inputRevision: number;
+  inputGeneration: string;
   status: Status;
   /**
    * Head, tail and a byte count, the same collector the foreground path uses. These were plain
@@ -312,8 +317,9 @@ export class ProcessManager {
         ...(session.status === 'running'
           ? {
               yielded: true,
-              instruction:
-                'This command is still running under the returned sessionId. Do not launch it again. Do independent work, then use process action=wait to resume automatically when it stops.'
+              instruction: request.pty
+                ? 'The terminal is still running under this sessionId. Read its output and use process write for input. Do not launch it again. Use process wait only once no further input is needed.'
+                : 'This command is still running under the returned sessionId. Do not launch it again. Do independent work, then use process action=wait to resume automatically when it stops.'
             }
           : {})
       };
@@ -407,14 +413,13 @@ export class ProcessManager {
       await discardMissionInvocation(prepared);
       throw new Error('The coding mission execution scope is closed');
     }
-    const child = spawn(prepared.executable, prepared.args, {
-      cwd: prepared.cwd,
-      env: prepared.env,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      // Leads its own process group so stopping the session reaches grandchildren too.
-      detached: true,
-      shell: false
-    });
+    let child: ManagedProcess;
+    try {
+      child = spawnManagedProcess(prepared, request.pty);
+    } catch (error) {
+      await discardMissionInvocation(prepared);
+      throw error;
+    }
     trackMissionInvocation(workspaceRoot, prepared, child);
     const id = options.id ?? `proc_${randomUUID()}`;
     const timeout =
@@ -436,6 +441,10 @@ export class ProcessManager {
       owner,
       command: [request.executable, ...request.args],
       child,
+      launch: ServiceLaunchSchema.parse(request),
+      input: request.stdin ?? '',
+      inputRevision: 0,
+      inputGeneration: randomUUID(),
       status: 'running',
       stdout: boundedCollector(request.maxOutputBytes),
       stderr: boundedCollector(request.maxOutputBytes),
@@ -482,6 +491,12 @@ export class ProcessManager {
     session.diskFloor = diskFloor;
     child.stdout.on('data', (chunk: Buffer) => session.stdout.push(chunk));
     child.stderr.on('data', (chunk: Buffer) => session.stderr.push(chunk));
+    child.on('inputError', () =>
+      noteOnStderr(
+        session,
+        'Process input closed before the write was accepted. Read the output before continuing.'
+      )
+    );
     // Settled on the drained exit rather than on 'exit' itself. The poll that reads a terminal
     // status is also the poll that reads the log, and whatever was still sitting in the pipes when
     // the process ended is exactly the tail a job's result is in - so reporting `completed` before
@@ -512,6 +527,7 @@ export class ProcessManager {
       session.exitCode = exitCode;
       session.signal = signal;
       session.finishedAt = new Date().toISOString();
+      session.input = '';
       if (session.status === 'running') session.status = status;
       if (options.onSettled) {
         // A service's row must not be swept: it is the record the owner reads while the backoff
@@ -529,7 +545,7 @@ export class ProcessManager {
       () => settle('failed', null, null)
     );
     if (request.stdin) child.stdin.write(request.stdin);
-    if (request.yieldAfterMs !== undefined) child.stdin.end();
+    if (request.yieldAfterMs !== undefined && !request.pty) child.stdin.end();
     return session;
   }
 
@@ -1415,16 +1431,45 @@ export class ProcessManager {
    * cross-task influence; stopping and reading are what the owner's panel was widened for, and
    * neither can be aimed at another turn's reasoning.
    */
+  inputPlan(workspaceId: string, owner: string, id: string, data: string) {
+    const session = this.#sessions.get(id);
+    if (
+      !session ||
+      session.workspaceId !== workspaceId ||
+      session.owner !== owner ||
+      session.status !== 'running'
+    )
+      throw new Error('Running process not found');
+    if (!session.child.stdin.writable) throw new Error('Process input is closed');
+    if (Buffer.byteLength(session.input) + Buffer.byteLength(data) > 10_000_000)
+      throw new Error(
+        'Interactive input exceeds its inspection limit; put the script or data in a workspace file'
+      );
+    return {
+      invocation: { ...session.launch, stdin: session.input + data },
+      inputRevision: session.inputRevision,
+      inputGeneration: session.inputGeneration
+    };
+  }
+
   action(workspaceId: string, owner: string | null, id: string, value: unknown) {
     const request = z
       .object({
-        action: z.enum(['poll', 'log', 'kill', 'write']),
+        action: z.enum(['poll', 'log', 'kill', 'write', 'resize']),
+        columns: z.number().int().min(20).max(500).optional(),
+        rows: z.number().int().min(5).max(200).optional(),
+        inputRevision: z.number().int().nonnegative().optional(),
+        inputGeneration: z.string().uuid().optional(),
         data: z.string().max(1_000_000).optional()
       })
       .parse(value);
     const session = this.#sessions.get(id);
     const job = this.#jobs.get(id);
-    if (!session && job?.record.workspaceId === workspaceId && request.action !== 'write') {
+    if (
+      !session &&
+      job?.record.workspaceId === workspaceId &&
+      !['write', 'resize'].includes(request.action)
+    ) {
       if (request.action === 'kill' && ['running', 'interrupted'].includes(job.record.state)) {
         job.retiring = true;
         job.record.state = 'stopped';
@@ -1451,12 +1496,14 @@ export class ProcessManager {
     const durable =
       (this.#supervised.has(id) || this.#jobs.has(id)) && session?.workspaceId === workspaceId;
     const mayReach =
-      owner === null || session?.owner === owner || (durable && request.action !== 'write');
+      owner === null ||
+      session?.owner === owner ||
+      (durable && !['write', 'resize'].includes(request.action));
     if (
       !session ||
       session.workspaceId !== workspaceId ||
       !mayReach ||
-      (owner === null && request.action === 'write')
+      (owner === null && ['write', 'resize'].includes(request.action))
     )
       throw new Error('Background process not found');
     if (request.action === 'kill') {
@@ -1468,9 +1515,24 @@ export class ProcessManager {
         this.#stop(session);
       }
     }
+    if (request.action === 'resize') {
+      if (session.status !== 'running' || !session.child.resize)
+        throw new Error('This process has no running terminal');
+      if (!request.columns || !request.rows)
+        throw new Error('Terminal resize requires columns and rows');
+      session.child.resize(request.columns, request.rows);
+    }
     if (request.action === 'write') {
       if (session.status !== 'running') throw new Error('Background process is not running');
+      const plan = this.inputPlan(workspaceId, owner!, id, request.data ?? '');
+      if (
+        request.inputRevision !== plan.inputRevision ||
+        request.inputGeneration !== plan.inputGeneration
+      )
+        throw new Error('Process input changed; inspect its input plan before sending more');
       session.child.stdin.write(request.data ?? '');
+      session.input = plan.invocation.stdin;
+      session.inputRevision++;
     }
     return this.#view(session, request.action === 'log' || request.action === 'poll');
   }
@@ -1719,6 +1781,7 @@ export class ProcessManager {
         : {}),
       status: session.status,
       command: session.command,
+      ...(session.child.terminal ? { terminal: { ...session.child.terminal } } : {}),
       startedAt: session.startedAt,
       ranForMs: Math.max(0, ranToMs - Date.parse(session.startedAt)),
       outputBytes: session.stdout.bytes + session.stderr.bytes + (job?.outputOffset ?? 0),

@@ -17,6 +17,8 @@ export async function executeComputationTool(
 ): Promise<unknown> {
   if (call.arguments.action === 'describe')
     return {
+      terminal:
+        'shell pty=true allocates an interactive terminal with combined stdout/stderr. It uses the same sandbox, job supervision and approval floor. process write sends exact input (include a newline to submit); resize takes options.columns/rows. Poll before writing. Use a human computer handoff for private credentials. Wait only after all input is supplied.',
       debugger: debuggerDescription(),
       workflow: workflowDescription(),
       options: z.toJSONSchema(ComputationRequest),

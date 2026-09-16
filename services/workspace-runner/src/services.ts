@@ -74,6 +74,7 @@ export const nextFailureCount = (
 ): number => (ranForMs >= policy.healthyAfterMs ? 1 : consecutiveFailures + 1);
 
 export const ServiceLaunchSchema = z.object({
+  pty: z.boolean().optional(),
   executable: z.string().min(1).max(4096),
   args: z.array(z.string().max(100_000)).max(8_192).default([]),
   cwd: z.string().default('workspace'),

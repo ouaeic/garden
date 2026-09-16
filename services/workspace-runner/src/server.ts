@@ -1147,6 +1147,25 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
   );
 
   app.post<{ Params: { workspaceId: string; sessionId: string } }>(
+    '/v1/workspaces/:workspaceId/processes/:sessionId/input-plan',
+    async (request) => {
+      requireScope(request, 'exec');
+      if (request.capability.role !== 'agent')
+        throw new Error('Process input belongs to its owning task');
+      const { data } = z
+        .object({ data: z.string().max(1_000_000) })
+        .strict()
+        .parse(request.body);
+      return processes.inputPlan(
+        request.params.workspaceId,
+        request.capability.sub,
+        request.params.sessionId,
+        data
+      );
+    }
+  );
+
+  app.post<{ Params: { workspaceId: string; sessionId: string } }>(
     '/v1/workspaces/:workspaceId/processes/:sessionId/resume',
     async (request) => {
       requireScope(request, 'exec');

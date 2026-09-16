@@ -1,4 +1,5 @@
-import { execFile, type ChildProcess } from 'node:child_process';
+import type { ProcessHandle } from './subprocess.js';
+import { execFile } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -24,14 +25,14 @@ interface Entry {
   root: string;
   file: string;
   sandbox: AgentSandbox;
-  child?: ChildProcess;
+  child?: ProcessHandle;
   ended?: Promise<void>;
   settlement?: Promise<void>;
 }
 const entries = new Map<string, Entry>();
 const frozen = new Set<string>();
 let unknownLease = false;
-const children = new Map<ChildProcess, { root: string; ended: Promise<void> }>();
+const children = new Map<ProcessHandle, { root: string; ended: Promise<void> }>();
 const gatePath = (file: string) => file.replace(/\.lease$/, '.gate');
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -103,7 +104,7 @@ export const discardMissionInvocation = async (prepared: {
 export const trackMissionInvocation = (
   root: string,
   prepared: { processTreeLease?: string },
-  child: ChildProcess
+  child: ProcessHandle
 ): void => {
   const ended = new Promise<void>((resolve) => {
     child.once('exit', () => resolve());

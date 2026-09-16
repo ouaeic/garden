@@ -10,7 +10,7 @@ export const checkpointInvocation = (
     executable: 'bash',
     args: ['-lc', command],
     ...Object.fromEntries(
-      ['cwd', 'env', 'network', 'maxOutputBytes']
+      ['cwd', 'env', 'network', 'maxOutputBytes', 'pty']
         .filter((key) => args[key] !== undefined)
         .map((key) => [key, args[key]])
     )

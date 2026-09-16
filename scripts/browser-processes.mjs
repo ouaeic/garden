@@ -86,6 +86,7 @@ export function processFixture(workspaceId, taskId) {
       startedAt,
       ranForMs: 3 * 86400_000 + 5 * 3600_000,
       outputBytes: 8192,
+      terminal: { columns: 120, rows: 36, streams: 'combined' },
       command: [
         'python3',
         'analyses/whole_genome_analysis.py',
@@ -250,6 +251,7 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
     await next;
     assert.equal(fixture.reads, before + 1, 'Refresh process status on the relaxed interval');
     await card.getByText('Command & details', { exact: true }).click();
+    await card.getByText('Interactive terminal · 120 × 36.', { exact: false }).waitFor();
     assert((await card.innerText()).includes('aligner · R · 2d'));
     await card.getByRole('button', { name: 'Read output', exact: true }).click();
     const output = card.getByRole('textbox', { name: 'Output from Whole-genome analysis' });

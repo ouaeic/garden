@@ -31,6 +31,7 @@ const METHODS = [
   'recoveryPlan',
   'resumeJob',
   'action',
+  'inputPlan',
   'flush',
   'isWorkspaceBusy',
   'quiesceWorkspace',

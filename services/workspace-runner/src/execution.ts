@@ -1,5 +1,5 @@
 import { assertMissionWorkspaceOpen, trackMissionInvocation } from './mission-processes.js';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
 import path from 'node:path';
 import { z } from 'zod';
@@ -18,7 +18,7 @@ import {
 } from './host-storage.js';
 import { limitedInvocation, type CommandLimits } from './limits.js';
 import { isCodingMissionWorkspace, sandboxedInvocation, type AgentSandbox } from './sandbox.js';
-import { awaitChildExit, killProcessTree } from './subprocess.js';
+import { awaitChildExit, killProcessTree, type ProcessHandle } from './subprocess.js';
 
 /** Native commands share the owner's workspace, resource ceilings and approval floor. */
 
@@ -39,6 +39,7 @@ export const ExecRequest = z
     env: z.record(z.string(), z.string()).default({}),
     timeoutSeconds: z.number().int().positive().max(86_400).default(300),
     stdin: z.string().max(10_000_000).optional(),
+    pty: z.boolean().optional(),
     network: z.boolean().default(false),
     maxOutputBytes: z
       .number()
@@ -58,6 +59,13 @@ export const ExecRequest = z
     service: z.string().min(1).max(120).optional()
   })
   .superRefine((value, context) => {
+    if (value.pty)
+      context.addIssue({
+        code: 'custom',
+        path: ['pty'],
+        message:
+          'A terminal requires managed execution; system package installation cannot use a terminal'
+      });
     if (value.service !== undefined)
       context.addIssue({
         code: 'custom',
@@ -874,7 +882,7 @@ const TERMINATION_GRACE_MS = 2_000;
  * has actually gone; a caller with nothing left to wait for can ignore it, because the timer is
  * unreferenced and cannot by itself hold the runner open.
  */
-export const stopProcessTree = (child: ChildProcess): NodeJS.Timeout => {
+export const stopProcessTree = (child: ProcessHandle): NodeJS.Timeout => {
   killProcessTree(child, 'SIGTERM');
   const escalation = setTimeout(() => killProcessTree(child, 'SIGKILL'), TERMINATION_GRACE_MS);
   escalation.unref();

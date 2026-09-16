@@ -32,6 +32,7 @@ import { textValue } from './values.js';
 import { pinMediaGenerationApproval } from './media-approval.js';
 import { computationApproval } from './computation-approval.js';
 import { jobRecoveryApproval } from './job-recovery-approval.js';
+import { processInputApproval } from './process-input-approval.js';
 import { SECURITY_MODE_FLOOR } from './approval-common.js';
 import {
   currentTranscriptionCredential,
@@ -217,6 +218,12 @@ export const approvalForCall = async (
     });
   if (call.name === 'process' && call.arguments.action === 'resume')
     return jobRecoveryApproval(deps.runner, task, call, {
+      ...(state?.taint ? { taintSources: state.taint.sources } : {}),
+      ...undoPointFor(state),
+      ...deps.destinationContext(state)
+    });
+  if (call.name === 'process' && call.arguments.action === 'write')
+    return processInputApproval(deps.runner, task, call, {
       ...(state?.taint ? { taintSources: state.taint.sources } : {}),
       ...undoPointFor(state),
       ...deps.destinationContext(state)

@@ -672,6 +672,10 @@ export const agentTools: ModelTool[] = [
             'Job recovery shell command: safely continue saved work after interruption. Without it, recovery requires attention. Approval covers this command too.'
         },
         stdin: { type: 'string' },
+        pty: {
+          type: 'boolean',
+          description: 'Allocate a terminal for interactive programs. Use process write for input.'
+        },
         maxOutputBytes: {
           type: 'integer',
           minimum: 4096,
@@ -707,7 +711,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'process',
     description:
-      'wait releases this turn until finite jobs stop, then resumes automatically. Do other work first. Status/log/input/stop; resume uses a declared checkpoint. describe lists computation, debugging and workflows; compute/debug/workflow take options.',
+      'wait releases this turn until finite jobs stop, then resumes automatically. Do other work first. Status/log/input/stop; resize takes options.columns and options.rows for a terminal. resume uses a declared checkpoint. describe lists computation, debugging and workflows; compute/debug/workflow take options.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -722,6 +726,7 @@ export const agentTools: ModelTool[] = [
             'wait',
             'kill',
             'write',
+            'resize',
             'resume',
             'describe',
             'compute',

@@ -28,6 +28,7 @@ export interface ManagedProcess {
   finishedAt?: string;
   deadlineAt?: string;
   exitCode?: number | null;
+  terminal?: { columns: number; rows: number; streams: 'combined' };
   workflow?: WorkflowRun;
   lifetime?: 'task' | 'service' | 'job';
   resources?: ProcessResourceSample;

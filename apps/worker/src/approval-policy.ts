@@ -257,6 +257,13 @@ export const approvalRequirement = (
 ): ApprovalRequirement | null => {
   const taintSources = context.taintSources ?? [];
   if (name === 'process' && args.action === 'describe') return null;
+  if (name === 'process' && args.action === 'write')
+    return {
+      sideEffect: 'external_consequential',
+      action: 'Review process input',
+      preview:
+        'Resolve the owning process and check its command together with all submitted input before writing.'
+    };
   if (name === 'process' && args.action === 'workflow') {
     const action = (args.options as { action?: unknown } | undefined)?.action;
     if (action === 'list' || action === 'status') return null;
