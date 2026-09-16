@@ -13,6 +13,7 @@ import { desktopActionProperties } from './surface-actions.js';
 import {
   deferredExecutionPaths,
   isMutatingToolCall,
+  requiresAcceptanceChecks,
   writtenPaths
 } from './write-classification.js';
 
@@ -221,5 +222,32 @@ describe('the picture a browser action writes', () => {
         path: '.git/hooks/pre-commit'
       })
     ).toEqual(['.git/hooks/pre-commit']);
+  });
+});
+
+describe('acceptance checks for browsing', () => {
+  it.each(['navigate', 'click', 'type', 'press', 'select_tab', 'scroll', 'upload'])(
+    '%s retains the mutation clock without requesting a file or command check',
+    (action) => {
+      expect(isMutatingToolCall('browser_action', { action })).toBe(true);
+      expect(requiresAcceptanceChecks('browser_action', { action })).toBe(false);
+    }
+  );
+  it('requires checks for captured files, unknown actions and mixed batches', () => {
+    expect(requiresAcceptanceChecks('browser_action', { action: 'screenshot' })).toBe(true);
+    expect(requiresAcceptanceChecks('browser_action', { action: 'unknown' })).toBe(true);
+    expect(requiresAcceptanceChecks('file_write', { path: 'workspace/app.ts' })).toBe(true);
+    expect(
+      requiresAcceptanceChecks('browser_action', {
+        action: 'batch',
+        actions: [{ action: 'navigate' }, { type: 'click' }]
+      })
+    ).toBe(false);
+    expect(
+      requiresAcceptanceChecks('browser_action', {
+        action: 'batch',
+        actions: [{ action: 'navigate' }, { type: 'screenshot' }]
+      })
+    ).toBe(true);
   });
 });

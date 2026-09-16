@@ -1219,7 +1219,7 @@ describe('the document arms', () => {
       },
       {
         route: (url) =>
-          url.endsWith(`${root}/exec`)
+          url.endsWith(`${root}/documents`)
             ? observation({ stdout: JSON.stringify({ pages: [{ page: 3, text: 'hello' }] }) })
             : undefined
       }
@@ -1228,24 +1228,14 @@ describe('the document arms', () => {
     expect(executed.calls).toEqual([
       {
         method: 'POST',
-        path: `${root}/exec`,
-        scopes: ['exec'],
+        path: `${root}/documents`,
+        scopes: ['files.read'],
         body: {
-          executable: '/usr/local/lib/athanor/athanor-document',
-          args: [
-            'read',
-            '--path',
-            'workspace/report.pdf',
-            '--start-page',
-            '3',
-            '--end-page',
-            '5',
-            '--max-chars',
-            '9000'
-          ],
-          cwd: '.',
-          timeoutSeconds: 300,
-          maxOutputBytes: 1_048_576
+          action: 'read',
+          path: 'workspace/report.pdf',
+          startPage: 3,
+          endPage: 5,
+          maxCharacters: 9_000
         }
       }
     ]);
@@ -1255,20 +1245,19 @@ describe('the document arms', () => {
   it('defaults a document read to twenty pages and eighty thousand characters', async () => {
     const executed = await dispatch(
       { name: 'document_read', arguments: { path: 'workspace/report.pdf' } },
-      { route: (url) => (url.endsWith(`${root}/exec`) ? observation({ stdout: '{}' }) : undefined) }
+      {
+        route: (url) =>
+          url.endsWith(`${root}/documents`) ? observation({ stdout: '{}' }) : undefined
+      }
     );
 
-    expect((executed.calls[0]?.body as { args: string[] }).args).toEqual([
-      'read',
-      '--path',
-      'workspace/report.pdf',
-      '--start-page',
-      '1',
-      '--end-page',
-      '20',
-      '--max-chars',
-      '80000'
-    ]);
+    expect(executed.calls[0]?.body).toEqual({
+      action: 'read',
+      path: 'workspace/report.pdf',
+      startPage: 1,
+      endPage: 20,
+      maxCharacters: 80_000
+    });
   });
 
   it("reports the extractor's own reason when it fails", async () => {
@@ -1276,7 +1265,7 @@ describe('the document arms', () => {
       { name: 'document_read', arguments: { path: 'workspace/broken.pdf' } },
       {
         route: (url) =>
-          url.endsWith(`${root}/exec`)
+          url.endsWith(`${root}/documents`)
             ? observation({ exitCode: 2, stderr: 'Encrypted PDF: password required' })
             : undefined
       }
@@ -1296,33 +1285,24 @@ describe('the document arms', () => {
       },
       {
         route: (url) =>
-          url.endsWith(`${root}/exec`) ? observation({ stdout: '{"matches":[]}' }) : undefined
+          url.endsWith(`${root}/documents`) ? observation({ stdout: '{"matches":[]}' }) : undefined
       }
     );
 
     expect(executed.calls).toEqual([
       {
         method: 'POST',
-        path: `${root}/exec`,
-        scopes: ['exec'],
+        path: `${root}/documents`,
+        scopes: ['files.read'],
         body: {
-          executable: '/usr/local/lib/athanor/athanor-document',
-          args: [
-            'search',
-            '--path',
-            'workspace/filings',
-            '--query',
-            'turnover',
-            '--max-files',
-            '500',
-            '--max-results',
-            '4',
-            '--max-pages',
-            '500'
-          ],
-          cwd: '.',
-          timeoutSeconds: 300,
-          maxOutputBytes: 1_048_576
+          action: 'search',
+          path: 'workspace/filings',
+          query: 'turnover',
+          alternatives: [],
+          maxFiles: 500,
+          fileOffset: 0,
+          maxResults: 4,
+          maxPages: 500
         }
       }
     ]);
@@ -1340,28 +1320,21 @@ describe('the document arms', () => {
       },
       {
         route: (url) =>
-          url.endsWith(`${root}/exec`) ? observation({ stdout: '{"results":[]}' }) : undefined
+          url.endsWith(`${root}/documents`) ? observation({ stdout: '{"results":[]}' }) : undefined
       }
     );
     expect(executed.failure).toBeUndefined();
     expect(executed.calls).toHaveLength(1);
-    expect((executed.calls[0]?.body as { args: string[] }).args).toEqual([
-      'search',
-      '--path',
-      'workspace',
-      '--query',
-      'heart attack',
-      '--max-files',
-      '500',
-      '--max-results',
-      '12',
-      '--max-pages',
-      '500',
-      '--alternative=myocardial infarction',
-      '--alternative=-ECG',
-      '--file-offset',
-      '10'
-    ]);
+    expect(executed.calls[0]?.body).toEqual({
+      action: 'search',
+      path: 'workspace',
+      query: 'heart attack',
+      alternatives: ['myocardial infarction', '-ECG'],
+      maxFiles: 500,
+      fileOffset: 10,
+      maxResults: 12,
+      maxPages: 500
+    });
   });
   it.each([
     { alternatives: ['', 'valid'] },

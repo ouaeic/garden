@@ -56,6 +56,7 @@ import {
 import { asRecord, textValue } from './values.js';
 import {
   isMutatingToolCall,
+  requiresAcceptanceChecks,
   writesOnlyDurableInstructions,
   writesOnlyProse
 } from './write-classification.js';
@@ -268,7 +269,7 @@ export const runToolCallsTogether = async (
     await deps.ensureTurnUndoPoint(task, key, state, call.name);
     if (isMutatingToolCall(call.name, call.arguments)) {
       state.mutated = true;
-      if (!writesOnlyProse(call.name, call.arguments)) state.mutatedBeyondProse = true;
+      if (requiresAcceptanceChecks(call.name, call.arguments)) state.mutatedBeyondProse = true;
     }
     state.toolsStarted = (state.toolsStarted ?? 0) + 1;
     await event(deps.store, task, key, 'tool_started', `Running ${call.name}`, {

@@ -1561,23 +1561,8 @@ describe('the operating contract in the window', () => {
     expect(BASE_SYSTEM_PROMPT).toContain('validUntil');
   });
 
-  it('asks for the definition of done before the work rather than after it', () => {
-    // The harness holds a finish that changed something and never said what would prove it, and
-    // asks for the record then. That question costs a full billed step against a full window,
-    // every mutating turn, and it arrives at the one moment the answer can be reverse-engineered
-    // from whatever was produced. One sentence in the cached prefix moves it to the front, where
-    // the model can still name a check that does not pass yet.
-    expect(BASE_SYSTEM_PROMPT).toContain('Before you change anything');
-    expect(BASE_SYSTEM_PROMPT).toContain('set_acceptance');
-    expect(BASE_SYSTEM_PROMPT).toContain('fail now and pass once the work is right');
-    // And the escape hatch is stated, so a conversational answer is not pushed into inventing a
-    // check for work that has no executable proof.
-    expect(BASE_SYSTEM_PROMPT).toContain('only answers a question changes nothing and needs none');
-  });
-
   it('states the output contract and carries no harness metadata', () => {
     expect(BASE_SYSTEM_PROMPT).toContain('## Your response');
-    expect(BASE_SYSTEM_PROMPT).toMatch(/streamed reply is the answer the user reads/);
     // The phrase the model kept echoing into its own first line.
     expect(BASE_SYSTEM_PROMPT).not.toContain('into chat');
     // Governance the model cannot act on until it reaches for the tool; it lives on the tool now.

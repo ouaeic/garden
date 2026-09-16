@@ -786,7 +786,6 @@ const mediaResponse = (
 };
 
 /** What the document tools shell out to, whose stdout has to be JSON rather than a console line. */
-const DOCUMENT_BINARY = '/usr/local/lib/athanor/athanor-document';
 
 /**
  * What a fully provisioned box answers `/toolchain` with, by capability id.
@@ -1065,27 +1064,21 @@ const runnerResponse = (
   // Before any branch decides what to answer, because the question this record answers is what the
   // loop ASKED for, and a route recorded inside a branch is a route somebody already modelled.
   state.observed.push(routeName(url, init));
+  if (url.endsWith('/documents')) {
+    const path = asText(body.path);
+    return json({
+      exitCode: 0,
+      stdout: JSON.stringify(
+        body.action === 'search'
+          ? { matches: Object.keys(stub.files ?? {}).map((file) => ({ path: file, page: 1 })) }
+          : { path, text: stub.files?.[path] ?? '', pages: 1 }
+      ),
+      stderr: '',
+      durationMs: 5,
+      timedOut: false
+    });
+  }
   if (url.includes('/exec') || url.includes('/processes/start')) {
-    // document_read and document_search are shell calls too, and they parse their own stdout as
-    // JSON. They are answered off to one side so they do not consume the exit codes a fixture wrote
-    // for its acceptance checks - the sequence that makes a check fail before the work and pass
-    // after it is the whole mechanism, and a document read landing in the middle of it would
-    // silently shift every code by one.
-    if (asText(body.executable) === DOCUMENT_BINARY) {
-      const args = Array.isArray(body.args) ? (body.args as unknown[]) : [];
-      const path = asText(args[args.indexOf('--path') + 1]);
-      return json({
-        exitCode: 0,
-        stdout: JSON.stringify(
-          (Array.isArray(body.args) ? body.args[0] : '') === 'search'
-            ? { matches: Object.keys(stub.files ?? {}).map((file) => ({ path: file, page: 1 })) }
-            : { path, text: stub.files?.[path] ?? '', pages: 1 }
-        ),
-        stderr: '',
-        durationMs: 5,
-        timedOut: false
-      });
-    }
     const index = state.execs;
     state.execs += 1;
     const codes = stub.exec ?? [0];

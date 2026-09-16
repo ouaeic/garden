@@ -55,31 +55,9 @@ export async function executeDocumentTool(
       const result = await context.runner.call<ExecObservation>(
         task.workspaceId,
         task.id,
-        'exec',
-        `${root}/exec`,
-        {
-          executable: '/usr/local/lib/athanor/athanor-document',
-          args: [
-            'read',
-            '--path',
-            path,
-            '--start-page',
-            String(startPage),
-            '--end-page',
-            String(endPage),
-            '--max-chars',
-            String(maxCharacters)
-          ],
-          cwd: '.',
-          // Long enough to contain the reader's own OCR budget and the page still being
-          // recognised when it runs out. A PDF whose pages are pictures is read a page at a time
-          // and stops on a page boundary to name the pages it did not reach; killing the process
-          // before it can get there turns that reading into a failed tool call, which is the one
-          // outcome worse than a short answer. Every other format returns in milliseconds and
-          // never comes near this.
-          timeoutSeconds: 300,
-          maxOutputBytes: 1024 * 1024
-        }
+        'files.read',
+        `${root}/documents`,
+        { action: 'read', path, startPage, endPage, maxCharacters }
       );
       if (result.exitCode !== 0)
         throw new AthanorError(
@@ -127,29 +105,9 @@ export async function executeDocumentTool(
       const result = await context.runner.call<ExecObservation>(
         task.workspaceId,
         task.id,
-        'exec',
-        `${root}/exec`,
-        {
-          executable: '/usr/local/lib/athanor/athanor-document',
-          args: [
-            'search',
-            '--path',
-            path,
-            '--query',
-            query,
-            '--max-files',
-            String(maxFiles),
-            '--max-results',
-            String(maxResults),
-            '--max-pages',
-            String(maxPages),
-            ...alternatives.map((value) => `--alternative=${value}`),
-            ...(fileOffset > 0 ? ['--file-offset', String(fileOffset)] : [])
-          ],
-          cwd: '.',
-          timeoutSeconds: 300,
-          maxOutputBytes: 1024 * 1024
-        }
+        'files.read',
+        `${root}/documents`,
+        { action: 'search', path, query, alternatives, maxFiles, fileOffset, maxResults, maxPages }
       );
       if (result.exitCode !== 0)
         throw new AthanorError('document_search_failed', result.stderr || 'Document search failed');

@@ -140,7 +140,9 @@ plain assistant message does not mark a task complete.
 Evidence that post-dates the last change is a check on ordering, not on the work. It is satisfied by
 reading back a file you just wrote, which is how “the service starts and serves /health” came to be
 accepted on the strength of a `file_read`. So the model also declares, in its own words and before
-it starts, what would prove the job is done — and the harness runs that itself.
+it starts, what would prove the job is done — and the harness runs that itself for code and artifact
+work. Browser interaction instead needs fresh surface evidence of its outcome; it does not require
+creating a file or inventing a build check. Saving a browser capture remains artifact work.
 
 `set_acceptance` takes up to eight checks of two kinds: a **command**, which is an executable, its
 arguments, and the exit code and stdout substring it must produce; and an **artifact**, which is a
@@ -549,7 +551,11 @@ that is the number to read rather than one written here.
 The computer’s files are the source of truth. `document_search` performs bounded, source-linked BM25
 retrieval across supported local formats, with phrase/title/coverage bonuses and per-file result
 diversity; `document_read` extracts grounded content and PDF page ranges. The lead can expand queries
-with synonyms and inspect multiple documents agentically.
+with synonyms and inspect multiple documents agentically. Both document tools share the file tools'
+workspace-relative path rules and read only workspace files or published artifacts. A sparse PDF text
+layer remains searchable. Sparse image pages are recognised individually; exact text on other pages
+and blank-page offsets are preserved. OCR provenance identifies the recognised pages, and incomplete
+recognition is reported alongside the available text.
 
 This deliberately avoids a second vector database, automatic document upload, opaque embeddings, and
 silent permanent ingestion. The trade is explicit: lexical search cannot retrieve a passage that

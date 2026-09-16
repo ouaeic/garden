@@ -1,3 +1,4 @@
+import { registerDocumentRoutes } from './document-routes.js';
 import { registerBrowserActionRoutes } from './browser-action-routes.js';
 import { connectProcessSupervisor } from './process-supervisor.js';
 import { OwnerStroke } from '@athanor/contracts';
@@ -1157,6 +1158,12 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
     }
   );
 
+  registerDocumentRoutes(app, config.WORKSPACE_ROOT, {
+    maximumSeconds: config.MAX_EXECUTION_SECONDS,
+    isolateNetwork: config.ISOLATE_AGENT_NETWORK,
+    sandbox,
+    guards
+  });
   registerFileDownloadRoutes(app, config);
   registerCodeIntelligenceRoutes(app, config.WORKSPACE_ROOT, codeIntelligence);
   registerComputationRoutes(app, computations);

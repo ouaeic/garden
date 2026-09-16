@@ -800,6 +800,7 @@ export const createServerSupport = (context: ServerBase) => {
         ),
       {
         provider: secret.provider === 'openrouter' ? 'openrouter' : 'custom',
+        inputText: `${TITLE_SYSTEM_PROMPT}\n${input.prompt}`,
         privacyRoute: privacy,
         ceiling: priceCeilingFields(
           ownerPriceCeiling(await store.effectiveSpendLimits(input.userId))

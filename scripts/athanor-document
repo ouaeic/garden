@@ -88,11 +88,7 @@ LEGACY_SEARCH_BUDGET_SECONDS = 60.0
 # rest of the book is named rather than read; a `read` clips at 200,000 characters anyway.
 MAX_BOOK_CHARACTERS = 400_000
 
-# Below this many characters a page, it is not a page but a picture of one - and pdftotext
-# returning nothing is not the same fact as the document not matching. Deliberately lower than the
-# sparsest real page: a slide deck exported to PDF can be down at a dozen characters a page and is
-# genuinely text, so the number errs towards missing a marginal scan rather than towards telling
-# the owner that a thin document is one. See `pdf_is_pictures`, which is the point of it.
+# Sparse text is a reason to inspect for image content, never evidence of an unreadable page.
 MIN_PDF_CHARACTERS_PER_PAGE = 16
 
 # What reads a PDF, and what reads the pictures in one once they are known to be pictures. All
@@ -1048,7 +1044,12 @@ def extract_pdf(target: Path, start_page: int, end_page: int) -> tuple[str, int 
         raise ValueError(
             normalized(result.stderr.decode("utf-8", "replace")) or "PDF extraction failed"
         )
-    return normalized(result.stdout.decode("utf-8", "replace")), pages
+    page_text = result.stdout.decode("utf-8", "replace").split("\f")
+    if page_text and not page_text[-1].strip():
+        page_text.pop()
+    count = min(pages, end_page) - start_page + 1 if pages else len(page_text)
+    page_text += [""] * max(0, count - len(page_text))
+    return "\f".join(normalized(page) for page in page_text[:count]), pages
 
 
 class Extraction(NamedTuple):
@@ -1063,17 +1064,40 @@ class Extraction(NamedTuple):
     # by `unread_reason` for the first and by the search for the second, because both owe the owner
     # the difference between a document that says nothing and a document nothing here finished.
     ocr_gap: str | None = None
+    ocr_pages: tuple[int, ...] = ()
 
 
-def pdf_is_pictures(extraction: Extraction) -> bool:
-    """Whether what came back from a PDF is a document or the absence of one.
-
-    A page of a scan yields nothing through pdftotext, and nothing is not a low score - it is the
-    same output an empty file gives. This is the one test that separates the two, and both the
-    decision to recognise the pages and the sentence the owner is told hang off it.
-    """
-    pages = max(1, extraction.pages_read)
-    return len(extraction.text.strip()) < MIN_PDF_CHARACTERS_PER_PAGE * pages
+def pdf_ocr_pages(target: Path, plain: Extraction, start: int, end: int) -> list[int]:
+    """Recognise sparse pages with images, including scans within an otherwise textual PDF."""
+    page_text = plain.text.split("\f")
+    sparse = [
+        start + i
+        for i in range(plain.pages_read)
+        if len(page_text[i].strip() if i < len(page_text) else "")
+        < MIN_PDF_CHARACTERS_PER_PAGE
+    ]
+    if not sparse:
+        return []
+    inspector = installed("/usr/bin/pdfimages", "ATHANOR_PDFIMAGES")
+    if inspector is None:
+        return sparse
+    try:
+        result = subprocess.run(
+            [inspector, "-f", str(start), "-l", str(end), "-list", str(target)],
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        if result.returncode != 0:
+            return sparse
+        image_pages = {
+            int(line.split()[0])
+            for line in result.stdout.splitlines()
+            if line.split() and line.split()[0].isdigit()
+        }
+        return [page for page in sparse if page in image_pages or not (page_text[page - start].strip() if page - start < len(page_text) else "")]
+    except (OSError, subprocess.SubprocessError):
+        return sparse
 
 
 def last_line(stream: bytes) -> str:
@@ -1128,85 +1152,55 @@ def recognise_page(engine: str, rasteriser: str, target: Path, page: int, scratc
 
 
 def recognised_pdf(
-    plain: Extraction, target: Path, start_page: int, end_page: int, budget: ConversionBudget
+    plain: Extraction,
+    target: Path,
+    start_page: int,
+    candidates: list[int],
+    budget: ConversionBudget,
 ) -> Extraction:
-    """A PDF whose pages are pictures, read off the pictures, a page at a time.
-
-    A page at a time rather than one conversion of the whole document is what makes the budget mean
-    anything: a reading that has spent its seconds stops on a page boundary and can name the pages
-    it did not reach, where one long conversion can only be waited for or killed with nothing at
-    all to show for it. The pictures live in a temporary directory that goes when the reading does,
-    so a folder of the owner's scans is read without a byte being written next to them.
-
-    Whatever the text layer held wins if recognition cannot beat it. A page with a scanner's header
-    burnt into it is still that header, and losing it to a recogniser that found nothing would be a
-    worse answer than the one this started from.
-    """
-
-    def unreadable(gap: str | None) -> Extraction:
-        return Extraction(plain.text, plain.pages, plain.extractor, plain.pages_read, gap)
-
+    """Keep exact text on readable pages; OCR only the sparse image pages within this reading."""
     engine = installed(OCR_ENGINE, "ATHANOR_TESSERACT")
     rasteriser = installed(PAGE_RASTERISER, "ATHANOR_PDFTOPPM")
     if engine is None or rasteriser is None:
-        return unreadable(
-            "nothing installed here reads the pictures: apt-get install -y tesseract-ocr "
-            "tesseract-ocr-eng poppler-utils is what opens a scan"
+        return plain._replace(
+            ocr_gap="image pages could not be recognised: install tesseract-ocr "
+            "and poppler-utils to read them"
         )
-    if budget.remaining <= 0:
-        return unreadable(
-            "this search had already spent the seconds it allows OCR by the time it reached this "
-            "file. Reading this one file with document_read recognises it"
-        )
-    total = plain.pages or end_page
-    last = min(end_page, total, start_page + MAX_OCR_PAGES - 1)
-    recognised: list[str] = []
+    pages = plain.text.split("\f")
+    pages += [""] * max(0, plain.pages_read - len(pages))
+    recognised = 0
+    changed_pages: list[int] = []
     failure: str | None = None
     with tempfile.TemporaryDirectory(prefix="athanor-ocr-") as scratch:
-        for page in range(start_page, last + 1):
+        for page in candidates[:MAX_OCR_PAGES]:
+            if budget.remaining <= 0:
+                failure = "the seconds this reading allows OCR were spent"
+                break
             started = time.monotonic()
             try:
-                recognised.append(recognise_page(engine, rasteriser, target, page, Path(scratch)))
+                text = recognise_page(engine, rasteriser, target, page, Path(scratch))
+                index = page - start_page
+                if len(text.strip()) > len(pages[index].strip()):
+                    pages[index] = text
+                    changed_pages.append(page)
+                recognised += 1
             except (ValueError, OSError, subprocess.SubprocessError) as error:
-                failure = f"OCR stopped on page {page}: {str(error) or type(error).__name__}"
+                failure = (
+                    f"OCR stopped on page {page}: {str(error) or type(error).__name__}"
+                )
                 break
             finally:
                 budget.spend(time.monotonic() - started)
-            if budget.remaining <= 0:
-                break
-    body = "\f".join(recognised)
-    if len(body.strip()) <= len(plain.text.strip()):
-        return unreadable(failure)
-    reached = start_page + len(recognised) - 1
-    short: str | None = None
-    # Only where the page count is a fact. A PDF whose count pdfinfo could not report would
-    # otherwise have the pages this reading guessed at subtracted from the pages it read, and be
-    # told it had left behind four hundred and eighty pages that were never there.
-    if plain.pages and reached < plain.pages:
-        # Named rather than silently dropped, in the words the e-book reader uses for the same
-        # thing: a search that stops halfway through a scan and says nothing has told the owner
-        # that the clause is not in a document it never finished looking at.
-        why = failure or (
-            "the seconds this reading allows OCR were spent"
-            if budget.remaining <= 0
-            else f"one reading recognises at most {plural(MAX_OCR_PAGES, 'page')}"
+    remaining = len(candidates) - recognised
+    gap = None
+    if remaining:
+        why = (
+            failure or f"one reading recognises at most {plural(MAX_OCR_PAGES, 'page')}"
         )
-        short = (
-            f"{plural(plain.pages - reached, 'page')} of this scan "
-            f"{'was' if plain.pages - reached == 1 else 'were'} never recognised, because {why}"
-        )
-        body += (
-            f"\n\n[Not read: {plural(plain.pages - reached, 'further page')} of this scan, because "
-            f"{why}. Asking for those pages by page range with document_read reads them.]"
-        )
-    # Carried on the extraction as well as written into the text, because the two readers need it
-    # in different places. A `read` hands the whole document over and the line above travels with
-    # it; a search hands back three excerpts chosen by score, and the line sits on the last page it
-    # got to, which has no reason to be one of the three. Told only through the text, a search that
-    # got half way through a scan and stopped would report every file as read and let the owner
-    # conclude the clause is not in a document nothing here finished looking at.
+        gap = f"{plural(remaining, 'image page')} were not recognised, because {why}"
+    body = "\f".join(pages)
     return Extraction(
-        f"{OCR_NOTE}\n\n{normalized(body)}", plain.pages, "OCR", len(recognised), short
+        body, plain.pages, "OCR" if changed_pages else plain.extractor, plain.pages_read, gap, tuple(changed_pages)
     )
 
 
@@ -1223,12 +1217,10 @@ def extract_text(
         plain = Extraction(
             text, pages, None, max(1, min(pages or end_page, end_page) - start_page + 1)
         )
-        # Recognition only where the alternative is nothing. A PDF that carries its own text is
-        # never rasterised and read back: that would be minutes spent to replace exact characters
-        # with recognised ones, which is slower and worse than what the file already said.
-        if not pdf_is_pictures(plain):
+        candidates = pdf_ocr_pages(target, plain, start_page, end_page)
+        if not candidates:
             return plain
-        return recognised_pdf(plain, target, start_page, end_page, budgets.ocr)
+        return recognised_pdf(plain, target, start_page, candidates, budgets.ocr)
     if suffix == ".docx":
         return Extraction(extract_docx(target))
     if suffix == ".pptx":
@@ -1237,7 +1229,9 @@ def extract_text(
         text, extractor = extract_xlsx(target)
         return Extraction(text, None, extractor)
     if suffix in LEGACY_OFFICE:
-        return Extraction(extract_legacy_office(target, budgets.office), None, "LibreOffice")
+        return Extraction(
+            extract_legacy_office(target, budgets.office), None, "LibreOffice"
+        )
     if suffix == ".epub":
         return Extraction(extract_epub(target))
     if suffix == ".eml":
@@ -1267,36 +1261,16 @@ def extract_text(
 
 
 def unread_reason(extraction: Extraction, suffix: str) -> str | None:
-    """Why this document contributed nothing, in the case where it contributed nothing.
-
-    "Nothing in these documents matched" and "none of these documents could be read" arrived at the
-    owner looking identical, and only one of them is ever true at a time. A folder of scanned
-    contracts searched for a clause came back empty or nearly so - every page is a picture of a
-    page, every page yields zero characters, every page ranks below everything - and the owner
-    concluded the clause was not there. It is the wrong conclusion and the search handed it to them.
-
-    The pictures are read now rather than only described, so what is left to say here is what
-    reading them could not fix: a scan on a computer with no recogniser installed, one a search ran
-    out of seconds before it reached, and one where recognition ran and came back with nothing. All
-    three used to arrive as the same empty result, and only ever one of them is true at a time.
-    """
-    body = extraction.text.strip()
+    """Sparse but valid text remains readable and searchable; missing OCR is partial coverage."""
+    if extraction.text.strip():
+        return None
     if suffix == ".pdf":
-        if not pdf_is_pictures(extraction):
-            return None
-        opening = (
-            f"almost nothing in this PDF is text - {plural(len(body), 'character')} across "
-            f"{plural(max(1, extraction.pages_read), 'page')}. Pages that are images of pages read "
-            "exactly like this"
+        return "no text was extracted from these PDF pages" + (
+            f"; {extraction.ocr_gap}"
+            if extraction.ocr_gap
+            else "; they may be blank, pictures, or text that the installed readers could not recognise"
         )
-        if extraction.ocr_gap:
-            return f"{opening}, and {extraction.ocr_gap}"
-        return (
-            f"{opening}, and reading those pictures with OCR produced almost nothing either - a "
-            "scan of a blank page, a photograph, or handwriting reads like this. Nothing in it can "
-            "be searched, and it is still not an empty document"
-        )
-    return None if body else "no text at all came out of this file"
+    return "no text at all came out of this file"
 
 
 def chunks(text: str, size: int = 2_400) -> Iterable[str]:
@@ -1380,19 +1354,22 @@ def read_command(args: argparse.Namespace) -> dict[str, object]:
         "extractor": extraction.extractor,
         "pages": extraction.pages,
         "pageRange": (
-            {"start": args.start_page, "end": args.end_page} if suffix == ".pdf" else None
+            {"start": args.start_page, "end": args.end_page}
+            if suffix == ".pdf"
+            else None
         ),
-        # Present only when the reading came back empty or near enough, and phrased for the one
-        # sentence that has to reach the owner: this document was not read, rather than this
-        # document says nothing.
         **(
-            {}
-            if reason is None
-            else {
-                "note": f"This document could not be read as text: {reason}. Do not describe it "
-                "as empty or summarise it as saying nothing."
+            {
+                "note": f"This document could not be read as text: {reason}. Do not assume it is empty."
             }
+            if reason
+            else {
+                "note": f"Partial reading: {extraction.ocr_gap}. Extracted text remains searchable."
+            }
+            if extraction.ocr_gap
+            else {}
         ),
+        **({"recognitionNote": OCR_NOTE, "recognisedPages": list(extraction.ocr_pages)} if extraction.extractor == "OCR" else {}),
     }
 
 
@@ -1453,6 +1430,7 @@ def search_command(args: argparse.Namespace) -> dict[str, object]:
     # An excerpt recognised off a picture and an excerpt copied out of a document look identical on
     # the way to the owner, and they are not worth the same.
     readers: dict[Path, str] = {}
+    recognised_pages: dict[Path, tuple[int, ...]] = {}
     budgets = search_budgets()
     for target in files:
         relative = os.path.relpath(target, Path.cwd())
@@ -1477,6 +1455,7 @@ def search_command(args: argparse.Namespace) -> dict[str, object]:
             partial.append({"path": relative, "reason": extraction.ocr_gap})
         if extraction.extractor:
             readers[target] = extraction.extractor
+            recognised_pages[target] = extraction.ocr_pages
         for chunk, page in located_chunks(extraction.text, target.suffix.lower()):
             counts = Counter(term.lower() for term in TOKEN.findall(chunk))
             token_count = sum(counts.values())
@@ -1518,7 +1497,7 @@ def search_command(args: argparse.Namespace) -> dict[str, object]:
             result["matchedQueries"] = matched
         if page is not None:
             result["page"] = page
-        if target in readers:
+        if target in readers and (readers[target] != "OCR" or page in recognised_pages[target]):
             result["extractor"] = readers[target]
         results.append(result)
         per_file[relative] += 1

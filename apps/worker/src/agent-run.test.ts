@@ -8320,6 +8320,50 @@ describe('what athanor answered itself, and what the computer answered', () => {
     expect(probe.checkpoints.at(-1)).toMatchObject({ status: 'paused', clearLease: true });
   });
 
+  it('finishes a browser lookup from fresh observed evidence without creating acceptance artifacts', async () => {
+    const task = makeTask();
+    const probe = probeStore(() => task);
+    const log: FetchLog = { calls: [], modelRequests: [] };
+    installFetch(
+      [
+        toolFrame('browse', 'browser_action', {
+          action: 'navigate',
+          url: 'https://example.test/',
+          purpose: 'Read the heading'
+        }),
+        toolFrame('observe', 'browser_snapshot', {}),
+        toolFrame('finish-lookup', 'finish', {
+          summary: 'Read the heading',
+          answer: 'The heading is Example Domain.',
+          verification: {
+            status: 'verified',
+            evidence: [{ claim: 'The page heading', source: 'tool_result', toolCallId: 'observe' }]
+          }
+        })
+      ],
+      log,
+      {
+        route: (url) =>
+          url.includes('/browser/preflight')
+            ? jsonResponse({ consequential: false, sensitiveInput: false, preview: 'navigate' })
+            : url.includes('/browser/action')
+              ? jsonResponse({ ok: true, url: 'https://example.test/' })
+              : url.includes('/browser/snapshot')
+                ? jsonResponse({ text: 'Example Domain', url: 'https://example.test/' })
+                : undefined
+      }
+    );
+    await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 5 }), masterKey, runnerSecret).run(
+      task
+    );
+    expect(probe.events.some((entry) => entry.kind === 'completed')).toBe(true);
+    expect(probe.events.filter((entry) => entry.kind === 'approval_requested')).toEqual([]);
+    expect(probe.events.some((entry) => entry.summary === 'Asked for an acceptance record')).toBe(
+      false
+    );
+    expect(log.modelRequests).toHaveLength(3);
+  });
+
   it('raises no card when the browser broker says the action is harmless', async () => {
     const task = makeTask();
     const probe = probeStore(() => task);

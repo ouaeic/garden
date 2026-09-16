@@ -12,16 +12,19 @@ export interface TitleRoute {
   reasoningEffort?: 'none';
 }
 
-/** A full-context quote avoids estimating the provider's tokenizer or hidden message framing. */
+/** Reserve for the bounded text request with a UTF-8 byte estimate and framing headroom. */
 export const selectTitleRoute = (
   models: readonly RoutableModel[],
   input: {
     provider: string;
+    inputText: string;
     privacyRoute: PrivacyRoute;
     ceiling: Pick<ModelRequest, 'maxInputUsdPerMillionTokens' | 'maxOutputUsdPerMillionTokens'>;
   }
 ): TitleRoute | null => {
   const candidates: TitleRoute[] = [];
+  // These requests have two text messages and no tools, images or conversation history.
+  const inputTokens = Buffer.byteLength(input.inputText, 'utf8') + 1_024;
   for (const model of models) {
     if (model.provider !== input.provider || model.privacyRoute !== input.privacyRoute) continue;
     if (model.expiresAt && Date.parse(model.expiresAt) <= Date.now()) continue;
@@ -37,7 +40,7 @@ export const selectTitleRoute = (
         privacyRoute: input.privacyRoute,
         requiredCapabilities: ['chat'],
         requiredModalities: ['text'],
-        minContextTokens: 4_096,
+        minContextTokens: Math.max(4_096, inputTokens + TITLE_OUTPUT_TOKENS),
         preference: 'fast',
         ...input.ceiling
       })
@@ -72,8 +75,7 @@ export const selectTitleRoute = (
     )
       continue;
     if (model.maxOutputTokens != null && model.maxOutputTokens < TITLE_OUTPUT_TOKENS) continue;
-    const maxCostUsd =
-      (model.contextTokens * prompt + TITLE_OUTPUT_TOKENS * completion) / 1_000_000;
+    const maxCostUsd = (inputTokens * prompt + TITLE_OUTPUT_TOKENS * completion) / 1_000_000;
     if (!Number.isFinite(maxCostUsd) || maxCostUsd > TITLE_MAX_COST_USD) continue;
     candidates.push({
       model,

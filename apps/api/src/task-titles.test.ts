@@ -430,6 +430,9 @@ describe('provisional task names', () => {
     expect(title.length).toBeLessThan(60);
     expect(provisionalTaskTitle('Can you create a plot? Here are details')).toBe('Create a plot');
     expect(provisionalTaskTitle('\n\n')).toBe('New project');
+    expect(
+      provisionalTaskTitle('Open https://example.com in the project browser and report the heading')
+    ).toBe('Open example.com in the project browser and…');
     expect(provisionalTaskTitle('研究'.repeat(100))).not.toContain('�');
   });
 });

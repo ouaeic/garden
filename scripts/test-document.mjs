@@ -267,7 +267,7 @@ const writePdf = async (file, objects) => {
  * have text and then throwing the text away, because a fixture that only looks like a scan proves
  * nothing about reading one - the words have to survive as pixels and come back through recognition.
  */
-const writeScannedPdf = async (rasteriser, source, destination) => {
+const writeScannedPdf = async (rasteriser, source, destination, mixed = false) => {
   const prefix = path.join(path.dirname(destination), 'rendered');
   const dpi = 200;
   const rendered = spawnSync(
@@ -286,7 +286,11 @@ const writeScannedPdf = async (rasteriser, source, destination) => {
   const content = `q ${across} 0 0 ${down} 0 0 cm /Im0 Do Q`;
   await writePdf(destination, [
     Buffer.from('1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n'),
-    Buffer.from('2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n'),
+    Buffer.from(
+      mixed
+        ? '2 0 obj<</Type/Pages/Kids[3 0 R 6 0 R]/Count 2>>endobj\n'
+        : '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n'
+    ),
     Buffer.from(
       `3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${across} ${down}]` +
         '/Resources<</XObject<</Im0 5 0 R>>>>/Contents 4 0 R>>endobj\n'
@@ -300,7 +304,18 @@ const writeScannedPdf = async (rasteriser, source, destination) => {
       ),
       image,
       Buffer.from('\nendstream endobj\n')
-    ])
+    ]),
+    ...(mixed
+      ? [
+          Buffer.from(
+            '6 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</Font<</F1 8 0 R>>>>/Contents 7 0 R>>endobj\n'
+          ),
+          Buffer.from(
+            '7 0 obj<</Length 79>>stream\nBT /F1 12 Tf 60 700 Td (Exact native text: ACCT-0029 and 0.000314159265358979) Tj ET\nendstream endobj\n'
+          ),
+          Buffer.from('8 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\n')
+        ]
+      : [])
   ]);
   await rm(`${prefix}.pgm`, { force: true });
 };
@@ -646,6 +661,7 @@ try {
   };
   const poppler = {
     ATHANOR_PDFTOTEXT: process.env.ATHANOR_PDFTOTEXT ?? whereIs('pdftotext', '/usr/bin/pdftotext'),
+    ATHANOR_PDFIMAGES: process.env.ATHANOR_PDFIMAGES ?? whereIs('pdfimages', '/usr/bin/pdfimages'),
     ATHANOR_PDFINFO: process.env.ATHANOR_PDFINFO ?? whereIs('pdfinfo', '/usr/bin/pdfinfo'),
     ATHANOR_PDFTOPPM: process.env.ATHANOR_PDFTOPPM ?? whereIs('pdftoppm', '/usr/bin/pdftoppm')
   };
@@ -678,9 +694,7 @@ try {
       'poppler-utils'
     )
   ) {
-    // Three pages carrying one stamped line each and nothing else - what a scanner that burns in a
-    // header produces. Deliberately not an empty PDF: a few characters is the case a plain
-    // "did it produce any text at all" test would call readable and hand back as an empty search.
+    // Short text without image content must stay searchable and must not invoke OCR.
     const pages = 3;
     const kids = Array.from({ length: pages }, (unused, index) => `${index + 3} 0 R`).join(' ');
     await writeFile(
@@ -705,28 +719,16 @@ try {
         ''
       ].join('\n')
     );
-    // With no recogniser on the computer, the sentence the owner gets is the one they can act on:
-    // that this is a picture of a page, and which package would read it. Never that it is empty.
     const scan = runIn(scans, unrecognised, 'read', '--path', 'stamped-lease.pdf');
     assert.equal(scan.status, 0, scan.stderr);
     const scanPayload = JSON.parse(scan.stdout);
     assert.ok(scanPayload.characters > 0 && scanPayload.characters < 64);
-    assert.match(scanPayload.note, /almost nothing in this PDF is text/);
-    assert.match(scanPayload.note, /tesseract-ocr/);
-    const clause = runIn(
-      scans,
-      unrecognised,
-      'search',
-      '--path',
-      '.',
-      '--query',
-      'termination clause'
-    );
+    assert.equal(scanPayload.note, undefined);
+    const clause = runIn(scans, unrecognised, 'search', '--path', '.', '--query', 'exhibit');
+    assert.equal(clause.status, 0, clause.stderr);
     const clausePayload = JSON.parse(clause.stdout);
-    assert.ok(
-      clausePayload.unread.some((entry) => entry.path === 'stamped-lease.pdf'),
-      'a scanned PDF was passed over in silence'
-    );
+    assert.ok(clausePayload.results.some((entry) => entry.path === 'stamped-lease.pdf'));
+    assert.equal(clausePayload.filesUnread, 0);
 
     // Twenty-two pages of pictures, read through stubs standing in for the rasteriser and the
     // recogniser. What is proven here is the accounting rather than the recognition: that a long
@@ -773,6 +775,7 @@ try {
       scans,
       {
         ...poppler,
+        ATHANOR_PDFIMAGES: path.join(scans, 'no-inspector'),
         ATHANOR_PDFTOPPM: stubRasteriser,
         ATHANOR_TESSERACT: stubRecogniser,
         ATHANOR_STUB_RENDERED: path.join(scans, 'rendered-long-scan')
@@ -786,10 +789,10 @@ try {
     assert.equal(bounded.status, 0, bounded.stderr);
     const boundedPayload = JSON.parse(bounded.stdout);
     assert.equal(boundedPayload.extractor, 'OCR');
-    assert.match(boundedPayload.text, /Read by OCR/);
+    assert.match(boundedPayload.recognitionNote, /Read by OCR/);
     assert.match(
-      boundedPayload.text,
-      /\[Not read: 2 further pages of this scan, because one reading recognises at most 20 pages\./
+      boundedPayload.note,
+      /2 image pages were not recognised, because one reading recognises at most 20 pages/
     );
 
     // The same scan through a search, where the line above cannot be relied on to arrive. A search
@@ -801,6 +804,7 @@ try {
       scans,
       {
         ...poppler,
+        ATHANOR_PDFIMAGES: path.join(scans, 'no-inspector'),
         ATHANOR_PDFTOPPM: stubRasteriser,
         ATHANOR_TESSERACT: stubRecogniser,
         ATHANOR_STUB_RENDERED: path.join(scans, 'rendered-half-scan')
@@ -818,8 +822,7 @@ try {
     assert.deepEqual(halfPayload.partiallyRead, [
       {
         path: 'long-scan.pdf',
-        reason:
-          '2 pages of this scan were never recognised, because one reading recognises at most 20 pages'
+        reason: '2 image pages were not recognised, because one reading recognises at most 20 pages'
       }
     ]);
     assert.match(halfPayload.note, /read only as far as this search got through it/);
@@ -829,6 +832,7 @@ try {
       scans,
       {
         ...poppler,
+        ATHANOR_PDFIMAGES: path.join(scans, 'no-inspector'),
         ATHANOR_PDFTOPPM: stubRasteriser,
         ATHANOR_TESSERACT: stubRecogniser,
         ATHANOR_STUB_RENDERED: path.join(scans, 'rendered-whole-scan')
@@ -853,6 +857,7 @@ try {
       scans,
       {
         ...poppler,
+        ATHANOR_PDFIMAGES: path.join(scans, 'no-inspector'),
         ATHANOR_PDFTOPPM: stubRasteriser,
         ATHANOR_TESSERACT: stubRecogniser,
         ATHANOR_STUB_RENDERED: marker
@@ -897,7 +902,7 @@ try {
         0,
         'the fixture is not a scan at all: it came back carrying text'
       );
-      assert.match(beforePayload.note, /almost nothing in this PDF is text/);
+      assert.match(beforePayload.note, /no text was extracted/);
 
       const reading = { ...poppler, ATHANOR_TESSERACT: recogniser };
       const after = runIn(contracts, reading, 'read', '--path', 'lease-scan.pdf');
@@ -907,12 +912,41 @@ try {
       // Which text this is, said in the payload and again in the text itself, because a figure read
       // off a picture is wrong in ways a figure copied out of a document cannot be.
       assert.equal(afterPayload.extractor, 'OCR');
-      assert.match(afterPayload.text, /Read by OCR/);
+      assert.match(afterPayload.recognitionNote, /Read by OCR/);
       assert.equal(
         afterPayload.note,
         undefined,
         'a scan that was read is still being reported as unreadable'
       );
+
+      await writeScannedPdf(
+        poppler.ATHANOR_PDFTOPPM,
+        path.join(scans, 'source-page.pdf'),
+        path.join(contracts, 'mixed.pdf'),
+        true
+      );
+      const mixed = runIn(contracts, reading, 'read', '--path', 'mixed.pdf');
+      assert.equal(mixed.status, 0, mixed.stderr);
+      const mixedPayload = JSON.parse(mixed.stdout);
+      assert.equal(mixedPayload.pages, 2);
+      assert.deepEqual(mixedPayload.recognisedPages, [1]);
+      assert.match(mixedPayload.text.split('\f')[0], /Termination for convenience/i);
+      assert.equal(
+        mixedPayload.text.split('\f')[1],
+        'Exact native text: ACCT-0029 and 0.000314159265358979'
+      );
+      const exact = runIn(
+        contracts,
+        reading,
+        'search',
+        '--path',
+        'mixed.pdf',
+        '--query',
+        'ACCT-0029'
+      );
+      assert.equal(exact.status, 0, exact.stderr);
+      assert.equal(JSON.parse(exact.stdout).results[0].page, 2);
+      assert.equal(JSON.parse(exact.stdout).results[0].extractor, undefined);
 
       const found = runIn(
         contracts,

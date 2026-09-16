@@ -156,6 +156,52 @@ export const isMutatingToolCall = (name: string, args: Record<string, unknown> =
   return true;
 };
 
+const BROWSER_SURFACE_ACTIONS = new Set([
+  'navigate',
+  'click',
+  'double_click',
+  'hover',
+  'type',
+  'select_option',
+  'upload',
+  'text_input',
+  'press',
+  'scroll',
+  'wait_for',
+  'back',
+  'reload',
+  'new_tab',
+  'select_tab',
+  'close_tab',
+  'inspect_tab',
+  'click_at',
+  'dialog'
+]);
+
+/** Browsing needs fresh surface evidence, not an invented file or build to test. */
+export const requiresAcceptanceChecks = (
+  name: string,
+  args: Record<string, unknown> = {}
+): boolean => {
+  if (!isMutatingToolCall(name, args) || writesOnlyProse(name, args)) return false;
+  if (name === 'browser_action') {
+    const action = surfaceActionVerb(args);
+    if (action === 'batch') {
+      if (!Array.isArray(args.actions) || args.actions.length === 0) return true;
+      return args.actions.some(
+        (step) =>
+          !step ||
+          typeof step !== 'object' ||
+          Array.isArray(step) ||
+          surfaceActionVerb(step as Record<string, unknown>) === 'batch' ||
+          requiresAcceptanceChecks(name, step as Record<string, unknown>)
+      );
+    }
+    return !BROWSER_SURFACE_ACTIONS.has(action);
+  }
+  return true;
+};
+
 /**
  * Files whose contents become instructions in every later task on this computer.
  *

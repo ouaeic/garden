@@ -83,13 +83,19 @@ export const TITLE_SYSTEM_PROMPT =
 export function provisionalTaskTitle(prompt: string): string {
   const opening =
     prompt
-      .replace(/https?:\/\/\S+/g, '')
+      .replace(/https?:\/\/\S+/g, (value) => {
+        try {
+          return new URL(value).hostname.replace(/^www\./, '');
+        } catch {
+          return '';
+        }
+      })
       .replace(/^[\s#>*`-]+/, '')
       .replace(
         /^(?:(?:please|can you|could you|would you|I want you to|I would like you to)\s+)+/i,
         ''
       )
-      .split(/[\n.!?。！？]/, 1)[0]
+      .split(/\n|[.!?。！？](?:\s|$)/, 1)[0]
       ?.trim() ?? '';
   const words = opening.split(/\s+/).filter(Boolean);
   let title = '';

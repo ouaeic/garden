@@ -28,7 +28,7 @@ import type { ModelToolCall } from '@athanor/model-gateway';
 import type { AgentState } from '../agent-state.js';
 import { event } from '../tool-recording.js';
 import { REPEATABLE_TOOLS, failingCallKey, repeatedFailuresAfter } from '../turn-bounds.js';
-import { isMutatingToolCall, writesOnlyProse } from '../tools.js';
+import { isMutatingToolCall, requiresAcceptanceChecks } from '../write-classification.js';
 import type { TurnResumeDeps } from './resume.js';
 
 /**
@@ -56,7 +56,7 @@ export const executeApprovedCall = async (
   // doing material work, and that is what the user-visible plan is for.
   if (isMutatingToolCall(call.name, call.arguments)) {
     state.mutated = true;
-    if (!writesOnlyProse(call.name, call.arguments)) state.mutatedBeyondProse = true;
+    if (requiresAcceptanceChecks(call.name, call.arguments)) state.mutatedBeyondProse = true;
   }
   state.toolsStarted = (state.toolsStarted ?? 0) + 1;
   await event(deps.store, task, key, 'tool_started', `Running ${call.name}`, {

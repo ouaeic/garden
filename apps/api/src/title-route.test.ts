@@ -18,7 +18,12 @@ const model = (overrides: Partial<RoutableModel> = {}): RoutableModel => ({
   ...overrides
 });
 const select = (models: RoutableModel[]) =>
-  selectTitleRoute(models, { provider: 'openrouter', privacyRoute: 'provider_zdr', ceiling: {} });
+  selectTitleRoute(models, {
+    provider: 'openrouter',
+    inputText: 'Name this short task',
+    privacyRoute: 'provider_zdr',
+    ceiling: {}
+  });
 const titleMasterKey = Buffer.alloc(32, 29);
 const support = (models: RoutableModel[], native = false, connectionId?: string) =>
   createServerSupport({
@@ -86,13 +91,28 @@ describe('bounded auxiliary title route', () => {
     ).toBe('none');
   });
 
+  it('quotes the submitted title text independently of unused model context', () => {
+    const small = select([model()]);
+    const large = select([model({ contextTokens: 1_000_000 })]);
+    expect(large).not.toBeNull();
+    expect(large?.maxCostUsd).toBe(small?.maxCostUsd);
+    expect(
+      selectTitleRoute([model()], {
+        provider: 'openrouter',
+        privacyRoute: 'provider_zdr',
+        ceiling: {},
+        inputText: '🌻'.repeat(10_000)
+      })
+    ).toBeNull();
+  });
+
   it('skips mandatory, unknown, retired, wrong-provider, over-cap and unpriced routes', () => {
     const invalid = [
       model({ reasoning: { mandatory: true } }),
       model({ capabilities: ['chat', 'reasoning'] }),
       model({ expiresAt: '2000-01-01' }),
       model({ provider: 'different' }),
-      model({ contextTokens: 1_000_000 }),
+      model({ inputUsdPerMillionTokens: 10 }),
       model({ inputUsdPerMillionTokens: null }),
       model({
         priceTiers: [
