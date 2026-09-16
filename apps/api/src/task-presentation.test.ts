@@ -209,6 +209,31 @@ describe('task results are concrete owner-accessible outputs', () => {
       ['unknown', null, `/v1/workspaces/${workspaceId}/download?path=workspace%2Funknown.csv`]
     ]);
   });
+  it('shows planned files as pending during work and unavailable when a finished task failed to produce them', () => {
+    const pending = input({
+      taskStatus: 'running',
+      plan: {
+        taskId,
+        steps: [],
+        outputs: [{ kind: 'document', title: 'Analysis', files: ['results.json'] }]
+      } as never,
+      files: new Map([['workspace/results.json', { status: 'unavailable' }]])
+    });
+    expect(buildTaskPresentation(pending).results).toMatchObject([
+      {
+        status: 'unknown',
+        downloadUrl: null,
+        detail: 'This planned output is not available yet.'
+      }
+    ]);
+    expect(buildTaskPresentation({ ...pending, taskStatus: 'completed' }).results).toMatchObject([
+      {
+        status: 'unavailable',
+        downloadUrl: null,
+        detail: 'This file is no longer available.'
+      }
+    ]);
+  });
 
   it.each([
     '/etc/passwd',

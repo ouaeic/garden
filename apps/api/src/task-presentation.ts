@@ -217,16 +217,20 @@ export const buildTaskPresentation = (input: PresentationInput): TaskPresentatio
   }
   const deliveryFiles = taskDeliveryFiles(events);
   const outputs = input.plan?.taskId === input.taskId ? input.plan.outputs : undefined;
-  for (const path of plannedOutputPaths(outputs).paths)
-    if (!deliveryFiles.has(path)) deliveryFiles.set(path, []);
+  const plannedFiles = new Set(plannedOutputPaths(outputs).paths);
+  for (const path of plannedFiles) if (!deliveryFiles.has(path)) deliveryFiles.set(path, []);
   for (const [path, evidence] of deliveryFiles) {
     const observed = input.files.get(path) ?? { status: 'unknown' as const };
+    const awaitingFile =
+      observed.status === 'unavailable' &&
+      plannedFiles.has(path) &&
+      !['completed', 'failed', 'cancelled'].includes(input.taskStatus);
     const url = `/v1/workspaces/${encodeURIComponent(input.workspaceId)}/download?path=${encodeURIComponent(path)}`;
     results.push({
       id: `file:${path}`,
       kind: 'file',
       title: path.split('/').at(-1) ?? path,
-      status: observed.status,
+      status: awaitingFile ? 'unknown' : observed.status,
       url: null,
       downloadUrl: observed.status === 'unavailable' ? null : url,
       accessPath: null,
@@ -235,8 +239,9 @@ export const buildTaskPresentation = (input: PresentationInput): TaskPresentatio
       ...(observed.sizeBytes === undefined ? {} : { sizeBytes: observed.sizeBytes }),
       ...(observed.status !== 'ready'
         ? {
-            detail:
-              observed.status === 'unknown'
+            detail: awaitingFile
+              ? 'This planned output is not available yet.'
+              : observed.status === 'unknown'
                 ? 'Availability has not been checked. Download opens the recorded file directly.'
                 : 'This file is no longer available.'
           }
