@@ -101,6 +101,7 @@ esac
 exit 0'
 make_fake nginx 'exit 0'
 make_fake chown 'exit 0'
+make_fake chgrp 'exit 0'
 # Ownership is accepted and ignored: this drill runs as an ordinary user, and what it is checking
 # is which files an update puts where, not who ends up owning them.
 make_fake install '
