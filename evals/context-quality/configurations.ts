@@ -430,7 +430,7 @@ const SPECIFIERS: ReadonlyArray<readonly [string, string]> = [
   ['@athanor/model-gateway', 'packages/model-gateway/src/index.ts'],
   ['@athanor/data', 'packages/data/src/index.ts'],
   ['./output-spill.js', 'apps/worker/src/output-spill.ts'],
-  ['./approval-policy.js', 'apps/worker/src/approval-policy.ts']
+  ['@athanor/contracts/permission-policy', 'packages/contracts/src/permission-policy.ts']
 ];
 
 let scratch: string | undefined;

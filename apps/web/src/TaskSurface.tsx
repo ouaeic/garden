@@ -1116,6 +1116,20 @@ export default function TaskSurface({
               Latest
             </Button>
           </div>
+          <details className="diagnostic-download">
+            <summary>Troubleshooting</summary>
+            <p className="muted">
+              Download recorded activity, wait states and cost counters for offline inspection.
+              Prompts, file contents, addresses and private input are excluded. Nothing is sent
+              elsewhere.
+            </p>
+            <a
+              href={`/v1/tasks/${encodeURIComponent(task.id)}/diagnostics`}
+              download="garden-diagnostic.ndjson"
+            >
+              Download diagnostics
+            </a>
+          </details>
           <ol className="activity-ledger">
             {historyPage
               .filter((event) => !['assistant_delta', 'assistant_reasoning'].includes(event.kind))

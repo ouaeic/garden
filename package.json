@@ -34,7 +34,8 @@
     "native:configure": "node apps/desktop/configure-native.mjs",
     "desktop:dev": "pnpm --filter @athanor/desktop dev",
     "desktop:build": "pnpm --filter @athanor/desktop native:build",
-    "test:ui": "pnpm --filter @athanor/web build && node scripts/test-web-layout.mjs && node scripts/test-pdf-viewer.mjs"
+    "test:ui": "pnpm --filter @athanor/web build && node scripts/test-web-layout.mjs && node scripts/test-pdf-viewer.mjs",
+    "diagnostic:replay": "NODE_OPTIONS=--conditions=development tsx packages/core/src/diagnostic-cli.ts"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",

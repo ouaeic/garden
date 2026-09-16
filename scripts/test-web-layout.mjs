@@ -38,6 +38,14 @@ const mime = {
 const server = createServer(async (request, response) => {
   try {
     const pathname = new URL(request.url, 'http://localhost').pathname;
+    if (pathname === `/v1/tasks/${task.id}/diagnostics`) {
+      assert.equal(request.method, 'GET');
+      response.setHeader('content-type', 'application/x-ndjson');
+      response.setHeader('content-disposition', 'attachment; filename="garden-diagnostic.ndjson"');
+      response.end('{"fixture":"content_omitted"}\n');
+      return;
+    }
+
     if (pathname.endsWith('/download')) {
       response.setHeader('content-type', 'text/html');
       response.setHeader('content-disposition', 'attachment; filename="index.html"');
@@ -1052,6 +1060,7 @@ try {
         nextCursor: events.at(-1).sequence
       });
     }
+    if (path === `/v1/tasks/${task.id}/diagnostics`) return route.continue();
     if (path === `/v1/tasks/${task.id}/events` && url.searchParams.get('limit') === '250') {
       const before = url.searchParams.has('before') ? Number(url.searchParams.get('before')) : null;
       projectEventRequests.push(before);
@@ -1182,6 +1191,21 @@ try {
     assert.equal(projectEventRequests[0], null, 'Open the most recent page without a sentinel');
     await page.getByRole('button', { name: 'Activity', exact: true }).click();
     const activity = page.getByRole('dialog', { name: 'Activity and directions', exact: true });
+    await activity.getByText('Troubleshooting', { exact: true }).click();
+    const diagnosticLink = activity.getByRole('link', {
+      name: 'Download diagnostics',
+      exact: true
+    });
+    assert.equal(await diagnosticLink.getAttribute('href'), `/v1/tasks/${task.id}/diagnostics`);
+    const diagnosticPromise = page.waitForEvent('download');
+    await diagnosticLink.click();
+    const diagnostic = await diagnosticPromise;
+    assert.equal(diagnostic.suggestedFilename(), 'garden-diagnostic.ndjson');
+    assert.deepEqual(JSON.parse(await readFile(await diagnostic.path(), 'utf8')), {
+      fixture: 'content_omitted'
+    });
+    await activity.getByText('Troubleshooting', { exact: true }).click();
+
     await activity.getByRole('button', { name: 'Earlier activity', exact: true }).click();
     await activity.getByText('Earlier project direction.', { exact: true }).waitFor();
     await activity.getByRole('button', { name: 'Details', exact: true }).click();

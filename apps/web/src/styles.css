@@ -1795,3 +1795,13 @@ canvas {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+.diagnostic-download {
+  margin-block: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+}
+.diagnostic-download summary {
+  cursor: pointer;
+}

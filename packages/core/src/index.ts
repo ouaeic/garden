@@ -21,3 +21,5 @@ export * from './spend.js';
 export * from './usage.js';
 
 export { ownerMessageContent, type OwnerMessage } from './owner-message.js';
+
+export * from './diagnostics.js';

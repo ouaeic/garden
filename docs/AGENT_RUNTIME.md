@@ -686,3 +686,19 @@ whole file or build an offset index. Quoted CSV records may contain newlines; JS
 objects. Schema hints describe only the current page. Omitted columns and shortened values are
 reported explicitly; preview budgets do not constrain scripts, jobs or downloads. The browser
 retains only the visible rows and provides keyboard scrolling and previous/next page controls.
+
+## Local diagnostics
+
+Conversation activity includes a Troubleshooting disclosure with a diagnostic download. The
+versioned NDJSON export fixes an event boundary, streams bounded pages and reports missing or
+unreadable history. It contains checkpoint message shapes, counters, permission mode, wait state,
+correlated tool and approval references, exit results and usage. Reference hashes use an ephemeral
+key that is not exported. Prompts, tool arguments, outputs, addresses, model identifiers and private
+input are omitted by an allowlist; nothing is uploaded.
+
+Run `pnpm diagnostic:replay path/to/garden-diagnostic.ndjson` to reconstruct recorded control flow
+offline. This executes no commands and contacts no model. It rejects malformed, truncated or
+out-of-order records and reports unresolved calls, failures and approvals. A partial or unreadable
+export produces a nonzero exit status. The checkpoint and event boundary are separately observed
+and may differ while work is active. This is operational replay, not reproduction of exact model
+requests or semantic verification of a tool's answer; those contents are deliberately absent.
