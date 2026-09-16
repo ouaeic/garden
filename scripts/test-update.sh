@@ -1802,7 +1802,9 @@ printf 'ok  doctor reports the filesystem rung the runner is enforcing, and call
 # The advice `doctor` gives an owner whose document tooling is incomplete. It read "On Debian and
 # Ubuntu, sudo athanor update reinstalls it" and was false on every family, because an update
 # installed no packages at all; the owner of the measured server followed it and nothing happened.
+make_fake fc-list 'exit 0'
 tooling_doctor=$(run_athanor doctor 2>&1 || true)
+rm "$fake_bin/fc-list"
 if grep -q 'sudo athanor update reinstalls it' <<EOF
 $tooling_doctor
 EOF
