@@ -1,20 +1,5 @@
+import { turnEvidenceCount } from './progress.js';
 import { taskReasoningEffort } from './reasoning.js';
-/**
- * The three ceilings a turn can reach, and the one closing call it is given when it does.
- *
- * Lifted out of `AgentWorker` in Wave 7.2 carrying #78 (loop F9 / rel F9): there was no clock
- * ceiling anywhere in the product. `TASK_MAX_STEPS`, `TASK_MAX_SELF_CONTINUATIONS`,
- * `maxComputeCredits` and the owner's spend caps were the only turn-level bounds, and the per-unit
- * ceilings compose badly - six idle steps at ten minutes of generation each is an hour of billed
- * deliberation, five completion nags is fifty minutes, and a hundred and twenty steps of tool time
- * is days in principle. The credit ceiling bites first on a frontier model and is a proxy for time
- * rather than a bound on it: on a cheap local route credits accumulate slowly and the wall clock
- * does not.
- *
- * The exit already existed - this is the file that writes the owner a handoff when a ceiling is
- * reached - so the clock is a third `reason` beside `steps` and `credits` rather than a new
- * mechanism.
- */
 import type { ModelRelease, WebToolPlan } from '@athanor/contracts';
 import { sha256 } from '@athanor/core';
 import type { DataStore, TaskRecord } from '@athanor/data';
@@ -48,20 +33,6 @@ import { withRequestDeadline } from './turn-lifecycle.js';
 import { textValue } from './values.js';
 import { turnRoutingTaskId } from './window.js';
 
-/**
- * How long one leased execution of a turn may run before the harness writes the handoff.
- *
- * Two hours, and it costs a healthy turn nothing: the measured record in this file is that a
- * frontier model reaches the credit ceiling somewhere around step 22 to 39, long before this. What
- * it bounds is the shape the incident had - a turn that is cheap per step and never stops - which
- * no other ceiling in the product can see.
- *
- * Measured from the moment this worker picked the turn up rather than from a field on the state,
- * and the difference is deliberate rather than incidental: a resumed turn gets a fresh allowance,
- * exactly as a new turn does, because what is being bounded is how long one worker may hold one
- * lease without saying anything to the owner. Persisting it would bound the conversation instead,
- * which is a different promise and one the API's own resume contract does not make.
- */
 export const TURN_WALL_CLOCK_MS = 2 * 60 * 60 * 1_000;
 
 /** Whether this leased execution has been running longer than the harness will hold it. */
@@ -159,43 +130,6 @@ export const stepCeiling = (deps: HandoffDeps, state: AgentState): number => {
   return deps.config.TASK_MAX_STEPS * (1 + (state.selfContinuations ?? 0));
 };
 
-/**
- * A turn that has used its step budget, has not finished the job, and is still working.
- *
- * Everything this box does is meant to survive the owner not being there, and this was the one
- * place where it did not: the ceiling ended the turn, the handoff wrote "the user can reply and
- * you continue on this same computer with a fresh budget", and on a run started by a schedule at
- * three in the morning there is nobody to send that reply for eight hours. Nothing about the job
- * was finished; the interaction model had simply run out.
- *
- * What makes continuing safe is not that the model has no say - it chooses which check to declare
- * and it makes the changes that count as progress - but that it cannot mark its own homework and
- * cannot outspend the owner. The acceptance record is executed by the harness, so "is this done?"
- * is answered by running it rather than by a self-assessment, on the same run and the same
- * timeouts the finish gate is held to; and the ceiling that actually bounds a determined turn is
- * money, checked every step against the task's own allowance with a tenth of it kept back. What
- * remains gameable is wall clock: a turn willing to declare a check it will not satisfy and write
- * one file per budget can reach the configured continuation ceiling.
- *
- * Every other condition is checked in front of it, in the order they cost:
- * the free reads first, then one indexed row for the task's status and one for the spend guard,
- * and only then the checks themselves, which can be a full build.
- *
- * The bounds, all of them:
- *
- * - the record must exist, and the harness must have just watched it fail;
- * - the turn must have changed something since the last ceiling it was let past;
- * - the harness must not already have spent its refusals arguing with this turn;
- * - the task must still be running, still leased here, and not parked on an approval;
- * - the compute allowance and the owner's spend caps must both still allow it;
- * - and it may happen at most `TASK_MAX_SELF_CONTINUATIONS` times.
- *
- * What bounds the money is not on that list, because a continuation does not touch it. It buys
- * steps and only steps: `maxComputeCredits` is unchanged, the per-step spend guard runs before
- * every step of a renewed budget exactly as it does now, and a turn that reaches either ceiling
- * hands off in the ordinary way. Three budgets therefore cannot cost more than one - they spend
- * the allowance a stopped turn would have left behind.
- */
 export const renewStepBudget = async (
   deps: HandoffDeps,
   task: TaskRecord,
@@ -205,6 +139,7 @@ export const renewStepBudget = async (
   const ceiling = deps.config.TASK_MAX_SELF_CONTINUATIONS;
   const used = state.selfContinuations ?? 0;
   const writes = turnWriteCount(state.turnToolResults);
+  const evidence = turnEvidenceCount(state.turnToolResults);
   const record = state.acceptance;
   const refused = async (reason: string): Promise<boolean> => {
     // The work log, not the conversation: a turn that stopped at its ceiling already raises the
@@ -227,6 +162,7 @@ export const renewStepBudget = async (
     continuationsUsed: used,
     continuationCeiling: ceiling,
     writes,
+    evidence,
     mark: state.continuationMark,
     credits: state.credits,
     maxCredits: task.maxComputeCredits,
@@ -242,7 +178,6 @@ export const renewStepBudget = async (
   // about it on every task that reaches its step limit.
   if (ceiling <= 0) return false;
   if (!verdict.ok) return refused(verdict.reason);
-  if (!record) return false;
   /*
    * The owner's word, read fresh, immediately before the decision.
    *
@@ -276,22 +211,18 @@ export const renewStepBudget = async (
   if (decision.outcome === 'deny')
     return refused(spendHalt(decision) || 'a spending cap has been reached');
 
-  const results = await deps.runAcceptanceChecks(
-    task,
-    key,
-    record,
-    { purpose: 'continuation' },
-    state
-  );
+  const results = record
+    ? await deps.runAcceptanceChecks(task, key, record, { purpose: 'continuation' }, state)
+    : [];
   const failed = results.filter((result) => !result.passed);
-  if (!failed.length)
+  if (record && !failed.length)
     // Every check the model wrote before the work now passes. That is the strongest evidence this
     // box has that the job is done, so the turn ends and spends its closing call saying so.
     return refused('every acceptance check now passes');
 
   const continuation = used + 1;
   state.selfContinuations = continuation;
-  state.continuationMark = { atStep: state.step, writes };
+  state.continuationMark = { atStep: state.step, writes, evidence };
   /*
    * The wind-down notice, taken back out of the window.
    *
@@ -323,13 +254,16 @@ export const renewStepBudget = async (
     task,
     key,
     'status',
-    `Continuing on its own (${continuation} of ${ceiling}): ${failed.length} of ${results.length} acceptance ${results.length === 1 ? 'check' : 'checks'} still ${failed.length === 1 ? 'fails' : 'fail'} after ${state.step} steps`,
+    record
+      ? `Continuing on its own (${continuation} of ${ceiling}): ${failed.length} of ${results.length} acceptance ${results.length === 1 ? 'check' : 'checks'} still ${failed.length === 1 ? 'fails' : 'fail'} after ${state.step} steps`
+      : 'Continuing with newly observed source evidence',
     {
       continuation,
       maxContinuations: ceiling,
       step: state.step,
       maxSteps: deps.config.TASK_MAX_STEPS * (1 + continuation),
       writes,
+      evidence,
       acceptance: results
     }
   ).catch(() => undefined);
@@ -341,29 +275,6 @@ export const renewStepBudget = async (
   return true;
 };
 
-/**
- * The end of a turn that ran out of steps rather than out of work.
- *
- * This used to be the one exit that ended in nothing. The loop threw, the task landed `failed`,
- * and the owner came back to a red error halfway through a form with no summary, no statement of
- * which fields were already filled, and no hint that replying resumes it - which the API has
- * always allowed. Everything the turn produced was durable the whole time; what was missing was
- * anyone saying so.
- *
- * So the ceiling buys one more model call, allowed nothing but `set_plan` and `finish`. It cannot
- * start new work - that is the point, and the loop below enforces it by answering every other
- * call with a denial - and it can do the two things that are worth more than another tool call:
- * leave the plan honest about where the work stopped, and write the handoff the owner reads. The
- * call is billed like any other step but deliberately not counted
- * against the budget: the budget bounds the work, and taking a working step away to pay for the
- * harness closing the turn would make one number mean two things.
- *
- * It lands `completed` rather than `awaiting_user`, which is not a claim that the job is done -
- * the summary and the preserved plan both say otherwise. It is the only terminal status a reply
- * can resume: `continueTask` accepts completed, failed, awaiting_resource and cancelled, while a
- * task parked in `awaiting_user` is waiting on an approval decision and nothing would ever lease
- * it again.
- */
 export const handOffAtStepLimit = async (
   deps: HandoffDeps,
   task: TaskRecord,
@@ -376,17 +287,6 @@ export const handOffAtStepLimit = async (
     catalog: ModelRelease[];
     turn: number;
     maxOutputTokens: number;
-    /**
-     * The tools the turn has been sending all along, so the closing call sends them too.
-     *
-     * The catalogue is the head of the cached prefix. Handing this call a two-tool list replaced
-     * some forty thousand tokens of it with a few hundred, on the largest request the turn makes -
-     * every byte behind the change re-billed at the write price, for a call that is about to end
-     * the turn anyway. Nothing was bought by it either: the restriction is enforced below, where
-     * every call that is not set_plan or finish is answered with a denial, so the model cannot
-     * start new work whatever the catalogue says. Passing the caller's own array rather than
-     * rebuilding one keeps this byte-identical to the request before it, which is the whole point.
-     */
     tools: ModelTool[];
     /**
      * The run's pinned web route, carried in only so the closing call's `set_plan` can reach the

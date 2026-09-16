@@ -22,7 +22,7 @@ athanor_update_step_seconds="${ATHANOR_UPDATE_STEP_SECONDS:-1800}"
 # for a socket to open. Overridable for a server slow enough to need it.
 athanor_ready_timeout_seconds="${ATHANOR_READY_TIMEOUT_SECONDS:-180}"
 athanor_runtime_prefix="${ATHANOR_RUNTIME_PREFIX:-}"
-service_units="athanor-runner.service athanor@api.service athanor@worker.service athanor@registry.service athanor@notifications.service athanor-network-watch.service"
+service_units="athanor-jobs.service athanor-runner.service athanor@api.service athanor@worker.service athanor@registry.service athanor@notifications.service athanor-network-watch.service"
 auto_update_timer="athanor-auto-update.timer"
 backup_timer="athanor-backup.timer"
 # What the last backup run did, beside the certificate and dynamic DNS files the same way: the
@@ -252,7 +252,10 @@ restart_athanor() {
   need_root restart
   systemctl start athanor.target
   stop_withdrawn_units
-  for unit_name in $service_units; do systemctl restart "$unit_name"; done
+  for unit_name in $service_units; do
+    if [ "$unit_name" = athanor-jobs.service ]; then systemctl reload-or-restart "$unit_name"
+    else systemctl restart "$unit_name"; fi
+  done
   systemctl reload-or-restart nginx
   wait_until_serving
   printf 'athanor restarted.\n'
@@ -1846,7 +1849,12 @@ backup_athanor() {
   # real name — otherwise a failure in the seconds after the rename would delete the good copy this
   # run had just produced.
   partial_destination="$destination"
-  trap 'rm -rf -- "$partial_destination"; systemctl start athanor.target >/dev/null 2>&1 || true' EXIT INT TERM
+  jobs_frozen=false
+  trap 'if [ "$jobs_frozen" = true ]; then systemctl thaw athanor-jobs.service >/dev/null 2>&1 || true; fi; rm -rf -- "$partial_destination"; systemctl start athanor.target >/dev/null 2>&1 || true' EXIT INT TERM
+  if systemctl is-active --quiet athanor-jobs.service; then
+    systemctl freeze athanor-jobs.service
+    jobs_frozen=true
+  fi
   runuser -u postgres -- pg_dump -Fc athanor >"$destination/database.dump"
   # The services are down for the whole of this archive, so what goes into it is outage time.
   # Package caches and installed dependency trees are the bulk of a working agent computer and
@@ -1898,6 +1906,7 @@ backup_athanor() {
   partial_destination=""
   destination="$final_destination"
   last_backup_destination="$final_destination"
+  if [ "$jobs_frozen" = true ]; then systemctl thaw athanor-jobs.service; jobs_frozen=false; fi
   if [ "$restart_mode" = "restart" ]; then
     systemctl start athanor.target
   fi
@@ -2262,6 +2271,8 @@ install_runtime_files() {
     "$(runtime_path /usr/local/lib/athanor/athanor-desktop-bridge.py)"
   install -D -m 0644 infra/native/athanor@.service \
     "$(runtime_path /etc/systemd/system/athanor@.service)"
+  install -D -m 0644 infra/native/athanor-jobs.service "$(runtime_path /etc/systemd/system/athanor-jobs.service)"
+  install -D -m 0644 infra/native/athanor-work.slice "$(runtime_path /etc/systemd/system/athanor-work.slice)"
   install -D -m 0644 infra/native/athanor-runner.service \
     "$(runtime_path /etc/systemd/system/athanor-runner.service)"
   install -D -m 0644 infra/native/athanor.target \
@@ -2554,6 +2565,9 @@ runner_background_work() {
   }
   runner_background_count=$(printf '%s' "$runner_health" | tr ',' '\n' |
     sed -n 's/.*"backgroundCommands"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | sed -n '1p')
+  runner_restart_unsafe=$(printf '%s' "$runner_health" | tr ',' '\n' |
+    sed -n 's/.*"runnerRestartUnsafeCommands"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | sed -n '1p')
+  if [ -n "$runner_restart_unsafe" ]; then runner_background_count="$runner_restart_unsafe"; fi
   runner_background_longest_ms=$(printf '%s' "$runner_health" | tr ',' '\n' |
     sed -n 's/.*"backgroundLongestRemainingMs"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' |
     sed -n '1p')
@@ -3231,7 +3245,7 @@ uninstall_athanor() {
   # writes a fresh archive of the database, the workspaces and every server key into
   # /var/backups/athanor until the disk fills. On a self-hosted product this command is a promise
   # about the owner's own machine.
-  systemctl disable --now athanor-network-watch.service athanor-network-refresh.timer \
+  systemctl disable --now athanor-jobs.service athanor-network-watch.service athanor-network-refresh.timer \
     athanor-network-refresh.path athanor-auto-update.timer athanor-certificate-renew.timer \
     "$backup_timer" \
     >/dev/null 2>&1 || true
@@ -3241,6 +3255,8 @@ uninstall_athanor() {
     "$(runtime_path /etc/update-motd.d/99-athanor)" \
     "$(runtime_path /etc/systemd/system/athanor@.service)" \
     "$(runtime_path /etc/systemd/system/athanor-runner.service)" \
+    "$(runtime_path /etc/systemd/system/athanor-jobs.service)" \
+    "$(runtime_path /etc/systemd/system/athanor-work.slice)" \
     "$(runtime_path /etc/systemd/system/athanor-network-refresh.service)" \
     "$(runtime_path /etc/systemd/system/athanor-network-refresh.timer)" \
     "$(runtime_path /etc/systemd/system/athanor-network-refresh.path)" \

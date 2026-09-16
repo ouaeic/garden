@@ -148,7 +148,7 @@ export const isMutatingToolCall = (name: string, args: Record<string, unknown> =
       String((args.options as { action?: unknown } | undefined)?.action)
     );
   if (['schedule', 'memory', 'skill', 'process'].includes(name))
-    return !['list', 'poll', 'log', 'view'].includes(textValue(args.action));
+    return !['list', 'poll', 'log', 'view', 'wait'].includes(textValue(args.action));
   if (name === 'coding_agent')
     return !['describe', 'status', 'review', 'wait'].includes(textValue(args.action));
   return true;

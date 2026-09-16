@@ -138,8 +138,11 @@ test(
       page.setDefaultTimeout(5_000);
       await page.goto(origin);
       await page.getByText('First garden page', { exact: true }).waitFor({ state: 'attached' });
-      await page.getByRole('status').waitFor({ state: 'hidden' });
-      const canvas = page.locator('canvas');
+      await page.waitForFunction(() => !document.querySelector('[role="status"]'));
+      const canvas = page.locator('[data-page="1"] canvas');
+      const originalWidth = await canvas.evaluate(
+        (element) => element.getBoundingClientRect().width
+      );
       const first = await canvas.evaluate((element) =>
         Array.from(
           element
@@ -151,14 +154,22 @@ test(
       assert.ok(first[2] > first[0]);
       await page.getByRole('button', { name: 'Next page', exact: true }).click();
       await page.getByText('Second garden page', { exact: true }).waitFor({ state: 'attached' });
-      await page.getByRole('status').waitFor({ state: 'hidden' });
+      await page.waitForFunction(() => !document.querySelector('[role="status"]'));
       assert.equal(
         await page.getByRole('spinbutton', { name: 'Page', exact: true }).inputValue(),
         '2'
       );
       await page.getByLabel('Zoom', { exact: true }).selectOption('2');
-      await page.getByRole('status').waitFor({ state: 'hidden' });
+      await page.waitForFunction(() => !document.querySelector('[role="status"]'));
+      await page.waitForFunction(
+        (width) => document.querySelector('canvas')?.getBoundingClientRect().width > width * 1.9,
+        originalWidth
+      );
       assert.ok((await canvas.evaluate((element) => element.width * element.height)) <= 4_010_000);
+      assert.match(
+        await page.locator('[data-page="2"] .pdf-text-layer').innerText(),
+        /Second garden page/
+      );
       assert.equal(
         await page.getByRole('link', { name: 'Download PDF' }).getAttribute('download'),
         'Garden proof'

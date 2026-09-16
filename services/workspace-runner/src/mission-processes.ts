@@ -11,6 +11,7 @@ interface Identity {
 }
 interface Lease {
   purpose?: 'mission' | 'session';
+  controller?: Identity;
   workspaceRoot: string;
   launchExpiresAt: number;
   phase: 'prepared' | 'supervising' | 'running' | 'reaped';
@@ -43,6 +44,16 @@ export const freezeMissionWorkspace = (root: string): void => {
 export const missionWorkspaceBusy = (root: string): boolean =>
   [...entries.values()].some((entry) => entry.root === root);
 
+const processIdentity = async (pid: number): Promise<string | undefined> => {
+  if (process.platform !== 'linux') return undefined;
+  try {
+    const stat = await readFile(`/proc/${pid}/stat`, 'utf8');
+    return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
+  } catch {
+    return undefined;
+  }
+};
+
 export const createMissionLease = async (
   root: string,
   file: string,
@@ -53,11 +64,13 @@ export const createMissionLease = async (
   const entry = { root, file, sandbox, purpose };
   entries.set(file, entry);
   try {
+    const identity = await processIdentity(process.pid);
     await writeFile(
       file,
       JSON.stringify({
         workspaceRoot: root,
         purpose,
+        ...(identity ? { controller: { pid: process.pid, identity } } : {}),
         phase: 'prepared',
         launchExpiresAt: Date.now() + 10_000
       } satisfies Lease),
@@ -235,6 +248,13 @@ export const recoverMissionProcesses = async (sandbox: AgentSandbox): Promise<bo
       unknownLease = true;
       continue;
     }
+    // A different live supervisor owns its own leases. Restarting the runner cannot reap its jobs.
+    if (
+      record.controller &&
+      record.controller.pid !== process.pid &&
+      (await processIdentity(record.controller.pid)) === record.controller.identity
+    )
+      continue;
     const root = record.workspaceRoot;
     entries.set(file, { root, file, sandbox, purpose: record.purpose ?? 'mission' });
     frozen.add(root);

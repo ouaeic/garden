@@ -1,7 +1,7 @@
 [Unit]
 Description=athanor AI computer
-Wants=athanor-runner.service athanor@api.service athanor@worker.service athanor@registry.service athanor@notifications.service athanor-network-watch.service nginx.service
-After=athanor-runner.service athanor@api.service athanor@worker.service athanor@registry.service athanor@notifications.service athanor-network-watch.service nginx.service
+Wants=athanor-jobs.service athanor-runner.service athanor@api.service athanor@worker.service athanor@registry.service athanor@notifications.service athanor-network-watch.service nginx.service
+After=athanor-jobs.service athanor-runner.service athanor@api.service athanor@worker.service athanor@registry.service athanor@notifications.service athanor-network-watch.service nginx.service
 
 [Install]
 WantedBy=multi-user.target

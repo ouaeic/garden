@@ -305,7 +305,7 @@ export class NativeCodingMissions {
     private readonly confined: boolean,
     private readonly execution: {
       quiesceWorkspace: (id: string) => Promise<void>;
-      isWorkspaceBusy: (id: string) => boolean;
+      isWorkspaceBusy: (id: string) => boolean | Promise<boolean>;
     }
   ) {}
   capabilities() {
@@ -808,7 +808,7 @@ export class NativeCodingMissions {
         };
       if (!['active', 'ready'].includes(mission.phase) || mission.generation !== generation)
         throw new Error('The coding mission no longer permits integration');
-      if (this.execution.isWorkspaceBusy(parent) || this.activeWriters.get(parent)?.size)
+      if ((await this.execution.isWorkspaceBusy(parent)) || this.activeWriters.get(parent)?.size)
         throw new Error('Wait for active work in the parent workspace before integrating');
       this.frozen.add(parent);
       let release = true;

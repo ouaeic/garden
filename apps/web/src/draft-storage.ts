@@ -43,8 +43,12 @@ export const keepsDeviceDrafts = (): boolean => {
 };
 const openDatabase = () =>
   (database ??= new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
-    request.onupgradeneeded = () => request.result.createObjectStore('drafts', { keyPath: 'id' });
+    const request = indexedDB.open(DB_NAME, 2);
+    request.onupgradeneeded = () => {
+      for (const name of ['drafts', 'answers'])
+        if (!request.result.objectStoreNames.contains(name))
+          request.result.createObjectStore(name, { keyPath: 'id' });
+    };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => {
       database = null;
@@ -57,17 +61,18 @@ const openDatabase = () =>
   }));
 async function transaction<T>(
   mode: IDBTransactionMode,
-  run: (store: IDBObjectStore, done: (value: T) => void) => void
+  run: (store: IDBObjectStore, done: (value: T) => void) => void,
+  storeName: 'drafts' | 'answers' = 'drafts'
 ): Promise<T> {
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction('drafts', mode);
+    const tx = db.transaction(storeName, mode);
     let result: T;
     tx.oncomplete = () => resolve(result);
     tx.onerror = () => reject(tx.error ?? new Error('Device draft storage failed.'));
     tx.onabort = () => reject(tx.error ?? new Error('Device draft storage was interrupted.'));
     try {
-      run(tx.objectStore('drafts'), (value) => {
+      run(tx.objectStore(storeName), (value) => {
         result = value;
       });
     } catch (error) {
@@ -229,6 +234,14 @@ export async function clearDeviceDrafts(): Promise<void> {
     store.clear();
     done();
   });
+  await transaction<void>(
+    'readwrite',
+    (store, done) => {
+      store.clear();
+      done();
+    },
+    'answers'
+  );
   recoveries.clear();
   device = null;
 }
@@ -248,9 +261,17 @@ export async function readQuestionDraft(userId: string, id: string): Promise<str
   if (!keepsDeviceDrafts()) return '';
   if (!device || device.userId !== userId) await recoverDeviceDrafts(userId);
   if (!device) return '';
-  const row = sessionStorage.getItem(id);
-  if (!row) return '';
-  const sealed = JSON.parse(row) as { iv: string; ciphertext: string };
+  const namespace = device.namespace;
+  const sealed = await transaction<{ iv: string; ciphertext: string } | undefined>(
+    'readonly',
+    (store, done) => {
+      const request = store.get(JSON.stringify([namespace, id]));
+      request.onsuccess = () =>
+        done(request.result as { iv: string; ciphertext: string } | undefined);
+    },
+    'answers'
+  );
+  if (!sealed || device?.namespace !== namespace) return '';
   const value = await crypto.subtle.decrypt(
     {
       name: 'AES-GCM',
@@ -263,14 +284,23 @@ export async function readQuestionDraft(userId: string, id: string): Promise<str
   return new TextDecoder().decode(value);
 }
 export async function writeQuestionDraft(userId: string, id: string, value: string): Promise<void> {
-  if (!value) {
-    sessionStorage.removeItem(id);
-    return;
-  }
   if (!keepsDeviceDrafts()) return;
   if (!device || device.userId !== userId) await recoverDeviceDrafts(userId);
   if (!device) throw new Error('Connect to Garden to save your answer draft.');
   const generation = keyGeneration;
+  const namespace = device.namespace;
+  const storageId = JSON.stringify([namespace, id]);
+  if (!value) {
+    await transaction<void>(
+      'readwrite',
+      (store, done) => {
+        store.delete(storageId);
+        done();
+      },
+      'answers'
+    );
+    return;
+  }
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ciphertext = await crypto.subtle.encrypt(
     {
@@ -283,5 +313,14 @@ export async function writeQuestionDraft(userId: string, id: string, value: stri
   );
   if (generation !== keyGeneration)
     throw new Error('The device session changed before the answer draft was saved.');
-  sessionStorage.setItem(id, JSON.stringify({ iv: base64(iv), ciphertext: base64(ciphertext) }));
+  await transaction<void>(
+    'readwrite',
+    (store, done) => {
+      if (generation !== keyGeneration)
+        throw new Error('The device session changed before the answer draft was saved.');
+      store.put({ id: storageId, iv: base64(iv), ciphertext: base64(ciphertext) });
+      done();
+    },
+    'answers'
+  );
 }

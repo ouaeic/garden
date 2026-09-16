@@ -500,21 +500,11 @@ describe('the owner block', () => {
       'packages/data/src/migrations.ts',
       'packages/data/src/store/sql/memory.ts'
     ]);
-    /*
-     * The readers, for completeness: the owner's own screen, and the window that renders it.
-     *
-     * The two `evals/` entries are not readers. `evals/harness.ts` STUBS the method, and it is here
-     * because its absence from that stub is what made the whole 72-fixture suite report "What you
-     * have written about yourself could not be read for this task" on every row while the loop
-     * carried on - the store is deliberately survivable, so a missing stub fails silently. This
-     * census is the reason a third occurrence of that shape is loud. `evals/run.ts` names the method
-     * in the prose that explains the gate.
-     */
+    // The eval harness must provide the same owner-profile reader as the live window.
     expect(await mentions(/\breadOwnerBlock\b/)).toEqual([
       'apps/api/src/routes/knowledge.ts',
       'apps/worker/src/window.ts',
       'evals/harness.ts',
-      'evals/run.ts',
       'packages/data/src/store.ts',
       'packages/data/src/store/memory.ts'
     ]);

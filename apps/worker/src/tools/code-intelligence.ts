@@ -19,12 +19,17 @@ export async function executeCodeIntelligenceTool(
       options: z.toJSONSchema(optionsSchema),
       actions: {
         start:
-          'Start the bundled language server for path, with explicit approval. Sessions are task-scoped and expire when idle.',
+          'Start the bundled language server for path under the task permission mode. Sessions are task-scoped and expire when idle.',
         status: 'Read the session for path without launching anything.',
         stop: 'Stop the session for path.',
         diagnostics: 'Read native typed diagnostics for file path.',
         definition: 'Find the symbol definition at one-based line and UTF-16 column.',
         references: 'Find source-linked references at line and column.',
+        hover: 'Read type and documentation at line and column.',
+        symbols: 'Read the structural outline of file path.',
+        implementation: 'Find implementations at line and column.',
+        type_definition: 'Find type definitions at line and column.',
+        code_actions: 'Preview available fixes at line and column; commands are never executed.',
         rename:
           'Preview source-linked rename edits to newName with source hashes; no files are changed.'
       },

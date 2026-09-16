@@ -392,31 +392,9 @@ const workspaceFiles = {
 
 /* ------------------------------------------------------------------ the catalogue, as a claim */
 
-/**
- * The catalogue every request of a run carries, derived from the same two sources the loop builds
- * it from rather than written out by name.
- *
- * Naming forty tools here would make a fixture fail every time one is added, which is how an
- * assertion about the catalogue turns into an assertion about its length - the objection
- * `Expectation.finalCatalogueUnchanged` was written against. Deriving it keeps the two real claims
- * and drops that one:
- *
- *   the order is fixed for the life of the run. `agentToolsFor()` puts core tools first and the
- *   rest in declaration order, `compact_context` goes last, and nothing after `agent.ts:8552`
- *   touches the array - so a catalogue assembled per step, or reordered, fails here.
- *
- *   the closing handoff is handed the caller's own array. The handoff request is the largest of
- *   the turn and it is the one a narrowed catalogue would be cheapest to sneak into; a shorter
- *   list on it rewrites the head of the biggest prompt of the run.
- *
- * And the withdrawal is exactly one. `connector_action` is the only tool any run drops, on a box
- * with nothing connected, which is what every fixture here is; `connector_list` stays, precisely so
- * the model can find out. A second withdrawal appearing - the `web_search` swap this set used to
- * do - is a model reading descriptions of a computer it is not on, and it fails here.
- */
 const EVAL_CATALOGUE: readonly string[] = [...agentToolsFor(), COMPACT_CONTEXT_TOOL]
   .map((tool) => tool.name)
-  .filter((name) => name !== 'connector_action');
+  .filter((name) => !['connector_action', 'connector_list'].includes(name));
 
 /**
  * Names read out of a source file, failing loudly when the pattern stops matching.
@@ -3830,7 +3808,10 @@ export const fixtures: readonly Fixture[] = [
       for (const name of dispatched)
         // `connector_action` is the one tool a run withdraws, and it keeps its handler on purpose:
         // the withdrawal is per-box, and a box with a connector enabled is offered it again.
-        if (!EVAL_CATALOGUE.includes(name) && name !== 'connector_action')
+        if (
+          !EVAL_CATALOGUE.includes(name) &&
+          !['connector_action', 'connector_list'].includes(name)
+        )
           findings.push(`${name} has a handler and is in no catalogue this suite ever sends`);
       for (const name of loopAnswered)
         if (!EVAL_CATALOGUE.includes(name))

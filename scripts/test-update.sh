@@ -209,6 +209,8 @@ cp "$repository_root/infra/native/start-desktop-session.sh" \
   "$repository_root/infra/native/athanor-desktop-bridge.py" \
   "$repository_root/infra/native/athanor@.service" \
   "$repository_root/infra/native/athanor-runner.service" \
+  "$repository_root/infra/native/athanor-jobs.service" \
+  "$repository_root/infra/native/athanor-work.slice" \
   "$repository_root/infra/native/athanor.target" \
   "$repository_root/infra/native/athanor-network-refresh.service" \
   "$repository_root/infra/native/athanor-network-refresh.timer" \

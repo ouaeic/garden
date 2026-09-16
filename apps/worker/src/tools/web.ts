@@ -33,7 +33,10 @@ export async function executeSurfaceTool(
         task.id,
         'browser.read',
         `${root}/browser/snapshot`,
-        {}
+        {
+          ...(typeof call.arguments.offset === 'number' ? { offset: call.arguments.offset } : {}),
+          ...(textValue(call.arguments.sha256) ? { sha256: textValue(call.arguments.sha256) } : {})
+        }
       );
     case 'read_elements':
       return context.runner.call(

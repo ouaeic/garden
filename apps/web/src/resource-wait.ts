@@ -2,6 +2,7 @@ import type { Task, TaskEvent } from '@athanor/contracts';
 import { data, text } from './model';
 
 const reasons = new Map([
+  ['background_jobs', 'Background work is running'],
   ['provider_unavailable', 'Waiting for model provider'],
   ['provider_quota_exhausted', 'Provider limit reached'],
   ['provider_not_connected', 'Model connection needed']

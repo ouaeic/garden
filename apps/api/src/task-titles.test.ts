@@ -17,6 +17,7 @@ import { createDatabase, DataStore, migrateDatabase, type Database } from '@atha
 import { createLogger } from './log.js';
 import {
   cleanGeneratedTitle,
+  provisionalTaskTitle,
   MAX_GENERATED_TITLE_LENGTH,
   startTaskTitler,
   titleTasksOnce,
@@ -418,4 +419,17 @@ describe('the titler', () => {
       await database.close();
     }
   }, 60_000);
+});
+
+describe('provisional task names', () => {
+  it('uses a compact opening without copying a long prompt into the title', () => {
+    const prompt =
+      'Please analyse the RNA sequencing data and compare treatment responses across every batch. Use these extensive details...';
+    const title = provisionalTaskTitle(prompt);
+    expect(title).toBe('Analyse the RNA sequencing data and compare…');
+    expect(title.length).toBeLessThan(60);
+    expect(provisionalTaskTitle('Can you create a plot? Here are details')).toBe('Create a plot');
+    expect(provisionalTaskTitle('\n\n')).toBe('New project');
+    expect(provisionalTaskTitle('研究'.repeat(100))).not.toContain('�');
+  });
 });

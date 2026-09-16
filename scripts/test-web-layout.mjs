@@ -1076,9 +1076,12 @@ try {
                   id: 'recorded-answer',
                   sequence: 2,
                   kind: 'assistant_message',
-                  payload: { markdown: recordedReply }
+                  payload: { markdown: 'Progress commentary must not replace the final answer.' }
                 },
-                event
+                {
+                  ...event,
+                  payload: { ...event.payload, answer: recordedReply, answerChannel: 'final' }
+                }
               ]
             : [event],
         hasMore: !earlier,
@@ -1883,16 +1886,28 @@ try {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByLabel('Your answer').waitFor();
     await page.getByLabel('Your answer').fill('Use both arrow keys and WASD.');
-    await page.waitForFunction(() =>
-      Object.keys(sessionStorage).some(
-        (key) =>
-          key.startsWith('garden:question:') && JSON.parse(sessionStorage.getItem(key)).ciphertext
-      )
-    );
+    const encryptedAnswers = await page.evaluate(async () => {
+      const db = await new Promise((resolve, reject) => {
+        const request = indexedDB.open('garden-private-drafts', 2);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      let rows = [];
+      const deadline = Date.now() + 5000;
+      while (!rows.length && Date.now() < deadline) {
+        rows = await new Promise((resolve) => {
+          const request = db.transaction('answers').objectStore('answers').getAll();
+          request.onsuccess = () => resolve(request.result);
+        });
+        if (!rows.length) await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      db.close();
+      sessionStorage.clear();
+      return rows;
+    });
+    assert(encryptedAnswers.length > 0, 'Question answer must reach durable device storage');
     assert(
-      !(await page.evaluate(() => JSON.stringify(sessionStorage))).includes(
-        'Use both arrow keys and WASD.'
-      ),
+      !JSON.stringify(encryptedAnswers).includes('Use both arrow keys and WASD.'),
       'Question drafts must not persist plaintext'
     );
     await page.reload({ waitUntil: 'domcontentloaded' });

@@ -1,6 +1,6 @@
 import { discardMissionInvocation, trackMissionInvocation } from './mission-processes.js';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { scheduleDeadline } from './deadline.js';
 import { ProcessResources, processScanner, PROCESS_SAMPLE_MS } from './process-resources.js';
 import path from 'node:path';
@@ -65,6 +65,8 @@ const BackgroundRequest = z
      */
     service: z.string().min(1).max(120).optional(),
     job: z.string().min(1).max(120).optional(),
+    requestId: z.string().min(1).max(256).optional(),
+    yieldAfterMs: z.number().int().min(0).max(5000).optional(),
     checkpointResume: ServiceLaunchSchema.optional()
   })
   .refine((request) => !(request.service && request.job), 'Choose a service or a finite job')
@@ -202,6 +204,18 @@ const noteOnStderr = (session: Session, note: string): void => {
 };
 
 export class ProcessManager {
+  #closing = false;
+
+  prepareForRestart(): boolean {
+    if (
+      this.#declarations.size ||
+      this.#recoveries.size ||
+      [...this.#sessions.values()].some((session) => session.status === 'running')
+    )
+      return false;
+    this.#closing = true;
+    return true;
+  }
   readonly #quiesced = new Set<string>();
   readonly #sessions = new Map<string, Session>();
   readonly #supervised = new Map<string, Supervised>();
@@ -262,6 +276,7 @@ export class ProcessManager {
     isolateNetwork: boolean,
     guards: Guards = {}
   ) {
+    if (this.#closing) throw new Error('Process supervisor is restarting; retry the request.');
     if (this.#quiesced.has(workspaceId))
       throw new Error('The coding mission execution scope is closed');
     const request = BackgroundRequest.parse(value);
@@ -273,10 +288,35 @@ export class ProcessManager {
           guards
         })
       );
-    if (request.job)
-      return this.#declareInOrder(workspaceId, () =>
+    if (request.job) {
+      const launched = await this.#declareInOrder(workspaceId, () =>
         this.#declareJob(workspaceRoot, workspaceId, owner, request, { isolateNetwork, guards })
       );
+      if (request.yieldAfterMs === undefined) return launched;
+      const session = this.#sessions.get(launched.sessionId);
+      if (!session) return this.action(workspaceId, owner, launched.sessionId, { action: 'poll' });
+      let timer: NodeJS.Timeout | undefined;
+      try {
+        await Promise.race([
+          session.settled,
+          new Promise<void>((resolve) => {
+            timer = setTimeout(resolve, request.yieldAfterMs);
+          })
+        ]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+      return {
+        ...this.#view(session, true),
+        ...(session.status === 'running'
+          ? {
+              yielded: true,
+              instruction:
+                'This command is still running under the returned sessionId. Do not launch it again. Do independent work, then use process action=wait to resume automatically when it stops.'
+            }
+          : {})
+      };
+    }
     refuseUnreachableTimeout(value, maximumSeconds, true);
     const session = await this.#launch(workspaceRoot, workspaceId, owner, request, {
       maximumSeconds,
@@ -488,6 +528,7 @@ export class ProcessManager {
       () => settle('failed', null, null)
     );
     if (request.stdin) child.stdin.write(request.stdin);
+    if (request.yieldAfterMs !== undefined) child.stdin.end();
     return session;
   }
 
@@ -562,6 +603,18 @@ export class ProcessManager {
   ) {
     const registry = this.#registry(root, workspaceId);
     if (registry.list().length === 0) await registry.load();
+    const id = request.requestId
+      ? `job_${createHash('sha256')
+          .update(JSON.stringify([workspaceId, owner, request.requestId]))
+          .digest('hex')}`
+      : undefined;
+    const launch = ServiceLaunchSchema.parse(request);
+    const existing = id ? registry.list().find((record) => record.id === id) : undefined;
+    if (existing) {
+      if (JSON.stringify(existing.launch) !== JSON.stringify(launch))
+        throw new Error('Command request identity was already used for different arguments');
+      return this.action(workspaceId, owner, existing.id, { action: 'poll' });
+    }
     if (this.#activePersistentCount() >= SERVICE_LIMIT_PER_WORKSPACE)
       throw new Error(
         'This computer has reached its limit of active persistent processes. Stop one before starting another.'
@@ -571,7 +624,7 @@ export class ProcessManager {
       owner,
       name: request.job!,
       kind: 'job',
-      launch: ServiceLaunchSchema.parse(request),
+      launch,
       ...(request.checkpointResume ? { checkpointResume: request.checkpointResume } : {}),
       ...(request.timeoutSeconds === undefined
         ? {}
@@ -579,6 +632,7 @@ export class ProcessManager {
             deadlineAt: new Date(Date.now() + request.timeoutSeconds * 1_000).toISOString()
           })
     });
+    if (id) record.id = id;
     // Journal before executing: an uncertain launch may require attention, but may never become
     // an unrecorded command that a restart blindly executes again.
     await registry.put(record, true);
@@ -799,6 +853,7 @@ export class ProcessManager {
   }
 
   async resumeJob(workspaceId: string, owner: string | null, id: string) {
+    if (this.#closing) throw new Error('Process supervisor is restarting; retry the request.');
     this.recoveryPlan(workspaceId, owner, id);
     const job = this.#jobs.get(id)!;
     await this.#resumeJob(job);

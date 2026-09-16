@@ -1,3 +1,4 @@
+import { parkProcessWait } from '../job-waits.js';
 import { parkCodingMissionWait } from '../coding-missions.js';
 import { ZodError } from 'zod';
 /**
@@ -614,6 +615,25 @@ export const dispatchToolCalls = async (
         response.toolCalls.slice(callIndex + 1)
       );
       return 'returned';
+    }
+    if (call.name === 'process' && call.arguments.action === 'wait') {
+      try {
+        if (
+          await parkProcessWait(
+            deps,
+            task,
+            key,
+            state,
+            call,
+            response.toolCalls.slice(callIndex + 1),
+            { model, catalog, webPlan }
+          )
+        )
+          return 'returned';
+      } catch (cause) {
+        await deps.resume.recordToolFailure(task, key, state, call, cause);
+      }
+      continue;
     }
     // Run it, record it, and leave behind whatever a worker that died mid-call would need.
     // @see executeApprovedCall in `turn/execute-call.ts`.

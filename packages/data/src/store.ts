@@ -1,3 +1,4 @@
+import { JobWaitStore } from './store/job-waits.js';
 import type { Database } from './database.js';
 import { ProjectStore } from './projects.js';
 import { ProjectExecutionStore } from './project-executions.js';
@@ -89,6 +90,17 @@ export type {
 } from './store/memory.js';
 
 export class DataStore {
+  readonly #jobWaits: JobWaitStore;
+
+  parkTaskForJobs(...args: Parameters<JobWaitStore['parkTaskForJobs']>) {
+    return this.#jobWaits.parkTaskForJobs(...args);
+  }
+  claimJobWaits(...args: Parameters<JobWaitStore['claimJobWaits']>) {
+    return this.#jobWaits.claimJobWaits(...args);
+  }
+  wakeTaskFromJobs(...args: Parameters<JobWaitStore['wakeTaskFromJobs']>) {
+    return this.#jobWaits.wakeTaskFromJobs(...args);
+  }
   /**
    * The domains, lifted to `store/*.ts` across Waves 6.3 and 7.3. Constructed in the constructor
    * body rather than in field initialisers: with `useDefineForClassFields` on under ES2022 a field
@@ -131,6 +143,7 @@ export class DataStore {
     // One emitter and one LISTEN connection per process, shared by the two domains that write rows
     // worth waking somebody for. Two of these would mean two connections and two deliveries.
     this.#taskSignals = new TaskSignals(database);
+    this.#jobWaits = new JobWaitStore(database, this.#taskSignals);
     this.#projectExecutions = new ProjectExecutionStore(database, this.#taskSignals);
     this.#mediaDelivery = new MediaDeliveryStore(database, this.#notifications, this.#taskSignals);
     this.#connectors = new ConnectorStore(database, this.#taskSignals);

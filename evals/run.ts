@@ -1,60 +1,3 @@
-/**
- * The entry point: `pnpm eval`.
- *
- * ── WHY THERE ARE TWO EXIT RULES ──────────────────────────────────────────────────────────────
- *
- * This file used to open by saying the suite was deliberately not part of `pnpm check`, because
- * "a behavioural suite that blocks every commit is a suite somebody deletes the first week it is
- * wrong about something", and the fixtures are meant to be argued with: the point of committing a
- * step count is that changing it is a decision rather than a failure.
- *
- * Half of that is still true and the other half was measured false. What is true is about the
- * BASELINE: a token count that drifts past its band is a conversation, and a gate that refuses
- * every commit until somebody re-accepts a row is the gate that gets bypassed. What was false is
- * the conclusion drawn from it. Kept out of `check` entirely, this suite went red at 71 of 72
- * fixtures and stayed there for a whole wave - twice, the second time after the first was written
- * down in `harness.ts` as a comment nobody re-read - because `check` runs `eval:rigs` and has
- * never run this. Six specialised rigs were green beside a dead suite.
- *
- * So the two reasons this suite exits non-zero are now separated, because they were never the same
- * kind of thing:
- *
- *   A STATED CLAIM FAILED, or a fixture never really ran - a 404 on an unmodelled route, a warning
- *   the loop had to survive, a tool that threw, a status that is not what the row says. None of
- *   these is a decision. Every one of them means the row's numbers were produced by a failure
- *   branch, so every number in the report beside it is about something other than what it claims.
- *
- *   A COMMITTED NUMBER MOVED. That is the decision, and it stays out of the gate.
- *
- * `--gate` exits on the first kind only. `pnpm eval` unchanged exits on both, which is what the
- * suite is for when a person runs it.
- *
- * ── WHY THIS AND NOT A CHEAPER CHECK ──────────────────────────────────────────────────────────
- *
- * The obvious cheaper repair is a unit-speed check that the harness stub answers every route the
- * production loop can request, which is what refused all 71 fixtures this time. It was rejected on
- * evidence rather than on taste. The same incident ALSO had two unmodelled store methods -
- * `readOwnerBlock` on all 72 fixtures and `attachMemoryCitedCalls` on 49 - which no route check
- * can see, and which the loop swallows into a warning by design because it is written to survive a
- * store it cannot reach. And a static route census can only ever under-approximate what a loop
- * asks for, so the day it misses a route it reports green: a check that cannot see it is not
- * running is the exact defect shape this repository keeps shipping, and putting a second one in
- * front of the suite that DOES see it would be building the disease.
- *
- * Measured, on the machine this was written on: `pnpm eval` is 9.3 seconds. `pnpm check` already
- * spends 59 seconds on `eval:rigs` and six minutes on `pnpm test`. There was no affordability
- * question to answer.
- *
- * Usage:
- *   pnpm eval                    run everything and print the report
- *   pnpm eval --gate             the same run, failing only on claims - what `pnpm check` runs
- *   pnpm eval --filter research  run the fixtures whose id or shape contains this
- *   pnpm eval --accept           accept this run's numbers as the committed baseline
- *   pnpm eval --json out.json    also write the raw results
- *
- * `EVAL_DUMP_WINDOW=<directory>` additionally writes each fixture's last assembled window there,
- * which is how a row that moved is read rather than guessed at.
- */
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -164,6 +107,14 @@ if (flag('accept')) {
     process.stderr.write('--accept needs the whole suite; drop --filter.\n');
     process.exit(2);
   }
+  if (
+    claims.some(
+      (result) => (result.failures.length > 0 && !pendingHeld(result)) || brokenPromise(result)
+    )
+  ) {
+    process.stderr.write('Cannot accept a baseline while behavioral contracts fail.\n');
+    process.exit(1);
+  }
   writeFileSync(baselinePath, `${JSON.stringify(baselineFrom(results), null, 2)}\n`);
   process.stdout.write(`Baseline accepted: ${baselinePath}\n`);
 }
@@ -174,7 +125,7 @@ if (flag('accept')) {
 // Under `--gate` the pending marker is judged on the claims too, and it has to be: a pending row
 // whose stated target is met is a stale marker whatever its token count did, and one held up only
 // by baseline drift is not being held up by the thing it is waiting for.
-const judged = flag('gate') ? claims : results;
+const judged = flag('gate') || flag('accept') ? claims : results;
 const failed = judged.some(
   (result) => (result.failures.length > 0 && !pendingHeld(result)) || brokenPromise(result)
 );

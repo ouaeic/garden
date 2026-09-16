@@ -1,7 +1,8 @@
 [Unit]
 Description=athanor native agent computer
 PartOf=athanor.target
-After=network-online.target
+After=network-online.target athanor-jobs.service
+Wants=athanor-jobs.service
 Wants=network-online.target
 # The runner is the unit an agent command can wedge, so it must always be allowed back. Under the
 # default start limit a crash loop - a command that exhausts memory, a browser that will not
@@ -9,6 +10,7 @@ Wants=network-online.target
 StartLimitIntervalSec=0
 
 [Service]
+Slice=athanor-work.slice
 Type=simple
 User=athanor
 Group=athanor

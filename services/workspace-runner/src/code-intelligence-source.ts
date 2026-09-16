@@ -41,6 +41,12 @@ export function codeOffset(text: string, position: z.infer<typeof CodePosition>)
   const line = lines[position.line];
   if (line === undefined || position.character > line.replace(/\r$/, '').length)
     throw new Error('Language server source range is outside the file');
+  if (
+    position.character > 0 &&
+    /[\uD800-\uDBFF]/.test(line[position.character - 1] ?? '') &&
+    /[\uDC00-\uDFFF]/.test(line[position.character] ?? '')
+  )
+    throw new Error('Language server source range splits a Unicode character');
   return (
     lines.slice(0, position.line).reduce((sum, entry) => sum + entry.length + 1, 0) +
     position.character

@@ -100,18 +100,34 @@ describe('the current work surface', () => {
     });
   });
 
-  it('preserves the answer when the timeline receipt only describes the work', () => {
+  it('uses an explicit final answer independently of its short completion receipt', () => {
     const events = [
       event(1, 'user_message', { markdown: 'What is my current stored report label?' }),
       event(2, 'assistant_message', { markdown: 'harbor-cobalt-46' }),
       event(3, 'completed', {
         summary: 'Read current stored owner memory; one active entry supplies the report label.',
+        answer: 'harbor-cobalt-46',
+        answerChannel: 'final',
         verification: { status: 'verified' }
       })
     ];
     expect(surfaceAnswer(events).markdown).toBe('harbor-cobalt-46');
     events[2] = event(3, 'completed', { summary: 'Stopped without finish', interrupted: true });
-    expect(surfaceAnswer(events).markdown).toBe('harbor-cobalt-46');
+    expect(surfaceAnswer(events).markdown).toBe('Stopped without finish');
+  });
+
+  it('does not promote progress or a repair message over a newer completion', () => {
+    const events = [
+      event(1, 'assistant_message', { markdown: 'Published; resubmitting the finish request.' }),
+      event(2, 'completed', { summary: 'The analysis is ready.' })
+    ];
+    expect(surfaceAnswer(events)).toEqual({
+      markdown: 'The analysis is ready.',
+      partial: false,
+      previous: false
+    });
+    events.push(event(3, 'user_message', { markdown: 'Explore a different hypothesis.' }));
+    expect(surfaceAnswer(events).previous).toBe(true);
   });
 
   it('uses the receipt when this completion has no reply, without borrowing an earlier answer', () => {

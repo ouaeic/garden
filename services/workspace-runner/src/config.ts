@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 const Config = z.object({
+  JOB_SUPERVISOR_SOCKET: z.string().optional(),
   RUNNER_HOST: z.string().default('127.0.0.1'),
   RUNNER_PORT: z.coerce.number().int().positive().default(4300),
   RUNNER_SHARED_SECRET: z.string().min(32),

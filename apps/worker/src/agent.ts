@@ -1705,6 +1705,7 @@ export class AgentWorker {
     state: AgentState,
     completion: {
       summary: string;
+      answer?: string;
       deliverables?: unknown[];
       verification: CompletionVerification;
       /** Present, and true, only on a turn the harness stopped rather than the model. */
@@ -1727,25 +1728,17 @@ export class AgentWorker {
     } = {}
   ): Promise<void> {
     sealUnansweredToolCalls(state.messages, 'the agent finished the turn before this call ran');
-    // The plan is left exactly as the model last set it.
-    //
-    // Every ordinary finish used to fetch the active plan and rewrite every step that was not
-    // 'skipped' to 'completed', then publish that as a new version with a "completed" event. So an
-    // agent that published nine steps, did four, ran out of ideas and called finish left the owner
-    // looking at nine of nine - and the completion contract could not catch it, because it checks
-    // evidence for one claim rather than coverage of the plan. Coverage is now asked for at the
-    // finish gate instead, where the model can still answer it.
-    // A turn that never said anything. The model can do all of its work through tools and call
-    // finish without once writing in its own voice, and the owner is then left with a Result card
-    // and a file - which is what happened to someone who had asked, in the same sentence, for a
-    // report and for the gist of it in the reply. The summary is the model's own account of what it
-    // did, so it is promoted to the answer rather than a sentence of athanor's being invented here.
-    // It costs no extra model turn, and a turn that did reply is untouched.
-    if (!state.answered && completion.summary.trim())
+    // The completion carries the answer identity; ordinary messages remain progress.
+    if (!state.answered && (completion.answer ?? completion.summary).trim())
       await event(this.store, task, key, 'assistant_message', completion.summary.slice(0, 500), {
-        markdown: completion.summary
-      }).catch(() => undefined);
-    await event(this.store, task, key, 'completed', options.label ?? 'Task completed', completion);
+        markdown: completion.answer ?? completion.summary,
+        channel: 'final'
+      });
+    await event(this.store, task, key, 'completed', options.label ?? 'Task completed', {
+      ...completion,
+      answer: completion.answer ?? completion.summary,
+      answerChannel: 'final'
+    });
     await this.#captureMemory(task, key, state, completion, options.deadEnds ?? []);
     const turn = state.turn ?? 0;
     await this.store.transitionUsage(

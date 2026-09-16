@@ -345,6 +345,29 @@ describe('browser snapshot shape', () => {
     expect(delivered.length).toBeLessThanOrEqual(24_000);
   });
 
+  it('reports omitted text and resumes only the same observed page', () => {
+    const whole = 'a'.repeat(BROWSER_SNAPSHOT_TEXT_LIMIT) + 'Final section';
+    const first = snapshot(whole);
+    expect(first.textComplete).toBe(false);
+    expect(first.nextTextOffset).toBe(BROWSER_SNAPSHOT_TEXT_LIMIT);
+    const parts = { ...first, text: whole };
+    const next = composeBrowserSnapshot(parts, {
+      offset: first.nextTextOffset!,
+      sha256: first.textRange.sha256
+    });
+    expect(next.text).toBe('Final section');
+    expect(next.textComplete).toBe(true);
+    expect(next.textOmitted).toBe(0);
+    expect(next.nextTextOffset).toBeUndefined();
+    const changed = composeBrowserSnapshot(
+      { ...parts, text: 'Updated page' },
+      { offset: first.nextTextOffset!, sha256: first.textRange.sha256 }
+    );
+    expect(changed.text).toBe('Updated page');
+    expect(changed.textChanged).toBe(true);
+    expect(changed.textRange.offset).toBe(0);
+  });
+
   it('bounds the page text so it cannot swallow the budget on its own', () => {
     expect(snapshot('x'.repeat(500_000)).text).toHaveLength(BROWSER_SNAPSHOT_TEXT_LIMIT);
   });

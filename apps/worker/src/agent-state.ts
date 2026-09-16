@@ -1,19 +1,3 @@
-/**
- * What a turn is carrying, as a type the rest of this package can name.
- *
- * `AgentState` is the whole of what one turn remembers between steps, and every other module in
- * the decision layer has to name it: the bounds ask it what step this is, the provenance rules ask
- * it what the turn has read, the completion check asks it what it has shown the owner. While that
- * type lived beside `AgentWorker` no other module could import it without importing the class, and
- * that single edge is what kept `agent.ts` in one piece for six waves.
- *
- * The observation shapes travel with it for the same reason. `ExecObservation` is the record a
- * shell result leaves in the state, and the tool arms that produce one are in `tools/`, several
- * import levels away from the class that reads it.
- *
- * Lifted out of `agent.ts` unchanged by Wave 7.1; `agent.ts` re-exports the names it exported
- * before, so nothing outside this package moved on the same commit.
- */
 import type {
   MediaModelSelection,
   TaskMode,
@@ -72,20 +56,6 @@ export interface AgentState {
    * prefix a provider cached is never rewritten upwards when a compaction frees room.
    */
   toolOutputFloor?: number;
-  /**
-   * Built-in skills whose full procedure is already somewhere in this window.
-   *
-   * `openSkill` has always taken an `active` list and answered with a short `state="already_open"`
-   * stub instead of the body, and nothing ever supplied it - so a model that viewed a skill at step
-   * 4 and viewed it again at step 30 received the whole procedure a second time, up to five
-   * thousand tokens of it, with nothing saying it was a duplicate. The only test of that branch
-   * passed the option the product never passed.
-   *
-   * Names rather than a set because this is persisted with the rest of the state, and it is checked
-   * against the window before it is used: a compaction that condensed the body away has to make the
-   * next view a real one again, or the model is left holding a stub for instructions it can no
-   * longer read.
-   */
   openedSkills?: string[];
   /**
    * Whether this turn has already changed something. It gates the fallback plan - a request that
@@ -103,6 +73,8 @@ export interface AgentState {
   mutatedBeyondProse?: boolean;
   /** Whether this turn has said anything to the owner in its own voice. */
   answered?: boolean;
+  /** Identity of the durable process dependency currently holding this turn. */
+  jobWaitId?: string;
   /**
    * Set when the harness has just refused a finish and sent the model round again.
    *
@@ -150,6 +122,7 @@ export interface AgentState {
        * that threw, and the two failure paths in `agent.ts` that record only a name.
        */
       eventId?: string;
+      progressKey?: string;
     }
   >;
   /**
@@ -220,23 +193,6 @@ export interface AgentState {
   argumentTruncations?: number;
   /** What each file held when this turn last read or wrote it, so a whole-file write can say so. */
   readFileHashes?: Record<string, string>;
-  /**
-   * Files this turn has read part of, to a line number the reads have to cover before a whole-file
-   * write of them is allowed.
-   *
-   * A hash says the file has not changed since it was read; it says nothing about how much of it
-   * the model was shown, and a whole-file `file_write` claiming one is a request to replace lines
-   * that may never have been on screen. This is what the write is held to instead, and it is a
-   * number rather than a flag because the refusal lifts as soon as the reads on record cover it.
-   *
-   * A FLOOR, not always the exact length. An unwindowed read knows the file's length exactly; a
-   * windowed read that stopped before the end knows only that the file goes at least one line
-   * further than what it delivered whole, because the runner's ranged reader will not walk to the
-   * end of a two-gigabyte log to count. Both are recorded here, both are true as "at least this
-   * many", and the value is only ever raised - a later narrow read learning less about a file must
-   * not lower a bar a wider one set. Absent means nothing is outstanding: the file was never read
-   * this turn, was read in full, or has since been rewritten by this turn's own edit.
-   */
   partialReads?: Record<string, number>;
   /**
    * Read-only calls already made this turn, keyed by tool and arguments, to the id that made them.
@@ -291,35 +247,6 @@ export interface AgentState {
    * scheduled conversation is still unattended work until the owner replies to it.
    */
   unattended?: boolean;
-  /**
-   * Whether this conversation may change anything yet, or is still working the approach out.
-   *
-   * Absent is `act`, which is what every task written before this field existed carries and what
-   * every task that never enters plan mode carries for ever - so the default costs an ordinary turn
-   * one `undefined` comparison per tool call and nothing else. @see `TaskMode` in @athanor/contracts
-   * for why it is two words rather than a flag.
-   *
-   * Three places read it, and they are named here because a reader looking for the enforcement
-   * finds the first and stops: the batch loop's gate and `planModeRefusal` in `turn/dispatch.ts`;
-   * the approved-call arm in `turn/resume.ts`, which is the one path that runs a tool without
-   * passing through that gate; and two of the five holds in `turn/finish.ts`, where the mode stops
-   * the acceptance suite - the owner's own build and test commands - from being executed on the
-   * owner's computer by a turn that changed nothing.
-   *
-   * NOTHING IN PRODUCTION WRITES IT, which is the honest state of this field rather than a defect
-   * in the readers. There is no owner-settable, task-scoped, persisted place to carry the mode: a
-   * task row has named scalars beside `securityMode` and no generic column, so setting it needs a
-   * migration, a store method and a route this field's own change did not own. Until those land,
-   * every conversation reads `undefined` here and behaves exactly as it did before the field
-   * existed. @see docs/CAPABILITIES.md, which says the same thing to the owner.
-   *
-   * It lives here, on the persisted trajectory, rather than in the loop frame, for the reason every
-   * bound in this file lives here: an approval park, a question, a worker handover and a restart all
-   * reload the state and carry on, and a mode a restart clears is a mode the owner never chose. It
-   * is deliberately NOT re-derived per step from anywhere - the owner's decision to leave plan mode
-   * has to be an owner action, and a re-derivation is a place that decision could arrive from
-   * somewhere else.
-   */
   mode?: TaskMode;
   /** What the last step cost, in dollars, so the next one can be priced before it runs. */
   lastStepUsd?: number;
@@ -400,7 +327,7 @@ export interface AgentState {
    * told when a budget is renewed.
    */
   selfContinuations?: number;
-  continuationMark?: { atStep: number; writes: number };
+  continuationMark?: { atStep: number; writes: number; evidence?: number };
   /** Whether this turn has already been sent back once for a plan whose steps were left open. */
   planCoverageNagged?: boolean;
   /** True while the only plan on record is the boilerplate one the harness wrote for itself. */

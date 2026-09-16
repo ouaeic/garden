@@ -1126,7 +1126,7 @@ describe('API production boundaries', () => {
     expect(conversationSearch.statusCode, conversationSearch.body).toBe(200);
     expect(conversationSearch.json()).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ taskId, workspaceId, title: 'New project' })
+        expect.objectContaining({ taskId, workspaceId, title: 'Prepare a concise report' })
       ])
     );
     const reviewedTask = await app.inject({
@@ -1279,7 +1279,7 @@ describe('API production boundaries', () => {
         })
       ).statusCode
     ).toBe(404);
-    expect(task.json<{ title: string }>().title).toBe('New project');
+    expect(task.json<{ title: string }>().title).toBe('Prepare a concise report');
     const storedTaskContent = await database.query(
       'SELECT title,prompt_ciphertext FROM tasks WHERE id=$1',
       [taskId]
@@ -6832,7 +6832,9 @@ describe('searching the owner’s own history', () => {
     const named = await search('concise report');
     expect(named.statusCode, named.body).toBe(200);
     expect(named.json()).toEqual(
-      expect.arrayContaining([expect.objectContaining({ taskId, title: 'New project' })])
+      expect.arrayContaining([
+        expect.objectContaining({ taskId, title: 'Prepare a concise report' })
+      ])
     );
     expect(events).not.toHaveBeenCalled();
 

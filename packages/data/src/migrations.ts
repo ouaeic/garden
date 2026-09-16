@@ -3892,5 +3892,21 @@ CREATE TABLE IF NOT EXISTS model_throughput_ceiling (
       CREATE TRIGGER tasks_update_project AFTER INSERT OR UPDATE OF status,title,workspace_id ON tasks
         FOR EACH ROW EXECUTE FUNCTION update_conversation_project();
     `
+  },
+  {
+    version: 106,
+    name: 'durable_job_dependencies',
+    sql: `
+      CREATE TABLE IF NOT EXISTS task_job_waits (
+        task_id UUID PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE,
+        id UUID NOT NULL,
+        dependencies_ciphertext JSONB NOT NULL,
+        outcome_ciphertext JSONB,
+        state TEXT NOT NULL DEFAULT 'waiting' CHECK(state IN ('waiting','delivered')),
+        checked_at TIMESTAMPTZ,
+        finished_at TIMESTAMPTZ
+      );
+      CREATE INDEX IF NOT EXISTS task_job_waits_pending ON task_job_waits(checked_at) WHERE state='waiting';
+    `
   }
 ] as const;

@@ -1,39 +1,20 @@
+/* eslint jsx-a11y/no-noninteractive-tabindex: ["error", {"roles": ["region"]}] -- Keyboard users must be able to scroll the labeled document region. */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import {
-  getDocument,
-  GlobalWorkerOptions,
-  type PDFDocumentProxy,
-  type PDFPageProxy,
-  type RenderTask
-} from 'pdfjs-dist';
+import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&url';
 import { Button, Field } from '../ui.js';
 import { message } from './format.js';
+import { PdfPage } from './PdfPage.js';
 import './pdf-preview.css';
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 const assetBase = '/pdfjs/';
-const MAX_CANVAS_PIXELS = 4_000_000;
+const PAGE_GAP = 8;
 /** Pages rendered ahead of and behind the viewport while scrolling. */
 const OVERSCAN_PAGES = 2;
 /** A page is released again once it sits this far outside the viewport. */
 const RELEASE_PAGES = 4;
 
-interface PageHandle {
-  proxy: PDFPageProxy;
-  render?: RenderTask;
-}
-
-/**
- * A continuously scrolling PDF: every page is its own canvas, laid out top to bottom in one
- * scroller, rendered as it approaches the viewport and released when it leaves. No page turns - the
- * document reads like a document.
- *
- * One canvas per page is what makes both directions cheap to be wrong about. A rendered page costs
- * its canvas memory; an unrendered one costs a placeholder sized from the page's own aspect ratio,
- * so the scrollbar is honest before anything draws. The intersection observer schedules work, and
- * a page that scrolls away before its render starts is cancelled for free.
- */
 export default function PdfPreview({ url, name }: { url: string; name: string }) {
   const scroller = useRef<HTMLDivElement>(null);
   const pageRefs = useRef(new Map<number, HTMLDivElement>());
@@ -53,22 +34,25 @@ export default function PdfPreview({ url, name }: { url: string; name: string })
     () => Array.from({ length: pageCount }, (_, index) => index + 1),
     [pageCount]
   );
-  const handles = useRef(new Map<number, PageHandle>());
-  const firstPageRatio = useRef<number | null>(null);
 
   useEffect(() => {
     setDocument(null);
     setPageCount(0);
     setPageSizes(null);
-    firstPageRatio.current = null;
+    setRendered(new Set());
+    setCurrentPage(1);
+    setPassword('');
     setError('');
     setPasswordPrompt(null);
     let active = true;
     const loading = getDocument({
       url,
-      assetBase,
-      ...(password ? { password } : {})
-    } as Parameters<typeof getDocument>[0]);
+      cMapUrl: `${assetBase}cmaps/`,
+      cMapPacked: true,
+      standardFontDataUrl: `${assetBase}standard_fonts/`,
+      wasmUrl: `${assetBase}wasm/`,
+      iccUrl: `${assetBase}iccs/`
+    });
     loading.onPassword = (submit: (password: string) => void, reason: number) => {
       if (active) setPasswordPrompt({ submit, reason });
     };
@@ -80,20 +64,22 @@ export default function PdfPreview({ url, name }: { url: string; name: string })
         }
         setDocument(value);
         setPageCount(value.numPages);
-        // Page sizes are measured once, from the document itself, so every placeholder has the
-        // right aspect ratio before a single pixel renders. The first page's ratio stands in for
-        // the rest when the provider withholds per-page geometry.
-        const sizes: Array<{ width: number; height: number }> = [];
-        for (let number = 1; number <= value.numPages; number += 1) {
+        const first = await value.getPage(1);
+        if (!active) return value;
+        const initial = first.getViewport({ scale: 1 });
+        const sizes = Array.from({ length: value.numPages }, () => ({
+          width: initial.width,
+          height: initial.height
+        }));
+        setPageSizes([...sizes]);
+        // Publish geometry progressively so a long document can be read before its last page loads.
+        for (let number = 2; number <= value.numPages && active; number += 1) {
           const page = await value.getPage(number);
+          if (!active) break;
           const viewport = page.getViewport({ scale: 1 });
-          sizes.push({ width: viewport.width, height: viewport.height });
+          sizes[number - 1] = { width: viewport.width, height: viewport.height };
+          if (number % 16 === 0 || number === value.numPages) setPageSizes([...sizes]);
         }
-        if (!active) {
-          await value.cleanup();
-          return value;
-        }
-        setPageSizes(sizes);
         return value;
       })
       .catch((cause) => {
@@ -101,11 +87,9 @@ export default function PdfPreview({ url, name }: { url: string; name: string })
       });
     return () => {
       active = false;
-      for (const handle of handles.current.values()) handle.render?.cancel();
-      handles.current.clear();
       void loading.destroy();
     };
-  }, [url, password]);
+  }, [url]);
 
   useEffect(() => {
     const element = scroller.current;
@@ -123,7 +107,7 @@ export default function PdfPreview({ url, name }: { url: string; name: string })
   // churn when the document is long.
   useLayoutEffect(() => {
     const element = scroller.current;
-    if (!element || !document || !pageSizes) return;
+    if (!element || !documentProxy || !pageSizes) return;
     let frame = 0;
     const pass = () => {
       const bounds = element.getBoundingClientRect();
@@ -138,20 +122,13 @@ export default function PdfPreview({ url, name }: { url: string; name: string })
         const pageHeight = (size?.height ?? size?.width ?? width) * cssScale;
         const top = offsets;
         const bottom = offsets + pageHeight;
-        offsets = bottom;
+        offsets = bottom + PAGE_GAP;
         if (bottom >= viewTop && top <= viewBottom) next.add(number);
         else if (
           bottom < viewTop - pageHeight * RELEASE_PAGES ||
           top > viewBottom + pageHeight * RELEASE_PAGES
         )
           release.add(number);
-      }
-      for (const number of release) {
-        const handle = handles.current.get(number);
-        if (!handle) continue;
-        handle.render?.cancel();
-        handle.proxy.cleanup();
-        handles.current.delete(number);
       }
       setRendered((current) => {
         const changed = [...next].some((number) => !current.has(number));
@@ -173,49 +150,7 @@ export default function PdfPreview({ url, name }: { url: string; name: string })
       cancelAnimationFrame(frame);
       element.removeEventListener('scroll', schedule);
     };
-  }, [document, pageSizes, pageCount, width, zoom]);
-
-  // One render per visible page. A canvas holds its pixels until release; a re-render happens
-  // only when the page's own scale changed under it.
-  useEffect(() => {
-    if (!documentProxy || !pageSizes) return;
-    let active = true;
-    for (const number of rendered) {
-      if (handles.current.has(number)) continue;
-      void documentProxy.getPage(number).then(async (proxy) => {
-        if (!active) return proxy.cleanup();
-        const host = pageRefs.current.get(number);
-        if (!host) return proxy.cleanup();
-        const existing = handles.current.get(number);
-        if (existing) {
-          if (existing.render) existing.render.cancel();
-          else return proxy.cleanup();
-        }
-        const natural = proxy.getViewport({ scale: 1 });
-        const cssScale = Math.max(0.1, width / natural.width) * zoom;
-        const ratio = Math.min(window.devicePixelRatio || 1, 2);
-        const scale = Math.min(
-          cssScale * ratio,
-          Math.sqrt(MAX_CANVAS_PIXELS / (natural.width * natural.height))
-        );
-        const viewport = proxy.getViewport({ scale });
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.ceil(viewport.width);
-        canvas.height = Math.ceil(viewport.height);
-        canvas.style.width = `${natural.width * cssScale}px`;
-        canvas.style.height = `${natural.height * cssScale}px`;
-        canvas.setAttribute('aria-label', `Page ${number} of ${name}`);
-        canvas.setAttribute('role', 'img');
-        host.replaceChildren(canvas);
-        const render = proxy.render({ canvas, viewport, background: '#ffffff' });
-        handles.current.set(number, { proxy, render });
-        await render.promise.catch(() => undefined);
-      });
-    }
-    return () => {
-      active = false;
-    };
-  }, [document, pageSizes, rendered, width, zoom, name]);
+  }, [documentProxy, pageSizes, pageCount, width, zoom]);
 
   // Jump-to-page on scroll position, so the toolbar's page field tracks where the reader is.
   useEffect(() => {
@@ -233,7 +168,7 @@ export default function PdfPreview({ url, name }: { url: string; name: string })
           setCurrentPage(number);
           return;
         }
-        offsets += pageHeight;
+        offsets += pageHeight + PAGE_GAP;
       }
     };
     element.addEventListener('scroll', onScroll, { passive: true });
@@ -248,8 +183,9 @@ export default function PdfPreview({ url, name }: { url: string; name: string })
     for (let number = 1; number < value; number += 1) {
       const size = pageSizes[number - 1];
       const cssScale = Math.max(0.1, width / (size?.width ?? width)) * zoom;
-      offsets += (size?.height ?? size?.width ?? width) * cssScale;
+      offsets += (size?.height ?? size?.width ?? width) * cssScale + PAGE_GAP;
     }
+    setCurrentPage(value);
     element.scrollTo({ top: offsets });
   };
 
@@ -324,7 +260,14 @@ export default function PdfPreview({ url, name }: { url: string; name: string })
           {error} You can download the complete PDF above.
         </p>
       )}
-      <div className="pdf-page-scroll" ref={scroller}>
+      {!documentProxy && !error && !passwordPrompt && <p role="status">Opening document…</p>}
+      <div
+        className="pdf-page-scroll"
+        ref={scroller}
+        tabIndex={0}
+        role="region"
+        aria-label="Document pages"
+      >
         {pageSizes
           ? pages.map((number) => {
               const size = pageSizes[number - 1];
@@ -332,7 +275,10 @@ export default function PdfPreview({ url, name }: { url: string; name: string })
               return (
                 <div
                   className="pdf-page"
-                  key={number}
+                  key={`${url}:${number}`}
+                  role="region"
+                  aria-label={`Page ${number}`}
+                  data-page={number}
                   ref={(host) => {
                     if (host) pageRefs.current.set(number, host);
                     else pageRefs.current.delete(number);
@@ -342,7 +288,14 @@ export default function PdfPreview({ url, name }: { url: string; name: string })
                     height: (size?.height ?? size?.width ?? width) * cssScale
                   }}
                 >
-                  {rendered.has(number) ? null : (
+                  {rendered.has(number) && documentProxy ? (
+                    <PdfPage
+                      documentProxy={documentProxy}
+                      number={number}
+                      width={width}
+                      zoom={zoom}
+                    />
+                  ) : (
                     <span className="pdf-page-placeholder">Page {number}</span>
                   )}
                 </div>

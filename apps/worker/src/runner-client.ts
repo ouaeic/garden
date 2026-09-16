@@ -76,22 +76,6 @@ const isAbort = (error: unknown): boolean => asRecord(error)?.name === 'AbortErr
 
 const isTimeout = (error: unknown): boolean => asRecord(error)?.name === 'TimeoutError';
 
-/**
- * A refusal the caller can act on rather than a sentence it would have to read back.
- *
- * Every runner route answers a refusal with `{error:{code,message,…}}`, and one of those codes is
- * the only failure whose answer is a person instead of a retry: `browser_bot_wall` carries the
- * vendor, the site and the tab the challenge is on, and the turn needs all three to raise the
- * takeover with the owner and to leave the conversation something to show. Flattening the body into
- * `Workspace tool failed (409): {…}` threw every one of them away and left the model a JSON blob to
- * guess at. A body that is not shaped like that keeps the old sentence, since there is nothing else
- * to say about it.
- *
- * The file routes below used to answer with the bare status instead - `File write failed (400)`,
- * for a runner that had already said which paths it accepts. A model cannot act on a number, so it
- * guessed at paths and spent the owner's money doing it. Every route reports the reason it was
- * given.
- */
 const runnerFailure = async (response: Response): Promise<Error> => {
   const body = (await response.text().catch(() => '')).slice(0, 4_000);
   let parsed: unknown;
@@ -195,22 +179,6 @@ export class AgentRunnerClient {
     private readonly window?: string
   ) {}
 
-  /**
-   * The same runner, signing for one context window inside the task rather than for the task.
-   *
-   * `sub` is what the runner keys a reader by: its seen-line ledger records which lines were put in
-   * front of WHICH MODEL, and answers a write with whether that writer was shown the lines it
-   * changes. A delegated specialist has a window of its own - it is handed reads the lead never
-   * sees - and signed with the lead's task id it was the same reader as the lead, so a file the
-   * specialist had read whole was a file the lead could write whole with no read of its own.
-   * Measured: the specialist read 1-400 of a file the lead had been shown 1-50 of, and the lead's
-   * five-line write landed.
-   *
-   * Composed onto the task id rather than replacing it, because the runner also scopes other things
-   * by `sub` - a process list, a stop - and every one of those is about the task. A subject that
-   * starts with the task's own id keeps those readable by whoever asks about the task; a subject
-   * that is only a window would be a task the runner has never heard of.
-   */
   forWindow(window: string): AgentRunnerClient {
     return new AgentRunnerClient(this.baseUrl, this.secret, window);
   }
@@ -570,16 +538,6 @@ export class AgentRunnerClient {
     };
   }
 
-  /**
-   * A picture from the workspace, already in a form the gateway can put in a request.
-   *
-   * This used to read the plain file endpoint and then refuse anything that was not one of four
-   * types. That refusal was the whole of athanor's answer to a phone photograph: HEIC arrived as
-   * bytes of no stated kind, and the owner was told their computer could not open a file sitting in
-   * front of them in the Files pane. The runner now re-encodes every picture it answers with, so
-   * the check below is no longer a policy - it is this side making sure the other side kept its
-   * promise before a data URL is built out of it.
-   */
   async readImage(
     workspaceId: string,
     taskId: string,

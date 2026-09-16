@@ -82,7 +82,8 @@ const patch = async (
   const context = {
     task: { workspaceId: 'ws-1', id: 'task-1', userId: 'user-1' },
     state: {} as AgentState,
-    store: { setWorkspaceStorage: async () => undefined },
+    key: new Uint8Array(32).fill(7),
+    store: { setWorkspaceStorage: async () => undefined, appendTaskEvent: async () => undefined },
     runner: {
       readFileWithHash: async (_workspace: string, _task: string, path: string) => {
         const content = written.get(path);
@@ -413,7 +414,8 @@ const turn = async (
   const context = {
     task: { workspaceId: 'ws-1', id: 'task-read', userId: 'user-1' },
     state,
-    store: { setWorkspaceStorage: async () => undefined },
+    key: new Uint8Array(32).fill(7),
+    store: { setWorkspaceStorage: async () => undefined, appendTaskEvent: async () => undefined },
     runner: {
       readFileWithHash: async (_w: string, _t: string, path: string) => {
         const content = written.get(path);
@@ -1111,7 +1113,8 @@ const rigFor = (files: Record<string, string>, tree: Tree): Rig => {
   const context = {
     task: { workspaceId: 'ws-1', id: 'task-1', userId: 'user-1' },
     state: {} as AgentState,
-    store: { setWorkspaceStorage: async () => undefined },
+    key: new Uint8Array(32).fill(7),
+    store: { setWorkspaceStorage: async () => undefined, appendTaskEvent: async () => undefined },
     runner: {
       readFileWithHash: async (_workspace: string, _task: string, path: string) => {
         const content = written.get(path);
@@ -1874,5 +1877,115 @@ describe('what a task holding a stamp per patched path is allowed to accumulate'
     expect(rig.execs).toHaveLength(2);
     expect(block).not.toContain('src/stale.ts');
     expect(block).toContain('src/fresh.ts');
+  });
+});
+
+describe('multi-file mutation receipts', () => {
+  const exercise = (failure: 'none' | 'write' | 'ack' | 'changed' | 'unreadable' | 'usage') => {
+    forgetReads();
+    const files = new Map([
+      ['workspace/a.txt', 'alpha\n'],
+      ['workspace/b.txt', 'bravo\n']
+    ]);
+    for (const [path, content] of files) recordRead('task-1', path, 1, content);
+    let writing = false;
+    const context = {
+      task: { id: 'task-1', workspaceId: 'ws-1', userId: 'user-1' },
+      state: {},
+      key: new Uint8Array(32).fill(7),
+      store: { setWorkspaceStorage: async () => undefined, appendTaskEvent: async () => undefined },
+      runner: {
+        readFileWithHash: async (_workspace: string, _task: string, path: string) => {
+          if (writing && failure === 'unreadable') throw new Error('disconnected');
+          return { content: files.get(path), sha256: 'observed-hash' };
+        },
+        writeFile: async (
+          _workspace: string,
+          _task: string,
+          path: string,
+          content: string,
+          expected: string
+        ) => {
+          expect(expected).toBe('observed-hash');
+          if (path.endsWith('b.txt')) {
+            writing = true;
+            if (failure === 'changed') files.set(path, 'concurrent owner edit\n');
+            if (['write', 'changed', 'unreadable'].includes(failure))
+              throw new Error('connection lost');
+          }
+          files.set(path, content);
+          if (path.endsWith('b.txt') && failure === 'ack') throw new Error('response lost');
+          return { sha256: 'written-hash' };
+        },
+        call: async () => {
+          if (failure === 'usage') throw new Error('accounting unavailable');
+          return { storageBytes: 20 };
+        }
+      }
+    } as unknown as ToolContext;
+    const run = (
+      patches: unknown[] = [
+        { path: 'workspace/a.txt', edit: 'PUT 1:\n+ALPHA\n' },
+        { path: 'workspace/b.txt', edit: 'PUT 1:\n+BRAVO\n' }
+      ]
+    ) =>
+      executeWorkspaceTool(context, {
+        id: 'patch-receipt',
+        name: 'file_patch',
+        arguments: { patches }
+      });
+    return { files, run };
+  };
+
+  it.each([
+    { path: 'workspace/a.txt', edit: 'PUT 1:\n+again\n' },
+    { path: 'workspace/./a.txt', edit: 'PUT 1:\n+again\n' },
+    { path: 'workspace/b.txt' },
+    null
+  ])('validates the complete envelope before writing: %j', async (invalid) => {
+    const { files, run } = exercise('none');
+    await expect(
+      run([{ path: 'workspace/a.txt', edit: 'PUT 1:\n+ALPHA\n' }, invalid])
+    ).rejects.toThrow();
+    expect([...files.values()]).toEqual(['alpha\n', 'bravo\n']);
+  });
+
+  it('reports the first write when the second fails without changing its file', async () => {
+    const { files, run } = exercise('write');
+    expect(await run()).toMatchObject({
+      filesChanged: [{ path: 'workspace/a.txt' }],
+      failed: [{ path: 'workspace/b.txt' }]
+    });
+    expect([...files.values()]).toEqual(['ALPHA\n', 'bravo\n']);
+  });
+
+  it('reconciles a lost acknowledgement by reading, without replaying the write', async () => {
+    const { run } = exercise('ack');
+    expect(await run()).toMatchObject({
+      patchCount: 2,
+      filesChanged: [{ path: 'workspace/a.txt' }, { path: 'workspace/b.txt' }]
+    });
+  });
+
+  it.each(['changed', 'unreadable'] as const)(
+    'preserves uncertain outcomes and never rolls back concurrent edits: %s',
+    async (failure) => {
+      const { files, run } = exercise(failure);
+      expect(await run()).toMatchObject({
+        filesChanged: [{ path: 'workspace/a.txt' }],
+        uncertain: [{ path: 'workspace/b.txt' }]
+      });
+      expect(files.get('workspace/a.txt')).toBe('ALPHA\n');
+      if (failure === 'changed')
+        expect(files.get('workspace/b.txt')).toBe('concurrent owner edit\n');
+    }
+  );
+
+  it('does not discard applied receipts when storage accounting fails', async () => {
+    const { run } = exercise('usage');
+    expect(await run()).toMatchObject({
+      patchCount: 2,
+      warnings: [expect.stringContaining('Storage accounting')]
+    });
   });
 });

@@ -124,16 +124,21 @@ export const statusLabel: Record<Task['status'], string> = {
 export const isWorking = (task: Task): boolean =>
   ['queued', 'planning', 'running'].includes(task.status);
 export const hasOngoingWork = (task: Task): boolean =>
-  isWorking(task) || task.deliveryStatus === 'pending';
+  isWorking(task) ||
+  task.deliveryStatus === 'pending' ||
+  (task.status === 'awaiting_resource' && task.resourceWait?.code === 'background_jobs');
 export const needsAttention = (task: Task): boolean =>
-  ['awaiting_user', 'awaiting_resource', 'failed'].includes(task.status) ||
+  (['awaiting_user', 'awaiting_resource', 'failed'].includes(task.status) &&
+    task.resourceWait?.code !== 'background_jobs') ||
   (task.status === 'completed' && task.deliveryStatus === 'incomplete');
 export const taskStatusLabel = (task: Task): string =>
-  task.status === 'completed' && task.deliveryStatus === 'pending'
-    ? 'Generating media'
-    : task.status === 'completed' && task.deliveryStatus === 'incomplete'
-      ? 'Delivery needs attention'
-      : statusLabel[task.status];
+  task.status === 'awaiting_resource' && task.resourceWait?.code === 'background_jobs'
+    ? 'Background work is running'
+    : task.status === 'completed' && task.deliveryStatus === 'pending'
+      ? 'Generating media'
+      : task.status === 'completed' && task.deliveryStatus === 'incomplete'
+        ? 'Delivery needs attention'
+        : statusLabel[task.status];
 export const isFinished = (task: Task): boolean =>
   ['completed', 'failed', 'cancelled'].includes(task.status);
 export const data = (value: unknown): Record<string, unknown> =>
@@ -206,20 +211,6 @@ export function surfaceAnswer(events: TaskEvent[]): {
   const message = lastEvent(events, 'assistant_message');
   const completed = lastEvent(events, 'completed');
   const finish = data(completed?.payload);
-  const finished =
-    !finish.interrupted &&
-    text(finish.summary) &&
-    (completed?.sequence ?? 0) > (message?.sequence ?? 0);
-  const completionStart = events.reduce(
-    (boundary, event) =>
-      ['completed', 'user_message'].includes(event.kind) &&
-      event.sequence < (completed?.sequence ?? 0)
-        ? Math.max(boundary, event.sequence)
-        : boundary,
-    0
-  );
-  // The completion summary is a timeline receipt; the model's answer is a separate message.
-  const replyForCompletion = message && message.sequence > completionStart;
   const boundary = Math.max(
     message?.sequence ?? 0,
     lastEvent(events, 'user_message')?.sequence ?? 0,
@@ -232,11 +223,11 @@ export function surfaceAnswer(events: TaskEvent[]): {
     return { markdown: deltas.map(eventText).join(''), partial: true, previous: false };
   return {
     markdown:
-      finished && !replyForCompletion
-        ? text(finish.summary)
+      completed && completed.sequence > (message?.sequence ?? 0)
+        ? text(finish.answer) || text(finish.summary)
         : message
           ? eventText(message)
-          : text(finish.summary),
+          : text(finish.answer) || text(finish.summary),
     partial: false,
     previous:
       (lastEvent(events, 'user_message')?.sequence ?? 0) >

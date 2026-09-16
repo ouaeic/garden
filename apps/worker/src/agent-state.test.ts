@@ -109,6 +109,7 @@ const FIELDS: ReadonlyArray<keyof AgentState> = [
   'nativeInputApprovals',
   'transcriptionApprovals',
   'mediaApprovals',
+  'jobWaitId',
   'codingMissionWaiting',
   'codingMissionReviews',
   'mainModelPreference',
@@ -169,6 +170,7 @@ const FULL: Required<AgentState> = {
     }
   ],
   codingMissionWaiting: true,
+  jobWaitId: 'job-wait-fixture',
   codingMissionReviews: { mission: { digest: 'reviewed', generation: 1 } },
   messages: [
     { role: 'system', content: 'ATHANOR RUNTIME CONTEXT (dynamic)' },
@@ -377,6 +379,7 @@ describe('what a new turn inherits', () => {
       'nativeInputApprovals',
       'transcriptionApprovals',
       'mediaApprovals',
+      'jobWaitId',
       'codingMissionWaiting',
       'codingMissionReviews'
     ]);

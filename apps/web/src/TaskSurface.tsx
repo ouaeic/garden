@@ -550,17 +550,25 @@ export default function TaskSurface({
                   busy={busy}
                   onClick={() =>
                     action(
-                      ['paused', 'awaiting_resource'].includes(task.status) ? 'resume' : 'pause'
+                      task.status === 'paused' ||
+                        (task.status === 'awaiting_resource' &&
+                          task.resourceWait?.code !== 'background_jobs')
+                        ? 'resume'
+                        : 'pause'
                     )
                   }
                 >
-                  {['paused', 'awaiting_resource'].includes(task.status) ? (
+                  {task.status === 'paused' ||
+                  (task.status === 'awaiting_resource' &&
+                    task.resourceWait?.code !== 'background_jobs') ? (
                     <Play size={14} />
                   ) : (
                     <Pause size={14} />
                   )}{' '}
                   {task.status === 'awaiting_resource'
-                    ? 'Retry now'
+                    ? task.resourceWait?.code === 'background_jobs'
+                      ? 'Pause follow-up'
+                      : 'Retry now'
                     : task.status === 'paused'
                       ? 'Resume'
                       : 'Pause'}

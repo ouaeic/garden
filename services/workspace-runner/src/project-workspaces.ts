@@ -49,7 +49,10 @@ export interface ProjectWorkspaceReceipt {
   handles?: Array<{ id: string; kind: string }>;
 }
 type Dependencies = {
-  ownedWriters: (workspaceId: string, taskId: string) => Array<{ id: string; kind: string }>;
+  ownedWriters: (
+    workspaceId: string,
+    taskId: string
+  ) => Array<{ id: string; kind: string }> | Promise<Array<{ id: string; kind: string }>>;
 };
 
 /** Copy only selected project sources. Unrelated work on the same computer keeps running. */
@@ -232,7 +235,7 @@ export class ProjectWorkspaces {
     const requestHash = digest({ sourceWorkspaceId, ...input });
     const source = workspacePath(this.root, sourceWorkspaceId),
       target = workspacePath(this.root, input.workspaceId);
-    const handles = this.dependencies.ownedWriters(sourceWorkspaceId, input.taskId);
+    const handles = await this.dependencies.ownedWriters(sourceWorkspaceId, input.taskId);
     if (handles.length)
       return {
         taskId: input.taskId,
@@ -445,7 +448,7 @@ export class ProjectWorkspaces {
         )
           throw Error('A selected project directory changed during preparation');
       }
-      const finalHandles = this.dependencies.ownedWriters(sourceWorkspaceId, input.taskId);
+      const finalHandles = await this.dependencies.ownedWriters(sourceWorkspaceId, input.taskId);
       if (finalHandles.length)
         throw Error('This project started a managed writer during preparation');
       receipt.directories = Object.fromEntries(

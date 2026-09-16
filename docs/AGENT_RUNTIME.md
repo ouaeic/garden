@@ -109,38 +109,16 @@ is a `df -h` the model is told to run rather than a number interpolated here.
 
 ## Tools
 
-The whole catalogue is sent on every request — every tool, plus the compaction trigger. Nothing is
-gated. Gating was measured and removed: the keyword rules that decided which tools to send matched
-almost none of the requests owners actually make, so a request to read a contract arrived without a
-document reader.
+Tool definitions are selected from measured browser/desktop availability, connected service kinds
+and the lead or specialist role. Unknown capability state retains definitions; a known missing
+capability removes them. The selected definitions keep stable order within an execution so the
+provider can reuse its cached prefix. The serialized catalogue and description ceilings are enforced
+by `tool-catalogue.test.ts`.
 
-Its exact size is not written down here, because a byte count in prose goes stale the first time a
-tool is added and then reads exactly like a measurement. It is enforced instead, in
-`tool-catalogue.test.ts`, by three separate numbers: a ceiling on the whole serialized catalogue, a
-cap on each tool's own description, and a second, higher cap on every description nested inside a
-tool's `parameters` — which the first cap never reached, so the whole of a tool's prose could grow
-below it unwatched. The ceiling is deliberately hard to move: it logs every raise in order, each
-recorded beside the measurement that justified it and the argument that no wording could have
-substituted for the capability. The rule it encodes is that it moves for a capability and never for
-prose, and it has held while the catalogue moved under it — most recently two undeclared schema facts
-were paid for out of two return-shape enumerations rather than out of the ceiling.
-
-To read the live figure rather than a sentence about it, run `pnpm eval` and read the `cat` column,
-which is what the catalogue actually cost on each fixture. It is the largest fixed cost the product
-pays and on a short turn it is the overwhelming majority of the bill — a fact the report could not
-see at all until the token column was corrected to count `body.tools`.
-
-The catalogue sits at the very front of the request, where a provider caches it once and replays it
-for the rest of the task, so it is a large share of the tokens sent and a smaller share of the money.
-That is why the answer to a large catalogue is to write the descriptions tightly rather than to
-withhold them, and why schemas are not the place to save tokens: a declared action variant is an
-interface fact the model would otherwise guess at and spend a round trip discovering.
-
-A search tool over the catalogue was built and then removed, for failing that same test from the
-other direction: it ranked definitions the model already had in front of it, billed a full pass over
-the window to do it, and admitted in its own description that it unlocked nothing. It is not coming
-back. Room, when room is needed, comes from flattening a schema rather than from withholding a
-definition or trimming prose.
+`pnpm eval` reports estimated serialized input and catalogue tokens. These are offline accounting
+measurements, not provider-tokenizer counts or actual charges. The context-quality rig checks what
+facts survive window changes; changing residency also requires verifying capability discovery and
+end-to-end outcomes.
 
 The catalogue covers plans, the acceptance record that defines what would prove the job done, shell
 commands, background processes and services the computer keeps running, files, conflict-detecting

@@ -784,8 +784,11 @@ export interface ContinuationInput {
   readonly continuationCeiling: number;
   /** Successful tool calls this turn that changed something, counted with `turnWriteCount`. */
   readonly writes: number;
+  readonly evidence?: number;
   /** What was true at the last ceiling this turn was let past; absent before the first one. */
-  readonly mark?: { readonly atStep: number; readonly writes: number } | undefined;
+  readonly mark?:
+    | { readonly atStep: number; readonly writes: number; readonly evidence?: number }
+    | undefined;
   readonly credits: number;
   readonly maxCredits: number;
   /**
@@ -826,13 +829,14 @@ export const mayRenewStepBudget = (input: ContinuationInput): ContinuationVerdic
       ok: false,
       reason: `it has already renewed its own budget ${input.continuationsUsed} times`
     };
-  if (!input.hasAcceptance)
+  const observedProgress = (input.evidence ?? 0) > (input.mark?.evidence ?? 0);
+  if (!input.hasAcceptance && !(input.writes === 0 && observedProgress))
     return {
       ok: false,
       reason:
         'this turn never declared what would prove the job done, so nothing but the model could say it is unfinished'
     };
-  if (!input.acceptanceIsThisTurn)
+  if (input.hasAcceptance && !input.acceptanceIsThisTurn)
     return {
       ok: false,
       reason:
@@ -845,21 +849,8 @@ export const mayRenewStepBudget = (input: ContinuationInput): ContinuationVerdic
       ok: false,
       reason: 'the harness has already refused this turn as many times as it refuses anything'
     };
-  /*
-   * Progress, from the one thing the harness counts rather than the model claims.
-   *
-   * A budget spent without a single successful change is a turn that is reading, re-planning or
-   * arguing with itself, and another hundred and twenty steps of that is exactly the runaway this
-   * whole mechanism exists not to be. Before the first renewal the bar is that the turn changed
-   * something at all; after it, that it changed something *since* the last renewal - so a turn that
-   * downs tools halfway through its second budget does not get a third.
-   *
-   * Deliberately not "the acceptance checks pass more than they did". A real job has one check that
-   * flips at the very end - the build compiles, the suite is green - so measuring progress by it
-   * would refuse continuation to precisely the work that needs it. The checks answer whether the job
-   * is done; this answers whether it is still moving.
-   */
-  if (input.writes <= (input.mark?.writes ?? 0))
+  // Both file changes and new observed evidence advance a task. Repeated reads do not.
+  if (input.writes <= (input.mark?.writes ?? 0) && !observedProgress)
     return {
       ok: false,
       reason: input.mark
@@ -896,7 +887,9 @@ export const stepBudgetRenewedNote = (input: {
     // opening words so a step is never billed for a notice it already carries, and a renewal that
     // began with the same two words would be mistaken for one - which would silently cost the
     // renewed budget the wind-down warning of its own ending.
-    `BUDGET RENEWED (${input.continuation} of ${input.ceiling}) after ${input.steps} steps. You did not stop, because the harness has just run your own acceptance checks and ${failed.length} of ${input.results.length} still ${failed.length === 1 ? 'fails' : 'fail'}:`,
+    input.results.length
+      ? `BUDGET RENEWED (${input.continuation} of ${input.ceiling}) after ${input.steps} steps. You did not stop, because the harness has just run your own acceptance checks and ${failed.length} of ${input.results.length} still ${failed.length === 1 ? 'fails' : 'fail'}:`
+      : `BUDGET RENEWED (${input.continuation} of ${input.ceiling}) after ${input.steps} steps because new source evidence was observed. Continue toward the requested outcome; repeated reads do not renew the budget.`,
     ...failed.map((result) => `- ${result.id} (${result.label}): ${result.detail}`),
     'This is the same turn on the same computer under the same spending caps, and the user has not been asked anything - carry straight on from the first thing that is not done. Do not restart finished work and do not re-plan from the beginning.',
     last

@@ -104,20 +104,20 @@ the whole block on every `pnpm check`. Accept a new baseline and this page fails
 is re-derived, naming the value it should now carry. The instruction is no longer advice.
 
 ```baseline
-fixtures                                                                             77
-long-a-finished-phase-is-never-declared.modelCalls                                   38
-long-a-finished-phase-is-never-declared.promptTokens                          1,468,199
-long-a-finished-phase-is-never-declared.catalogueTokens                         483,474
-long-a-finished-phase-is-never-declared.cachePrefix                                  95
-long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.modelCalls           40
-long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.promptTokens  1,414,908
-long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.catalogueTokens    496,198
-long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.cachePrefix          94
-long-finished-phases-condense-rather-than-shred.cachePrefix                          66
-compaction.extraModelCalls                                                            2
-compaction.tokensSaved                                                           53,291
-compaction.cachePointsGivenUp                                                         1
-floorWalk.cachePointsLost                                                            28
+fixtures                                                                                 77
+long-a-finished-phase-is-never-declared.modelCalls                                       38
+long-a-finished-phase-is-never-declared.promptTokens                              1,474,102
+long-a-finished-phase-is-never-declared.catalogueTokens                             494,456
+long-a-finished-phase-is-never-declared.cachePrefix                                      95
+long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.modelCalls               40
+long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.promptTokens      1,420,968
+long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.catalogueTokens      507,469
+long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.cachePrefix              94
+long-finished-phases-condense-rather-than-shred.cachePrefix                              66
+compaction.extraModelCalls                                                                2
+compaction.tokensSaved                                                               53,134
+compaction.cachePointsGivenUp                                                             1
+floorWalk.cachePointsLost                                                                28
 ```
 
 The last four are derived rather than stored, and the check does the subtraction itself:
@@ -127,21 +127,14 @@ is the size of what their tools returned.
 
 ## What the report says
 
-Each row is one fixture: its shape, the model calls it cost, the prompt tokens the provider would
-bill for across those calls, how many of those were the tool catalogue, the largest single window
-garden prepared, how much of each request was a byte-for-byte repeat of the one before it, and the
-drift of each against `evals/baseline.json`. Under the table, `WHAT FAILED` names the fixtures whose
-expectations broke, each with the prose statement of what it was protecting; `WHAT IS PENDING` names
-the stated targets the loop does not meet yet, which are not regressions; `WHAT THE HOLDS COST`
-totals how many fixtures each gate fired on and how many extra model calls it bought.
+Each row reports model calls, estimated serialized prompt tokens, the catalogue share, the largest
+prepared window and common-prefix reuse. These are deterministic offline accounting estimates,
+not billed usage, tokenizer-exact counts or a claim about task quality. Actual cost depends on the
+provider tokenizer, cached-input pricing, reasoning and output usage.
 
-`tokens` and `cat` are the two halves of one correction, and it is worth stating plainly what it
-changed. The column used to sum garden's own window estimate, which is the number the compaction
-trigger is compared against — and that number counts none of `body.tools`. So the largest fixed cost
-the product pays was invisible to the one instrument built to price it: deleting the entire tool
-catalogue would have moved the headline column by nothing at all. `tokens` is now what a provider
-would charge for, catalogue included, and `cat` is how much of it the catalogue was. On a
-question-answering turn `cat` is the overwhelming majority of the row.
+`tokens` includes messages and tool definitions; `cat` isolates tool definitions. `WHAT FAILED`
+reports broken fixture contracts; baseline drift is separately reviewable. `WHAT THE HOLDS COST`
+counts additional scripted model calls caused by runtime gates.
 
 `peak` is the largest single request the run prepared, beside the sum of them. The sum says what a
 turn cost; `peak` says whether it fitted, and the two move in opposite directions on the same

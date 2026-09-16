@@ -96,6 +96,20 @@ describe('native code intelligence', () => {
           expect.objectContaining({ path: python ? 'workspace/maths.py' : 'workspace/maths.ts' })
         ]
       });
+      const hover = await call({
+        action: 'hover',
+        path: python ? 'use.py' : 'use.ts',
+        line: 2,
+        column: python ? 15 : 24
+      });
+      expect(hover).toMatchObject({
+        text: expect.stringContaining('twice') as unknown,
+        truncated: false
+      });
+      const outline = await call({ action: 'symbols', path: python ? 'maths.py' : 'maths.ts' });
+      expect(outline).toMatchObject({
+        entries: expect.arrayContaining([expect.objectContaining({ name: 'twice' })]) as unknown
+      });
       const references = await call({
         action: 'references',
         path: python ? 'maths.py' : 'maths.ts',

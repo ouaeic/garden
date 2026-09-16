@@ -2,7 +2,13 @@ import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'rea
 import { ArrowLeft, MessageSquarePlus, Settings2 } from 'lucide-react';
 import type { ConversationSource, Project, Task, TaskPresentation } from '@athanor/contracts';
 import { get, patch } from './client';
-import { money, taskStatusLabel, conversationResultSource } from './model';
+import {
+  money,
+  taskStatusLabel,
+  conversationResultSource,
+  needsAttention,
+  hasOngoingWork
+} from './model';
 import { Button, Dialog, ErrorNotice, Field, Spinner } from './ui';
 import { projectStatus } from './ProjectCollection';
 import './projects.css';
@@ -266,16 +272,47 @@ export default function ProjectSpace({
         <div className="project-conversation">{children}</div>
       ) : (
         <div className="project-overview">
-          {project.brief && (
-            <details className="project-brief">
-              <summary>Project brief</summary>
-              <p>{project.brief}</p>
-            </details>
+          {!archived && tasks.some((task) => needsAttention(task) || hasOngoingWork(task)) && (
+            <section aria-label="Current work" className="project-current-work">
+              <h2>Current work</h2>
+              <div className="project-conversation-grid">
+                {tasks
+                  .filter((task) => needsAttention(task) || hasOngoingWork(task))
+                  .map((task) => (
+                    <button key={task.id} onClick={() => onTask(task.id)}>
+                      <span className={`garden-project-dot status-${task.status}`} />
+                      <span>
+                        <strong>{task.title}</strong>
+                        <small>{taskStatusLabel(task)}</small>
+                      </span>
+                    </button>
+                  ))}
+              </div>
+            </section>
           )}
-          <Suspense fallback={<Spinner />}>
-            <ProjectUpdates projectId={project.id} tasks={tasks} onTask={onTask} />
-            <ProjectNotes projectId={project.id} revision={project.updatedAt} onTask={onTask} />
-          </Suspense>
+          {!archived && (
+            <section aria-label="Project results">
+              <h2>Results</h2>
+              {tasks
+                .slice()
+                .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+                .slice(0, 4)
+                .map((task) => (
+                  <ConversationResults
+                    key={task.id}
+                    task={task}
+                    onOpen={() => onTask(task.id)}
+                    onDiscuss={(source) => onNewConversation(project, source)}
+                  />
+                ))}
+              {tasks.length > 4 && (
+                <p className="muted">
+                  Recent conversation results are shown here. Open any conversation for its complete
+                  results.
+                </p>
+              )}
+            </section>
+          )}
           <section aria-label="Conversations">
             <div className="project-section-heading">
               <h2>Conversations</h2>
@@ -337,29 +374,17 @@ export default function ProjectSpace({
               </Button>
             )}
           </section>
-          {!archived && (
-            <section aria-label="Project results">
-              <h2>Results</h2>
-              {tasks
-                .slice()
-                .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-                .slice(0, 4)
-                .map((task) => (
-                  <ConversationResults
-                    key={task.id}
-                    task={task}
-                    onOpen={() => onTask(task.id)}
-                    onDiscuss={(source) => onNewConversation(project, source)}
-                  />
-                ))}
-              {tasks.length > 4 && (
-                <p className="muted">
-                  Recent conversation results are shown here. Open any conversation for its complete
-                  results.
-                </p>
-              )}
-            </section>
+
+          {project.brief && (
+            <details className="project-brief">
+              <summary>Project brief</summary>
+              <p>{project.brief}</p>
+            </details>
           )}
+          <Suspense fallback={<Spinner />}>
+            <ProjectUpdates projectId={project.id} tasks={tasks} onTask={onTask} />
+            <ProjectNotes projectId={project.id} revision={project.updatedAt} onTask={onTask} />
+          </Suspense>
           {
             <Suspense fallback={<Spinner />}>
               <ProjectSessions projectId={project.id} onOpen={onComputer} />

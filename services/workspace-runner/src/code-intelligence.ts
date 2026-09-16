@@ -188,7 +188,12 @@ export class CodeIntelligenceManager {
             diagnostics: Boolean(session.capabilities.diagnosticProvider),
             definition: Boolean(session.capabilities.definitionProvider),
             references: Boolean(session.capabilities.referencesProvider),
-            rename: Boolean(session.capabilities.renameProvider)
+            rename: Boolean(session.capabilities.renameProvider),
+            hover: Boolean(session.capabilities.hoverProvider),
+            symbols: Boolean(session.capabilities.documentSymbolProvider),
+            implementation: Boolean(session.capabilities.implementationProvider),
+            type_definition: Boolean(session.capabilities.typeDefinitionProvider),
+            code_actions: Boolean(session.capabilities.codeActionProvider)
           }
         : null
     };
@@ -344,6 +349,15 @@ export class CodeIntelligenceManager {
             synchronization: { dynamicRegistration: false },
             definition: { linkSupport: true },
             references: {},
+            hover: { contentFormat: ['markdown', 'plaintext'] },
+            documentSymbol: { hierarchicalDocumentSymbolSupport: true },
+            implementation: { linkSupport: true },
+            typeDefinition: { linkSupport: true },
+            codeAction: {
+              codeActionLiteralSupport: {
+                codeActionKind: { valueSet: ['quickfix', 'refactor', 'source.organizeImports'] }
+              }
+            },
             rename: { prepareSupport: true },
             diagnostic: { dynamicRegistration: true },
             publishDiagnostics: { versionSupport: true }
@@ -366,11 +380,8 @@ export class CodeIntelligenceManager {
         try {
           await Promise.race([
             diagnosticsReady,
-            new Promise<never>((_, reject) => {
-              timer = setTimeout(
-                () => reject(new Error('Language server did not register diagnostics')),
-                20_000
-              );
+            new Promise<void>((resolve) => {
+              timer = setTimeout(resolve, 1000);
               timer.unref();
             })
           ]);
@@ -419,7 +430,7 @@ export class CodeIntelligenceManager {
       });
     // Opening a Python source joins asynchronous project discovery. Its diagnostic response
     // acknowledges analysis before rename can classify that source as an external library.
-    if (session.language === 'python') {
+    if (session.language === 'python' && session.capabilities.diagnosticProvider) {
       try {
         await session.connection.request('textDocument/diagnostic', {
           textDocument: { uri: source.uri }
@@ -446,19 +457,38 @@ export class CodeIntelligenceManager {
     }
     const source = await this.#sync(session, request.path);
     if (request.action === 'diagnostics') {
-      if (!session.capabilities.diagnosticProvider)
-        throw new Error('This language server does not support pull diagnostics');
-      const report = z.object({ kind: z.literal('full'), items: Diagnostics }).parse(
-        await session.connection.request('textDocument/diagnostic', {
-          textDocument: { uri: source.uri }
-        })
-      );
+      let report: { items: Diagnostic[] };
+      let complete = true;
+      if (session.capabilities.diagnosticProvider) {
+        report = z.object({ kind: z.literal('full'), items: Diagnostics }).parse(
+          await session.connection.request('textDocument/diagnostic', {
+            textDocument: { uri: source.uri }
+          })
+        );
+      } else {
+        const deadline = Date.now() + 5000;
+        let pushed = session.diagnostics.get(source.uri);
+        while (!pushed && Date.now() < deadline && !session.connection.closed) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          pushed = session.diagnostics.get(source.uri);
+        }
+        complete = pushed?.version === source.version;
+        report = {
+          items:
+            pushed && (pushed.version === undefined || pushed.version === source.version)
+              ? pushed.items
+              : []
+        };
+      }
       await this.#assertCurrent(session, source);
       for (const entry of report.items) sourceRange(source.text, entry.range);
       return {
         path: source.path,
         sha256: source.sha256,
-        complete: true,
+        complete,
+        ...(!complete
+          ? { note: 'The server has not confirmed diagnostics for this exact document version.' }
+          : {}),
         total: report.items.length,
         truncated: report.items.length > RESULT_LIMIT,
         diagnostics: report.items.slice(0, RESULT_LIMIT).map((entry) => ({
@@ -468,24 +498,141 @@ export class CodeIntelligenceManager {
         }))
       };
     }
+    if (request.action === 'symbols') {
+      if (!session.capabilities.documentSymbolProvider)
+        throw new Error('Language server does not support document symbols');
+      const raw = await session.connection.request('textDocument/documentSymbol', {
+        textDocument: { uri: source.uri }
+      });
+      const entries: unknown[] = [];
+      let total = 0;
+      const visit = (items: unknown, parent?: string): void => {
+        for (const item of z.array(z.unknown()).parse(items ?? [])) {
+          const symbol = z
+            .object({
+              name: z.string(),
+              kind: z.number().int(),
+              detail: z.string().optional(),
+              range: CodeRange.optional(),
+              selectionRange: CodeRange.optional(),
+              location: z.object({ uri: z.string(), range: CodeRange }).optional(),
+              children: z.array(z.unknown()).optional()
+            })
+            .parse(item);
+          const range = symbol.selectionRange ?? symbol.range ?? symbol.location?.range;
+          if (!range || (symbol.location && symbol.location.uri !== source.uri)) continue;
+          sourceRange(source.text, range);
+          total++;
+          if (entries.length < RESULT_LIMIT)
+            entries.push({
+              name: symbol.name.slice(0, 500),
+              kind: symbol.kind,
+              detail: symbol.detail?.slice(0, 1000),
+              parent,
+              range: displayRange(range)
+            });
+          if (symbol.children) visit(symbol.children, symbol.name);
+        }
+      };
+      visit(raw);
+      await this.#assertCurrent(session, source);
+      return {
+        path: source.path,
+        sha256: source.sha256,
+        entries,
+        total,
+        truncated: total > entries.length
+      };
+    }
     if (!request.line || !request.column)
       throw new Error('This action requires one-based line and UTF-16 column');
     const position = { line: request.line - 1, character: request.column - 1 };
     sourceRange(source.text, { start: position, end: position });
     const params = { textDocument: { uri: source.uri }, position };
     if (request.action === 'rename') return this.#rename(session, source, params, request.newName);
-    const method =
-      request.action === 'definition' ? 'textDocument/definition' : 'textDocument/references';
-    if (
-      !session.capabilities[
-        request.action === 'definition' ? 'definitionProvider' : 'referencesProvider'
-      ]
-    )
+    const navigation = {
+      definition: ['textDocument/definition', 'definitionProvider'],
+      references: ['textDocument/references', 'referencesProvider'],
+      implementation: ['textDocument/implementation', 'implementationProvider'],
+      type_definition: ['textDocument/typeDefinition', 'typeDefinitionProvider'],
+      hover: ['textDocument/hover', 'hoverProvider'],
+      code_actions: ['textDocument/codeAction', 'codeActionProvider']
+    } as const;
+    const route = navigation[request.action as keyof typeof navigation];
+    if (!route || !session.capabilities[route[1]])
       throw new Error(`Language server does not support ${request.action}`);
-    const raw = await session.connection.request(method, {
-      ...params,
-      context: { includeDeclaration: true }
-    });
+    const raw = await session.connection.request(
+      route[0],
+      request.action === 'code_actions'
+        ? {
+            textDocument: params.textDocument,
+            range: { start: position, end: position },
+            context: { diagnostics: session.diagnostics.get(source.uri)?.items ?? [] }
+          }
+        : {
+            ...params,
+            ...(request.action === 'references' ? { context: { includeDeclaration: true } } : {})
+          }
+    );
+    if (request.action === 'hover') {
+      const hover = z
+        .object({ contents: z.unknown(), range: CodeRange.optional() })
+        .nullable()
+        .parse(raw);
+      const stringify = (value: unknown): string => {
+        if (typeof value === 'string') return value;
+        if (Array.isArray(value)) return value.map(stringify).join('\n\n');
+        return z.object({ value: z.string() }).parse(value).value;
+      };
+      const text = hover ? stringify(hover.contents) : '';
+      if (hover?.range) sourceRange(source.text, hover.range);
+      await this.#assertCurrent(session, source);
+      return {
+        path: source.path,
+        sha256: source.sha256,
+        text: text.slice(0, 12000),
+        truncated: text.length > 12000,
+        ...(hover?.range ? { range: displayRange(hover.range) } : {})
+      };
+    }
+    if (request.action === 'code_actions') {
+      const actions = z
+        .array(
+          z.object({
+            title: z.string(),
+            kind: z.string().optional(),
+            edit: z.unknown().optional(),
+            command: z.unknown().optional(),
+            disabled: z.object({ reason: z.string() }).optional()
+          })
+        )
+        .parse(raw ?? []);
+      const entries = [];
+      for (const action of actions.slice(0, 30)) {
+        let preview: unknown;
+        try {
+          if (action.edit) preview = await this.#editPreview(session, workspaceEdits(action.edit));
+        } catch (cause) {
+          preview = { unavailable: cause instanceof Error ? cause.message : 'Cannot preview edit' };
+        }
+        entries.push({
+          title: action.title.slice(0, 1000),
+          kind: action.kind,
+          disabled: action.disabled?.reason,
+          preview,
+          requiresCommand: action.command !== undefined
+        });
+      }
+      await this.#assertCurrent(session, source);
+      return {
+        path: source.path,
+        sha256: source.sha256,
+        applied: false,
+        actions: entries,
+        total: actions.length,
+        truncated: actions.length > entries.length
+      };
+    }
     const locations = z
       .array(
         z.union([
@@ -550,11 +697,16 @@ export class CodeIntelligenceManager {
     for (const uri of edits.keys())
       await this.#sync(session, codeUriPath(session.root, session.project, uri));
     edits = await rename();
+    const preview = await this.#editPreview(session, edits);
+    await this.#assertCurrent(session, source);
+    return { ...preview, newName };
+  }
+
+  async #editPreview(session: Session, edits: ReturnType<typeof workspaceEdits>) {
     const files = [];
     let bytes = 0;
     for (const [uri, changes] of edits) {
-      const snapshot = session.documents.get(uri);
-      if (!snapshot) throw new Error('Rename scope changed during analysis; retry');
+      const snapshot = await this.#sync(session, codeUriPath(session.root, session.project, uri));
       await this.#assertCurrent(session, snapshot);
       const ranges = changes
         .map((edit) => ({ ...edit, ...sourceRange(snapshot.text, edit.range) }))
@@ -575,11 +727,9 @@ export class CodeIntelligenceManager {
       if (bytes > 100_000)
         throw new Error('Rename preview exceeds its response limit; narrow the project');
     }
-    await this.#assertCurrent(session, source);
     return {
       preview: true,
       applied: false,
-      newName,
       files,
       edits: files.reduce((sum, file) => sum + file.edits.length, 0)
     };

@@ -89,6 +89,7 @@ export interface TurnFinishDeps {
     state: AgentState,
     completion: {
       summary: string;
+      answer?: string;
       deliverables?: unknown[];
       verification: CompletionVerification;
       interrupted?: boolean;
@@ -474,7 +475,7 @@ export const handleFinishCall = async (
    * are bookkeeping, and this is the opposite - it exists to get an answer published, so it
    * clears the flag a refusal may have left set.
    */
-  if (!state.answered && !state.answerNagged) {
+  if (!state.answered && !state.answerNagged && !textValue(call.arguments.answer)) {
     state.answerNagged = true;
     state.repairStep = false;
     state.messages.push({
@@ -554,6 +555,7 @@ export const handleFinishCall = async (
     state,
     {
       summary,
+      answer: textValue(call.arguments.answer, summary),
       deliverables: delivery.deliverables,
       verification,
       ...(acceptanceEvidence.length ? { acceptance: acceptanceEvidence } : {}),

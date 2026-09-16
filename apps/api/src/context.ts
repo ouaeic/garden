@@ -821,7 +821,8 @@ export const createApiContext = async (config: ApiConfig, overrides: ApiOverride
           ? await taskFailure(
               store,
               task.id,
-              unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id)
+              unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id),
+              task.agentStateCiphertext
             )
           : null,
       ...(workspace?.parentWorkspaceId ? { parentWorkspaceId: workspace.parentWorkspaceId } : {})

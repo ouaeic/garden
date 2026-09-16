@@ -1,3 +1,4 @@
+import { evidenceProgressKey } from './progress.js';
 /**
  * What a turn writes down about a tool call: the timeline row, the window entry, the provenance it
  * moves forward, and the run of read-only calls that share one lease and one cancellation watch.
@@ -564,9 +565,11 @@ export const recordToolResult = async (
    * workspace: the single thing the completion contract exists to refuse.
    */
   const skipped = isHarnessAnswer(result);
+  const progressKey = skipped ? undefined : evidenceProgressKey(call, result);
   state.turnToolResults[call.id] = {
     name: call.name,
     success: !skipped,
+    ...(progressKey ? { progressKey } : {}),
     // Recorded for every result, including a harness answer: whether a call is citable is the
     // completion contract's question, and this is only where its bytes were put.
     ...(recorded?.id ? { eventId: recorded.id } : {}),

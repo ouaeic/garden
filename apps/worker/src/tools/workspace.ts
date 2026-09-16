@@ -1,3 +1,4 @@
+import { recordPatchReceipt, type PatchReceipt } from '../edit/receipts.js';
 import { executeDebuggerTool } from './debugger.js';
 import { sha256, AthanorError } from '@athanor/core';
 import { type ModelToolCall } from '@athanor/model-gateway';
@@ -761,15 +762,21 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
         task.id,
         systemPackageCommand ? ['exec', 'system.packages'] : 'exec',
         background ? `${root}/processes/start` : `${root}/exec`,
-        execution
+        !background && !systemPackageCommand
+          ? { ...execution, yieldAfterMs: 5000, requestId: call.id }
+          : execution
       );
-      const usage = await context.runner.call<{ storageBytes: number }>(
-        task.workspaceId,
-        task.id,
-        'files.read',
-        `${root}/usage`
-      );
-      await context.store.setWorkspaceStorage(task.userId, task.workspaceId, usage.storageBytes);
+      try {
+        const usage = await context.runner.call<{ storageBytes: number }>(
+          task.workspaceId,
+          task.id,
+          'files.read',
+          `${root}/usage`
+        );
+        await context.store.setWorkspaceStorage(task.userId, task.workspaceId, usage.storageBytes);
+      } catch {
+        /* The command receipt remains authoritative if metering is unavailable. */
+      }
       // The runner reports a missing file; only this side knows the command was written against
       // the wrong frame. One sentence, appended only where it is true - @see shell-frame.ts.
       return withWorkspacePrefixNote(execution, result);
@@ -987,33 +994,6 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
         content: renderNumbered(shown, 1)
       };
     }
-    /*
-     * The line-addressed editor, which replaced oldText/newText search-and-replace outright.
-     *
-     * The old shape proved an edit was fresh by making the model quote the text it was replacing,
-     * exactly once. That quote was the safety AND the cost: on a file that says `return null;`
-     * eleven times the quote had to grow until it was unique, and then be typed back with one word
-     * different. Measured on this repository's own corpus over fifteen tasks, addressing by line
-     * number instead cost 61% fewer characters of arguments and won fourteen of the fourteen rows
-     * where both formats did what the task asked. A move - the worst row - went from 777 characters
-     * to 57, because the moved block crosses the wire once instead of twice.
-     *
-     * It REPLACES rather than joins. Two ways to do one thing doubles what the model has to learn,
-     * pays for both entries on every request of every turn, and turns a real saving into a net loss;
-     * `docs/design/edit/BUILD.md` has the byte ledger both ways.
-     *
-     * The freshness proof moved from the model to the harness. `apps/worker/src/edit/snapshots.ts`
-     * remembers the exact lines each `file_read` above put in front of the model, so at apply time
-     * there are two texts to compare - what was shown, and what is on disk now - and a range needs
-     * to carry no evidence at all. That is strictly better evidence than a quote, because a quote is
-     * the model's memory of the file and a snapshot is this process's record of what it sent.
-     *
-     * Nothing here loosens the two guards that were already on this path. The runner's hash from the
-     * read is still claimed on the write, so a file that changed between the two fails closed rather
-     * than being silently overwritten. The runner's own seen-line ledger still runs underneath,
-     * against the whole-file write this produces, and it is what holds when this process's snapshot
-     * cache is cold - a worker restart mid-turn loses an opinion here and loses nothing there.
-     */
     case 'file_patch': {
       const patches = Array.isArray(call.arguments.patches)
         ? (call.arguments.patches as Array<Record<string, unknown>>)
@@ -1029,35 +1009,43 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
         notes: readonly string[];
       }> = [];
       const failures: Array<{ path: string; reason: string }> = [];
-      const readHashes = new Map<string, string>();
+      const uncertain: Array<{ path: string; reason: string; expectedSha256: string }> = [];
+      const warnings: string[] = [];
       const seenPaths = new Set<string>();
-      for (const patch of patches) {
-        const path = textValue(patch.path);
-        const edit = textValue(patch.edit);
+      // Validate the entire envelope before the first mutation. Aliases cannot address one file twice.
+      const validated = patches.map((patch) => {
+        const path = textValue(patch?.path);
+        const edit = textValue(patch?.edit);
         if (!path || !edit)
           throw new AthanorError(
             'patch_invalid',
             'Every patch requires a path and a non-empty edit.'
           );
-        /*
-         * One patch per file, and a repeated path is refused rather than chained.
-         *
-         * Every range in a patch names the numbers of the read it came from. A second patch on the
-         * same file would be addressed against those same numbers while the first patch had already
-         * moved them, so chaining the two would apply the second one somewhere the model never
-         * meant. Saying so is one sentence; getting it wrong is a corrupted file.
-         */
-        if (seenPaths.has(path))
+        const identity = path
+          .replace(/^workspace\//, '')
+          .split('/')
+          .filter((part) => part !== '.' && part !== '')
+          .join('/');
+        if (path.includes('\0') || path.split('/').includes('..'))
           throw new AthanorError(
             'patch_invalid',
-            `${path} appears in two patches of the same call. Every operation on one file addresses the numbers of the same read, so they belong in that file's single patch. Put all the operations for ${path} in one edit, each on its own line and in any order: they are applied from the end of the file backwards, so an edit low down does not move the numbers an edit higher up is addressing.`
+            'Patch paths must not contain traversal or null bytes.'
           );
-        seenPaths.add(path);
+        if (seenPaths.has(identity))
+          throw new AthanorError(
+            'patch_invalid',
+            `${path} appears in two patches of the same call. Combine its operations into one edit.`
+          );
+        seenPaths.add(identity);
+        return { path, edit };
+      });
+      for (const { path, edit } of validated) {
+        let readHash: string | undefined;
         let before: string;
         try {
           const read = await context.runner.readFileWithHash(task.workspaceId, task.id, path);
           before = read.content;
-          if (read.sha256) readHashes.set(path, read.sha256);
+          readHash = read.sha256 ?? undefined;
         } catch (cause) {
           failures.push({
             path,
@@ -1085,13 +1073,73 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
           continue;
         }
         forgetRefusal(task.id, path);
-        const written = await context.runner.writeFile(
-          task.workspaceId,
-          task.id,
+        const receipt: PatchReceipt = {
           path,
-          result.text,
-          readHashes.get(path)
-        );
+          expectedSha256: sha256(result.text),
+          beforeSha256: sha256(before),
+          status: 'uncertain'
+        };
+        try {
+          await recordPatchReceipt(context.store, task.id, context.key, call.id, receipt);
+        } catch {
+          failures.push({
+            path,
+            reason: 'Could not persist the edit intent. No write was attempted.'
+          });
+          continue;
+        }
+        let written: unknown;
+        try {
+          written = await context.runner.writeFile(
+            task.workspaceId,
+            task.id,
+            path,
+            result.text,
+            readHash
+          );
+        } catch (cause) {
+          // A lost response does not prove a write failed. Reconcile without replay or rollback.
+          const reason = cause instanceof Error ? cause.message : 'Write failed';
+          try {
+            const observed = await context.runner.readFileWithHash(task.workspaceId, task.id, path);
+            if (observed.content === result.text) {
+              written = { sha256: sha256(result.text) };
+              warnings.push(
+                `${path}: write response was lost; the resulting bytes were verified by rereading.`
+              );
+            } else if (observed.content === before) {
+              failures.push({ path, reason });
+              await recordPatchReceipt(context.store, task.id, context.key, call.id, {
+                ...receipt,
+                status: 'failed',
+                reason
+              }).catch(() => undefined);
+              continue;
+            } else {
+              uncertain.push({
+                path,
+                reason: `${reason}; the file now has different bytes. Read it before editing again.`,
+                expectedSha256: sha256(result.text)
+              });
+              continue;
+            }
+          } catch {
+            uncertain.push({
+              path,
+              reason: `${reason}; the current file could not be read. Reconcile it before retrying.`,
+              expectedSha256: sha256(result.text)
+            });
+            continue;
+          }
+        }
+        await recordPatchReceipt(context.store, task.id, context.key, call.id, {
+          ...receipt,
+          status: 'applied'
+        }).catch(() => {
+          warnings.push(
+            `${path}: acknowledgement storage was unavailable; the durable intent can be reconciled by hash.`
+          );
+        });
         const hash = (written as { sha256?: unknown })?.sha256;
         /*
          * What is on disk now is what this patch just wrote, in both ledgers.
@@ -1138,7 +1186,10 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
          * one question it cannot answer on this turn - does the file still parse - and the
          * numbered line beside the answer is what makes the fix one more edit rather than a read.
          */
-        const fault = await checkSyntax(path, result.text);
+        const fault = await checkSyntax(path, result.text).catch(() => {
+          warnings.push(`${path}: syntax verification could not run; the edit is already applied.`);
+          return null;
+        });
         const notes = fault
           ? [
               ...result.notes,
@@ -1163,18 +1214,22 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
           notes
         });
       }
-      if (!applied.length)
+      if (!applied.length && !uncertain.length)
         throw new AthanorError(
           'patch_conflict',
           failures.map((failure) => failure.reason).join('\n\n') || 'No patch could be applied'
         );
-      const usage = await context.runner.call<{ storageBytes: number }>(
-        task.workspaceId,
-        task.id,
-        'files.read',
-        `${root}/usage`
-      );
-      await context.store.setWorkspaceStorage(task.userId, task.workspaceId, usage.storageBytes);
+      try {
+        const usage = await context.runner.call<{ storageBytes: number }>(
+          task.workspaceId,
+          task.id,
+          'files.read',
+          `${root}/usage`
+        );
+        await context.store.setWorkspaceStorage(task.userId, task.workspaceId, usage.storageBytes);
+      } catch {
+        warnings.push('Storage accounting could not refresh; the file receipts below still apply.');
+      }
       /*
        * The trigger, on the paths the workspace confirmed rather than on the paths that were asked
        * for: a patch that failed has already `continue`d into `failures` and is not in `applied`,
@@ -1199,6 +1254,8 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
           lines
         })),
         patchCount: applied.length,
+        ...(uncertain.length ? { uncertain } : {}),
+        ...(warnings.length ? { warnings } : {}),
         // The numbers the file now has, so the next edit to it addresses this and not the read.
         wrote: applied.map(({ path, wrote }) => `${path}\n${wrote}`).join('\n\n'),
         // And how the numbers of the read map onto them, so the rest of the file can be addressed
@@ -1216,7 +1273,8 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
         ...(failures.length
           ? {
               failed: failures,
-              instruction: `${failures.length} of ${patches.length} patches were not applied and wrote nothing; the rest are already written. Each reason below carries the file's real text at those lines, so fix only the failures and send them again without reading first.`
+              instruction:
+                'filesChanged are confirmed on disk. failed were not applied. Reconcile any uncertain entries by reading; never replay the whole batch.'
             }
           : {})
       };

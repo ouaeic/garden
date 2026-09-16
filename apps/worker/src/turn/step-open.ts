@@ -1,27 +1,3 @@
-/**
- * Opening a step, and the three ceilings that can decide there is not going to be one.
- *
- * Everything here happens before a single token of the step is prepared, and the order is the whole
- * of it:
- *
- *   - the owner is asked first, because a Stop pressed between two steps must not buy a fourth one;
- *   - a correction is drained **before** the plan is refreshed, so a message that changes the goal
- *     is in the window when the plan is read rather than one step behind it;
- *   - the dormant rules run ahead of the runtime block, which keeps the block carrying the clock
- *     last in the window and therefore free to change;
- *   - then the wall clock, the compute credits and the owner's spend caps, in that order. `credits`
- *     is checked in front of the clock deliberately: when both are reached the money is the one the
- *     owner can do something about, and it is the sentence they should be given.
- *
- * The clock ceiling is the youngest of the three and the reason this reads as a set. Steps,
- * self-continuations, credits and spend caps compose rather than cap: six idle steps of generation
- * is an hour, a hundred and twenty steps of tool time is days. On a frontier model the credit
- * ceiling bites first, which is why it was a residual rather than an open runaway; on a cheap local
- * route credits accumulate slowly and the clock does not.
- *
- * Lifted out of `AgentWorker.run()` unchanged; the six `return`s became `'closed'`, which is the
- * whole of the edit.
- */
 import type { TaskRecord } from '@athanor/data';
 import type { AgentState } from '../agent-state.js';
 import { refreshArtifactLedger } from '../context.js';

@@ -9,6 +9,11 @@ export const CodeIntelligenceRequest = z
       'diagnostics',
       'definition',
       'references',
+      'hover',
+      'symbols',
+      'implementation',
+      'type_definition',
+      'code_actions',
       'rename'
     ]),
     language: z.enum(['typescript', 'python']),

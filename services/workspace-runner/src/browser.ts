@@ -327,23 +327,39 @@ export interface BrowserSnapshotParts {
 // therefore emitted last and bounded, leaving the actionable fields intact.
 export const BROWSER_SNAPSHOT_TEXT_LIMIT = 12_000;
 
-export const composeBrowserSnapshot = (parts: BrowserSnapshotParts): BrowserSnapshotParts => ({
-  url: parts.url,
-  title: parts.title,
-  holder: parts.holder,
-  botWall: parts.botWall,
-  elements: parts.elements,
-  elementsOmitted: parts.elementsOmitted,
-  framesOmitted: parts.framesOmitted,
-  tabs: parts.tabs,
-  downloads: parts.downloads,
-  pendingDialog: parts.pendingDialog,
-  consoleMessages: parts.consoleMessages,
-  failedRequests: parts.failedRequests,
-  images: parts.images,
-  screenshotBase64: parts.screenshotBase64,
-  text: parts.text.slice(0, BROWSER_SNAPSHOT_TEXT_LIMIT)
-});
+export const composeBrowserSnapshot = (
+  parts: BrowserSnapshotParts,
+  cursor: { offset?: number | undefined; sha256?: string | undefined } = {}
+) => {
+  const digest = createHash('sha256').update(parts.text).digest('hex');
+  const changed = Boolean(cursor.sha256 && cursor.sha256 !== digest);
+  const offset = changed
+    ? 0
+    : Math.min(parts.text.length, Math.max(0, Math.trunc(cursor.offset ?? 0)));
+  const end = Math.min(parts.text.length, offset + BROWSER_SNAPSHOT_TEXT_LIMIT);
+  return {
+    url: parts.url,
+    title: parts.title,
+    holder: parts.holder,
+    botWall: parts.botWall,
+    elements: parts.elements,
+    elementsOmitted: parts.elementsOmitted,
+    framesOmitted: parts.framesOmitted,
+    tabs: parts.tabs,
+    downloads: parts.downloads,
+    pendingDialog: parts.pendingDialog,
+    consoleMessages: parts.consoleMessages,
+    failedRequests: parts.failedRequests,
+    images: parts.images,
+    screenshotBase64: parts.screenshotBase64,
+    textComplete: end >= parts.text.length,
+    textOmitted: Math.max(0, parts.text.length - end),
+    textRange: { offset, end, total: parts.text.length, sha256: digest },
+    ...(end < parts.text.length ? { nextTextOffset: end } : {}),
+    ...(changed ? { textChanged: true } : {}),
+    text: parts.text.slice(offset, end)
+  };
+};
 
 /** Popups must not steal the agent's page; adopt one only once the current page is gone. */
 export const shouldAdoptNewPage = (current: Pick<Page, 'isClosed'> | undefined): boolean =>
@@ -2504,7 +2520,12 @@ export class BrowserManager {
     if (timer) clearTimeout(timer);
   }
 
-  async snapshot(workspaceId: string, root: string, actor: 'agent' | 'user') {
+  async snapshot(
+    workspaceId: string,
+    root: string,
+    actor: 'agent' | 'user',
+    cursor: { offset?: number | undefined; sha256?: string | undefined } = {}
+  ) {
     const session = await this.ensure(workspaceId, root);
     if (session.control.holder === 'secure_input' && actor === 'agent') {
       throw new Error('Browser is in secure input mode');
@@ -2591,28 +2612,31 @@ export class BrowserManager {
       []
     );
     const scan = await this.#scanPage(page);
-    return composeBrowserSnapshot({
-      url: page.url(),
-      title,
-      holder: session.control.holder,
-      botWall: null,
-      elements: scan.elements,
-      elementsOmitted: scan.elementsOmitted,
-      framesOmitted: scan.framesOmitted,
-      tabs: await sessionTabs(session),
-      // A download that outlived the action that started it is only discoverable here.
-      downloads: session.downloads.recent.slice(-10),
-      pendingDialog: session.pendingDialog
-        ? { type: session.pendingDialog.type(), message: session.pendingDialog.message() }
-        : null,
-      consoleMessages: session.consoleMessages.slice(-40),
-      // Already bounded to `FAILED_REQUEST_LIMIT` as it was recorded; copied so a later failure
-      // cannot mutate a payload that has been handed out.
-      failedRequests: [...session.failedRequests],
-      images,
-      screenshotBase64: screenshot.toString('base64'),
-      text
-    });
+    return composeBrowserSnapshot(
+      {
+        url: page.url(),
+        title,
+        holder: session.control.holder,
+        botWall: null,
+        elements: scan.elements,
+        elementsOmitted: scan.elementsOmitted,
+        framesOmitted: scan.framesOmitted,
+        tabs: await sessionTabs(session),
+        // A download that outlived the action that started it is only discoverable here.
+        downloads: session.downloads.recent.slice(-10),
+        pendingDialog: session.pendingDialog
+          ? { type: session.pendingDialog.type(), message: session.pendingDialog.message() }
+          : null,
+        consoleMessages: session.consoleMessages.slice(-40),
+        // Already bounded to `FAILED_REQUEST_LIMIT` as it was recorded; copied so a later failure
+        // cannot mutate a payload that has been handed out.
+        failedRequests: [...session.failedRequests],
+        images,
+        screenshotBase64: screenshot.toString('base64'),
+        text
+      },
+      cursor
+    );
   }
 
   /**

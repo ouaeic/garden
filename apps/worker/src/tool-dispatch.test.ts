@@ -843,7 +843,14 @@ describe('the workspace arms', () => {
         method: 'POST',
         path: `${root}/exec`,
         scopes: ['exec'],
-        body: { executable: 'ls', args: ['-la'], cwd: 'workspace', timeoutSeconds: 30 }
+        body: {
+          executable: 'ls',
+          args: ['-la'],
+          cwd: 'workspace',
+          timeoutSeconds: 30,
+          yieldAfterMs: 5000,
+          requestId: expect.any(String) as unknown
+        }
       },
       { method: 'GET', path: `${root}/usage`, scopes: ['files.read'], body: undefined }
     ]);

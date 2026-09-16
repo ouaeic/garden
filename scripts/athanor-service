@@ -13,9 +13,10 @@ case "${1:-}" in
   worker) entry="apps/worker/dist/index.js" ;;
   registry) entry="services/model-registry/dist/index.js" ;;
   notifications) entry="services/notifications/dist/index.js" ;;
+  jobs) entry="services/workspace-runner/dist/jobs.js" ;;
   runner) entry="services/workspace-runner/dist/index.js" ;;
   *)
-    echo "Usage: athanor-service {api|worker|registry|notifications|runner}" >&2
+    echo "Usage: athanor-service {api|worker|registry|notifications|runner|jobs}" >&2
     exit 1
     ;;
 esac

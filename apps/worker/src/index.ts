@@ -1,3 +1,4 @@
+import { runJobWaitLoop } from './job-waits.js';
 import { createServer } from 'node:http';
 import {
   assertMasterKeyOpensDatabase,
@@ -46,6 +47,16 @@ const codingMissionLoop = runCodingMissionLoop({
   onError: (error) =>
     workerLogger.error('worker.coding_mission_recovery_failed', failureFields(error))
 });
+const jobWaitShutdown = new AbortController();
+const jobWaitLoop = runJobWaitLoop({
+  store,
+  masterKey: keyRelease.key,
+  runnerBaseUrl: config.WORKSPACE_RUNNER_URL,
+  runnerSecret:
+    config.RUNNER_SHARED_SECRET ?? deriveServiceSecret(keyRelease.key, 'runner-capabilities'),
+  signal: jobWaitShutdown.signal,
+  onError: (error) => workerLogger.error('worker.job_wait_recovery_failed', failureFields(error))
+});
 const mediaLoop = runMediaJobLoop({
   store,
   masterKey: keyRelease.key,
@@ -74,6 +85,7 @@ const shutdown = () => {
   running = false;
   mediaShutdown.abort();
   codingMissionShutdown.abort();
+  jobWaitShutdown.abort();
 };
 process.once('SIGINT', shutdown);
 process.once('SIGTERM', shutdown);
@@ -147,6 +159,6 @@ await runLeaseLoops({
 });
 
 mediaShutdown.abort();
-await Promise.all([mediaLoop, codingMissionLoop]);
+await Promise.all([mediaLoop, codingMissionLoop, jobWaitLoop]);
 await new Promise<void>((resolve) => health.close(() => resolve()));
 await database.close();

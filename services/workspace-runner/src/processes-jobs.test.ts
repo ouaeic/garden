@@ -52,6 +52,49 @@ afterEach(async () => {
 });
 
 describe('durable finite jobs', () => {
+  it('returns a quick command output and exit receipt within its foreground wait', async () => {
+    const { root, current } = await setup();
+    const result = await start(current, root, "console.log('fast output')", {
+      yieldAfterMs: 5000,
+      timeoutSeconds: undefined
+    });
+    expect(result).toMatchObject({
+      status: 'completed',
+      stdout: 'fast output\n',
+      exitCode: 0,
+      lifetime: 'job'
+    });
+    expect(result).not.toHaveProperty('yielded');
+    expect(result).not.toHaveProperty('deadlineAt');
+  });
+
+  it('yields a slow command once and preserves its eventual output under the same handle', async () => {
+    const { root, current } = await setup();
+    const result = await start(
+      current,
+      root,
+      "require('fs').appendFileSync('launches','one\\n');setTimeout(()=>console.log('done'),500)",
+      { yieldAfterMs: 10, timeoutSeconds: undefined }
+    );
+    expect(result).toMatchObject({ status: 'running', yielded: true, lifetime: 'job' });
+    expect(result).not.toHaveProperty('deadlineAt');
+    const finished = await settled(current, result.sessionId);
+    expect(finished).toMatchObject({ status: 'completed', exitCode: 0, stdout: 'done\n' });
+    expect(await readFile(path.join(root, 'workspace/launches'), 'utf8')).toBe('one\n');
+  });
+
+  it('reconciles a repeated command request after a lost response without launching again', async () => {
+    const { root, current } = await setup();
+    const script = "require('fs').appendFileSync('runs','one\\n');setTimeout(()=>{},100)";
+    const first = await start(current, root, script, { requestId: 'one-call', yieldAfterMs: 5000 });
+    const again = await start(current, root, script, { requestId: 'one-call', yieldAfterMs: 5000 });
+    expect(again.sessionId).toBe(first.sessionId);
+    expect(await readFile(path.join(root, 'workspace/runs'), 'utf8')).toBe('one\n');
+    await expect(start(current, root, 'console.log(2)', { requestId: 'one-call' })).rejects.toThrow(
+      'different arguments'
+    );
+  });
+
   it('allows a finite job without a deadline and recovers only its checkpoint', async () => {
     const { root, current } = await setup();
     const launched = await start(current, root, "console.log('ready'); setInterval(()=>{},1000)", {

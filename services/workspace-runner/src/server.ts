@@ -1,3 +1,4 @@
+import { connectProcessSupervisor } from './process-supervisor.js';
 import { OwnerStroke } from '@athanor/contracts';
 import { ProjectUpdatesManager } from './project-updates.js';
 import { registerProjectUpdateRoutes } from './project-update-routes.js';
@@ -337,7 +338,9 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       : undefined,
     maxFileBytes: config.MAX_FILE_BYTES
   });
-  const processes = new ProcessManager();
+  const processes = config.JOB_SUPERVISOR_SOCKET
+    ? connectProcessSupervisor(config.JOB_SUPERVISOR_SOCKET, config.RUNNER_SHARED_SECRET)
+    : new ProcessManager();
   let processCapacity: { at: number; value: ReturnType<typeof machineReport> } | undefined;
   const checkpoints = new WorkspaceCheckpoints({
     workspaceRoot: config.WORKSPACE_ROOT,
@@ -443,11 +446,11 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
         ]);
         await quiesceManagedChildren(root);
       },
-      isWorkspaceBusy: (id) => {
+      isWorkspaceBusy: async (id) => {
         const root = workspacePath(config.WORKSPACE_ROOT, id);
         return (
           [...terminals.values()].includes(id) ||
-          processes.isWorkspaceBusy(id) ||
+          (await processes.isWorkspaceBusy(id)) ||
           computations.isWorkspaceBusy(id) ||
           debuggers.isWorkspaceBusy(root) ||
           codeIntelligence.isWorkspaceBusy(root) ||
@@ -601,13 +604,19 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
   // Loopback only, and deliberately says what the sandbox is actually doing: an operator - and a
   // control plane that tells the owner an agent shell is confined - has to be able to check.
   app.get('/healthz', async () => {
-    const backgroundWork = processes.backgroundWork();
+    const backgroundWork = await processes.backgroundWork();
     const computationWork = computations.backgroundWork();
     const debuggerWork = debuggers.backgroundWork();
     const projectPreparations = projectUpdates.backgroundPreparations();
     return {
       ok: true,
       service: 'workspace-runner',
+      processSupervisor: config.JOB_SUPERVISOR_SOCKET ? 'independent' : 'in_process',
+      runnerRestartUnsafeCommands:
+        (config.JOB_SUPERVISOR_SOCKET ? 0 : backgroundWork.commands) +
+        computationWork.commands +
+        debuggerWork.commands +
+        projectPreparations,
       agentSandbox: Boolean(sandbox),
       agentNetworkIsolated: config.ISOLATE_AGENT_NETWORK,
       // The rung this box is actually on, not the one its configuration asked for: with no helper
@@ -668,8 +677,8 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
   });
   registerCodingMissionRoutes(app, missions);
   const projectWorkspaces = new ProjectWorkspaces(config.WORKSPACE_ROOT, {
-    ownedWriters: (id, taskId) => [
-      ...processes.taskWriters(id, taskId),
+    ownedWriters: async (id, taskId) => [
+      ...(await processes.taskWriters(id, taskId)),
       ...computations
         .list(id, taskId)
         .filter((session) => ['starting', 'busy'].includes(session.state))
@@ -703,8 +712,8 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
     },
     poll: (workspaceId, taskId, sessionId, logs) =>
       processes.action(workspaceId, taskId, sessionId, { action: logs ? 'log' : 'poll' }),
-    stop: (workspaceId, taskId, sessionId) => {
-      processes.action(workspaceId, taskId, sessionId, { action: 'kill' });
+    stop: async (workspaceId, taskId, sessionId) => {
+      await processes.action(workspaceId, taskId, sessionId, { action: 'kill' });
     }
   });
   await projectUpdates.restore((error) =>
@@ -774,7 +783,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       codeIntelligence.stopWorkspace(
         workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId)
       );
-      processes.stopWorkspace(request.params.workspaceId, { forget: true });
+      await processes.stopWorkspace(request.params.workspaceId, { forget: true });
       await processes.flush();
       const root = workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId);
       await clearAgentOwnedFiles(root);
@@ -798,7 +807,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       codeIntelligence.stopWorkspace(
         workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId)
       );
-      processes.stopWorkspace(request.params.workspaceId);
+      await processes.stopWorkspace(request.params.workspaceId);
       await processes.flush();
       await browser.close(request.params.workspaceId);
       await desktop.close(request.params.workspaceId);
@@ -842,7 +851,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       codeIntelligence.stopWorkspace(
         workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId)
       );
-      processes.stopWorkspace(request.params.workspaceId);
+      await processes.stopWorkspace(request.params.workspaceId);
       await processes.flush();
       await browser.close(request.params.workspaceId);
       await desktop.close(request.params.workspaceId);
@@ -910,7 +919,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       codeIntelligence.stopWorkspace(
         workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId)
       );
-      processes.stopWorkspace(request.params.workspaceId);
+      await processes.stopWorkspace(request.params.workspaceId);
       await processes.flush();
       try {
         return await checkpoints.restore(
@@ -945,6 +954,29 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       // upload route. Refusing to start is the cheap half; execute() also watches the floor while
       // the command runs, because a command that fills the disk does it after this check.
       await assertHostStorageWrite(root, 0, probeHostStorage);
+      const deferred = z
+        .object({
+          yieldAfterMs: z.number().int().min(0).max(5000).optional(),
+          service: z.unknown().optional()
+        })
+        .passthrough()
+        .parse(request.body);
+      if (
+        deferred.yieldAfterMs !== undefined &&
+        request.capability.role === 'agent' &&
+        !request.capability.scopes.includes('system.packages')
+      ) {
+        if (deferred.service !== undefined) throw new Error('A service requires background=true');
+        return processes.start(
+          root,
+          request.params.workspaceId,
+          request.capability.sub,
+          { ...deferred, job: 'Command' },
+          config.MAX_BACKGROUND_SECONDS,
+          config.ISOLATE_AGENT_NETWORK,
+          guards
+        );
+      }
       // A worker that abandons the request has been cancelled or has died. Either way nobody will
       // ever read this command's result, so it must not keep running - and keep acting on the box.
       const disconnected = new AbortController();
@@ -1020,14 +1052,14 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
           })
         };
       const capacity = await processCapacity.value;
-      const listeners = processes.observedAgentListeners();
+      const listeners = await processes.observedAgentListeners();
       const reachable = (listeners ?? []).filter(
         (socket) => reachOfBindAddress(socket.address) !== 'self'
       );
       return {
         observedAt: new Date().toISOString(),
         refreshAfterMs: PROCESS_SAMPLE_MS,
-        resourcesAvailable: processes.resourcesAvailable(),
+        resourcesAvailable: await processes.resourcesAvailable(),
         host: {
           logicalCpus: capacity.cores,
           memoryBytes: totalmem(),
@@ -1035,8 +1067,8 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
         },
         processes:
           request.capability.role === 'agent'
-            ? processes.list(request.params.workspaceId, request.capability.sub)
-            : processes.listWorkspace(request.params.workspaceId),
+            ? await processes.list(request.params.workspaceId, request.capability.sub)
+            : await processes.listWorkspace(request.params.workspaceId),
         ...(listeners === undefined
           ? {}
           : { agentListeners: listeners.map((socket) => `${socket.address}:${socket.port}`) }),
@@ -1769,7 +1801,16 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       return browser.snapshot(
         request.params.workspaceId,
         root,
-        request.capability.role === 'user' ? 'user' : 'agent'
+        request.capability.role === 'user' ? 'user' : 'agent',
+        z
+          .object({
+            offset: z.number().int().nonnegative().optional(),
+            sha256: z
+              .string()
+              .regex(/^[a-f0-9]{64}$/)
+              .optional()
+          })
+          .parse(request.body ?? {})
       );
     }
   );
@@ -2210,7 +2251,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       codeIntelligence.stopWorkspace(
         workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId)
       );
-      processes.stopWorkspace(request.params.workspaceId);
+      await processes.stopWorkspace(request.params.workspaceId);
       await processes.flush();
       await browser.close(request.params.workspaceId);
       await desktop.close(request.params.workspaceId);

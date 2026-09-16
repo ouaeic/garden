@@ -895,16 +895,15 @@ describe('the wire a box is sent about the services it has actually connected', 
         | undefined
     )?.input;
 
-  it('describes every action when nobody has said what is connected', () => {
-    // The default argument, on the same terms as the surface gate above: every measurement, rig
-    // and test in this repository gets the whole catalogue without knowing this argument exists.
-    // An empty list means the caller never asked - a run that genuinely has nothing connected
-    // withdraws `connector_action` outright in `claimTurn`, so there is no box this could be the
-    // honest answer for.
-    expect(actionsOf(compacted([]))).toEqual(Object.keys(connectorActions));
-    expect(Buffer.byteLength(JSON.stringify(compacted([])))).toBe(
-      Buffer.byteLength(JSON.stringify(everything))
-    );
+  it('omits connector calls when the owner has no connections', () => {
+    const names = agentToolsFor('lead', undefined, []).map((tool) => tool.name);
+    expect(names.length).toBeGreaterThan(0);
+    expect(names).not.toContain('connector_action');
+    expect(names).not.toContain('connector_list');
+  });
+
+  it('describes every action when connection availability is unknown', () => {
+    expect(actionsOf(agentToolsFor())).toEqual(Object.keys(connectorActions));
   });
 
   it('withdraws nothing from a box that has connected all five kinds', () => {
@@ -1604,7 +1603,7 @@ describe('the catalogue as the model reads it', () => {
       [
         'browser_snapshot',
         '../../../services/workspace-runner/src/browser.ts',
-        /composeBrowserSnapshot = \(parts: BrowserSnapshotParts\): BrowserSnapshotParts => \(\{([\s\S]*?)\n\}\);/,
+        /composeBrowserSnapshot = [\s\S]*?return \{([\s\S]*?)\n {2}\};/,
         ['elementsOmitted', 'framesOmitted']
       ],
       [
@@ -2123,7 +2122,8 @@ describe('the contract each answer is written to', () => {
   it('says where the answer goes and how long the card is', () => {
     const finish = agentTools.find((tool) => tool.name === 'finish');
     const properties = finish?.parameters.properties as Record<string, { description?: string }>;
-    expect(properties.summary?.description).toMatch(/streamed reply/);
+    expect(properties.answer?.description).toMatch(/user-facing answer/);
+    expect(properties.summary?.description).toMatch(/answer is omitted/);
     expect(properties.deliverables?.description).toMatch(/can now open/);
   });
 

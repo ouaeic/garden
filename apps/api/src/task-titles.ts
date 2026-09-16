@@ -79,7 +79,32 @@ const PROMPT_EXCERPT_CHARACTERS = 2_000;
 export const TITLE_SYSTEM_PROMPT =
   'You name conversations. Reply with nothing but a clear, specific title naming the request and its intended outcome. Keep it concise, but preserve the details needed to distinguish this work, in the language the request is written in. No quotation marks, no final full stop, no preamble.';
 
-export const INITIAL_TASK_TITLE = 'New project';
+/** A bounded provisional name is useful even when optional title inference is unavailable. */
+export function provisionalTaskTitle(prompt: string): string {
+  const opening =
+    prompt
+      .replace(/https?:\/\/\S+/g, '')
+      .replace(/^[\s#>*`-]+/, '')
+      .replace(
+        /^(?:(?:please|can you|could you|would you|I want you to|I would like you to)\s+)+/i,
+        ''
+      )
+      .split(/[\n.!?。！？]/, 1)[0]
+      ?.trim() ?? '';
+  const words = opening.split(/\s+/).filter(Boolean);
+  let title = '';
+  for (const word of words.slice(0, 7)) {
+    if (Array.from(`${title} ${word}`).length > 56) break;
+    title += `${title ? ' ' : ''}${word}`;
+  }
+  if (!title) title = Array.from(opening).slice(0, 48).join('');
+  if (!title) return 'New project';
+  return (
+    title.charAt(0).toLocaleUpperCase() +
+    title.slice(1) +
+    (title.length < opening.length ? '…' : '')
+  );
+}
 
 /**
  * Turns whatever the model said into a name, or nothing.

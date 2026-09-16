@@ -224,6 +224,7 @@ export const startTurnState = <T extends Record<string, unknown>>(
     browserHandoff?: unknown;
     continuationMark?: unknown;
     artifactLedger?: unknown;
+    jobWaitId?: unknown;
     codingMissionWaiting?: unknown;
     codingMissionReviews?: unknown;
     pendingNativeInputs?: unknown;
@@ -231,6 +232,7 @@ export const startTurnState = <T extends Record<string, unknown>>(
     transcriptionApprovals?: unknown;
     mediaApprovals?: unknown;
   };
+  delete next.jobWaitId;
   delete next.codingMissionWaiting;
   delete next.codingMissionReviews;
   delete next.pendingNativeInputs;

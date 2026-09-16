@@ -9,6 +9,7 @@ import { codeOffset, codeSource, codeUriPath, workspaceEdits } from './code-inte
 describe('source-linked language results', () => {
   it('validates UTF-16 offsets and refuses ranges beyond a line', () => {
     expect(codeOffset('🌿x\r\ny', { line: 0, character: 2 })).toBe(2);
+    expect(() => codeOffset('🌿x', { line: 0, character: 1 })).toThrow('Unicode');
     expect(codeOffset('🌿x\r\ny', { line: 1, character: 1 })).toBe(6);
     expect(() => codeOffset('x\ny', { line: 0, character: 2 })).toThrow('outside');
   });

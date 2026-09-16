@@ -65,8 +65,13 @@ export interface ProjectCheckExecution {
     command: ProjectCheckCommand,
     job: string
   ): Promise<{ sessionId: string }>;
-  poll(workspaceId: string, taskId: string, sessionId: string, logs: boolean): CheckProcess;
-  stop(workspaceId: string, taskId: string, sessionId: string): void;
+  poll(
+    workspaceId: string,
+    taskId: string,
+    sessionId: string,
+    logs: boolean
+  ): CheckProcess | Promise<CheckProcess>;
+  stop(workspaceId: string, taskId: string, sessionId: string): void | Promise<void>;
 }
 
 /** The only mutable shared file is a durable head reference; working processes never use it as a pathname. */
@@ -706,7 +711,7 @@ export class ProjectUpdatesManager {
             saved.sessionId = process.sessionId;
             saved.status = 'running';
             if (this.#cancelled.has(check.id)) {
-              this.execution.stop(check.id, update.taskId, process.sessionId);
+              await this.execution.stop(check.id, update.taskId, process.sessionId);
               saved.status = 'cancelled';
             }
             await this.save(current);
@@ -747,7 +752,7 @@ export class ProjectUpdatesManager {
       if (check.status !== 'running' || !check.sessionId) continue;
       let process: CheckProcess;
       try {
-        process = this.execution.poll(check.id, update.taskId, check.sessionId, false);
+        process = await this.execution.poll(check.id, update.taskId, check.sessionId, false);
       } catch {
         check.status = 'interrupted';
         check.detail = 'The check process is unavailable; it is not a passing result.';
@@ -857,7 +862,7 @@ export class ProjectUpdatesManager {
       if (stop) {
         this.#cancelled.add(check.id);
         if (check.sessionId && ['preparing', 'running'].includes(check.status))
-          this.execution.stop(check.id, update.taskId, check.sessionId);
+          await this.execution.stop(check.id, update.taskId, check.sessionId);
         if (['pending', 'preparing', 'running', 'verifying'].includes(check.status)) {
           check.status = 'cancelled';
           check.finishedAt = now();
@@ -878,7 +883,7 @@ export class ProjectUpdatesManager {
       for (const check of update.checks) {
         this.#cancelled.add(check.id);
         if (check.sessionId && check.status === 'running')
-          this.execution.stop(check.id, update.taskId, check.sessionId);
+          await this.execution.stop(check.id, update.taskId, check.sessionId);
         if (['pending', 'preparing', 'running', 'verifying'].includes(check.status)) {
           check.status = 'cancelled';
           check.finishedAt = now();

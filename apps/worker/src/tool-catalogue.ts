@@ -198,40 +198,6 @@ const CONNECTOR_INPUT_PROPERTIES: Record<string, unknown> = {
   response: { type: 'string', enum: ['accepted', 'declined', 'tentative'] }
 };
 
-/**
- * What each connector action takes, in the two forms the request needs it in.
- *
- * `fields` is which of the 49 names in the input bag that action can use, and `clause` is the
- * sentence the model reads to find that out. They were one thing - a 1,741-byte literal
- * description and a 49-field bag beside it, both unconditional - and they are two here for one
- * reason: `executeConnectorAction` in @athanor/core refuses any action whose `kind` is not the
- * connector's, two lines before it looks at scopes, so on a box with a mailbox and a calendar the
- * eleven GitHub, WebDAV and MCP actions are not "unlikely", they are *unable to succeed*. They
- * were being described anyway, at the head of the cached prefix, on every request of every task.
- * @see connectorActionTool, and `agentToolsFor`'s third argument, which is the only thing that
- * narrows this.
- *
- * A total `Record<ConnectorAction, ...>` rather than a lookup with a fallback, and that is the
- * guard: an action added to `connectorActions` cannot compile until somebody has said here what
- * it takes, so the narrowing can never silently drop a capability nobody declared. The other
- * direction - a field in the bag no action reaches, or an action naming a field the bag does not
- * declare - is a set equality the ceiling test asserts, because there is no type that can.
- *
- * Exported for the test that reads each ROW against the Zod object which parses that action,
- * which is a different question from the set equality and the one the set equality structurally
- * cannot ask: a field assigned to the wrong action is invisible to a union, because a sibling
- * action of the same kind is usually reaching it anyway. That is not hypothetical - the first
- * version of `calendar_update_event` here named two fields its schema rejects, at a cost of zero
- * bytes, which is exactly why nothing caught it. The thirteen mail and calendar rows are checked
- * against `mailConnectorActionInputs`; the eleven GitHub, WebDAV and MCP rows cannot be, because
- * `connectorActionInput` in @athanor/core is not exported, and that is worth an export the day
- * one of them is wrong.
- *
- * The clauses are the shipped wording, unchanged. Rebuilt whole for every action, this produces
- * the previous literal byte for byte, which is asserted rather than claimed: nothing in this
- * restructure is allowed to be a rewrite, because the description is 3% of the cached prefix and
- * a reworded sentence is a cache miss the model gets nothing for.
- */
 export const CONNECTOR_ACTION_INPUTS = {
   mail_list_mailboxes: { fields: [], clause: 'none' },
   mail_search: {
@@ -734,7 +700,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'process',
     description:
-      'Background status/log/input/stop and declared-checkpoint resume (never completed jobs). describe exposes native persistent Python/JavaScript cells, plots/checkpoints and task debugging via compute/debug options; cached status is code-free.',
+      'wait releases this turn until finite jobs stop, then resumes automatically. Do other work first. Status/log/input/stop; resume uses a declared checkpoint. describe lists persistent computation and debugging; compute/debug take options.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -742,9 +708,26 @@ export const agentTools: ModelTool[] = [
       properties: {
         action: {
           type: 'string',
-          enum: ['list', 'poll', 'log', 'kill', 'write', 'resume', 'describe', 'compute', 'debug']
+          enum: [
+            'list',
+            'poll',
+            'log',
+            'wait',
+            'kill',
+            'write',
+            'resume',
+            'describe',
+            'compute',
+            'debug'
+          ]
         },
         sessionId: { type: 'string' },
+        sessionIds: {
+          type: 'array',
+          items: { type: 'string' },
+          maxItems: 32,
+          description: 'Finite jobs to await together when action=wait.'
+        },
         data: { type: 'string', description: 'Input when action=write.' },
         options: { type: 'object' }
       }
@@ -887,7 +870,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'code_diagnostics',
     description:
-      'Run project diagnostics after edits, then run tests separately. For native TypeScript/JavaScript or Python definitions, references and rename previews, use action=describe for controls.',
+      'Run project diagnostics after edits, then run tests separately. Use describe for native TS/JS and Python symbols, hover, navigation and edit previews.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -902,6 +885,11 @@ export const agentTools: ModelTool[] = [
             'diagnostics',
             'definition',
             'references',
+            'hover',
+            'symbols',
+            'implementation',
+            'type_definition',
+            'code_actions',
             'rename'
           ]
         },
@@ -970,38 +958,6 @@ export const agentTools: ModelTool[] = [
   },
   {
     name: 'file_patch',
-    /**
-     * The editor, and the one place on this catalogue where the dialect itself is the capability.
-     *
-     * It used to be oldText/newText with an exactly-once guard. That guard was the safety and also
-     * the cost: on a file that says `return null;` eleven times, the quote had to grow until it was
-     * unique and then be typed back with one word different, so the price of an edit was set by how
-     * repetitive the file is rather than by how large the edit is. Measured offline over fifteen
-     * tasks on this repository's own corpus, addressing by line number instead costs 61% fewer
-     * characters of arguments - 4,086 against 1,589 - and wins fourteen of the fourteen rows where
-     * both formats do what the task asked. The worst row is a move: eleven lines relocated cost 777
-     * characters as a quote, because the block had to cross the wire twice, and 57 as a CUT and a
-     * PUT of a named register.
-     *
-     * It REPLACES the quoted shape rather than joining it. Two ways to do one thing doubles what the
-     * model has to learn, pays for both entries on every request of every turn, and is what turns a
-     * measured saving into a net loss on the wire.
-     *
-     * The spec below is resident on every request and is therefore the number that had to be
-     * argued. The reference dialect this was measured from spends 5,268 bytes describing itself;
-     * this spends 1,090, and the difference is not terseness. Three of the reference's paragraphs
-     * describe a per-file version tag, what to do when it does not match, and how to recover from
-     * that - and the harness here needs no tag at all, because `apps/worker/src/edit/snapshots.ts`
-     * remembers what each read displayed and can therefore compare the file to what the model was
-     * actually shown. The reference's own harness ships a hand-maintained list of four models that
-     * "drop the tag header" often enough to be routed to a lenient parser; a header the model can
-     * drop is a header this harness does without.
-     *
-     * `REM` and `MV` are not here for a different reason and it is worth the sentence: the worker's
-     * runner client has no delete or rename route, so declaring them would put two operations on
-     * every request that the arm behind them cannot carry out. `shell` already removes and renames
-     * files. A capability wired to nothing is the failure this programme has shipped twice.
-     */
     description:
       'Edit files by line number, using the numbers file_read returns. The range says which lines go and the body says only what replaces them, so no text is ever typed twice and moving a block costs one copy of it rather than two.',
     parameters: {
@@ -1505,25 +1461,6 @@ export const agentTools: ModelTool[] = [
   },
   {
     name: 'publish_preview',
-    /**
-     * ONE entry, where there were two: `publish_site` was folded in here as `reach` and its
-     * catalogue entry deleted.
-     *
-     * The two tools took the same required pair, ran the same runner action and minted the same
-     * kind of token; the only thing separating a private link from a public deployment was which
-     * NAME the model wrote, and 188 bytes of the two descriptions went on telling it which. The
-     * approval floor could not see the difference at all - it read the name too, in three places -
-     * so the merge was blocked until `approval-policy.ts` learned to read the reach. Measured:
-     * 645 bytes of entry recovered, 118 of "use the other one" prose deleted with it, and about
-     * 200 spent on the enum and an honest sentence about what each reach does.
-     *
-     * `hostingMode` used to be a parameter on the public half, described as the difference between
-     * a computer that idles between visits and one held awake for the site. Nothing hibernates a
-     * workspace on a timer and nothing holds one awake, so both halves of that choice were prose -
-     * and the one place the mode is read wakes a sleeping computer for an on-demand site and
-     * refuses an always-ready one, which is the opposite of what it said. There is no mode here
-     * either.
-     */
     description:
       /*
        * The `path` clause is here because of what the owner actually received. Asked to build a
@@ -1612,7 +1549,19 @@ export const agentTools: ModelTool[] = [
      */
     description:
       'Open the persistent server browser if needed and read the page in front of it, with a screenshot and the interactive elements of the page and its frames. Each element carries: its selector, accessible name, submitted field name, current value, checked state, whether it is required, disabled or currently invalid, the hint or error text the site is showing beside it, and every option of a select. elementsOmitted and framesOmitted count what did not fit: above zero, bring it into view and snapshot again. This is how you read a page on the internet once you have its address: navigate browser_action to the website, then snapshot it to read what is on screen. Use web_search to find that address rather than driving this at a search engine. Snapshot once to see the page, then use read_elements for every re-check after that - it returns the same element list without the screenshot or the page text. A snapshot carrying botWall is that page raising an anti-bot challenge: do not reload it, open it in another tab, or touch the challenge.',
-    parameters: { type: 'object', additionalProperties: false, properties: {} }
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        offset: {
+          type: 'integer',
+          minimum: 0,
+          description:
+            'Continue at nextTextOffset with textRange.sha256. A changed page restarts at zero.'
+        },
+        sha256: { type: 'string' }
+      }
+    }
   },
   {
     name: 'read_elements',
@@ -1728,8 +1677,12 @@ export const agentTools: ModelTool[] = [
         summary: {
           type: 'string',
           maxLength: 400,
+          description: 'Concise outcome. Used as the final answer when answer is omitted.'
+        },
+        answer: {
+          type: 'string',
           description:
-            'One or two lines for the timeline card: what changed and where it is. The answer itself belongs in your streamed reply - do not repeat it here.'
+            'Complete user-facing answer in Markdown when summary is insufficient. Put the answer here once; ordinary streamed messages are progress.'
         },
         deliverables: {
           type: 'array',
@@ -1802,35 +1755,6 @@ const coreToolNames = new Set([
  */
 export type ToolAudience = 'lead' | 'specialist';
 
-/**
- * The specialist's whole wire surface, and the containment property it is.
- *
- * Read-only, and each one safely concurrent with the other two. `parallel_web_read` earns its place
- * because it opens its own isolated browser rather than steering the persistent session the lead and
- * the owner share, which is what makes "read these fifteen sources and tell me where they disagree"
- * a delegable job at all. `web_search` is here for a different reason: a challenge no longer takes
- * the browser off the agent, it stops the one tab and the one site that raised it, so a specialist
- * that walks into one costs that search and nothing else. A specialist that cannot search can only
- * read sources somebody else already found for it.
- *
- * It lives here rather than in delegate.ts because this file owns what reaches a provider, and while
- * the set sat inside `runDelegateMission` the only thing checking it was a four-name blocklist in
- * agent-run.test.ts - `shell`, `file_write`, `browser_action`, `finish`. Measured: adding
- * `file_patch` to it, a tool whose entire purpose is changing a file the specialist is told it
- * cannot change, left all 1,145 worker tests green. The read-only fence of the quarantine path was
- * enumerated, not derived. It is derived now, in tool-catalogue.test.ts, from the two classification
- * sets the property actually rests on: `isMutatingToolCall` (write-classification.ts) and
- * `REPEATABLE_TOOLS` (turn-bounds.ts). A name added here that either of those calls a change now
- * fails, whether or not anybody thought to blocklist it.
- *
- * Four of these nine - `files_list`, `repo_overview`, `document_read`, `document_search` - have been
- * proposed for demotion off the *lead's* wire on the grounds that `shell` substitutes for them.
- * They stay on both, and the reason is the same test that keeps them here: `shell` is in neither
- * `NON_MUTATING_TOOLS` nor `REPEATABLE_TOOLS`, so a read routed through it becomes a change, takes a
- * workspace checkpoint, sets `mutatedBeyondProse`, lands in front of the completion-evidence rule,
- * and is never replayed after an interrupted turn. Substituting `shell` for a reader does not move a
- * property, it removes two.
- */
 export const specialistToolNames = new Set([
   'files_list',
   'file_read',
@@ -1910,38 +1834,7 @@ const DESKTOP_SURFACE_TOOLS = new Set(['desktop_observe', 'desktop_launch', 'des
  *     decide it.
  */
 
-/**
- * The catalogue for a task: all of the audience's tier, core set first.
- *
- * It used to be gated. Six keyword regexes over the last four user messages decided which of six
- * playbooks were in force, and only an active playbook's tools were sent. Measured against
- * twenty-four plausible owner requests, twenty-two matched no regex at all - so "read this contract
- * and tell me what I am agreeing to" arrived with no document reader, "take a look at the
- * screenshot" with no image reader, and "make me a logo" with no way to make one. The escape hatch
- * cost a full billed round trip on the whole window before any work could start, and only worked
- * when the owner had happened to use a word that appeared in a tool description.
- *
- * The definitions sent on every request sit at the very front of the request, where a provider
- * caches them once and replays them for the rest of the task. That is the cheaper mistake by a wide
- * margin, and it is why the answer to a large catalogue is to write the descriptions tightly rather
- * than to withhold them: the size of the catalogue is measured in tools.test.ts against a ceiling,
- * not asserted in a comment here, because a stale number in a comment reads exactly like a
- * measurement.
- *
- * What was removed instead is the thing that cost a round trip and unlocked nothing: `tool_search`
- * ranked definitions the model already had in front of it, billed a full pass over the window to do
- * it, and its own description admitted it did not make anything reachable.
- *
- * Order is fixed for the life of a task rather than assembled per step, which is what the caching
- * actually needs: the tool block opens the prompt prefix, so a definition moving position ends the
- * common prefix at that point. Core first, then declaration order, on every request.
- *
- * The audience is the one thing that does select, and it is decided once when the agent is created
- * and never after: a residency decision taken mid-run saves tokens on one request and ends the
- * cached prefix on every request that follows it, which costs more than it saves within two steps.
- * Selecting here rather than filtering at the call site is not tidiness - it is what lets the tier
- * be a tested property of the wire instead of a literal buried in a six-hundred-line function.
- */
+/** Stable, capability-filtered definitions. Undefined connectors means unknown; an empty list means none. */
 export const agentToolsFor = (
   audience: ToolAudience = 'lead',
   /**
@@ -1950,43 +1843,7 @@ export const agentToolsFor = (
    * argument exists, and only a run that has actually asked the runner can withdraw anything.
    */
   surfaces: WorkspaceSurfaces = UNKNOWN_SURFACES,
-  /**
-   * Which kinds of service the owner has actually connected, on the same terms as `surfaces`.
-   *
-   * The third fact, and the only one of the three that narrows a tool instead of removing one.
-   * `connector_action` declares twenty-four actions across five kinds of connection, and
-   * `executeConnectorAction` (@athanor/core) refuses any whose `kind` is not the connector's
-   * before it looks at a scope or opens a credential - so on a box with a mailbox and a calendar
-   * the eleven GitHub, WebDAV and MCP actions are not merely unlikely, they cannot succeed.
-   * Measured through this function: 1,293 bytes off a mailbox-and-calendar box, 2,511 off a
-   * mailbox alone, 5,069 off a box whose one connection is an MCP server, 0 off a box that has
-   * connected all five. Nothing is withdrawn on the last of those, which is the property that
-   * makes this honest - the saving is the absence of a connection, not a capability given up.
-   *
-   * Empty or absent means unknown and describes every action, which is the fail-safe direction
-   * and also the only sound reading of empty: a run with nothing connected withdraws
-   * `connector_action` outright a few lines above the call site, so an empty set here is a caller
-   * that never asked rather than an owner who connected nothing.
-   *
-   * Findability survives at zero cost, which is why this narrowing is allowed where a narrowing
-   * by *granted scope* is not yet: `connector_list` sits beside it on every request and its
-   * description names all five kinds - "a mailbox, a calendar, GitHub, WebDAV, a remote MCP
-   * server" - so the model reads what could be connected whether or not anything is. And being
-   * wrong is one cheap call FOR THE TWELVE READS: `executeConnectorTool` answers an action outside
-   * this set by naming the ones this connector does reach, in the same result, so the retry needs
-   * no round trip of its own.
-   *
-   * It is not cheap for the other twelve, and that is measured rather than assumed. Eight of the
-   * twenty-four actions are `write` and four are `delete`, and `approvalRequirement` reads
-   * `connectorActions[action].sideEffect` alone - it never sees which connector the call named -
-   * while `approvalForCallOnce` runs in `turn/dispatch.ts` BEFORE the arm that would refuse the
-   * mismatch. So a mailbox-only box guessing `webdav_delete` parks the turn behind a card the
-   * owner has to answer before the cheap refusal is ever reached. Nothing here caused that: it is
-   * the same on a box sent all twenty-four, and narrowing can only lower the rate of the guess.
-   * It is stated because the sentence above is otherwise half true, and half-true is how a
-   * comment in this repository gets believed and then relied on.
-   */
-  connectorKinds: readonly AnyConnectorKind[] = []
+  connectorKinds?: readonly AnyConnectorKind[]
 ): ModelTool[] => {
   const kinds = new Set(connectorKinds);
   const audienceTier =
@@ -1996,6 +1853,9 @@ export const agentToolsFor = (
   const tier = audienceTier
     .filter(
       (tool) =>
+        (!['connector_action', 'connector_list'].includes(tool.name) ||
+          connectorKinds === undefined ||
+          kinds.size > 0) &&
         (!BROWSER_SURFACE_TOOLS.has(tool.name) || surfaceDescribable(surfaces.browser)) &&
         (!DESKTOP_SURFACE_TOOLS.has(tool.name) || surfaceDescribable(surfaces.desktop))
     )

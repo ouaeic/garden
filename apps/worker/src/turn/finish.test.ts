@@ -70,6 +70,7 @@ const neverRan: AcceptanceResult = {
 /** The completion `completeTurn` was handed, which is the payload of the `completed` event. */
 interface Completed {
   readonly verification: CompletionVerification;
+  readonly answer?: string | undefined;
   /** Absent when the turn declared no checks, which is a case this file asserts on. */
   readonly acceptance: string[] | undefined;
 }
@@ -103,7 +104,8 @@ const finish = async (
   results: readonly AcceptanceResult[] | null,
   state: Partial<AgentState> = {},
   /** What the plan says is still open, which only the plan-coverage hold reads. Empty by default. */
-  outstanding: readonly string[] = []
+  outstanding: readonly string[] = [],
+  answer?: string
 ): Promise<Run> => {
   let completed: Completed | null = null;
   const ran: string[] = [];
@@ -141,9 +143,13 @@ const finish = async (
       _task: TaskRecord,
       _key: Uint8Array,
       _state: AgentState,
-      completion: { verification: CompletionVerification; acceptance?: string[] }
+      completion: { verification: CompletionVerification; acceptance?: string[]; answer?: string }
     ) => {
-      completed = { verification: completion.verification, acceptance: completion.acceptance };
+      completed = {
+        verification: completion.verification,
+        acceptance: completion.acceptance,
+        answer: completion.answer
+      };
     }
   } as unknown as TurnFinishDeps;
   const call = {
@@ -151,6 +157,7 @@ const finish = async (
     name: 'finish',
     arguments: {
       summary: 'Totalled the column and wrote it to total.txt.',
+      ...(answer ? { answer } : {}),
       verification: {
         status: 'verified',
         evidence: [
@@ -447,4 +454,15 @@ describe('a finish call made while the conversation is in plan mode', () => {
     expect(run.outcome).toBe('held');
     expect(run.toldTheModel.join('\n')).toContain('2 plan steps are still open');
   });
+});
+
+it('carries the full final answer independently of progress and the short receipt', async () => {
+  const run = await finish(
+    null,
+    { mutated: false, mutatedBeyondProse: false, answered: false },
+    [],
+    'The total is **1260**, from the source column.'
+  );
+  expect(run.outcome).toBe('completed');
+  expect(run.completed?.answer).toBe('The total is **1260**, from the source column.');
 });

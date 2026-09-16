@@ -41,7 +41,7 @@ import { withTaskDeliveryStatus } from '../task-delivery-status.js';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 import { errorFields } from '../log.js';
-import { INITIAL_TASK_TITLE } from '../task-titles.js';
+import { provisionalTaskTitle } from '../task-titles.js';
 import { validateTaskReasoning } from '../task-reasoning.js';
 import { recordSecurityEvent } from '../security-events.js';
 
@@ -302,7 +302,7 @@ export const registerTaskRoutes = (context: RouteContext): void => {
       }
       const reasoningEffort = validateTaskReasoning(input.reasoningEffort ?? 'auto', selected);
       const dataKey = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
-      const title = input.title ?? (project ? 'New conversation' : INITIAL_TASK_TITLE);
+      const title = input.title ?? provisionalTaskTitle(input.prompt);
       const prepared = await database.transaction(async () => {
         const created = await store.createTask({
           userId: user.id,

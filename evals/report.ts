@@ -57,27 +57,7 @@ export interface Baseline {
      * than reading as a suite-wide regression on the first run after the upgrade.
      */
     readonly catalogueTokens?: number;
-    /**
-     * The mean share of a request that repeated the one before it, byte for byte.
-     *
-     * Committed alongside the step count because it is the other half of what a long task costs,
-     * and the half nothing here could previously see. A cached prefix is billed at a fraction of a
-     * written one, so a change that leaves the step count alone and drops this number twenty points
-     * has made every long turn dearer - which is exactly what a floor that re-cut the middle out of
-     * every older tool result on an ordinary step did, unnoticed, for the whole life of the product.
-     */
     readonly cachePrefix?: number;
-    /**
-     * Rows of file text this turn's reads put in front of the model.
-     *
-     * The numerator of displayed lines per landed edit, committed as its own row because it is the
-     * one term of that quotient a change to the read side moves on its own - and because it is a
-     * count of lines, so unlike the token columns it needs no band: nothing drifts it. Gated one
-     * way only. Showing the model MORE for the same work is the regression; showing it less is the
-     * whole point of the read lane, and a gate that fired on an improvement would be a gate against
-     * the work. Optional, so a baseline accepted before this column existed still gates its own
-     * rows rather than reading as a suite-wide regression on the first run after the upgrade.
-     */
     readonly displayedLines?: number;
   };
 }
@@ -123,27 +103,6 @@ export const brokenPromise = (result: Result): boolean =>
 const same = (left: readonly string[], right: readonly string[]): boolean =>
   left.length === right.length && left.every((value, index) => value === right[index]);
 
-/**
- * How far a committed number may move before it is a decision rather than drift.
- *
- * Steps are exact and always were: a step is a provider call and the whole point of committing the
- * count is that changing it costs a conversation. The other two need a band, and each for its own
- * reason.
- *
- * Tokens move under this suite without anything in the loop changing, because part of the prompt is
- * a function of the day it is built - the clock line, and every relative date the window renders.
- * Frozen deliberately and measured: pinning the wall clock to the task's own start instant moves
- * the three longest fixtures by 33, 31 and 28 tokens on rows of 910,080, 984,416 and 2,491,662, so
- * the calendar is worth about three thousandths of a per cent. Two per cent is not calibrated to
- * that - it is calibrated to the largest drift a real baseline has actually carried, which was 1,807
- * tokens on a 982,609-token row when this gate was written, or 0.18%. Ten times the worst observed
- * drift and still a fiftieth of the smallest change worth arguing about.
- *
- * The cached share is one-sided. A prefix that repeats MORE than the committed number is the thing
- * this wave is trying to produce and must never fail a run; one that repeats less is the regression
- * the number exists to catch, and it is quoted in whole points, so three points is the smallest
- * band that does not fire on the rounding.
- */
 const TOKEN_BAND = 0.02;
 const CACHE_PREFIX_BAND = 3;
 
@@ -610,7 +569,7 @@ export const render = (results: readonly Result[], baseline: Baseline): string =
       pending.length ? `, ${pending.length} pending` : ''
     }. ${steps} model calls in total${
       beforeSteps ? ` (baseline ${beforeSteps})` : ''
-    }, ${tokens} prompt tokens billed, the largest single prepared window ${peak}.`
+    }, ${tokens} estimated serialized prompt tokens (offline; no provider calls), the largest single prepared window ${peak}.`
   );
   /*
    * Where the money went, in the one line an owner reads.
@@ -622,7 +581,7 @@ export const render = (results: readonly Result[], baseline: Baseline): string =
    * object of the residency work; a share that rises is a tool somebody added without saying so.
    */
   lines.push(
-    `Of those, ${catalogue} tokens (${((catalogue / Math.max(1, tokens)) * 100).toFixed(1)}%) were the tool catalogue, resident at ${resident} bytes on every request of every turn. athanor's own window estimate, which is what the compaction trigger is compared against and which counts none of the catalogue, saw ${windows}.`
+    `Of those, ${catalogue} tokens (${((catalogue / Math.max(1, tokens)) * 100).toFixed(1)}%) were the tool catalogue, with a largest resident catalogue of ${resident} bytes. athanor's own window estimate, which is what the compaction trigger is compared against and which counts none of the catalogue, saw ${windows}.`
   );
   // Averaged over the turns that had a previous request to repeat, because a one-call turn has no
   // opinion about caching and averaging its nought in would make the suite look worse the more
