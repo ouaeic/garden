@@ -2,66 +2,46 @@
 name: data-analysis
 description: Clean a messy dataset and analyse it with a saved, re-runnable script that states its assumptions, so the numbers can be reproduced and audited rather than asserted. Use when the request involves a CSV, TSV, parquet file, database extract or pasted table and the deliverable is an answer, a summary statistic, a comparison or a chart. Do not use when the deliverable is a formula workbook the owner will edit, which belongs to xlsx-authoring.
 license: AGPL-3.0-or-later
-compatibility: pandas, matplotlib, Pillow, scipy and statsmodels are installed on every supported host, through /usr/local/lib/athanor/python/bin/python3. Reading a parquet file needs pyarrow on top of pandas; a fresh install of this computer places the host's pyarrow package and a box that has only been updated may not have it, so import it before promising anything about a .parquet file. scikit-learn is not installed anywhere and is not part of this skill.
+compatibility: The managed interpreter is /usr/local/lib/athanor/python/bin/python3. Probe required imports in the selected runtime before starting; other tools can be installed in an isolated environment through the normal execution policy.
 allowed-tools: shell file_read file_write files_list document_read image_read set_acceptance publish_artifact
 metadata:
   athanor.tier: 'builtin'
-  athanor.version: '2.4.0'
+  athanor.version: '2.5.0'
   athanor.risk: 'workspace'
   athanor.domain: 'data'
 ---
 
 # Data analysis
 
-Profiling a file before trusting its dtypes, printing the row count after every transform, naming
-what happened to the missing values, reporting `n` beside every rate — that is the work, and you do
-it without being told. Four things here are about this computer rather than about analysis.
+Save analysis code as a project artifact. Profile inputs before trusting inferred types, preserve
+identifiers with leading zeros, record missing-value handling, check joins and report relevant
+control totals after transformations. State statistical assumptions, units and denominators.
+Compute results with tested libraries and verify important numbers independently.
 
-## The script is half the deliverable
+## Runtime and reproducibility
 
-Never analyse in the chat window. Write `workspace/analysis.py`, run it with the pinned interpreter,
-and keep it: it is what makes the numbers checkable and re-runnable next month, and re-running it
-from a clean interpreter for identical output is the natural `set_acceptance` command check — the
-interpreter, the script, exit 0, and a control total the run must print.
+The managed interpreter provides the document and analysis toolchain. Check required imports in
+the actual interpreter selected for the run; a package installed elsewhere is not evidence that
+it is available there. Install additional packages in an isolated project environment as needed,
+using normal tool policy. Autonomous mode handles routine dependency setup. Preserve exact
+dependency locks and the executable paths needed to recreate the environment.
 
-## What the pinned interpreter already carries
+Use the `scientific-computing` procedure and `garden-run` to record source, declared input hashes,
+version probes and outputs. Keep inputs unchanged and write results separately. A clean rerun
+should reproduce deterministic outputs; numerical tolerances for stochastic or platform-dependent
+results need explicit independent checks. Neither exit success nor a checksum proves statistical
+or biological validity. Explain uncertainty and unresolved data-quality problems in the result.
 
-`/usr/local/lib/athanor/python/bin/python3` has **pandas, matplotlib, Pillow, scipy and
-statsmodels** installed. So a confidence interval, a p-value, a trend coefficient, a seasonal
-decomposition and a multiple-comparison correction are computed by a library that is already here,
-never by you from memory — `scipy.stats` and `statsmodels` between them cover every test worth
-running on a dataset this size. A formula written from memory produces a number that looks exactly
-like a correct one and arrives in the same confident sentence, and afterwards neither the owner nor
-the script can tell the difference. State the test and its assumptions in the script beside the
-number it produced; if nothing in those two libraries fits the question, say the question is not
-answerable from this data rather than approximating one.
+## Formats and inspection
 
-## Parquet is the one format that needs an import checked first
+Preserve source formats and meaningful types. For Parquet, probe an appropriate engine before
+reading. Converting to CSV can lose categorical, decimal and other type information; only convert
+when the output requirements justify it. Large CSV, TSV and JSONL outputs can be inspected in the
+project file browser using bounded table pages. Those displayed type hints describe the page,
+not the entire dataset. Use streaming, chunked or database operations when inputs exceed memory.
 
-`pandas.read_parquet` carries no reader of its own. Without pyarrow it raises `ImportError` naming
-pyarrow and fastparquet, and it raises it inside the read rather than at import time - so a script
-that profiles three CSVs and reaches the parquet file on the fourth step fails a minute into a run
-the owner is watching. Run `import pyarrow` once, first, before any promise about a `.parquet` file.
-
-Where it is absent the recovery is one operating-system package - `python3-pyarrow` on a Debian,
-Ubuntu, Fedora or openSUSE host and `python-pyarrow` on an Arch one - installed through the shell as
-an approval the owner sees, never through `pip`, which would stack a second compiled Arrow beside
-the distribution's own inside an interpreter built with `--system-site-packages`. Converting the
-file to CSV is not the recovery: parquet carries dtypes and CSV does not, so the conversion is where
-a decimal becomes a float, a category becomes a string, and `007` becomes `7` on the way back in.
-
-scikit-learn is not on this computer and is not planned. A household or research dataset gets an
-answer with a stated confidence from scipy and statsmodels; if a question genuinely needs a fitted
-model rather than a statistic, say that plainly and ask, because it is one approved install and not
-an impossibility.
-
-## Where the chart is going decides how it is drawn
-
-There is one answer per destination, and it is the reason to decide before drawing anything:
-
-- **A slide deck or a workbook** — a native chart built there, with `pptx-authoring` or
-  `xlsx-authoring`. It stays editable, keeps the theme, and moves when the numbers do. Pasting a
-  matplotlib PNG into a deck is the defect those skills exist to prevent, so hand the aggregated
-  table over and let them draw it.
-- **A document, a report, or a standalone image** — matplotlib, rendered to PNG at 150 dpi and then
-  looked at with `image_read` before it is used anywhere.
+For a slide deck or workbook, prefer an editable native chart when the target format supports the
+needed plot. For scientific reports and standalone figures, generate an appropriate vector or
+raster artifact with readable labels, units and uncertainty. Inspect the rendered result before
+publishing it, and keep the producing code and underlying data alongside it. Use the relevant
+document or presentation procedure when assembling the final deliverable.

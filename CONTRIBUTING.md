@@ -92,6 +92,7 @@ The server's shell is not covered by the TypeScript suites, so a set of drills r
 fixtures. They need no root, no network and no server, and they finish in seconds:
 
 ```bash
+python3 scripts/test-reproducible-run.py # analysis manifests, clean rerun and changed-dependency refusal
 sh scripts/test-sandbox.sh          # which account an agent command really lands on
 sh scripts/test-certificate.sh      # renewal, reissue and the recorded failure alarm
 sh scripts/test-relay-endpoint.sh   # what the connection manifest advertises, relay on and off
