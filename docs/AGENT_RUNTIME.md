@@ -615,3 +615,17 @@ schemas are resident, not what the conversation is authorized to do.
 
 Browser snapshot continuation pages carry text without another screenshot when the page-text hash
 matches. A changed hash restarts the text and supplies a fresh screenshot.
+
+## Browser action recovery
+
+Each worker browser action carries an internal identity derived from its checkpointed start and
+provider call ID. The runner commits an encrypted receipt before dispatch and records intent and
+acknowledgement for each step. Duplicate completed requests return their saved result; interrupted
+requests never repeat automatically. A resumed worker fetches that receipt using the original
+task's read capability. Completed results pass through the normal untrusted-tool-result path.
+Missing or incomplete receipts require observation before further action. An execution receipt
+is not verification that a website accepted a submission.
+
+Tab identifiers are unique across browser process lifetimes. A stale reference fails instead of
+selecting a new page that happens to occupy the same position. Restarted browser profiles retain
+cookies and local state; this does not promise restoration of live JavaScript or unsaved forms.

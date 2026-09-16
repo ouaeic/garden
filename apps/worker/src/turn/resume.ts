@@ -16,7 +16,7 @@
  * the loop, and had nothing to do with the loop.
  */
 import { ownerMessageContent, type OwnerMessage, decryptJson, encryptJson } from '@athanor/core';
-import type { ModelRelease, WebToolPlan } from '@athanor/contracts';
+import type { BrowserActionReceipt, ModelRelease, WebToolPlan } from '@athanor/contracts';
 import type { TaskRecord } from '@athanor/data';
 import type { ModelToolCall } from '@athanor/model-gateway';
 import type { AgentState } from '../agent-state.js';
@@ -36,6 +36,11 @@ import { PLAN_MODE_PERMITTED } from './dispatch.js';
  * loop reaches directly and that interface therefore never had to name.
  */
 export interface TurnResumeDeps extends ToolRecordingDeps {
+  browserActionReceipt(
+    task: TaskRecord,
+    state: AgentState,
+    callId: string
+  ): Promise<BrowserActionReceipt | null>;
   recordToolFailure(
     task: TaskRecord,
     key: Uint8Array,
@@ -66,19 +71,49 @@ export const resumeParkedTurn = async (
   // still unanswered. An awaiting-approval state is not: its own call is answered by the approval
   // outcome below, and the calls behind it were deferred in writing when it was saved.
   const interrupted = state.inFlight;
+  const browserReceipt =
+    interrupted?.tool === 'browser_action'
+      ? await deps.browserActionReceipt(task, state, interrupted.toolCallId).catch(() => null)
+      : null;
   delete state.inFlight;
+  let restoredBrowserResult = false;
+  if (
+    browserReceipt?.status === 'completed' &&
+    interrupted &&
+    unansweredToolCallIds(state.messages).includes(interrupted.toolCallId)
+  ) {
+    const original = state.messages
+      .flatMap((message) => message.toolCalls ?? [])
+      .find((call) => call.id === interrupted.toolCallId);
+    if (original) {
+      await deps.recordToolResult(
+        task,
+        key,
+        state,
+        original,
+        browserReceipt.result,
+        model,
+        catalog
+      );
+      restoredBrowserResult = true;
+    }
+  }
   const patchReceipts =
     interrupted?.tool === 'file_patch'
       ? await recoverPatchReceipts(deps.store, task.id, key, interrupted.toolCallId).catch(() => [])
       : [];
-  if (interrupted && unansweredToolCallIds(state.messages).includes(interrupted.toolCallId))
+  if (
+    interrupted &&
+    !restoredBrowserResult &&
+    unansweredToolCallIds(state.messages).includes(interrupted.toolCallId)
+  )
     // Whether that call reached the outside world cannot be known from here: the process died
     // between the action and its result. Re-running it is how one restart becomes two emails, so
     // the doubt goes to the model as the call's own result and the model has to check first.
     state.messages.push({
       role: 'tool',
       toolCallId: interrupted.toolCallId,
-      content: `Interrupted: this ${interrupted.tool} call was still running when the worker restarted, so it may have taken effect and it may not have. Do not run it again until you have established which - read the file back, list the connected service's own record, or re-observe the page - and state what you found before you act.${patchReceipts.length ? ` Durable per-file receipts: ${JSON.stringify(patchReceipts)}. Applied entries landed; uncertain entries must be read and compared with their expected hash.` : ''}`
+      content: `Interrupted: this ${interrupted.tool} call was still running when the worker restarted, so it may have taken effect and it may not have. Do not run it again until you have established which - read the file back, list the connected service's own record, or re-observe the page - and state what you found before you act.${browserReceipt ? ` Browser receipt: ${browserReceipt.status}; ${browserReceipt.steps.filter((step) => step.status === 'completed').length} actions acknowledged. This is execution history, not proof of a successful submission.` : ''}${patchReceipts.length ? ` Durable per-file receipts: ${JSON.stringify(patchReceipts)}. Applied entries landed; uncertain entries must be read and compared with their expected hash.` : ''}`
     });
   const stranded = state.pending
     ? []
@@ -91,10 +126,12 @@ export const resumeParkedTurn = async (
       deps.store,
       task,
       key,
-      'warning',
-      interrupted
-        ? `${interrupted.tool} was interrupted by a restart and was not repeated automatically`
-        : 'A restart interrupted this step, so the calls that had not started were dropped',
+      restoredBrowserResult ? 'status' : 'warning',
+      restoredBrowserResult
+        ? 'Recovered the browser action receipt without repeating the action'
+        : interrupted
+          ? `${interrupted.tool} was interrupted by a restart and was not repeated automatically`
+          : 'A restart interrupted this step, so the calls that had not started were dropped',
       {
         ...(interrupted
           ? {

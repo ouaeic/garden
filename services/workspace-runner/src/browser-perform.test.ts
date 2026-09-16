@@ -1125,6 +1125,46 @@ describe('the gates an agent action passes and a takeover does not', () => {
   });
 });
 
+it('records intent before each page operation and acknowledgement after it', async () => {
+  const harness = buildHarness();
+  await hold(harness, 'agent');
+  const progress = {
+    begin: (index: number, type: string) => {
+      harness.trace.push(`intent ${index} ${type}`);
+    },
+    complete: (index: number) => {
+      harness.trace.push(`ack ${index}`);
+    }
+  };
+  await harness.manager.act(
+    'workspace-1',
+    WORKSPACE_ROOT,
+    { type: 'batch', actions: [{ type: 'reload' }, { type: 'press', key: 'Tab' }] },
+    'agent',
+    true,
+    'task',
+    progress
+  );
+  expect(harness.trace).toEqual([
+    'intent 0 reload',
+    'tab-1 reload',
+    'ack 0',
+    'intent 1 press',
+    'tab-1 keyboard.press Tab',
+    'ack 1'
+  ]);
+  harness.trace.length = 0;
+  await expect(
+    harness.manager.act('workspace-1', WORKSPACE_ROOT, { type: 'reload' }, 'agent', true, 'task', {
+      ...progress,
+      begin: () => {
+        throw new Error('receipt disk unavailable');
+      }
+    })
+  ).rejects.toThrow('receipt disk unavailable');
+  expect(harness.trace).toEqual([]);
+});
+
 describe('what a batch reports', () => {
   it('runs an authorized form batch but still stops when a later step needs private input', async () => {
     const harness = buildHarness();

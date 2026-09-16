@@ -1,3 +1,5 @@
+import { BrowserActionReceipt } from '@athanor/contracts';
+import { browserActionRequestId } from './browser-action-receipts.js';
 import { codingMissionAdapter } from './coding-mission-gateway.js';
 import type { ReasoningEffort } from '@athanor/contracts';
 import { randomUUID } from 'node:crypto';
@@ -341,6 +343,16 @@ export class AgentWorker {
     };
     this.#resume = {
       ...this.#toolRecording,
+      browserActionReceipt: async (task, state, callId) => {
+        const id = browserActionRequestId(task.id, state, callId);
+        const result = await this.#runner.call<{ receipt: unknown }>(
+          task.workspaceId,
+          task.id,
+          'browser.read',
+          `/v1/workspaces/${task.workspaceId}/browser/receipts/${id}`
+        );
+        return result.receipt ? BrowserActionReceipt.parse(result.receipt) : null;
+      },
       recordToolFailure: (task, key, state, call, error) =>
         this.#recordToolFailure(task, key, state, call, error)
     };

@@ -2767,7 +2767,11 @@ describe('the web arms', () => {
       method: 'POST',
       path: `${root}/browser/action`,
       scopes: ['browser.control', 'files.write'],
-      body: { type: 'screenshot', path: 'workspace/proofs/checkout.png' }
+      body: {
+        requestId: expect.stringMatching(/^[a-f0-9]{64}$/) as unknown,
+        type: 'screenshot',
+        path: 'workspace/proofs/checkout.png'
+      }
     });
     expect(executed.result).toMatchObject({ path: 'workspace/proofs/checkout.png' });
 
@@ -2817,7 +2821,11 @@ describe('the web arms', () => {
         method: 'POST',
         path: `${root}/browser/action`,
         scopes: ['browser.control'],
-        body: { type: 'hover', selector: '#menu' }
+        body: {
+          requestId: expect.stringMatching(/^[a-f0-9]{64}$/) as unknown,
+          type: 'hover',
+          selector: '#menu'
+        }
       }
     ]);
   });
@@ -2839,7 +2847,12 @@ describe('the web arms', () => {
         method: 'POST',
         path: `${root}/browser/action`,
         scopes: ['browser.control', 'browser.consequential'],
-        body: { type: 'click_at', x: 820, y: 410 }
+        body: {
+          requestId: expect.stringMatching(/^[a-f0-9]{64}$/) as unknown,
+          type: 'click_at',
+          x: 820,
+          y: 410
+        }
       }
     ]);
   });
@@ -2914,6 +2927,7 @@ describe('the web arms', () => {
     );
 
     expect(executed.calls[0]?.body).toEqual({
+      requestId: expect.stringMatching(/^[a-f0-9]{64}$/) as unknown,
       type: 'batch',
       tabId: 'tab-1',
       actions: [

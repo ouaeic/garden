@@ -70,12 +70,13 @@ describe('persistent browser ownership', () => {
     let now = 1;
     const { manager, root } = await setup({ now: () => now });
     const session = await manager.ensure(workspace, root);
-    session.tabLifecycle!.adopt('tab-1', { owner: 'agent', taskId: 'task' });
+    const tabId = [...session.tabs.keys()][0]!;
+    session.tabLifecycle!.adopt(tabId, { owner: 'agent', taskId: 'task' });
     now += TAB_IDLE_MS + 1;
     expect(await manager.retireIdle((id) => id === workspace)).toEqual([]);
-    session.tabLifecycle!.pin('tab-1', true);
+    session.tabLifecycle!.pin(tabId, true);
     expect(await manager.retireIdle()).toEqual([]);
-    session.tabLifecycle!.pin('tab-1', false);
+    session.tabLifecycle!.pin(tabId, false);
     await session.control.transfer('user');
     expect(await manager.retireIdle()).toEqual([]);
     await session.control.transfer('agent');
@@ -86,7 +87,14 @@ describe('persistent browser ownership', () => {
     await active;
     expect(await manager.retireIdle()).toEqual([workspace]);
     expect(contexts[0]!.close).toHaveBeenCalledTimes(1);
-    expect(await manager.ensure(workspace, root)).not.toBe(session);
+    const restarted = await manager.ensure(workspace, root);
+    expect(restarted).not.toBe(session);
+    expect(restarted.tabs.size).toBeGreaterThan(0);
+    expect(restarted.tabs.has(tabId)).toBe(false);
+    await expect(
+      manager.act(workspace, root, { type: 'close_tab', tabId }, 'agent')
+    ).rejects.toThrow();
+    expect(restarted.tabs.size).toBeGreaterThan(0);
   });
 
   it('keeps owner tabs and a recently accessed session', async () => {
@@ -95,7 +103,8 @@ describe('persistent browser ownership', () => {
     const session = await manager.ensure(workspace, root);
     now += TAB_IDLE_MS + 1;
     expect(await manager.retireIdle()).toEqual([]);
-    session.tabLifecycle!.adopt('tab-1', { owner: 'agent', taskId: 'task' });
+    const tabId = [...session.tabs.keys()][0]!;
+    session.tabLifecycle!.adopt(tabId, { owner: 'agent', taskId: 'task' });
     await manager.ensure(workspace, root);
     expect(await manager.retireIdle()).toEqual([]);
     expect(contexts[0]!.close).not.toHaveBeenCalled();
