@@ -104,7 +104,7 @@ export function registerProjectUpdateRoutes(app: FastifyInstance, manager: Proje
         case 'status':
           return action.updateId
             ? manager.inspect(projectId, action.updateId, action.changesAfter)
-            : manager.list(projectId, action.before);
+            : manager.list(projectId, action.before, action.revisionsBefore);
         case 'prepare':
           if (!taskId) throw new Error('Choose the conversation whose files are being prepared');
           return manager.prepare(

@@ -611,7 +611,7 @@ export const agentTools: ModelTool[] = [
         options: {
           type: 'object',
           description:
-            'status: updateId, before, changesAfter; includeDiff:true for file diffs. prepare: update:{title,paths,deletePaths?,resolvedPaths?,expectedRevision?,checks:[{name,executable,args,cwd?}]}, sourceTaskId?. checkout: paths, revisionId?. Others: updateId; check/log/stop: checkId; check/publish: digest from status.',
+            'status: updateId, before, revisionsBefore, changesAfter, includeDiff. prepare: update:{title,paths,deletePaths?,resolvedPaths?,expectedRevision?,checks:[{name,executable,args,cwd?}]}, sourceTaskId?. checkout: paths, revisionId?. Others: updateId; check/log/stop: checkId; check/publish: digest from status.',
           additionalProperties: true
         }
       }

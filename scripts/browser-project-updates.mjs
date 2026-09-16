@@ -17,13 +17,19 @@ export function projectUpdateFixture(project, tasks) {
     const json = (body) => route.fulfill({ json: body });
     if (route.request().method() === 'GET') {
       const id = url.searchParams.get('updateId');
+      const cursor = url.searchParams.get('revisionsBefore');
+      const offset = cursor ? fixture.revisions.findIndex((item) => item.id === cursor) + 1 : 0;
+      assert(!cursor || offset > 0, 'Version cursor must identify a published version');
+      const revisions = fixture.revisions.slice(offset, offset + 40);
       await json(
         id
           ? fixture.updates.find((update) => update.id === id)
           : {
               head: fixture.head,
               updates: fixture.updates,
-              revisions: fixture.revisions,
+              revisions,
+              nextRevisionCursor:
+                offset + 40 < fixture.revisions.length ? revisions.at(-1).id : null,
               observedAt: new Date().toISOString(),
               nextCursor: null
             }
@@ -249,7 +255,44 @@ export async function checkProjectUpdates({ page, fixture, project, report }) {
     .waitFor({ state: 'detached' });
   assert.equal(fixture.head.number, 1);
   assert.equal(fixture.head.updateId, fixture.updates[0].id);
+  const firstPublication = structuredClone(fixture.head);
+  fixture.revisions = Array.from({ length: 42 }, (_, index) => ({
+    ...structuredClone(fixture.head),
+    id: randomUUID(),
+    number: 43 - index,
+    title: `Published analysis ${43 - index}`
+  }));
+  fixture.revisions.push(firstPublication);
+  fixture.head = fixture.revisions[0];
+  await panel.getByRole('button', { name: 'Refresh project updates', exact: true }).click();
+  await panel
+    .locator('.project-version-head')
+    .getByText('Version 43 · Published analysis 43', { exact: true })
+    .waitFor();
+  await panel.locator('.project-version-path > summary').click();
+  const history = panel.locator('.project-version-path ol');
+  assert.equal(
+    await history.locator('li').count(),
+    41,
+    'A previously loaded old version stays visible when new versions arrive'
+  );
+  const earlier = panel.getByRole('button', { name: 'Load earlier versions', exact: true });
+  await earlier.focus();
+  await earlier.press('Enter');
+  await earlier.waitFor({ state: 'detached' });
+  assert.equal(await history.locator('li').count(), 43);
+  await panel.getByRole('button', { name: 'Refresh project updates', exact: true }).click();
+  await panel
+    .locator('.project-version-head')
+    .getByText('Version 43 · Published analysis 43', { exact: true })
+    .waitFor();
+  assert.equal(await history.locator('li').count(), 43, 'Polling must preserve loaded history');
+  assert.deepEqual(
+    await history.locator('button').allTextContents(),
+    fixture.revisions.map((item) => `Version ${item.number} · ${item.title}`)
+  );
+  await panel.locator('.project-version-path > summary').click();
   console.log(
-    'Project update browser checks passed: preparation, parallel checks, elapsed days, resource samples, logs, scoped cancellation, stale evidence, reset checks, checked publication and responsive layouts.'
+    'Project update browser checks passed: preparation, parallel checks, elapsed days, resource samples, logs, scoped cancellation, stale evidence, reset checks, checked publication, paginated history retained across refresh and responsive layouts.'
   );
 }

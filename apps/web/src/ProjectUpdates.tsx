@@ -73,6 +73,9 @@ export default function ProjectUpdates({
       .filter((update) => update.state === 'preparing' || update.checks.some(active))
       .map((update) => update.id) ?? [];
   const historyCursor = useRef<string | null | undefined>(undefined);
+  const revisionCursor = useRef<string | null | undefined>(undefined);
+  const activeProject = useRef(projectId);
+  activeProject.current = projectId;
   const request = useRef<AbortController | null>(null),
     details = useRef<string | null>(null);
   details.current = selected?.id ?? null;
@@ -109,7 +112,17 @@ export default function ProjectUpdates({
                 )
               ],
               nextCursor:
-                historyCursor.current === undefined ? page.nextCursor : historyCursor.current
+                historyCursor.current === undefined ? page.nextCursor : historyCursor.current,
+              revisions: [
+                ...page.revisions,
+                ...previous.revisions.filter(
+                  (old) => !page.revisions.some((item) => item.id === old.id)
+                )
+              ].sort((a, b) => b.number - a.number),
+              nextRevisionCursor:
+                revisionCursor.current === undefined
+                  ? page.nextRevisionCursor
+                  : revisionCursor.current
             }
           : page
       );
@@ -133,6 +146,7 @@ export default function ProjectUpdates({
   }, [endpoint]);
   useEffect(() => {
     historyCursor.current = undefined;
+    revisionCursor.current = undefined;
     setData(null);
     setSelected(null);
     setLogs(null);
@@ -290,6 +304,36 @@ export default function ProjectUpdates({
                   </li>
                 ))}
               </ol>
+              {data.nextRevisionCursor && (
+                <Button
+                  disabled={!!busy}
+                  onClick={() =>
+                    void perform('versions', async () => {
+                      const page = await get<Updates>(
+                        `${endpoint}?revisionsBefore=${data.nextRevisionCursor}`
+                      );
+                      if (activeProject.current !== projectId) return;
+                      revisionCursor.current = page.nextRevisionCursor;
+                      setData((previous) =>
+                        previous
+                          ? {
+                              ...previous,
+                              revisions: [
+                                ...previous.revisions,
+                                ...page.revisions.filter(
+                                  (item) => !previous.revisions.some((old) => old.id === item.id)
+                                )
+                              ].sort((a, b) => b.number - a.number),
+                              nextRevisionCursor: page.nextRevisionCursor
+                            }
+                          : previous
+                      );
+                    })
+                  }
+                >
+                  Load earlier versions
+                </Button>
+              )}
             </details>
           )}
           <div className="project-update-list">

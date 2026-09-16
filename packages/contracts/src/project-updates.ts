@@ -47,6 +47,7 @@ export const ProjectUpdateAction = z.discriminatedUnion('action', [
       action: z.literal('status'),
       updateId: z.uuid().optional(),
       before: z.uuid().optional(),
+      revisionsBefore: z.uuid().optional(),
       changesAfter: ProjectPath.optional(),
       includeDiff: z.boolean().optional()
     })
@@ -170,5 +171,6 @@ export interface ProjectUpdates {
   updates: ProjectUpdate[];
   revisions: ProjectRevision[];
   nextCursor: string | null;
+  nextRevisionCursor: string | null;
   observedAt: string;
 }

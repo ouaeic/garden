@@ -112,6 +112,7 @@ export function registerProjectUpdateRoutes(context: RouteContext) {
     const query = z
       .object({
         before: z.uuid().optional(),
+        revisionsBefore: z.uuid().optional(),
         updateId: z.uuid().optional(),
         changesAfter: z.string().max(4096).optional()
       })
