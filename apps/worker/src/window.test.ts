@@ -82,7 +82,7 @@ const task = {
   id: taskId,
   userId,
   workspaceId,
-  securityMode: 'standard',
+  securityMode: 'balanced',
   createdAt: '2026-08-01T00:00:00.000Z'
 } as unknown as TaskRecord;
 
@@ -90,7 +90,7 @@ const workspace = {
   id: workspaceId,
   userId,
   name: 'daily',
-  securityMode: 'standard'
+  securityMode: 'balanced'
 } as unknown as WorkspaceRecord;
 
 interface Probe {
