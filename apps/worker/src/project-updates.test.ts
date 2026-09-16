@@ -3,8 +3,13 @@ import { expect, it, vi } from 'vitest';
 import type { TaskRecord } from '@athanor/data';
 import type { ModelToolCall } from '@athanor/model-gateway';
 import { AgentRunnerClient } from './runner-client.js';
-import { projectOperation, projectUpdateApproval } from './project-updates.js';
+import {
+  executeProjectUpdate,
+  projectOperation,
+  projectUpdateApproval
+} from './project-updates.js';
 import { approvalRequirement } from './approval-policy.js';
+import type { ToolContext } from './tool-dispatch.js';
 
 const task = {
   id: randomUUID(),
@@ -100,4 +105,56 @@ it('assigns retry-stable preparation identities and rejects unrelated conversati
   expect(first).toEqual(second);
   expect(projectOperation({ ...task, id: randomUUID() }, input)).not.toEqual(first);
   expect(() => projectOperation({ ...task, projectId: '' }, input)).toThrow('project conversation');
+});
+it('keeps status polling compact while preserving candidate and pagination metadata and explicit diff reads', async () => {
+  const runner = new AgentRunnerClient('http://runner.invalid', 'x'.repeat(32));
+  const update = {
+    id: updateId,
+    candidateDigest: digest,
+    changeCount: 3,
+    nextChange: 'analysis.py',
+    checks: [{ id: checkId, status: 'running', ranForMs: 12_000 }],
+    changes: [
+      { path: 'analysis.py', kind: 'modified', conflict: true, diff: '+é\n'.repeat(10_000) },
+      { path: 'plot.png', kind: 'added', conflict: false, diff: null }
+    ]
+  };
+  const request = vi.spyOn(runner, 'call').mockResolvedValue(update);
+  const context = { runner, task } as ToolContext;
+  const compact = (await executeProjectUpdate(context, call('status', { updateId }))) as {
+    changes: unknown[];
+  };
+  expect(compact).toEqual({
+    ...update,
+    changes: [
+      {
+        path: 'analysis.py',
+        kind: 'modified',
+        conflict: true,
+        diffAvailable: true,
+        diffBytes: 40_000
+      },
+      { path: 'plot.png', kind: 'added', conflict: false, diffAvailable: false, diffBytes: 0 }
+    ]
+  });
+  expect(JSON.stringify(compact).length).toBeLessThan(JSON.stringify(update).length / 20);
+  expect(update.changes[0]?.diff).toHaveLength(30_000);
+  request.mockResolvedValue({ head: null, updates: [update], nextCursor: updateId });
+  expect(await executeProjectUpdate(context, call('status', {}))).toEqual({
+    head: null,
+    updates: [compact],
+    nextCursor: updateId
+  });
+  request.mockResolvedValue(update);
+  expect(await executeProjectUpdate(context, call('status', { updateId, includeDiff: true }))).toBe(
+    update
+  );
+  expect(await executeProjectUpdate(context, call('check', { updateId, checkId, digest }))).toEqual(
+    compact
+  );
+  request.mockResolvedValue({ output: 'Full diagnostic output', exitCode: 1 });
+  expect(await executeProjectUpdate(context, call('log', { updateId, checkId }))).toEqual({
+    output: 'Full diagnostic output',
+    exitCode: 1
+  });
 });

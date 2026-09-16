@@ -3,6 +3,7 @@ import { TaskPresentation, type TaskEvent, type WorkspacePreview } from '@athano
 import {
   buildTaskPresentation,
   deliveryFilePath,
+  taskDeliveryFiles,
   taskSourceFiles,
   type PresentationInput
 } from './task-presentation.js';
@@ -51,6 +52,34 @@ const input = (over: Partial<PresentationInput> = {}): PresentationInput => ({
 });
 
 describe('task results are concrete owner-accessible outputs', () => {
+  it('keeps published artifact names out of file cards and bundles while retaining real source paths', () => {
+    const events = [
+      event(1, 'tool_started', {
+        tool: 'file_write',
+        toolCallId: 'write',
+        arguments: { path: 'application/cv.typ' }
+      }),
+      event(2, 'tool_result', { toolCallId: 'write', result: { path: 'application/cv.typ' } }),
+      event(3, 'artifact', { artifactId: 'cv', name: 'Alex Morgan CV.pdf' }),
+      event(4, 'completed', {
+        deliverables: ['Alex Morgan CV.pdf', 'workspace/application/cv.pdf', 'missing.txt']
+      })
+    ];
+    expect([...taskDeliveryFiles(events).keys()]).toEqual([
+      'workspace/application/cv.pdf',
+      'workspace/missing.txt'
+    ]);
+    expect([...taskSourceFiles(events).keys()]).toEqual([
+      'workspace/application/cv.pdf',
+      'workspace/missing.txt',
+      'workspace/application/cv.typ'
+    ]);
+    const result = buildTaskPresentation(input({ events }));
+    expect(result.results.map((result) => result.title)).toEqual(['cv.pdf', 'missing.txt']);
+    expect([
+      ...taskDeliveryFiles([event(5, 'completed', { deliverables: ['Unpublished CV.pdf'] })]).keys()
+    ]).toEqual(['workspace/Unpublished CV.pdf']);
+  });
   it('includes recorded supporting files in a source bundle even when completion names only its entry page', () => {
     const events = [
       event(1, 'tool_started', {

@@ -21,6 +21,21 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+it('reads partial JSON files as raw text when requested without accepting broken JSON API responses', async () => {
+  vi.stubGlobal(
+    'fetch',
+    async () =>
+      new Response('{', {
+        headers: { 'content-type': 'application/json' }
+      })
+  );
+  const path = `/v1/workspaces/${workspaceId}/file?path=workspace/results.json&maxBytes=1`;
+  await expect(
+    client.call(workspaceId, taskId, 'files.read', path, undefined, { responseType: 'text' })
+  ).resolves.toBe('{');
+  await expect(client.call(workspaceId, taskId, 'files.read', path)).rejects.toThrow();
+});
+
 describe('a workspace runner that is restarting', () => {
   it('rides out the restart window instead of failing the tool', async () => {
     vi.useFakeTimers();

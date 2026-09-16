@@ -4,7 +4,7 @@ import type { DataStore, TaskRecord } from '@athanor/data';
 import type { ModelToolCall } from '@athanor/model-gateway';
 import { declaredTaskOutputs, resolveDelivery } from './delivery.js';
 import type { AgentState } from './agent-state.js';
-import type { AgentRunnerClient } from './runner-client.js';
+import { AgentRunnerClient } from './runner-client.js';
 import { handleFinishCall, type TurnFinishDeps } from './turn/finish.js';
 
 const key = new Uint8Array(32).fill(9);
@@ -51,6 +51,31 @@ const fixture = () => {
 };
 
 describe('delivery resolves against scoped output evidence', () => {
+  it('verifies a JSON file prefix without parsing it and still rejects missing files', async () => {
+    const { deps, state } = fixture();
+    deps.runner = new AgentRunnerClient('http://runner.invalid', 'r'.repeat(48));
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      const path = new URL(url instanceof Request ? url.url : url);
+      expect(path.searchParams.get('maxBytes')).toBe('1');
+      return path.searchParams.get('path')?.endsWith('missing.json')
+        ? new Response(JSON.stringify({ error: { code: 'file_not_found', message: 'Missing' } }), {
+            status: 404,
+            headers: { 'content-type': 'application/json' }
+          })
+        : new Response('{', { headers: { 'content-type': 'application/json' } });
+    });
+    try {
+      expect(
+        await resolveDelivery(deps, task, key, state, ['results.json', 'missing.json'])
+      ).toEqual({
+        deliverables: ['results.json', 'missing.json'],
+        unavailable: ['missing.json']
+      });
+      expect(fetch).toHaveBeenCalledTimes(2);
+    } finally {
+      fetch.mockRestore();
+    }
+  });
   it('requires an app preview even when finish omitted every output reference', async () => {
     const { deps, store, state } = fixture();
     store.listWorkspacePreviews.mockResolvedValueOnce([]);
@@ -154,7 +179,9 @@ describe('delivery resolves against scoped output evidence', () => {
       task.workspaceId,
       task.id,
       'files.read',
-      '/v1/workspaces/workspace/file?path=workspace%2Fapp%2Findex.html&maxBytes=1'
+      '/v1/workspaces/workspace/file?path=workspace%2Fapp%2Findex.html&maxBytes=1',
+      undefined,
+      { responseType: 'text' }
     );
   });
 

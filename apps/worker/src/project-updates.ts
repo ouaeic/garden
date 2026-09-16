@@ -45,7 +45,28 @@ export async function executeProjectUpdate(
   context: ToolContext,
   call: ModelToolCall
 ): Promise<unknown> {
-  return projectRequest(context.runner, context.task, projectOperation(context.task, call));
+  const operation = projectOperation(context.task, call);
+  const result = await projectRequest(context.runner, context.task, operation);
+  if (operation.action === 'status' && operation.includeDiff) return result;
+  if (!result || typeof result !== 'object') return result;
+  const view = result as Record<string, unknown>;
+  if (Array.isArray(view.changes)) return compactUpdate(view);
+  if (Array.isArray(view.updates))
+    return { ...view, updates: view.updates.map((update: ProjectUpdate) => compactUpdate(update)) };
+  return result;
+}
+
+/** Status polling needs identities and check progress; file content is an explicit read. */
+function compactUpdate<T extends { changes?: unknown }>(update: T) {
+  if (!Array.isArray(update.changes)) return update;
+  return {
+    ...update,
+    changes: update.changes.map(({ diff, ...change }: ProjectUpdate['changes'][number]) => ({
+      ...change,
+      diffAvailable: diff !== null,
+      diffBytes: diff === null ? 0 : Buffer.byteLength(diff)
+    }))
+  };
 }
 
 /** Persisted check commands and content digests are the approval subject, never a model-supplied substitute. */

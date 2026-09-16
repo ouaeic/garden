@@ -212,7 +212,9 @@ export const resolveDelivery = async (
             task.workspaceId,
             task.id,
             'files.read',
-            `/v1/workspaces/${task.workspaceId}/file?${new URLSearchParams({ path, maxBytes: '1' })}`
+            `/v1/workspaces/${task.workspaceId}/file?${new URLSearchParams({ path, maxBytes: '1' })}`,
+            undefined,
+            { responseType: 'text' }
           );
           return true;
         }).catch(() => false);

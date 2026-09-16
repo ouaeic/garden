@@ -37,6 +37,12 @@ export const taskPreviewIds = (events: readonly TaskEvent[]): Map<string, string
 
 export const taskDeliveryFiles = (events: readonly TaskEvent[]): Map<string, string[]> => {
   const paths = new Map<string, string[]>();
+  const artifactNames = new Set(
+    events
+      .filter((event) => event.kind === 'artifact')
+      .map((event) => text(record(event.payload).name))
+      .filter(Boolean)
+  );
   const writes = new Map<string, string[]>();
   const calls = new Map<string, Record<string, unknown>>();
   for (const event of events) {
@@ -54,6 +60,8 @@ export const taskDeliveryFiles = (events: readonly TaskEvent[]): Map<string, str
       const values = payload.deliverables;
       if (Array.isArray(values) && values.length) {
         for (const value of values) {
+          // A published download's display name is not a path in the working directory.
+          if (typeof value === 'string' && artifactNames.has(value)) continue;
           const path = deliveryFilePath(value);
           if (path) paths.set(path, [...(paths.get(path) ?? []), event.id]);
         }

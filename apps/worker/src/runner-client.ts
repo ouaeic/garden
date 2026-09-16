@@ -224,7 +224,8 @@ export class AgentRunnerClient {
     taskId: string,
     scope: string | string[],
     path: string,
-    body?: unknown
+    body?: unknown,
+    options: { responseType?: 'text' } = {}
   ): Promise<T> {
     const method = body === undefined ? 'GET' : 'POST';
     const token = signCapabilityToken(
@@ -254,7 +255,11 @@ export class AgentRunnerClient {
     );
     if (!response.ok) throw await runnerFailure(response);
     const type = response.headers.get('content-type') ?? '';
-    return (type.includes('application/json') ? await response.json() : await response.text()) as T;
+    return (
+      options.responseType !== 'text' && type.includes('application/json')
+        ? await response.json()
+        : await response.text()
+    ) as T;
   }
 
   /**

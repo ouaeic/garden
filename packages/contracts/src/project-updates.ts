@@ -47,7 +47,8 @@ export const ProjectUpdateAction = z.discriminatedUnion('action', [
       action: z.literal('status'),
       updateId: z.uuid().optional(),
       before: z.uuid().optional(),
-      changesAfter: ProjectPath.optional()
+      changesAfter: ProjectPath.optional(),
+      includeDiff: z.boolean().optional()
     })
     .strict(),
   z
