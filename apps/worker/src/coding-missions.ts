@@ -21,6 +21,7 @@ import { event } from './tool-recording.js';
 import { textValue } from './values.js';
 
 export const CODING_CHILD_TOOLS: ReadonlySet<string> = new Set([
+  'load_tools',
   'set_plan',
   'shell',
   'process',

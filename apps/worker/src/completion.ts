@@ -94,6 +94,7 @@ export interface CompletionVerification {
  * well-formed, so without this the cheapest citation in any turn would be the promise it made.
  */
 const DECLARATION_TOOLS = new Set([
+  'load_tools',
   'set_plan',
   'set_acceptance',
   // Asking is the same kind of act: it is something the model said, not something it observed, and

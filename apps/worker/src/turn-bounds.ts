@@ -34,6 +34,7 @@ import { canonicalJson } from './values.js';
  * version-guarded and idempotent in effect.
  */
 export const REPEATABLE_TOOLS = new Set([
+  'load_tools',
   'browser_snapshot',
   'code_diagnostics',
   'code_search',
@@ -734,7 +735,9 @@ export const repeatedFailureBreak = (count: number, tool: string): string =>
  * first differing result, which is what those three ceilings produce on the attempt that trips them.
  */
 export const BOOKKEEPING_TOOLS: ReadonlySet<string> = new Set(
-  [...LOOP_ANSWERED_TOOLS, 'set_plan'].filter((name) => !['finish', 'ask', 'notify'].includes(name))
+  [...LOOP_ANSWERED_TOOLS, 'set_plan', 'load_tools'].filter(
+    (name) => !['finish', 'ask', 'notify'].includes(name)
+  )
 );
 
 /**

@@ -14,6 +14,8 @@ import type { TranscriptionApproval } from './transcription-approval.js';
 import type { MediaGenerationApproval } from './media-approval.js';
 
 export interface AgentState {
+  /** Ordered capability groups persist across compaction, pauses and worker leases. */
+  enabledToolGroups?: string[];
   /** Last applied project main choice; subsequent explicit turn choices remain authoritative. */
   mainModelPreference?: string;
   projectContextFingerprint?: string;

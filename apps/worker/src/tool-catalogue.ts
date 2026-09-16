@@ -16,6 +16,7 @@ import {
 } from './subscription-agent.js';
 import { EDIT_FORMAT_SPEC } from './edit/index.js';
 import { browserActionProperties, desktopActionProperties } from './surface-actions.js';
+import { LOAD_TOOLS, TOOL_GROUPS, enabledToolGroups } from './tool-groups.js';
 
 /*
  * What the model is sent, and nothing about what it is then allowed to do.
@@ -445,6 +446,7 @@ const MAX_TURNS_CLAUSE = `Stops ${specialistNames(
 )} have no turn bound and stop on timeoutSeconds.`;
 
 export const agentTools: ModelTool[] = [
+  LOAD_TOOLS,
   {
     name: 'set_plan',
     description:
@@ -1558,7 +1560,7 @@ export const agentTools: ModelTool[] = [
           type: 'integer',
           minimum: 0,
           description:
-            'Continue at nextTextOffset with textRange.sha256. A changed page restarts at zero.'
+            'Continue text without another image using nextTextOffset and textRange.sha256. Changed text restarts with an image.'
         },
         sha256: { type: 'string' }
       }
@@ -1723,6 +1725,7 @@ export const agentTools: ModelTool[] = [
 ];
 
 const coreToolNames = new Set([
+  'load_tools',
   'set_plan',
   'set_acceptance',
   'shell',
@@ -1844,7 +1847,8 @@ export const agentToolsFor = (
    * argument exists, and only a run that has actually asked the runner can withdraw anything.
    */
   surfaces: WorkspaceSurfaces = UNKNOWN_SURFACES,
-  connectorKinds?: readonly AnyConnectorKind[]
+  connectorKinds?: readonly AnyConnectorKind[],
+  activeGroups?: readonly string[]
 ): ModelTool[] => {
   const kinds = new Set(connectorKinds);
   const audienceTier =
@@ -1867,8 +1871,13 @@ export const agentToolsFor = (
           )
         : tool
     );
+  const core = tier.filter((tool) => coreToolNames.has(tool.name));
+  const advanced = tier.filter((tool) => !coreToolNames.has(tool.name));
+  if (audience === 'specialist' || activeGroups === undefined) return [...core, ...advanced];
   return [
-    ...tier.filter((tool) => coreToolNames.has(tool.name)),
-    ...tier.filter((tool) => !coreToolNames.has(tool.name))
+    ...core,
+    ...enabledToolGroups(activeGroups).flatMap((group) =>
+      advanced.filter((tool) => (TOOL_GROUPS[group] as readonly string[]).includes(tool.name))
+    )
   ];
 };

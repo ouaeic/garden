@@ -326,10 +326,13 @@ export interface BrowserSnapshotParts {
 // the tail, so a long page body placed early destroys everything after it. Page text is
 // therefore emitted last and bounded, leaving the actionable fields intact.
 export const BROWSER_SNAPSHOT_TEXT_LIMIT = 12_000;
+type SnapshotCursor = { offset?: number | undefined; sha256?: string | undefined };
+const continuesSnapshotText = (text: string, cursor: SnapshotCursor) =>
+  (cursor.offset ?? 0) > 0 && cursor.sha256 === createHash('sha256').update(text).digest('hex');
 
 export const composeBrowserSnapshot = (
   parts: BrowserSnapshotParts,
-  cursor: { offset?: number | undefined; sha256?: string | undefined } = {}
+  cursor: SnapshotCursor = {}
 ) => {
   const digest = createHash('sha256').update(parts.text).digest('hex');
   const changed = Boolean(cursor.sha256 && cursor.sha256 !== digest);
@@ -337,6 +340,7 @@ export const composeBrowserSnapshot = (
     ? 0
     : Math.min(parts.text.length, Math.max(0, Math.trunc(cursor.offset ?? 0)));
   const end = Math.min(parts.text.length, offset + BROWSER_SNAPSHOT_TEXT_LIMIT);
+  const continuation = offset > 0 && cursor.sha256 === digest;
   return {
     url: parts.url,
     title: parts.title,
@@ -351,7 +355,8 @@ export const composeBrowserSnapshot = (
     consoleMessages: parts.consoleMessages,
     failedRequests: parts.failedRequests,
     images: parts.images,
-    screenshotBase64: parts.screenshotBase64,
+    screenshotBase64: continuation ? '' : parts.screenshotBase64,
+    ...(continuation ? { screenshotOmitted: 'text_continuation' as const } : {}),
     textComplete: end >= parts.text.length,
     textOmitted: Math.max(0, parts.text.length - end),
     textRange: { offset, end, total: parts.text.length, sha256: digest },
@@ -2524,7 +2529,7 @@ export class BrowserManager {
     workspaceId: string,
     root: string,
     actor: 'agent' | 'user',
-    cursor: { offset?: number | undefined; sha256?: string | undefined } = {}
+    cursor: SnapshotCursor = {}
   ) {
     const session = await this.ensure(workspaceId, root);
     if (session.control.holder === 'secure_input' && actor === 'agent') {
@@ -2595,7 +2600,9 @@ export class BrowserManager {
         text: botWallMessage(wall)
       });
     }
-    const screenshot = await captureScreenshot(page, 'jpeg');
+    const screenshot = continuesSnapshotText(text, cursor)
+      ? null
+      : await captureScreenshot(page, 'jpeg');
     const images = await withDeadline(
       page.evaluate(() =>
         Array.from(document.images)
@@ -2632,7 +2639,7 @@ export class BrowserManager {
         // cannot mutate a payload that has been handed out.
         failedRequests: [...session.failedRequests],
         images,
-        screenshotBase64: screenshot.toString('base64'),
+        screenshotBase64: screenshot?.toString('base64') ?? '',
         text
       },
       cursor

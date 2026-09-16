@@ -714,6 +714,80 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+describe('curated tool discovery', () => {
+  it('loads schemas on the next real model request and persists them through a worker lease', async () => {
+    const task = makeTask();
+    const probe = probeStore(() => task);
+    const log: FetchLog = { calls: [], modelRequests: [] };
+    installFetch(
+      [
+        `data: ${JSON.stringify({ choices: [{ delta: { content: 'I will load the coding tools and read the project note.' } }] })}\n\n` +
+          toolFrame('load-code', 'load_tools', { groups: ['code'] }),
+        toolFrame('read-note', 'file_read', { path: 'workspace/notes.txt' }),
+        toolFrame('finish-discovery', 'finish', {
+          summary: 'The coding tools are ready and the note was read.',
+          verification: {
+            status: 'verified',
+            evidence: [{ claim: 'Read the note', source: 'tool_result', toolCallId: 'read-note' }]
+          }
+        })
+      ],
+      log,
+      {
+        route: (url) =>
+          url.includes('/file?')
+            ? new Response(JSON.stringify({ content: 'The coding work starts from this note.' }), {
+                headers: { 'content-type': 'application/json' }
+              })
+            : undefined
+      }
+    );
+    await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 8 }), masterKey, runnerSecret).run(
+      task
+    );
+    expect(log.modelRequests, JSON.stringify(probe.events)).toHaveLength(3);
+    const catalogue = (request: Record<string, unknown>) =>
+      request.tools as Array<{ function: { name: string } }>;
+    const first = catalogue(log.modelRequests[0]!),
+      second = catalogue(log.modelRequests[1]!);
+    expect(first.map((tool) => tool.function.name)).toContain('load_tools');
+    expect(first.map((tool) => tool.function.name)).not.toContain('code_search');
+    expect(second.map((tool) => tool.function.name)).toContain('code_search');
+    expect(second.slice(0, first.length)).toEqual(first);
+    expect(probe.events.some((entry) => entry.kind === 'completed')).toBe(true);
+    const saved = probe.checkpoints.filter((entry) => entry.agentStateCiphertext).at(-1);
+    expect(saved).toBeDefined();
+    const state = decryptJson<{ enabledToolGroups: string[] }>(
+      saved!.agentStateCiphertext as Parameters<typeof decryptJson>[0],
+      dataKey
+    );
+    expect(state.enabledToolGroups).toEqual(['code']);
+    const resumed = makeTask(state),
+      resumedProbe = probeStore(() => resumed);
+    const resumedLog: FetchLog = { calls: [], modelRequests: [] };
+    installFetch(
+      [
+        toolFrame('finish-resumed', 'finish', {
+          summary: 'Ready.',
+          verification: { status: 'not_applicable', evidence: [] }
+        })
+      ],
+      resumedLog
+    );
+    await new AgentWorker(
+      resumedProbe.store,
+      config({ TASK_MAX_STEPS: 8 }),
+      masterKey,
+      runnerSecret
+    ).run(resumed);
+    expect(resumedLog.modelRequests.length).toBeGreaterThan(0);
+    expect(catalogue(resumedLog.modelRequests[0]!).map((tool) => tool.function.name)).toContain(
+      'code_search'
+    );
+    expect(log.calls.some((url) => url.includes('/exec'))).toBe(false);
+  });
+});
+
 describe('owner message attachments', () => {
   it('delivers sealed attachment references in the first owner message sent to the model', async () => {
     const task = makeTask();

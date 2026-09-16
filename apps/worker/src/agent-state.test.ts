@@ -40,6 +40,7 @@ const aad = `task-state:${taskId}`;
  * a person has said what a new turn should do with it.
  */
 const FIELDS: ReadonlyArray<keyof AgentState> = [
+  'enabledToolGroups',
   'messages',
   'step',
   'credits',
@@ -127,6 +128,7 @@ const FIELDS: ReadonlyArray<keyof AgentState> = [
  * as a present field.
  */
 const FULL: Required<AgentState> = {
+  enabledToolGroups: ['browser', 'documents'],
   mainModelPreference: '[true,"best",""]',
   projectContextFingerprint: 'f'.repeat(64),
   walledProviders: ['openrouter'],
@@ -418,6 +420,7 @@ describe('what a new turn inherits', () => {
       'memoryReaches'
     ]);
     expect(carried).toEqual([
+      'enabledToolGroups',
       'credits',
       'planVersion',
       'contextBrief',

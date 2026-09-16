@@ -1543,6 +1543,8 @@ export interface Expectation {
    * is that a turn which only appends to its window did not rewrite the front of it.
    */
   readonly minCachePrefix?: number;
+  /** Serialized lead-input characters outside the repeated prefix, including the first request. */
+  readonly maxFreshLeadCharacters?: number;
   /**
    * The same floor for a delegated specialist's own window. One mission at a time; see
    * `RunOutcome.delegatedCachePrefix`.
@@ -2348,27 +2350,12 @@ export interface RunOutcome {
   readonly mediaGenerated: number;
   /** The model id each of those generations named on the wire, in order. */
   readonly mediaModels: readonly string[];
-  /**
-   * The mean share of a request that repeated the previous request byte for byte, 0 to 100.
-   *
-   * Every provider that bills a cached prefix bills it as a prefix: the read stops at the first
-   * byte that differs from what it cached. So the common leading run between one request and the
-   * next is the ceiling on what any of them could have read back, and the mean of that over a turn
-   * is what a long task's bill actually turns on. A turn of one call has no previous request and
-   * reads as zero.
-   *
-   * It is a mean of per-request shares rather than a share of the whole turn's bytes, so a turn is
-   * not scored mostly by its largest step.
-   *
-   * What it cannot see, so that nobody sets a floor against it in the belief that it can: the tool
-   * catalogue is the head of every comparison and it does not move, so on a short turn it is most
-   * of the bytes and the share has a floor no message-side defect can push it under. Measured by
-   * making the first message of the window differ on every step - every message byte destroyed - on
-   * `files-helper-script-then-run`: 97% became 91%, not 0%. A floor worth setting on a five-step
-   * fixture is in the mid-nineties; a defect costing less than a point or two is only visible on a
-   * turn long enough for the conversation to outweigh the catalogue.
-   */
+  /** Mean common-prefix share of successive serialized lead requests; not provider cache usage. */
   readonly cachePrefix: number;
+  /** Serialized UTF-16 character counts; offline proxies, not tokens or billing. */
+  readonly leadInputCharacters: number;
+  readonly leadPrefixCharacters: number;
+  readonly freshLeadCharacters: number;
   /**
    * The same share, measured over a delegated specialist's own consecutive requests.
    *
@@ -2888,6 +2875,9 @@ const schemaOutcome = (findings: readonly string[]): RunOutcome => ({
   mediaGenerated: 0,
   mediaModels: [],
   cachePrefix: 0,
+  leadInputCharacters: 0,
+  leadPrefixCharacters: 0,
+  freshLeadCharacters: 0,
   delegatedCachePrefix: 0,
   compactions: 0,
   briefSections: 0,
@@ -3514,6 +3504,8 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
   let lastCatalogue = '';
   let previousCatalogue = '';
   const prefixShares: number[] = [];
+  let leadInputCharacters = 0;
+  let leadPrefixCharacters = 0;
   const delegatedPrefixShares: number[] = [];
   let previousDelegatedBytes = '';
   const everyMessage = new Set<string>();
@@ -3693,7 +3685,10 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
         steps += 1;
         lastAgentRequest = body;
         const bytes = promptBytes(body);
-        if (previousBytes) prefixShares.push(commonPrefix(previousBytes, bytes) / bytes.length);
+        const prefix = commonPrefix(previousBytes, bytes);
+        leadInputCharacters += bytes.length;
+        leadPrefixCharacters += prefix;
+        if (previousBytes) prefixShares.push(prefix / bytes.length);
         previousBytes = bytes;
         previousCatalogue = lastCatalogue;
         lastCatalogue = JSON.stringify(body.tools ?? []);
@@ -4132,6 +4127,9 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
     // Rounded to a whole point, which is all this number can honestly carry: the runtime block at
     // the end of the window rebuilds its clock on every step, so the last few bytes of a request
     // differ from the last one's whatever else the loop did.
+    leadInputCharacters,
+    leadPrefixCharacters,
+    freshLeadCharacters: leadInputCharacters - leadPrefixCharacters,
     cachePrefix: prefixShares.length
       ? Math.round(
           (prefixShares.reduce((total, share) => total + share, 0) / prefixShares.length) * 100

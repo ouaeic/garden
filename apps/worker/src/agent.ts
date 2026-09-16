@@ -72,6 +72,7 @@ import {
 import { providerWebSearch, type WebSearchAnswer } from './provider-search.js';
 import { WEB_SEARCH_MAX_OUTPUT_TOKENS, WEB_SEARCH_REQUEST_TIMEOUT_MS, routeTo } from './routing.js';
 import { executeToolCall } from './tool-dispatch.js';
+import { agentToolsFor } from './tool-catalogue.js';
 import { AgentRunnerClient, withRunnerAbort } from './runner-client.js';
 import { buildIdentity } from './build-identity.js';
 import {
@@ -1823,7 +1824,6 @@ export class AgentWorker {
       timeZone,
       unattended,
       webPlan,
-      requestTools,
       toolchainSummary,
       machineSummary
     } = run;
@@ -1859,22 +1859,11 @@ export class AgentWorker {
     // state on every step until something drops it.
     dropLegacyGuidance(state.messages);
     delete (state as { playbooks?: unknown }).playbooks;
-    // The contract is built from this run's own two facts, not from the constant.
-    //
-    // `requestTools` is the array this request will carry, after every withdrawal above it, and
-    // `toolchainSummary` is the runner's probe - both already in hand, both fixed for the life of
-    // the run, which is what makes gating on them free rather than ruinous at the head of a cached
-    // prefix. Passed here rather than at the initial-state literal forty lines up, because this is
-    // the call that rewrites the head message on every turn, including a resumed one whose saved
-    // window was written on a differently provisioned box.
-    //
-    // Worth stating why this is not cosmetic: the withdrawal a few lines above removes
-    // `connector_action` and justifies itself in prose by what the contract still says about
-    // reaching a mailbox. For one wave that reasoning was unenforced and, worse, false - the
-    // contract installed here was the fully provisioned constant, so a box with nothing connected
-    // was told `connector_action` was the route to a mailbox it had just been denied.
+    // The contract describes supported capabilities, including groups that can be loaded later.
     const { removedDuplicates } = ensureBasePrompt(state.messages, {
-      tools: requestTools.map((tool) => tool.name),
+      tools: agentToolsFor('lead', run.surfaces, run.connectorKinds)
+        .filter((tool) => !run.withdrawnTools.has(tool.name))
+        .map((tool) => tool.name),
       toolchainSummary
     });
     if (removedDuplicates)
@@ -1974,7 +1963,9 @@ export class AgentWorker {
       catalog,
       turn,
       maxOutputTokens,
-      tools: requestTools,
+      get tools() {
+        return run.requestTools;
+      },
       webPlan
     };
     /**
