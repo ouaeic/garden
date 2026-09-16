@@ -30,7 +30,7 @@ export const registerProjectDirectoryRoutes = ({ app, store, runner }: RouteCont
       }
       return { directories: directories.sort((a, b) => Number(b.current) - Number(a.current)) };
     });
-  for (const operation of ['directory', 'directory.zip'] as const) {
+  for (const operation of ['directory', 'directory.zip', 'table'] as const) {
     app.get<{ Params: { workspaceId: string }; Querystring: { path?: string; cursor?: string } }>(
       `/v1/workspaces/:workspaceId/${operation}`,
       async (request, reply) => {
@@ -44,7 +44,8 @@ export const registerProjectDirectoryRoutes = ({ app, store, runner }: RouteCont
           })
           .parse(request.query);
         const params = new URLSearchParams({ path: query.path });
-        if (operation === 'directory' && query.cursor) params.set('cursor', query.cursor);
+        if (['directory', 'table'].includes(operation) && query.cursor)
+          params.set('cursor', query.cursor);
         const response = await runner.raw({
           workspaceId: workspace.id,
           userId: user.id,

@@ -1,0 +1,74 @@
+.table-preview {
+  min-width: 0;
+  width: 100%;
+}
+.table-preview-toolbar,
+.table-preview-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+}
+.table-preview-note {
+  font-size: 0.8rem;
+  margin: 0.5rem 0;
+  overflow-wrap: anywhere;
+}
+.table-preview-scroll {
+  contain: inline-size;
+  min-width: 0;
+  max-width: 100%;
+  max-height: 32rem;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  overscroll-behavior: contain;
+}
+.table-preview-scroll:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.table-preview table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.8rem;
+}
+.table-preview th,
+.table-preview td {
+  padding: 0.65rem 0.8rem;
+  min-width: 7rem;
+  max-width: 24rem;
+  border-bottom: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.table-preview thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel);
+}
+.table-preview th small {
+  display: block;
+  font-weight: 400;
+  font-size: 0.68rem;
+  margin-top: 0.25rem;
+}
+.table-preview .table-preview-row-number {
+  min-width: 3.5rem;
+  width: 3.5rem;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.table-preview tbody th {
+  font-weight: 400;
+}
+.table-preview-truncated {
+  padding-left: 0.1rem;
+}

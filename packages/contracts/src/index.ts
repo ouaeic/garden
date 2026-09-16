@@ -1,3 +1,4 @@
+export * from './table-preview.js';
 export * from './browser-action-receipts.js';
 export * from './projects.js';
 import { ConversationSource } from './projects.js';

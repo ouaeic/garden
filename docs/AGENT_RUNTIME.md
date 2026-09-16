@@ -629,3 +629,13 @@ is not verification that a website accepted a submission.
 Tab identifiers are unique across browser process lifetimes. A stale reference fails instead of
 selecting a new page that happens to occupy the same position. Restarted browser profiles retain
 cookies and local state; this does not promise restoration of live JavaScript or unsaved forms.
+
+## Table inspection
+
+Project files, saved versions and check outputs expose bounded CSV, TSV and JSONL pages. A page
+uses a held file descriptor and a signed byte cursor tied to the file identity and source root.
+If a file changes, the reader rejects continuation and asks for a refresh. It does not scan the
+whole file or build an offset index. Quoted CSV records may contain newlines; JSONL rows must be
+objects. Schema hints describe only the current page. Omitted columns and shortened values are
+reported explicitly; preview budgets do not constrain scripts, jobs or downloads. The browser
+retains only the visible rows and provides keyboard scrolling and previous/next page controls.
