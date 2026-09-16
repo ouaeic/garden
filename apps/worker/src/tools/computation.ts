@@ -1,3 +1,4 @@
+import { workflowDescription } from './workflow.js';
 import { debuggerDescription } from './debugger.js';
 import { ComputationRequest } from '@athanor/contracts';
 import { z } from 'zod';
@@ -17,6 +18,7 @@ export async function executeComputationTool(
   if (call.arguments.action === 'describe')
     return {
       debugger: debuggerDescription(),
+      workflow: workflowDescription(),
       options: z.toJSONSchema(ComputationRequest),
       actions: {
         start:

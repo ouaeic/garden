@@ -11,6 +11,9 @@ async function fixture() {
     { taskId: 'branch', workspaceId: 'two' }
   ];
   const store = {
+    getWorkspace: vi.fn(async (user: string, id: string) =>
+      user === 'owner' && id === 'one' ? { id } : null
+    ),
     projectExecutionMembers: vi.fn(async (user: string, task: string) =>
       user === 'owner' && ['root', 'branch'].includes(task) ? members : []
     )
@@ -26,7 +29,9 @@ async function fixture() {
     }))
   };
   app.decorateRequest('user', null);
+  app.decorateRequest('apiToken', null);
   app.addHook('onRequest', async (request) => {
+    if (request.headers['x-api-token']) request.apiToken = {} as never;
     request.user = request.headers['x-owner']
       ? ({ id: request.headers['x-owner'] } as never)
       : null;
@@ -111,6 +116,51 @@ describe('project process scope', () => {
       });
       expect(response.statusCode).toBeGreaterThanOrEqual(500);
       expect(response.json<ProcessList>()).not.toHaveProperty('processes');
+    } finally {
+      await app.close();
+    }
+  });
+  it('resumes only owned workflows from signed-in devices and preserves the displayed attempt', async () => {
+    const { app, runner } = await fixture(),
+      workflowId = '10000000-0000-4000-8000-000000000001';
+    try {
+      for (const headers of [
+        {},
+        { 'x-owner': 'other' },
+        { 'x-owner': 'owner', 'x-api-token': 'token' }
+      ]) {
+        const response = await app.inject({
+          method: 'POST',
+          url: `/v1/workspaces/one/workflows/${workflowId}/resume`,
+          headers,
+          payload: { attempt: 2 }
+        });
+        expect(response.statusCode).toBeGreaterThanOrEqual(400);
+      }
+      expect(runner.request).not.toHaveBeenCalled();
+      const response = await app.inject({
+        method: 'POST',
+        url: `/v1/workspaces/one/workflows/${workflowId}/resume`,
+        headers: { 'x-owner': 'owner' },
+        payload: { attempt: 2 }
+      });
+      expect(response.statusCode).toBe(200);
+      expect(runner.request).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workspaceId: 'one',
+          role: 'user',
+          path: `/v1/workspaces/one/workflows/${workflowId}/resume`,
+          body: '{"attempt":2}'
+        })
+      );
+      const forged = await app.inject({
+        method: 'POST',
+        url: `/v1/workspaces/one/workflows/${workflowId}/resume`,
+        headers: { 'x-owner': 'owner' },
+        payload: { attempt: 2, parameters: { other: true } }
+      });
+      expect(forged.statusCode).toBeGreaterThanOrEqual(400);
+      expect(runner.request).toHaveBeenCalledTimes(1);
     } finally {
       await app.close();
     }

@@ -1,3 +1,4 @@
+import type { WorkflowRun } from './workflows.js';
 export interface ProcessResourceSample {
   sampledAt: string;
   intervalMs: number | null;
@@ -27,6 +28,7 @@ export interface ManagedProcess {
   finishedAt?: string;
   deadlineAt?: string;
   exitCode?: number | null;
+  workflow?: WorkflowRun;
   lifetime?: 'task' | 'service' | 'job';
   resources?: ProcessResourceSample;
   resourceState?: 'pending' | 'available' | 'unavailable';

@@ -1,3 +1,4 @@
+import { workflowApproval } from './workflow-approval.js';
 import { projectUpdateApproval } from './project-updates.js';
 import { useTaskApproval } from './approval-grants.js';
 import { debuggerApproval } from './debugger-approval.js';
@@ -192,6 +193,12 @@ export const approvalForCall = async (
     call.arguments.action === 'integrate'
   )
     return codingMissionApproval(deps, task, call, state, {
+      ...(state?.taint ? { taintSources: state.taint.sources } : {}),
+      ...undoPointFor(state),
+      ...deps.destinationContext(state)
+    });
+  if (call.name === 'process' && call.arguments.action === 'workflow')
+    return workflowApproval(deps.runner, task, call, {
       ...(state?.taint ? { taintSources: state.taint.sources } : {}),
       ...undoPointFor(state),
       ...deps.destinationContext(state)

@@ -1,6 +1,7 @@
+import { jobIdentity } from './job-identity.js';
 import { discardMissionInvocation, trackMissionInvocation } from './mission-processes.js';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { scheduleDeadline } from './deadline.js';
 import { ProcessResources, processScanner, PROCESS_SAMPLE_MS } from './process-resources.js';
 import path from 'node:path';
@@ -603,11 +604,7 @@ export class ProcessManager {
   ) {
     const registry = this.#registry(root, workspaceId);
     if (registry.list().length === 0) await registry.load();
-    const id = request.requestId
-      ? `job_${createHash('sha256')
-          .update(JSON.stringify([workspaceId, owner, request.requestId]))
-          .digest('hex')}`
-      : undefined;
+    const id = request.requestId ? jobIdentity(workspaceId, owner, request.requestId) : undefined;
     const launch = ServiceLaunchSchema.parse(request);
     const existing = id ? registry.list().find((record) => record.id === id) : undefined;
     if (existing) {

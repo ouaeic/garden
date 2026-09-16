@@ -1,3 +1,4 @@
+import { WorkflowProgress } from './WorkflowProgress';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Activity, RefreshCw, Square } from 'lucide-react';
 import type { ManagedProcess, ProcessList } from '@athanor/contracts';
@@ -101,9 +102,14 @@ export default function ProcessPanel({
     setError(null);
     try {
       const base = `/v1/workspaces/${process.workspaceId ?? workspaceId}/processes/${encodeURIComponent(process.sessionId)}`;
+      const workflow = action === 'resume' ? process.workflow : undefined;
       const result = await post<{ stdout?: string; stderr?: string }>(
-        action === 'resume' ? `${base}/resume` : base,
-        action === 'resume' ? {} : { action }
+        workflow
+          ? `/v1/workspaces/${process.workspaceId ?? workspaceId}/workflows/${workflow.workflowId}/resume`
+          : action === 'resume'
+            ? `${base}/resume`
+            : base,
+        workflow ? { attempt: workflow.attempt } : action === 'resume' ? {} : { action }
       );
       if (generation.current !== at) return;
       if (action === 'log')
@@ -196,6 +202,7 @@ export default function ProcessPanel({
                       {state.replaceAll('_', ' ')}
                     </span>
                   </div>
+                  {process.workflow && <WorkflowProgress run={process.workflow} />}
                   <dl className="process-metrics">
                     <div>
                       <dt>{process.status === 'running' ? 'Running' : 'Duration'}</dt>
@@ -293,9 +300,21 @@ export default function ProcessPanel({
                     <Button disabled={busy !== null} onClick={() => void act(process, 'log')}>
                       Read output
                     </Button>
-                    {process.job?.state === 'interrupted' && process.job.checkpointResumable && (
+                    {!process.workflow &&
+                      process.job?.state === 'interrupted' &&
+                      process.job.checkpointResumable && (
+                        <Button
+                          disabled={busy !== null}
+                          onClick={() => void act(process, 'resume')}
+                        >
+                          Resume checkpoint
+                        </Button>
+                      )}
+                    {process.workflow?.canResume && (
                       <Button disabled={busy !== null} onClick={() => void act(process, 'resume')}>
-                        Resume checkpoint
+                        {process.workflow.state === 'completed'
+                          ? 'Rerun using cache'
+                          : 'Resume workflow'}
                       </Button>
                     )}
                     {['running', 'restarting', 'crash_looped', 'interrupted'].includes(state) && (

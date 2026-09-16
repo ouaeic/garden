@@ -2358,3 +2358,5 @@ export type * from './directories.js';
 export * from './project-updates.js';
 
 export * from './project-sessions.js';
+
+export * from './workflows.js';

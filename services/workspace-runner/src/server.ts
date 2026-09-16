@@ -1,3 +1,5 @@
+import { WorkflowManager } from './workflows.js';
+import { registerWorkflowRoutes } from './workflow-routes.js';
 import { registerDocumentRoutes } from './document-routes.js';
 import { registerBrowserActionRoutes } from './browser-action-routes.js';
 import { connectProcessSupervisor } from './process-supervisor.js';
@@ -407,6 +409,16 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
     limiter,
     systemPackages: { mode: 'refused', helper: config.SYSTEM_PACKAGE_HELPER }
   });
+  const workflows = new WorkflowManager(
+    {
+      workspaceRoot: config.WORKSPACE_ROOT,
+      secret: config.RUNNER_SHARED_SECRET,
+      maximumSeconds: config.MAX_BACKGROUND_SECONDS,
+      isolateNetwork: config.ISOLATE_AGENT_NETWORK,
+      guards
+    },
+    processes
+  );
   const computations = new ComputationManager(
     config.WORKSPACE_ROOT,
     {
@@ -1061,10 +1073,12 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
           memoryBytes: totalmem(),
           commandMemoryLimitBytes: limiter ? capacity.memoryBytes : null
         },
-        processes:
+        processes: await workflows.decorate(
+          request.params.workspaceId,
           request.capability.role === 'agent'
             ? await processes.list(request.params.workspaceId, request.capability.sub)
-            : await processes.listWorkspace(request.params.workspaceId),
+            : await processes.listWorkspace(request.params.workspaceId)
+        ),
         ...(listeners === undefined
           ? {}
           : { agentListeners: listeners.map((socket) => `${socket.address}:${socket.port}`) }),
@@ -1167,6 +1181,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
   registerFileDownloadRoutes(app, config);
   registerCodeIntelligenceRoutes(app, config.WORKSPACE_ROOT, codeIntelligence);
   registerComputationRoutes(app, computations);
+  registerWorkflowRoutes(app, workflows);
   registerDebuggerRoutes(app, debuggers);
 
   app.get<{ Params: { workspaceId: string }; Querystring: { path?: string } }>(

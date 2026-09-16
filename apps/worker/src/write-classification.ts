@@ -145,7 +145,7 @@ export const isMutatingToolCall = (name: string, args: Record<string, unknown> =
     return !['list', 'status', 'stack', 'scopes'].includes(
       String((args.options as { action?: unknown } | undefined)?.action)
     );
-  if (name === 'process' && args.action === 'compute')
+  if (name === 'process' && (args.action === 'compute' || args.action === 'workflow'))
     return !['list', 'status'].includes(
       String((args.options as { action?: unknown } | undefined)?.action)
     );

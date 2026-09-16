@@ -1,3 +1,4 @@
+import { executeWorkflowTool } from './workflow.js';
 import { recordPatchReceipt, type PatchReceipt } from '../edit/receipts.js';
 import { executeDebuggerTool } from './debugger.js';
 import { sha256, AthanorError } from '@athanor/core';
@@ -782,6 +783,7 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
       return withWorkspacePrefixNote(execution, result);
     }
     case 'process': {
+      if (call.arguments.action === 'workflow') return executeWorkflowTool(context, call);
       if (call.arguments.action === 'debug') return executeDebuggerTool(context, call);
       if (call.arguments.action === 'describe' || call.arguments.action === 'compute')
         return executeComputationTool(context, call);

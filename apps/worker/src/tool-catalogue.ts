@@ -702,7 +702,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'process',
     description:
-      'wait releases this turn until finite jobs stop, then resumes automatically. Do other work first. Status/log/input/stop; resume uses a declared checkpoint. describe lists persistent computation and debugging; compute/debug take options.',
+      'wait releases this turn until finite jobs stop, then resumes automatically. Do other work first. Status/log/input/stop; resume uses a declared checkpoint. describe lists computation, debugging and workflows; compute/debug/workflow take options.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -720,7 +720,8 @@ export const agentTools: ModelTool[] = [
             'resume',
             'describe',
             'compute',
-            'debug'
+            'debug',
+            'workflow'
           ]
         },
         sessionId: { type: 'string' },

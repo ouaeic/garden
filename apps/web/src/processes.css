@@ -193,3 +193,48 @@
     min-height: 44px;
   }
 }
+
+.workflow-progress {
+  border-block: 1px solid var(--border);
+  padding-block: 10px;
+  margin-block: 10px;
+  min-width: 0;
+}
+.workflow-summary {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+.workflow-stages {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0;
+}
+.workflow-stages li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 12px;
+  padding: 7px 0;
+  font-size: 12px;
+}
+.workflow-stages li > :last-child {
+  grid-column: 1 / -1;
+  color: var(--muted);
+}
+.workflow-stage-name,
+.workflow-files dd {
+  overflow-wrap: anywhere;
+}
+.workflow-files {
+  display: grid;
+  gap: 7px;
+  font-size: 12px;
+}
+.workflow-files div {
+  min-width: 0;
+}
+.workflow-files dt {
+  color: var(--muted);
+}
+.workflow-files dd {
+  margin: 2px 0 0;
+}

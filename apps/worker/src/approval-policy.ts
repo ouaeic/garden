@@ -257,6 +257,16 @@ export const approvalRequirement = (
 ): ApprovalRequirement | null => {
   const taintSources = context.taintSources ?? [];
   if (name === 'process' && args.action === 'describe') return null;
+  if (name === 'process' && args.action === 'workflow') {
+    const action = (args.options as { action?: unknown } | undefined)?.action;
+    if (action === 'list' || action === 'status') return null;
+    return {
+      sideEffect: 'external_consequential',
+      action: 'Review workflow execution',
+      preview:
+        'Resolve the owning task, pipeline, configuration and network authority before starting or resuming a workflow.'
+    };
+  }
   if (name === 'process' && args.action === 'debug') {
     const action = (
       args.options as

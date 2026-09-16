@@ -6,7 +6,7 @@ compatibility: Needs python3 with the venv module, curl and the shell, all insta
 allowed-tools: shell process file_read file_write files_list set_plan set_acceptance notify
 metadata:
   athanor.tier: 'builtin'
-  athanor.version: '1.1.0'
+  athanor.version: '1.2.0'
   athanor.risk: 'workspace'
   athanor.domain: 'science'
 ---
@@ -74,6 +74,20 @@ Output checksum differences fail the reproduction check. The manifest does not i
 fetch data, capture undeclared dependencies or prove scientific validity. For nondeterministic
 analyses, record and test justified numerical tolerances separately rather than reporting exact
 reproduction. A run interrupted during execution is never automatically replayed.
+
+## Dependent pipelines
+
+For dependent stages, scatter/gather or reusable intermediate results, inspect `process(action="describe")`
+and use its workflow controls. Start a project Nextflow script with explicit JSON parameters and
+configuration paths. Probe the optional local Nextflow/Java runtime before choosing it; install
+missing tools through governed commands. Use absolute workspace paths for input parameters or
+`projectDir` in the script because the engine runs from its retained workflow directory.
+
+Wait on the returned job `sessionId` while independent work continues. The project process panel
+shows observed stage outcomes and sampled resources. Retain both the cache and work directories.
+After an interrupted or failed attempt, resume explicitly with the workflow ID; changed parameters,
+source or inputs can invalidate cached stages. Do not infer a completion percentage from a dynamic
+task graph or treat cached execution as scientific validation.
 
 ## Verification
 

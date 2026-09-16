@@ -1,9 +1,33 @@
+import { z } from 'zod';
 import { AthanorError } from '@athanor/core';
 import type { ProcessList } from '@athanor/contracts';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 
 export const registerProjectProcessRoutes = ({ app, store, runner }: RouteContext): void => {
+  app.post<{ Params: { workspaceId: string; workflowId: string } }>(
+    '/v1/workspaces/:workspaceId/workflows/:workflowId/resume',
+    async (request) => {
+      const user = requireUser(request.user);
+      if (request.apiToken)
+        throw new AthanorError('session_required', 'Resume workflows from a signed-in device', 403);
+      const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
+      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found', 404);
+      const workflowId = z.uuid().parse(request.params.workflowId),
+        body = z.object({ attempt: z.number().int().positive() }).strict().parse(request.body);
+      return runner.request({
+        workspaceId: workspace.id,
+        userId: user.id,
+        role: 'user',
+        scopes: ['exec'],
+        method: 'POST',
+        path: `/v1/workspaces/${workspace.id}/workflows/${workflowId}/resume`,
+        contentType: 'application/json',
+        body: JSON.stringify(body),
+        timeoutMs: 30_000
+      });
+    }
+  );
   for (const kind of ['task', 'project'] as const)
     app.get<{ Params: { taskId: string } }>(`/v1/${kind}s/:taskId/processes`, async (request) => {
       const user = requireUser(request.user);

@@ -4,6 +4,26 @@ import { resolve } from 'node:path';
 export function processFixture(workspaceId, taskId) {
   const fixture = { rows: [], failRead: false, failStop: false, reads: 0, actions: [] };
   fixture.handle = async (route, pathname) => {
+    if (/\/workflows\/[^/]+\/resume$/.test(pathname)) {
+      const row = fixture.rows.find(
+        (item) => item.workflow && pathname.includes('/' + item.workflow.workflowId + '/')
+      );
+      assert(row, 'Workflow resume belongs to a displayed run');
+      assert(pathname.startsWith(`/v1/workspaces/${row.workspaceId}/workflows/`));
+      const body = route.request().postDataJSON();
+      assert.equal(body.attempt, row.workflow.attempt);
+      fixture.actions.push({ path: pathname, body });
+      row.status = 'running';
+      row.workflow = {
+        ...row.workflow,
+        attempt: row.workflow.attempt + 1,
+        state: 'running',
+        canResume: false
+      };
+      row.job.state = 'running';
+      await route.fulfill({ json: row.workflow });
+      return true;
+    }
     if (!/\/processes(?:\/[^/]+(?:\/resume)?)?$/.test(pathname)) return false;
     const json = (body, status = 200) => route.fulfill({ status, json: body });
     if (pathname.endsWith('/processes')) {
@@ -48,6 +68,8 @@ export function processFixture(workspaceId, taskId) {
     else {
       row.status = pathname.endsWith('/resume') ? 'running' : 'stopped';
       if (row.job) row.job.state = row.status;
+      if (row.workflow && row.status === 'stopped')
+        row.workflow = { ...row.workflow, state: 'cancelled', canResume: true };
       await json(row);
     }
     return true;
@@ -78,6 +100,58 @@ export function processFixture(workspaceId, taskId) {
         startedAt,
         restarts: 0,
         checkpointResumable: true
+      },
+      workflow: {
+        workflowId: '40000000-0000-4000-8000-000000000004',
+        workspaceId: '10000000-0000-4000-8000-000000000088',
+        ownerTaskId: taskId,
+        name: 'Whole-genome analysis',
+        engine: 'nextflow',
+        engineVersion: '26.04.6',
+        script: 'workspace/analysis/main.nf',
+        directory: 'workspace/.garden/workflows/40000000-0000-4000-8000-000000000004',
+        state: 'running',
+        attempt: 2,
+        canResume: false,
+        sessionId: 'job_genome',
+        createdAt: startedAt,
+        startedAt,
+        finishedAt: null,
+        tracePath:
+          'workspace/.garden/workflows/40000000-0000-4000-8000-000000000004/attempt-2/trace.tsv',
+        reportPath:
+          'workspace/.garden/workflows/40000000-0000-4000-8000-000000000004/attempt-2/report.html',
+        timelinePath: 'timeline.html',
+        progress: {
+          recordedTasks: 34,
+          completed: 2,
+          cached: 31,
+          failed: 1,
+          aborted: 0,
+          catchingUp: false,
+          pendingRecord: false,
+          observedAt: new Date(now).toISOString(),
+          recent: [
+            {
+              taskId: '32',
+              name: 'ALIGN (' + 'long-sample-identifier'.repeat(8) + ')',
+              hash: 'fa/123abc',
+              status: 'cached',
+              exitCode: 0,
+              durationMs: 130000,
+              peakMemoryBytes: 1024 ** 3
+            },
+            {
+              taskId: '34',
+              name: 'REPORT',
+              hash: 'ca/456def',
+              status: 'failed',
+              exitCode: 11,
+              durationMs: 300,
+              peakMemoryBytes: null
+            }
+          ]
+        }
       },
       resources: {
         sampledAt: new Date(now - 30_000).toISOString(),
@@ -111,6 +185,7 @@ export function processFixture(workspaceId, taskId) {
       {
         ...row,
         sessionId: 'job_finished',
+        workflow: undefined,
         status: 'completed',
         workspaceId,
         job: {
@@ -124,6 +199,7 @@ export function processFixture(workspaceId, taskId) {
       {
         ...row,
         sessionId: 'job_interrupted',
+        workflow: undefined,
         status: 'interrupted',
         workspaceId,
         job: {
@@ -153,6 +229,16 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
     assert((await card.innerText()).includes('825%'));
     assert((await card.innerText()).includes('18.0 GiB'));
     assert((await card.innerText()).includes('No time limit'));
+    assert((await card.innerText()).includes('2 completed · 31 cached'));
+    await card.getByText('Workflow stages & files', { exact: true }).click();
+    assert((await card.innerText()).includes('failed · exit 11'));
+    assert((await card.innerText()).includes('Peak RAM not captured'));
+    assert.equal(
+      await card.getByRole('progressbar').count(),
+      0,
+      'An unknown task graph must not imply a completion percentage'
+    );
+
     assert.equal(await panel.getByRole('article').count(), 1);
     const before = fixture.reads;
     await page.clock.runFor(119_000);
@@ -238,6 +324,17 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
     await dialog.waitFor({ state: 'detached' });
     assert.equal(fixture.rows[0].status, 'stopped');
     assert.equal(await card.getByRole('button', { name: 'Stop', exact: true }).count(), 0);
+    await card.getByRole('button', { name: 'Resume workflow', exact: true }).click();
+    assert(
+      fixture.actions.some(
+        (action) => action.path.includes('/workflows/') && action.body.attempt === 2
+      )
+    );
+    assert.equal(fixture.rows[0].workflow.attempt, 3);
+    await card
+      .getByRole('button', { name: 'Resume workflow', exact: true })
+      .waitFor({ state: 'detached' });
+
     console.log(
       'Project process browser checks passed: multi-day clocks, child resources, relaxed polling, responsive controls, checkpoint resume, log replacement, stale/error status and exact-root stop.'
     );

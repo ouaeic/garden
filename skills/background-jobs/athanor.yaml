@@ -1,5 +1,5 @@
 id: background-jobs
-version: 1.4.0
+version: 1.5.0
 catalog_line: 'Run long or batched work with a manifest, checkpoints and idempotent external writes.'
 
 lineage:
