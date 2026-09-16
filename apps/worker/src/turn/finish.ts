@@ -1,3 +1,4 @@
+import { waitForQuestion } from '../questions.js';
 /** Validate completion evidence, plan coverage, acceptance and delivery before ending the turn. */
 import type { ModelToolCall } from '@athanor/model-gateway';
 import type { TaskRecord } from '@athanor/data';
@@ -73,7 +74,7 @@ export interface TurnFinishDeps {
  * `held` means the model was told why and the batch loop must move to the next call; `completed`
  * means the turn is over and the caller must return.
  */
-export type FinishOutcome = 'held' | 'completed';
+export type FinishOutcome = 'held' | 'completed' | 'parked';
 
 export const handleFinishCall = async (
   deps: TurnFinishDeps,
@@ -84,6 +85,10 @@ export const handleFinishCall = async (
   /** The turn this step belongs to, and the prose the model wrote alongside the call. */
   step: { turn: number; assistantText: string }
 ): Promise<FinishOutcome> => {
+  if (state.question) {
+    await waitForQuestion(deps, task, key, state, call);
+    return 'parked';
+  }
   const { turn, assistantText } = step;
   const summary = textValue(call.arguments.summary, assistantText || 'Task complete');
   const checked = completionVerification(state, call.arguments.verification);

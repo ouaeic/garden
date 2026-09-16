@@ -128,17 +128,20 @@ export const hasOngoingWork = (task: Task): boolean =>
   task.deliveryStatus === 'pending' ||
   (task.status === 'awaiting_resource' && task.resourceWait?.code === 'background_jobs');
 export const needsAttention = (task: Task): boolean =>
+  task.hasOpenQuestion === true ||
   (['awaiting_user', 'awaiting_resource', 'failed'].includes(task.status) &&
     task.resourceWait?.code !== 'background_jobs') ||
   (task.status === 'completed' && task.deliveryStatus === 'incomplete');
 export const taskStatusLabel = (task: Task): string =>
-  task.status === 'awaiting_resource' && task.resourceWait?.code === 'background_jobs'
-    ? 'Background work is running'
-    : task.status === 'completed' && task.deliveryStatus === 'pending'
-      ? 'Generating media'
-      : task.status === 'completed' && task.deliveryStatus === 'incomplete'
-        ? 'Delivery needs attention'
-        : statusLabel[task.status];
+  task.hasOpenQuestion && isWorking(task)
+    ? 'Working · answer requested'
+    : task.status === 'awaiting_resource' && task.resourceWait?.code === 'background_jobs'
+      ? 'Background work is running'
+      : task.status === 'completed' && task.deliveryStatus === 'pending'
+        ? 'Generating media'
+        : task.status === 'completed' && task.deliveryStatus === 'incomplete'
+          ? 'Delivery needs attention'
+          : statusLabel[task.status];
 export const isFinished = (task: Task): boolean =>
   ['completed', 'failed', 'cancelled'].includes(task.status);
 export const data = (value: unknown): Record<string, unknown> =>
@@ -193,12 +196,18 @@ export function lastEvent(events: TaskEvent[], kind: TaskEvent['kind']): TaskEve
   return [...events].reverse().find((event) => event.kind === kind);
 }
 export function activeQuestion(events: TaskEvent[], task: Task): TaskEvent | undefined {
-  if (task.status !== 'awaiting_user') return undefined;
+  if (['completed', 'cancelled', 'failed'].includes(task.status)) return undefined;
   const question = lastEvent(events, 'question_asked');
   if (!question) return undefined;
+  const asynchronous = Boolean(data(question.payload).continueWith);
+  if (task.status !== 'awaiting_user' && !asynchronous) return undefined;
   return events.some(
     (event) =>
-      event.sequence > question.sequence && ['user_message', 'completed'].includes(event.kind)
+      event.sequence > question.sequence &&
+      (event.kind === 'completed' ||
+        (['queued_message', 'user_message'].includes(event.kind) &&
+          (data(event.payload).questionId === question.id ||
+            (!asynchronous && event.kind === 'user_message'))))
   )
     ? undefined
     : question;

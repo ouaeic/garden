@@ -1,3 +1,4 @@
+import { askUser, parkBrowserHandoff, saveQuestion } from './questions.js';
 import { BrowserActionReceipt } from '@athanor/contracts';
 import { browserActionRequestId } from './browser-action-receipts.js';
 import { codingMissionAdapter } from './coding-mission-gateway.js';
@@ -54,7 +55,7 @@ import {
   stepUsageKey,
   usageCredit
 } from './billing.js';
-import { askOutcome, startTurnState, type CompletionVerification } from './completion.js';
+import { startTurnState, type CompletionVerification } from './completion.js';
 import { originOf, type DestinationContext } from './egress.js';
 import {
   dropLegacyGuidance,
@@ -483,7 +484,7 @@ export class AgentWorker {
         this.#recordToolResult(task, key, state, call, result, leadModel, catalog),
       compactContext: (task, key, state, input) => this.#compactContext(task, key, state, input),
       sendNotice: (task, key, state, call) => this.#sendNotice(task, key, state, call),
-      askUser: (task, key, state, call, deferred) => this.#askUser(task, key, state, call, deferred)
+      askUser: (task, key, state, call) => askUser(this.#turnControl, task, key, state, call)
     };
   }
 
@@ -1187,85 +1188,6 @@ export class AgentWorker {
   }
 
   /**
-   * Stops the turn on a question, which is the other half of `#sendNotice`.
-   *
-   * It mirrors the approval path deliberately rather than inventing a second way to wait: the call
-   * is answered in the window, the remaining calls in the batch are deferred in writing, an event is
-   * written, and the task is saved `awaiting_user` with its lease cleared. What it does not mirror is
-   * the approvals table. A question is not an approval - there is nothing to bind arguments to,
-   * nothing to expire into a denial, and no yes or no to be given - so the answer is the owner's next
-   * message, taken back into this same turn by `run`.
-   *
-   * The notification is the one an unattended run already has. It carries the agent's own sentence
-   * to a device, which is exactly what a question is, and it is charged against the same
-   * per-conversation ceiling as every other notification the agent raises. Failure to queue it is
-   * swallowed, like the takeover raise: the question is in the transcript and the conversation is
-   * parked either way, and a device that could not be reached is not a reason to keep working past a
-   * decision the model has just said it cannot make.
-   *
-   * Returns whether the turn is parked. A refused question is an ordinary failed tool call and the
-   * turn carries on, which is the point: the refusals tell the model to go and find out instead.
-   */
-  async #askUser(
-    task: TaskRecord,
-    key: Uint8Array,
-    state: AgentState,
-    call: ModelToolCall,
-    deferred: readonly ModelToolCall[]
-  ): Promise<boolean> {
-    const outcome = askOutcome(state, call.arguments);
-    state.turnToolResults ??= {};
-    if (!outcome.ok) {
-      state.messages.push({ role: 'tool', toolCallId: call.id, content: outcome.refusal });
-      state.turnToolResults[call.id] = { name: call.name, success: false };
-      return false;
-    }
-    const { question, options, why } = outcome;
-    state.questionsAsked = (state.questionsAsked ?? 0) + 1;
-    state.question = { question, askedAtStep: state.step };
-    // Answered before the park, not after it: a tool call with no result is a malformed window, and
-    // this one is saved and reloaded by whichever worker picks the conversation back up.
-    state.messages.push({
-      role: 'tool',
-      toolCallId: call.id,
-      content: `Asked. The conversation is parked until the user answers, and their reply arrives as the next user message - so do not ask again, and do not act on a guess in the meantime. Question: ${question}${
-        options.length ? `\nOptions offered: ${options.join(' | ')}` : ''
-      }`
-    });
-    state.turnToolResults[call.id] = { name: call.name, success: true };
-    for (const later of deferred)
-      state.messages.push({
-        role: 'tool',
-        toolCallId: later.id,
-        content:
-          'Deferred because the turn stopped for a question. Request it again if still needed.'
-      });
-    await this.store
-      .createAgentNotification({
-        userId: task.userId,
-        taskId: task.id,
-        kind: 'agent_message',
-        messageCiphertext: encryptJson({ message: question }, key, agentNotificationAad(task.id))
-      })
-      .catch(() => undefined);
-    await event(this.store, task, key, 'question_asked', question, {
-      question,
-      why,
-      ...(options.length ? { options } : {}),
-      unattended: state.unattended === true
-    });
-    await this.store.updateTask({
-      id: task.id,
-      workerId: this.config.WORKER_ID,
-      status: 'awaiting_user',
-      actualComputeCredits: state.credits,
-      agentStateCiphertext: encryptJson(state, key, `task-state:${task.id}`),
-      clearLease: true
-    });
-    return true;
-  }
-
-  /**
    * Tells the owner about a challenge only a person can clear.
    *
    * The runner detects the wall, scopes it and hands it over as data, and the conversation shows it
@@ -1741,6 +1663,12 @@ export class AgentWorker {
     } = {}
   ): Promise<void> {
     sealUnansweredToolCalls(state.messages, 'the agent finished the turn before this call ran');
+    if (await parkBrowserHandoff(this.#turnControl, task, key, state)) return;
+    if (state.question) {
+      state.question.waiting = true;
+      await saveQuestion(this.#turnControl, task, key, state, true);
+      return;
+    }
     // The completion carries the answer identity; ordinary messages remain progress.
     if (!state.answered && (completion.answer ?? completion.summary).trim())
       await event(this.store, task, key, 'assistant_message', completion.summary.slice(0, 500), {
@@ -2047,6 +1975,7 @@ export class AgentWorker {
       return;
 
     if (await honorUserControl()) return;
+    if (await parkBrowserHandoff(this.#turnControl, task, key, state)) return;
     await this.store.updateTask({
       id: task.id,
       workerId: this.config.WORKER_ID,
@@ -2180,37 +2109,7 @@ export class AgentWorker {
       )
         return;
       sealUnansweredToolCalls(state.messages, 'the step ended before this call ran');
-      if (state.browserHandoff) {
-        const wall = state.browserHandoff;
-        delete state.browserHandoff;
-        const question = `Complete the browser verification on ${botWallSite(wall.url)}`;
-        const handoff = {
-          kind: 'challenge' as const,
-          surface: 'browser' as const,
-          url: wall.url,
-          ...(wall.tabId ? { tabId: wall.tabId } : {})
-        };
-        state.question = { question, askedAtStep: state.step, handoff };
-        state.messages.push({
-          role: 'assistant',
-          content:
-            'The browser needs human verification. Work is paused until the owner completes the handoff. After their reply, observe the page afresh and continue; do not repeat their action.'
-        });
-        await event(this.store, task, key, 'question_asked', question, {
-          question,
-          why: 'This site requires a person. Open the browser, complete its verification, then choose Done and continue.',
-          handoff
-        });
-        await this.store.updateTask({
-          id: task.id,
-          workerId: this.config.WORKER_ID,
-          status: 'awaiting_user',
-          actualComputeCredits: state.credits,
-          agentStateCiphertext: encryptJson(state, key, `task-state:${task.id}`),
-          clearLease: true
-        });
-        return;
-      }
+      if (await parkBrowserHandoff(this.#turnControl, task, key, state)) return;
 
       /*
        * The three questions asked at the end of every step: did anything happen in it, did any of

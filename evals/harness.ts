@@ -3162,6 +3162,27 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
     }),
     getTask: async () => task,
     taskClaim: async () => ({ status: task.status, leaseOwner: task.leaseOwner ?? null }),
+    saveTaskQuestion: async (
+      input: Parameters<DataStore['saveTaskQuestion']>[0]
+    ): Promise<boolean> => {
+      await store.updateTask({
+        id: input.taskId,
+        workerId: input.workerId,
+        status: input.park ? 'awaiting_user' : 'running',
+        agentStateCiphertext: input.agentStateCiphertext,
+        actualComputeCredits: input.actualComputeCredits,
+        clearLease: input.park
+      });
+      if (input.event)
+        await store.appendTaskEvent({
+          taskId: input.taskId,
+          id: input.event.id,
+          kind: 'question_asked',
+          summary: 'Question',
+          payloadCiphertext: input.event.payloadCiphertext
+        });
+      return true;
+    },
     updateTask: async (input: Record<string, unknown>) => {
       if (typeof input.status === 'string') finalStatus = input.status;
       // The column that separates a pause the ceiling imposed from one the owner asked for. An

@@ -48,7 +48,7 @@ export interface TurnControlDeps {
  * one as the other from timing alone would be wrong half the time.
  */
 export const drainCorrection = async (
-  deps: Pick<TurnControlDeps, 'store' | 'config'>,
+  deps: Pick<TurnControlDeps, 'store'> & { config: Pick<AgentWorkerConfig, 'WORKER_ID'> },
   task: TaskRecord,
   key: Uint8Array,
   state: AgentState
@@ -59,6 +59,11 @@ export const drainCorrection = async (
   const correction = message.prompt;
   if (!correction.trim()) return false;
   const nextState = structuredClone(state);
+  const answersQuestion = Boolean(message.questionId && message.questionId === state.question?.id);
+  if (answersQuestion) {
+    delete nextState.question;
+    nextState.questionsAsked = 0;
+  }
   if (!queued.approvalId)
     nextState.ownerReasoningEffort = queued.reasoningEffort ?? task.reasoningEffort ?? 'auto';
   sealUnansweredToolCalls(nextState.messages, 'the user redirected the task before this call ran');
@@ -70,7 +75,12 @@ export const drainCorrection = async (
     additionalComputeCredits: queued.maxComputeCredits,
     ...(queued.maxSpendUsd === null ? {} : { additionalSpendUsd: queued.maxSpendUsd }),
     userMessageCiphertext: encryptJson(
-      { markdown: correction, attachments: message.attachments, messageId: queued.id },
+      {
+        markdown: correction,
+        attachments: message.attachments,
+        messageId: queued.id,
+        ...(message.questionId ? { questionId: message.questionId } : {})
+      },
       key,
       `task-event:${task.id}`
     ),
@@ -87,9 +97,18 @@ export const drainCorrection = async (
     return false;
   }
   Object.assign(state, nextState);
+  if (answersQuestion) delete state.question;
   if (!queued.approvalId && queued.securityMode) task.securityMode = queued.securityMode;
   if (!queued.approvalId) task.reasoningEffort = nextState.ownerReasoningEffort ?? 'auto';
-  await event(deps.store, task, key, 'status', 'Applying your correction to the running task');
+  await event(
+    deps.store,
+    task,
+    key,
+    'status',
+    answersQuestion
+      ? 'Answer received — continuing the task'
+      : 'Applying your correction to the running task'
+  );
   return true;
 };
 

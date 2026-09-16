@@ -27,6 +27,7 @@ import { drainCorrection } from '../turn-control.js';
 import { textValue } from '../values.js';
 import { recoverPatchReceipts } from '../edit/receipts.js';
 import { PLAN_MODE_PERMITTED } from './dispatch.js';
+import { saveQuestion } from '../questions.js';
 
 /**
  * What settling a parked turn needs from the worker that owns it.
@@ -321,27 +322,18 @@ export const resumeParkedTurn = async (
     }
   }
 
-  /*
-   * The answer to a parked question, taken back into the turn that asked it.
-   *
-   * A question is answered by the owner writing, and a message sent to a conversation the agent
-   * still holds is queued rather than started - so this is the same move `drainCorrection` makes
-   * mid-turn, at the one point where waiting for it is the whole state of the machine. Keeping the
-   * turn is the point: everything the agent had already established is still in the window, and
-   * the alternative - ending the turn and starting a fresh one on the reply - throws away the
-   * context that made the question worth asking.
-   *
-   * `interrupt` is not required here, as it is for a correction. There the distinction earns its
-   * keep, because "do this next" and "no, not that" are different intentions and timing alone
-   * cannot tell them apart; here the agent has stopped and said what it is waiting for, so the
-   * next thing the owner writes is the answer by construction.
-   *
-   * With nothing queued the conversation is parked again exactly as it was, mirroring the pending
-   * approval that is still waiting above. That is what makes a re-lease from any direction - a
-   * worker restart, a sweep, an owner resuming - safe: the machine returns to waiting rather than
-   * carrying on as though it had been answered.
-   */
-  if (state.question) {
+  // Answers to a running question use the same atomic queue consumption as corrections.
+  if (state.question?.id) {
+    for (let count = 0; count < 8 && state.question; count++) {
+      if (!(await drainCorrection(deps, task, key, state))) break;
+      if (await honorUserControl()) return true;
+    }
+    if (state.question?.waiting) {
+      await saveQuestion(deps, task, key, state, true);
+      return true;
+    }
+  }
+  if (state.question && (!state.question.continueWith || state.question.waiting)) {
     const asked = state.question;
     let waiting = await deps.store.getNextQueuedTaskMessage(task.id);
     // A refusal explains a decision; it does not consume the answer to a separate question.
@@ -374,7 +366,12 @@ export const resumeParkedTurn = async (
             additionalComputeCredits: waiting.maxComputeCredits,
             ...(waiting.maxSpendUsd === null ? {} : { additionalSpendUsd: waiting.maxSpendUsd }),
             userMessageCiphertext: encryptJson(
-              { markdown: answer, attachments: message?.attachments, messageId: waiting.id },
+              {
+                markdown: answer,
+                attachments: message?.attachments,
+                messageId: waiting.id,
+                ...(message?.questionId ? { questionId: message.questionId } : {})
+              },
               key,
               `task-event:${task.id}`
             ),

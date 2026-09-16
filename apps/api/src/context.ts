@@ -157,6 +157,7 @@ export const taskResponse = (
   // The end of the run, as opposed to the last time anything about it was written.
   completedAt: task.completedAt ?? null,
   queuedMessageCount: task.queuedMessageCount,
+  hasOpenQuestion: task.hasOpenQuestion ?? false,
   shareCount: task.shareCount ?? 0,
   rewind: task.rewindScope ?? null,
   restoredCheckpointId: task.restoredCheckpointId ?? null,

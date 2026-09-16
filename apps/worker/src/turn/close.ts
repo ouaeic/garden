@@ -26,6 +26,7 @@ import type { ModelGateway, ModelTool } from '@athanor/model-gateway';
 import type { AgentState } from '../agent-state.js';
 import { handOffAtStepLimit, type HandoffDeps } from '../handoff.js';
 import { stepLimitCarryOver } from '../turn-bounds.js';
+import { saveQuestion } from '../questions.js';
 
 /** The run-scoped facts the closing call is built from, fixed for the life of the turn. */
 export interface TurnCloseContext {
@@ -66,6 +67,11 @@ export const closeTurnAtCeiling = async (
   context: TurnCloseContext,
   ceiling: TurnCeiling
 ): Promise<void> => {
+  if (state.question) {
+    state.question.waiting = true;
+    await saveQuestion(deps, task, key, state, true);
+    return;
+  }
   await handOffAtStepLimit(deps, task, key, state, {
     ...context,
     ...(ceiling.reason === undefined ? {} : { reason: ceiling.reason })

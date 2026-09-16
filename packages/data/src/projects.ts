@@ -16,7 +16,7 @@ import { taskDeliveryCountsSql } from './task-delivery.js';
 const counts = `
   (SELECT COUNT(*) FROM tasks t WHERE t.project_id=p.id AND t.parent_mission_id IS NULL) AS conversation_count,
   (SELECT COUNT(*) FROM tasks t WHERE t.project_id=p.id AND t.parent_mission_id IS NULL AND (t.status IN ('queued','planning','running') OR EXISTS(SELECT 1 FROM delivery d WHERE d.task_id=t.id AND d.pending>0))) AS active_count,
-  (SELECT COUNT(*) FROM tasks t WHERE t.project_id=p.id AND t.parent_mission_id IS NULL AND (t.status IN ('awaiting_user','awaiting_resource','failed') OR EXISTS(SELECT 1 FROM delivery d WHERE d.task_id=t.id AND d.failed>0))) AS attention_count,
+  (SELECT COUNT(*) FROM tasks t WHERE t.project_id=p.id AND t.parent_mission_id IS NULL AND (t.status IN ('awaiting_user','awaiting_resource','failed') OR (t.pending_question_id IS NOT NULL AND t.status NOT IN ('completed','cancelled','failed')) OR EXISTS(SELECT 1 FROM delivery d WHERE d.task_id=t.id AND d.failed>0))) AS attention_count,
   (SELECT t.id FROM tasks t WHERE t.project_id=p.id AND t.parent_mission_id IS NULL
     ORDER BY (t.archived_at IS NULL) DESC,t.updated_at DESC,t.id DESC LIMIT 1) AS latest_task_id,
   COALESCE((SELECT SUM(u.cost_usd) FROM usage_entries u WHERE u.project_id=p.id AND u.state='settled' AND u.cost_usd>0),0) +

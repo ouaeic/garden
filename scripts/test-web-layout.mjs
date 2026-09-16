@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { checkRunningQuestion } from './browser-questions.mjs';
 import { checkHumanInterventions } from './browser-interventions.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -1111,6 +1112,7 @@ try {
   });
   if (process.env.GARDEN_UI_FOCUS !== 'drafts') {
     await checkHumanInterventions({ context, origin, task, report });
+    await checkRunningQuestion({ context, origin, bootstrap, task, report });
     await checkProjectConversations({
       context,
       origin,
@@ -1123,7 +1125,7 @@ try {
       report,
       errors
     });
-    await checkTaskRecovery({ context, origin, task, report, errors });
+    await checkTaskRecovery({ context, origin, bootstrap, task, report, errors });
     await checkProjectDirectories({
       context,
       origin,

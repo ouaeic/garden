@@ -418,9 +418,19 @@ with an expiring receipt bound to the page, response digest and challenge frames
 alone cannot grant it. Owner actions are never gated by a wall. `parallel_web_read` uses its own
 isolated browser.
 
-Direction answers are bound to their question event, so a lost acknowledgement can be retried
-without creating another message or allocating another budget. Stale or conflicting answers are
-rejected. Ordinary answer drafts use the encrypted device draft key; private computer input is
+`ask` identifies the work blocked by an owner decision. With `continueWith`, the conversation keeps
+doing that named independent work while its question remains visible. The pending dependency is
+retained in the runtime context across compaction. `ask(waitFor)` pauses when independent work is
+exhausted; completion also waits for an outstanding answer. A human browser challenge cannot
+replace a pending direction question. Unrelated corrections do not answer it.
+
+Direction answers are bound to their question event and consumed atomically with the saved
+trajectory. A lost acknowledgement can be retried without creating another message or allocating
+another budget. Saving an answer does not require an available model account. Question publication,
+lease release and a reply arriving during that release are coordinated so the reply cannot strand
+the conversation. Project and conversation lists show when working tasks need an answer without
+decrypting their trajectories. Stale or conflicting answers are rejected.
+Ordinary answer drafts use the encrypted device draft key; private computer input is
 never saved as a draft or added to the conversation. Recognized signing controls request owner
 input, including in Autonomous mode. The remote screen supports owner pointer strokes for
 signature pads and drag interactions. Done and continue waits for acknowledged input and requires

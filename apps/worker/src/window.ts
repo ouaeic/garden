@@ -350,7 +350,7 @@ export const refreshRuntimeContext = (deps: WindowDeps, input: RuntimeContextInp
     webPlan,
     modelRoster
   } = input;
-  const content = runtimeContext(
+  let content = runtimeContext(
     { ...workspace, securityMode: task.securityMode },
     deps.config.PREVIEW_BASE_URL,
     { now: new Date(), timeZone },
@@ -364,6 +364,8 @@ export const refreshRuntimeContext = (deps: WindowDeps, input: RuntimeContextInp
     { credits: state.credits, maxCredits: task.maxComputeCredits },
     modelRoster ?? []
   );
+  if (state.question?.continueWith)
+    content += `\nPending owner question (not answered): ${JSON.stringify({ id: state.question.id, question: state.question.question, blockedWork: state.question.why, independentWork: state.question.continueWith })}\nOnly independent work may continue. Do not infer an answer. Call ask with waitFor when it is exhausted.`;
   const last = state.messages.at(-1);
   // Nothing is touched when the block is already last and already says this - a removal and a
   // re-push of identical bytes would still be identical bytes, but a step that changes nothing

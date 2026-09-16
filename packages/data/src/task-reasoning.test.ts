@@ -108,6 +108,13 @@ describe('task reasoning preferences survive each durable message path', () => {
     };
     expect(await store.consumeQueuedTaskMessageInTurn(input)).toBe(false);
     expect((await store.getTask(userId, task.id))?.reasoningEffort).toBe('low');
+    expect(await store.consumeQueuedTaskMessageInTurn({ ...input, workerId: 'worker' })).toBe(
+      false
+    );
+    await database.query(
+      "UPDATE tasks SET lease_expires_at=NOW()+INTERVAL '1 minute' WHERE id=$1",
+      [task.id]
+    );
     expect(await store.consumeQueuedTaskMessageInTurn({ ...input, workerId: 'worker' })).toBe(true);
     expect((await store.getTask(userId, task.id))?.reasoningEffort).toBe('xhigh');
     expect((await store.getTask(userId, task.id))?.securityMode).toBe('review');

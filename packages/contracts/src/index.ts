@@ -613,6 +613,7 @@ export const Task = z.object({
   /** When this run stopped. Null while it can still do work; cleared again by a follow-up. */
   completedAt: IsoDate.nullable().default(null),
   queuedMessageCount: z.number().int().nonnegative().default(0),
+  hasOpenQuestion: z.boolean().optional(),
   /**
    * How many links to a snapshot of this conversation are live - neither revoked nor expired. The
    * count is all a client needs to draw the badge; the links themselves are read on demand.

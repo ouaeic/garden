@@ -130,16 +130,22 @@ export function registerQuestionRoutes(context: RouteContext): void {
         )
       ).rows[0];
       const state = task.agentStateCiphertext
-        ? decryptJson<{ question?: { handoff?: { kind: string; tabId?: string; url?: string } } }>(
-            task.agentStateCiphertext,
-            key
-          )
+        ? decryptJson<{
+            question?: {
+              id?: string;
+              continueWith?: string;
+              handoff?: { kind: string; tabId?: string; url?: string };
+            };
+          }>(task.agentStateCiphertext, key)
         : null;
       if (
-        task.status !== 'awaiting_user' ||
+        !(
+          task.status === 'awaiting_user' ||
+          (state?.question?.continueWith &&
+            ['queued', 'planning', 'running', 'paused', 'awaiting_resource'].includes(task.status))
+        ) ||
         !state?.question ||
-        latest?.id !== input.questionId ||
-        task.queuedMessageCount > 0
+        (state.question.id ?? latest?.id) !== input.questionId
       )
         throw new AthanorError(
           'question_changed',
@@ -191,7 +197,11 @@ export function registerQuestionRoutes(context: RouteContext): void {
         task.id,
         { prompt: input.prompt },
         {
-          retainBudget: { expected: taskContinuationSnapshot(task), messageId }
+          retainBudget: {
+            expected: taskContinuationSnapshot(task),
+            messageId,
+            ...(state.question.id ? { questionId: state.question.id } : {})
+          }
         }
       );
     });

@@ -552,7 +552,7 @@ export class TaskStore {
         // ceiling is anchored to what the task has already spent rather than to zero - otherwise
         // asking for "$2 more" on a task that spent $5 would read as an instantly-breached cap.
         `UPDATE tasks t SET
-           status='queued', model_override=model_override OR $10 OR model_id<>$3, model_id=$3, privacy_route=$4, reasoning_effort=COALESCE($8,reasoning_effort), security_mode=COALESCE($9,security_mode),
+           status='queued', pending_question_id=NULL, model_override=model_override OR $10 OR model_id<>$3, model_id=$3, privacy_route=$4, reasoning_effort=COALESCE($8,reasoning_effort), security_mode=COALESCE($9,security_mode),
            max_compute_credits=max_compute_credits+$5,
            max_spend_usd=CASE WHEN $7::double precision IS NULL THEN max_spend_usd ELSE
              COALESCE(max_spend_usd, (SELECT COALESCE(SUM(u.cost_usd),0) FROM usage_entries u
@@ -628,6 +628,7 @@ export class TaskStore {
     promptCiphertext: EncryptedEnvelope;
     queuedEventCiphertext: EncryptedEnvelope;
     queuedEventId?: string;
+    questionId?: string;
     /** Apply this to the turn already running rather than waiting for it to finish. */
     interrupt?: boolean;
   }): Promise<TaskRecord | null> {
@@ -641,7 +642,14 @@ export class TaskStore {
       if (
         !row ||
         row.parent_mission_id ||
-        !['queued', 'planning', 'running', 'awaiting_user', 'paused'].includes(String(row.status))
+        (!['queued', 'planning', 'running', 'awaiting_user', 'paused'].includes(
+          String(row.status)
+        ) &&
+          !(
+            row.status === 'awaiting_resource' &&
+            input.questionId &&
+            input.maxComputeCredits === 0
+          ))
       )
         return null;
       await tx.query(
@@ -692,8 +700,14 @@ export class TaskStore {
           JSON.stringify(input.queuedEventCiphertext)
         ]
       );
+      const answered = input.questionId && input.questionId === row.pending_question_id;
+      if (answered)
+        await tx.query('UPDATE tasks SET pending_question_id=NULL,updated_at=NOW() WHERE id=$1', [
+          input.taskId
+        ]);
       return mapTask({
         ...row,
+        ...(answered ? { pending_question_id: null } : {}),
         queued_message_count: Number(row.queued_message_count ?? 0) + 1
       });
     });
@@ -858,9 +872,8 @@ export class TaskStore {
       if (!queued.rows[0]) return false;
       const denial = Boolean(queued.rows[0].approval_id);
       if (
-        denial &&
-        (!['planning', 'running'].includes(String(locked.rows[0].status)) ||
-          locked.rows[0].lease_live !== true)
+        !['planning', 'running'].includes(String(locked.rows[0].status)) ||
+        locked.rows[0].lease_live !== true
       )
         return false;
       if (denial && input.agentStateCiphertext?.aad !== `task-state:${input.taskId}`)
@@ -951,7 +964,7 @@ export class TaskStore {
       );
       const updated = await tx.query(
         `UPDATE tasks SET
-           status='queued',model_override=model_override OR (NOT $9 AND ($11 OR model_id<>$3)),model_id=CASE WHEN $9 THEN model_id ELSE $3 END,
+           status='queued',pending_question_id=NULL,model_override=model_override OR (NOT $9 AND ($11 OR model_id<>$3)),model_id=CASE WHEN $9 THEN model_id ELSE $3 END,
            privacy_route=CASE WHEN $9 THEN privacy_route ELSE $4 END,
            reasoning_effort=CASE WHEN $9 THEN reasoning_effort ELSE $8 END,
            security_mode=CASE WHEN $9 THEN security_mode ELSE COALESCE($10,security_mode) END,
@@ -1983,6 +1996,55 @@ export class TaskStore {
     // already queued behind it. Read off the row rather than off the flag, so a caller that let go
     // without meaning to still wakes whoever was waiting on it.
     if (result.rows[0]?.released === true) this.#signalWorkspaceRelease(input.id);
+  }
+
+  /** Publish a question and its resumable state together, guarded by the active lease. */
+  async saveTaskQuestion(input: {
+    taskId: string;
+    workerId: string;
+    agentStateCiphertext: EncryptedEnvelope;
+    actualComputeCredits: number;
+    park: boolean;
+    event?: { id: string; payloadCiphertext: EncryptedEnvelope };
+  }): Promise<boolean> {
+    const saved = await this.database.transaction(async (tx) => {
+      const held = await tx.query(
+        `SELECT id FROM tasks WHERE id=$1 AND lease_owner=$2
+           AND lease_expires_at>NOW() AND status IN ('running','planning') FOR UPDATE`,
+        [input.taskId, input.workerId]
+      );
+      if (!held.rows.length) return null;
+      const updated = await tx.query(
+        `UPDATE tasks SET agent_state_ciphertext=$2::jsonb,pending_question_id=COALESCE($5::uuid,pending_question_id),
+           actual_compute_credits=GREATEST(actual_compute_credits,$3),updated_at=NOW(),
+           status=CASE WHEN NOT $4 THEN status
+             WHEN EXISTS (SELECT 1 FROM task_message_queue q WHERE q.task_id=tasks.id
+               AND q.status='queued' AND q.interrupt) THEN 'queued' ELSE 'awaiting_user' END,
+           lease_owner=CASE WHEN $4 THEN NULL ELSE lease_owner END,
+           lease_expires_at=CASE WHEN $4 THEN NULL ELSE lease_expires_at END
+         WHERE id=$1 RETURNING status`,
+        [
+          input.taskId,
+          JSON.stringify(input.agentStateCiphertext),
+          input.actualComputeCredits,
+          input.park,
+          input.event?.id ?? null
+        ]
+      );
+      if (input.event)
+        await tx.query(
+          `INSERT INTO task_events(id,task_id,sequence,kind,summary,payload_ciphertext)
+           SELECT $1,$2,COALESCE(MAX(sequence),0)+1,'question_asked','Encrypted question asked event',$3::jsonb
+           FROM task_events WHERE task_id=$2`,
+          [input.event.id, input.taskId, JSON.stringify(input.event.payloadCiphertext)]
+        );
+      return String(updated.rows[0]!.status);
+    });
+    if (!saved) return false;
+    this.#signal(TASK_EVENT_CHANNEL, input.taskId);
+    if (input.park) this.#signalWorkspaceRelease(input.taskId);
+    if (saved === 'queued') this.#signal(TASK_QUEUE_CHANNEL, input.taskId);
+    return true;
   }
 
   /**

@@ -1176,25 +1176,24 @@ export const agentTools: ModelTool[] = [
   },
   {
     name: 'ask',
-    /**
-     * The operating contract has always told the model to ask when a missing choice materially
-     * changes the result, and until now there was nowhere to ask: `awaiting_user` was written only
-     * by the approval path, so a genuine blocker came back as a `finish` with a `not_applicable`
-     * verification and landed as a completion card that reads exactly like finished work - and on
-     * an unattended run the box then went silent until the owner next looked.
-     *
-     * The description spends most of its length on when *not* to call it, deliberately. The failure
-     * this tool creates is an agent that asks instead of working, and that failure is far more
-     * likely than the one it fixes: a reversible assumption stated out loud costs the owner one
-     * sentence to correct, and a question costs them a round trip they are not there for.
-     */
     description:
-      'Put one question to the user and stop this turn until they answer. Only for a decision you cannot make and cannot take back: a fork whose branches cost different things and only they can weigh, an authority nobody gave you, a fact about them nothing on this computer holds. Never for something you could find out by looking - read the file, inspect connected services, search the workspace, try it. Never for a detail you can decide reversibly: choose the sensible option, say in your reply which way you went and what would change it, and carry on. A stated assumption beats a question every time, because they correct it in one sentence and the work is already done. It is not an approval and does not stand in for one - buying, sending, publishing, deleting and pushing stop on their own. Never invent a personal fact or required decision. Do not ask as your first act: a turn that has looked at nothing has not earned a question. The conversation parks, their devices are told, and their answer comes back as their next message.',
+      'Ask a required decision or personal fact that inspection cannot resolve. State the work blocked in why. Usually make reversible choices yourself. Supply continueWith to keep doing named independent work while the user answers; never guess the answer or do dependent work. Without continueWith the task pauses. Only one question may be pending. Call ask with waitFor=questionId when independent work is exhausted. Answers arrive in the same turn. This does not replace action approval or human browser verification.',
     parameters: {
       type: 'object',
       additionalProperties: false,
-      required: ['question', 'why'],
+      anyOf: [{ required: ['question', 'why'] }, { required: ['waitFor'] }],
       properties: {
+        waitFor: {
+          type: 'string',
+          format: 'uuid',
+          description: 'Pause for the pending question ID; omit other fields.'
+        },
+        continueWith: {
+          type: 'string',
+          minLength: 1,
+          maxLength: 400,
+          description: 'Independent work to do while waiting. Omit to pause immediately.'
+        },
         question: {
           type: 'string',
           maxLength: 200,

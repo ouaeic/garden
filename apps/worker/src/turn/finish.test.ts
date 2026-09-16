@@ -76,7 +76,7 @@ interface Completed {
 }
 
 interface Run {
-  readonly outcome: 'held' | 'completed';
+  readonly outcome: 'held' | 'completed' | 'parked';
   readonly completed: Completed | null;
   /** What the model was told, when it was told anything, which is the hold's own half. */
   readonly toldTheModel: string[];

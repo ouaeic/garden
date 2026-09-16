@@ -3,6 +3,7 @@ import { MessageAttachments } from '@athanor/contracts';
 export interface OwnerMessage {
   prompt: string;
   attachments?: string[] | undefined;
+  questionId?: string;
 }
 
 /** Attachment paths are context data; the stored transcript remains the owner's exact text. */

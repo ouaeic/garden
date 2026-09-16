@@ -186,6 +186,9 @@ export const mapTask = (row: Record<string, unknown>): TaskRecord => {
     // `optionalText` rather than `String`: the column is text and nullable, and stringifying an
     // unexpected shape would put "[object Object]" into a field the worker branches on.
     queuedMessageCount: Number(row.queued_message_count ?? 0),
+    hasOpenQuestion:
+      Boolean(row.pending_question_id) &&
+      !['completed', 'cancelled', 'failed'].includes(String(row.status)),
     ...(row.pending_delivery_count !== undefined
       ? {
           deliveryStatus: optionalText(row.delivery_status) as Exclude<

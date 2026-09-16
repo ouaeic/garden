@@ -285,6 +285,52 @@ it('retains execution directories and settled project spending after conversatio
   expect(await store.projectExecutionMembers(randomUUID(), id, 'project')).toEqual([]);
 });
 
+it('counts a working conversation with an unanswered direction as needing attention', async () => {
+  const f = await fixture();
+  const questionId = randomUUID();
+  await db.query("UPDATE tasks SET status='completed' WHERE project_id=$1", [f.root.projectId]);
+  await db.query("UPDATE tasks SET status='running',pending_question_id=$2 WHERE id=$1", [
+    f.child.id,
+    questionId
+  ]);
+  expect(await store.getProject(f.user.id, f.root.projectId!)).toMatchObject({
+    activeCount: 1,
+    attentionCount: 1
+  });
+  expect(
+    (await store.listProjectConversations(f.user.id, f.root.projectId!)).tasks.find(
+      (task) => task.id === f.child.id
+    )
+  ).toMatchObject({ hasOpenQuestion: true });
+  await store.enqueueTaskMessage({
+    id: randomUUID(),
+    taskId: f.child.id,
+    userId: f.user.id,
+    modelId: f.child.modelId,
+    privacyRoute: f.child.privacyRoute,
+    maxComputeCredits: 0,
+    maxSpendUsd: null,
+    resourceClass: 'light',
+    reservationKey: randomUUID(),
+    interrupt: true,
+    questionId,
+    promptCiphertext: f.child.promptCiphertext,
+    queuedEventCiphertext: f.child.promptCiphertext
+  });
+  expect(await store.getProject(f.user.id, f.root.projectId!)).toMatchObject({
+    activeCount: 1,
+    attentionCount: 0
+  });
+  await db.query("UPDATE tasks SET status='cancelled',pending_question_id=$2 WHERE id=$1", [
+    f.child.id,
+    questionId
+  ]);
+  expect(await store.getProject(f.user.id, f.root.projectId!)).toMatchObject({
+    activeCount: 0,
+    attentionCount: 0
+  });
+});
+
 it('keeps pending deliveries visible in project and conversation status, using the latest attempt per output', async () => {
   const f = await fixture();
   await db.query("UPDATE tasks SET status='completed' WHERE project_id=$1", [f.root.projectId]);

@@ -1,3 +1,4 @@
+import type { AgentState } from './agent-state.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AthanorError,
@@ -255,6 +256,24 @@ const probeStore = (task: () => TaskRecord): StoreProbe => {
     },
     yieldTaskLease: async (input: Record<string, unknown>) => {
       checkpoints.push({ ...input, status: 'queued', clearLease: true, yielded: true });
+      return true;
+    },
+    saveTaskQuestion: async (
+      input: Parameters<DataStore['saveTaskQuestion']>[0]
+    ): Promise<boolean> => {
+      await store.updateTask({
+        id: input.taskId,
+        workerId: input.workerId,
+        status: input.park ? 'awaiting_user' : 'running',
+        agentStateCiphertext: input.agentStateCiphertext,
+        actualComputeCredits: input.actualComputeCredits,
+        clearLease: input.park
+      });
+      if (input.event)
+        await store.appendTaskEvent({
+          kind: 'question_asked',
+          payloadCiphertext: input.event.payloadCiphertext
+        });
       return true;
     },
     updateTask: async (input: Record<string, unknown>) => {
@@ -6052,12 +6071,59 @@ describe('a question the agent stops to ask', () => {
     // this one is reloaded by whichever worker picks the conversation back up - and the read the
     // model proposed behind the question is deferred in writing rather than run.
     expect(saved.messages.find((message) => message.toolCallId === 'call-2')?.content).toContain(
-      'parked until the user answers'
+      'waiting for the user'
     );
     expect(saved.messages.find((message) => message.toolCallId === 'call-3')?.content).toContain(
-      'Deferred because the turn stopped for a question'
+      'waiting for the user’s answer'
     );
     expect(log.calls.filter((entry) => entry.includes('terms.md'))).toHaveLength(0);
+  });
+
+  it('continues independent reads while a question is visible, then waits instead of completing', async () => {
+    const task = makeTask();
+    const probe = probeStore(() => task);
+    const log: FetchLog = { calls: [], modelRequests: [] };
+    installFetch(
+      [
+        toolFrame('read-labels', 'file_read', { path: 'workspace/samples.txt' }),
+        toolFrame('ask-control', 'ask', {
+          ...parked,
+          continueWith: 'Read the independent quality report.'
+        }),
+        toolFrame('read-quality', 'file_read', { path: 'workspace/quality.txt' }),
+        toolFrame('finish-independent', 'finish', {
+          summary: 'Independent quality review is done.',
+          verification: { status: 'not_applicable', evidence: [] }
+        })
+      ],
+      log,
+      {
+        route: (url) =>
+          url.includes('/file?')
+            ? new Response(JSON.stringify({ content: 'Quality: 98%' }), {
+                headers: { 'content-type': 'application/json' }
+              })
+            : undefined
+      }
+    );
+    await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 6 }), masterKey, runnerSecret).run(
+      task
+    );
+    expect(log.modelRequests).toHaveLength(4);
+    expect(log.calls.some((value) => value.includes('quality.txt'))).toBe(true);
+    expect(probe.events.filter((entry) => entry.kind === 'question_asked')).toHaveLength(1);
+    expect(probe.events.some((entry) => entry.kind === 'completed')).toBe(false);
+    expect(probe.checkpoints.at(-1)).toMatchObject({ status: 'awaiting_user', clearLease: true });
+    const pending = decryptCheckpoints(probe.checkpoints).at(-1) as unknown as AgentState;
+    expect(pending.question).toMatchObject({
+      question: parked.question,
+      waiting: true,
+      continueWith: 'Read the independent quality report.'
+    });
+    const during = log.modelRequests[2]!.messages as Array<{ content: string }>;
+    expect(
+      during.some((message) => message.content.includes('Pending owner question (not answered)'))
+    ).toBe(true);
   });
 
   it('refuses a question from a turn that has looked at nothing, and keeps working', async () => {

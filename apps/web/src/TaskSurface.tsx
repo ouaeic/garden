@@ -368,6 +368,9 @@ export default function TaskSurface({
             </div>
             <h2>{text(questionData.question, question.summary)}</h2>
             {text(questionData.why) && <p>{text(questionData.why)}</p>}
+            {text(questionData.continueWith) && task.status === 'running' && (
+              <p className="muted">Working meanwhile: {text(questionData.continueWith)}</p>
+            )}
             {data(questionData.handoff).kind === 'challenge' && (
               <Button className="primary" onClick={() => onComputer('browser')}>
                 Open browser verification
@@ -401,7 +404,7 @@ export default function TaskSurface({
                   disabled={!questionAnswer.trim()}
                   busy={busy}
                 >
-                  Answer and continue
+                  {task.status === 'running' ? 'Send answer' : 'Answer and continue'}
                   <ArrowUpRight size={16} />
                 </Button>
               </form>

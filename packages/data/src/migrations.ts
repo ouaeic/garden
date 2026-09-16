@@ -3908,5 +3908,10 @@ CREATE TABLE IF NOT EXISTS model_throughput_ceiling (
       );
       CREATE INDEX IF NOT EXISTS task_job_waits_pending ON task_job_waits(checked_at) WHERE state='waiting';
     `
+  },
+  {
+    version: 107,
+    name: 'question_attention_identity',
+    sql: `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pending_question_id UUID;`
   }
 ] as const;

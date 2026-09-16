@@ -44,6 +44,7 @@ export const taskContinuationSnapshot = (task: TaskRecord): TaskContinuationSnap
 export interface RetainedTaskContinuation {
   expected: TaskContinuationSnapshot;
   messageId: string;
+  questionId?: string;
 }
 const started = <T>(work: Promise<T>): Promise<() => T> =>
   work.then(
@@ -106,7 +107,7 @@ async function performContinuation(
           return ceilingUsd;
         })
   );
-  const catalogRead = started(modelsForUser(user));
+  const catalogRead = started(retained?.questionId ? Promise.resolve([]) : modelsForUser(user));
   let task = (await taskRead)();
   if (!task) throw new AthanorError('task_not_found', 'Task not found');
   if (task.userId !== user.id)
@@ -173,6 +174,53 @@ async function performContinuation(
           409
         );
       return privateTaskResponse(task, workspace);
+    }
+    if (retained.questionId) {
+      z.string().uuid().parse(retained.questionId);
+      const queued = await store.enqueueTaskMessage({
+        id: retained.messageId,
+        taskId: task.id,
+        userId: user.id,
+        modelId: task.modelId,
+        reasoningEffort: task.reasoningEffort ?? 'auto',
+        privacyRoute: task.privacyRoute,
+        maxComputeCredits: 0,
+        maxSpendUsd: null,
+        resourceClass: 'light',
+        reservationKey: `task:${task.id}:message:${retained.messageId}:reservation`,
+        interrupt: true,
+        queuedEventId: retained.messageId,
+        questionId: retained.questionId,
+        promptCiphertext: encryptJson(
+          { prompt: input.prompt, questionId: retained.questionId },
+          dataKey,
+          `task-message:${task.id}`
+        ),
+        queuedEventCiphertext: encryptJson(
+          {
+            markdown: input.prompt,
+            questionId: retained.questionId,
+            messageId: retained.messageId,
+            position: task.queuedMessageCount + 1
+          },
+          dataKey,
+          `task-event:${task.id}`
+        )
+      });
+      if (!queued)
+        throw new AthanorError(
+          'question_changed',
+          'The task changed before its answer could be saved.',
+          409
+        );
+      const unparked =
+        task.status === 'awaiting_user' &&
+        !(await store.hasPendingApproval(user.id, task.id)) &&
+        (await store.setTaskStatusForUser(user.id, task.id, 'queued'));
+      return privateTaskResponse(
+        unparked ? ((await store.getTask(user.id, task.id)) ?? queued) : queued,
+        workspace
+      );
     }
     assertSpendAllowed(
       await store.spendGuard({

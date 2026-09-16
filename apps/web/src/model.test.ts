@@ -185,3 +185,31 @@ describe('background task refresh', () => {
     expect(mergeTaskRefresh(current, fresh, true)).toBe(fresh);
   });
 });
+
+describe('questions while work continues', () => {
+  it('marks project-list attention without changing a working task into a paused one', () => {
+    const running = { ...task, status: 'running' as const, hasOpenQuestion: true };
+    expect(hasOngoingWork(running)).toBe(true);
+    expect(needsAttention(running)).toBe(true);
+    expect(taskStatusLabel(running)).toBe('Working · answer requested');
+  });
+
+  it('keeps a direction visible while running and closes only on its own answer', () => {
+    const question = event(1, 'question_asked', {
+      question: 'Which sample?',
+      continueWith: 'Quality checks'
+    });
+    const running = { ...task, status: 'running' as const };
+    expect(activeQuestion([question], running)).toBe(question);
+    const unrelated = event(2, 'user_message', { markdown: 'Also report lengths.' });
+    expect(activeQuestion([question, unrelated], running)).toBe(question);
+    const otherAnswer = event(3, 'queued_message', {
+      questionId: crypto.randomUUID(),
+      markdown: 'Sample B'
+    });
+    expect(activeQuestion([question, unrelated, otherAnswer], running)).toBe(question);
+    const answer = event(4, 'queued_message', { questionId: question.id, markdown: 'Sample A' });
+    expect(activeQuestion([question, unrelated, otherAnswer, answer], running)).toBeUndefined();
+    expect(activeQuestion([question], { ...task, status: 'cancelled' })).toBeUndefined();
+  });
+});

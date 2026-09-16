@@ -284,8 +284,12 @@ export interface AgentState {
   /** The pending human question or browser handoff survives worker restarts. */
   browserHandoff?: { vendor: string; url: string; reason: string; tabId?: string | null };
   question?: {
+    id?: string;
     question: string;
     askedAtStep: number;
+    why?: string;
+    continueWith?: string;
+    waiting?: boolean;
     handoff?: { kind: 'challenge'; surface: 'browser'; tabId?: string; url: string };
   };
   questionsAsked?: number;

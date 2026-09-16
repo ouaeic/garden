@@ -490,3 +490,92 @@ describe('durable question replies', () => {
     }
   });
 });
+
+describe('answers during independent work', () => {
+  it.each(['running', 'paused', 'awaiting_resource'])(
+    'saves one bound answer while %s, ahead of unrelated follow-ups and without new allowance',
+    async (status) => {
+      const f = await fixture('running');
+      const questionId = randomUUID();
+      await store.appendTaskEvent({
+        id: questionId,
+        taskId: f.task.id,
+        kind: 'question_asked',
+        summary: 'Control sample',
+        payloadCiphertext: encryptJson(
+          { question: 'Which control?', continueWith: 'Read quality checks.' },
+          key,
+          `task-event:${f.task.id}`
+        )
+      });
+      await database.query(
+        "UPDATE tasks SET lease_owner='worker',lease_expires_at=NOW()+INTERVAL '1 minute',agent_state_ciphertext=$2::jsonb,pending_question_id=$3::uuid WHERE id=$1",
+        [
+          f.task.id,
+          JSON.stringify(
+            encryptJson(
+              {
+                messages: [],
+                question: {
+                  id: questionId,
+                  question: 'Which control?',
+                  continueWith: 'Read quality checks.',
+                  askedAtStep: 2
+                }
+              },
+              key,
+              `task-state:${f.task.id}`
+            )
+          ),
+          questionId
+        ]
+      );
+      await continueTaskOperation(f.context, f.user, f.task.id, {
+        prompt: 'Afterwards, draw a chart.'
+      });
+      const app = Fastify();
+      app.decorateRequest('user', null);
+      app.addHook('onRequest', async (request) => {
+        request.user = f.user;
+      });
+      registerQuestionRoutes({ ...f.context, app });
+      try {
+        f.context.modelsForUser = async () => {
+          throw new Error('Model account unavailable');
+        };
+        await database.query(
+          "UPDATE tasks SET status=$2,lease_owner=CASE WHEN $2='running' THEN lease_owner ELSE NULL END,lease_expires_at=CASE WHEN $2='running' THEN lease_expires_at ELSE NULL END WHERE id=$1",
+          [f.task.id, status]
+        );
+
+        const request = {
+          method: 'POST' as const,
+          url: `/v1/tasks/${f.task.id}/answer`,
+          payload: { questionId, prompt: 'Sample B' }
+        };
+        const responses = await Promise.all([app.inject(request), app.inject(request)]);
+        expect(responses.map((response) => response.statusCode)).toEqual([200, 200]);
+        const queued = await store.getNextQueuedTaskMessage(f.task.id, { interruptOnly: true });
+        expect(queued?.interrupt).toBe(true);
+        expect(queued?.maxComputeCredits).toBe(0);
+        expect(queued?.maxSpendUsd).toBeNull();
+        expect(decryptJson(queued!.promptCiphertext, key)).toMatchObject({
+          prompt: 'Sample B',
+          questionId
+        });
+        const current = (await store.getTask(f.user.id, f.task.id))!;
+        expect(current.status).toBe(status);
+        expect(current.leaseOwner).toBe(status === 'running' ? 'worker' : null);
+        expect(current.hasOpenQuestion).toBe(false);
+        expect(current.maxComputeCredits).toBe(4);
+        const stale = await app.inject({
+          ...request,
+          payload: { questionId: randomUUID(), prompt: 'Sample A' }
+        });
+        expect(stale.statusCode).toBe(409);
+      } finally {
+        await app.close();
+      }
+    }
+  );
+});

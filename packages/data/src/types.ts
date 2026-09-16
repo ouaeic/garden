@@ -149,6 +149,7 @@ export interface TaskRecord {
    */
   completedAt?: string | null;
   queuedMessageCount: number;
+  hasOpenQuestion?: boolean;
   /**
    * Live share links - neither revoked nor expired. Optional on the record rather than zero,
    * because the worker builds task records by hand in its own tests and a field it has no reason

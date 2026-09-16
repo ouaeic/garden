@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
-export async function checkTaskRecovery({ context, origin, task, report, errors }) {
+export async function checkTaskRecovery({ context, origin, bootstrap, task, report, errors }) {
   const page = await context.newPage();
   page.on('pageerror', (error) => errors.push(error.message));
   let failHistory = true;
@@ -17,6 +17,10 @@ export async function checkTaskRecovery({ context, origin, task, report, errors 
   await page.route('**/v1/**', async (route) => {
     const url = new URL(route.request().url());
     const path = `/v1/tasks/${task.id}`;
+    if (url.pathname === '/v1/bootstrap')
+      return route.fulfill({ json: { ...bootstrap, tasks: [currentTask] } });
+    if (url.pathname === `/v1/projects/${task.projectId}/conversations`)
+      return route.fulfill({ json: { tasks: [currentTask], nextCursor: null } });
     if (url.pathname === path) return route.fulfill({ json: currentTask });
     if (url.pathname === `${path}/presentation` && failPresentation)
       return route.fulfill({
