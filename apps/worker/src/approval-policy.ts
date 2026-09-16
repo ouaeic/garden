@@ -359,7 +359,7 @@ const ordinaryRequirement = (
       {
         sideEffect: 'external_reversible',
         action: 'Start native code analysis',
-        preview: `Launch the bundled ${textValue(args.language)} language server for ${textValue(args.path) || 'workspace'}. It reads project source under the workspace sandbox and network policy, and expires when idle. Rename returns previews only.`
+        preview: `Launch native ${textValue(args.language)} analysis for ${textValue(args.path) || 'workspace'}. It reads project source under the workspace sandbox and network policy, and expires when idle. Rename returns previews only.`
       },
       name,
       args,
@@ -596,18 +596,25 @@ const ordinaryRequirement = (
         args,
         'commands'
       );
-    if (name === 'file_write' || name === 'file_patch' || name === 'print_pdf') {
+    if (
+      name === 'file_write' ||
+      name === 'file_patch' ||
+      name === 'print_pdf' ||
+      (name === 'code_diagnostics' && args.action === 'apply')
+    ) {
       const patched = namedObjects(writtenPaths(name, args));
       return withTaskApproval(
         {
           sideEffect: 'workspace_write',
           action: 'Change a workspace file',
           preview:
-            name === 'file_patch'
-              ? `Apply ${Array.isArray(args.patches) ? args.patches.length : 0} conflict-checked file patch(es) to ${patched || 'a workspace file'}`
-              : name === 'print_pdf'
-                ? `Print the current page to ${textValue(args.path, 'a workspace PDF')}`
-                : `Create or replace ${textValue(args.path, 'a workspace file')}`
+            name === 'code_diagnostics'
+              ? `Apply the checked code preview to ${patched || 'the listed workspace files'}`
+              : name === 'file_patch'
+                ? `Apply ${Array.isArray(args.patches) ? args.patches.length : 0} conflict-checked file patch(es) to ${patched || 'a workspace file'}`
+                : name === 'print_pdf'
+                  ? `Print the current page to ${textValue(args.path, 'a workspace PDF')}`
+                  : `Create or replace ${textValue(args.path, 'a workspace file')}`
         },
         name,
         args,

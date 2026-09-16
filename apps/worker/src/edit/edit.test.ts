@@ -1,19 +1,5 @@
-/**
- * The edit vertical, held to the two things it claims: it applies the cheap dialect correctly, and
- * it recovers from every named way of writing that dialect wrongly WITHOUT a second read.
- *
- * The second half is the one that decides whether the format ships. The offline comparison priced a
- * line-addressed edit at 61% fewer output characters than the quoted editor it replaces, and every
- * one of those numbers is an upper bound available only to a model that emits the dialect perfectly.
- * The harness this format was measured from answers that by maintaining a list of models that
- * cannot, and routing them elsewhere. Each test under "forgiveness" is one entry off that list,
- * turned into a case that lands.
- *
- * Every refusal here is asserted to CARRY THE FILE'S REAL TEXT, not merely to refuse. A refusal that
- * costs a round trip is barely better than the wrong edit it prevented.
- */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { applyEdit, NO_ANCHOR_NOTE } from './apply.js';
+import { applyEdit } from './apply.js';
 import { blockAt } from './block.js';
 import { normaliseLine, renderNumbered, sameLine, toLines } from './format.js';
 import { parseEdit } from './parse.js';
@@ -98,7 +84,9 @@ describe('the canonical dialect', () => {
   it('replaces a range, emitting only the new text', () => {
     read();
     expect(
-      applied('PUT 3.=4:\n+  if (!job) return undefined;\n+  return job.payload ?? null;')
+      applied(
+        'PUT 3.=4:\n-  if (!job) return null;\n+  if (!job) return undefined;\n+  return job.payload ?? null;'
+      )
     ).toBe(
       FILE.replace(
         '  if (!job) return null;\n  return job.payload;',
@@ -111,32 +99,38 @@ describe('the canonical dialect', () => {
     // Line 8 is byte-identical to line 3. A quoted editor has to grow its quote past both of them;
     // the number is the whole address.
     read();
-    const out = toLines(applied('PUT 8:\n+  if (!queue) return 0;'));
+    const out = toLines(applied('PUT 8:\n-  if (!queue) return null;\n+  if (!queue) return 0;'));
     expect(out[2]).toBe('  if (!job) return null;');
     expect(out[7]).toBe('  if (!queue) return 0;');
   });
 
   it('inserts before and after a line without repeating it', () => {
     read();
-    expect(toLines(applied('PUT <1:\n+// header'))[0]).toBe('// header');
-    expect(toLines(applied('PUT >5:\n+// tail'))[5]).toBe('// tail');
+    expect(
+      toLines(applied('PUT <1:\n-export const drain = (queue: Job[]) => {\n+// header'))[0]
+    ).toBe('// header');
+    expect(toLines(applied('PUT >5:\n-};\n+// tail'))[5]).toBe('// tail');
   });
 
   it('deletes a range with CUT, and with a PUT that has no body', () => {
     read();
-    expect(toLines(applied('CUT 6')).length).toBe(9);
-    expect(toLines(applied('PUT 6:')).length).toBe(9);
+    expect(toLines(applied('CUT 6\n-')).length).toBe(9);
+    expect(toLines(applied('PUT 6:\n-')).length).toBe(9);
   });
 
   it('replaces the whole block that opens at a line', () => {
     read();
-    const out = toLines(applied('PUT 7*:\n+export const size = () => 0;'));
+    const out = toLines(
+      applied('PUT 7*:\n-export const size = (queue: Job[]) => {\n+export const size = () => 0;')
+    );
     expect(out.slice(6)).toEqual(['export const size = () => 0;']);
   });
 
   it('moves a block with one copy of it on the wire', () => {
     read();
-    const out = applied('CUT 7.=10 @size\nPUT <1 @size');
+    const out = applied(
+      'CUT 7.=10 @size\n-export const size = (queue: Job[]) => {\nPUT <1 @size\n-export const drain = (queue: Job[]) => {'
+    );
     expect(toLines(out)[0]).toBe('export const size = (queue: Job[]) => {');
     expect(out).not.toContain('export const size = (queue: Job[]) => {\n  const job');
     // The saving is the whole reason the operation exists: the moved lines are named, not typed.
@@ -145,7 +139,11 @@ describe('the canonical dialect', () => {
 
   it('resolves every range against the file as READ, not against its own earlier hunks', () => {
     read();
-    const out = toLines(applied('PUT 1:\n+A\n+B\nPUT 9:\n+  return 0;'));
+    const out = toLines(
+      applied(
+        'PUT 1:\n-export const drain = (queue: Job[]) => {\n+A\n+B\nPUT 9:\n-  return queue.length;\n+  return 0;'
+      )
+    );
     // The first hunk added a line. A front-to-back applier would put the second one at line 8.
     expect(out[9]).toBe('  return 0;');
   });
@@ -154,12 +152,16 @@ describe('the canonical dialect', () => {
 describe('forgiveness - a dropped or malformed header', () => {
   it('needs no header at all, because the path is a field of the call', () => {
     read();
-    expect(apply('PUT 3:\n+  if (!job) return undefined;').ok).toBe(true);
+    expect(apply('PUT 3:\n-  if (!job) return null;\n+  if (!job) return undefined;').ok).toBe(
+      true
+    );
   });
 
   it('accepts and drops a [path#tag] header a model brought from another dialect', () => {
     read();
-    const result = apply('[workspace/queue.ts#3f9a]\nPUT 3:\n+  if (!job) return undefined;');
+    const result = apply(
+      '[workspace/queue.ts#3f9a]\nPUT 3:\n-  if (!job) return null;\n+  if (!job) return undefined;'
+    );
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.notes.join(' ')).toMatch(/dropped a \[path\] section header/);
   });
@@ -168,13 +170,16 @@ describe('forgiveness - a dropped or malformed header', () => {
     // The path in the call is the authority. A header that disagreed with it used to be the one way
     // a patch could be applied to a file the approval card had never named.
     read();
-    const out = applied('[some/other/file.ts]\nPUT 3:\n+  if (!job) return undefined;');
+    const out = applied(
+      '[some/other/file.ts]\nPUT 3:\n-  if (!job) return null;\n+  if (!job) return undefined;'
+    );
     expect(toLines(out)[2]).toBe('  if (!job) return undefined;');
   });
 });
 
 describe('forgiveness - a misspelt operation', () => {
-  const bodies = '\n+  if (!job) return undefined;\n+  return job.payload ?? null;';
+  const bodies =
+    '\n-  if (!job) return null;\n+  if (!job) return undefined;\n+  return job.payload ?? null;';
   for (const spelling of [
     'PUT 3.=4:',
     'PUT 3-4:',
@@ -211,7 +216,7 @@ describe('forgiveness - a misspelt operation', () => {
    */
   it('still reads a terminator as a terminator, not as a separator with no number', () => {
     read();
-    const out = toLines(applied('PUT 3:\n+  only this line'));
+    const out = toLines(applied('PUT 3:\n-  if (!job) return null;\n+  only this line'));
     expect(out[2]).toBe('  only this line');
     expect(out.length).toBe(10);
   });
@@ -285,7 +290,9 @@ describe('forgiveness - a model that reached for a unified diff', () => {
    */
   it('forgives a mid-body row whose + was dropped when + rows follow it, and says so', () => {
     read();
-    const result = apply('PUT >4:\n+\n+\ndef nth_prime(n):\n+    """Return the n-th prime."""');
+    const result = apply(
+      'PUT >4:\n-  return job.payload;\n+\n+\ndef nth_prime(n):\n+    """Return the n-th prime."""'
+    );
     expect(result.ok).toBe(true);
     if (result.ok) {
       const out = toLines(result.text);
@@ -296,7 +303,7 @@ describe('forgiveness - a model that reached for a unified diff', () => {
         '    """Return the n-th prime."""'
       ]);
       expect(out).toHaveLength(14);
-      expect(result.notes.join(' ')).toMatch(/patch row 4 .*dropped/);
+      expect(result.notes.join(' ')).toMatch(/patch row 5 .*dropped/);
     }
   });
 
@@ -310,7 +317,9 @@ describe('forgiveness - a model that reached for a unified diff', () => {
   it('still reads a mid-body row that is a real operation as the next operation', () => {
     read();
     const out = toLines(
-      applied('PUT 3:\n+  if (!job) return undefined;\nPUT 8:\n+  if (!queue) return 0;')
+      applied(
+        'PUT 3:\n-  if (!job) return null;\n+  if (!job) return undefined;\nPUT 8:\n-  if (!queue) return null;\n+  if (!queue) return 0;'
+      )
     );
     expect(out[2]).toBe('  if (!job) return undefined;');
     expect(out[7]).toBe('  if (!queue) return 0;');
@@ -318,7 +327,7 @@ describe('forgiveness - a model that reached for a unified diff', () => {
     // A CUT and a paste are operations too, whatever follows them: the CUT owns the + row under
     // it and refuses it, and the paste takes no body, so the + row under it is an orphan.
     expect(refused('PUT 3:\n+  a;\nCUT 8.=9\n+  b;')).toMatch(/only deletes/);
-    expect(refused('PUT 3:\n+  a;\nPUT >8 @none\n+  b;')).toMatch(/no operation above it/);
+    expect(refused('PUT 3:\n+  a;\nPUT >8 @none\n+  b;')).toMatch(/no replacement body/);
   });
 
   /*
@@ -345,7 +354,7 @@ describe('forgiveness - a model that reached for a unified diff', () => {
   it('still forgives a code row that merely begins with a verb', () => {
     read();
     for (const row of ['put(x)', 'cut = 3', 'del cache[key]', 'rm_stale = True', 'move(a, b)']) {
-      const out = toLines(applied(`PUT 3:\n+a\n${row}\n+b`));
+      const out = toLines(applied(`PUT 3:\n-  if (!job) return null;\n+a\n${row}\n+b`));
       expect(out.slice(2, 5), row).toEqual(['a', row, 'b']);
     }
   });
@@ -387,7 +396,9 @@ describe('forgiveness - a model that pasted the whole diff', () => {
     // The same guarantee the `[path]` header gets: the path is a field of the call, and nothing in
     // the patch text may choose a different one.
     read();
-    const out = applied('--- a/some/other/file.ts\n+++ b/some/other/file.ts\nPUT 3:\n+  changed;');
+    const out = applied(
+      '--- a/some/other/file.ts\n+++ b/some/other/file.ts\nPUT 3:\n-  if (!job) return null;\n+  changed;'
+    );
     expect(toLines(out)[2]).toBe('  changed;');
   });
 
@@ -395,7 +406,7 @@ describe('forgiveness - a model that pasted the whole diff', () => {
     // A comment that lies about behaviour is the same defect as behaviour that lies about itself,
     // and of the two spellings the cheaper one to fix is the one that costs a round trip.
     read();
-    const out = toLines(applied('PUT 3 4:\n+  a;\n+  b;'));
+    const out = toLines(applied('PUT 3 4:\n-  if (!job) return null;\n+  a;\n+  b;'));
     expect(out[2]).toBe('  a;');
     expect(out[3]).toBe('  b;');
     expect(out.length).toBe(10);
@@ -416,16 +427,6 @@ describe('forgiveness - a miscounted anchor', () => {
   });
 
   it('corrects an off-by-one on a file that repeats the quoted line, which is the case bought', () => {
-    /*
-     * The correction searched the WHOLE FILE and gave up unless the quote occurred exactly once in
-     * it - so on a file that says `if (!job) return null;` three times, an off-by-one whose quote
-     * named the right line was refused. The recovery had inherited the exact requirement the format
-     * was bought to escape, and it failed on precisely the file shape the 61% was measured on: a
-     * quoted editor cannot edit inside a repeated stanza cheaply, and that is the whole argument.
-     *
-     * `CORRECTION_RADIUS` was already the only distance an anchor could move, so searching the
-     * window rather than the file is strictly narrower in reach and strictly wider in recovery.
-     */
     const repetitive = [
       'export const a = (q: Job[]) => {', //  1
       '  const job = q.shift();', //         2
@@ -471,7 +472,9 @@ describe('forgiveness - a miscounted anchor', () => {
     expect(message).toMatch(/2 and 3/);
     expect(message).toMatch(/1:const x = 1;/);
     // Untouched, which is the assertion that matters: an ambiguous correction writes nothing.
-    expect(applyEdit(PATH, 'PUT 1:\n+const x = 2;', twins, readsOf(TASK, PATH)).ok).toBe(true);
+    expect(
+      applyEdit(PATH, 'PUT 1:\n-const x = 1;\n+const x = 2;', twins, readsOf(TASK, PATH)).ok
+    ).toBe(true);
   });
 
   it('refuses when the quoted text is too far from the anchor to be a miscount', () => {
@@ -490,18 +493,11 @@ describe('forgiveness - a miscounted anchor', () => {
     expect(message).toMatch(/3: {2}if \(!job\) return null;/);
   });
 
-  it('accepts a plain off-by-one it has no evidence about, and shows what it wrote', () => {
-    /*
-     * The deliberate ruling, and the one that had to go either way. With no - rows there is nothing
-     * in the patch that says what the model believed was at line 4, so an off-by-one is
-     * indistinguishable from a correct edit and refusing every plain range would be refusing the
-     * format. It lands, and the result carries the numbered text of what was written with a line of
-     * context on each side, so the miscount is visible on the same turn.
-     */
+  it('refuses an unanchored off-by-one even when the line number is valid', () => {
     read();
     const result = apply('PUT 4:\n+  if (!job) return undefined;');
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.wrote).toEqual([{ from: 4, to: 4 }]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.refusal.message).toContain('no content anchor');
   });
 });
 
@@ -535,7 +531,10 @@ describe('a file that moved under the edit', () => {
 
   it('follows the text when the file shifted, rather than refusing', () => {
     read();
-    const result = apply('PUT 3.=4:\n+  return job?.payload ?? null;', shifted);
+    const result = apply(
+      'PUT 3.=4:\n-  if (!job) return null;\n+  return job?.payload ?? null;',
+      shifted
+    );
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(toLines(result.text)[4]).toBe('  return job?.payload ?? null;');
@@ -545,7 +544,7 @@ describe('a file that moved under the edit', () => {
 
   it('follows an insert too, by widening its one-line anchor', () => {
     read();
-    const result = apply('PUT >4:\n+  // done', shifted);
+    const result = apply('PUT >4:\n-  return job.payload;\n+  // done', shifted);
     expect(result.ok).toBe(true);
     if (result.ok) expect(toLines(result.text)[6]).toBe('  // done');
   });
@@ -555,7 +554,7 @@ describe('a file that moved under the edit', () => {
     const rewritten = toLines(FILE)
       .map((line, index) => (index === 2 || index === 3 ? '  // gone' : line))
       .join('\n');
-    const message = refused('PUT 3.=4:\n+x', rewritten);
+    const message = refused('PUT 3.=4:\n-  if (!job) return null;\n+x', rewritten);
     expect(message).toMatch(/no longer there/);
     expect(message).toMatch(/3: {2}\/\/ gone/);
   });
@@ -563,7 +562,9 @@ describe('a file that moved under the edit', () => {
   it('fails closed when the shifted lines now appear twice, so there is no unambiguous place', () => {
     read();
     const duplicated = `// added\n// added\n${FILE}\n${toLines(FILE).slice(2, 4).join('\n')}`;
-    expect(refused('PUT 3.=4:\n+x', duplicated)).toMatch(/gone or now appears more than once/);
+    expect(refused('PUT 3.=4:\n-  if (!job) return null;\n+x', duplicated)).toMatch(
+      /gone or now appears more than once/
+    );
   });
 
   it('does not care that the text is repeated when the numbers are still live', () => {
@@ -574,7 +575,7 @@ describe('a file that moved under the edit', () => {
      */
     read();
     const duplicated = `${FILE}\n${toLines(FILE).slice(2, 4).join('\n')}`;
-    expect(toLines(applied('PUT 3.=4:\n+x', duplicated))[2]).toBe('x');
+    expect(toLines(applied('PUT 3.=4:\n-  if (!job) return null;\n+x', duplicated))[2]).toBe('x');
   });
 });
 
@@ -591,7 +592,10 @@ describe('whitespace, tabs and line endings', () => {
     const crlf = toLines(FILE)
       .map((line) => `${line}\r`)
       .join('\n');
-    const result = apply('PUT 3:\n+  if (!job) return undefined;', `// added\n${crlf}`);
+    const result = apply(
+      'PUT 3:\n-  if (!job) return null;\n+  if (!job) return undefined;',
+      `// added\n${crlf}`
+    );
     expect(result.ok).toBe(true);
     if (result.ok) expect(toLines(result.text)[3]).toBe('  if (!job) return undefined;');
   });
@@ -600,26 +604,21 @@ describe('whitespace, tabs and line endings', () => {
 describe('the bounds that stop a patch corrupting a file', () => {
   it('refuses two operations that touch the same lines, and writes nothing', () => {
     read();
-    expect(refused('PUT 3.=4:\n+a\nPUT 4:\n+b')).toMatch(/touch the same lines/);
+    expect(
+      refused('PUT 3.=4:\n-  if (!job) return null;\n+a\nPUT 4:\n-  return job.payload;\n+b')
+    ).toMatch(/touch the same lines/);
   });
 
   it('refuses a paste whose register was never cut', () => {
     read();
-    expect(refused('PUT >1 @nothing')).toMatch(/was never filled/);
+    expect(refused('PUT >1 @nothing\n-export const drain = (queue: Job[]) => {')).toMatch(
+      /was never filled/
+    );
   });
 
-  /*
-   * The refusal has to be recoverable from, not merely correct.
-   *
-   * Measured on the box: a turn adding a `split` function wrote `PUT >N @split` four times in a
-   * row and was told the register was never filled each time, rewriting the same patch until the
-   * repeated-failure bound stopped the turn. The sigil reads as a label for the edit - the more so
-   * when the register is named after the thing being written - and naming the rule did not move it
-   * off that reading. So the message shows the two intents apart, at the line already addressed.
-   */
   it('shows how to write new lines and how to move read ones, at the line addressed', () => {
     read();
-    const message = refused('PUT >7 @split');
+    const message = refused('PUT >7 @split\n-export const size = (queue: Job[]) => {');
     expect(message).toMatch(/To write NEW lines/);
     expect(message).toContain('PUT >7:');
     expect(message).toMatch(/To MOVE lines/);
@@ -629,16 +628,9 @@ describe('the bounds that stop a patch corrupting a file', () => {
 
   it('shows the before form when the patch addressed a line from before', () => {
     read();
-    expect(refused('PUT <3 @body')).toContain('PUT <3:');
+    expect(refused('PUT <3 @body\n-  if (!job) return null;')).toContain('PUT <3:');
   });
 
-  /*
-   * A grammar is what a reader who already knows the format needs. Measured on the box: nine
-   * file_patch calls in one turn, five refused, and three of those were a body row that never
-   * reached its operation - the body written on the operation's own line, and a bare `def f():`
-   * read as an operation. Each refusal restated the same list of forms, and the list does not show
-   * the one thing all three got wrong: the operation and its body are on separate lines.
-   */
   it('shows a whole valid patch on every parse failure, whichever rule was tripped', () => {
     read();
     for (const bad of ['PUT 3: junk after the colon', 'def test_split_empty():', 'CUT']) {
@@ -656,7 +648,7 @@ describe('the bounds that stop a patch corrupting a file', () => {
    */
   it('reads a body written on the operation row as the first body row', () => {
     read();
-    const result = apply('PUT 3:+  if (!job) return undefined;');
+    const result = apply('PUT 3:-  if (!job) return null;\n+  if (!job) return undefined;');
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(toLines(result.text)[2]).toBe('  if (!job) return undefined;');
@@ -664,7 +656,7 @@ describe('the bounds that stop a patch corrupting a file', () => {
       expect(result.notes.join(' ')).toMatch(/text after the colon/);
     }
     // And with more body rows below it, all of them land in order.
-    const out = toLines(applied('PUT 3:+  a;\n+  b;'));
+    const out = toLines(applied('PUT 3:-  if (!job) return null;\n+  a;\n+  b;'));
     expect(out[2]).toBe('  a;');
     expect(out[3]).toBe('  b;');
     // Only a marker may follow the colon; anything else is still not an operation.
@@ -699,9 +691,12 @@ describe('what the store remembers, and what it forgets', () => {
 
   it('lets a second edit follow the first with no read between them', () => {
     read();
-    const once = patched('PUT <1:\n+// header');
+    const once = patched('PUT <1:\n-export const drain = (queue: Job[]) => {\n+// header');
     // Line 4 in the NEW numbering is line 3 of the original.
-    const twice = applied('PUT 4:\n+  if (!job) return undefined;', once);
+    const twice = applied(
+      'PUT 4:\n-  if (!job) return null;\n+  if (!job) return undefined;',
+      once
+    );
     expect(toLines(twice)[3]).toBe('  if (!job) return undefined;');
   });
 
@@ -715,11 +710,11 @@ describe('what the store remembers, and what it forgets', () => {
   it('vouches for the span a patch wrote, and for no more of the file than the reads did', () => {
     const long = Array.from({ length: 400 }, (_, line) => `line ${line + 1}`).join('\n');
     recordRead(TASK, PATH, 1, toLines(long).slice(0, 50).join('\n'));
-    const after = patched('PUT 10:\n+line 10 // touched', long);
+    const after = patched('PUT 10:\n-line 10\n+line 10 // touched', long);
 
     expect(displayedRanges(TASK, PATH)).toEqual([{ start: 1, end: 50 }]);
     expect(apply('PUT 300:\n+blind', after).ok).toBe(false);
-    expect(apply('PUT 20:\n+line 20 // also touched', after).ok).toBe(true);
+    expect(apply('PUT 20:\n-line 20\n+line 20 // also touched', after).ok).toBe(true);
   });
 
   /*
@@ -730,10 +725,10 @@ describe('what the store remembers, and what it forgets', () => {
   it('moves the lines a read showed by what the edit changed the length by', () => {
     const long = Array.from({ length: 400 }, (_, line) => `line ${line + 1}`).join('\n');
     recordRead(TASK, PATH, 1, toLines(long).slice(0, 50).join('\n'));
-    const after = patched('PUT 10:\n+one\n+two\n+three', long);
+    const after = patched('PUT 10:\n-line 10\n+one\n+two\n+three', long);
 
     expect(displayedRanges(TASK, PATH)).toEqual([{ start: 1, end: 52 }]);
-    expect(apply('PUT 52:\n+line 50 // touched', after).ok).toBe(true);
+    expect(apply('PUT 52:\n-line 50\n+line 50 // touched', after).ok).toBe(true);
     expect(apply('PUT 53:\n+blind', after).ok).toBe(false);
   });
 
@@ -794,15 +789,6 @@ describe('what the store remembers, and what it forgets', () => {
 
 describe('the resident cost', () => {
   it('states the whole format in under 1,200 bytes', () => {
-    /*
-     * The only part of this vertical that is resident on every request, and therefore the only part
-     * whose size is an argument. The reference dialect spends 5,268 bytes on the same job; three of
-     * its paragraphs describe a version tag, what to do when it does not match, and how to recover -
-     * and nothing here needs the model to carry a tag.
-     *
-     * A ceiling and not a licence. If it grows, the thing to ask is whether an operation was added
-     * or whether prose was.
-     */
     expect(Buffer.byteLength(EDIT_FORMAT_SPEC)).toBeLessThan(1_200);
   });
 
@@ -837,8 +823,8 @@ describe('the resident cost', () => {
   });
 
   it('teaches the one - row, as a prefix, and shows it in the example', () => {
-    expect(EDIT_FORMAT_SPEC).toMatch(/One - row first/);
-    expect(EDIT_FORMAT_SPEC).toMatch(/8\+ characters/);
+    expect(EDIT_FORMAT_SPEC).toMatch(/Every operation requires one - row first/);
+    expect(EDIT_FORMAT_SPEC).toMatch(/8\+ non-space characters/);
     expect(EDIT_FORMAT_SPEC).toContain('\n  -  if (!job) return null;\n');
   });
 });
@@ -1000,7 +986,7 @@ describe('the content anchor', () => {
     // A different number is left byte for byte, and cannot move the edit.
     const message = refused('PUT 3:\n-2:  const job = queue.shift();\n+  changed;');
     expect(message).toMatch(/not in workspace\/queue\.ts at all/);
-    const literal = applied('PUT 3:\n+2:  literal;');
+    const literal = applied('PUT 3:\n-  if (!job) return null;\n+2:  literal;');
     expect(toLines(literal)[2]).toBe('2:  literal;');
   });
 
@@ -1031,24 +1017,31 @@ describe('the content anchor', () => {
     }
   });
 
-  it('nudges a patch with no anchor at all, once, and not one that has one', () => {
+  it('requires an anchor on every operation, including later operations', () => {
     read();
-    const plain = apply('PUT 3:\n+  a;\nPUT 8:\n+  b;');
-    expect(plain.ok).toBe(true);
-    if (plain.ok) expect(plain.notes).toEqual([NO_ANCHOR_NOTE]);
-    const anchored = apply('PUT 3:\n-  if (!job)\n+  a;\nPUT 8:\n+  b;');
-    expect(anchored.ok).toBe(true);
-    if (anchored.ok) expect(anchored.notes).not.toContain(NO_ANCHOR_NOTE);
+    for (const patch of [
+      'PUT 3:\n+  a;\nPUT 8:\n+  b;',
+      'PUT 3:\n-  if (!job)\n+  a;\nPUT 8:\n+  b;',
+      'CUT 7.=10 @size\n-export const size\nPUT <1 @size'
+    ]) {
+      const result = apply(patch);
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.refusal.message).toContain('no content anchor');
+    }
   });
 
   it('names the merged spelling when two operations overlap', () => {
     read();
-    expect(refused('PUT 3.=4:\n+a\nPUT 4:\n+b')).toMatch(/PUT 3\.=4:/);
+    expect(
+      refused('PUT 3.=4:\n-  if (!job) return null;\n+a\nPUT 4:\n-  return job.payload;\n+b')
+    ).toMatch(/PUT 3\.=4:/);
   });
 
   it('reports the new numbering, cumulatively, so the next patch needs no read', () => {
     read();
-    const result = apply('PUT 3:\n+  a;\n+  b;\n+  c;\nCUT 8.=9');
+    const result = apply(
+      'PUT 3:\n-  if (!job) return null;\n+  a;\n+  b;\n+  c;\nCUT 8.=9\n-  if (!queue) return null;'
+    );
     expect(result.ok).toBe(true);
     if (result.ok)
       expect(result.renumbered).toEqual([
@@ -1056,10 +1049,10 @@ describe('the content anchor', () => {
         'lines after 9 are now 0',
         'net: lines after 9 are now 0'
       ]);
-    const one = apply('PUT >5:\n+// tail');
+    const one = apply('PUT >5:\n-};\n+// tail');
     expect(one.ok).toBe(true);
     if (one.ok) expect(one.renumbered).toEqual(['lines after 5 are now +1']);
-    const none = apply('PUT 3:\n+  a;');
+    const none = apply('PUT 3:\n-  if (!job) return null;\n+  a;');
     expect(none.ok).toBe(true);
     if (none.ok) expect(none.renumbered).toEqual([]);
   });
@@ -1160,10 +1153,10 @@ describe('the anchor against a file that moved, and the rows that only look like
     }
     const grid = '1|a|b\n2|c|d\n3|e|f';
     read(grid);
-    expect(toLines(applied('PUT 2:\n+2|C|D', grid))[1]).toBe('2|C|D');
+    expect(toLines(applied('PUT 2:\n-2|c|d\n+2|C|D', grid))[1]).toBe('2|C|D');
     const tabs = '1\tone\n2\ttwo';
     read(tabs);
-    expect(toLines(applied('PUT 2:\n+2\tTWO', tabs))[1]).toBe('2\tTWO');
+    expect(toLines(applied('PUT 2:\n-2\ttwo\n+2\tTWO', tabs))[1]).toBe('2\tTWO');
   });
 
   it('keeps a CRLF file CRLF on the rows it inserts, and bare on a last line with no newline', () => {
@@ -1188,15 +1181,15 @@ describe('the anchor against a file that moved, and the rows that only look like
     // A last line that ends in a bare CR is the file's own, and an edit above it leaves it alone.
     const bareTail = 'alpha\r\nbeta\r';
     read(bareTail);
-    expect(applied('PUT 1:\n+ALPHA', bareTail)).toBe('ALPHA\r\nbeta\r');
+    expect(applied('PUT 1:\n-alpha\n+ALPHA', bareTail)).toBe('ALPHA\r\nbeta\r');
     // Appending after the last line of a CRLF file that ends in a newline.
     const ending = 'alpha\r\nbeta\r\n';
     read(ending);
-    expect(applied('PUT >2:\n+gamma', ending)).toBe('alpha\r\nbeta\r\ngamma\r\n');
+    expect(applied('PUT >2:\n-beta\n+gamma', ending)).toBe('alpha\r\nbeta\r\ngamma\r\n');
     // A file that already mixes its endings is left to mix them.
     const mixed = 'alpha\r\nbeta\ngamma\r\n';
     read(mixed);
-    expect(applied('PUT 2:\n+BETA', mixed)).toBe('alpha\r\nBETA\ngamma\r\n');
+    expect(applied('PUT 2:\n-beta\n+BETA', mixed)).toBe('alpha\r\nBETA\ngamma\r\n');
   });
 
   it('refuses a whole quote whose corrected range runs past the lines shown', () => {

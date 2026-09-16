@@ -17,8 +17,8 @@
       "verdict": "landed"
     },
     "anchor-off-by-one-no-evidence": {
-      "cost": "X-echo",
-      "verdict": "landed-wrong"
+      "cost": 1,
+      "verdict": "refused"
     },
     "anchor-off-by-three-with-evidence": {
       "cost": 0,
@@ -160,9 +160,9 @@
       "cost": 0,
       "verdict": "landed"
     },
-    "plain-range-carries-the-nudge": {
-      "cost": 0,
-      "verdict": "landed"
+    "plain-range-requires-an-anchor": {
+      "cost": 1,
+      "verdict": "refused"
     },
     "anchored-off-by-six-unique-elsewhere": {
       "cost": 1,
@@ -265,8 +265,8 @@
       "verdict": "landed"
     },
     "body-zero-context-hunk-insert": {
-      "cost": 0,
-      "verdict": "landed"
+      "cost": 1,
+      "verdict": "refused"
     },
     "body-dropped-plus-marker": {
       "cost": 1,
@@ -477,7 +477,7 @@
       },
       "byLine": {
         "cost": 0,
-        "chars": 64
+        "chars": 83
       }
     },
     "deep-stanza": {
@@ -487,7 +487,7 @@
       },
       "byLine": {
         "cost": 0,
-        "chars": 68
+        "chars": 90
       }
     },
     "trailing-spaces": {
@@ -497,7 +497,7 @@
       },
       "byLine": {
         "cost": 0,
-        "chars": 91
+        "chars": 141
       }
     },
     "crlf-file": {
@@ -507,7 +507,7 @@
       },
       "byLine": {
         "cost": 0,
-        "chars": 91
+        "chars": 141
       }
     },
     "stale-middle-hunk": {
@@ -517,7 +517,7 @@
       },
       "byLine": {
         "cost": 1,
-        "chars": 159
+        "chars": 254
       }
     },
     "self-invalidating-hunks": {
@@ -527,7 +527,7 @@
       },
       "byLine": {
         "cost": 1,
-        "chars": 158
+        "chars": 246
       }
     },
     "unified-diff-fallback": {
@@ -546,7 +546,7 @@
         "chars": 136
       },
       "byLine": {
-        "cost": "X-echo",
+        "cost": 1,
         "chars": 59
       }
     },
@@ -557,7 +557,7 @@
       },
       "byLine": {
         "cost": 0,
-        "chars": 65
+        "chars": 186
       }
     },
     "move-anchored-inside-itself": {
@@ -567,16 +567,16 @@
       },
       "byLine": {
         "cost": 1,
-        "chars": 66
+        "chars": 178
       }
     }
   },
   "totals": {
     "cases": 117,
-    "free": 69,
-    "oneTrip": 47,
+    "free": 67,
+    "oneTrip": 50,
     "twoTrips": 0,
     "overRefused": 0,
-    "defects": 1
+    "defects": 0
   }
 }

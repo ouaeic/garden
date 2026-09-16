@@ -780,7 +780,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       await debuggers.stopWorkspace(
         workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId)
       );
-      codeIntelligence.stopWorkspace(
+      await codeIntelligence.stopWorkspace(
         workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId)
       );
       await processes.stopWorkspace(request.params.workspaceId, { forget: true });
@@ -804,7 +804,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       await debuggers.stopWorkspace(
         workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId)
       );
-      codeIntelligence.stopWorkspace(
+      await codeIntelligence.stopWorkspace(
         workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId)
       );
       await processes.stopWorkspace(request.params.workspaceId);
@@ -848,7 +848,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       await debuggers.stopWorkspace(
         workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId)
       );
-      codeIntelligence.stopWorkspace(
+      await codeIntelligence.stopWorkspace(
         workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId)
       );
       await processes.stopWorkspace(request.params.workspaceId);
@@ -916,7 +916,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       await debuggers.stopWorkspace(
         workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId)
       );
-      codeIntelligence.stopWorkspace(
+      await codeIntelligence.stopWorkspace(
         workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId)
       );
       await processes.stopWorkspace(request.params.workspaceId);
@@ -2248,7 +2248,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       await debuggers.stopWorkspace(
         workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId)
       );
-      codeIntelligence.stopWorkspace(
+      await codeIntelligence.stopWorkspace(
         workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId)
       );
       await processes.stopWorkspace(request.params.workspaceId);
@@ -2467,7 +2467,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
     await sessionSweep;
     await computations.close();
     await debuggers.close();
-    codeIntelligence.close();
+    await codeIntelligence.close();
     await processes.close();
   });
   return app;

@@ -814,7 +814,7 @@ export const fixtures: readonly Fixture[] = [
               patches: [
                 {
                   path: 'workspace/importer.py',
-                  edit: 'PUT 2:\n+    return [(a, b, c) for a, b, c in rows]'
+                  edit: 'PUT 2:\n-    return rows\n+    return [(a, b, c) for a, b, c in rows]'
                 }
               ]
             }
@@ -904,7 +904,7 @@ export const fixtures: readonly Fixture[] = [
               patches: [
                 {
                   path: 'workspace/importer.py',
-                  edit: 'PUT 2:\n+    return [(a, b, c) for a, b, c in rows]'
+                  edit: 'PUT 2:\n-    return rows\n+    return [(a, b, c) for a, b, c in rows]'
                 }
               ]
             }
@@ -993,7 +993,12 @@ export const fixtures: readonly Fixture[] = [
             id: 'call-3',
             name: 'file_patch',
             args: {
-              patches: [{ path: 'workspace/queue.ts', edit: 'CUT 8.=11 @log\nPUT <1 @log' }]
+              patches: [
+                {
+                  path: 'workspace/queue.ts',
+                  edit: 'CUT 8.=11 @log\n-const log = (message) => {\nPUT <1 @log\n-export const drain = (jobs) => {'
+                }
+              ]
             }
           }
         ]
@@ -1112,7 +1117,7 @@ export const fixtures: readonly Fixture[] = [
               patches: [
                 {
                   path: 'workspace/queue.ts',
-                  edit: 'PUT 3:\n+  return done.filter(Boolean);'
+                  edit: 'PUT 3:\n-  return done;\n+  return done.filter(Boolean);'
                 }
               ]
             }
@@ -1208,11 +1213,14 @@ export const fixtures: readonly Fixture[] = [
                   path: 'workspace/queue.ts',
                   edit: [
                     'PUT >4:',
+                    '-};',
                     '+',
                     '+export const size = (jobs) => jobs.length;',
                     'PUT 6:',
+                    '-export const retry = (job) => job.attempts < 3;',
                     '+export const retry = (job) => job.attempts < 5;',
                     'PUT 8*:',
+                    '-const log = (message) => {',
                     '+const log = (message) => {',
                     '+  if (QUIET) return;',
                     '+  console.log(message);',
@@ -3275,7 +3283,7 @@ export const fixtures: readonly Fixture[] = [
                         path: 'workspace/importer.py',
                         // Line 2 of the read above, which numbered the file 1:def load(rows): /
                         // 2:    return rows / 3:.
-                        edit: 'PUT 2:\n+    return [row for row in rows if row]'
+                        edit: 'PUT 2:\n-    return rows\n+    return [row for row in rows if row]'
                       }
                     ]
                   }
@@ -3302,7 +3310,7 @@ export const fixtures: readonly Fixture[] = [
                          * it has been shown. A second edit costing a second read would be a real
                          * step and a real window, on the commonest shape there is.
                          */
-                        edit: 'PUT 2:\n+    return [row for row in rows if any(row)]'
+                        edit: 'PUT 2:\n-    return [row for row in rows if row]\n+    return [row for row in rows if any(row)]'
                       }
                     ]
                   }
@@ -3413,7 +3421,7 @@ export const fixtures: readonly Fixture[] = [
                 path: 'workspace/importer.py',
                 // Byte-identical every time, and refused every time for the same reason: no read of
                 // this file is on record for the task, so the numbers come from nowhere.
-                edit: 'PUT 2:\n+    return [row for row in rows if any(row)]'
+                edit: 'PUT 2:\n-    return [row for row in rows if row]\n+    return [row for row in rows if any(row)]'
               }
             ]
           }

@@ -279,7 +279,12 @@ const callFor = (step: Step, id: string): ScriptedCall => {
     args: {
       // `PUT n.=n:` with a single `+` body row: the canonical spelling of a one-line replacement in
       // `apps/worker/src/edit/parse.ts`. One line out, one line in, so no later number moves.
-      patches: [{ path: step.path, edit: `PUT ${step.at}.=${step.at}:\n+${step.text}` }]
+      patches: [
+        {
+          path: step.path,
+          edit: `PUT ${step.at}.=${step.at}:\n-${FILES[step.path]!.split('\n')[step.at - 1]}\n+${step.text}`
+        }
+      ]
     }
   };
 };

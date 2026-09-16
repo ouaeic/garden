@@ -6,6 +6,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import { CodeIntelligenceRequest } from '@athanor/contracts';
+import { applyCodeEditPreview, saveCodeEditPreview } from './code-edit-previews.js';
 import { prepareInvocation, type InvocationPolicy } from './execution.js';
 import { assertUserDataPath, resolveInside } from './files.js';
 import { killProcessTree } from './subprocess.js';
@@ -62,6 +63,8 @@ type Session = {
 };
 
 export function nativeLanguageServer(language: Language): { executable: string; args: string[] } {
+  if (language === 'r')
+    return { executable: 'R', args: ['--vanilla', '--slave', '-e', 'languageserver::run()'] };
   const name = language === 'typescript' ? 'typescript-native' : 'pyright';
   const packageRoot = path.dirname(require.resolve(`${name}/package.json`));
   return {
@@ -76,6 +79,10 @@ export function nativeLanguageServer(language: Language): { executable: string; 
 /** Sessions are analysis processes. They never supervise or restart scientific jobs. */
 export class CodeIntelligenceManager {
   #sessions = new Map<string, Session>();
+  #operations = new Map<string, Set<Promise<unknown>>>();
+  #epochs = new Map<string, number>();
+  #quiescing = new Set<string>();
+  #closed = false;
   #timer: NodeJS.Timeout;
   constructor(
     private readonly policy: InvocationPolicy,
@@ -86,11 +93,32 @@ export class CodeIntelligenceManager {
   }
 
   async act(root: string, owner: string, value: unknown): Promise<unknown> {
+    if (this.#closed || this.#quiescing.has(root))
+      throw new Error('Code analysis is stopping for this workspace');
+    const active = this.#operations.get(root) ?? new Set<Promise<unknown>>();
+    this.#operations.set(root, active);
+    const operation = this.#act(root, owner, value, this.#epochs.get(root) ?? 0);
+    active.add(operation);
+    try {
+      return await operation;
+    } finally {
+      active.delete(operation);
+      if (!active.size) this.#operations.delete(root);
+    }
+  }
+  async #act(root: string, owner: string, value: unknown, epoch: number): Promise<unknown> {
     const request = CodeIntelligenceRequest.parse(value);
     const relative = assertUserDataPath(root, request.root);
     const project = resolveInside(path.join(root, 'workspace'), path.join(root, relative));
     if ((await realpath(project)) !== project || !(await stat(project)).isDirectory())
       throw new Error('Code intelligence requires a real directory inside the workspace');
+    if (this.#closed || (this.#epochs.get(root) ?? 0) !== epoch)
+      throw new Error('Workspace changed while code analysis was preparing');
+    if (request.action === 'apply') {
+      if (!request.previewId || !request.paths)
+        throw new Error('Apply requires the previewId and exact paths returned by a preview');
+      return applyCodeEditPreview(root, owner, project, request.previewId, request.paths);
+    }
     const key = JSON.stringify([root, owner, project, request.language]);
     this.sweep();
     let session = this.#sessions.get(key);
@@ -107,7 +135,7 @@ export class CodeIntelligenceManager {
     }
     if (!session || session.connection.closed)
       throw new Error(
-        'No active language session. Use code_diagnostics action=start for this root and language; starting requires approval.'
+        'No active language session. Use code_diagnostics action=start for this root and language under the task permission mode.'
       );
     if (session.pending >= 8) throw new Error('Language session request queue is full');
     const active = session;
@@ -139,21 +167,28 @@ export class CodeIntelligenceManager {
         this.#stop(session);
   }
   isWorkspaceBusy(root: string): boolean {
-    return [...this.#sessions.values()].some(
-      (session) => session.root === root && session.pending > 0
-    );
+    return Boolean(this.#operations.get(root)?.size);
   }
   async quiesceWorkspace(root: string): Promise<void> {
     const sessions = [...this.#sessions.values()].filter((session) => session.root === root);
-    this.stopWorkspace(root);
+    await this.stopWorkspace(root);
     await Promise.allSettled(sessions.map((session) => session.tail));
   }
-  stopWorkspace(root: string): void {
-    for (const session of this.#sessions.values()) if (session.root === root) this.#stop(session);
+  async stopWorkspace(root: string): Promise<void> {
+    this.#quiescing.add(root);
+    this.#epochs.set(root, (this.#epochs.get(root) ?? 0) + 1);
+    try {
+      for (const session of this.#sessions.values()) if (session.root === root) this.#stop(session);
+      await Promise.allSettled([...(this.#operations.get(root) ?? [])]);
+    } finally {
+      this.#quiescing.delete(root);
+    }
   }
-  close(): void {
+  async close(): Promise<void> {
+    this.#closed = true;
     clearInterval(this.#timer);
     for (const session of this.#sessions.values()) this.#stop(session);
+    await Promise.allSettled([...this.#operations.values()].flatMap((writes) => [...writes]));
   }
   #stop(session: Session): void {
     if (this.#sessions.get(session.key) !== session) return;
@@ -207,6 +242,7 @@ export class CodeIntelligenceManager {
   ): Promise<Session> {
     if (this.#sessions.size >= CODE_SESSION_LIMIT)
       throw new Error('Language session capacity reached; stop an unused session');
+    const epoch = this.#epochs.get(root) ?? 0;
     const invocation = await prepareInvocation(
       root,
       {
@@ -218,6 +254,10 @@ export class CodeIntelligenceManager {
       },
       this.policy
     );
+    if (this.#closed || (this.#epochs.get(root) ?? 0) !== epoch) {
+      await discardMissionInvocation(invocation);
+      throw new Error('Workspace changed while code analysis was preparing');
+    }
     // Preparation can await the sandbox specification; recheck before reserving a slot.
     const existing = this.#sessions.get(key);
     if (existing) {
@@ -313,10 +353,17 @@ export class CodeIntelligenceManager {
       },
       () => this.#stop(session)
     );
-    child.stderr.on('data', () => undefined);
+    let stderr = '';
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr = (stderr + chunk.toString('utf8')).slice(-4000);
+    });
     child.on('error', (error) => connection.close(error));
     child.on('exit', () =>
-      connection.close(new Error('Language server exited; a new approved start is required'))
+      connection.close(
+        new Error(
+          `Language server exited. ${stderr.trim() || 'Start a new session under the task permission mode.'}${language === 'r' ? ' R analysis requires R and the languageserver R package in the agent environment.' : ''}`
+        )
+      )
     );
     const session: Session = {
       key,
@@ -417,8 +464,8 @@ export class CodeIntelligenceManager {
         textDocument: {
           uri: source.uri,
           languageId:
-            session.language === 'python'
-              ? 'python'
+            session.language !== 'typescript'
+              ? session.language
               : /\.[cm]?jsx?$/.test(source.path)
                 ? 'javascript'
                 : /\.tsx$/.test(source.path)
@@ -611,7 +658,12 @@ export class CodeIntelligenceManager {
       for (const action of actions.slice(0, 30)) {
         let preview: unknown;
         try {
-          if (action.edit) preview = await this.#editPreview(session, workspaceEdits(action.edit));
+          if (action.edit)
+            preview = await this.#editPreview(
+              session,
+              workspaceEdits(action.edit),
+              !action.command && !action.disabled
+            );
         } catch (cause) {
           preview = { unavailable: cause instanceof Error ? cause.message : 'Cannot preview edit' };
         }
@@ -702,11 +754,21 @@ export class CodeIntelligenceManager {
     return { ...preview, newName };
   }
 
-  async #editPreview(session: Session, edits: ReturnType<typeof workspaceEdits>) {
+  async #editPreview(
+    session: Session,
+    edits: ReturnType<typeof workspaceEdits>,
+    applicable = true
+  ) {
     const files = [];
+    const changed = [];
     let bytes = 0;
     for (const [uri, changes] of edits) {
-      const snapshot = await this.#sync(session, codeUriPath(session.root, session.project, uri));
+      const snapshot = session.documents.get(uri);
+      if (!snapshot)
+        throw new Error('Read diagnostics for each affected file, then request this preview again');
+      const expectedVersion = edits.versions.get(uri);
+      if (expectedVersion != null && expectedVersion !== snapshot.version)
+        throw new Error('Language server edit targets a stale document version');
       await this.#assertCurrent(session, snapshot);
       const ranges = changes
         .map((edit) => ({ ...edit, ...sourceRange(snapshot.text, edit.range) }))
@@ -723,6 +785,10 @@ export class CodeIntelligenceManager {
           newText: edit.newText
         }))
       });
+      let content = snapshot.text;
+      for (const edit of [...ranges].reverse())
+        content = content.slice(0, edit.start) + edit.newText + content.slice(edit.end);
+      changed.push({ path: snapshot.path, sha256: snapshot.sha256, content });
       bytes += Buffer.byteLength(JSON.stringify(files[files.length - 1]));
       if (bytes > 100_000)
         throw new Error('Rename preview exceeds its response limit; narrow the project');
@@ -730,6 +796,18 @@ export class CodeIntelligenceManager {
     return {
       preview: true,
       applied: false,
+      root: path.relative(session.root, session.project),
+      ...(applicable && changed.length
+        ? {
+            previewId: await saveCodeEditPreview(
+              session.root,
+              session.owner,
+              session.project,
+              changed
+            ),
+            paths: changed.map((file) => file.path)
+          }
+        : {}),
       files,
       edits: files.reduce((sum, file) => sum + file.edits.length, 0)
     };

@@ -350,7 +350,7 @@ export const PAIRED: readonly PairedIntent[] = [
     file: queue,
     after: splice(queue, 11, 11, ['    return undefined;']),
     patches: [{ path: QUEUE, oldText: line(queue, 11), newText: '    return undefined;\n' }],
-    edit: 'PUT 11:\n+    return undefined;',
+    edit: 'PUT 11:\n-    return null;\n+    return undefined;',
     target: { from: 11, to: 11 }
   },
   {
@@ -361,7 +361,7 @@ export const PAIRED: readonly PairedIntent[] = [
     file: yaml,
     after: splice(yaml, 23, 23, ['      interval: 15s']),
     patches: [{ path: YAML, oldText: line(yaml, 23), newText: '      interval: 15s\n' }],
-    edit: 'PUT 23:\n+      interval: 15s',
+    edit: 'PUT 23:\n-      interval: 30s\n+      interval: 15s',
     target: { from: 23, to: 23 }
   },
   {
@@ -381,7 +381,7 @@ export const PAIRED: readonly PairedIntent[] = [
         newText: "    logger.error('job expired', { id: job.id });\n"
       }
     ],
-    edit: "PUT 14:\n+    logger.error('job expired', { id: job.id });",
+    edit: "PUT 14:\n-    logger.warn('job expired', { id: job.id });\n+    logger.error('job expired', { id: job.id });",
     target: { from: 14, to: 14 }
   },
   {
@@ -402,7 +402,7 @@ export const PAIRED: readonly PairedIntent[] = [
         newText: "    logger.error('job expired', { id: job.id });\n"
       }
     ],
-    edit: "PUT 14:\n+    logger.error('job expired', { id: job.id });",
+    edit: "PUT 14:\n-    logger.warn('job expired', { id: job.id });\n+    logger.error('job expired', { id: job.id });",
     target: { from: 14, to: 14 }
   },
   {
@@ -427,7 +427,7 @@ export const PAIRED: readonly PairedIntent[] = [
       { path: QUEUE, oldText: line(queue, 22), newText: '  const job = queue.shift();\n' },
       { path: QUEUE, oldText: line(queue, 45), newText: '  let total = 0;\n' }
     ],
-    edit: "PUT 14:\n+    logger.error('job expired', { id: job.id });\nPUT 22:\n+  const job = queue.shift();\nPUT 45:\n+  let total = 0;"
+    edit: "PUT 14:\n-    logger.warn('job expired', { id: job.id });\n+    logger.error('job expired', { id: job.id });\nPUT 22:\n-  const job = queue[0];\n+  const job = queue.shift();\nPUT 45:\n-  let count = 0;\n+  let total = 0;"
   },
   {
     id: 'self-invalidating-hunks',
@@ -448,7 +448,7 @@ export const PAIRED: readonly PairedIntent[] = [
         newText: "    logger.error('job expired', { id: job.id });\n"
       }
     ],
-    edit: "PUT 13.=16:\n+  if (job.expiresAt < Date.now()) return undefined;\nPUT 14:\n+    logger.error('job expired', { id: job.id });"
+    edit: "PUT 13.=16:\n-  if (job.expiresAt < Date.now()) {\n+  if (job.expiresAt < Date.now()) return undefined;\nPUT 14:\n-    logger.warn('job expired', { id: job.id });\n+    logger.error('job expired', { id: job.id });"
   },
   {
     id: 'unified-diff-fallback',
@@ -498,7 +498,7 @@ export const PAIRED: readonly PairedIntent[] = [
         moveAfter: line(queue, 2)
       }
     ],
-    edit: 'CUT 32.=41 @block\nPUT >2 @block'
+    edit: "CUT 32.=41 @block\n-/** Every job that will never run, so a caller can report them and drop them. */\nPUT >2 @block\n-import { logger } from '../log.js';"
   },
   {
     id: 'move-anchored-inside-itself',
@@ -522,7 +522,7 @@ export const PAIRED: readonly PairedIntent[] = [
         moveAfter: line(queue, 34)
       }
     ],
-    edit: 'CUT 32.=41 @block\nPUT >34 @block'
+    edit: 'CUT 32.=41 @block\n-/** Every job that will never run, so a caller can report them and drop them. */\nPUT >34 @block\n-  const found: Job[] = [];'
   }
 ];
 

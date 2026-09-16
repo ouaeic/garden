@@ -108,10 +108,27 @@ export function registerProjectUpdateRoutes(context: RouteContext) {
       body: JSON.stringify({ operation, ...(taskId ? { taskId } : {}) })
     });
   };
+  app.get<{ Params: { projectId: string } }>('/v1/projects/:projectId/changes', async (request) => {
+    const user = requireUser(request.user);
+    const project = await owned(user.id, request.params.projectId);
+    const query = z.object({ tasks: z.string().max(3700) }).parse(request.query);
+    const tasks = z.array(z.uuid()).min(1).max(100).parse(query.tasks.split(','));
+    return runner.request({
+      workspaceId: project.workspaceId,
+      userId: user.id,
+      role: 'user',
+      scopes: ['files.read'],
+      method: 'POST',
+      path: `/v1/workspaces/${project.workspaceId}/projects/${project.id}/changes`,
+      contentType: 'application/json',
+      body: JSON.stringify(tasks)
+    });
+  });
   app.get<{ Params: { projectId: string } }>('/v1/projects/:projectId/updates', async (request) => {
     const query = z
       .object({
         before: z.uuid().optional(),
+        revisionsBefore: z.uuid().optional(),
         updateId: z.uuid().optional(),
         changesAfter: z.string().max(4096).optional()
       })

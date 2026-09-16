@@ -528,3 +528,23 @@ it('reuses captured content and refuses a new data copy when the host storage re
   await expect(files.copy(fact, destination)).rejects.toThrow('Host disk is too full');
   await expect(stat(destination)).rejects.toMatchObject({ code: 'ENOENT' });
 });
+
+it('pages all published versions while preserving the current head', async () => {
+  const f = await fixture();
+  const expected: string[] = [];
+  for (let version = 1; version <= 43; version++) {
+    await f.write(f.wa, 'revision.txt', `version ${version}\n`);
+    const published = await f.publish(await f.prepare(f.a, ['revision.txt']));
+    expected.unshift(published.id);
+  }
+  const first = await f.manager.list(f.project);
+  expect(first.revisions).toHaveLength(40);
+  expect(first.head?.id).toBe(expected[0]);
+  expect(first.nextRevisionCursor).toBe(expected[39]);
+  const second = await f.manager.list(f.project, undefined, first.nextRevisionCursor!);
+  expect(second.head?.id).toBe(expected[0]);
+  expect(second.revisions).toHaveLength(3);
+  expect(second.nextRevisionCursor).toBeNull();
+  expect([...first.revisions, ...second.revisions].map((item) => item.id)).toEqual(expected);
+  await expect(f.manager.list(f.project, undefined, randomUUID())).rejects.toThrow('not found');
+});

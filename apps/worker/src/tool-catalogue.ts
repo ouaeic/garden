@@ -611,7 +611,7 @@ export const agentTools: ModelTool[] = [
         options: {
           type: 'object',
           description:
-            'status: updateId, before, changesAfter; includeDiff:true for file diffs. prepare: update:{title,paths,deletePaths?,resolvedPaths?,expectedRevision?,checks:[{name,executable,args,cwd?}]}, sourceTaskId?. checkout: paths, revisionId?. Others: updateId; check/log/stop: checkId; check/publish: digest from status.',
+            'status: updateId, before, revisionsBefore, changesAfter, includeDiff. prepare: update:{title,paths,deletePaths?,resolvedPaths?,expectedRevision?,checks:[{name,executable,args,cwd?}]}, sourceTaskId?. checkout: paths, revisionId?. Others: updateId; check/log/stop: checkId; check/publish: digest from status.',
           additionalProperties: true
         }
       }
@@ -870,7 +870,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'code_diagnostics',
     description:
-      'Run project diagnostics after edits, then run tests separately. Use describe for native TS/JS and Python symbols, hover, navigation and edit previews.',
+      'Run project diagnostics after edits, then run tests separately. Use describe for native TS/JS, Python and R symbols, hover, navigation and checked edit previews.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -890,6 +890,7 @@ export const agentTools: ModelTool[] = [
             'implementation',
             'type_definition',
             'code_actions',
+            'apply',
             'rename'
           ]
         },

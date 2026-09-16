@@ -62,6 +62,17 @@ process.stdout.write(renderPairs(pairs, assertIncumbentRetired()));
 const jsonOut = argument('json');
 if (jsonOut) writeFileSync(jsonOut, `${JSON.stringify({ conformance, pairs }, null, 2)}\n`);
 
+const failed = conformance.filter((row) => row.verdict !== 'landed' && row.verdict !== 'refused');
+const wrong = pairs.filter(
+  (row) => row.byLine.wrote === 'the wrong edit' || row.byLine.wrote === 'part of the edit'
+);
+if (failed.length || wrong.length) {
+  process.stderr.write(
+    `Edit outcomes failed: ${[...failed, ...wrong].map((row) => row.id).join(', ')}. Baseline acceptance is disabled.\n`
+  );
+  process.exit(1);
+}
+
 if (flag('accept')) {
   writeFileSync(baselinePath, `${JSON.stringify(baselineFrom(conformance, pairs), null, 2)}\n`);
   process.stdout.write(`  baseline written to ${baselinePath}\n\n`);

@@ -6,6 +6,20 @@ import { requireScope } from './auth.js';
 import type { ProjectUpdatesManager } from './project-updates.js';
 
 export function registerProjectUpdateRoutes(app: FastifyInstance, manager: ProjectUpdatesManager) {
+  app.post<{ Params: { workspaceId: string; projectId: string } }>(
+    '/v1/workspaces/:workspaceId/projects/:projectId/changes',
+    async (request) => {
+      requireScope(request, 'files.read');
+      const { projectId, workspaceId } = request.params;
+      if (
+        request.capability.role !== 'user' ||
+        (await manager.projectWorkspace(projectId)) !== workspaceId
+      )
+        throw new Error('Live change counts require the project owner');
+      const taskIds = z.array(z.uuid()).min(1).max(100).parse(request.body);
+      return manager.liveChanges(projectId, [...new Set(taskIds)]);
+    }
+  );
   registerFileReadRoutes(
     app,
     '/v1/workspaces/:workspaceId/projects/:projectId/versions/:revisionId',
@@ -104,7 +118,7 @@ export function registerProjectUpdateRoutes(app: FastifyInstance, manager: Proje
         case 'status':
           return action.updateId
             ? manager.inspect(projectId, action.updateId, action.changesAfter)
-            : manager.list(projectId, action.before);
+            : manager.list(projectId, action.before, action.revisionsBefore);
         case 'prepare':
           if (!taskId) throw new Error('Choose the conversation whose files are being prepared');
           return manager.prepare(

@@ -15,7 +15,11 @@ export function registerCodeIntelligenceRoutes(
       const body = CodeIntelligenceRequest.parse(request.body);
       requireScope(
         request,
-        body.action === 'start' || body.action === 'stop' ? 'exec' : 'files.read'
+        body.action === 'apply'
+          ? 'files.write'
+          : body.action === 'start' || body.action === 'stop'
+            ? 'exec'
+            : 'files.read'
       );
       return manager.act(
         workspacePath(workspaceRoot, request.params.workspaceId),

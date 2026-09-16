@@ -252,6 +252,10 @@ const probeStore = (task: () => TaskRecord): StoreProbe => {
       const current = task();
       return { status: current.status, leaseOwner: current.leaseOwner ?? null };
     },
+    yieldTaskLease: async (input: Record<string, unknown>) => {
+      checkpoints.push({ ...input, status: 'queued', clearLease: true, yielded: true });
+      return true;
+    },
     updateTask: async (input: Record<string, unknown>) => {
       checkpoints.push(input);
       return task();
@@ -733,48 +737,40 @@ describe('owner message attachments', () => {
 });
 
 describe('the turn wall clock', () => {
-  /**
-   * Nothing in the product bounded a turn on time. The credit ceiling is what stops a frontier
-   * model, and it is a proxy: on a cheap route credits accumulate slowly while the clock does not,
-   * so a turn that is inexpensive per step and never satisfied could hold a worker for hours. This
-   * drives a turn whose steps cost nothing and whose clock has run out, and asks for the exit that
-   * already exists for the other two ceilings.
-   */
-  it('writes the owner a handoff when the turn has been running longer than the harness holds it', async () => {
+  it('yields a long execution without a model call or resetting its budget', async () => {
     vi.useFakeTimers();
     const task = makeTask();
     const probe = probeStore(() => task);
     const log: FetchLog = { calls: [], modelRequests: [] };
     installFetch(
       [
-        // A step that costs nothing and finishes nothing, then the closing handoff call.
         () => {
           vi.setSystemTime(Date.now() + TURN_WALL_CLOCK_MS);
           return toolFrame('call-1', 'files_list', { path: 'workspace' });
-        },
-        textFrame('Out of time - the listing is done, the tidy-up is not.')
+        }
       ],
       log
     );
-
-    await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 40 }), masterKey, runnerSecret)
-      .run(task)
-      .catch(() => undefined);
-
-    const warning = probe.events.find(
-      (entry) =>
-        entry.kind === 'warning' &&
-        entry.summary === 'This turn ran for its whole time budget before the work was finished'
+    await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 40 }), masterKey, runnerSecret).run(
+      task
     );
-    expect(warning).toBeDefined();
-    // The owner is told, because only they can start it again.
-    expect((warning?.payload as { owner?: boolean }).owner).toBe(true);
-    // And the turn ends the way the other two ceilings end: a handoff the owner can reply to,
-    // rather than a red error halfway through the work.
-    expect(probe.events.some((entry) => entry.kind === 'completed')).toBe(true);
-    const spoken = probe.events.filter((entry) => entry.kind === 'assistant_message');
-    expect(spoken).toHaveLength(1);
-    expect(spoken[0]?.summary).toContain('Out of time');
+    expect(log.modelRequests).toHaveLength(1);
+    expect(probe.events.some((entry) => entry.kind === 'completed')).toBe(false);
+    expect(
+      probe.events.some(
+        (entry) => (entry.payload as { code?: string } | undefined)?.code === 'task_budget_reached'
+      )
+    ).toBe(false);
+    const saved = probe.checkpoints.find((entry) => entry.yielded === true);
+    expect(saved).toBeDefined();
+    expect(saved?.status).toBe('queued');
+    const state = decryptJson<AgentStateShape>(
+      saved!.agentStateCiphertext as Parameters<typeof decryptJson>[0],
+      dataKey
+    );
+    expect(state.step).toBe(1);
+    expect(state.inFlight).toBeUndefined();
+    expect(state.messages.some((entry) => entry.toolCallId === 'call-1')).toBe(true);
   });
 
   /**

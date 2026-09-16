@@ -1,46 +1,3 @@
-/**
- * Applying a line-addressed patch, and refusing one that cannot be applied honestly.
- *
- * The editor this replaces proved an edit was fresh by making the model quote the text it was
- * replacing: if the quote was not there exactly once, nothing landed. That proof was carried in
- * output tokens, on every hunk, inflated by whatever it took to be unique.
- *
- * Here the proof is carried by the HARNESS. `snapshots.ts` remembers the exact lines a read put in
- * front of the model, so at apply time there are two texts to compare - what was shown, and what is
- * on disk now - and the range needs to carry no evidence at all. That is strictly stronger than a
- * quote: a quote is the model's memory of the file, and a snapshot is the harness's record of what
- * it actually sent.
- *
- * FORGIVENESS IS THE POINT, and it is built before the format rather than bolted onto it. The
- * measured 61% saving is an upper bound available only to a model that emits the dialect perfectly;
- * a round trip spent on a miscounted anchor costs a whole generation and eats the saving several
- * times over. So every failure mode of a line-addressed dialect is answered here without a second
- * read:
- *
- *   - A DROPPED HEADER costs nothing, because there is no header. The path is a field of the call.
- *   - A MISCOUNTED NUMBER is caught and the correction is IN the refusal: every refusal carries the
- *     file's real text, numbered, around the lines that were addressed. The retry is a re-emit, not
- *     a re-read. And with one `-` row quoting the line, the number is corrected rather than
- *     refused - see `placeWithAnchor`.
- *   - A SHIFTED FILE - somebody else wrote to it between the read and the edit - is recovered
- *     rather than refused: the recorded lines are found again by content and the edit lands where
- *     the model meant it, with the shift reported.
- *   - AN OFF-BY-ONE is the single most likely error, and it gets the most deliberate answer of the
- *     lot. See `placeWithAnchor` and `placeWithEvidence` below.
- *   - WHITESPACE, CRLF AND TRAILING SPACES never invalidate an anchor: every comparison in this
- *     file goes through `sameLine` or `anchorPrefixes`.
- *
- * THE ONE INVARIANT every recovery here is held to, and the reason a recovery can be trusted at all:
- * bytes land only on lines the patch NAMED and the ledger VOUCHES FOR. A number is a name; an
- * anchor that relocates a number is a name only where the live file and the recorded read both
- * carry it at the target; a span that moves is checked, whole, against what the read recorded at
- * its new place. Where the two records disagree nothing is written, and the refusal shows both.
- *
- * A patch is ATOMIC per file. The quoted editor applied the hunks that matched and reported the
- * ones that did not, which is right for independent quoted edits and wrong here: half a patch
- * applied means every remaining number in the model's head is off by the delta, so the retry is
- * worse than the failure.
- */
 import { blockAt } from './block.js';
 import {
   anchorPrefixes,
@@ -84,14 +41,7 @@ export type EditResult =
       readonly text: string;
       /** Line ranges of the new file the patch wrote, for the echo the result carries back. */
       readonly wrote: ReadonlyArray<{ from: number; to: number }>;
-      /**
-       * Every span this patch replaced, in both numberings, ascending.
-       *
-       * The ledger needs the OLD numbers as well as the new ones: it is holding ranges of the file
-       * as it was read, and to carry them across this write it has to know which of them this patch
-       * removed and how far the rest moved. `wrote` cannot answer that - it says where the new text
-       * is and not what it displaced.
-       */
+
       readonly changed: readonly LineChange[];
       /**
        * How the numbers the model read map onto the numbers the file has now, one line per change
@@ -132,15 +82,6 @@ const CORRECTION_RADIUS = 3;
  * lines; nearest is never chosen.
  */
 const ANCHOR_RINGS: readonly number[] = [CORRECTION_RADIUS, 5];
-
-/**
- * The plainest note in the vertical, on every patch that carried no anchor at all.
- *
- * It is the whole nudge towards the taught form: one sentence, on the success path, saying what
- * the harness could not do for this patch. A model that reads it writes the `-` row next time and
- * the sentence stops appearing.
- */
-export const NO_ANCHOR_NOTE = 'no - row: a miscount here cannot be corrected, only shown';
 
 interface Placement {
   readonly from: number;
@@ -223,16 +164,6 @@ const placeRange = (
  * is corrected, the edit lands, and the correction is reported in the result. Refusing here would
  * be refusing an edit whose meaning is written out in the patch itself.
  *
- * WITHOUT EVIDENCE - `PUT 40.=42:` and three `+` rows. Nothing in the patch says what the model
- * thought was at 40. An off-by-one is then INDISTINGUISHABLE from a correct edit, and every
- * available response to it is wrong in one direction or the other. Silently accepting it is
- * corruption. Refusing every plain range would be refusing the format. So it is accepted, and the
- * result carries back the numbered text of what was written with a line of context on each side, so
- * a model that miscounted sees it on the same turn and fixes it with one more edit rather than
- * discovering it when the tests run. Report-after, because guess-before is not available - and the
- * result says so in one sentence, `NO_ANCHOR_NOTE`, so the next patch carries the row that would
- * have let it be corrected.
- *
  * The claimed text is also allowed to be a different LENGTH from the addressed range - a model that
  * writes four `-` rows under `PUT 40.=42:` has miscounted the range, not the text, and the text is
  * the better evidence of the two.
@@ -258,20 +189,7 @@ const placeWithEvidence = (
       message: `${path} has changed since you read it: the lines you addressed had moved to ${sayRange(placed.from, placed.to)}, and the lines you quoted are not what stands there now, so there is no line this edit can be said to mean. Nothing was written. The file now reads:\n\n${numberedWindow(live, placed, CONTEXT_LINES)}`,
       fix: 'drop the - rows and address the numbers shown below'
     };
-  /*
-   * THE CORRECTION IS LOOKED FOR IN THE WINDOW IT IS ALLOWED TO REACH, NOT IN THE WHOLE FILE.
-   *
-   * This searched the entire file and gave up unless the quoted text occurred exactly once in it -
-   * so on `src/queue.ts`, which says `if (!job) return null;` three times, an off-by-one whose
-   * quote named the right line was REFUSED. The recovery had inherited the exact requirement the
-   * format was bought to escape: text that has to be unique across a file the model did not choose
-   * the repetitiveness of. And the refusal fell on the file shape the whole 61% was measured on.
-   *
-   * `CORRECTION_RADIUS` was already the only distance a quote could be moved, so the whole-file
-   * search was never able to use a hit outside this window anyway: it could only turn one into a
-   * refusal. Searching the window instead is strictly narrower in reach and strictly wider in
-   * recovery, and ambiguity INSIDE the window is still a refusal, which is the case that matters.
-   */
+
   const low = Math.max(1, placed.from - CORRECTION_RADIUS);
   const high = Math.min(live.length, placed.from + CORRECTION_RADIUS + claimed.length - 1);
   const near = occurrences(live.slice(low - 1, high), claimed).map((at) => at + low - 1);
@@ -385,18 +303,6 @@ const placeWithAnchor = (
         };
   if (carries(at)) return placed;
 
-  /*
-   * A short anchor - a brace, a `return;`, a blank - stands on a dozen lines of any file, so on its
-   * own it says nothing about which line is meant. It counts at a candidate only where the line
-   * above and the line below both still read as the ledger recorded them, which is the one piece
-   * of evidence such a row cannot carry itself. No recorded neighbour at all is no evidence.
-   *
-   * And it reaches the inner ring only. Measured by the rig's own attack row: with the lines
-   * beside both braces in the inner ring changed since the read, the outer ring found a third
-   * brace four lines away with its neighbours intact and landed the edit on it - a line that
-   * carried the anchor in both records and was still not the line the model meant. A row that
-   * cannot say which brace it is cannot be allowed to reach for a further one.
-   */
   const weak = isWeakAnchor(anchor);
   const rings = weak ? ANCHOR_RINGS.slice(0, 1) : ANCHOR_RINGS;
   const reach = rings[rings.length - 1] as number;
@@ -596,38 +502,13 @@ export const applyEdit = (
   const splices: Splice[] = [];
   const registers = new Map<string, readonly string[]>();
 
-  /*
-   * A range no read displayed is a range the model is guessing at, and the refusal below carries
-   * the real text at those lines so the retry is a re-emit rather than a re-derivation.
-   *
-   * IT IS NOT A DISPLAY THAT COUNTS. `services/workspace-runner/src/seen-lines.ts` records what its
-   * refusal handed over, so the identical call sent again applies there; nothing here records
-   * anything, so the identical call sent again is refused again. Both messages used to say "send it
-   * again" and only one of them meant it. Either the disclosure is recorded or the message names
-   * the read - and recording it here would mean vouching for a window whose width is set by the
-   * range the model addressed, in a result that may carry forty of them and is cut to
-   * `RECENT_TOOL_OUTPUT_CHARS` two layers downstream, which is the same over-claim this ledger
-   * exists to remove. So the message names the read.
-   */
   // Registers are filled from the live file before anything moves, so a CUT and the PUT that pastes
   // it can be written in either order and mean the same thing.
   const placements = new Map<EditOp, Placement>();
-  let anchorable = 0;
-  let anchored = 0;
 
   for (const op of lineOps) {
     const anySnapshot = newest[0];
     if (!anySnapshot) {
-      /*
-       * No read of this file at all, which is the one refusal that used to cost a SECOND round trip
-       * - it said "read the file and address those numbers" and quoted nothing, so the retry was a
-       * read and then a re-emit. But this arm has just read the file itself in order to patch it,
-       * and the branch eight lines below already hands back the live text when a read exists and
-       * did not cover the anchor. Quoting here too makes every refusal in this file cost exactly one
-       * generation, which is the property the whole format is bought on; leaving one branch out of
-       * it was the difference between "malformed emissions cost nothing extra" being a claim and
-       * being true.
-       */
       const asked =
         op.kind === 'replace' || op.kind === 'cut'
           ? { from: op.from, to: op.to }
@@ -700,9 +581,7 @@ export const applyEdit = (
       });
     if (placed.note) notes.push(placed.note);
 
-    if (op.kind !== 'paste') anchorable += 1;
-    if (op.kind !== 'paste' && op.anchor !== undefined) {
-      anchored += 1;
+    if (op.anchor !== undefined) {
       const checked = placeWithAnchor(path, live, against, newest, span.from, placed, op.anchor);
       if ('message' in checked) return refuse(placed.note ? 'moved' : 'evidence', checked);
       if (checked.note) notes.push(checked.note);
@@ -728,7 +607,6 @@ export const applyEdit = (
         placed = moved;
       } else placed = checked;
     } else if (op.kind === 'replace' || op.kind === 'cut') {
-      if (op.old.length) anchored += 1;
       const checked = placeWithEvidence(path, live, against, placed, op.old);
       if ('message' in checked) return refuse(placed.note ? 'moved' : 'evidence', checked);
       if (checked.note) notes.push(checked.note);
@@ -740,19 +618,6 @@ export const applyEdit = (
       );
     placements.set(op, placed);
     if (op.kind === 'cut' && op.register) {
-      /*
-       * A SECOND CUT INTO A FILLED REGISTER IS A REFUSAL, not a last-wins overwrite.
-       *
-       * `registers.set` used to overwrite, so `CUT a @x / CUT b @x / PUT >N @x` deleted both blocks
-       * and pasted only the second one back: two hundred lines gone, `ok: true`, and an empty
-       * notes array. It is the shape a model reaches for when told to gather two helpers together,
-       * and it is the worst failure this vertical can have - silent data loss reported as success.
-       * Caught by the ruling gate driving the shape rather than reading a table.
-       *
-       * Refusing rather than appending, because appending would have to guess whether the second
-       * block goes above or below the first, and a guess about intent is exactly what the rest of
-       * this file refuses to make. Nothing has been written at this point.
-       */
       if (registers.has(op.register))
         return refuse('register', {
           message: `Two CUTs in this patch both hold their lines as @${op.register}, so the first block would be deleted and never pasted back. Give them different names - CUT ... @${op.register}1 and CUT ... @${op.register}2 - and paste each one. Nothing was written. The second block reads:\n\n${numberedWindow(live, placed, 0)}`,
@@ -798,19 +663,6 @@ export const applyEdit = (
         const value = registers.get(op.register);
         if (!value)
           return refuse('register', {
-            /*
-             * The two intents, shown apart, because naming the rule was not enough to recover
-             * from. Measured on the box: a turn asked to add a `split` function wrote
-             * `PUT >N @split` four times in a row, was told the register was never filled each
-             * time, and rewrote the same patch each time until the repeated-failure bound
-             * stopped it. The register sigil reads as a LABEL for the edit - and the register
-             * is very often named after the thing being written, which makes it read that way
-             * even harder - when it actually means "paste back what a CUT is holding".
-             *
-             * So the refusal now separates writing new lines from moving lines you have read,
-             * and gives the shape of each at the line the patch was already addressing. It
-             * costs nothing resident: this text exists only on the failure that needs it.
-             */
             message: [
               `@${op.register} was never filled: a PUT that pastes a register needs a CUT N.=M @${op.register} in the same patch. Nothing was written.`,
               'To write NEW lines, leave the register off and give the lines in the body:',
@@ -854,6 +706,16 @@ export const applyEdit = (
         fix: `write one operation PUT ${low}.=${high}: with the body of both`
       });
     }
+  }
+
+  for (const op of lineOps) {
+    if (op.anchor !== undefined || ((op.kind === 'replace' || op.kind === 'cut') && op.old.length))
+      continue;
+    const at = op.kind === 'replace' || op.kind === 'cut' ? op.from : op.at;
+    return refuse('evidence', {
+      message: `The operation at patch row ${op.row} has no content anchor. Nothing was written. Add one - row quoting the start of line ${at} from your read (8+ non-space characters, or the whole line if shorter). This checks which content you intended to edit. The file currently reads:\n\n${numberedWindow(live, { from: at, to: at }, CONTEXT_LINES)}`,
+      fix: `add a - row quoting the intended line ${at} below the operation, before any + rows`
+    });
   }
 
   /*
@@ -915,7 +777,6 @@ export const applyEdit = (
     });
     moved += splice.insert.length - splice.remove;
   }
-  if (anchorable && !anchored) notes.push(NO_ANCHOR_NOTE);
   // De-duplicated because one operation can be forgiven twice for the same reason - a relocation
   // reported once by the placement and once again by the evidence check that passed it through -
   // and a result that says the same sentence twice reads as two different findings.

@@ -1,72 +1,3 @@
-/**
- * The dialect, and the only place that knows its spelling. Deliberately forgiving.
- *
- * One operation per line; body rows that begin with `+` and carry the FINAL text of the line, and
- * one optional `-` row first, quoting the start of the first addressed line. There are no context
- * rows in the canonical form, and that is the entire source of the saving: the range says what
- * goes, the body says what arrives, and the anchor says which line the number was counted at.
- *
- *   PUT 40.=42:
- *   -  if (!job) return null;
- *   +  if (!job) return undefined;
- *   +  return job.payload;
- *   CUT 88.=95 @helper
- *   PUT >12 @helper
- *
- * WHY THIS PARSER IS LENIENT, when the version it replaces was deliberately strict.
- *
- * The strict argument is good and it is wrong here. It says a parser that guesses at `PUT 40 - 42`
- * teaches the model that spelling does not matter, and then the guess is wrong once on a line that
- * mattered. But the reference harness this format was measured against maintains a hand-written
- * list of four models that "miscount anchors or drop the tag header" and silently routes them to a
- * lenient parser - which is that harness conceding, in code, that strictness costs round trips on
- * real models and buys nothing. A round trip is not a free correction: it is a whole billed
- * generation, and on the highest-traffic tool in the harness it is the single largest thing
- * standing between a measured 61% saving and a real one.
- *
- * So every leniency here obeys one rule: IT MAY NEVER CHANGE WHICH LINES ARE TOUCHED OR WHAT LANDS
- * IN THEM. It may only recognise a different spelling of the same operation. Anything that would
- * require guessing at intent is a refusal, and `apply.ts` makes every refusal actionable in one
- * turn by handing back the file's real text at the anchor. What is forgiven:
- *
- *   - a `[path]` or `[path#tag]` section header, which other dialects require and this one does not
- *     need at all, because the path arrives in a field of the call;
- *   - `PUT 40-42:`, `PUT 40..42:`, `PUT 40,42:`, `PUT 40 to 42:`, `PUT 40 42:` - every plausible
- *     spelling of a range separator, all meaning `PUT 40.=42:`;
- *   - a missing trailing colon, and lower-case verbs;
- *   - a reversed range, `PUT 42.=40:`;
- *   - the body written on the operation's own row, `PUT 3:+text`. Watched on the box twice in one
- *     turn: refusing that row leaves the next real body row to be read as an operation, so one
- *     habit costs two refusals. The text after the colon is the first body row;
- *   - a carriage return at the end of a patch row, which a CRLF surface puts there and no display
- *     shows;
- *   - a line-number prefix copied out of the read into a body or anchor row, `+12:text`, taken off
- *     only when the number is the one the row already stands at - see `stripLeakedPrefix`;
- *   - several `-` rows, or `-` rows with context, which every model has written a thousand of in
- *     unified diffs. They are not noise and they are not an error: they are the model stating what
- *     it believes it is replacing, which is EVIDENCE, and `apply.ts` checks the numbers against
- *     it. One `-` row first is the anchor the spec teaches; more than one is the whole quote;
- *   - a whole unified-diff hunk, `@@ -40,3 +40,2 @@` and context rows included. A model that falls
- *     back to the format it knows best gets its edit applied rather than a lecture - and a WHOLE
- *     `git diff`, `diff --git` and `--- a/path` rows and all, which is the more likely emission of
- *     the two and was the one being refused;
- *   - `@@ -40,0 +41,2 @@`, the zero-context insertion hunk `git diff -U0` writes. It removes
- *     nothing, and reading it as a replacement of line 40 destroyed a line and reported success;
- *   - a body row with NO marker at all, standing between rows that have one - after at least one
- *     marked row, and with a `+` row directly under it - when the row is not itself an operation.
- *     Watched live three times in one turn from a cheap model: `+`, `+`, `def nth_prime(n):`, then
- *     `+    """..."""`. A row like that has exactly one reading, a `+` that did not survive
- *     generation: prose cannot stand there, because a `+` row cannot follow prose without an
- *     operation between them. Reading it as a body row touches the same lines the patch already
- *     named - see `droppedMarkerAhead`.
- *
- * What is NOT forgiven, and the line is drawn here on purpose: a body row that begins with a space
- * when nothing in the body begins with `-`. It is either a context row or a `+` the model dropped,
- * those two readings put different text in the file, and there is no evidence to choose between
- * them. That is a refusal naming the row. The same holds for an unmarked row at the END of a body,
- * with no `+` row under it: that is where the sentence a model writes after its patch lives, and
- * it too is refused by name.
- */
 import { stripLeakedPrefix, toLines } from './format.js';
 
 export type EditOp =
@@ -101,6 +32,7 @@ export type EditOp =
       readonly at: number;
       readonly side: 'before' | 'after';
       readonly register: string;
+      readonly anchor?: string;
       readonly row: number;
     }
   | {
@@ -155,20 +87,7 @@ const PREAMBLE =
 const HUNK = /^\s*@@+\s*-(\d+)(?:,(\d+))?\s+\+\d+(?:,\d+)?\s*@@/;
 const VERB = /^\s*(put|cut|rem|rm|del|delete|mv|move|rename)\b\s*(.*?)\s*$/i;
 const REGISTER = /\s*@([A-Za-z0-9_-]+)\s*$/;
-/**
- * A line number, then optionally a separator and a second one.
- *
- * The second number is only consumed when a separator IS followed by digits, so `PUT 40:` reads as
- * the single line 40 with a terminator rather than as a range with a missing end. That property is
- * what makes the separator safe to widen: between two numbers a run of these characters can only be
- * a range, and everywhere else it is not matched at all.
- *
- * A RUN rather than one of a list, because the list was a list of the spellings someone thought of.
- * Measured on the box: `PUT 40.:=42:` was refused with "unexpected `.:=` after the range" - the
- * model had blended the two spellings this file already accepts separately, `.=` and `:`, and the
- * refusal cost a step and a retry to say so. `=`, `:=`, `...` and `. = ` fall out of the same gap.
- * There is nothing to be gained by being strict here: the numbers are what carry the meaning.
- */
+
 const RANGE = /^(\d+)(?:(?:\s*(?:to|(?:[.=:,\-–—]\s*)+)\s*|\s+)(\d+))?\s*/i;
 
 /**
@@ -191,21 +110,6 @@ const OPENS = /^\s*(?:put|cut)\s*(?:[<>]\s*)?\d+/i;
  */
 const OPERATION_ATTEMPT = /^\s*(?:PUT|CUT|REM|RM|DEL|DELETE|MV|MOVE|RENAME)(?:\s|$)/;
 
-/**
- * Whether the unmarked row at `cursor` is a body row that lost its `+`, decided on the rows around
- * it and never on its text.
- *
- * Three things have to hold, and each one closes a different wrong reading. At least one marked
- * row must stand above it, so the row is inside a body and not the first thing under an operation.
- * A `+` row must stand DIRECTLY under it, so it cannot be prose written after the patch - prose
- * ends the patch, and a `+` row after prose has no operation to belong to. And the row must not
- * be an operation, an attempt at one, a hunk header or a diff preamble in its own right, because
- * those are the next operation and a body that swallowed one would land it as text.
- *
- * Only one row at a time, on purpose: two unmarked rows in a run are refused at the first, and
- * the refusal names it. The leniency is sized to the shape that was watched, not to every shape
- * that could be argued for.
- */
 const droppedMarkerAhead = (rows: readonly string[], cursor: number, marked: number): boolean => {
   const row = rows[cursor] as string;
   if (!marked || !row.trim()) return false;
@@ -217,20 +121,6 @@ const droppedMarkerAhead = (rows: readonly string[], cursor: number, marked: num
 const CANONICAL =
   'expected PUT N:, PUT N.=M:, PUT N*:, PUT <N:, PUT >N:, CUT N.=M, CUT N.=M @name or PUT >N @name';
 
-/**
- * One patch, written out, appended to every parse failure.
- *
- * `CANONICAL` above is a grammar, and a grammar is what a reader who already knows the format needs.
- * Measured on the box: nine `file_patch` calls in one turn, five of them refused, and three of those
- * five were a body row that never reached its operation - `PUT 3:+from x import y` with the body on
- * the operation's own line, and a bare `def test_split(): ` read as an operation because the PUT
- * above it had not opened a body. Each refusal restated the same list of forms, and the list does
- * not show the one thing all three got wrong, which is that the operation and its body are on
- * SEPARATE LINES and every body row carries a marker.
- *
- * So the shape goes out with the rule. It is on the failure path only and costs nothing resident,
- * which is the whole reason it can afford to be this long.
- */
 const WORKED_EXAMPLE = [
   'A whole patch looks like this - the operation on its own line, the body indented under it, one',
   'marker per body row (+ adds, - quotes the start of the line you are replacing, a space is context):',
@@ -238,6 +128,7 @@ const WORKED_EXAMPLE = [
   '  -    return None',
   '  +    return merge(rest)',
   '  PUT >40:',
+  '  -# Helpers',
   '  +def split(intervals, at):',
   '  +    return intervals'
 ].join('\n');
@@ -260,14 +151,6 @@ interface Body {
   readonly anchor?: string;
 }
 
-/**
- * Where the body's rows will stand, so a leaked line-number prefix can be recognised as leaked.
- *
- * `anchorLine` is the line a `-` row quotes. `firstBodyLine` is where the first `+` row lands in
- * the file the read numbered: the addressed line for a replacement, the line after for an insert
- * after it. Neither is used to place anything - only to decide whether a `12:` at the start of a
- * row is the display's number or the row's own text.
- */
 interface Standing {
   readonly anchorLine: number;
   readonly firstBodyLine: number;
@@ -495,14 +378,6 @@ export const parseEdit = (source: string, options: ParseOptions = {}): ParseResu
     if (verb[1] !== verb[1]?.toUpperCase())
       note('accepted a lower-case verb; the canonical spelling is upper case');
 
-    /*
-     * Whole-file deletion and rename are recognised only so they can be refused by name.
-     *
-     * The dialect this was measured from carries `REM` and `MV`, and they are not declared here
-     * because the worker's runner client has no delete or rename route to carry them out - see
-     * `prompt.ts`. Recognising them costs nothing resident and turns "not an operation" into an
-     * answer the model can act on in the same turn, which is the whole discipline of this parser.
-     */
     if (spelt !== 'put' && spelt !== 'cut')
       return fail(
         index,
@@ -524,8 +399,18 @@ export const parseEdit = (source: string, options: ParseOptions = {}): ParseResu
       const at = Number(gap[2]);
       const side = gap[1] === '<' ? 'before' : 'after';
       if (register) {
-        ops.push({ kind: 'paste', at, side, register, row: opRow + 1 });
-        index += 1;
+        const body = takeBody(opRow, { anchorLine: at, firstBodyLine: at });
+        if ('ok' in body) return body;
+        if (body.old.length || body.next.length)
+          return fail(opRow, 'A register paste accepts one - anchor row and no replacement body.');
+        ops.push({
+          kind: 'paste',
+          at,
+          side,
+          register,
+          ...(body.anchor === undefined ? {} : { anchor: body.anchor }),
+          row: opRow + 1
+        });
         continue;
       }
       const carried = inlineBody(opRow, rest.slice(gap[0].length));

@@ -12,6 +12,7 @@ import type {
 } from '@athanor/contracts';
 import { PrepareProjectUpdate } from '@athanor/contracts';
 import { ensureWorkspace, workspacePath, withWorkspaceDirectory } from './files.js';
+import { ProjectLiveChanges } from './project-live-changes.js';
 import {
   ProjectVersionFiles,
   durableJson,
@@ -76,6 +77,7 @@ export interface ProjectCheckExecution {
 
 /** The only mutable shared file is a durable head reference; working processes never use it as a pathname. */
 export class ProjectUpdatesManager {
+  readonly #changes = new ProjectLiveChanges();
   readonly #locks = new Map<string, Promise<unknown>>();
   readonly #operations = new Map<string, Promise<void>>();
   readonly #cancelled = new Set<string>();
@@ -141,6 +143,7 @@ export class ProjectUpdatesManager {
   async close(): Promise<void> {
     this.#closed = true;
     clearInterval(this.#timer);
+    await this.#changes.close();
     await Promise.allSettled([...this.#operations.values()]);
   }
   directory(projectId: string): string {
@@ -221,6 +224,17 @@ export class ProjectUpdatesManager {
     const workspace = (await this.registry(projectId)).members[uuid(taskId)];
     if (!workspace) throw new Error('Conversation is not registered in this project');
     return workspace;
+  }
+  async liveChanges(projectId: string, taskIds: string[]) {
+    const registry = await this.registry(projectId);
+    const members = taskIds.map((taskId) => {
+      const workspaceId = registry.members[uuid(taskId)];
+      if (!workspaceId) throw new Error('Conversation is not registered in this project');
+      return { taskId, workspaceId };
+    });
+    return members.map(({ taskId, workspaceId }) =>
+      this.#changes.request(workspacePath(this.root, workspaceId), this.file(projectId, ''), taskId)
+    );
   }
   private async revision(projectId: string, id: string): Promise<StoredRevision> {
     const revision = await readJson<StoredRevision>(
@@ -1003,7 +1017,11 @@ export class ProjectUpdatesManager {
       await durableJson(baselineFile, baseline);
     }
   }
-  async list(projectId: string, before?: string): Promise<ProjectUpdates> {
+  async list(
+    projectId: string,
+    before?: string,
+    revisionsBefore?: string
+  ): Promise<ProjectUpdates> {
     const registry = await this.registry(projectId);
     const names = (
       await readdir(this.file(projectId, 'summaries')).catch((error: NodeJS.ErrnoException) => {
@@ -1061,20 +1079,28 @@ export class ProjectUpdatesManager {
         b.id.localeCompare(a.id)
     );
     const revisions: ProjectRevision[] = [];
-    let revisionId = registry.head;
+    const revisionSummary = async (id: string): Promise<ProjectRevision> =>
+      (await readJson<ProjectRevision>(
+        this.file(projectId, `revision-summaries/${uuid(id)}.json`)
+      )) ?? this.revisionView(await this.revision(projectId, id));
+    const head = registry.head ? await revisionSummary(registry.head) : null;
+    let revisionId = revisionsBefore
+      ? (await revisionSummary(revisionsBefore)).parentId
+      : registry.head;
+    const visited = new Set<string>();
     while (revisionId && revisions.length < 40) {
-      const revision =
-        (await readJson<ProjectRevision>(
-          this.file(projectId, `revision-summaries/${revisionId}.json`)
-        )) ?? this.revisionView(await this.revision(projectId, revisionId));
+      if (visited.has(revisionId)) throw new Error('Project version history contains a cycle');
+      visited.add(revisionId);
+      const revision = await revisionSummary(revisionId);
       revisions.push(revision);
       revisionId = revision.parentId;
     }
     return {
-      head: revisions[0] ?? null,
+      head,
       updates: all,
       revisions,
       nextCursor: names.length > cursorIndex + 41 ? visible.at(-1)!.id : null,
+      nextRevisionCursor: revisionId ? revisions.at(-1)!.id : null,
       observedAt: now()
     };
   }
