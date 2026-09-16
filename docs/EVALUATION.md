@@ -104,20 +104,20 @@ the whole block on every `pnpm check`. Accept a new baseline and this page fails
 is re-derived, naming the value it should now carry. The instruction is no longer advice.
 
 ```baseline
-fixtures 77
+fixtures 78
 long-a-finished-phase-is-never-declared.modelCalls 38
-long-a-finished-phase-is-never-declared.promptTokens 1473701
-long-a-finished-phase-is-never-declared.catalogueTokens 494076
-long-a-finished-phase-is-never-declared.cachePrefix 95
+long-a-finished-phase-is-never-declared.promptTokens 1251429
+long-a-finished-phase-is-never-declared.catalogueTokens 270826
+long-a-finished-phase-is-never-declared.cachePrefix 94
 long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.modelCalls 40
-long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.promptTokens 1420556
-long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.catalogueTokens 507079
-long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.cachePrefix 94
-long-finished-phases-condense-rather-than-shred.cachePrefix 66
+long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.promptTokens 1192436
+long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.catalogueTokens 277954
+long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.cachePrefix 92
+long-finished-phases-condense-rather-than-shred.cachePrefix 63
 compaction.extraModelCalls 2
-compaction.tokensSaved 53145
-compaction.cachePointsGivenUp 1
-floorWalk.cachePointsLost 28
+compaction.tokensSaved 58993
+compaction.cachePointsGivenUp 2
+floorWalk.cachePointsLost 29
 ```
 
 The last four are derived rather than stored, and the check does the subtraction itself:
@@ -130,7 +130,12 @@ is the size of what their tools returned.
 Each row reports model calls, estimated serialized prompt tokens, the catalogue share, the largest
 prepared window and common-prefix reuse. These are deterministic offline accounting estimates,
 not billed usage, tokenizer-exact counts or a claim about task quality. Actual cost depends on the
-provider tokenizer, cached-input pricing, reasoning and output usage.
+provider tokenizer, cached-input pricing, reasoning and output usage. The JSON report also records total,
+repeated-prefix and fresh serialized lead-input characters, including the initial request. Fresh
+input ceilings remain meaningful when the catalogue size changes; a percentage alone does not.
+Tool groups load on demand and remain available in the conversation. The discovery fixture counts
+its explicit activation call. Older scripted fixtures may call known tools directly and therefore
+measure execution behavior, not how reliably a real model discovers the tool it needs.
 
 `tokens` includes messages and tool definitions; `cat` isolates tool definitions. `WHAT FAILED`
 reports broken fixture contracts; baseline drift is separately reviewable. `WHAT THE HOLDS COST`

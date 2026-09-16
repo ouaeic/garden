@@ -28,6 +28,7 @@ import type { ModelGateway, ModelTool } from '@athanor/model-gateway';
 import type { AgentState, AgentWorkerConfig } from '../agent-state.js';
 import { BASE_SYSTEM_PROMPT, COMPACT_CONTEXT_TOOL } from '../context.js';
 import { agentToolsFor } from '../tools.js';
+import { requestToolsFor } from '../request-tools.js';
 import { applyProjectMainModel } from '../purpose-model.js';
 import { routingForTurn } from '../routing-policy.js';
 import type { ProviderPreferences } from '@athanor/core';
@@ -269,44 +270,13 @@ export const claimTurn = async (
     )
   ];
   if (!connectorKinds.length) withdrawnTools.add('connector_action');
-  // Byte-identical on both web routes and for the whole run, which is the point: the catalogue is
-  // the head of the cached prefix, and it is also the whole of the model's map of what this
-  // computer can do. Nothing withdraws a tool after this line, so it is built once here rather
-  // than rebuilt every step - and the closing handoff below can be handed the same array, instead
-  // of a shorter one that would move the front of the prompt on the largest request of the turn.
-  /**
-   * Surfaces this box does not have are not described either, and this is the larger half by an
-   * order of magnitude.
-   *
-   * The withdrawal above is about what the *owner* has connected. This is about what the *machine*
-   * has underneath it, which nothing on this side of the wire could answer until the runner grew a
-   * probe for it. A runner with no Chromium and no X session cannot honour `browser_action`,
-   * `browser_snapshot`, `read_elements`, `print_pdf`, `desktop_observe`, `desktop_launch` or
-   * `desktop_action` under any circumstances, and describing all seven anyway cost this request
-   * 11,692 bytes of the model's map of a computer it is not on - on every step of every task, at
-   * the head of the cached prefix.
-   *
-   * Withdrawn through `agentToolsFor` rather than added to `withdrawnTools`, and the distinction is
-   * load-bearing: `withdrawnTools` is subtraction from the catalogue this run is entitled to send,
-   * and the derivation check re-derives that entitlement from the same call. A surface the box does
-   * not have is not something withdrawn from the catalogue - it is not in the catalogue this box
-   * has. @see requestDerivationBreach, which compares the two.
-   *
-   * Failing toward the whole catalogue is deliberate and is enforced one layer down, in
-   * `surfaceDescribable`: only a probe that came back and said `absent` removes anything.
-   */
+  // Hardware and connected accounts are frozen; enabled groups grow only at settled tool boundaries.
   const surfaces = await deps.workspaceSurfaces(task);
   if (task.parentMissionId)
     for (const tool of [...agentToolsFor('lead', surfaces, connectorKinds), COMPACT_CONTEXT_TOOL])
       if (!CODING_CHILD_TOOLS.has(tool.name)) withdrawnTools.add(tool.name);
-  const requestTools = [
-    ...agentToolsFor('lead', surfaces, connectorKinds),
-    COMPACT_CONTEXT_TOOL
-  ].filter((tool) => !withdrawnTools.has(tool.name));
-  // What every request carries before a word of conversation. The step loop measures its budget
-  // against it, the compaction target is derived from the same budget, and the handoff counts it
-  // for itself from the same array.
-  const reservedTokens = Math.ceil(JSON.stringify(requestTools).length / 4);
+  const requestTools = () =>
+    requestToolsFor(surfaces, connectorKinds, state.enabledToolGroups ?? [], withdrawnTools);
   const [toolchainSummary, machineSummary] = await Promise.all([
     deps.toolchainSummary(task),
     deps.machineSummary(task)
@@ -343,8 +313,12 @@ export const claimTurn = async (
       providerPreferences: routing.preferences,
       measuringThroughput: routing.measuring,
       withdrawnTools,
-      requestTools,
-      reservedTokens,
+      get requestTools() {
+        return requestTools();
+      },
+      get reservedTokens() {
+        return Math.ceil(JSON.stringify(requestTools()).length / 4);
+      },
       toolchainSummary,
       machineSummary,
       surfaces,

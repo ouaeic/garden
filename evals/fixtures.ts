@@ -25,6 +25,8 @@ import { readdirSync, readFileSync, type Dirent } from 'node:fs';
 import path from 'node:path';
 
 import { COMPACT_CONTEXT_TOOL } from '../apps/worker/src/context.js';
+import { requestToolsFor } from '../apps/worker/src/request-tools.js';
+import { UNKNOWN_SURFACES } from '../packages/contracts/src/index.js';
 import { agentToolsFor } from '../apps/worker/src/tool-catalogue.js';
 import {
   conversational,
@@ -692,7 +694,7 @@ export const fixtures: readonly Fixture[] = [
        */
       anchorHeld: true,
       minCacheBreakpoints: 2,
-      minCachePrefix: 95,
+      maxFreshLeadCharacters: 70_000,
       maxPeakPromptTokens: 5_200,
       ownerMessageIntact: true,
       replies: 1
@@ -1338,7 +1340,7 @@ export const fixtures: readonly Fixture[] = [
       maxPeakPromptTokens: 6_800,
       anchorHeld: true,
       // File provenance enters with the read; anchorHeld still protects the stable prefix.
-      minCachePrefix: 94
+      maxFreshLeadCharacters: 80_000
     }
   },
   {
@@ -2953,24 +2955,10 @@ export const fixtures: readonly Fixture[] = [
       status: 'completed',
       verification: 'verified',
       commandsRun: 1,
-      /*
-       * A turn that only appends to its window must not rewrite the front of it.
-       *
-       * Five steps of ordinary work, nothing condensed, nothing over budget - so every request here
-       * is the last one plus what happened since, and the whole prompt ahead of that is a byte-for-
-       * byte repeat a provider can hand back at a fraction of the price. It measures 97%.
-       *
-       * Ninety-five, not ninety, and the difference is the whole worth of the assertion. On a turn
-       * this short the tool catalogue is most of what is being compared, and the catalogue does not
-       * move - so the share can never fall to the floor a long turn reaches however badly the
-       * messages are rewritten. Measured by making the very first message of the window change on
-       * every step, which is every message byte destroyed and the worst this fixture can be made to
-       * do: 91%. A floor of ninety would have called that healthy. Ninety-five has two points of
-       * headroom on the working turn and four points of bite on the broken one; anything watching
-       * for a defect that costs less than two points needs the long fixture, where the messages are
-       * the bytes.
-       */
-      minCachePrefix: 95,
+      // Bound newly sent input as well as the system anchor. A smaller catalogue changes a
+      // reuse percentage even when exactly the same conversation bytes are appended.
+      anchorHeld: true,
+      maxFreshLeadCharacters: 55_000,
       holds: ['acceptance_hold']
     }
   },
@@ -3530,67 +3518,8 @@ export const fixtures: readonly Fixture[] = [
       // The turn still finishes, and that matters: nothing here is about a task that breaks. It is
       // about a task that works and costs several times what it should.
       holds: [],
-      /*
-       * The target, in seven parts. All seven hold. Six of them were met by step 3.1; the seventh
-       * was re-derived here, because it was wrong rather than unmet.
-       *
-       * Met by the loop: two compactions, both set off by the budget rather than by a declaration
-       * this fixture never makes, with a brief a model wrote rather than the deterministic
-       * fallback; no soft-pass window at all, because the soft pass is the warning a budget
-       * compaction answers and not the answer itself; a preamble that stands still, which is what
-       * the anchor breakpoint is placed at the end of; and a floor that stops at 4,000 characters
-       * instead of walking to the 2,000-character bottom.
-       *
-       * ── The seventh, and why 75 was never a number this row could reach ─────────────────────
-       *
-       * `minCachePrefix` was 75, taken by analogy: the small-result arm of the pair above condenses
-       * on the same mechanism and reads 94, the shred row - floor unopposed, nothing condensing on
-       * the budget - reads 66, so a row that condenses AND holds its floor was put between them. It
-       * read 44, then 52 once 3.1 separated the tiers, and 75 stayed out of reach through two
-       * waves; it is not reachable at RECENT_TOOL_OUTPUT_MESSAGES = 2 either, which reads 60. The
-       * analogy was the mistake. Both of those rows run on a 1,000,000-token window with results
-       * small enough that the floor never has to cut one, and this row's entire subject is a window
-       * that fills on the smaller of the two shipped ones.
-       *
-       * Re-derived from this row's own requests instead. Nineteen model calls are seventeen step
-       * requests and two summarising ones, so sixteen consecutive pairs, and every pair falls into
-       * exactly one of three regimes - measured by dumping the divergence point of each pair, in
-       * scratchpad/wave4/4H.md:
-       *
-       *   7 pairs  growth only   mean 77.9%  nothing is rewritten; the request first differs at the
-       *                                      assistant message the previous one did not carry.
-       *   7 pairs  floor re-cut  mean 31.1%  a result that has just left the recency window is cut,
-       *                                      so the request first differs just past the preamble.
-       *   2 pairs  compaction    mean 34.4%  the brief replaces the run that was condensed.
-       *
-       * (7 x 77.9 + 7 x 31.1 + 2 x 34.4) / 16 = 52.0, which is what the row reports - so this is a
-       * decomposition of the measurement and not a restatement of it.
-       *
-       * Two of those numbers are fixed points of the fixture rather than opinions. The preamble -
-       * the catalogue plus the leading system run - is 65,207 bytes, and it is the shortest common
-       * prefix any pair has. A row every one of whose requests diverged immediately after it would
-       * read mean(65,207 / request bytes) = 31.2%; the floor-re-cut regime reads 31.1%, the same
-       * number, which is what a floor-cutting step actually costs: the cache reads back the
-       * catalogue and nothing else. The other fixed point is 77.9%, what a pair costs when nothing
-       * is rewritten at all.
-       *
-       * So this target is a count of rewritten requests wearing a percentage, and that is what
-       * fixes its value. Losing one more pair out of the growth regime costs (77.9 - 31.1) / 16 =
-       * 2.9 points to the floor or (77.9 - 34.4) / 16 = 2.7 points to a third compaction; either
-       * way the row reads 49. 50 is therefore the largest floor this run clears that the smallest
-       * real degradation - one more request rewritten by anything other than the two compactions -
-       * still fails. It is deliberately not 52: the measured value written back is a target that
-       * can never go red, which is how a target becomes furniture.
-       *
-       * And 75 was above this row's ceiling by any route. Turning all seven floor-re-cut pairs into
-       * growth-only pairs - what a recency boundary counted in tool results rather than messages
-       * would do, ledger C3-2 - gives (14 x 77.9 + 2 x 34.4) / 16 = 72.5%. If that change lands,
-       * re-derive this from the run it produces rather than reinstating 75.
-       *
-       * Drift is a separate gate and is already covered: baseline.json commits cachePrefix 52 and
-       * report.ts bands it one-sided by three points, so a slide to 48 fails there too. That one is
-       * the tripwire; this one is the statement about what the row is for.
-       */
+      // Bound all fresh input, including compaction-induced prefix loss. The assertions below
+      // separately require both budget compactions and preservation of the owner's request.
       minCompactions: 1,
       // Two, and both on the budget rather than on a declaration this fixture never makes. It read
       // one, and the second was missing for the reason the pending note gives: the soft pass fired
@@ -3606,7 +3535,7 @@ export const fixtures: readonly Fixture[] = [
       softPassWindows: 0,
       anchorHeld: true,
       minToolResultFloor: 4_000,
-      minCachePrefix: 50,
+      maxFreshLeadCharacters: 2_100_000,
       ownerMessageIntact: true
     }
   },
@@ -3833,10 +3762,10 @@ export const fixtures: readonly Fixture[] = [
     }
   },
   {
-    id: 'answer-the-catalogue-is-one-list-for-the-whole-run',
+    id: 'answer-the-core-catalogue-stays-stable-throughout-a-read',
     shape: 'answer',
     request: 'What is in the notes about the renewal date?',
-    why: 'The catalogue is the head of the prompt and the largest fixed cost of a turn, and the one thing that makes it cheap is that it never moves: it is built once for the life of the run and the closing handoff is handed the caller’s own array. Nothing asserted any of that. This row asserts all three - the exact membership, that no step changed it, and that the last request offered what the step before it did - against a list derived from the same two sources the loop builds it from, so adding a tool does not break it and assembling the catalogue per step does.',
+    why: 'Reading a local note needs only the core tools. The same ordered definitions must reach every step and the closing response, without eagerly loading unrelated capabilities.',
     runner: { files: workspaceFiles },
     model: sequence(
       { calls: [{ id: 'call-1', name: 'file_read', args: { path: 'workspace/notes.txt' } }] },
@@ -3853,9 +3782,43 @@ export const fixtures: readonly Fixture[] = [
       tools: ['file_read'],
       status: 'completed',
       holds: [],
-      finalCatalogue: EVAL_CATALOGUE,
+      finalCatalogue: requestToolsFor(UNKNOWN_SURFACES, [], [], new Set()).map((tool) => tool.name),
       finalCatalogueUnchanged: true,
       catalogueStableThroughout: true
+    }
+  },
+  {
+    id: 'answer-discovers-document-tools-before-reading',
+    shape: 'answer',
+    request: 'Read workspace/contract.pdf and tell me its notice period.',
+    why: 'A task discovers an advanced capability through the resident loader, then uses the provided definition. The activation call, changed cache prefix and final answer are all included in its cost.',
+    runner: { files: workspaceFiles },
+    model: sequence(
+      {
+        text: 'I’ll check the notice clause in the contract.',
+        calls: [{ id: 'load', name: 'load_tools', args: { groups: ['documents'] } }]
+      },
+      { calls: [{ id: 'read', name: 'document_read', args: { path: 'workspace/contract.pdf' } }] },
+      {
+        text: 'Either party may terminate with 60 days written notice.',
+        calls: finishCall('done', {
+          summary: 'Read and cited the notice clause.',
+          verification: evidence('read', 'Clause 7 specifies 60 days written notice.')
+        })
+      }
+    ),
+    expect: {
+      modelCalls: 3,
+      tools: ['load_tools', 'document_read'],
+      status: 'completed',
+      holds: [],
+      finalCatalogue: requestToolsFor(UNKNOWN_SURFACES, [], ['documents'], new Set()).map(
+        (tool) => tool.name
+      ),
+      finalCatalogueUnchanged: true,
+      catalogueStableThroughout: false,
+      maxFreshLeadCharacters: 65_000,
+      anchorHeld: true
     }
   },
   {

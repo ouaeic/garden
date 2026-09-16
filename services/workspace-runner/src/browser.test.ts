@@ -350,7 +350,7 @@ describe('browser snapshot shape', () => {
     const first = snapshot(whole);
     expect(first.textComplete).toBe(false);
     expect(first.nextTextOffset).toBe(BROWSER_SNAPSHOT_TEXT_LIMIT);
-    const parts = { ...first, text: whole };
+    const parts = { ...first, text: whole, screenshotBase64: 'initial-image' };
     const next = composeBrowserSnapshot(parts, {
       offset: first.nextTextOffset!,
       sha256: first.textRange.sha256
@@ -359,6 +359,8 @@ describe('browser snapshot shape', () => {
     expect(next.textComplete).toBe(true);
     expect(next.textOmitted).toBe(0);
     expect(next.nextTextOffset).toBeUndefined();
+    expect(next.screenshotBase64).toBe('');
+    expect(next.screenshotOmitted).toBe('text_continuation');
     const changed = composeBrowserSnapshot(
       { ...parts, text: 'Updated page' },
       { offset: first.nextTextOffset!, sha256: first.textRange.sha256 }
@@ -366,6 +368,14 @@ describe('browser snapshot shape', () => {
     expect(changed.text).toBe('Updated page');
     expect(changed.textChanged).toBe(true);
     expect(changed.textRange.offset).toBe(0);
+    expect(changed.screenshotBase64).toBe('initial-image');
+    expect(changed.screenshotOmitted).toBeUndefined();
+    expect(
+      composeBrowserSnapshot(parts, { offset: 0, sha256: first.textRange.sha256 }).screenshotBase64
+    ).toBe('initial-image');
+    expect(composeBrowserSnapshot(parts, { offset: first.nextTextOffset }).screenshotBase64).toBe(
+      'initial-image'
+    );
   });
 
   it('bounds the page text so it cannot swallow the budget on its own', () => {

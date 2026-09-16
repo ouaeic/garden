@@ -198,6 +198,13 @@ export const check = (
     failures.push(
       `cached prefix: expected at least ${expect.minCachePrefix}% of each request to repeat the one before it, got ${outcome.cachePrefix}%`
     );
+  if (
+    expect.maxFreshLeadCharacters !== undefined &&
+    outcome.freshLeadCharacters > expect.maxFreshLeadCharacters
+  )
+    failures.push(
+      `fresh serialized lead input: expected at most ${expect.maxFreshLeadCharacters} characters, got ${outcome.freshLeadCharacters}`
+    );
   if (expect.minCompactions !== undefined && outcome.compactions < expect.minCompactions)
     failures.push(
       `compactions: expected at least ${expect.minCompactions}, got ${outcome.compactions}`
@@ -458,9 +465,18 @@ const row = (result: Result, baseline: Baseline, width: number): string => {
 export const render = (results: readonly Result[], baseline: Baseline): string => {
   const lines: string[] = [];
   const pending = results.filter(pendingHeld);
-  const failed = results.filter(
+  const claims = results.map((result) => ({
+    ...result,
+    failures: check(result.fixture.expect, result.outcome)
+  }));
+  const failed = claims.filter(
     (result) => (result.failures.length > 0 || brokenPromise(result)) && !pendingHeld(result)
   );
+  const changed = results.flatMap((result, index) => {
+    const behavioral = new Set(claims[index]!.failures);
+    const failures = result.failures.filter((failure) => !behavioral.has(failure));
+    return failures.length ? [{ ...result, failures }] : [];
+  });
   const steps = results.reduce((total, result) => total + result.outcome.modelCalls, 0);
   const tokens = results.reduce((total, result) => total + result.outcome.promptTokens, 0);
   const catalogue = results.reduce((total, result) => total + result.outcome.catalogueTokens, 0);
@@ -504,6 +520,20 @@ export const render = (results: readonly Result[], baseline: Baseline): string =
       'Note: the committed numbers were measured by a different revision of athanor or of this rig. A row that moved may have moved for that reason.'
     );
 
+  const leadCharacters = results.reduce(
+    (sum, result) => sum + result.outcome.leadInputCharacters,
+    0
+  );
+  const freshCharacters = results.reduce(
+    (sum, result) => sum + result.outcome.freshLeadCharacters,
+    0
+  );
+  lines.push(
+    `Lead input: ${leadCharacters} serialized characters; ${freshCharacters} outside the repeated prefix (including initial requests).`
+  );
+  lines.push(
+    'Prefix reuse is an offline proxy, not provider cache usage. Capability activation costs are included.'
+  );
   lines.push('');
   lines.push(
     `     ${pad('fixture', width)} ${pad('shape', 10)} ${padStart('steps', 5)} ${padStart('Δ', 5)} ${padStart('tokens', 8)} ${padStart('Δ', 8)} ${padStart('cat', 8)} ${padStart('Δ', 7)} ${padStart('peak', 8)} ${padStart('cached', 6)} ${padStart('Δ', 5)} ${padStart('shown', 5)} ${padStart('l/edit', 7)} holds`
@@ -523,6 +553,14 @@ export const render = (results: readonly Result[], baseline: Baseline): string =
         lines.push(
           `    - this fixture is marked pending and every expectation in it now holds. Delete the marker: ${result.fixture.pending}`
         );
+      for (const failure of result.failures) lines.push(`    - ${failure}`);
+    }
+  }
+
+  if (changed.length) {
+    lines.push('', 'BASELINE DRIFT - accounting changes for review');
+    for (const result of changed) {
+      lines.push(`  ${result.fixture.id}`);
       for (const failure of result.failures) lines.push(`    - ${failure}`);
     }
   }
@@ -617,8 +655,9 @@ export const render = (results: readonly Result[], baseline: Baseline): string =
     lines.push(
       `Reads displayed ${results.reduce((total, result) => total + result.outcome.readLedger.displayedLines, 0)} lines of file text across the suite, and ${(displayed / landed).toFixed(2)} of them per landed edit over the n=${landing.length} turns that landed one. Every displayed line is charged again on every later request of its turn.`
     );
-  if (failed.length)
-    lines.push(`${failed.length} fixture${failed.length === 1 ? '' : 's'} failed.`);
+  lines.push(
+    `${failed.length} behavioral fixture failures; ${changed.length} rows with accounting drift.`
+  );
   lines.push('');
   return lines.join('\n');
 };

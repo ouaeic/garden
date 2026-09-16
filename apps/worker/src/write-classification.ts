@@ -32,6 +32,7 @@ import { surfaceActionVerb } from './surface-actions.js';
 
 /** Tools whose successful result is a check, not a change; everything else here changes something. */
 const NON_MUTATING_TOOLS = new Set([
+  'load_tools',
   // A question changes nothing on the computer or outside it. Counting it as a change would put it
   // in front of the completion-evidence rule, where the only result after it is the question - which
   // shows nothing about the work, for exactly the reason notify is listed below.

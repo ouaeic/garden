@@ -602,3 +602,16 @@ Consuming a correction, recording it in the transcript, and saving its continuat
 transaction, so a worker restart cannot lose or duplicate it. Denial adds no spending or compute
 allowance, preserves the current model and effort settings, and leaves paused work paused. An
 unrelated pending question still requires its own answer.
+
+## Capability discovery
+
+A conversation starts with core file, command, job, search and coordination tools. `load_tools`
+adds the definitions for a built-in capability group on the following model step; enabled groups
+are persisted with the encrypted conversation state. Added definitions follow the existing core
+and previously enabled groups. Hardware availability and configured connections still filter the
+result, and all actions pass the same approval floor regardless of how their definitions loaded.
+A known advanced tool call also retains its group for subsequent steps. Discovery changes which
+schemas are resident, not what the conversation is authorized to do.
+
+Browser snapshot continuation pages carry text without another screenshot when the page-text hash
+matches. A changed hash restarts the text and supplies a fresh screenshot.

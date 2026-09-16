@@ -1,4 +1,5 @@
 import { executeProjectUpdate } from './project-updates.js';
+import { enableToolGroups, rememberToolGroup } from './tool-groups.js';
 import { CODING_CHILD_TOOLS } from './coding-missions.js';
 import type { ModelRelease, WebToolPlan } from '@athanor/contracts';
 import type { DataStore, TaskRecord } from '@athanor/data';
@@ -146,6 +147,7 @@ type ToolDomain = (context: ToolContext, call: ModelToolCall) => Promise<unknown
  * `Unknown tool` the switch's `default` threw.
  */
 const DOMAIN_OF: Readonly<Record<string, ToolDomain>> = {
+  load_tools: async (context, call) => enableToolGroups(context.state, call.arguments),
   set_plan: executePlanTool,
   project_update: executeProjectUpdate,
   shell: executeWorkspaceTool,
@@ -196,5 +198,6 @@ export async function executeToolCall(context: ToolContext, call: ModelToolCall)
     throw new Error('This capability is outside the coding specialist workspace');
   const domain = DOMAIN_OF[call.name];
   if (!domain) throw new Error(`Unknown tool ${call.name}`);
+  rememberToolGroup(context.state, call.name);
   return domain(context, call);
 }
