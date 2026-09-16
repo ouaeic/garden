@@ -48,7 +48,7 @@ export default function Computer({
       <header className="section-heading">
         <div>
           <p className="eyebrow">Your computer</p>
-          <h2>{workspace.name}</h2>
+          <h2>{task?.title ?? workspace.name}</h2>
         </div>
         <span className="muted">{workspace.status}</span>
       </header>
@@ -100,7 +100,12 @@ export default function Computer({
           </div>
         )}
         {visible && (tool === 'browser' || tool === 'desktop') && (
-          <Screen key={`${workspace.id}:${tool}`} workspaceId={workspace.id} surface={tool} />
+          <Screen
+            key={`${workspace.id}:${tool}`}
+            workspaceId={workspace.id}
+            {...(task ? { taskId: task.id } : {})}
+            surface={tool}
+          />
         )}
         {(tool === 'previews' || tool === 'processes' || tool === 'checkpoints') && (
           <Operations

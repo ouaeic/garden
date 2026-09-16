@@ -3,7 +3,8 @@ import type { DesktopHolder, BrowserTabState, BrowserTabCleanup } from '@athanor
 import { Maximize2, Minimize2, Pin, X } from 'lucide-react';
 import { remotePoint } from './screen-geometry';
 import { useExpandedView } from '../use-expanded-view';
-import { get, post } from '../client.js';
+import { stepUp } from '../auth';
+import { get, post, ApiError } from '../client.js';
 import { jpegPayload, PAGE_VIEWPORT, socketAddress } from './transport.js';
 import { message } from './format.js';
 
@@ -16,7 +17,7 @@ interface ScreenState {
   url?: string;
   activeApplication?: string;
   pendingDialog?: { type: string; message: string } | null;
-  botWall?: { kind?: string; message?: string } | null;
+  botWall?: { vendor?: string; reason?: string; url?: string; tabId?: string | null } | null;
   tabs?: BrowserTabState[];
   cleanup?: BrowserTabCleanup;
 }
@@ -40,11 +41,50 @@ interface Ack {
 
 export default function Screen({
   workspaceId,
-  surface
+  surface,
+  taskId
 }: {
   workspaceId: string;
   surface: 'browser' | 'desktop';
+  taskId?: string;
 }) {
+  const [handoff, setHandoff] = useState<{
+    id: string;
+    kind: string;
+    surface: string;
+    title: string;
+    tabId?: string;
+    route: 'answer' | 'approval';
+  } | null>(null);
+  const [handoffBusy, setHandoffBusy] = useState(false);
+  const [inputBusy, setInputBusy] = useState(false);
+  const [strokePreview, setStrokePreview] = useState<Array<{ x: number; y: number }>>([]);
+  const stroke = useRef<{
+    pointerId: number;
+    points: Array<{ x: number; y: number }>;
+    generation?: number;
+    tabId?: string;
+  } | null>(null);
+  useEffect(() => {
+    if (!taskId) return;
+    const abort = new AbortController();
+    const refresh = async () => {
+      try {
+        const value = await get<typeof handoff>(`/v1/tasks/${taskId}/intervention`, {
+          signal: abort.signal
+        });
+        if (!abort.signal.aborted) setHandoff(value?.surface === surface ? value : null);
+      } catch (cause) {
+        if (!abort.signal.aborted) setError(message(cause));
+      }
+    };
+    void refresh();
+    const timer = setInterval(() => void refresh(), 10000);
+    return () => {
+      abort.abort();
+      clearInterval(timer);
+    };
+  }, [taskId, surface]);
   const [state, setState] = useState<ScreenState>({ holder: 'agent', ...PAGE_VIEWPORT });
   const stateRef = useRef(state);
   const [connected, setConnected] = useState(false);
@@ -78,8 +118,9 @@ export default function Screen({
           reject(new Error('Input was not acknowledged. Check the screen before trying it again.'));
         }, 15_000);
         pending.current.set(requestId, { resolve, reject, timer });
+        setInputBusy(true);
         socket.current.send(JSON.stringify({ ...frame, requestId }));
-      }),
+      }).finally(() => setInputBusy(pending.current.size > 0)),
     []
   );
   const run = async (fn: () => Promise<unknown>) => {
@@ -358,9 +399,94 @@ export default function Screen({
       clear();
     };
   }, [base, clear, surface, workspaceId]);
+  useEffect(() => {
+    if (!connected || !taskId || surface !== 'browser') return;
+    let tabId: string | null = null;
+    try {
+      tabId = sessionStorage.getItem(`garden:open-tab:${taskId}`);
+      sessionStorage.removeItem(`garden:open-tab:${taskId}`);
+    } catch {
+      return;
+    }
+    if (tabId)
+      void control({ type: 'holder', holder: 'user' })
+        .then(() => control({ type: 'action', action: { type: 'select_tab', tabId } }))
+        .catch((cause) => setError(message(cause)));
+  }, [connected, control, taskId, surface]);
+  async function beginHandoff() {
+    await control({ type: 'holder', holder: 'user' });
+    const tabId = handoff?.tabId ?? state.botWall?.tabId;
+    if (surface === 'browser' && tabId) await action({ type: 'select_tab', tabId });
+  }
+  async function completeHandoff() {
+    if (!handoff || !taskId) return;
+    if (pending.current.size || stroke.current)
+      throw new Error('Wait for your input to finish before continuing.');
+    setHandoffBusy(true);
+    try {
+      const send = () =>
+        handoff.route === 'answer'
+          ? post(`/v1/tasks/${taskId}/answer`, {
+              questionId: handoff.id,
+              prompt: 'I completed the browser verification. Observe the page and continue.'
+            })
+          : post(`/v1/approvals/${handoff.id}/approve`, {});
+      try {
+        await send();
+      } catch (cause) {
+        if (
+          !(cause instanceof ApiError) ||
+          !['step_up_required', 'recent_authentication_required'].includes(cause.code)
+        )
+          throw cause;
+        await stepUp();
+        await send();
+      }
+      setHandoff(null);
+      setStatus('Handoff complete — the conversation is continuing');
+    } finally {
+      setHandoffBusy(false);
+    }
+  }
   const controlling = connected && state.holder !== 'agent';
   return (
     <div className={`stack garden-screen-surface ${expanded ? 'expanded' : ''}`} ref={viewer}>
+      {handoff && (
+        <section className="computer-handoff" aria-label="Your action is needed">
+          <span className="eyebrow">Needs you · this conversation</span>
+          <h2>{handoff.title}</h2>
+          <p>
+            {handoff.kind === 'private_input'
+              ? 'Take control, click the field, then enable Private input before typing. End private input when finished.'
+              : handoff.kind === 'signature'
+                ? 'Review the document and sign it yourself. You can draw directly on the screen with a mouse, touch, or pen.'
+                : 'Complete the site’s verification in this browser. Garden will check the page again before continuing.'}
+          </p>
+          <div className="row">
+            <button
+              className="button"
+              disabled={!connected || handoffBusy}
+              onClick={() => void run(beginHandoff)}
+            >
+              Take control{handoff.tabId ? ' of this tab' : ''}
+            </button>
+            <button
+              className="button primary"
+              disabled={
+                !connected ||
+                state.holder !== 'user' ||
+                handoffBusy ||
+                inputBusy ||
+                strokePreview.length > 0
+              }
+              onClick={() => void run(completeHandoff)}
+            >
+              {handoffBusy ? 'Continuing…' : 'Done and continue'}
+            </button>
+          </div>
+          <small>Your action will not be repeated by the agent.</small>
+        </section>
+      )}
       <div className="row">
         <strong>
           {state.title ||
@@ -377,7 +503,7 @@ export default function Screen({
         </span>
         <button
           className="button"
-          disabled={!connected}
+          disabled={!connected || Boolean(handoff)}
           onClick={() =>
             void run(() =>
               control({ type: 'holder', holder: state.holder === 'agent' ? 'user' : 'agent' })
@@ -515,7 +641,12 @@ export default function Screen({
       )}
       {state.botWall && (
         <p role="status">
-          This page needs a person to complete its challenge. Take control to continue.
+          {state.botWall.vendor ?? 'This site'} needs human verification. {state.botWall.url}
+          {!handoff && (
+            <button className="button" disabled={!connected} onClick={() => void run(beginHandoff)}>
+              Open verification tab
+            </button>
+          )}
         </p>
       )}
       {state.pendingDialog && (
@@ -544,17 +675,81 @@ export default function Screen({
           height={PAGE_VIEWPORT.height}
           tabIndex={controlling ? 0 : -1}
           aria-label={`Remote ${surface}. Take control, then click and type. Use the text input below on a phone.`}
-          onClick={(e) => {
-            if (!controlling || state.holder === 'secure_input') return;
+          onPointerDown={(e) => {
+            if (!controlling || state.holder === 'secure_input' || e.button !== 0) return;
+            e.preventDefault();
             e.currentTarget.focus();
-            const rect = e.currentTarget.getBoundingClientRect();
-            void run(() =>
-              action({
-                type: 'click_at',
-                ...remotePoint({ x: e.clientX, y: e.clientY }, rect, state),
-                ...(surface === 'desktop' ? { button: 'left', clicks: 1 } : {})
-              })
+            e.currentTarget.setPointerCapture(e.pointerId);
+            stroke.current = {
+              pointerId: e.pointerId,
+              points: [
+                remotePoint(
+                  { x: e.clientX, y: e.clientY },
+                  e.currentTarget.getBoundingClientRect(),
+                  state
+                )
+              ],
+              ...(state.generation !== undefined ? { generation: state.generation } : {}),
+              ...(state.tabs?.find((tab) => tab.active)?.tabId
+                ? { tabId: state.tabs.find((tab) => tab.active)!.tabId }
+                : {})
+            };
+          }}
+          onPointerMove={(e) => {
+            const gesture = stroke.current;
+            if (!gesture || gesture.pointerId !== e.pointerId) return;
+            const point = remotePoint(
+              { x: e.clientX, y: e.clientY },
+              e.currentTarget.getBoundingClientRect(),
+              state
             );
+            const last = gesture.points.at(-1)!;
+            if (Math.hypot(point.x - last.x, point.y - last.y) < 2) return;
+            if (gesture.points.length >= 2047)
+              gesture.points = gesture.points.filter((_, index) => index % 2 === 0);
+            gesture.points.push(point);
+            setStrokePreview([...gesture.points]);
+          }}
+          onPointerCancel={() => {
+            stroke.current = null;
+            setStrokePreview([]);
+          }}
+          onLostPointerCapture={() => {
+            stroke.current = null;
+            setStrokePreview([]);
+          }}
+          onPointerUp={(e) => {
+            const gesture = stroke.current;
+            stroke.current = null;
+            setStrokePreview([]);
+            if (
+              !gesture ||
+              gesture.pointerId !== e.pointerId ||
+              !controlling ||
+              state.holder === 'secure_input'
+            )
+              return;
+            const end = remotePoint(
+              { x: e.clientX, y: e.clientY },
+              e.currentTarget.getBoundingClientRect(),
+              state
+            );
+            if (
+              gesture.points.length === 1 &&
+              Math.hypot(end.x - gesture.points[0]!.x, end.y - gesture.points[0]!.y) < 3
+            ) {
+              void run(() =>
+                action({
+                  type: 'click_at',
+                  ...end,
+                  ...(surface === 'desktop' ? { button: 'left', clicks: 1 } : {})
+                })
+              );
+            } else {
+              gesture.points.push(end);
+              const { pointerId: _pointer, ...input } = gesture;
+              void run(() => control({ type: 'stroke', action: input }));
+            }
           }}
           onKeyDown={(e) => {
             if (!controlling || ['Shift', 'Alt', 'Control', 'Meta'].includes(e.key)) return;
@@ -589,6 +784,15 @@ export default function Screen({
             );
           }}
         />
+        {strokePreview.length > 1 && (
+          <svg
+            className="computer-stroke-preview"
+            viewBox={`0 0 ${state.width} ${state.height}`}
+            aria-hidden="true"
+          >
+            <polyline points={strokePreview.map((point) => `${point.x},${point.y}`).join(' ')} />
+          </svg>
+        )}
         {!connected && snapshot?.screenshotBase64 && state.holder !== 'secure_input' && (
           <img
             className="computer-snapshot"
@@ -608,8 +812,11 @@ export default function Screen({
         onSubmit={(e) => {
           e.preventDefault();
           const value = text;
-          setText('');
-          void run(() => action({ type: 'text_input', text: value }));
+          void run(async () => {
+            if (state.holder === 'secure_input') setText('');
+            await action({ type: 'text_input', text: value });
+            setText((current) => (current === value ? '' : current));
+          });
         }}
       >
         <input

@@ -18,6 +18,7 @@ export interface AgentApprovalRequirement {
   action: string;
   preview: string;
   handoffOnly?: boolean;
+  handoff?: { kind: 'private_input' | 'signature'; tabId?: string };
   recovery?: 'verify_public_source' | 'separate_network_steps' | 'use_explicit_cwd';
 }
 

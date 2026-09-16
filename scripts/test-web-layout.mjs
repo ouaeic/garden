@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { checkHumanInterventions } from './browser-interventions.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
@@ -650,6 +651,9 @@ try {
         nextCursor: null,
         observedAt: new Date().toISOString()
       });
+    if (path.endsWith('/sessions') && path.startsWith('/v1/projects/'))
+      return json({ sessions: [], unavailableWorkspaces: 0, observedAt: time });
+    if (path.endsWith('/intervention')) return json(null);
     if (path.endsWith('/notes') && path.startsWith('/v1/projects/'))
       return json({ notes: [], nextCursor: null });
     if (path === '/v1/projects') return json({ projects: [project], nextCursor: null });
@@ -1089,7 +1093,7 @@ try {
         oldestSequence: 3,
         nextCursor: 3
       });
-    if (path === `/v1/tasks/${childTask.id}/messages`) {
+    if (path === `/v1/tasks/${childTask.id}/answer`) {
       childAnswer = route.request().postDataJSON();
       assert.match(route.request().headers()['idempotency-key'], /^[0-9a-f-]{36}$/i);
       childTask.status = 'queued';
@@ -1103,6 +1107,7 @@ try {
     return route.fulfill({ status: 501, json: { error: { message: 'Unspecified UI fixture' } } });
   });
   if (process.env.GARDEN_UI_FOCUS !== 'drafts') {
+    await checkHumanInterventions({ context, origin, task, report });
     await checkProjectConversations({
       context,
       origin,
@@ -1878,13 +1883,32 @@ try {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByLabel('Your answer').waitFor();
     await page.getByLabel('Your answer').fill('Use both arrow keys and WASD.');
-    await page.getByRole('button', { name: 'Send answer', exact: true }).click();
+    await page.waitForFunction(() =>
+      Object.keys(sessionStorage).some(
+        (key) =>
+          key.startsWith('garden:question:') && JSON.parse(sessionStorage.getItem(key)).ciphertext
+      )
+    );
+    assert(
+      !(await page.evaluate(() => JSON.stringify(sessionStorage))).includes(
+        'Use both arrow keys and WASD.'
+      ),
+      'Question drafts must not persist plaintext'
+    );
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByLabel('Your answer').waitFor();
+    assert.equal(
+      await page.getByLabel('Your answer').inputValue(),
+      'Use both arrow keys and WASD.',
+      'Pending question drafts survive a reload'
+    );
+    await page.getByRole('button', { name: 'Answer and continue', exact: true }).click();
     await page
-      .getByRole('button', { name: 'Send answer', exact: true })
+      .getByRole('button', { name: 'Answer and continue', exact: true })
       .waitFor({ state: 'detached' });
     assert.deepEqual(
       childAnswer,
-      { prompt: 'Use both arrow keys and WASD.' },
+      { questionId: childQuestion.id, prompt: 'Use both arrow keys and WASD.' },
       'A specialist answer must preserve its existing allocation and model'
     );
     await page.getByRole('button', { name: 'Return to parent work', exact: true }).click();
@@ -2236,7 +2260,7 @@ try {
       );
       await card.getByRole('button', { name: 'Deny', exact: true }).scrollIntoViewIfNeeded();
       const actionsFit = await card.locator('.decision-actions').evaluate((element) => {
-        const scroll = document.querySelector('.garden-task-composer').getBoundingClientRect();
+        const scroll = document.querySelector('.garden-task-scroll').getBoundingClientRect();
         const buttons = [...element.querySelectorAll('button')];
         return (
           buttons.length === 2 &&
@@ -2251,7 +2275,7 @@ try {
           })
         );
       });
-      assert(actionsFit, 'Approval actions must remain visible in the prompt area');
+      assert(actionsFit, 'Approval actions must remain visible in the conversation scroll area');
       await card.screenshot({ path: resolve(report, `approval-reason-${theme}-phone.png`) });
     }
     approvalFailures = [
@@ -2352,7 +2376,7 @@ try {
       );
       await card.locator('.decision-actions').scrollIntoViewIfNeeded();
       const approvalLayout = await card.locator('.decision-actions').evaluate((element) => ({
-        area: document.querySelector('.garden-task-composer').getBoundingClientRect().toJSON(),
+        area: document.querySelector('.garden-task-scroll').getBoundingClientRect().toJSON(),
         buttons: [...element.querySelectorAll('button')].map((button) =>
           button.getBoundingClientRect().toJSON()
         ),
@@ -2360,7 +2384,7 @@ try {
       }));
       assert(
         await card.locator('.decision-actions').evaluate((element) => {
-          const area = document.querySelector('.garden-task-composer').getBoundingClientRect();
+          const area = document.querySelector('.garden-task-scroll').getBoundingClientRect();
           const buttons = [...element.querySelectorAll('button')];
           return (
             buttons.length === 3 &&
@@ -2377,7 +2401,7 @@ try {
             })
           );
         }),
-        `All three approval actions must be reachable inside the prompt area: ${JSON.stringify(approvalLayout)}`
+        `All three approval actions must be reachable inside the conversation: ${JSON.stringify(approvalLayout)}`
       );
       await card.screenshot({ path: resolve(report, `approval-compact-${width}.png`) });
       await card.getByText('Inspect full action', { exact: true }).click();

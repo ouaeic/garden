@@ -45,10 +45,10 @@ export function DecisionCard({
     : [];
   const grantDescription = text(data(preview.taskGrant).description);
   const privateInput =
+    Boolean(data(preview.handoff).kind) ||
     ['secure_input', 'type_secure'].includes(text(args.action)) ||
     decision.action === 'secure_input_handoff' ||
     /^Secure (browser|desktop) input required$/.test(decision.action);
-  const [inputFinished, setInputFinished] = useState(false);
   const expired = Date.parse(decision.expiresAt) <= Date.now();
   async function resolve(action: 'approve' | 'deny', scope: 'once' | 'run' = 'once') {
     const body =
@@ -79,6 +79,34 @@ export function DecisionCard({
       setBusy(false);
     }
   }
+  if (privateInput)
+    return (
+      <article className="decision-card computer-handoff">
+        <div className="eyebrow">Needs you · personal action</div>
+        <h3>{decision.action}</h3>
+        <p>
+          {data(preview.handoff).kind === 'signature'
+            ? 'Review and sign the document yourself, then continue from the computer.'
+            : 'Enter the private value in the computer, then continue there. It will not be put into the conversation.'}
+        </p>
+        {onComputer ? (
+          <Button
+            className="primary"
+            onClick={() => onComputer(tool === 'desktop_action' ? 'desktop' : 'browser')}
+          >
+            Open {tool === 'desktop_action' ? 'desktop' : 'browser'}
+          </Button>
+        ) : (
+          onOpenTask && (
+            <Button onClick={() => onOpenTask(decision.taskId)}>Open conversation</Button>
+          )
+        )}
+        <Button disabled={busy || expired} onClick={() => resolve('deny')}>
+          Cancel request
+        </Button>
+        <ErrorNotice error={error} />
+      </article>
+    );
   return (
     <article className="decision-card">
       <div className="eyebrow">
@@ -123,32 +151,6 @@ export function DecisionCard({
             : JSON.stringify(decision.preview, null, 2)}
         </pre>
       </details>
-      {privateInput && (
-        <div className="stack">
-          <p>
-            Open the computer, take control, and use Private input to enter the value. End private
-            input before continuing.
-          </p>
-          {onComputer && (
-            <Button onClick={() => onComputer(tool === 'desktop_action' ? 'desktop' : 'browser')}>
-              Open private input
-            </Button>
-          )}
-          {!onComputer && onOpenTask && (
-            <Button onClick={() => onOpenTask(decision.taskId)}>
-              Open work to enter privately
-            </Button>
-          )}
-          <label className="row">
-            <input
-              type="checkbox"
-              checked={inputFinished}
-              onChange={(event) => setInputFinished(event.target.checked)}
-            />
-            I have finished entering the value privately.
-          </label>
-        </div>
-      )}
       <details className="decision-note">
         <summary>Add a reason for denying</summary>
         <label className="field">
@@ -169,7 +171,7 @@ export function DecisionCard({
         </small>
       </details>
       <ErrorNotice error={error} />
-      {grantDescription && !privateInput && (
+      {grantDescription && (
         <div className="decision-permission">
           <strong>For this run</strong>
           <p>{grantDescription}</p>
@@ -180,12 +182,12 @@ export function DecisionCard({
         <Button
           className="primary"
           busy={busy}
-          disabled={expired || (privateInput && !inputFinished)}
+          disabled={expired}
           onClick={() => resolve('approve')}
         >
-          {expired ? 'Expired' : privateInput ? 'Continue after private input' : 'Approve once'}
+          {expired ? 'Expired' : 'Approve once'}
         </Button>
-        {grantDescription && !privateInput && (
+        {grantDescription && (
           <Button disabled={busy || expired} onClick={() => resolve('approve', 'run')}>
             Allow for this run
           </Button>
@@ -194,9 +196,7 @@ export function DecisionCard({
           Deny
         </Button>
       </div>
-      {(!grantDescription || privateInput) && (
-        <small>This approval applies to the action shown here.</small>
-      )}
+      {!grantDescription && <small>This approval applies to the action shown here.</small>}
     </article>
   );
 }

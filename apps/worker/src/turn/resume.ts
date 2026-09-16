@@ -314,6 +314,7 @@ export const resumeParkedTurn = async (
       answeredState.ownerReasoningEffort =
         waiting?.reasoningEffort ?? task.reasoningEffort ?? 'auto';
       delete answeredState.question;
+      answeredState.questionsAsked = 0;
       answeredState.messages.push({
         role: 'user',
         content: ownerMessageContent({ prompt: answer, attachments: message?.attachments })

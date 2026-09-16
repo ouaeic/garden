@@ -330,6 +330,8 @@ export const approvalForCall = async (
     const policy = await deps.runner.call<{
       consequential: boolean;
       sensitiveInput: boolean;
+      handoffKind?: 'signature';
+      tabId?: string;
       preview: string;
       destinations?: string[];
     }>(
@@ -339,12 +341,19 @@ export const approvalForCall = async (
       `/v1/workspaces/${task.workspaceId}/${surface}/preflight`,
       surfaceActionRequest(call.arguments)
     );
-    if (policy.sensitiveInput) {
+    if (policy.sensitiveInput || policy.handoffKind) {
       return {
         ...(policy.destinations ? { destinations: policy.destinations } : {}),
         sideEffect: 'external_consequential',
-        action: `Secure ${surface} input required`,
-        preview: `${policy.preview}\nTake over the ${surface === 'browser' ? 'Browser' : 'Computer'} pane, enable Secure input, enter the private value, return control, then approve this handoff. The agent will not replay the typed value.`,
+        action:
+          policy.handoffKind === 'signature'
+            ? 'Your signature is needed'
+            : `Private ${surface} input needed`,
+        preview: policy.preview,
+        handoff: {
+          kind: policy.handoffKind ?? 'private_input',
+          ...(policy.tabId ? { tabId: policy.tabId } : {})
+        },
         handoffOnly: true
       };
     }

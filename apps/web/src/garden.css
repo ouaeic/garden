@@ -1773,3 +1773,11 @@
   margin-top: 12px;
   flex-wrap: wrap;
 }
+.garden-attention-jump {
+  width: 100%;
+  justify-content: space-between;
+}
+.work-attention {
+  scroll-margin-block: 18px;
+  margin-bottom: 24px;
+}

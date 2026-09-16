@@ -2,8 +2,12 @@ import type { Task } from '@athanor/contracts';
 import { post } from './client.js';
 
 export function createQuestionAnswerSender(
-  write: (taskId: string, prompt: string, key: string) => Promise<Task> = (taskId, prompt, key) =>
-    post<Task>(`/v1/tasks/${taskId}/messages`, { prompt }, { idempotencyKey: key })
+  write: (taskId: string, prompt: string, key: string, questionId: string) => Promise<Task> = (
+    taskId,
+    prompt,
+    key,
+    questionId
+  ) => post<Task>(`/v1/tasks/${taskId}/answer`, { prompt, questionId }, { idempotencyKey: key })
 ) {
   let attempt: { signature: string; key: string; pending?: Promise<Task>; result?: Task } | null =
     null;
@@ -17,7 +21,7 @@ export function createQuestionAnswerSender(
     if (attempt.result) return Promise.resolve(attempt.result);
     if (attempt.pending) return attempt.pending;
     const current = attempt;
-    current.pending = write(taskId, prompt, current.key)
+    current.pending = write(taskId, prompt, current.key, questionId)
       .then((result) => {
         current.result = result;
         return result;

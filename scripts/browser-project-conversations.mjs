@@ -77,6 +77,34 @@ export async function checkProjectConversations({
       }
       return json(project);
     }
+    if (path === `/v1/projects/${project.id}/sessions`)
+      return json({
+        sessions: [
+          {
+            workspaceId: root.workspaceId,
+            taskId: root.id,
+            title: root.title,
+            browser: {
+              holder: 'agent',
+              tabs: [
+                {
+                  tabId: 'tab-1',
+                  title: 'Assembly reference',
+                  url: 'https://example.invalid/reference',
+                  active: true
+                }
+              ]
+            },
+            desktop: {
+              holder: 'agent',
+              windows: [{ id: 'window-1', name: 'Alignment viewer', role: 'window' }],
+              activeApplication: 'Alignment viewer'
+            }
+          }
+        ],
+        unavailableWorkspaces: 0,
+        observedAt: new Date().toISOString()
+      });
     if (path === `/v1/projects/${project.id}/conversations`)
       return json({ tasks: [...tasks].reverse(), nextCursor: null });
     if (path === `/v1/projects/${project.id}/notes`) {
@@ -166,6 +194,11 @@ export async function checkProjectConversations({
   try {
     await page.goto(`${origin}/?project=${project.id}`);
     await page.getByRole('heading', { name: project.title, exact: true }).waitFor();
+    await page
+      .getByRole('region', { name: 'Project browser and desktop' })
+      .getByRole('button', { name: /Assembly reference/ })
+      .waitFor();
+    await page.getByText('Alignment viewer', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'New conversation', exact: true }).click();
     let dialog = page.getByRole('dialog', { name: 'New conversation', exact: true });
     let input = dialog.getByPlaceholder('Describe what you want to do…');

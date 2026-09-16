@@ -242,3 +242,46 @@ export function forgetDraftKey(): void {
   device = null;
   recoveries.clear();
 }
+
+/** Question drafts use the same device key; private computer input never enters this path. */
+export async function readQuestionDraft(userId: string, id: string): Promise<string> {
+  if (!keepsDeviceDrafts()) return '';
+  if (!device || device.userId !== userId) await recoverDeviceDrafts(userId);
+  if (!device) return '';
+  const row = sessionStorage.getItem(id);
+  if (!row) return '';
+  const sealed = JSON.parse(row) as { iv: string; ciphertext: string };
+  const value = await crypto.subtle.decrypt(
+    {
+      name: 'AES-GCM',
+      iv: bytes(sealed.iv),
+      additionalData: new TextEncoder().encode(JSON.stringify([device.namespace, id]))
+    },
+    device.key,
+    bytes(sealed.ciphertext)
+  );
+  return new TextDecoder().decode(value);
+}
+export async function writeQuestionDraft(userId: string, id: string, value: string): Promise<void> {
+  if (!value) {
+    sessionStorage.removeItem(id);
+    return;
+  }
+  if (!keepsDeviceDrafts()) return;
+  if (!device || device.userId !== userId) await recoverDeviceDrafts(userId);
+  if (!device) throw new Error('Connect to Garden to save your answer draft.');
+  const generation = keyGeneration;
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt(
+    {
+      name: 'AES-GCM',
+      iv,
+      additionalData: new TextEncoder().encode(JSON.stringify([device.namespace, id]))
+    },
+    device.key,
+    new TextEncoder().encode(value)
+  );
+  if (generation !== keyGeneration)
+    throw new Error('The device session changed before the answer draft was saved.');
+  sessionStorage.setItem(id, JSON.stringify({ iv: base64(iv), ciphertext: base64(ciphertext) }));
+}

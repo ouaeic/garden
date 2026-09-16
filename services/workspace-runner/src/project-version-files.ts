@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { spawn } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { constants, type BigIntStats } from 'node:fs';
 import {
   chmod,
@@ -132,6 +133,39 @@ export class ProjectVersionFiles {
   object(fact: ProjectFileVersion): string {
     if (!/^[a-f0-9]{64}$/.test(fact.sha256)) throw new Error('Invalid version content identity');
     return path.join(this.directory, 'objects', `${fact.sha256}.${fact.executable ? 'x' : 'r'}`);
+  }
+  async lineChanges(base: ProjectFileVersion | null, proposed: ProjectFileVersion | null) {
+    // Measurement is bounded independently of the datasets this workspace can store or process.
+    if ((base?.bytes ?? 0) + (proposed?.bytes ?? 0) > 2 * 1024 * 1024) return null;
+    const args = [
+      '-c',
+      'core.hooksPath=/dev/null',
+      'diff',
+      '--no-index',
+      '--no-ext-diff',
+      '--no-textconv',
+      '--numstat',
+      '--',
+      base ? this.object(base) : '/dev/null',
+      proposed ? this.object(proposed) : '/dev/null'
+    ];
+    let output: string;
+    try {
+      output = (
+        await promisify(execFile)('/usr/bin/git', args, {
+          timeout: 3000,
+          maxBuffer: 8192,
+          env: { PATH: '/usr/bin:/bin', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' }
+        })
+      ).stdout;
+    } catch (error) {
+      const result = error as { code?: number; stdout?: string };
+      if (result.code !== 1 || typeof result.stdout !== 'string') return null;
+      output = result.stdout;
+    }
+    if (!output) return { added: 0, removed: 0 };
+    const match = /^(\d+)\t(\d+)\t/.exec(output);
+    return match ? { added: Number(match[1]), removed: Number(match[2]) } : null;
   }
   async copy(
     fact: ProjectFileVersion,

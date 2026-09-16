@@ -55,10 +55,12 @@ export function projectUpdateFixture(project, tasks) {
             current: null,
             conflict: false,
             merged: false,
+            lines: { added: 1, removed: 0 },
             diff: '+++ Proposed\nprint("cohort checks")'
           }
         ],
         changeCount: 1,
+        lineChanges: { added: 1, removed: 0, unmeasuredFiles: 0 },
         nextChange: null,
         checks: operation.update.checks.map((check) => ({
           ...check,

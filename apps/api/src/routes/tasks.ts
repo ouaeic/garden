@@ -1,3 +1,4 @@
+import { registerQuestionRoutes } from './questions.js';
 import { continueTaskOperation } from '../task-continuation.js';
 import {
   beginProjectExecution,
@@ -45,6 +46,7 @@ import { validateTaskReasoning } from '../task-reasoning.js';
 import { recordSecurityEvent } from '../security-events.js';
 
 export const registerTaskRoutes = (context: RouteContext): void => {
+  registerQuestionRoutes(context);
   const {
     log,
     app,

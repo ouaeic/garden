@@ -69,6 +69,7 @@ export const parkForApproval = async (
         action: approval.action,
         preview: approval.preview,
         tool: call.name,
+        ...(approval.handoff ? { handoff: approval.handoff } : {}),
         securityMode: task.securityMode,
         ...(!task.parentMissionId &&
         !approval.handoffOnly &&

@@ -221,6 +221,7 @@ export const startTurnState = <T extends Record<string, unknown>>(
     compactedAtStep?: unknown;
     pending?: unknown;
     question?: unknown;
+    browserHandoff?: unknown;
     continuationMark?: unknown;
     artifactLedger?: unknown;
     codingMissionWaiting?: unknown;
@@ -244,6 +245,7 @@ export const startTurnState = <T extends Record<string, unknown>>(
   delete next.frameLossNoted;
   delete next.pending;
   delete next.question;
+  delete next.browserHandoff;
   // What the last turn had changed by its last ceiling says nothing about this one, and left behind
   // it would be the bar a fresh turn has to clear before it may renew its own budget.
   delete next.continuationMark;

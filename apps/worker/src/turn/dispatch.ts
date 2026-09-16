@@ -262,6 +262,7 @@ export const dispatchToolCalls = async (
   let answeredByRun = -1;
   for (const [callIndex, call] of response.toolCalls.entries()) {
     if (callIndex <= answeredByRun) continue;
+    if (state.browserHandoff) break;
     // Re-checked before every call in the batch, not once before it. A model routinely proposes
     // several actions at a time, and the earlier single check meant a cancel landing after the
     // first one still sent the email, published the artifact and fired the POST - minutes after

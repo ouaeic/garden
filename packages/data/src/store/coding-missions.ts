@@ -592,6 +592,7 @@ export class CodingMissionStore {
     return parked;
   }
   async replyToCodingMission(input: {
+    messageId?: string;
     userId: string;
     taskId: string;
     expectedState: EncryptedEnvelope;
@@ -616,6 +617,7 @@ export class CodingMissionStore {
       );
       if (!result.rows.length) return false;
       await this.tasks.appendTaskEvent({
+        ...(input.messageId ? { id: input.messageId } : {}),
         taskId: input.taskId,
         kind: 'user_message',
         summary: 'Owner clarification',

@@ -266,6 +266,14 @@ export class ProjectUpdatesManager {
       })),
       changes,
       changeCount: update.changes.length,
+      lineChanges: update.changes.reduce(
+        (total, change) => ({
+          added: total.added + (change.lines?.added ?? 0),
+          removed: total.removed + (change.lines?.removed ?? 0),
+          unmeasuredFiles: total.unmeasuredFiles + (change.lines ? 0 : 1)
+        }),
+        { added: 0, removed: 0, unmeasuredFiles: 0 }
+      ),
       nextChange: start + 100 < update.changes.length ? changes.at(-1)!.path : null
     };
   }
@@ -462,6 +470,7 @@ export class ProjectUpdatesManager {
         result,
         conflict,
         merged,
+        lines: await versions.lineChanges(base, ours),
         detail: conflict
           ? 'The published file and this proposal both changed. Resolve against the current version.'
           : merged

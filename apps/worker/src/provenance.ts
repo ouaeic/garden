@@ -209,17 +209,9 @@ export const botWallSite = (url: string): string => {
   }
 };
 
-/**
- * What the owner is told when the agent hits something no amount of retrying clears.
- *
- * The runner's own sentence is written for the model - which tab stopped, which site is closed to
- * it, what not to try next - and none of that is readable at a glance on a phone. This is the other
- * audience: the one site that needs a person, and where to deal with it. It deliberately does not
- * say the work has stopped, because it has not: the wall holds one tab and one site, and the turn
- * carries on everywhere else.
- */
+/** Names the site and the affected conversation without exposing the challenge to the model. */
 export const takeoverNotice = (wall: BotWall): string =>
-  `${botWallSite(wall.url)} is showing a ${wall.vendor} check only you can clear. Take over the Computer pane - the rest of the task carries on.`;
+  `${botWallSite(wall.url)} is showing a ${wall.vendor} check only you can clear. Open this conversation’s browser to complete it. Other conversations keep running.`;
 
 /**
  * Marks what came from outside as having come from outside.

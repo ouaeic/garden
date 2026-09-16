@@ -95,6 +95,7 @@ export interface ProjectFileChange {
   merged: boolean;
   detail: string | null;
   diff: string | null;
+  lines?: { added: number; removed: number } | null;
 }
 export interface ProjectCheck extends ProjectCheckCommand {
   id: string;
@@ -139,6 +140,7 @@ export interface ProjectUpdate {
   path: string | null;
   changes: ProjectFileChange[];
   changeCount: number;
+  lineChanges?: { added: number; removed: number; unmeasuredFiles: number };
   nextChange: string | null;
   checks: ProjectCheck[];
   progress: { files: number; bytes: number; stage: string };

@@ -22,7 +22,11 @@ class Page extends EventEmitter {
   readonly opener = vi.fn(async (): Promise<Page | null> => null);
   readonly bringToFront = vi.fn(async () => {});
   readonly keyboard = { up: vi.fn(async () => {}) };
-  readonly mouse = { up: vi.fn(async () => {}) };
+  readonly mouse = {
+    up: vi.fn(async () => {}),
+    down: vi.fn(async () => {}),
+    move: vi.fn<(x: number, y: number) => Promise<void>>(async () => {})
+  };
   readonly close = vi.fn(async () => {
     this.closed = true;
     this.emit('close');
@@ -202,4 +206,97 @@ describe('live tab lifecycle', () => {
     );
     expect(states.at(-1)?.tabs.find((tab) => tab.tabId === id)?.pinned).toBe(true);
   });
+});
+
+it('keeps profiles, tabs, private input and control isolated between projects without starting sessions when listed', async () => {
+  const f = await setup();
+  expect(f.manager.sessions('unopened')).toBeNull();
+  const other = new Context();
+  const root = await mkdtemp(path.join(tmpdir(), 'garden-other-project-'));
+  driver.launchPersistentContext.mockResolvedValueOnce(other);
+  try {
+    await f.manager.ensure('other-project', root);
+    const launches = driver.launchPersistentContext.mock.calls;
+    expect(launches).toHaveLength(2);
+    expect(launches[0]![0]).not.toBe(launches[1]![0]);
+    await f.open();
+    expect(f.manager.sessions(workspaceId)!.tabs.length).toBeGreaterThan(1);
+    expect(f.manager.sessions('other-project')!.tabs).toHaveLength(1);
+    await f.manager.setHolder(workspaceId, f.root, 'secure_input');
+    expect(f.manager.sessions(workspaceId)).toMatchObject({ holder: 'secure_input', tabs: [] });
+    expect(f.manager.sessions('other-project')).toMatchObject({ holder: 'agent' });
+    const result = await f.manager.act(
+      'other-project',
+      root,
+      { type: 'new_tab', activate: false },
+      'agent'
+    );
+    expect(result).toHaveProperty('tabId');
+  } finally {
+    await f.manager.close('other-project');
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+it('requires owner control for drawing and releases the mouse after a failed stroke', async () => {
+  const f = await setup();
+  const gesture = {
+    points: [
+      { x: 5, y: 5 },
+      { x: 10, y: 20 },
+      { x: 40, y: 5 }
+    ]
+  };
+  await expect(f.manager.ownerStroke(workspaceId, f.root, gesture)).rejects.toThrow();
+  await f.manager.setHolder(workspaceId, f.root, 'user');
+  const mouse = f.context.all[0]!.mouse;
+  mouse.move.mockClear();
+  mouse.down.mockClear();
+  mouse.up.mockClear();
+  await f.manager.ownerStroke(workspaceId, f.root, gesture);
+  expect(mouse.down).toHaveBeenCalledOnce();
+  expect(mouse.move).toHaveBeenCalledTimes(3);
+  expect(mouse.up).toHaveBeenCalledOnce();
+  mouse.move.mockRejectedValueOnce(new Error('Page closed'));
+  await expect(f.manager.ownerStroke(workspaceId, f.root, gesture)).rejects.toThrow('Page closed');
+  expect(mouse.up).toHaveBeenCalledTimes(2);
+});
+
+it('keeps the human in control when the challenge has not cleared', async () => {
+  const f = await setup();
+  await f.manager.setHolder(workspaceId, f.root, 'user');
+  f.context.all[0]!.title.mockResolvedValue('Just a moment...');
+  await expect(f.manager.completeHandoff(workspaceId, f.root, 'tab-1')).rejects.toThrow(
+    'still shows'
+  );
+  expect(f.manager.sessions(workspaceId)?.holder).toBe('user');
+  f.context.all[0]!.title.mockResolvedValue('Application received');
+  await f.manager.completeHandoff(workspaceId, f.root, 'tab-1');
+  expect(f.manager.sessions(workspaceId)?.holder).toBe('agent');
+});
+
+it('requires explicit owner completion for an embedded widget and revokes that receipt when its response changes', async () => {
+  const f = await setup();
+  const page = f.context.all[0]!;
+  let token = 'synthetic-response-one';
+  page.frames.mockReturnValue([
+    { url: () => 'https://www.google.com/recaptcha/api2/anchor?k=fixture' }
+  ] as never);
+  page.evaluate.mockImplementation(async () => token as never);
+  await expect(f.manager.completeHandoff(workspaceId, f.root, 'tab-1')).rejects.toThrow(
+    'still shows'
+  );
+  await f.manager.setHolder(workspaceId, f.root, 'user');
+  await f.manager.completeHandoff(workspaceId, f.root, 'tab-1');
+  expect(f.manager.sessions(workspaceId)?.holder).toBe('agent');
+  await expect(f.manager.completeHandoff(workspaceId, f.root, 'tab-1')).resolves.toBeUndefined();
+  token = 'synthetic-response-two';
+  await expect(f.manager.completeHandoff(workspaceId, f.root, 'tab-1')).rejects.toThrow(
+    'still shows'
+  );
+  await f.manager.setHolder(workspaceId, f.root, 'user');
+  page.title.mockResolvedValue('Verify you are human');
+  await expect(f.manager.completeHandoff(workspaceId, f.root, 'tab-1')).rejects.toThrow(
+    'still shows'
+  );
 });

@@ -1,3 +1,4 @@
+import { registerProjectSessionRoutes } from './project-sessions.js';
 /**
  * The screen, the shell and the desktop, proxied to the workspace runner.
  *
@@ -21,6 +22,7 @@ import { registerProjectProcessRoutes } from './project-processes.js';
 
 export const registerRunnerProxyRoutes = (context: RouteContext): void => {
   registerProjectProcessRoutes(context);
+  registerProjectSessionRoutes(context);
   const { app, store, runner, config, idempotent } = context;
   app.post<{ Params: { workspaceId: string; tab: string } }>(
     '/v1/workspaces/:workspaceId/browser/tabs/:tab/retention',

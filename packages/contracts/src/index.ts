@@ -2384,3 +2384,5 @@ export * from './voice.js';
 export type * from './processes.js';
 export type * from './directories.js';
 export * from './project-updates.js';
+
+export * from './project-sessions.js';

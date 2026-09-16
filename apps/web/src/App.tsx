@@ -690,6 +690,11 @@ function WorkspaceApp() {
           {navigation.view === 'work' &&
             (navigation.projectId && !navigation.taskId ? (
               <ProjectSpace
+                onComputer={(id, surface, tabId) => {
+                  if (tabId) sessionStorage.setItem(`garden:open-tab:${id}`, tabId);
+                  setTool(surface);
+                  navigate('computer', id);
+                }}
                 key={navigation.projectId}
                 projectId={navigation.projectId}
                 revision={
@@ -707,6 +712,11 @@ function WorkspaceApp() {
               <Spinner label="Opening project…" />
             ) : task && taskWorkspace ? (
               <ProjectSpace
+                onComputer={(id, surface, tabId) => {
+                  if (tabId) sessionStorage.setItem(`garden:open-tab:${id}`, tabId);
+                  setTool(surface);
+                  navigate('computer', id);
+                }}
                 key={task.projectId}
                 projectId={task.projectId!}
                 taskId={task.id}

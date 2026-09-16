@@ -1,3 +1,5 @@
+import Fastify from 'fastify';
+import { registerQuestionRoutes } from './routes/questions.js';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
@@ -339,5 +341,73 @@ describe('confirmed continuation within existing task authority', () => {
       maxSpendUsd: 2
     });
     expect(f.resolveSpendCeiling).toHaveBeenCalledExactlyOnceWith(f.user.id, 2);
+  });
+});
+
+describe('durable question replies', () => {
+  it('binds a reply to the current question across duplicate device requests without adding budget', async () => {
+    const f = await fixture('awaiting_user');
+    const question = await store.appendTaskEvent({
+      taskId: f.task.id,
+      kind: 'question_asked',
+      summary: 'Choose a direction',
+      payloadCiphertext: encryptJson(
+        { question: 'Choose a direction' },
+        key,
+        `task-event:${f.task.id}`
+      )
+    });
+    await database.query('UPDATE tasks SET agent_state_ciphertext=$2::jsonb WHERE id=$1', [
+      f.task.id,
+      JSON.stringify(
+        encryptJson(
+          { messages: [], question: { question: 'Choose a direction', askedAtStep: 2 } },
+          key,
+          `task-state:${f.task.id}`
+        )
+      )
+    ]);
+    const app = Fastify();
+    app.decorateRequest('user', null);
+    app.addHook('onRequest', async (request) => {
+      request.user = f.user;
+    });
+    registerQuestionRoutes({ ...f.context, app });
+    try {
+      const payload = { questionId: question.id, prompt: 'Use the public dataset' };
+      const first = await app.inject({
+        method: 'POST',
+        url: `/v1/tasks/${f.task.id}/answer`,
+        payload
+      });
+      expect(first.statusCode).toBe(200);
+      const retry = await app.inject({
+        method: 'POST',
+        url: `/v1/tasks/${f.task.id}/answer`,
+        payload
+      });
+      expect(retry.statusCode).toBe(200);
+      const events = await store.listTaskEvents(f.task.id, 0, {
+        kind: 'queued_message',
+        limit: 10
+      });
+      expect(events).toHaveLength(1);
+      expect((await store.getNextQueuedTaskMessage(f.task.id))?.maxComputeCredits).toBe(0);
+      expect(f.resolveSpendCeiling).not.toHaveBeenCalled();
+      const stale = await app.inject({
+        method: 'POST',
+        url: `/v1/tasks/${f.task.id}/answer`,
+        payload: { ...payload, questionId: randomUUID() }
+      });
+      expect(stale.statusCode).toBe(409);
+      const different = await app.inject({
+        method: 'POST',
+        url: `/v1/tasks/${f.task.id}/answer`,
+        payload: { ...payload, prompt: 'Different answer' }
+      });
+      expect(different.statusCode).toBe(409);
+    } finally {
+      await app.close();
+    }
   });
 });

@@ -83,6 +83,7 @@ const FIELDS: ReadonlyArray<keyof AgentState> = [
   'checkpoint',
   'pending',
   'question',
+  'browserHandoff',
   'questionsAsked',
   'inFlight',
   'acceptance',
@@ -241,6 +242,7 @@ const FULL: Required<AgentState> = {
     toolCall: { id: 'call-3', name: 'http_request', arguments: { url: 'https://example.com' } },
     handoffOnly: true
   },
+  browserHandoff: { vendor: 'test', url: 'https://example.com', reason: 'verification' },
   question: { question: 'which database should this point at?', askedAtStep: 12 },
   questionsAsked: 1,
   inFlight: { toolCallId: 'call-4', tool: 'browser_action', startedAt: '2026-08-25T09:00:00.000Z' },
@@ -366,6 +368,7 @@ describe('what a new turn inherits', () => {
       'frameLossNoted',
       'pending',
       'question',
+      'browserHandoff',
       'continuationMark',
       'reasoningFloor',
       'compactedAtStep',

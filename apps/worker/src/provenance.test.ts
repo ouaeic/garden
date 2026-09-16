@@ -71,7 +71,7 @@ describe('a challenge the agent cannot pass', () => {
     // The runner's own sentence is written for the model - three lines about what is still open to
     // it - and a lock screen shows one.
     expect(takeoverNotice(botWallFromRunner(wall)!)).toBe(
-      'careers.example.com is showing a Cloudflare Turnstile check only you can clear. Take over the Computer pane - the rest of the task carries on.'
+      'careers.example.com is showing a Cloudflare Turnstile check only you can clear. Open this conversation’s browser to complete it. Other conversations keep running.'
     );
     expect(takeoverNotice({ vendor: 'hCaptcha', url: 'not a url', reason: '' })).toContain(
       'not a url'

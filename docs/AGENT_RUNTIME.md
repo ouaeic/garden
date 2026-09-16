@@ -420,18 +420,29 @@ When a site raises an anti-bot challenge, the stop is scoped to what the challen
 that tab, and that site. The runner refuses every further agent action on the stopped tab and every
 navigation to that host for thirty minutes — so the retry the challenge is asking for cannot be made
 by opening the same page in a fresh tab — and leaves every other tab and every other site working.
-It is a hard stop in the runner, not advice to the model: no reload, no re-navigation, no touching
-the widget. The message the model receives says what is still open to it and tells it to carry on
-with the rest of the task elsewhere, because a stop that read as "the browser is gone" was what
-turned one interstitial into a failed task.
+It is a hard stop in the runner: the agent cannot reload, re-navigate or touch the widget.
+The worker records a durable intervention and parks the affected conversation, releasing its lease.
+Other conversations can keep working. The owner sees the reason and exact tab in the conversation
+and computer pane. Taking control opens that tab; Done and continue checks the page and resumes
+the matching question without replaying the blocked action. A challenge still visible in the page
+keeps the handoff pending. An embedded response is accepted only after explicit owner completion,
+with an expiring receipt bound to the page, response digest and challenge frames; page content
+alone cannot grant it. Owner actions are never gated by a wall. `parallel_web_read` uses its own
+isolated browser.
 
-The browser is not taken away from the agent, and the owner is not made to fix it. They are told:
-the pane names the vendor and the host, and the agent raises a takeover notification so a phone
-learns about it too. Taking control is one button, and it brings the stopped tab to the front;
-handing the browser back clears every wall in the session, because a person having been there is the
-best evidence there is that the page is passable. Owner actions are never gated by a wall.
-`parallel_web_read` is unaffected either way — it opens its own isolated browser rather than
-steering the shared session.
+Direction answers are bound to their question event, so a lost acknowledgement can be retried
+without creating another message or allocating another budget. Stale or conflicting answers are
+rejected. Ordinary answer drafts use the encrypted device draft key; private computer input is
+never saved as a draft or added to the conversation. Recognized signing controls request owner
+input, including in Autonomous mode. The remote screen supports owner pointer strokes for
+signature pads and drag interactions. Done and continue waits for acknowledged input and requires
+private input to have ended; the agent observes the resulting page before acting again.
+
+The project overview lists existing browser tabs and desktop windows by conversation without
+starting a computer session. Execution workspaces have separate browser profiles and desktops;
+shared legacy workspaces are excluded from this project-private listing. Captured project updates
+show added and removed text lines against their conversation baseline, marking binary or oversized
+files as unmeasured. These counts describe the captured proposal, not later working-file edits.
 
 Linux GUI programs run in Xvfb/Openbox with a private D-Bus and AT-SPI accessibility bus. Semantic
 actions are preferred; coordinate actions remain approval-sensitive. Passwords, CAPTCHAs, payment

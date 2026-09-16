@@ -1972,6 +1972,7 @@ export class TaskStore {
    * the read side has to either lie about or refuse a whole page over.
    */
   async appendTaskEvent(input: {
+    id?: string;
     taskId: string;
     kind: string;
     summary: string;
@@ -1995,7 +1996,7 @@ export class TaskStore {
          FROM task_events WHERE task_id = $2
          RETURNING *`,
         [
-          randomUUID(),
+          input.id ?? randomUUID(),
           input.taskId,
           kind,
           input.summary,

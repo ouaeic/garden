@@ -153,6 +153,7 @@ interface StoreProbe {
 }
 
 interface AgentStateShape {
+  question?: { handoff?: { kind: string; tabId?: string } };
   messages: Array<{ role: string; content: string; toolCallId?: string }>;
   inFlight?: { toolCallId: string; tool: string; startedAt: string };
   step: number;
@@ -3053,7 +3054,7 @@ describe('finding things on the internet', () => {
     ).not.toContain('Read a URL on its own');
   });
 
-  it('tells the owner about a challenge once per site, and keeps the wall as data', async () => {
+  it('parks on a durable challenge handoff before further model calls', async () => {
     // The runner detects the wall and scopes it, but it has no database identity: nothing it can do
     // reaches the owner's phone. A wall hit three times used to reach it zero times.
     const walls = [
@@ -3102,7 +3103,12 @@ describe('finding things on the internet', () => {
       .catch(() => undefined);
 
     const failures = probe.events.filter((entry) => entry.kind === 'error');
-    expect(failures).toHaveLength(3);
+    expect(failures).toHaveLength(1);
+    expect(log.modelRequests).toHaveLength(1);
+    expect(decryptCheckpoints(probe.checkpoints).at(-1)?.question).toMatchObject({
+      handoff: { kind: 'challenge', tabId: 'tab-2' }
+    });
+    expect(probe.events.filter((entry) => entry.kind === 'question_asked')).toHaveLength(1);
     // The pane renders the wall from the event, so it has to survive as fields rather than prose -
     // every field it reads, including the one that decides whether the banner says the challenge
     // may clear on its own.
@@ -3116,18 +3122,8 @@ describe('finding things on the internet', () => {
         tabId: 'tab-2'
       }
     });
-    expect(probe.notifications).toEqual([
-      {
-        kind: 'takeover_needed',
-        message:
-          'html.duckduckgo.com is showing a Cloudflare Turnstile check only you can clear. Take over the Computer pane - the rest of the task carries on.'
-      },
-      {
-        kind: 'takeover_needed',
-        message:
-          'careers.example.com is showing a Cloudflare Turnstile check only you can clear. Take over the Computer pane - the rest of the task carries on.'
-      }
-    ]);
+    expect(probe.notifications).toHaveLength(1);
+    expect(probe.notifications[0]).toMatchObject({ kind: 'takeover_needed' });
     // And the model is told what is still open to it, in the runner's own words.
     const messages = decryptCheckpoints(probe.checkpoints).at(-1)?.messages ?? [];
     expect(messages.find((message) => message.toolCallId === 'call-1')?.content).toContain(

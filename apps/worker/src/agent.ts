@@ -1269,6 +1269,7 @@ export class AgentWorker {
     state: AgentState,
     wall: BotWall
   ): Promise<void> {
+    state.browserHandoff = wall;
     const site = botWallSite(wall.url);
     const raised = state.takeoversRaised ?? [];
     if (raised.includes(site)) return;
@@ -2183,6 +2184,38 @@ export class AgentWorker {
       )
         return;
       sealUnansweredToolCalls(state.messages, 'the step ended before this call ran');
+      if (state.browserHandoff) {
+        const wall = state.browserHandoff;
+        delete state.browserHandoff;
+        const question = `Complete the browser verification on ${botWallSite(wall.url)}`;
+        const handoff = {
+          kind: 'challenge' as const,
+          surface: 'browser' as const,
+          url: wall.url,
+          ...(wall.tabId ? { tabId: wall.tabId } : {})
+        };
+        state.question = { question, askedAtStep: state.step, handoff };
+        state.messages.push({
+          role: 'assistant',
+          content:
+            'The browser needs human verification. Work is paused until the owner completes the handoff. After their reply, observe the page afresh and continue; do not repeat their action.'
+        });
+        await event(this.store, task, key, 'question_asked', question, {
+          question,
+          why: 'This site requires a person. Open the browser, complete its verification, then choose Done and continue.',
+          handoff
+        });
+        await this.store.updateTask({
+          id: task.id,
+          workerId: this.config.WORKER_ID,
+          status: 'awaiting_user',
+          actualComputeCredits: state.credits,
+          agentStateCiphertext: encryptJson(state, key, `task-state:${task.id}`),
+          clearLease: true
+        });
+        return;
+      }
+
       /*
        * The three questions asked at the end of every step: did anything happen in it, did any of
        * it fail the way it failed last time, and is it still doing anything different from what it

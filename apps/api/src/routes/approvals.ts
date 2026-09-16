@@ -100,6 +100,12 @@ export const registerApprovalRoutes = (context: RouteContext): void => {
             'approval_unavailable',
             'Approval is missing, resolved, or expired'
           );
+        if (
+          decision === 'approve' &&
+          approval.action === 'secure_input_handoff' &&
+          approval.status === 'approved'
+        )
+          return { ok: true };
         const note = approvalDenialMessage({
           tool: textValue(approval.action),
           ...('note' in input && typeof input.note === 'string' ? { note: input.note } : {})
@@ -173,6 +179,59 @@ export const registerApprovalRoutes = (context: RouteContext): void => {
             promptCiphertext: encryptJson({ prompt: note }, key, `task-message:${task.id}`),
             queuedEventCiphertext: encryptJson({ markdown: note }, key, `task-event:${task.id}`)
           };
+        }
+        if (
+          decision === 'approve' &&
+          approval.action === 'secure_input_handoff' &&
+          approval.status === 'pending'
+        ) {
+          if (request.apiToken)
+            throw new AthanorError(
+              'session_required',
+              'Complete the handoff from a signed-in device',
+              403
+            );
+          const task = await store.getTask(user.id, String(approval.taskId));
+          const workspace = task ? await store.getWorkspace(user.id, task.workspaceId) : null;
+          if (!task || !workspace?.wrappedKey)
+            throw new AthanorError('approval_unavailable', 'Handoff workspace unavailable', 409);
+          const preview = decryptJson<{ tool: string }>(
+            approval.previewCiphertext as Parameters<typeof decryptJson>[0],
+            unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id)
+          );
+          const surface = preview.tool === 'desktop_action' ? 'desktop' : 'browser';
+          const sessions = await context.runner.request<{
+            browser: { holder: string } | null;
+            desktop: { holder: string } | null;
+          }>({
+            workspaceId: workspace.id,
+            userId: user.id,
+            role: 'user',
+            scopes: ['browser.read', 'desktop.read'],
+            path: `/v1/workspaces/${workspace.id}/computer-sessions`
+          });
+          if (sessions[surface]?.holder === 'secure_input')
+            throw new AthanorError(
+              'private_input_active',
+              'End private input before continuing',
+              409
+            );
+          if (!sessions[surface])
+            throw new AthanorError(
+              'handoff_unavailable',
+              'Open the computer and complete the requested action first',
+              409
+            );
+          await context.runner.request({
+            workspaceId: workspace.id,
+            userId: user.id,
+            role: 'user',
+            scopes: [`${surface}.takeover`],
+            path: `/v1/workspaces/${workspace.id}/${surface}/holder`,
+            method: 'POST',
+            body: JSON.stringify({ holder: 'agent' }),
+            contentType: 'application/json'
+          });
         }
         const settlement: [
           Parameters<typeof store.resolveApproval>[3]?,

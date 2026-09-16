@@ -1,5 +1,6 @@
+import { signatureControl } from './human-input.js';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import type {
   Browser,
@@ -14,6 +15,7 @@ import type {
   Response as PageResponse
 } from 'playwright-core';
 import type {
+  OwnerStroke,
   BrowserAction,
   BrowserPrimitiveAction,
   ParallelWebReadResult,
@@ -212,6 +214,8 @@ interface ElementPolicyInput {
 }
 
 export interface BrowserActionPreflight {
+  handoffKind?: 'signature';
+  tabId?: string;
   consequential: boolean;
   sensitiveInput: boolean;
   preview: string;
@@ -1420,6 +1424,17 @@ export const classifyBrowserAction = (
   action: BrowserAction,
   element?: ElementPolicyInput
 ): BrowserActionPreflight => {
+  if (
+    typeof element?.name === 'string' &&
+    signatureControl(element.name) &&
+    ['click', 'double_click', 'click_at', 'type', 'press'].includes(action.type)
+  )
+    return {
+      consequential: true,
+      sensitiveInput: false,
+      handoffKind: 'signature',
+      preview: 'Review and sign this document yourself in the browser.'
+    };
   if (action.type === 'click_at') {
     return {
       consequential: true,
@@ -1505,6 +1520,17 @@ export const classifyBrowserAction = (
 export const combineBatchPreflight = (
   steps: Array<{ index: number; preflight: BrowserActionPreflight }>
 ): BrowserActionPreflight => ({
+  ...(() => {
+    const handoff = steps.find(
+      (step) => step.preflight.handoffKind || step.preflight.sensitiveInput
+    )?.preflight;
+    return handoff
+      ? {
+          ...(handoff.handoffKind ? { handoffKind: handoff.handoffKind } : {}),
+          ...(handoff.tabId ? { tabId: handoff.tabId } : {})
+        }
+      : {};
+  })(),
   consequential: steps.some((step) => step.preflight.consequential),
   sensitiveInput: steps.some((step) => step.preflight.sensitiveInput),
   destinations: [...new Set(steps.flatMap((step) => step.preflight.destinations ?? []))],
@@ -1753,6 +1779,10 @@ export const releaseBrowserInput = async (page: Page): Promise<void> => {
 
 export class BrowserManager {
   readonly #sessions = new Map<string, Session>();
+  readonly #humanReceipts = new WeakMap<
+    Page,
+    { url: string; digest: string; frames: string[]; expires: number }
+  >();
   readonly #starting = new Map<string, Promise<Session>>();
   readonly #closing = new Map<string, Promise<void>>();
   readonly #failedStarts = new Map<string, () => Promise<void>>();
@@ -1846,6 +1876,109 @@ export class BrowserManager {
     }
     if (closed.length) this.#notifyStreamState(session);
     return closed;
+  }
+
+  sessions(workspaceId: string) {
+    const session = this.#sessions.get(workspaceId);
+    return session
+      ? {
+          holder: session.control.holder,
+          tabs: session.control.holder === 'secure_input' ? [] : this.#tabStates(session)
+        }
+      : null;
+  }
+
+  async ownerStroke(workspaceId: string, root: string, stroke: OwnerStroke): Promise<void> {
+    const session = await this.ensure(workspaceId, root);
+    await this.#controlOf(session).submit('user', async (signal) => {
+      if (session.control.holder === 'secure_input')
+        throw new Error('End private input before drawing');
+      const page = resolveTab(session, stroke.tabId);
+      if (page !== session.page)
+        throw new Error('The active tab changed. Draw again on the current page.');
+      try {
+        const first = stroke.points[0]!;
+        await page.mouse.move(first.x, first.y);
+        await page.mouse.down();
+        for (const point of stroke.points.slice(1)) {
+          signal.throwIfAborted();
+          await page.mouse.move(point.x, point.y);
+        }
+      } finally {
+        await page.mouse.up({ button: 'left' }).catch(() => undefined);
+      }
+    });
+  }
+
+  async #challengeDigest(page: Page): Promise<string | null> {
+    const value: unknown = await page
+      .evaluate(() =>
+        Array.from(
+          document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+            '[name="g-recaptcha-response"],[name="h-captcha-response"],[name="cf-turnstile-response"]'
+          )
+        )
+          .map((field) => field.value)
+          .filter(Boolean)
+          .join('\n')
+      )
+      .catch(() => null);
+    return typeof value === 'string' && value.length > 0 && value.length <= 65536
+      ? createHash('sha256').update(value).digest('hex')
+      : null;
+  }
+
+  async #unacknowledgedFrames(page: Page): Promise<string[]> {
+    const frames = page.frames().map((frame) => frame.url());
+    const receipt = this.#humanReceipts.get(page);
+    if (!receipt) return frames;
+    if (
+      receipt.url !== page.url() ||
+      receipt.expires < Date.now() ||
+      receipt.digest !== (await this.#challengeDigest(page))
+    ) {
+      this.#humanReceipts.delete(page);
+      return frames;
+    }
+    return frames.filter((frame) => !receipt.frames.includes(frame));
+  }
+
+  async completeHandoff(workspaceId: string, root: string, tabId?: string): Promise<void> {
+    const session = await this.ensure(workspaceId, root);
+    if (session.control.holder === 'secure_input')
+      throw new Error('End private input before continuing');
+    tabId ??= session.walls.latest()?.tabId ?? undefined;
+    if (tabId) {
+      const page = resolveTab(session, tabId);
+      // Only an explicit owner completion can issue this receipt. Page content alone cannot.
+      const digest = session.control.holder === 'user' ? await this.#challengeDigest(page) : null;
+      const frames = page.frames().map((frame) => frame.url());
+      const completedFrames = digest
+        ? frames.filter((frame) => BOT_WALL_FRAMES.some((rule) => rule.pattern.test(frame)))
+        : [];
+      const wall = detectBotWall({
+        url: page.url(),
+        title: await page.title(),
+        text: await page.locator('body').innerText({ timeout: 5000 }),
+        frameUrls: (await this.#unacknowledgedFrames(page)).filter(
+          (frame) => !completedFrames.includes(frame)
+        )
+      });
+      if (wall)
+        throw new Error(
+          'The page still shows a human verification challenge. Complete it before continuing.'
+        );
+      if (digest && completedFrames.length)
+        this.#humanReceipts.set(page, {
+          url: page.url(),
+          digest,
+          frames: completedFrames,
+          expires: Date.now() + 120000
+        });
+      const previous = session.walls.standing(tabId);
+      if (previous) session.walls.clear(tabId, previous.url);
+    }
+    await this.setHolder(workspaceId, root, 'agent');
   }
 
   async sweepTabs(workspaceId: string): Promise<string[]> {
@@ -2405,7 +2538,7 @@ export class BrowserManager {
         url: page.url(),
         title,
         text,
-        frameUrls: page.frames().map((frame) => frame.url())
+        frameUrls: await this.#unacknowledgedFrames(page)
       });
       if (detected) wall = this.#raiseWall(session, page, detected);
     }
@@ -2573,7 +2706,7 @@ export class BrowserManager {
         .locator('body')
         .innerText({ timeout: 2_000 })
         .catch(() => ''),
-      frameUrls: page.frames().map((frame) => frame.url())
+      frameUrls: await this.#unacknowledgedFrames(page)
     });
     if (current) return session.walls.raise(tabId, current);
     session.walls.clear(tabId, standing.url);
@@ -2740,7 +2873,7 @@ export class BrowserManager {
           .locator('body')
           .innerText({ timeout: 5_000 })
           .catch(() => ''),
-        frameUrls: page.frames().map((frame) => frame.url()),
+        frameUrls: await this.#unacknowledgedFrames(page),
         status: response?.status() ?? null,
         headers: response?.headers() ?? {}
       });
@@ -2786,7 +2919,7 @@ export class BrowserManager {
           .locator('body')
           .innerText({ timeout: 5_000 })
           .catch(() => ''),
-        frameUrls: page.frames().map((frame) => frame.url()),
+        frameUrls: await this.#unacknowledgedFrames(page),
         status: response?.status() ?? null,
         headers: response?.headers() ?? {}
       });
@@ -3089,24 +3222,44 @@ export class BrowserManager {
     action: BrowserAction | BrowserPrimitiveAction,
     options: { timeout: number; tolerant: boolean } = { timeout: 20_000, tolerant: false }
   ): Promise<BrowserActionPreflight> {
-    if (!ELEMENT_POLICY_ACTIONS.includes(action.type)) return classifyBrowserAction(action);
+    if (
+      !ELEMENT_POLICY_ACTIONS.includes(action.type) &&
+      action.type !== 'click_at' &&
+      action.type !== 'press'
+    )
+      return classifyBrowserAction(action);
     const targeted = action as Extract<
       BrowserAction,
       { type: 'click' | 'double_click' | 'type' | 'select_option' | 'upload' }
     >;
     const page = resolveTab(session, targeted.tabId);
-    const target = await resolveBrowserTarget(page, targeted.selector);
+    const target =
+      action.type === 'click_at' || action.type === 'press'
+        ? page.locator('html')
+        : await resolveBrowserTarget(page, targeted.selector);
     const read = target.evaluate(
-      (target) => {
+      (root, input) => {
+        const target =
+          input.type === 'click_at'
+            ? (root.ownerDocument
+                .elementFromPoint(input.x, input.y)
+                ?.closest('button,input,textarea,[role="button"],canvas') ?? root)
+            : input.type === 'press'
+              ? (root.ownerDocument.activeElement ?? root)
+              : root;
         const control = target as HTMLInputElement | HTMLButtonElement;
         const form = target.closest('form');
         return {
           tag: target.tagName.toLowerCase(),
           type: String(control.type ?? target.getAttribute('type') ?? '').toLowerCase(),
           name:
-            target.getAttribute('aria-label') ??
-            target.getAttribute('placeholder') ??
-            (target as HTMLElement).innerText?.trim().slice(0, 160) ??
+            target.getAttribute('aria-label') ||
+            Array.from((control as HTMLInputElement).labels ?? [])
+              .map((label) => label.textContent ?? '')
+              .join(' ')
+              .trim() ||
+            target.getAttribute('placeholder') ||
+            (target as HTMLElement).innerText?.trim().slice(0, 160) ||
             '',
           autocomplete: target.getAttribute('autocomplete') ?? '',
           formAction: form?.action ?? '',
@@ -3114,7 +3267,9 @@ export class BrowserManager {
           pageUrl: target.ownerDocument.URL
         };
       },
-      undefined,
+      action.type === 'click_at'
+        ? { type: action.type, x: action.x, y: action.y }
+        : { type: action.type, x: 0, y: 0 },
       { timeout: options.timeout }
     );
     // A control that has not appeared yet is an answer only inside a batch, where the step is
@@ -3136,6 +3291,7 @@ export class BrowserManager {
     ];
     return {
       ...policy,
+      ...(tabIdFor(session, page) ? { tabId: tabIdFor(session, page)! } : {}),
       destinations,
       preview:
         action.type === 'upload' && destinations.length
@@ -3146,6 +3302,8 @@ export class BrowserManager {
 
   /** The gate every agent action passes, whether it arrived on its own or inside a batch. */
   #enforce(policy: BrowserActionPreflight, consequentialApproved: boolean, where: string): void {
+    if (policy.handoffKind)
+      throw new Error('A personal signature requires the owner to take control');
     if (policy.sensitiveInput)
       throw new Error(`Secure input takeover is required for this browser field${where}`);
     if (policy.consequential && !consequentialApproved)
@@ -3649,7 +3807,7 @@ export class BrowserManager {
     const wall = detectBotWall({
       url: page.url(),
       title: await page.title().catch(() => ''),
-      frameUrls: page.frames().map((frame) => frame.url()),
+      frameUrls: await this.#unacknowledgedFrames(page),
       status: response?.status() ?? null,
       headers: response?.headers() ?? {}
     });

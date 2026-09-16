@@ -7,7 +7,8 @@ import type { RouteContext } from './http/server-context.js';
 export async function replyToCodingMission(
   context: RouteContext,
   task: TaskRecord,
-  value: unknown
+  value: unknown,
+  messageId?: string
 ) {
   const { prompt } = z
     .object({ prompt: z.string().trim().min(1).max(200_000) })
@@ -50,7 +51,9 @@ export async function replyToCodingMission(
     );
   state.messages.push({ role: 'user', content: prompt });
   delete state.question;
+  state.questionsAsked = 0;
   const saved = await context.store.replyToCodingMission({
+    ...(messageId ? { messageId } : {}),
     userId: task.userId,
     taskId: task.id,
     expectedState: task.agentStateCiphertext,

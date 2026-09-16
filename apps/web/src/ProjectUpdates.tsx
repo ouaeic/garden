@@ -309,6 +309,14 @@ export default function ProjectUpdates({
                     {update.changeCount} changed {update.changeCount === 1 ? 'file' : 'files'} ·{' '}
                     {stamp(update.updatedAt)}
                   </small>
+                  {update.lineChanges && (
+                    <small className="project-line-changes">
+                      <span>+{update.lineChanges.added.toLocaleString()}</span>{' '}
+                      <span>−{update.lineChanges.removed.toLocaleString()}</span> lines
+                      {update.lineChanges.unmeasuredFiles > 0 &&
+                        ` · ${update.lineChanges.unmeasuredFiles} files unmeasured`}
+                    </small>
+                  )}
                 </span>
                 <span>
                   {update.state === 'preparing'
@@ -666,12 +674,18 @@ export default function ProjectUpdates({
             )}
             <details>
               <summary>Changed files ({selected.changeCount})</summary>
+              <p className="muted">
+                Line counts compare each captured proposal with its conversation’s baseline. Binary
+                and oversized files are reported as unmeasured. Edits made after capture belong to
+                the next update.
+              </p>
               <div className="project-change-list">
                 {selected.changes.map((change) => (
                   <details key={change.path}>
                     <summary>
                       {change.conflict ? 'Conflict' : change.merged ? 'Combined' : change.kind} ·{' '}
                       {change.path}
+                      {change.lines && ` · +${change.lines.added} −${change.lines.removed}`}
                     </summary>
                     {change.detail && <p>{change.detail}</p>}
                     {change.diff ? (

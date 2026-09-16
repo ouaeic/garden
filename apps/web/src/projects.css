@@ -344,3 +344,32 @@
   display: block;
   color: var(--muted);
 }
+
+.project-session {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-block: 0.75rem;
+  min-width: 0;
+}
+.project-session .button {
+  justify-content: space-between;
+  text-align: left;
+  gap: 1rem;
+}
+.project-session .button > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.project-session small {
+  display: block;
+  opacity: 0.65;
+  font-weight: normal;
+  font-size: 0.75rem;
+}
+.project-line-changes span:first-child {
+  color: var(--success, #297748);
+}
+.project-line-changes span:nth-child(2) {
+  color: var(--danger, #ad4545);
+}

@@ -104,6 +104,33 @@ describe('the approval floor is evaluated once per call', () => {
     }
   );
 
+  it.each(['browser_action', 'desktop_action'])(
+    'hands a recognized signature to the owner in Autonomous for %s',
+    async (name) => {
+      const deps = { ...countingFloor().deps };
+      deps.runner = {
+        call: async () => ({
+          consequential: true,
+          sensitiveInput: false,
+          handoffKind: 'signature',
+          tabId: 'signing-tab',
+          preview: 'Sign employment agreement'
+        })
+      } as unknown as AgentRunnerClient;
+      const result = await approvalForCallOnce(
+        deps,
+        createApprovalFloorMemo(),
+        { ...task, securityMode: 'autonomous' },
+        call('signature', name, { action: 'click', selector: '#sign' })
+      );
+      expect(result).toMatchObject({
+        handoffOnly: true,
+        handoff: { kind: 'signature', tabId: 'signing-tab' },
+        action: 'Your signature is needed'
+      });
+    }
+  );
+
   it('does not let Autonomous erase a provenance requirement', async () => {
     const deps = { ...countingFloor().deps };
     deps.runner = {

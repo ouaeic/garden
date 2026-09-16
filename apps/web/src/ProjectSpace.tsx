@@ -10,6 +10,7 @@ const ProjectUpdates = lazy(() => import('./ProjectUpdates'));
 const ProjectNotes = lazy(() => import('./ProjectNotes'));
 const ProcessPanel = lazy(() => import('./ProcessPanel'));
 const DirectoryPanel = lazy(() => import('./DirectoryPanel'));
+const ProjectSessions = lazy(() => import('./ProjectSessions'));
 const ProjectModels = lazy(() => import('./ProjectModels'));
 const TaskOutputs = lazy(() =>
   import('./TaskCanvas').then((module) => ({ default: module.TaskOutputs }))
@@ -69,7 +70,8 @@ export default function ProjectSpace({
   onOverview,
   onTask,
   onNewConversation,
-  onRefresh
+  onRefresh,
+  onComputer
 }: {
   projectId: string;
   taskId?: string;
@@ -81,6 +83,7 @@ export default function ProjectSpace({
   onTask: (id: string) => void;
   onNewConversation: (project: Project, source?: ConversationSource) => void;
   onRefresh: () => void;
+  onComputer: (taskId: string, surface: 'browser' | 'desktop', tabId?: string) => void;
 }) {
   const [project, setProject] = useState<Project | null>(null),
     [tasks, setTasks] = useState<Task[]>([]),
@@ -359,6 +362,7 @@ export default function ProjectSpace({
           )}
           {
             <Suspense fallback={<Spinner />}>
+              <ProjectSessions projectId={project.id} onOpen={onComputer} />
               <ProcessPanel workspaceId={project.workspaceId} projectId={project.id} />
               <DirectoryPanel projectId={project.id} />
             </Suspense>

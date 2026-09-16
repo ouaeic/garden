@@ -352,17 +352,13 @@ export interface AgentState {
     uncovered?: readonly string[];
   };
   pending?: { approvalId: string; toolCall: ModelToolCall; handoffOnly?: boolean };
-  /**
-   * The question this turn is parked on, and how many it has asked.
-   *
-   * Persisted beside `pending` and for the same reasons. The park is durable - the task is written
-   * `awaiting_user` with its lease cleared, exactly as an approval does - so the question has to
-   * survive being picked up by a different worker, and the count has to survive it too or the bound
-   * is one an owner's answer resets for free. `question` is deliberately not the whole tool call:
-   * the call is answered in the window before the park, so nothing is left to re-run on resume, and
-   * what is needed back is only the sentence to put beside the owner's reply.
-   */
-  question?: { question: string; askedAtStep: number };
+  /** The pending human question or browser handoff survives worker restarts. */
+  browserHandoff?: { vendor: string; url: string; reason: string; tabId?: string | null };
+  question?: {
+    question: string;
+    askedAtStep: number;
+    handoff?: { kind: 'challenge'; surface: 'browser'; tabId?: string; url: string };
+  };
   questionsAsked?: number;
   /**
    * The tool call this worker had started but not yet recorded a result for. Written durably before

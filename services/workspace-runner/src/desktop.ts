@@ -1,3 +1,4 @@
+import { signatureControl } from './human-input.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { captureSpawnFailure, spawnFailureMessage } from './spawn-guard.js';
 import { chromiumDriver } from './playwright.js';
@@ -5,7 +6,12 @@ import { existsSync } from 'node:fs';
 import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
-import type { DesktopAction, DesktopHolder, DesktopLaunchRequest } from '@athanor/contracts';
+import type {
+  OwnerStroke,
+  DesktopAction,
+  DesktopHolder,
+  DesktopLaunchRequest
+} from '@athanor/contracts';
 import {
   DISPLAY_PROTOCOL,
   DisplayEncoder,
@@ -176,6 +182,8 @@ export const selectDesktopNodes = (
 };
 
 export interface DesktopActionPreflight {
+  handoffKind?: 'signature';
+  tabId?: string;
   consequential: boolean;
   sensitiveInput: boolean;
   preview: string;
@@ -694,6 +702,17 @@ export const classifyDesktopAction = (
   action: DesktopAction,
   node?: DesktopNode
 ): DesktopActionPreflight => {
+  if (
+    node &&
+    signatureControl(node.name) &&
+    ['invoke', 'set_text', 'text_input', 'click_at'].includes(action.type)
+  )
+    return {
+      consequential: true,
+      sensitiveInput: false,
+      handoffKind: 'signature',
+      preview: 'Review and sign this document yourself on the desktop.'
+    };
   // Looking closer is a read. It moves nothing, types nothing and cannot be the thing that goes
   // wrong, so making it ask would be the ceremony that stopped the pixel path being usable.
   if (action.type === 'zoom')
@@ -826,6 +845,54 @@ export class DesktopManager {
 
   get configured(): boolean {
     return Boolean(this.bridgeExecutable && this.sessionExecutable);
+  }
+
+  async sessions(workspaceId: string) {
+    const session = this.#sessions.get(workspaceId);
+    if (!session) return null;
+    const privateInput = session.control.holder === 'secure_input';
+    return {
+      holder: session.control.holder,
+      activeApplication: privateInput ? '' : session.activeApplication,
+      windows: privateInput ? [] : await this.#visibleWindows(session)
+    };
+  }
+
+  async ownerStroke(workspaceId: string, root: string, stroke: OwnerStroke): Promise<void> {
+    const session = await this.ensure(workspaceId, root);
+    await session.control.submit('user', async (signal) => {
+      if (session.control.holder === 'secure_input')
+        throw new Error('End private input before drawing');
+      if (stroke.generation !== session.control.generation)
+        throw new Error('The desktop changed. Draw again on the current screen.');
+      const points = stroke.points.map((p) =>
+        imageToDisplayPoint(p, session.geometry, session.geometry)
+      );
+      const first = points[0]!;
+      const args = [
+        'mousemove',
+        '--sync',
+        String(Math.round(first.x)),
+        String(Math.round(first.y)),
+        'mousedown',
+        '1'
+      ];
+      for (const point of points.slice(1))
+        args.push('mousemove', '--sync', String(Math.round(point.x)), String(Math.round(point.y)));
+      args.push('mouseup', '1');
+      try {
+        await this.#run(session, '/usr/bin/xdotool', args, {
+          env: session.env,
+          timeoutMs: 15000,
+          signal
+        });
+      } finally {
+        await this.#run(session, '/usr/bin/xdotool', ['mouseup', '1'], {
+          env: session.env,
+          timeoutMs: 2000
+        }).catch(() => undefined);
+      }
+    });
   }
 
   hasSubscribers(workspaceId: string): boolean {
@@ -1623,6 +1690,8 @@ export class DesktopManager {
     session.control.authorize(actor, expected);
     if (actor === 'agent') {
       const policy = await this.#classify(session, action);
+      if (policy.handoffKind)
+        throw new Error('A personal signature requires the owner to take control');
       if (policy.sensitiveInput) throw new Error('Secure desktop input takeover is required');
       if (policy.consequential && !consequentialApproved)
         throw new Error('A desktop consequential-action approval capability is required');

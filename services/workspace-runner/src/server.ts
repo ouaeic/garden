@@ -1,3 +1,4 @@
+import { OwnerStroke } from '@athanor/contracts';
 import { ProjectUpdatesManager } from './project-updates.js';
 import { registerProjectUpdateRoutes } from './project-update-routes.js';
 import { DebuggerManager } from './debugger.js';
@@ -1872,6 +1873,36 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
     }
   );
 
+  app.get<{ Params: { workspaceId: string } }>(
+    '/v1/workspaces/:workspaceId/computer-sessions',
+    async (request) => {
+      requireScope(request, 'browser.read');
+      requireScope(request, 'desktop.read');
+      if (request.capability.role !== 'user') throw new Error('Owner session required');
+      return {
+        browser: browser.sessions(request.params.workspaceId),
+        desktop: await desktop.sessions(request.params.workspaceId)
+      };
+    }
+  );
+  app.post<{ Params: { workspaceId: string } }>(
+    '/v1/workspaces/:workspaceId/browser/handoff-complete',
+    async (request) => {
+      requireScope(request, 'browser.takeover');
+      if (request.capability.role !== 'user') throw new Error('Owner session required');
+      const body = z
+        .object({ tabId: z.string().max(64).optional() })
+        .strict()
+        .parse(request.body);
+      await browser.completeHandoff(
+        request.params.workspaceId,
+        workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId),
+        body.tabId
+      );
+      return { ok: true };
+    }
+  );
+
   app.post<{
     Params: { workspaceId: string };
     Body: { holder: 'agent' | 'user' | 'secure_input' };
@@ -1958,6 +1989,10 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
             if (!['agent', 'user', 'secure_input'].includes(message.holder ?? ''))
               throw new Error('Invalid browser holder');
             await browser.setHolder(workspaceId, root, message.holder!);
+          } else if (message.type === 'stroke') {
+            requireScope(request, 'browser.control');
+            if (request.capability.role !== 'user') throw new Error('Owner session required');
+            await browser.ownerStroke(workspaceId, root, OwnerStroke.parse(message.action));
           } else if (message.type === 'action') {
             requireScope(request, 'browser.control');
             await browser.act(workspaceId, root, BrowserAction.parse(message.action), 'user');
@@ -2125,6 +2160,10 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
           if (message.type === 'holder') {
             requireScope(request, 'desktop.takeover');
             await desktop.setHolder(workspaceId, root, DesktopHolder.parse(message.holder));
+          } else if (message.type === 'stroke') {
+            requireScope(request, 'desktop.control');
+            if (request.capability.role !== 'user') throw new Error('Owner session required');
+            await desktop.ownerStroke(workspaceId, root, OwnerStroke.parse(message.action));
           } else if (message.type === 'action') {
             requireScope(request, 'desktop.control');
             await desktop.act(workspaceId, root, DesktopAction.parse(message.action), 'user');
