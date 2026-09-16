@@ -315,10 +315,12 @@ it('reserves concurrent scans before directory IO and releases them on failure',
   ]);
   try {
     expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(2);
-    expect(results[2]).toMatchObject({
-      status: 'rejected',
-      reason: expect.objectContaining({ message: expect.stringContaining('busy') })
-    });
+    const rejected = results[2];
+    expect(rejected?.status).toBe('rejected');
+    if (rejected?.status !== 'rejected') throw new Error('The excess scan was admitted');
+    const reason: unknown = rejected.reason;
+    expect(reason).toBeInstanceOf(Error);
+    expect(String(reason)).toContain('busy');
     await expect(
       mapper.map(root, { path: 'workspace/missing' }, { maximumSeconds: 30 })
     ).rejects.toThrow();
