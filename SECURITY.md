@@ -259,13 +259,16 @@ host is on rather than taking a preference for it.
 **When it stops and asks you.** Three positions, each one everything the position below it asks
 about plus more.
 
-- _Autonomous_ stops only for what this computer cannot take back for you.
-- _Balanced_ is Autonomous plus reaching an address out on the internet, and installing software.
+- _Autonomous_ authorizes browser and desktop actions for the requested task, including uploads,
+  form submissions and confirmations. CAPTCHA, private input and provenance checks still apply.
+  Non-surface tools retain their external, destructive and durable-operation approval rules.
+- _Balanced_ also asks before consequential browser and desktop actions, commands reaching the
+  internet, and software installation.
 - _Review_ is Balanced plus a card in front of every command, every file written, and every browser
   or desktop action.
 
 The authoritative wording of all three is `SECURITY_MODE_FLOOR` in
-`apps/worker/src/approval-policy.ts`, which sits beside the branches that enforce it and is held
+`apps/worker/src/approval-common.ts`, used by the branches that enforce it and is held
 against the page the owner reads by `scripts/check-repository.mjs`. It is deliberately not restated
 here in full: three descriptions of this behaviour once existed in three files and had drifted
 apart, and a fourth copy in a document no check reads is how that happens again.

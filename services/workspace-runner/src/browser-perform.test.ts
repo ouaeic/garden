@@ -983,16 +983,19 @@ describe('the gates an agent action passes and a takeover does not', () => {
     expect(harness.trace).toEqual(['tab-1 reload']);
   });
 
-  it('hands typing at the keyboard to the owner, and performs it for them', async () => {
-    const harness = buildHarness();
-    await expect(act(harness, { type: 'text_input', text: 'hunter2' }, 'agent')).rejects.toThrow(
-      /Secure input takeover is required/
-    );
-    expect(harness.trace).toEqual([]);
-    await hold(harness, 'user');
-    await act(harness, { type: 'text_input', text: 'hunter2' }, 'user');
-    expect(harness.trace).toEqual(['tab-1 keyboard.insertText "hunter2"']);
-  });
+  it.each([false, true])(
+    'requires private-input takeover even with consequential authority %s',
+    async (authorized) => {
+      const harness = buildHarness();
+      await expect(
+        act(harness, { type: 'text_input', text: 'hunter2' }, 'agent', authorized)
+      ).rejects.toThrow(/Secure input takeover is required/);
+      expect(harness.trace).toEqual([]);
+      await hold(harness, 'user');
+      await act(harness, { type: 'text_input', text: 'hunter2' }, 'user');
+      expect(harness.trace).toEqual(['tab-1 keyboard.insertText "hunter2"']);
+    }
+  );
 
   it('stops a consequential click without the approval capability, and runs it with one', async () => {
     const harness = buildHarness();
@@ -1087,22 +1090,25 @@ describe('the gates an agent action passes and a takeover does not', () => {
     });
   });
 
-  it('stops the agent on a tab a challenge is standing on, and does not stop the owner', async () => {
-    const harness = buildHarness();
-    harness.session.walls.raise('tab-1', {
-      vendor: 'Cloudflare',
-      url: PAGE_URL,
-      reason: 'response carried cf-mitigated',
-      evidence: 'response'
-    });
-    await expect(act(harness, { type: 'click', selector: REF }, 'agent')).rejects.toThrow(
-      /Cloudflare/
-    );
-    expect(harness.trace).toEqual([]);
-    await hold(harness, 'user');
-    await act(harness, { type: 'click', selector: REF }, 'user');
-    expect(harness.trace).toEqual([`tab-1 click ${REF}`]);
-  });
+  it.each([false, true])(
+    'requires CAPTCHA takeover even with consequential authority %s',
+    async (authorized) => {
+      const harness = buildHarness();
+      harness.session.walls.raise('tab-1', {
+        vendor: 'Cloudflare',
+        url: PAGE_URL,
+        reason: 'response carried cf-mitigated',
+        evidence: 'response'
+      });
+      await expect(
+        act(harness, { type: 'click', selector: REF }, 'agent', authorized)
+      ).rejects.toThrow(/Cloudflare/);
+      expect(harness.trace).toEqual([]);
+      await hold(harness, 'user');
+      await act(harness, { type: 'click', selector: REF }, 'user');
+      expect(harness.trace).toEqual([`tab-1 click ${REF}`]);
+    }
+  );
 
   it('refuses the same site from a fresh tab, which is the retry the challenge is asking for', async () => {
     const harness = buildHarness();
@@ -1120,6 +1126,32 @@ describe('the gates an agent action passes and a takeover does not', () => {
 });
 
 describe('what a batch reports', () => {
+  it('runs an authorized form batch but still stops when a later step needs private input', async () => {
+    const harness = buildHarness();
+    harness.elements.set(SUBMIT_REF, { evaluate: SUBMIT_CONTROL });
+    const result = batchResult(
+      await act(
+        harness,
+        {
+          type: 'batch',
+          actions: [
+            { type: 'type', selector: REF, text: 'Ada' },
+            { type: 'click', selector: SUBMIT_REF },
+            { type: 'text_input', text: 'private' },
+            { type: 'press', key: 'Enter' }
+          ]
+        },
+        'agent',
+        true
+      )
+    );
+    expect(result.completed).toBe(2);
+    expect(result.steps).toHaveLength(3);
+    expect(result.steps[2]?.ok).toBe(false);
+    expect(result.steps[2]?.error).toContain('Secure input takeover');
+    expect(harness.trace).toEqual([`tab-1 fill "Ada" ${REF}`, `tab-1 click ${SUBMIT_REF}`]);
+  });
+
   it('runs its steps in order and reports each one', async () => {
     const harness = buildHarness();
     const result = batchResult(

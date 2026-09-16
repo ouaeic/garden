@@ -571,16 +571,22 @@ the boundary, not a stepping stone to another index.
 
 ## Approval policy
 
-| Mode       | Ordinary files/code | Network/package install | External side effect |
-| ---------- | ------------------- | ----------------------- | -------------------- |
-| Review     | Confirm             | Confirm                 | Confirm              |
-| Balanced   | Allow               | Confirm                 | Confirm              |
-| Autonomous | Allow               | Allow                   | Confirm at floor     |
+| Mode       | Ordinary files/code | Network/package install | Browser/desktop effects |
+| ---------- | ------------------- | ----------------------- | ----------------------- |
+| Review     | Confirm             | Confirm                 | Confirm                 |
+| Balanced   | Allow               | Confirm                 | Confirm                 |
+| Autonomous | Allow               | Allow                   | Owner-authorized        |
 
-All modes still protect credentials, submissions, messages, purchases, public publishing,
-destructive system/filesystem actions, ambiguous coordinates, connected-service writes/deletes,
-subscription coding missions, and remote MCP execution. Autonomous still confirms network access for
-an executable outside the read-only and package-install allowlists.
+Autonomous is the owner's standing permission for browser and desktop work within the requested
+scope, including uploads, submissions and confirmations. The worker still evaluates the common
+approval floor and broker preflight; the saved mode supplies the signed consequential-action
+capability. Tool arguments cannot select that mode. The broker checks every action again, including
+batch steps, and still requires takeover for private input or a CAPTCHA. Mode downgrades inherited
+from a parent task remove this authorization. Preparing a draft never authorizes submission.
+
+Provenance checks, private-address restrictions, credential isolation and owner takeover remain
+active. Non-surface tools retain their approval floors for external writes, public publishing,
+destructive operations, durable configuration, connected services and remote execution.
 
 **A read is a read, however it is spelled.** The floor judges what a shell command does, not what
 shape the model wrote it in. A command wrapped in an inline script — which the catalogue itself tells

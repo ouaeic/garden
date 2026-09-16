@@ -217,13 +217,13 @@ The three modes, and what each still stops for, are in `apps/worker/src/approval
 
 - **Review** asks before every command, every file written, and every browser or desktop action.
 - **Balanced** asks whenever a command reaches an address on the internet, and before installing
-  software. The built-in web tools — search, page reads and the browser — read without asking;
+  software, and before consequential browser or desktop actions. The built-in web tools — search, page reads and the browser — read without asking;
   what leaves on a turn that has read untrusted content is still carded, in every mode.
-- **Autonomous** asks only about what the computer cannot take back: publishing, sending, spending,
-  destroying data, signing or accepting terms, anything it would go on running by itself, and a
-  control on a screen that nothing could identify.
+- **Autonomous** completes browser and desktop actions within the requested scope, including
+  uploads and submissions, without repeated approvals. CAPTCHA and private input require takeover.
+  Provenance checks and non-surface approval floors still apply.
 
-Autonomous is a floor, not an off switch. An unattended run in any mode can still stop.
+An unattended run can still stop for a human-only challenge or another enforced boundary.
 
 A task inherits its mode from its workspace when it is created. Change the workspace's default with
 one call, using a token carrying `workspaces:write`:

@@ -31,6 +31,7 @@ import { textValue } from './values.js';
 import { pinMediaGenerationApproval } from './media-approval.js';
 import { computationApproval } from './computation-approval.js';
 import { jobRecoveryApproval } from './job-recovery-approval.js';
+import { SECURITY_MODE_FLOOR } from './approval-common.js';
 import {
   currentTranscriptionCredential,
   pinTranscriptionApproval
@@ -347,6 +348,8 @@ export const approvalForCall = async (
         handoffOnly: true
       };
     }
+    // The saved owner mode authorizes screen actions; private input and provenance remain gates.
+    if (SECURITY_MODE_FLOOR[task.securityMode].authorizesSurfaceActions) return declared;
     if (policy.consequential) {
       return {
         ...(policy.destinations ? { destinations: policy.destinations } : {}),

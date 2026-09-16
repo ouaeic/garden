@@ -53,6 +53,97 @@ const countingFloor = (): { deps: ApprovalFloorDeps; evaluations: () => number }
 };
 
 describe('the approval floor is evaluated once per call', () => {
+  const surfaceCases = [
+    ['browser_action', { action: 'click', selector: '#apply' }],
+    ['browser_action', { action: 'upload', selector: '#cv', paths: ['workspace/cv.pdf'] }],
+    ['browser_action', { action: 'press', key: 'Enter' }],
+    ['browser_action', { action: 'click_at', x: 10, y: 20 }],
+    ['browser_action', { action: 'dialog', response: 'accept' }],
+    ['browser_action', { action: 'batch', actions: [{ action: 'click', selector: '#submit' }] }],
+    ['desktop_action', { action: 'invoke', nodeId: 'submit' }],
+    ['desktop_action', { action: 'click_at', x: 10, y: 20 }]
+  ] as const;
+
+  it.each(surfaceCases)('honors owner-selected Autonomous for %s %j', async (name, args) => {
+    const deps = { ...countingFloor().deps };
+    const preflight = vi.fn(async () => ({
+      consequential: true,
+      sensitiveInput: false,
+      preview: 'Submit application'
+    }));
+    deps.runner = { call: preflight } as unknown as AgentRunnerClient;
+    const proposal = call('surface', name, args);
+    for (const securityMode of ['autonomous', 'balanced', 'review'] as const) {
+      const result = await approvalForCallOnce(
+        deps,
+        createApprovalFloorMemo(),
+        { ...task, securityMode },
+        proposal
+      );
+      if (securityMode === 'autonomous') expect(result).toBeNull();
+      else expect(result?.sideEffect).toBe('external_consequential');
+    }
+    expect(preflight).toHaveBeenCalledTimes(3);
+  });
+
+  it.each(['browser_action', 'desktop_action'])(
+    'keeps private input a handoff in Autonomous for %s',
+    async (name) => {
+      const deps = { ...countingFloor().deps };
+      deps.runner = {
+        call: async () => ({ consequential: true, sensitiveInput: true, preview: 'Password' })
+      } as unknown as AgentRunnerClient;
+      const result = await approvalForCallOnce(
+        deps,
+        createApprovalFloorMemo(),
+        { ...task, securityMode: 'autonomous' },
+        call('secret', name, { action: 'type', selector: '#password', text: 'private' })
+      );
+      expect(result).toMatchObject({ handoffOnly: true, sideEffect: 'external_consequential' });
+      expect(result?.preview).not.toContain('text:');
+    }
+  );
+
+  it('does not let Autonomous erase a provenance requirement', async () => {
+    const deps = { ...countingFloor().deps };
+    deps.runner = {
+      call: async () => ({ consequential: false, sensitiveInput: false, preview: 'Navigate' })
+    } as unknown as AgentRunnerClient;
+    const result = await approvalForCallOnce(
+      deps,
+      createApprovalFloorMemo(),
+      { ...task, securityMode: 'autonomous' },
+      call('sink', 'browser_action', {
+        action: 'navigate',
+        url: 'https://unverified.invalid/private?value=' + 'x'.repeat(5000)
+      }),
+      { taint: { sources: ['web page'] } } as unknown as AgentState
+    );
+    expect(result?.sideEffect).toBe('external_reversible');
+  });
+
+  it('applies a parent mode downgrade before authorizing a mission browser action', async () => {
+    const deps = { ...countingFloor().deps };
+    deps.store = { getTask: async () => ({ ...task, status: 'running' }) } as unknown as DataStore;
+    deps.runner = {
+      call: async () => ({ consequential: true, sensitiveInput: false, preview: 'Submit' })
+    } as unknown as AgentRunnerClient;
+    const child = {
+      ...task,
+      securityMode: 'autonomous' as const,
+      parentMissionId: 'mission',
+      parentTaskId: task.id
+    };
+    const result = await approvalForCallOnce(
+      deps,
+      createApprovalFloorMemo(),
+      child,
+      call('submit', 'browser_action', { action: 'click', selector: '#submit' })
+    );
+    expect(result?.sideEffect).toBe('external_consequential');
+    expect(child.securityMode).toBe('balanced');
+  });
+
   it('describes the actual browser upload destination without substituting the agent explanation', async () => {
     const { deps: base } = countingFloor();
     const runner = {

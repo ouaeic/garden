@@ -6,7 +6,7 @@ compatibility: Requires the athanor browser runner.
 allowed-tools: browser_snapshot read_elements browser_action file_read files_list image_read
 metadata:
   athanor.tier: 'builtin'
-  athanor.version: '2.2.0'
+  athanor.version: '2.3.0'
   athanor.risk: 'external'
   athanor.domain: 'web'
 ---
@@ -15,7 +15,9 @@ metadata:
 
 The order is: enumerate, plan, fill, read back, review, submit. The owner's request sets the scope:
 preparing a draft does not authorize submission, while an explicit request to apply can. Runtime
-approval cards still control execution. A submitted form may be impossible to retract.
+approval cards still control execution. In Autonomous mode, uploads, step confirmations and final
+submission within that scope are already authorized; do not request another confirmation. A submitted
+form may be impossible to retract.
 
 Three tools do the work and each has one job. `browser_snapshot` is the picture and the page text —
 call it once to see the form. `read_elements` is the same element list scoped to one selector, with
@@ -88,8 +90,8 @@ says exactly which field it got to.
 Rules that decide whether the batch works:
 
 - **Keep the last irreversible action out of it.** A batch is judged step by step, so an upload,
-  an Enter press or a submit click inside one stops the whole batch for approval. Do those as their
-  own call, deliberately.
+  an Enter press or a submit click must be deliberate. Autonomous authorizes these actions; other
+  modes can pause the batch for approval. Verify fields before a submission.
 - **Group by dependency, not by count.** Fields whose options depend on an earlier field — a state
   list after a country, a step that only renders once the previous one validates — go in the next
   batch, after a `wait_for` and a read.
@@ -140,8 +142,8 @@ Three failed attempts on the same field is the ceiling. Stop, capture the state,
 
 ## 6. Uploads
 
-`{"type":"upload","selector":"…","paths":["workspace/cv.pdf"]}`, as its own call — it always stops
-for the owner's approval, because it sends a workspace file to an outside site. Afterwards read the
+`{"type":"upload","selector":"…","paths":["workspace/cv.pdf"]}` sends a workspace file to the
+site. Autonomous authorizes uploads within the requested workflow; other modes ask first. Read the
 page back and confirm it shows the file name, that the size limit was not exceeded, and that the
 type was accepted. Many portals accept an upload and reject it silently at review.
 
@@ -194,7 +196,8 @@ these forms time out, and a turn that ends mid-form should hand the next one a p
 
 - Never enter passwords, card numbers, bank details, or government identity numbers. Hand the live
   session to the owner for those.
-- Never create an account or accept terms on the owner's behalf.
+- Create accounts or accept required terms only within the owner's requested workflow. Use secure
+  handoff for credentials or identity verification; never fabricate a missing personal fact.
 - Never attempt a CAPTCHA, bot check, or identity verification. Detect it, stop, and hand over.
 - **An anti-bot challenge closes that tab and that site.** The stop is enforced in the runner, not
   advice: do not reload it, do not open it in another tab, do not try a different route into the
@@ -210,9 +213,9 @@ these forms time out, and a turn that ends mid-form should hand the next one a p
 - **A full snapshot per field.** Twenty-five screenshots and page dumps exhaust the window before
   the form is finished. `read_elements` is the same information without either.
 - **Enter as a shortcut.** Pressing Enter in a text field submits many forms. Only ever press Enter
-  as a deliberate, approved submit.
-- **A batch that carries the submit.** It works, and it puts the irreversible step behind the same
-  single approval as twenty field fills.
+  as a deliberate submission within the owner's authorized scope.
+- **A batch that carries the submit.** Verify the completed fields before the final submission.
+  Autonomous authorizes the action; it does not remove the need to check accuracy.
 - **Filling a wizard's later step before it exists.** Fields appear only after the previous step
   validates. `wait_for` then read.
 - **Session expiry mid-form.** Long forms time out; read the form back before submitting and be

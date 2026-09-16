@@ -5,6 +5,7 @@ import { perPartOutputChars } from '../context.js';
 import { surfaceActionRequest } from '../tools.js';
 import { type ToolContext } from '../tool-dispatch.js';
 import { clampNumber } from './numbers.js';
+import { SECURITY_MODE_FLOOR } from '../approval-common.js';
 
 /**
  * The surface tools: the browser and the desktop, the two things on this computer that are looked at
@@ -21,6 +22,9 @@ export async function executeSurfaceTool(
   call: ModelToolCall
 ): Promise<unknown> {
   const { task, consequentialApproved, webPlan, state } = context;
+  // Authority comes from the persisted owner choice or an approved call, never model arguments.
+  const surfaceAuthorized =
+    consequentialApproved || SECURITY_MODE_FLOOR[task.securityMode].authorizesSurfaceActions;
   const root = `/v1/workspaces/${task.workspaceId}`;
   switch (call.name) {
     case 'browser_snapshot':
@@ -132,7 +136,7 @@ export async function executeSurfaceTool(
         task.id,
         [
           'browser.control',
-          ...(consequentialApproved ? ['browser.consequential'] : []),
+          ...(surfaceAuthorized ? ['browser.consequential'] : []),
           ...(writes ? ['files.write'] : [])
         ],
         `${root}/browser/action`,
@@ -159,7 +163,7 @@ export async function executeSurfaceTool(
       return context.runner.call(
         task.workspaceId,
         task.id,
-        consequentialApproved ? ['desktop.control', 'desktop.consequential'] : 'desktop.control',
+        surfaceAuthorized ? ['desktop.control', 'desktop.consequential'] : 'desktop.control',
         `${root}/desktop/action`,
         surfaceActionRequest(call.arguments)
       );

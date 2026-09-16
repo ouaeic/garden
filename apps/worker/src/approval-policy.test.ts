@@ -92,34 +92,15 @@ describe('agent approval policy', () => {
     ).toBe('external_consequential');
   });
 
-  /**
-   * The floor three documents promise is not "transactional verbs"; it is destructive operations,
-   * in every mode. This assertion did not exist, and could not have failed if it had, while
-   * `#approvalForCall` carded every browser and desktop action whatever the broker said (ATH-001).
-   * Repairing that let a benign verdict mean "no card" for the first time, and the two literals
-   * this now reads had between them no word for erasing, formatting, resetting, overwriting,
-   * emptying, revoking or deactivating anything. Balanced and Autonomous are the modes that matter:
-   * Review stops for these anyway, on a rule that knows nothing about what the action does.
-   */
-  it('stops for a destructive activation in the modes that would otherwise allow it', () => {
-    for (const mode of ['balanced', 'autonomous'] as const) {
-      for (const purpose of [
-        'Erase the recovery drive',
-        'Format the external disk',
-        'Reset the device to factory settings',
-        'Overwrite the exported ledger',
-        'Empty Trash',
-        'Revoke the deploy key',
-        'Deactivate the account'
-      ]) {
-        expect(
-          approvalRequirement('desktop_action', { action: 'invoke', nodeId: '0/2', purpose }, mode)
-            ?.sideEffect
-        ).toBe('external_consequential');
-        expect(
-          approvalRequirement('browser_action', { action: 'click', selector: '#go', purpose }, mode)
-            ?.sideEffect
-        ).toBe('external_consequential');
+  it('uses the saved mode for consequential browser and desktop activations', () => {
+    for (const purpose of ['Submit the application', 'Accept the terms', 'Empty Trash']) {
+      for (const [name, args] of [
+        ['desktop_action', { action: 'invoke', nodeId: '0/2', purpose }],
+        ['browser_action', { action: 'click', selector: '#go', purpose }]
+      ] as const) {
+        expect(approvalRequirement(name, args, 'autonomous')).toBeNull();
+        for (const mode of ['balanced', 'review'] as const)
+          expect(approvalRequirement(name, args, mode)?.sideEffect).toBe('external_consequential');
       }
     }
   });
@@ -647,8 +628,8 @@ describe('agent approval policy', () => {
         'browser_action',
         { action: 'click', selector: 'button[type=submit]', purpose: 'Submit form' },
         'autonomous'
-      )?.sideEffect
-    ).toBe('external_consequential');
+      )
+    ).toBeNull();
     expect(
       approvalRequirement(
         'shell',
@@ -1707,13 +1688,15 @@ describe('what a tainted turn may still do through shell', () => {
     for (const [name, args] of calls) {
       const clean = approvalRequirement(name, args, 'autonomous');
       const raised = approvalRequirement(name, args, 'autonomous', tainted);
-      expect(clean?.sideEffect, name).toBe('external_consequential');
-      expect(rank[raised?.sideEffect ?? 'workspace_write'], name).toBeGreaterThanOrEqual(
-        rank[clean?.sideEffect ?? 'workspace_write']
+      if (name === 'shell') expect(clean?.sideEffect).toBe('external_consequential');
+      else expect(clean).toBeNull();
+      expect(raised, name).not.toBeNull();
+      expect(raised ? rank[raised.sideEffect] : -1, name).toBeGreaterThanOrEqual(
+        clean ? rank[clean.sideEffect] : -1
       );
       // And both reasons survive, because the owner is only asked once.
       expect(raised?.preview, name).toContain('attacker.example');
-      expect(raised?.preview, name).toContain(clean?.preview ?? '');
+      if (clean) expect(raised?.preview, name).toContain(clean.preview);
     }
   });
 
@@ -3482,19 +3465,22 @@ describe('what a security mode means', () => {
     expect(SECURITY_MODE_FLOOR.balanced.asksBeforeEveryChange).toBe(false);
     expect(SECURITY_MODE_FLOOR.autonomous.asksBeforeReachingTheInternet).toBe(false);
     expect(SECURITY_MODE_FLOOR.autonomous.asksBeforeInstallingSoftware).toBe(false);
-    // Balanced is Autonomous plus exactly two rules. If a third is ever added, the sentence on the
-    // page changes in the same edit or the repository check fails.
     expect(
       (
         [
           'asksBeforeEveryChange',
           'asksBeforeReachingTheInternet',
-          'asksBeforeInstallingSoftware'
+          'asksBeforeInstallingSoftware',
+          'authorizesSurfaceActions'
         ] as const
       ).filter(
         (field) => SECURITY_MODE_FLOOR.balanced[field] !== SECURITY_MODE_FLOOR.autonomous[field]
       )
-    ).toEqual(['asksBeforeReachingTheInternet', 'asksBeforeInstallingSoftware']);
+    ).toEqual([
+      'asksBeforeReachingTheInternet',
+      'asksBeforeInstallingSoftware',
+      'authorizesSurfaceActions'
+    ]);
   });
 
   /*
@@ -3526,13 +3512,7 @@ describe('what a security mode means', () => {
     ).toBeNull();
   });
 
-  /*
-   * THE AUTONOMOUS SENTENCE, DRIVEN. Every clause of it is named here with an act that belongs to
-   * it, and each act must card in autonomous mode. The sentence claims to be exhaustive, which is
-   * the claim that matters: a summary that is only mostly true is how the resident contract came to
-   * promise that public publishing always stopped while `npm publish` ran unasked in every mode.
-   */
-  it('stops every clause of its own Autonomous sentence, in autonomous mode', () => {
+  it('retains the approval floor for non-surface external and durable operations', () => {
     const clauses: Array<[string, string, Record<string, unknown>]> = [
       ['publishing', 'shell', { executable: 'npm', args: ['publish'] }],
       /*
@@ -3585,32 +3565,6 @@ describe('what a security mode means', () => {
         'shell',
         { executable: 'systemctl', args: ['--user', 'enable', 'tracker'] }
       ],
-      /*
-       * The clause used to be named here by `coding_agent setup`, which agrees to nothing on
-       * anybody's behalf: it cards because it writes a coding tool's own configuration, which is the
-       * "left behind to run later" clause two rows down. So the sentence's one unheld clause was
-       * being held by an act belonging to another clause - a fixture that does not exercise the
-       * path, in the test whose whole job is that the sentence is exhaustive.
-       *
-       * The acts below are the clause. `sign` was already in the vocabulary; `terms` and `licence`
-       * are this wave's, and the sentence was narrowed to what these three prove - see the
-       * counterweight in the next test, which is the half the floor cannot keep.
-       */
-      [
-        'signing in your name',
-        'browser_action',
-        { action: 'click', selector: '#sign', purpose: 'sign the tenancy agreement' }
-      ],
-      [
-        'accepting terms in your name',
-        'browser_action',
-        { action: 'click', selector: '#accept', purpose: 'accept the terms of service' }
-      ],
-      [
-        'accepting terms in your name',
-        'desktop_action',
-        { action: 'invoke', nodeId: 'accept-eula', purpose: 'accept the licence to finish setup' }
-      ],
       [
         'left behind to run later',
         'shell',
@@ -3622,11 +3576,6 @@ describe('what a security mode means', () => {
         'left behind to run later',
         'shell',
         { executable: 'npm', args: ['run', 'dev'], background: true, service: 'dev' }
-      ],
-      [
-        'a control nothing could identify',
-        'desktop_action',
-        { action: 'click_at', x: 10, y: 10, purpose: 'press it' }
       ]
     ];
     for (const [clause, name, args] of clauses)
@@ -3674,23 +3623,6 @@ describe('what a security mode means', () => {
       expect(approvalRequirement(name, args, 'autonomous'), JSON.stringify(args)).toBeNull();
   });
 
-  /*
-   * WHAT THE SENTENCE DELIBERATELY STOPPED PROMISING, and why this is a test rather than a comment.
-   *
-   * Autonomous said "agreeing to something on your behalf". Driven at cd7033f, every one of these
-   * raised no card in balanced or autonomous, so the clause was false for the commonest thing on
-   * the web. The repair was not to widen it: consent is not a category either classifier can
-   * recognise - a cookie banner's button is a plain `<button>` outside any form, indistinguishable
-   * by the evidence a click carries from every other button on the page - so it could only be a
-   * phrase list over button copy, and that list rots outwards ("Got it", "Alle akzeptieren") while
-   * firing on ordinary reading, because a banner stands in front of almost every page a research
-   * turn opens.
-   *
-   * So the sentence was narrowed to "signing or accepting terms in your name", which the test above
-   * drives, and these stay free on purpose. If a later wave decides a cookie banner is worth a card,
-   * it changes this test and the sentence in the same commit - which is the whole point of holding
-   * a deliberate absence in the rig rather than in prose.
-   */
   it('does not promise, or card, the cookie banner in front of every page', () => {
     for (const purpose of [
       'accept all cookies',
@@ -3707,9 +3639,6 @@ describe('what a security mode means', () => {
         ),
         purpose
       ).toBeNull();
-    // And the sentence must not have quietly regained the promise those rows cannot keep.
-    expect(SECURITY_MODE_FLOOR.autonomous.sentence).not.toContain('agreeing to something');
-    expect(SECURITY_MODE_FLOOR.autonomous.sentence).toContain('accepting terms in your name');
   });
 
   /*
@@ -3942,7 +3871,7 @@ describe('what a security mode means', () => {
         approvalRequirement(
           'browser_action',
           { action: 'click', selector: '#accept', purpose },
-          'autonomous'
+          'balanced'
         ),
         purpose
       ).toMatchObject({ sideEffect: 'external_consequential' });

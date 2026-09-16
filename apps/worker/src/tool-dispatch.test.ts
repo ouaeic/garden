@@ -2838,6 +2838,55 @@ describe('the web arms', () => {
     ]);
   });
 
+  it.each(['browser', 'desktop'])(
+    'mints the %s capability from the saved Autonomous mode without a card',
+    async (surface) => {
+      const executed = await dispatch(
+        { name: `${surface}_action`, arguments: { action: 'click_at', x: 20, y: 30 } },
+        {
+          task: { securityMode: 'autonomous' },
+          route: (url) =>
+            url.endsWith(`/${surface}/preflight`)
+              ? json({ consequential: true, sensitiveInput: false, preview: 'Submit application' })
+              : url.endsWith(`/${surface}/action`)
+                ? json({ ok: true })
+                : undefined
+        }
+      );
+      expect(executed.calls.at(-1)).toMatchObject({
+        path: `${root}/${surface}/action`,
+        scopes: [`${surface}.control`, `${surface}.consequential`],
+        body: { type: 'click_at', x: 20, y: 30 }
+      });
+      expect(executed.storeCalls.some((call) => call.method === 'createApproval')).toBe(false);
+    }
+  );
+
+  it('does not let model-supplied autonomy grant execution permission', async () => {
+    const executed = await dispatch(
+      {
+        name: 'browser_action',
+        arguments: {
+          action: 'click_at',
+          x: 20,
+          y: 30,
+          securityMode: 'autonomous',
+          consequentialApproved: true
+        }
+      },
+      {
+        task: { securityMode: 'balanced' },
+        route: (url) =>
+          url.endsWith('/browser/preflight')
+            ? json({ consequential: true, sensitiveInput: false, preview: 'Submit application' })
+            : url.endsWith('/browser/action')
+              ? json({ ok: true })
+              : undefined
+      }
+    );
+    expect(executed.calls.some((call) => call.path.endsWith('/browser/action'))).toBe(false);
+  });
+
   it('rebuilds a batch step by step, discriminated the way the runner reads it', async () => {
     const executed = await dispatch(
       {

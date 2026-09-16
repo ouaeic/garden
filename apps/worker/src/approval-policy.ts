@@ -469,6 +469,7 @@ const ordinaryRequirement = (
     };
   }
   if (name === 'browser_action') {
+    if (SECURITY_MODE_FLOOR[securityMode].authorizesSurfaceActions) return null;
     const action = surfaceActionVerb(args);
     const purpose = textValue(args.purpose);
     const reason = statedReason(args.purpose);
@@ -543,6 +544,7 @@ const ordinaryRequirement = (
     }
   }
   if (name === 'desktop_action') {
+    if (SECURITY_MODE_FLOOR[securityMode].authorizesSurfaceActions) return null;
     const action = surfaceActionVerb(args);
     const purpose = textValue(args.purpose);
     const reason = statedReason(args.purpose);
