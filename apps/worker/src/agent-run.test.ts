@@ -40,6 +40,7 @@ import { managedMediaCatalog } from './media.js';
 import { fixtureMediaRouting } from './media-fixture.js';
 import { memoryItemAad, MEMORY_PACK_MARKER } from './memory-runtime.js';
 import { agentTools } from './tools.js';
+import { TOOL_GROUPS } from './tool-groups.js';
 import type { WorkerConfig } from './config.js';
 
 const masterKey = Buffer.alloc(32, 5);
@@ -1611,38 +1612,50 @@ describe('what actually reaches the provider', () => {
     };
   };
 
-  it('makes general capabilities available on the very first step without prompt keyword selection', async () => {
+  it('offers a compact core and a discovery path without guessing capabilities from prompt keywords', async () => {
     const { request } = await firstRequest();
-    const names = ((request.tools ?? []) as Array<{ function?: { name?: string } }>).map(
-      (tool) => tool.function?.name
-    );
-    // Catalogue growth is bounded by the serialized wire budget in tool-catalogue.test.ts.
+    const tools = (request.tools ?? []) as Array<{
+      function?: { name?: string; description?: string };
+    }>;
+    const names = tools.map((tool) => tool.function?.name);
     expect(names.length).toBeGreaterThan(0);
     expect(names).toEqual(
       expect.arrayContaining([
-        'document_read',
-        'image_read',
-        'audio_read',
-        'browser_snapshot',
-        'generate_media',
+        'load_tools',
         'compact_context',
-        // Research, comparison and a job hunt all begin here, and until now the catalogue had no
-        // way to search at all - the prompt sent the model to drive a browser at a search page.
         'web_search',
-        // The retrieval store could be read once at task start and never asked a question again.
         'memory_recall',
+        'file_read',
+        'file_patch',
+        'shell',
+        'process',
         'notify',
-        'ask',
-        'project_update'
+        'ask'
       ])
     );
-    // The catalogue is sent whole on every request and is the largest fixed cost in a turn, and
-    // connector_action is the biggest tool in it - almost all of that being the declared shape of
-    // mail, calendar, repository and WebDAV operations. With nothing connected none of those calls
-    // can do anything but fail, so the box stops paying for the description on every step.
-    expect(names).not.toContain('connector_action');
-    // An empty connection inventory is already known before building this request.
-    expect(names).not.toContain('connector_list');
+    for (const group of [
+      'code',
+      'documents',
+      'browser',
+      'desktop',
+      'media',
+      'publishing',
+      'connections'
+    ])
+      expect(
+        tools.find((tool) => tool.function?.name === 'load_tools')?.function?.description
+      ).toContain(group);
+    for (const deferred of [
+      'document_read',
+      'image_read',
+      'audio_read',
+      'browser_snapshot',
+      'generate_media',
+      'project_update',
+      'connector_action',
+      'connector_list'
+    ])
+      expect(names).not.toContain(deferred);
   });
 
   it('describes only the connector actions the box can actually run', async () => {
@@ -1669,7 +1682,13 @@ describe('what actually reaches the provider', () => {
       const task = makeTask();
       const probe = probeStore(() => task);
       const log: FetchLog = { calls: [], modelRequests: [] };
-      installFetch([textFrame('thinking')], log);
+      installFetch(
+        [
+          toolFrame('load-connections', 'load_tools', { groups: ['connections'] }),
+          textFrame('thinking')
+        ],
+        log
+      );
       const store = {
         ...probe.store,
         listConnectors: async () =>
@@ -1683,7 +1702,12 @@ describe('what actually reaches the provider', () => {
       await new AgentWorker(store, config(), masterKey, runnerSecret)
         .run(task)
         .catch(() => undefined);
-      return (log.modelRequests[0]?.tools ?? []) as Array<{ function?: { name?: string } }>;
+      expect(
+        (log.modelRequests[0]?.tools as Array<{ function: { name: string } }>).some(
+          (tool) => tool.function.name === 'connector_action'
+        )
+      ).toBe(false);
+      return (log.modelRequests[1]?.tools ?? []) as Array<{ function?: { name?: string } }>;
     };
     const tools = await withConnectors([
       { kind: 'imap', enabled: true },
@@ -2315,7 +2339,7 @@ describe('the web route a run is pinned to', () => {
     // has never heard of it is a request that fails, so an unrecognised endpoint arrives refused.
     const { log } = await runOnce(makeTask(), config({ TASK_MAX_STEPS: 1 }), [model]);
     const request = log.modelRequests[0];
-    expect(toolNames(request)).toEqual(expect.arrayContaining(['web_search', 'parallel_web_read']));
+    expect(toolNames(request)).toEqual(expect.arrayContaining(['web_search', 'load_tools']));
     expect(toolNames(request)).not.toContain('openrouter:web_search');
   });
 
@@ -2360,13 +2384,13 @@ describe('the web route a run is pinned to', () => {
     // The two tools the four cross-referencing descriptions send the model to, present under the
     // names those descriptions use.
     expect(names).toContain('web_search');
-    expect(names).toContain('parallel_web_read');
+    expect(names).toContain('load_tools');
     // And nothing the model has no way to invoke. A provider-side tool on this request would be a
     // second answerer for a question the model can already ask.
     expect(names).not.toContain('openrouter:web_search');
     expect(names).not.toContain('openrouter:web_fetch');
-    expect(names).toContain('browser_action');
-    expect(names).toContain('browser_snapshot');
+    expect(names).not.toContain('browser_action');
+    expect(names).not.toContain('browser_snapshot');
     // The owner is told, in one sentence, where their queries now go.
     expect(
       probe.events.find((entry) => entry.summary.includes("model provider's search service"))
@@ -2397,17 +2421,23 @@ describe('the web route a run is pinned to', () => {
    * the capability itself rather than the tool - nothing is connected, every call would fail, and
    * `connector_list` names it in the course of being the call that says so.
    */
-  it('sends no description naming a tool this run took out of the catalogue', async () => {
+  it('keeps every referenced tool resident or explicitly discoverable', async () => {
     const { log } = await runOnce(standardTask(), serverConfig, [openrouterModel]);
     const sent = new Set(toolNames(log.modelRequests[0]));
     const declared = new Set(agentTools.map((tool) => tool.name));
+    expect(sent.has('load_tools')).toBe(true);
+    const discoverable = new Set<string>(
+      Object.entries(TOOL_GROUPS)
+        .filter(([group]) => group !== 'connections')
+        .flatMap(([, tools]) => [...tools])
+    );
     for (const tool of agentTools)
       if (sent.has(tool.name))
         for (const token of tool.description.match(/[a-z][a-z0-9]*(?:_[a-z0-9]+)+/g) ?? [])
           if (declared.has(token) && token !== 'connector_action')
             expect(
-              sent.has(token),
-              `${tool.name} sends the model to ${token}, which this run did not offer it`
+              sent.has(token) || discoverable.has(token),
+              `${tool.name} references ${token}, which is neither resident nor discoverable`
             ).toBe(true);
     expect(sent.has('connector_action')).toBe(false);
   });

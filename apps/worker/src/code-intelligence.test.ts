@@ -25,6 +25,7 @@ describe('native language-tool authority and dispatch', () => {
     const call = vi.fn(async () => ({ running: true }));
     const context = {
       task: { id: 'task', workspaceId: 'workspace' },
+      state: { messages: [], step: 0, credits: 0 },
       runner: { call }
     } as unknown as ToolContext;
     const description = await executeToolCall(context, {
