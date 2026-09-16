@@ -206,15 +206,14 @@ document did not convert.
 
 ## Long work
 
-A turn is bounded by steps, by compute credits, by the owner's spend caps, and by the clock —
-whichever binds first. The clock bound is two hours per leased execution, and it exists because the
-other three compose rather than cap: a turn that is cheap per step and never stops is invisible to
-all of them. It is checked behind the credit ceiling deliberately, so that when both are reached the
-owner is told about the money, which is the one they can act on. A resumed turn gets a fresh
-allowance, because what is bounded is how long one worker may hold one lease without saying
-anything.
+A turn is bounded by steps, compute credits and the owner's spend caps. A long execution yields
+its worker lease at a settled step boundary and requeues itself with the same conversation state,
+step count, continuation allowance and accumulated cost. This releases scheduling capacity without
+asking the owner to resume healthy work. A failed or cancelled execution cannot use this path to
+clear its retry limit. Finite background jobs use durable dependencies and wake the conversation
+when an outcome is available, without model calls while waiting.
 
-There is a fourth brake, and it is the only one that acts before any money is spent: the pre-flight
+There is also a brake and it is the only one that acts before any money is spent: the pre-flight
 price ceiling. `sudo athanor price-ceiling` names a maximum input and output rate in dollars per
 million tokens, and every place garden picks a model _for_ the owner ranks against it — the lead at
 task creation, the vision specialist, the model the picker recommends, and the support picker behind

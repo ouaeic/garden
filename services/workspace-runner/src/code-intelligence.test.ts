@@ -40,12 +40,72 @@ async function fixture() {
 }
 afterEach(async () => {
   for (const { root, manager } of fixtures.splice(0)) {
-    manager.close();
+    await manager.close();
     await rm(root, { recursive: true, force: true });
   }
 });
 
 describe('native code intelligence', () => {
+  it('drains a pending launch before workspace replacement without starting a late child', async () => {
+    const { root, manager } = await fixture();
+    let release!: () => void;
+    let entered = false;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.mocked(prepareInvocation).mockImplementationOnce(async () => {
+      entered = true;
+      await gate;
+      return {
+        executable: process.execPath,
+        args: ['-e', 'process.exit(1)'],
+        cwd: root,
+        env: { PATH: process.env.PATH ?? '/usr/bin:/bin' }
+      };
+    });
+    const starting = manager.act(root, 'task', { action: 'start', language: 'typescript' });
+    await expect.poll(() => entered).toBe(true);
+    expect(manager.isWorkspaceBusy(root)).toBe(true);
+    const refused = expect(starting).rejects.toThrow('Workspace changed');
+    const stopped = manager.quiesceWorkspace(root);
+    release();
+    await Promise.all([refused, stopped]);
+    expect(manager.isWorkspaceBusy(root)).toBe(false);
+    expect(
+      await manager.act(root, 'task', { action: 'status', language: 'typescript' })
+    ).toMatchObject({ running: false });
+  });
+
+  it.each(['current', 'unversioned', 'stale'] as const)(
+    'reports %s push diagnostics without inventing a verified version',
+    async (mode) => {
+      const { root, manager, write } = await fixture();
+      await write('input.py', 'answer = missing\n');
+      const script = `let buffer=Buffer.alloc(0);const send=x=>{const body=Buffer.from(JSON.stringify(x));process.stdout.write('Content-Length: '+body.length+'\\r\\n\\r\\n');process.stdout.write(body)};
+      process.stdin.on('data',chunk=>{buffer=Buffer.concat([buffer,chunk]);for(;;){const end=buffer.indexOf('\\r\\n\\r\\n');if(end<0)return;const length=Number(/Content-Length: (\\d+)/i.exec(buffer.subarray(0,end).toString())[1]);if(buffer.length<end+4+length)return;const message=JSON.parse(buffer.subarray(end+4,end+4+length));buffer=buffer.subarray(end+4+length);
+      if(message.method==='initialize')send({jsonrpc:'2.0',id:message.id,result:{capabilities:{textDocumentSync:1}}});
+      else if(message.method==='textDocument/didOpen'){const document=message.params.textDocument;send({jsonrpc:'2.0',method:'textDocument/publishDiagnostics',params:{uri:document.uri,${mode === 'unversioned' ? '' : `version:${mode === 'current' ? 'document.version' : 'document.version-1'},`}diagnostics:[{range:{start:{line:0,character:9},end:{line:0,character:16}},severity:1,message:'Unknown variable'}]}})}
+      else if(message.method==='shutdown')send({jsonrpc:'2.0',id:message.id,result:null});else if(message.method==='exit')process.exit(0);
+      }});`;
+      vi.mocked(prepareInvocation).mockImplementationOnce(async () => ({
+        executable: process.execPath,
+        args: ['-e', script],
+        cwd: root,
+        env: { PATH: process.env.PATH ?? '/usr/bin:/bin' }
+      }));
+      await manager.act(root, 'task', { action: 'start', language: 'python' });
+      const result = await manager.act(root, 'task', {
+        action: 'diagnostics',
+        language: 'python',
+        path: 'workspace/input.py'
+      });
+      expect(result).toMatchObject({
+        complete: mode === 'current',
+        total: mode === 'stale' ? 0 : 1
+      });
+    }
+  );
+
   it.each(['typescript', 'python'] as const)(
     'uses the installed %s language server for diagnostics, cross-file definitions/references and rename previews',
     async (language) => {
@@ -165,6 +225,29 @@ describe('native code intelligence', () => {
       })) as { complete: boolean; diagnostics: Array<{ severity: number }> };
       expect(corrected.complete).toBe(true);
       expect(corrected.diagnostics.filter((entry) => entry.severity === 1)).toEqual([]);
+      const stale = preview as { previewId: string; paths: string[] };
+      expect(
+        await call({ action: 'apply', previewId: stale.previewId, paths: stale.paths })
+      ).toMatchObject({ applied: false });
+      const fresh = (await call({
+        action: 'rename',
+        path: python ? 'maths.py' : 'maths.ts',
+        line: 1,
+        column: python ? 5 : 18,
+        newName: 'doubleValue'
+      })) as { previewId: string; paths: string[] };
+      await call({ action: 'stop' });
+      const applied = await call({
+        action: 'apply',
+        previewId: fresh.previewId,
+        paths: fresh.paths
+      });
+      expect(applied).toMatchObject({ applied: true });
+      for (const name of [python ? 'maths.py' : 'maths.ts', python ? 'use.py' : 'use.ts']) {
+        const text = await readFile(path.join(root, 'workspace', name), 'utf8');
+        expect(text).toContain('doubleValue');
+        expect(text).not.toContain('twice');
+      }
     },
     60_000
   );

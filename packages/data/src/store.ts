@@ -1078,6 +1078,9 @@ export class DataStore {
   updateTask(...args: Parameters<TaskStore['updateTask']>) {
     return this.#tasks.updateTask(...args);
   }
+  yieldTaskLease(...args: Parameters<TaskStore['yieldTaskLease']>) {
+    return this.#tasks.yieldTaskLease(...args);
+  }
 
   appendTaskEvent(...args: Parameters<TaskStore['appendTaskEvent']>) {
     return this.#tasks.appendTaskEvent(...args);

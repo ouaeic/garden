@@ -1903,6 +1903,31 @@ export class TaskStore {
     return result.rows.length === 1;
   }
 
+  async yieldTaskLease(input: {
+    taskId: string;
+    workerId: string;
+    agentStateCiphertext: EncryptedEnvelope;
+    actualComputeCredits: number;
+  }): Promise<boolean> {
+    const result = await this.database.query(
+      `UPDATE tasks SET status='queued',lease_owner=NULL,lease_expires_at=NULL,
+         attempt=0,updated_at=NOW(),agent_state_ciphertext=$3::jsonb,
+         actual_compute_credits=GREATEST(actual_compute_credits,$4)
+       WHERE id=$1 AND status='running' AND lease_owner=$2 AND lease_expires_at>NOW()
+       RETURNING id`,
+      [
+        input.taskId,
+        input.workerId,
+        JSON.stringify(input.agentStateCiphertext),
+        input.actualComputeCredits
+      ]
+    );
+    if (!result.rows.length) return false;
+    this.#signalWorkspaceRelease(input.taskId);
+    this.#taskSignals.signal(TASK_QUEUE_CHANNEL, input.taskId);
+    return true;
+  }
+
   async updateTask(input: {
     id: string;
     workerId?: string;

@@ -1,4 +1,5 @@
 import type { TaskRecord } from '@athanor/data';
+import { encryptJson } from '@athanor/core';
 import type { AgentState } from '../agent-state.js';
 import { refreshArtifactLedger } from '../context.js';
 import { noteStepBudget, stepCeiling, turnWallClockReached, type HandoffDeps } from '../handoff.js';
@@ -77,28 +78,6 @@ export const openStep = async (
   // boundary every tool call has been answered, so nothing here can split a call from its
   // result.
   refreshRuntimeContext();
-  /*
-   * The third ceiling, checked where the other two are and priced the same way.
-   *
-   * Nothing in the product bounded a turn on the clock. Steps, self-continuations, compute
-   * credits and the owner's spend caps were the whole of it, and the per-unit ceilings compose
-   * rather than cap - six idle steps of generation is an hour, a hundred and twenty steps of
-   * tool time is days. On a frontier model the credit ceiling bites first, which is why this
-   * has been a residual rather than an open runaway; on a cheap local route credits accumulate
-   * slowly and the wall clock does not, and that is the case nothing was watching.
-   *
-   * `credits` is checked in front of it deliberately: when both ceilings are reached the money
-   * is the one the owner can do something about, and it is the sentence they should be given.
-   */
-  if (turnWallClockReached(turnStartedAt)) {
-    if (await honorUserControl()) return 'closed';
-    await closeTurnAtCeiling(deps.handoff, task, key, state, closeContext, {
-      reason: 'time',
-      code: 'task_budget_reached',
-      spent: 'ran for its whole time budget'
-    });
-    return 'closed';
-  }
   if (state.credits >= task.maxComputeCredits) {
     // The same closing call the step ceiling gets. A turn that stops because it ran out of
     // money has exactly as much to hand over as one that ran out of steps, and the owner is
@@ -112,5 +91,16 @@ export const openStep = async (
     return 'closed';
   }
   if (await deps.haltIfOutOfMoney(task, key, state)) return 'closed';
+  // Yield only between settled steps. The next lease inherits the same turn, credits and limits.
+  if (turnWallClockReached(turnStartedAt)) {
+    if (await honorUserControl()) return 'closed';
+    await deps.handoff.store.yieldTaskLease({
+      taskId: task.id,
+      workerId: deps.handoff.config.WORKER_ID,
+      agentStateCiphertext: encryptJson(state, key, `task-state:${task.id}`),
+      actualComputeCredits: state.credits
+    });
+    return 'closed';
+  }
   return 'open';
 };

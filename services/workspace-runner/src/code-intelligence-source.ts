@@ -65,7 +65,7 @@ export const displayRange = (range: CodeRange) => ({
   end: { line: range.end.line + 1, column: range.end.character + 1 }
 });
 
-export function workspaceEdits(value: unknown): Map<string, z.infer<typeof CodeEdit>[]> {
+export function workspaceEdits(value: unknown) {
   const parsed = z
     .object({
       changes: z.record(z.string(), z.array(CodeEdit)).optional(),
@@ -85,12 +85,15 @@ export function workspaceEdits(value: unknown): Map<string, z.infer<typeof CodeE
     })
     .strict()
     .parse(value);
-  const edits = new Map<string, z.infer<typeof CodeEdit>[]>();
+  const edits = Object.assign(new Map<string, z.infer<typeof CodeEdit>[]>(), {
+    versions: new Map<string, number | null | undefined>()
+  });
   for (const [uri, changes] of Object.entries(parsed.changes ?? {})) edits.set(uri, changes);
   for (const document of parsed.documentChanges ?? []) {
     if (edits.has(document.textDocument.uri))
       throw new Error('Language server returned duplicate rename documents');
     edits.set(document.textDocument.uri, document.edits);
+    edits.versions.set(document.textDocument.uri, document.textDocument.version);
   }
   if (edits.size > 32 || [...edits.values()].reduce((sum, rows) => sum + rows.length, 0) > 500)
     throw new Error('Rename exceeds the bounded preview; narrow the project root');

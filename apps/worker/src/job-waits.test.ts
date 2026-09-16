@@ -85,6 +85,39 @@ async function fixture() {
 }
 
 describe('durable job wakeups', () => {
+  it('yields a held lease without losing state, money or the owner stop', async () => {
+    const f = await fixture();
+    await database.query(
+      "UPDATE tasks SET status='running',attempt=3,lease_owner='worker',lease_expires_at=NOW()+INTERVAL '1 hour' WHERE id=$1",
+      [f.task.id]
+    );
+    const saved = encryptJson(
+      { ...f.state, step: 75, selfContinuations: 2 },
+      f.key,
+      `task-state:${f.task.id}`
+    );
+    const input = {
+      taskId: f.task.id,
+      workerId: 'worker',
+      agentStateCiphertext: saved,
+      actualComputeCredits: 0.2
+    };
+    expect(await store.yieldTaskLease(input)).toBe(true);
+    const task = await store.getTask(f.user.id, f.task.id);
+    expect(task).toMatchObject({
+      status: 'queued',
+      leaseOwner: null,
+      attempt: 0,
+      maxComputeCredits: 1,
+      actualComputeCredits: 0.2
+    });
+    expect(task!.agentStateCiphertext).toEqual(saved);
+    expect(await store.yieldTaskLease(input)).toBe(false);
+    await store.setTaskStatusForUser(f.user.id, f.task.id, 'paused');
+    expect(await store.yieldTaskLease(input)).toBe(false);
+    expect((await store.getTask(f.user.id, f.task.id))?.status).toBe('paused');
+  });
+
   it.each(['completed', 'failed', 'stopped', 'interrupted', 'timed_out'])(
     'queues one continuation for %s with no command replay',
     async (terminal) => {

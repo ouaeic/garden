@@ -84,6 +84,7 @@ const NON_MUTATING_TOOLS = new Set([
  * the shell, which is most of them, can never ground a completion.
  */
 export const isMutatingToolCall = (name: string, args: Record<string, unknown> = {}): boolean => {
+  if (name === 'code_diagnostics' && args.action === 'apply') return true;
   if (name === 'project_update') return args.action === 'checkout';
   if (NON_MUTATING_TOOLS.has(name)) return false;
   // Zoom returns captured pixels without sending input or writing a workspace artifact.
@@ -381,6 +382,12 @@ const screenshotPaths = (args: Record<string, unknown>): string[] => {
 };
 
 export const writtenPaths = (name: string, args: Record<string, unknown>): string[] => {
+  if (name === 'code_diagnostics' && args.action === 'apply') {
+    const paths = (args.options as { paths?: unknown } | undefined)?.paths;
+    return Array.isArray(paths)
+      ? paths.filter((item): item is string => typeof item === 'string')
+      : [];
+  }
   if (name === 'file_write' || name === 'print_pdf') return [textValue(args.path)].filter(Boolean);
   if (name === 'browser_action') return screenshotPaths(args);
   // A redirect writes the brief as surely as file_write does, and the whole point of the durable
@@ -413,7 +420,13 @@ export const writtenPaths = (name: string, args: Record<string, unknown>): strin
  * here for the one path it ever writes, a screenshot's, which goes through the same boundary as a
  * printed page's. @see isDeferredExecutionPath
  */
-const PATH_CONFINED_TOOLS = new Set(['file_write', 'file_patch', 'print_pdf', 'browser_action']);
+const PATH_CONFINED_TOOLS = new Set([
+  'file_write',
+  'file_patch',
+  'print_pdf',
+  'browser_action',
+  'code_diagnostics'
+]);
 
 /**
  * The paths this call leaves for a later, more privileged process to execute.

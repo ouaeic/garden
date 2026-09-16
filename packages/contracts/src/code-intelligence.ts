@@ -14,14 +14,17 @@ export const CodeIntelligenceRequest = z
       'implementation',
       'type_definition',
       'code_actions',
+      'apply',
       'rename'
     ]),
-    language: z.enum(['typescript', 'python']),
+    language: z.enum(['typescript', 'python', 'r']),
     root: z.string().max(4096).default('workspace'),
     path: z.string().max(4096).optional(),
     line: z.number().int().positive().optional(),
     column: z.number().int().positive().optional(),
-    newName: z.string().min(1).max(200).optional()
+    newName: z.string().min(1).max(200).optional(),
+    previewId: z.string().uuid().optional(),
+    paths: z.array(z.string().max(4096)).min(1).max(32).optional()
   })
   .strict();
 export type CodeIntelligenceRequest = z.infer<typeof CodeIntelligenceRequest>;
