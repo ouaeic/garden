@@ -1064,6 +1064,8 @@ const runnerResponse = (
   // Before any branch decides what to answer, because the question this record answers is what the
   // loop ASKED for, and a route recorded inside a branch is a route somebody already modelled.
   state.observed.push(routeName(url, init));
+  if (url.endsWith('/repository-map'))
+    return json({ available: false, reason: 'Lexical repository fixture' });
   if (url.endsWith('/documents')) {
     const path = asText(body.path);
     return json({

@@ -1,3 +1,4 @@
+import { invalidateWorkspaceReadCache } from './read-invalidation.js';
 import { randomUUID } from 'node:crypto';
 import { decryptJson, encryptJson, unwrapDataKey } from '@athanor/core';
 import type { DataStore, TaskRecord } from '@athanor/data';
@@ -180,6 +181,7 @@ export async function reconcileJobWaits(
       }
       if (!ready) continue;
       // Only schema-checked process metadata enters the window. Command output is read through its normal taint path.
+      invalidateWorkspaceReadCache(state);
       delete state.jobWaitId;
       state.messages.push({
         role: 'system',

@@ -1,3 +1,4 @@
+import { RepositoryMapper, registerRepositoryMapRoute } from './repository-map.js';
 import { WorkflowManager } from './workflows.js';
 import { registerWorkflowRoutes } from './workflow-routes.js';
 import { registerDocumentRoutes } from './document-routes.js';
@@ -402,6 +403,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
     systemPackageHelper: config.SYSTEM_PACKAGE_HELPER,
     hostStorage: probeHostStorage
   };
+  const repositoryMapper = new RepositoryMapper();
   const codeIntelligence = new CodeIntelligenceManager({
     isolateNetwork: config.ISOLATE_AGENT_NETWORK,
     sandbox,
@@ -1173,6 +1175,12 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
   );
 
   registerDocumentRoutes(app, config.WORKSPACE_ROOT, {
+    maximumSeconds: config.MAX_EXECUTION_SECONDS,
+    isolateNetwork: config.ISOLATE_AGENT_NETWORK,
+    sandbox,
+    guards
+  });
+  registerRepositoryMapRoute(app, config.WORKSPACE_ROOT, repositoryMapper, {
     maximumSeconds: config.MAX_EXECUTION_SECONDS,
     isolateNetwork: config.ISOLATE_AGENT_NETWORK,
     sandbox,
@@ -2468,6 +2476,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
     await sessionSweep;
     await computations.close();
     await debuggers.close();
+    repositoryMapper.close();
     await codeIntelligence.close();
     await processes.close();
   });

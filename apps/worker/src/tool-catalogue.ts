@@ -859,18 +859,13 @@ export const agentTools: ModelTool[] = [
   {
     name: 'repo_overview',
     description:
-      // "an even sample" rather than "its tracked files", which stopped being true when the file
-      // list became a stride: it shows 6 of this repository's 114 directories completely and 87 of
-      // them partially, where the prefix it replaced showed 55 completely and 3 partially. Paid
-      // for inside the wire ceiling rather than added to it - "falls back to listing" and "all you
-      // need" gave back more than "an even sample of" costs, so the whole edit is four bytes under
-      // where it started. The ceiling caught the first attempt at +101 and was right to.
-      'Map an unfamiliar repository before editing it: an even sample of its tracked files, its working-tree state, and the symbols that matter, in one compact result. Run it once as work in a codebase starts and narrow from there. Outside a Git working tree it says so and lists the files it finds, so use files_list when one directory is enough.',
+      'Map repository files, Git state and source-linked definitions/candidate callers. Uses bounded structural parsing with explicit gaps and a lexical fallback. Narrow path or query to focus; use files_list for a directory listing.',
     parameters: {
       type: 'object',
       additionalProperties: false,
       properties: {
         path: { type: 'string', default: 'workspace' },
+        query: { type: 'string', maxLength: 2000, description: 'Relevant symbol or task terms.' },
         maxFiles: { type: 'integer', minimum: 20, maximum: 1000, default: 400 }
       }
     }

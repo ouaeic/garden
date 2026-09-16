@@ -95,21 +95,7 @@ export const REPEATABLE_TOOLS = new Set([
  */
 export const REPEATABLE_TOOLS_THAT_WRITE: ReadonlySet<string> = new Set(['code_diagnostics']);
 
-/**
- * Tools where the same call twice in one turn cannot say anything the first did not.
- *
- * A loop is the failure mode a step budget contains rather than prevents: an agent that cannot find
- * something re-runs the identical search, gets the identical answer, and spends forty steps and the
- * owner's money learning nothing. The budget stops it eventually, but the run ends at a ceiling
- * with the work undone rather than at the point the agent should have tried something else.
- *
- * Narrow on purpose. These are the tools whose answer is a pure function of the workspace and the
- * arguments within one turn, so a byte-identical repeat is byte-identically uninformative. Polling
- * and re-observation are deliberately absent - `process` is how the model is told to watch a build,
- * `browser_snapshot` and `desktop_observe` take no arguments at all so every call looks identical,
- * and `shell` may legitimately be run twice to see whether anything changed. Repeating those is the
- * documented way to use them, not a symptom.
- */
+/** Exact read repeats are suppressed until an observed write or job update invalidates their inputs. */
 export const IDEMPOTENT_WITHIN_TURN = new Set([
   // The only member that costs money to repeat. Transcription is billed by the minute, so a second
   // identical reading of the same window of the same recording buys the same text twice.

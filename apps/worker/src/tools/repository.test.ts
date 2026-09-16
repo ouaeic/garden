@@ -1433,10 +1433,11 @@ describe('a repository read answering the same thing twice', () => {
       return emit(args);
     });
 
-    expect((first as { importantSymbols: string[] }).importantSymbols).toHaveLength(
-      OVERVIEW_SYMBOL_BUDGET
-    );
-    expect((first as { filesRepresented: number }).filesRepresented).toBe(OVERVIEW_SYMBOL_BUDGET);
+    const shown = (first as { importantSymbols: string[] }).importantSymbols;
+    expect(shown.length).toBeGreaterThan(0);
+    expect(shown.length).toBeLessThanOrEqual(OVERVIEW_SYMBOL_BUDGET);
+    expect(Buffer.byteLength(JSON.stringify(first))).toBeLessThanOrEqual(24_000);
+    expect((first as { filesRepresented: number }).filesRepresented).toBe(shown.length);
     expect(first).toEqual(second);
   });
 
@@ -1600,4 +1601,63 @@ describe('a repository read answering the same thing twice', () => {
     );
     expect(first).toEqual(second);
   });
+});
+
+it('uses structural symbols without running duplicate lexical scans and forwards the focus query', async () => {
+  const requests: Array<{ scopes: string; route: string; input: Record<string, unknown> }> = [];
+  const symbol = {
+    name: 'countBases',
+    path: 'analysis.py',
+    hash: 'a'.repeat(64),
+    line: 3,
+    endLine: 9,
+    kind: 'function',
+    signature: 'countBases(sequence)',
+    candidateCallers: [{ path: 'main.py', line: 8, caller: 'run' }]
+  };
+  const context = {
+    task: { workspaceId: 'w', id: 't' },
+    runner: {
+      call: async (
+        _w: string,
+        _t: string,
+        scopes: string,
+        route: string,
+        input: Record<string, unknown>
+      ) => {
+        requests.push({ scopes, route, input });
+        if (route.endsWith('/repository-map'))
+          return {
+            engine: 'tree-sitter',
+            importantSymbols: [symbol],
+            parsedPaths: ['analysis.py'],
+            symbolCount: 1,
+            symbolsTruncated: false,
+            coverage: { scanComplete: true, unsupportedSourceFiles: 0 }
+          };
+        const args = input.args as string[];
+        return {
+          stdout:
+            args[0] === 'status'
+              ? '## main'
+              : input.executable === 'git'
+                ? 'analysis.py\nmain.py\n'
+                : 'README.md\n'
+        };
+      }
+    }
+  } as unknown as ToolContext;
+  const result = (await executeRepositoryTool(context, {
+    id: 'map',
+    name: 'repo_overview',
+    arguments: { query: 'countBases' }
+  })) as Record<string, unknown>;
+  expect(requests).toHaveLength(4);
+  expect(requests.find((request) => request.route.endsWith('/repository-map'))).toMatchObject({
+    scopes: 'files.read',
+    input: { query: 'countBases', path: 'workspace' }
+  });
+  expect(requests.filter((request) => request.input.executable === 'rg')).toHaveLength(1);
+  expect(result.importantSymbols).toEqual([symbol]);
+  expect(result.mapping).toMatchObject({ engine: 'tree-sitter' });
 });

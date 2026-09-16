@@ -1468,7 +1468,7 @@ describe('the repository arms', () => {
     expect(symbols?.args.join(' ')).toContain('--sort path');
   });
 
-  it('reads a repository with five commands at once and answers from all of them', async () => {
+  it('falls back to lexical mapping when structural parsing is unavailable', async () => {
     const executed = await dispatch(
       { name: 'repo_overview', arguments: { path: 'workspace/app' } },
       {
@@ -1484,23 +1484,26 @@ describe('the repository arms', () => {
       }
     );
 
-    // Five: the working-tree state, the tracked files, the symbol sweep, the import sweep the
-    // symbols are ranked by, and the instruction files. They go out together, so what the fifth
-    // adds to a call bounded at 90 seconds is the difference between the slowest two of them -
-    // measured on this repository, 36 ms for the import sweep against 57 ms for the symbols.
-    expect(executed.calls).toHaveLength(5);
-    expect(
-      executed.calls.map((entry) => (entry.body as { executable: string }).executable)
-    ).toEqual(['git', 'git', 'rg', 'rg', 'rg']);
-    expect(executed.calls.every((entry) => entry.path === `${root}/exec`)).toBe(true);
-    expect(executed.calls.every((entry) => entry.scopes.join() === 'exec')).toBe(true);
+    const commands = executed.calls.filter((entry) => entry.path === `${root}/exec`);
+    expect(commands).toHaveLength(5);
+    expect(commands.map((entry) => (entry.body as { executable: string }).executable)).toEqual([
+      'git',
+      'git',
+      'rg',
+      'rg',
+      'rg'
+    ]);
+    expect(commands.every((entry) => entry.scopes.join() === 'exec')).toBe(true);
+    expect(executed.calls.filter((entry) => entry.path === `${root}/repository-map`)).toMatchObject(
+      [{ scopes: ['files.read'], body: { path: 'workspace/app', query: '', maxSymbols: 120 } }]
+    );
     expect(executed.calls[0]?.body).toEqual({
       executable: 'git',
       args: ['status', '--short', '--branch'],
       cwd: 'workspace/app',
       timeoutSeconds: 90
     });
-    expect(executed.calls[1]?.body).toMatchObject({ args: ['ls-files'] });
+    expect(executed.calls[1]?.body).toMatchObject({ args: ['ls-files', '-z'] });
     expect(executed.result).toMatchObject({
       path: 'workspace/app',
       versionControl: '## main\n M a.ts',

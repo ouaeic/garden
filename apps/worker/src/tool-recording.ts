@@ -1,3 +1,4 @@
+import { invalidateWorkspaceReadCache } from './read-invalidation.js';
 import { evidenceProgressKey } from './progress.js';
 /**
  * What a turn writes down about a tool call: the timeline row, the window entry, the provenance it
@@ -176,6 +177,8 @@ export const recordToolFailure = async (
   call: ModelToolCall,
   error: unknown
 ): Promise<void> => {
+  if (isMutatingToolCall(call.name, call.arguments) || call.name === 'code_diagnostics')
+    invalidateWorkspaceReadCache(state);
   const message = error instanceof Error ? error.message : 'Tool failed';
   const wall = botWallFromError(error);
   await event(deps.store, task, key, 'error', `${call.name} failed`, {
@@ -583,6 +586,13 @@ export const recordToolResult = async (
     ...(writesOnlyProse(call.name, call.arguments) ? { proseOnly: true } : {}),
     ...(shellObservation(call, result) ?? {})
   };
+  if (
+    !skipped &&
+    (isMutatingToolCall(call.name, call.arguments) ||
+      call.name === 'code_diagnostics' ||
+      (call.name === 'process' && call.arguments.action !== 'describe'))
+  )
+    invalidateWorkspaceReadCache(state);
   const modelResult = boundedToolResultForModel(call.name, result, imageSummary);
   /*
    * Every untrusted result carries its own fence, not just the first one in the turn.

@@ -40,7 +40,14 @@ async function fixture() {
     [task.id]
   );
   const id = randomUUID();
-  const state: AgentState = { messages: [], step: 3, credits: 0.01, turn: 1, jobWaitId: id };
+  const state: AgentState = {
+    messages: [],
+    step: 3,
+    credits: 0.01,
+    turn: 1,
+    jobWaitId: id,
+    seenCalls: { 'file_read:{}': 'stale', 'memory_recall:{}': 'memory' }
+  };
   const startedAt = '2026-09-16T12:00:00.000Z';
   const input = {
     id,
@@ -149,6 +156,7 @@ describe('durable job wakeups', () => {
       expect(ready).toMatchObject({ status: 'queued', actualComputeCredits: 0.01 });
       const resumed = decryptJson<AgentState>(ready!.agentStateCiphertext!, f.key);
       expect(resumed.jobWaitId).toBeUndefined();
+      expect(resumed.seenCalls).toEqual({ 'memory_recall:{}': 'memory' });
       expect(resumed.messages.at(-1)?.content).toContain(terminal);
       expect(f.call).toHaveBeenCalledTimes(2);
     }

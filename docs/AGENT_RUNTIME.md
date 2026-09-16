@@ -132,6 +132,15 @@ and completion.
 Order is fixed for the life of a task rather than assembled per step, because the tool block opens
 the prompt prefix: a definition that moves position ends the shared prefix at that point.
 
+`repo_overview` parses TypeScript, JavaScript, Python, R and C/C++ with bundled text-only grammars.
+Its bounded map ranks definitions by the supplied query and candidate call sites, retaining source
+locations and file hashes. Caller links are syntactic candidates, not proof of dynamic dispatch or
+type resolution. Parse failures, skipped files and truncated scans are reported; lexical symbols
+remain available for unsupported or partially parsed files. The in-memory parse cache is keyed by
+language and current file content, with no persistent index or execution of project configuration.
+Workspace writes, commands that may have partially failed, and background-job observations clear
+the turn's duplicate-read cache so subsequent verification can read the changed source.
+
 The model must finish with verification evidence, and the evidence must post-date its last change. A
 plain assistant message does not mark a task complete.
 
