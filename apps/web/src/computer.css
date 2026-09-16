@@ -319,6 +319,40 @@ button.computer-file-row:hover {
   align-self: center;
   white-space: nowrap;
 }
+
+.garden-browser-recovery {
+  margin: 0.75rem 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+}
+.garden-browser-recovery summary {
+  cursor: pointer;
+}
+.garden-browser-recovery ul {
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.75rem;
+}
+.garden-browser-recovery li {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.garden-browser-recovery .button {
+  justify-self: start;
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.garden-browser-recovery li span {
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .garden-screen-surface .computer-screen {
   width: 100%;
 }

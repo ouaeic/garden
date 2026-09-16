@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { DesktopHolder, BrowserTabState, BrowserTabCleanup } from '@athanor/contracts';
+import type {
+  DesktopHolder,
+  BrowserTabState,
+  BrowserTabCleanup,
+  BrowserRecovery
+} from '@athanor/contracts';
 import { Maximize2, Minimize2, Pin, X } from 'lucide-react';
 import { remotePoint } from './screen-geometry';
 import { useExpandedView } from '../use-expanded-view';
@@ -20,6 +25,7 @@ interface ScreenState {
   botWall?: { vendor?: string; reason?: string; url?: string; tabId?: string | null } | null;
   tabs?: BrowserTabState[];
   cleanup?: BrowserTabCleanup;
+  recovery?: BrowserRecovery;
 }
 interface Snapshot {
   screenshotBase64?: string;
@@ -618,6 +624,63 @@ export default function Screen({
             </span>
           )}
         </div>
+      )}
+      {surface === 'browser' && state.holder !== 'secure_input' && state.recovery && (
+        <>
+          {state.recovery.unavailable && (
+            <p className="muted">
+              The browser recovery list could not be saved or read. Current tabs are still
+              available.
+            </p>
+          )}
+          {(state.recovery.tabs.length > 0 || state.recovery.omitted > 0) && (
+            <details className="garden-browser-recovery">
+              <summary>Pages from before restart ({state.recovery.tabs.length})</summary>
+              <p>
+                Reopening restores the address. Unsaved form entries are not recovered. Check
+                whether a submission succeeded before repeating it.
+              </p>
+              {!controlling && <p>Take control to reopen a page.</p>}
+              <ul>
+                {state.recovery.tabs.map((tab) => (
+                  <li key={tab.tabId}>
+                    <button
+                      className="button"
+                      disabled={!controlling || inputBusy}
+                      title={tab.url}
+                      onClick={() =>
+                        void run(async () => {
+                          await action({ type: 'new_tab', url: tab.url });
+                          setState((current) => ({
+                            ...current,
+                            ...(current.recovery
+                              ? {
+                                  recovery: {
+                                    ...current.recovery,
+                                    tabs: current.recovery.tabs.filter(
+                                      (saved) => saved.tabId !== tab.tabId
+                                    )
+                                  }
+                                }
+                              : {})
+                          }));
+                        })
+                      }
+                    >
+                      Reopen {tab.title || tab.url}
+                    </button>
+                    <span title={tab.url}>{tab.url}</span>
+                  </li>
+                ))}
+              </ul>
+              {state.recovery.omitted > 0 && (
+                <p>
+                  {state.recovery.omitted} additional pages are outside the saved recovery list.
+                </p>
+              )}
+            </details>
+          )}
+        </>
       )}
       {surface === 'browser' && (
         <form

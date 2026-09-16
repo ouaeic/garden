@@ -1,4 +1,6 @@
 import type { BrowserActionProgress } from './browser-action-journal.js';
+import { BrowserTabJournal, recoverableTabUrl } from './browser-tab-journal.js';
+import type { BrowserRecovery } from '@athanor/contracts';
 import { signatureControl } from './human-input.js';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
@@ -47,6 +49,7 @@ import { DesktopControl } from './holder.js';
 import { chromiumDriver } from './playwright.js';
 
 export interface BrowserStreamState {
+  recovery?: BrowserRecovery | undefined;
   url: string;
   title: string;
   holder: 'agent' | 'user' | 'secure_input';
@@ -138,6 +141,10 @@ export class BrowserDownloadHistory {
 }
 
 interface Session {
+  recovery?: BrowserRecovery;
+  recoveryTimer?: NodeJS.Timeout;
+  recoverySignature?: string;
+  ending?: boolean;
   context: BrowserContext;
   page: Page;
   /** The workspace this session belongs to, so shutting it down can clean up after it. */
@@ -285,6 +292,7 @@ export interface BrowserFailedRequest {
 }
 
 export interface BrowserSnapshotParts {
+  recovery?: BrowserRecovery | undefined;
   url: string;
   title: string;
   holder: 'agent' | 'user' | 'secure_input';
@@ -350,6 +358,7 @@ export const composeBrowserSnapshot = (
     elementsOmitted: parts.elementsOmitted,
     framesOmitted: parts.framesOmitted,
     tabs: parts.tabs,
+    ...(parts.recovery ? { recovery: parts.recovery } : {}),
     downloads: parts.downloads,
     pendingDialog: parts.pendingDialog,
     consoleMessages: parts.consoleMessages,
@@ -1799,6 +1808,7 @@ export const releaseBrowserInput = async (page: Page): Promise<void> => {
 };
 
 export class BrowserManager {
+  readonly #tabJournal: BrowserTabJournal | undefined;
   readonly #sessions = new Map<string, Session>();
   readonly #humanReceipts = new WeakMap<
     Page,
@@ -1819,6 +1829,7 @@ export class BrowserManager {
 
   constructor(
     private readonly options: {
+      recoverySecret?: string;
       executablePath?: string | undefined;
       /**
        * How far down the scheduler this workspace's browser sits, and what applies it.
@@ -1859,7 +1870,56 @@ export class BrowserManager {
       maxFileBytes: number;
       now?: () => number;
     }
-  ) {}
+  ) {
+    this.#tabJournal = options.recoverySecret
+      ? new BrowserTabJournal(options.recoverySecret)
+      : undefined;
+  }
+
+  #recovery(session: Session): BrowserRecovery | undefined {
+    if (!session.recovery || session.control.holder === 'secure_input') return undefined;
+    const live = new Set(
+      [...session.tabs.values()].filter((page) => !page.isClosed()).map((page) => page.url())
+    );
+    session.recovery.tabs = session.recovery.tabs.filter((tab) => !live.has(tab.url));
+    return session.recovery;
+  }
+
+  async #rememberTabs(session: Session): Promise<void> {
+    if (!this.#tabJournal || session.ending || session.control.holder === 'secure_input') return;
+    // The last tab cannot be closed through the action API; an empty set is browser teardown.
+    if (![...session.tabs.values()].some((page) => !page.isClosed())) return;
+    const previous = this.#recovery(session);
+    const tabs = this.#tabStates(session)
+      .filter((tab) => recoverableTabUrl(tab.url))
+      .map((tab) => ({
+        tabId: tab.tabId,
+        url: tab.url,
+        title: tab.title,
+        lastSeenAt: new Date(this.#now()).toISOString()
+      }));
+    const saved = [...tabs, ...(previous?.tabs ?? [])];
+    const signature = JSON.stringify({
+      tabs: saved.map(({ tabId, url, title }) => ({ tabId, url, title })),
+      omitted: previous?.omitted ?? 0
+    });
+    if (signature === session.recoverySignature) return;
+    try {
+      await this.#tabJournal.save(session.root, saved, previous?.omitted ?? 0);
+      session.recoverySignature = signature;
+    } catch {
+      if (session.recovery) session.recovery.unavailable = true;
+    }
+  }
+
+  #scheduleTabMemory(session: Session): void {
+    if (!this.#tabJournal || session.ending || session.recoveryTimer) return;
+    session.recoveryTimer = setTimeout(() => {
+      delete session.recoveryTimer;
+      void this.#rememberTabs(session);
+    }, 250);
+    session.recoveryTimer.unref();
+  }
 
   #now(): number {
     return this.options.now?.() ?? Date.now();
@@ -2165,6 +2225,18 @@ export class BrowserManager {
   }
 
   async #start(workspaceId: string, root: string): Promise<Session> {
+    const recovery: BrowserRecovery = {
+      tabs: [],
+      omitted: 0,
+      note: 'These pages were open before the browser restarted. Reopen a URL in a new tab, then inspect the page. Unsaved form state is not restored. Never repeat a submission merely because its tab closed; consult its action receipt and verify the outcome.'
+    };
+    if (this.#tabJournal) {
+      try {
+        Object.assign(recovery, await this.#tabJournal.read(root));
+      } catch {
+        recovery.unavailable = true;
+      }
+    }
     const profile = path.join(root, '.athanor', 'browser');
     // systemd kills the runner's full process group on restart. Chromium can
     // nevertheless leave these exact profile locks behind after a crash.
@@ -2225,6 +2297,8 @@ export class BrowserManager {
     context.once('close', () => {
       closed = true;
       if (!active) return;
+      active.ending = true;
+      if (active.recoveryTimer) clearTimeout(active.recoveryTimer);
       if (active.tabSweep) clearInterval(active.tabSweep);
       active.detachControl?.();
       delete active.detachControl;
@@ -2242,6 +2316,7 @@ export class BrowserManager {
     try {
       const page = context.pages()[0] ?? (await context.newPage());
       const session: Session = {
+        ...(this.#tabJournal ? { recovery } : {}),
         context,
         page,
         root,
@@ -2357,6 +2432,9 @@ export class BrowserManager {
         };
         candidate.on('domcontentloaded', republish);
         candidate.on('load', republish);
+        candidate.on('framenavigated', (frame) => {
+          if (!frame.parentFrame()) this.#notifyStreamState(session);
+        });
         candidate.on('download', (download) => {
           if (session.pendingDownloads.size >= DOWNLOAD_SAVE_LIMIT) {
             const url = download.url().slice(0, 2_000);
@@ -2587,6 +2665,7 @@ export class BrowserManager {
         elementsOmitted: 0,
         framesOmitted: 0,
         tabs: await sessionTabs(session),
+        recovery: this.#recovery(session),
         downloads: [],
         pendingDialog: null,
         consoleMessages: [],
@@ -2627,6 +2706,7 @@ export class BrowserManager {
         elementsOmitted: scan.elementsOmitted,
         framesOmitted: scan.framesOmitted,
         tabs: await sessionTabs(session),
+        recovery: this.#recovery(session),
         // A download that outlived the action that started it is only discoverable here.
         downloads: session.downloads.recent.slice(-10),
         pendingDialog: session.pendingDialog
@@ -3083,6 +3163,7 @@ export class BrowserManager {
       height: BROWSER_VIEWPORT.height,
       transport: 'chromium_screencast',
       tabs: session.control.holder === 'secure_input' ? [] : this.#tabStates(session),
+      recovery: this.#recovery(session),
       cleanup: { ...this.#tabLifecycle(session).cleanup },
       botWall: session.walls.latest(),
       pendingDialog: session.pendingDialog
@@ -3100,6 +3181,7 @@ export class BrowserManager {
   }
 
   #notifyStreamState(session: Session): void {
+    this.#scheduleTabMemory(session);
     if (!session.stream) return;
     const state = this.#streamState(session);
     for (const subscriber of session.stream.subscribers) subscriber.state(state);
@@ -3372,12 +3454,16 @@ export class BrowserManager {
     const shared = await this.#sharedControl(workspaceId, root);
     shared?.authorize(actor);
     const session = await this.ensure(workspaceId, root);
-    return this.#adopt(session, shared).submit(actor, (signal) =>
-      this.#raceTakeover(
-        signal,
-        this.#act(session, root, action, actor, consequentialApproved, signal, taskId, progress)
-      )
-    );
+    return this.#adopt(session, shared).submit(actor, async (signal) => {
+      try {
+        return await this.#raceTakeover(
+          signal,
+          this.#act(session, root, action, actor, consequentialApproved, signal, taskId, progress)
+        );
+      } finally {
+        await this.#rememberTabs(session);
+      }
+    });
   }
 
   /**
@@ -3955,6 +4041,9 @@ export class BrowserManager {
     session.detachControl?.();
     delete session.detachControl;
     this.#attached.delete(session);
+    await this.#rememberTabs(session);
+    session.ending = true;
+    if (session.recoveryTimer) clearTimeout(session.recoveryTimer);
     await session.context.close();
     await clearStagedUploads(session.root);
   }

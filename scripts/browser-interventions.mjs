@@ -159,6 +159,42 @@ export async function checkHumanInterventions({ context, origin, task, report })
       frames.filter((frame) => frame.type === 'action' && frame.action.type === 'new_tab').length,
       1
     );
+    state.recovery = {
+      tabs: [
+        {
+          tabId: 'tab-before-restart',
+          title: 'Research before restart',
+          url: 'https://example.invalid/recorded-research?query=' + 'long-page-name-'.repeat(14),
+          lastSeenAt: '2026-09-17T00:00:00.000Z'
+        }
+      ],
+      omitted: 0,
+      note: 'Reopen the address and inspect the outcome. Form entries are not restored.'
+    };
+    publish();
+    await page.getByText('Pages from before restart (1)', { exact: true }).click();
+    const reopen = page.getByRole('button', {
+      name: 'Reopen Research before restart',
+      exact: true
+    });
+    assert(await reopen.isDisabled(), 'Restoring a page requires control');
+    await page.getByRole('button', { name: 'Take control', exact: true }).click();
+    for (const width of [1440, 390, 320]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await reopen.scrollIntoViewIfNeeded();
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
+      await page.screenshot({ path: resolve(report, `browser-recovery-${width}.png`) });
+    }
+    const beforeReopen = frames.filter((frame) => frame.type === 'action').length;
+    await reopen.click();
+    await reopen.waitFor({ state: 'detached' });
+    const recoveryActions = frames.filter((frame) => frame.type === 'action').slice(beforeReopen);
+    assert.deepEqual(
+      recoveryActions.map((frame) => frame.action),
+      [{ type: 'new_tab', url: state.recovery.tabs[0].url }]
+    );
+    state.recovery.tabs = [];
+    publish();
     console.log(
       'Human handoff browser checks passed: exact tab, curved gesture, private blackout, reconnection, lost-page recovery, responsive layout, and single completion without replay.'
     );

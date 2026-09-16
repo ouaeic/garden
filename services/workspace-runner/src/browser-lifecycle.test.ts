@@ -8,6 +8,7 @@ import { BrowserDownloadHistory, BrowserManager } from './browser.js';
 import { DesktopControl } from './holder.js';
 import { runnerLogger } from './log.js';
 import { TAB_IDLE_MS } from './browser-tabs.js';
+import { BrowserTabJournal } from './browser-tab-journal.js';
 
 const deferred = <T>() => {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -66,6 +67,61 @@ afterEach(async () => {
 });
 
 describe('persistent browser ownership', () => {
+  it('retains lost tab metadata without reopening or replaying a page', async () => {
+    const { manager, root } = await setup({ recoverySecret: 'test-recovery-key' });
+    const first = await manager.ensure(workspace, root);
+    const oldId = [...first.tabs.keys()][0]!;
+    contexts[0]!.page.url.mockReturnValue('https://example.com/result');
+    contexts[0]!.page.title.mockResolvedValue('Completed application');
+    contexts[0]!.page.emit('load');
+    await vi.waitFor(() => expect(first.tabLifecycle!.title(oldId)).toBe('Completed application'));
+    await manager.close(workspace);
+    const next = await manager.ensure(workspace, root);
+    const snapshot = await manager.snapshot(workspace, root, 'agent');
+    expect(next.tabs.has(oldId)).toBe(false);
+    expect(next.page.url()).toBe('about:blank');
+    expect(snapshot.recovery?.tabs).toEqual([
+      expect.objectContaining({
+        tabId: oldId,
+        title: 'Completed application',
+        url: 'https://example.com/result'
+      })
+    ]);
+    expect(snapshot.recovery?.note).toMatch(/Never repeat a submission/);
+    contexts[1]!.page.url.mockReturnValue('https://example.com/result');
+    expect((await manager.snapshot(workspace, root, 'agent')).recovery?.tabs).toEqual([]);
+  });
+
+  it('does not erase remembered tabs when page-close events precede a browser crash', async () => {
+    const { manager, root } = await setup({ recoverySecret: 'test-recovery-key' });
+    await manager.ensure(workspace, root);
+    contexts[0]!.page.url.mockReturnValue('https://example.com/report');
+    contexts[0]!.page.emit('load');
+    const journal = new BrowserTabJournal('test-recovery-key');
+    await vi.waitFor(async () => expect((await journal.read(root)).tabs).toHaveLength(1));
+    contexts[0]!.page.emit('close');
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    contexts[0]!.emit('close');
+    const snapshot = await manager.snapshot(workspace, root, 'agent');
+    expect(snapshot.recovery?.tabs[0]?.url).toBe('https://example.com/report');
+  });
+
+  it('excludes private-input state and reports unavailable recovery without blocking current work', async () => {
+    const { manager, root } = await setup({ recoverySecret: 'test-recovery-key' });
+    await mkdir(path.join(root, '.athanor/browser-tabs'), { recursive: true });
+    await writeFile(path.join(root, '.athanor/browser-tabs/state.json'), 'invalid encrypted state');
+    const session = await manager.ensure(workspace, root);
+    expect((await manager.snapshot(workspace, root, 'agent')).recovery?.unavailable).toBe(true);
+    await session.control.transfer('secure_input');
+    contexts[0]!.page.url.mockReturnValue('https://example.com/?code=PRIVATE_CANARY');
+    contexts[0]!.page.emit('load');
+    expect(await manager.snapshot(workspace, root, 'user')).not.toHaveProperty('recovery');
+    await manager.close(workspace);
+    expect(
+      await readFile(path.join(root, '.athanor/browser-tabs/state.json'), 'utf8')
+    ).not.toContain('PRIVATE_CANARY');
+  });
+
   it('retires only idle unpinned agent sessions and can reopen them', async () => {
     let now = 1;
     const { manager, root } = await setup({ now: () => now });

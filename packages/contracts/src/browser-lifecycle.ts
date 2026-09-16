@@ -21,3 +21,17 @@ export type BrowserTabCleanup = z.infer<typeof BrowserTabCleanup>;
 
 export const BrowserTabRetentionRequest = z.object({ pinned: z.boolean() });
 export type BrowserTabRetentionRequest = z.infer<typeof BrowserTabRetentionRequest>;
+
+export const BrowserRecoveredTab = z.object({
+  tabId: z.string().max(100),
+  url: z.string().max(2000),
+  title: z.string().max(500),
+  lastSeenAt: z.string().datetime()
+});
+export type BrowserRecoveredTab = z.infer<typeof BrowserRecoveredTab>;
+export interface BrowserRecovery {
+  tabs: BrowserRecoveredTab[];
+  omitted: number;
+  unavailable?: boolean;
+  note: string;
+}

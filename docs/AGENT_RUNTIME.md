@@ -657,6 +657,14 @@ matches. A changed hash restarts the text and supplies a fresh screenshot.
 
 ## Browser action recovery
 
+Page addresses and titles are stored in a separate encrypted recovery journal. After a browser
+restart, snapshots and the computer pane list pages that are no longer open. Reopening uses the
+normal navigation path and approval floor; startup never loads a saved address or replays a form.
+Every reopened page has a new tab identity. Private-input state and credential-bearing addresses
+are excluded. Missing or unreadable recovery metadata remains explicit while current tabs work.
+The journal does not recover unsaved form entries, script state or proof of a completed submission.
+It coalesces passive page changes and commits action checkpoints without saving unchanged tabs.
+
 Each worker browser action carries an internal identity derived from its checkpointed start and
 provider call ID. The runner commits an encrypted receipt before dispatch and records intent and
 acknowledgement for each step. Duplicate completed requests return their saved result; interrupted

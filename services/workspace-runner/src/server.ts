@@ -314,6 +314,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
   // The browser runs on the workspace's own X server when there is one, so a page sees an
   // ordinary desktop and a person taking over finds the browser on the screen they are watching.
   const browser = new BrowserManager({
+    recoverySecret: config.RUNNER_SHARED_SECRET,
     executablePath: config.BROWSER_EXECUTABLE_PATH,
     /*
      * The session browser yields to the work it is meant to be serving.
