@@ -49,32 +49,6 @@ export const SecurityMode = z.enum(['review', 'balanced', 'autonomous']);
 export type SecurityMode = z.infer<typeof SecurityMode>;
 
 /**
- * How long this conversation is meant to live, which two very different things read.
- *
- * A run that mocks up a page in ten minutes and a run that assembles a genome over three days are
- * the same object here, and both were bounded as though they were the middle case: one step budget,
- * renewable twice, and anything published left serving until somebody removed it. So a quick
- * experiment left a website hosted for ever, and a long analysis stopped at a ceiling designed for
- * a conversation somebody was watching.
- *
- * - `brief` is a thing the owner wants to see and be done with. What it publishes is meant to be
- *   looked at and closed, so it expires in a day rather than joining a list of forgotten sites, and
- *   the run is not renewed past its budget: if it is not finished, the owner is there to say so.
- * - `standard` is the conversation athanor has always run, and stays the default by absence.
- * - `sustained` says the work is expected to outlast the owner's attention. Its step budget renews
- *   far past the interactive ceiling and what it publishes keeps the ordinary idle expiry.
- *
- * What this never moves is money. `maxSpendUsd` and the account's ceilings bound a sustained run
- * exactly as they bound every other one - the guard runs before every step of a renewed budget -
- * so declaring a run long buys it steps and time, never allowance.
- */
-export const TaskLifetime = z.enum(['brief', 'standard', 'sustained']);
-export type TaskLifetime = z.infer<typeof TaskLifetime>;
-
-/** How long a `brief` task's published preview stays up before it expires on its own. */
-export const BRIEF_PREVIEW_EXPIRY_HOURS = 24;
-
-/**
  * Whether this conversation is allowed to change anything yet.
  *
  * `act` is every task athanor has ever run, and it is the default everywhere by absence: a state
@@ -636,8 +610,6 @@ export const Task = z.object({
   spendPausedAt: IsoDate.nullable().default(null),
   /** When this run stopped. Null while it can still do work; cleared again by a follow-up. */
   completedAt: IsoDate.nullable().default(null),
-  /** How long this conversation is meant to live; `standard` unless the owner said otherwise. */
-  lifetime: TaskLifetime.default('standard'),
   queuedMessageCount: z.number().int().nonnegative().default(0),
   /**
    * How many links to a snapshot of this conversation are live - neither revoked nor expired. The
@@ -1686,7 +1658,6 @@ export const CreateTaskRequest = z.object({
   maxComputeCredits: z.number().min(0.01).max(10_000).default(1),
   /** Omitted means "use the account default", not "unlimited". */
   maxSpendUsd: TaskSpendUsd.optional(),
-  lifetime: TaskLifetime.optional(),
   attachments: MessageAttachments.optional()
 });
 export type CreateTaskRequest = z.input<typeof CreateTaskRequest>;
@@ -2240,7 +2211,6 @@ export const SaveDraftRequest = z.object({
         })
         .optional(),
       modelChoices: ProjectModelChoices.optional(),
-      lifetime: TaskLifetime.optional(),
       reasoningEffort: TaskReasoningEffort,
       securityMode: SecurityMode.optional(),
       privacyRoute: PrivacyRoute,

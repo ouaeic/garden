@@ -125,7 +125,6 @@ const buildHarness = async (overrides: Partial<ApiConfig> = {}): Promise<Harness
     SCHEDULER_POLL_MS: 600_000,
     TASK_MAX_STEPS: 3,
     TASK_MAX_SELF_CONTINUATIONS: 0,
-    TASK_SUSTAINED_SELF_CONTINUATIONS: 0,
     SECURITY_EVENT_RETENTION_DAYS: 30,
     LOG_LEVEL: 'silent',
     OPENROUTER_BASE_URL: 'https://openrouter.ai/api/v1',

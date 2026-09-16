@@ -197,7 +197,6 @@ const configFor = (directory: string, overrides: Partial<ApiConfig> = {}): ApiCo
   TASK_MAX_STEPS: 2,
   // Off: every expectation in this file describes a turn that stops at its step ceiling.
   TASK_MAX_SELF_CONTINUATIONS: 0,
-  TASK_SUSTAINED_SELF_CONTINUATIONS: 0,
   SECURITY_EVENT_RETENTION_DAYS: 30,
   OPENROUTER_BASE_URL: 'https://openrouter.ai/api/v1',
   AI_PROVIDER: 'openrouter',

@@ -129,31 +129,8 @@ export const sharedEnv = {
    * runaway guard, and it was set tight enough to cut off ordinary work instead.
    */
   TASK_MAX_STEPS: z.coerce.number().int().min(1).max(400).default(120),
-  /**
-   * How many times one turn may hand itself another step budget rather than stopping for a reply.
-   *
-   * Shared for the same reason as the ceiling above it: the API embeds a worker on the development
-   * shape and builds it from its own parse of the same control.env, so a key only one of them
-   * declares is a box where the embedded worker and the packaged one behave differently on the
-   * identical file - and here that difference is whether an unattended run stops overnight.
-   *
-   * A renewal is granted only when the harness itself has just run the turn's acceptance record and
-   * found it unsatisfied, and only while the turn is still changing things. It buys steps and
-   * nothing else, so three budgets cost no more than one. Zero restores the old behaviour exactly,
-   * and three is a hard bound on how far it can ever be turned up.
-   */
-  TASK_MAX_SELF_CONTINUATIONS: z.coerce.number().int().min(0).max(3).default(2),
-  /**
-   * The ceiling for a run the owner declared sustained, where the work was always going to outlast
-   * their attention - a long analysis, a dataset that takes days.
-   *
-   * Far higher than the interactive ceiling and still a ceiling, because a bound nothing enforces
-   * is not one. What actually stops such a run is money: the spend guard runs before every step of
-   * every renewed budget, so this buys wall clock and steps and never allowance. Sixty budgets at
-   * the default step size is roughly seven thousand steps - a long analysis rather than an infinite
-   * one - and each ceiling still has to be earned by passing a harness-executed acceptance check.
-   */
-  TASK_SUSTAINED_SELF_CONTINUATIONS: z.coerce.number().int().min(0).max(500).default(60),
+  /** Automatic continuation never increases the owner's spending or compute allowance. */
+  TASK_MAX_SELF_CONTINUATIONS: z.coerce.number().int().min(0).max(500).default(60),
   /**
    * Where this box's own API listens. The API binds it; the notifier posts an answer the owner
    * types on the phone to the same task-message route the web client and the command line use, so

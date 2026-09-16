@@ -337,9 +337,6 @@ export const registerTaskRoutes = (context: RouteContext): void => {
           ),
           maxSpendUsd: spendCeilingUsd,
           securityMode: input.securityMode ?? project?.securityMode ?? workspace.securityMode,
-          // Absent means `standard`, which is what every conversation was before one could say how
-          // long it was meant to live - so an owner who does not choose gets exactly what they had.
-          ...(input.lifetime ? { lifetime: input.lifetime } : {}),
           promptCiphertext: encryptJson(
             {
               prompt: input.prompt,

@@ -117,7 +117,6 @@ const buildHarness = async (): Promise<Harness> => {
     // occurrence the next line is about.
     SCHEDULER_POLL_MS: 600_000,
     TASK_MAX_STEPS: 3,
-    TASK_SUSTAINED_SELF_CONTINUATIONS: 0,
     TASK_MAX_SELF_CONTINUATIONS: 0,
     SECURITY_EVENT_RETENTION_DAYS: 30,
     LOG_LEVEL: 'silent',

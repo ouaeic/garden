@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from 'react';
 import { ArrowUpRight, Paperclip, X, Mic, Square, SlidersHorizontal } from 'lucide-react';
-import type { Task, TaskLifetime, TaskReasoningEffort } from '@athanor/contracts';
+import type { Task, TaskReasoningEffort } from '@athanor/contracts';
 import { modeFloors } from './asking-rules';
 import { effortLabel } from './reasoning-options';
 import { isWorking } from './model';
@@ -26,7 +26,6 @@ export default function Composer(props: ComposerProps) {
     modelChoices,
     reasoningEffort,
     privacyRoute,
-    lifetime,
     securityMode,
     cap,
     interrupt,
@@ -53,7 +52,6 @@ export default function Composer(props: ComposerProps) {
     changeModel,
     changeModelChoices,
     changePrivacy,
-    changeLifetime,
     changeEffort,
     changeCap,
     changeSecurityMode,
@@ -251,22 +249,6 @@ export default function Composer(props: ComposerProps) {
           >
             <SlidersHorizontal size={14} />
           </Button>
-          {!task && (
-            <label className="garden-approval-select">
-              <span>Runs for</span>
-              <select
-                aria-label="How long this work is meant to run"
-                title="How long anything this publishes stays up, and how far past one step budget the run may carry itself"
-                value={lifetime}
-                disabled={editingDisabled}
-                onChange={(event) => changeLifetime(event.target.value as TaskLifetime)}
-              >
-                <option value="brief">Minutes — output expires in a day</option>
-                <option value="standard">Normal</option>
-                <option value="sustained">Days — keeps going unattended</option>
-              </select>
-            </label>
-          )}
           <label className="garden-approval-select">
             <span>Approvals</span>
             <select

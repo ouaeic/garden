@@ -117,9 +117,6 @@ const config = (
   // Off unless a test asks for it, so every existing expectation about what happens at the step
   // ceiling still describes a turn that stops there.
   TASK_MAX_SELF_CONTINUATIONS: 0,
-  // A sustained run's ceiling, off by default here for the same reason the interactive one is:
-  // a fixture that renewed its own budget would run the case twice over.
-  TASK_SUSTAINED_SELF_CONTINUATIONS: 0,
   ...overrides
 });
 

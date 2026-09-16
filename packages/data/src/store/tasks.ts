@@ -430,16 +430,14 @@ export class TaskStore {
     maxSpendUsd?: number | null;
     promptCiphertext: EncryptedEnvelope;
     securityMode?: TaskRecord['securityMode'];
-    /** How long this conversation is meant to live; the column's own default is 'standard'. */
-    lifetime?: string;
   }): Promise<TaskRecord> {
     const id = randomUUID();
     const result = await this.database.query(
       `INSERT INTO tasks(
         id,user_id,workspace_id,title,status,model_id,privacy_route,max_compute_credits,
-        prompt_ciphertext,security_mode,max_spend_usd,name_tsv,reasoning_effort,lifetime,project_id,model_override,conversation_source_ciphertext,model_choices_ciphertext
+        prompt_ciphertext,security_mode,max_spend_usd,name_tsv,reasoning_effort,project_id,model_override,conversation_source_ciphertext,model_choices_ciphertext
        ) VALUES ($1,$2,$3,$4,'queued',$5,$6,$7,$8::jsonb,$9,$10,${taskNameTsv(11, 12, 13)},$14,
-         COALESCE($15,'standard'),$16,$17,$18::jsonb,$19::jsonb)
+         $15,$16,$17::jsonb,$18::jsonb)
        RETURNING *`,
       [
         id,
@@ -454,7 +452,6 @@ export class TaskStore {
         input.maxSpendUsd ?? null,
         ...taskNameTokens(input.nameIndex),
         input.reasoningEffort ?? 'auto',
-        input.lifetime ?? null,
         input.projectId ?? null,
         input.modelOverride ?? false,
         input.conversationSourceCiphertext

@@ -235,7 +235,6 @@ const buildHarness = async (options: {
     // Long enough that the scheduler never fires behind these assertions.
     SCHEDULER_POLL_MS: 600_000,
     TASK_MAX_STEPS: 3,
-    TASK_SUSTAINED_SELF_CONTINUATIONS: 0,
     TASK_MAX_SELF_CONTINUATIONS: 0,
     SECURITY_EVENT_RETENTION_DAYS: 30,
     LOG_LEVEL: 'silent',

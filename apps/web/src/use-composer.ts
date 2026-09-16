@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type {
   Task,
-  TaskLifetime,
   TaskReasoningEffort,
   ProjectModelChoices,
   ProjectModelPreferences
@@ -50,15 +49,6 @@ export function useComposer({
   );
   const [privacyRoute, setPrivacyRoute] = useState(
     initialDraft?.controls?.privacyRoute ?? task?.privacyRoute ?? defaultPrivacy(bootstrap)
-  );
-  /*
-   * How long this conversation is meant to live, which two very different things read: how long
-   * anything it publishes stays up, and how far past one step budget the run may carry itself.
-   * Only offered when starting work - a run already under way has a lifetime, and changing it
-   * mid-flight would move a ceiling the turn is already being held to.
-   */
-  const [lifetime, setLifetime] = useState<TaskLifetime>(
-    initialDraft?.controls?.lifetime ?? 'standard'
   );
   const [securityMode, setSecurityMode] = useState<Task['securityMode']>(
     initialDraft?.controls?.securityMode ??
@@ -210,7 +200,7 @@ export function useComposer({
         privacyRoute,
         spendCap: cap,
         ...(conversationDraft ? { conversation: conversationDraft } : {}),
-        ...(!task ? { modelChoices, lifetime } : {})
+        ...(!task ? { modelChoices } : {})
       }
     };
     onDraftRef.current(draft);
@@ -245,7 +235,6 @@ export function useComposer({
     attachments,
     modelId,
     modelChoices,
-    lifetime,
     reasoningEffort,
     securityMode,
     privacyRoute,
@@ -385,7 +374,6 @@ export function useComposer({
             project?.securityMode ??
             workspace.securityMode
         );
-        setLifetime(draft.controls?.lifetime ?? 'standard');
         setCap(draft.controls?.spendCap ?? '');
       }
       setDraftConflict(null);
@@ -435,9 +423,6 @@ export function useComposer({
       securityMode,
       privacyRoute,
       ...(limit !== undefined ? { maxSpendUsd: limit } : {}),
-      // Only on a new conversation, and only when it is not the default: a follow-up inherits the
-      // lifetime the run already has, and sending `standard` explicitly would say nothing.
-      ...(task || lifetime === 'standard' ? {} : { lifetime }),
       ...(task ? { interrupt } : { workspaceId: workspace.id }),
       ...(!task && project
         ? {
@@ -462,7 +447,6 @@ export function useComposer({
           controls: {
             modelId,
             modelChoices,
-            lifetime,
             reasoningEffort,
             securityMode,
             privacyRoute,
@@ -580,10 +564,6 @@ export function useComposer({
     });
     setReasoningEffort('auto');
   }
-  function changeLifetime(value: TaskLifetime) {
-    changed.current = true;
-    setLifetime(value);
-  }
   function changeEffort(value: TaskReasoningEffort) {
     changed.current = true;
     setReasoningEffort(value);
@@ -621,7 +601,6 @@ export function useComposer({
     modelChoices,
     reasoningEffort,
     privacyRoute,
-    lifetime,
     securityMode,
     cap,
     interrupt,
@@ -648,7 +627,6 @@ export function useComposer({
     changeModel,
     changeModelChoices,
     changePrivacy,
-    changeLifetime,
     changeEffort,
     changeCap,
     changeSecurityMode,

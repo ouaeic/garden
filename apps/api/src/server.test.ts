@@ -240,7 +240,6 @@ describe('API production boundaries', () => {
       WORKER_POLL_MS: 60_000,
       SCHEDULER_POLL_MS: 1_000,
       TASK_MAX_STEPS: 3,
-      TASK_SUSTAINED_SELF_CONTINUATIONS: 0,
       // Off: every expectation in this file describes a turn that stops at its step ceiling.
       TASK_MAX_SELF_CONTINUATIONS: 0,
       SECURITY_EVENT_RETENTION_DAYS: 30,
@@ -1620,7 +1619,6 @@ describe('API production boundaries', () => {
 
 const isolatedConfig = (directory: string): ApiConfig => ({
   DEPLOYMENT_MODE: 'development',
-  TASK_SUSTAINED_SELF_CONTINUATIONS: 0,
   MODEL_CATALOG_SCOPE: 'provider_catalog',
   CONNECTION_MANIFEST_PATH: join(directory, 'connection.json'),
   ATHANOR_STATE_PATH: directory,
@@ -10156,50 +10154,6 @@ describe('an account with more than one provider connected', () => {
     expect(models.statusCode, models.body).toBe(200);
     const listed = models.json<{ id: string }[]>();
     expect(listed.some((model) => model.id.startsWith('openrouter/'))).toBe(true);
-  }, 30_000);
-});
-
-/**
- * A conversation that says how long it is meant to live.
- *
- * Every task was bounded as the middle case, so a ten-minute mock-up left a website serving for a
- * month and a three-day analysis stopped at a ceiling designed for someone watching. The column
- * defaults to what every existing run already had, so a task that says nothing is unchanged.
- */
-describe('how long a conversation is meant to live', () => {
-  test('records what the owner declared, and defaults to standard when they did not', async () => {
-    stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-lifetime-'));
-    disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory), { masterKey });
-    disposers.push(() => app.close());
-    const { cookie, workspaceId } = await seedOwnerWithTask(app, 'lifetime', 'Sketch a page');
-
-    const start = (payload: Record<string, unknown>, key: string) =>
-      app.inject({
-        method: 'POST',
-        url: '/v1/tasks',
-        headers: { cookie, 'idempotency-key': key },
-        payload: {
-          workspaceId,
-          prompt: 'Assemble the genome',
-          modelId: 'openrouter/openai/gpt-oss-120b',
-          privacyRoute: 'provider_zdr',
-          maxComputeCredits: 5,
-          ...payload
-        }
-      });
-
-    const sustained = await start({ lifetime: 'sustained' }, 'lifetime-sustained');
-    expect(sustained.statusCode, sustained.body).toBe(200);
-    expect(sustained.json<{ lifetime: string }>().lifetime).toBe('sustained');
-
-    const silent = await start({}, 'lifetime-default');
-    expect(silent.statusCode, silent.body).toBe(200);
-    expect(silent.json<{ lifetime: string }>().lifetime).toBe('standard');
-
-    const brief = await start({ lifetime: 'brief' }, 'lifetime-brief');
-    expect(brief.json<{ lifetime: string }>().lifetime).toBe('brief');
   }, 30_000);
 });
 

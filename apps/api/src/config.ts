@@ -89,7 +89,6 @@ const Config = z.object({
   // the development shape ran a worker that could not be configured at all, and the packaged one
   // could - on the same file, from the same key.
   TASK_MAX_SELF_CONTINUATIONS: sharedEnv.TASK_MAX_SELF_CONTINUATIONS,
-  TASK_SUSTAINED_SELF_CONTINUATIONS: sharedEnv.TASK_SUSTAINED_SELF_CONTINUATIONS,
   SECURITY_EVENT_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(30),
   /**
    * `info` is what an owner reading `athanor logs` wants: lifecycle, scheduled work, and every

@@ -5,7 +5,6 @@ import type { AgentState } from './agent-state.js';
 import type { ModelRelease } from '@athanor/contracts';
 import type { ModelGateway } from '@athanor/model-gateway';
 import {
-  continuationCeilingFor,
   handOffAtStepLimit,
   renewStepBudget,
   TURN_WALL_CLOCK_MS,
@@ -310,40 +309,5 @@ describe('the effort the closing call thinks at', () => {
     const build = costs[0]?.build as { version?: string; commit?: string | null } | undefined;
     expect(build?.version).toBeTruthy();
     expect(build).toEqual(buildIdentity());
-  });
-});
-
-/**
- * How long a run may keep going, which is a property of what it was for.
- *
- * The configured ceiling is sized for a conversation somebody is watching, and it is right for one:
- * two renewals, then hand the work back with an account of where it got to. It is the wrong number
- * for an analysis that was always going to take days - it stops three budgets in with nobody there
- * to say carry on - and the wrong number the other way for a ten-minute mock-up, where a renewal
- * usually means the model is circling rather than converging.
- */
-describe('the renewal ceiling a run is held to', () => {
-  const deps = {
-    config: {
-      TASK_MAX_SELF_CONTINUATIONS: 2,
-      TASK_SUSTAINED_SELF_CONTINUATIONS: 60,
-      WORKER_ID: 'worker-self'
-    }
-  } as unknown as HandoffDeps;
-  const task = (lifetime?: string) => ({ lifetime }) as unknown as TaskRecord;
-
-  it('gives an interactive conversation the configured ceiling', () => {
-    expect(continuationCeilingFor(deps, task('standard'))).toBe(2);
-    // Absent means standard, which is what every run was before one could say otherwise.
-    expect(continuationCeilingFor(deps, task(undefined))).toBe(2);
-  });
-
-  it('lets a sustained run keep earning budgets', () => {
-    expect(continuationCeilingFor(deps, task('sustained'))).toBe(60);
-  });
-
-  it('does not renew a brief one at all', () => {
-    // Not a failure state: a brief run that reaches its budget hands back to an owner who is there.
-    expect(continuationCeilingFor(deps, task('brief'))).toBe(0);
   });
 });

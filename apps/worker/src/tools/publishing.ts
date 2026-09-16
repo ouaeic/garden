@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { publishesPublicly, BRIEF_PREVIEW_EXPIRY_HOURS } from '@athanor/contracts';
+import { publishesPublicly } from '@athanor/contracts';
 import { encryptJson, sha256, AthanorError } from '@athanor/core';
 import { type ModelToolCall } from '@athanor/model-gateway';
 import { type ExecObservation } from '../agent-state.js';
@@ -242,19 +242,7 @@ export async function executePublishingTool(
         port,
         slug,
         accessTokenHash: sha256(accessToken),
-        entryPath: entryPath || null,
-        /*
-         * A brief conversation's page expires in a day rather than a month.
-         *
-         * The owner's complaint was a box serving pages nobody remembered asking for, and the
-         * reason was that every publication got the same month of idle life whatever it was for.
-         * A run that declared itself brief is one whose output is meant to be looked at and closed,
-         * so its page says so from the moment it goes up - not by being deleted later by something
-         * that has to guess.
-         */
-        ...(task.lifetime === 'brief'
-          ? { idleInterval: `${BRIEF_PREVIEW_EXPIRY_HOURS} hours` }
-          : {})
+        entryPath: entryPath || null
       });
       if (!publicReach) {
         const preview = {

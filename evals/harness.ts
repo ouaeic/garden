@@ -3840,10 +3840,9 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
         TASK_MAX_STEPS: stepCeiling,
         // A turn that renews its own budget is a separate mechanism with its own bounds. Left off
         // so every step count below is the cost of one budget rather than of two.
-        TASK_MAX_SELF_CONTINUATIONS: 0,
+        TASK_MAX_SELF_CONTINUATIONS: 0
         // The sustained ceiling is the same mechanism for a run declared long, and is off here for
         // the same reason: every step count below is the cost of one budget rather than of several.
-        TASK_SUSTAINED_SELF_CONTINUATIONS: 0
       },
       masterKey,
       runnerSecret,

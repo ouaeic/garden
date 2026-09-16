@@ -148,8 +148,6 @@ export interface TaskRecord {
    * grows every time the owner touches it.
    */
   completedAt?: string | null;
-  /** How long this conversation is meant to live: 'brief', 'standard' or 'sustained'. */
-  lifetime?: string;
   queuedMessageCount: number;
   /**
    * Live share links - neither revoked nor expired. Optional on the record rather than zero,

@@ -9,7 +9,6 @@ import type {
   Workspace,
   PrivacyRoute,
   TaskReasoningEffort,
-  TaskLifetime,
   ProjectModelChoices,
   TaskSchedule
 } from '@athanor/contracts';
@@ -35,7 +34,6 @@ export interface Draft {
     };
     modelId: string;
     modelChoices?: ProjectModelChoices;
-    lifetime?: TaskLifetime;
     reasoningEffort: TaskReasoningEffort;
     securityMode?: Task['securityMode'];
     privacyRoute: PrivacyRoute;

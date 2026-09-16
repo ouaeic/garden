@@ -542,21 +542,6 @@ export default function TaskSurface({
                 {task.maxSpendUsd !== null && ` of ${money(task.maxSpendUsd)}`}
               </span>
               {elapsed && ` · ${elapsed}${isFinished(task) ? '' : ' so far'}`}
-              {/*
-               * Said only when it is not the ordinary case, because a badge on every run would be
-               * noise: what an owner needs to see is the run that will keep going without them, or
-               * the one whose output is about to expire.
-               */}
-              {task.lifetime === 'sustained' && (
-                <span title="Declared to run unattended: it renews its own step budget far past the interactive ceiling, still bounded by its spending limit">
-                  {' · runs unattended'}
-                </span>
-              )}
-              {task.lifetime === 'brief' && (
-                <span title="Declared brief: anything it publishes expires in a day, and it hands back rather than renewing its step budget">
-                  {' · brief'}
-                </span>
-              )}
             </span>
             {!isFinished(task) && (
               <>

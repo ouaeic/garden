@@ -40,7 +40,6 @@ import type {
   TaskPage,
   TaskPlan,
   TaskPlanStep,
-  TaskLifetime,
   TaskSchedule,
   TaskStatus,
   Workspace,
@@ -157,7 +156,6 @@ export const taskResponse = (
   spendPausedAt: task.spendPausedAt ?? null,
   // The end of the run, as opposed to the last time anything about it was written.
   completedAt: task.completedAt ?? null,
-  lifetime: (task.lifetime ?? 'standard') as TaskLifetime,
   queuedMessageCount: task.queuedMessageCount,
   shareCount: task.shareCount ?? 0,
   rewind: task.rewindScope ?? null,

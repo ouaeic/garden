@@ -160,29 +160,6 @@ export const stepCeiling = (deps: HandoffDeps, state: AgentState): number => {
 };
 
 /**
- * How many times a run may renew its own step budget, which depends on what it said it was for.
- *
- * The configured ceiling is sized for a conversation somebody is watching, and it is the right
- * number for one: two renewals, then hand the work back with an account of where it got to. It is
- * the wrong number for an analysis that was always going to take days, which stops three budgets in
- * with nobody there to say carry on - and the wrong number in the other direction for a ten-minute
- * mock-up, where a renewal usually means the model is circling rather than converging.
- *
- * A sustained run gets `TASK_SUSTAINED_SELF_CONTINUATIONS` instead. What that buys is steps and
- * only steps: `maxComputeCredits` is untouched, and the spend guard runs before every step of every
- * renewed budget exactly as it does now - so a run declared long cannot outspend one that was not,
- * it can only take longer to spend the same allowance. The acceptance record still has to exist and
- * still has to have just failed under the harness's own execution, which is what stops a turn
- * renewing itself on its own opinion of its progress.
- */
-export const continuationCeilingFor = (deps: HandoffDeps, task: TaskRecord): number =>
-  task.lifetime === 'sustained'
-    ? deps.config.TASK_SUSTAINED_SELF_CONTINUATIONS
-    : task.lifetime === 'brief'
-      ? 0
-      : deps.config.TASK_MAX_SELF_CONTINUATIONS;
-
-/**
  * A turn that has used its step budget, has not finished the job, and is still working.
  *
  * Everything this box does is meant to survive the owner not being there, and this was the one
@@ -225,7 +202,7 @@ export const renewStepBudget = async (
   key: Uint8Array,
   state: AgentState
 ): Promise<boolean> => {
-  const ceiling = continuationCeilingFor(deps, task);
+  const ceiling = deps.config.TASK_MAX_SELF_CONTINUATIONS;
   const used = state.selfContinuations ?? 0;
   const writes = turnWriteCount(state.turnToolResults);
   const record = state.acceptance;
