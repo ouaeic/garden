@@ -3,10 +3,10 @@ name: web-form-filling
 description: Fill a web form correctly — enumerate the live fields, plan values from owner-provided facts, enter them in groups, verify the saved values, then submit within the owner's authorized scope. Use when completing multi-step application, grant or permit portals. Respect runtime approval cards and private-input handoffs; never invent facts or defeat a CAPTCHA.
 license: AGPL-3.0-or-later
 compatibility: Requires the athanor browser runner.
-allowed-tools: browser_snapshot read_elements browser_action file_read files_list image_read
+allowed-tools: browser_snapshot read_elements browser_action document_read file_read files_list image_read
 metadata:
   athanor.tier: 'builtin'
-  athanor.version: '2.3.0'
+  athanor.version: '2.3.1'
   athanor.risk: 'external'
   athanor.domain: 'web'
 ---
@@ -141,6 +141,13 @@ Read the error text the read already gave you, then work through this in order:
 Three failed attempts on the same field is the ceiling. Stop, capture the state, and ask.
 
 ## 6. Uploads
+
+Before uploading a document, use `document_read` on the exact final file. Compare its extracted
+content with the owner's original facts and the field mapping: name, complete email address, phone
+digits, qualifications, dates and any declarations. Copy identifiers exactly; never shorten an email
+address to fit a layout. A successful compile, a correct source file or matching form fields does
+not verify the attachment. Fix discrepancies, regenerate and read the final file again before
+uploading. Keep this check in the submission record; it needs no additional owner approval.
 
 `{"type":"upload","selector":"…","paths":["workspace/cv.pdf"]}` sends a workspace file to the
 site. Autonomous authorizes uploads within the requested workflow; other modes ask first. Read the
