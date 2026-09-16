@@ -66,6 +66,30 @@ describe('streaming source delivery', () => {
     authorization: `Bearer ${signCapabilityToken({ sub: 'owner', workspaceId, role: 'user', scopes, nonce: randomUUID(), aud: capabilityAudience('GET', url) }, secret, 60)}`
   });
 
+  it('serves bounded table pages only through a matching files-read capability', async () => {
+    await writeFile(
+      path.join(workspace, 'workspace/project/data.csv'),
+      'id,value\n' + Array.from({ length: 102 }, (_, i) => `${i},data\n`).join('')
+    );
+    const app = appFor();
+    const url = `/v1/workspaces/${workspaceId}/table?path=workspace%2Fproject%2Fdata.csv`;
+    const first = await app.inject({ url, headers: auth(url) });
+    expect(first.statusCode).toBe(200);
+    expect(first.headers['cache-control']).toBe('private, no-store');
+    const page = first.json<{ rows: unknown[]; nextCursor: string }>();
+    expect(page.rows).toHaveLength(100);
+    expect(page.nextCursor).toBeTypeOf('string');
+    const nextUrl = url + '&cursor=' + encodeURIComponent(page.nextCursor);
+    const next = await app.inject({ url: nextUrl, headers: auth(nextUrl) });
+    expect(next.statusCode).toBe(200);
+    expect(next.json()).toMatchObject({ rowStart: 101, nextCursor: null });
+    expect(next.json<{ rows: unknown[] }>().rows).toHaveLength(2);
+    expect((await app.inject({ url })).statusCode).not.toBe(200);
+    expect((await app.inject({ url, headers: auth(url, ['exec']) })).statusCode).not.toBe(200);
+    const other = url.replace(workspaceId, '00000000-0000-4000-8000-000000000002');
+    expect((await app.inject({ url: other, headers: auth(other) })).statusCode).not.toBe(200);
+  });
+
   it('downloads the entire directory, preserving empty directories, hidden files, environments and symbolic links', async () => {
     await mkdir(path.join(workspace, 'workspace/project/empty'));
     await mkdir(path.join(workspace, 'workspace/project/node_modules'));

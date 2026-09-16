@@ -38,7 +38,7 @@ export function registerProjectUpdateRoutes(context: RouteContext) {
     return project;
   };
   for (const source of ['versions', 'checks'] as const)
-    for (const operation of ['directory', 'directory.zip', 'download'] as const) {
+    for (const operation of ['directory', 'directory.zip', 'download', 'table'] as const) {
       const route = source === 'versions' ? 'versions/:revisionId' : 'checks/:updateId/:checkId';
       app.get<{
         Params: { projectId: string; revisionId?: string; updateId?: string; checkId?: string };
@@ -56,7 +56,8 @@ export function registerProjectUpdateRoutes(context: RouteContext) {
           })
           .parse(request.query);
         const params = new URLSearchParams({ path: query.path });
-        if (operation === 'directory' && query.cursor) params.set('cursor', query.cursor);
+        if (['directory', 'table'].includes(operation) && query.cursor)
+          params.set('cursor', query.cursor);
         const headers: Record<string, string> = {};
         for (const name of ['range', 'if-range'])
           if (typeof request.headers[name] === 'string') headers[name] = request.headers[name];

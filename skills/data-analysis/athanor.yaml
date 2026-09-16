@@ -1,5 +1,5 @@
 id: data-analysis
-version: 2.4.0
+version: 2.5.0
 catalog_line: 'Clean and analyse a dataset with a saved re-runnable script and stated assumptions.'
 
 lineage:
@@ -31,5 +31,5 @@ capability:
 
 verify:
   - run: '/usr/local/lib/athanor/python/bin/python3 analysis.py'
-    assert: 'exits 0 and reproduces identical output on a second run'
+    assert: 'exits successfully and reproduces expected results in a clean run, with explicit tolerances where needed'
   - check: 'One headline number was reconciled by an independent route, and row counts are printed after every transform.'

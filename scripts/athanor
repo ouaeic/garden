@@ -2224,6 +2224,7 @@ restore_workspace_ownership() {
 install_runtime_files() {
   install -D -m 0755 scripts/athanor "$(runtime_path /usr/local/bin/athanor)"
   install -D -m 0755 scripts/athanor "$(runtime_path /usr/local/bin/garden)"
+  install -D -m 0755 scripts/reproducible-run.py "$(runtime_path /usr/local/bin/garden-run)"
   # Deliberately outside every directory on the agent's PATH, and not executable by the account
   # agent commands run as: named directly it would be a root package install with no capability
   # scope and no approval. An update also removes the copy earlier releases left on the PATH.
@@ -2405,7 +2406,7 @@ install_checked_out_runtime_files() {
 runtime_files_match_checkout() {
   command -v cmp >/dev/null 2>&1 || return 0
   cmp -s "$athanor_root/scripts/athanor" "$(runtime_path /usr/local/bin/athanor)" || return 1
-  if grep -q '^[[:space:]]*install .*runtime_path /usr/local/bin/garden' "$athanor_root/scripts/athanor"; then
+  if grep -q '^[[:space:]]*install .*runtime_path /usr/local/bin/garden)' "$athanor_root/scripts/athanor"; then
     cmp -s "$athanor_root/scripts/athanor" "$(runtime_path /usr/local/bin/garden)"
   fi
 }
@@ -3298,6 +3299,10 @@ uninstall_athanor() {
   supervisor_path="$(runtime_path /usr/local/lib/athanor/mission-supervisor.py)"
   if cmp -s "$athanor_root/scripts/mission-supervisor.py" "$supervisor_path"; then
     rm -f "$supervisor_path"
+  fi
+  run_manifest_path="$(runtime_path /usr/local/bin/garden-run)"
+  if cmp -s "$athanor_root/scripts/reproducible-run.py" "$run_manifest_path"; then
+    rm -f "$run_manifest_path"
   fi
   systemctl daemon-reload
   systemctl reload nginx >/dev/null 2>&1 || true

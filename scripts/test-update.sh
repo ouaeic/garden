@@ -187,6 +187,7 @@ cp "$repository_root/scripts/athanor" \
   "$repository_root/scripts/athanor-package-helper" \
   "$repository_root/scripts/athanor-sandbox" \
   "$repository_root/scripts/mission-supervisor.py" \
+  "$repository_root/scripts/reproducible-run.py" \
   "$repository_root/scripts/athanor-system-packages" \
   "$repository_root/scripts/athanor-service" \
   "$repository_root/scripts/athanor-network-refresh" \
@@ -665,6 +666,8 @@ grep -q 'Rollback completed; the failed update was not activated' <<EOF
 $native_failure
 EOF
 cmp "$checkout/scripts/mission-supervisor.py" "$runtime/usr/local/lib/athanor/mission-supervisor.py"
+cmp "$checkout/scripts/reproducible-run.py" "$runtime/usr/local/bin/garden-run"
+test -x "$runtime/usr/local/bin/garden-run"
 rm "$seed/FAIL_NATIVE"
 printf 'ok  missing native capabilities roll back before the new release starts\n'
 

@@ -541,6 +541,7 @@ describe('the shipped built-in library', () => {
     };
     const installedPath: Record<string, string> = {
       'athanor-office-convert': '/usr/local/bin/athanor-office-convert',
+      'garden-run': '/usr/local/bin/garden-run',
       'athanor-pdf-tables': '/usr/local/bin/athanor-pdf-tables',
       typst: '/usr/local/bin/typst'
     };

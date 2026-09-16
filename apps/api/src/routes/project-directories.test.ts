@@ -62,6 +62,35 @@ describe('project directory access', () => {
       await app.close();
     }
   });
+  it('forwards table cursors and stale-file errors only for the owning user', async () => {
+    const { app, raw } = fixture();
+    try {
+      const url = '/v1/workspaces/two/table?path=workspace%2Fresults.csv&cursor=signed.cursor';
+      raw.mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: { message: 'Table changed' } }), {
+          status: 409,
+          headers: { 'content-type': 'application/json' }
+        })
+      );
+      const result = await app.inject({ url, headers: { 'x-owner': 'owner' } });
+      expect(result.statusCode).toBe(409);
+      expect(result.json()).toEqual({ error: { message: 'Table changed' } });
+      expect(raw).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workspaceId: 'two',
+          userId: 'owner',
+          role: 'user',
+          scopes: ['files.read'],
+          path: url
+        })
+      );
+      expect((await app.inject({ url, headers: { 'x-owner': 'other' } })).statusCode).toBe(404);
+      expect((await app.inject({ url })).statusCode).not.toBe(200);
+      expect(raw).toHaveBeenCalledTimes(1);
+    } finally {
+      await app.close();
+    }
+  });
   it('streams ZIP responses through a files-read capability, forwards errors and excludes unrelated roots', async () => {
     const { app, raw } = fixture();
     try {

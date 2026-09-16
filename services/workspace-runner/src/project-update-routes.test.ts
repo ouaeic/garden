@@ -26,6 +26,7 @@ it('binds project reads and mutations to signed membership and keeps unchecked p
   await ensureWorkspace(path.join(root, wa));
   await ensureWorkspace(path.join(root, wb));
   await writeFile(path.join(root, wa, 'workspace/result.txt'), 'versioned result');
+  await writeFile(path.join(root, wa, 'workspace/results.csv'), 'sample,value\nA,7\n');
   const manager = new ProjectUpdatesManager(root, {
     start: async () => ({ sessionId: 'unused' }),
     poll: () => {
@@ -35,7 +36,10 @@ it('binds project reads and mutations to signed membership and keeps unchecked p
   });
   await manager.bind(project, main, a, wa);
   await manager.bind(project, main, b, wb);
-  const update = await manager.prepare(project, a, { title: 'Result', paths: ['result.txt'] });
+  const update = await manager.prepare(project, a, {
+    title: 'Result',
+    paths: ['result.txt', 'results.csv']
+  });
   await manager.settle(update.id);
   const prepared = await manager.inspect(project, update.id);
   const app = Fastify();
@@ -155,4 +159,44 @@ it('binds project reads and mutations to signed membership and keeps unchecked p
   });
   expect(download.statusCode).toBe(206);
   expect(download.body).toBe('versioned');
+  const tableUrl = `/v1/workspaces/${main}/projects/${project}/versions/${revision.id}/table?path=workspace/results.csv`;
+  const tableToken = signCapabilityToken(
+    {
+      workspaceId: main,
+      sub: a,
+      role: 'user',
+      scopes: ['files.read'],
+      nonce: randomUUID(),
+      aud: capabilityAudience('GET', tableUrl)
+    },
+    secret,
+    60
+  );
+  const table = await app.inject({
+    url: tableUrl,
+    headers: { authorization: `Bearer ${tableToken}` }
+  });
+  expect(table.statusCode).toBe(200);
+  expect(table.json()).toMatchObject({
+    columns: [{ name: 'sample' }, { name: 'value' }],
+    rows: [[{ text: 'A' }, { text: '7' }]],
+    nextCursor: null
+  });
+  const wrongUrl = tableUrl.replace(`/workspaces/${main}/`, `/workspaces/${wb}/`);
+  const wrongToken = signCapabilityToken(
+    {
+      workspaceId: wb,
+      sub: b,
+      role: 'user',
+      scopes: ['files.read'],
+      nonce: randomUUID(),
+      aud: capabilityAudience('GET', wrongUrl)
+    },
+    secret,
+    60
+  );
+  expect(
+    (await app.inject({ url: wrongUrl, headers: { authorization: `Bearer ${wrongToken}` } }))
+      .statusCode
+  ).not.toBe(200);
 });

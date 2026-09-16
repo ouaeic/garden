@@ -134,6 +134,17 @@ if (shellcheck.error?.code === 'ENOENT') {
  * recorders and every absolute path the script names is rewritten in a copy - so it costs about a
  * second and works on a developer's laptop.
  */
+const analysisRuns = spawnSync('python3', ['scripts/test-reproducible-run.py'], {
+  cwd: repositoryRoot,
+  encoding: 'utf8',
+  timeout: 30_000
+});
+if (analysisRuns.status !== 0) fail(`Analysis run manifests failed: ${analysisRuns.stderr}`);
+else
+  say(
+    'Analysis run manifests: verified execution, changed-dependency refusal and clean replay passed.'
+  );
+
 const systemPackages = spawnSync('/bin/sh', ['scripts/test-system-packages.sh'], {
   cwd: repositoryRoot,
   encoding: 'utf8'

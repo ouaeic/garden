@@ -1,3 +1,6 @@
+import { readTablePage } from './table-preview.js';
+import { openDownloadFile } from './open-download-file.js';
+export { openDownloadFile } from './open-download-file.js';
 import { constants, type ReadStream } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { open, opendir } from 'node:fs/promises';
@@ -71,25 +74,6 @@ export const sourceManifest = async (root: string, paths: string[], directories:
   if ([...files].some((p) => !p.startsWith(`workspace${path.sep}`)))
     throw new Error('Source bundles contain only workspace files');
   return { paths: [...files].sort(), excluded };
-};
-
-/** Hold the verified descriptor throughout delivery, even if the named path is replaced. */
-export const openDownloadFile = async (root: string, requested: string) => {
-  const relative = assertUserDataPath(root, requested);
-  const target = resolveInside(root, relative);
-  const handle = await open(
-    target,
-    constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK
-  );
-  try {
-    await assertOpenedInPlace(root, target, handle);
-    const stat = await handle.stat();
-    if (!stat.isFile()) throw new Error('Only regular files can be downloaded');
-    return { handle, stat, relative };
-  } catch (error) {
-    await handle.close();
-    throw error;
-  }
 };
 
 export const byteRange = (
@@ -251,6 +235,30 @@ export function registerFileReadRoutes(
   prefix: string,
   rootFor: (request: FastifyRequest) => Promise<string>
 ): void {
+  app.get<{ Querystring: { path?: string; cursor?: string } }>(
+    `${prefix}/table`,
+    async (request, reply) => {
+      requireScope(request, 'files.read');
+      reply.header('cache-control', 'private, no-store');
+      const query = z
+        .object({ path: z.string().min(1).max(4096), cursor: z.string().max(2048).optional() })
+        .parse(request.query);
+      const controller = new AbortController();
+      const close = () => controller.abort();
+      reply.raw.once('close', close);
+      try {
+        return await readTablePage(
+          await rootFor(request),
+          query.path,
+          query.cursor,
+          100,
+          controller.signal
+        );
+      } finally {
+        reply.raw.off('close', close);
+      }
+    }
+  );
   app.get<{ Params: { workspaceId: string }; Querystring: { path?: string; cursor?: string } }>(
     `${prefix}/directory`,
     async (request) => {
