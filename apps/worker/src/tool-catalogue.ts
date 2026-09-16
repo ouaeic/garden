@@ -1,5 +1,10 @@
 import type { ModelTool } from '@athanor/model-gateway';
-import { surfaceDescribable, UNKNOWN_SURFACES, type WorkspaceSurfaces } from '@athanor/contracts';
+import {
+  TASK_TITLE_MAX_LENGTH,
+  surfaceDescribable,
+  UNKNOWN_SURFACES,
+  type WorkspaceSurfaces
+} from '@athanor/contracts';
 import {
   connectorActions,
   MEMORY_RECALL_ITEM_CEILING,
@@ -1668,16 +1673,18 @@ export const agentTools: ModelTool[] = [
   connectorActionTool(ALL_CONNECTOR_ACTIONS),
   {
     name: 'finish',
-    // The ordering requirement is stated here because it used to be enforced and never explained:
-    // a model learnt it only by being rejected, and a job that had already produced the right file
-    // could fail on the third rejection. A sentence on every request is cheaper than one lost task.
     description:
-      'Finish only after verifying the requested outcome. Cite successful tool results or published outputs as evidence, at least one of them from after your last change; use not_applicable only for conversational answers that required no external verification.',
+      'Finish after checking the requested outcome. Cite exact tool call IDs (not tool names or job IDs) or published outputs, with evidence after your last change. Use not_applicable only for answers needing no external verification.',
     parameters: {
       type: 'object',
       additionalProperties: false,
       required: ['summary', 'verification'],
       properties: {
+        title: {
+          type: 'string',
+          maxLength: TASK_TITLE_MAX_LENGTH,
+          description: 'Task title; preserves owner names.'
+        },
         summary: {
           type: 'string',
           maxLength: 400,

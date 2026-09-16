@@ -9,10 +9,10 @@ import type { ToolContext } from './tool-dispatch.js';
 
 /** Reuses a headline already written by the agent, preserving an owner's explicit name in SQL. */
 export async function applyPresentationTitle(
-  context: ToolContext,
+  context: Pick<ToolContext, 'task' | 'key' | 'store'>,
   title: string
 ): Promise<boolean> {
-  const name = title.trim();
+  const name = title.replace(/\s+/g, ' ').trim();
   if (!name || name.length > TASK_TITLE_MAX_LENGTH) return false;
   const { task, key } = context;
   const prompt = decryptJson<{ prompt: string }>(

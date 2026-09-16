@@ -1,37 +1,4 @@
-/**
- * What happens when the model says the work is done: five holds, and then the turn completes.
- *
- * The largest single branch in the turn loop, and the one the reader most often arrives at with a
- * question the surrounding four hundred lines cannot help with. It ran inline inside the batch loop
- * inside the step loop, at nesting depth eleven.
- *
- * Its shape is five holds asked in a fixed order, each of which sends the model round once and only
- * once, and each of which is bounded so that past its ceiling the turn ends **honestly rather than
- * being thrown away**:
- *
- *   1. **verification** - the finish must cite something this turn produced.
- *   2. **plan coverage** - open plan steps, but only against a plan somebody chose to write.
- *   3. **acceptance declared** - a turn that changed something must say what would prove it.
- *   4. **acceptance run** - the harness executes that record, and a failure sends it round.
- *   5. **the answer itself** - a turn that did everything through tools and never said a word.
- *
- * The bound on every one of them exists because the alternative was observed and was worse: an
- * agent that built the page, served it, published a working preview and wrote a correct summary,
- * binned as a failure because its own curl made the evidence it had just cited stale. Verification
- * failing is not the work failing, and a harness that cannot tell the difference must not be the
- * one deciding. So the completion stands and the doubt travels with it, into `remainingRisks`,
- * where the completion card already shows it.
- *
- * Lifted out of `AgentWorker.run()` unchanged; the five `continue`s became `'held'` and the one
- * `return` became `'completed'`, which is the whole of the edit.
- *
- * Two of the five read `state.mode`, and both clauses are commented where they sit. Hold 2 is
- * skipped in plan mode because a plan of open steps is what that mode was asked for, and hold 4
- * does not run the checks in plan mode because running them is the owner's build and test commands
- * executing on the owner's computer, which is the one thing the mode promises does not happen.
- * Holds 1, 3 and 5 are correct in both modes and are untouched: hold 3 in particular never fires in
- * plan mode, because the turn changed nothing.
- */
+/** Validate completion evidence, plan coverage, acceptance and delivery before ending the turn. */
 import type { ModelToolCall } from '@athanor/model-gateway';
 import type { TaskRecord } from '@athanor/data';
 import { deliveryFilePath, mediaDeliveryState } from '@athanor/contracts';
@@ -66,6 +33,7 @@ import {
 import { textValue } from '../values.js';
 import { declaredTaskOutputs, resolveDelivery } from '../delivery.js';
 import type { AgentRunnerClient } from '../runner-client.js';
+import { applyPresentationTitle } from '../presentation-title.js';
 
 /** What completing a turn needs from the worker that owns it. */
 export interface TurnFinishDeps {
@@ -565,5 +533,9 @@ export const handleFinishCall = async (
     // these as a remaining risk, and this copy exists only for the memory write.
     deadEnds.length ? { deadEnds } : {}
   );
+  const title = textValue(call.arguments.title);
+  // Naming is optional; the background titler can retry a transient database failure.
+  if (title)
+    await applyPresentationTitle({ store: deps.store, task, key }, title).catch(() => false);
   return 'completed';
 };

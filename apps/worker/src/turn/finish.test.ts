@@ -466,3 +466,51 @@ it('carries the full final answer independently of progress and the short receip
   expect(run.outcome).toBe('completed');
   expect(run.completed?.answer).toBe('The total is **1260**, from the source column.');
 });
+
+it('uses a completion title without another model call and keeps naming failures separate from the result', async () => {
+  const { encryptJson, decryptJson } = await import('@athanor/core');
+  const writes: unknown[] = [],
+    completions: unknown[] = [];
+  const titledTask = {
+    ...task,
+    promptCiphertext: encryptJson(
+      { prompt: 'Inspect a heading' },
+      key,
+      `task-prompt:${task.workspaceId}`
+    )
+  };
+  const deps = {
+    store: {
+      getLatestTaskPlan: async () => null,
+      listMediaJobs: async () => [],
+      setGeneratedTaskTitle: async (_id: string, envelope: Parameters<typeof decryptJson>[0]) => {
+        writes.push(decryptJson(envelope, key, `task-title:${task.workspaceId}`));
+        throw new Error('Temporary title store failure');
+      }
+    },
+    outstandingPlanSteps: async () => [],
+    completeTurn: async (...args: unknown[]) => {
+      completions.push(args);
+    }
+  } as unknown as TurnFinishDeps;
+  const outcome = await handleFinishCall(
+    deps,
+    titledTask,
+    key,
+    { messages: [] } as unknown as AgentState,
+    {
+      id: 'finish',
+      name: 'finish',
+      arguments: {
+        title: 'Example page heading',
+        answer: 'Example Domain',
+        summary: 'Example Domain',
+        verification: { status: 'not_applicable', evidence: [] }
+      }
+    },
+    { turn: 1, assistantText: '' }
+  );
+  expect(outcome).toBe('completed');
+  expect(completions).toHaveLength(1);
+  expect(writes).toEqual([{ title: 'Example page heading' }]);
+});

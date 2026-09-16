@@ -284,3 +284,105 @@ it('binds an auxiliary title to its named account instead of a cheaper sibling a
   expect(result).toMatchObject({ text: 'Named account title' });
   expect(calls).toEqual([{ model: 'named-title', authorization: 'Bearer named-account-key' }]);
 });
+
+it('honors an explicit title model and refuses an unavailable choice instead of silently substituting', async () => {
+  const cheap = model(),
+    selected = model({
+      id: 'openrouter/chosen',
+      providerModelId: 'chosen',
+      inputUsdPerMillionTokens: 0.3
+    });
+  const choice = { automatic: false, preference: 'balanced' as const, modelId: selected.id };
+  const parameters = {
+    inputText: 'Name this work',
+    privacyRoute: 'provider_zdr' as const,
+    ceiling: {},
+    choice
+  };
+  expect(selectTitleRoute([cheap, selected], parameters)?.model.id).toBe(selected.id);
+  expect(selectTitleRoute([cheap], parameters)).toBeNull();
+  expect(
+    selectTitleRoute([cheap, { ...selected, inputUsdPerMillionTokens: 100 }], parameters)
+  ).toBeNull();
+  const fetch = vi.fn();
+  vi.stubGlobal('fetch', fetch);
+  expect(
+    await support([cheap]).titleCompletion({
+      userId: 'owner',
+      modelId: cheap.id,
+      prompt: 'Name this work',
+      privacyRoute: 'provider_zdr',
+      choice
+    })
+  ).toEqual({ skipped: true });
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it('uses the selected connection credential when multiple accounts are connected', async () => {
+  const { createTitleCompletion } = await import('./title-completion.js');
+  const secondId = 'openai-compatible:10000000-0000-4000-8000-000000000002';
+  const selected = model({
+    id: 'custom/selected',
+    providerModelId: 'selected',
+    provider: 'custom',
+    connectionId: secondId
+  });
+  const calls: Array<{ authorization: string | null; model: unknown }> = [];
+  vi.stubGlobal('fetch', async (_url: unknown, init?: RequestInit) => {
+    calls.push({
+      authorization: new Headers(init?.headers).get('authorization'),
+      model: (JSON.parse(init?.body as string) as Record<string, unknown>).model
+    });
+    return new Response(
+      JSON.stringify({
+        choices: [{ message: { content: 'Selected title' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 10, completion_tokens: 3 }
+      })
+    );
+  });
+  const complete = createTitleCompletion(
+    {
+      store: {
+        listModels: async () => [model(), selected],
+        effectiveSpendLimits: async () => ({})
+      },
+      config: { PUBLIC_APP_URL: 'https://garden.example' }
+    } as unknown as ServerBase,
+    async () =>
+      new Map([
+        [
+          'openrouter',
+          {
+            secret: {
+              provider: 'openrouter',
+              baseUrl: 'https://openrouter.ai/api/v1',
+              apiKey: 'first-key',
+              enforceZeroDataRetention: true
+            }
+          }
+        ],
+        [
+          secondId,
+          {
+            secret: {
+              provider: 'openai-compatible',
+              connectionId: secondId,
+              baseUrl: 'https://api.openai.com/v1',
+              apiKey: 'second-key',
+              enforceZeroDataRetention: true
+            }
+          }
+        ]
+      ])
+  );
+  expect(
+    await complete({
+      userId: 'owner',
+      modelId: 'main-model',
+      choice: { automatic: false, modelId: selected.id, preference: 'balanced' },
+      privacyRoute: 'provider_zdr',
+      prompt: 'Name it'
+    })
+  ).toMatchObject({ text: 'Selected title' });
+  expect(calls).toEqual([{ authorization: 'Bearer second-key', model: 'selected' }]);
+});

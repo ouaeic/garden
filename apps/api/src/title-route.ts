@@ -1,5 +1,10 @@
-import type { PrivacyRoute } from '@athanor/contracts';
-import { isModelEligible, type RoutableModel, type ModelRequest } from '@athanor/core';
+import type { PrivacyRoute, PurposeModelChoice } from '@athanor/contracts';
+import {
+  isModelEligible,
+  selectPurposeModel,
+  type RoutableModel,
+  type ModelRequest
+} from '@athanor/core';
 
 export const TITLE_MAX_COST_USD = 0.005;
 export const TITLE_OUTPUT_TOKENS = 256;
@@ -16,7 +21,8 @@ export interface TitleRoute {
 export const selectTitleRoute = (
   models: readonly RoutableModel[],
   input: {
-    provider: string;
+    provider?: string;
+    choice?: PurposeModelChoice;
     inputText: string;
     privacyRoute: PrivacyRoute;
     ceiling: Pick<ModelRequest, 'maxInputUsdPerMillionTokens' | 'maxOutputUsdPerMillionTokens'>;
@@ -26,7 +32,12 @@ export const selectTitleRoute = (
   // These requests have two text messages and no tools, images or conversation history.
   const inputTokens = Buffer.byteLength(input.inputText, 'utf8') + 1_024;
   for (const model of models) {
-    if (model.provider !== input.provider || model.privacyRoute !== input.privacyRoute) continue;
+    if (
+      (input.provider && model.provider !== input.provider) ||
+      model.privacyRoute !== input.privacyRoute
+    )
+      continue;
+    if (input.choice && !input.choice.automatic && model.id !== input.choice.modelId) continue;
     if (model.expiresAt && Date.parse(model.expiresAt) <= Date.now()) continue;
     const reasoning = model.reasoning;
     if (reasoning?.mandatory) continue;
@@ -84,6 +95,16 @@ export const selectTitleRoute = (
       maxPrice: { prompt, completion, request: 0 },
       ...(disableReasoning ? { reasoningEffort: 'none' as const } : {})
     });
+  }
+  if (input.choice) {
+    const selected = selectPurposeModel({
+      purpose: 'title',
+      choice: input.choice,
+      catalog: candidates.map((candidate) => candidate.model),
+      privacyRoute: input.privacyRoute,
+      ceiling: input.ceiling
+    });
+    return candidates.find((candidate) => candidate.model.id === selected.model?.id) ?? null;
   }
   return (
     candidates.sort(

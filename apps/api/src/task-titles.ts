@@ -1,4 +1,8 @@
-import { TASK_TITLE_MAX_LENGTH } from '@athanor/contracts';
+import {
+  OwnerPreferences,
+  TASK_TITLE_MAX_LENGTH,
+  type PurposeModelChoice
+} from '@athanor/contracts';
 import {
   AthanorError,
   buildConversationNameIndex,
@@ -7,7 +11,12 @@ import {
   memoryIndexKey,
   unwrapDataKey
 } from '@athanor/core';
-import type { DataStore, TaskRecord } from '@athanor/data';
+import {
+  readTaskModelPreferences,
+  resolvePurposeChoice,
+  type DataStore,
+  type TaskRecord
+} from '@athanor/data';
 import { errorFields, type Logger } from './log.js';
 import { TITLE_MAX_COST_USD } from './title-route.js';
 
@@ -43,21 +52,7 @@ const MAX_TRACKED_ATTEMPTS = 500;
 /** How long the titler waits out a provider that just failed, rather than asking it per answer. */
 const PROVIDER_COOLDOWN_MS = 5 * 60_000;
 
-/**
- * A provider refusing to serve us, however it says so.
- *
- * `complete` answers a wall with `null` and the sweep stands down for five minutes, which is the
- * contract and is tested. What was not tested is a caller honouring it, and the one caller did not:
- * every pre-flight check returned `null` and the call itself threw, so the throw landed in the
- * catch below, charged the conversation an attempt, wrote a stack trace and carried on to the next
- * one. A box with no provider configured did that fourteen times on every boot and never once
- * reached the cooldown built for exactly this.
- *
- * The caller is fixed. This is the sweep refusing to depend on it, for the same reason the store
- * stopped depending on callers to clear a lease: a bound that holds only while everybody remembers
- * is not a bound. `apps/api/src/server.ts` keys its owner-facing notices on the same three codes
- * and the two must agree - it is the fuller table, this is only the recognition.
- */
+/** Provider outages defer naming without consuming a task attempt. */
 const PROVIDER_WALL_CODES = new Set([
   'provider_quota_exhausted',
   'provider_unavailable',
@@ -153,6 +148,7 @@ export interface TaskTitlerDeps {
   readonly complete: (input: {
     userId: string;
     modelId: string;
+    choice?: PurposeModelChoice;
     privacyRoute: string;
     prompt: string;
     beforeSubmit?: (admission: {
@@ -196,10 +192,18 @@ const titleOneTask = async (
   });
   if (decision.outcome === 'deny') return 'not_now';
 
+  const user = await deps.store.getUserById(task.userId);
+  if (!user) return 'not_now';
+  const owner = OwnerPreferences.parse(user.preferences);
+  const project = task.projectId
+    ? await readTaskModelPreferences(deps.store, deps.masterKey, task)
+    : { choices: {} };
+  const { choice } = resolvePurposeChoice('title', project.choices, owner.modelPurposes ?? {});
   let reserved = false;
   const completion = await deps.complete({
     userId: task.userId,
     modelId: task.modelId,
+    choice,
     privacyRoute: task.privacyRoute,
     prompt: prompt.slice(0, PROMPT_EXCERPT_CHARACTERS),
     beforeSubmit: async (admission) => {
@@ -278,31 +282,42 @@ const titleOneTask = async (
  */
 export const titleTasksOnce = async (
   deps: TaskTitlerDeps,
-  state: { attempts: Map<string, number>; providerReadyAt: number; cursor?: string },
+  state: {
+    attempts: Map<string, number>;
+    providerReadyAt: number;
+    cursor?: string;
+    retryAfter?: Map<string, number>;
+  },
   now: number = Date.now(),
   signal?: AbortSignal
 ): Promise<number> => {
   if (now < state.providerReadyAt) return 0;
-  const pending = await deps.store.listTasksNeedingTitle(BACKLOG_WINDOW, state.cursor);
-  if (!pending.length) delete state.cursor;
+  let pending = await deps.store.listTasksNeedingTitle(BACKLOG_WINDOW, state.cursor);
+  if (!pending.length && state.cursor) {
+    delete state.cursor;
+    pending = await deps.store.listTasksNeedingTitle(BACKLOG_WINDOW);
+  }
   let named = 0;
   for (const task of pending) {
     if (signal?.aborted) break;
     if (named >= TITLES_PER_SWEEP) break;
     state.cursor = task.id;
     if ((state.attempts.get(task.id) ?? 0) >= MAX_ATTEMPTS_PER_TASK) continue;
+    if ((state.retryAfter?.get(task.id) ?? 0) > now) continue;
+    state.retryAfter?.delete(task.id);
     try {
       const outcome = await titleOneTask(deps, task, signal);
       if (outcome === 'named') {
         named += 1;
-        deps.log.debug('task.titled', { taskId: task.id, modelId: task.modelId });
+        deps.log.debug('task.titled', { taskId: task.id });
       } else if (outcome === 'skipped') {
-        if (state.attempts.size >= MAX_TRACKED_ATTEMPTS) state.attempts.clear();
-        state.attempts.set(task.id, MAX_ATTEMPTS_PER_TASK);
+        state.retryAfter ??= new Map();
+        if (state.retryAfter.size >= MAX_TRACKED_ATTEMPTS)
+          state.retryAfter.delete(state.retryAfter.keys().next().value!);
+        state.retryAfter.set(task.id, now + PROVIDER_COOLDOWN_MS);
       } else if (outcome === 'unusable') {
         recordAttempt(state.attempts, task.id);
       } else if (outcome === 'provider_failed') {
-        delete state.cursor;
         state.providerReadyAt = now + PROVIDER_COOLDOWN_MS;
         return named;
       }
@@ -318,7 +333,6 @@ export const titleTasksOnce = async (
       )
         continue;
       if (error instanceof AthanorError && PROVIDER_WALL_CODES.has(error.code)) {
-        delete state.cursor;
         state.providerReadyAt = now + PROVIDER_COOLDOWN_MS;
         deps.log.warn('task.title_provider_unavailable', { code: error.code });
         return named;

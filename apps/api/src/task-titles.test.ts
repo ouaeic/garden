@@ -338,14 +338,19 @@ describe('the titler', () => {
     }
   }, 60_000);
 
-  it('does not loop on an unavailable bounded naming route', async () => {
-    const { database, store } = await boxWithAnsweredTask();
+  it('defers an unavailable route without spending an attempt and retries after capabilities change', async () => {
+    const { database, store, titleOf } = await boxWithAnsweredTask();
     try {
       const complete = vi.fn<TaskTitlerDeps['complete']>(async () => ({ skipped: true }));
       const state = freshState();
-      for (let n = 0; n < 4; n++) await titleTasksOnce({ store, masterKey, log, complete }, state);
+      for (let n = 0; n < 4; n++)
+        await titleTasksOnce({ store, masterKey, log, complete }, state, 1000 + n);
       expect(complete).toHaveBeenCalledOnce();
+      expect(state.attempts.size).toBe(0);
       expect(state.providerReadyAt).toBe(0);
+      complete.mockResolvedValue(completion('Release repair'));
+      expect(await titleTasksOnce({ store, masterKey, log, complete }, state, 301_001)).toBe(1);
+      expect(await titleOf()).toBe('Release repair');
     } finally {
       await database.close();
     }
@@ -436,3 +441,31 @@ describe('provisional task names', () => {
     expect(provisionalTaskTitle('研究'.repeat(100))).not.toContain('�');
   });
 });
+
+it('reads title choices from owner, project and conversation settings in that order', async () => {
+  const { database, store, task, user } = await boxWithAnsweredTask();
+  const pin = (modelId: string) => ({ automatic: false, preference: 'balanced' as const, modelId });
+  const complete = vi.fn<TaskTitlerDeps['complete']>(async () => ({ skipped: true }));
+  try {
+    const { writeProjectModelPreferences, writeConversationModelPreferences } =
+      await import('@athanor/data');
+    await store.mergeUserPreferences(user.id, { modelPurposes: { title: pin('owner-title') } });
+    await titleTasksOnce({ store, masterKey, log, complete }, freshState());
+    expect(complete.mock.lastCall?.[0].choice).toEqual(pin('owner-title'));
+    await writeProjectModelPreferences(store, masterKey, task, {
+      expectedRevision: 0,
+      choices: { title: pin('project-title') }
+    });
+    await titleTasksOnce({ store, masterKey, log, complete }, freshState());
+    expect(complete.mock.lastCall?.[0].choice).toEqual(pin('project-title'));
+    await writeConversationModelPreferences(store, masterKey, task, {
+      expectedRevision: 0,
+      choices: { title: pin('conversation-title') }
+    });
+    await titleTasksOnce({ store, masterKey, log, complete }, freshState());
+    expect(complete.mock.lastCall?.[0].choice).toEqual(pin('conversation-title'));
+    expect(complete).toHaveBeenCalledTimes(3);
+  } finally {
+    await database.close();
+  }
+}, 60_000);
