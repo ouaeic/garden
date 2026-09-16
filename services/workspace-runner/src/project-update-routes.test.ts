@@ -43,6 +43,38 @@ it('binds project reads and mutations to signed membership and keeps unchecked p
   const secret = 's'.repeat(32);
   app.addHook('preHandler', authenticateRunnerRequest(secret));
   registerProjectUpdateRoutes(app, manager);
+  cleanup.unshift(() => manager.close());
+  const changeCounts = async (
+    role: 'agent' | 'user',
+    workspaceId: string,
+    scope: string,
+    ids: string[]
+  ) => {
+    const url = `/v1/workspaces/${workspaceId}/projects/${project}/changes`;
+    const token = signCapabilityToken(
+      {
+        workspaceId,
+        sub: a,
+        role,
+        scopes: [scope],
+        nonce: randomUUID(),
+        aud: capabilityAudience('POST', url)
+      },
+      secret,
+      60
+    );
+    return app.inject({
+      method: 'POST',
+      url,
+      headers: { authorization: `Bearer ${token}` },
+      payload: ids
+    });
+  };
+  expect((await changeCounts('user', main, 'files.read', [a, b])).statusCode).toBe(200);
+  expect((await changeCounts('user', wa, 'files.read', [a])).statusCode).not.toBe(200);
+  expect((await changeCounts('agent', wa, 'files.read', [a])).statusCode).not.toBe(200);
+  expect((await changeCounts('user', main, 'project.updates.read', [a])).statusCode).not.toBe(200);
+  expect((await changeCounts('user', main, 'files.read', [randomUUID()])).statusCode).not.toBe(200);
   const invoke = (
     role: 'agent' | 'user' | 'control',
     workspaceId: string,

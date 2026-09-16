@@ -174,3 +174,18 @@ export interface ProjectUpdates {
   nextRevisionCursor: string | null;
   observedAt: string;
 }
+
+export interface ConversationChanges {
+  taskId: string;
+  status: 'queued' | 'measuring' | 'ready' | 'unavailable';
+  measurement: {
+    observedAt: string;
+    baselineRevision: string | null;
+    added: number;
+    removed: number;
+    changedFiles: number;
+    unmeasuredFiles: number;
+    scannedFiles: number;
+    truncated: boolean;
+  } | null;
+}

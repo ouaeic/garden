@@ -6,6 +6,29 @@ export function projectUpdateFixture(project, tasks) {
   const fixture = { head: null, updates: [], revisions: [], actions: [], fail: false };
   fixture.handle = async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname === `/v1/projects/${project.id}/changes`) {
+      const identities = url.searchParams.get('tasks').split(',');
+      assert(
+        identities.length > 0 && identities.every((id) => tasks.some((task) => task.id === id))
+      );
+      await route.fulfill({
+        json: identities.map((taskId, index) => ({
+          taskId,
+          status: 'ready',
+          measurement: {
+            observedAt: new Date().toISOString(),
+            baselineRevision: null,
+            added: index === 0 ? 23 : 7,
+            removed: index === 0 ? 4 : 0,
+            changedFiles: 2,
+            unmeasuredFiles: index === 0 ? 1 : 0,
+            scannedFiles: 3,
+            truncated: false
+          }
+        }))
+      });
+      return true;
+    }
     if (url.pathname !== `/v1/projects/${project.id}/updates`) return false;
     if (fixture.fail) {
       await route.fulfill({
@@ -153,6 +176,11 @@ export function projectUpdateFixture(project, tasks) {
 
 export async function checkProjectUpdates({ page, fixture, project, report }) {
   await page.setViewportSize({ width: 1440, height: 1050 });
+  const conversations = page.getByRole('region', { name: 'Conversations', exact: true });
+  await conversations.scrollIntoViewIfNeeded();
+  await conversations
+    .getByText('+23 −4 lines · 2 changed files · 1 unmeasured', { exact: true })
+    .waitFor();
   const panel = page.getByRole('region', { name: 'Project updates and checks', exact: true });
   await panel.getByText('No published version yet', { exact: true }).waitFor();
   await panel.getByRole('button', { name: 'Prepare update', exact: true }).click();

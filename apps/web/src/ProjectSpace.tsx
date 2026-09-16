@@ -11,6 +11,7 @@ import {
 } from './model';
 import { Button, Dialog, ErrorNotice, Field, Spinner } from './ui';
 import { projectStatus } from './ProjectCollection';
+import { changeSummary, useProjectChanges } from './use-project-changes';
 import './projects.css';
 const ProjectUpdates = lazy(() => import('./ProjectUpdates'));
 const ProjectNotes = lazy(() => import('./ProjectNotes'));
@@ -111,6 +112,13 @@ export default function ProjectSpace({
   const loadedScope = useRef('');
   const paged = useRef(false);
   const conversationTabs = useRef<HTMLElement>(null);
+  const conversationGrid = useRef<HTMLDivElement>(null);
+  const changes = useProjectChanges(
+    projectId,
+    conversationGrid,
+    Boolean(project) && !taskId,
+    `${query}:${archived}:${tasks.map((task) => task.id).join(',')}`
+  );
   useEffect(() => {
     const tabs = conversationTabs.current;
     const selected = tabs?.querySelector<HTMLElement>('[aria-current="page"]');
@@ -332,9 +340,9 @@ export default function ProjectSpace({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
-            <div className="project-conversation-grid">
+            <div className="project-conversation-grid" ref={conversationGrid}>
               {visible.map((task) => (
-                <button key={task.id} onClick={() => onTask(task.id)}>
+                <button key={task.id} data-task-id={task.id} onClick={() => onTask(task.id)}>
                   <span className={`garden-project-dot status-${task.status}`} />
                   <span>
                     <strong>{task.title}</strong>
@@ -344,6 +352,13 @@ export default function ProjectSpace({
                         : taskStatusLabel(task)}{' '}
                       · {money(task.spentUsd)}
                     </small>
+                    {changeSummary(changes[task.id]) && (
+                      <small
+                        title={`Compared with this conversation's last published or checked-out files. Large files, binary data and dependency environments are excluded from line counts.${changes[task.id]?.measurement ? ` Measured ${new Date(changes[task.id]!.measurement!.observedAt).toLocaleString()}.` : ''}`}
+                      >
+                        {changeSummary(changes[task.id])}
+                      </small>
+                    )}
                     {task.activity && (
                       <>
                         <small className="project-activity-detail">
