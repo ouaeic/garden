@@ -50,7 +50,7 @@ const tools = (): ModelTool[] =>
   });
 
 /** The real entry, which is the only thing whose content varying by box is the point. */
-const connectorAction = (kinds: ConnectorKind[]): ModelTool => {
+const connectorAction = (kinds?: ConnectorKind[]): ModelTool => {
   const tool = agentToolsFor('lead', UNKNOWN_SURFACES, kinds).find(
     (entry) => entry.name === 'connector_action'
   );
@@ -122,7 +122,7 @@ describe('the request athanor is about to send', () => {
    * cannot honour, and moves the head of the cached prefix while doing it.
    */
   it('catches a tool the run withdrew being sent anyway', () => {
-    const breach = requestDerivationBreach(request({ sent: [...tools(), connectorAction([])] }));
+    const breach = requestDerivationBreach(request({ sent: [...tools(), connectorAction()] }));
     expect(breach).toContain('withdrew');
     expect(breach).toContain('5');
   });
@@ -145,7 +145,7 @@ describe('the request athanor is about to send', () => {
    */
   it('catches one tool whose definition is not the one this run may send', () => {
     const mailbox = connectorAction(['imap']);
-    const everything = connectorAction([]);
+    const everything = connectorAction();
     // The premise, asserted rather than assumed: same name, different definition.
     expect(mailbox.name).toBe(everything.name);
     expect(JSON.stringify(mailbox)).not.toBe(JSON.stringify(everything));
@@ -175,7 +175,7 @@ describe('the request athanor is about to send', () => {
 
   it('reports the tools before the window, because a wrong catalogue explains a wrong window', () => {
     const both = requestDerivationBreach(
-      request({ sent: [...tools(), connectorAction([])], rederived: [] })
+      request({ sent: [...tools(), connectorAction()], rederived: [] })
     );
     expect(both).toContain('withdrew');
   });

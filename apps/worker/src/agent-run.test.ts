@@ -1571,9 +1571,8 @@ describe('what actually reaches the provider', () => {
     // mail, calendar, repository and WebDAV operations. With nothing connected none of those calls
     // can do anything but fail, so the box stops paying for the description on every step.
     expect(names).not.toContain('connector_action');
-    // The way the model finds out stays, and the contract already tells it what to do with an
-    // empty answer.
-    expect(names).toContain('connector_list');
+    // An empty connection inventory is already known before building this request.
+    expect(names).not.toContain('connector_list');
   });
 
   it('describes only the connector actions the box can actually run', async () => {

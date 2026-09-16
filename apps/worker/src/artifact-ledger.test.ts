@@ -104,9 +104,10 @@ const run = async (
     recordRead('task-1', path, 1, text);
   const state = { step: 7, ...options.state } as AgentState;
   const context = {
+    key: Buffer.alloc(32, 1),
     task: { workspaceId: 'ws-1', id: 'task-1', userId: 'user-1' },
     state,
-    store: { setWorkspaceStorage: async () => undefined },
+    store: { setWorkspaceStorage: async () => undefined, appendTaskEvent: async () => undefined },
     runner: {
       readFileWithHash: async (_workspace: string, _task: string, path: string) => {
         const content = written.get(path);
