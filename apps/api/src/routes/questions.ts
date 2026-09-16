@@ -7,7 +7,11 @@ import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 
 const Answer = z
-  .object({ questionId: z.uuid(), prompt: z.string().trim().min(1).max(200_000) })
+  .object({
+    questionId: z.uuid(),
+    prompt: z.string().trim().min(1).max(200_000),
+    tabId: z.string().max(64).optional()
+  })
   .strict();
 export function questionAnswerId(taskId: string, questionId: string): string {
   const bytes = createHash('sha256')
@@ -126,7 +130,7 @@ export function registerQuestionRoutes(context: RouteContext): void {
         )
       ).rows[0];
       const state = task.agentStateCiphertext
-        ? decryptJson<{ question?: { handoff?: { kind: string; tabId?: string } } }>(
+        ? decryptJson<{ question?: { handoff?: { kind: string; tabId?: string; url?: string } } }>(
             task.agentStateCiphertext,
             key
           )
@@ -149,18 +153,35 @@ export function registerQuestionRoutes(context: RouteContext): void {
             'Complete the handoff from a signed-in device',
             403
           );
-        await context.runner.request({
-          workspaceId: task.workspaceId,
-          userId: user.id,
-          role: 'user',
-          scopes: ['browser.takeover'],
-          path: `/v1/workspaces/${task.workspaceId}/browser/handoff-complete`,
-          method: 'POST',
-          body: JSON.stringify({
-            ...(state.question.handoff.tabId ? { tabId: state.question.handoff.tabId } : {})
-          }),
-          contentType: 'application/json'
-        });
+        const completion = await context.runner
+          .request<{ ok?: boolean; error?: { code?: string } }>({
+            workspaceId: task.workspaceId,
+            userId: user.id,
+            role: 'user',
+            scopes: ['browser.takeover'],
+            path: `/v1/workspaces/${task.workspaceId}/browser/handoff-complete`,
+            method: 'POST',
+            body: JSON.stringify({
+              ...((input.tabId ?? state.question.handoff.tabId)
+                ? { tabId: input.tabId ?? state.question.handoff.tabId }
+                : {}),
+              ...(state.question.handoff.url ? { expectedUrl: state.question.handoff.url } : {})
+            }),
+            contentType: 'application/json',
+            acceptAnyStatus: true,
+            timeoutMs: 10000
+          })
+          .catch(() => null);
+        if (!completion?.ok) {
+          const blocked = completion?.error?.code === 'browser_bot_wall';
+          throw new AthanorError(
+            blocked ? 'human_verification_incomplete' : 'handoff_unavailable',
+            blocked
+              ? 'The page still needs human verification. Complete it in the browser, then choose Done and continue.'
+              : 'Garden could not check the browser. Reconnect to it and try Done and continue again.',
+            blocked ? 409 : 503
+          );
+        }
       }
       if (task.parentMissionId)
         return replyToCodingMission(context, task, { prompt: input.prompt }, messageId);

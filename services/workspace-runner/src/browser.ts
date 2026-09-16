@@ -1943,13 +1943,25 @@ export class BrowserManager {
     return frames.filter((frame) => !receipt.frames.includes(frame));
   }
 
-  async completeHandoff(workspaceId: string, root: string, tabId?: string): Promise<void> {
-    const session = await this.ensure(workspaceId, root);
+  async completeHandoff(
+    workspaceId: string,
+    root: string,
+    tabId?: string,
+    expectedUrl?: string
+  ): Promise<void> {
+    const session = this.#sessions.get(workspaceId);
+    if (!session) throw new Error('Open the browser and complete verification before continuing');
     if (session.control.holder === 'secure_input')
       throw new Error('End private input before continuing');
     tabId ??= session.walls.latest()?.tabId ?? undefined;
+    if (!tabId) throw new Error('Select the verification tab before continuing');
     if (tabId) {
       const page = resolveTab(session, tabId);
+      if (
+        !/^https?:\/\//.test(page.url()) ||
+        (expectedUrl && new URL(page.url()).origin !== new URL(expectedUrl).origin)
+      )
+        throw new Error('Reopen the verification site and complete it before continuing');
       // Only an explicit owner completion can issue this receipt. Page content alone cannot.
       const digest = session.control.holder === 'user' ? await this.#challengeDigest(page) : null;
       const frames = page.frames().map((frame) => frame.url());
@@ -1964,10 +1976,7 @@ export class BrowserManager {
           (frame) => !completedFrames.includes(frame)
         )
       });
-      if (wall)
-        throw new Error(
-          'The page still shows a human verification challenge. Complete it before continuing.'
-        );
+      if (wall) throw new BotWallError(this.#raiseWall(session, page, wall));
       if (digest && completedFrames.length)
         this.#humanReceipts.set(page, {
           url: page.url(),

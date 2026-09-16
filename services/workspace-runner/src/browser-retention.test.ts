@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BrowserManager, type BrowserStreamState } from './browser.js';
+import { BotWallError, BrowserManager, type BrowserStreamState } from './browser.js';
 import { AGENT_TAB_LIMIT, TAB_IDLE_MS } from './browser-tabs.js';
 
 const driver = vi.hoisted(() => ({ launchPersistentContext: vi.fn() }));
@@ -265,9 +265,10 @@ it('requires owner control for drawing and releases the mouse after a failed str
 it('keeps the human in control when the challenge has not cleared', async () => {
   const f = await setup();
   await f.manager.setHolder(workspaceId, f.root, 'user');
+  f.context.all[0]!.url.mockReturnValue('https://fixture.test/challenge');
   f.context.all[0]!.title.mockResolvedValue('Just a moment...');
   await expect(f.manager.completeHandoff(workspaceId, f.root, 'tab-1')).rejects.toThrow(
-    'still shows'
+    BotWallError
   );
   expect(f.manager.sessions(workspaceId)?.holder).toBe('user');
   f.context.all[0]!.title.mockResolvedValue('Application received');
@@ -278,13 +279,14 @@ it('keeps the human in control when the challenge has not cleared', async () => 
 it('requires explicit owner completion for an embedded widget and revokes that receipt when its response changes', async () => {
   const f = await setup();
   const page = f.context.all[0]!;
+  page.url.mockReturnValue('https://fixture.test/challenge');
   let token = 'synthetic-response-one';
   page.frames.mockReturnValue([
     { url: () => 'https://www.google.com/recaptcha/api2/anchor?k=fixture' }
   ] as never);
   page.evaluate.mockImplementation(async () => token as never);
   await expect(f.manager.completeHandoff(workspaceId, f.root, 'tab-1')).rejects.toThrow(
-    'still shows'
+    BotWallError
   );
   await f.manager.setHolder(workspaceId, f.root, 'user');
   await f.manager.completeHandoff(workspaceId, f.root, 'tab-1');
@@ -292,11 +294,27 @@ it('requires explicit owner completion for an embedded widget and revokes that r
   await expect(f.manager.completeHandoff(workspaceId, f.root, 'tab-1')).resolves.toBeUndefined();
   token = 'synthetic-response-two';
   await expect(f.manager.completeHandoff(workspaceId, f.root, 'tab-1')).rejects.toThrow(
-    'still shows'
+    BotWallError
   );
   await f.manager.setHolder(workspaceId, f.root, 'user');
   page.title.mockResolvedValue('Verify you are human');
   await expect(f.manager.completeHandoff(workspaceId, f.root, 'tab-1')).rejects.toThrow(
-    'still shows'
+    BotWallError
   );
+});
+
+it('cannot acknowledge a lost page or a different site after browser recovery', async () => {
+  const f = await setup();
+  await f.manager.setHolder(workspaceId, f.root, 'user');
+  await expect(
+    f.manager.completeHandoff(workspaceId, f.root, 'tab-1', 'https://fixture.test/challenge')
+  ).rejects.toThrow('Reopen');
+  f.context.all[0]!.url.mockReturnValue('https://different.test/');
+  await expect(
+    f.manager.completeHandoff(workspaceId, f.root, 'tab-1', 'https://fixture.test/challenge')
+  ).rejects.toThrow('Reopen');
+  expect(f.manager.sessions(workspaceId)?.holder).toBe('user');
+  f.context.all[0]!.url.mockReturnValue('https://fixture.test/complete');
+  await f.manager.completeHandoff(workspaceId, f.root, 'tab-1', 'https://fixture.test/challenge');
+  expect(f.manager.sessions(workspaceId)?.holder).toBe('agent');
 });

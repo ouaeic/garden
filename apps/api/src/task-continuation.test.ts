@@ -345,6 +345,85 @@ describe('confirmed continuation within existing task authority', () => {
 });
 
 describe('durable question replies', () => {
+  it('keeps a blocked or disconnected handoff pending, then accepts an acknowledged completion', async () => {
+    const f = await fixture('awaiting_user');
+    const question = await store.appendTaskEvent({
+      taskId: f.task.id,
+      kind: 'question_asked',
+      summary: 'Complete verification',
+      payloadCiphertext: encryptJson(
+        { question: 'Complete verification' },
+        key,
+        `task-event:${f.task.id}`
+      )
+    });
+    await database.query('UPDATE tasks SET agent_state_ciphertext=$2::jsonb WHERE id=$1', [
+      f.task.id,
+      JSON.stringify(
+        encryptJson(
+          {
+            messages: [],
+            question: {
+              question: 'Complete verification',
+              askedAtStep: 1,
+              handoff: { kind: 'challenge', tabId: 'tab-2', url: 'https://fixture.test/challenge' }
+            }
+          },
+          key,
+          `task-state:${f.task.id}`
+        )
+      )
+    ]);
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({ error: { code: 'browser_bot_wall' } })
+      .mockRejectedValueOnce(new Error('Connection closed'))
+      .mockResolvedValueOnce({ ok: true });
+    const app = Fastify();
+    app.decorateRequest('user', null);
+    app.addHook('onRequest', async (r) => {
+      r.user = f.user;
+    });
+    registerQuestionRoutes({
+      ...f.context,
+      app,
+      runner: { request } as unknown as RouteContext['runner']
+    });
+    try {
+      const input = {
+        method: 'POST' as const,
+        url: `/v1/tasks/${f.task.id}/answer`,
+        payload: {
+          questionId: question.id,
+          prompt: 'I completed verification.',
+          tabId: 'tab-reopened'
+        }
+      };
+      const blocked = await app.inject(input);
+      expect(blocked.statusCode).toBe(409);
+      expect(blocked.json<{ message: string }>().message).toContain(
+        'still needs human verification'
+      );
+      expect((await store.getTask(f.user.id, f.task.id))?.status).toBe('awaiting_user');
+      expect(await store.getNextQueuedTaskMessage(f.task.id)).toBeNull();
+      const disconnected = await app.inject(input);
+      expect(disconnected.statusCode).toBe(503);
+      expect(disconnected.json<{ message: string }>().message).toContain('Reconnect');
+      expect((await app.inject(input)).statusCode).toBe(200);
+      expect(request).toHaveBeenCalledTimes(3);
+      expect(request.mock.calls[0]?.[0]).toMatchObject({
+        workspaceId: f.task.workspaceId,
+        body: JSON.stringify({
+          tabId: 'tab-reopened',
+          expectedUrl: 'https://fixture.test/challenge'
+        }),
+        acceptAnyStatus: true
+      });
+      expect(f.resolveSpendCeiling).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  });
   it('binds a reply to the current question across duplicate device requests without adding budget', async () => {
     const f = await fixture('awaiting_user');
     const question = await store.appendTaskEvent({

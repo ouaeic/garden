@@ -54,6 +54,7 @@ export default function Screen({
     surface: string;
     title: string;
     tabId?: string;
+    url?: string;
     route: 'answer' | 'approval';
   } | null>(null);
   const [handoffBusy, setHandoffBusy] = useState(false);
@@ -413,10 +414,24 @@ export default function Screen({
         .then(() => control({ type: 'action', action: { type: 'select_tab', tabId } }))
         .catch((cause) => setError(message(cause)));
   }, [connected, control, taskId, surface]);
+  const handoffTab =
+    state.tabs?.find((tab) => tab.tabId === handoff?.tabId && /^https?:\/\//.test(tab.url)) ??
+    state.tabs?.find(
+      (tab) =>
+        tab.active &&
+        handoff?.kind === 'challenge' &&
+        handoff.url &&
+        /^https?:\/\//.test(tab.url) &&
+        new URL(tab.url).origin === new URL(handoff.url).origin
+    );
   async function beginHandoff() {
     await control({ type: 'holder', holder: 'user' });
     const tabId = handoff?.tabId ?? state.botWall?.tabId;
-    if (surface === 'browser' && tabId) await action({ type: 'select_tab', tabId });
+    if (surface === 'browser' && tabId) {
+      if (handoff?.kind === 'challenge' && handoff.url && !handoffTab) {
+        await action({ type: 'new_tab', url: handoff.url, activate: true });
+      } else await action({ type: 'select_tab', tabId: handoffTab?.tabId ?? tabId });
+    }
   }
   async function completeHandoff() {
     if (!handoff || !taskId) return;
@@ -428,6 +443,9 @@ export default function Screen({
         handoff.route === 'answer'
           ? post(`/v1/tasks/${taskId}/answer`, {
               questionId: handoff.id,
+              ...(state.tabs?.find((tab) => tab.active)?.tabId
+                ? { tabId: state.tabs.find((tab) => tab.active)!.tabId }
+                : {}),
               prompt: 'I completed the browser verification. Observe the page and continue.'
             })
           : post(`/v1/approvals/${handoff.id}/approve`, {});
@@ -468,7 +486,11 @@ export default function Screen({
               disabled={!connected || handoffBusy}
               onClick={() => void run(beginHandoff)}
             >
-              Take control{handoff.tabId ? ' of this tab' : ''}
+              {handoff.kind === 'challenge' && handoff.url && !handoffTab ? (
+                'Reopen verification page'
+              ) : (
+                <>Take control{handoff.tabId ? ' of this tab' : ''}</>
+              )}
             </button>
             <button
               className="button primary"

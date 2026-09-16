@@ -37,7 +37,10 @@ export async function checkHumanInterventions({ context, origin, task, report })
     if (path === `/v1/tasks/${task.id}/intervention`) return route.fulfill({ json: intervention });
     if (path === `/v1/workspaces/${task.workspaceId}/browser-token`)
       return route.fulfill({ json: { runnerUrl: origin, token: 'fixture' } });
-    if (path === `/v1/approvals/${intervention?.id}/approve`) {
+    if (
+      path === `/v1/approvals/${intervention?.id}/approve` ||
+      path === `/v1/tasks/${task.id}/answer`
+    ) {
       replies.push(route.request().postDataJSON());
       intervention = null;
       state.holder = 'agent';
@@ -56,6 +59,18 @@ export async function checkHumanInterventions({ context, origin, task, report })
       if (frame.type === 'holder') state.holder = frame.holder;
       if (frame.type === 'action' && frame.action.type === 'select_tab')
         for (const tab of state.tabs) tab.active = tab.tabId === frame.action.tabId;
+      if (frame.type === 'action' && frame.action.type === 'new_tab') {
+        assert.equal(state.holder, 'user');
+        state.tabs.forEach((tab) => {
+          tab.active = false;
+        });
+        state.tabs.push({
+          tabId: 'tab-recovered',
+          title: 'Recovered verification page',
+          url: frame.action.url,
+          active: true
+        });
+      }
       publish();
       ws.send(JSON.stringify({ type: 'control_ack', requestId: frame.requestId }));
     });
@@ -111,8 +126,36 @@ export async function checkHumanInterventions({ context, origin, task, report })
       1,
       'Completion must not replay the human action'
     );
+    intervention = {
+      id: '10000000-0000-4000-8000-000000000089',
+      kind: 'challenge',
+      surface: 'browser',
+      route: 'answer',
+      title: 'Complete browser verification',
+      tabId: 'tab-missing',
+      url: 'https://example.invalid/challenge'
+    };
+    state.holder = 'agent';
+    state.tabs = [{ tabId: 'tab-1', title: 'New tab', url: 'about:blank', active: true }];
+    await page.reload();
+    await page.getByRole('button', { name: 'Browser', exact: true }).click();
+    await panel.getByRole('button', { name: 'Reopen verification page', exact: true }).click();
+    await page.waitForFunction(() =>
+      document
+        .querySelector('.garden-browser-tab.active')
+        ?.textContent.includes('Recovered verification page')
+    );
+    await panel.getByRole('button', { name: 'Done and continue' }).click();
+    await panel.waitFor({ state: 'detached' });
+    assert.equal(replies.length, 2);
+    assert.equal(replies[1].questionId, '10000000-0000-4000-8000-000000000089');
+    assert.equal(replies[1].tabId, 'tab-recovered');
+    assert.equal(
+      frames.filter((frame) => frame.type === 'action' && frame.action.type === 'new_tab').length,
+      1
+    );
     console.log(
-      'Human handoff browser checks passed: exact tab, curved gesture, private blackout, reconnection, responsive layout, and single completion without replay.'
+      'Human handoff browser checks passed: exact tab, curved gesture, private blackout, reconnection, lost-page recovery, responsive layout, and single completion without replay.'
     );
   } finally {
     await page.close();

@@ -1891,13 +1891,14 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       requireScope(request, 'browser.takeover');
       if (request.capability.role !== 'user') throw new Error('Owner session required');
       const body = z
-        .object({ tabId: z.string().max(64).optional() })
+        .object({ tabId: z.string().max(64).optional(), expectedUrl: z.url().optional() })
         .strict()
         .parse(request.body);
       await browser.completeHandoff(
         request.params.workspaceId,
         workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId),
-        body.tabId
+        body.tabId,
+        body.expectedUrl
       );
       return { ok: true };
     }
