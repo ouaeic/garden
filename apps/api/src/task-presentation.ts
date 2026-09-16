@@ -292,6 +292,10 @@ export const buildTaskPresentation = (input: PresentationInput): TaskPresentatio
       });
     } else if (event.kind === 'error') {
       pending.delete(id);
+      if (payload.code === 'browser_bot_wall' && record(payload.botWall).tabId) {
+        add(event, 'checkpoint', 'Browser verification requested');
+        continue;
+      }
       /*
        * Counted whether or not the call that failed was seen starting.
        *

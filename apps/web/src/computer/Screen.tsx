@@ -641,7 +641,10 @@ export default function Screen({
       )}
       {state.botWall && (
         <p role="status">
-          {state.botWall.vendor ?? 'This site'} needs human verification. {state.botWall.url}
+          {state.botWall.vendor && state.botWall.vendor !== 'Unnamed bot wall'
+            ? state.botWall.vendor
+            : 'This site'}{' '}
+          needs human verification. {state.botWall.url}
           {!handoff && (
             <button className="button" disabled={!connected} onClick={() => void run(beginHandoff)}>
               Open verification tab

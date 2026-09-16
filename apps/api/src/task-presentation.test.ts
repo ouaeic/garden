@@ -500,6 +500,39 @@ describe('failed tool calls are counted, not only listed', () => {
   const failures = (built: ReturnType<typeof buildTaskPresentation>) =>
     built.progress.metrics.find((metric) => metric.key === 'toolFailures')?.value;
 
+  it('records a detected human challenge as an intervention while preserving real failures', () => {
+    const built = buildTaskPresentation(
+      input({
+        taskStatus: 'awaiting_user',
+        events: [
+          event(1, 'tool_started', { toolCallId: 'wall', tool: 'browser_action', arguments: {} }),
+          event(
+            2,
+            'error',
+            {
+              toolCallId: 'wall',
+              code: 'browser_bot_wall',
+              botWall: { tabId: 'tab-2' }
+            },
+            'browser_action failed'
+          ),
+          event(3, 'error', { toolCallId: 'network', code: 'network_error' }, 'Connection failed')
+        ]
+      })
+    );
+    expect(failures(built)).toBe(1);
+    expect(built.progress.milestones).toContainEqual(
+      expect.objectContaining({
+        kind: 'checkpoint',
+        title: 'Browser verification requested',
+        status: 'observed'
+      })
+    );
+    expect(built.progress.milestones.some((entry) => entry.title === 'browser_action failed')).toBe(
+      false
+    );
+  });
+
   it('counts every failure, including ones whose start scrolled out of the window', () => {
     const built = buildTaskPresentation(
       input({

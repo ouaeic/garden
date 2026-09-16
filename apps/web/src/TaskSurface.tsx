@@ -775,7 +775,7 @@ export default function TaskSurface({
                     </div>
                   )}
                 </article>
-              ) : (
+              ) : attentionPanel ? null : (
                 <article className="garden-working-note">
                   <span className="eyebrow">{statusLabel[task.status]}</span>
                   <h2>
