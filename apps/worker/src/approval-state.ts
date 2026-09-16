@@ -12,6 +12,7 @@ import { canonicalJson, textValue } from './values.js';
 import type { TaskApprovalScope } from '@athanor/contracts';
 
 export interface AgentApprovalRequirement {
+  destinations?: string[];
   taskGrant?: TaskApprovalScope;
   sideEffect: 'workspace_write' | 'external_reversible' | 'external_consequential';
   action: string;

@@ -118,6 +118,8 @@ export const resumeParkedTurn = async (
     // Dropped before the pause check below so a paused resume seals this call once instead of
     // executing it a second time when the task is picked back up.
     delete state.pending;
+    // This response has already been billed; the next generation must consume a fresh step.
+    state.step += 1;
     const approvalCoversCall =
       outcome === 'approved' &&
       approvalArgumentsMatch(textValue(approval?.previewHash), key, call.name, call.arguments);

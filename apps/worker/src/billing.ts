@@ -12,7 +12,7 @@
  * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
 import type { ModelRelease } from '@athanor/contracts';
-import { pricesAtPromptSize, readRoutingMetadata } from '@athanor/core';
+import { pricesAtPromptSize, readRoutingMetadata, sha256 } from '@athanor/core';
 import type { DataStore } from '@athanor/data';
 import type { ModelResponse } from '@athanor/model-gateway';
 
@@ -22,7 +22,14 @@ export const recordModelStepUsage = async (
   response: ModelResponse,
   usage: Parameters<DataStore['recordUsage']>[0]
 ): Promise<void> => {
-  if (!response.nativeInputUsageRecorded) await store.recordUsage(usage);
+  if (response.nativeInputUsageRecorded) return;
+  const generationId = response.metadata.generationId;
+  // A provider receipt identifies an incurred charge even when execution resumes at the same step.
+  const receiptKey =
+    generationId && usage.taskId
+      ? `task:${usage.taskId}:generation:${sha256(`${response.metadata.provider}:${generationId}`)}`
+      : usage.idempotencyKey;
+  await store.recordUsage({ ...usage, idempotencyKey: receiptKey });
 };
 
 export const DELEGATE_BUDGET_SHARE = 0.25;

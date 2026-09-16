@@ -12,6 +12,37 @@ afterEach(async () => {
 });
 
 describe('the first observable approval', () => {
+  it('preserves broker-observed destinations in the sealed browser card, including the port', async () => {
+    const key = new Uint8Array(32).fill(7);
+    let preview: Record<string, unknown> | undefined;
+    const store = {
+      parkTaskForApproval: async (input: {
+        previewCiphertext: Parameters<typeof decryptJson>[0];
+      }) => {
+        preview = decryptJson(input.previewCiphertext, key, 'approval:task');
+        return false;
+      }
+    } as unknown as DataStore;
+    await parkForApproval(
+      { store, config: { WORKER_ID: 'worker' } } as never,
+      { id: 'task', userId: 'owner' } as never,
+      key,
+      { messages: [], credits: 0 } as unknown as AgentState,
+      {
+        id: 'upload',
+        name: 'browser_action',
+        arguments: { action: 'upload', selector: '#cv', paths: ['workspace/cv.pdf'] }
+      },
+      {
+        sideEffect: 'external_consequential',
+        action: 'Upload CV',
+        preview: 'Upload the CV',
+        destinations: ['https://careers.example:8443']
+      },
+      []
+    );
+    expect(preview?.addresses).toEqual(['careers.example:8443']);
+  });
   it('can be answered immediately without losing the exact sealed continuation', async () => {
     database = createDatabase({ driver: 'pglite', pglitePath: ':memory:' });
     await migrateDatabase(database);

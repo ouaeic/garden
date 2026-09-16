@@ -3,8 +3,8 @@ import type { ModelToolCall } from '@athanor/model-gateway';
 import type { AgentState } from '../agent-state.js';
 import type { AgentApprovalRequirement } from '../approval-state.js';
 
-/** One source check and one separated command proposal before an owner decision is needed. */
-const MAX_RECOVERY_ATTEMPTS = 2;
+/** Splitting a command must not consume the independent chance to verify its public source. */
+const MAX_ATTEMPTS_PER_REASON = 2;
 
 export const recoverApprovalProposal = (
   task: Pick<TaskRecord, 'securityMode' | 'parentMissionId'>,
@@ -21,10 +21,25 @@ export const recoverApprovalProposal = (
   )
     return false;
   const turn = state.turn ?? 0;
-  const attempts = state.approvalRecovery?.turn === turn ? state.approvalRecovery.attempts : 0;
-  if (!Number.isSafeInteger(attempts) || attempts < 0 || attempts >= MAX_RECOVERY_ATTEMPTS)
+  const previous = state.approvalRecovery?.turn === turn ? state.approvalRecovery : undefined;
+  const attempts = previous?.attempts ?? 0;
+  const reasonAttempts = previous?.byReason
+    ? (previous.byReason[approval.recovery] ?? 0)
+    : attempts;
+  if (
+    !Number.isSafeInteger(attempts) ||
+    attempts < 0 ||
+    attempts >= MAX_ATTEMPTS_PER_REASON * 2 ||
+    !Number.isSafeInteger(reasonAttempts) ||
+    reasonAttempts < 0 ||
+    reasonAttempts >= MAX_ATTEMPTS_PER_REASON
+  )
     return false;
-  state.approvalRecovery = { turn, attempts: attempts + 1 };
+  state.approvalRecovery = {
+    turn,
+    attempts: attempts + 1,
+    byReason: { ...previous?.byReason, [approval.recovery]: reasonAttempts + 1 }
+  };
   const guidance =
     approval.recovery === 'separate_network_steps'
       ? 'Separate the public download from local file edits. Use a direct curl or wget GET with a literal verified URL and a workspace output path, then file_patch or a local-only command. An opaque interpreter script is not a verified download.'

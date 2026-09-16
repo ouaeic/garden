@@ -330,6 +330,7 @@ export const approvalForCall = async (
       consequential: boolean;
       sensitiveInput: boolean;
       preview: string;
+      destinations?: string[];
     }>(
       task.workspaceId,
       task.id,
@@ -339,6 +340,7 @@ export const approvalForCall = async (
     );
     if (policy.sensitiveInput) {
       return {
+        ...(policy.destinations ? { destinations: policy.destinations } : {}),
         sideEffect: 'external_consequential',
         action: `Secure ${surface} input required`,
         preview: `${policy.preview}\nTake over the ${surface === 'browser' ? 'Browser' : 'Computer'} pane, enable Secure input, enter the private value, return control, then approve this handoff. The agent will not replay the typed value.`,
@@ -347,9 +349,10 @@ export const approvalForCall = async (
     }
     if (policy.consequential) {
       return {
+        ...(policy.destinations ? { destinations: policy.destinations } : {}),
         sideEffect: 'external_consequential',
         action: declared?.action ?? `Confirm ${surface} action`,
-        preview: `${declared?.preview ?? policy.preview}\nThe ${surface} broker identified the actual control as consequential.`
+        preview: `${policy.preview}\nThe ${surface} broker identified the actual control as consequential.`
       };
     }
     /*

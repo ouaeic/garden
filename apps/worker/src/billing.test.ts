@@ -1,5 +1,44 @@
-import { describe, expect, it } from 'vitest';
-import { delegateBudget } from './billing.js';
+import { describe, expect, it, vi } from 'vitest';
+import type { ModelResponse } from '@athanor/model-gateway';
+import type { DataStore } from '@athanor/data';
+import { delegateBudget, recordModelStepUsage } from './billing.js';
+
+it('records distinct provider generations at a resumed step while replaying one receipt idempotently', async () => {
+  const recordUsage = vi.fn();
+  const response = (generationId: string) =>
+    ({
+      metadata: { provider: 'openrouter', generationId }
+    }) as ModelResponse;
+  const usage = {
+    userId: 'owner',
+    taskId: 'task',
+    kind: 'model_inference',
+    resourceClass: 'light',
+    quantity: 100,
+    unit: 'tokens',
+    credits: 0.01,
+    state: 'settled',
+    idempotencyKey: 'task:task:step:7',
+    costUsd: 0.1
+  } as Parameters<DataStore['recordUsage']>[0];
+  await recordModelStepUsage({ recordUsage }, response('first'), usage);
+  await recordModelStepUsage({ recordUsage }, response('second'), usage);
+  await recordModelStepUsage({ recordUsage }, response('second'), {
+    ...usage,
+    idempotencyKey: 'task:task:step:8'
+  });
+  expect(recordUsage).toHaveBeenCalledTimes(3);
+  const entries = recordUsage.mock.calls.map(([entry]) => entry as typeof usage);
+  expect(entries[0]!.idempotencyKey).not.toBe(entries[1]!.idempotencyKey);
+  expect(entries[1]!.idempotencyKey).toBe(entries[2]!.idempotencyKey);
+  expect(new Map(entries.map((entry) => [entry.idempotencyKey, entry.costUsd])).size).toBe(2);
+  await recordModelStepUsage(
+    { recordUsage },
+    { ...response('native'), nativeInputUsageRecorded: true },
+    usage
+  );
+  expect(recordUsage).toHaveBeenCalledTimes(3);
+});
 
 describe('delegate budget', () => {
   it('gives a delegated mission a share of the parent budget', () => {

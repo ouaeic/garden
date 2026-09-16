@@ -208,12 +208,14 @@ interface ElementPolicyInput {
   autocomplete: string;
   formAction: string;
   inForm: boolean;
+  pageUrl?: string;
 }
 
 export interface BrowserActionPreflight {
   consequential: boolean;
   sensitiveInput: boolean;
   preview: string;
+  destinations?: string[];
 }
 
 export interface BrowserSelectOption {
@@ -242,6 +244,9 @@ export interface BrowserSnapshotElement {
   field?: string;
   /** Present on every value-bearing control, empty string included: "still empty" is an answer. */
   value?: string;
+  /** Present when the returned value is only a prefix; never mistake it for the saved value. */
+  valueTruncated?: true;
+  valueLength?: number;
   checked?: boolean;
   disabled?: boolean;
   required?: boolean;
@@ -721,6 +726,7 @@ const flatten = (value: string): string => value.replace(/\s+/g, ' ').trim();
 
 const ELEMENT_NAME_LIMIT = 160;
 const ELEMENT_VALUE_LIMIT = 200;
+const FORM_VALUE_LIMIT = 4_000;
 const ELEMENT_DESCRIPTION_LIMIT = 300;
 const ELEMENT_OPTION_LIMIT = 200;
 
@@ -738,7 +744,10 @@ export const redactPasswordValue = (value: string): string =>
 const CLOSED_SHADOW_DESCRIPTION =
   'This element draws itself from a closed shadow root, so its contents cannot be listed. Click the element itself, or act on it by coordinates from the screenshot.';
 
-export const describeScannedElement = (raw: RawScannedElement): ScannedElement => {
+export const describeScannedElement = (
+  raw: RawScannedElement,
+  valueLimit = ELEMENT_VALUE_LIMIT
+): ScannedElement => {
   const name =
     [raw.ariaLabel, raw.labelledByText, raw.labelText, raw.placeholder, raw.title, raw.text]
       .map(flatten)
@@ -765,9 +774,10 @@ export const describeScannedElement = (raw: RawScannedElement): ScannedElement =
     ...(raw.fieldName ? { field: flatten(raw.fieldName) } : {}),
     ...(raw.valueBearing
       ? {
-          value: raw.password
-            ? redactPasswordValue(raw.value)
-            : raw.value.slice(0, ELEMENT_VALUE_LIMIT)
+          value: raw.password ? redactPasswordValue(raw.value) : raw.value.slice(0, valueLimit),
+          ...(!raw.password && raw.value.length > valueLimit
+            ? { valueTruncated: true as const, valueLength: raw.value.length }
+            : {})
         }
       : {}),
     ...(raw.checked === null ? {} : { checked: raw.checked }),
@@ -797,14 +807,15 @@ export const describeScannedElement = (raw: RawScannedElement): ScannedElement =
  */
 export const foldScannedElements = (
   raw: RawScannedElement[],
-  limit: number
+  limit: number,
+  valueLimit = ELEMENT_VALUE_LIMIT
 ): { kept: ScannedElement[]; folded: number } => {
   const scanned = new Set(raw.map((entry) => entry.ref));
   const standing = raw.filter(
     (entry) => !(entry.tag === 'label' && entry.labelFor !== null && scanned.has(entry.labelFor))
   );
   return {
-    kept: standing.slice(0, limit).map(describeScannedElement),
+    kept: standing.slice(0, limit).map((entry) => describeScannedElement(entry, valueLimit)),
     // What was dropped as a duplicate rather than lost to the budget. The caller subtracts it,
     // because a folded label is still represented - its text is on the control it names - and
     // counting it as omitted would report a page of labelled inputs as half missing.
@@ -827,7 +838,8 @@ const scanFrameElements = async (
   frame: Frame,
   ordinal: number,
   limit: number,
-  rootSelector?: string
+  rootSelector?: string,
+  valueLimit = ELEMENT_VALUE_LIMIT
 ): Promise<{ elements: ScannedElement[]; omitted: number }> => {
   const raw = await withDeadline(
     frame
@@ -1040,7 +1052,7 @@ const scanFrameElements = async (
     PAGE_SCRIPT_TIMEOUT_MS,
     { elements: [], matched: 0 }
   );
-  const folded = foldScannedElements(raw.elements, limit);
+  const folded = foldScannedElements(raw.elements, limit, valueLimit);
   /*
    * What the page had and this list does not carry.
    *
@@ -1341,7 +1353,8 @@ const ELEMENT_POLICY_ACTIONS: BrowserAction['type'][] = [
   'click',
   'double_click',
   'type',
-  'select_option'
+  'select_option',
+  'upload'
 ];
 
 /** Actions that can start a download, and so wait to report where the file landed. */
@@ -1465,8 +1478,8 @@ export const classifyBrowserAction = (
     element.inForm &&
     ((element.tag === 'button' && element.type === 'submit') ||
       (element.tag === 'input' && ['submit', 'image'].includes(element.type)));
-  const consequential =
-    activates && (isSubmitControl || consequentialText.test(`${label} ${element.formAction}`));
+  // A form URL such as /apply does not make its Previous or Help control a submission.
+  const consequential = activates && (isSubmitControl || consequentialText.test(label));
   const verb =
     action.type === 'type'
       ? 'Fill'
@@ -1494,6 +1507,7 @@ export const combineBatchPreflight = (
 ): BrowserActionPreflight => ({
   consequential: steps.some((step) => step.preflight.consequential),
   sensitiveInput: steps.some((step) => step.preflight.sensitiveInput),
+  destinations: [...new Set(steps.flatMap((step) => step.preflight.destinations ?? []))],
   preview: steps
     .map((step) => `${step.index + 1}. ${step.preflight.preview}`)
     .join('\n')
@@ -2466,7 +2480,8 @@ export class BrowserManager {
    */
   async #scanPage(
     page: Page,
-    rootSelector?: string
+    rootSelector?: string,
+    valueLimit = ELEMENT_VALUE_LIMIT
   ): Promise<{
     elements: BrowserSnapshotElement[];
     elementsOmitted: number;
@@ -2483,7 +2498,7 @@ export class BrowserManager {
       // consent, payment and submit frames live.
       if (budget <= 0) break;
       scannedFrames += 1;
-      const scan = await scanFrameElements(frame, ordinal, budget, rootSelector);
+      const scan = await scanFrameElements(frame, ordinal, budget, rootSelector, valueLimit);
       elementsOmitted += scan.omitted;
       for (const scanned of scan.elements) {
         const { ref, ...rest } = scanned;
@@ -2516,7 +2531,7 @@ export class BrowserManager {
     const page = resolveTab(session, input.tabId);
     if (actor === 'agent') await this.#assertNoWall(session, page);
     this.#assertReadablePage(page, actor);
-    const scan = await this.#scanPage(page, input.selector);
+    const scan = await this.#scanPage(page, input.selector, FORM_VALUE_LIMIT);
     return {
       url: page.url(),
       title: await page.title().catch(() => ''),
@@ -3077,7 +3092,7 @@ export class BrowserManager {
     if (!ELEMENT_POLICY_ACTIONS.includes(action.type)) return classifyBrowserAction(action);
     const targeted = action as Extract<
       BrowserAction,
-      { type: 'click' | 'double_click' | 'type' | 'select_option' }
+      { type: 'click' | 'double_click' | 'type' | 'select_option' | 'upload' }
     >;
     const page = resolveTab(session, targeted.tabId);
     const target = await resolveBrowserTarget(page, targeted.selector);
@@ -3095,7 +3110,8 @@ export class BrowserManager {
             '',
           autocomplete: target.getAttribute('autocomplete') ?? '',
           formAction: form?.action ?? '',
-          inForm: Boolean(form)
+          inForm: Boolean(form),
+          pageUrl: target.ownerDocument.URL
         };
       },
       undefined,
@@ -3105,7 +3121,27 @@ export class BrowserManager {
     // classified again when it runs. On its own it is a failure the caller has to hear about,
     // because classifying an unresolvable target as harmless is how an unapproved submit lands.
     const element = options.tolerant ? await read.catch(() => undefined) : await read;
-    return classifyBrowserAction(action, element);
+    const policy = classifyBrowserAction(action, element);
+    const destinations = [
+      ...new Set(
+        [element?.pageUrl ?? page.url(), element?.formAction ?? ''].flatMap((value) => {
+          try {
+            const url = new URL(value);
+            return ['https:', 'http:'].includes(url.protocol) ? [url.origin] : [];
+          } catch {
+            return [];
+          }
+        })
+      )
+    ];
+    return {
+      ...policy,
+      destinations,
+      preview:
+        action.type === 'upload' && destinations.length
+          ? `${policy.preview}\nWebsite: ${destinations.join(', ')}`
+          : policy.preview
+    };
   }
 
   /** The gate every agent action passes, whether it arrived on its own or inside a batch. */

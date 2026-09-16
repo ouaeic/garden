@@ -21,10 +21,8 @@ const TITLES_PER_SWEEP = 5;
 /**
  * How far down the backlog one sweep is willing to look.
  *
- * Wider than it names, because a conversation can be unnameable for a reason that never changes -
- * its own spending ceiling was reached, so paying for a title would step over it - and the backlog
- * is read oldest first. Reading exactly as many as are named would let a handful of those sit at
- * the front forever and starve every conversation behind them.
+ * Sweeps advance through this bounded window even when every conversation in it is unnameable.
+ * At the end they wrap, so skipped conversations can become eligible after their limits change.
  */
 const BACKLOG_WINDOW = 25;
 
@@ -249,16 +247,18 @@ const titleOneTask = async (
  */
 export const titleTasksOnce = async (
   deps: TaskTitlerDeps,
-  state: { attempts: Map<string, number>; providerReadyAt: number },
+  state: { attempts: Map<string, number>; providerReadyAt: number; cursor?: string },
   now: number = Date.now(),
   signal?: AbortSignal
 ): Promise<number> => {
   if (now < state.providerReadyAt) return 0;
-  const pending = await deps.store.listTasksNeedingTitle(BACKLOG_WINDOW);
+  const pending = await deps.store.listTasksNeedingTitle(BACKLOG_WINDOW, state.cursor);
+  if (!pending.length) delete state.cursor;
   let named = 0;
   for (const task of pending) {
     if (signal?.aborted) break;
     if (named >= TITLES_PER_SWEEP) break;
+    state.cursor = task.id;
     if ((state.attempts.get(task.id) ?? 0) >= MAX_ATTEMPTS_PER_TASK) continue;
     try {
       const outcome = await titleOneTask(deps, task, signal);
@@ -271,6 +271,7 @@ export const titleTasksOnce = async (
       } else if (outcome === 'unusable') {
         recordAttempt(state.attempts, task.id);
       } else if (outcome === 'provider_failed') {
+        delete state.cursor;
         state.providerReadyAt = now + PROVIDER_COOLDOWN_MS;
         return named;
       }
@@ -286,6 +287,7 @@ export const titleTasksOnce = async (
       )
         continue;
       if (error instanceof AthanorError && PROVIDER_WALL_CODES.has(error.code)) {
+        delete state.cursor;
         state.providerReadyAt = now + PROVIDER_COOLDOWN_MS;
         deps.log.warn('task.title_provider_unavailable', { code: error.code });
         return named;
@@ -294,6 +296,7 @@ export const titleTasksOnce = async (
       deps.log.warn('task.title_failed', { taskId: task.id, ...errorFields(error) });
     }
   }
+  if (pending.length < BACKLOG_WINDOW && pending.at(-1)?.id === state.cursor) delete state.cursor;
   return named;
 };
 

@@ -350,6 +350,53 @@ describe('the titler', () => {
     }
   }, 60_000);
 
+  it('names new work beyond a full window of permanently skipped conversations', async () => {
+    const { database, store, task, dataKey } = await boxWithAnsweredTask();
+    try {
+      for (let index = 0; index < 25; index++) {
+        const newer = await store.createTask({
+          userId: task.userId,
+          workspaceId: task.workspaceId,
+          titleCiphertext: task.titleCiphertext!,
+          nameIndex: buildConversationNameIndex(
+            'New project',
+            'New analysis',
+            memoryIndexKey(dataKey)
+          ),
+          modelId: task.modelId,
+          privacyRoute: task.privacyRoute,
+          maxComputeCredits: 1,
+          securityMode: task.securityMode,
+          promptCiphertext: task.promptCiphertext
+        });
+        await store.appendTaskEvent({
+          taskId: newer.id,
+          kind: 'assistant_message',
+          summary: 'Working',
+          payloadCiphertext: encryptJson({ markdown: 'Working' }, dataKey, `task-event:${newer.id}`)
+        });
+      }
+      const pending = await store.listTasksNeedingTitle(50);
+      expect(pending).toHaveLength(26);
+      const last = pending.at(-1)!;
+      const state = freshState();
+      for (const old of pending.slice(0, 25)) state.attempts.set(old.id, 3);
+      const complete = vi.fn<TaskTitlerDeps['complete']>(async () =>
+        completion('New analysis results')
+      );
+      const deps = { store, masterKey, log, complete };
+      expect(await titleTasksOnce(deps, state)).toBe(0);
+      expect(await titleTasksOnce(deps, state)).toBe(1);
+      expect(complete).toHaveBeenCalledOnce();
+      expect((await store.getTask(task.userId, last.id))?.titleSource).toBe('generated');
+      // Removing the page boundary cannot strand the cursor on a missing row.
+      await database.query('DELETE FROM tasks WHERE id=$1', [pending[0]!.id]);
+      expect(await store.listTasksNeedingTitle(50, pending[0]!.id)).toHaveLength(24);
+    } finally {
+      await database.close();
+    }
+  }, 60_000);
+
   it('survives a store that fails under it, and stops when it is asked to', async () => {
     const { database, store } = await boxWithAnsweredTask();
     const failing = {

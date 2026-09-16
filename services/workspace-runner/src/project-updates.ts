@@ -180,8 +180,17 @@ export class ProjectUpdatesManager {
         members: {},
         head: null
       };
-      if (registry.workspaceId !== projectWorkspaceId)
-        throw new Error('Project working-area identity changed');
+      if (registry.workspaceId !== projectWorkspaceId) {
+        // The control plane can finalize the root's move only to its already registered area.
+        // Published versions live under the project identity and do not move with this handle.
+        if (
+          taskId !== projectId ||
+          workspaceId !== projectWorkspaceId ||
+          registry.members[taskId] !== projectWorkspaceId
+        )
+          throw new Error('Project working-area identity changed');
+        registry.workspaceId = projectWorkspaceId;
+      }
       await durableMkdir(this.publicDirectory(projectId), 0o755);
       registry.members[taskId] = workspaceId;
       await durableJson(this.file(projectId, 'registry.json'), registry);

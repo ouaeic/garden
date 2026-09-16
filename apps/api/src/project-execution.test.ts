@@ -136,6 +136,17 @@ describe('project preparation API operation', () => {
         workspaceId: f.workspace.id
       })
     );
+    const project = await f.store.getProject(f.user.id, updated.projectId!);
+    expect(project?.workspaceId).toBe(updated.workspaceId);
+    const bindings = f.call.mock.calls
+      .map(([request]) => request)
+      .filter((request) => request.path.endsWith('/members'));
+    expect(bindings.length).toBeGreaterThan(0);
+    expect(bindings.at(-1)).toMatchObject({
+      workspaceId: project!.workspaceId,
+      path: `/v1/workspaces/${project!.workspaceId}/projects/${project!.id}/members`,
+      body: JSON.stringify([{ taskId: updated.id, workspaceId: updated.workspaceId }])
+    });
     expect((await f.store.listWorkspaces(f.user.id))[0]?.storageBytes).toBe(42);
     expect(await f.store.leaseNextTask('ready')).toMatchObject({
       id: f.task.id,

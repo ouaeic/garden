@@ -1,4 +1,5 @@
 import { parkCodingMissionWait } from '../coding-missions.js';
+import { ZodError } from 'zod';
 /**
  * The batch of calls the model proposed, and the nine gates each one passes before it runs.
  *
@@ -335,7 +336,13 @@ export const dispatchToolCalls = async (
         // defers everything behind it in writing - so the approval order the owner sees is the
         // order the model declared. Every tool in the run is one whose verdict is a pure
         // function of arguments and turn state, so asking early cannot change the answer.
-        if (await deps.approvalForCallOnce(approvalMemo, task, candidate, state)) break;
+        try {
+          if (await deps.approvalForCallOnce(approvalMemo, task, candidate, state)) break;
+        } catch (error) {
+          // Invalid input belongs to the sequential repair path; it cannot authorize execution.
+          if (error instanceof ZodError) break;
+          throw error;
+        }
         run.push(candidate);
       }
       if (run.length > 1) {
@@ -572,7 +579,16 @@ export const dispatchToolCalls = async (
      * reads still costs nothing, because every tool in it is exempt.
      */
     await deps.resume.ensureTurnUndoPoint(task, key, state, call.name);
-    const approval = await deps.approvalForCallOnce(approvalMemo, task, call, state);
+    let approval: AgentApprovalRequirement | null;
+    try {
+      approval = await deps.approvalForCallOnce(approvalMemo, task, call, state);
+    } catch (error) {
+      if (!(error instanceof ZodError)) throw error;
+      if (IDEMPOTENT_WITHIN_TURN.has(call.name) && state.seenCalls)
+        delete state.seenCalls[idempotentCallKey(call)];
+      await deps.resume.recordToolFailure(task, key, state, call, error);
+      continue;
+    }
     if (approval) {
       if (recoverApprovalProposal(task, state, call, approval)) {
         if (IDEMPOTENT_WITHIN_TURN.has(call.name) && state.seenCalls)

@@ -1341,17 +1341,20 @@ export class TaskStore {
    * complete enough to be read. Ordered oldest first so a backlog left by a restart is worked
    * through in the order the owner created it.
    */
-  async listTasksNeedingTitle(limit = 5): Promise<TaskRecord[]> {
+  async listTasksNeedingTitle(limit = 5, afterId?: string): Promise<TaskRecord[]> {
     const result = await this.database.query(
       `SELECT t.*, 0 AS queued_message_count
        FROM tasks t
        WHERE t.title_source='prompt'
+         AND ($2::uuid IS NULL
+           OR NOT EXISTS (SELECT 1 FROM tasks cursor WHERE cursor.id=$2)
+           OR (t.created_at,t.id) > (SELECT cursor.created_at,cursor.id FROM tasks cursor WHERE cursor.id=$2))
          AND EXISTS (
            SELECT 1 FROM task_events e
            WHERE e.task_id=t.id AND e.kind='assistant_message')
        ORDER BY t.created_at, t.id
        LIMIT $1`,
-      [Math.max(1, Math.min(Math.trunc(limit), 50))]
+      [Math.max(1, Math.min(Math.trunc(limit), 50)), afterId ?? null]
     );
     return result.rows.map(mapTask);
   }

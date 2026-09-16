@@ -80,6 +80,20 @@ describe('Autonomous alternatives pass the floor without executing the rejected 
       recoverApprovalProposal(task, state(), script, { ...requirement, handoffOnly: true })
     ).toBe(false);
   });
+  it('can verify a source after separating a batch of downloads, with an independent persisted bound', () => {
+    const requirement = approvalRequirement(script.name, script.arguments, 'autonomous', context)!;
+    const current = state();
+    expect(recoverApprovalProposal(task, current, script, requirement)).toBe(true);
+    expect(recoverApprovalProposal(task, current, script, requirement)).toBe(true);
+    expect(recoverApprovalProposal(task, current, script, requirement)).toBe(false);
+    const resumed = JSON.parse(JSON.stringify(current)) as AgentState;
+    const source = { ...requirement, recovery: 'verify_public_source' as const };
+    expect(recoverApprovalProposal(task, resumed, script, source)).toBe(true);
+    expect(resumed.messages.at(-1)?.content).toContain('web_search');
+    expect(recoverApprovalProposal(task, resumed, script, source)).toBe(true);
+    expect(recoverApprovalProposal(task, resumed, script, source)).toBe(false);
+    expect(resumed.approvalRecovery?.attempts).toBe(4);
+  });
   it.each([
     {
       executable: 'curl',

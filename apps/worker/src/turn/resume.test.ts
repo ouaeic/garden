@@ -147,10 +147,11 @@ describe('an approved call resumed into plan mode', () => {
    */
   it('runs exactly as before when the conversation is not in plan mode', async () => {
     for (const mode of [undefined, 'act' as const]) {
-      const { seen } = await resume(remove, mode);
+      const { seen, state } = await resume(remove, mode);
 
       expect(seen.executed, String(mode)).toEqual(['shell']);
       expect(seen.events.join(' | '), String(mode)).toContain('Approved action resumed');
+      expect(state.step).toBe(3);
     }
   });
 

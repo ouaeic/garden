@@ -1,20 +1,21 @@
 ---
 name: web-form-filling
-description: Fill a web form correctly and reversibly — enumerate the real fields from the live page, plan every value, enter them a group at a time, read the whole form back, then present it for owner approval before any submit. Use whenever data must be entered into a website, including a multi-step portal such as an applicant tracking system, a grant portal or a permit application. Do not use to submit without approval, to enter credentials, card numbers or government identifiers, or to defeat a CAPTCHA or bot check.
+description: Fill a web form correctly — enumerate the live fields, plan values from owner-provided facts, enter them in groups, verify the saved values, then submit within the owner's authorized scope. Use when completing multi-step application, grant or permit portals. Respect runtime approval cards and private-input handoffs; never invent facts or defeat a CAPTCHA.
 license: AGPL-3.0-or-later
 compatibility: Requires the athanor browser runner.
 allowed-tools: browser_snapshot read_elements browser_action file_read files_list image_read
 metadata:
   athanor.tier: 'builtin'
-  athanor.version: '2.1.0'
+  athanor.version: '2.2.0'
   athanor.risk: 'external'
   athanor.domain: 'web'
 ---
 
 # Web form filling
 
-The order is: enumerate, plan, fill, read back, review, submit. Submitting is the owner's action. A
-form filled wrongly and submitted cannot be unsubmitted.
+The order is: enumerate, plan, fill, read back, review, submit. The owner's request sets the scope:
+preparing a draft does not authorize submission, while an explicit request to apply can. Runtime
+approval cards still control execution. A submitted form may be impossible to retract.
 
 Three tools do the work and each has one job. `browser_snapshot` is the picture and the page text —
 call it once to see the form. `read_elements` is the same element list scoped to one selector, with
@@ -110,6 +111,8 @@ Rules that decide whether the batch works:
 After each batch, one `read_elements` scoped to the form container. Check, per field:
 
 - the value is the value you planned, not a truncated or reformatted version of it;
+- `valueTruncated` means the tool returned a prefix; `valueLength` is the actual field length.
+  Use `read_elements` to inspect long answers rather than treating a snapshot prefix as lost text;
 - `checked` is what you intended;
 - no field carries a validation message or has become invalid;
 - no other field changed — dependent fields reset when their parent does;
@@ -144,12 +147,14 @@ type was accepted. Many portals accept an upload and reject it silently at revie
 
 ## 7. Review and submit
 
-Before any submit:
+Before final submission:
 
-- read the completed form once more, take one `browser_snapshot` for the screenshot, and report
-  every field and its final value back to the owner in a single message alongside that screenshot;
+- read the completed form once more and verify its values against the owner's facts;
 - say explicitly what submitting will do and whether it is reversible;
-- wait for a clear yes. Approval for one submission is not approval for the next.
+- if this submission is already explicitly authorized, proceed through the runtime approval floor
+  without asking the same question in conversation. Otherwise present a concise review and ask;
+- approval for one destination or applicant does not authorize a different one. Keep a field-level
+  submission record in the workspace rather than repeating the entire form at every saved step.
 
 Then submit with a single click on the real submit control, on its own. After submitting: capture
 the response page, record any reference number, and confirm the record exists — a form that returns

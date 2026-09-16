@@ -217,6 +217,29 @@ describe('browser action policy', () => {
     expect(preflight).toMatchObject({ consequential: true, sensitiveInput: false });
     expect(preflight.preview).toContain('workspace/cv.pdf');
   });
+  it('judges a form control by its action rather than transaction words in the destination URL', () => {
+    const element = {
+      tag: 'button',
+      type: 'button',
+      name: 'Previous',
+      autocomplete: '',
+      formAction: 'https://jobs.example.invalid/apply',
+      inForm: true
+    };
+    expect(
+      classifyBrowserAction({ type: 'click', selector: '#previous' }, element).consequential
+    ).toBe(false);
+    expect(
+      classifyBrowserAction({ type: 'click', selector: '#submit' }, { ...element, type: 'submit' })
+        .consequential
+    ).toBe(true);
+    expect(
+      classifyBrowserAction(
+        { type: 'click', selector: '#send' },
+        { ...element, name: 'Send application' }
+      ).consequential
+    ).toBe(true);
+  });
 
   it('leaves reading, pointing and choosing a listed option unapproved', () => {
     const menu = {
@@ -745,6 +768,26 @@ describe('form field legibility', () => {
     expect(
       describeScannedElement(rawElement({ type: 'password', password: true, value: '' })).value
     ).toBe('');
+  });
+
+  it('marks shortened values explicitly and lets a form read verify a complete long answer', () => {
+    const value = 'A truthful application statement. '.repeat(30);
+    const raw = rawElement({ tag: 'textarea', value });
+    expect(describeScannedElement(raw)).toMatchObject({
+      value: value.slice(0, 200),
+      valueTruncated: true,
+      valueLength: value.length
+    });
+    const form = foldScannedElements([raw], 1, 4000);
+    expect(form.kept).toHaveLength(1);
+    expect(form.kept[0]?.value).toBe(value);
+    expect(form.kept[0]?.valueTruncated).toBeUndefined();
+    const huge = describeScannedElement(rawElement({ value: 'x'.repeat(5000) }), 4000);
+    expect(huge).toMatchObject({ valueTruncated: true, valueLength: 5000 });
+    expect(huge.value).toHaveLength(4000);
+    expect(describeScannedElement(rawElement({ password: true, value }), 4000)).toMatchObject({
+      value: `${value.length} characters entered`
+    });
   });
 
   it('carries the constraints and the option list a form actually validates against', () => {

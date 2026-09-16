@@ -1004,6 +1004,31 @@ describe('the gates an agent action passes and a takeover does not', () => {
     await act(harness, { type: 'click', selector: SUBMIT_REF }, 'agent', true);
     expect(harness.trace).toEqual([`tab-1 click ${SUBMIT_REF}`]);
   });
+  it('reports the upload control document and form destination instead of guessing from the active tab', async () => {
+    const harness = buildHarness();
+    harness.elements.set(REF, {
+      evaluate: {
+        ...CONTROL,
+        type: 'file',
+        pageUrl: 'https://uploads.example.invalid:8443/form?token=private',
+        formAction: 'https://receiver.example.invalid/application'
+      }
+    });
+    const result = await harness.manager.preflight(
+      'workspace',
+      WORKSPACE_ROOT,
+      { type: 'upload', selector: REF, paths: ['workspace/cv.pdf'] },
+      'agent'
+    );
+    expect(result.consequential).toBe(true);
+    expect(result.destinations).toEqual([
+      'https://uploads.example.invalid:8443',
+      'https://receiver.example.invalid'
+    ]);
+    expect(result.preview).toContain('Website: https://uploads.example.invalid:8443');
+    expect(result.preview).not.toContain('token=private');
+    expect(harness.trace).toEqual([]);
+  });
 
   it('never judges the owner’s own action, so the same submit needs no capability from them', async () => {
     const harness = buildHarness();

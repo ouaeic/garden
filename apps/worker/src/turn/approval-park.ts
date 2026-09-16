@@ -84,13 +84,15 @@ export const parkForApproval = async (
           : {}),
         addresses: [
           ...new Set(
-            callDestinations(call.name, call.arguments).map((address) => {
-              try {
-                return new URL(address).hostname;
-              } catch {
-                return 'Unresolved address';
+            [...callDestinations(call.name, call.arguments), ...(approval.destinations ?? [])].map(
+              (address) => {
+                try {
+                  return new URL(address).host;
+                } catch {
+                  return 'Unresolved address';
+                }
               }
-            })
+            )
           )
         ],
         arguments: approval.handoffOnly

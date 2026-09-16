@@ -9673,8 +9673,9 @@ describe('round trips before the first token', () => {
         }
       })
     );
-    // Measured at 21 with the owner-scoped query that installs read-only project inputs.
-    expect(send.depth).toBeLessThanOrEqual(21);
+    // Measured at 22: owner-scoped inputs are installed before preparation and finalized
+    // against the activated canonical workspace so project versions remain reachable.
+    expect(send.depth).toBeLessThanOrEqual(22);
     expect(JSON.parse(send.body) as { workspaceId: string }).not.toMatchObject({ workspaceId });
     const taskId = (JSON.parse(send.body) as { id: string }).id;
 

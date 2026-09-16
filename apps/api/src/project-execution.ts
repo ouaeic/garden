@@ -245,6 +245,7 @@ export async function completeProjectExecution(
       await context.store.setWorkspaceStorage(task.userId, execution.workspaceId, receipt.bytes);
     const updated = (await context.store.getTask(task.userId, task.id))!;
     const activated = updated.workspaceId === execution.workspaceId;
+    if (activated) await configureConversationInputs(context, updated);
     await context.store.appendTaskEvent({
       taskId: task.id,
       kind: 'notice',

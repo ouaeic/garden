@@ -5454,7 +5454,7 @@ describe('a correction sent while the task is working', () => {
       ],
       log
     );
-    await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 2 }), masterKey, runnerSecret)
+    await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 3 }), masterKey, runnerSecret)
       .run(task)
       .catch(() => undefined);
     expect(consumed).toHaveLength(1);

@@ -9,6 +9,20 @@ import { ProjectUpdatesManager, type ProjectCheckExecution } from './project-upd
 import { ProjectVersionFiles } from './project-version-files.js';
 
 const roots: string[] = [];
+it('finalizes the root working area without changing versions or admitting an unrelated area', async () => {
+  const f = await fixture();
+  await f.manager.bind(f.project, f.main, f.project, f.wa);
+  const before = await f.seed();
+  const wrong = randomUUID();
+  await expect(f.manager.bind(f.project, wrong, f.project, wrong)).rejects.toThrow(
+    'identity changed'
+  );
+  await expect(f.manager.bind(f.project, f.wa, f.a, f.wa)).rejects.toThrow('identity changed');
+  await f.manager.bind(f.project, f.wa, f.project, f.wa);
+  expect(await f.manager.projectWorkspace(f.project)).toBe(f.wa);
+  expect(await f.manager.member(f.project, f.b)).toBe(f.wb);
+  expect((await f.manager.list(f.project)).head?.id).toBe(before.id);
+});
 afterEach(async () => {
   for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true });
 });

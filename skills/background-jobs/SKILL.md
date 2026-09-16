@@ -16,7 +16,8 @@ metadata:
 The `shell`, `process`, `schedule`, `notify` and `memory` schemas already carry the mechanics of
 this: what ends an unnamed background process, what a named service survives, how much a scheduled
 run may spend, that an unattended run says nothing at all unless you call `notify`, and that a
-running record belongs in `workspace/ATHANOR.md` rather than in durable memory. None of that is
+running record belongs in an ordinary project file such as `workspace/RUN_LOG.md`, rather than in
+standing instructions or durable memory. None of that is
 repeated here. What follows is the part that is true on this computer and nowhere in the schemas.
 
 ## The manifest is the checkpoint

@@ -6,7 +6,7 @@ compatibility: Every tool named here is installed on this computer by athanor - 
 allowed-tools: shell file_read file_write files_list image_read publish_artifact
 metadata:
   athanor.tier: 'builtin'
-  athanor.version: '2.2.0'
+  athanor.version: '2.3.0'
   athanor.risk: 'workspace'
   athanor.domain: 'documents'
 ---
@@ -81,16 +81,15 @@ d.items.map(i => i.qty * i.price).sum()`.
 
 ## The one-page CV
 
-"One page" is a hard constraint that the writing does not enforce and the compiler will not warn
-about — it just adds a second page. Build for density first, then measure, then cut:
+"One page" needs a rendered page-count check. Start with readable type and useful white space;
+shorten repetitive content before compressing the layout:
 
 ```typst
 #set page(paper: "a4", margin: (x: 1.8cm, y: 1.6cm))
-#set text(size: 9.6pt)
-#set par(justify: false, leading: 0.55em)
+#set text(size: 10.5pt)
+#set par(justify: false, leading: 0.65em)
 #show heading.where(level: 1): it => block(above: 0.9em, below: 0.45em)[
-  #set text(size: 11pt, weight: 700); #upper(it.body)
-  #v(-0.35em)
+  #set text(size: 14pt, weight: 700); #it.body
   #line(length: 100%, stroke: 0.6pt)
 ]
 #grid(columns: (1fr, auto), gutter: 6pt,
@@ -100,9 +99,15 @@ about — it just adds a second page. Build for density first, then measure, the
 #list(tight: true, spacing: 0.42em, [...], [...])
 ```
 
-`#grid` with a `1fr` first column and `auto` second is what puts the dates hard against the right
-margin on every role without a table. `tight: true` on lists and a `leading` around `0.55em` are
-where the space comes from. 9.6pt body on A4 is readable in print and holds roughly 700 words.
+`#grid` with a `1fr` first column and `auto` second aligns role dates at the right margin.
+Give every multi-row grid explicit spacing, including contact details: for example,
+`row-gutter: 4pt, column-gutter: 12pt`. Paragraph leading does not space separate grid cells.
+Inspect the contact block at readable scale; email, location and wrapped authorization text must
+not touch the row above. Do not use negative vertical spacing to force content onto a page.
+
+Keep salary, availability and personal declarations in the application fields unless the owner
+asks for them on the CV. Omit unsupported achievements, unnamed institutions and irrelevant
+negative statements about qualifications the applicant does not hold.
 
 Declare `expectPages: 1` on the acceptance render clause before you compile. If the harness reports
 2, cut content — do not drop below 9pt, and do not shrink the margins under 1.4cm, because both

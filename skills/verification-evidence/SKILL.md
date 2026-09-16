@@ -6,7 +6,7 @@ compatibility: No external binaries required.
 allowed-tools: set_acceptance shell file_read files_list document_read image_read audio_read publish_artifact finish
 metadata:
   athanor.tier: 'builtin'
-  athanor.version: '1.3.0'
+  athanor.version: '1.4.0'
   athanor.risk: 'read_only'
   athanor.domain: 'discipline'
 ---
@@ -72,6 +72,11 @@ asking the writer to read back its own in-memory model proves nothing, which is 
 engine, the renderer and a fresh request are worth more than a second look from the same code path.
 And compare the result against the request rather than against your plan; the most common silent
 failure is delivering the thing you decided to build.
+
+When an analysis reports no matches, test the actual analysis code on a small positive control
+with a known match as well as a negative control. Two implementations returning empty lists do
+not prove either can detect anything. Exercise relevant boundaries, such as overlapping matches
+and a circular sequence's origin, and compare exact coordinates rather than just counts.
 
 The summary states, per deliverable: what it is, where it is, what was checked, and what was not.
 "Not checked" is an acceptable answer. "Checked", without saying how, is not.

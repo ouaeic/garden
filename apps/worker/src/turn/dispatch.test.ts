@@ -28,9 +28,64 @@ import { CHECKPOINT_EXEMPT_TOOLS, PARALLEL_SAFE_TOOLS } from '../turn-bounds.js'
 import { isMutatingToolCall } from '../write-classification.js';
 import { dispatchToolCalls, PLAN_MODE_PERMITTED, type TurnDispatchDeps } from './dispatch.js';
 import type { TurnRun } from './claim.js';
+import { projectOperation } from '../project-updates.js';
 
 const task = { id: 'task-1', workspaceId: 'ws-1', securityMode: 'autonomous' } as TaskRecord;
 const key = new Uint8Array(32);
+
+it('answers invalid project-update arguments and continues the turn without executing the rejected action', async () => {
+  const invalid = {
+    id: 'invalid-prepare',
+    name: 'project_update',
+    arguments: {
+      action: 'prepare',
+      options: { title: 'Analysis', update: { paths: ['results.json'] } }
+    }
+  };
+  const next = {
+    id: 'read-source',
+    name: 'parallel_web_read',
+    arguments: { urls: ['https://source.example/page'] }
+  };
+  const state = { messages: [], turn: 3, toolsStarted: 0 } as unknown as AgentState;
+  const recordToolFailure = vi.fn();
+  const execute = vi.fn();
+  const parkTaskForApproval = vi.fn();
+  const floor = vi.fn(async (_memo: unknown, current: TaskRecord, call: ModelToolCall) => {
+    if (call.name === 'project_update') projectOperation(current, call);
+    return approvalRequirement(call.name, call.arguments, 'autonomous', {
+      taintSources: ['workspace/file']
+    });
+  });
+  const deps = {
+    store: { appendTaskEvent: vi.fn(async () => ({})), parkTaskForApproval },
+    config: {},
+    resume: { ensureTurnUndoPoint: async () => {}, recordToolFailure, execute },
+    approvalForCallOnce: floor
+  } as unknown as TurnDispatchDeps;
+  expect(
+    await dispatchToolCalls(
+      deps,
+      { ...task, projectId: task.id },
+      key,
+      state,
+      { toolCalls: [invalid, next] } as unknown as ModelResponse,
+      '',
+      { model: {}, catalog: [], webPlan: {} } as unknown as TurnRun,
+      { maxOutputTokens: 1024, turn: 3 },
+      { honorUserControl: async () => false, refreshActivePlan: async () => false }
+    )
+  ).toBe('done');
+  expect(recordToolFailure).toHaveBeenCalledOnce();
+  expect(recordToolFailure.mock.calls[0]?.[3]).toEqual(invalid);
+  expect(String(recordToolFailure.mock.calls[0]?.[4])).toContain('title');
+  expect(floor).toHaveBeenCalledTimes(2);
+  expect(state.messages).toHaveLength(1);
+  expect(state.messages[0]).toMatchObject({ toolCallId: next.id });
+  expect(state.toolsStarted).toBe(0);
+  expect(execute).not.toHaveBeenCalled();
+  expect(parkTaskForApproval).not.toHaveBeenCalled();
+});
 
 it('answers an unverified Autonomous read without running it, parking the owner or marking it as executed', async () => {
   const call = {

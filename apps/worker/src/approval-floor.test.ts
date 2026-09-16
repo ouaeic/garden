@@ -53,6 +53,35 @@ const countingFloor = (): { deps: ApprovalFloorDeps; evaluations: () => number }
 };
 
 describe('the approval floor is evaluated once per call', () => {
+  it('describes the actual browser upload destination without substituting the agent explanation', async () => {
+    const { deps: base } = countingFloor();
+    const runner = {
+      call: async () => ({
+        consequential: true,
+        sensitiveInput: false,
+        preview: 'Attach workspace file workspace/cv.pdf\nWebsite: https://careers.example:8443',
+        destinations: ['https://careers.example:8443']
+      })
+    } as unknown as AgentRunnerClient;
+    const deps = { ...base, runner };
+    const card = await approvalForCallOnce(
+      deps,
+      createApprovalFloorMemo(),
+      task,
+      call('upload', 'browser_action', {
+        action: 'upload',
+        selector: '#cv',
+        paths: ['workspace/cv.pdf']
+      }),
+      { messages: [], toolsStarted: 0 } as unknown as AgentState
+    );
+    expect(card).toMatchObject({
+      sideEffect: 'external_consequential',
+      destinations: ['https://careers.example:8443']
+    });
+    expect(card?.preview).toContain('Website: https://careers.example:8443');
+    expect(card?.preview).not.toContain('The agent stated no reason');
+  });
   /*
    * The loop asks twice about the first call of every candidate parallel run: once while choosing
    * the run, and again on the sequential path the run falls through to when it collapses to one
