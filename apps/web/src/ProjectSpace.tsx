@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, MessageSquarePlus, Settings2 } from 'lucide-react';
 import type { ConversationSource, Project, Task, TaskPresentation } from '@athanor/contracts';
 import { get, patch } from './client';
@@ -12,6 +12,7 @@ import {
 import { Button, Dialog, ErrorNotice, Field, Spinner } from './ui';
 import { projectStatus } from './ProjectCollection';
 import { changeSummary, useProjectChanges } from './use-project-changes';
+import { permissionModeSummary } from './asking-rules';
 import './projects.css';
 const ProjectUpdates = lazy(() => import('./ProjectUpdates'));
 const ProjectNotes = lazy(() => import('./ProjectNotes'));
@@ -92,6 +93,7 @@ export default function ProjectSpace({
   onRefresh: () => void;
   onComputer: (taskId: string, surface: 'browser' | 'desktop', tabId?: string) => void;
 }) {
+  const permissionHelpId = useId();
   const [project, setProject] = useState<Project | null>(null),
     [tasks, setTasks] = useState<Task[]>([]),
     [cursor, setCursor] = useState<string | null>(null),
@@ -455,6 +457,7 @@ export default function ProjectSpace({
             <Field label="Default autonomy for new conversations">
               <select
                 value={project.securityMode}
+                aria-describedby={permissionHelpId}
                 disabled={busy}
                 onChange={(event) => void save({ securityMode: event.target.value })}
               >
@@ -463,6 +466,10 @@ export default function ProjectSpace({
                 <option value="autonomous">Autonomous</option>
               </select>
             </Field>
+            <details>
+              <summary>What this mode allows</summary>
+              <p id={permissionHelpId}>{permissionModeSummary(project.securityMode)}</p>
+            </details>
             <div className="row">
               <Button busy={busy} onClick={() => void save({ pinned: !project.pinned })}>
                 {project.pinned ? 'Unpin project' : 'Pin project'}

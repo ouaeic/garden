@@ -1302,31 +1302,6 @@ const copiedConstants = [
     find: /providerWalls: Record<[^=]*= \{([\s\S]*?)\n\};/,
     findInCopy: /PARKABLE_PROVIDER_WALLS = new Set\(\[([\s\S]*?)\]\)/,
     normalise: keysAtTopLevel
-  },
-  {
-    what: 'what each security mode stops for',
-    owner: 'apps/worker/src/approval-common.ts',
-    copy: 'apps/web/src/asking-rules.ts',
-    /*
-     * The one copied constant that is prose, and it earns the place the numbers above hold.
-     *
-     * `SECURITY_MODE_FLOOR` is what the floor reads: three sites in `ordinaryRequirement` that used
-     * to compare a mode inline now read its fields, so these sentences are a claim about behaviour
-     * rather than a paragraph beside it. `asking-rules.ts` is what the owner reads on the page where
-     * the mode is chosen, and it cannot import from the worker. Before the two were held together
-     * there were four descriptions of these three modes in the product and they had drifted: the
-     * page called Autonomous "Balanced minus two rules" while the two produced the same number of
-     * cards on the owner's own work, and the always-resident contract promised in a third wording
-     * that public publishing always stopped while `npm publish` raised no card in any mode.
-     *
-     * The object bodies have different shapes - a record of objects here, a record of strings there
-     * - so the sentences are lifted out of both by the same pattern rather than compared raw. Forty
-     * characters is the floor on what counts as one, which is well above every other quoted string
-     * either body contains and well below the shortest sentence.
-     */
-    find: /SECURITY_MODE_FLOOR[\s\S]*?\n> = \{([\s\S]*?)\n\};/,
-    findInCopy: /modeFloors: Record<[^=]*= \{([\s\S]*?)\n\};/,
-    normalise: (body) => [...body.matchAll(/'([^']{40,})'/g)].map(([, text]) => text).join(' | ')
   }
 ];
 const drifted = [];

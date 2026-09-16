@@ -7,14 +7,8 @@ import {
 } from '@athanor/model-gateway';
 import type { TaskRecord } from '@athanor/data';
 import { spillCarriedRecovery, spillPathIn } from './output-spill.js';
-import { SECURITY_MODE_FLOOR } from './approval-policy.js';
-import type { SecurityMode } from '@athanor/contracts';
-
-/** Mode guidance comes from the same policy that decides execution authority. */
-export const securityModeFloorLine = (mode: SecurityMode): string =>
-  mode === 'review'
-    ? `${SECURITY_MODE_FLOOR.review.sentence} ${SECURITY_MODE_FLOOR.balanced.sentence}`
-    : SECURITY_MODE_FLOOR[mode].sentence;
+export { permissionModeSummary as securityModeFloorLine } from '@athanor/contracts/permission-policy';
+import { permissionModeSummary as securityModeFloorLine } from '@athanor/contracts/permission-policy';
 
 /**
  * The first line is a stable marker rather than prose so `ensureBasePrompt` can find a preamble it

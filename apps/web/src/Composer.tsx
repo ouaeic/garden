@@ -1,7 +1,7 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useId, useState } from 'react';
 import { ArrowUpRight, Paperclip, X, Mic, Square, SlidersHorizontal } from 'lucide-react';
 import type { Task, TaskReasoningEffort } from '@athanor/contracts';
-import { modeFloors } from './asking-rules';
+import { permissionModeSummary } from './asking-rules';
 import { effortLabel } from './reasoning-options';
 import { isWorking } from './model';
 import { isNativeClient } from './client';
@@ -17,6 +17,7 @@ const LocalFolderAttachments = lazy(() => import('./LocalFolderAttachments.js'))
 const DictationSetup = lazy(() => import('./DictationSetup'));
 
 export default function Composer(props: ComposerProps) {
+  const permissionHelpId = useId();
   const { workspace, task = null, bootstrap, scope, toolbarExtra } = props;
   const [advancedModels, setAdvancedModels] = useState(false);
   const {
@@ -253,7 +254,8 @@ export default function Composer(props: ComposerProps) {
             <span>Approvals</span>
             <select
               aria-label="Approvals for this prompt"
-              title={modeFloors[securityMode]}
+              title={permissionModeSummary(securityMode)}
+              aria-describedby={permissionHelpId}
               value={securityMode}
               disabled={editingDisabled}
               onChange={(event) => changeSecurityMode(event.target.value as Task['securityMode'])}
@@ -262,6 +264,9 @@ export default function Composer(props: ComposerProps) {
               <option value="balanced">Balanced</option>
               <option value="autonomous">Autonomous</option>
             </select>
+            <span className="sr-only" id={permissionHelpId}>
+              {permissionModeSummary(securityMode)}
+            </span>
           </label>
           <label className="garden-effort-control">
             <span>Effort</span>

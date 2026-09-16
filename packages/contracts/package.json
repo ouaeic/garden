@@ -13,6 +13,12 @@
       "types": "./src/env.ts",
       "development": "./src/env.ts",
       "default": "./dist/env.js"
+    },
+    "./permission-policy": {
+      "types": "./src/permission-policy.ts",
+      "browser": "./src/permission-policy.ts",
+      "development": "./src/permission-policy.ts",
+      "default": "./dist/permission-policy.js"
     }
   },
   "scripts": {

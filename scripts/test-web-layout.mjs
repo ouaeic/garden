@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { checkPermissionModes } from './browser-permissions.mjs';
 import { checkRunningQuestion } from './browser-questions.mjs';
 import { checkHumanInterventions } from './browser-interventions.mjs';
 import assert from 'node:assert/strict';
@@ -1111,6 +1112,7 @@ try {
     return route.fulfill({ status: 501, json: { error: { message: 'Unspecified UI fixture' } } });
   });
   if (process.env.GARDEN_UI_FOCUS !== 'drafts') {
+    await checkPermissionModes({ context, origin, bootstrap, task, project, workspace, report });
     await checkHumanInterventions({ context, origin, task, report });
     await checkRunningQuestion({ context, origin, bootstrap, task, report });
     await checkProjectConversations({

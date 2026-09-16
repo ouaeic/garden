@@ -58,6 +58,7 @@
   margin: 0 0 8px;
 }
 .management-section .section-heading {
+  display: block;
   margin-bottom: 22px;
 }
 .management-grid {

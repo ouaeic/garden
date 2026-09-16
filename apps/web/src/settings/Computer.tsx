@@ -1,4 +1,6 @@
-import type { Workspace, WorkspaceSnapshot } from '@athanor/contracts';
+import { useId, useState } from 'react';
+import type { SecurityMode, Workspace, WorkspaceSnapshot } from '@athanor/contracts';
+import { permissionModeSummary } from '../asking-rules.js';
 import { del, patch, post, put } from '../client.js';
 import { Button, Field } from '../ui.js';
 import {
@@ -22,9 +24,20 @@ export function ComputerSettings({
   workspace: Workspace | null;
   onChange: () => void;
 }) {
+  const permissionHelpId = useId(),
+    newPermissionHelpId = useId();
+  const [reviewDraft, setReviewDraft] = useState<{ workspaceId: string; mode: SecurityMode }>();
+  const reviewMode =
+    reviewDraft && reviewDraft.workspaceId === workspace?.id
+      ? reviewDraft.mode
+      : (workspace?.securityMode ?? 'balanced');
+  const [newReviewMode, setNewReviewMode] = useState<SecurityMode>('balanced');
   const root = workspace ? `/v1/workspaces/${workspace.id}` : null;
   const snapshots = useResource<WorkspaceSnapshot[]>(root ? `${root}/snapshots` : null);
   const brief = useResource<{ markdown: string; path: string }>(root ? `${root}/brief` : null);
+  const briefAction = useAction(() => brief.refresh());
+  const snapshotAction = useAction(() => snapshots.refresh());
+  const createAction = useAction(onChange);
   const action = useAction(() => {
     snapshots.refresh();
     onChange();
@@ -91,16 +104,27 @@ export function ComputerSettings({
               }}
             >
               <Field label="Review level for new work">
-                <select name="securityMode" defaultValue={workspace.securityMode}>
+                <select
+                  name="securityMode"
+                  value={reviewMode}
+                  aria-describedby={permissionHelpId}
+                  onChange={(event) =>
+                    setReviewDraft({
+                      workspaceId: workspace.id,
+                      mode: event.target.value as SecurityMode
+                    })
+                  }
+                >
                   <option value="review">Review each action</option>
                   <option value="balanced">Balanced</option>
                   <option value="autonomous">Autonomous</option>
                 </select>
               </Field>
-              <p className="muted">
-                The safety floor still applies to sensitive or consequential actions. Existing tasks
-                retain their own review level.
-              </p>
+              <details>
+                <summary>What this mode allows</summary>
+                <p id={permissionHelpId}>{permissionModeSummary(reviewMode)}</p>
+                <p className="muted">Existing conversations retain their own review level.</p>
+              </details>
               <Button type="submit" busy={action.busy}>
                 Save review level
               </Button>
@@ -151,7 +175,7 @@ export function ComputerSettings({
                 onSubmit={(event) => {
                   event.preventDefault();
                   const form = new FormData(event.currentTarget);
-                  void action.run(
+                  void briefAction.run(
                     () => put(`${root}/brief`, { markdown: rawFieldValue(form, 'markdown') }),
                     'Workspace brief saved'
                   );
@@ -166,10 +190,10 @@ export function ComputerSettings({
                     placeholder="What should the agent know about work on this computer?"
                   />
                 </Field>
-                <Button type="submit" busy={action.busy}>
+                <Button type="submit" busy={briefAction.busy}>
                   Save brief
                 </Button>
-                <ActionFeedback action={action} />
+                <ActionFeedback action={briefAction} />
               </form>
             )}
           </Section>
@@ -184,7 +208,7 @@ export function ComputerSettings({
                 event.preventDefault();
                 const form = event.currentTarget;
                 const values = new FormData(form);
-                void action
+                void snapshotAction
                   .run(
                     () =>
                       sensitive(() =>
@@ -200,11 +224,11 @@ export function ComputerSettings({
               <Field label="Recovery point name">
                 <input required name="name" maxLength={80} placeholder="Before a major change" />
               </Field>
-              <Button type="submit" busy={action.busy}>
+              <Button type="submit" busy={snapshotAction.busy}>
                 Create recovery point
               </Button>
             </form>
-            <ActionFeedback action={action} />
+            <ActionFeedback action={snapshotAction} />
             <div className="management-list">
               {snapshots.value?.map((snapshot) => (
                 <article key={snapshot.id} className="management-item">
@@ -276,7 +300,7 @@ export function ComputerSettings({
             event.preventDefault();
             const form = event.currentTarget;
             const values = new FormData(form);
-            void action
+            void createAction
               .run(
                 () =>
                   post('/v1/workspaces', {
@@ -287,7 +311,10 @@ export function ComputerSettings({
                 'Workspace created'
               )
               .then((ok) => {
-                if (ok) form.reset();
+                if (ok) {
+                  form.reset();
+                  setNewReviewMode('balanced');
+                }
               });
           }}
         >
@@ -306,17 +333,26 @@ export function ComputerSettings({
               />
             </Field>
             <Field label="Default review level">
-              <select name="securityMode" defaultValue="balanced">
+              <select
+                name="securityMode"
+                value={newReviewMode}
+                aria-describedby={newPermissionHelpId}
+                onChange={(event) => setNewReviewMode(event.target.value as SecurityMode)}
+              >
                 <option value="review">Review</option>
                 <option value="balanced">Balanced</option>
                 <option value="autonomous">Autonomous</option>
               </select>
             </Field>
           </div>
-          <Button type="submit" busy={action.busy}>
+          <details>
+            <summary>What this mode allows</summary>
+            <p id={newPermissionHelpId}>{permissionModeSummary(newReviewMode)}</p>
+          </details>
+          <Button type="submit" busy={createAction.busy}>
             Create workspace
           </Button>
-          <ActionFeedback action={action} />
+          <ActionFeedback action={createAction} />
         </form>
       </Section>
     </>

@@ -1,5 +1,5 @@
 /** Shared approval facts and presentation bounds; no authority is derived here. */
-import { type SecurityMode, type TaskApprovalScope } from '@athanor/contracts';
+import { type TaskApprovalScope } from '@athanor/contracts';
 import { type ResolvedMediaModel } from './media.js';
 import { textValue } from './values.js';
 
@@ -44,41 +44,7 @@ export const APPROVAL_RANK: Record<ApprovalRequirement['sideEffect'], number> = 
   external_consequential: 2
 };
 
-export const SECURITY_MODE_FLOOR: Record<
-  SecurityMode,
-  {
-    readonly asksBeforeEveryChange: boolean;
-    readonly asksBeforeReachingTheInternet: boolean;
-    readonly asksBeforeInstallingSoftware: boolean;
-    readonly authorizesSurfaceActions: boolean;
-    readonly sentence: string;
-  }
-> = {
-  review: {
-    asksBeforeEveryChange: true,
-    asksBeforeReachingTheInternet: true,
-    asksBeforeInstallingSoftware: true,
-    authorizesSurfaceActions: false,
-    sentence:
-      'Every command, every file written, and every browser or desktop action, on top of everything Balanced asks about.'
-  },
-  balanced: {
-    asksBeforeEveryChange: false,
-    asksBeforeReachingTheInternet: true,
-    asksBeforeInstallingSoftware: true,
-    authorizesSurfaceActions: false,
-    sentence:
-      'Asks before consequential browser or desktop actions, a command reaching the internet, and installing software; the built-in web tools read without asking. Other safeguards also apply.'
-  },
-  autonomous: {
-    asksBeforeEveryChange: false,
-    asksBeforeReachingTheInternet: false,
-    asksBeforeInstallingSoftware: false,
-    authorizesSurfaceActions: true,
-    sentence:
-      'Completes browser and desktop work, including uploads and submissions, without approval. CAPTCHA and private input need you. Other tools still ask about external changes, destructive operations, a durable instruction, schedule, service or tool configuration, and unverifiable network destinations.'
-  }
-};
+export { SECURITY_MODE_FLOOR } from '@athanor/contracts/permission-policy';
 
 export const DEFERRED_EXECUTION_ACTION = 'Change a file this computer runs on its own';
 
