@@ -55,6 +55,7 @@ export const shellApprovalRequirement = (
   ): {
     action: string;
     preview: string;
+    recovery?: NonNullable<ApprovalRequirement['recovery']>;
   } | null => {
     const lowerArgs = commandArgs.map((argument) => argument.toLowerCase());
     const gitCommand = executable === 'git' ? gitSubcommand(commandArgs) : null;
@@ -125,6 +126,12 @@ export const shellApprovalRequirement = (
       )
     )
       return null;
+    if (rebased && context.undoPoint?.id && context.undoPoint.uncovered !== undefined)
+      return {
+        action: relocation ? 'Review a file move' : 'Review a file removal',
+        recovery: 'use_explicit_cwd',
+        preview: `Run ${[executable, ...commandArgs].join(' ')}. The command changes its own working directory, so Garden cannot establish whether every affected file is covered by this turn's undo point. Use an explicit cwd and separate the directory change so the paths can be checked.`
+      };
     if (relocation)
       return {
         action: `Move data out of reach with ${executable}`,
@@ -167,7 +174,7 @@ export const shellApprovalRequirement = (
       .map((command) => commandCarriedIntoAnotherBox(command))
       .filter((inner): inner is NonNullable<typeof inner> => inner !== null);
     const destructive =
-      destructiveCommand(executable, commandArgs) ??
+      destructiveCommand(executable, commandArgs, rebased) ??
       commands
         .map(([command = '', ...rest]) => destructiveCommand(command, rest, rebased))
         .find(Boolean);

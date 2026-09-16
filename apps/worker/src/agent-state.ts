@@ -192,7 +192,9 @@ export interface AgentState {
   approvalRecovery?: {
     turn: number;
     attempts: number;
-    byReason?: Partial<Record<'verify_public_source' | 'separate_network_steps', number>>;
+    byReason?: Partial<
+      Record<'verify_public_source' | 'separate_network_steps' | 'use_explicit_cwd', number>
+    >;
   };
   /**
    * Tools this turn has actually started, counted where `tool_started` is written.

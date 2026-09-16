@@ -35,7 +35,7 @@ export interface ApprovalRequirement {
   action: string;
   preview: string;
   /** Reject this proposal and let Autonomous try a separately checked alternative. */
-  recovery?: 'verify_public_source' | 'separate_network_steps';
+  recovery?: 'verify_public_source' | 'separate_network_steps' | 'use_explicit_cwd';
 }
 
 export const APPROVAL_RANK: Record<ApprovalRequirement['sideEffect'], number> = {

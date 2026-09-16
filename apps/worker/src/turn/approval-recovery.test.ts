@@ -123,4 +123,59 @@ describe('Autonomous alternatives pass the floor without executing the rejected 
     expect(requirement?.recovery).toBeUndefined();
     expect(requirement?.sideEffect).toBe('external_reversible');
   });
+  it('replans directory-changing file operations without authorizing either the original or an unsafe rewrite', () => {
+    const checked = { ...context, undoPoint: { id: 'undo', uncovered: [] } };
+    const call = {
+      id: 'move-input',
+      name: 'shell',
+      arguments: {
+        executable: 'bash',
+        args: ['-lc', 'cd phix174 && mv J02482.1.fasta input/']
+      }
+    };
+    const requirement = approvalRequirement(call.name, call.arguments, 'autonomous', checked)!;
+    expect(requirement).toMatchObject({
+      sideEffect: 'external_consequential',
+      recovery: 'use_explicit_cwd'
+    });
+    expect(requirement.preview).toContain('cannot establish');
+    const current = state();
+    expect(recoverApprovalProposal(task, current, call, requirement)).toBe(true);
+    expect(current.messages[0]?.content).toContain('Not executed:');
+    expect(current.messages[0]?.content).toContain('cwd field');
+    expect(
+      approvalRequirement(
+        'shell',
+        {
+          executable: 'mv',
+          args: ['J02482.1.fasta', 'input/'],
+          cwd: 'workspace/phix174'
+        },
+        'autonomous',
+        checked
+      )
+    ).toBeNull();
+    const unsafe = approvalRequirement(
+      'shell',
+      {
+        executable: 'mv',
+        args: ['.ssh', '/tmp/copied'],
+        cwd: '.'
+      },
+      'autonomous',
+      checked
+    )!;
+    expect(unsafe.sideEffect).toBe('external_consequential');
+    expect(unsafe.recovery).toBeUndefined();
+    expect(recoverApprovalProposal(task, state(), call, unsafe)).toBe(false);
+    expect(recoverApprovalProposal(task, current, call, requirement)).toBe(true);
+    expect(recoverApprovalProposal(task, current, call, requirement)).toBe(false);
+    expect(current.messages).toHaveLength(2);
+    expect(
+      recoverApprovalProposal({ ...task, securityMode: 'balanced' }, state(), call, requirement)
+    ).toBe(false);
+    expect(
+      recoverApprovalProposal(task, state(), { ...call, name: 'desktop_action' }, requirement)
+    ).toBe(false);
+  });
 });
