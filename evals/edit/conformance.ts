@@ -49,7 +49,7 @@
  * measured anywhere in athanor and is not measured here. This bounds the cost of each failure; it
  * does not weight them.
  */
-import { applyEdit, NO_ANCHOR_NOTE } from '../../apps/worker/src/edit/apply.js';
+import { applyEdit } from '../../apps/worker/src/edit/apply.js';
 import { normaliseLine, toLines } from '../../apps/worker/src/edit/format.js';
 import { boundRepeatedRefusal, forgetRefusals } from '../../apps/worker/src/edit/refusals.js';
 import {
@@ -248,11 +248,9 @@ export const CASES: readonly ConformanceCase[] = [
   {
     id: 'anchor-off-by-one-no-evidence',
     group: 'anchor',
-    what: 'anchor one line late, with nothing in the patch saying what it meant',
+    what: 'a valid but unintended line address without an anchor must not write',
     edit: 'PUT 12:\n+    return undefined;',
-    want: { kind: 'apply', after: (live) => splice(live, 11, 11, ['    return undefined;']) },
-    finding:
-      'THE FORMAT’S ONE UNAVOIDABLE HOLE: nothing in the patch says what line 12 was, so an off-by-one is indistinguishable from a correct edit and it lands as written. The result’s echo shows the written line and its neighbours, so it is visible on the same turn'
+    want: { kind: 'refuse', fixableFrom: 'content' }
   },
   {
     id: 'anchor-off-by-three-with-evidence',
@@ -296,7 +294,7 @@ export const CASES: readonly ConformanceCase[] = [
     id: 'anchor-reversed-range',
     group: 'anchor',
     what: 'PUT 12.=10: - the range written back to front',
-    edit: 'PUT 12.=10:\n+    return undefined;',
+    edit: 'PUT 12.=10:\n-  if (!job.ready) {\n+    return undefined;',
     want: { kind: 'apply', after: (live) => splice(live, 10, 12, ['    return undefined;']) }
   },
   {
@@ -382,7 +380,7 @@ export const CASES: readonly ConformanceCase[] = [
     group: 'anchor',
     what: 'the same shift, where the recorded lines still stand in exactly one place',
     drift: (text) => `// added\n// by somebody else\n${text}`,
-    edit: 'PUT 13.=15:\n+  if (job.expiresAt < Date.now()) {',
+    edit: 'PUT 13.=15:\n-  if (job.expiresAt < Date.now()) {\n+  if (job.expiresAt < Date.now()) {',
     want: {
       kind: 'apply',
       after: (live) => splice(live, 15, 17, ['  if (job.expiresAt < Date.now()) {'])
@@ -528,7 +526,7 @@ export const CASES: readonly ConformanceCase[] = [
     id: 'anchored-renumbered-after-own-patch',
     group: 'anchored',
     what: 'a second patch addressed in the numbering the first one reported, with no read between',
-    edit: 'PUT <5:\n+// added\n+// added',
+    edit: 'PUT <5:\n-export const drain = (queue: Job[]): Payload | null => {\n+// added\n+// added',
     then: "PUT 16:\n-    logger.warn('job expired'\n+    logger.error('job expired', { id: job.id });",
     want: {
       kind: 'apply',
@@ -605,7 +603,7 @@ export const CASES: readonly ConformanceCase[] = [
     group: 'anchored',
     what: 'the anchor came back with a no-break space where the file has a space; the body keeps its own',
     file: 'export const run = () => {\n  const label = "a - b";\n  return label;\n};\n',
-    edit: 'PUT 2:\n-  const\u00A0label = "a - b"\n+  const label = "a\u00A0-\u00A0b";',
+    edit: 'PUT 2:\n-  const label = "a - b"\n+  const label = "a - b";',
     want: {
       kind: 'apply',
       after: (live) => splice(live, 2, 2, ['  const label = "a\u00A0-\u00A0b";'])
@@ -615,7 +613,7 @@ export const CASES: readonly ConformanceCase[] = [
     id: 'body-row-leaked-prefix-same-number',
     group: 'body',
     what: 'body rows copied with their display numbers, each the number the row will stand at',
-    edit: 'PUT 10.=12:\n+10:  if (job.ready === false) {\n+11:    return null;\n+12:  }',
+    edit: 'PUT 10.=12:\n-  if (!job.ready) {\n+10:  if (job.ready === false) {\n+11:    return null;\n+12:  }',
     want: {
       kind: 'apply',
       after: (live) =>
@@ -635,19 +633,15 @@ export const CASES: readonly ConformanceCase[] = [
     group: 'body',
     what: 'a grid whose rows begin `N|`, replaced with a row that begins the same way',
     file: '1|a|b\n2|c|d\n3|e|f\n',
-    edit: 'PUT 2:\n+2|C|D',
+    edit: 'PUT 2:\n-2|c|d\n+2|C|D',
     want: { kind: 'apply', after: (live) => splice(live, 2, 2, ['2|C|D']) }
   },
   {
-    id: 'plain-range-carries-the-nudge',
+    id: 'plain-range-requires-an-anchor',
     group: 'anchored',
-    what: 'a plain range with no anchor: applied, and the result says what could not be checked',
+    what: 'a plain range without a content anchor must be refused before writing',
     edit: 'PUT 11:\n+    return undefined;',
-    want: {
-      kind: 'apply',
-      after: (live) => splice(live, 11, 11, ['    return undefined;']),
-      note: new RegExp(NO_ANCHOR_NOTE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    }
+    want: { kind: 'refuse', fixableFrom: 'content' }
   },
   {
     id: 'anchored-off-by-six-unique-elsewhere',
@@ -810,14 +804,14 @@ export const CASES: readonly ConformanceCase[] = [
     id: 'header-from-another-dialect',
     group: 'header',
     what: 'a `[path#tag]` section header this format has no use for',
-    edit: '[src/queue.ts#3f9a]\nPUT 11:\n+    return undefined;',
+    edit: '[src/queue.ts#3f9a]\nPUT 11:\n-    return null;\n+    return undefined;',
     want: { kind: 'apply', after: (live) => splice(live, 11, 11, ['    return undefined;']) }
   },
   {
     id: 'header-names-another-file',
     group: 'header',
     what: 'a section header naming a DIFFERENT file from the one the call addresses',
-    edit: '[src/somewhere-else.ts]\nPUT 11:\n+    return undefined;',
+    edit: '[src/somewhere-else.ts]\nPUT 11:\n-    return null;\n+    return undefined;',
     want: { kind: 'apply', after: (live) => splice(live, 11, 11, ['    return undefined;']) },
     finding:
       'the header is dropped and the edit lands in the path the JSON field names, which is the contract - but the note says only "dropped a [path] section header" and never echoes the path it dropped, so a model that believed the header chose the file gets no signal that it edited a different one'
@@ -866,18 +860,9 @@ export const CASES: readonly ConformanceCase[] = [
   {
     id: 'body-zero-context-hunk-insert',
     group: 'body',
-    what: 'a zero-context unified-diff hunk that INSERTS - `@@ -11,0 +12,1 @@`',
+    what: 'a zero-context insertion has no content anchor and must not write',
     edit: '@@ -11,0 +12,1 @@\n+    logger.debug({ id: job.id });',
-    want: {
-      kind: 'apply',
-      after: (live) => {
-        const out = toLines(live);
-        out.splice(11, 0, '    logger.debug({ id: job.id });');
-        return out.join('\n');
-      }
-    },
-    finding:
-      'THE ONE SILENT CORRUPTION. `-N,0` is unified diff for "insert, remove nothing"; the parser reads the count through `Math.max(1, count)` and turns it into a replacement of line N. Line 11 is destroyed and the tool reports success. The note it prints reads `PUT 11.=10:`, a range the dialect cannot express, which is the bug visible in its own output'
+    want: { kind: 'refuse', fixableFrom: 'content' }
   },
   {
     id: 'body-dropped-plus-marker',
@@ -930,7 +915,7 @@ export const CASES: readonly ConformanceCase[] = [
     id: 'body-dropped-plus-mid-body-more-plus-rows-follow',
     group: 'body',
     what: 'a body row whose `+` was dropped, in the middle of the body, with `+` rows after it',
-    edit: 'PUT >34:\n+\n+\ndef nth_prime(n):\n+    """Return the n-th prime."""',
+    edit: 'PUT >34:\n-  const found: Job[] = [];\n+\n+\ndef nth_prime(n):\n+    """Return the n-th prime."""',
     want: {
       kind: 'apply',
       after: (live) => {
@@ -961,7 +946,7 @@ export const CASES: readonly ConformanceCase[] = [
     id: 'body-unmarked-mid-row-is-the-next-operation',
     group: 'body',
     what: 'a second PUT directly under the first body, with `+` rows after it',
-    edit: 'PUT 11:\n+    return undefined;\nPUT 15:\n+    return undefined;',
+    edit: 'PUT 11:\n-    return null;\n+    return undefined;\nPUT 15:\n-    return null;\n+    return undefined;',
     want: {
       kind: 'apply',
       after: (live) =>
@@ -991,7 +976,7 @@ export const CASES: readonly ConformanceCase[] = [
     id: 'body-on-the-operation-row',
     group: 'body',
     what: 'the body written after the colon on the operation row itself',
-    edit: 'PUT 11:+    return undefined;',
+    edit: 'PUT 11:-    return null;\n+    return undefined;',
     want: { kind: 'apply', after: (live) => splice(live, 11, 11, ['    return undefined;']) },
     finding:
       'the text after the colon is read as the first body row, with a note saying where the body belongs. A refusal here is worse than one refusal: the next real body row is then read as an operation, so the one habit costs two in the same turn. Watched on the box twice in one turn'
@@ -1016,14 +1001,14 @@ export const CASES: readonly ConformanceCase[] = [
     id: 'body-empty-on-replace',
     group: 'body',
     what: 'a replace with no body at all',
-    edit: 'PUT 10.=12:',
+    edit: 'PUT 10.=12:\n-  if (!job.ready) {',
     want: { kind: 'apply', after: (live) => splice(live, 10, 12, []) }
   },
   {
     id: 'body-carries-the-dialect',
     group: 'body',
     what: 'new content that is itself made of this format’s own operations',
-    edit: 'PUT 11:\n+// PUT 9: and CUT 1.=2 @x are not operations here\n+@@ -1 +1 @@',
+    edit: 'PUT 11:\n-    return null;\n+// PUT 9: and CUT 1.=2 @x are not operations here\n+@@ -1 +1 @@',
     want: {
       kind: 'apply',
       after: (live) =>
@@ -1069,7 +1054,7 @@ export const CASES: readonly ConformanceCase[] = [
     group: 'whitespace',
     what: 'every line of the file ends CRLF; the read displayed LF, and the new line must end CRLF too',
     drift: (text) => text.replace(/\n/g, '\r\n'),
-    edit: 'PUT 11:\n+    return undefined;',
+    edit: 'PUT 11:\n-    return null;\n+    return undefined;',
     want: {
       kind: 'apply',
       after: (live) => splice(live, 11, 11, ['    return undefined;\r'])
@@ -1099,7 +1084,7 @@ export const CASES: readonly ConformanceCase[] = [
       toLines(text)
         .map((line) => (line ? `${line}  ` : line))
         .join('\n'),
-    edit: 'PUT 11:\n+    return undefined;',
+    edit: 'PUT 11:\n-    return null;\n+    return undefined;',
     want: { kind: 'apply', after: (live) => splice(live, 11, 11, ['    return undefined;']) }
   },
   {
@@ -1117,7 +1102,7 @@ export const CASES: readonly ConformanceCase[] = [
     group: 'whitespace',
     what: 'a file that does not end in a newline, edited on its last line',
     file: 'alpha\nbeta\ngamma',
-    edit: 'PUT 3:\n+GAMMA',
+    edit: 'PUT 3:\n-gamma\n+GAMMA',
     want: { kind: 'apply', after: () => 'alpha\nbeta\nGAMMA' }
   },
   {
@@ -1126,7 +1111,7 @@ export const CASES: readonly ConformanceCase[] = [
     what: 'an insert hung off a blank line, in a file that has since shifted',
     file: SMALL,
     drift: (text) => `prepended\n${text}`,
-    edit: 'PUT >3:\n+inserted',
+    edit: 'PUT >3:\n-gamma\n+inserted',
     want: {
       kind: 'apply',
       after: (live) => {
@@ -1167,7 +1152,7 @@ export const CASES: readonly ConformanceCase[] = [
     id: 'register-pasted-twice',
     group: 'register',
     what: 'one CUT and two PUTs of the same register - a copy the format never declared',
-    edit: 'CUT 1.=2 @head\nPUT >20 @head\nPUT >40 @head',
+    edit: "CUT 1.=2 @head\n-import type { Job, Payload } from './types.js';\nPUT >20 @head\n-/** The next job without taking it, or nothing if the queue is empty. */\nPUT >40 @head\n-  return found;",
     want: {
       kind: 'apply',
       after: (live) => {
@@ -1197,7 +1182,7 @@ export const CASES: readonly ConformanceCase[] = [
     group: 'encoding',
     what: 'a line of non-ASCII text replaced by another',
     file: 'const greeting = "こんにちは";\nconst farewell = "さようなら";\n',
-    edit: 'PUT 1:\n+const greeting = "你好";',
+    edit: 'PUT 1:\n-const greeting = "こんにちは";\n+const greeting = "你好";',
     want: { kind: 'apply', after: (live) => splice(live, 1, 1, ['const greeting = "你好";']) }
   },
   {
@@ -1215,7 +1200,7 @@ export const CASES: readonly ConformanceCase[] = [
     group: 'encoding',
     what: 'a lone surrogate in the line above the edit',
     file: 'const broken = "\ud800";\nconst other = 1;\n',
-    edit: 'PUT 2:\n+const other = 2;',
+    edit: 'PUT 2:\n-const other = 1;\n+const other = 2;',
     want: { kind: 'apply', after: (live) => splice(live, 2, 2, ['const other = 2;']) }
   },
   {
@@ -1223,7 +1208,7 @@ export const CASES: readonly ConformanceCase[] = [
     group: 'encoding',
     what: 'a 200,000-character single line beside the edit',
     file: `const data = '${'x'.repeat(200_000)}';\nconst other = 1;\n`,
-    edit: 'PUT 2:\n+const other = 2;',
+    edit: 'PUT 2:\n-const other = 1;\n+const other = 2;',
     want: { kind: 'apply', after: (live) => splice(live, 2, 2, ['const other = 2;']) }
   },
 
@@ -1232,7 +1217,7 @@ export const CASES: readonly ConformanceCase[] = [
     id: 'scale-first-line',
     group: 'scale',
     what: 'an edit at line 1',
-    edit: "PUT 1:\n+import type { Job, Payload } from './job.js';",
+    edit: "PUT 1:\n-import type { Job, Payload } from './types.js';\n+import type { Job, Payload } from './job.js';",
     want: {
       kind: 'apply',
       after: (live) => splice(live, 1, 1, ["import type { Job, Payload } from './job.js';"])
@@ -1243,7 +1228,7 @@ export const CASES: readonly ConformanceCase[] = [
     group: 'scale',
     what: 'an edit at the last line of the file',
     file: SMALL,
-    edit: 'PUT 6:\n+ZETA',
+    edit: 'PUT 6:\n-zeta\n+ZETA',
     want: { kind: 'apply', after: (live) => splice(live, 6, 6, ['ZETA']) }
   },
   {
@@ -1251,7 +1236,7 @@ export const CASES: readonly ConformanceCase[] = [
     group: 'scale',
     what: 'an insert after the last line',
     file: SMALL,
-    edit: 'PUT >6:\n+eta',
+    edit: 'PUT >6:\n-zeta\n+eta',
     want: { kind: 'apply', after: (live) => `${live}\neta` }
   },
   {
@@ -1259,7 +1244,7 @@ export const CASES: readonly ConformanceCase[] = [
     group: 'scale',
     what: 'the whole file is one line',
     file: 'only',
-    edit: 'PUT 1:\n+ONLY',
+    edit: 'PUT 1:\n-only\n+ONLY',
     want: { kind: 'apply', after: () => 'ONLY' }
   },
   {
@@ -1267,7 +1252,7 @@ export const CASES: readonly ConformanceCase[] = [
     group: 'scale',
     what: 'the file is empty',
     file: '',
-    edit: 'PUT 1:\n+first line',
+    edit: 'PUT 1:\n-\n+first line',
     want: { kind: 'apply', after: () => 'first line' }
   },
   {
@@ -1275,7 +1260,7 @@ export const CASES: readonly ConformanceCase[] = [
     group: 'scale',
     what: 'the file is empty and the model inserts after its one empty line',
     file: '',
-    edit: 'PUT >1:\n+first line',
+    edit: 'PUT >1:\n-\n+first line',
     want: { kind: 'apply', after: () => '\nfirst line' },
     finding:
       'an empty file reads as one empty line, so inserting after it leaves a leading blank. That is the numbering being consistent rather than a bug, and it is the shape a model will get wrong on a new file'
@@ -1285,7 +1270,7 @@ export const CASES: readonly ConformanceCase[] = [
     group: 'scale',
     what: 'an edit near the end of a 50,000-line file',
     file: HUGE,
-    edit: 'PUT 49999:\n+line 49999 of the file, changed',
+    edit: 'PUT 49999:\n-line 49999 of the file\n+line 49999 of the file, changed',
     want: {
       kind: 'apply',
       after: (live) => splice(live, 49_999, 49_999, ['line 49999 of the file, changed'])
@@ -1297,7 +1282,7 @@ export const CASES: readonly ConformanceCase[] = [
     what: 'the same, after another writer prepended two lines',
     file: HUGE,
     drift: (text) => `// added\n// by somebody else\n${text}`,
-    edit: 'PUT 49999:\n+line 49999 of the file, changed',
+    edit: 'PUT 49999:\n-line 49999 of the file\n+line 49999 of the file, changed',
     want: {
       kind: 'apply',
       after: (live) => splice(live, 50_001, 50_001, ['line 49999 of the file, changed'])
@@ -1309,7 +1294,7 @@ export const CASES: readonly ConformanceCase[] = [
     id: 'dialect-space-separated-range',
     group: 'dialect',
     what: 'PUT 10 12: - the separator the parser’s own comment says is forgiven',
-    edit: 'PUT 10 12:\n+    return undefined;',
+    edit: 'PUT 10 12:\n-  if (!job.ready) {\n+    return undefined;',
     want: { kind: 'apply', after: (live) => splice(live, 10, 12, ['    return undefined;']) },
     finding:
       '`parse.ts` lists `PUT 40 42:` among the spellings it forgives and the regex has no bare-space separator, so it does not. The refusal is cheap and the comment is wrong; one of the two has to change'
@@ -1318,14 +1303,14 @@ export const CASES: readonly ConformanceCase[] = [
     id: 'dialect-dash-range-lowercase',
     group: 'dialect',
     what: 'put 10-12 - lower case, dash separator, no colon',
-    edit: 'put 10-12\n+    return undefined;',
+    edit: 'put 10-12\n-  if (!job.ready) {\n+    return undefined;',
     want: { kind: 'apply', after: (live) => splice(live, 10, 12, ['    return undefined;']) }
   },
   {
     id: 'dialect-double-dot-range',
     group: 'dialect',
     what: 'PUT 10..12:',
-    edit: 'PUT 10..12:\n+    return undefined;',
+    edit: 'PUT 10..12:\n-  if (!job.ready) {\n+    return undefined;',
     want: { kind: 'apply', after: (live) => splice(live, 10, 12, ['    return undefined;']) }
   },
   {
@@ -1338,7 +1323,7 @@ export const CASES: readonly ConformanceCase[] = [
     id: 'dialect-blended-range-separator',
     group: 'dialect',
     what: 'PUT 10.:=12: - two accepted separators run together',
-    edit: 'PUT 10.:=12:\n+    return undefined;',
+    edit: 'PUT 10.:=12:\n-  if (!job.ready) {\n+    return undefined;',
     want: { kind: 'apply', after: (live) => splice(live, 10, 12, ['    return undefined;']) }
   },
   {
@@ -1383,14 +1368,14 @@ export const CASES: readonly ConformanceCase[] = [
     group: 'dialect',
     what: 'a line changed inside the second of three byte-identical YAML stanzas',
     path: YAML,
-    edit: 'PUT 23:\n+      interval: 15s',
+    edit: 'PUT 23:\n-      interval: 30s\n+      interval: 15s',
     want: { kind: 'apply', after: (live) => splice(live, 23, 23, ['      interval: 15s']) }
   },
   {
     id: 'dialect-renumbered-after-own-hunk',
     group: 'dialect',
     what: 'two hunks, the second addressed in the numbering the FIRST one would leave',
-    edit: "PUT 7.=9:\n+  if (!job) return undefined;\nPUT 12:\n-    logger.warn('job expired', { id: job.id });\n+    logger.error('job expired', { id: job.id });",
+    edit: "PUT 7.=9:\n-  if (!job) {\n+  if (!job) return undefined;\nPUT 12:\n-    logger.warn('job expired', { id: job.id });\n+    logger.error('job expired', { id: job.id });",
     want: {
       kind: 'apply',
       after: (live) =>

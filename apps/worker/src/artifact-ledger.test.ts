@@ -166,7 +166,10 @@ describe('what reaches the ledger is what the workspace confirmed', () => {
         name: 'file_patch',
         arguments: {
           patches: [
-            { path: 'workspace/queue.ts', edit: 'PUT 1:\n+import type { Job } from "./j";\n' }
+            {
+              path: 'workspace/queue.ts',
+              edit: 'PUT 1:\n-import type\n+import type { Job } from "./j";\n'
+            }
           ]
         }
       },
@@ -229,7 +232,10 @@ describe('what reaches the ledger is what the workspace confirmed', () => {
         name: 'file_patch',
         arguments: {
           patches: [
-            { path: 'workspace/queue.ts', edit: 'PUT 1:\n+import type { Job } from "./j";\n' },
+            {
+              path: 'workspace/queue.ts',
+              edit: 'PUT 1:\n-import type\n+import type { Job } from "./j";\n'
+            },
             { path: 'workspace/missing.ts', edit: 'PUT 1:\n+nothing\n' }
           ]
         }
@@ -264,8 +270,14 @@ describe('what reaches the ledger is what the workspace confirmed', () => {
         name: 'file_patch',
         arguments: {
           patches: [
-            { path: 'workspace/queue.ts', edit: 'PUT 1:\n+import type { Job } from "./j";\n' },
-            { path: 'workspace/config.ts', edit: 'PUT 2:\n+export const timeoutMs = 9_000;\n' }
+            {
+              path: 'workspace/queue.ts',
+              edit: 'PUT 1:\n-import type\n+import type { Job } from "./j";\n'
+            },
+            {
+              path: 'workspace/config.ts',
+              edit: 'PUT 2:\n-export const timeoutMs = 5_000;\n+export const timeoutMs = 9_000;\n'
+            }
           ]
         }
       },
@@ -293,7 +305,10 @@ describe('what reaches the ledger is what the workspace confirmed', () => {
         name: 'file_patch',
         arguments: {
           patches: [
-            { path: 'workspace/config.ts', edit: 'PUT 2:\n+export const timeoutMs = 9_000;\n' }
+            {
+              path: 'workspace/config.ts',
+              edit: 'PUT 2:\n-export const timeoutMs = 5_000;\n+export const timeoutMs = 9_000;\n'
+            }
           ]
         }
       },

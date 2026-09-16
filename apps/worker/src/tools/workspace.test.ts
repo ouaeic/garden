@@ -115,7 +115,10 @@ describe('moving a block instead of retyping it', () => {
     // named by a range and never typed at all, which is the whole point of the operation - the
     // quoted editor this replaced had to carry every one of them in `oldText`.
     const { written, result } = await patch([
-      { path: 'workspace/queue.ts', edit: 'CUT 7.=10 @ready\nPUT >1 @ready\n' }
+      {
+        path: 'workspace/queue.ts',
+        edit: "CUT 7.=10 @ready\n-\nPUT >1 @ready\n-import type { Job } from './types.js';\n"
+      }
     ]);
 
     const after = written.get('workspace/queue.ts') ?? '';
@@ -138,13 +141,16 @@ describe('moving a block instead of retyping it', () => {
       patch([
         {
           path: 'workspace/queue.ts',
-          edit: 'CUT 3.=6 @moved\nCUT 8.=10 @moved\nPUT >1 @moved\n'
+          edit: "CUT 3.=6 @moved\n-export const drain = (queue: Job[]): Job | null => {\nCUT 8.=10 @moved\n-export const ready = (job: Job): boolean => {\nPUT >1 @moved\n-import type { Job } from './types.js';\n"
         }
       ])
     ).rejects.toThrow(/both hold their lines as @moved/);
 
     const { written } = await patch([
-      { path: 'workspace/queue.ts', edit: 'CUT 3.=6 @a\nCUT 8.=10 @b\nPUT >1 @a\nPUT >1 @b\n' }
+      {
+        path: 'workspace/queue.ts',
+        edit: "CUT 3.=6 @a\n-export const drain = (queue: Job[]): Job | null => {\nCUT 8.=10 @b\n-export const ready = (job: Job): boolean => {\nPUT >1 @a\n-import type { Job } from './types.js';\nPUT >1 @b\n-import type { Job } from './types.js';\n"
+      }
     ]);
     // Named apart, both blocks survive - so the refusal above is about the collision and not about
     // gathering two blocks, which is a thing the format can do.
@@ -153,35 +159,41 @@ describe('moving a block instead of retyping it', () => {
   });
 
   it('refuses a register nothing filled, rather than pasting emptiness', async () => {
-    await expect(patch([{ path: 'workspace/queue.ts', edit: 'PUT >1 @never\n' }])).rejects.toThrow(
-      /@never was never filled/
-    );
+    await expect(
+      patch([
+        {
+          path: 'workspace/queue.ts',
+          edit: "PUT >1 @never\n-import type { Job } from './types.js';\n"
+        }
+      ])
+    ).rejects.toThrow(/@never was never filled/);
     // Nothing was written: a paste of a register that does not exist is a whole-patch refusal and
     // not a no-op that reports success.
   });
 });
 
 describe('the diff a model reaches for when it does not reach for this one', () => {
-  it('reads a zero-context insertion hunk as an insertion, not as a replacement', async () => {
-    /*
-     * `git diff -U0` writes `@@ -1,0 +2,1 @@` for a pure insertion - remove nothing at line 1, add
-     * one line after it. The count was clamped to one and the hunk applied as a REPLACEMENT of line
-     * 1, destroying a line while reporting success, and printing a note that read `PUT 1.=0:` - a
-     * range this dialect cannot express. The defect was legible in the harness's own output.
-     */
-    const { written, result } = await patch([
+  it('refuses a zero-context insertion without changing the addressed line', async () => {
+    await expect(
+      patch([
+        {
+          path: 'workspace/queue.ts',
+          edit: "@@ -1,0 +2,1 @@\n+import type { Clock } from './clock.js';\n"
+        }
+      ])
+    ).rejects.toThrow('no content anchor');
+    const { written } = await patch([
       {
         path: 'workspace/queue.ts',
-        edit: "@@ -1,0 +2,1 @@\n+import type { Clock } from './clock.js';\n"
+        edit: "PUT >1:\n-import type { Job }\n+import type { Clock } from './clock.js';\n"
       }
     ]);
-
-    const after = written.get('workspace/queue.ts') ?? '';
-    expect(after.startsWith("import type { Job } from './types.js';\n")).toBe(true);
-    expect(after).toContain("import type { Clock } from './clock.js';");
-    // The line the hunk did not ask to remove is still there.
-    expect(after).toContain("import type { Job } from './types.js';");
-    expect(((result as { notes?: string[] }).notes ?? []).join(' ')).toMatch(/PUT >1/);
+    expect(written.get('workspace/queue.ts')).toBe(
+      QUEUE.replace(
+        "import type { Job } from './types.js';\n",
+        "import type { Job } from './types.js';\nimport type { Clock } from './clock.js';\n"
+      )
+    );
   });
 
   it('refuses a zero-count hunk that also claims to remove lines', async () => {
@@ -202,11 +214,17 @@ describe('the diff a model reaches for when it does not reach for this one', () 
 describe('what the arm hands back beside the echo', () => {
   it('reports the new numbering, so the next patch to the file needs no read', async () => {
     const { result } = await patch([
-      { path: 'workspace/queue.ts', edit: 'PUT <3:\n+// a\n+// b\n' }
+      {
+        path: 'workspace/queue.ts',
+        edit: 'PUT <3:\n-export const drain = (queue: Job[]): Job | null => {\n+// a\n+// b\n'
+      }
     ]);
     expect(result.renumbered).toEqual(['workspace/queue.ts: lines after 2 are now +2']);
     const same = await patch([
-      { path: 'workspace/queue.ts', edit: 'PUT 4:\n+  const job = queue.pop();\n' }
+      {
+        path: 'workspace/queue.ts',
+        edit: 'PUT 4:\n-  const job = queue.shift();\n+  const job = queue.pop();\n'
+      }
     ]);
     expect(same.result.renumbered).toBeUndefined();
   });
@@ -216,7 +234,12 @@ describe('what the arm hands back beside the echo', () => {
       { name: 'file_read', args: { path: 'workspace/queue.ts' } }
     ]);
     const first = await run('file_patch', {
-      patches: [{ path: 'workspace/queue.ts', edit: 'PUT <3:\n+// a\n+// b\n' }]
+      patches: [
+        {
+          path: 'workspace/queue.ts',
+          edit: 'PUT <3:\n-export const drain = (queue: Job[]): Job | null => {\n+// a\n+// b\n'
+        }
+      ]
     });
     expect(first.renumbered).toEqual(['workspace/queue.ts: lines after 2 are now +2']);
     // Old line 4 is new line 6; the anchor quotes what is there and nothing is corrected.
@@ -252,7 +275,10 @@ describe('what the arm hands back beside the echo', () => {
 
   it('names the first syntax fault of what it just wrote, as a note and never a refusal', async () => {
     const { written, result } = await patch([
-      { path: 'workspace/queue.ts', edit: 'PUT 4:\n+  const job = queue.shift(;\n' }
+      {
+        path: 'workspace/queue.ts',
+        edit: 'PUT 4:\n-  const job = queue.shift();\n+  const job = queue.shift(;\n'
+      }
     ]);
     // Written regardless: a file mid-change is allowed to be unparseable between two patches.
     expect(toLines(written.get('workspace/queue.ts') ?? '')[3]).toBe('  const job = queue.shift(;');
@@ -265,13 +291,16 @@ describe('what the arm hands back beside the echo', () => {
 
   it('says nothing about syntax when the file still parses, or cannot be parsed here', async () => {
     const fine = await patch([
-      { path: 'workspace/queue.ts', edit: 'PUT 4:\n+  const job = queue.pop();\n' }
+      {
+        path: 'workspace/queue.ts',
+        edit: 'PUT 4:\n-  const job = queue.shift();\n+  const job = queue.pop();\n'
+      }
     ]);
     expect(((fine.result.notes ?? []) as string[]).some((note) => note.startsWith('syntax'))).toBe(
       false
     );
     const json = await patch(
-      [{ path: 'workspace/acl.json', edit: 'PUT 2:\n+  "b": 2,\n' }],
+      [{ path: 'workspace/acl.json', edit: 'PUT 2:\n-  "a": 1\n+  "b": 2,\n' }],
       { 'workspace/acl.json': '{\n  "a": 1\n}\n' },
       ['workspace/acl.json']
     );
@@ -289,8 +318,11 @@ describe('the shapes a patch is allowed to be', () => {
     // file would be addressed against those same numbers while the first had already moved them.
     await expect(
       patch([
-        { path: 'workspace/queue.ts', edit: 'PUT 1:\n+// a\n' },
-        { path: 'workspace/queue.ts', edit: 'PUT 2:\n+// b\n' }
+        {
+          path: 'workspace/queue.ts',
+          edit: "PUT 1:\n-import type { Job } from './types.js';\n+// a\n"
+        },
+        { path: 'workspace/queue.ts', edit: 'PUT 2:\n-\n+// b\n' }
       ])
     ).rejects.toThrow(/appears in two patches of the same call/);
   });
@@ -310,7 +342,12 @@ describe('the shapes a patch is allowed to be', () => {
      * the delta, so the retry is worse than the failure.
      */
     await expect(
-      patch([{ path: 'workspace/queue.ts', edit: 'PUT 3.=6:\n+// one\nPUT 5:\n+// two\n' }])
+      patch([
+        {
+          path: 'workspace/queue.ts',
+          edit: 'PUT 3.=6:\n-export const drain = (queue: Job[]): Job | null => {\n+// one\nPUT 5:\n-  return job && ready(job) ? job : null;\n+// two\n'
+        }
+      ])
     ).rejects.toThrow(/touch the same lines/);
   });
 
@@ -323,7 +360,10 @@ describe('the shapes a patch is allowed to be', () => {
      */
     const { written, result } = await patch(
       [
-        { path: 'workspace/queue.ts', edit: 'PUT 4:\n+  const job = queue.pop();\n' },
+        {
+          path: 'workspace/queue.ts',
+          edit: 'PUT 4:\n-  const job = queue.shift();\n+  const job = queue.pop();\n'
+        },
         { path: 'workspace/other.ts', edit: 'PUT 2:\n+const changed = true;\n' }
       ],
       { 'workspace/queue.ts': QUEUE, 'workspace/other.ts': 'const a = 1;\nconst b = 2;\n' },
@@ -344,7 +384,7 @@ describe('the shapes a patch is allowed to be', () => {
     // The applier re-records what it wrote as seen, so a turn that edits twice does not have to
     // spend a read proving to itself what it just authored. Without it the format is one edit deep
     // per file, which is most of what a turn actually does.
-    const first = await patch([{ path: 'workspace/queue.ts', edit: 'CUT 2\n' }]);
+    const first = await patch([{ path: 'workspace/queue.ts', edit: 'CUT 2\n-\n' }]);
     expect(first.result).toMatchObject({ patchCount: 1 });
     expect(String(first.result.wrote)).toMatch(/\d+:/);
   });
@@ -658,7 +698,7 @@ describe('what a read that showed part of a file lets you do to the rest of it',
 
     // And the bound does not over-refuse: a line the read did display is still editable.
     const inside = await run('file_patch', {
-      patches: [{ path: 'workspace/big.ts', edit: 'PUT 12:\n+changed\n' }]
+      patches: [{ path: 'workspace/big.ts', edit: 'PUT 12:\n-line 12\n+changed\n' }]
     });
     expect(inside).toMatchObject({ patchCount: 1 });
   });
@@ -830,7 +870,7 @@ describe('what a read that showed part of a file lets you do to the rest of it',
       { name: 'file_read', args: { path: 'workspace/big.ts' } }
     ]);
     await run('file_patch', {
-      patches: [{ path: 'workspace/big.ts', edit: 'PUT 12:\n+changed\n' }]
+      patches: [{ path: 'workspace/big.ts', edit: 'PUT 12:\n-line 12\n+changed\n' }]
     });
     const after = written.get('workspace/big.ts') ?? '';
 
@@ -851,7 +891,7 @@ describe('what a read that showed part of a file lets you do to the rest of it',
       { name: 'file_read', args: { path: 'workspace/big.ts', startLine: 1, endLine: 200 } }
     ]);
     await run('file_patch', {
-      patches: [{ path: 'workspace/big.ts', edit: 'PUT 10:\n+changed\n' }]
+      patches: [{ path: 'workspace/big.ts', edit: 'PUT 10:\n-line 10\n+changed\n' }]
     });
 
     await expect(
@@ -873,10 +913,10 @@ describe('what a read that showed part of a file lets you do to the rest of it',
       { name: 'file_read', args: { path: 'workspace/big.ts', startLine: 1, endLine: 200 } }
     ]);
     await run('file_patch', {
-      patches: [{ path: 'workspace/big.ts', edit: 'PUT 10:\n+first\n' }]
+      patches: [{ path: 'workspace/big.ts', edit: 'PUT 10:\n-line 10\n+first\n' }]
     });
     const second = await run('file_patch', {
-      patches: [{ path: 'workspace/big.ts', edit: 'PUT 20:\n+second\n' }]
+      patches: [{ path: 'workspace/big.ts', edit: 'PUT 20:\n-line 20\n+second\n' }]
     });
 
     expect(second).toMatchObject({ patchCount: 1 });
@@ -899,12 +939,12 @@ describe('what a read that showed part of a file lets you do to the rest of it',
       patches: [
         {
           path: 'workspace/big.ts',
-          edit: `PUT <10:\n${Array.from({ length: 9 }, (_, at) => `+added ${at + 1}`).join('\n')}\n`
+          edit: `PUT <10:\n-line 10\n${Array.from({ length: 9 }, (_, at) => `+added ${at + 1}`).join('\n')}\n`
         }
       ]
     });
     await run('file_patch', {
-      patches: [{ path: 'workspace/big.ts', edit: 'PUT 29:\n+moved\n' }]
+      patches: [{ path: 'workspace/big.ts', edit: 'PUT 29:\n-line 20\n+moved\n' }]
     });
 
     const lines = toLines(written.get('workspace/big.ts') ?? '');
@@ -1011,7 +1051,7 @@ describe('a file too long to be remembered four windows at a time', () => {
     });
 
     const landed = await run('file_patch', {
-      patches: [{ path: 'workspace/mid.ts', edit: 'PUT 50:\n+line 50 // touched\n' }]
+      patches: [{ path: 'workspace/mid.ts', edit: 'PUT 50:\n-line 50\n+line 50 // touched\n' }]
     });
     expect(landed).toMatchObject({ patchCount: 1 });
     expect(toLines(written.get('workspace/mid.ts') ?? '')[49]).toBe('line 50 // touched');
@@ -1192,7 +1232,9 @@ const PACKAGE_FILES = {
   'workspace/pkg/src/b.ts': 'export const m: number = 2;\n',
   'workspace/pkg/src/notes.md': '# notes\n'
 };
-const swap = (path: string, text: string) => [{ path, edit: `PUT 1:\n+${text}\n` }];
+const swap = (path: string, text: string, anchor = 'export const') => [
+  { path, edit: `PUT 1:\n-${anchor}\n+${text}\n` }
+];
 
 describe('the checker a patch triggers on what it just wrote', () => {
   it('names the patched file and carries the compiler’s own message, on the next call', async () => {
@@ -1282,7 +1324,9 @@ describe('what a patch must never run, counted on the wire', () => {
         'workspace/crate/src': ['main.rs']
       }
     );
-    const patched = await rig.patch(swap('workspace/crate/src/main.rs', 'fn main() { }'));
+    const patched = await rig.patch(
+      swap('workspace/crate/src/main.rs', 'fn main() { }', 'fn main()')
+    );
     await rig.settle();
     expect(patched).toMatchObject({ patchCount: 1 });
     expect(rig.execs).toHaveLength(0);
@@ -1291,7 +1335,7 @@ describe('what a patch must never run, counted on the wire', () => {
 
   it('runs nothing for a patch that wrote no code, in a package that has a checker', async () => {
     const rig = rigFor(PACKAGE_FILES, PACKAGE_TREE);
-    await rig.patch(swap('workspace/pkg/src/notes.md', '# other notes'));
+    await rig.patch(swap('workspace/pkg/src/notes.md', '# other notes', '# notes'));
     await rig.settle();
     expect(rig.execs).toHaveLength(0);
   });
@@ -1431,7 +1475,7 @@ describe('the check may not refuse work, and may not claim health', () => {
     await rig.patch(
       Array.from({ length: PROJECTS }, (_unused, index) => ({
         path: `workspace/p${index}/src/a.ts`,
-        edit: `PUT 1:\n+export const n${index}: number = 'x';\n`
+        edit: `PUT 1:\n-export const\n+export const n${index}: number = 'x';\n`
       }))
     );
     await rig.settle();
@@ -1495,7 +1539,7 @@ describe('the check may not refuse work, and may not claim health', () => {
     await rig.patch(
       Array.from({ length: PROJECTS }, (_unused, index) => ({
         path: `workspace/p${index}/src/a.ts`,
-        edit: `PUT 1:\n+export const n${index}: number = 'x';\n`
+        edit: `PUT 1:\n-export const\n+export const n${index}: number = 'x';\n`
       }))
     );
     await rig.settle();
@@ -1561,7 +1605,7 @@ describe('the check may not refuse work, and may not claim health', () => {
     await rig.patch(
       Array.from({ length: PROJECTS }, (_unused, index) => ({
         path: `workspace/p${index}/src/a.ts`,
-        edit: `PUT 1:\n+export const n${index}: number = 'x';\n`
+        edit: `PUT 1:\n-export const\n+export const n${index}: number = 'x';\n`
       }))
     );
     await rig.settle();
@@ -1772,7 +1816,7 @@ describe('what a task holding a stamp per patched path is allowed to accumulate'
       await rig.patch(
         FLOOD_NAMES.slice(batch * BATCH, (batch + 1) * BATCH).map((name) => ({
           path: `workspace/pkg/src/${name}`,
-          edit: `PUT 1:\n+export const changed${batch}: number = 1;\n`
+          edit: `PUT 1:\n-export const\n+export const changed${batch}: number = 1;\n`
         }))
       );
       await rig.settle();
@@ -1808,7 +1852,7 @@ describe('what a task holding a stamp per patched path is allowed to accumulate'
     await rig.patch(
       FLOOD_NAMES.slice(0, BATCH).map((name) => ({
         path: `workspace/pkg/src/${name}`,
-        edit: `PUT 1:\n+export const repaired: number = 1;\n`
+        edit: `PUT 1:\n-export const\n+export const repaired: number = 1;\n`
       }))
     );
     await rig.settle();
@@ -1862,7 +1906,7 @@ describe('what a task holding a stamp per patched path is allowed to accumulate'
       await rig.patch(
         LOOSE.slice(batch * BATCH, (batch + 1) * BATCH).map((name) => ({
           path: `workspace/loose/${name}`,
-          edit: `PUT 1:\n+export const changed${batch} = 1;\n`
+          edit: `PUT 1:\n-export const\n+export const changed${batch} = 1;\n`
         }))
       );
       await rig.settle();
@@ -1925,8 +1969,8 @@ describe('multi-file mutation receipts', () => {
     } as unknown as ToolContext;
     const run = (
       patches: unknown[] = [
-        { path: 'workspace/a.txt', edit: 'PUT 1:\n+ALPHA\n' },
-        { path: 'workspace/b.txt', edit: 'PUT 1:\n+BRAVO\n' }
+        { path: 'workspace/a.txt', edit: 'PUT 1:\n-alpha\n+ALPHA\n' },
+        { path: 'workspace/b.txt', edit: 'PUT 1:\n-bravo\n+BRAVO\n' }
       ]
     ) =>
       executeWorkspaceTool(context, {
@@ -1938,6 +1982,23 @@ describe('multi-file mutation receipts', () => {
   };
 
   it.each([
+    'PUT 1:\n+changed',
+    'PUT 1.=2:\n+changed',
+    'CUT 1',
+    'PUT <1:\n+new line',
+    'PUT >1:\n+new line',
+    'CUT 1 @move\n-alpha\nPUT >2 @move',
+    'PUT 1:\n-alpha\n+changed\nPUT >2:\n+new line'
+  ])('refuses an unanchored operation before any file mutation: %s', async (edit) => {
+    const { files, run } = exercise('none');
+    await expect(run([{ path: 'workspace/a.txt', edit }])).rejects.toThrow('no content anchor');
+    expect([...files]).toEqual([
+      ['workspace/a.txt', 'alpha\n'],
+      ['workspace/b.txt', 'bravo\n']
+    ]);
+  });
+
+  it.each([
     { path: 'workspace/a.txt', edit: 'PUT 1:\n+again\n' },
     { path: 'workspace/./a.txt', edit: 'PUT 1:\n+again\n' },
     { path: 'workspace/b.txt' },
@@ -1945,7 +2006,7 @@ describe('multi-file mutation receipts', () => {
   ])('validates the complete envelope before writing: %j', async (invalid) => {
     const { files, run } = exercise('none');
     await expect(
-      run([{ path: 'workspace/a.txt', edit: 'PUT 1:\n+ALPHA\n' }, invalid])
+      run([{ path: 'workspace/a.txt', edit: 'PUT 1:\n-alpha\n+ALPHA\n' }, invalid])
     ).rejects.toThrow();
     expect([...files.values()]).toEqual(['alpha\n', 'bravo\n']);
   });

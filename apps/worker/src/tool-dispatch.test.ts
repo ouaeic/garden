@@ -1111,7 +1111,7 @@ describe('the workspace arms', () => {
       {
         name: 'file_patch',
         arguments: {
-          patches: [{ path: 'workspace/a.md', edit: 'PUT 1:\n+ONE\nPUT 2:\n+TWO\n' }]
+          patches: [{ path: 'workspace/a.md', edit: 'PUT 1:\n-one\n+ONE\nPUT 2:\n-two\n+TWO\n' }]
         }
       },
       {
@@ -1155,7 +1155,7 @@ describe('the workspace arms', () => {
         name: 'file_patch',
         arguments: {
           patches: [
-            { path: 'workspace/a.md', edit: 'PUT 1:\n+ONE\n' },
+            { path: 'workspace/a.md', edit: 'PUT 1:\n-one\n+ONE\n' },
             { path: 'workspace/b.md', edit: 'PUT 1:\n+x\n' }
           ]
         }

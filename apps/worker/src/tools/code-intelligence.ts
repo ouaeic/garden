@@ -24,7 +24,7 @@ export async function executeCodeIntelligenceTool(
         r: 'R, using the locally installed languageserver package'
       },
       installation: {
-        r: 'Install R with the system package tool if missing. In the agent shell, use R --vanilla --slave -e to create Sys.getenv("R_LIBS_USER") and install.packages("languageserver", repos="https://cloud.r-project.org", lib=Sys.getenv("R_LIBS_USER")). Installation follows the task permission mode; no hosted account is required.'
+        r: 'Install R with the system package tool if missing. Building CRAN dependencies may also need make, C/C++ compilers and libxml2/libuv headers (Debian/Ubuntu: build-essential libxml2-dev libuv1-dev; ICU headers can avoid a bundled ICU build). In the agent shell, use R --vanilla --slave -e to create Sys.getenv("R_LIBS_USER") and install.packages("languageserver", repos="https://cloud.r-project.org", lib=Sys.getenv("R_LIBS_USER")). Installation follows the task permission mode; no hosted account is required.'
       },
       options: z.toJSONSchema(optionsSchema),
       actions: {

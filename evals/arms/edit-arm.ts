@@ -77,7 +77,7 @@
  * table prints input tokens beside output tokens for that reason. Netting the two silently would
  * be arguing for a conclusion.
  */
-import { applyEdit, NO_ANCHOR_NOTE } from '../../apps/worker/src/edit/apply.js';
+import { applyEdit } from '../../apps/worker/src/edit/apply.js';
 import { blockAt } from '../../apps/worker/src/edit/block.js';
 import { renderNumbered, toLines } from '../../apps/worker/src/edit/format.js';
 import { parseEdit } from '../../apps/worker/src/edit/parse.js';
@@ -469,7 +469,7 @@ const PREFIX_STRIPPED = /leaked line-number prefix/;
  * absorbing a mistake, so neither counts as forgiveness - a clean call carrying the nudge is still
  * a clean call.
  */
-const NOT_FORGIVENESS = [NO_ANCHOR_NOTE, /already read that way/];
+const NOT_FORGIVENESS = [/already read that way/];
 const forgave = (note: string): boolean =>
   !NOT_FORGIVENESS.some((plain) => (typeof plain === 'string' ? note === plain : plain.test(note)));
 
