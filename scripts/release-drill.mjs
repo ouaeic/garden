@@ -110,6 +110,7 @@ try {
   // the drill does not assert.
   const ATHANOR_PYTHON = '/usr/local/lib/athanor/python/bin/python3';
   const REQUIRED_BINARIES = [
+    'garden-run',
     'athanor-office-convert',
     'athanor-pdf-tables',
     'dot',

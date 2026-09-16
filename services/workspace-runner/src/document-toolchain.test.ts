@@ -117,7 +117,7 @@ describe('the document toolchain is declared where the drill can assert it', () 
 describe('what the skills ask for is what the drill refuses to ship without', () => {
   const skillsDirectory = path.join(repositoryRoot, 'skills');
   // Binaries that belong to a skill's own subject matter rather than to the document toolchain.
-  const outsideTheDocumentToolchain = new Set(['systemctl', 'journalctl']);
+  const outsideTheDocumentToolchain = new Set(['systemctl', 'journalctl', 'garden-run']);
 
   const declaredBinaries = async () => {
     const declared = new Set<string>();
