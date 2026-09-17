@@ -246,6 +246,17 @@
   display: flex;
   flex-direction: column;
 }
+.project-space.has-conversation > nav {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.project-space.has-conversation > [role='tabpanel'] {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
 .project-space.has-conversation .project-space-header {
   flex: 0 0 auto;
   padding: 0.8rem clamp(1rem, 3vw, 2.75rem) 0.5rem;

@@ -810,10 +810,9 @@ export const TaskEventKind = z.enum([
 export type TaskEventKind = z.infer<typeof TaskEventKind>;
 
 /**
- * One delegated lane as a moment in its work. The stream of `subagent` events with one `laneId`
- * is the lane's trajectory; latest status wins. `elapsedMs` is the mission's own clock, frozen
- * once a terminal status arrives; `verified` says the harness re-read the report's cited sources
- * and states whether the quoted spans held.
+ * The latest event for a `laneId` describes that lane's current work. `elapsedMs` is the
+ * mission's clock, frozen at a terminal status. Quotation matches and independent claim
+ * assessments have separate coverage; neither turns the lane into whole-report verification.
  */
 export const SubagentLane = z.object({
   laneId: z.string().min(1).max(64),

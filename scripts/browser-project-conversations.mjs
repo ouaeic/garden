@@ -2,6 +2,7 @@ import { projectUpdateFixture, checkProjectUpdates } from './browser-project-upd
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
+import { writeFile } from 'node:fs/promises';
 
 export async function checkProjectConversations({
   context,
@@ -54,17 +55,23 @@ export async function checkProjectConversations({
     requests = [];
   project.latestTaskId = root.id;
   const updates = projectUpdateFixture(project, tasks);
+  let pageSize = null;
+  let delayPage = null;
+  let delayTask = null;
+  let releaseTask;
+  const reads = [];
   await page.route('**/v1/**', async (route) => {
     const url = new URL(route.request().url()),
       path = url.pathname,
       method = route.request().method(),
       json = (body) => route.fulfill({ json: body });
+    if (method === 'GET') reads.push(path);
     if (await updates.handle(route)) return;
     if (path === '/v1/bootstrap')
       return json({
         ...bootstrap,
         models,
-        tasks: [...tasks],
+        tasks: pageSize ? [root] : [...tasks],
         projects: [project],
         workspaces: [workspace, anchor],
         drafts: [...drafts.values()]
@@ -105,8 +112,26 @@ export async function checkProjectConversations({
         unavailableWorkspaces: 0,
         observedAt: new Date().toISOString()
       });
-    if (path === `/v1/projects/${project.id}/conversations`)
-      return json({ tasks: [...tasks].reverse(), nextCursor: null });
+    if (path === `/v1/projects/${project.id}/conversations`) {
+      const rows = tasks
+        .filter(
+          (task) => Boolean(task.archivedAt) === (url.searchParams.get('archived') === 'true')
+        )
+        .slice()
+        .reverse();
+      const before = Number(url.searchParams.get('before') || 0);
+      if (before && delayPage) await delayPage();
+      const end = pageSize ? before + pageSize : rows.length;
+      try {
+        return await json({
+          tasks: rows.slice(before, end),
+          nextCursor: end < rows.length ? String(end) : null
+        });
+      } catch (error) {
+        if (!before) throw error;
+      }
+      return;
+    }
     if (path === `/v1/projects/${project.id}/notes`) {
       if (method === 'POST') {
         const input = route.request().postDataJSON(),
@@ -186,7 +211,10 @@ export async function checkProjectConversations({
       return json(child);
     }
     const selected = tasks.find((task) => path === `/v1/tasks/${task.id}`);
-    if (selected) return json(selected);
+    if (selected) {
+      if (delayTask) await delayTask();
+      return json(selected);
+    }
     if (tasks.some((task) => path === `/v1/tasks/${task.id}/presentation`))
       return json({ ...presentation, taskId: path.split('/')[3] });
     return route.fallback();
@@ -230,12 +258,12 @@ export async function checkProjectConversations({
     await page.getByRole('heading', { name: 'QC conversation', exact: true }).waitFor();
     const tabs = page.getByRole('navigation', { name: 'Project conversations' });
     const initialOrder = ['Overview', 'Assembly analysis', 'QC conversation'];
-    assert.deepEqual(await tabs.getByRole('button').allTextContents(), initialOrder);
+    assert.deepEqual(await tabs.getByRole('tab').allTextContents(), initialOrder);
     for (const name of ['Assembly analysis', 'QC conversation', 'Overview', 'QC conversation']) {
-      const selected = tabs.getByRole('button', { name, exact: true });
+      const selected = tabs.getByRole('tab', { name, exact: true });
       await selected.click();
       assert.equal(await selected.getAttribute('aria-current'), 'page');
-      assert.deepEqual(await tabs.getByRole('button').allTextContents(), initialOrder);
+      assert.deepEqual(await tabs.getByRole('tab').allTextContents(), initialOrder);
     }
     root.updatedAt = new Date(Date.now() + 60_000).toISOString();
     const child = tasks[1];
@@ -249,7 +277,7 @@ export async function checkProjectConversations({
     tasks.push(...additional);
     project.conversationCount = tasks.length;
     await page.reload();
-    await tabs.getByRole('button', { name: 'Discussion 7', exact: true }).waitFor();
+    await tabs.getByRole('tab', { name: 'Discussion 7', exact: true }).waitFor();
     const expandedOrder = [
       'Overview',
       'Discussion 7',
@@ -257,11 +285,11 @@ export async function checkProjectConversations({
       'QC conversation',
       ...additional.slice(0, 6).map((task) => task.title)
     ];
-    assert.deepEqual(await tabs.getByRole('button').allTextContents(), expandedOrder);
+    assert.deepEqual(await tabs.getByRole('tab').allTextContents(), expandedOrder);
     await page.setViewportSize({ width: 320, height: 900 });
-    await tabs.getByRole('button', { name: 'Discussion 6', exact: true }).click();
+    await tabs.getByRole('tab', { name: 'Discussion 6', exact: true }).click();
     await page.reload();
-    const activeTab = tabs.getByRole('button', { name: 'Discussion 6', exact: true });
+    const activeTab = tabs.getByRole('tab', { name: 'Discussion 6', exact: true });
     await activeTab.waitFor();
     await page.waitForFunction(() => {
       const row = document.querySelector('.project-conversation-tabs');
@@ -271,9 +299,9 @@ export async function checkProjectConversations({
         selected = active.getBoundingClientRect();
       return selected.left >= frame.left - 1 && selected.right <= frame.right + 1;
     });
-    assert.deepEqual(await tabs.getByRole('button').allTextContents(), expandedOrder);
-    await tabs.getByRole('button', { name: 'Assembly analysis', exact: true }).click();
-    assert.deepEqual(await tabs.getByRole('button').allTextContents(), expandedOrder);
+    assert.deepEqual(await tabs.getByRole('tab').allTextContents(), expandedOrder);
+    await tabs.getByRole('tab', { name: 'Assembly analysis', exact: true }).click();
+    assert.deepEqual(await tabs.getByRole('tab').allTextContents(), expandedOrder);
     tasks.splice(2);
     project.conversationCount = tasks.length;
     await page.goto(`${origin}/?task=${child.id}`, { waitUntil: 'domcontentloaded' });
@@ -290,7 +318,7 @@ export async function checkProjectConversations({
     }
     await page
       .getByRole('navigation', { name: 'Project conversations' })
-      .getByRole('button', { name: 'Overview', exact: true })
+      .getByRole('tab', { name: 'Overview', exact: true })
       .click();
     const journal = page.getByRole('region', { name: 'Project notes' });
     await journal.getByRole('button', { name: 'Add note' }).click();
@@ -330,13 +358,192 @@ export async function checkProjectConversations({
     await linked.getByRole('button', { name: 'Close New conversation', exact: true }).click();
     await page
       .getByRole('navigation', { name: 'Project conversations' })
-      .getByRole('button', { name: 'Overview', exact: true })
+      .getByRole('tab', { name: 'Overview', exact: true })
       .click();
     await checkProjectUpdates({ page, fixture: updates, project, report });
+    const dense = Array.from({ length: 248 }, (_, index) => ({
+      ...root,
+      id: randomUUID(),
+      title: `Analysis ${String(index + 1).padStart(3, '0')}`,
+      createdAt: new Date(Date.parse(child.createdAt) + (index + 1) * 1000).toISOString(),
+      updatedAt: new Date(Date.parse(child.createdAt) + (index + 1) * 1000).toISOString()
+    }));
+    tasks.push(...dense);
+    const archivedTask = {
+      ...root,
+      id: randomUUID(),
+      title: 'Archived analysis',
+      archivedAt: new Date().toISOString()
+    };
+    tasks.push(archivedTask);
+    pageSize = 50;
+    project.conversationCount = tasks.length;
+    reads.length = 0;
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.clock.install();
+    const began = performance.now();
+    await page.goto(`${origin}/?project=${project.id}`);
+    await page.getByRole('tab').nth(50).waitFor();
+    const initialReadyMs = performance.now() - began;
+    assert.equal(await page.getByRole('tab').count(), 51);
+    assert.equal(await page.locator('[role="tab"][tabindex="0"]').count(), 1);
+    const overviewTab = tabs.getByRole('tab', { name: 'Overview', exact: true });
+    await overviewTab.focus();
+    await overviewTab.press('End');
+    assert(
+      await tabs
+        .getByRole('tab')
+        .last()
+        .evaluate((el) => document.activeElement === el)
+    );
+    assert.equal(await overviewTab.getAttribute('aria-selected'), 'true');
+    await page.keyboard.press('Tab');
+    assert(await page.getByRole('tabpanel').evaluate((el) => document.activeElement === el));
+    await page.keyboard.press('Shift+Tab');
+    assert(
+      await tabs
+        .getByRole('tab')
+        .last()
+        .evaluate((el) => document.activeElement === el)
+    );
+    await page.keyboard.press('Home');
+    assert(await overviewTab.evaluate((el) => document.activeElement === el));
+    await page.keyboard.press('ArrowRight');
+    const focusedTitle = await page.locator(':focus').textContent();
+    await Promise.all([
+      page.waitForResponse(
+        (response) => new URL(response.url()).pathname === `/v1/projects/${project.id}`
+      ),
+      page.clock.runFor(15_100)
+    ]);
+    assert.equal(await page.locator(':focus').textContent(), focusedTitle);
+    assert.equal(await page.locator('[role="tab"][tabindex="0"]').count(), 1);
+    await page
+      .getByRole('region', { name: 'Conversations', exact: true })
+      .getByRole('button', { name: 'More conversations', exact: true })
+      .click();
+    await page.getByRole('tab').nth(100).waitFor();
+    assert.equal(await page.getByRole('tab').count(), 101);
+    assert.equal(await page.locator('[role="tab"][tabindex="0"]').count(), 1);
+    assert(
+      await page
+        .getByRole('region', { name: 'Conversations', exact: true })
+        .getByRole('button', { name: 'More conversations', exact: true })
+        .evaluate((el) => document.activeElement === el)
+    );
+    const metrics = {
+      totalConversations: tasks.length,
+      loadedConversations: 100,
+      initialReadyMs,
+      domNodes: await page.locator('*').count(),
+      requestCounts: Object.fromEntries(
+        [...new Set(reads)].map((path) => [path, reads.filter((value) => value === path).length])
+      )
+    };
+    const presentationReads = reads.filter((path) => path.endsWith('/presentation'));
+    assert(presentationReads.length > 0);
+    assert.equal(
+      new Set(presentationReads).size,
+      4,
+      'Result presentation reads must stay bounded by visible recent results'
+    );
+    let enteredTask;
+    const taskPending = new Promise((done) => {
+      releaseTask = done;
+    });
+    const taskEntered = new Promise((done) => {
+      enteredTask = done;
+    });
+    delayTask = async () => {
+      enteredTask();
+      await taskPending;
+    };
+    const olderTab = tabs.getByRole('tab').nth(30);
+    const olderName = await olderTab.textContent();
+    await olderTab.focus();
+    await olderTab.press('Enter');
+    await taskEntered;
+    assert(await olderTab.evaluate((el) => document.activeElement === el));
+    assert.equal(await olderTab.getAttribute('aria-selected'), 'true');
+    assert.equal(await tabs.getByRole('tab').count(), 101);
+    releaseTask();
+    delayTask = null;
+    await page.getByRole('heading', { name: olderName, exact: true }).waitFor();
+    assert(await olderTab.evaluate((el) => document.activeElement === el));
+    await olderTab.press('Home');
+    await page.keyboard.press('Enter');
+    await page.getByRole('region', { name: 'Conversations', exact: true }).waitFor();
+    assert.equal(await tabs.getByRole('tab').count(), 101);
+    const smallInput = page.getByRole('textbox', { name: 'Find a conversation', exact: true });
+    await page.setViewportSize({ width: 360, height: 340 });
+    await smallInput.scrollIntoViewIfNeeded();
+    await smallInput.fill('Analysis');
+    assert(await smallInput.evaluate((el) => document.activeElement === el));
+    const inputBox = await smallInput.boundingBox();
+    assert(inputBox.y >= 0 && inputBox.y + inputBox.height <= 340);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 360);
+    await page.screenshot({ path: resolve(report, 'project-keyboard-compact-viewport.png') });
+    await smallInput.fill('');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const trigger = page.getByRole('button', { name: 'Project settings', exact: true });
+    await trigger.focus();
+    await trigger.press('Enter');
+    await page.getByRole('dialog', { name: 'Project settings', exact: true }).waitFor();
+    await page.keyboard.press('Escape');
+    assert(await trigger.evaluate((el) => document.activeElement === el));
+    let releasePage, enteredPage;
+    const pendingPage = new Promise((done) => {
+      releasePage = done;
+    });
+    const entered = new Promise((done) => {
+      enteredPage = done;
+    });
+    delayPage = async () => {
+      enteredPage();
+      await pendingPage;
+    };
+    const cancelledPage = page.waitForEvent('requestfailed', {
+      predicate: (request) => {
+        const url = new URL(request.url());
+        return (
+          url.pathname === `/v1/projects/${project.id}/conversations` &&
+          url.searchParams.get('before') === '100'
+        );
+      }
+    });
+    await page
+      .getByRole('region', { name: 'Conversations', exact: true })
+      .getByRole('button', { name: 'More conversations', exact: true })
+      .click();
+    await entered;
+    await page.getByRole('checkbox', { name: 'Archived', exact: true }).check();
+    await tabs.getByRole('tab', { name: archivedTask.title, exact: true }).waitFor();
+    releasePage();
+    await cancelledPage;
+    await page.clock.runFor(100);
+    assert.deepEqual(await tabs.getByRole('tab').allTextContents(), [
+      'Overview',
+      archivedTask.title
+    ]);
+    assert.equal(
+      await page
+        .getByRole('region', { name: 'Conversations', exact: true })
+        .getByRole('button', { name: 'More conversations', exact: true })
+        .count(),
+      0
+    );
+    for (const width of [1440, 360]) {
+      await page.setViewportSize({ width, height: 540 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
+      await page.screenshot({ path: resolve(report, `project-keyboard-${width}.png`) });
+    }
+    await writeFile(resolve(report, 'project-scale.json'), JSON.stringify(metrics, null, 2) + '\n');
+    await writeFile(resolve(report, 'project-tabs-accessibility.txt'), await tabs.ariaSnapshot());
     console.log(
       'Project conversation browser checks passed: persistent working-area drafts, inherited autonomy, independent creation, stable tab order across navigation and activity, pinned tabs, scrollable overflow and restored selection, reloads, responsive names and controls, notes with correction history, and exact result references.'
     );
   } finally {
+    releaseTask?.();
     await page.close();
   }
 }

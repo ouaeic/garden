@@ -393,6 +393,7 @@ function WorkspaceApp() {
     bootstrap?.workspaces[0] ??
     null;
   const task = bootstrap?.tasks.find((item) => item.id === navigation.taskId) ?? null;
+  const activeProjectId = task?.projectId ?? navigation.projectId;
   const taskWorkspace =
     bootstrap?.workspaces.find((item) => item.id === task?.workspaceId) ??
     (task && taskWorkspaces.ownerId === bootstrap?.user.id
@@ -416,7 +417,7 @@ function WorkspaceApp() {
       });
     return () => controller.abort();
   }, [task?.workspaceId, taskWorkspace?.id, bootstrap?.user.id]);
-  function openTask(id: string) {
+  function openTask(id: string, projectId: string | null = null) {
     if (window.innerWidth <= 760) setSidebarOpen(false);
     const target = bootstrapRef.current?.tasks.find((item) => item.id === id);
     if (
@@ -426,7 +427,7 @@ function WorkspaceApp() {
       )
     )
       setWorkspaceId(target.parentWorkspaceId ?? target.workspaceId);
-    navigate('work', id);
+    navigate('work', id, projectId ?? target?.projectId ?? null);
   }
   function updateTask(next: Task) {
     if (deletedTasks.current.has(next.id)) return;
@@ -688,71 +689,60 @@ function WorkspaceApp() {
         <ErrorNotice error={error} onRetry={requestRefresh} />
         <Suspense fallback={<Spinner label="Opening this surface…" />}>
           {navigation.view === 'work' &&
-            (navigation.projectId && !navigation.taskId ? (
+            (activeProjectId ? (
               <ProjectSpace
                 onComputer={(id, surface, tabId) => {
                   if (tabId) sessionStorage.setItem(`garden:open-tab:${id}`, tabId);
                   setTool(surface);
                   navigate('computer', id);
                 }}
-                key={navigation.projectId}
-                projectId={navigation.projectId}
+                key={activeProjectId}
+                projectId={activeProjectId}
+                {...(navigation.taskId ? { taskId: navigation.taskId } : {})}
+                {...(task ? { currentTask: task } : {})}
                 revision={
-                  bootstrap.projects?.find((p) => p.id === navigation.projectId)?.updatedAt ?? ''
+                  task?.updatedAt ??
+                  bootstrap.projects?.find((p) => p.id === activeProjectId)?.updatedAt ??
+                  ''
                 }
                 onAllProjects={() => navigate('work')}
-                onOverview={() => navigate('work', null, navigation.projectId)}
-                onTask={openTask}
-                onNewConversation={(project, source) =>
-                  setNewConversation({ project, ...(source ? { source } : {}) })
-                }
-                onRefresh={requestRefresh}
-              />
-            ) : navigation.taskId && (!task || !taskWorkspace) ? (
-              <Spinner label="Opening project…" />
-            ) : task && taskWorkspace ? (
-              <ProjectSpace
-                onComputer={(id, surface, tabId) => {
-                  if (tabId) sessionStorage.setItem(`garden:open-tab:${id}`, tabId);
-                  setTool(surface);
-                  navigate('computer', id);
-                }}
-                key={task.projectId}
-                projectId={task.projectId!}
-                taskId={task.id}
-                currentTask={task}
-                revision={task.updatedAt}
-                onAllProjects={() => navigate('work')}
-                onOverview={() => navigate('work', null, task.projectId)}
-                onTask={openTask}
+                onOverview={() => navigate('work', null, activeProjectId)}
+                onTask={(id) => openTask(id, activeProjectId)}
                 onNewConversation={(project, source) =>
                   setNewConversation({ project, ...(source ? { source } : {}) })
                 }
                 onRefresh={requestRefresh}
               >
-                <TaskSurface
-                  key={task.id}
-                  task={task}
-                  workspace={taskWorkspace}
-                  bootstrap={bootstrap}
-                  decisions={decisions}
-                  {...(drafts[task.id] ? { draft: drafts[task.id] } : {})}
-                  onDraft={saveDraft}
-                  onTask={updateTask}
-                  onRefresh={requestRefresh}
-                  onBack={() => navigate('work', null, task.projectId)}
-                  onDiscuss={(source) => {
-                    void get<Project>(`/v1/projects/${task.projectId}`)
-                      .then((project) => setNewConversation({ project, source }))
-                      .catch(setError);
-                  }}
-                  onOpenTask={openTask}
-                  onComputer={(nextTool) => {
-                    setTool(nextTool);
-                    navigate('computer', task.id);
-                  }}
-                />
+                {navigation.taskId &&
+                  (task && taskWorkspace ? (
+                    <TaskSurface
+                      key={task.id}
+                      task={task}
+                      workspace={taskWorkspace}
+                      bootstrap={bootstrap}
+                      decisions={decisions}
+                      {...(drafts[task.id] ? { draft: drafts[task.id] } : {})}
+                      onDraft={saveDraft}
+                      onTask={updateTask}
+                      onRefresh={requestRefresh}
+                      onBack={() => navigate('work', null, task.projectId)}
+                      onDiscuss={(source) => {
+                        void get<Project>(`/v1/projects/${task.projectId}`)
+                          .then((project) => setNewConversation({ project, source }))
+                          .catch(setError);
+                      }}
+                      onOpenTask={openTask}
+                      onComputer={(nextTool) => {
+                        setTool(nextTool);
+                        navigate('computer', task.id);
+                      }}
+                    />
+                  ) : (
+                    <Spinner label="Opening conversation…" />
+                  ))}
               </ProjectSpace>
+            ) : navigation.taskId ? (
+              <Spinner label="Opening project…" />
             ) : (
               <section className="overview">
                 <div className="overview-top">
