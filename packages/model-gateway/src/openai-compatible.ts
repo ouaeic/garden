@@ -10,6 +10,7 @@ import type {
   ProviderModel
 } from './protocol.js';
 import { isProviderWallStatus } from './retry.js';
+import { retainInterruptedResponse } from './interrupted-response.js';
 import { assertReasoningEffort, readReasoningOptions, type ReasoningOptions } from './reasoning.js';
 import { describeNativeOpenAIInput } from './openai-native-input-catalog.js';
 import { isNativeOpenAIEndpoint } from './openai-media-catalog.js';
@@ -177,6 +178,7 @@ interface StreamChunk {
 /** A completion assembled from a stream, plus what the stream itself cost and how it ended. */
 interface StreamedBody extends CompletionBody {
   generatedChars: number;
+  failure?: Error;
   cutoff?: { reason: GenerationCutoff; detail: string };
   /**
    * How many `data:` frames parsed as JSON. Zero is the whole of the diagnosis for a reply that was
@@ -1377,11 +1379,14 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
     // larger of the two stands. A stream that ran to its end keeps whatever the provider said,
     // however the estimate compares: nothing here estimates over the top of a finished count.
     const estimated =
-      countedOutputTokens > 0 &&
-      (reportedOutputTokens === undefined ||
-        (streamed?.cutoff !== undefined && countedOutputTokens > reportedOutputTokens));
+      streamed?.failure !== undefined ||
+      (countedOutputTokens > 0 &&
+        (reportedOutputTokens === undefined ||
+          (streamed?.cutoff !== undefined && countedOutputTokens > reportedOutputTokens)));
     const inputTokens = body.usage?.prompt_tokens ?? 0;
-    const outputTokens = estimated ? countedOutputTokens : (reportedOutputTokens ?? 0);
+    const outputTokens = estimated
+      ? Math.max(countedOutputTokens, reportedOutputTokens ?? 0)
+      : (reportedOutputTokens ?? 0);
     const citations = webCitationsFrom(choice?.message?.annotations);
     const serverToolUse = serverToolUseFrom(body.usage?.server_tool_use);
     /*
@@ -1405,7 +1410,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
     const reasoning = inline.reasoning
       ? `${inline.reasoning}${wireReasoning ?? ''}`
       : wireReasoning;
-    return {
+    const result: ModelResponse = {
       text: inline.text,
       ...(reasoning ? { reasoning } : {}),
       ...(choice?.message?.reasoning_details?.length
@@ -1426,7 +1431,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
           ? inputTokens + outputTokens
           : (body.usage?.total_tokens ?? inputTokens + outputTokens),
         ...(estimated ? { estimated: true as const } : {}),
-        ...(typeof body.usage?.cost === 'number' ? { costUsd: body.usage.cost } : {}),
+        ...(!estimated && typeof body.usage?.cost === 'number' ? { costUsd: body.usage.cost } : {}),
         ...(serverToolUse ? { serverToolUse } : {}),
         ...readCacheUsage(body.usage)
       },
@@ -1442,6 +1447,11 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
         ...(body.id ? { generationId: body.id } : {})
       }
     };
+    if (streamed?.failure) {
+      retainInterruptedResponse(streamed.failure, result);
+      throw streamed.failure;
+    }
+    return result;
   }
 
   /**
@@ -1507,6 +1517,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
     if (!response.body)
       throw new AthanorError('provider_request_failed', `${this.provider} returned no stream`);
     let cutoff: GenerationCutoff | undefined;
+    let failure: Error | undefined;
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     const toolCalls = new Map<
@@ -1731,39 +1742,38 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
         if (buffer.trim()) await consumeLine(buffer);
         if (!cutoff) await consumeLine('');
       }
+      if (!cutoff && !outputLimit && !terminal && !finishReason && frames > 0) {
+        failure = new AthanorError(
+          'provider_unavailable',
+          `${this.provider} ended the response stream before its completion marker`,
+          503
+        );
+        if (!budget.characters() && !toolCalls.size && !reasoningDetails.length) throw failure;
+      }
       // Every cutoff leaves the socket open and the provider still writing into it, so the read side
       // is torn down here rather than left to garbage collection.
       if (cutoff || outputLimit || terminal) await reader.cancel().catch(() => undefined);
     } catch (cause) {
       await reader.cancel().catch(() => undefined);
-      /*
-       * An abort the caller raised itself, on a generation that had already produced something.
-       *
-       * This is the repetition watch stopping a model that has stopped saying anything new, and it
-       * is the owner pressing Stop. Both used to escape as an exception, and the caller's handler
-       * for them jumped the whole billing block: a quarter of an hour of output the provider
-       * charged for, recorded as a step that never happened. What was generated is returned marked
-       * `cancelled` instead, exactly as the three clocks below already return theirs, so the
-       * caller's own accounting runs on it unchanged and the decision about what a stopped answer
-       * is worth stays where it was made.
-       *
-       * `AthanorError` is checked first and deliberately: the request deadline aborts with one as
-       * its reason, and that is a fault the caller must still see as a throw.
-       */
-      if (cause instanceof AthanorError) throw cause;
-      if (isAbort(cause) && signal?.aborted && (content || reasoning || toolCalls.size > 0))
+      const generated =
+        budget.characters() > 0 ||
+        toolCalls.size > 0 ||
+        reasoningDetails.length > 0 ||
+        (usage?.total_tokens ?? 0) > 0;
+      if (!(cause instanceof AthanorError) && isAbort(cause) && signal?.aborted && generated)
         cutoff = 'cancelled';
-      // A connection that dies a few bytes into the body is the same fault as one that dies before
-      // the headers, and the caller already refuses to replay a request whose text the owner has
-      // seen - so it is classified the same way instead of escaping as a bare TypeError that no
-      // retry rule recognises. An abort and a fault the provider named for itself pass through.
-      else if (isAbort(cause)) throw cause;
-      else
-        throw new AthanorError(
-          'provider_unavailable',
-          `${this.provider} dropped the response stream: ${transportDetail(cause)}`,
-          503
-        );
+      else {
+        const fault =
+          cause instanceof AthanorError || (isAbort(cause) && cause instanceof Error)
+            ? cause
+            : new AthanorError(
+                'provider_unavailable',
+                `${this.provider} dropped the response stream: ${transportDetail(cause)}`,
+                503
+              );
+        if (!generated) throw fault;
+        failure = fault;
+      }
     }
     /*
      * Whatever the splitter was still holding when the stream ended, however it ended.
@@ -1804,6 +1814,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
       ...(generationId ? { id: generationId } : {}),
       ...(upstreamProvider ? { provider: upstreamProvider } : {}),
       generatedChars: budget.characters(),
+      ...(failure ? { failure } : {}),
       frames,
       ...(frames === 0 ? { unstreamed } : {}),
       ...(cutoff

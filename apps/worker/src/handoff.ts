@@ -4,6 +4,7 @@ import type { ModelRelease, WebToolPlan } from '@athanor/contracts';
 import { sha256 } from '@athanor/core';
 import type { DataStore, TaskRecord } from '@athanor/data';
 import type { ModelGateway, ModelTool, ModelToolCall } from '@athanor/model-gateway';
+import { interruptedResponseOf } from '@athanor/model-gateway';
 import {
   mayRenewStepBudget,
   stepBudgetRenewedNote,
@@ -13,7 +14,12 @@ import {
 } from './acceptance.js';
 import type { AgentState, AgentWorkerConfig } from './agent-state.js';
 import { buildIdentity } from './build-identity.js';
-import { estimatedInferenceCostUsd, stepUsageKey, usageCredit } from './billing.js';
+import {
+  estimatedInferenceCostUsd,
+  recordModelStepUsage,
+  stepUsageKey,
+  usageCredit
+} from './billing.js';
 import { modelInputBudget, prepareModelContext } from './context.js';
 import type { CompletionVerification } from './completion.js';
 import { routeTo } from './routing.js';
@@ -419,25 +425,33 @@ Nothing you produced was rolled back and none of it is lost. This same task cont
    * and again by the first step, and the answer is memoised on the record itself.
    */
   const sessionId = sha256(`athanor-task:${await turnRoutingTaskId(deps, task, key)}`).slice(0, 64);
-  const response = await deps.withLeaseRenewal(task, () =>
-    withRequestDeadline((signal) =>
-      gateway.chat(provider, {
-        ...routeTo(model),
-        messages: preparedContext.messages,
-        tools,
-        temperature: 0.2,
-        maxTokens: maxOutputTokens,
-        reasoningEffort,
-        ...(model.reasoning ? { reasoningOptions: model.reasoning } : {}),
-        sessionId,
-        signal,
-        onTextDelta: (delta) => {
-          const frame = flusher.push(delta);
-          if (frame !== null) emitStreamFrame(frame);
-        }
-      })
+  const interruptedFailure: { error?: Error } = {};
+  const response = await deps
+    .withLeaseRenewal(task, () =>
+      withRequestDeadline((signal) =>
+        gateway.chat(provider, {
+          ...routeTo(model),
+          messages: preparedContext.messages,
+          tools,
+          temperature: 0.2,
+          maxTokens: maxOutputTokens,
+          reasoningEffort,
+          ...(model.reasoning ? { reasoningOptions: model.reasoning } : {}),
+          sessionId,
+          signal,
+          onTextDelta: (delta) => {
+            const frame = flusher.push(delta);
+            if (frame !== null) emitStreamFrame(frame);
+          }
+        })
+      )
     )
-  );
+    .catch((error: unknown) => {
+      const partial = interruptedResponseOf(error);
+      if (!partial || !(error instanceof Error)) throw error;
+      interruptedFailure.error = error;
+      return partial;
+    });
   const finalFrame = flusher.drain();
   if (finalFrame !== null) emitStreamFrame(finalFrame);
   await streamEvents;
@@ -472,7 +486,7 @@ Nothing you produced was rolled back and none of it is lost. This same task cont
   // from a number known to be wrong. There is no route in the product to add an entry by hand.
   // The cost *event* below may still fail without taking the turn down - it is the transcript's
   // account of the charge, not the charge itself.
-  await deps.store.recordUsage({
+  await recordModelStepUsage(deps.store, response, {
     userId: task.userId,
     workspaceId: task.workspaceId,
     taskId: task.id,
@@ -491,20 +505,32 @@ Nothing you produced was rolled back and none of it is lost. This same task cont
     idempotencyKey: stepUsageKey(task.id, turn, state.step),
     providerRef: `${response.metadata.provider}:${response.metadata.model}`
   });
-  await event(deps.store, task, key, 'cost', 'Handoff completed', {
-    credits: credit,
-    costUsd,
-    cumulativeCredits: state.credits,
-    usage: response.usage,
-    metadata: response.metadata,
-    // Stamped on both cost paths or on neither: a baseline that carries the build on ordinary steps
-    // and drops it on the closing call of every step-limited turn is a baseline with a hole in the
-    // one row that is largest.
-    build: buildIdentity(),
-    // The same value the request carried, from the same variable. Two literals in one file that
-    // nothing held together is how a cost line comes to report an effort the request never used.
-    reasoningEffort
-  }).catch(() => undefined);
+  await event(
+    deps.store,
+    task,
+    key,
+    'cost',
+    interruptedFailure.error ? 'Interrupted handoff usage recorded' : 'Handoff completed',
+    {
+      credits: credit,
+      costUsd,
+      cumulativeCredits: state.credits,
+      usage: response.usage,
+      metadata: response.metadata,
+      // Stamped on both cost paths or on neither: a baseline that carries the build on ordinary steps
+      // and drops it on the closing call of every step-limited turn is a baseline with a hole in the
+      // one row that is largest.
+      build: buildIdentity(),
+      // The same value the request carried, from the same variable. Two literals in one file that
+      // nothing held together is how a cost line comes to report an effort the request never used.
+      reasoningEffort
+    }
+  ).catch(() => undefined);
+  if (interruptedFailure.error) {
+    state.step += 1;
+    await deps.checkpoint(task, key, state);
+    throw interruptedFailure.error;
+  }
   const assistantText = normalizeAssistantText(response.text);
   state.messages.push({
     role: 'assistant',

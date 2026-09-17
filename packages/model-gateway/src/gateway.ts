@@ -1,6 +1,7 @@
 import { AthanorError } from '@athanor/core';
 import type { ModelAdapter, ModelRequest, ModelResponse, ProviderModel } from './protocol.js';
 import { defaultRetryPolicy, withRetry, type RetryPolicy } from './retry.js';
+import { interruptedResponseOf } from './interrupted-response.js';
 
 export type { RetryPolicy } from './retry.js';
 // The wall question, published beside the gateway that asks it: a caller deciding whether to park a
@@ -75,10 +76,17 @@ export class ModelGateway {
               : {})
           }
         : request;
-    return withRetry(() => adapter.chat(attempted), {
-      policy: options?.retry === false ? { ...this.#retry, maxAttempts: 1 } : this.#retry,
-      hasStreamed: () => streamed,
-      ...(request.signal ? { signal: request.signal } : {})
-    });
+    return withRetry(
+      () =>
+        adapter.chat(attempted).catch((error: unknown) => {
+          if (interruptedResponseOf(error)) streamed = true;
+          throw error;
+        }),
+      {
+        policy: options?.retry === false ? { ...this.#retry, maxAttempts: 1 } : this.#retry,
+        hasStreamed: () => streamed,
+        ...(request.signal ? { signal: request.signal } : {})
+      }
+    );
   }
 }

@@ -31,7 +31,7 @@ import type { ReasoningEffort } from '@athanor/contracts';
 import { AthanorError, sha256 } from '@athanor/core';
 import type { ModelRelease } from '@athanor/contracts';
 import type { DataStore, TaskRecord } from '@athanor/data';
-import type { ModelResponse } from '@athanor/model-gateway';
+import { interruptedResponseOf, type ModelResponse } from '@athanor/model-gateway';
 import type { AgentState, AgentWorkerConfig } from '../agent-state.js';
 import type { AgentRunnerClient } from '../runner-client.js';
 import { materializeNativeInputs } from '../native-input.js';
@@ -56,6 +56,7 @@ export interface TurnGenerateDeps {
   readonly config: AgentWorkerConfig;
   /** Keeps the lease alive across a generation that outruns it, which a full window routinely does. */
   withLeaseRenewal<T>(task: TaskRecord, operation: () => Promise<T>): Promise<T>;
+  checkpoint(task: TaskRecord, key: Uint8Array, state: AgentState): Promise<void>;
   /** The ledger row. Every abort path that generated a token reaches this. */
   billModelStep(
     task: TaskRecord,
@@ -148,6 +149,7 @@ export const generateModelStep = async (
    * happens inside a callback, which the compiler's flow analysis does not follow.
    */
   const refusedWindow: { error?: AthanorError } = {};
+  const interruptedFailure: { error?: Error } = {};
   const looping = new AbortController();
   let streamed = '';
   /*
@@ -254,6 +256,11 @@ export const generateModelStep = async (
       )
     )
     .catch((error: unknown) => {
+      const partial = interruptedResponseOf(error);
+      if (partial && error instanceof Error) {
+        interruptedFailure.error = error;
+        return partial;
+      }
       /*
        * A window the route will not take, which is the one refusal at this status a caller can
        * do something about. It is repaired below rather than here so the repair happens with
@@ -421,6 +428,12 @@ export const generateModelStep = async (
       ).catch(() => undefined);
     await deps.noteRepeatingAnswer(task, key, state, loopedOn);
     return { outcome: 'retry' };
+  }
+  // Settle generated tokens before normal provider recovery parks this turn; never dispatch its tools.
+  if (interruptedFailure.error) {
+    state.step += 1;
+    await deps.checkpoint(task, key, state);
+    throw interruptedFailure.error;
   }
   return { outcome: 'generated', response };
 };

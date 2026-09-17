@@ -1,3 +1,4 @@
+import { interruptedResponseOf } from './interrupted-response.js';
 import { resolveWebToolPlan } from '@athanor/contracts';
 import { AthanorError } from '@athanor/core';
 import { describe, expect, it, vi } from 'vitest';
@@ -439,7 +440,7 @@ describe('OpenAICompatibleAdapter', () => {
   it('raises a mid-stream error frame instead of returning a truncated turn as a success', async () => {
     const deltas: string[] = [];
     const frames = [
-      'data: {"choices":[{"delta":{"content":"Working on "}}]}\n\n',
+      'data: {"choices":[{"delta":{"content":"Working on "}}],"usage":{"prompt_tokens":40,"completion_tokens":1,"total_tokens":41,"cost":0.00001}}\n\n',
       'data: {"error":{"code":429,"message":"rate limited mid-stream","metadata":{"headers":{"Retry-After":"120"}}}}\n\n'
     ].join('');
 
@@ -452,6 +453,12 @@ describe('OpenAICompatibleAdapter', () => {
     expect((failure as AthanorError).statusCode).toBe(429);
     expect((failure as AthanorError).message).toContain('rate limited mid-stream');
     expect(retryAfterMsOf(failure)).toBe(120_000);
+    expect(interruptedResponseOf(failure)).toMatchObject({
+      text: 'Working on ',
+      finishReason: 'error',
+      usage: { inputTokens: 40, outputTokens: 3, totalTokens: 43, estimated: true }
+    });
+    expect(interruptedResponseOf(failure)?.usage.costUsd).toBeUndefined();
     expect(deltas).toEqual(['Working on ']);
   });
 
@@ -599,6 +606,36 @@ describe('OpenAICompatibleAdapter', () => {
     expect((failure as AthanorError).message).toContain('UND_ERR_SOCKET');
     expect(isRetryableError(failure)).toBe(true);
     expect(deltas).toEqual(['Half an ']);
+    expect(interruptedResponseOf(failure)).toMatchObject({
+      text: 'Half an ',
+      finishReason: 'error',
+      usage: { outputTokens: 2, estimated: true }
+    });
+    expect(JSON.stringify(failure)).not.toContain('Half an ');
+  });
+
+  it.each([
+    { content: 'Unfinished answer' },
+    {
+      tool_calls: [
+        {
+          index: 0,
+          id: 'unfinished-tool',
+          function: { name: 'shell', arguments: '{"command":"echo pending"}' }
+        }
+      ]
+    }
+  ])('refuses an unfinished response even when the socket closes cleanly: %j', async (delta) => {
+    const failure: unknown = await streamRequest(
+      streamingAdapter(`data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`),
+      []
+    ).catch((error: unknown) => error);
+    expect(failure).toMatchObject({ code: 'provider_unavailable', statusCode: 503 });
+    const partial = interruptedResponseOf(failure);
+    expect(partial).toBeDefined();
+    expect(partial?.finishReason).toBe('error');
+    expect(partial?.usage.estimated).toBe(true);
+    expect(partial?.usage.outputTokens).toBeGreaterThan(0);
   });
 
   it('keeps what a stream had written when it goes silent, rather than losing it with the error', async () => {

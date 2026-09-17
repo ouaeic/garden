@@ -464,6 +464,7 @@ export class AgentWorker {
       runner: this.#runner,
       store,
       config,
+      checkpoint: (task, key, state) => this.#checkpoint(task, key, state),
       withLeaseRenewal: (task, operation) => this.#withLeaseRenewal(task, operation),
       billModelStep: (task, key, state, input) => this.#billModelStep(task, key, state, input),
       compactContext: (task, key, state, input) => this.#compactContext(task, key, state, input),
@@ -869,27 +870,34 @@ export class AgentWorker {
      */
     if (measuringThroughput && response.metadata.generationId)
       await this.#recordThroughputCeiling(task, model, response.metadata.generationId);
-    await event(this.store, task, key, 'cost', `Step ${state.step + 1} completed`, {
-      credits: credit,
-      costUsd,
-      cumulativeCredits: state.credits,
-      usage: response.usage,
-      metadata: response.metadata,
-      // Which athanor priced this. A cost line is the most-compared number the product emits - a
-      // baseline read back a year later, a regression argued from two transcripts - and until now
-      // nothing on it said which build produced it, so two figures that disagree could not be told
-      // apart from two builds that disagree. `buildIdentity()` is derived once from the checkout and
-      // is a constant for the process, so it costs the row a few bytes and no work.
-      build: buildIdentity(),
-      reasoningEffort,
-      context: {
-        estimatedInputTokens: preparedContext.estimatedInputTokens,
-        contextWindowTokens: model.contextTokens,
-        compacted: preparedContext.compacted,
-        cacheBreakpoints: preparedContext.cacheBreakpoints,
-        olderToolOutputChars: preparedContext.olderToolOutputChars
+    await event(
+      this.store,
+      task,
+      key,
+      'cost',
+      `Step ${state.step + 1} ${response.finishReason === 'error' ? 'interrupted' : 'completed'}`,
+      {
+        credits: credit,
+        costUsd,
+        cumulativeCredits: state.credits,
+        usage: response.usage,
+        metadata: response.metadata,
+        // Which athanor priced this. A cost line is the most-compared number the product emits - a
+        // baseline read back a year later, a regression argued from two transcripts - and until now
+        // nothing on it said which build produced it, so two figures that disagree could not be told
+        // apart from two builds that disagree. `buildIdentity()` is derived once from the checkout and
+        // is a constant for the process, so it costs the row a few bytes and no work.
+        build: buildIdentity(),
+        reasoningEffort,
+        context: {
+          estimatedInputTokens: preparedContext.estimatedInputTokens,
+          contextWindowTokens: model.contextTokens,
+          compacted: preparedContext.compacted,
+          cacheBreakpoints: preparedContext.cacheBreakpoints,
+          olderToolOutputChars: preparedContext.olderToolOutputChars
+        }
       }
-    });
+    );
   }
 
   /**

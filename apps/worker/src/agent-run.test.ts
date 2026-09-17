@@ -1016,7 +1016,11 @@ describe('the model call and the task lease', () => {
             start(controller) {
               // Part of an answer arrives, and then the provider keeps writing - which is the whole
               // shape of the complaint: Stop said the task had stopped and the text kept coming.
-              controller.enqueue(encode(textFrame('Half a sen')));
+              controller.enqueue(
+                encode(
+                  `data: ${JSON.stringify({ choices: [{ delta: { content: 'Half a sen' } }] })}\n\n`
+                )
+              );
               requested();
               init?.signal?.addEventListener('abort', () => {
                 torn = true;

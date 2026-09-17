@@ -1,3 +1,4 @@
+import { retainInterruptedResponse, interruptedResponseOf } from './interrupted-response.js';
 import { AthanorError } from '@athanor/core';
 import { describe, expect, it } from 'vitest';
 import { ModelGateway } from './gateway.js';
@@ -231,5 +232,34 @@ describe('ModelGateway.chat retries', () => {
     await expect(gateway.chat('missing', baseRequest)).rejects.toThrow(
       'Provider missing is not configured'
     );
+  });
+});
+
+describe('interrupted usage evidence', () => {
+  it('does not replay a partial tool-only or unobserved response', async () => {
+    const waits: number[] = [];
+    let attempts = 0;
+    const failure = new AthanorError('provider_unavailable', 'stream cut', 503);
+    const partial = {
+      ...completion(''),
+      toolCalls: [{ id: 'pending', name: 'shell', arguments: { command: 'echo pending' } }]
+    };
+    retainInterruptedResponse(failure, partial);
+    const gateway = new ModelGateway({ retry: instantPolicy(waits) }).register(
+      'test',
+      stubAdapter(async () => {
+        attempts += 1;
+        throw failure;
+      })
+    );
+    await expect(gateway.chat('test', baseRequest)).rejects.toBe(failure);
+    expect(attempts).toBe(1);
+    expect(waits).toEqual([]);
+    expect(interruptedResponseOf(failure)).toMatchObject({
+      finishReason: 'error',
+      usage: partial.usage
+    });
+    expect(JSON.stringify(failure)).not.toContain('echo pending');
+    expect(interruptedResponseOf({ response: partial })).toBeUndefined();
   });
 });
