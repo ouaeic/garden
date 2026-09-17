@@ -14,6 +14,7 @@ import { processFixture, checkProjectProcesses } from './browser-processes.mjs';
 import { directoryFixture, checkProjectDirectories } from './browser-directories.mjs';
 import { checkProjectConversations } from './browser-project-conversations.mjs';
 import { checkTaskRecovery } from './browser-task-recovery.mjs';
+import { checkArtifactLinks } from './browser-artifact-links.mjs';
 
 // Local fixtures exercise browser interactions; API and runner suites own authorization and delivery.
 const requireRunner = createRequire(
@@ -1137,6 +1138,7 @@ try {
       errors
     });
     await checkTaskRecovery({ context, origin, bootstrap, task, report, errors });
+    await checkArtifactLinks({ context, origin, task, workspace, presentation, report, errors });
     await checkProjectDirectories({
       context,
       origin,

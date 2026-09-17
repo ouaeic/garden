@@ -125,6 +125,8 @@ export interface AgentState {
        */
       eventId?: string;
       progressKey?: string;
+      /** Native process identity, retained independently of model-visible output. */
+      process?: { id: string; completed: boolean };
     }
   >;
   /**

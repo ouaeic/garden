@@ -20,7 +20,7 @@ import type { DataStore, TaskRecord } from '@athanor/data';
 import type { ModelToolCall } from '@athanor/model-gateway';
 import type { AgentState, AgentWorkerConfig } from './agent-state.js';
 import { callDestinations } from './command-classification.js';
-import { shellObservation } from './completion.js';
+import { shellObservation, processObservation } from './completion.js';
 import {
   boundToolResultText,
   RECENT_TOOL_OUTPUT_CHARS,
@@ -584,7 +584,8 @@ export const recordToolResult = async (
     // contract reads this, because only there does "the last change" mean the work being proved.
     ...(writesOnlyDurableInstructions(call.name, call.arguments) ? { briefOnly: true } : {}),
     ...(writesOnlyProse(call.name, call.arguments) ? { proseOnly: true } : {}),
-    ...(shellObservation(call, result) ?? {})
+    ...(shellObservation(call, result) ?? {}),
+    ...(!skipped ? (processObservation(task, call, result) ?? {}) : {})
   };
   if (
     !skipped &&

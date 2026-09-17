@@ -481,6 +481,40 @@ export const observedCommands = (
   return observed;
 };
 
+/** A process reference is citable only through its latest successful completion observation. */
+const evidenceCallId = (state: AgentState, reference: string): string => {
+  if (state.turnToolResults?.[reference]) return reference;
+  const latest = Object.entries(state.turnToolResults ?? {})
+    .reverse()
+    .find(([, result]) => result.process?.id === reference);
+  return latest?.[1].success && !latest[1].skipped && latest[1].process?.completed
+    ? latest[0]
+    : reference;
+};
+
+export const processObservation = (
+  task: { id: string; workspaceId: string },
+  call: ModelToolCall,
+  result: unknown
+): { process: { id: string; completed: boolean } } | null => {
+  if (call.name !== 'shell' && call.name !== 'process') return null;
+  const row = asRecord(result);
+  if (
+    !row ||
+    row.ownerTaskId !== task.id ||
+    row.workspaceId !== task.workspaceId ||
+    typeof row.sessionId !== 'string' ||
+    !/^job_[a-f0-9]{64}$/.test(row.sessionId)
+  )
+    return null;
+  return {
+    process: {
+      id: row.sessionId,
+      completed: row.status === 'completed' && row.exitCode === 0 && row.timedOut !== true
+    }
+  };
+};
+
 export const completionVerification = (
   state: AgentState,
   value: unknown
@@ -511,13 +545,13 @@ export const completionVerification = (
    */
   const evidence = rawEvidence.flatMap((item) => {
     if (typeof item === 'string') {
-      const toolCallId = item.trim();
+      const toolCallId = evidenceCallId(state, item.trim());
       return toolCallId ? [{ claim: '', source: 'tool_result' as const, toolCallId }] : [];
     }
     if (!item || typeof item !== 'object') return [];
     const record = item as Record<string, unknown>;
     const claim = textValue(record.claim).trim().slice(0, 2_000);
-    const toolCallId = textValue(record.toolCallId).trim();
+    const toolCallId = evidenceCallId(state, textValue(record.toolCallId).trim());
     // Named when the model named it; otherwise read off what it cited, which is the only thing
     // these three values were ever distinguishing.
     const declared = textValue(record.source);

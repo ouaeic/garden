@@ -733,7 +733,9 @@ export default function TaskSurface({
                 <details className="garden-previous-answer">
                   <summary>Answer from an earlier direction</summary>
                   <Suspense fallback={null}>
-                    <Markdown>{previousAnswer.markdown}</Markdown>
+                    <Markdown artifacts={artifacts} onArtifact={showArtifact}>
+                      {previousAnswer.markdown}
+                    </Markdown>
                   </Suspense>
                 </details>
               )}
@@ -763,7 +765,9 @@ export default function TaskSurface({
                     </div>
                   </div>
                   <Suspense fallback={<Spinner label="Opening the result…" />}>
-                    <Markdown>{answer.markdown}</Markdown>
+                    <Markdown artifacts={artifacts} onArtifact={showArtifact}>
+                      {answer.markdown}
+                    </Markdown>
                   </Suspense>
                   {answer.partial && (
                     <div className="writing-indicator" role="status">
@@ -1084,7 +1088,9 @@ export default function TaskSurface({
                   </span>
                   <div>
                     <Suspense fallback={<p>{event.summary}</p>}>
-                      <Markdown>{eventText(event)}</Markdown>
+                      <Markdown artifacts={artifacts} onArtifact={showArtifact}>
+                        {eventText(event)}
+                      </Markdown>
                     </Suspense>
                     <MessageAttachmentList
                       workspaceId={task.workspaceId}

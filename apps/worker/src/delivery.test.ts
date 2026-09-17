@@ -51,6 +51,51 @@ const fixture = () => {
 };
 
 describe('delivery resolves against scoped output evidence', () => {
+  it('accepts only task-scoped artifact names and immutable reference forms', async () => {
+    const { deps, store, runner, state } = fixture();
+    store.listArtifacts.mockResolvedValue([
+      {
+        id: 'known',
+        taskId: task.id,
+        nameCiphertext: encryptJson(
+          { name: 'result.json' },
+          key,
+          `artifact-name:${task.workspaceId}`
+        )
+      },
+      {
+        id: 'foreign',
+        taskId: 'another-task',
+        nameCiphertext: encryptJson(
+          { name: 'private.json' },
+          key,
+          `artifact-name:${task.workspaceId}`
+        )
+      }
+    ]);
+    const references = [
+      'result.json',
+      'known',
+      'artifact:known',
+      'artifact:result.json',
+      'artifact:result.json (known)'
+    ];
+    expect(references.length).toBeGreaterThan(0);
+    expect(await resolveDelivery(deps, task, key, state, references)).toEqual({
+      deliverables: ['result.json'],
+      unavailable: []
+    });
+    expect(runner.call).not.toHaveBeenCalled();
+    expect(
+      (
+        await resolveDelivery(deps, task, key, state, [
+          'artifact:private.json',
+          'artifact:wrong.json (known)'
+        ])
+      ).unavailable
+    ).toEqual(['artifact:private.json', 'artifact:wrong.json (known)']);
+  });
+
   it('verifies a JSON file prefix without parsing it and still rejects missing files', async () => {
     const { deps, state } = fixture();
     deps.runner = new AgentRunnerClient('http://runner.invalid', 'r'.repeat(48));

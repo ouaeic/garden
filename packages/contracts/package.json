@@ -19,6 +19,12 @@
       "browser": "./src/permission-policy.ts",
       "development": "./src/permission-policy.ts",
       "default": "./dist/permission-policy.js"
+    },
+    "./artifact-reference": {
+      "types": "./src/artifact-reference.ts",
+      "browser": "./src/artifact-reference.ts",
+      "development": "./src/artifact-reference.ts",
+      "default": "./dist/artifact-reference.js"
     }
   },
   "scripts": {

@@ -1,3 +1,4 @@
+import { resolveArtifactReference } from '@athanor/contracts/artifact-reference';
 import { deliveryFilePath, TaskOutputIntents, type TaskOutputIntent } from '@athanor/contracts';
 import { decryptJson } from '@athanor/core';
 import type { DataStore, TaskRecord } from '@athanor/data';
@@ -83,18 +84,21 @@ export const resolveDelivery = async (
     hasUrls ? deps.store.listWorkspacePreviews(task.userId, task.workspaceId) : [],
     hasUrls ? deps.store.listTaskEvents(task.id, 0, { kind: 'preview', limit: 128 }) : []
   ]);
-  const names = new Set(
-    artifacts
-      .filter((item) => item.taskId === task.id)
-      .map(
-        (item) =>
-          decryptJson<{ name: string }>(
-            item.nameCiphertext as Parameters<typeof decryptJson>[0],
-            key,
-            `artifact-name:${task.workspaceId}`
-          ).name
-      )
+  const scopedArtifacts = artifacts
+    .filter((item) => item.taskId === task.id)
+    .map((item) => ({
+      id: String(item.id),
+      name: decryptJson<{ name: string }>(
+        item.nameCiphertext as Parameters<typeof decryptJson>[0],
+        key,
+        `artifact-name:${task.workspaceId}`
+      ).name
+    }));
+  const names = new Set(scopedArtifacts.map((item) => item.name));
+  const normalized = deliverables.map(
+    (value) => resolveArtifactReference(value, scopedArtifacts)?.name ?? value
   );
+  deliverables.splice(0, deliverables.length, ...new Set(normalized));
   const previewIds = new Set(
     events
       .filter((item) => item.kind === 'preview' && item.taskId === task.id)
@@ -192,7 +196,7 @@ export const resolveDelivery = async (
         const value = checks[next++]!;
         const declaredPath = deliveryFilePath(value);
         if (declaredPath && intent.deferredFiles?.has(declaredPath)) continue;
-        if (names.has(value)) continue;
+        if (names.has(value) || resolveArtifactReference(value, scopedArtifacts)) continue;
         const url = address(value);
         const preview = url
           ? previews.find(
