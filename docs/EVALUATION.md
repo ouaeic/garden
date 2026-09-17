@@ -277,3 +277,13 @@ return.
 The model is scripted, so nothing here measures model judgement. It measures the harness: what the
 loop does with a given trajectory. A fixture where the scripted model behaves well and one where it
 behaves badly are both statements about garden's response, not about any model's quality.
+
+## Independent delivered outcomes
+
+`pnpm eval:outcomes --ci` checks the independent outcome grader and a durable synthetic form with
+a deliberately lost acknowledgement. Expected answers and signed observations remain on the
+evaluator's machine; only the task inputs go into the agent workspace. The rig reports correctness,
+completion, interventions, cost, latency and recovery separately, with missing measurements left
+unknown. Its deterministic controls are part of `eval:rigs`; they do not spend provider credits or
+establish model quality. See [the outcome rig](../evals/outcomes/README.md) for task preparation,
+observation collection, grading commands and explicit coverage limits.

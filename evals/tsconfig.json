@@ -13,6 +13,7 @@
     "arms/*.ts",
     "edit/*.ts",
     "read/*.ts",
-    "reach/*.ts"
+    "reach/*.ts",
+    "outcomes/*.ts"
   ]
 }

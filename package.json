@@ -22,7 +22,7 @@
     "eval:bench": "NODE_OPTIONS=--conditions=development tsx evals/bench/run.ts",
     "eval:edit": "NODE_OPTIONS=--conditions=development tsx evals/edit/run.ts",
     "eval:read": "NODE_OPTIONS=--conditions=development tsx evals/read/run.ts",
-    "eval:rigs": "pnpm eval:context -- --ci && pnpm eval:injection -- --ci && pnpm eval:arms -- --ci && pnpm eval:cards -- --ci && pnpm eval:edit -- --ci && pnpm eval:read -- --ci",
+    "eval:rigs": "pnpm eval:context -- --ci && pnpm eval:injection -- --ci && pnpm eval:arms -- --ci && pnpm eval:cards -- --ci && pnpm eval:edit -- --ci && pnpm eval:read -- --ci && pnpm eval:outcomes -- --ci",
     "lint": "NODE_OPTIONS=--max-old-space-size=8192 eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -35,7 +35,8 @@
     "desktop:dev": "pnpm --filter @athanor/desktop dev",
     "desktop:build": "pnpm --filter @athanor/desktop native:build",
     "test:ui": "pnpm --filter @athanor/web build && node scripts/test-web-layout.mjs && node scripts/test-pdf-viewer.mjs",
-    "diagnostic:replay": "NODE_OPTIONS=--conditions=development tsx packages/core/src/diagnostic-cli.ts"
+    "diagnostic:replay": "NODE_OPTIONS=--conditions=development tsx packages/core/src/diagnostic-cli.ts",
+    "eval:outcomes": "NODE_OPTIONS=--conditions=development tsx evals/outcomes/run.ts"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
@@ -48,6 +49,7 @@
     "tsx": "4.23.12",
     "typescript": "5.9.3",
     "typescript-eslint": "8.56.0",
-    "vitest": "4.1.10"
+    "vitest": "4.1.10",
+    "zod": "4.4.3"
   }
 }

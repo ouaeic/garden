@@ -58,8 +58,10 @@ one that costs least to run:
    seconds. It is here because the suite spent two separate waves red at 71 of 73 fixtures with
    `pnpm check` green beside it, the second time after the first had been written down in
    `evals/harness.ts` as a comment nobody re-read.
-6. `pnpm eval:rigs` — the six rigs that hold a committed baseline: context quality, prompt
-   injection, the arm comparison, approval cards, edit-format conformance, and read cost. They are
+6. `pnpm eval:rigs` — context quality, prompt injection, the arm comparison, approval cards,
+   edit-format conformance, read cost, and independent outcome calibration. The outcome rig
+   checks incorrect-result controls and durable form submission recovery; it does not measure
+   model quality or spend provider credits. They are
    offline, need no key, and finish in about fourteen seconds between them. They are here rather than
    nightly because each one answers "did this change cross a floor", and a floor that quietly stops
    firing is not a drift to argue with in the morning — the cards rig in particular pins that reading
