@@ -1,4 +1,5 @@
 import { performance } from 'node:perf_hooks';
+import { MAX_STREAM_LINE_CHARS, streamLimits } from './stream-limits.js';
 import { duplicatedWebCapabilities, serverToolUseFrom, webCitationsFrom } from '@athanor/contracts';
 import { AthanorError } from '@athanor/core';
 import type {
@@ -196,44 +197,6 @@ interface StreamedBody extends CompletionBody {
  * this the reply is not a completion, and holding more of it only spends the worker's memory.
  */
 const MAX_UNSTREAMED_RECOVERY_CHARS = 1_000_000;
-
-/**
- * The longest a single un-terminated SSE line may grow before the reply stops being a stream.
- *
- * The line buffer had no bound at all, and it is the one place in this file where a provider
- * chooses how much of this box's memory to spend: bytes that never form a line are never consumed,
- * never counted, and never released. A megabyte is far past the longest frame this product
- * produces - a `file_write` carrying a whole file inside a tool call's arguments - and far short of
- * anything that threatens the worker.
- */
-const MAX_STREAM_LINE_CHARS = 1_000_000;
-
-/**
- * How much more raw stream than generated answer is allowed before the stream is called a runaway.
- *
- * A route that frames one token per event spends about fifty characters of envelope on four
- * characters of content, so the raw reply is legitimately an order of magnitude larger than the
- * answer inside it. Sixteen leaves that whole range alone and still bounds a producer that is
- * sending keep-alives, comments or repeated `[DONE]` markers and no answer at all - the shape the
- * generated-character ceiling cannot see, because nothing it counts is arriving.
- *
- * **Measured, and the fifty is wrong.** Fifty characters is the frame this repository's own eval
- * harness writes - `{"choices":[{"delta":{"content":"abcd"}}]}` and nothing else - and it is the
- * only frame shape anywhere in the tree, which is why every test and all 52 eval fixtures pass with
- * room to spare (308 streams measured through this function: aggregate raw/generated 1.11, worst
- * single stream 10.1). A provider's own chunk carries `id`, `object`, `created`, `model`,
- * `system_fingerprint`, `index`, `logprobs` and `finish_reason` beside the token: 276 characters on
- * a vLLM/OpenAI chunk and 295 on an OpenRouter one, for the same four characters of content. That
- * is a ratio of 69 to 74, not 12.5.
- *
- * Driven through this function with a real OpenRouter-shaped chunk, one token per event, the raw
- * ceiling cuts the answer at **21.7%** of the character ceiling the request asked for and labels it
- * `overrun` - the same label a genuine runaway gets, after which `worthContinuing` may ask the
- * model to write the whole thing again. It is left at sixteen here rather than raised in passing:
- * the number bounds a real failure mode and moving it is a decision about how much of the owner's
- * money a silent producer may spend, not a typo. See `wave4/4E.md`.
- */
-const STREAM_ENVELOPE_ALLOWANCE = 16;
 
 /**
  * The tags an unparsed reasoning route writes its deliberation between, inside `content`.
@@ -1552,9 +1515,11 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
     >();
     let buffer = '';
     let frames = 0;
-    // Raw decoded characters, envelopes and keep-alives included, against their own ceiling.
-    let rawChars = 0;
-    const rawCeiling = budget.maxChars() * STREAM_ENVELOPE_ALLOWANCE;
+    const limits = streamLimits(budget.maxChars());
+    let terminal = false;
+    let retainedMetadata = 0;
+    let eventData: string[] = [];
+    let eventChars = 0;
     // Held back only until the first frame parses, and only to a bound. A route that honoured
     // `stream: true` never reads this; a route that ignored it wrote its whole answer in here.
     let unstreamed = '';
@@ -1582,10 +1547,16 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
     const consume = async (line: string): Promise<void> => {
       if (!line.startsWith('data:')) return;
       const payload = line.slice(5).trim();
-      if (!payload || payload === '[DONE]') return;
+      if (payload === '[DONE]') {
+        terminal = true;
+        return;
+      }
+      if (!payload) return;
       let chunk: StreamChunk;
       try {
-        chunk = JSON.parse(payload) as StreamChunk;
+        const parsed: unknown = JSON.parse(payload);
+        if (!isRecord(parsed)) return;
+        chunk = parsed as StreamChunk;
       } catch {
         return;
       }
@@ -1651,9 +1622,19 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
         // a route that loops inside its own reasoning produces no content at all to measure.
         if (budget.produced(reasoningDelta.length)) cutoff ??= 'overrun';
       }
-      if (delta?.reasoning_details?.length) reasoningDetails.push(...delta.reasoning_details);
-      if (delta?.annotations?.length) annotations.push(...delta.annotations);
-      if (choice?.message?.annotations?.length) annotations.push(...choice.message.annotations);
+      for (const [items, destination] of [
+        [delta?.reasoning_details, reasoningDetails],
+        [delta?.annotations, annotations],
+        [choice?.message?.annotations, annotations]
+      ] as const) {
+        if (!Array.isArray(items) || !items.length) continue;
+        if (limits.metadata(JSON.stringify(items).length)) {
+          cutoff ??= 'framing';
+          break;
+        }
+        for (const item of items) destination.push(item);
+        retainedMetadata += items.length;
+      }
       for (const fragment of delta?.tool_calls ?? []) {
         const index = fragment.index ?? toolCalls.size;
         const current = toolCalls.get(index) ?? {
@@ -1673,6 +1654,31 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
         if (generated && budget.produced(generated)) cutoff ??= 'overrun';
       }
     };
+    const consumeLine = async (line: string): Promise<void> => {
+      if (line.startsWith('data:') || line === 'data') {
+        eventChars += line.length + 1;
+        if (eventChars > MAX_STREAM_LINE_CHARS) {
+          cutoff ??= 'framing';
+          return;
+        }
+        eventData.push(line.slice(5).replace(/^ /, ''));
+        return;
+      }
+      if (line === '' && eventData.length) {
+        const before = budget.characters(),
+          metadataBefore = retainedMetadata;
+        await consume(`data:${eventData.join('\n')}`);
+        if (
+          limits.line(
+            eventChars + 1,
+            budget.characters() > before || retainedMetadata > metadataBefore
+          )
+        )
+          cutoff ??= 'framing';
+        eventData = [];
+        eventChars = 0;
+      } else if (limits.line(line.length + 1, false)) cutoff ??= 'framing';
+    };
     try {
       for (;;) {
         const step = await this.#readWithin(reader, budget.remainingMs(), streamIdleTimeoutMs);
@@ -1682,39 +1688,29 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
         }
         const { done, value } = step.read;
         const text = decoder.decode(value, { stream: !done });
-        if (frames === 0 && unstreamed.length < MAX_UNSTREAMED_RECOVERY_CHARS) unstreamed += text;
-        /*
-         * What arrived, as opposed to what parsed out of it.
-         *
-         * The character ceiling is only ever consulted from `consume`, and `consume` only runs on a
-         * complete line - so bytes that never form one are invisible to it. Measured: 4 KB of
-         * newline-free bytes per pull against a ceiling of fifty characters read 593 chunks and
-         * 2.4 MB in four hundred milliseconds without the ceiling being asked once, and at the
-         * ten-minute default the same producer accumulates gigabytes inside one worker slot. It
-         * ends as V8's maximum string length, thrown as a `RangeError`, wrapped as
-         * `provider_unavailable` - which is retryable, so the gateway does the whole thing again.
-         *
-         * Counted separately from the generated characters rather than into them: this number
-         * includes every `data:` envelope and every keep-alive, so billing an answer by it would
-         * charge two or three times what the model wrote. The allowance is generous because a route
-         * that frames one token per event genuinely sends an order of magnitude more envelope than
-         * content; what it bounds is a producer that is not sending an answer at all.
-         */
-        rawChars += text.length;
-        if (rawChars > rawCeiling) cutoff ??= 'overrun';
+        if (frames === 0 && unstreamed.length < MAX_UNSTREAMED_RECOVERY_CHARS)
+          unstreamed += text.slice(0, MAX_UNSTREAMED_RECOVERY_CHARS - unstreamed.length);
         buffer += text;
-        const lines = buffer.split(/\r?\n/);
-        buffer = lines.pop() ?? '';
-        for (const line of lines) {
-          await consume(line);
-          if (outputLimit) break;
+        // Consume one line at a time so network coalescing cannot bypass the output bound.
+        let offset = 0;
+        for (;;) {
+          const boundary = /[\r\n]/g;
+          boundary.lastIndex = offset;
+          const newline = boundary.exec(buffer)?.index ?? -1;
+          if (newline < 0 || (!done && buffer[newline] === '\r' && newline === buffer.length - 1))
+            break;
+          const length = newline - offset;
+          if (length > MAX_STREAM_LINE_CHARS) {
+            cutoff ??= 'framing';
+            break;
+          }
+          await consumeLine(buffer.slice(offset, newline));
+          offset = newline + (buffer[newline] === '\r' && buffer[newline + 1] === '\n' ? 2 : 1);
+          if (outputLimit || cutoff || terminal) break;
         }
-        // One line longer than this is not a frame of anything: the longest legitimate frame on this
-        // product carries a whole file inside a tool call's arguments, and a few hundred kilobytes
-        // covers that with room to spare. Past it the reply is a producer with no newline in it, and
-        // holding more of it only spends the worker's memory waiting for a line that is not coming.
-        if (buffer.length > MAX_STREAM_LINE_CHARS) cutoff ??= 'overrun';
-        if (done || cutoff || outputLimit) break;
+        buffer = buffer.slice(offset);
+        if (!terminal && buffer.length + eventChars > MAX_STREAM_LINE_CHARS) cutoff ??= 'framing';
+        if (done || cutoff || outputLimit || terminal) break;
         /*
          * The clock is read again here, and not only raced against the read above, because a race
          * is not a bound.
@@ -1731,10 +1727,13 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
           break;
         }
       }
-      if (!cutoff && !outputLimit && buffer.trim()) await consume(buffer);
+      if (!cutoff && !outputLimit && !terminal) {
+        if (buffer.trim()) await consumeLine(buffer);
+        if (!cutoff) await consumeLine('');
+      }
       // Every cutoff leaves the socket open and the provider still writing into it, so the read side
       // is torn down here rather than left to garbage collection.
-      if (cutoff || outputLimit) await reader.cancel().catch(() => undefined);
+      if (cutoff || outputLimit || terminal) await reader.cancel().catch(() => undefined);
     } catch (cause) {
       await reader.cancel().catch(() => undefined);
       /*

@@ -56,7 +56,7 @@ export const DEFAULT_GENERATION_MAX_CHARS = 400_000;
  * and take the whole step's billing with it, so the one generation the box stops on purpose was the
  * one generation nobody ever paid for on paper.
  */
-export type GenerationCutoff = 'stalled' | 'timeout' | 'overrun' | 'cancelled';
+export type GenerationCutoff = 'stalled' | 'timeout' | 'overrun' | 'cancelled' | 'framing';
 
 export const generationCharCeiling = (maxTokens: number | undefined): number =>
   maxTokens === undefined
@@ -164,7 +164,7 @@ export const startGenerationBudget = (options: {
  * arrived.
  */
 export const worthContinuing = (cutoff: GenerationCutoff, budget: GenerationBudget): boolean => {
-  if (cutoff === 'overrun' || cutoff === 'cancelled') return false;
+  if (cutoff === 'overrun' || cutoff === 'cancelled' || cutoff === 'framing') return false;
   const seconds = budget.elapsedMs() / 1000;
   return seconds > 0 && budget.characters() / seconds >= MIN_CONTINUABLE_CHARS_PER_SECOND;
 };
@@ -186,6 +186,8 @@ export const describeCutoff = (
     return `${provider} went quiet mid-answer after ${written}; what had arrived was kept`;
   if (cutoff === 'overrun')
     return `${provider} wrote past the output ceiling this request asked for, ${written}; the answer was cut there`;
+  if (cutoff === 'framing')
+    return `${provider} exceeded the stream framing or metadata limit after ${written}; the partial answer was kept`;
   if (cutoff === 'cancelled')
     return `the request was stopped here after ${provider} produced ${written}; what had arrived was kept`;
   return `${provider} was still writing after ${written} and the generation was cut there`;

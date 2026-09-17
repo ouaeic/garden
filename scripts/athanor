@@ -2519,15 +2519,8 @@ announce_outage() {
     printf 'garden: stopping the server now for the backup, rebuild and restart. This run is bounded to %s minutes per step and its duration is reported at the end.\n' \
       "$((athanor_update_step_seconds / 60))"
   fi
-  # What the outage actually costs, which the two lines above never said. Stopping the server stops
-  # the workspace runner, and the runner stops every command it is holding. A DECLARED SERVICE comes
-  # back: its record is in the workspace's .athanor/services.json and the runner relaunches it on
-  # the way up. An ordinary background command does not, because nothing anywhere writes it down -
-  # so a twenty-hour alignment an agent started yesterday ends here, and the agent that polls it
-  # next is told only "Background process not found", which names no cause at all. Printed on every
-  # update rather than only when something is running, because this shell cannot always tell:
-  # `runner_background_work` below is the half of the answer that can be measured.
-  printf 'garden: this stops every background command an agent left running, and they do not come back. Declared services do.\n'
+  # The independently supervised jobs survive runner restarts; in-process sessions do not.
+  printf 'garden: supervised jobs keep running. Interactive analysis and debugger sessions may stop; declared services restart.\n'
 }
 
 # What an update is about to destroy, asked of the one process on this box that knows.
