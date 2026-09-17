@@ -133,12 +133,23 @@ describe('independent project preparation', () => {
       'destination already exists'
     );
   });
-  it('refuses a changed source after a lost reply instead of activating an outdated copy', async () => {
-    const f = await fixture(),
-      manager = new ProjectWorkspaces(f.root, { ownedWriters: () => [] });
-    await manager.prepare(f.sourceWorkspaceId, f.input);
-    await writeFile(path.join(f.source, 'workspace/project-b/main.py'), 'changed source');
-    await expect(manager.prepare(f.sourceWorkspaceId, f.input)).rejects.toThrow('source changed');
+  it('replays a committed snapshot after source edits and a runner restart without overwriting either side', async () => {
+    const f = await fixture();
+    const manager = new ProjectWorkspaces(f.root, { ownedWriters: () => [] });
+    const receipt = await manager.prepare(f.sourceWorkspaceId, f.input);
+    const targetFile = path.join(f.root, f.workspaceId, 'workspace/project-b/main.py');
+    await writeFile(path.join(f.source, 'workspace/project-b/main.py'), 'later owner source edit');
+    await writeFile(targetFile, 'later independent edit');
+    const writers = vi.fn(() => [{ id: 'later-analysis', kind: 'job' }]);
+    const restarted = new ProjectWorkspaces(f.root, { ownedWriters: writers });
+    expect(await restarted.prepare(f.sourceWorkspaceId, f.input)).toEqual(receipt);
+    expect(writers).not.toHaveBeenCalled();
+    expect(await readFile(targetFile, 'utf8')).toBe('later independent edit');
+    expect(await readFile(path.join(f.source, 'workspace/project-b/main.py'), 'utf8')).toBe(
+      'later owner source edit'
+    );
+    await rm(path.join(f.source, 'workspace/project-b'), { recursive: true });
+    expect(await restarted.prepare(f.sourceWorkspaceId, f.input)).toEqual(receipt);
   });
   it('observes cancellation before publication and removes only matching marked staging roots', async () => {
     const f = await fixture(),

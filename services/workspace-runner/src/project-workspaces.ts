@@ -235,6 +235,24 @@ export class ProjectWorkspaces {
     const requestHash = digest({ sourceWorkspaceId, ...input });
     const source = workspacePath(this.root, sourceWorkspaceId),
       target = workspacePath(this.root, input.workspaceId);
+    const marker = path.join(target, '.athanor', 'project-source.json');
+    try {
+      const prior = JSON.parse(await readFile(marker, 'utf8')) as ProjectWorkspaceReceipt;
+      if (
+        prior.requestHash !== requestHash ||
+        prior.workspaceId !== input.workspaceId ||
+        prior.taskId !== input.taskId ||
+        prior.sourceWorkspaceId !== sourceWorkspaceId ||
+        prior.status !== 'ready'
+      )
+        throw Error('Project preparation identity changed');
+      // An atomically published receipt identifies an already independent snapshot. Re-reading
+      // its source would make a lost acknowledgement depend on later edits in another workspace.
+      this.#assertActive(sourceWorkspaceId, input.workspaceId);
+      return prior;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
     const handles = await this.dependencies.ownedWriters(sourceWorkspaceId, input.taskId);
     if (handles.length)
       return {
@@ -249,46 +267,6 @@ export class ProjectWorkspaces {
         status: 'shared',
         handles
       };
-    const marker = path.join(target, '.athanor', 'project-source.json');
-    try {
-      const prior = JSON.parse(await readFile(marker, 'utf8')) as ProjectWorkspaceReceipt;
-      if (
-        prior.requestHash !== requestHash ||
-        prior.workspaceId !== input.workspaceId ||
-        prior.taskId !== input.taskId
-      )
-        throw Error('Project preparation identity changed');
-      const replayDeadline = Date.now() + 60_000;
-      for (const [relative, fact] of Object.entries(prior.files)) {
-        const opened = await openDownloadFile(source, relative);
-        try {
-          const hash = createHash('sha256');
-          for await (const chunk of opened.handle.createReadStream({ autoClose: false })) {
-            this.#assertActive(sourceWorkspaceId, input.workspaceId);
-            if (Date.now() > replayDeadline) throw Error('Project receipt validation timed out');
-            hash.update(chunk as Buffer);
-          }
-          if (opened.stat.size !== fact.bytes || hash.digest('hex') !== fact.sha256)
-            throw Error('Project source changed after preparation');
-        } finally {
-          await opened.handle.close();
-        }
-      }
-      for (const [relative, fact] of Object.entries(prior.directories ?? {})) {
-        const now = await lstat(resolveInside(source, relative));
-        if (
-          now.ino !== fact.ino ||
-          now.dev !== fact.dev ||
-          now.mtimeMs !== fact.mtimeMs ||
-          now.ctimeMs !== fact.ctimeMs
-        )
-          throw Error('Project source directory changed after preparation');
-      }
-      this.#assertActive(sourceWorkspaceId, input.workspaceId);
-      return prior;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-    }
     // Never replace an existing execution root, even when a previous reply was lost.
     try {
       await lstat(target);
