@@ -5,19 +5,17 @@ import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&url';
 import { Button, Field } from '../ui.js';
 import { message } from './format.js';
 import { PdfPage } from './PdfPage.js';
+import { pdfGeometry } from './pdf-geometry.js';
 import './pdf-preview.css';
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 const assetBase = '/pdfjs/';
-const PAGE_GAP = 8;
-/** Pages rendered ahead of and behind the viewport while scrolling. */
-const OVERSCAN_PAGES = 2;
-/** A page is released again once it sits this far outside the viewport. */
-const RELEASE_PAGES = 4;
+/** Viewport lengths rendered ahead of and behind the visible pages. */
+const OVERSCAN_VIEWPORTS = 2;
 
 export default function PdfPreview({ url, name }: { url: string; name: string }) {
   const scroller = useRef<HTMLDivElement>(null);
-  const pageRefs = useRef(new Map<number, HTMLDivElement>());
+  const scrollPosition = useRef(0);
   const [documentProxy, setDocument] = useState<PDFDocumentProxy | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [pageSizes, setPageSizes] = useState<Array<{ width: number; height: number }> | null>(null);
@@ -29,17 +27,25 @@ export default function PdfPreview({ url, name }: { url: string; name: string })
     reason: number;
     submit: (password: string) => void;
   } | null>(null);
-  const [rendered, setRendered] = useState<Set<number>>(() => new Set());
-  const pages = useMemo(
-    () => Array.from({ length: pageCount }, (_, index) => index + 1),
-    [pageCount]
+  const [rendered, setRendered] = useState({ first: 0, last: 0 });
+  const geometry = useMemo(
+    () => pdfGeometry(pageSizes ?? [], width, zoom),
+    [pageSizes, width, zoom]
+  );
+  const previousGeometry = useRef<{ url: string; geometry: typeof geometry } | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const first = Math.min(rendered.first, Math.max(0, pageCount - 1));
+  const last = Math.min(rendered.last, Math.max(0, pageCount - 1));
+  const pages = Array.from(
+    { length: pageCount ? last - first + 1 : 0 },
+    (_, index) => first + index + 1
   );
 
   useEffect(() => {
     setDocument(null);
     setPageCount(0);
     setPageSizes(null);
-    setRendered(new Set());
+    setRendered({ first: 0, last: 0 });
     setCurrentPage(1);
     setPassword('');
     setError('');
@@ -102,109 +108,83 @@ export default function PdfPreview({ url, name }: { url: string; name: string })
     return () => observer.disconnect();
   }, []);
 
-  // Renders and releases pages as the viewport moves. The whole set is re-derived from one
-  // intersection pass, so the cost is a map scan per scroll frame - no per-page observers to
-  // churn when the document is long.
+  // Preserve the same point on the same page when its scale or measured geometry changes.
   useLayoutEffect(() => {
     const element = scroller.current;
-    if (!element || !documentProxy || !pageSizes) return;
+    if (!element) return;
+    const previous = previousGeometry.current;
+    if (!previous || previous.url !== url) element.scrollTo({ top: 0, left: 0 });
+    else if (previous.geometry.count && geometry.count) {
+      const index = Math.min(previous.geometry.pageAt(scrollPosition.current), geometry.count - 1);
+      const fraction = Math.max(
+        0,
+        Math.min(
+          1,
+          (scrollPosition.current - previous.geometry.offsets[index]!) /
+            previous.geometry.heights[index]!
+        )
+      );
+      element.scrollTop = geometry.offsets[index]! + fraction * geometry.heights[index]!;
+    }
+    scrollPosition.current = element.scrollTop;
+    previousGeometry.current = { url, geometry };
+  }, [url, geometry]);
+
+  useLayoutEffect(() => {
+    const element = scroller.current;
+    if (!element || !documentProxy || !geometry.count) return;
     let frame = 0;
     const pass = () => {
-      const bounds = element.getBoundingClientRect();
-      const viewTop = element.scrollTop - bounds.height * OVERSCAN_PAGES;
-      const viewBottom = element.scrollTop + bounds.height * (OVERSCAN_PAGES + 1);
-      let offsets = 0;
-      const next = new Set<number>();
-      const release = new Set<number>();
-      for (let number = 1; number <= pageCount; number += 1) {
-        const size = pageSizes[number - 1];
-        const cssScale = Math.max(0.1, width / (size?.width ?? width)) * zoom;
-        const pageHeight = (size?.height ?? size?.width ?? width) * cssScale;
-        const top = offsets;
-        const bottom = offsets + pageHeight;
-        offsets = bottom + PAGE_GAP;
-        if (bottom >= viewTop && top <= viewBottom) next.add(number);
-        else if (
-          bottom < viewTop - pageHeight * RELEASE_PAGES ||
-          top > viewBottom + pageHeight * RELEASE_PAGES
-        )
-          release.add(number);
-      }
-      setRendered((current) => {
-        const changed = [...next].some((number) => !current.has(number));
-        if (!changed && current.size === next.size) return current;
-        const merged = new Set(current);
-        for (const number of next) merged.add(number);
-        for (const number of merged)
-          if (!next.has(number) && release.has(number)) merged.delete(number);
-        return merged;
-      });
+      scrollPosition.current = element.scrollTop;
+      const height = element.clientHeight;
+      const first = geometry.pageAt(element.scrollTop - height * OVERSCAN_VIEWPORTS);
+      const last = geometry.pageAt(element.scrollTop + height * (OVERSCAN_VIEWPORTS + 1));
+      setRendered((old) => (old.first === first && old.last === last ? old : { first, last }));
+      setCurrentPage(geometry.pageAt(element.scrollTop + height / 2) + 1);
     };
     const schedule = () => {
+      scrollPosition.current = element.scrollTop;
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(pass);
     };
-    schedule();
+    pass();
+    const observer = new ResizeObserver(schedule);
+    observer.observe(element);
     element.addEventListener('scroll', schedule, { passive: true });
     return () => {
       cancelAnimationFrame(frame);
+      observer.disconnect();
       element.removeEventListener('scroll', schedule);
     };
-  }, [documentProxy, pageSizes, pageCount, width, zoom]);
+  }, [documentProxy, geometry]);
 
-  // Jump-to-page on scroll position, so the toolbar's page field tracks where the reader is.
-  useEffect(() => {
-    const element = scroller.current;
-    if (!element || !pageSizes) return;
-    const onScroll = () => {
-      const bounds = element.getBoundingClientRect();
-      const middle = element.scrollTop + bounds.height / 2;
-      let offsets = 0;
-      for (let number = 1; number <= pageCount; number += 1) {
-        const size = pageSizes[number - 1];
-        const cssScale = Math.max(0.1, width / (size?.width ?? width)) * zoom;
-        const pageHeight = (size?.height ?? size?.width ?? width) * cssScale;
-        if (middle >= offsets && middle < offsets + pageHeight) {
-          setCurrentPage(number);
-          return;
-        }
-        offsets += pageHeight + PAGE_GAP;
-      }
-    };
-    element.addEventListener('scroll', onScroll, { passive: true });
-    return () => element.removeEventListener('scroll', onScroll);
-  }, [pageSizes, pageCount, width, zoom]);
-
-  const [currentPage, setCurrentPage] = useState(1);
   const scrollToPage = (value: number) => {
     const element = scroller.current;
-    if (!element || !pageSizes) return;
-    let offsets = 0;
-    for (let number = 1; number < value; number += 1) {
-      const size = pageSizes[number - 1];
-      const cssScale = Math.max(0.1, width / (size?.width ?? width)) * zoom;
-      offsets += (size?.height ?? size?.width ?? width) * cssScale + PAGE_GAP;
-    }
+    if (!element || !geometry.count) return;
     setCurrentPage(value);
-    element.scrollTo({ top: offsets });
+    element.scrollTo({ top: geometry.offsets[value - 1]! });
+    scrollPosition.current = element.scrollTop;
   };
 
   return (
     <section className="pdf-viewer" aria-label={`${name} document`}>
       <div className="pdf-toolbar">
-        <Field label="Page">
-          <input
-            type="number"
-            min={1}
-            max={pageCount || 1}
-            value={currentPage}
-            onChange={(event) => {
-              const value = Number(event.target.value);
-              if (Number.isInteger(value) && value >= 1 && value <= pageCount) scrollToPage(value);
-            }}
-          />
-        </Field>
-        <span>of {pageCount || '…'}</span>
+        <div className="pdf-page-control">
+          <Field label="Page">
+            <input
+              type="number"
+              min={1}
+              max={pageCount || 1}
+              value={currentPage}
+              onChange={(event) => {
+                const value = Number(event.target.value);
+                if (Number.isInteger(value) && value >= 1 && value <= pageCount)
+                  scrollToPage(value);
+              }}
+            />
+          </Field>
+          <span>of {pageCount || '…'}</span>
+        </div>
         <Field label="Zoom">
           <select
             aria-label="Zoom"
@@ -217,24 +197,29 @@ export default function PdfPreview({ url, name }: { url: string; name: string })
             <option value={3}>300%</option>
           </select>
         </Field>
-        <Button
-          disabled={currentPage <= 1}
-          onClick={() => scrollToPage(Math.max(1, currentPage - 1))}
-        >
-          Previous page
-        </Button>
-        <Button
-          disabled={!pageCount || currentPage >= pageCount}
-          onClick={() => scrollToPage(Math.min(pageCount, currentPage + 1))}
-        >
-          Next page
-        </Button>
+        <div className="pdf-navigation">
+          <Button
+            aria-label="Previous page"
+            disabled={currentPage <= 1}
+            onClick={() => scrollToPage(Math.max(1, currentPage - 1))}
+          >
+            Previous
+          </Button>
+          <Button
+            aria-label="Next page"
+            disabled={!pageCount || currentPage >= pageCount}
+            onClick={() => scrollToPage(Math.min(pageCount, currentPage + 1))}
+          >
+            Next
+          </Button>
+        </div>
         <a className="button" href={url} download={name}>
           Download PDF
         </a>
       </div>
       {passwordPrompt && (
         <form
+          className="pdf-password"
           onSubmit={(event) => {
             event.preventDefault();
             passwordPrompt.submit(password);
@@ -268,6 +253,7 @@ export default function PdfPreview({ url, name }: { url: string; name: string })
         role="region"
         aria-label="Document pages"
       >
+        {pageSizes && <div aria-hidden="true" style={{ height: geometry.offsets[first] ?? 0 }} />}
         {pageSizes
           ? pages.map((number) => {
               const size = pageSizes[number - 1];
@@ -279,16 +265,12 @@ export default function PdfPreview({ url, name }: { url: string; name: string })
                   role="region"
                   aria-label={`Page ${number}`}
                   data-page={number}
-                  ref={(host) => {
-                    if (host) pageRefs.current.set(number, host);
-                    else pageRefs.current.delete(number);
-                  }}
                   style={{
                     width: (size?.width ?? width) * cssScale,
                     height: (size?.height ?? size?.width ?? width) * cssScale
                   }}
                 >
-                  {rendered.has(number) && documentProxy ? (
+                  {documentProxy ? (
                     <PdfPage
                       documentProxy={documentProxy}
                       number={number}
@@ -302,6 +284,12 @@ export default function PdfPreview({ url, name }: { url: string; name: string })
               );
             })
           : null}
+        {pageSizes && (
+          <div
+            aria-hidden="true"
+            style={{ height: Math.max(0, geometry.total - (geometry.offsets[last + 1] ?? 0)) }}
+          />
+        )}
       </div>
     </section>
   );

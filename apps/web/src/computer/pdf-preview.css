@@ -11,15 +11,43 @@
   flex-wrap: wrap;
   gap: 8px;
 }
-.pdf-toolbar .field {
-  min-width: 0;
+.pdf-toolbar > .field {
+  flex: 0 0 8rem;
 }
-.pdf-toolbar input {
-  width: 5rem;
+.pdf-page-control {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.pdf-page-control .field {
+  flex: 0 0 auto;
+}
+.pdf-page-control .field input {
+  width: 6rem;
+}
+.pdf-page-control > span {
+  padding-bottom: 11px;
+  white-space: nowrap;
+}
+.pdf-navigation {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+.pdf-password {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+.pdf-password .field {
+  flex: 1 1 15rem;
 }
 .pdf-page-scroll {
   min-width: 0;
   overflow: auto;
+  overflow-anchor: none;
   width: 100%;
   height: min(75dvh, 900px);
   background: #d5d4ce;

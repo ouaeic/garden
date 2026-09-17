@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { before as beforeAll, after as afterAll, test } from 'node:test';
 import { createServer } from 'node:http';
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -18,17 +18,24 @@ const requireRunner = createRequire(
 const { chromium } = requireRunner('playwright-core');
 let server, origin, directory;
 const requests = [];
-function pdf() {
-  const streams = [
-    '0 0 1 rg 20 20 90 90 re f BT /F1 20 Tf 20 170 Td (First garden page) Tj ET',
-    '1 0 0 rg 20 20 90 90 re f BT /F1 20 Tf 20 170 Td (Second garden page) Tj ET'
-  ];
+const delayedResponses = new Set();
+let abortedDocuments = 0;
+const report = process.env.GARDEN_PDF_REPORT;
+function pdf(count = 2) {
+  const streams = Array.from(
+    { length: count },
+    (_, index) =>
+      `${index % 2 ? '1 0 0' : '0 0 1'} rg 20 20 90 90 re f BT /F1 20 Tf 20 170 Td (${count === 2 ? (index ? 'Second garden page' : 'First garden page') : `Garden page ${index + 1}`}) Tj ET`
+  );
+  const fontId = count + 3,
+    streamStart = fontId + 1,
+    scriptId = streamStart + count;
   const objects = [
-    '<< /Type /Catalog /Pages 2 0 R /OpenAction 8 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
+    `<< /Type /Catalog /Pages 2 0 R /OpenAction ${scriptId} 0 R >>`,
+    `<< /Type /Pages /Kids [${streams.map((_, index) => `${index + 3} 0 R`).join(' ')}] /Count ${count} >>`,
     ...streams.map(
       (_, index) =>
-        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Resources << /Font << /F1 5 0 R >> >> /Contents ${index + 6} 0 R >>`
+        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${count > 2 && index % 2 ? 200 : 300} ${count > 2 && index % 2 ? 300 : 200}] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${index + streamStart} 0 R >>`
     ),
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
     ...streams.map((stream) => `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`),
@@ -62,7 +69,7 @@ beforeAll(async () => {
         resolveId: (id) => (id === 'virtual:pdf-proof' ? '\0pdf-proof.js' : null),
         load: (id) =>
           id === '\0pdf-proof.js'
-            ? `import React from 'react';import {createRoot} from 'react-dom/client';import PdfPreview from ${JSON.stringify(path.resolve(import.meta.dirname, '../apps/web/src/computer/PdfPreview.tsx'))};const root=createRoot(document.getElementById('root'));root.render(React.createElement(PdfPreview,{url:'/fixture.pdf',name:'Garden proof'}));window.closePdf=()=>root.unmount();`
+            ? `import ${JSON.stringify(path.resolve(import.meta.dirname, '../apps/web/src/styles.css'))};import React from 'react';import {createRoot} from 'react-dom/client';import PdfPreview from ${JSON.stringify(path.resolve(import.meta.dirname, '../apps/web/src/computer/PdfPreview.tsx'))};const root=createRoot(document.getElementById('root'));root.render(React.createElement(PdfPreview,{url:'/fixture.pdf',name:'Garden proof'}));window.closePdf=()=>root.unmount();window.showPdf=(url,name='Garden proof')=>root.render(React.createElement(PdfPreview,{url,name}));`
             : null
       }
     ],
@@ -91,10 +98,23 @@ beforeAll(async () => {
       );
       return;
     }
-    if (url === '/fixture.pdf') {
+    if (url === '/fixture.pdf' || url === '/long.pdf') {
       res.setHeader('content-type', 'application/pdf');
       res.setHeader('content-security-policy', "sandbox; default-src 'none'");
-      res.end(pdf());
+      res.end(pdf(url === '/long.pdf' ? 240 : 2));
+      return;
+    }
+    if (url === '/password.pdf') {
+      res.setHeader('content-type', 'application/pdf');
+      res.end(await readFile(new URL('./fixtures/pdf/password.pdf', import.meta.url)));
+      return;
+    }
+    if (url === '/delayed.pdf') {
+      delayedResponses.add(res);
+      res.on('close', () => {
+        if (!res.writableEnded) abortedDocuments += 1;
+        delayedResponses.delete(res);
+      });
       return;
     }
     if (url.includes('..') || !url.startsWith('/')) {
@@ -123,6 +143,7 @@ beforeAll(async () => {
   origin = `http://127.0.0.1:${address.port}`;
 });
 afterAll(async () => {
+  for (const response of delayedResponses) response.destroy();
   await new Promise((resolve) => server?.close(() => resolve()));
   if (directory) await rm(directory, { recursive: true, force: true });
 });
@@ -202,4 +223,148 @@ test(
     }
   },
   30_000
+);
+
+test(
+  'keeps the reading location across zoom and resize while bounding mixed-page rendering',
+  { timeout: 30_000 },
+  async () => {
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
+      page.setDefaultTimeout(5000);
+      const errors = [];
+      page.on('pageerror', (error) => errors.push(error.message));
+      await page.goto(origin);
+      await page.evaluate(() => window.showPdf('/long.pdf'));
+      await page.getByText('Garden page 1', { exact: true }).waitFor({ state: 'attached' });
+      await page.getByRole('spinbutton', { name: 'Page', exact: true }).fill('120');
+      await page.getByText('Garden page 120', { exact: true }).waitFor({ state: 'attached' });
+      await page.waitForFunction(() => !document.querySelector('[role="status"]'));
+      const top = () =>
+        page
+          .locator('[data-page="120"]')
+          .evaluate(
+            (element) =>
+              element.getBoundingClientRect().top -
+              document.querySelector('.pdf-page-scroll').getBoundingClientRect().top
+          );
+      const before = await top();
+      await page.getByLabel('Zoom', { exact: true }).selectOption('2');
+      await page.waitForFunction(() => {
+        const scroller = document.querySelector('.pdf-page-scroll');
+        const canvas = document.querySelector('[data-page="120"] canvas');
+        return (
+          canvas &&
+          Math.abs(canvas.getBoundingClientRect().width - scroller.clientWidth * 2) < 2 &&
+          !document.querySelector('[role="status"]')
+        );
+      });
+      assert.ok(
+        Math.abs((await top()) - before) < 3,
+        'zoom must keep the selected page at the same reading position'
+      );
+      assert.ok(
+        (await page.locator('[data-page]').count()) < 25,
+        'offscreen page wrappers must be virtualized'
+      );
+      assert.ok((await page.locator('canvas').count()) < 25);
+      await page.setViewportSize({ width: 360, height: 640 });
+      await page.getByLabel('Zoom', { exact: true }).selectOption('1');
+      await page.waitForFunction(() => {
+        const scroller = document.querySelector('.pdf-page-scroll');
+        const canvas = document.querySelector('[data-page="120"] canvas');
+        return (
+          canvas &&
+          Math.abs(canvas.getBoundingClientRect().width - scroller.clientWidth) < 2 &&
+          !document.querySelector('[role="status"]')
+        );
+      });
+      const resizedTop = await top();
+      assert.ok(
+        Math.abs(resizedTop) < 3,
+        `resize must preserve the page anchor; observed ${resizedTop}, before ${before}`
+      );
+      assert.match(await page.locator('[data-page="120"]').ariaSnapshot(), /Garden page 120/);
+      const controlSizes = await page.evaluate(() => ({
+        page: document.querySelector('.pdf-toolbar input').getBoundingClientRect().width,
+        zoom: document.querySelector('.pdf-toolbar select').getBoundingClientRect().width,
+        document: document.documentElement.scrollWidth,
+        viewport: window.innerWidth
+      }));
+      assert.ok(
+        controlSizes.page >= 85 && controlSizes.zoom >= 110,
+        'page and zoom values must remain readable'
+      );
+      assert.ok(
+        controlSizes.document <= controlSizes.viewport,
+        'document controls must wrap at phone widths'
+      );
+      if (report) {
+        await mkdir(report, { recursive: true });
+        await page.screenshot({ path: path.join(report, 'pdf-phone.png'), fullPage: true });
+      }
+      await page.evaluate(() => window.showPdf('/fixture.pdf', 'Replacement'));
+      await page.getByText('First garden page', { exact: true }).waitFor({ state: 'attached' });
+      assert.equal(
+        await page.locator('.pdf-page-scroll').evaluate((element) => element.scrollTop),
+        0
+      );
+      assert.equal(await page.getByText('Garden page 120', { exact: true }).count(), 0);
+      assert.deepEqual(errors, []);
+    } finally {
+      await browser.close();
+    }
+  }
+);
+
+test(
+  'unlocks one fetched document and cancels pending documents when replaced',
+  { timeout: 30_000 },
+  async () => {
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const page = await browser.newPage();
+      page.setDefaultTimeout(5_000);
+      const errors = [];
+      page.on('pageerror', (error) => errors.push(error.message));
+      await page.goto(origin);
+      const before = requests.filter((request) => request.path === '/password.pdf').length;
+      await page.evaluate(() => window.showPdf('/password.pdf', 'Private document'));
+      await page.getByLabel('PDF password', { exact: true }).fill('wrong');
+      await page.getByRole('button', { name: 'Open document' }).click();
+      await page.getByLabel('Incorrect password. Try again', { exact: true }).fill('garden-test');
+      await page.getByRole('button', { name: 'Open document' }).click();
+      await page.getByText('Unlocked garden page', { exact: true }).waitFor({ state: 'attached' });
+      assert.equal(
+        requests.filter((request) => request.path === '/password.pdf').length - before,
+        1
+      );
+      assert.equal(await page.locator('input[type="password"]').count(), 0);
+
+      await page.evaluate(() => window.showPdf('/fixture.pdf'));
+      await page.getByText('First garden page', { exact: true }).waitFor({ state: 'attached' });
+      await page.evaluate(() => window.showPdf('/password.pdf'));
+      await page.getByLabel('PDF password', { exact: true }).waitFor();
+      await page.evaluate(() => window.showPdf('/fixture.pdf'));
+      await page.getByText('First garden page', { exact: true }).waitFor({ state: 'attached' });
+      assert.equal(await page.locator('input[type="password"]').count(), 0);
+
+      const abortsBefore = abortedDocuments;
+      const pending = page.waitForRequest(
+        (request) => new URL(request.url()).pathname === '/delayed.pdf'
+      );
+      await page.evaluate(() => window.showPdf('/delayed.pdf'));
+      const request = await pending;
+      const failed = page.waitForEvent('requestfailed', (value) => value === request);
+      await page.evaluate(() => window.showPdf('/fixture.pdf'));
+      await failed;
+      await page.getByText('First garden page', { exact: true }).waitFor({ state: 'attached' });
+      assert.equal(abortedDocuments, abortsBefore + 1);
+      assert.equal(await page.getByText('Unlocked garden page', { exact: true }).count(), 0);
+      assert.deepEqual(errors, []);
+    } finally {
+      await browser.close();
+    }
+  }
 );
