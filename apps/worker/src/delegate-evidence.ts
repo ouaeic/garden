@@ -1,4 +1,4 @@
-import type { ParallelWebReadResult } from '@athanor/contracts';
+import type { ModelRelease, ParallelWebReadResult } from '@athanor/contracts';
 import type { TaskRecord } from '@athanor/data';
 import type { AgentState } from './agent-state.js';
 import {
@@ -11,9 +11,64 @@ import type { ToolContext } from './tool-dispatch.js';
 import {
   CLAIM_REVIEW_SOURCES,
   CLAIM_REVIEW_SOURCE_CHARS,
+  reviewClaims,
   type ClaimReview,
   type ClaimSource
 } from './claim-review.js';
+import { untrustedOriginOfResult } from './provenance.js';
+
+export async function assessEvidenceReport(
+  context: ToolContext,
+  model: ModelRelease,
+  report: DelegateReport | null,
+  destinations: DestinationContext,
+  state: AgentState,
+  reachedAddresses: readonly string[],
+  remainingCredits: number,
+  requestId: string,
+  question: string
+) {
+  const evidence = report?.evidence.length
+    ? await verifyDelegateEvidence(
+        context,
+        context.task,
+        report.evidence,
+        destinations,
+        state,
+        reachedAddresses
+      )
+    : { checks: [], sources: [] };
+  const untrustedSources = new Set<string>();
+  for (const source of evidence.sources) {
+    const origin = untrustedOriginOfResult(
+      {
+        id: 'citation-reread',
+        name: /^https?:\/\//i.test(source.source) ? 'parallel_web_read' : 'file_read',
+        arguments: { path: source.source }
+      },
+      { sources: [{ url: source.source }] }
+    );
+    if (origin) untrustedSources.add(origin);
+  }
+  const claimReview =
+    evidence.sources.length && report
+      ? await reviewClaims(
+          context,
+          model,
+          evidence.sources,
+          report.answer,
+          remainingCredits,
+          requestId,
+          question
+        )
+      : undefined;
+  return {
+    evidenceChecks: evidence.checks,
+    claimReview,
+    unverified: unverifiedNotice(report, evidence.checks, claimReview),
+    untrustedSources: [...untrustedSources]
+  };
+}
 
 /** Citation addresses remain subject to the same egress floor as the specialist's own reads. */
 export async function verifyDelegateEvidence(

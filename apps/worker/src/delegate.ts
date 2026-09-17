@@ -1,12 +1,17 @@
 import type { ModelRelease, SubagentLane, WebToolPlan } from '@athanor/contracts';
 import { AthanorError, sha256 } from '@athanor/core';
 import type { TaskRecord } from '@athanor/data';
-import { type ModelMessage, type ModelToolCall } from '@athanor/model-gateway';
+import {
+  interruptedResponseOf,
+  type ModelMessage,
+  type ModelToolCall
+} from '@athanor/model-gateway';
 import { type AgentState } from './agent-state.js';
 import { delegateBudget, estimatedInferenceCostUsd, usageCredit } from './billing.js';
 import type { DelegateEvidenceCheck } from './completion.js';
-import { verifyDelegateEvidence, unverifiedNotice } from './delegate-evidence.js';
-import { reviewClaims, type ClaimReview } from './claim-review.js';
+import { assessEvidenceReport, unverifiedNotice } from './delegate-evidence.js';
+import type { ClaimReview } from './claim-review.js';
+import { DirectClaims } from './claim-input.js';
 import { originsFromResult, providerWebProvenance, untrustedOriginOfResult } from './provenance.js';
 import { routeTo } from './routing.js';
 import { resolveTaskPurposeModel } from './purpose-model.js';
@@ -59,17 +64,20 @@ const leadContext = (context: string, taint: AgentState['taint']): string => {
   );
 };
 
+type MissionProgress = { credits: number; steps: number; model?: string };
+
 async function runDelegatedMission(
   context: ToolContext,
   task: TaskRecord,
   key: Uint8Array,
-  mission: { name: string; instruction: string; context?: string },
+  mission: { name: string; instruction: string; context?: string; claims?: DirectClaims },
   parentCallId: string,
   missionIndex: number,
   missionCount = 1,
   webPlan: WebToolPlan,
   destinations: DestinationContext,
-  state: AgentState
+  state: AgentState,
+  progress: MissionProgress
 ): Promise<{
   name: string;
   model: string;
@@ -102,6 +110,67 @@ async function runDelegatedMission(
   };
   const catalog = (await context.store.listModels()) as unknown as ModelRelease[];
   const model = await resolveTaskPurposeModel(context, task, 'specialist', catalog);
+  progress.model = model.displayName;
+  const budget = delegateBudget(task.maxComputeCredits, missionCount);
+  if (mission.claims) {
+    announceLane('started', {
+      allocatedCredits: budget,
+      detail: 'Checking supplied claims against re-read sources.'
+    });
+    const report = { answer: mission.context ?? mission.instruction, evidence: mission.claims };
+    const assessed = await assessEvidenceReport(
+      context,
+      model,
+      report,
+      destinations,
+      state,
+      [],
+      Math.max(0, Math.min(budget, task.maxComputeCredits - (state.credits ?? 0))),
+      `${state.turn ?? 0}:${parentCallId}:${missionIndex}`,
+      mission.instruction
+    );
+    const review = assessed.claimReview;
+    progress.credits = review?.usageCredits ?? 0;
+    progress.steps = review?.generation ? 1 : 0;
+    const checked = assessed.evidenceChecks.filter((item) => item.reread).length;
+    announceLane(review?.status === 'reviewed' ? 'completed' : 'failed', {
+      steps: review?.generation ? 1 : 0,
+      usedCredits: review?.usageCredits ?? 0,
+      allocatedCredits: budget,
+      citations: {
+        checked,
+        matched: assessed.evidenceChecks.filter((item) => item.quoteMatched).length,
+        cited: mission.claims.length
+      },
+      ...(review?.status === 'reviewed'
+        ? {
+            claimReview: {
+              checked: review.claims.length,
+              supported: review.claims.filter((item) => item.assessment === 'supported').length,
+              contradicted: review.claims.filter((item) => item.assessment === 'contradicted')
+                .length
+            }
+          }
+        : {}),
+      detail:
+        review?.status === 'reviewed'
+          ? 'Independent review of the supplied claims. See coverage and limitations.'
+          : assessed.unverified
+    });
+    return {
+      name: mission.name,
+      model: model.displayName,
+      report: JSON.stringify(report),
+      steps: review?.generation ? 1 : 0,
+      usageCredits: review?.usageCredits ?? 0,
+      schemaValid: true,
+      evidenceChecks: assessed.evidenceChecks,
+      unverified: assessed.unverified,
+      untrustedSources: assessed.untrustedSources,
+      citations: { checked, cited: mission.claims.length },
+      ...(review ? { claimReview: review } : {})
+    };
+  }
   const { gateway, provider } = await context.gateway(task, model);
   const tools = agentToolsFor('specialist');
   const timeZone = await context.store
@@ -143,7 +212,6 @@ ${clockLine(new Date(), timeZone)}
     }
   ];
   const maxTokens = Math.min(8_192, Math.max(2_048, Math.floor(model.contextTokens * 0.1)));
-  const budget = delegateBudget(task.maxComputeCredits, missionCount);
   let usageCredits = 0;
   announceLane('started', { allocatedCredits: budget });
   const untrusted = new Set<string>();
@@ -216,6 +284,7 @@ ${clockLine(new Date(), timeZone)}
       () => context.store.taskClaim(task.id),
       context.config.WORKER_ID
     );
+    let providerFailure: Error | undefined;
     const response = await withRequestDeadline((signal) =>
       gateway.chat(provider, {
         ...routeTo(model),
@@ -227,11 +296,20 @@ ${clockLine(new Date(), timeZone)}
         sessionId: window,
         signal: AbortSignal.any([signal, stopWatch.signal])
       })
-    ).finally(() => stopWatch.stop());
+    )
+      .catch((error: unknown) => {
+        const partial = interruptedResponseOf(error);
+        if (!partial || !(error instanceof Error)) throw error;
+        providerFailure = error;
+        return partial;
+      })
+      .finally(() => stopWatch.stop());
     const specialistWeb = providerWebProvenance(response).origin;
     if (specialistWeb) untrusted.add(specialistWeb);
     const credit = usageCredit(model, response.usage.inputTokens, response.usage.outputTokens);
     usageCredits += credit;
+    progress.credits = usageCredits;
+    progress.steps = step + 1;
     if (step > 0)
       announceLane('working', {
         steps: step,
@@ -262,6 +340,7 @@ ${clockLine(new Date(), timeZone)}
         : {}),
       providerRef: `${response.metadata.provider}:${response.metadata.model}`
     });
+    if (providerFailure) throw providerFailure;
     messages.push({
       role: 'assistant',
       content: response.text,
@@ -287,26 +366,25 @@ ${clockLine(new Date(), timeZone)}
       const structured = validation.report;
       const reportText = structured ? response.text : (held?.text ?? response.text);
       const schemaErrors = structured ? validation.errors : held ? heldErrors() : validation.errors;
-      const evidence = structured?.evidence.length
-        ? await verifyDelegateEvidence(
-            context,
-            task,
-            structured.evidence,
-            destinations,
-            state,
-            reachedAddresses
+      const assessed = await assessEvidenceReport(
+        context,
+        model,
+        structured,
+        destinations,
+        state,
+        reachedAddresses,
+        Math.max(
+          0,
+          Math.min(
+            budget - usageCredits,
+            task.maxComputeCredits - (state.credits ?? 0) - usageCredits
           )
-        : { checks: [], sources: [] };
-      const evidenceChecks = evidence.checks;
-      for (const source of evidence.sources) {
-        const origin = untrustedOriginOfResult(
-          {
-            id: 'citation-reread',
-            name: /^https?:\/\//i.test(source.source) ? 'parallel_web_read' : 'file_read',
-            arguments: { path: source.source }
-          },
-          { sources: [{ url: source.source }] }
-        );
+        ),
+        `${state.turn ?? 0}:${parentCallId}:${missionIndex}`,
+        mission.instruction
+      );
+      const { evidenceChecks, claimReview, unverified } = assessed;
+      for (const origin of assessed.untrustedSources) {
         const covered =
           origin?.startsWith('web page ') &&
           [...untrusted].some(
@@ -319,26 +397,8 @@ ${clockLine(new Date(), timeZone)}
           );
         if (origin && !covered) untrusted.add(origin);
       }
-      const claimReview =
-        evidence.sources.length && structured
-          ? await reviewClaims(
-              context,
-              model,
-              evidence.sources,
-              structured.answer,
-              Math.max(
-                0,
-                Math.min(
-                  budget - usageCredits,
-                  task.maxComputeCredits - (state.credits ?? 0) - usageCredits
-                )
-              ),
-              `${state.turn ?? 0}:${parentCallId}:${missionIndex}`,
-              mission.instruction
-            )
-          : undefined;
       usageCredits += claimReview?.usageCredits ?? 0;
-      const unverified = unverifiedNotice(structured, evidenceChecks, claimReview);
+      progress.credits = usageCredits;
       const checked = evidenceChecks.filter((check) => check.reread);
       announceLane(structured || held ? 'completed' : 'failed', {
         steps: step + 1,
@@ -504,14 +564,16 @@ export async function executeDelegateTool(
     ? (call.arguments.missions as Array<Record<string, unknown>>).slice(0, 3).map((mission) => ({
         name: boundedKnowledge(mission.name, 80),
         instruction: boundedKnowledge(mission.instruction, 8_000),
+        ...(mission.claims === undefined ? {} : { claims: DirectClaims.parse(mission.claims) }),
         ...(mission.context ? { context: boundedKnowledge(mission.context, 8_000) } : {})
       }))
     : [];
   if (!missions.length)
     throw new AthanorError('delegate_invalid', 'At least one mission is required');
   const reports = await Promise.all(
-    missions.map((mission, index) =>
-      runDelegatedMission(
+    missions.map((mission, index) => {
+      const progress: MissionProgress = { credits: 0, steps: 0 };
+      return runDelegatedMission(
         context,
         task,
         key,
@@ -521,7 +583,8 @@ export async function executeDelegateTool(
         missions.length,
         webPlan,
         context.destinationContext(state),
-        state
+        state,
+        progress
       ).catch(async (error: unknown) => {
         await emitSubagentLane(context.store, task, key, {
           laneId: `${call.id}:${index}`,
@@ -530,9 +593,20 @@ export async function executeDelegateTool(
           status: 'failed',
           detail: error instanceof Error ? error.message.slice(0, 240) : 'the mission threw'
         }).catch(() => undefined);
-        throw error;
-      })
-    )
+        return {
+          name: mission.name,
+          model: progress.model ?? 'Unavailable',
+          report: 'This mission did not finish. No assessment was accepted.',
+          schemaValid: false,
+          schemaErrors: [
+            error instanceof Error ? error.message.slice(0, 240) : 'The mission failed.'
+          ],
+          unverified: 'An unfinished mission does not establish any claims.',
+          usageCredits: progress.credits,
+          steps: progress.steps
+        };
+      });
+    })
   );
   return {
     reports,

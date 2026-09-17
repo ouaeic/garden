@@ -296,6 +296,10 @@ evidence. Supporting passages must resolve to the supplied text; unresolved cont
 produce a supported assessment. Coverage, limitations, and unavailable reviews remain explicit.
 The review reserves spending before submission and retains uncertain charges after a lost response;
 it does not retry automatically. Its model assessment is not proof that a source is true.
+The lead can supply explicit `claims` on a mission to use the same independent reviewer directly.
+This rereads the named sources and skips the specialist research loop. It checks the supplied claims,
+not the entire answer, and never replaces missing sources or quotations with model recollection.
+The ordinary source-access rules and spend reservations apply to both paths.
 Specialists cannot change anything,
 cannot reach the owner, and cannot see each other or the lead’s conversation, so each mission must
 stand alone. The lead remains responsible for every decision, every change, and the answer.

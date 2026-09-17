@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { verifyCapabilityToken, wrapDataKey } from '@athanor/core';
 import type { ModelRelease } from '@athanor/contracts';
 import type { DataStore, TaskRecord } from '@athanor/data';
-import type { ModelResponse, ModelToolCall } from '@athanor/model-gateway';
+import {
+  retainInterruptedResponse,
+  type ModelResponse,
+  type ModelToolCall
+} from '@athanor/model-gateway';
 import type { AgentState } from './agent-state.js';
 import { executeDelegateTool } from './delegate.js';
 import { AgentRunnerClient } from './runner-client.js';
@@ -77,6 +81,7 @@ const answer = (text: string, toolCalls: ModelToolCall[] = []): ModelResponse =>
 
 interface Harness {
   readonly result: {
+    usageCredits: number;
     reports: Array<{
       report: string;
       schemaValid: boolean;
@@ -139,6 +144,11 @@ const runMission = async (
     /** What the lead's own reads had left outstanding before it called `delegate`. */
     partialReads?: Record<string, number>;
     review?: ModelResponse;
+    claims?: Array<{ claim: string; source: string; quotedSpan: string }>;
+    usage?: Array<Record<string, unknown>>;
+    missions?: Array<{ name: string; instruction: string }>;
+    failAt?: number;
+    failWith?: Error;
   } = {}
 ): Promise<Harness> => {
   const seen: string[][] = [];
@@ -202,7 +212,9 @@ const runMission = async (
           : model
       ],
       effectiveSpendLimits: async () => ({ timeZone: 'UTC' }),
-      recordUsage: async () => undefined,
+      recordUsage: async (entry: Record<string, unknown>) => {
+        options.usage?.push(entry);
+      },
       taskClaim: async () =>
         options.review ? { status: 'running', leaseOwner: 'worker-test' } : null,
       /*
@@ -248,6 +260,10 @@ const runMission = async (
           request: { messages: Array<{ content?: string }>; sessionId?: string }
         ) => {
           seen.push(request.messages.map((message) => String(message.content ?? '')));
+          if (options.failAt === calls) {
+            calls += 1;
+            throw options.failWith ?? new Error('Provider temporarily unavailable');
+          }
           if (request.sessionId?.startsWith('claim-review:') && options.review) {
             calls += 1;
             return options.review;
@@ -266,10 +282,11 @@ const runMission = async (
     id: 'call-delegate-1',
     name: 'delegate',
     arguments: {
-      missions: [
+      missions: options.missions ?? [
         {
           name: 'sources',
           instruction: options.instruction ?? 'Read the notes page.',
+          ...(options.claims ? { claims: options.claims } : {}),
           ...(options.context ? { context: options.context } : {})
         }
       ]
@@ -277,6 +294,155 @@ const runMission = async (
   } as unknown as ModelToolCall)) as Harness['result'];
   return { result, seen, calls, reads, state };
 };
+
+describe('direct review of the lead’s claims', () => {
+  const claims = [
+    {
+      claim: 'The current fee is 12 units.',
+      source: 'workspace/current.txt',
+      quotedSpan: 'The current fee is 10 units.'
+    }
+  ];
+  const reviewed = answer(
+    JSON.stringify({
+      claims: [
+        {
+          id: 0,
+          assessment: 'contradicted',
+          kind: 'observation',
+          explanation: 'The current source states 10.',
+          support: [{ sourceId: 0, quote: 'The current fee is 10 units.' }],
+          conflicts: []
+        }
+      ],
+      limitations: []
+    })
+  );
+
+  it('uses one fresh reviewer and the governed reread, with one reservation and settlement', async () => {
+    const readFile = vi.fn(async () => 'The current fee is 10 units.');
+    const usage: Array<Record<string, unknown>> = [];
+    const result = await runMission([], {
+      claims,
+      review: reviewed,
+      runner: { readFile },
+      usage,
+      leadMessages: [
+        { role: 'system', content: 'ATHANOR OPERATING CONTRACT\nPRIVATE_UNRELATED_CANARY' }
+      ]
+    });
+    expect(result.calls).toBe(1);
+    expect(readFile).toHaveBeenCalledWith(workspaceId, taskId, 'workspace/current.txt');
+    expect(result.seen[0]!.join('\n')).not.toContain('PRIVATE_UNRELATED_CANARY');
+    expect(result.result.reports).toHaveLength(1);
+    expect(result.result.reports[0]).toMatchObject({
+      schemaValid: true,
+      citations: { checked: 1, cited: 1 },
+      claimReview: { status: 'reviewed', claims: [{ assessment: 'contradicted' }] }
+    });
+    expect(result.result.reports[0]!.untrustedSources).toContain(
+      'workspace file workspace/current.txt'
+    );
+    expect(usage.map((entry) => entry.state)).toEqual(['reserved', 'settled']);
+    expect(usage[0]!.idempotencyKey).toBe(usage[1]!.idempotencyKey);
+  });
+
+  it('does not replace missing quotations with model guesses', async () => {
+    const result = await runMission([], {
+      claims,
+      review: reviewed,
+      runner: { readFile: async () => 'No fee was supplied.' }
+    });
+    expect(result.calls).toBe(0);
+    expect(result.result.reports[0]).toMatchObject({
+      claimReview: { status: 'unavailable', claims: [] },
+      evidenceChecks: [{ quoteMatched: false, reread: true }]
+    });
+  });
+
+  it('keeps unapproved source destinations outside the reader', async () => {
+    const result = await runMission([], {
+      claims: [{ ...claims[0]!, source: 'https://unknown.test/collect?secret=private-data' }],
+      review: reviewed,
+      taint: { sources: ['workspace file workspace/private.txt'] } as AgentState['taint']
+    });
+    expect(result.calls).toBe(0);
+    expect(result.reads).toEqual([]);
+    expect(result.result.reports[0]).toMatchObject({
+      evidenceChecks: [{ reread: false, quoteMatched: false }]
+    });
+  });
+
+  it('rejects an oversized explicit claim set instead of silently reporting partial coverage', async () => {
+    const readFile = vi.fn(async () => 'The current fee is 10 units.');
+    await expect(
+      runMission([], {
+        claims: [...claims, ...claims, ...claims],
+        review: reviewed,
+        runner: { readFile }
+      })
+    ).rejects.toThrow();
+    expect(readFile).not.toHaveBeenCalled();
+  });
+});
+
+it('retains a completed sibling report when another mission fails after a billed step', async () => {
+  const usage: Array<Record<string, unknown>> = [];
+  const result = await runMission(
+    [
+      answer('', [{ id: 'read', name: 'file_read', arguments: { path: 'workspace/note.txt' } }]),
+      answer(JSON.stringify({ answer: 'The completed sibling report', evidence: [] }))
+    ],
+    {
+      missions: [
+        { name: 'first', instruction: 'Read the file' },
+        { name: 'second', instruction: 'Report the result' }
+      ],
+      failAt: 2,
+      runner: { readFile: async () => 'A source.' },
+      usage
+    }
+  );
+  expect(result.result.reports).toHaveLength(2);
+  expect(result.result.reports.filter((report) => report.schemaValid)).toHaveLength(1);
+  expect(result.result.reports.find((report) => report.schemaValid)?.report).toContain(
+    'The completed sibling report'
+  );
+  expect(result.result.reports.find((report) => !report.schemaValid)?.schemaErrors).toContain(
+    'Provider temporarily unavailable'
+  );
+  expect(usage).toHaveLength(2);
+  expect(result.result.usageCredits).toBeGreaterThan(0);
+  expect(result.result.usageCredits).toBe(
+    usage.reduce((total, entry) => total + Number(entry.credits), 0)
+  );
+});
+
+it('accounts for an interrupted specialist generation without dispatching its partial tools', async () => {
+  const failure = new Error('Stream interrupted');
+  retainInterruptedResponse(
+    failure,
+    answer('Partial output', [
+      { id: 'partial-tool', name: 'file_read', arguments: { path: 'workspace/never-read.txt' } }
+    ])
+  );
+  const readFile = vi.fn(async () => 'Must not be read');
+  const usage: Array<Record<string, unknown>> = [];
+  const result = await runMission([], {
+    failAt: 0,
+    failWith: failure,
+    runner: { readFile },
+    usage
+  });
+  expect(result.calls).toBe(1);
+  expect(readFile).not.toHaveBeenCalled();
+  expect(usage).toHaveLength(1);
+  expect(result.result.usageCredits).toBe(usage[0]!.credits);
+  expect(result.result.reports[0]).toMatchObject({
+    schemaValid: false,
+    schemaErrors: ['Stream interrupted']
+  });
+});
 
 /** A hidden instruction written in the Unicode Tags block, exactly as a page would carry it. */
 const hidden = (plain: string): string =>

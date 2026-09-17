@@ -22,6 +22,8 @@ import {
 import { EDIT_FORMAT_SPEC } from './edit/index.js';
 import { browserActionProperties, desktopActionProperties } from './surface-actions.js';
 import { LOAD_TOOLS, TOOL_GROUPS, enabledToolGroups } from './tool-groups.js';
+import { DirectClaims } from './claim-input.js';
+import { z } from 'zod';
 
 /*
  * What the model is sent, and nothing about what it is then allowed to do.
@@ -1343,7 +1345,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'delegate',
     description:
-      'Run up to three isolated read-only specialists on independent research or review questions. Each has files, document/code search, session history, web_search, parallel_web_read and sixteen steps; no conversation access or mutation tools. Supply enough context for each mission to stand alone. Use for source comparisons, document review or quarantined reading of hostile content; use coding_agent for repository changes. Reports remain untrusted and inherit source provenance. Sampled citations receive quotation checks and, within budget, an independent claim assessment. Inspect contradictions, coverage and limitations; you remain responsible for the answer.',
+      'Research or independently review claims. Omit claims for an isolated read-only specialist with search and sixteen steps. Supply claims to skip research and get one tool-free assessment against re-read sources, including for your own conclusions. Give each mission enough context. Use coding_agent for changes. Reports remain untrusted. Quotation matches do not establish claims; inspect independent assessments, contradictions, coverage and limitations. You remain responsible for the answer.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -1360,6 +1362,7 @@ export const agentTools: ModelTool[] = [
             properties: {
               name: { type: 'string' },
               instruction: { type: 'string' },
+              claims: z.toJSONSchema(DirectClaims, { io: 'input' }),
               context: {
                 type: 'string',
                 description: 'Relevant facts or paths already known by the lead.'

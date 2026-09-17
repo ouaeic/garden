@@ -9,6 +9,8 @@ import { routeTo } from './routing.js';
 import { taskReasoningEffort } from './reasoning.js';
 import { sanitiseUntrustedText, untrustedEnvelope } from './sanitise.js';
 import { startStopWatch, withRequestDeadline } from './turn-lifecycle.js';
+import { CLAIM_REVIEW_SOURCES, CLAIM_REVIEW_SOURCE_CHARS } from './claim-input.js';
+export { CLAIM_REVIEW_SOURCES, CLAIM_REVIEW_SOURCE_CHARS } from './claim-input.js';
 
 export interface ClaimSource {
   id: number;
@@ -17,9 +19,6 @@ export interface ClaimSource {
   text: string;
   quoteMatched: boolean;
 }
-
-export const CLAIM_REVIEW_SOURCES = 2;
-export const CLAIM_REVIEW_SOURCE_CHARS = 20_000;
 
 const ReviewClaim = z.object({
   id: z.number().int().nonnegative(),
