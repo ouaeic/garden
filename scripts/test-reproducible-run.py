@@ -108,6 +108,7 @@ Path('result.json').write_text(json.dumps({'length': len(sequence), 'counts': co
         )
         receipt = self.read()
         self.assertEqual(receipt["status"], "completed")
+        self.assertEqual(receipt["directoryFromManifest"], ".")
         self.assertTrue(receipt["dependenciesUnchanged"])
         self.assertEqual(
             receipt["outputs"][0]["sha256"],
@@ -127,6 +128,17 @@ Path('result.json').write_text(json.dumps({'length': len(sequence), 'counts': co
         self.assertEqual(again.returncode, 0, again.stderr)
         self.assertTrue(self.read(fresh)["outputsMatchPrevious"])
         self.assertEqual(self.read(fresh)["replayedFrom"], receipt["id"])
+
+    def test_nested_manifest_records_execution_directory(self):
+        (self.first / "records" / "trial").mkdir(parents=True)
+        result = subprocess.run(
+            [PYTHON, str(RUNNER), "run", "--spec", "spec.json", "--manifest", "records/trial/run.json"],
+            cwd=self.first, capture_output=True, text=True, timeout=15,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        receipt = json.loads((self.first / "records/trial/run.json").read_text())
+        self.assertEqual(receipt["directoryFromManifest"], "../..")
+        self.assertEqual(receipt["status"], "completed")
 
     def test_changed_reference_refuses_before_execution(self):
         self.assertEqual(self.invoke().returncode, 0)

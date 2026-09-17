@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { readAnalysisRecord } from './analysis-record';
+import AnalysisRunPreview from './AnalysisRunPreview';
 import { message } from './format';
 import { readWorkspaceFile, saveWorkspaceFile } from './workspace-file';
 import type { WorkspaceTextFile } from './workspace-file';
@@ -25,6 +27,14 @@ export default function SourceInspector({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [source, setSource] = useState(false);
+  const record = useMemo(
+    () =>
+      file && !file.truncated && !file.binary && /\.json$/i.test(path)
+        ? readAnalysisRecord(file.original)
+        : null,
+    [file?.original, file?.truncated, file?.binary, path]
+  );
   const controller = useRef<AbortController | null>(null);
   const editor = useRef<HTMLTextAreaElement>(null);
   const dirty = file !== null && file.text !== file.original;
@@ -37,6 +47,7 @@ export default function SourceInspector({
     setFile(null);
     setError('');
     setNotice('');
+    setSource(line > 1);
     setBusy(true);
     void readWorkspaceFile(workspaceId, path, {
       start: Math.max(1, line - 12),
@@ -65,7 +76,7 @@ export default function SourceInspector({
     const start = lines.slice(0, index).reduce((length, value) => length + value.length + 1, 0);
     editor.current.focus();
     editor.current.setSelectionRange(start, start + lines[index]!.length);
-  }, [file?.original, file?.start, line]);
+  }, [file?.original, file?.start, line, source]);
 
   async function operate(action: 'save' | 'reload' | 'next' | 'beginning') {
     if (!file || busy) return;
@@ -134,7 +145,28 @@ export default function SourceInspector({
               file.
             </p>
           )}
-          {file.binary ? (
+          {record && (
+            <div className="row" role="group" aria-label="Run display">
+              <button
+                className="button"
+                aria-pressed={!source}
+                disabled={dirty}
+                onClick={() => setSource(false)}
+              >
+                Run overview
+              </button>
+              <button className="button" aria-pressed={source} onClick={() => setSource(true)}>
+                Source JSON
+              </button>
+            </div>
+          )}
+          {record && !source ? (
+            <AnalysisRunPreview
+              key={record.id}
+              record={record}
+              location={{ workspaceId, manifestPath: path }}
+            />
+          ) : file.binary ? (
             <p>Binary file. Download it to open it in its application.</p>
           ) : (
             <textarea
@@ -149,13 +181,15 @@ export default function SourceInspector({
             />
           )}
           <div className="row">
-            <button
-              className="button primary"
-              disabled={busy || !dirty || file.truncated || file.binary || !file.sha}
-              onClick={() => void operate('save')}
-            >
-              Save changes
-            </button>
+            {(!record || source) && (
+              <button
+                className="button primary"
+                disabled={busy || !dirty || file.truncated || file.binary || !file.sha}
+                onClick={() => void operate('save')}
+              >
+                Save changes
+              </button>
+            )}
             {dirty && (
               <button
                 className="button"

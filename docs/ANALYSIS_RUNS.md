@@ -17,6 +17,17 @@ while the command is active. An interrupted or unfinished record is evidence to 
 automatic instruction to execute again. Long work should use a named durable job, whose supervisor,
 resource snapshots, cancellation and log handling remain responsible for the process lifecycle.
 
+Opening a complete JSON run record in project files or saved results presents a run overview:
+recorded status, command duration, declared inputs and scripts, dependency locks, environment
+probes, outputs and replay comparisons. The source JSON remains available. Unrecognised or
+oversized records retain the ordinary file preview or download path. A record is a snapshot;
+live process state belongs to the project's jobs view.
+
+New records carry the execution directory relative to the manifest. When opened in project
+files, this allows workspace-scoped downloads of their declared files. Downloads return current
+contents, which may differ from the recorded hashes. Saved artifacts and records without a
+known location do not invent links to files. Source URLs and commands are displayed as data.
+
 An explicit replay uses a completed manifest and a clean directory containing the original source
 and inputs. Before launching, it compares content hashes, lock files, version-probe output and the
 recorded platform. Changed dependencies refuse execution. Afterward it compares output hashes;

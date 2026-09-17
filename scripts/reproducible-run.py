@@ -394,6 +394,7 @@ def run(spec, root, filename, previous=None):
         "id": str(uuid.uuid4()),
         "status": "preparing",
         "createdAt": now(),
+        "directoryFromManifest": Path(os.path.relpath(root, filename.parent)).as_posix(),
         "spec": spec,
         "seedCoverage": "declared_by_caller_not_automatically_applied",
         "coverage": "declared_files_and_environment_probes",

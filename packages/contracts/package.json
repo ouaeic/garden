@@ -25,6 +25,12 @@
       "browser": "./src/artifact-reference.ts",
       "development": "./src/artifact-reference.ts",
       "default": "./dist/artifact-reference.js"
+    },
+    "./analysis-run": {
+      "types": "./src/analysis-run.ts",
+      "browser": "./src/analysis-run.ts",
+      "development": "./src/analysis-run.ts",
+      "default": "./dist/analysis-run.js"
     }
   },
   "scripts": {

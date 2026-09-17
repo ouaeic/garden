@@ -6,6 +6,7 @@ import { message, mimeTypeForFile } from './format.js';
 import '../computer.css';
 const Markdown = lazy(() => import('../MarkdownBody'));
 const PdfPreview = lazy(() => import('./PdfPreview'));
+const AnalysisJsonPreview = lazy(() => import('./AnalysisJsonPreview'));
 
 export function ResultPreview({ artifact }: { artifact: Artifact }) {
   const url = `/v1/artifacts/${artifact.id}/content`;
@@ -85,6 +86,12 @@ export function ResultPreview({ artifact }: { artifact: Artifact }) {
     ) : (
       <Suspense fallback={<p className="muted">Opening document…</p>}>
         <Markdown>{content}</Markdown>
+      </Suspense>
+    );
+  if (mime === 'application/json' && content !== null && artifact.sizeBytes <= 262144)
+    return (
+      <Suspense fallback={<p className="muted">Opening run record…</p>}>
+        <AnalysisJsonPreview key={artifact.id} content={content} />
       </Suspense>
     );
   if (plain && artifact.sizeBytes <= 262144)
