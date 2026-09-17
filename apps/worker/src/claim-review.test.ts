@@ -65,6 +65,59 @@ function fixture() {
   return { context, chat, taskClaim, recordUsage, order };
 }
 describe('bounded independent claim review', () => {
+  it('reserves room for reasoning and uses only the selected model’s advertised effort', async () => {
+    const f = fixture();
+    await reviewClaims(
+      f.context,
+      {
+        ...model,
+        reasoning: { mandatory: true, supportedEfforts: ['low', 'high'], defaultEffort: 'high' }
+      },
+      sources,
+      'report',
+      1,
+      'turn:call'
+    );
+    expect(f.chat.mock.calls[0]?.[1]).toMatchObject({
+      maxTokens: 8192,
+      reasoningEffort: 'high',
+      reasoningOptions: { supportedEfforts: ['low', 'high'] }
+    });
+    expect(f.recordUsage.mock.calls[0]![0]).toMatchObject({
+      state: 'reserved',
+      reserveAgainstCaps: true
+    });
+    expect(f.order).toEqual(['reserved', 'provider', 'settled']);
+  });
+  it('honors a smaller provider output bound and reports an exhausted response without accepting claims', async () => {
+    const f = fixture();
+    const response = await f.chat();
+    f.chat.mockClear();
+    f.chat.mockResolvedValue({ ...response, finishReason: 'length' });
+    const limited = { ...model, maxOutputTokens: 4096 };
+    const result = await reviewClaims(f.context, limited, sources, 'report', 1, 'turn:call');
+    expect(f.chat.mock.calls[0]?.[1]?.maxTokens).toBe(4096);
+    expect(result).toMatchObject({
+      status: 'unavailable',
+      claims: [],
+      limitations: ['The review reached its output limit; no conclusion was accepted.']
+    });
+    expect(f.recordUsage.mock.calls.map(([entry]) => entry.state)).toEqual(['reserved', 'settled']);
+  });
+  it('does not accept a syntactically complete assessment from an interrupted response', async () => {
+    const f = fixture();
+    const response = await f.chat();
+    f.chat.mockResolvedValue({
+      ...response,
+      truncated: { reason: 'framing', detail: 'Excess stream metadata' }
+    });
+    const result = await reviewClaims(f.context, model, sources, 'report', 1, 'turn:call');
+    expect(result).toMatchObject({
+      status: 'unavailable',
+      claims: [],
+      limitations: ['The review was interrupted: Excess stream metadata']
+    });
+  });
   it('keeps a real quotation distinct from an unsupported causal conclusion', async () => {
     const f = fixture();
     const result = await reviewClaims(
