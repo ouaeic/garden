@@ -294,6 +294,8 @@ specialist model has published prices and the task has enough remaining allowanc
 distinguishes observations and inferences, supported and contradicted claims, and insufficient
 evidence. Supporting passages must resolve to the supplied text; unresolved contradictions cannot
 produce a supported assessment. Coverage, limitations, and unavailable reviews remain explicit.
+Each returned assessment must echo its assigned target claim exactly. A review of a different
+proposal from the background report is refused even when its numeric identity is valid.
 The review reserves spending before submission and retains uncertain charges after a lost response;
 it does not retry automatically. Its model assessment is not proof that a source is true.
 The lead can supply explicit `claims` on a mission to use the same independent reviewer directly.

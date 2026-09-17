@@ -308,6 +308,7 @@ describe('direct review of the lead’s claims', () => {
       claims: [
         {
           id: 0,
+          claim: claims[0]!.claim,
           assessment: 'contradicted',
           kind: 'observation',
           explanation: 'The current source states 10.',
@@ -720,6 +721,7 @@ describe('what the lead is told not to rely on', () => {
             claims: [
               {
                 id: 0,
+                claim: 'This study established causation.',
                 assessment: 'contradicted',
                 kind: 'inference',
                 explanation: 'Association does not establish causation.',

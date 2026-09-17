@@ -17,6 +17,7 @@ const assessment = (overrides = {}) => ({
   claims: [
     {
       id: 0,
+      claim: sources[0]!.claim,
       assessment: 'contradicted',
       kind: 'inference',
       explanation: 'The source explicitly does not establish causation.',
@@ -184,6 +185,7 @@ describe('bounded independent claim review', () => {
     const output = assessment({ assessment: 'supported', conflicts: [1] });
     output.claims.push({
       id: 1,
+      claim: conflicting[1]!.claim,
       assessment: 'contradicted',
       kind: 'inference',
       explanation: 'The quoted number is historical.',
@@ -198,12 +200,57 @@ describe('bounded independent claim review', () => {
     const outputs = [
       { claims: [], limitations: [] },
       assessment({ id: 9 }),
+      assessment({ claim: 'The study did not establish causation.' }),
       { ...assessment(), claims: [...assessment().claims, ...assessment().claims] },
       assessment({ conflicts: [99] })
     ];
     expect(outputs.length).toBeGreaterThan(0);
     for (const output of outputs)
       expect(() => parseClaimReview(JSON.stringify(output), sources)).toThrow();
+  });
+  it('binds a review to the target claim rather than a different proposal in the background report', async () => {
+    const f = fixture();
+    const target = { ...sources[0]!, claim: 'The study did not establish causation.' };
+    const result = await reviewClaims(
+      f.context,
+      model,
+      [target],
+      'Assess the proposal: The study established causation.',
+      1,
+      'binding'
+    );
+    expect(result.status).toBe('unavailable');
+    expect(result.claims).toEqual([]);
+    expect(f.recordUsage.mock.calls.map(([entry]) => entry.state)).toEqual(['reserved', 'settled']);
+    const response = await f.chat();
+    f.chat.mockResolvedValue({
+      ...response,
+      text: JSON.stringify(
+        assessment({
+          claim: target.claim,
+          assessment: 'supported',
+          kind: 'observation',
+          explanation: 'The target preserves the source’s explicit negation.'
+        })
+      )
+    });
+    const corrected = await reviewClaims(
+      f.context,
+      model,
+      [target],
+      'Assess the proposal: The study established causation.',
+      1,
+      'binding-corrected'
+    );
+    expect(corrected).toMatchObject({
+      status: 'reviewed',
+      claims: [{ claim: target.claim, assessment: 'supported' }]
+    });
+    const prompt = f.chat.mock.calls[0]![1]!.messages[1]!.content;
+    expect(prompt).toContain(
+      '"targets":[{"id":0,"claim":"The study did not establish causation."}]'
+    );
+    expect(prompt).toContain('"background":');
   });
   it.each(['price', 'compute', 'context', 'cancelled', 'reservation', 'no-quotation'] as const)(
     'skips a review safely when %s prevents submission',

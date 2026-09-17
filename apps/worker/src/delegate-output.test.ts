@@ -24,6 +24,7 @@ describe('parallel research report delivery', () => {
         claims: [
           {
             id: 0,
+            claim: 'current rate',
             assessment: 'contradicted',
             kind: 'observation',
             explanation: 'This is the stale rate.',
@@ -46,10 +47,47 @@ describe('parallel research report delivery', () => {
     for (const [id, report] of output.reports.entries()) {
       expect(report.name).toBe(`mission-${id}`);
       expect(report.claimReview.claims[0]!.assessment).toBe('contradicted');
+      expect(report.claimReview.claims[0]!.claim).toBe('current rate');
       expect(report.report).toContain(`conclusion-${id}`);
       expect(report.report).toContain(`ending-${id}`);
       expect(report.citations).toEqual({ checked: 2, cited: 8 });
     }
+  });
+  it('preserves usable source addresses and labels shortened claims as previews', () => {
+    const source = `https://example.com/${'long-directory/'.repeat(40)}source.txt`;
+    const claim = 'A long claim with qualifications. '.repeat(30);
+    const result = JSON.parse(
+      delegateOutputSummary(
+        {
+          reports: [
+            {
+              evidenceChecks: [{ source, claim, reread: true, quoteMatched: true }],
+              claimReview: {
+                status: 'reviewed',
+                claims: [{ id: 0, claim, assessment: 'supported' }]
+              }
+            }
+          ]
+        },
+        24_000,
+        { path: 'workspace/full-review.json' }
+      )!
+    ) as {
+      reports: Array<{
+        evidenceChecks: Array<{ source: string; claim?: string; claimPreview: string }>;
+        claimReview: { claims: Array<{ claim?: string; claimPreview: string }> };
+      }>;
+      fullResult: { path: string };
+    };
+    expect(result.reports).toHaveLength(1);
+    const report = result.reports[0]!;
+    expect(report.evidenceChecks[0]!.source).toBe(source);
+    for (const entry of [report.evidenceChecks[0]!, report.claimReview.claims[0]!]) {
+      expect(entry.claim).toBeUndefined();
+      expect(entry.claimPreview).toContain(' […] ');
+      expect(entry.claimPreview.length).toBeLessThanOrEqual(200);
+    }
+    expect(result.fullResult.path).toBe('workspace/full-review.json');
   });
   it('does not invent a recovery file or silently remove all reports', () => {
     expect(delegateOutputSummary({ reports: [] }, 24_000, null)).toBeNull();

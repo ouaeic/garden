@@ -8,6 +8,10 @@ const clip = (value: unknown, maximum: number): string => {
 };
 const entries = (value: unknown, maximum: number) =>
   (Array.isArray(value) ? value : []).slice(0, maximum).map((entry) => asRecord(entry) ?? {});
+const claimIdentity = (value: unknown) => {
+  const claim = textValue(value);
+  return claim.length <= 200 ? { claim } : { claimPreview: clip(claim, 200) };
+};
 
 /** Preserve each mission's adverse findings before allocating space to report prose. */
 export function delegateOutputSummary(
@@ -28,8 +32,8 @@ export function delegateOutputSummary(
       unverified: clip(report.unverified, 700),
       ...(citations ? { citations: { checked: citations.checked, cited: citations.cited } } : {}),
       evidenceChecks: entries(report.evidenceChecks, 2).map((check) => ({
-        claim: clip(check.claim, 200),
-        source: clip(check.source, 400),
+        ...claimIdentity(check.claim),
+        source: textValue(check.source),
         quoteMatched: check.quoteMatched === true,
         reread: check.reread === true,
         detail: clip(check.detail, 180)
@@ -40,6 +44,7 @@ export function delegateOutputSummary(
               status: clip(review.status, 40),
               claims: entries(review.claims, 2).map((claim) => ({
                 id: claim.id,
+                ...claimIdentity(claim.claim),
                 assessment: clip(claim.assessment, 24),
                 kind: clip(claim.kind, 24),
                 explanation: clip(claim.explanation, 400),
