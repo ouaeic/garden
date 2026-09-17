@@ -495,6 +495,85 @@ describe('live voice owner route and provider loop', () => {
     expect(stored.rows).toHaveLength(1);
     expect(JSON.stringify(stored.rows)).not.toContain(proposal.prompt);
   });
+  it('streams a detailed answer and interrupts before any late proposal or output', async () => {
+    const f = await fixture(),
+      connection = await created(f),
+      c = await f.connect(connection);
+    await begin(c);
+    for (let batch = 0; batch < 6; batch++) {
+      c.provider.event({
+        type: 'response.output_audio.delta',
+        response_id: 'resp_one',
+        item_id: 'item_one',
+        delta: Buffer.alloc(24_000 * 5 * 2).toString('base64')
+      });
+      await vi.waitFor(() => expect(c.binary).toHaveLength((batch + 1) * 50));
+    }
+    expect(c.events.some((event) => event.type === 'flush')).toBe(false);
+    expect(c.provider.sent.some((event) => event.type === 'response.cancel')).toBe(false);
+    c.socket.send(JSON.stringify({ type: 'interrupt', epoch: 1, playedSamples: 24_000 * 8 }));
+    await vi.waitFor(() =>
+      expect(c.provider.sent).toContainEqual(
+        expect.objectContaining({ type: 'conversation.item.truncate', audio_end_ms: 8_000 })
+      )
+    );
+    c.provider.event({
+      type: 'response.function_call_arguments.done',
+      response_id: 'resp_one',
+      name: 'request_task_work',
+      call_id: 'cancelled-proposal',
+      arguments: JSON.stringify({ prompt: 'This late proposal must not be saved.' })
+    });
+    c.provider.event({
+      type: 'response.output_audio.delta',
+      response_id: 'resp_one',
+      item_id: 'late-item',
+      delta: Buffer.alloc(480).toString('base64')
+    });
+    const detailedUsage = {
+      ...usage,
+      output_tokens: 2_048,
+      total_tokens: 2_148,
+      output_token_details: { text_tokens: 48, audio_tokens: 2_000 }
+    };
+    c.provider.event({ type: 'response.done', response: { id: 'resp_one', usage: detailedUsage } });
+    await vi.waitFor(async () =>
+      expect((await voice.get(f.user.id, connection.session.id))?.session).toMatchObject({
+        status: 'listening',
+        pendingUsd: 0
+      })
+    );
+    expect(await voice.proposals(f.user.id, connection.session.id)).toEqual([]);
+    expect(c.binary).toHaveLength(300);
+    expect(c.provider.sent.filter((event) => event.type === 'response.create')).toHaveLength(1);
+  });
+  it('cancels an interrupted reserved response even when its provider id arrives after speech starts', async () => {
+    const f = await fixture(),
+      connection = await created(f),
+      c = await f.connect(connection);
+    c.socket.send(encodeVoiceFrame(1, 0, new Uint8Array(480)));
+    await vi.waitFor(() =>
+      expect(c.provider.sent.some((e) => e.type === 'input_audio_buffer.append')).toBe(true)
+    );
+    c.provider.event({ type: 'input_audio_buffer.committed' });
+    await vi.waitFor(() =>
+      expect(c.provider.sent.some((e) => e.type === 'response.create')).toBe(true)
+    );
+    c.provider.event({ type: 'input_audio_buffer.speech_started' });
+    c.provider.event({ type: 'response.created', response: { id: 'late-response' } });
+    await vi.waitFor(() =>
+      expect(c.provider.sent).toContainEqual({
+        type: 'response.cancel',
+        response_id: 'late-response'
+      })
+    );
+    c.provider.event({ type: 'response.done', response: { id: 'late-response', usage } });
+    await vi.waitFor(async () =>
+      expect(await voice.pending(f.user.id, connection.session.id)).toEqual([])
+    );
+    expect(c.provider.sent.filter((event) => event.type === 'response.create')).toHaveLength(1);
+    expect(c.events.filter((event) => event.type === 'audio_start')).toEqual([]);
+  });
   it('flushes only the played prefix, holds a lost receipt and recovers it from an owner invoice without another provider call', async () => {
     const f = await fixture(),
       connection = await created(f),
@@ -546,7 +625,7 @@ describe('live voice owner route and provider loop', () => {
     await vi.waitFor(() => expect(f.providers[0]?.sent[0]?.type).toBe('session.update'));
     const provider = f.providers[0]!,
       session = structuredClone(provider.sent[0]!.session) as Record<string, unknown>;
-    session.max_output_tokens = 4096;
+    session.max_output_tokens = 'inf';
     provider.event({ type: 'session.updated', session });
     await vi.waitFor(() => expect(socket.readyState).toBe(WebSocket.CLOSED));
     expect(events.some((event) => (JSON.parse(event) as { type: string }).type === 'ready')).toBe(

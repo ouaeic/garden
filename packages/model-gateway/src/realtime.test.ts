@@ -3,6 +3,7 @@ import {
   assertRealtimeSessionAcknowledged,
   decodeVoiceFrame,
   encodeVoiceFrame,
+  REALTIME_MAX_OUTPUT_TOKENS,
   REALTIME_MODELS,
   realtimeReservationUsd,
   realtimeSessionConfiguration,
@@ -54,7 +55,7 @@ describe('bounded native realtime transport', () => {
   it('requires acknowledgement of limits, no automatic response, ASR, tracing or extra tools', () => {
     expect(() => assertRealtimeSessionAcknowledged(config(), config())).not.toThrow();
     const variants: Array<[string[], unknown]> = [
-      [['max_output_tokens'], 193],
+      [['max_output_tokens'], REALTIME_MAX_OUTPUT_TOKENS + 1],
       [['audio', 'input', 'turn_detection', 'create_response'], true],
       [['audio', 'input', 'transcription'], { model: 'whisper-1' }],
       [['tools'], [{ type: 'function', name: 'shell' }]],
@@ -91,10 +92,28 @@ describe('bounded native realtime transport', () => {
     cache.input_token_details.cached_tokens_details.audio_tokens = 11;
     expect(() => realtimeUsageReceipt(cache, model)).toThrow();
     const excess = usage();
-    excess.output_tokens = 193;
-    excess.output_token_details.audio_tokens = 183;
+    excess.output_tokens = REALTIME_MAX_OUTPUT_TOKENS + 1;
+    excess.output_token_details.audio_tokens = REALTIME_MAX_OUTPUT_TOKENS - 9;
     expect(() => realtimeUsageReceipt(excess, model)).toThrow();
     expect(() => realtimeReservationUsd({ ...model, contextTokens: -1 })).toThrow();
+  });
+  it('retains the model context after reserving instruction, tool and output capacity', () => {
+    const c = config();
+    const limits = (c.truncation as { token_limits: { post_instructions: number } }).token_limits;
+    expect(limits.post_instructions).toBeGreaterThan(100_000);
+    expect(limits.post_instructions + Number(c.max_output_tokens)).toBeLessThan(
+      model.contextTokens
+    );
+    expect(realtimeReservationUsd(model)).toBeGreaterThanOrEqual(
+      (model.contextTokens * model.price.inputAudio +
+        REALTIME_MAX_OUTPUT_TOKENS * model.price.outputAudio) /
+        1_000_000
+    );
+    const long = usage();
+    long.output_tokens = 2_048;
+    long.output_token_details.audio_tokens = 2_038;
+    long.total_tokens = long.input_tokens + long.output_tokens;
+    expect(realtimeUsageReceipt(long, model).outputTokens).toBe(2_048);
   });
   it('preserves exact PCM framing and refuses malformed, oversized or wrapping frames', () => {
     const pcm = new Uint8Array([1, 2, 3, 4]);

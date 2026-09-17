@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AudioControl, AudioObservation } from './audio-types';
 import { pcm16 } from './audio-dsp';
+import { VOICE_PLAYBACK_BUFFER_SECONDS } from './audio-constants';
 
 type Processor = {
   port: Port;
@@ -101,7 +102,7 @@ describe('voice worklet ownership', () => {
     expect(node.process([], [[new Float32Array(128)]])).toBe(false);
     const bounded = await processor();
     bounded.port.send({ type: 'output', epoch: 2 });
-    for (let offset = 0; offset < 13 * 24000; offset += 2400)
+    for (let offset = 0; offset < (VOICE_PLAYBACK_BUFFER_SECONDS + 1) * 24000; offset += 2400)
       bounded.port.send({ type: 'pcm', epoch: 2, offset, pcm: new ArrayBuffer(4800) });
     expect(bounded.port.messages.at(-1)).toMatchObject({
       type: 'error',

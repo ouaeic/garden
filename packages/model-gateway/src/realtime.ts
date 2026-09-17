@@ -7,9 +7,8 @@ import {
   type VoiceReasoningEffort
 } from '@athanor/contracts';
 
-export const REALTIME_MAX_OUTPUT_TOKENS = 192;
-export const REALTIME_CONVERSATION_TOKENS = 2_048;
-export const REALTIME_MAX_ITEM_SECONDS = 10;
+export const REALTIME_MAX_OUTPUT_TOKENS = 4_096;
+export const REALTIME_MAX_ITEM_SECONDS = 120;
 export interface RealtimePrice {
   inputText: number;
   cachedText: number;
@@ -184,7 +183,15 @@ export const realtimeSessionConfiguration = (input: {
     truncation: {
       type: 'retention_ratio',
       retention_ratio: 0.8,
-      token_limits: { post_instructions: REALTIME_CONVERSATION_TOKENS }
+      // UTF-8 bytes conservatively bound the text tokens without a tokenizer tied to one model.
+      token_limits: {
+        post_instructions:
+          model.contextTokens -
+          REALTIME_MAX_OUTPUT_TOKENS -
+          Buffer.byteLength(input.instructions) -
+          Buffer.byteLength(JSON.stringify(REALTIME_TOOLS)) -
+          1_024
+      }
     },
     audio: {
       input: {
@@ -224,7 +231,8 @@ export const assertRealtimeSessionAcknowledged = (
     vad.interrupt_response !== true ||
     vad.type !== 'server_vad' ||
     truncation.type !== 'retention_ratio' ||
-    limits.post_instructions !== REALTIME_CONVERSATION_TOKENS ||
+    limits.post_instructions !==
+      record(record(expected.truncation).token_limits).post_instructions ||
     !same(session.output_modalities, ['audio']) ||
     output.voice !== record(record(expected.audio).output).voice ||
     !same(record(session.reasoning).effort, record(expected.reasoning).effort) ||
