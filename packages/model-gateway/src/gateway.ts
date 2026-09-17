@@ -32,7 +32,11 @@ export class ModelGateway {
     return results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
   }
 
-  async chat(provider: string, request: ModelRequest): Promise<ModelResponse> {
+  async chat(
+    provider: string,
+    request: ModelRequest,
+    options?: { retry?: boolean }
+  ): Promise<ModelResponse> {
     const adapter = this.#adapters.get(provider);
     if (!adapter)
       throw new AthanorError('provider_not_configured', `Provider ${provider} is not configured`);
@@ -72,7 +76,7 @@ export class ModelGateway {
           }
         : request;
     return withRetry(() => adapter.chat(attempted), {
-      policy: this.#retry,
+      policy: options?.retry === false ? { ...this.#retry, maxAttempts: 1 } : this.#retry,
       hasStreamed: () => streamed,
       ...(request.signal ? { signal: request.signal } : {})
     });

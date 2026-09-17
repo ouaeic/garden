@@ -825,6 +825,20 @@ export const SubagentLane = z.object({
   usedCredits: z.number().nonnegative().optional(),
   allocatedCredits: z.number().nonnegative().optional(),
   steps: z.number().int().nonnegative().optional(),
+  citations: z
+    .object({
+      checked: z.number().int().nonnegative(),
+      matched: z.number().int().nonnegative(),
+      cited: z.number().int().nonnegative()
+    })
+    .optional(),
+  claimReview: z
+    .object({
+      checked: z.number().int().nonnegative(),
+      supported: z.number().int().nonnegative(),
+      contradicted: z.number().int().nonnegative()
+    })
+    .optional(),
   verified: z
     .object({ checked: z.number().int().nonnegative(), held: z.number().int().nonnegative() })
     .optional()

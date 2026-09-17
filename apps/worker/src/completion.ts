@@ -766,23 +766,11 @@ export const harnessEvidence = (
       source: 'acceptance_check' as const
     }));
 
-/** A cited span the harness re-fetched and checked for itself. */
+/** Source provenance only. Claim support is assessed separately. */
 export interface DelegateEvidenceCheck {
   readonly claim: string;
   readonly source: string;
-  readonly verified: boolean;
-  /**
-   * Whether the harness actually got the source in front of it.
-   *
-   * `verified: false` was carrying two facts that are not the same fact: a span the harness looked
-   * for and could not find, which is evidence against the report, and a source the harness never
-   * opened, which is no evidence about the report at all. The second case is now reachable on the
-   * ordinary path - the citation re-read is a web reach and is refused when the destination is one
-   * this run has not been sent to - so the difference has to survive to the lead rather than
-   * arriving as the same boolean with different prose beside it. `unverifiedNotice` reads this
-   * field, and it is what keeps "nothing in this report stood up" from being said about a report
-   * nothing was read for.
-   */
+  readonly quoteMatched: boolean;
   readonly reread: boolean;
   readonly detail: string;
 }

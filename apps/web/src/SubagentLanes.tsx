@@ -105,11 +105,25 @@ function LaneCard({ lane, lastEventAt }: { lane: SubagentLane; lastEventAt: stri
       )}
       {typeof lane.verified === 'object' && lane.verified && (
         <p className="muted">
-          ✓ the harness re-read {lane.verified.checked}{' '}
-          {lane.verified.checked === 1 ? 'source' : 'sources'};{' '}
-          {lane.verified.held === lane.verified.checked
-            ? 'the quoted spans are really there'
-            : `${lane.verified.held} of ${lane.verified.checked} quoted ${lane.verified.checked === 1 ? 'span held' : 'spans held'}`}
+          {lane.verified.held} quotation matches · {lane.verified.checked}{' '}
+          {lane.verified.checked === 1 ? 'source checked' : 'sources checked'}
+        </p>
+      )}
+      {lane.citations && (
+        <p className="muted">
+          {lane.citations.matched} quotation matches · {lane.citations.checked} of{' '}
+          {lane.citations.cited} citations checked
+        </p>
+      )}
+      {lane.claimReview && (
+        <p className="muted">
+          Claim review: {lane.claimReview.supported} supported · {lane.claimReview.contradicted}{' '}
+          contradicted ·{' '}
+          {Math.max(
+            0,
+            lane.claimReview.checked - lane.claimReview.supported - lane.claimReview.contradicted
+          )}{' '}
+          inconclusive
         </p>
       )}
       {typeof lane.detail === 'string' && lane.detail && <p>{lane.detail}</p>}
@@ -121,7 +135,11 @@ function LaneCard({ lane, lastEventAt }: { lane: SubagentLane; lastEventAt: stri
         <strong>
           {lane.name} <span className="badge">{laneLabel[String(lane.lane)] ?? lane.lane}</span>
         </strong>
-        <span className="badge">{statusLabel[status] ?? status}</span>
+        <span className="badge">
+          {lane.lane === 'research' && status === 'verified'
+            ? 'Quotations checked'
+            : (statusLabel[status] ?? status)}
+        </span>
       </div>
       {done ? (
         <details>

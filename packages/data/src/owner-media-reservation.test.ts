@@ -82,6 +82,56 @@ describe('owner-scoped media receipt settlement', () => {
       ).rows
     ).toEqual([{ state: 'released', cost_usd: 0 }]);
   });
+  it.each(['model:task-title', 'model:claim-review'])(
+    'counts held %s requests against allowance and settles their actual credits',
+    async (resourceClass) => {
+      const owner = await store.createUser({ username: randomUUID(), displayName: 'Owner' });
+      await store.setSpendLimits({ userId: owner.id, dailyCapUsd: 0.7, monthlyCapUsd: 1 });
+      const usage = {
+        userId: owner.id,
+        kind: 'model_inference',
+        resourceClass,
+        quantity: 1000,
+        unit: 'tokens',
+        credits: 0.5,
+        costUsd: 0.5,
+        idempotencyKey: randomUUID()
+      };
+      await store.recordUsage({ ...usage, state: 'reserved', reserveAgainstCaps: true });
+      await expect(
+        store.recordUsage({
+          ...usage,
+          idempotencyKey: randomUUID(),
+          state: 'reserved',
+          reserveAgainstCaps: true
+        })
+      ).rejects.toMatchObject({ code: 'spend_cap_reached' });
+      await store.recordUsage({
+        ...usage,
+        costUsd: 0.1,
+        credits: 0.02,
+        quantity: 200,
+        state: 'settled',
+        settleReservation: true
+      });
+      expect(
+        (
+          await database.query(
+            'SELECT state,credits,cost_usd FROM usage_entries WHERE idempotency_key=$1',
+            [usage.idempotencyKey]
+          )
+        ).rows
+      ).toEqual([{ state: 'settled', credits: 0.02, cost_usd: 0.1 }]);
+      await expect(
+        store.recordUsage({
+          ...usage,
+          idempotencyKey: randomUUID(),
+          state: 'reserved',
+          reserveAgainstCaps: true
+        })
+      ).resolves.toBeUndefined();
+    }
+  );
   it('limits invoice recovery to the original owner and dictation provenance', async () => {
     const usage = await fixture();
     expect(await store.listDictationReceipts(usage.userId)).toHaveLength(0);

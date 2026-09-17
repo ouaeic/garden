@@ -288,8 +288,15 @@ nothing else, and a specialist that cannot search can only read sources somebody
 Each runs at most sixteen steps against its own share of the task’s compute budget, on the strongest
 eligible model for the task’s privacy route, and is told the current date and its own reporting
 standard. The harness re-reads two of every specialist’s cited sources and checks the quoted spans
-are really there, so a span it did not copy from the page comes back to the lead marked as not to
-be trusted. Specialists cannot change anything,
+are really there. Quotation presence is source provenance, not confirmation of the claim. A fresh,
+tool-free model context reviews the sampled claims against the re-read text when the selected
+specialist model has published prices and the task has enough remaining allowance. The review
+distinguishes observations and inferences, supported and contradicted claims, and insufficient
+evidence. Supporting passages must resolve to the supplied text; unresolved contradictions cannot
+produce a supported assessment. Coverage, limitations, and unavailable reviews remain explicit.
+The review reserves spending before submission and retains uncertain charges after a lost response;
+it does not retry automatically. Its model assessment is not proof that a source is true.
+Specialists cannot change anything,
 cannot reach the owner, and cannot see each other or the lead’s conversation, so each mission must
 stand alone. The lead remains responsible for every decision, every change, and the answer.
 

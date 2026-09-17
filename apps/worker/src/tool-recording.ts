@@ -45,6 +45,7 @@ import {
 import { spillOverflow, spillRecovery } from './output-spill.js';
 import { sanitiseUntrusted, sanitiseUntrustedText, untrustedEnvelope } from './sanitise.js';
 import { boundedToolResultForModel } from './streaming.js';
+import { delegateOutputSummary } from './delegate-output.js';
 import { surfaceActionVerb } from './surface-actions.js';
 import type { BotWall } from './provenance.js';
 import {
@@ -638,7 +639,14 @@ export const recordToolResult = async (
       ? await spillOverflow(task, state, full, untrustedOrigin !== null)
       : null;
   const recovery: TruncationRecovery | undefined = spilled ? spillRecovery(spilled) : undefined;
-  const serialised = boundToolResultText(full, RECENT_TOOL_OUTPUT_CHARS, recovery);
+  const serialised =
+    (call.name === 'delegate' && full.length > RECENT_TOOL_OUTPUT_CHARS
+      ? delegateOutputSummary(
+          modelResult,
+          RECENT_TOOL_OUTPUT_CHARS,
+          spilled ? { path: spilled } : null
+        )
+      : null) ?? boundToolResultText(full, RECENT_TOOL_OUTPUT_CHARS, recovery);
   const forModel = untrustedOrigin
     ? untrustedEnvelope(untrustedOrigin, sanitiseUntrustedText(serialised))
     : serialised;

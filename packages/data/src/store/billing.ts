@@ -401,7 +401,8 @@ export class BillingStore {
       if (
         input.state !== 'reserved' ||
         input.kind !== 'model_inference' ||
-        (!input.resourceClass.startsWith('media:') && input.resourceClass !== 'model:task-title') ||
+        (!input.resourceClass.startsWith('media:') &&
+          !['model:task-title', 'model:claim-review'].includes(input.resourceClass)) ||
         !Number.isFinite(input.costUsd) ||
         Number(input.costUsd) < 0
       )
@@ -444,7 +445,9 @@ export class BillingStore {
         !Number.isFinite(input.costUsd) ||
         Number(input.costUsd) < 0 ||
         !Number.isFinite(input.quantity) ||
-        input.quantity < 0
+        input.quantity < 0 ||
+        !Number.isFinite(input.credits) ||
+        input.credits < 0
       )
         throw new AthanorError(
           'media_cost_invalid',
@@ -452,7 +455,7 @@ export class BillingStore {
           400
         );
       const updated = await this.database.query(
-        `UPDATE usage_entries SET state=$3,cost_usd=$4,provider_ref=$5,quantity=$8
+        `UPDATE usage_entries SET state=$3,cost_usd=$4,provider_ref=$5,quantity=$8,credits=$9
         WHERE idempotency_key=$1 AND user_id=$2 AND state='reserved' AND kind='model_inference' AND resource_class=$6 AND task_id IS NOT DISTINCT FROM $7`,
         [
           input.idempotencyKey,
@@ -462,7 +465,8 @@ export class BillingStore {
           input.providerRef ?? null,
           input.resourceClass,
           input.taskId ?? null,
-          input.quantity
+          input.quantity,
+          input.credits
         ]
       );
       if (updated.rowCount !== 1)
@@ -970,7 +974,8 @@ export class BillingStore {
           AND child.status IN ${COMMITTED_TASK_STATUSES})) THEN 0 ELSE held.cost_usd END),0) AS pending,
       COALESCE(SUM(CASE WHEN root.id=$2::uuid THEN held.cost_usd ELSE 0 END),0) AS task_pending
       FROM (
-        SELECT u.task_id,u.cost_usd FROM usage_entries u WHERE u.user_id=$1 AND u.state='reserved' AND u.resource_class LIKE 'media:%'
+        SELECT u.task_id,u.cost_usd FROM usage_entries u WHERE u.user_id=$1 AND u.state='reserved'
+          AND (u.resource_class LIKE 'media:%' OR u.resource_class IN ('model:task-title','model:claim-review'))
         UNION ALL SELECT c.task_id,c.reserved_usd FROM coding_family_calls c
           WHERE c.user_id=$1 AND c.actual_usd IS NULL AND c.usage_id IS NULL
       ) held LEFT JOIN tasks t ON t.id=held.task_id

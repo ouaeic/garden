@@ -9,6 +9,7 @@ import { AgentRunnerClient } from './runner-client.js';
 import { executeToolCall, type ToolContext } from './tool-dispatch.js';
 import { displayedRanges, forgetReads, recordRead } from './edit/index.js';
 import { refuseShellReplacementOfUnread } from './tools/shell-writes.js';
+import type { ClaimReview } from './claim-review.js';
 
 /**
  * The delegate arm's own file, which it did not have.
@@ -81,9 +82,10 @@ interface Harness {
       schemaValid: boolean;
       schemaErrors?: string[];
       unverified?: string;
-      evidenceChecks?: Array<{ verified: boolean; reread: boolean; detail: string }>;
+      evidenceChecks?: Array<{ quoteMatched: boolean; reread: boolean; detail: string }>;
       citations?: { checked: number; cited: number };
       untrustedSources?: string[];
+      claimReview?: ClaimReview;
     }>;
   };
   /** Every message array the specialist's model was called with, in order. */
@@ -136,6 +138,7 @@ const runMission = async (
     webPlan?: { mode: string };
     /** What the lead's own reads had left outstanding before it called `delegate`. */
     partialReads?: Record<string, number>;
+    review?: ModelResponse;
   } = {}
 ): Promise<Harness> => {
   const seen: string[][] = [];
@@ -193,10 +196,15 @@ const runMission = async (
         revision: 0,
         choicesCiphertext: null
       }),
-      listModels: async () => [model],
+      listModels: async () => [
+        options.review
+          ? { ...model, inputUsdPerMillionTokens: 0.1, outputUsdPerMillionTokens: 0.2 }
+          : model
+      ],
       effectiveSpendLimits: async () => ({ timeZone: 'UTC' }),
       recordUsage: async () => undefined,
-      taskClaim: async () => null,
+      taskClaim: async () =>
+        options.review ? { status: 'running', leaseOwner: 'worker-test' } : null,
       /*
        * The owner block is taken from the lead's window and never re-read here, and this is what
        * says so rather than a comment. A mission that reached the store for it would fail every
@@ -235,8 +243,15 @@ const runMission = async (
     }),
     gateway: async () => ({
       gateway: {
-        chat: async (_provider: string, request: { messages: Array<{ content?: string }> }) => {
+        chat: async (
+          _provider: string,
+          request: { messages: Array<{ content?: string }>; sessionId?: string }
+        ) => {
           seen.push(request.messages.map((message) => String(message.content ?? '')));
+          if (request.sessionId?.startsWith('claim-review:') && options.review) {
+            calls += 1;
+            return options.review;
+          }
           const response = script[calls] ?? answer('Nothing further.');
           calls += 1;
           return response;
@@ -514,6 +529,52 @@ describe('the contract a specialist report is held to', () => {
 });
 
 describe('what the lead is told not to rely on', () => {
+  it('delivers an independent contradiction alongside a matched quotation without laundering the conclusion', async () => {
+    const { result, calls, seen } = await runMission(
+      [
+        answer(
+          JSON.stringify({
+            answer: 'This study established causation.',
+            evidence: [
+              {
+                claim: 'This study established causation.',
+                source: 'study.txt',
+                quotedSpan: 'The study found an association.'
+              }
+            ]
+          })
+        )
+      ],
+      {
+        runner: {
+          readFile: async () => 'The study found an association. Causation was not established.'
+        },
+        review: answer(
+          JSON.stringify({
+            claims: [
+              {
+                id: 0,
+                assessment: 'contradicted',
+                kind: 'inference',
+                explanation: 'Association does not establish causation.',
+                support: [{ sourceId: 0, quote: 'Causation was not established.' }],
+                conflicts: []
+              }
+            ],
+            limitations: ['The conclusion overstates the study.']
+          })
+        )
+      }
+    );
+    expect(calls).toBe(2);
+    expect(seen[1]).toHaveLength(2);
+    expect(result.reports[0]).toMatchObject({
+      evidenceChecks: [{ quoteMatched: true }],
+      claimReview: { status: 'reviewed', claims: [{ assessment: 'contradicted' }] }
+    });
+    expect(result.reports[0]?.unverified).toContain('0 of 1 sampled claims as supported');
+    expect(result.reports[0]?.untrustedSources).toContain('workspace file study.txt');
+  });
   it('drops invisible evidence without fetching it and tells the lead nothing was checked', async () => {
     const readFile = vi.fn(async () => '');
     const { result } = await runMission(
@@ -550,7 +611,7 @@ describe('what the lead is told not to rely on', () => {
 
       expect(result.reports).toHaveLength(1);
       expect(result.reports[0]?.evidenceChecks).toEqual([
-        expect.objectContaining({ verified: false, reread: true })
+        expect.objectContaining({ quoteMatched: false, reread: true })
       ]);
       expect(result.reports[0]?.citations).toEqual({ checked: 1, cited: 1 });
       expect(result.reports[0]?.unverified).toContain('found the quoted span in none of them');
@@ -587,7 +648,7 @@ describe('what the lead is told not to rely on', () => {
       '1 of 2 evidence items were dropped'
     );
     expect(result.reports[0]?.evidenceChecks).toEqual([
-      expect.objectContaining({ verified: true, reread: true })
+      expect.objectContaining({ quoteMatched: true, reread: true })
     ]);
     expect(readFile).toHaveBeenCalledExactlyOnceWith(workspaceId, taskId, 'notes.md');
   });
@@ -609,19 +670,19 @@ describe('what the lead is told not to rely on', () => {
       } as unknown as Partial<AgentRunnerClient>
     });
 
-    expect(result.reports[0]?.evidenceChecks?.[0]?.verified).toBe(false);
+    expect(result.reports[0]?.evidenceChecks?.[0]?.quoteMatched).toBe(false);
     expect(result.reports[0]?.unverified).toContain('found the quoted span in none of them');
   });
 
-  it('stays quiet when the harness found the span it re-read', async () => {
+  it('distinguishes quotation presence from claim support', async () => {
     const { result } = await runMission([answer(REPORT)], {
       runner: {
         readFile: async () => 'the notes say three tiers'
       } as unknown as Partial<AgentRunnerClient>
     });
 
-    expect(result.reports[0]?.evidenceChecks?.[0]?.verified).toBe(true);
-    expect(result.reports[0]?.unverified).toBeUndefined();
+    expect(result.reports[0]?.evidenceChecks?.[0]?.quoteMatched).toBe(true);
+    expect(result.reports[0]?.unverified).toContain('Quotation matches do not establish claims');
   });
 });
 
@@ -817,7 +878,7 @@ describe('where the harness will go to check a citation', () => {
 
     expect(reads).toHaveLength(1);
     expect(result.reports[0]?.evidenceChecks).toEqual([
-      expect.objectContaining({ verified: false, reread: false })
+      expect.objectContaining({ quoteMatched: false, reread: false })
     ]);
     expect(result.reports[0]?.citations).toEqual({ checked: 0, cited: 1 });
     expect(result.reports[0]?.unverified).toContain('could not open');
@@ -830,7 +891,7 @@ describe('where the harness will go to check a citation', () => {
     });
 
     expect(result.reports[0]?.evidenceChecks).toEqual([
-      expect.objectContaining({ verified: false, reread: true })
+      expect.objectContaining({ quoteMatched: false, reread: true })
     ]);
     expect(result.reports[0]?.citations).toEqual({ checked: 1, cited: 1 });
     expect(result.reports[0]?.unverified).toContain('found the quoted span in none of them');
@@ -851,7 +912,7 @@ describe('where the harness will go to check a citation', () => {
       }
     ]);
     const check = result.reports[0]?.evidenceChecks?.[0];
-    expect(check?.verified).toBe(false);
+    expect(check?.quoteMatched).toBe(false);
     expect(check?.reread).toBe(false);
     expect(check?.detail).toContain('the harness did not fetch this source');
     // In the classifier's own words, so the lead is told which of the two things happened.
@@ -872,9 +933,9 @@ describe('where the harness will go to check a citation', () => {
 
     expect(reads).toHaveLength(2);
     expect(reads[1]?.urls).toEqual(['https://hostile.test/notes']);
-    expect(result.reports[0]?.evidenceChecks?.[0]?.verified).toBe(true);
+    expect(result.reports[0]?.evidenceChecks?.[0]?.quoteMatched).toBe(true);
     expect(result.reports[0]?.evidenceChecks?.[0]?.reread).toBe(true);
-    expect(result.reports[0]?.unverified).toBeUndefined();
+    expect(result.reports[0]?.unverified).toContain('Quotation matches do not establish claims');
     expect(result.reports[0]?.citations).toEqual({ checked: 1, cited: 1 });
     // An address the turn was handed is an address the model did not compose, here as everywhere.
     expect(state.turnNoveltyBytes).toBe(0);
@@ -900,8 +961,8 @@ describe('where the harness will go to check a citation', () => {
     );
 
     expect(reads[1]?.urls).toEqual(['https://mirror.test/notes']);
-    expect(result.reports[0]?.evidenceChecks?.[0]?.verified).toBe(true);
-    expect(result.reports[0]?.unverified).toBeUndefined();
+    expect(result.reports[0]?.evidenceChecks?.[0]?.quoteMatched).toBe(true);
+    expect(result.reports[0]?.unverified).toContain('Quotation matches do not establish claims');
     expect(state.turnNoveltyBytes).toBe(0);
   });
 
@@ -919,7 +980,7 @@ describe('where the harness will go to check a citation', () => {
     );
 
     expect(reads).toHaveLength(2);
-    expect(result.reports[0]?.evidenceChecks?.[0]?.verified).toBe(true);
+    expect(result.reports[0]?.evidenceChecks?.[0]?.quoteMatched).toBe(true);
     expect(state.turnNoveltyBytes).toBeGreaterThan(0);
   });
 
@@ -953,8 +1014,8 @@ describe('where the harness will go to check a citation', () => {
     );
 
     expect(reads[1]?.urls).toEqual(['https://searched.test/tiers']);
-    expect(result.reports[0]?.evidenceChecks?.[0]?.verified).toBe(true);
-    expect(result.reports[0]?.unverified).toBeUndefined();
+    expect(result.reports[0]?.evidenceChecks?.[0]?.quoteMatched).toBe(true);
+    expect(result.reports[0]?.unverified).toContain('Quotation matches do not establish claims');
   });
 
   /** A workspace path is not a web reach and is read exactly as it was before. */
@@ -966,7 +1027,7 @@ describe('where the harness will go to check a citation', () => {
     });
 
     expect(reads).toEqual([]);
-    expect(result.reports[0]?.evidenceChecks?.[0]?.verified).toBe(true);
+    expect(result.reports[0]?.evidenceChecks?.[0]?.quoteMatched).toBe(true);
     expect(result.reports[0]?.evidenceChecks?.[0]?.reread).toBe(true);
   });
 });
@@ -999,7 +1060,7 @@ describe('how much of a report the two spot checks stand for', () => {
     expect(result.reports[0]?.citations).toEqual({ checked: 2, cited: 8 });
     expect(result.reports[0]?.evidenceChecks).toHaveLength(2);
     expect(result.reports[0]?.unverified).toContain('re-read 2 of the 8 cited sources');
-    expect(result.reports[0]?.unverified).toContain('the other 6 were not re-read at all');
+    expect(result.reports[0]?.unverified).toContain('The other 6 were not re-read at all');
   });
 
   /**
@@ -1027,7 +1088,7 @@ describe('how much of a report the two spot checks stand for', () => {
     expect(result.reports[0]?.unverified).toContain('re-read 1 of the 3 cited sources');
     // The refused one is counted among the sources nothing was compared for, which is where it
     // belongs - and `evidenceChecks` says which it was.
-    expect(result.reports[0]?.unverified).toContain('the other 2 were not re-read at all');
+    expect(result.reports[0]?.unverified).toContain('The other 2 were not re-read at all');
   });
 
   /** One left over is one, in the words a reader uses for one. */
@@ -1044,7 +1105,7 @@ describe('how much of a report the two spot checks stand for', () => {
     });
 
     expect(result.reports[0]?.citations).toEqual({ checked: 1, cited: 2 });
-    expect(result.reports[0]?.unverified).toContain('the other 1 was not re-read at all');
+    expect(result.reports[0]?.unverified).toContain('The other 1 was not re-read at all');
   });
 
   it('stays quiet when the two it re-read are the whole of what was cited', async () => {
@@ -1062,7 +1123,7 @@ describe('how much of a report the two spot checks stand for', () => {
     });
 
     expect(result.reports[0]?.citations).toEqual({ checked: 2, cited: 2 });
-    expect(result.reports[0]?.unverified).toBeUndefined();
+    expect(result.reports[0]?.unverified).toContain('Quotation matches do not establish claims');
   });
 });
 

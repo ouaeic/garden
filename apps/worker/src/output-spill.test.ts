@@ -485,6 +485,50 @@ describe('reading a marker back, so a later pass can carry the pointer that made
  * own window; it is pinned in `context.test.ts` at the exact call it makes.
  */
 describe('what a cut result says when nothing was kept', () => {
+  it('stores complete research reports while retaining every mission and its adverse finding in the model window', async () => {
+    const { deps, state, writes, events } = recording();
+    const reports = Array.from({ length: 3 }, (_, index) => ({
+      name: `source-review-${index}`,
+      report: body(30_000, `report-${index}`),
+      unverified: 'Material claims need qualification.',
+      untrustedSources: ['web page source.test'],
+      claimReview: {
+        status: 'reviewed',
+        claims: [
+          {
+            id: 0,
+            assessment: 'contradicted',
+            kind: 'observation',
+            explanation: `adverse-finding-${index}`,
+            support: [],
+            conflicts: []
+          }
+        ],
+        limitations: []
+      }
+    }));
+    const payload = { reports, usageCredits: 0.01 };
+    await recordToolResult(
+      deps,
+      task,
+      Buffer.from(dataKey),
+      state,
+      { id: 'delegate-call', name: 'delegate', arguments: {} },
+      payload
+    );
+    expect(writes).toHaveLength(1);
+    expect(writes[0]!.content).toBe(JSON.stringify(payload));
+    const text = windowEntry(state);
+    expect(text).toContain(writes[0]!.path);
+    expect(text).toContain('Everything between the markers');
+    expect(reports).toHaveLength(3);
+    for (const [index, report] of reports.entries()) {
+      expect(text).toContain(report.name);
+      expect(text).toContain(`adverse-finding-${index}`);
+    }
+    const event = events.find((event) => event.summary === 'delegate completed');
+    expect(event?.payload).toEqual({ toolCallId: 'delegate-call', result: payload });
+  });
   const shell = {
     id: 'call-1',
     name: 'shell',

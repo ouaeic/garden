@@ -40,6 +40,24 @@ export async function checkArtifactLinks({
         json: {
           events: [
             {
+              id: 'research-review',
+              taskId: task.id,
+              sequence: 2,
+              kind: 'subagent',
+              summary: 'Research review completed',
+              createdAt: task.createdAt,
+              payload: {
+                laneId: 'research-lane',
+                lane: 'research',
+                name: 'Clinical source review',
+                status: 'completed',
+                citations: { checked: 2, matched: 2, cited: 6 },
+                claimReview: { checked: 2, supported: 0, contradicted: 1 },
+                detail:
+                  'The current figure contradicts the report. The causal claim remains unestablished.'
+              }
+            },
+            {
               id: 'artifact-answer',
               taskId: task.id,
               sequence: 3,
@@ -64,6 +82,14 @@ export async function checkArtifactLinks({
         .locator('.garden-answer')
         .getByRole('link', { name: 'Open result.json', exact: true });
       await link.waitFor();
+      const lane = page.locator('.garden-mission').filter({ hasText: 'Clinical source review' });
+      await lane.getByText('Report outcome', { exact: true }).click();
+      assert((await lane.innerText()).includes('0 supported'));
+      assert((await lane.innerText()).includes('1 contradicted'));
+      assert(!(await lane.innerText()).includes('Verified'));
+      const laneBounds = await lane.boundingBox();
+      assert(laneBounds && laneBounds.x >= 0 && laneBounds.x + laneBounds.width <= width + 1);
+      await page.screenshot({ path: resolve(report, `claim-review-${width}.png`) });
       assert.equal(await link.getAttribute('href'), `/v1/artifacts/${artifact.id}/content`);
       assert.equal(await page.getByRole('link', { name: 'missing file', exact: true }).count(), 0);
       const before = reads;

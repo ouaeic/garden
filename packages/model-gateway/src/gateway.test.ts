@@ -44,6 +44,24 @@ const baseRequest: ModelRequest = {
 };
 
 describe('ModelGateway.chat retries', () => {
+  it('can submit one reserved attempt without changing retries for later calls', async () => {
+    const waits: number[] = [];
+    let attempts = 0;
+    const gateway = new ModelGateway({ retry: instantPolicy(waits) }).register(
+      'test',
+      stubAdapter(async () => {
+        attempts += 1;
+        throw new AthanorError('provider_unavailable', 'upstream down', 503);
+      })
+    );
+    await expect(gateway.chat('test', baseRequest, { retry: false })).rejects.toThrow(
+      'upstream down'
+    );
+    expect(attempts).toBe(1);
+    expect(waits).toEqual([]);
+    await expect(gateway.chat('test', baseRequest)).rejects.toThrow('upstream down');
+    expect(attempts).toBe(4);
+  });
   it('rides out transient upstream faults with backoff instead of failing the task', async () => {
     const waits: number[] = [];
     let attempts = 0;
