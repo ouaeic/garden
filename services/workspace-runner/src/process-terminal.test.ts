@@ -34,6 +34,7 @@ describe('managed interactive terminals', () => {
       args: [
         '-e',
         `
+        process.stdout.on('resize', () => console.log('resized='+process.stdout.columns+'x'+process.stdout.rows));
         console.log('TTY='+Boolean(process.stdin.isTTY && process.stdout.isTTY));
         console.error('combined stderr');
         require('readline').createInterface({input:process.stdin}).on('line', line => {
@@ -60,6 +61,8 @@ describe('managed interactive terminals', () => {
       columns: 83,
       rows: 29
     });
+    // The child's cached dimensions update when its event loop handles SIGWINCH.
+    await expect.poll(() => inspect(manager, result.sessionId).stdout).toContain('resized=83x29');
     write(manager, result.sessionId, 'hello\n');
     await expect.poll(() => inspect(manager, result.sessionId).status).toBe('completed');
     expect(inspect(manager, result.sessionId)).toMatchObject({
