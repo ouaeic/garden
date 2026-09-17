@@ -148,6 +148,7 @@ describe('reaching a connected service', () => {
   it('sends the workspace files the model named, as the bytes the protocol needs', async () => {
     const sent: Array<Record<string, unknown>> = [];
     const result = await performConnectorAction({
+      connectorId: 'test-account',
       kind: 'imap',
       action: 'mail_send',
       requested: {
@@ -183,6 +184,7 @@ describe('reaching a connected service', () => {
     // promising a CV that is not there.
     await expect(
       performConnectorAction({
+        connectorId: 'test-account',
         kind: 'imap',
         action: 'mail_send',
         requested: { attachments: [{ filename: 'cv.pdf', contentBase64: 'AAAA' }] },
@@ -197,6 +199,7 @@ describe('reaching a connected service', () => {
     let opened = false;
     await expect(
       performConnectorAction({
+        connectorId: 'test-account',
         kind: 'imap',
         action: 'mail_send',
         requested: { attachments: ['workspace/a.mov', 'workspace/b.mov'] },
@@ -214,6 +217,7 @@ describe('reaching a connected service', () => {
   it('writes a read attachment into the workspace and answers with its path', async () => {
     const written: Array<{ path: string; bytes: number }> = [];
     const result = (await performConnectorAction({
+      connectorId: 'test-account',
       kind: 'imap',
       action: 'mail_read_attachment',
       requested: { mailbox: 'INBOX', uid: 9, partId: '2' },
@@ -236,10 +240,47 @@ describe('reaching a connected service', () => {
       })
     })) as { trust: string; content: Record<string, unknown> };
 
-    expect(written).toEqual([{ path: 'workspace/mail/9-contract.pdf', bytes: 5 }]);
-    expect(result.content.path).toBe('workspace/mail/9-contract.pdf');
+    expect(written).toHaveLength(1);
+    expect(written[0]).toEqual({
+      path: expect.stringMatching(/^workspace\/mail\/[a-f0-9]{16}-contract\.pdf$/) as unknown,
+      bytes: 5
+    });
+    expect(result.content.path).toBe(written[0]!.path);
     expect(result.content.contentBase64).toBeUndefined();
     expect(result.trust).toBe('untrusted');
+  });
+
+  it('keeps same-name attachments from separate accounts, message parts and revisions distinct, including empty files', async () => {
+    const saved = new Map<string, string>();
+    const download = async (connectorId: string, partId: string, body: string) => {
+      const result = (await performConnectorAction({
+        connectorId,
+        kind: 'google',
+        action: 'account_mail_attachment',
+        requested: { messageId: 'shared-id', partId },
+        readFile: async () => ({ mimeType: 'text/plain', bytes: Buffer.alloc(0) }),
+        writeFile: async (path, bytes) => {
+          saved.set(path, bytes.toString());
+        },
+        execute: async () => ({
+          filename: 'notes.txt',
+          contentBase64: Buffer.from(body).toString('base64')
+        })
+      })) as { content: { path: string; contentBase64?: string } };
+      expect(result.content.contentBase64).toBeUndefined();
+      return result.content.path;
+    };
+    const paths = [
+      await download('a', 'one', 'first'),
+      await download('b', 'one', 'second'),
+      await download('a', 'two', 'third'),
+      await download('a', 'one', 'changed'),
+      await download('a', 'empty', '')
+    ];
+    expect(new Set(paths).size).toBe(5);
+    expect([...saved.values()]).toEqual(['first', 'second', 'third', 'changed', '']);
+    expect(await download('a', 'one', 'first')).toBe(paths[0]);
+    expect(saved.size).toBe(5);
   });
 
   it('returns the path an attachment was written to, never the bytes of it', () => {

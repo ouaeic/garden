@@ -12,7 +12,7 @@
  *
  * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
-import { AthanorError, isMailConnectorKind, type AnyConnectorKind } from '@athanor/core';
+import { AthanorError, isMailConnectorKind, sha256, type AnyConnectorKind } from '@athanor/core';
 import { labelledConnectorResult } from './provenance.js';
 import { asRecord, textValue } from './values.js';
 
@@ -80,7 +80,13 @@ export const attachmentDestination = (saveTo: string, filename: string, uid: unk
     .replace(/^[.-]+/, '')
     .slice(0, 80);
   const message = Number(uid);
-  return `${MAIL_ATTACHMENT_DIRECTORY}/${Number.isSafeInteger(message) && message > 0 ? message : 'message'}-${safe || 'attachment'}`;
+  const identity =
+    Number.isSafeInteger(message) && message > 0
+      ? message
+      : typeof uid === 'string' && /^[a-f0-9]{16}$/.test(uid)
+        ? uid
+        : 'message';
+  return `${MAIL_ATTACHMENT_DIRECTORY}/${identity}-${safe || 'attachment'}`;
 };
 
 /**
@@ -116,6 +122,7 @@ export const attachmentSavedResult = (result: unknown, path: string): unknown =>
  * leave the computer, which bytes land on it, and what is labelled as somebody else's words.
  */
 export const performConnectorAction = async (input: {
+  connectorId: string;
   kind: AnyConnectorKind;
   action: string;
   requested: Record<string, unknown>;
@@ -161,16 +168,30 @@ export const performConnectorAction = async (input: {
     ...(attachments.length ? { attachments } : {}),
     action: input.action
   });
-  if (input.action !== 'mail_read_attachment')
-    return labelledConnectorResult(input.kind, input.action, result);
-  const content = asRecord(asRecord(result)?.content);
-  const encoded = textValue(content?.contentBase64);
-  if (!encoded) return result;
+  const labelled = labelledConnectorResult(input.kind, input.action, result);
+  if (!['mail_read_attachment', 'account_mail_attachment'].includes(input.action)) return labelled;
+  const content = asRecord(asRecord(labelled)?.content);
+  const encoded = content?.contentBase64;
+  if (typeof encoded !== 'string')
+    throw new AthanorError(
+      'mail_content_invalid',
+      'The mailbox omitted the requested attachment bytes.'
+    );
+  const bytes = Buffer.from(encoded, 'base64');
   const destination = attachmentDestination(
     textValue(input.requested.saveTo),
     textValue(content?.filename),
-    input.requested.uid
+    sha256(
+      JSON.stringify([
+        input.connectorId,
+        input.requested.mailbox,
+        input.requested.uid,
+        input.requested.messageId,
+        input.requested.partId,
+        sha256(bytes)
+      ])
+    ).slice(0, 16)
   );
-  await input.writeFile(destination, Buffer.from(encoded, 'base64'));
-  return attachmentSavedResult(result, destination);
+  await input.writeFile(destination, bytes);
+  return attachmentSavedResult(labelled, destination);
 };

@@ -83,6 +83,7 @@ const publicPaths = new Set([
   '/v1/auth/enroll/verify',
   '/v1/auth/dev',
   '/v1/connectors/mcp/oauth/callback',
+  '/v1/connectors/accounts/oauth/callback',
   '/v1/connectors/mcp/oauth/client-metadata',
   /*
    * The inbound trigger, which is unauthenticated in the sense this table means and not in the

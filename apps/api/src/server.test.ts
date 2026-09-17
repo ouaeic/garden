@@ -695,6 +695,7 @@ describe('API production boundaries', () => {
     });
     expect(oauthStart.statusCode, oauthStart.body).toBe(200);
     const oauthStartBody = oauthStart.json<{
+      connectorId: string;
       authorizationUrl: string;
       authorizationHost: string;
       expiresAt: string;
@@ -738,6 +739,7 @@ describe('API production boundaries', () => {
     expect(connectorsAfterOAuth.json()).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
+          id: oauthStartBody.connectorId,
           kind: 'mcp_http',
           authMode: 'oauth',
           label: 'Secure tools'

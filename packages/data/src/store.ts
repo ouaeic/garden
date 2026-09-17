@@ -6,7 +6,7 @@ export type { ProjectExecutionRecord } from './project-executions.js';
 import { IdentityStore } from './store/identity.js';
 import { BillingStore } from './store/billing.js';
 import { DictationStore } from './store/dictation.js';
-import { ConnectorStore } from './store/connectors.js';
+import { ConnectorStore, type ConnectorAuthorization } from './store/connectors.js';
 import { NotificationStore } from './store/notifications.js';
 import { MemoryStore } from './store/memory.js';
 import { TaskSignals, TaskStore } from './store/tasks.js';
@@ -1389,6 +1389,10 @@ export class DataStore {
 
   updateConnectorSecret(...args: Parameters<ConnectorStore['updateConnectorSecret']>) {
     return this.#connectors.updateConnectorSecret(...args);
+  }
+
+  withConnectorAuthorization<T>(userId: string, id: string, authorize: ConnectorAuthorization<T>) {
+    return this.#connectors.withConnectorAuthorization(userId, id, authorize);
   }
 
   createConnectorOAuthAttempt(...args: Parameters<ConnectorStore['createConnectorOAuthAttempt']>) {

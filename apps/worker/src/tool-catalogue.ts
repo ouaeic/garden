@@ -7,6 +7,7 @@ import {
 } from '@athanor/contracts';
 import {
   connectorActions,
+  connectorActionSupportsKind,
   MEMORY_RECALL_ITEM_CEILING,
   MEMORY_RECALL_MAX_ITEMS,
   type AnyConnectorKind,
@@ -190,6 +191,19 @@ const CONNECTOR_INPUT_PROPERTIES: Record<string, unknown> = {
   },
   replyToMailbox: { type: 'string' },
   replyToUid: { type: 'integer' },
+  messageId: { type: 'string', description: 'Message ID from account_mail_search.' },
+  calendarId: {
+    type: 'string',
+    description: 'Calendar ID from account_calendar_list; omitted means primary.'
+  },
+  query: {
+    type: 'string',
+    description: 'Native Gmail search syntax or Microsoft mail search terms.'
+  },
+  cursor: {
+    type: 'string',
+    description: 'nextCursor from the same action with unchanged search parameters.'
+  },
   calendarUrl: { type: 'string', description: 'Calendar address from calendar_list.' },
   eventUrl: { type: 'string', description: 'Event address from calendar_read_range.' },
   start: { type: 'string' },
@@ -323,7 +337,29 @@ export const CONNECTOR_ACTION_INPUTS = {
   },
   webdav_delete: { fields: ['path'], clause: 'path' },
   mcp_list_tools: { fields: [], clause: 'no parameters' },
-  mcp_call_tool: { fields: ['tool', 'arguments'], clause: 'tool, arguments' }
+  mcp_call_tool: { fields: ['tool', 'arguments'], clause: 'tool, arguments' },
+  account_mail_search: {
+    fields: ['query', 'limit', 'cursor'],
+    clause: 'optional query, limit, cursor'
+  },
+  account_mail_read: {
+    fields: ['messageId', 'maxCharacters'],
+    clause: 'messageId, optional maxCharacters'
+  },
+  account_mail_attachments: {
+    fields: ['messageId', 'cursor'],
+    clause: 'messageId, optional cursor for remaining attachments'
+  },
+  account_mail_attachment: {
+    fields: ['messageId', 'partId', 'maxBytes', 'saveTo'],
+    clause:
+      'messageId, partId from account_mail_read, optional maxBytes, saveTo; saves the file in the workspace'
+  },
+  account_calendar_list: { fields: ['limit', 'cursor'], clause: 'optional limit, cursor' },
+  account_calendar_range: {
+    fields: ['calendarId', 'start', 'end', 'limit', 'cursor'],
+    clause: 'start, end with explicit UTC offsets; optional calendarId, limit, cursor'
+  }
 } as const satisfies Record<ConnectorAction, { fields: readonly string[]; clause: string }>;
 
 /**
@@ -352,7 +388,9 @@ const CONNECTOR_GROUP_LABELS = {
   caldav: 'Calendar',
   github: 'GitHub',
   webdav: 'WebDAV',
-  mcp_http: 'MCP'
+  mcp_http: 'MCP',
+  google: 'Account mail and calendar',
+  microsoft: 'Account mail and calendar'
 } as const satisfies Record<AnyConnectorKind, string>;
 
 const CONNECTOR_GROUPS = Object.entries(CONNECTOR_GROUP_LABELS) as ReadonlyArray<
@@ -386,8 +424,12 @@ const ALL_CONNECTOR_ACTIONS = Object.keys(connectorActions) as ConnectorAction[]
  */
 const connectorActionTool = (reachable: readonly ConnectorAction[]): ModelTool => {
   const fields = new Set<string>(reachable.flatMap((name) => CONNECTOR_ACTION_INPUTS[name].fields));
+  const described = new Set<ConnectorAction>();
   const sections = CONNECTOR_GROUPS.map(([kind, label]) => {
-    const mine = reachable.filter((name) => connectorActions[name].kind === kind);
+    const mine = reachable.filter(
+      (name) => connectorActionSupportsKind(name, kind) && !described.has(name)
+    );
+    for (const name of mine) described.add(name);
     return mine.length
       ? `${label} - ${mine.map((name) => `${name}: ${CONNECTOR_ACTION_INPUTS[name].clause}`).join('. ')}`
       : '';
@@ -1877,7 +1919,9 @@ export const agentToolsFor = (
     .map((tool) =>
       tool.name === 'connector_action' && kinds.size
         ? connectorActionTool(
-            ALL_CONNECTOR_ACTIONS.filter((action) => kinds.has(connectorActions[action].kind))
+            ALL_CONNECTOR_ACTIONS.filter((action) =>
+              [...kinds].some((kind) => connectorActionSupportsKind(action, kind))
+            )
           )
         : tool
     );

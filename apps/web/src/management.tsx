@@ -59,7 +59,12 @@ export function useAction(onChange?: () => void) {
       setBusy(false);
     }
   };
-  return { busy, error, message, run };
+  const reset = () => {
+    if (lock.current) return;
+    setError(null);
+    setMessage('');
+  };
+  return { busy, error, message, run, reset };
 }
 
 export function ActionFeedback({ action }: { action: ReturnType<typeof useAction> }) {

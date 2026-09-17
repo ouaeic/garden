@@ -24,6 +24,7 @@ import { z } from 'zod';
 import {
   connectorActions,
   mailConnectorActionInputs,
+  accountConnectorInputs,
   MEMORY_RECALL_ITEM_CEILING,
   MEMORY_RECALL_MAX_ITEMS
 } from '@athanor/core';
@@ -98,36 +99,13 @@ describe('the size of the catalogue the model is sent', () => {
   });
 
   it('stays inside the wire budget the whole prefix is cached against', () => {
-    // Explicit capability discovery measures 58,886 bytes for the complete catalogue.
+    // Native account reads measure 59,785 bytes for the complete catalogue.
     // The resident core has a separate ceiling in tool-groups.test.ts.
-    expect(bytes).toBeLessThan(59_000);
-    // Where the bytes actually are, because it is not where it looks. connector_action is now the
-    // largest entry at ~6.6 kB, and 5.0 kB of that is one `input` object declaring 48 fields - the
-    // union of what twenty-four actions across mail, calendar and repositories accept. Those are
-    // interface facts a model would otherwise guess at and burn a round trip on. Prose that
-    // restates the system prompt is what gets trimmed here; what a call has to contain is not
-    // prose, and is deliberately not where tokens are saved.
+    expect(bytes).toBeLessThan(60_100);
+    // Each tool and nested parameter description is bounded separately.
     for (const tool of sent)
       expect(Buffer.byteLength(tool.description), `${tool.name} description`).toBeLessThan(1_400);
-    /*
-     * And every description nested inside `parameters`, which the cap above never reached.
-     *
-     * The cap was written against `tool.description` alone, so the whole of a tool's prose could
-     * grow anywhere below it and the ceiling above was the only thing that noticed - a whole-
-     * catalogue figure that moves for forty other reasons and is raised, on the record, whenever a
-     * capability lands. Measured when the walk was first added: eleven tools carry a nested
-     * description of their own, forty-one nested descriptions in all, and one of them was past the
-     * top-level cap - connector_action.properties.input.description at 1,741 bytes.
-     *
-     * That one is the per-action field map: which of the 48 fields each of the twenty-four
-     * connector actions takes. It is the case the paragraph above describes and refuses to trim -
-     * a model that has to guess at it burns a billed round trip finding out, and the Zod schemas
-     * in @athanor/core are the only other place the answer exists, where the model cannot read it.
-     * So the number here is raised rather than the text cut, deliberately and once: 1,750 is the
-     * measured 1,741 with nine bytes to spare, which is a ceiling and not a licence. It is a
-     * separate number from the top-level cap on purpose - a nested description that grows still
-     * fails here, and the tool's own pitch is still held to 1,400.
-     */
+    // Bound nested descriptions as well as each tool description.
     const nested: [string, number][] = [];
     const walk = (node: unknown, path: string): void => {
       if (!node || typeof node !== 'object') return;
@@ -145,7 +123,12 @@ describe('the size of the catalogue the model is sent', () => {
     // A walk that stops finding anything is this check failing while it looks like it passed, which
     // is exactly how the top-level cap missed 1,741 bytes for as long as it did.
     expect(nested.length).toBeGreaterThan(30);
-    for (const [where, size] of nested) expect(size, where).toBeLessThan(1_750);
+    for (const [where, size] of nested) {
+      // The field map with native account reads measures 2,227 bytes.
+      expect(size, where).toBeLessThan(
+        where === 'connector_action.properties.input.description' ? 2_250 : 1_750
+      );
+    }
   });
 
   it('declares the line-addressed edit shape, and only that shape', () => {
@@ -454,7 +437,8 @@ describe('the wire a box without a browser or a screen is sent', () => {
      * so they are paid for here too. 44,000 against a measured 43,981, up from 43,908. The gap to
      * the provisioned wire is still exactly 11,692, because the same 73 bytes landed on both.
      */
-    expect(Buffer.byteLength(JSON.stringify(bare))).toBeLessThan(47_000);
+    // Native account read schemas measure 47,751 bytes without computer surfaces.
+    expect(Buffer.byteLength(JSON.stringify(bare))).toBeLessThan(48_100);
     // The other direction, and the one that fails silently. A gate wired to nothing returns the
     // unconditional constant on every box; this is the assertion that would go red if it did.
     expect(Buffer.byteLength(JSON.stringify(bare))).toBeLessThan(
@@ -547,11 +531,11 @@ describe('the wire a box is sent about the services it has actually connected', 
     expect(actionsOf(agentToolsFor())).toEqual(Object.keys(connectorActions));
   });
 
-  it('withdraws nothing from a box that has connected all five kinds', () => {
+  it('withdraws nothing from a box that has connected every kind', () => {
     // The half that would look like success while capability fell. Byte-identical, not merely the
     // same names: the enum, the per-action sentence and the field bag are all rebuilt here, and a
     // rebuild that moved one comma would be a cache miss the owner gets nothing for.
-    const all = compacted(['imap', 'caldav', 'github', 'webdav', 'mcp_http']);
+    const all = compacted(ConnectorKind.options);
     expect(JSON.stringify(all)).toBe(JSON.stringify(everything));
   });
 
@@ -568,22 +552,26 @@ describe('the wire a box is sent about the services it has actually connected', 
       ['github'],
       ['webdav'],
       ['mcp_http'],
+      ['google'],
+      ['microsoft'],
+      ['google', 'microsoft'],
       ['imap', 'caldav'],
       ['imap', 'caldav', 'github']
     ] as ConnectorKind[][]) {
       const label = kinds.join('+');
       const sent = compacted(kinds);
       const reachable = Object.entries(connectorActions)
-        .filter(([, definition]) => kinds.includes(definition.kind))
+        .filter(([, definition]) => definition.kinds.some((kind) => kinds.includes(kind)))
         .map(([name]) => name);
       expect(actionsOf(sent), label).toEqual(reachable);
       const input = inputOf(sent);
       // Every reachable action is still named where the model finds out what shape it takes, and
       // nothing that cannot be reached is.
       for (const name of Object.keys(connectorActions))
-        expect(input?.description?.includes(`${name}:`), `${label} / ${name}`).toBe(
-          reachable.includes(name)
-        );
+        expect(
+          new RegExp(`(?<![a-z_])${name}:`).test(input?.description ?? ''),
+          `${label} / ${name}`
+        ).toBe(reachable.includes(name));
       // And every field one of them takes is still declared. Read off the full bag rather than
       // listed here: a field this filter dropped while an action still needed it would be a call
       // the model cannot make and a refusal it cannot read a reason out of.
@@ -662,13 +650,13 @@ describe('the wire a box is sent about the services it has actually connected', 
     const union = new Set(
       Object.keys(connectorActions).flatMap((name) =>
         Object.keys(
-          inputOf(compacted([connectorActions[name as keyof typeof connectorActions].kind]))
+          inputOf(compacted([...connectorActions[name as keyof typeof connectorActions].kinds]))
             ?.properties ?? {}
         )
       )
     );
     expect([...union].sort()).toEqual([...full].sort());
-    expect(full.length).toBe(49);
+    expect(full.length).toBe(53);
   });
 
   it('gives each action the fields its own schema accepts, not its neighbour’s', () => {
@@ -689,7 +677,7 @@ describe('the wire a box is sent about the services it has actually connected', 
      * than quietly skipped.
      */
     const accepted = new Map<string, string[]>();
-    for (const schema of mailConnectorActionInputs) {
+    for (const schema of [...mailConnectorActionInputs, ...accountConnectorInputs]) {
       const shape: Record<string, unknown> = schema.shape;
       const name = (shape.action as { value: string }).value;
       accepted.set(
@@ -697,11 +685,15 @@ describe('the wire a box is sent about the services it has actually connected', 
         Object.keys(shape).filter((field) => field !== 'action')
       );
     }
-    expect(accepted.size).toBe(13);
+    expect(accepted.size).toBe(mailConnectorActionInputs.length + accountConnectorInputs.length);
+    expect(accepted.size).toBeGreaterThan(0);
     // The one field declared here that no connector schema will ever accept, named so that it
     // stays a decision. `saveTo` is stripped before the connector layer sees it and is honoured by
     // the workspace write route instead, which is what the entry's own comment says.
-    const beyondTheSchema: Record<string, string[]> = { mail_read_attachment: ['saveTo'] };
+    const beyondTheSchema: Record<string, string[]> = {
+      mail_read_attachment: ['saveTo'],
+      account_mail_attachment: ['saveTo']
+    };
     for (const [name, fields] of accepted) {
       const declared = CONNECTOR_ACTION_INPUTS[name as keyof typeof CONNECTOR_ACTION_INPUTS].fields;
       expect([...declared].sort(), name).toEqual(

@@ -1,3 +1,12 @@
+import {
+  accountConnectorActions,
+  accountConnectorInputs,
+  accountConnectorCatalog,
+  accountConnectorBase,
+  isAccountConnectorKind,
+  executeAccountConnector
+} from './account-connectors.js';
+import { AccountOAuth, verifyAccountOAuthIdentity } from './account-oauth.js';
 import { lookup as resolveDns } from 'node:dns/promises';
 import { request as httpsRequest } from 'node:https';
 import { type LookupFunction } from 'node:net';
@@ -35,6 +44,7 @@ import type {
 import { hostMatchesSuffix, isPublicInternetAddress } from './network-scope.js';
 
 export interface ConnectorSecret {
+  accountOAuth?: AccountOAuth;
   token?: string;
   username?: string;
   password?: string;
@@ -131,36 +141,50 @@ export const connectorCatalog: ConnectorDefinition[] = [
       }
     ]
   },
-  ...mailConnectorCatalog
+  ...mailConnectorCatalog,
+  ...accountConnectorCatalog
 ];
 
 export const connectorActions = {
-  github_list_repositories: { kind: 'github', scope: 'github:repository.read', sideEffect: 'read' },
-  github_read_file: { kind: 'github', scope: 'github:repository.read', sideEffect: 'read' },
-  github_list_issues: { kind: 'github', scope: 'github:issues.read', sideEffect: 'read' },
-  github_create_issue: { kind: 'github', scope: 'github:issues.write', sideEffect: 'write' },
+  github_list_repositories: {
+    kinds: ['github'],
+    scope: 'github:repository.read',
+    sideEffect: 'read'
+  },
+  github_read_file: { kinds: ['github'], scope: 'github:repository.read', sideEffect: 'read' },
+  github_list_issues: { kinds: ['github'], scope: 'github:issues.read', sideEffect: 'read' },
+  github_create_issue: { kinds: ['github'], scope: 'github:issues.write', sideEffect: 'write' },
   github_create_pull_request: {
-    kind: 'github',
+    kinds: ['github'],
     scope: 'github:pull_requests.write',
     sideEffect: 'write'
   },
-  webdav_list: { kind: 'webdav', scope: 'webdav:files.read', sideEffect: 'read' },
-  webdav_read: { kind: 'webdav', scope: 'webdav:files.read', sideEffect: 'read' },
-  webdav_write: { kind: 'webdav', scope: 'webdav:files.write', sideEffect: 'write' },
-  webdav_delete: { kind: 'webdav', scope: 'webdav:files.delete', sideEffect: 'delete' },
-  mcp_list_tools: { kind: 'mcp_http', scope: 'mcp:tools.read', sideEffect: 'read' },
+  webdav_list: { kinds: ['webdav'], scope: 'webdav:files.read', sideEffect: 'read' },
+  webdav_read: { kinds: ['webdav'], scope: 'webdav:files.read', sideEffect: 'read' },
+  webdav_write: { kinds: ['webdav'], scope: 'webdav:files.write', sideEffect: 'write' },
+  webdav_delete: { kinds: ['webdav'], scope: 'webdav:files.delete', sideEffect: 'delete' },
+  mcp_list_tools: { kinds: ['mcp_http'], scope: 'mcp:tools.read', sideEffect: 'read' },
   mcp_call_tool: {
-    kind: 'mcp_http',
+    kinds: ['mcp_http'],
     scope: 'mcp:tools.execute',
     sideEffect: 'delete'
   },
-  ...mailConnectorActions
+  ...mailConnectorActions,
+  ...accountConnectorActions
 } as const satisfies Record<
   string,
-  { kind: AnyConnectorKind; scope: AnyConnectorScope; sideEffect: 'read' | 'write' | 'delete' }
+  {
+    kinds: readonly AnyConnectorKind[];
+    scope: AnyConnectorScope;
+    sideEffect: 'read' | 'write' | 'delete';
+  }
 >;
 
 export type ConnectorAction = keyof typeof connectorActions;
+export const connectorActionSupportsKind = (
+  action: ConnectorAction,
+  kind: AnyConnectorKind
+): boolean => (connectorActions[action].kinds as readonly AnyConnectorKind[]).includes(kind);
 
 /**
  * What content read through each connector *is*, in one word, for the label that travels with it.
@@ -183,7 +207,9 @@ export const connectorContentOrigins = {
   webdav: 'webdav share',
   mcp_http: 'mcp server',
   imap: 'mailbox',
-  caldav: 'calendar'
+  caldav: 'calendar',
+  google: 'google account',
+  microsoft: 'microsoft account'
 } as const satisfies Record<AnyConnectorKind, string>;
 
 /**
@@ -257,7 +283,8 @@ const connectorActionInput = z.discriminatedUnion('action', [
     tool: z.string().min(1).max(256),
     arguments: z.record(z.string(), z.unknown()).default({})
   }),
-  ...mailConnectorActionInputs
+  ...mailConnectorActionInputs,
+  ...accountConnectorInputs
 ]);
 
 export interface ConnectorRequestInput {
@@ -848,6 +875,13 @@ export const verifyConnector = async (
   input: Omit<ConnectorExecutionInput, 'action' | 'scopes'>
 ): Promise<{ accountLabel: string; statusCode: number }> => {
   const transport = input.transport ?? secureConnectorRequest;
+  if (isAccountConnectorKind(input.kind)) {
+    const secret = AccountOAuth.parse(input.secret.accountOAuth);
+    if (secret.provider !== input.kind || input.baseUrl !== accountConnectorBase(secret.provider))
+      throw new AthanorError('connector_secret_context', 'The account provider does not match.');
+    const verified = await verifyAccountOAuthIdentity(secret, transport);
+    return { accountLabel: verified.account!.address, statusCode: 200 };
+  }
   if (isMailConnectorKind(input.kind))
     return verifyMailConnector({
       kind: input.kind,
@@ -904,13 +938,15 @@ export const executeConnectorAction = async (
 ): Promise<ConnectorExecutionResult> => {
   const parsed = connectorActionInput.parse(input.action);
   const definition = connectorActions[parsed.action];
-  if (definition.kind !== input.kind)
+  if (!connectorActionSupportsKind(parsed.action, input.kind))
     throw new AthanorError('connector_action_invalid', 'Action does not match this connector');
   if (!input.scopes.includes(definition.scope))
     throw new AthanorError(
       'connector_scope_denied',
       `Connector has not granted ${definition.scope}`
     );
+  if (isAccountConnectorKind(input.kind))
+    return executeAccountConnector(input, input.transport ?? secureConnectorRequest);
   if (isMailConnectorKind(input.kind)) {
     const executed = await executeMailConnectorAction({
       kind: input.kind,

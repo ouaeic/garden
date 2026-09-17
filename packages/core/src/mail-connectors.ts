@@ -105,32 +105,36 @@ export const mailConnectorCatalog: ConnectorDefinition[] = [
 ];
 
 export const mailConnectorActions = {
-  mail_list_mailboxes: { kind: 'imap', scope: 'mail:mailbox.read', sideEffect: 'read' },
-  mail_search: { kind: 'imap', scope: 'mail:mailbox.read', sideEffect: 'read' },
-  mail_read_message: { kind: 'imap', scope: 'mail:mailbox.read', sideEffect: 'read' },
-  mail_read_attachment: { kind: 'imap', scope: 'mail:mailbox.read', sideEffect: 'read' },
-  mail_mark: { kind: 'imap', scope: 'mail:message.write', sideEffect: 'write' },
-  mail_draft: { kind: 'imap', scope: 'mail:message.write', sideEffect: 'write' },
+  mail_list_mailboxes: { kinds: ['imap'], scope: 'mail:mailbox.read', sideEffect: 'read' },
+  mail_search: { kinds: ['imap'], scope: 'mail:mailbox.read', sideEffect: 'read' },
+  mail_read_message: { kinds: ['imap'], scope: 'mail:mailbox.read', sideEffect: 'read' },
+  mail_read_attachment: { kinds: ['imap'], scope: 'mail:mailbox.read', sideEffect: 'read' },
+  mail_mark: { kinds: ['imap'], scope: 'mail:message.write', sideEffect: 'write' },
+  mail_draft: { kinds: ['imap'], scope: 'mail:message.write', sideEffect: 'write' },
   /**
    * Sending carries the connector layer's always-ask tier rather than the reversible one. A sent
    * message cannot be recalled, it is attributed to the owner personally, and it reaches someone
    * the owner has a relationship with - so it belongs on the same floor as an MCP tool call, and
    * no security mode is allowed to wave it through.
    */
-  mail_send: { kind: 'imap', scope: 'mail:message.send', sideEffect: 'delete' },
-  mail_reply: { kind: 'imap', scope: 'mail:message.send', sideEffect: 'delete' },
-  calendar_list: { kind: 'caldav', scope: 'calendar:calendars.read', sideEffect: 'read' },
-  calendar_read_range: { kind: 'caldav', scope: 'calendar:calendars.read', sideEffect: 'read' },
-  calendar_create_event: { kind: 'caldav', scope: 'calendar:events.write', sideEffect: 'write' },
-  calendar_update_event: { kind: 'caldav', scope: 'calendar:events.write', sideEffect: 'write' },
+  mail_send: { kinds: ['imap'], scope: 'mail:message.send', sideEffect: 'delete' },
+  mail_reply: { kinds: ['imap'], scope: 'mail:message.send', sideEffect: 'delete' },
+  calendar_list: { kinds: ['caldav'], scope: 'calendar:calendars.read', sideEffect: 'read' },
+  calendar_read_range: { kinds: ['caldav'], scope: 'calendar:calendars.read', sideEffect: 'read' },
+  calendar_create_event: { kinds: ['caldav'], scope: 'calendar:events.write', sideEffect: 'write' },
+  calendar_update_event: { kinds: ['caldav'], scope: 'calendar:events.write', sideEffect: 'write' },
   calendar_respond_invitation: {
-    kind: 'caldav',
+    kinds: ['caldav'],
     scope: 'calendar:events.write',
     sideEffect: 'write'
   }
 } as const satisfies Record<
   string,
-  { kind: MailConnectorKind; scope: MailConnectorScope; sideEffect: 'read' | 'write' | 'delete' }
+  {
+    kinds: readonly MailConnectorKind[];
+    scope: MailConnectorScope;
+    sideEffect: 'read' | 'write' | 'delete';
+  }
 >;
 
 export type MailConnectorAction = keyof typeof mailConnectorActions;

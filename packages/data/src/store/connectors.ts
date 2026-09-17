@@ -28,6 +28,11 @@ import {
  */
 export const MAX_APPROVAL_PAGE = 200;
 
+export type ConnectorAuthorization<T> = (connector: ConnectorRecord) => Promise<{
+  value: T;
+  secretCiphertext?: EncryptedEnvelope;
+}>;
+
 interface TaskApprovalGrantInput {
   turn: number;
   securityMode: string;
@@ -556,7 +561,8 @@ export class ConnectorStore {
 
   async revokeConnector(userId: string, id: string): Promise<boolean> {
     const result = await this.database.query(
-      `UPDATE connectors SET enabled=FALSE,updated_at=NOW()
+      `UPDATE connectors SET enabled=FALSE,updated_at=NOW(),
+         secret_ciphertext=jsonb_build_object('v',1,'iv','','tag','','ciphertext','','aad','connector:' || user_id::text || ':' || id::text)
        WHERE id=$1 AND user_id=$2 AND enabled=TRUE`,
       [id, userId]
     );
@@ -574,6 +580,33 @@ export class ConnectorStore {
       [id, userId, JSON.stringify(secretCiphertext)]
     );
     return result.rowCount === 1;
+  }
+
+  /** Serialize credential rotation across API and worker processes, before using the new token. */
+  async withConnectorAuthorization<T>(
+    userId: string,
+    id: string,
+    authorize: ConnectorAuthorization<T>
+  ): Promise<T> {
+    return this.database.transaction(async (tx) => {
+      const selected = await tx.query(
+        `SELECT * FROM connectors WHERE id=$1 AND user_id=$2 AND enabled=TRUE FOR UPDATE`,
+        [id, userId]
+      );
+      if (!selected.rows[0])
+        throw new AthanorError('connector_not_found', 'Connected service is unavailable', 404);
+      const connector = mapConnector(selected.rows[0]);
+      const authorization = await authorize(connector);
+      if (authorization.secretCiphertext) {
+        if (authorization.secretCiphertext.aad !== `connector:${userId}:${id}`)
+          throw new AthanorError('connector_secret_context', 'Connector secret context is invalid');
+        await tx.query(
+          `UPDATE connectors SET secret_ciphertext=$3::jsonb,updated_at=NOW() WHERE id=$1 AND user_id=$2`,
+          [id, userId, JSON.stringify(authorization.secretCiphertext)]
+        );
+      }
+      return authorization.value;
+    });
   }
 
   async createConnectorOAuthAttempt(input: {

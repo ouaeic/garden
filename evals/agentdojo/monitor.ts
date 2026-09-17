@@ -61,12 +61,12 @@ const call = (name: string, args: Record<string, unknown>) => ({
  * that drifted would label a mail read as a webdav read and the origin string in every card below
  * would be wrong in a way no assertion here would catch.
  */
-const kindOf = (action: string): 'imap' | 'caldav' | 'webdav' | 'github' | 'mcp_http' => {
-  const definition = connectorActions[action as keyof typeof connectorActions] as
-    | { kind: 'imap' | 'caldav' | 'webdav' | 'github' | 'mcp_http' }
-    | undefined;
+const kindOf = (action: string) => {
+  const definition = connectorActions[action as keyof typeof connectorActions];
   if (!definition) throw new Error(`no such connector action in athanor: ${action}`);
-  return definition.kind;
+  if (definition.kinds.length !== 1)
+    throw new Error(`this evaluation must choose a provider for connector action: ${action}`);
+  return definition.kinds[0];
 };
 
 /** The `connector_action{...}` inside an athanor call, or null when it is not one. */

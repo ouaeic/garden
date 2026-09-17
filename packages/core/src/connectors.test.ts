@@ -456,7 +456,8 @@ describe('what a connector read is, for the label that travels with it', () => {
   });
 
   it('reads the same for every action of the same kind', () => {
-    const kinds = new Set(Object.values(connectorActions).map((action) => action.kind));
+    const kinds = new Set(Object.values(connectorActions).flatMap((action) => action.kinds));
+    expect(kinds.size).toBeGreaterThan(0);
     // Every read through a connector is content somebody who is not the owner wrote — an issue
     // body, a mail, a file on a shared drive, an MCP response. The label does not vary by action.
     for (const kind of kinds) expect(connectorContentOrigin(kind)).toBeTruthy();

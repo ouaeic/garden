@@ -3913,5 +3913,12 @@ CREATE TABLE IF NOT EXISTS model_throughput_ceiling (
     version: 107,
     name: 'question_attention_identity',
     sql: `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pending_question_id UUID;`
+  },
+  {
+    version: 108,
+    name: 'native_account_oauth',
+    sql: `ALTER TABLE connectors DROP CONSTRAINT IF EXISTS connectors_kind_check;
+      ALTER TABLE connectors ADD CONSTRAINT connectors_kind_check
+      CHECK (kind IN ('github','webdav','mcp_http','imap','caldav','google','microsoft'));`
   }
 ] as const;

@@ -1,5 +1,8 @@
 import {
   connectorActions,
+  isAccountConnectorKind,
+  authorizeAccountConnector,
+  secureConnectorRequest,
   decryptJson,
   encryptJson,
   executeConnectorAction,
@@ -63,23 +66,28 @@ export async function executeConnectorTool(
        * which is already the better sentence, and it is the one refusal the audit trail records
        * as `denied` rather than `failed`.
        */
-      const definition = (connectorActions as Record<string, { kind: string } | undefined>)[
-        operation
-      ];
-      if (definition && definition.kind !== connector.kind)
+      const definition = (
+        connectorActions as Record<string, { kinds: readonly string[] } | undefined>
+      )[operation];
+      if (definition && !definition.kinds.includes(connector.kind))
         throw new AthanorError(
           'connector_action_invalid',
-          `${operation} is a ${definition.kind} action and ${connector.label} is a ${connector.kind} connection. On this one: ${Object.entries(
+          `${operation} is a ${definition.kinds.join('/')} action and ${connector.label} is a ${connector.kind} connection. On this one: ${Object.entries(
             connectorActions
           )
-            .filter(([, entry]) => entry.kind === connector.kind)
+            .filter(([, entry]) => (entry.kinds as readonly string[]).includes(connector.kind))
             .map(([name]) => name)
             .join(', ')}. Call connector_list to see everything that is connected.`
         );
-      const secret = decryptJson<ConnectorSecret>(connector.secretCiphertext, context.masterKey);
+      const secret = isAccountConnectorKind(connector.kind)
+        ? await context.store.withConnectorAuthorization(task.userId, connector.id, (current) =>
+            authorizeAccountConnector(current, context.masterKey, secureConnectorRequest)
+          )
+        : decryptJson<ConnectorSecret>(connector.secretCiphertext, context.masterKey);
       const requested = asRecord(call.arguments.input) ?? {};
       try {
         return await performConnectorAction({
+          connectorId: connector.id,
           kind: connector.kind,
           action: operation,
           requested,

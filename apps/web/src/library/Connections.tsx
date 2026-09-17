@@ -3,9 +3,9 @@ import type {
   Connector,
   ConnectorAuditEvent,
   ConnectorTestResult,
-  StartMcpOAuthResponse
+  StartConnectorOAuthResponse
 } from '@athanor/contracts';
-import { del, post } from '../client.js';
+import { del, get, post } from '../client.js';
 import { Button, Dialog, Field } from '../ui.js';
 import {
   ActionFeedback,
@@ -33,13 +33,16 @@ interface Definition {
 export function ConnectionsLibrary({ onChange }: { onChange: () => void }) {
   const connections = useResource<Connector[]>('/v1/connectors');
   const catalog = useResource<Definition[]>('/v1/connectors/catalog');
+  const accountSetup = useResource<{ redirectUrl: string }>('/v1/connectors/accounts/oauth/config');
   const audit = useResource<ConnectorAuditEvent[]>('/v1/connectors/audit?limit=100');
   const action = useAction();
   const [adding, setAdding] = useState(false);
   const [kind, setKind] = useState('github');
   const [auth, setAuth] = useState('bearer');
   const [registration, setRegistration] = useState('dynamic');
-  const [authorization, setAuthorization] = useState<StartMcpOAuthResponse | null>(null);
+  const nativeAccount = kind === 'google' || kind === 'microsoft';
+  const usingOAuth = nativeAccount || (kind === 'mcp_http' && auth === 'oauth');
+  const [authorization, setAuthorization] = useState<StartConnectorOAuthResponse | null>(null);
   const [oauthMessage, setOauthMessage] = useState('');
   const [tested, setTested] = useState<Record<string, ConnectorTestResult>>({});
   const popup = useRef<Window | null>(null);
@@ -53,6 +56,7 @@ export function ConnectionsLibrary({ onChange }: { onChange: () => void }) {
           completion.message ?? (completion.ok ? 'Connected' : 'Authorization was not completed')
         )
       );
+      setAuthorization(null);
       if (completion.ok) {
         setAdding(false);
         setAuthorization(null);
@@ -64,6 +68,52 @@ export function ConnectionsLibrary({ onChange }: { onChange: () => void }) {
     window.addEventListener('message', complete);
     return () => window.removeEventListener('message', complete);
   }, [connections.refresh, audit.refresh, onChange]);
+  useEffect(() => {
+    if (!adding || !authorization) return;
+    const controller = new AbortController();
+    let pending = false;
+    const check = async () => {
+      if (Date.now() >= Date.parse(authorization.expiresAt)) {
+        setAuthorization(null);
+        setOauthMessage('This authorization link expired. Start again to connect the account.');
+        return;
+      }
+      if (pending || controller.signal.aborted) return;
+      pending = true;
+      try {
+        const value = await get<Connector[]>('/v1/connectors', { signal: controller.signal });
+        if (!controller.signal.aborted) connections.setValue(value);
+      } catch {
+        // A lost polling response does not cancel the provider's authorization window.
+      } finally {
+        pending = false;
+      }
+    };
+    const checkLater = () => {
+      void check();
+    };
+    const timer = window.setInterval(checkLater, 5000);
+    window.addEventListener('focus', checkLater);
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+      window.removeEventListener('focus', checkLater);
+    };
+  }, [adding, authorization, connections.setValue]);
+  useEffect(() => {
+    if (
+      !authorization?.connectorId ||
+      !connections.value?.some(
+        (connection) => connection.id === authorization.connectorId && connection.enabled
+      )
+    )
+      return;
+    setAdding(false);
+    setAuthorization(null);
+    setOauthMessage('Account connected.');
+    audit.refresh();
+    onChange();
+  }, [authorization, connections.value, audit.refresh, onChange]);
   const refresh = () => {
     connections.refresh();
     audit.refresh();
@@ -77,6 +127,7 @@ export function ConnectionsLibrary({ onChange }: { onChange: () => void }) {
       >
         <Button
           onClick={() => {
+            action.reset();
             setAdding(true);
             setAuthorization(null);
             setOauthMessage('');
@@ -136,7 +187,7 @@ export function ConnectionsLibrary({ onChange }: { onChange: () => void }) {
               </Button>
               <ConfirmButton
                 label="Disconnect"
-                description={`Revoke “${connection.label}” from garden. Work that uses this connection will need it to be reconnected.`}
+                description={`Remove “${connection.label}” and its saved credentials from Garden. You can also revoke the application in your provider account settings.`}
                 action={async () => {
                   await sensitive(() => del(`/v1/connectors/${connection.id}`));
                   refresh();
@@ -199,7 +250,7 @@ export function ConnectionsLibrary({ onChange }: { onChange: () => void }) {
               const form = event.currentTarget;
               const values = new FormData(form);
               let authorizationOpened = false;
-              if (kind === 'mcp_http' && auth === 'oauth')
+              if (usingOAuth)
                 popup.current = window.open(
                   'about:blank',
                   'athanor-connection',
@@ -214,9 +265,26 @@ export function ConnectionsLibrary({ onChange }: { onChange: () => void }) {
                       definition?.scopes.map((scope) => scope.id) ?? []
                     );
                     const { scopes } = input;
+                    if (nativeAccount) {
+                      const started = await sensitive(() =>
+                        post<StartConnectorOAuthResponse>('/v1/connectors/accounts/oauth/start', {
+                          provider: kind,
+                          label: input.label,
+                          scopes,
+                          clientId: fieldValue(values, 'clientId'),
+                          clientSecret: secretValue(values, 'clientSecret')
+                        })
+                      );
+                      setAuthorization(started);
+                      if (popup.current) {
+                        popup.current.location.href = started.authorizationUrl;
+                        authorizationOpened = true;
+                      }
+                      return;
+                    }
                     if (kind === 'mcp_http' && auth === 'oauth') {
                       const started = await sensitive(() =>
-                        post<StartMcpOAuthResponse>('/v1/connectors/mcp/oauth/start', {
+                        post<StartConnectorOAuthResponse>('/v1/connectors/mcp/oauth/start', {
                           label: input.label,
                           scopes,
                           baseUrl: fieldValue(values, 'baseUrl'),
@@ -246,7 +314,7 @@ export function ConnectionsLibrary({ onChange }: { onChange: () => void }) {
                     setAdding(false);
                     refresh();
                   },
-                  kind === 'mcp_http' && auth === 'oauth'
+                  usingOAuth
                     ? 'Complete authorization in the service window'
                     : 'Connection verified and saved'
                 )
@@ -261,8 +329,10 @@ export function ConnectionsLibrary({ onChange }: { onChange: () => void }) {
                 <select
                   value={kind}
                   onChange={(event) => {
+                    action.reset();
                     setKind(event.target.value);
                     setAuthorization(null);
+                    setOauthMessage('');
                   }}
                 >
                   {catalog.value?.map((item) => (
@@ -285,7 +355,7 @@ export function ConnectionsLibrary({ onChange }: { onChange: () => void }) {
               </>
             )}
             <div className="management-grid" key={`${kind}:${auth}:${registration}`}>
-              {kind !== 'github' && (
+              {kind !== 'github' && !nativeAccount && (
                 <Field label={kind === 'imap' ? 'Mailbox endpoint URL' : 'Service URL'}>
                   <input
                     required
@@ -299,9 +369,69 @@ export function ConnectionsLibrary({ onChange }: { onChange: () => void }) {
                   />
                 </Field>
               )}
+              {nativeAccount && (
+                <>
+                  <div className="management-note">
+                    <p>
+                      Use your own registered web application. Garden connects directly to the
+                      account you select.
+                    </p>
+                    <p>
+                      <a
+                        href={
+                          kind === 'google'
+                            ? 'https://console.cloud.google.com/apis/credentials'
+                            : 'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade'
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open {kind === 'google' ? 'Google' : 'Microsoft'} app registration
+                      </a>
+                    </p>
+                    <ResourceState resource={accountSetup} />
+                    {accountSetup.value && (
+                      <Field
+                        label="Registered redirect URI"
+                        hint="Copy this exact address into your provider's web app registration."
+                      >
+                        <input
+                          readOnly
+                          value={accountSetup.value.redirectUrl}
+                          onFocus={(event) => event.currentTarget.select()}
+                        />
+                      </Field>
+                    )}
+                    <p className="muted">
+                      {kind === 'google'
+                        ? 'Enable the Gmail and Calendar APIs for the access you select. Add yourself as a test user if the consent app is in testing.'
+                        : 'Choose an application account type that includes your account. Use a Web redirect URI and create a client secret.'}
+                    </p>
+                  </div>
+                  <Field label="Application client ID">
+                    <input required name="clientId" autoComplete="off" />
+                  </Field>
+                  <Field label="Client secret">
+                    <input
+                      required
+                      type="password"
+                      name="clientSecret"
+                      autoComplete="new-password"
+                    />
+                  </Field>
+                </>
+              )}
               {kind === 'mcp_http' && (
                 <Field label="Authentication">
-                  <select value={auth} onChange={(event) => setAuth(event.target.value)}>
+                  <select
+                    value={auth}
+                    onChange={(event) => {
+                      action.reset();
+                      setAuth(event.target.value);
+                      setAuthorization(null);
+                      setOauthMessage('');
+                    }}
+                  >
                     <option value="bearer">Token or no authentication</option>
                     <option value="oauth">OAuth sign-in</option>
                   </select>
@@ -396,10 +526,7 @@ export function ConnectionsLibrary({ onChange }: { onChange: () => void }) {
                       value={scope.id}
                       defaultChecked={scope.sideEffect === 'read'}
                     />
-                    <span>
-                      {scope.label}
-                      <small className="muted">{scope.sideEffect}</small>
-                    </span>
+                    <span>{scope.label}</span>
                   </label>
                 ))}
               </div>
@@ -440,7 +567,7 @@ export function ConnectionsLibrary({ onChange }: { onChange: () => void }) {
               </div>
             )}
             <Button type="submit" className="primary" busy={action.busy}>
-              {kind === 'mcp_http' && auth === 'oauth' ? 'Authorize service' : 'Verify and connect'}
+              {usingOAuth ? 'Choose account and connect' : 'Verify and connect'}
             </Button>
             <ActionFeedback action={action} />
             {oauthMessage && <p role="status">{oauthMessage}</p>}

@@ -8,6 +8,12 @@ export function connectionInput(form: FormData, kind: string, allowedScopes: rea
   if (scopes.some((scope) => !allowedScopes.includes(scope)))
     throw new Error('The access choices changed. Choose this service’s permissions again.');
   const common = { kind, label: fieldValue(form, 'label'), scopes };
+  if (kind === 'google' || kind === 'microsoft')
+    return {
+      ...common,
+      clientId: fieldValue(form, 'clientId'),
+      clientSecret: secretValue(form, 'clientSecret')
+    };
   if (kind === 'github') return { ...common, token: secretValue(form, 'token') };
   if (kind === 'mcp_http')
     return {
@@ -41,6 +47,10 @@ export function oauthCompletion(
   if (!popup || event.source !== popup || event.origin !== origin) return null;
   if (!event.data || typeof event.data !== 'object') return null;
   const data = event.data as Record<string, unknown>;
-  if (data.source !== 'athanor-mcp-oauth' || typeof data.ok !== 'boolean') return null;
+  if (
+    !['athanor-mcp-oauth', 'athanor-account-oauth'].includes(String(data.source)) ||
+    typeof data.ok !== 'boolean'
+  )
+    return null;
   return { ok: data.ok, ...(typeof data.message === 'string' ? { message: data.message } : {}) };
 }

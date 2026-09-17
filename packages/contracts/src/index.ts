@@ -269,7 +269,15 @@ export const SideEffectLevel = z.enum([
 ]);
 export type SideEffectLevel = z.infer<typeof SideEffectLevel>;
 
-export const ConnectorKind = z.enum(['github', 'webdav', 'mcp_http', 'imap', 'caldav']);
+export const ConnectorKind = z.enum([
+  'github',
+  'webdav',
+  'mcp_http',
+  'imap',
+  'caldav',
+  'google',
+  'microsoft'
+]);
 export type ConnectorKind = z.infer<typeof ConnectorKind>;
 
 export const ConnectorScope = z.enum([
@@ -400,6 +408,15 @@ export const CreateConnectorRequest = z.discriminatedUnion('kind', [
 ]);
 export type CreateConnectorRequest = z.input<typeof CreateConnectorRequest>;
 
+export const StartAccountOAuthRequest = z.object({
+  provider: z.enum(['google', 'microsoft']),
+  label: z.string().trim().min(1).max(80),
+  clientId: z.string().trim().min(1).max(1024),
+  clientSecret: z.string().min(1).max(8192),
+  scopes: z.array(ConnectorScope).min(1).max(5)
+});
+export type StartAccountOAuthRequest = z.infer<typeof StartAccountOAuthRequest>;
+
 const McpOAuthBase = z.object({
   label: z.string().min(1).max(80),
   baseUrl: z.string().url().max(2048),
@@ -428,12 +445,13 @@ export const StartMcpOAuthRequest = z.discriminatedUnion('registration', [
 ]);
 export type StartMcpOAuthRequest = z.infer<typeof StartMcpOAuthRequest>;
 
-export const StartMcpOAuthResponse = z.object({
+export const StartConnectorOAuthResponse = z.object({
+  connectorId: Id,
   authorizationUrl: z.string().url(),
   authorizationHost: z.string().min(1),
   expiresAt: IsoDate
 });
-export type StartMcpOAuthResponse = z.infer<typeof StartMcpOAuthResponse>;
+export type StartConnectorOAuthResponse = z.infer<typeof StartConnectorOAuthResponse>;
 
 /**
  * How long a private preview survives without being opened.

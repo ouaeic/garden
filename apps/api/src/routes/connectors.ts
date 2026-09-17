@@ -1,3 +1,4 @@
+import { registerAccountConnectorRoutes } from './account-connectors.js';
 /**
  * Accounts the agent is allowed to act in: mailboxes, calendars, and MCP servers.
  *
@@ -8,9 +9,16 @@
 
 import { randomBytes, randomUUID } from 'node:crypto';
 import { CreateConnectorRequest, StartMcpOAuthRequest } from '@athanor/contracts';
-import type { Connector, ConnectorTestResult, StartMcpOAuthResponse } from '@athanor/contracts';
+import type {
+  Connector,
+  ConnectorTestResult,
+  StartConnectorOAuthResponse
+} from '@athanor/contracts';
 import {
   AthanorError,
+  authorizeAccountConnector,
+  isAccountConnectorKind,
+  secureConnectorRequest,
   assertConnectorUrl,
   beginMcpOAuth,
   completeMcpOAuth,
@@ -68,18 +76,16 @@ export const registerConnectorRoutes = (context: RouteContext): void => {
     return [...new Set(requested)];
   };
 
-  const mcpOAuthPage = (
+  const connectorOAuthPage = (
     reply: FastifyReply,
     ok: boolean,
     message: string,
-    statusCode = ok ? 200 : 400
+    statusCode = ok ? 200 : 400,
+    source = 'athanor-mcp-oauth'
   ) => {
     const appUrl = new URL(config.PUBLIC_APP_URL);
     const targetOrigin = appUrl.origin;
-    const event = JSON.stringify({ source: 'athanor-mcp-oauth', ok, message }).replaceAll(
-      '<',
-      '\\u003c'
-    );
+    const event = JSON.stringify({ source, ok, message }).replaceAll('<', '\\u003c');
     const origin = JSON.stringify(targetOrigin).replaceAll('<', '\\u003c');
     const home = appUrl.toString().replaceAll('&', '&amp;').replaceAll('"', '&quot;');
     const title = ok ? 'Connection ready' : 'Connection not completed';
@@ -103,6 +109,8 @@ export const registerConnectorRoutes = (context: RouteContext): void => {
 <script>if(window.opener){window.opener.postMessage(${event},${origin});setTimeout(()=>window.close(),500)}</script>
 </html>`);
   };
+
+  registerAccountConnectorRoutes(context, { connectorScopes, oauthPage: connectorOAuthPage });
 
   app.get('/v1/connectors/mcp/oauth/client-metadata', async (_request, reply) => {
     const clientId = new URL(
@@ -169,10 +177,11 @@ export const registerConnectorRoutes = (context: RouteContext): void => {
         expiresAt
       });
       return {
+        connectorId: attemptId,
         authorizationUrl: started.authorizationUrl,
         authorizationHost: new URL(started.authorizationUrl).hostname,
         expiresAt: expiresAt.toISOString()
-      } satisfies StartMcpOAuthResponse;
+      } satisfies StartConnectorOAuthResponse;
     });
   });
 
@@ -194,7 +203,7 @@ export const registerConnectorRoutes = (context: RouteContext): void => {
           400
         );
       if (request.query.error)
-        return mcpOAuthPage(
+        return connectorOAuthPage(
           reply,
           false,
           'The MCP service did not grant access. You can safely close this window and try again.'
@@ -227,7 +236,7 @@ export const registerConnectorRoutes = (context: RouteContext): void => {
         allowedHostSuffixes,
         ...(overrides.connectorTransport ? { transport: overrides.connectorTransport } : {})
       });
-      const id = randomUUID();
+      const id = attempt.id;
       const connector = await store.createConnector({
         id,
         userId: attempt.userId,
@@ -244,7 +253,7 @@ export const registerConnectorRoutes = (context: RouteContext): void => {
         operation: 'oauth_connection_verified',
         outcome: 'succeeded'
       });
-      return mcpOAuthPage(
+      return connectorOAuthPage(
         reply,
         true,
         `${attempt.label} is connected. This window will close automatically.`
@@ -256,7 +265,7 @@ export const registerConnectorRoutes = (context: RouteContext): void => {
         },
         'MCP OAuth callback failed'
       );
-      return mcpOAuthPage(
+      return connectorOAuthPage(
         reply,
         false,
         'The secure connection could not be completed. Close this window and try again.'
@@ -389,9 +398,17 @@ export const registerConnectorRoutes = (context: RouteContext): void => {
           'connector_secret_context',
           'Connector secret encryption context is invalid'
         );
-      const secret = decryptJson<ConnectorSecret>(connector.secretCiphertext, masterKey);
       const checkedAt = new Date().toISOString();
       try {
+        const secret = isAccountConnectorKind(connector.kind)
+          ? await store.withConnectorAuthorization(user.id, connector.id, (current) =>
+              authorizeAccountConnector(
+                current,
+                masterKey,
+                overrides.connectorTransport ?? secureConnectorRequest
+              )
+            )
+          : decryptJson<ConnectorSecret>(connector.secretCiphertext, masterKey);
         const verified = await verifyConnector({
           kind: connector.kind,
           baseUrl: connector.baseUrl,

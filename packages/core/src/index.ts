@@ -23,3 +23,6 @@ export * from './usage.js';
 export { ownerMessageContent, type OwnerMessage } from './owner-message.js';
 
 export * from './diagnostics.js';
+
+export * from './account-oauth.js';
+export * from './account-connectors.js';

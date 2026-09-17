@@ -28,7 +28,9 @@ const readsThrough = {
   webdav: { action: 'webdav_read', origin: 'webdav share' },
   mcp_http: { action: 'mcp_list_tools', origin: 'mcp server' },
   imap: { action: 'mail_list_mailboxes', origin: 'mailbox' },
-  caldav: { action: 'calendar_list', origin: 'calendar' }
+  caldav: { action: 'calendar_list', origin: 'calendar' },
+  google: { action: 'account_mail_read', origin: 'google account' },
+  microsoft: { action: 'account_mail_read', origin: 'microsoft account' }
 } as const satisfies Record<AnyConnectorKind, { action: ConnectorAction; origin: string }>;
 
 const connectorCall = { id: 'call-1', name: 'connector_action', arguments: {} };

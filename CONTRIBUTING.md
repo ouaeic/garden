@@ -300,3 +300,7 @@ Set `GARDEN_UI_REPORT` to a local directory to retain its screenshots.
 The analysis-viewer drill also creates a real native run receipt and checks its project-file and
 saved-result presentations, source editing, scoped downloads and phone layout. Set
 `GARDEN_ANALYSIS_REPORT` to retain its screenshot and accessibility tree.
+
+The account-connection drill checks scoped consent, callback completion and recovery when a provider
+severs the popup opener, using local fixtures. Set `GARDEN_ACCOUNT_REPORT` to retain its phone
+screenshot and accessibility tree.
