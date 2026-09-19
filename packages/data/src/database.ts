@@ -11,6 +11,13 @@ export interface QueryResult<T> {
   rowCount: number;
 }
 
+export type AdvisoryConnection = Pick<Database, 'query' | 'exec'> & {
+  readonly signal: AbortSignal;
+};
+export interface AdvisoryLockOptions {
+  autocommit?: boolean;
+}
+
 export interface Database {
   query<T extends Record<string, unknown>>(
     sql: string,
@@ -19,7 +26,11 @@ export interface Database {
   exec(sql: string): Promise<void>;
   transaction<T>(callback: (database: Database) => Promise<T>): Promise<T>;
   /** Runs the callback while holding a lock that every process sharing this database respects. */
-  withAdvisoryLock<T>(key: number, callback: () => Promise<T>): Promise<T>;
+  withAdvisoryLock<T>(
+    key: number,
+    callback: (connection?: AdvisoryConnection) => Promise<T>,
+    options?: AdvisoryLockOptions
+  ): Promise<T>;
   /**
    * Wakes the other processes sharing this database.
    *
@@ -114,8 +125,15 @@ class PostgresDatabase implements Database {
         await client.query(sql);
       },
       transaction: async <R>(nested: (database: Database) => Promise<R>) => nested(scoped),
-      withAdvisoryLock: async <R>(key: number, locked: () => Promise<R>) =>
-        acquireAdvisoryLock(client, key, locked),
+      withAdvisoryLock: async <R>(
+        key: number,
+        locked: (connection?: AdvisoryConnection) => Promise<R>,
+        options?: AdvisoryLockOptions
+      ) => {
+        if (options?.autocommit)
+          throw new Error('A durable operation cannot run inside a database transaction');
+        return acquireAdvisoryLock(client, key, locked);
+      },
       notify: (channel, payload) => this.notify(channel, payload),
       listen: (channel, handler) => this.listen(channel, handler),
       close: async () => undefined
@@ -137,18 +155,44 @@ class PostgresDatabase implements Database {
     }
   }
 
-  async withAdvisoryLock<T>(key: number, callback: () => Promise<T>): Promise<T> {
+  async withAdvisoryLock<T>(
+    key: number,
+    callback: (connection?: AdvisoryConnection) => Promise<T>,
+    options?: AdvisoryLockOptions
+  ): Promise<T> {
+    if (options?.autocommit && this.#transaction.getStore())
+      throw new Error('A durable operation cannot run inside a database transaction');
     const client = await this.#pool.connect();
+    const lifetime = new AbortController();
+    const lost = () => lifetime.abort(new Error('The database lock session was lost'));
+    client.on('error', lost);
+    client.on('end', lost);
+    let discard = false;
     try {
-      const result = await acquireAdvisoryLock(client, key, callback);
-      client.release();
-      return result;
+      // Autocommit checkpoints share the held session, leaving pool slots available to other work.
+      return await acquireAdvisoryLock(client, key, () =>
+        callback({
+          signal: lifetime.signal,
+          query: async <R extends Record<string, unknown>>(sql: string, params: unknown[] = []) => {
+            lifetime.signal.throwIfAborted();
+            const result = await client.query<R>(sql, params);
+            return { rows: result.rows, rowCount: result.rowCount ?? result.rows.length };
+          },
+          exec: async (sql: string) => {
+            lifetime.signal.throwIfAborted();
+            await client.query(sql);
+          }
+        })
+      );
     } catch (error) {
-      // Advisory locks live for the session, so a connection that failed anywhere in the critical
-      // section may still hold one. Destroying it ends the session and releases the lock, which
-      // matters more than saving a connection on a path that is already failing.
-      client.release(true);
+      // Destroy an uncertain session so an unreleased advisory lock cannot return to the pool.
+      discard = true;
       throw error;
+    } finally {
+      lifetime.abort(new Error('The database lock was released'));
+      client.removeListener('error', lost);
+      client.removeListener('end', lost);
+      client.release(discard);
     }
   }
 
@@ -272,8 +316,11 @@ class EmbeddedDatabase implements Database {
           await transaction.exec(sql);
         },
         transaction: async <R>(nested: (database: Database) => Promise<R>) => nested(scoped),
-        withAdvisoryLock: <R>(key: number, locked: () => Promise<R>) =>
-          this.withAdvisoryLock(key, locked),
+        withAdvisoryLock: <R>(
+          key: number,
+          locked: (connection?: AdvisoryConnection) => Promise<R>,
+          options?: AdvisoryLockOptions
+        ) => this.withAdvisoryLock(key, locked, options),
         notify: (channel: string) => this.notify(channel),
         listen: (channel: string) => this.listen(channel),
         close: async () => undefined
@@ -285,15 +332,39 @@ class EmbeddedDatabase implements Database {
   // PGlite is a single backend embedded in this process, so pg_advisory_lock would be taken and
   // re-taken on the one session and never block anybody. Queueing on a promise chain gives the
   // same exclusion for the only concurrency that can exist here: two callers in one process.
-  async withAdvisoryLock<T>(key: number, callback: () => Promise<T>): Promise<T> {
-    const queued = (this.#locks.get(key) ?? Promise.resolve()).then(callback);
-    this.#locks.set(
-      key,
-      queued.then(
-        () => undefined,
-        () => undefined
-      )
+  async withAdvisoryLock<T>(
+    key: number,
+    callback: (connection?: AdvisoryConnection) => Promise<T>,
+    options?: AdvisoryLockOptions
+  ): Promise<T> {
+    if (options?.autocommit && this.#transaction.getStore())
+      throw new Error('A durable operation cannot run inside a database transaction');
+    const queued = (this.#locks.get(key) ?? Promise.resolve()).then(async () => {
+      const lifetime = new AbortController();
+      try {
+        return await callback({
+          signal: lifetime.signal,
+          query: <R extends Record<string, unknown>>(sql: string, params: unknown[] = []) => {
+            lifetime.signal.throwIfAborted();
+            return this.query<R>(sql, params);
+          },
+          exec: (sql: string) => {
+            lifetime.signal.throwIfAborted();
+            return this.exec(sql);
+          }
+        });
+      } finally {
+        lifetime.abort(new Error('The database lock was released'));
+      }
+    });
+    const tail = queued.then(
+      () => undefined,
+      () => undefined
     );
+    this.#locks.set(key, tail);
+    void tail.then(() => {
+      if (this.#locks.get(key) === tail) this.#locks.delete(key);
+    });
     return queued;
   }
 

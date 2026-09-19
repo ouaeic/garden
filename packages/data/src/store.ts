@@ -1,3 +1,9 @@
+import { ConnectorOperationStore } from './store/connector-operations.js';
+export { connectorOperationAad } from './store/connector-operations.js';
+export type {
+  ConnectorOperationRecord,
+  ConnectorOperationIdentity
+} from './store/connector-operations.js';
 import { JobWaitStore } from './store/job-waits.js';
 import type { Database } from './database.js';
 import { ProjectStore } from './projects.js';
@@ -90,6 +96,10 @@ export type {
 } from './store/memory.js';
 
 export class DataStore {
+  readonly #connectorOperations: ConnectorOperationStore;
+
+  withConnectorOperation: ConnectorOperationStore['withOperation'];
+
   readonly #jobWaits: JobWaitStore;
 
   parkTaskForJobs(...args: Parameters<JobWaitStore['parkTaskForJobs']>) {
@@ -129,6 +139,10 @@ export class DataStore {
   readonly #projectModelPreferences: ProjectModelPreferenceStore;
 
   constructor(database: Database) {
+    this.#connectorOperations = new ConnectorOperationStore(database);
+    this.withConnectorOperation = this.#connectorOperations.withOperation.bind(
+      this.#connectorOperations
+    );
     this.#projects = new ProjectStore(database);
     this.#projectModelPreferences = new ProjectModelPreferenceStore(database);
     this.#identity = new IdentityStore(database);

@@ -3920,5 +3920,25 @@ CREATE TABLE IF NOT EXISTS model_throughput_ceiling (
     sql: `ALTER TABLE connectors DROP CONSTRAINT IF EXISTS connectors_kind_check;
       ALTER TABLE connectors ADD CONSTRAINT connectors_kind_check
       CHECK (kind IN ('github','webdav','mcp_http','imap','caldav','google','microsoft'));`
+  },
+  {
+    version: 109,
+    name: 'durable_connector_operations',
+    sql: `CREATE TABLE connector_operations (
+      id UUID PRIMARY KEY,
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      connector_id UUID NOT NULL REFERENCES connectors(id) ON DELETE CASCADE,
+      task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      action TEXT NOT NULL,
+      operation_key TEXT NOT NULL CHECK(operation_key ~ '^[a-f0-9]{64}$'),
+      state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN ('pending','completed')),
+      recovery_ciphertext JSONB,
+      result_ciphertext JSONB,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(user_id,connector_id,operation_key),
+      CHECK(state <> 'completed' OR result_ciphertext IS NOT NULL)
+    );
+    CREATE INDEX connector_operations_task ON connector_operations(task_id);`
   }
 ] as const;
