@@ -913,6 +913,23 @@ const moduleRun = (executable: string, tokens: readonly string[]): string[] => {
   return at < 0 || !module ? [] : [module, ...tokens.slice(at + 2).map(unquoted)];
 };
 
+const commandSegments = (body: string): string[] => {
+  // Query separators in literal quoted URLs are data. Expansions and backslash escapes
+  // remain visible to the conservative command scan, including commands inside a URL.
+  const urls = [...body.matchAll(/(['"])(https?:\/\/[^\s'"`$\\]+)\1/g)];
+  const segments: string[] = [];
+  let start = 0;
+  let at = 0;
+  for (const delimiter of body.matchAll(/\$\(|[|;&\n`]+/g)) {
+    while (urls[at] && urls[at]!.index + urls[at]![0].length <= delimiter.index) at += 1;
+    if (urls[at] && urls[at]!.index <= delimiter.index) continue;
+    segments.push(body.slice(start, delimiter.index));
+    start = delimiter.index + delimiter[0].length;
+  }
+  segments.push(body.slice(start));
+  return segments;
+};
+
 const commandsFromBody = (body: string): string[][] => {
   /*
    * A proxy set anywhere in a script applies to every fetch after it, and `export http_proxy=x;
@@ -923,7 +940,7 @@ const commandsFromBody = (body: string): string[][] => {
    * alternative is missing the shape that does.
    */
   const bodyTokens = assignmentWords(body);
-  return body.split(/\$\(|[|;&\n`]+/).flatMap((segment) => {
+  return commandSegments(body).flatMap((segment) => {
     /*
      * `FOO=1 curl https://x` runs curl, and so do `timeout 30 curl …` and `then curl …`. Whatever
      * sits in front of the command is setup for it, not a command of its own, and treating it as
@@ -2765,7 +2782,7 @@ export const gitConfigRunsCode = (args: readonly string[]): boolean => {
 const URL_IN_COMMAND = /https?:\/\/[^\s'"`<>\\)]+/g;
 
 /** Everything a `shell` call wrote down, wherever it wrote it: the invocation and any script. */
-const commandText = (args: Record<string, unknown>): string =>
+export const commandText = (args: Record<string, unknown>): string =>
   [
     textValue(args.executable),
     ...(Array.isArray(args.args) ? args.args.map(String) : []),

@@ -19,6 +19,9 @@ import re
 FORMAT = "garden-analysis-run-1"
 MAX_SPEC_BYTES = 1024 * 1024
 MAX_PRODUCER_BYTES = 64 * 1024 * 1024
+# The command and file-viewer identities share the private workspace group.
+WORKSPACE_FILE_MODE = 0o660
+WORKSPACE_DIRECTORY_MODE = 0o770
 
 
 def now():
@@ -271,7 +274,7 @@ def parent_descriptor(root, filename):
         raise
 
 
-def open_relative(root, filename, flags, mode=0o600):
+def open_relative(root, filename, flags, mode=WORKSPACE_FILE_MODE):
     parent, name = parent_descriptor(root, filename)
     try:
         return os.open(name, flags | os.O_NOFOLLOW, mode, dir_fd=parent)
@@ -335,7 +338,7 @@ def atomic_write(filename, value):
     descriptor = os.open(
         staging,
         os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-        0o600,
+        WORKSPACE_FILE_MODE,
         dir_fd=parent,
     )
     try:
@@ -608,7 +611,7 @@ def prepare_r(spec, root, receipt, filename, execution_env=None):
     parent, name = parent_descriptor(root, str(directory.parent.relative_to(root)))
     try:
         try:
-            os.mkdir(name, 0o700, dir_fd=parent)
+            os.mkdir(name, WORKSPACE_DIRECTORY_MODE, dir_fd=parent)
         except FileExistsError:
             pass
         os.fsync(parent)
@@ -616,7 +619,7 @@ def prepare_r(spec, root, receipt, filename, execution_env=None):
         os.close(parent)
     parent, name = parent_descriptor(root, recipe["directory"])
     try:
-        os.mkdir(name, 0o700, dir_fd=parent)
+        os.mkdir(name, WORKSPACE_DIRECTORY_MODE, dir_fd=parent)
         os.fsync(parent)
     finally:
         os.close(parent)
@@ -658,7 +661,7 @@ def prepare_python(spec, root, receipt, filename):
     # mkdir is exclusive; an existing or interrupted environment is never repaired in place.
     parent, name = parent_descriptor(root, recipe["directory"])
     try:
-        os.mkdir(name, mode=0o700, dir_fd=parent)
+        os.mkdir(name, mode=WORKSPACE_DIRECTORY_MODE, dir_fd=parent)
     finally:
         os.close(parent)
     environment = {

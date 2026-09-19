@@ -17,6 +17,11 @@ while the command is active. An interrupted or unfinished record is evidence to 
 automatic instruction to execute again. Long work should use a named durable job, whose supervisor,
 resource snapshots, cancellation and log handling remain responsible for the process lifecycle.
 
+New manifests and environment directories allow the private workspace group to read and manage
+them, subject to the caller's umask. This lets the command account and Garden's file viewer work
+with the same records without making them accessible to other users. Existing paths are not
+repermissioned. A deliberately stricter caller umask can prevent group access.
+
 Opening a complete JSON run record in project files or saved results presents a run overview:
 recorded status, command duration, declared inputs and scripts, dependency locks, environment
 probes, outputs and replay comparisons. The source JSON remains available. Unrecognised or

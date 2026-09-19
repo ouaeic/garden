@@ -7,6 +7,7 @@ import {
   commandCarriedIntoAnotherBox,
   commandsChangeDirectory,
   commandScript,
+  commandText,
   consequentialExecutables,
   COMMAND_RUNNERS,
   destructionOperation,
@@ -41,6 +42,18 @@ import {
   namedObjects,
   shellInvocation
 } from './approval-common.js';
+
+// These utilities inspect files without executing helpers or opening sockets. A shell
+// redirection can open a socket on their behalf, so that syntax is checked separately.
+const LOCAL_INSPECTION_EXECUTABLES = new Set([
+  'ls',
+  'head',
+  'tail',
+  'wc',
+  'stat',
+  'sha256sum',
+  'sha512sum'
+]);
 
 export const shellApprovalRequirement = (
   name: string,
@@ -284,10 +297,12 @@ export const shellApprovalRequirement = (
     const unreadable = reachesAnUnreadableFarEnd(args);
     const reachesOutside = outbound.length > 0 || unreadable;
     if (reachesOutside && !SECURITY_MODE_FLOOR[securityMode].asksBeforeReachingTheInternet) {
+      const shellSocket = /\/dev\/(?:tcp|udp)\//.test(commandText(args));
       const unlisted = commands.find(
         ([command = '']) =>
           !(
             noEgressExecutables.has(command) ||
+            (!shellSocket && LOCAL_INSPECTION_EXECUTABLES.has(command)) ||
             safeNetworkExecutables.has(command) ||
             command === 'gh'
           )

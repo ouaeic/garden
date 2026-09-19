@@ -17,6 +17,7 @@ import zipfile
 import tarfile
 import io
 import csv
+import stat
 
 RUNNER = Path(__file__).with_name("reproducible-run.py").resolve()
 PYTHON = sys.executable
@@ -248,6 +249,30 @@ Path('result.json').write_text(json.dumps({'length': len(sequence), 'counts': co
                 changed["sha256"],
                 hashlib.sha256((self.first / "input.fa").read_bytes()).hexdigest(),
             )
+
+    def test_workspace_group_can_read_records_and_access_rebuilt_environments(self):
+        self.wheel_recipe()
+        result = self.invoke(umask=0o007)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(stat.S_IMODE((self.first / "run.json").stat().st_mode), 0o660)
+        self.assertEqual(stat.S_IMODE((self.first / ".venv").stat().st_mode) & 0o777, 0o770)
+        failed = self.root / "failed"
+        failed.mkdir()
+        self.populate(failed)
+        (failed / "input.fa").unlink()
+        result = self.invoke(failed, umask=0o007)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.read(failed)["status"], "failed")
+        self.assertEqual(stat.S_IMODE((failed / "run.json").stat().st_mode), 0o660)
+
+    @unittest.skipUnless(R, "R is not installed")
+    def test_r_rebuilt_library_uses_the_private_workspace_group(self):
+        self.r_recipe()
+        result = self.invoke(umask=0o007)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for directory in [".garden", ".garden/r-library"]:
+            self.assertEqual(stat.S_IMODE((self.first / directory).stat().st_mode) & 0o777, 0o770)
+        self.assertEqual(stat.S_IMODE((self.first / "run.json").stat().st_mode), 0o660)
 
     def test_clean_replay_and_independent_metrics(self):
         result = self.invoke()
