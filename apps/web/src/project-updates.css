@@ -223,3 +223,9 @@
 :root[data-theme='light'] .check-invalidated {
   color: #904217;
 }
+
+.project-version-history > [role='group'] .button[aria-pressed='true'] {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--paper);
+}
