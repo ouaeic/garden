@@ -72,7 +72,7 @@ describe('native account authorization routes', () => {
     if (directory) await rm(directory, { recursive: true, force: true });
     vi.unstubAllGlobals();
   });
-  const start = (provider: 'google' | 'microsoft', key: string) =>
+  const start = (provider: 'google' | 'microsoft', key: string, write = false) =>
     server.app.inject({
       method: 'POST',
       url: '/v1/connectors/accounts/oauth/start',
@@ -82,14 +82,22 @@ describe('native account authorization routes', () => {
         label: `${provider} owner`,
         clientId: 'owner-client',
         clientSecret: 'CLIENT_SECRET_CANARY',
-        scopes: ['mail:mailbox.read', 'calendar:calendars.read']
+        scopes: [
+          'mail:mailbox.read',
+          'calendar:calendars.read',
+          ...(write ? ['calendar:events.write'] : [])
+        ]
       }
     });
 
   it.each(['google', 'microsoft'] as const)(
     'binds %s to the owner and callback, consumes the state once, seals credentials and clears them on disconnect',
     async (provider) => {
-      const response = await start(provider, `account-start-${provider}-0001`);
+      const response = await start(
+        provider,
+        `account-start-${provider}-0001`,
+        provider === 'microsoft'
+      );
       expect(response.statusCode, response.body).toBe(200);
       expect(response.body).not.toContain('CLIENT_SECRET_CANARY');
       const url = new URL(response.json<{ authorizationUrl: string }>().authorizationUrl);
@@ -99,6 +107,8 @@ describe('native account authorization routes', () => {
       expect(url.searchParams.get('code_challenge')).toBeTruthy();
       scopes = url.searchParams.get('scope')!;
       expect(scopes).not.toMatch(/Mail.Send|gmail.send/);
+      if (provider === 'microsoft') expect(scopes).toContain('Calendars.ReadWrite');
+      else expect(scopes).not.toMatch(/calendar.events|Calendars.ReadWrite/);
       const pending = await server.database.query(
         'SELECT state_hash,secret_ciphertext FROM connector_oauth_attempts'
       );
@@ -123,6 +133,7 @@ describe('native account authorization routes', () => {
         .find((value) => value.kind === provider && value.enabled)!;
       expect(connection).toBeTruthy();
       expect(connection.authMode).toBe('oauth');
+      expect(connection.scopes.includes('calendar:events.write')).toBe(provider === 'microsoft');
       const stored = (await server.store.getConnector(userId, connection.id))!;
       const saved = decryptJson<{ accountOAuth: AccountOAuth }>(stored.secretCiphertext, masterKey);
       expect(saved.accountOAuth.account?.address).toBe('owner@example.org');

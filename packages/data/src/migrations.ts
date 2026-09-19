@@ -3931,6 +3931,7 @@ CREATE TABLE IF NOT EXISTS model_throughput_ceiling (
       task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
       action TEXT NOT NULL,
       operation_key TEXT NOT NULL CHECK(operation_key ~ '^[a-f0-9]{64}$'),
+      intent_key TEXT NOT NULL CHECK(intent_key ~ '^[a-f0-9]{64}$'),
       state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN ('pending','completed')),
       recovery_ciphertext JSONB,
       result_ciphertext JSONB,
@@ -3939,6 +3940,15 @@ CREATE TABLE IF NOT EXISTS model_throughput_ceiling (
       UNIQUE(user_id,connector_id,operation_key),
       CHECK(state <> 'completed' OR result_ciphertext IS NOT NULL)
     );
-    CREATE INDEX connector_operations_task ON connector_operations(task_id);`
+    CREATE INDEX connector_operations_task ON connector_operations(task_id);
+    CREATE UNIQUE INDEX connector_operations_pending_intent ON connector_operations(user_id,connector_id,task_id,action,intent_key) WHERE state='pending';
+    CREATE TABLE connector_operation_requests (
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      connector_id UUID NOT NULL REFERENCES connectors(id) ON DELETE CASCADE,
+      operation_key TEXT NOT NULL CHECK(operation_key ~ '^[a-f0-9]{64}$'),
+      operation_id UUID NOT NULL REFERENCES connector_operations(id) ON DELETE CASCADE,
+      PRIMARY KEY(user_id,connector_id,operation_key)
+    );
+    CREATE INDEX connector_operation_requests_operation ON connector_operation_requests(operation_id);`
   }
 ] as const;

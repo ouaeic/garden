@@ -53,7 +53,8 @@ export class AccountApi {
   readonly metrics = { requestBytes: 0, responseBytes: 0, durationMs: 0, statusCode: 0 };
   constructor(
     secret: AccountOAuth,
-    private readonly transport: ConnectorTransport
+    private readonly transport: ConnectorTransport,
+    private readonly signal?: AbortSignal
   ) {
     this.secret = AccountOAuth.parse(secret);
     if (!this.secret.tokens || !this.secret.account || this.secret.pending)
@@ -120,6 +121,7 @@ export class AccountApi {
       headers?: Record<string, string>;
     } = {}
   ): Promise<ConnectorRequestResult> {
+    this.signal?.throwIfAborted();
     this.assertUrl(url);
     const body = options.body === undefined ? undefined : Buffer.from(JSON.stringify(options.body));
     const maxBytes = options.maxBytes ?? 2_000_000;
@@ -148,6 +150,7 @@ export class AccountApi {
       ...(body ? { body } : {}),
       allowedHostSuffixes: [url.hostname],
       timeoutMs: 20_000,
+      ...(this.signal ? { signal: this.signal } : {}),
       maxResponseBytes: maxBytes
     });
     this.metrics.requestBytes += body?.length ?? 0;
@@ -188,12 +191,10 @@ export class AccountApi {
       const retryAfter = response.headers['retry-after'];
       const seconds =
         retryAfter && /^\d+$/.test(retryAfter) ? Math.min(Number(retryAfter), 86400) : undefined;
-      throw new AthanorError(
-        code,
-        message,
-        400,
-        seconds === undefined ? undefined : { retryAfterSeconds: seconds }
-      );
+      throw new AthanorError(code, message, 400, {
+        statusCode: response.status,
+        ...(seconds === undefined ? {} : { retryAfterSeconds: seconds })
+      });
     }
     return response;
   }

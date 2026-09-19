@@ -26,3 +26,5 @@ export * from './diagnostics.js';
 
 export * from './account-oauth.js';
 export * from './account-connectors.js';
+
+export type { AccountOperation } from './account-operation.js';

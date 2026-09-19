@@ -62,7 +62,8 @@ test(
         providerLogging: 'Provider account policy.',
         scopes: [
           { id: 'mail:mailbox.read', label: 'Read mail and attachments', sideEffect: 'read' },
-          { id: 'calendar:calendars.read', label: 'Read calendars', sideEffect: 'read' }
+          { id: 'calendar:calendars.read', label: 'Read calendars', sideEffect: 'read' },
+          { id: 'calendar:events.write', label: 'Create calendar events', sideEffect: 'write' }
         ]
       }));
       server = createServer(async (req, res) => {
@@ -152,6 +153,12 @@ test(
         assert.equal(await page.getByLabel('Service URL', { exact: true }).count(), 0);
         await page.getByLabel('Read calendars', { exact: false }).uncheck();
         assert.equal(
+          await page.getByLabel('Create calendar events', { exact: false }).isChecked(),
+          false
+        );
+        if (provider === 'microsoft')
+          await page.getByLabel('Create calendar events', { exact: false }).check();
+        assert.equal(
           await page
             .getByRole('dialog')
             .getByText('Complete authorization in the service window', { exact: true })
@@ -183,7 +190,10 @@ test(
         assert.deepEqual(attempts.at(-1), {
           provider,
           label: `${provider} personal`,
-          scopes: ['mail:mailbox.read'],
+          scopes: [
+            'mail:mailbox.read',
+            ...(provider === 'microsoft' ? ['calendar:events.write'] : [])
+          ],
           clientId: 'client-id',
           clientSecret: ' SECRET_CANARY '
         });

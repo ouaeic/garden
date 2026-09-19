@@ -1,3 +1,4 @@
+import { AccountCalendarCreate, createAccountCalendarEvent } from './account-calendar-write.js';
 import { z } from 'zod';
 import type {
   ConnectorDefinition,
@@ -32,13 +33,19 @@ export const accountConnectorActions = {
   account_mail_attachments: read('mail:mailbox.read'),
   account_mail_attachment: read('mail:mailbox.read'),
   account_calendar_list: read('calendar:calendars.read'),
-  account_calendar_range: read('calendar:calendars.read')
+  account_calendar_range: read('calendar:calendars.read'),
+  account_calendar_create: {
+    kinds: ['google', 'microsoft'] as const,
+    scope: 'calendar:events.write' as const,
+    sideEffect: 'write' as const
+  }
 };
 const page = {
   limit: z.number().int().min(1).max(50).default(25),
   cursor: z.string().max(16384).optional()
 };
 export const accountConnectorInputs = [
+  AccountCalendarCreate.safeExtend({ action: z.literal('account_calendar_create') }),
   z.object({
     action: z.literal('account_mail_search'),
     query: z.string().max(2000).default(''),
@@ -70,6 +77,7 @@ export const accountConnectorInputs = [
   })
 ] as const;
 const actionInput = z.discriminatedUnion('action', accountConnectorInputs);
+export const parseAccountConnectorAction = (input: unknown) => actionInput.parse(input);
 
 export const accountConnectorCatalog: ConnectorDefinition[] = (
   ['google', 'microsoft'] as const
@@ -77,7 +85,7 @@ export const accountConnectorCatalog: ConnectorDefinition[] = (
   kind,
   name: kind === 'google' ? 'Google mail and calendar' : 'Microsoft mail and calendar',
   description:
-    'Search and read mail, download attachments, and read calendars through the account API.',
+    'Search and read mail, download attachments, read calendars, and create events through the account API.',
   dataAccess: 'Only the selected account and granted mail or calendar access are used.',
   tokenLocation:
     'Authorization and refresh tokens are encrypted on your Garden server and never sent to a model.',
@@ -86,7 +94,8 @@ export const accountConnectorCatalog: ConnectorDefinition[] = (
     'Register an OAuth web application with the provider, then choose the account during sign-in.',
   scopes: [
     { id: 'mail:mailbox.read', label: 'Read mail and attachments', sideEffect: 'read' },
-    { id: 'calendar:calendars.read', label: 'Read calendars', sideEffect: 'read' }
+    { id: 'calendar:calendars.read', label: 'Read calendars', sideEffect: 'read' },
+    { id: 'calendar:events.write', label: 'Create calendar events', sideEffect: 'write' }
   ]
 }));
 
@@ -127,7 +136,11 @@ export async function executeAccountConnector(
       'connector_scope_denied',
       `Connector has not granted ${definition.scope}`
     );
-  const api = new AccountApi(AccountOAuth.parse(input.secret.accountOAuth), transport);
+  const api = new AccountApi(
+    AccountOAuth.parse(input.secret.accountOAuth),
+    transport,
+    input.operation?.signal
+  );
   if (
     api.secret.provider !== input.kind ||
     input.baseUrl !== accountConnectorBase(api.secret.provider)
@@ -156,6 +169,14 @@ export async function executeAccountConnector(
         partId: action.partId,
         maxBytes: action.maxBytes
       });
+      break;
+    case 'account_calendar_create':
+      if (!input.operation)
+        throw new AthanorError(
+          'connector_operation_required',
+          'Calendar changes need a durable operation receipt.'
+        );
+      result = await createAccountCalendarEvent(api, action, input.operation, input.scopes);
       break;
     case 'account_calendar_list':
       result = await listAccountCalendars(api, action);

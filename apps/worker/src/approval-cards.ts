@@ -95,6 +95,7 @@ export const connectorApprovalCard = (
         preview: `Mark ${count} message${count === 1 ? '' : 's'} in ${mailbox} as ${flags || 'changed'}.`
       };
     }
+    case 'account_calendar_create':
     case 'calendar_create_event':
       return {
         action: `Put "${textValue(input.summary, 'an event')}" in the calendar`,

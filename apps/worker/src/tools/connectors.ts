@@ -6,9 +6,12 @@ import {
   decryptJson,
   encryptJson,
   executeConnectorAction,
+  parseAccountConnectorAction,
   AthanorError,
-  type ConnectorSecret
+  type ConnectorSecret,
+  type AccountOperation
 } from '@athanor/core';
+import { withAccountOperation } from '../account-operation.js';
 import { type ModelToolCall } from '@athanor/model-gateway';
 import { connectorHostAllowance, performConnectorAction } from '../connector-call.js';
 import { asRecord, textValue } from '../values.js';
@@ -95,39 +98,56 @@ export async function executeConnectorTool(
           writeFile: (path, bytes) =>
             context.runner.writeBytes(task.workspaceId, task.id, path, bytes),
           execute: async (actionInput) => {
-            const executed = await executeConnectorAction({
-              kind: connector.kind,
-              baseUrl: connector.baseUrl,
-              scopes: connector.scopes,
-              secret,
-              action: actionInput,
-              allowedHostSuffixes: connectorHostAllowance(
-                context.config.CONNECTOR_ALLOWED_HOST_SUFFIXES,
-                connector
-              ),
-              onSecretUpdated: async (updatedSecret) => {
-                const saved = await context.store.updateConnectorSecret(
-                  task.userId,
-                  connector.id,
-                  encryptJson(
-                    updatedSecret,
-                    context.masterKey,
-                    `connector:${task.userId}:${connector.id}`
-                  )
-                );
-                if (!saved)
-                  throw new AthanorError(
-                    'connector_secret_update_failed',
-                    'The refreshed connector authorization could not be saved'
+            const execute = (accountOperation?: AccountOperation) =>
+              executeConnectorAction({
+                ...(accountOperation ? { operation: accountOperation } : {}),
+                kind: connector.kind,
+                baseUrl: connector.baseUrl,
+                scopes: connector.scopes,
+                secret,
+                action: actionInput,
+                allowedHostSuffixes: connectorHostAllowance(
+                  context.config.CONNECTOR_ALLOWED_HOST_SUFFIXES,
+                  connector
+                ),
+                onSecretUpdated: async (updatedSecret) => {
+                  const saved = await context.store.updateConnectorSecret(
+                    task.userId,
+                    connector.id,
+                    encryptJson(
+                      updatedSecret,
+                      context.masterKey,
+                      `connector:${task.userId}:${connector.id}`
+                    )
                   );
-              }
-            });
+                  if (!saved)
+                    throw new AthanorError(
+                      'connector_secret_update_failed',
+                      'The refreshed connector authorization could not be saved'
+                    );
+                }
+              });
+            const nativeWrite =
+              isAccountConnectorKind(connector.kind) && operation === 'account_calendar_create';
+            const executed = nativeWrite
+              ? await withAccountOperation({
+                  store: context.store,
+                  key: context.key,
+                  userId: task.userId,
+                  connectorId: connector.id,
+                  taskId: task.id,
+                  turn: context.state.turn ?? 0,
+                  action: operation,
+                  parameters: parseAccountConnectorAction(actionInput),
+                  execute
+                })
+              : await execute();
             await context.store.recordConnectorAudit({
               connectorId: connector.id,
               userId: task.userId,
               taskId: task.id,
               operation: executed.action,
-              outcome: 'succeeded',
+              outcome: asRecord(executed.result)?.status === 'uncertain' ? 'failed' : 'succeeded',
               statusCode: executed.statusCode,
               requestBytes: executed.requestBytes,
               responseBytes: executed.responseBytes,

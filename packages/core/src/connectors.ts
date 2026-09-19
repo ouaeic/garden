@@ -1,3 +1,4 @@
+import type { AccountOperation } from './account-operation.js';
 import {
   secureConnectorRequest,
   assertConnectorUrl,
@@ -734,6 +735,7 @@ const webdavHeaders = (secret: ConnectorSecret): Record<string, string> => {
 };
 
 export interface ConnectorExecutionInput {
+  operation?: AccountOperation;
   kind: AnyConnectorKind;
   baseUrl: string;
   scopes: AnyConnectorScope[];

@@ -136,6 +136,39 @@ describe('durable connected-service write receipts', () => {
     expect(lifetime?.aborted).toBe(true);
   });
 
+  it('resolves a pending intent across owner turns and preserves the later turn alias after completion', async () => {
+    const first = { ...identity('e'), intentKey: 'f'.repeat(64) };
+    const next = { ...first, operationKey: 'f'.repeat(64) };
+    let originalId: string | undefined;
+    await store.withConnectorOperation(first, async ({ operation, saveRecovery }) => {
+      originalId = operation.id;
+      await saveRecovery(
+        encryptJson({ phase: 'submitted' }, key, connectorOperationAad(operation, 'recovery'))
+      );
+    });
+    await store.withConnectorOperation(next, async ({ operation, fresh, complete }) => {
+      expect(fresh).toBe(false);
+      expect(operation.id).toBe(originalId);
+      expect(decryptJson(operation.recoveryCiphertext!, key)).toEqual({ phase: 'submitted' });
+      await complete(
+        encryptJson({ confirmed: true }, key, connectorOperationAad(operation, 'result'))
+      );
+    });
+    for (const request of [first, next])
+      await store.withConnectorOperation(request, async ({ operation, fresh }) => {
+        expect(fresh).toBe(false);
+        expect(operation.id).toBe(originalId);
+        expect(operation.state).toBe('completed');
+      });
+    await store.withConnectorOperation(
+      { ...first, operationKey: '0'.repeat(64) },
+      async ({ operation, fresh }) => {
+        expect(fresh).toBe(true);
+        expect(operation.id).not.toBe(originalId);
+      }
+    );
+  });
+
   it('rejects another owner, another task, wrong encryption context and late callbacks', async () => {
     const input = identity('c');
     await expect(
