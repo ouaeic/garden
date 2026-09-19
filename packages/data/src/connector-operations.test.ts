@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { beforeAll, afterAll, describe, expect, it } from 'vitest';
 import { encryptJson, decryptJson } from '@athanor/core';
 import { createDatabase, migrateDatabase } from './database.js';
+import { migrations } from './migrations.js';
 import { DataStore, connectorOperationAad, type ConnectorOperationIdentity } from './store.js';
 
 describe('durable connected-service write receipts', () => {
@@ -167,6 +168,35 @@ describe('durable connected-service write receipts', () => {
         expect(operation.id).not.toBe(originalId);
       }
     );
+  });
+
+  it('preserves completed receipts and request aliases when its migration is reapplied', async () => {
+    const input = identity('6');
+    const id = await store.withConnectorOperation(input, async ({ operation, complete }) => {
+      await complete(
+        encryptJson({ confirmed: true }, key, connectorOperationAad(operation, 'result'))
+      );
+      return operation.id;
+    });
+    const migration = migrations.find((entry) => entry.name === 'durable_connector_operations');
+    expect(migration).toBeDefined();
+    const snapshot = async () => ({
+      operations: (await database.query('SELECT * FROM connector_operations ORDER BY id')).rows,
+      requests: (
+        await database.query('SELECT * FROM connector_operation_requests ORDER BY operation_key')
+      ).rows
+    });
+    const before = await snapshot();
+    expect(before.operations.length).toBeGreaterThan(0);
+    expect(before.requests.length).toBeGreaterThan(0);
+    for (let pass = 0; pass < 2; pass++)
+      await database.transaction((transaction) => transaction.exec(migration!.sql));
+    expect(await snapshot()).toEqual(before);
+    await store.withConnectorOperation(input, async ({ operation, fresh }) => {
+      expect(fresh).toBe(false);
+      expect(operation.id).toBe(id);
+      expect(operation.state).toBe('completed');
+    });
   });
 
   it('rejects another owner, another task, wrong encryption context and late callbacks', async () => {
