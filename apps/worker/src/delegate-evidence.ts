@@ -10,6 +10,7 @@ import { chargeNovelty, classifyDestination, type DestinationContext } from './e
 import type { ToolContext } from './tool-dispatch.js';
 import {
   CLAIM_REVIEW_SOURCES,
+  CLAIM_REVIEW_CLAIMS,
   CLAIM_REVIEW_SOURCE_CHARS,
   reviewClaims,
   type ClaimReview,
@@ -26,7 +27,8 @@ export async function assessEvidenceReport(
   reachedAddresses: readonly string[],
   remainingCredits: number,
   requestId: string,
-  question: string
+  question: string,
+  options: { complete?: boolean } = {}
 ) {
   const evidence = report?.evidence.length
     ? await verifyDelegateEvidence(
@@ -35,7 +37,8 @@ export async function assessEvidenceReport(
         report.evidence,
         destinations,
         state,
-        reachedAddresses
+        reachedAddresses,
+        options
       )
     : { checks: [], sources: [] };
   const untrustedSources = new Set<string>();
@@ -51,7 +54,9 @@ export async function assessEvidenceReport(
     if (origin) untrustedSources.add(origin);
   }
   const claimReview =
-    evidence.sources.length && report
+    evidence.sources.length &&
+    report &&
+    (!options.complete || evidence.sources.length === report.evidence.length)
       ? await reviewClaims(
           context,
           model,
@@ -77,14 +82,22 @@ export async function verifyDelegateEvidence(
   evidence: ReadonlyArray<{ claim: string; source: string; quotedSpan: string }>,
   destinations: DestinationContext,
   state: AgentState,
-  reachedAddresses: readonly string[]
+  reachedAddresses: readonly string[],
+  options: { complete?: boolean } = {}
 ): Promise<{ checks: DelegateEvidenceCheck[]; sources: ClaimSource[] }> {
   const checks: DelegateEvidenceCheck[] = [];
   const sources: ClaimSource[] = [];
-  for (const [id, item] of evidence.slice(0, CLAIM_REVIEW_SOURCES).entries()) {
+  const limit = options.complete ? CLAIM_REVIEW_CLAIMS : CLAIM_REVIEW_SOURCES;
+  if (options.complete && evidence.length > limit)
+    throw new Error('Too many explicit claims for one review.');
+  const bodies = new Map<string, { body: string } | { failure: string }>();
+  for (const [id, item] of evidence.slice(0, limit).entries()) {
     try {
       let body: string;
-      if (/^https?:\/\//i.test(item.source)) {
+      const cached = bodies.get(item.source);
+      if (cached && 'failure' in cached) throw new Error(cached.failure);
+      if (cached && 'body' in cached) body = cached.body;
+      else if (/^https?:\/\//i.test(item.source)) {
         // Charge synchronously before awaiting: sibling missions share the same turn counter.
         const spent = state.turnNoveltyBytes ?? 0;
         const verdict = classifyDestination(item.source, {
@@ -93,6 +106,9 @@ export async function verifyDelegateEvidence(
           spentNoveltyBytes: spent
         });
         if (verdict.sink) {
+          bodies.set(item.source, {
+            failure: `The source destination was refused: ${verdict.reason}`
+          });
           checks.push({
             claim: item.claim,
             source: item.source,
@@ -118,6 +134,7 @@ export async function verifyDelegateEvidence(
         body = await context.runner.readFile(task.workspaceId, task.id, item.source);
       }
       body = body.slice(0, CLAIM_REVIEW_SOURCE_CHARS);
+      bodies.set(item.source, { body });
       const quoteMatched = quotedSpanMatchesSource(body, item.quotedSpan);
       checks.push({
         claim: item.claim,
@@ -130,6 +147,9 @@ export async function verifyDelegateEvidence(
       });
       sources.push({ id, claim: item.claim, source: item.source, text: body, quoteMatched });
     } catch (error) {
+      bodies.set(item.source, {
+        failure: error instanceof Error ? error.message : 'unknown error'
+      });
       checks.push({
         claim: item.claim,
         source: item.source,

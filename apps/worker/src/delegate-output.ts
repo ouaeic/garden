@@ -1,4 +1,5 @@
 import { asRecord, textValue } from './values.js';
+import { CLAIM_REVIEW_CLAIMS } from './claim-input.js';
 
 const clip = (value: unknown, maximum: number): string => {
   const text = textValue(value);
@@ -31,7 +32,7 @@ export function delegateOutputSummary(
       schemaValid: report.schemaValid === true,
       unverified: clip(report.unverified, 700),
       ...(citations ? { citations: { checked: citations.checked, cited: citations.cited } } : {}),
-      evidenceChecks: entries(report.evidenceChecks, 2).map((check) => ({
+      evidenceChecks: entries(report.evidenceChecks, CLAIM_REVIEW_CLAIMS).map((check) => ({
         ...claimIdentity(check.claim),
         source: textValue(check.source),
         quoteMatched: check.quoteMatched === true,
@@ -42,7 +43,7 @@ export function delegateOutputSummary(
         ? {
             claimReview: {
               status: clip(review.status, 40),
-              claims: entries(review.claims, 2).map((claim) => ({
+              claims: entries(review.claims, CLAIM_REVIEW_CLAIMS).map((claim) => ({
                 id: claim.id,
                 ...claimIdentity(claim.claim),
                 assessment: clip(claim.assessment, 24),
@@ -73,7 +74,42 @@ export function delegateOutputSummary(
       'The full result could not be spilled. Ask for the missing material as a narrower mission.'
   };
   const base = JSON.stringify(output).length;
-  if (base > maximum) return null;
+  if (base > maximum) {
+    const compact = JSON.stringify({
+      ...output,
+      reports: reports.map(({ evidenceChecks, claimReview, ...report }) => ({
+        ...report,
+        evidenceCheckCounts: {
+          reread: evidenceChecks.filter((check) => check.reread).length,
+          matched: evidenceChecks.filter((check) => check.quoteMatched).length,
+          checked: evidenceChecks.length
+        },
+        ...(claimReview
+          ? {
+              claimReview: {
+                status: claimReview.status,
+                claims: claimReview.claims.map(
+                  ({ id, claim, claimPreview, assessment, kind, explanation, conflicts }) => ({
+                    id,
+                    ...(claim
+                      ? { claimPreview: clip(claim, 120) }
+                      : { claimPreview: clip(claimPreview, 120) }),
+                    assessment,
+                    kind,
+                    explanation: clip(explanation, 180),
+                    conflicts
+                  })
+                ),
+                limitations: claimReview.limitations
+              }
+            }
+          : {})
+      })),
+      omitted:
+        'Source addresses, quotations and report prose are in fullResult. Every reviewed claim verdict is retained here.'
+    });
+    return compact.length <= maximum ? compact : null;
+  }
   const share = Math.floor((maximum - base) / reports.length);
   for (const [index, report] of reports.entries()) {
     const original = textValue(asRecord(root.reports[index])?.report);

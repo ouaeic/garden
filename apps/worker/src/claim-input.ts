@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const CLAIM_REVIEW_SOURCES = 2;
+export const CLAIM_REVIEW_CLAIMS = 8;
 export const CLAIM_REVIEW_SOURCE_CHARS = 20_000;
 export const CLAIM_REVIEW_CLAIM_CHARS = 1600;
 
@@ -16,5 +17,5 @@ export const DirectClaims = z
       .strict()
   )
   .min(1)
-  .max(CLAIM_REVIEW_SOURCES);
+  .max(CLAIM_REVIEW_CLAIMS);
 export type DirectClaims = z.infer<typeof DirectClaims>;

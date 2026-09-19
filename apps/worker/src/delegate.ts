@@ -127,7 +127,8 @@ async function runDelegatedMission(
       [],
       Math.max(0, Math.min(budget, task.maxComputeCredits - (state.credits ?? 0))),
       `${state.turn ?? 0}:${parentCallId}:${missionIndex}`,
-      mission.instruction
+      mission.instruction,
+      { complete: true }
     );
     const review = assessed.claimReview;
     progress.credits = review?.usageCredits ?? 0;

@@ -101,4 +101,53 @@ describe('parallel research report delivery', () => {
     );
     expect(delegateOutputSummary({ reports: [{ report: 'text' }] }, 10, null)).toBeNull();
   });
+
+  it('keeps every verdict when expanded claim sets require a compact evidence summary', () => {
+    const reports = Array.from({ length: 3 }, (_, mission) => ({
+      name: `mission-${mission}`,
+      report: 'Background '.repeat(12000),
+      evidenceChecks: Array.from({ length: 8 }, (_, id) => ({
+        claim: `target-${mission}-${id}`,
+        source: `workspace/${'nested/'.repeat(200)}source.txt`,
+        reread: true,
+        quoteMatched: true
+      })),
+      claimReview: {
+        status: 'reviewed',
+        claims: Array.from({ length: 8 }, (_, id) => ({
+          id,
+          claim: `target-${mission}-${id}`,
+          assessment: id === 7 ? 'contradicted' : 'supported',
+          kind: 'observation',
+          explanation: 'A substantive finding. '.repeat(100),
+          support: [{ sourceId: 0, quote: 'Source passage. '.repeat(100) }],
+          conflicts: []
+        })),
+        limitations: ['A bounded review.']
+      }
+    }));
+    const text = delegateOutputSummary({ reports }, 24000, { path: 'workspace/full.json' });
+    expect(text).not.toBeNull();
+    expect(text!.length).toBeLessThanOrEqual(24000);
+    const result = JSON.parse(text!) as {
+      reports: Array<{
+        name: string;
+        evidenceCheckCounts: { checked: number };
+        claimReview: { claims: Array<{ id: number; claimPreview: string; assessment: string }> };
+      }>;
+      fullResult: { path: string };
+      omitted: string;
+    };
+    expect(result.reports).toHaveLength(3);
+    expect(result.fullResult.path).toBe('workspace/full.json');
+    expect(result.omitted).toContain('Every reviewed claim verdict is retained');
+    for (const [mission, report] of result.reports.entries()) {
+      expect(report.evidenceCheckCounts.checked).toBe(8);
+      expect(report.claimReview.claims).toHaveLength(8);
+      expect(report.claimReview.claims.map((claim) => claim.id)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+      expect(report.claimReview.claims[7]).toEqual(
+        expect.objectContaining({ claimPreview: `target-${mission}-7`, assessment: 'contradicted' })
+      );
+    }
+  });
 });

@@ -66,6 +66,56 @@ function fixture() {
   return { context, chat, taskClaim, recordUsage, order };
 }
 describe('bounded independent claim review', () => {
+  it('covers eight targets without duplicating a shared source body or exceeding the context bound', async () => {
+    const f = fixture();
+    const body = 'Causation was not established.' + ' source detail'.repeat(1300);
+    const batch = Array.from({ length: 8 }, (_, id) => ({
+      ...sources[0]!,
+      id,
+      claim: `Claim ${id}: the study established causation.`,
+      text: body
+    }));
+    const response = await f.chat();
+    f.chat.mockClear();
+    f.chat.mockResolvedValue({
+      ...response,
+      text: JSON.stringify({
+        claims: batch.map((target) => ({
+          ...assessment().claims[0]!,
+          id: target.id,
+          claim: target.claim
+        })),
+        limitations: []
+      })
+    });
+    const result = await reviewClaims(f.context, model, batch, 'report', 1, 'eight-claims');
+    expect(result.status).toBe('reviewed');
+    expect(result.claims).toHaveLength(8);
+    expect(result.sources).toHaveLength(1);
+    const request = f.chat.mock.calls[0]![1]!;
+    const user = request.messages[1]!.content;
+    expect(user.split(body)).toHaveLength(2);
+    expect(user.length).toBeLessThan(25000);
+    expect(user).toContain('"id":7');
+    expect(f.recordUsage).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects support IDs that were not sent after source deduplication', () => {
+    const batch = [sources[0]!, { ...sources[0]!, id: 1, claim: 'A second claim.' }];
+    const output = assessment();
+    output.claims.push({
+      ...output.claims[0]!,
+      id: 1,
+      claim: batch[1]!.claim,
+      support: [{ sourceId: 1, quote: 'Causation was not established.' }]
+    });
+    expect(() => parseClaimReview(JSON.stringify(output), batch)).toThrow(
+      'outside the supplied evidence'
+    );
+    output.claims[1]!.support[0]!.sourceId = 0;
+    expect(parseClaimReview(JSON.stringify(output), batch).claims).toHaveLength(2);
+  });
+
   it('reserves room for reasoning and uses only the selected model’s advertised effort', async () => {
     const f = fixture();
     await reviewClaims(
@@ -248,7 +298,7 @@ describe('bounded independent claim review', () => {
     });
     const prompt = f.chat.mock.calls[0]![1]!.messages[1]!.content;
     expect(prompt).toContain(
-      '"targets":[{"id":0,"claim":"The study did not establish causation."}]'
+      '"targets":[{"id":0,"claim":"The study did not establish causation.","sourceId":0}]'
     );
     expect(prompt).toContain('"background":');
   });

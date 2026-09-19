@@ -378,12 +378,70 @@ describe('direct review of the lead’s claims', () => {
     const readFile = vi.fn(async () => 'The current fee is 10 units.');
     await expect(
       runMission([], {
-        claims: [...claims, ...claims, ...claims],
+        claims: Array.from({ length: 9 }, () => claims[0]!),
         review: reviewed,
         runner: { readFile }
       })
     ).rejects.toThrow();
     expect(readFile).not.toHaveBeenCalled();
+  });
+
+  it('reviews a complete explicit claim set against one consistent reread of a shared source', async () => {
+    const batch = Array.from({ length: 8 }, (_, index) => ({
+      ...claims[0]!,
+      claim: `Claim ${index + 1}: the current fee is 12 units.`
+    }));
+    const readFile = vi.fn(async () => 'The current fee is 10 units.');
+    const response = answer(
+      JSON.stringify({
+        claims: batch.map((entry, id) => ({
+          id,
+          claim: entry.claim,
+          assessment: 'contradicted',
+          kind: 'observation',
+          explanation: 'The current fee is 10.',
+          support: [{ sourceId: 0, quote: entry.quotedSpan }],
+          conflicts: []
+        })),
+        limitations: []
+      })
+    );
+    const result = await runMission([], { claims: batch, review: response, runner: { readFile } });
+    expect(result.calls).toBe(1);
+    expect(readFile).toHaveBeenCalledOnce();
+    expect(result.result.reports).toHaveLength(1);
+    expect(result.result.reports[0]?.citations).toEqual({ checked: 8, cited: 8 });
+    expect(result.result.reports[0]?.claimReview).toMatchObject({
+      status: 'reviewed',
+      sources: [{ id: 0, source: claims[0]!.source }]
+    });
+    expect(result.result.reports[0]?.claimReview?.claims).toHaveLength(8);
+    expect(result.result.reports[0]?.claimReview?.claims.map((claim) => claim.claim)).toEqual(
+      batch.map((claim) => claim.claim)
+    );
+    const request = result.seen[0]!.join('\n');
+    expect(request.match(/"source":"workspace\/current.txt"/g)).toHaveLength(1);
+    expect(request).toContain('"sourceId":0');
+  });
+
+  it('does not claim complete direct review when one assigned source could not be reread', async () => {
+    const readFile = vi.fn(async (_workspace: string, _task: string, path: string) => {
+      if (path.endsWith('missing.txt')) throw new Error('Not found');
+      return 'The current fee is 10 units.';
+    });
+    const result = await runMission([], {
+      claims: [...claims, { ...claims[0]!, source: 'workspace/missing.txt' }],
+      review: reviewed,
+      runner: { readFile }
+    });
+    expect(readFile).toHaveBeenCalledTimes(2);
+    expect(result.calls).toBe(0);
+    expect(result.result.reports[0]?.claimReview).toBeUndefined();
+    expect(result.result.reports[0]?.evidenceChecks?.map((check) => check.reread)).toEqual([
+      true,
+      false
+    ]);
+    expect(result.result.reports[0]?.unverified).toContain('has not been independently assessed');
   });
 });
 
