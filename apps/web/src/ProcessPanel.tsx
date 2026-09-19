@@ -4,6 +4,7 @@ import { Activity, RefreshCw, Square } from 'lucide-react';
 import type { ManagedProcess, ProcessList } from '@athanor/contracts';
 import { get, post } from './client';
 import { Button, Dialog, ErrorNotice, Spinner } from './ui';
+import { useVisibleClock } from './visible-clock';
 import {
   processActive,
   processDuration,
@@ -35,7 +36,11 @@ export default function ProcessPanel({
   const [confirm, setConfirm] = useState<ManagedProcess | null>(null);
   const [logs, setLogs] = useState<Record<string, string>>({});
   const [showFinished, setShowFinished] = useState(false);
-  const [clock, setClock] = useState(Date.now);
+  const clock = useVisibleClock(
+    Boolean(list?.processes.some(processActive)),
+    30_000,
+    list?.observedAt
+  );
   const request = useRef<AbortController | null>(null);
   const generation = useRef(0);
   const refresh = useCallback(async () => {
@@ -48,7 +53,6 @@ export default function ProcessPanel({
       if (controller.signal.aborted) return;
       setList(result);
       setError(null);
-      setClock(Date.now());
     } catch (cause) {
       if (!controller.signal.aborted) setError(cause);
     } finally {
@@ -84,13 +88,6 @@ export default function ProcessPanel({
     };
   }, [refresh, refreshAfterMs]);
   const active = list?.processes.filter(processActive) ?? [];
-  useEffect(() => {
-    if (!active.length) return;
-    const timer = setInterval(() => {
-      if (document.visibilityState === 'visible') setClock(Date.now());
-    }, 30_000);
-    return () => clearInterval(timer);
-  }, [active.length]);
   const finished = list?.processes.filter((process) => !processActive(process)) ?? [];
   const rows = [...active, ...(showFinished || !active.length ? finished : [])];
   const key = (process: ManagedProcess) =>

@@ -10,6 +10,7 @@ import type {
 import { get, post } from './client';
 import { Button, Dialog, ErrorNotice, Field, Spinner } from './ui';
 import { processDuration, processMemory } from './process-display';
+import { useVisibleClock } from './visible-clock';
 import './project-updates.css';
 
 const DirectoryPanel = lazy(() => import('./DirectoryPanel'));
@@ -66,7 +67,14 @@ export default function ProjectUpdates({
     [reason, setReason] = useState('');
   const [logs, setLogs] = useState<{ check: string; text: string } | null>(null),
     [history, setHistory] = useState(false);
-  const [clock, setClock] = useState(Date.now());
+  const ticking = (check: ProjectCheck) => ['preparing', 'running'].includes(check.status);
+  const clock = useVisibleClock(
+    Boolean(
+      data?.updates.some((update) => update.checks.some(ticking)) || selected?.checks.some(ticking)
+    ),
+    1000,
+    data?.observedAt
+  );
   const previouslyActive = useRef<string[]>([]);
   previouslyActive.current =
     data?.updates
@@ -139,7 +147,6 @@ export default function ProjectUpdates({
             : detail
         );
       setError(null);
-      setClock(Date.now());
     } catch (cause) {
       if (!controller.signal.aborted) setError(cause);
     }
@@ -165,10 +172,6 @@ export default function ProjectUpdates({
       document.removeEventListener('visibilitychange', visible);
     };
   }, [refresh]);
-  useEffect(() => {
-    const timer = setInterval(() => setClock(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
   const act = async (operation: ProjectUpdateAction, conversation?: string) => {
     const result = await post<ProjectUpdate>(endpoint, {
       operation,

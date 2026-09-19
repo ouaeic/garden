@@ -1,4 +1,5 @@
 import { readQuestionDraft, writeQuestionDraft } from './draft-storage';
+import { useVisibleClock } from './visible-clock';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
@@ -152,13 +153,8 @@ export default function TaskSurface({
    * minute keeps it honest while a task runs; a finished task's duration is fixed and the tick
    * is wasted, so this only runs while the work could still be accruing time.
    */
-  const [clock, setClock] = useState(() => Date.now());
   const running = !isFinished(task);
-  useEffect(() => {
-    if (!running) return;
-    const ticker = setInterval(() => setClock(Date.now()), 30_000);
-    return () => clearInterval(ticker);
-  }, [task.id, running]);
+  const clock = useVisibleClock(running, 30_000, task.updatedAt);
   function showArtifact(id: string) {
     const artifact = artifacts.find((item) => item.id === id);
     if (artifact) setPreview(artifact);
