@@ -45,6 +45,13 @@ export const AnalysisRunRecord = z.object({
   error: z.string().max(65536).optional(),
   dependenciesUnchanged: z.boolean().optional(),
   outputsMatchPrevious: z.boolean().optional(),
+  environmentSetup: z
+    .object({
+      kind: z.literal('python_wheels'),
+      directory: path,
+      status: z.enum(['creating', 'installing', 'ready'])
+    })
+    .optional(),
   spec: z.object({
     name: z.string().max(200).optional(),
     command,
@@ -58,6 +65,16 @@ export const AnalysisRunRecord = z.object({
     environment: z.object({
       lockFiles: paths,
       runtimeOnly: z.boolean().optional(),
+      python: z
+        .object({
+          interpreter: z.string().min(1).max(100000),
+          directory: path,
+          wheels: z
+            .array(z.object({ path, sha256: hash }))
+            .min(1)
+            .max(4096)
+        })
+        .optional(),
       probes: z.array(z.object({ name: z.string().max(120), command })).max(32)
     }),
     seeds: z
@@ -70,7 +87,7 @@ export const AnalysisRunRecord = z.object({
       sources: files,
       inputs: files,
       locks: files,
-      probes: z.array(probe).max(32),
+      probes: z.array(probe).max(33),
       platform: z.object({ system: z.string(), release: z.string(), architecture: z.string() })
     })
     .optional(),

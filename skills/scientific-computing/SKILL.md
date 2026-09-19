@@ -67,11 +67,22 @@ work, launch that command as a named durable job and wait using the process tool
 command output to the job log and hashes declared files without reading whole datasets into RAM.
 It refuses existing outputs and manifests; use a clean run directory.
 
-To reproduce, recreate the locked environment and copy the unchanged source and inputs into a
-clean directory, then run `garden-run replay --from-manifest /path/to/run.json --manifest rerun.json`.
+For automatic Python environment reconstruction, prepare a complete set of local wheels through
+the ordinary package tools. Add `environment.python` with `interpreter` (the base Python),
+`directory` (a relative path ending in `.venv`), and `wheels` (objects with `path` and `sha256`).
+Include every wheel in `lockFiles`, including all transitive dependencies. Use `python` or the
+installed command name in the analysis and probes. The recorder verifies the hashes, creates a
+fresh environment, installs offline, checks dependencies and records an installed-package inventory.
+The environment leads `PATH`; existing `.venv` directories are refused. Keep the wheel files for
+replay; `.venv` package trees are excluded from project source snapshots. Other toolchains retain
+the explicit environment preparation and version-probe path.
+
+To reproduce, copy the unchanged source, inputs and dependency files into a clean directory, then
+run `garden-run replay --from-manifest /path/to/run.json --manifest rerun.json`. A recorded Python
+recipe rebuilds its environment; without one, recreate the locked environment through normal tools.
 Changed inputs, source, lock files, environment probes or platform cause refusal before execution.
-Output checksum differences fail the reproduction check. The manifest does not install packages,
-fetch data, capture undeclared dependencies or prove scientific validity. For nondeterministic
+Output checksum differences fail the reproduction check. The manifest does not fetch data,
+capture undeclared dependencies or prove scientific validity. For nondeterministic
 analyses, record and test justified numerical tolerances separately rather than reporting exact
 reproduction. A run interrupted during execution is never automatically replayed.
 

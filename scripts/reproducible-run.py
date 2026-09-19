@@ -14,6 +14,7 @@ import stat
 import subprocess
 import sys
 import uuid
+import re
 
 FORMAT = "garden-analysis-run-1"
 MAX_SPEC_BYTES = 1024 * 1024
@@ -44,7 +45,13 @@ def relative(value):
     if not isinstance(value, str) or not value or len(value) > 4096:
         raise ValueError("A file path must be a nonempty relative path")
     candidate = Path(value)
-    if candidate.is_absolute() or ".." in candidate.parts or value == ".":
+    if (
+        candidate.is_absolute()
+        or ".." in candidate.parts
+        or value == "."
+        or "\0" in value
+        or "\\" in value
+    ):
         raise ValueError("Analysis file paths must stay inside the current directory")
     return str(candidate)
 
@@ -114,7 +121,7 @@ def validate(spec):
             raise ValueError("Invalid input SHA-256")
     input_paths = paths([item["path"] for item in spec["inputs"]])
     env = spec["environment"]
-    exact_keys(env, ["lockFiles", "probes"], ["runtimeOnly"])
+    exact_keys(env, ["lockFiles", "probes"], ["runtimeOnly", "python"])
     if "runtimeOnly" in env and not isinstance(env["runtimeOnly"], bool):
         raise ValueError("runtimeOnly must be a boolean")
     env["lockFiles"] = paths(env["lockFiles"])
@@ -138,6 +145,7 @@ def validate(spec):
             or not probe["name"]
             or len(probe["name"]) > 120
             or probe["name"] in names
+            or ("python" in env and probe["name"] == "Garden rebuilt Python environment")
         ):
             raise ValueError("Environment probe names must be nonempty and unique")
         names.add(probe["name"])
@@ -145,6 +153,33 @@ def validate(spec):
     files = spec["sources"] + input_paths + env["lockFiles"]
     if len(set(files)) != len(files) or set(files) & set(spec["outputs"]):
         raise ValueError("Source, input, lock and output paths must be distinct")
+    if "python" in env:
+        recipe = env["python"]
+        exact_keys(recipe, ["interpreter", "directory", "wheels"])
+        argv([recipe["interpreter"]])
+        recipe["directory"] = relative(recipe["directory"])
+        if env.get("runtimeOnly"):
+            raise ValueError("A package environment cannot be runtimeOnly")
+        if not isinstance(recipe["wheels"], list) or not 0 < len(recipe["wheels"]) <= 4096:
+            raise ValueError("Declare the complete nonempty wheel set")
+        wheels = set()
+        for wheel in recipe["wheels"]:
+            exact_keys(wheel, ["path", "sha256"])
+            wheel["path"] = relative(wheel["path"])
+            if (
+                wheel["path"] in wheels
+                or wheel["path"] not in env["lockFiles"]
+                or not wheel["path"].endswith(".whl")
+                or not isinstance(wheel["sha256"], str)
+                or not re.fullmatch(r"[a-f0-9]{64}", wheel["sha256"])
+            ):
+                raise ValueError("Each wheel needs a unique declared lock path and SHA-256")
+            wheels.add(wheel["path"])
+        directory = Path(recipe["directory"])
+        if directory.name != ".venv":
+            raise ValueError("Use a .venv directory so package files stay outside project snapshots")
+        if any(Path(name).is_relative_to(directory) for name in files + spec["outputs"]):
+            raise ValueError("The disposable environment cannot contain declared analysis files")
     if "name" in spec and (
         not isinstance(spec["name"], str) or len(spec["name"]) > 200
     ):
@@ -290,16 +325,33 @@ def stop_group(child):
     child.wait()
 
 
-def probes(spec, root):
+def probes(spec, root, execution_env=None):
     result = []
     remaining = 256 * 1024
-    for probe in spec["environment"]["probes"]:
+    declared = list(spec["environment"]["probes"])
+    recipe = spec["environment"].get("python")
+    if recipe:
+        declared.append(
+            {
+                "name": "Garden rebuilt Python environment",
+                "command": [
+                    str(Path(recipe["directory"]) / "bin/python"), "-I", "-c",
+                    "import sys,json,importlib.metadata as m; "
+                    "print(json.dumps({'python':sys.version,"
+                    "'implementation':sys.implementation.name,"
+                    "'packages':sorted((d.metadata['Name'],d.version) "
+                    "for d in m.distributions())},sort_keys=True))",
+                ],
+            }
+        )
+    for probe in declared:
         child = subprocess.Popen(
             probe["command"],
             cwd=root,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             start_new_session=True,
+            env=execution_env,
         )
         content = bytearray()
         deadline = time.monotonic() + 30
@@ -341,7 +393,7 @@ def probes(spec, root):
     return result
 
 
-def capture(spec, root, cache):
+def capture_files(spec, root, cache):
     inputs = []
     for item in spec["inputs"]:
         observed = file_identity(root, item["path"], cache)
@@ -359,13 +411,91 @@ def capture(spec, root, cache):
             file_identity(root, name, cache)
             for name in spec["environment"]["lockFiles"]
         ],
-        "probes": probes(spec, root),
+    }
+
+
+def capture(spec, root, cache, execution_env=None):
+    return {
+        **capture_files(spec, root, cache),
+        "probes": probes(spec, root, execution_env),
         "platform": {
             "system": platform.system(),
             "release": platform.release(),
             "architecture": platform.machine(),
         },
     }
+
+
+def setup_command(command, root, execution_env):
+    child = subprocess.Popen(command, cwd=root, env=execution_env, start_new_session=True)
+    try:
+        if child.wait():
+            raise ValueError("Python environment preparation failed; inspect the command log")
+    finally:
+        stop_group(child)
+
+
+def prepare_python(spec, root, captured, receipt, filename):
+    recipe = spec["environment"].get("python")
+    if not recipe:
+        return None
+    identities = {item["path"]: item["sha256"] for item in captured["locks"]}
+    for wheel in recipe["wheels"]:
+        if identities[wheel["path"]] != wheel["sha256"]:
+            raise ValueError("Wheel does not match its expected checksum: " + wheel["path"])
+    directory = checked_path(root, recipe["directory"])
+    if filename.is_relative_to(directory):
+        raise ValueError("The manifest must be outside the disposable environment")
+    # mkdir is exclusive; an existing or interrupted environment is never repaired in place.
+    parent, name = parent_descriptor(root, recipe["directory"])
+    try:
+        os.mkdir(name, mode=0o700, dir_fd=parent)
+    finally:
+        os.close(parent)
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith(("PIP_", "PYTHON")) and key != "VIRTUAL_ENV"
+    }
+    environment.update({"PIP_CONFIG_FILE": os.devnull, "PYTHONNOUSERSITE": "1"})
+    receipt["environmentSetup"] = {
+        "kind": "python_wheels",
+        "directory": recipe["directory"],
+        "status": "creating",
+    }
+    atomic_write(filename, receipt)
+    print("garden-run: creating isolated Python environment", file=sys.stderr, flush=True)
+    setup_command([recipe["interpreter"], "-I", "-m", "venv", str(directory)], root, environment)
+    environment.update(
+        {
+            "VIRTUAL_ENV": str(directory),
+            "PATH": str(directory / "bin") + os.pathsep + environment.get("PATH", os.defpath),
+        }
+    )
+    python = str(directory / "bin/python")
+    requirements = directory / "garden-wheels.txt"
+    # Generated local wheel URIs prevent a requirements file from introducing URLs or flags.
+    with requirements.open("x") as handle:
+        for wheel in recipe["wheels"]:
+            handle.write(
+                checked_path(root, wheel["path"]).as_uri()
+                + " --hash=sha256:" + wheel["sha256"] + "\n"
+            )
+    receipt["environmentSetup"]["status"] = "installing"
+    atomic_write(filename, receipt)
+    print("garden-run: installing the recorded local wheels", file=sys.stderr, flush=True)
+    pip = [python, "-I", "-m", "pip", "--isolated", "--disable-pip-version-check", "--no-input"]
+    setup_command(
+        pip + [
+            "install", "--no-index", "--no-deps", "--no-cache-dir",
+            "--only-binary=:all:", "--require-hashes", "--force-reinstall",
+            "-r", str(requirements),
+        ], root, environment,
+    )
+    setup_command(pip + ["check"], root, environment)
+    receipt["environmentSetup"]["status"] = "ready"
+    atomic_write(filename, receipt)
+    return environment
 
 
 def run(spec, root, filename, previous=None):
@@ -398,7 +528,10 @@ def run(spec, root, filename, previous=None):
         "spec": spec,
         "seedCoverage": "declared_by_caller_not_automatically_applied",
         "coverage": "declared_files_and_environment_probes",
-        "note": "No automatic dependency installation or source download. Undeclared dependencies, external services and unsaved runtime state are not captured.",
+        "note": (
+            "Only a declared Python wheel recipe rebuilds dependencies. No source download. "
+            "Undeclared dependencies, external services and unsaved runtime state are not captured."
+        ),
     }
     if previous:
         receipt["replayedFrom"] = previous["id"]
@@ -411,7 +544,15 @@ def run(spec, root, filename, previous=None):
             file=sys.stderr,
             flush=True,
         )
-        before = capture(spec, root, hash_cache)
+        files_before = capture_files(spec, root, hash_cache)
+        if previous and any(
+            previous["before"].get(key) != value for key, value in files_before.items()
+        ):
+            raise ValueError("Inputs, source or environment locks changed; execution refused")
+        execution_env = prepare_python(spec, root, files_before, receipt, filename)
+        before = capture(spec, root, hash_cache, execution_env)
+        if any(before[key] != value for key, value in files_before.items()):
+            raise ValueError("Declared files changed during environment preparation")
         receipt["before"] = before
         if previous and previous.get("before") != before:
             raise ValueError(
@@ -421,7 +562,7 @@ def run(spec, root, filename, previous=None):
         receipt["startedAt"] = now()
         atomic_write(filename, receipt)
         print("garden-run: running analysis", file=sys.stderr, flush=True)
-        child = subprocess.Popen(spec["command"], cwd=root, start_new_session=True)
+        child = subprocess.Popen(spec["command"], cwd=root, start_new_session=True, env=execution_env)
         receipt["pid"] = child.pid
         atomic_write(filename, receipt)
         code = child.wait()
@@ -434,7 +575,7 @@ def run(spec, root, filename, previous=None):
             file=sys.stderr,
             flush=True,
         )
-        after = capture(spec, root, hash_cache)
+        after = capture(spec, root, hash_cache, execution_env)
         receipt["dependenciesUnchanged"] = before == after
         if not receipt["dependenciesUnchanged"]:
             raise ValueError(

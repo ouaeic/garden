@@ -28,20 +28,46 @@ test(
       await mkdir(path.join(run, 'records'), { recursive: true });
       await writeFile(
         path.join(run, 'analysis.py'),
-        "from pathlib import Path\nPath('result.txt').write_text('42\\n')\n"
+        "from pathlib import Path\nfrom garden_view_science import VALUE\nPath('result.txt').write_text(str(VALUE)+'\\n')\n"
+      );
+      const wheel = 'garden_view_science-1.0-py3-none-any.whl';
+      execFileSync(
+        'python3',
+        [
+          '-c',
+          String.raw`import zipfile
+with zipfile.ZipFile('${wheel}', 'w') as archive:
+    archive.writestr('garden_view_science.py', 'VALUE = 42\n')
+    archive.writestr('garden_view_science-1.0.dist-info/METADATA', 'Metadata-Version: 2.1\nName: garden-view-science\nVersion: 1.0\n')
+    archive.writestr('garden_view_science-1.0.dist-info/WHEEL', 'Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n')
+    archive.writestr('garden_view_science-1.0.dist-info/RECORD', '')
+`
+        ],
+        { cwd: run }
       );
       await writeFile(
         path.join(run, 'spec.json'),
         JSON.stringify({
           name: 'Reference analysis',
-          command: ['python3', 'analysis.py'],
+          command: ['python', 'analysis.py'],
           sources: ['analysis.py'],
           inputs: [],
           outputs: ['result.txt'],
           environment: {
-            lockFiles: [],
-            runtimeOnly: true,
-            probes: [{ name: 'Python', command: ['python3', '--version'] }]
+            lockFiles: [wheel],
+            python: {
+              interpreter: 'python3',
+              directory: '.venv',
+              wheels: [
+                {
+                  path: wheel,
+                  sha256: createHash('sha256')
+                    .update(await readFile(path.join(run, wheel)))
+                    .digest('hex')
+                }
+              ]
+            },
+            probes: [{ name: 'Python', command: ['python', '--version'] }]
           }
         })
       );
@@ -148,6 +174,7 @@ test(
       page.on('pageerror', (error) => errors.push(error.message));
       await page.goto(origin);
       await page.getByText('Recorded: completed', { exact: true }).waitFor();
+      await page.getByText('Rebuilt from verified local packages', { exact: true }).waitFor();
       assert.equal(await page.getByRole('textbox').count(), 0);
       const downloadReady = page.waitForEvent('download');
       await page.getByRole('link', { name: 'Download current result.txt', exact: true }).click();
@@ -173,6 +200,8 @@ test(
       await page.getByText('Different checksums', { exact: true }).waitFor();
       await page.setViewportSize({ width: 360, height: 640 });
       await page.getByText('Environment and command', { exact: true }).click();
+      await page.getByText('Garden rebuilt Python environment', { exact: true }).click();
+      await page.getByText(/garden-view-science/).waitFor();
       await page.getByText('Record identity and scope', { exact: true }).click();
       assert.equal(
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),

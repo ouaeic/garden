@@ -126,6 +126,16 @@ export default function AnalysisRunPreview({
           <dt>Declared dependencies after execution</dt>
           <dd>{check(record.dependenciesUnchanged, 'Unchanged', 'Changed')}</dd>
         </div>
+        {record.environmentSetup && (
+          <div>
+            <dt>Python environment</dt>
+            <dd>
+              {record.environmentSetup.status === 'ready'
+                ? 'Rebuilt from verified local packages'
+                : 'Preparation incomplete'}
+            </dd>
+          </div>
+        )}
         {record.replayedFrom && (
           <div>
             <dt>Output comparison with original</dt>
@@ -169,7 +179,19 @@ export default function AnalysisRunPreview({
         <pre>{JSON.stringify(record.spec.command, null, 2)}</pre>
         {record.before && <p>{Object.values(record.before.platform).join(' · ')}</p>}
         {record.spec.environment.runtimeOnly && <p>Declared as using the standard library only.</p>}
-        {record.spec.environment.probes.map((probe) => {
+        {record.spec.environment.python && (
+          <p className="analysis-run-path">
+            Rebuild directory: <code>{record.spec.environment.python.directory}</code>. Only the
+            recorded local packages are installed; the rebuild does not download dependencies.
+          </p>
+        )}
+        {[
+          ...record.spec.environment.probes,
+          ...(record.before?.probes.filter(
+            (observed) =>
+              !record.spec.environment.probes.some((probe) => probe.name === observed.name)
+          ) ?? [])
+        ].map((probe) => {
           const observed = record.before?.probes.find((item) => item.name === probe.name);
           return (
             <details key={probe.name}>

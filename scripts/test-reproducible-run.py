@@ -13,6 +13,7 @@ import time
 import unittest
 from unittest import mock
 import importlib.util
+import zipfile
 
 RUNNER = Path(__file__).with_name("reproducible-run.py").resolve()
 PYTHON = sys.executable
@@ -290,6 +291,147 @@ Path('result.json').write_text(json.dumps({'length': len(sequence), 'counts': co
         result = self.invoke()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("symbolic links", result.stderr)
+
+    def wheel_recipe(self, dependency=None):
+        wheel = self.first / "wheels" / "garden_test_science-1.0-py3-none-any.whl"
+        wheel.parent.mkdir()
+        with zipfile.ZipFile(wheel, "w") as archive:
+            archive.writestr("garden_test_science.py", "VALUE = 42\n")
+            archive.writestr("garden_test_science-1.0.dist-info/METADATA",
+                "Metadata-Version: 2.1\nName: garden-test-science\nVersion: 1.0\n" +
+                ("Requires-Dist: " + dependency + "\n" if dependency else ""))
+            archive.writestr("garden_test_science-1.0.dist-info/WHEEL",
+                "Wheel-Version: 1.0\nGenerator: Garden test\nRoot-Is-Purelib: true\nTag: py3-none-any\n")
+            archive.writestr("garden_test_science-1.0.dist-info/RECORD", "")
+        name = str(wheel.relative_to(self.first))
+        self.spec["command"] = ["python", "analysis.py"]
+        self.spec["environment"] = {
+            "lockFiles": [name],
+            "probes": [{"name": "Python", "command": ["python", "--version"]}],
+            "python": {"interpreter": PYTHON, "directory": ".venv", "wheels": [
+                {"path": name, "sha256": hashlib.sha256(wheel.read_bytes()).hexdigest()}
+            ]},
+        }
+        self.source = "import garden_test_science as science\nassert science.VALUE == 42\n" + self.source
+        self.populate(self.first)
+        return wheel
+
+    def test_wheel_environment_is_built_and_replayed_without_an_index(self):
+        wheel = self.wheel_recipe()
+        environment = dict(os.environ)
+        environment.update({"PIP_TARGET": str(self.root / "escaped"),
+            "PIP_INDEX_URL": "http://127.0.0.1:1/forbidden", "PIP_REQUIRE_VIRTUALENV": "true",
+            "PYTHONPATH": str(self.root / "injected")})
+        (self.root / "injected").mkdir()
+        (self.root / "injected" / "garden_test_science.py").write_text("VALUE = -1\n")
+        result = self.invoke(env=environment)
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertFalse((self.root / "escaped").exists())
+        self.assertEqual(self.read()["environmentSetup"]["status"], "ready")
+        self.assertEqual(json.loads((self.first / "result.json").read_text())["gc"], 0.5)
+        inventory = json.loads(self.read()["before"]["probes"][-1]["output"])
+        self.assertIn(["garden-test-science", "1.0"], inventory["packages"])
+        fresh = self.root / "fresh"
+        fresh.mkdir()
+        self.populate(fresh)
+        (fresh / "wheels").mkdir()
+        shutil.copyfile(wheel, fresh / "wheels" / wheel.name)
+        result = self.invoke(fresh, self.first / "run.json", env=environment)
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertTrue(self.read(fresh)["outputsMatchPrevious"])
+        self.assertTrue((fresh / ".venv" / "bin" / "python").exists())
+
+    def test_corrupt_wheel_is_refused_before_environment_creation(self):
+        wheel = self.wheel_recipe()
+        wheel.write_bytes(wheel.read_bytes() + b"changed")
+        result = self.invoke()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Wheel does not match", result.stderr)
+        self.assertFalse((self.first / ".venv").exists())
+        self.assertFalse((self.first / "result.json").exists())
+
+    def test_missing_transitive_dependency_never_runs_analysis(self):
+        self.wheel_recipe("garden-missing-dependency==1.0")
+        result = self.invoke()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.first / "result.json").exists())
+        self.assertEqual(self.read()["status"], "failed")
+        self.assertEqual(self.read()["environmentSetup"]["status"], "installing")
+
+    def test_existing_or_symlinked_environment_is_never_overwritten(self):
+        self.wheel_recipe()
+        existing = self.first / ".venv"
+        existing.mkdir()
+        (existing / "keep").write_text("keep")
+        self.assertNotEqual(self.invoke().returncode, 0)
+        self.assertEqual((existing / "keep").read_text(), "keep")
+        (self.first / "run.json").unlink()
+        existing.rename(self.root / "outside")
+        existing.symlink_to(self.root / "outside")
+        result = self.invoke()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("symbolic links", result.stderr)
+        self.assertEqual((self.root / "outside" / "keep").read_text(), "keep")
+
+    def test_changed_replay_source_is_refused_before_environment_creation(self):
+        wheel = self.wheel_recipe()
+        self.assertEqual(self.invoke().returncode, 0)
+        fresh = self.root / "fresh"
+        fresh.mkdir()
+        self.populate(fresh)
+        (fresh / "wheels").mkdir()
+        shutil.copyfile(wheel, fresh / "wheels" / wheel.name)
+        (fresh / "analysis.py").write_text("raise Exception('must not execute')")
+        result = self.invoke(fresh, self.first / "run.json")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((fresh / ".venv").exists())
+
+    def test_interrupted_environment_preparation_stops_its_process(self):
+        self.wheel_recipe()
+        bootstrap = self.first / "bootstrap"
+        bootstrap.write_text("#!/bin/sh\necho $$ > setup.pid\nexec sleep 120\n")
+        bootstrap.chmod(0o700)
+        self.spec["environment"]["python"]["interpreter"] = str(bootstrap)
+        self.populate(self.first)
+        child = subprocess.Popen(
+            [PYTHON, str(RUNNER), "run", "--spec", "spec.json", "--manifest", "run.json"],
+            cwd=self.first, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+        )
+        try:
+            deadline = time.monotonic() + 8
+            marker = self.first / "setup.pid"
+            while not marker.exists() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertTrue(marker.exists())
+            pid = int(marker.read_text())
+            child.send_signal(signal.SIGTERM)
+            child.communicate(timeout=4)
+            self.assertEqual(self.read()["status"], "interrupted")
+            self.assertEqual(self.read()["environmentSetup"]["status"], "creating")
+            self.assertFalse((self.first / "result.json").exists())
+            with self.assertRaises(ProcessLookupError):
+                os.kill(pid, 0)
+        finally:
+            if child.poll() is None:
+                child.kill()
+                child.communicate()
+
+    def test_recipe_cannot_hide_a_package_or_replace_analysis_files(self):
+        self.wheel_recipe()
+        invalid = [
+            {"directory": "not-excluded"},
+            {"directory": "../.venv"},
+            {"wheels": [{"path": "outside.whl", "sha256": "a" * 64}]},
+            {"wheels": []},
+        ]
+        original = dict(self.spec["environment"]["python"])
+        for change in invalid:
+            with self.subTest(change=change):
+                self.spec["environment"]["python"] = {**original, **change}
+                self.populate(self.first)
+                self.assertNotEqual(self.invoke().returncode, 0)
+                self.assertFalse((self.first / ".venv").exists())
+                self.assertFalse((self.first / "result.json").exists())
 
 
 if __name__ == "__main__":

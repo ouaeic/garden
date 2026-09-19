@@ -33,9 +33,29 @@ and inputs. Before launching, it compares content hashes, lock files, version-pr
 recorded platform. Changed dependencies refuse execution. Afterward it compares output hashes;
 a mismatch fails the reproduction check even if the scientific command exited successfully.
 
+An optional `environment.python` recipe recreates an isolated Python environment on both the
+original run and replay. It declares an `interpreter`, a workspace-relative `directory` ending
+in `.venv`, and `wheels`: local `{ "path": "…whl", "sha256": "…" }` entries. Include every wheel
+in `lockFiles`, including transitive dependencies. Acquire or build these wheels through the
+ordinary tools before recording the run. Wheels may contain executable code; recorded hashes
+identify the selected packages and do not establish their trustworthiness.
+
+The recipe verifies wheel hashes before creating a fresh environment. Installation uses only
+those local files with hash checking, no package index, no dependency resolution and no source
+builds. The installer ignores caller pip configuration and Python path overrides. A dependency
+check must pass before analysis. The environment's executables lead `PATH`, so the command and
+probes can use `python` or installed entry points. An additional recorded probe captures the
+interpreter and sorted installed package versions. Existing environments are refused; a failed
+or interrupted rebuild remains available for inspection and is never silently repaired.
+
+Replay compares source, input and lock identities before rebuilding. Preparation and its result
+are recorded in the manifest and visible in the run overview. `.venv` package trees stay outside
+project source snapshots; retain the wheel files and manifest to recreate them. The base Python
+installation and compatible operating-system libraries must already be available. Other runtime
+environments can still be recreated through the ordinary tools and verified with declared probes.
+
 This contract records the declared dependency set. It does not capture containers, undeclared
-packages, external service state or all ambient environment variables. It does not acquire inputs
-or install dependencies automatically. Recreate the recorded environment through the usual tools.
+packages, external service state or all ambient environment variables. It does not acquire inputs.
 For stochastic algorithms or hardware-dependent numerical results, a separate independent check
 must define the acceptable metrics and tolerances; exact checksum equality is not a statistical
 validity test. Inputs are checked before and after execution, rather than locked throughout it.
@@ -43,5 +63,5 @@ validity test. Inputs are checked before and after execution, rather than locked
 `python3 scripts/test-reproducible-run.py` uses real commands and independent expected metrics to
 exercise clean replay, changed references, changed installed dependencies, expected input hashes,
 input mutation, missing outputs, duplicate requests, output mismatch, excessive probe output,
-signals and path boundaries. It runs in the repository gate. The native update drill also verifies
+signals, path boundaries and offline environment reconstruction. It runs in the repository gate. The native update drill also verifies
 that the installed executable matches the checkout.
