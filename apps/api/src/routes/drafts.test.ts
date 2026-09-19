@@ -95,7 +95,7 @@ describe('revisioned encrypted drafts', () => {
       method: 'GET',
       url: `/v1/drafts?workspaceId=${workspaceId}`
     });
-    expect(current.json().controls.context).toEqual(context);
+    expect(current.json<{ controls: { context: unknown } }>().controls.context).toEqual(context);
     const rows = await database.query('SELECT * FROM message_drafts WHERE workspace_id=$1', [
       workspaceId
     ]);

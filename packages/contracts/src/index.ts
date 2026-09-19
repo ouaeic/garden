@@ -2241,7 +2241,7 @@ export const DirectionContext = z.discriminatedUnion('kind', [
         (path) =>
           path.startsWith('workspace/') &&
           !path.includes('\\') &&
-          !/[\u0000-\u001f]/.test(path) &&
+          !Array.from(path).some((character) => character.charCodeAt(0) < 32) &&
           !path.split('/').some((part) => part === '..' || part === '.' || part === '')
       ),
     sha256: z.string().regex(/^[a-f0-9]{64}$/),

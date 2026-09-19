@@ -316,7 +316,7 @@ export async function checkProjectUpdates({ page, fixture, project, report }) {
     .waitFor();
   assert.equal(await history.locator('li').count(), 43, 'Polling must preserve loaded history');
   assert.deepEqual(
-    await history.locator('button').allTextContents(),
+    await history.getByRole('button', { name: /^Version \d+ · / }).allTextContents(),
     fixture.revisions.map((item) => `Version ${item.number} · ${item.title}`)
   );
   await panel.locator('.project-version-path > summary').click();
