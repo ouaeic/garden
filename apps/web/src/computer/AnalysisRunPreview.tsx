@@ -32,6 +32,11 @@ function FileGroup({
         {declared.slice(0, limit).map((name) => {
           const file = recorded.get(name);
           const resolved = location && analysisFilePath(location.manifestPath, directory, name);
+          const producer = file?.producer;
+          const producerPath =
+            producer &&
+            location &&
+            analysisFilePath(location.manifestPath, directory, producer.manifest);
           return (
             <li key={name}>
               <div className="row between">
@@ -58,6 +63,35 @@ function FileGroup({
                       <p className="analysis-run-path">Declared source: {file.declaredSourceUrl}</p>
                     )}
                   </details>
+                  {producer && (
+                    <details className="analysis-run-producer">
+                      <summary>Recorded producer · {producer.name || producer.runId}</summary>
+                      <p className="analysis-run-path">
+                        This input matched <code>{producer.output}</code> from that run when
+                        checked.
+                      </p>
+                      <p className="analysis-run-path">Run: {producer.runId}</p>
+                      <p className="analysis-run-path">
+                        Record: <code>{producer.manifest}</code>
+                      </p>
+                      <p>Recorded SHA-256:</p>
+                      <code className="analysis-run-hash">{producer.sha256}</code>
+                      {producerPath && location && (
+                        <a
+                          href={apiUrl(
+                            `/v1/workspaces/${location.workspaceId}/download?${new URLSearchParams({ path: producerPath })}`
+                          )}
+                          download={producer.manifest.split('/').at(-1)}
+                        >
+                          Download current producer record
+                        </a>
+                      )}
+                      <p className="muted">
+                        A checksum links the recorded bytes; it does not independently establish
+                        origin or scientific validity. The current record may have changed.
+                      </p>
+                    </details>
+                  )}
                 </>
               ) : (
                 <span className="muted">No file checksum recorded</span>

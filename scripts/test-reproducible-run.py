@@ -79,6 +79,156 @@ Path('result.json').write_text(json.dumps({'length': len(sequence), 'counts': co
     def read(self, root=None):
         return json.loads(((root or self.first) / "run.json").read_text())
 
+    def derived(self):
+        self.assertEqual(self.invoke().returncode, 0)
+        root = self.root / "derived"
+        root.mkdir()
+        shutil.copyfile(self.first / "result.json", root / "copied-input.json")
+        shutil.copyfile(self.first / "run.json", root / "producer.json")
+        (root / "analysis.py").write_text(
+            "from pathlib import Path\nimport json\n"
+            "data=json.loads(Path('copied-input.json').read_text())\n"
+            "Path('result.json').write_text(json.dumps({'length': data['length'], 'gc_percent': 100*data['gc']}))\n"
+        )
+        self.spec["inputs"] = [{
+            "path": "copied-input.json", "producer": {
+                "manifest": "producer.json", "output": "result.json",
+                "sha256": hashlib.sha256((root / "producer.json").read_bytes()).hexdigest(),
+            }
+        }]
+        (root / "spec.json").write_text(json.dumps(self.spec))
+        return root
+
+    def test_producer_identity_and_copied_output_survive_clean_replay(self):
+        root = self.derived()
+        result = self.invoke(root)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads((root / "result.json").read_text()), {"length": 8, "gc_percent": 50.0})
+        receipt = self.read(root)
+        link = receipt["before"]["inputs"][0]["producer"]
+        self.assertEqual(link, {
+            **self.spec["inputs"][0]["producer"],
+            "runId": self.read()["id"], "name": "DNA base counts",
+        })
+        fresh = self.root / "replay"
+        fresh.mkdir()
+        for name in ["analysis.py", "copied-input.json", "producer.json"]:
+            shutil.copyfile(root / name, fresh / name)
+        replay = self.invoke(fresh, root / "run.json")
+        self.assertEqual(replay.returncode, 0, replay.stderr)
+        self.assertTrue(self.read(fresh)["outputsMatchPrevious"])
+        self.assertEqual(self.read(fresh)["before"]["inputs"][0]["producer"], link)
+
+    def test_producer_drift_or_mismatched_input_refuses_before_execution(self):
+        root = self.derived()
+        original = (root / "producer.json").read_bytes()
+        (root / "producer.json").write_bytes(original + b"\n")
+        result = self.invoke(root)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Producer record does not match", result.stderr)
+        self.assertFalse((root / "result.json").exists())
+        (root / "run.json").unlink()
+        (root / "producer.json").write_bytes(original)
+        (root / "copied-input.json").write_text('{"length": 999, "gc": 1}')
+        result = self.invoke(root)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Input does not match the recorded producer output", result.stderr)
+        self.assertFalse((root / "result.json").exists())
+
+    def test_producer_mutation_during_analysis_fails_verification(self):
+        root = self.derived()
+        with (root / "analysis.py").open("a") as source:
+            source.write("Path('producer.json').write_text(Path('producer.json').read_text()+'\\n')\n")
+        result = self.invoke(root)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue((root / "result.json").exists())
+        self.assertEqual(self.read(root)["status"], "failed")
+        self.assertIn("Producer record does not match", self.read(root)["error"])
+        self.assertNotIn("outputs", self.read(root))
+
+    def test_producer_rejects_unsuccessful_ambiguous_or_inconsistent_evidence(self):
+        root = self.derived()
+        original = json.loads((root / "producer.json").read_text())
+        for patch in [
+            {"status": "running"}, {"exitCode": 1}, {"dependenciesUnchanged": False},
+            {"outputsMatchPrevious": False}, {"outputs": []},
+            {"outputs": original["outputs"] * 2},
+            {"outputs": [{**original["outputs"][0], "bytes": 1}]},
+            {"outputs": [{**original["outputs"][0], "path": "different.json"}]},
+        ]:
+            with self.subTest(patch=patch):
+                (root / "producer.json").write_text(json.dumps({**original, **patch}))
+                self.spec["inputs"][0]["producer"]["sha256"] = hashlib.sha256((root / "producer.json").read_bytes()).hexdigest()
+                (root / "spec.json").write_text(json.dumps(self.spec))
+                result = self.invoke(root)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse((root / "result.json").exists())
+                self.assertEqual(self.read(root)["status"], "failed")
+                (root / "run.json").unlink()
+
+    def test_producer_never_executes_commands_or_follows_upstream_paths(self):
+        root = self.derived()
+        producer = json.loads((root / "producer.json").read_text())
+        producer["spec"]["command"] = [PYTHON, "-c", "from pathlib import Path; Path('unexpected').touch()"]
+        producer["directoryFromManifest"] = "../../outside"
+        producer["spec"]["inputs"][0]["producer"] = {
+            "manifest": "missing-upstream.json", "output": "input.fa", "sha256": "0" * 64,
+        }
+        (root / "producer.json").write_text(json.dumps(producer))
+        self.spec["inputs"][0]["producer"]["sha256"] = hashlib.sha256((root / "producer.json").read_bytes()).hexdigest()
+        (root / "spec.json").write_text(json.dumps(self.spec))
+        result = self.invoke(root)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((root / "unexpected").exists())
+
+    def test_producer_paths_and_reads_are_confined_and_bounded(self):
+        root = self.derived()
+        module_spec = importlib.util.spec_from_file_location("garden_lineage", RUNNER)
+        module = importlib.util.module_from_spec(module_spec)
+        module_spec.loader.exec_module(module)
+        with self.assertRaisesRegex(ValueError, "combined read limit"):
+            module.read_producer(root, "producer.json", 10)
+        (root / "alias.json").symlink_to(root / "producer.json")
+        with self.assertRaisesRegex(ValueError, "symbolic links"):
+            module.read_producer(root, "alias.json", 100000)
+        os.mkfifo(root / "pipe.json")
+        with self.assertRaisesRegex(ValueError, "regular files"):
+            module.read_producer(root, "pipe.json", 100000)
+        self.spec["inputs"][0]["producer"]["manifest"] = "../first/run.json"
+        with self.assertRaisesRegex(ValueError, "inside the current directory"):
+            module.validate(self.spec)
+
+    def test_producer_read_budget_counts_unique_records_and_detects_inflight_changes(self):
+        root = self.derived()
+        module_spec = importlib.util.spec_from_file_location("garden_lineage_budget", RUNNER)
+        module = importlib.util.module_from_spec(module_spec)
+        module_spec.loader.exec_module(module)
+        shutil.copyfile(root / "copied-input.json", root / "second-input.json")
+        self.spec["inputs"].append({**self.spec["inputs"][0], "path": "second-input.json"})
+        size = (root / "producer.json").stat().st_size
+        with mock.patch.object(module, "MAX_PRODUCER_BYTES", size):
+            captured = module.capture_files(self.spec, root, {})
+            self.assertEqual(len(captured["inputs"]), 2)
+            self.assertEqual(captured["inputs"][0]["producer"], captured["inputs"][1]["producer"])
+            shutil.copyfile(root / "producer.json", root / "another-producer.json")
+            self.spec["inputs"][1]["producer"] = {**self.spec["inputs"][1]["producer"], "manifest": "another-producer.json"}
+            with self.assertRaisesRegex(ValueError, "combined read limit"):
+                module.capture_files(self.spec, root, {})
+        real_read = os.read
+        modified = False
+        def changing_read(descriptor, count):
+            nonlocal modified
+            content = real_read(descriptor, count)
+            if not modified:
+                modified = True
+                with (root / "producer.json").open("ab") as handle:
+                    handle.write(b"\n")
+            return content
+        with mock.patch.object(module.os, "read", side_effect=changing_read):
+            with self.assertRaisesRegex(ValueError, "changed while reading"):
+                module.read_producer(root, "producer.json", size + 100)
+        self.assertTrue(modified)
+
     def test_hash_cache_reuses_only_unchanged_opened_files(self):
         module_spec = importlib.util.spec_from_file_location("garden_repro", RUNNER)
         module = importlib.util.module_from_spec(module_spec)

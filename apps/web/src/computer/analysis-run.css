@@ -92,3 +92,13 @@
 .analysis-run-group > p {
   margin-block: 0.5rem;
 }
+.analysis-run-producer {
+  border-left: 2px solid var(--line);
+  padding-left: 0.75rem;
+  min-width: 0;
+}
+.analysis-run-producer p,
+.analysis-run-producer a {
+  display: block;
+  margin-block: 0.5rem;
+}

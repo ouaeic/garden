@@ -6,7 +6,7 @@ compatibility: Needs python3 with the venv module, curl and the shell, all insta
 allowed-tools: shell process file_read file_write files_list set_plan set_acceptance notify
 metadata:
   athanor.tier: 'builtin'
-  athanor.version: '1.3.0'
+  athanor.version: '1.4.0'
   athanor.risk: 'workspace'
   athanor.domain: 'science'
 ---
@@ -66,6 +66,13 @@ Run `garden-run run --spec run-spec.json --manifest run.json` in the analysis di
 work, launch that command as a named durable job and wait using the process tool. It streams
 command output to the job log and hashes declared files without reading whole datasets into RAM.
 It refuses existing outputs and manifests; use a clean run directory.
+
+For an input produced by an earlier recorded run, add `producer` with `manifest` (a relative path
+to its completed receipt), `sha256` (that receipt's checksum), and `output` (the output path inside
+that receipt). Keep the earlier receipt unchanged beside the input. The recorder checks the input
+against its recorded output and retains the link in the run overview. Copied or renamed inputs
+are supported when their bytes match. This verifies the immediate recorded relationship, not
+scientific validity or the complete upstream chain. It never runs earlier commands automatically.
 
 For automatic Python environment reconstruction, prepare a complete set of local wheels through
 the ordinary package tools. Add `environment.python` with `interpreter` (the base Python),

@@ -33,6 +33,21 @@ and inputs. Before launching, it compares content hashes, lock files, version-pr
 recorded platform. Changed dependencies refuse execution. Afterward it compares output hashes;
 a mismatch fails the reproduction check even if the scientific command exited successfully.
 
+An input derived from another recorded analysis may declare `producer` with `manifest` (a local
+relative path), `sha256` (the expected hash of that manifest) and `output` (its declared output
+path). The input may be a renamed or copied file: its byte count and hash must match the producer's
+recorded output. Only successful completed records with unchanged dependencies are accepted.
+The producer record is checked before environment preparation, before execution and afterward;
+changed records or mismatched outputs refuse or fail the run. Replay requires the same producer
+records alongside the other dependencies.
+
+The input's run-overview entry includes the producer name, run identity, output path and record
+checksum, plus a workspace-scoped download when its location is known. These are explicit links
+to recorded evidence. Upstream commands are never executed, upstream paths are never traversed,
+and no directory index is built. A file's checksum and a supplied record cannot independently
+establish who created it or whether its analysis is scientifically valid. Immediate producer
+records are checked; their own upstream chain is not recursively revalidated.
+
 An optional `environment.python` recipe recreates an isolated Python environment on both the
 original run and replay. It declares an `interpreter`, a workspace-relative `directory` ending
 in `.venv`, and `wheels`: local `{ "path": "…whl", "sha256": "…" }` entries. Include every wheel

@@ -18,6 +18,7 @@ import re
 
 FORMAT = "garden-analysis-run-1"
 MAX_SPEC_BYTES = 1024 * 1024
+MAX_PRODUCER_BYTES = 64 * 1024 * 1024
 
 
 def now():
@@ -95,7 +96,7 @@ def validate(spec):
     if not isinstance(spec["inputs"], list) or len(spec["inputs"]) > 4096:
         raise ValueError("Invalid analysis inputs")
     for item in spec["inputs"]:
-        exact_keys(item, ["path"], ["sourceUrl", "sha256"])
+        exact_keys(item, ["path"], ["sourceUrl", "sha256", "producer"])
         item["path"] = relative(item["path"])
         if "sourceUrl" in item:
             from urllib.parse import urlsplit
@@ -119,6 +120,13 @@ def validate(spec):
             or any(c not in "0123456789abcdef" for c in item["sha256"])
         ):
             raise ValueError("Invalid input SHA-256")
+        if "producer" in item:
+            producer = item["producer"]
+            exact_keys(producer, ["manifest", "sha256", "output"])
+            producer["manifest"] = relative(producer["manifest"])
+            producer["output"] = relative(producer["output"])
+            if not isinstance(producer["sha256"], str) or not re.fullmatch(r"[a-f0-9]{64}", producer["sha256"]):
+                raise ValueError("A producer record needs its expected SHA-256")
     input_paths = paths([item["path"] for item in spec["inputs"]])
     env = spec["environment"]
     exact_keys(env, ["lockFiles", "probes"], ["runtimeOnly", "python", "r"])
@@ -154,6 +162,10 @@ def validate(spec):
     files = spec["sources"] + input_paths + env["lockFiles"]
     if len(set(files)) != len(files) or set(files) & set(spec["outputs"]):
         raise ValueError("Source, input, lock and output paths must be distinct")
+    producer_paths = {item["producer"]["manifest"] for item in spec["inputs"] if "producer" in item}
+    if producer_paths & set(spec["outputs"]):
+        raise ValueError("Producer records cannot be analysis outputs")
+    files += sorted(producer_paths)
     if "python" in env:
         recipe = env["python"]
         exact_keys(recipe, ["interpreter", "directory", "wheels"])
@@ -429,6 +441,8 @@ def probes(spec, root, execution_env=None):
 
 def capture_files(spec, root, cache):
     inputs = []
+    producers = {}
+    producer_bytes = 0
     for item in spec["inputs"]:
         observed = file_identity(root, item["path"], cache)
         if item.get("sha256") and item["sha256"] != observed["sha256"]:
@@ -437,6 +451,24 @@ def capture_files(spec, root, cache):
             )
         if "sourceUrl" in item:
             observed["declaredSourceUrl"] = item["sourceUrl"]
+        if "producer" in item:
+            declared = item["producer"]
+            filename = declared["manifest"]
+            if filename not in producers:
+                producer, identity = read_producer(root, filename, MAX_PRODUCER_BYTES - producer_bytes)
+                producer_bytes += identity["bytes"]
+                producers[filename] = (producer, identity)
+            producer, identity = producers[filename]
+            if identity["sha256"] != declared["sha256"]:
+                raise ValueError("Producer record does not match its expected checksum: " + filename)
+            output = producer["outputs"].get(declared["output"])
+            if output is None or (output["sha256"], output["bytes"]) != (observed["sha256"], observed["bytes"]):
+                raise ValueError("Input does not match the recorded producer output: " + item["path"])
+            observed["producer"] = {
+                "manifest": filename, "sha256": identity["sha256"],
+                "output": declared["output"], "runId": producer["id"],
+                **({"name": producer["name"]} if producer.get("name") else {}),
+            }
         inputs.append(observed)
     return {
         "sources": [file_identity(root, name, cache) for name in spec["sources"]],
@@ -445,6 +477,66 @@ def capture_files(spec, root, cache):
             file_identity(root, name, cache)
             for name in spec["environment"]["lockFiles"]
         ],
+    }
+
+
+def read_producer(root, filename, remaining):
+    """Read only the explicitly named receipt; upstream files and commands are never followed."""
+    checked_path(root, filename)
+    descriptor = open_relative(root, filename, os.O_RDONLY | os.O_NONBLOCK)
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError("Producer records must be regular files: " + filename)
+        if before.st_size > remaining:
+            raise ValueError("Producer records exceed the combined read limit")
+        chunks = []
+        size = 0
+        digest = hashlib.sha256()
+        while True:
+            chunk = os.read(descriptor, min(1024 * 1024, remaining - size + 1))
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > remaining:
+                raise ValueError("Producer records exceed the combined read limit")
+            chunks.append(chunk)
+            digest.update(chunk)
+        after = os.fstat(descriptor)
+        named = checked_path(root, filename).stat()
+        if stat_stamp(before) != stat_stamp(after) or stat_stamp(after) != stat_stamp(named) or size != after.st_size:
+            raise ValueError("Producer record changed while reading: " + filename)
+        record = json.loads(b"".join(chunks))
+    finally:
+        os.close(descriptor)
+    if (
+        not isinstance(record, dict) or record.get("format") != FORMAT
+        or record.get("status") != "completed" or record.get("exitCode") != 0
+        or record.get("dependenciesUnchanged") is not True
+        or record.get("outputsMatchPrevious") is False
+    ):
+        raise ValueError("A producer must be a completed successful analysis record: " + filename)
+    uuid.UUID(record["id"])
+    parent_spec = validate(record["spec"])
+    recorded = record.get("outputs")
+    if not isinstance(recorded, list) or not recorded or len(recorded) > 4096:
+        raise ValueError("Producer output evidence is missing or invalid: " + filename)
+    outputs = {}
+    for output in recorded:
+        if (
+            not isinstance(output, dict) or not isinstance(output.get("sha256"), str)
+            or not re.fullmatch(r"[a-f0-9]{64}", output["sha256"])
+            or type(output.get("bytes")) is not int or output["bytes"] < 0
+        ):
+            raise ValueError("Producer output identity is invalid: " + filename)
+        name = relative(output["path"])
+        if name in outputs:
+            raise ValueError("Producer output identities are ambiguous: " + filename)
+        outputs[name] = output
+    if set(outputs) != set(parent_spec["outputs"]):
+        raise ValueError("Producer evidence does not match its declared outputs: " + filename)
+    return {"id": record["id"], "name": parent_spec.get("name"), "outputs": outputs}, {
+        "bytes": size, "sha256": digest.hexdigest()
     }
 
 
@@ -619,6 +711,7 @@ def run(spec, root, filename, previous=None):
         + spec["outputs"]
         + spec["environment"]["lockFiles"]
         + [item["path"] for item in spec["inputs"]]
+        + [item["producer"]["manifest"] for item in spec["inputs"] if "producer" in item]
     )
     if filename == root or str(filename.relative_to(root)) in reserved:
         raise ValueError("The manifest must have its own new file path")

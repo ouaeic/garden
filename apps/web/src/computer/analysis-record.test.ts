@@ -1,4 +1,5 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
@@ -31,6 +32,116 @@ describe('analysis file locations', () => {
 });
 
 describe('real scientific receipts', () => {
+  it('retains checked producer identity from a real dependent run and links only its scoped record', async () => {
+    const directory = await mkdtemp(resolve(tmpdir(), 'garden-lineage-contract-'));
+    const runner = resolve(import.meta.dirname, '../../../..', 'scripts/reproducible-run.py');
+    try {
+      const parent = resolve(directory, 'parent');
+      const child = resolve(directory, 'child');
+      await mkdir(parent);
+      await mkdir(child);
+      const base = {
+        command: ['python3', 'analysis.py'],
+        sources: ['analysis.py'],
+        inputs: [] as unknown[],
+        outputs: ['result.txt'],
+        environment: {
+          lockFiles: [],
+          runtimeOnly: true,
+          probes: [{ name: 'Python', command: ['python3', '--version'] }]
+        }
+      };
+      await writeFile(
+        resolve(parent, 'spec.json'),
+        JSON.stringify({ ...base, name: 'Raw <counts>' })
+      );
+      await writeFile(
+        resolve(parent, 'analysis.py'),
+        "from pathlib import Path\nPath('result.txt').write_text('25')\n"
+      );
+      execFileSync('python3', [runner, 'run', '--spec', 'spec.json', '--manifest', 'run.json'], {
+        cwd: parent
+      });
+      const upstream = await readFile(resolve(parent, 'run.json'));
+      const expectedHash = createHash('sha256').update(upstream).digest('hex');
+      const parentRecord = readAnalysisRecord(upstream.toString());
+      expect(parentRecord).not.toBeNull();
+      await copyFile(resolve(parent, 'result.txt'), resolve(child, 'renamed.txt'));
+      await writeFile(resolve(child, 'previous run.json'), upstream);
+      await writeFile(
+        resolve(child, 'analysis.py'),
+        "from pathlib import Path\nPath('result.txt').write_text(str(int(Path('renamed.txt').read_text())*2))\n"
+      );
+      await writeFile(
+        resolve(child, 'spec.json'),
+        JSON.stringify({
+          ...base,
+          inputs: [
+            {
+              path: 'renamed.txt',
+              producer: {
+                manifest: 'previous run.json',
+                output: 'result.txt',
+                sha256: expectedHash
+              }
+            }
+          ]
+        })
+      );
+      execFileSync('python3', [runner, 'run', '--spec', 'spec.json', '--manifest', 'run.json'], {
+        cwd: child
+      });
+      expect(await readFile(resolve(child, 'result.txt'), 'utf8')).toBe('50');
+      const record = readAnalysisRecord(await readFile(resolve(child, 'run.json'), 'utf8'));
+      expect(record).not.toBeNull();
+      expect(record!.before!.inputs[0]!.producer).toEqual({
+        manifest: 'previous run.json',
+        output: 'result.txt',
+        sha256: expectedHash,
+        runId: parentRecord!.id,
+        name: 'Raw <counts>'
+      });
+      const html = renderToStaticMarkup(
+        createElement(AnalysisRunPreview, {
+          record: record!,
+          location: { workspaceId: 'project', manifestPath: 'workspace/child/run.json' }
+        })
+      );
+      expect(html).toContain('Recorded producer');
+      expect(html).toContain('Raw &lt;counts&gt;');
+      expect(html).toContain(parentRecord!.id);
+      expect(html).toContain(expectedHash);
+      expect(html).toContain('path=workspace%2Fchild%2Fprevious+run.json');
+      expect(html).toContain('does not independently establish origin or scientific validity');
+      const unlocated = renderToStaticMarkup(
+        createElement(AnalysisRunPreview, { record: record! })
+      );
+      expect(unlocated).not.toContain('Download current producer record');
+      expect(unlocated).toContain(parentRecord!.id);
+      expect(
+        readAnalysisRecord(
+          JSON.stringify({
+            ...record,
+            before: {
+              ...record!.before,
+              inputs: [
+                {
+                  ...record!.before!.inputs[0],
+                  producer: {
+                    ...record!.before!.inputs[0]!.producer,
+                    manifest: '../outside.json'
+                  }
+                }
+              ]
+            }
+          })
+        )
+      ).toBeNull();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it('reads a native completed receipt and shows a failed replay without inventing verification', async () => {
     const directory = await mkdtemp(resolve(tmpdir(), 'garden-record-contract-'));
     try {

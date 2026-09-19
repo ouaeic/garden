@@ -16,11 +16,15 @@ const paths = z.array(path).max(4096);
 const command = z.array(z.string().max(100000)).min(1).max(8192);
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 const at = z.string().datetime({ offset: true });
+const producer = z.object({ manifest: path, sha256: hash, output: path });
 const file = z.object({
   path,
   bytes: z.number().int().nonnegative(),
   sha256: hash,
-  declaredSourceUrl: z.string().max(8192).optional()
+  declaredSourceUrl: z.string().max(8192).optional(),
+  producer: producer
+    .extend({ runId: z.string().uuid(), name: z.string().max(200).optional() })
+    .optional()
 });
 const files = z.array(file).max(4096);
 const probe = z.object({
@@ -64,7 +68,12 @@ export const AnalysisRunRecord = z.object({
     sources: paths,
     inputs: z
       .array(
-        z.object({ path, sourceUrl: z.string().max(8192).optional(), sha256: hash.optional() })
+        z.object({
+          path,
+          sourceUrl: z.string().max(8192).optional(),
+          sha256: hash.optional(),
+          producer: producer.optional()
+        })
       )
       .max(4096),
     outputs: paths,
