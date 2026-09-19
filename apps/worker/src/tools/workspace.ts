@@ -1028,9 +1028,10 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
       const failures: Array<{ path: string; reason: string }> = [];
       const uncertain: Array<{ path: string; reason: string; expectedSha256: string }> = [];
       const warnings: string[] = [];
-      const seenPaths = new Set<string>();
-      // Validate the entire envelope before the first mutation. Aliases cannot address one file twice.
-      const validated = patches.map((patch) => {
+      const grouped = new Map<string, { path: string; edit: string }>();
+      // All operations for one exact path share the original read and one atomic file write.
+      // Validate the entire envelope first; aliases cannot change which read ledger applies.
+      for (const patch of patches) {
         const path = textValue(patch?.path);
         const edit = textValue(patch?.edit);
         if (!path || !edit)
@@ -1048,15 +1049,16 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
             'patch_invalid',
             'Patch paths must not contain traversal or null bytes.'
           );
-        if (seenPaths.has(identity))
+        const previous = grouped.get(identity);
+        if (previous && previous.path !== path)
           throw new AthanorError(
             'patch_invalid',
-            `${path} appears in two patches of the same call. Combine its operations into one edit.`
+            `${path} and ${previous.path} address the same file. Use one exact path for its operations.`
           );
-        seenPaths.add(identity);
-        return { path, edit };
-      });
-      for (const { path, edit } of validated) {
+        if (previous) previous.edit += `\n${edit}`;
+        else grouped.set(identity, { path, edit });
+      }
+      for (const { path, edit } of grouped.values()) {
         let readHash: string | undefined;
         let before: string;
         try {

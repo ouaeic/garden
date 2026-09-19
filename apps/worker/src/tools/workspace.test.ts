@@ -313,18 +313,55 @@ describe('what the arm hands back beside the echo', () => {
 });
 
 describe('the shapes a patch is allowed to be', () => {
-  it('refuses two patches on one file, rather than chaining them onto moved numbers', async () => {
-    // Every range in a patch names the numbers of the read it came from. A second patch on the same
-    // file would be addressed against those same numbers while the first had already moved them.
+  it('combines repeated exact paths against their original read numbers', async () => {
+    const { written, result } = await patch([
+      {
+        path: 'workspace/queue.ts',
+        edit: "PUT 1:\n-import type { Job } from './types.js';\n+// a\n+// extra line\n"
+      },
+      { path: 'workspace/queue.ts', edit: 'PUT 2:\n-\n+// b\n' }
+    ]);
+    expect(written.get('workspace/queue.ts')).toBe(
+      '// a\n// extra line\n// b\n' + QUEUE.split('\n').slice(2).join('\n')
+    );
+    expect(result.patchCount).toBe(1);
+  });
+
+  it('refuses conflicting operations across repeated paths without writing either edit', async () => {
+    const { run, written } = await turn({ 'workspace/queue.ts': QUEUE }, [
+      { name: 'file_read', args: { path: 'workspace/queue.ts' } }
+    ]);
     await expect(
-      patch([
-        {
-          path: 'workspace/queue.ts',
-          edit: "PUT 1:\n-import type { Job } from './types.js';\n+// a\n"
-        },
-        { path: 'workspace/queue.ts', edit: 'PUT 2:\n-\n+// b\n' }
-      ])
-    ).rejects.toThrow(/appears in two patches of the same call/);
+      run('file_patch', {
+        patches: [
+          {
+            path: 'workspace/queue.ts',
+            edit: 'PUT 4:\n-  const job = queue.shift();\n+  const job = queue.pop();\n'
+          },
+          {
+            path: 'workspace/queue.ts',
+            edit: 'PUT 4:\n-  const job = queue.shift();\n+  const job = null;\n'
+          }
+        ]
+      })
+    ).rejects.toThrow(/overlap/);
+    expect(written.get('workspace/queue.ts')).toBe(QUEUE);
+  });
+
+  it('rejects path aliases before applying any file in the envelope', async () => {
+    const { run, written } = await turn({ 'workspace/queue.ts': QUEUE }, [
+      { name: 'file_read', args: { path: 'workspace/queue.ts' } }
+    ]);
+    const edit = 'PUT 4:\n-  const job = queue.shift();\n+  const job = queue.pop();\n';
+    await expect(
+      run('file_patch', {
+        patches: [
+          { path: 'workspace/queue.ts', edit },
+          { path: 'queue.ts', edit }
+        ]
+      })
+    ).rejects.toThrow(/same file/);
+    expect(written.get('workspace/queue.ts')).toBe(QUEUE);
   });
 
   it('refuses a patch with no edit in it', async () => {

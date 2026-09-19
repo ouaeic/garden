@@ -22,6 +22,6 @@ whole line if shorter). CUT and paste destinations also require anchors. A whole
 too. Missing or mismatched anchors write nothing.
 
 Ranges name the numbers you read, not those your earlier operations would leave, and must not
-overlap. One patch per file, applied whole or not at all.
+overlap. All operations on a file apply together or not at all, including repeated path entries.
 
 Refusals return current text. Correct the anchor and patch before retrying.`;

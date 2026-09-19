@@ -323,6 +323,7 @@ export const shellApprovalRequirement = (
     const reachesOutside = outbound.length > 0 || unreadable;
     if (reachesOutside && !SECURITY_MODE_FLOOR[securityMode].asksBeforeReachingTheInternet) {
       const shellSocket = /\/dev\/(?:tcp|udp)\//.test(commandText(args));
+      const computedValue = /\$\(|`/.test(commandText(args));
       const unlisted = commands.find(
         ([command = '', ...rest]) =>
           !(
@@ -332,7 +333,9 @@ export const shellApprovalRequirement = (
             command === 'gh'
           )
       );
-      if (unlisted || commands.length === 0)
+      // Segment splitting can retain a URL's static prefix while losing its computed suffix.
+      // Mixed network/substitution commands must be separated before local filters can clear them.
+      if (unreadable || computedValue || unlisted || commands.length === 0)
         return withTaskApproval(
           {
             sideEffect: 'external_reversible',

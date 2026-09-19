@@ -163,10 +163,6 @@ describe('the size of the catalogue the model is sent', () => {
     expect(item?.properties?.path).toBeTruthy();
     // The dialect itself, which is the only resident part of this vertical.
     expect(item?.properties?.edit?.description).toBe(EDIT_FORMAT_SPEC);
-    // A model chooses a tool by reading its description and only then reads the schema, so the
-    // saving that justifies the format has to be legible before the schema is opened.
-    expect(patch?.description).toMatch(/line number/);
-    expect(patch?.description).toMatch(/one copy/);
   });
 
   it('keeps the dialect under the size its saving pays for', () => {

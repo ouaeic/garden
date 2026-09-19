@@ -277,7 +277,11 @@ export default function ProjectUpdates({
             <span>
               {running
                 ? `${running} ${running === 1 ? 'check' : 'checks'} running`
-                : `${pending.length}${data.nextCursor ? '+' : ''} ${pending.length === 1 && !data.nextCursor ? 'update' : 'updates'} awaiting publication`}
+                : pending.length
+                  ? `${pending.length}${data.nextCursor ? '+' : ''} unpublished ${pending.length === 1 && !data.nextCursor ? 'update' : 'updates'}`
+                  : data.nextCursor
+                    ? 'More update history available'
+                    : 'No unpublished updates'}
             </span>
           </div>
           {data.head && (

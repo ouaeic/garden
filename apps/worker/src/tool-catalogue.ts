@@ -1028,7 +1028,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'file_patch',
     description:
-      'Edit files by line number, using the numbers file_read returns. The range says which lines go and the body says only what replaces them, so no text is ever typed twice and moving a block costs one copy of it rather than two.',
+      'Edit the lines shown by file_read. Each operation needs a - anchor quoting the start of its target line, then + rows for replacement text. All ranges use the original read numbers; operations on one file apply together.',
     parameters: {
       type: 'object',
       additionalProperties: false,
