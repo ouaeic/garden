@@ -687,7 +687,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'shell',
     description:
-      'Run an executable on the owner’s Linux computer. Use background=true and job for finite work, service for servers; process inspects or stops them. Nothing expands: use args; for pipes, globs or redirects run `bash -lc` or `python3 -c` with the script as one argument.',
+      'Run an executable on the owner’s Linux computer. Use background=true and job for finite work, service for servers; process inspects or stops them. Nothing expands: use args; for pipes, globs or redirects run `bash -lc` or `python3 -c` with the script as one argument. System packages: name the package manager directly; no shell wrapper, PTY or background.',
     parameters: {
       type: 'object',
       additionalProperties: false,

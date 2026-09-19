@@ -240,7 +240,9 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
       'An unknown task graph must not imply a completion percentage'
     );
 
-    assert.equal(await panel.getByRole('article').count(), 1);
+    assert.equal(await panel.getByRole('article').count(), 2);
+    const interrupted = panel.getByRole('article', { name: 'Checkpointed assembly' });
+    assert(await interrupted.isVisible(), 'Interrupted work stays visible without opening history');
     const before = fixture.reads;
     await page.clock.runFor(119_000);
     assert.equal(fixture.reads, before, 'No fast polling while a long job runs');
@@ -295,10 +297,9 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
         }
       await panel.screenshot({ path: resolve(report, `project-processes-${width}.png`) });
     }
-    await panel.getByRole('button', { name: 'Show finished processes (2)', exact: true }).click();
+    await panel.getByRole('button', { name: 'Show finished processes (1)', exact: true }).click();
     const finished = panel.getByRole('article', { name: 'Completed quality control' });
     assert.equal(await finished.getByRole('button', { name: 'Stop', exact: true }).count(), 0);
-    const interrupted = panel.getByRole('article', { name: 'Checkpointed assembly' });
     await interrupted.getByRole('button', { name: 'Resume checkpoint', exact: true }).click();
     assert(fixture.actions.some((action) => action.path.endsWith('/job_interrupted/resume')));
     fixture.failRead = true;
@@ -336,6 +337,70 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
     await card
       .getByRole('button', { name: 'Resume workflow', exact: true })
       .waitFor({ state: 'detached' });
+
+    const completed = fixture.rows.find((row) => row.sessionId === 'job_finished');
+    assert(completed);
+    fixture.rows = Array.from({ length: 45 }, (_, i) => ({
+      ...completed,
+      sessionId: `history-${i}`,
+      startedAt: new Date(Date.UTC(2026, 0, 1, 0, i)).toISOString(),
+      status: i === 44 ? 'failed' : 'completed',
+      command: ['python3', `analysis-${i}.py`],
+      job: {
+        ...completed.job,
+        jobId: `history-${i}`,
+        name: 'Command',
+        state: i === 44 ? 'failed' : 'completed'
+      }
+    }));
+    await page.reload();
+    const history = panel.getByRole('button', {
+      name: 'Show finished processes (45 · 1 failed)',
+      exact: true
+    });
+    await history.waitFor();
+    assert.equal(
+      await panel.getByRole('article').count(),
+      0,
+      'A finished project starts with compact history'
+    );
+    await history.click();
+    assert.equal(await panel.getByRole('article').count(), 10);
+    assert.equal(
+      await panel.getByRole('article').first().getAttribute('aria-label'),
+      'python3 analysis-44.py'
+    );
+    for (const remaining of [35, 25, 15, 5])
+      await panel
+        .getByRole('button', {
+          name: `Show earlier processes (${remaining} remaining)`,
+          exact: true
+        })
+        .click();
+    assert.equal(
+      await panel.getByRole('article').count(),
+      45,
+      'Every finished process remains accessible'
+    );
+    await panel
+      .getByRole('article', { name: 'python3 analysis-0.py', exact: true })
+      .getByRole('button', { name: 'Read output', exact: true })
+      .click();
+    await panel.getByRole('textbox', { name: 'Output from python3 analysis-0.py' }).waitFor();
+    await panel.getByRole('button', { name: 'Hide finished processes', exact: true }).click();
+    assert.equal(await panel.getByRole('article').count(), 0);
+    await history.click();
+    assert.equal(
+      await panel.getByRole('article').count(),
+      10,
+      'Reopening history starts from the latest page'
+    );
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await panel.screenshot({ path: resolve(report, 'project-process-history.png') });
+    await panel.getByRole('button', { name: 'Hide finished processes', exact: true }).click();
+    await page.setViewportSize({ width: 360, height: 900 });
+    await panel.scrollIntoViewIfNeeded();
+    await panel.screenshot({ path: resolve(report, 'project-process-history-collapsed.png') });
 
     console.log(
       'Project process browser checks passed: multi-day clocks, child resources, relaxed polling, responsive controls, checkpoint resume, log replacement, stale/error status and exact-root stop.'

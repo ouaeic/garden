@@ -60,6 +60,19 @@ export async function checkProjectConversations({
   let delayTask = null;
   let releaseTask;
   const reads = [];
+  const resultArtifact = {
+    id: `artifact:${randomUUID()}`,
+    kind: 'artifact',
+    artifactId: randomUUID(),
+    title: 'Genome analysis notes',
+    mimeType: 'text/plain',
+    sizeBytes: 30,
+    status: 'ready',
+    url: null,
+    downloadUrl: null,
+    accessPath: null,
+    evidenceEventIds: []
+  };
   await page.route('**/v1/**', async (route) => {
     const url = new URL(route.request().url()),
       path = url.pathname,
@@ -67,6 +80,8 @@ export async function checkProjectConversations({
       json = (body) => route.fulfill({ json: body });
     if (method === 'GET') reads.push(path);
     if (await updates.handle(route)) return;
+    if (path === `/v1/artifacts/${resultArtifact.artifactId}/content`)
+      return route.fulfill({ contentType: 'text/plain', body: 'Verified genome analysis result' });
     if (path === '/v1/bootstrap')
       return json({
         ...bootstrap,
@@ -216,7 +231,11 @@ export async function checkProjectConversations({
       return json(selected);
     }
     if (tasks.some((task) => path === `/v1/tasks/${task.id}/presentation`))
-      return json({ ...presentation, taskId: path.split('/')[3] });
+      return json({
+        ...presentation,
+        taskId: path.split('/')[3],
+        results: [...presentation.results, resultArtifact]
+      });
     return route.fallback();
   });
   try {
@@ -227,6 +246,28 @@ export async function checkProjectConversations({
       .getByRole('button', { name: /Assembly reference/ })
       .waitFor();
     await page.getByText('Alignment viewer', { exact: true }).waitFor();
+    const result = page.locator('.garden-delivery').filter({ hasText: resultArtifact.title });
+    await result.getByRole('button', { name: 'View', exact: true }).click();
+    const resultDialog = page.getByRole('dialog', { name: resultArtifact.title, exact: true });
+    await resultDialog.getByText('Verified genome analysis result', { exact: true }).waitFor();
+    assert.equal(
+      new URL(page.url()).searchParams.get('task'),
+      null,
+      'Viewing a result stays in the project overview'
+    );
+    assert.equal(
+      await resultDialog
+        .getByRole('link', { name: 'Download result', exact: true })
+        .getAttribute('href'),
+      `/v1/artifacts/${resultArtifact.artifactId}/content`
+    );
+    await page.keyboard.press('Escape');
+    await resultDialog.waitFor({ state: 'detached' });
+    assert(
+      await result
+        .getByRole('button', { name: 'View', exact: true })
+        .evaluate((element) => element === document.activeElement)
+    );
     await page.getByRole('button', { name: 'New conversation', exact: true }).click();
     let dialog = page.getByRole('dialog', { name: 'New conversation', exact: true });
     let input = dialog.getByPlaceholder('Describe what you want to do…');

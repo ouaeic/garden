@@ -108,6 +108,7 @@ it('assigns retry-stable preparation identities and rejects unrelated conversati
 });
 it('keeps status polling compact while preserving candidate and pagination metadata and explicit diff reads', async () => {
   const runner = new AgentRunnerClient('http://runner.invalid', 'x'.repeat(32));
+  const version = { sha256: 'f'.repeat(64), bytes: 250_000, executable: false };
   const update = {
     id: updateId,
     candidateDigest: digest,
@@ -115,7 +116,19 @@ it('keeps status polling compact while preserving candidate and pagination metad
     nextChange: 'analysis.py',
     checks: [{ id: checkId, status: 'running', ranForMs: 12_000 }],
     changes: [
-      { path: 'analysis.py', kind: 'modified', conflict: true, diff: '+é\n'.repeat(10_000) },
+      {
+        path: 'analysis.py',
+        kind: 'modified',
+        conflict: true,
+        merged: false,
+        detail: 'Concurrent edit',
+        lines: { added: 3, removed: 2 },
+        base: version,
+        current: version,
+        proposed: version,
+        result: null,
+        diff: '+é\n'.repeat(10_000)
+      },
       { path: 'plot.png', kind: 'added', conflict: false, diff: null }
     ]
   };
@@ -131,6 +144,9 @@ it('keeps status polling compact while preserving candidate and pagination metad
         path: 'analysis.py',
         kind: 'modified',
         conflict: true,
+        merged: false,
+        detail: 'Concurrent edit',
+        lines: { added: 3, removed: 2 },
         diffAvailable: true,
         diffBytes: 40_000
       },
@@ -139,6 +155,16 @@ it('keeps status polling compact while preserving candidate and pagination metad
   });
   expect(JSON.stringify(compact).length).toBeLessThan(JSON.stringify(update).length / 20);
   expect(update.changes[0]?.diff).toHaveLength(30_000);
+  const noDiff = {
+    ...update,
+    changes: update.changes.map((change) => ({ ...change, diff: null }))
+  };
+  request.mockResolvedValue(noDiff);
+  const metadataOnly = await executeProjectUpdate(context, call('status', { updateId }));
+  expect(JSON.stringify(metadataOnly)).not.toContain(version.sha256);
+  expect(Buffer.byteLength(JSON.stringify(metadataOnly))).toBeLessThan(
+    Buffer.byteLength(JSON.stringify(noDiff)) * 0.7
+  );
   request.mockResolvedValue({ head: null, updates: [update], nextCursor: updateId });
   expect(await executeProjectUpdate(context, call('status', {}))).toEqual({
     head: null,

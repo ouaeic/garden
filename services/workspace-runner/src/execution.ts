@@ -760,6 +760,7 @@ export const prepareInvocation = async (
   let executable = request.executable;
   let args = request.args;
   let sandbox = policy.sandbox;
+  const packageManager = packageManagerInvocation(request) ?? packageManagerInvocation(asResolved);
 
   if (packagePolicy.mode === 'refused') {
     // One sentence for the whole family: on this path none of them is rewritten onto anything, so
@@ -767,15 +768,17 @@ export const prepareInvocation = async (
     if (
       privilegeEscalationBinary(request) ??
       privilegeEscalationBinary(asResolved) ??
-      packageManagerInvocation(request) ??
-      packageManagerInvocation(asResolved) ??
+      packageManager ??
       privilegedHelperInvocation(request, privilegedHelpers) ??
       privilegedHelperInvocation(asResolved, privilegedHelpers)
     ) {
+      const reason = requireNetworkIsolation
+        ? 'Privilege and system-package operations cannot run in an isolated native capability'
+        : 'Privilege and system-package operations cannot run as background processes';
       throw new Error(
-        requireNetworkIsolation
-          ? 'Privilege and system-package operations cannot run in an isolated native capability'
-          : 'Privilege and system-package operations cannot run as background processes'
+        packageManager && !requireNetworkIsolation
+          ? `${reason}. Use shell with the package manager as executable, its supported update/install arguments, and no wrapper, PTY or background. Ordinary commands may yield into managed processes automatically.`
+          : reason
       );
     }
   } else {
@@ -792,8 +795,6 @@ export const prepareInvocation = async (
         "Athanor's own privileged helpers are reached by the runner after an approval, not by a command"
       );
     }
-    const packageManager =
-      packageManagerInvocation(request) ?? packageManagerInvocation(asResolved);
     // A wrapped package run cannot be rewritten onto the approved helper, so it never executes.
     if (packageManager === 'wrapped') {
       throw new Error(

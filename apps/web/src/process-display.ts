@@ -4,11 +4,15 @@ export const processState = (process: ManagedProcess): string =>
   process.job?.state ?? process.service?.state ?? process.status;
 export const processActive = (process: ManagedProcess): boolean =>
   ['running', 'restarting'].includes(processState(process));
-export const processName = (process: ManagedProcess): string =>
-  process.job?.name ??
-  process.service?.name ??
-  (Array.isArray(process.command) ? process.command[0] : process.command) ??
-  process.sessionId;
+export const processNeedsAttention = (process: ManagedProcess): boolean =>
+  ['interrupted', 'crash_looped'].includes(processState(process));
+export const processName = (process: ManagedProcess): string => {
+  const name = process.job?.name ?? process.service?.name;
+  if (name && name !== 'Command') return name;
+  const parts = Array.isArray(process.command) ? process.command : [process.command];
+  const command = parts.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  return command.length > 90 ? `${command.slice(0, 89)}…` : command || name || process.sessionId;
+};
 export const processElapsed = (
   process: ManagedProcess,
   observedAt: string | undefined,

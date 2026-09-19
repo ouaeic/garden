@@ -9,7 +9,11 @@ const PdfPreview = lazy(() => import('./PdfPreview'));
 const AnalysisJsonPreview = lazy(() => import('./AnalysisJsonPreview'));
 const NotebookPreview = lazy(() => import('./NotebookPreview'));
 
-export function ResultPreview({ artifact }: { artifact: Artifact }) {
+export function ResultPreview({
+  artifact
+}: {
+  artifact: Pick<Artifact, 'id' | 'name' | 'mimeType' | 'sizeBytes'>;
+}) {
   const url = `/v1/artifacts/${artifact.id}/content`;
   const declaredMime = artifact.mimeType.split(';')[0]!;
   const mime =

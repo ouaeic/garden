@@ -565,6 +565,22 @@ describe('background process manager', () => {
         false
       )
     ).rejects.toThrow('cannot run as background processes');
+    await expect(
+      manager.start(
+        root,
+        'workspace-1',
+        'task-1',
+        {
+          executable: 'bash',
+          args: ['-lc', 'apt-get install -y librsvg2-bin 2>&1 | tail -8'],
+          yieldAfterMs: 5000
+        },
+        30,
+        false
+      )
+    ).rejects.toThrow(
+      'package manager as executable, its supported update/install arguments, and no wrapper, PTY or background'
+    );
     await manager.close();
   });
 

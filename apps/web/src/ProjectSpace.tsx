@@ -1,6 +1,12 @@
 import { lazy, Suspense, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, MessageSquarePlus, Settings2 } from 'lucide-react';
-import type { ConversationSource, Project, Task, TaskPresentation } from '@athanor/contracts';
+import type {
+  Artifact,
+  ConversationSource,
+  Project,
+  Task,
+  TaskPresentation
+} from '@athanor/contracts';
 import { get, patch } from './client';
 import {
   money,
@@ -21,6 +27,9 @@ const ProcessPanel = lazy(() => import('./ProcessPanel'));
 const DirectoryPanel = lazy(() => import('./DirectoryPanel'));
 const ProjectSessions = lazy(() => import('./ProjectSessions'));
 const ProjectModels = lazy(() => import('./ProjectModels'));
+const ResultPreview = lazy(() =>
+  import('./computer/ResultPreview').then((module) => ({ default: module.ResultPreview }))
+);
 const TaskOutputs = lazy(() =>
   import('./TaskCanvas').then((module) => ({ default: module.TaskOutputs }))
 );
@@ -36,6 +45,10 @@ function ConversationResults({
 }) {
   const [result, setResult] = useState<TaskPresentation | null>(null),
     [error, setError] = useState<unknown>(null);
+  const [preview, setPreview] = useState<Pick<
+    Artifact,
+    'id' | 'name' | 'mimeType' | 'sizeBytes'
+  > | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     void get<TaskPresentation>(`/v1/tasks/${task.id}/presentation`, { signal: controller.signal })
@@ -58,13 +71,41 @@ function ConversationResults({
         <Suspense fallback={<Spinner />}>
           <TaskOutputs
             presentation={result}
-            onArtifact={onOpen}
+            onArtifact={(id) => {
+              const selected = result.results.find((item) => item.artifactId === id);
+              if (!selected?.mimeType || selected.sizeBytes === undefined) {
+                setError(
+                  new Error('This result could not be opened. Refresh the project and try again.')
+                );
+                return;
+              }
+              setPreview({
+                id,
+                name: selected.title,
+                mimeType: selected.mimeType,
+                sizeBytes: selected.sizeBytes
+              });
+            }}
             onDiscuss={(result) => onDiscuss(conversationResultSource(task.id, result))}
             autoPreview={false}
           />
         </Suspense>
       )}
       <ErrorNotice error={error} />
+      {preview && (
+        <Dialog title={preview.name} wide onClose={() => setPreview(null)}>
+          <Suspense fallback={<Spinner label="Opening result" />}>
+            <ResultPreview key={preview.id} artifact={preview} />
+          </Suspense>
+          <a
+            className="button"
+            href={`/v1/artifacts/${encodeURIComponent(preview.id)}/content`}
+            download={preview.name}
+          >
+            Download result
+          </a>
+        </Dialog>
+      )}
     </section>
   );
 }

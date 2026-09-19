@@ -11,6 +11,7 @@ import {
   processElapsed,
   processMemory,
   processName,
+  processNeedsAttention,
   processState
 } from './process-display';
 import './processes.css';
@@ -36,6 +37,7 @@ export default function ProcessPanel({
   const [confirm, setConfirm] = useState<ManagedProcess | null>(null);
   const [logs, setLogs] = useState<Record<string, string>>({});
   const [showFinished, setShowFinished] = useState(false);
+  const [historyLimit, setHistoryLimit] = useState(10);
   const clock = useVisibleClock(
     Boolean(list?.processes.some(processActive)),
     30_000,
@@ -67,6 +69,7 @@ export default function ProcessPanel({
     setBusy(null);
     setError(null);
     setShowFinished(false);
+    setHistoryLimit(10);
     void refresh();
     return () => {
       generation.current++;
@@ -88,8 +91,16 @@ export default function ProcessPanel({
     };
   }, [refresh, refreshAfterMs]);
   const active = list?.processes.filter(processActive) ?? [];
-  const finished = list?.processes.filter((process) => !processActive(process)) ?? [];
-  const rows = [...active, ...(showFinished || !active.length ? finished : [])];
+  const attention = list?.processes.filter(processNeedsAttention) ?? [];
+  const finished = (
+    list?.processes.filter(
+      (process) => !processActive(process) && !processNeedsAttention(process)
+    ) ?? []
+  ).sort(
+    (a, b) => b.startedAt.localeCompare(a.startedAt) || a.sessionId.localeCompare(b.sessionId)
+  );
+  const failed = finished.filter((process) => processState(process) === 'failed').length;
+  const rows = [...active, ...attention, ...(showFinished ? finished.slice(0, historyLimit) : [])];
   const key = (process: ManagedProcess) =>
     `${process.workspaceId ?? workspaceId}/${process.sessionId}`;
   const act = async (process: ManagedProcess, action: 'log' | 'kill' | 'resume') => {
@@ -177,11 +188,13 @@ export default function ProcessPanel({
               </p>
             </details>
           )}
-          {!rows.length && (
+          {!active.length && !attention.length && (
             <p className="process-empty">
-              {list.unavailableWorkspaces
-                ? 'No processes available to display from the reachable execution roots.'
-                : 'No background processes have been reported for this project.'}
+              {finished.length
+                ? 'No processes are running. Finished runs and their output are available below.'
+                : list.unavailableWorkspaces
+                  ? 'No processes available to display from the reachable execution roots.'
+                  : 'No background processes have been reported for this project.'}
             </p>
           )}
           <div className="process-list">
@@ -191,6 +204,37 @@ export default function ProcessPanel({
               const age = sample ? Math.max(0, clock - Date.parse(sample.sampledAt)) : 0;
               const stale = sample && age > refreshAfterMs * 2;
               const state = processState(process);
+              const prominent = processActive(process) || processNeedsAttention(process);
+              const metrics = (
+                <dl className="process-metrics">
+                  <div>
+                    <dt>{process.status === 'running' ? 'Running' : 'Duration'}</dt>
+                    <dd>
+                      {processDuration(
+                        processElapsed(
+                          process,
+                          list.observedAt,
+                          error && list.observedAt ? Date.parse(list.observedAt) : clock
+                        )
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>CPU{stale ? ' · stale' : ''}</dt>
+                    <dd>
+                      {sample?.cpuPercent == null ? '—' : `${Math.round(sample.cpuPercent)}%`}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>RAM{stale ? ' · stale' : ''}</dt>
+                    <dd>{sample ? processMemory(sample.residentBytes) : '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Processes / threads</dt>
+                    <dd>{sample ? `${sample.processCount} / ${sample.threadCount}` : '—'}</dd>
+                  </div>
+                </dl>
+              );
               return (
                 <article className="process-card" key={id} aria-label={processName(process)}>
                   <div className="process-card-heading">
@@ -200,35 +244,9 @@ export default function ProcessPanel({
                     </span>
                   </div>
                   {process.workflow && <WorkflowProgress run={process.workflow} />}
-                  <dl className="process-metrics">
-                    <div>
-                      <dt>{process.status === 'running' ? 'Running' : 'Duration'}</dt>
-                      <dd>
-                        {processDuration(
-                          processElapsed(
-                            process,
-                            list.observedAt,
-                            error && list.observedAt ? Date.parse(list.observedAt) : clock
-                          )
-                        )}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>CPU{stale ? ' · stale' : ''}</dt>
-                      <dd>
-                        {sample?.cpuPercent == null ? '—' : `${Math.round(sample.cpuPercent)}%`}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>RAM{stale ? ' · stale' : ''}</dt>
-                      <dd>{sample ? processMemory(sample.residentBytes) : '—'}</dd>
-                    </div>
-                    <div>
-                      <dt>Processes / threads</dt>
-                      <dd>{sample ? `${sample.processCount} / ${sample.threadCount}` : '—'}</dd>
-                    </div>
-                  </dl>
+                  {prominent && metrics}
                   <p className="process-timing">
+                    {!prominent && `${processDuration(process.ranForMs)} · `}
                     Started{' '}
                     <time dateTime={process.startedAt}>
                       {new Date(process.startedAt).toLocaleString()}
@@ -252,6 +270,7 @@ export default function ProcessPanel({
                   )}
                   <details className="process-details">
                     <summary>Command & details</summary>
+                    {!prominent && metrics}
                     <pre>
                       {Array.isArray(process.command)
                         ? process.command
@@ -343,14 +362,26 @@ export default function ProcessPanel({
               );
             })}
           </div>
-          {active.length > 0 && finished.length > 0 && (
+          {showFinished && finished.length > historyLimit && (
             <Button
               className="process-history-toggle"
-              onClick={() => setShowFinished((value) => !value)}
+              onClick={() => setHistoryLimit((value) => value + 10)}
+            >
+              Show earlier processes ({finished.length - historyLimit} remaining)
+            </Button>
+          )}
+          {finished.length > 0 && (
+            <Button
+              className="process-history-toggle"
+              aria-expanded={showFinished}
+              onClick={() => {
+                setShowFinished((value) => !value);
+                setHistoryLimit(10);
+              }}
             >
               {showFinished
                 ? 'Hide finished processes'
-                : `Show finished processes (${finished.length})`}
+                : `Show finished processes (${finished.length}${failed ? ` · ${failed} failed` : ''})`}
             </Button>
           )}
         </>

@@ -61,10 +61,15 @@ function compactUpdate<T extends { changes?: unknown }>(update: T) {
   if (!Array.isArray(update.changes)) return update;
   return {
     ...update,
-    changes: update.changes.map(({ diff, ...change }: ProjectUpdate['changes'][number]) => ({
-      ...change,
-      diffAvailable: diff !== null,
-      diffBytes: diff === null ? 0 : Buffer.byteLength(diff)
+    changes: update.changes.map((change: ProjectUpdate['changes'][number]) => ({
+      path: change.path,
+      kind: change.kind,
+      conflict: change.conflict,
+      merged: change.merged,
+      detail: change.detail,
+      lines: change.lines,
+      diffAvailable: change.diff !== null,
+      diffBytes: change.diff === null ? 0 : Buffer.byteLength(change.diff)
     }))
   };
 }
