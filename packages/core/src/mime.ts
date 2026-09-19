@@ -13,6 +13,8 @@
  */
 import { randomUUID } from 'node:crypto';
 import { AthanorError } from './errors.js';
+import { htmlToText } from './mail-html.js';
+export { htmlToText } from './mail-html.js';
 
 export interface MimeAddress {
   name: string | null;
@@ -302,50 +304,6 @@ export const parseAddressList = (input: string): MimeAddress[] => {
   flush();
   return addresses;
 };
-
-const entities: Record<string, string> = {
-  amp: '&',
-  lt: '<',
-  gt: '>',
-  quot: '"',
-  apos: "'",
-  nbsp: ' ',
-  '#39': "'"
-};
-
-const decodeEntities = (value: string): string =>
-  value.replaceAll(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (whole, name: string) => {
-    const lower = name.toLowerCase();
-    if (lower.startsWith('#x')) {
-      const code = Number.parseInt(lower.slice(2), 16);
-      return Number.isFinite(code) && code > 0 && code < 0x110000 ? String.fromCodePoint(code) : '';
-    }
-    if (lower.startsWith('#')) {
-      const code = Number.parseInt(lower.slice(1), 10);
-      return Number.isFinite(code) && code > 0 && code < 0x110000 ? String.fromCodePoint(code) : '';
-    }
-    return entities[lower] ?? whole;
-  });
-
-/**
- * HTML-only mail is the common case now, so the alternative to a crude converter is handing the
- * model raw markup and paying for it in tokens and in confusion. Structure that carries meaning -
- * paragraphs, list items, links - survives; everything else is dropped.
- */
-export const htmlToText = (html: string): string =>
-  decodeEntities(
-    html
-      .replaceAll(/<(script|style|head)[\s\S]*?<\/\1>/gi, ' ')
-      .replaceAll(/<!--[\s\S]*?-->/g, ' ')
-      .replaceAll(/<br\s*\/?>/gi, '\n')
-      .replaceAll(/<\/(p|div|tr|h[1-6]|blockquote|table)>/gi, '\n\n')
-      .replaceAll(/<li[^>]*>/gi, '\n- ')
-      .replaceAll(/<[^>]+>/g, ' ')
-  )
-    .replaceAll(/[ \t\u00a0]+/g, ' ')
-    .replaceAll(/ *\n */g, '\n')
-    .replaceAll(/\n{3,}/g, '\n\n')
-    .trim();
 
 interface WalkState {
   text: string[];

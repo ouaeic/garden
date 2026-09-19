@@ -128,7 +128,11 @@ describe('native mailbox reads', () => {
       .mockResolvedValueOnce(
         response({
           id: 'mail-1',
-          body: { contentType: 'html', content: '<p>Hello <b>world</b></p>' },
+          body: {
+            contentType: 'html',
+            content:
+              '<p>Hello <b>world</b>. <a href="https://jobs.example/apply">Apply here</a></p>'
+          },
           hasAttachments: false
         })
       )
@@ -150,6 +154,7 @@ describe('native mailbox reads', () => {
     const api = connect('microsoft', transport);
     const result = await readAccountMessage(api, { id: 'mail-1' });
     expect(result.body).toContain('Hello world');
+    expect(result.body).toContain('Apply here (https://jobs.example/apply)');
     expect(result.attachments).toMatchObject([{ partId: 'inline', inline: true }]);
     expect(result.nextCursor).toBeTruthy();
     await listAccountAttachments(api, 'mail-1', result.nextCursor!);
