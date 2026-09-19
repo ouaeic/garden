@@ -687,7 +687,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'shell',
     description:
-      'Run an executable on the owner’s Linux computer. Use background=true and job for finite work, service for servers; process inspects or stops them. Nothing expands: use args; for pipes, globs or redirects run `bash -lc` or `python3 -c` with the script as one argument. System packages: name the package manager directly; no shell wrapper, PTY or background.',
+      'Run an executable with literal args; use bash -lc or python3 -c for pipes/globs/redirects. background=true with job runs finite work, service runs servers; process inspects/stops them. System packages require the direct manager: no shell wrapper, PTY or background.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -1028,7 +1028,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'file_patch',
     description:
-      'Edit the lines shown by file_read. Each operation needs a - anchor quoting the start of its target line, then + rows for replacement text. All ranges use the original read numbers; operations on one file apply together.',
+      'Edit file_read’s numbered lines. Each range needs a - anchor quoting its first target line, then + replacement rows. Ranges use original read numbers; repeated paths apply together.',
     parameters: {
       type: 'object',
       additionalProperties: false,
