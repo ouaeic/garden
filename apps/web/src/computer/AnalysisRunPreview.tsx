@@ -5,20 +5,23 @@ import { analysisFilePath } from './analysis-record';
 import { bytes } from './format';
 import './analysis-run.css';
 
-type Location = { workspaceId: string; manifestPath: string };
+export type AnalysisLocation = { workspaceId: string; manifestPath: string };
+export type ProducerSelection = { path: string; input: AnalysisRunFile };
 
 function FileGroup({
   title,
   declared,
   files,
   location,
-  directory
+  directory,
+  onInspectProducer
 }: {
   title: string;
   declared: string[];
   files: AnalysisRunFile[] | undefined;
-  location: Location | undefined;
+  location: AnalysisLocation | undefined;
   directory: string | undefined;
+  onInspectProducer?: ((selection: ProducerSelection) => void) | undefined;
 }) {
   const [limit, setLimit] = useState(20);
   if (!declared.length) return null;
@@ -76,6 +79,14 @@ function FileGroup({
                       </p>
                       <p>Recorded SHA-256:</p>
                       <code className="analysis-run-hash">{producer.sha256}</code>
+                      {producerPath && file && onInspectProducer && (
+                        <button
+                          className="button"
+                          onClick={() => onInspectProducer({ path: producerPath, input: file })}
+                        >
+                          Inspect producer
+                        </button>
+                      )}
                       {producerPath && location && (
                         <a
                           href={apiUrl(
@@ -111,10 +122,12 @@ function FileGroup({
 
 export default function AnalysisRunPreview({
   record,
-  location
+  location,
+  onInspectProducer
 }: {
   record: AnalysisRunRecord;
-  location?: Location;
+  location?: AnalysisLocation;
+  onInspectProducer?: (selection: ProducerSelection) => void;
 }) {
   const end = record.commandFinishedAt;
   const setups =
@@ -194,6 +207,7 @@ export default function AnalysisRunPreview({
         files={record.before?.inputs}
         location={location}
         directory={record.directoryFromManifest}
+        onInspectProducer={onInspectProducer}
       />
       <FileGroup
         title="Scripts"

@@ -102,3 +102,19 @@
   display: block;
   margin-block: 0.5rem;
 }
+
+.analysis-provenance-nav {
+  border-left: 2px solid var(--line);
+  padding: 0.5rem 0.75rem;
+  min-width: 0;
+}
+.analysis-provenance-nav p {
+  margin: 0;
+}
+.analysis-provenance-nav details p {
+  margin-top: 0.5rem;
+}
+.analysis-provenance-nav summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+}

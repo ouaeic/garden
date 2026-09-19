@@ -47,9 +47,14 @@ changed records or mismatched outputs refuse or fail the run. Replay requires th
 records alongside the other dependencies.
 
 The input's run-overview entry includes the producer name, run identity, output path and record
-checksum, plus a workspace-scoped download when its location is known. These are explicit links
-to recorded evidence. Upstream commands are never executed, upstream paths are never traversed,
-and no directory index is built. A file's checksum and a supplied record cannot independently
+checksum, plus a workspace-scoped download when its location is known. In project files,
+Inspect producer opens that record only after checking its complete contents against the retained
+checksum, run identity and matching output. Changed or missing records stay visible as errors,
+with retry and download options. Original run and Previous producer provide navigation; returning
+to a producer checks its current file again. Requests are cancelled when the view changes.
+
+These are explicit links to recorded evidence. Opening a link never executes a command; no upstream
+chain is automatically fetched and no directory index is built. A file's checksum and a supplied record cannot independently
 establish who created it or whether its analysis is scientifically valid. Immediate producer
 records are checked; their own upstream chain is not recursively revalidated.
 

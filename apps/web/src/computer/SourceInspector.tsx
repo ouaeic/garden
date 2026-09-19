@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { readAnalysisRecord } from './analysis-record';
-import AnalysisRunPreview from './AnalysisRunPreview';
+import AnalysisRunExplorer from './AnalysisRunExplorer';
 import { message } from './format';
 import { readWorkspaceFile, saveWorkspaceFile } from './workspace-file';
 import type { WorkspaceTextFile } from './workspace-file';
@@ -28,6 +28,7 @@ export default function SourceInspector({
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [source, setSource] = useState(false);
+  const [showingProducer, setShowingProducer] = useState(false);
   const record = useMemo(
     () =>
       file && !file.truncated && !file.binary && /\.json$/i.test(path)
@@ -48,6 +49,7 @@ export default function SourceInspector({
     setError('');
     setNotice('');
     setSource(line > 1);
+    setShowingProducer(false);
     setBusy(true);
     void readWorkspaceFile(workspaceId, path, {
       start: Math.max(1, line - 12),
@@ -156,15 +158,16 @@ export default function SourceInspector({
                 Run overview
               </button>
               <button className="button" aria-pressed={source} onClick={() => setSource(true)}>
-                Source JSON
+                {showingProducer ? 'Original source JSON' : 'Source JSON'}
               </button>
             </div>
           )}
           {record && !source ? (
-            <AnalysisRunPreview
-              key={record.id}
+            <AnalysisRunExplorer
+              key={`${workspaceId}:${path}:${file.sha}`}
               record={record}
               location={{ workspaceId, manifestPath: path }}
+              onInspectingChange={setShowingProducer}
             />
           ) : file.binary ? (
             <p>Binary file. Download it to open it in its application.</p>

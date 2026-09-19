@@ -8,6 +8,8 @@ import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { analysisFilePath, readAnalysisRecord } from './analysis-record';
 import AnalysisRunPreview from './AnalysisRunPreview';
+import { checkedProducer } from './analysis-producer';
+import type { WorkspaceTextFile } from './workspace-file';
 
 describe('analysis file locations', () => {
   it('resolves nested manifests inside the current workspace only', () => {
@@ -101,6 +103,50 @@ describe('real scientific receipts', () => {
         runId: parentRecord!.id,
         name: 'Raw <counts>'
       });
+      const file: WorkspaceTextFile = {
+        path: 'workspace/child/previous run.json',
+        text: upstream.toString(),
+        original: upstream.toString(),
+        sha: expectedHash,
+        truncated: false,
+        next: null,
+        start: 1,
+        end: null,
+        binary: false
+      };
+      const input = record!.before!.inputs[0]!;
+      expect(checkedProducer(file, input).id).toBe(parentRecord!.id);
+      for (const changed of [
+        { sha: null },
+        { sha: '0'.repeat(64) },
+        { truncated: true },
+        { binary: true },
+        { original: '{}' }
+      ]) {
+        expect(() => checkedProducer({ ...file, ...changed }, input)).toThrow();
+      }
+      for (const changed of [
+        { id: '00000000-0000-4000-8000-000000000000' },
+        { status: 'running' },
+        { exitCode: 1 },
+        { dependenciesUnchanged: false },
+        { outputsMatchPrevious: false },
+        { outputs: [] },
+        { outputs: [...parentRecord!.outputs!, ...parentRecord!.outputs!] },
+        {
+          outputs: parentRecord!.outputs!.map((output) => ({ ...output, bytes: output.bytes + 1 }))
+        },
+        { outputs: parentRecord!.outputs!.map((output) => ({ ...output, sha256: '0'.repeat(64) })) }
+      ]) {
+        const content = JSON.stringify({ ...parentRecord, ...changed });
+        const sha = createHash('sha256').update(content).digest('hex');
+        expect(() =>
+          checkedProducer(
+            { ...file, original: content, sha },
+            { ...input, producer: { ...input.producer!, sha256: sha } }
+          )
+        ).toThrow();
+      }
       const html = renderToStaticMarkup(
         createElement(AnalysisRunPreview, {
           record: record!,
