@@ -16,6 +16,7 @@ import { money } from '../model.js';
 import { mediaRouteIsRetired, mediaRetirementDate } from '../media-state.js';
 import AudioReceipts from '../AudioReceipts';
 import DefaultModels from './DefaultModels.js';
+import ModelCatalog from './ModelCatalog.js';
 import ModelPicker from '../ModelPicker.js';
 
 interface Provider {
@@ -46,7 +47,6 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
     onChange();
   });
   const [choice, setChoice] = useState('');
-  const [query, setQuery] = useState('');
   const [mediaSelections, setMediaSelections] = useState<Record<string, string>>({});
   const mediaAction = useAction(() => onChange());
   const selected =
@@ -494,75 +494,7 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
         description="Availability, context and pricing from the connected catalog."
       >
         <ResourceState resource={models} />
-        <Field label="Find a model">
-          <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} />
-        </Field>
-        <div className="management-scroll">
-          <table className="management-table">
-            <thead>
-              <tr>
-                <th>Model</th>
-                <th>Availability</th>
-                <th>Inputs</th>
-                <th>Context</th>
-                <th>Input / output per million</th>
-              </tr>
-            </thead>
-            <tbody>
-              {models.value
-                ?.filter((model) =>
-                  `${model.displayName} ${model.id}`.toLowerCase().includes(query.toLowerCase())
-                )
-                .map((model) => (
-                  <tr key={model.id}>
-                    <td>
-                      <strong>{model.displayName}</strong>
-                      <br />
-                      <span className="muted">
-                        {model.privacyRoute === 'provider_zdr'
-                          ? 'Zero retention'
-                          : 'External route'}{' '}
-                        · {model.provider}
-                      </span>
-                    </td>
-                    <td>{model.availability}</td>
-                    <td>
-                      {(model.modalities ?? ['text']).join(' · ')}
-                      {(['audio', 'video'] as const)
-                        .filter((kind) => model.modalities?.includes(kind))
-                        .map((kind) => {
-                          const price =
-                            kind === 'audio'
-                              ? model.nativeInputPricing?.audioUsdPerMillionTokens
-                              : model.nativeInputPricing?.videoUsdPerMillionTokens;
-                          return (
-                            <small className="muted" key={kind} style={{ display: 'block' }}>
-                              {kind === 'audio' ? 'Audio' : 'Video'}:{' '}
-                              {price == null
-                                ? 'native input price unavailable'
-                                : `${money(price)} per million input tokens`}
-                            </small>
-                          );
-                        })}
-                    </td>
-                    <td>{model.contextTokens.toLocaleString()}</td>
-                    <td>
-                      {model.inputUsdPerMillionTokens == null
-                        ? 'Unknown'
-                        : money(model.inputUsdPerMillionTokens)}{' '}
-                      /{' '}
-                      {model.outputUsdPerMillionTokens == null
-                        ? 'Unknown'
-                        : money(model.outputUsdPerMillionTokens)}
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
-        {models.value?.length === 0 && (
-          <p className="empty">No models are available from this connection.</p>
-        )}
+        {models.value && <ModelCatalog models={models.value} />}
       </Section>
     </>
   );

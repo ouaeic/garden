@@ -10,7 +10,9 @@ import './projects.css';
 export const projectStatus = (project: Project) =>
   [
     project.activeCount ? `${project.activeCount} working` : '',
-    project.attentionCount ? `${project.attentionCount} need attention` : ''
+    project.attentionCount
+      ? `${project.attentionCount} ${project.attentionCount === 1 ? 'needs' : 'need'} attention`
+      : ''
   ]
     .filter(Boolean)
     .join(' · ') ||
@@ -204,7 +206,9 @@ export default function ProjectCollection({
           </div>
           {mode === 'grid' ? (
             <p className="project-card-meta">
-              {project.conversationCount} conversations <span>{money(project.spentUsd)} spent</span>
+              {project.conversationCount}{' '}
+              {project.conversationCount === 1 ? 'conversation' : 'conversations'}{' '}
+              <span>{money(project.spentUsd)} spent</span>
             </p>
           ) : (
             expanded === project.id && (

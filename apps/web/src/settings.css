@@ -176,6 +176,15 @@
 .management-table th {
   font-weight: 500;
 }
+.management-table.model-catalog-table {
+  min-width: 760px;
+}
+.model-catalog-table th,
+.model-catalog-table td:nth-child(2),
+.model-catalog-table td:nth-child(4),
+.model-catalog-table td:nth-child(5) {
+  white-space: nowrap;
+}
 .management-scroll {
   overflow: auto;
   max-width: 100%;
