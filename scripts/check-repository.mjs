@@ -134,16 +134,23 @@ if (shellcheck.error?.code === 'ENOENT') {
  * recorders and every absolute path the script names is rewritten in a copy - so it costs about a
  * second and works on a developer's laptop.
  */
+// Native package compilation and reconstruction run here alongside the recorder's file checks.
 const analysisRuns = spawnSync('python3', ['scripts/test-reproducible-run.py'], {
   cwd: repositoryRoot,
   encoding: 'utf8',
-  timeout: 30_000
+  timeout: 120_000
 });
 if (analysisRuns.status !== 0) fail(`Analysis run manifests failed: ${analysisRuns.stderr}`);
-else
+else {
   say(
     'Analysis run manifests: verified execution, changed-dependency refusal and clean replay passed.'
   );
+  const skipped = /OK \(skipped=(\d+)\)/.exec(analysisRuns.stderr);
+  if (skipped)
+    say(
+      `${skipped[1]} R-dependent analysis checks skipped; run native acceptance on an R-equipped host.`
+    );
+}
 
 const systemPackages = spawnSync('/bin/sh', ['scripts/test-system-packages.sh'], {
   cwd: repositoryRoot,
