@@ -13,17 +13,20 @@ const Syntax = lazy(() => import('./Syntax'));
 export default function Markdown({
   children,
   artifacts = [],
-  onArtifact
+  onArtifact,
+  imageSources
 }: {
   children: string;
   artifacts?: readonly ArtifactReference[];
   onArtifact?: (id: string) => void;
+  imageSources?: ReadonlyMap<string, string>;
 }) {
   const artifactUrl = (id: string) => `/v1/artifacts/${encodeURIComponent(id)}/content`;
   return (
     <div className="markdown">
       <ReactMarkdown
         urlTransform={(url, key) => {
+          if (key === 'src' && imageSources) return imageSources.get(url) ?? '';
           if (key === 'href' && url.startsWith('artifact:')) {
             const artifact = resolveArtifactReference(url, artifacts);
             return artifact ? artifactUrl(artifact.id) : '';
@@ -80,12 +83,17 @@ export default function Markdown({
             );
           },
           img: ({ node: _node, src, alt, ...props }) =>
-            src?.startsWith('/') || src?.startsWith('blob:') ? (
+            src &&
+            (imageSources
+              ? true
+              : (src.startsWith('/') && !src.startsWith('//')) || src.startsWith('blob:')) ? (
               <img {...props} src={src} alt={alt ?? ''} loading="lazy" />
-            ) : (
+            ) : src ? (
               <a href={src} target="_blank" rel="noopener noreferrer">
                 {alt || 'Open image'}
               </a>
+            ) : (
+              <span className="muted">{alt || 'Image'} (image unavailable in this preview)</span>
             )
         }}
       >

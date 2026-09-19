@@ -22,6 +22,7 @@ export function mimeTypeForFile(name: string): string {
     md: 'text/markdown',
     csv: 'text/csv',
     json: 'application/json',
+    ipynb: 'application/x-ipynb+json',
     html: 'text/html',
     htm: 'text/html',
     pdf: 'application/pdf',

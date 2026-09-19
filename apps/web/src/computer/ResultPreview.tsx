@@ -7,6 +7,7 @@ import '../computer.css';
 const Markdown = lazy(() => import('../MarkdownBody'));
 const PdfPreview = lazy(() => import('./PdfPreview'));
 const AnalysisJsonPreview = lazy(() => import('./AnalysisJsonPreview'));
+const NotebookPreview = lazy(() => import('./NotebookPreview'));
 
 export function ResultPreview({ artifact }: { artifact: Artifact }) {
   const url = `/v1/artifacts/${artifact.id}/content`;
@@ -14,12 +15,13 @@ export function ResultPreview({ artifact }: { artifact: Artifact }) {
   const mime =
     declaredMime === 'application/octet-stream' ? mimeTypeForFile(artifact.name) : declaredMime;
   const plain = (mime.startsWith('text/') && mime !== 'text/html') || mime === 'application/json';
+  const notebook = /\.ipynb$/i.test(artifact.name) || mime === 'application/x-ipynb+json';
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {
     setContent(null);
     setError('');
-    if ((!plain && mime !== 'text/html') || artifact.sizeBytes > 262144) return;
+    if (notebook || (!plain && mime !== 'text/html') || artifact.sizeBytes > 262144) return;
     const controller = new AbortController();
     void fetch(url, { credentials: 'include', signal: controller.signal })
       .then(async (response) => {
@@ -31,7 +33,13 @@ export function ResultPreview({ artifact }: { artifact: Artifact }) {
         if (!controller.signal.aborted) setError(message(cause));
       });
     return () => controller.abort();
-  }, [artifact.sizeBytes, mime, plain, url]);
+  }, [artifact.sizeBytes, mime, plain, notebook, url]);
+  if (notebook)
+    return (
+      <Suspense fallback={<p className="muted">Opening notebook…</p>}>
+        <NotebookPreview key={artifact.id} url={url} name={artifact.name} />
+      </Suspense>
+    );
   if (error)
     return (
       <p className="error" role="alert">

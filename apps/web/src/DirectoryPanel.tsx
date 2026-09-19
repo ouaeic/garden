@@ -10,6 +10,7 @@ import './directories.css';
 
 const SourceInspector = lazy(() => import('./computer/SourceInspector'));
 const TablePreview = lazy(() => import('./computer/TablePreview'));
+const NotebookPreview = lazy(() => import('./computer/NotebookPreview'));
 const tableFile = /\.(?:csv|tsv|jsonl|ndjson)$/i;
 const textFile =
   /\.(?:txt|md|log|csv|tsv|json|jsonl|ya?ml|toml|ini|py|r|sh|js|ts|tsx|jsx|html|css|sql|fa|fasta|fq|fastq|vcf|bed|gff3?|gtf)$/i;
@@ -36,7 +37,7 @@ export default function DirectoryPanel({
   const [folder, setFolder] = useState('workspace');
   const [listing, setListing] = useState<DirectoryPage | null>(null);
   const [file, setFile] = useState<DirectoryEntry | null>(null);
-  const [fileView, setFileView] = useState<'source' | 'table'>('source');
+  const [fileView, setFileView] = useState<'source' | 'table' | 'notebook'>('source');
   const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<unknown>(null);
@@ -244,6 +245,17 @@ export default function DirectoryPanel({
                             </small>
                           </div>
                           <div className="directory-entry-actions">
+                            {entry.type === 'file' && /\.ipynb$/i.test(entry.name) && (
+                              <Button
+                                disabled={dirty}
+                                onClick={() => {
+                                  setFileView('notebook');
+                                  setFile(entry);
+                                }}
+                              >
+                                Open notebook<span className="sr-only"> {entry.name}</span>
+                              </Button>
+                            )}
                             {entry.type === 'file' && tableFile.test(entry.name) && (
                               <Button
                                 disabled={dirty}
@@ -325,6 +337,12 @@ export default function DirectoryPanel({
               <Suspense fallback={<Spinner label="Opening file…" />}>
                 {fileView === 'table' ? (
                   <TablePreview key={`${base}:${file.path}`} base={base} path={file.path} />
+                ) : fileView === 'notebook' ? (
+                  <NotebookPreview
+                    key={`${base}:${file.path}`}
+                    url={`${base}/download?${new URLSearchParams({ path: file.path })}`}
+                    name={file.name}
+                  />
                 ) : (
                   <SourceInspector
                     key={`${rootId}:${file.path}`}
