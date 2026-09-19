@@ -1,4 +1,18 @@
 import {
+  secureConnectorRequest,
+  assertConnectorUrl,
+  type ConnectorTransport,
+  type ConnectorRequestResult
+} from './connector-transport.js';
+export {
+  secureConnectorRequest,
+  assertConnectorUrl,
+  isPublicConnectorAddress,
+  type ConnectorTransport,
+  type ConnectorRequestInput,
+  type ConnectorRequestResult
+} from './connector-transport.js';
+import {
   accountConnectorActions,
   accountConnectorInputs,
   accountConnectorCatalog,
@@ -7,9 +21,6 @@ import {
   executeAccountConnector
 } from './account-connectors.js';
 import { AccountOAuth, verifyAccountOAuthIdentity } from './account-oauth.js';
-import { lookup as resolveDns } from 'node:dns/promises';
-import { request as httpsRequest } from 'node:https';
-import { type LookupFunction } from 'node:net';
 import type { ConnectorKind, ConnectorScope } from '@athanor/contracts';
 import {
   auth as authorizeMcp,
@@ -41,7 +52,6 @@ import type {
   MailAccountSecret,
   MailSocketFactory
 } from './mail-protocol.js';
-import { hostMatchesSuffix, isPublicInternetAddress } from './network-scope.js';
 
 export interface ConnectorSecret {
   accountOAuth?: AccountOAuth;
@@ -286,132 +296,6 @@ const connectorActionInput = z.discriminatedUnion('action', [
   ...mailConnectorActionInputs,
   ...accountConnectorInputs
 ]);
-
-export interface ConnectorRequestInput {
-  url: URL;
-  method: string;
-  headers: Record<string, string>;
-  body?: Uint8Array;
-  allowedHostSuffixes: string[];
-  timeoutMs?: number;
-  maxResponseBytes?: number;
-}
-
-export interface ConnectorRequestResult {
-  status: number;
-  headers: Record<string, string>;
-  body: Buffer;
-  durationMs: number;
-}
-
-export type ConnectorTransport = (input: ConnectorRequestInput) => Promise<ConnectorRequestResult>;
-
-/**
- * A connector endpoint is a public internet host by the same definition everything else here uses;
- * kept as a named export because that is what the connector error messages talk about.
- */
-export const isPublicConnectorAddress = isPublicInternetAddress;
-
-export const assertConnectorUrl = (url: URL, allowedHostSuffixes: string[]): void => {
-  if (
-    url.protocol !== 'https:' ||
-    url.username ||
-    url.password ||
-    url.hash ||
-    (url.port && url.port !== '443') ||
-    !hostMatchesSuffix(url.hostname.toLowerCase(), allowedHostSuffixes)
-  ) {
-    throw new AthanorError(
-      'connector_url_not_allowed',
-      'Connector endpoints must use an approved, credential-free HTTPS host on port 443'
-    );
-  }
-};
-
-export const secureConnectorRequest: ConnectorTransport = async (input) => {
-  assertConnectorUrl(input.url, input.allowedHostSuffixes);
-  const addresses = await resolveDns(input.url.hostname, { all: true, verbatim: true });
-  if (!addresses.length || addresses.some((entry) => !isPublicConnectorAddress(entry.address))) {
-    throw new AthanorError(
-      'connector_address_not_allowed',
-      'Connector host did not resolve exclusively to public internet addresses'
-    );
-  }
-  const body = input.body ? Buffer.from(input.body) : undefined;
-  if (body && body.byteLength > 1_000_000)
-    throw new AthanorError('connector_request_too_large', 'Connector request exceeds 1 MB');
-  const started = Date.now();
-  const timeoutMs = input.timeoutMs ?? 15_000;
-  const maxResponseBytes = input.maxResponseBytes ?? 1_000_000;
-  const pinnedLookup = ((
-    _hostname: string,
-    options: { all?: boolean },
-    callback: (...values: unknown[]) => void
-  ) => {
-    if (options.all) callback(null, addresses);
-    else callback(null, addresses[0]!.address, addresses[0]!.family);
-  }) as unknown as LookupFunction;
-  return new Promise<ConnectorRequestResult>((resolve, reject) => {
-    const request = httpsRequest(
-      input.url,
-      {
-        method: input.method,
-        headers: {
-          ...input.headers,
-          ...(body ? { 'content-length': String(body.byteLength) } : {})
-        },
-        lookup: pinnedLookup,
-        servername: input.url.hostname,
-        timeout: timeoutMs
-      },
-      (response) => {
-        const chunks: Buffer[] = [];
-        let size = 0;
-        response.on('data', (chunk: Buffer) => {
-          size += chunk.byteLength;
-          if (size > maxResponseBytes) {
-            response.destroy(
-              new AthanorError('connector_response_too_large', 'Connector response exceeds 1 MB')
-            );
-            return;
-          }
-          chunks.push(chunk);
-        });
-        response.on('error', reject);
-        response.on('end', () => {
-          const headers = Object.fromEntries(
-            Object.entries(response.headers).map(([name, value]) => [
-              name,
-              Array.isArray(value) ? value.join(', ') : String(value ?? '')
-            ])
-          );
-          const status = response.statusCode ?? 502;
-          if (status >= 300 && status < 400) {
-            reject(
-              new AthanorError(
-                'connector_redirect_blocked',
-                'Connector redirects are blocked to prevent credential forwarding'
-              )
-            );
-            return;
-          }
-          resolve({
-            status,
-            headers,
-            body: Buffer.concat(chunks),
-            durationMs: Date.now() - started
-          });
-        });
-      }
-    );
-    request.on('timeout', () =>
-      request.destroy(new AthanorError('connector_timeout', 'Connector request timed out'))
-    );
-    request.on('error', reject);
-    if (body) request.write(body);
-    request.end();
-  });
-};
 
 const apiPath = (parts: string[]): string =>
   parts.map((part) => encodeURIComponent(part)).join('/');
