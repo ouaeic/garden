@@ -6,7 +6,7 @@ compatibility: Needs python3 with the venv module, curl and the shell, all insta
 allowed-tools: shell process file_read file_write files_list set_plan set_acceptance notify
 metadata:
   athanor.tier: 'builtin'
-  athanor.version: '1.2.0'
+  athanor.version: '1.3.0'
   athanor.risk: 'workspace'
   athanor.domain: 'science'
 ---
@@ -74,12 +74,20 @@ Include every wheel in `lockFiles`, including all transitive dependencies. Use `
 installed command name in the analysis and probes. The recorder verifies the hashes, creates a
 fresh environment, installs offline, checks dependencies and records an installed-package inventory.
 The environment leads `PATH`; existing `.venv` directories are refused. Keep the wheel files for
-replay; `.venv` package trees are excluded from project source snapshots. Other toolchains retain
-the explicit environment preparation and version-probe path.
+replay; `.venv` package trees are excluded from project source snapshots.
+
+For R reconstruction, prepare local source package archives and declare `environment.r` with
+`interpreter` (the base R executable), `directory` (a relative `.garden/r-library` path), and
+`packages` (objects with local `.tar.gz` `path` and `sha256`, in dependency order). Include all
+archives in `lockFiles`; install system build dependencies through ordinary tools first. The
+recorder verifies archives, installs into a new library and records rebuilt and base/recommended
+package versions. It does not fetch missing packages. Use R with `--vanilla` in commands and
+probes. Python and R recipes may coexist for a mixed pipeline. Library directories are disposable;
+retain source archives and native-tool probes for replay. Other toolchains retain explicit setup.
 
 To reproduce, copy the unchanged source, inputs and dependency files into a clean directory, then
-run `garden-run replay --from-manifest /path/to/run.json --manifest rerun.json`. A recorded Python
-recipe rebuilds its environment; without one, recreate the locked environment through normal tools.
+run `garden-run replay --from-manifest /path/to/run.json --manifest rerun.json`. Recorded Python and R
+recipes rebuild their environments; otherwise recreate dependencies through normal tools.
 Changed inputs, source, lock files, environment probes or platform cause refusal before execution.
 Output checksum differences fail the reproduction check. The manifest does not fetch data,
 capture undeclared dependencies or prove scientific validity. For nondeterministic

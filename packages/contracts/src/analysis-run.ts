@@ -30,6 +30,12 @@ const probe = z.object({
   output: z.string().max(131072)
 });
 
+const environmentSetup = z.object({
+  kind: z.enum(['python_wheels', 'r_archives']),
+  directory: path,
+  status: z.enum(['creating', 'installing', 'ready'])
+});
+
 /** A file supplied by a run; these are recorded observations, not live verification. */
 export const AnalysisRunRecord = z.object({
   format: z.literal('garden-analysis-run-1'),
@@ -45,12 +51,12 @@ export const AnalysisRunRecord = z.object({
   error: z.string().max(65536).optional(),
   dependenciesUnchanged: z.boolean().optional(),
   outputsMatchPrevious: z.boolean().optional(),
-  environmentSetup: z
-    .object({
-      kind: z.literal('python_wheels'),
-      directory: path,
-      status: z.enum(['creating', 'installing', 'ready'])
-    })
+  environmentSetup: environmentSetup.optional(),
+  environmentSetups: z
+    .array(environmentSetup)
+    .min(1)
+    .max(2)
+    .refine((setups) => new Set(setups.map((setup) => setup.kind)).size === setups.length)
     .optional(),
   spec: z.object({
     name: z.string().max(200).optional(),
@@ -75,6 +81,16 @@ export const AnalysisRunRecord = z.object({
             .max(4096)
         })
         .optional(),
+      r: z
+        .object({
+          interpreter: z.string().min(1).max(100000),
+          directory: path,
+          packages: z
+            .array(z.object({ path, sha256: hash }))
+            .min(1)
+            .max(4096)
+        })
+        .optional(),
       probes: z.array(z.object({ name: z.string().max(120), command })).max(32)
     }),
     seeds: z
@@ -87,7 +103,8 @@ export const AnalysisRunRecord = z.object({
       sources: files,
       inputs: files,
       locks: files,
-      probes: z.array(probe).max(33),
+      // Declared probes plus one package inventory per reconstructible runtime.
+      probes: z.array(probe).max(32 + 2),
       platform: z.object({ system: z.string(), release: z.string(), architecture: z.string() })
     })
     .optional(),

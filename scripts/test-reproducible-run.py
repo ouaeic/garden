@@ -14,9 +14,13 @@ import unittest
 from unittest import mock
 import importlib.util
 import zipfile
+import tarfile
+import io
+import csv
 
 RUNNER = Path(__file__).with_name("reproducible-run.py").resolve()
 PYTHON = sys.executable
+R = shutil.which("R")
 
 
 class AnalysisRuns(unittest.TestCase):
@@ -432,6 +436,188 @@ Path('result.json').write_text(json.dumps({'length': len(sequence), 'counts': co
                 self.assertNotEqual(self.invoke().returncode, 0)
                 self.assertFalse((self.first / ".venv").exists())
                 self.assertFalse((self.first / "result.json").exists())
+
+    def r_recipe(self, dependency=None, mixed=False, compiled=False):
+        archive = self.first / "packages" / "GardenScience_1.0.tar.gz"
+        archive.parent.mkdir()
+        content = {
+            "DESCRIPTION": "Package: GardenScience\nVersion: 1.0\nTitle: Local Analysis Test\nDescription: A deterministic local test package.\nAuthor: Garden Test\nMaintainer: Garden Test <test@example.invalid>\nLicense: MIT\n" + ("Imports: " + dependency + "\n" if dependency else ""),
+            "NAMESPACE": "export(gc_fraction)\n",
+            "R/science.R": "gc_fraction <- function(sequence) { bases <- strsplit(sequence, '', fixed=TRUE)[[1]]; sum(bases %in% c('G', 'C')) / length(bases) }\n",
+        }
+        if compiled:
+            content["DESCRIPTION"] += "NeedsCompilation: yes\n"
+            content["NAMESPACE"] += "useDynLib(GardenScience)\n"
+            content["R/science.R"] = "gc_fraction <- function(sequence) .Call('gc_fraction_c', as.character(sequence), PACKAGE='GardenScience')\n"
+            content["src/science.c"] = """#include <R.h>
+#include <Rinternals.h>
+#include <string.h>
+SEXP gc_fraction_c(SEXP sequence) {
+  const char *text = CHAR(STRING_ELT(sequence, 0));
+  size_t length = strlen(text), count = 0;
+  for (size_t i = 0; i < length; i++) if (text[i] == 'G' || text[i] == 'C') count++;
+  return ScalarReal((double)count / length);
+}
+"""
+        with tarfile.open(archive, "w:gz") as handle:
+            for name, text in content.items():
+                data = text.encode()
+                info = tarfile.TarInfo("GardenScience/" + name)
+                info.size = len(data)
+                info.mode = 0o644
+                handle.addfile(info, io.BytesIO(data))
+        name = str(archive.relative_to(self.first))
+        if not mixed:
+            self.spec["command"] = [R or "R", "--vanilla", "--slave", "-f", "analysis.R"]
+            self.spec["sources"] = ["analysis.R"]
+            self.spec["outputs"] = ["result.tsv"]
+            self.spec["environment"] = {"lockFiles": [], "probes": []}
+        self.spec["environment"]["lockFiles"].append(name)
+        self.spec["environment"]["probes"].append({"name": "R", "command": [R or "R", "--version"]})
+        self.spec["environment"]["r"] = {"interpreter": R or "R", "directory": ".garden/r-library", "packages": [{"path": name, "sha256": hashlib.sha256(archive.read_bytes()).hexdigest()}]}
+        self.populate(self.first)
+        (self.first / "analysis.R").write_text("lines <- readLines('input.fa')\nsequence <- paste(lines[!startsWith(lines, '>')], collapse='')\nutils::write.table(data.frame(length=nchar(sequence),gc=GardenScience::gc_fraction(sequence)), 'result.tsv', sep='\\t', quote=FALSE, row.names=FALSE)\n")
+        return archive
+
+    @unittest.skipUnless(R, "R native acceptance runs on the VPS")
+    def test_r_archive_rebuild_and_replay_with_clean_profiles(self):
+        archive = self.r_recipe()
+        poison = self.root / "poison.R"
+        poison.write_text("stop('undeclared user profile ran')\n")
+        environment = dict(os.environ, R_PROFILE_USER=str(poison), R_PROFILE=str(poison),
+            R_LIBS=str(self.root / "outside"), R_LIBS_SITE=str(self.root / "outside"))
+        result = self.invoke(env=environment)
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertEqual(self.read()["environmentSetups"][0]["kind"], "r_archives")
+        self.assertEqual(self.read()["environmentSetups"][0]["status"], "ready")
+        with (self.first / "result.tsv").open() as handle:
+            row = next(csv.DictReader(handle, delimiter="\t"))
+        self.assertEqual(int(row["length"]), 8)
+        self.assertEqual(float(row["gc"]), 0.5)
+        inventory = self.read()["before"]["probes"][-1]["output"]
+        self.assertIn('"GardenScience"\t"1.0"\t"reconstructed"', inventory)
+        self.assertNotIn(str(self.first), inventory)
+        fresh = self.root / "fresh"
+        fresh.mkdir()
+        for name in ["analysis.R", "input.fa"]:
+            shutil.copyfile(self.first / name, fresh / name)
+        (fresh / "packages").mkdir()
+        shutil.copyfile(archive, fresh / "packages" / archive.name)
+        result = self.invoke(fresh, self.first / "run.json", env=environment)
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertTrue(self.read(fresh)["outputsMatchPrevious"])
+        self.assertEqual(self.read()["before"], self.read(fresh)["before"])
+
+    def test_r_corrupted_archive_is_refused_before_creating_library(self):
+        archive = self.r_recipe()
+        archive.write_bytes(archive.read_bytes() + b"changed")
+        result = self.invoke()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("R archive does not match", result.stderr)
+        self.assertFalse((self.first / ".garden").exists())
+        self.assertFalse((self.first / "result.tsv").exists())
+
+    def test_r_recipe_refuses_undeclared_archives_and_existing_or_symlinked_libraries(self):
+        self.r_recipe()
+        recipe = self.spec["environment"]["r"]
+        for replacement in [{"directory": "../escape"}, {"directory": "library"}, {"packages": []},
+                {"packages": [{"path": "undeclared.tar.gz", "sha256": "a" * 64}]}]:
+            with self.subTest(replacement=replacement):
+                self.spec["environment"]["r"] = {**recipe, **replacement}
+                self.populate(self.first)
+                self.assertNotEqual(self.invoke().returncode, 0)
+                self.assertFalse((self.first / ".garden").exists())
+        self.spec["environment"]["r"] = recipe
+        self.populate(self.first)
+        library = self.first / ".garden" / "r-library"
+        library.mkdir(parents=True)
+        (library / "keep").write_text("keep")
+        self.assertNotEqual(self.invoke().returncode, 0)
+        self.assertEqual((library / "keep").read_text(), "keep")
+        (self.first / "run.json").unlink()
+        library.rename(self.root / "outside")
+        library.symlink_to(self.root / "outside")
+        result = self.invoke()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("symbolic links", result.stderr)
+        self.assertEqual((self.root / "outside" / "keep").read_text(), "keep")
+
+    @unittest.skipUnless(R, "R native acceptance runs on the VPS")
+    def test_r_missing_dependency_does_not_start_analysis(self):
+        self.r_recipe("GardenMissingDependency")
+        result = self.invoke()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.read()["status"], "failed")
+        self.assertEqual(self.read()["environmentSetups"][0]["status"], "installing")
+        self.assertFalse((self.first / "result.tsv").exists())
+
+    @unittest.skipUnless(R, "R native acceptance runs on the VPS")
+    def test_r_and_python_recipes_preserve_both_environments(self):
+        self.wheel_recipe()
+        self.r_recipe(mixed=True)
+        self.spec["sources"].append("analysis.R")
+        self.spec["outputs"].append("result.tsv")
+        self.source += "\nimport subprocess\nsubprocess.run([" + repr(R) + ", '--vanilla', '--slave', '-f', 'analysis.R'], check=True)\n"
+        self.populate(self.first)
+        result = self.invoke()
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        setups = self.read()["environmentSetups"]
+        self.assertEqual([item["kind"] for item in setups], ["python_wheels", "r_archives"])
+        self.assertTrue(all(item["status"] == "ready" for item in setups))
+        self.assertEqual([probe["name"] for probe in self.read()["before"]["probes"][-2:]],
+            ["Garden rebuilt Python environment", "Garden rebuilt R environment"])
+        self.assertEqual(json.loads((self.first / "result.json").read_text())["gc"], 0.5)
+        self.assertTrue((self.first / "result.tsv").is_file())
+
+    def test_r_bad_archive_in_mixed_recipe_refuses_before_either_setup(self):
+        self.wheel_recipe()
+        archive = self.r_recipe(mixed=True)
+        archive.write_bytes(archive.read_bytes() + b"changed")
+        result = self.invoke()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.first / ".venv").exists())
+        self.assertFalse((self.first / ".garden").exists())
+
+    def test_r_interrupted_installation_stops_its_process(self):
+        self.r_recipe()
+        bootstrap = self.first / "bootstrap"
+        bootstrap.write_text("#!/bin/sh\necho $$ > setup.pid\nexec sleep 120\n")
+        bootstrap.chmod(0o700)
+        self.spec["environment"]["r"]["interpreter"] = str(bootstrap)
+        self.populate(self.first)
+        child = subprocess.Popen([PYTHON, str(RUNNER), "run", "--spec", "spec.json", "--manifest", "run.json"],
+            cwd=self.first, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        try:
+            deadline = time.monotonic() + 8
+            marker = self.first / "setup.pid"
+            while not marker.exists() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertTrue(marker.exists())
+            pid = int(marker.read_text())
+            child.send_signal(signal.SIGTERM)
+            child.communicate(timeout=4)
+            self.assertEqual(self.read()["status"], "interrupted")
+            self.assertEqual(self.read()["environmentSetups"][0]["status"], "installing")
+            self.assertFalse((self.first / "result.tsv").exists())
+            with self.assertRaises(ProcessLookupError):
+                os.kill(pid, 0)
+        finally:
+            if child.poll() is None:
+                child.kill()
+                child.communicate()
+
+    @unittest.skipUnless(R, "R native acceptance runs on the VPS")
+    def test_r_compiles_local_source_package_before_analysis(self):
+        self.r_recipe(compiled=True)
+        self.spec["environment"]["probes"].append({"name": "C compiler", "command": ["cc", "--version"]})
+        self.populate(self.first)
+        result = self.invoke()
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        with (self.first / "result.tsv").open() as handle:
+            row = next(csv.DictReader(handle, delimiter="\t"))
+        self.assertEqual(int(row["length"]), 8)
+        self.assertEqual(float(row["gc"]), 0.5)
+        self.assertTrue(self.read()["dependenciesUnchanged"])
 
 
 if __name__ == "__main__":

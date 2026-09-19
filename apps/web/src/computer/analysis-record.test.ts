@@ -73,6 +73,42 @@ describe('real scientific receipts', () => {
       expect(html).toContain('Unchanged');
       expect(html).not.toContain('Download current file');
       expect(html).not.toContain('Exact checksum match');
+      const mixed = readAnalysisRecord(
+        JSON.stringify({
+          ...record,
+          environmentSetups: [
+            { kind: 'python_wheels', directory: '.venv', status: 'ready' },
+            { kind: 'r_archives', directory: '.garden/r-library', status: 'installing' }
+          ],
+          spec: {
+            ...record!.spec,
+            environment: {
+              ...record!.spec.environment,
+              r: {
+                interpreter: 'R',
+                directory: '.garden/r-library',
+                packages: [{ path: 'science.tar.gz', sha256: 'a'.repeat(64) }]
+              }
+            }
+          }
+        })
+      );
+      expect(mixed).not.toBeNull();
+      const mixedHtml = renderToStaticMarkup(createElement(AnalysisRunPreview, { record: mixed! }));
+      expect(mixedHtml).toContain('Python environment');
+      expect(mixedHtml).toContain('R library');
+      expect(mixedHtml).toContain('Rebuilt from verified local packages');
+      expect(mixedHtml).toContain('Preparation incomplete');
+      expect(mixedHtml).toContain('.garden/r-library');
+      expect(
+        readAnalysisRecord(
+          JSON.stringify({
+            ...mixed,
+            environmentSetups: [mixed!.environmentSetups![0], mixed!.environmentSetups![0]]
+          })
+        )
+      ).toBeNull();
+
       const failed = {
         ...record!,
         status: 'failed' as const,

@@ -121,7 +121,7 @@ def validate(spec):
             raise ValueError("Invalid input SHA-256")
     input_paths = paths([item["path"] for item in spec["inputs"]])
     env = spec["environment"]
-    exact_keys(env, ["lockFiles", "probes"], ["runtimeOnly", "python"])
+    exact_keys(env, ["lockFiles", "probes"], ["runtimeOnly", "python", "r"])
     if "runtimeOnly" in env and not isinstance(env["runtimeOnly"], bool):
         raise ValueError("runtimeOnly must be a boolean")
     env["lockFiles"] = paths(env["lockFiles"])
@@ -146,6 +146,7 @@ def validate(spec):
             or len(probe["name"]) > 120
             or probe["name"] in names
             or ("python" in env and probe["name"] == "Garden rebuilt Python environment")
+            or ("r" in env and probe["name"] == "Garden rebuilt R environment")
         ):
             raise ValueError("Environment probe names must be nonempty and unique")
         names.add(probe["name"])
@@ -180,6 +181,33 @@ def validate(spec):
             raise ValueError("Use a .venv directory so package files stay outside project snapshots")
         if any(Path(name).is_relative_to(directory) for name in files + spec["outputs"]):
             raise ValueError("The disposable environment cannot contain declared analysis files")
+    if "r" in env:
+        recipe = env["r"]
+        exact_keys(recipe, ["interpreter", "directory", "packages"])
+        argv([recipe["interpreter"]])
+        recipe["directory"] = relative(recipe["directory"])
+        directory = Path(recipe["directory"])
+        if tuple(directory.parts[-2:]) != (".garden", "r-library"):
+            raise ValueError("Use a .garden/r-library directory outside project snapshots")
+        if env.get("runtimeOnly"):
+            raise ValueError("A package environment cannot be runtimeOnly")
+        if not isinstance(recipe["packages"], list) or not 0 < len(recipe["packages"]) <= 4096:
+            raise ValueError("Declare the complete nonempty R package archive set")
+        archives = set()
+        for package in recipe["packages"]:
+            exact_keys(package, ["path", "sha256"])
+            package["path"] = relative(package["path"])
+            if (
+                package["path"] in archives
+                or package["path"] not in env["lockFiles"]
+                or not package["path"].endswith(".tar.gz")
+                or not isinstance(package["sha256"], str)
+                or not re.fullmatch(r"[a-f0-9]{64}", package["sha256"])
+            ):
+                raise ValueError("Each R archive needs a unique declared lock path and SHA-256")
+            archives.add(package["path"])
+        if any(Path(name).is_relative_to(directory.parent) for name in files + spec["outputs"]):
+            raise ValueError("The disposable R environment cannot contain declared analysis files")
     if "name" in spec and (
         not isinstance(spec["name"], str) or len(spec["name"]) > 200
     ):
@@ -344,6 +372,12 @@ def probes(spec, root, execution_env=None):
                 ],
             }
         )
+    r_recipe = spec["environment"].get("r")
+    if r_recipe:
+        declared.append({
+            "name": "Garden rebuilt R environment",
+            "command": [r_recipe["interpreter"], "--vanilla", "--slave", "-e", R_INVENTORY],
+        })
     for probe in declared:
         child = subprocess.Popen(
             probe["command"],
@@ -430,19 +464,102 @@ def setup_command(command, root, execution_env):
     child = subprocess.Popen(command, cwd=root, env=execution_env, start_new_session=True)
     try:
         if child.wait():
-            raise ValueError("Python environment preparation failed; inspect the command log")
+            raise ValueError("Environment preparation failed; inspect the command log")
     finally:
         stop_group(child)
 
 
-def prepare_python(spec, root, captured, receipt, filename):
+def verify_recipe_hashes(spec, captured):
+    identities = {item["path"]: item["sha256"] for item in captured["locks"]}
+    for runtime, field, description in [("python", "wheels", "Wheel"), ("r", "packages", "R archive")]:
+        recipe = spec["environment"].get(runtime)
+        for package in recipe[field] if recipe else []:
+            if identities[package["path"]] != package["sha256"]:
+                raise ValueError(description + " does not match its expected checksum: " + package["path"])
+
+
+def setup_receipt(receipt, kind, directory):
+    setup = {"kind": kind, "directory": directory, "status": "creating"}
+    receipt.setdefault("environmentSetups", []).append(setup)
+    # The first recipe remains readable by viewers accepting a single environment.
+    receipt.setdefault("environmentSetup", setup)
+    return setup
+
+
+# Library paths are deliberately absent from probe output so a fresh directory can reproduce it.
+R_INVENTORY = """
+lib <- Sys.getenv("R_LIBS_USER")
+local <- utils::installed.packages(lib.loc=lib, noCache=TRUE)
+if (!nrow(local)) stop("No reconstructed R packages found")
+runtime <- utils::installed.packages(lib.loc=.Library, noCache=TRUE)
+base <- runtime[!is.na(runtime[,"Priority"]) & runtime[,"Priority"] %in% c("base","recommended"),,drop=FALSE]
+all <- rbind(local, runtime[!runtime[,"Package"] %in% local[,"Package"],,drop=FALSE])
+deps <- unique(unlist(tools::package_dependencies(local[,"Package"], db=all,
+    which=c("Depends","Imports","LinkingTo"), recursive=TRUE), use.names=FALSE))
+missing <- setdiff(deps, c(local[,"Package"], base[,"Package"], "R"))
+if (length(missing)) stop(paste("Undeclared R package dependencies:", paste(sort(missing), collapse=", ")))
+cat(R.version.string, "\\n", R.version$platform, "\\n", sep="")
+inventory <- rbind(cbind(local[,c("Package","Version"),drop=FALSE], Origin="reconstructed"),
+    cbind(base[,c("Package","Version"),drop=FALSE], Origin="runtime"))
+utils::write.table(inventory[order(inventory[,"Origin"],inventory[,"Package"]),,drop=FALSE],
+    stdout(), sep="\\t", row.names=FALSE, col.names=TRUE, quote=TRUE)
+""".strip()
+
+
+def prepare_r(spec, root, receipt, filename, execution_env=None):
+    recipe = spec["environment"].get("r")
+    if not recipe:
+        return execution_env
+    directory = checked_path(root, recipe["directory"])
+    if filename.is_relative_to(directory.parent):
+        raise ValueError("The manifest must be outside the disposable environment")
+    parent, name = parent_descriptor(root, str(directory.parent.relative_to(root)))
+    try:
+        try:
+            os.mkdir(name, 0o700, dir_fd=parent)
+        except FileExistsError:
+            pass
+        os.fsync(parent)
+    finally:
+        os.close(parent)
+    parent, name = parent_descriptor(root, recipe["directory"])
+    try:
+        os.mkdir(name, 0o700, dir_fd=parent)
+        os.fsync(parent)
+    finally:
+        os.close(parent)
+    environment = {
+        key: value for key, value in (execution_env if execution_env is not None else os.environ).items()
+        if not key.startswith("R_")
+    }
+    environment.update({
+        "R_LIBS": str(directory), "R_LIBS_USER": str(directory), "R_LIBS_SITE": str(directory),
+        "R_ENVIRON": os.devnull, "R_ENVIRON_USER": os.devnull,
+        "R_PROFILE": os.devnull, "R_PROFILE_USER": os.devnull,
+        "R_MAKEVARS_USER": os.devnull, "R_MAKEVARS_SITE": os.devnull,
+    })
+    setup = setup_receipt(receipt, "r_archives", recipe["directory"])
+    atomic_write(filename, receipt)
+    print("garden-run: installing recorded local R packages in declared order", file=sys.stderr, flush=True)
+    setup["status"] = "installing"
+    atomic_write(filename, receipt)
+    for package in recipe["packages"]:
+        # Check immediately before each installer as well as after the complete preparation.
+        archive = checked_path(root, package["path"])
+        if file_identity(root, package["path"])["sha256"] != package["sha256"]:
+            raise ValueError("R archive changed before installation: " + package["path"])
+        setup_command([recipe["interpreter"], "CMD", "INSTALL", "--no-multiarch",
+            "--library=" + str(directory), str(archive)], root, environment)
+    setup_command([recipe["interpreter"], "--vanilla", "--slave", "-e", R_INVENTORY], root, environment)
+    setup["status"] = "ready"
+    atomic_write(filename, receipt)
+    return environment
+
+
+def prepare_python(spec, root, receipt, filename):
     recipe = spec["environment"].get("python")
     if not recipe:
         return None
-    identities = {item["path"]: item["sha256"] for item in captured["locks"]}
-    for wheel in recipe["wheels"]:
-        if identities[wheel["path"]] != wheel["sha256"]:
-            raise ValueError("Wheel does not match its expected checksum: " + wheel["path"])
     directory = checked_path(root, recipe["directory"])
     if filename.is_relative_to(directory):
         raise ValueError("The manifest must be outside the disposable environment")
@@ -458,11 +575,7 @@ def prepare_python(spec, root, captured, receipt, filename):
         if not key.startswith(("PIP_", "PYTHON")) and key != "VIRTUAL_ENV"
     }
     environment.update({"PIP_CONFIG_FILE": os.devnull, "PYTHONNOUSERSITE": "1"})
-    receipt["environmentSetup"] = {
-        "kind": "python_wheels",
-        "directory": recipe["directory"],
-        "status": "creating",
-    }
+    setup = setup_receipt(receipt, "python_wheels", recipe["directory"])
     atomic_write(filename, receipt)
     print("garden-run: creating isolated Python environment", file=sys.stderr, flush=True)
     setup_command([recipe["interpreter"], "-I", "-m", "venv", str(directory)], root, environment)
@@ -481,7 +594,7 @@ def prepare_python(spec, root, captured, receipt, filename):
                 checked_path(root, wheel["path"]).as_uri()
                 + " --hash=sha256:" + wheel["sha256"] + "\n"
             )
-    receipt["environmentSetup"]["status"] = "installing"
+    setup["status"] = "installing"
     atomic_write(filename, receipt)
     print("garden-run: installing the recorded local wheels", file=sys.stderr, flush=True)
     pip = [python, "-I", "-m", "pip", "--isolated", "--disable-pip-version-check", "--no-input"]
@@ -493,7 +606,7 @@ def prepare_python(spec, root, captured, receipt, filename):
         ], root, environment,
     )
     setup_command(pip + ["check"], root, environment)
-    receipt["environmentSetup"]["status"] = "ready"
+    setup["status"] = "ready"
     atomic_write(filename, receipt)
     return environment
 
@@ -529,7 +642,7 @@ def run(spec, root, filename, previous=None):
         "seedCoverage": "declared_by_caller_not_automatically_applied",
         "coverage": "declared_files_and_environment_probes",
         "note": (
-            "Only a declared Python wheel recipe rebuilds dependencies. No source download. "
+            "Only declared local Python wheel or R archive recipes rebuild dependencies. No source download. "
             "Undeclared dependencies, external services and unsaved runtime state are not captured."
         ),
     }
@@ -549,7 +662,9 @@ def run(spec, root, filename, previous=None):
             previous["before"].get(key) != value for key, value in files_before.items()
         ):
             raise ValueError("Inputs, source or environment locks changed; execution refused")
-        execution_env = prepare_python(spec, root, files_before, receipt, filename)
+        verify_recipe_hashes(spec, files_before)
+        execution_env = prepare_python(spec, root, receipt, filename)
+        execution_env = prepare_r(spec, root, receipt, filename, execution_env)
         before = capture(spec, root, hash_cache, execution_env)
         if any(before[key] != value for key, value in files_before.items()):
             raise ValueError("Declared files changed during environment preparation")

@@ -51,8 +51,27 @@ or interrupted rebuild remains available for inspection and is never silently re
 Replay compares source, input and lock identities before rebuilding. Preparation and its result
 are recorded in the manifest and visible in the run overview. `.venv` package trees stay outside
 project source snapshots; retain the wheel files and manifest to recreate them. The base Python
-installation and compatible operating-system libraries must already be available. Other runtime
-environments can still be recreated through the ordinary tools and verified with declared probes.
+installation and compatible operating-system libraries must already be available.
+
+An optional `environment.r` recipe declares the base R `interpreter`, a relative `directory`
+ending in `.garden/r-library`, and `packages`: local `{ "path": "…tar.gz", "sha256": "…" }`
+source archives listed in dependency order. Include every archive in `lockFiles` and acquire
+its complete dependency set through the ordinary tools before recording the run. R's compiler
+and required system libraries must already be available. `R CMD INSTALL` installs only the
+named local archives; package installation scripts still execute within the command's existing
+sandbox. A hash identifies a package and does not establish its trustworthiness.
+
+The R recipe refuses altered archives, existing libraries and symlinked destinations. It uses
+the fresh library for R package lookup and excludes user/site library overrides and startup
+profiles. The recorded inventory identifies rebuilt packages plus the base/recommended runtime
+packages. A dependency outside those sets refuses the run. Native compilers and system libraries
+remain subject to the declared version probes; this is not a capture of the operating system.
+
+Python and R recipes can be used together. Their preparation states are recorded separately
+in `environmentSetups` and displayed in the run overview. A replay reconstructs both before
+comparing the original file identities and probes. Other environments retain the ordinary
+preparation and declared-probe path. The R installation behavior follows the [R administration
+manual](https://cran.r-project.org/doc/manuals/r-release/R-admin.html#Installing-packages).
 
 This contract records the declared dependency set. It does not capture containers, undeclared
 packages, external service state or all ambient environment variables. It does not acquire inputs.
@@ -63,5 +82,6 @@ validity test. Inputs are checked before and after execution, rather than locked
 `python3 scripts/test-reproducible-run.py` uses real commands and independent expected metrics to
 exercise clean replay, changed references, changed installed dependencies, expected input hashes,
 input mutation, missing outputs, duplicate requests, output mismatch, excessive probe output,
-signals, path boundaries and offline environment reconstruction. It runs in the repository gate. The native update drill also verifies
+signals, path boundaries and local-package environment reconstruction. R-dependent cases report
+a skip when R is unavailable and require native acceptance on an R-equipped host. It runs in the repository gate. The native update drill also verifies
 that the installed executable matches the checkout.

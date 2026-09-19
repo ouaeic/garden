@@ -83,6 +83,8 @@ export default function AnalysisRunPreview({
   location?: Location;
 }) {
   const end = record.commandFinishedAt;
+  const setups =
+    record.environmentSetups ?? (record.environmentSetup ? [record.environmentSetup] : []);
   const elapsed =
     record.startedAt && end
       ? Math.max(0, (Date.parse(end) - Date.parse(record.startedAt)) / 1000)
@@ -126,16 +128,16 @@ export default function AnalysisRunPreview({
           <dt>Declared dependencies after execution</dt>
           <dd>{check(record.dependenciesUnchanged, 'Unchanged', 'Changed')}</dd>
         </div>
-        {record.environmentSetup && (
-          <div>
-            <dt>Python environment</dt>
+        {setups.map((setup) => (
+          <div key={setup.kind}>
+            <dt>{setup.kind === 'r_archives' ? 'R library' : 'Python environment'}</dt>
             <dd>
-              {record.environmentSetup.status === 'ready'
+              {setup.status === 'ready'
                 ? 'Rebuilt from verified local packages'
                 : 'Preparation incomplete'}
             </dd>
           </div>
-        )}
+        ))}
         {record.replayedFrom && (
           <div>
             <dt>Output comparison with original</dt>
@@ -183,6 +185,12 @@ export default function AnalysisRunPreview({
           <p className="analysis-run-path">
             Rebuild directory: <code>{record.spec.environment.python.directory}</code>. Only the
             recorded local packages are installed; the rebuild does not download dependencies.
+          </p>
+        )}
+        {record.spec.environment.r && (
+          <p className="analysis-run-path">
+            R library: <code>{record.spec.environment.r.directory}</code>. Local package archives
+            are installed in their declared order.
           </p>
         )}
         {[
