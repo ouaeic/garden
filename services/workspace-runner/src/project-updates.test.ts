@@ -9,6 +9,36 @@ import { ProjectUpdatesManager, type ProjectCheckExecution } from './project-upd
 import { ProjectVersionFiles } from './project-version-files.js';
 
 const roots: string[] = [];
+it('retains owner pins across publication and manager restart without changing published bytes', async () => {
+  const f = await fixture();
+  const first = await f.seed();
+  const firstBytes = await readFile(path.join(first.path, 'analysis.txt'), 'utf8');
+  expect((await f.manager.pinVersion(f.project, first.id, 'Final analysis')).pin?.label).toBe(
+    'Final analysis'
+  );
+  await f.write(f.wa, 'analysis.txt', 'later result\n');
+  const second = await f.publish(await f.prepare(f.a, ['analysis.txt']));
+  expect(second.number).toBe(first.number + 1);
+  const restored = new ProjectUpdatesManager(f.root, f.execution);
+  try {
+    const page = await restored.pinnedVersions(f.project);
+    expect(page.revisions).toHaveLength(1);
+    expect(page.revisions[0]).toMatchObject({ id: first.id, pin: { label: 'Final analysis' } });
+    expect(
+      (await restored.list(f.project)).revisions.find((item) => item.id === first.id)?.pin?.label
+    ).toBe('Final analysis');
+    await restored.pinVersion(f.project, first.id, null);
+    expect((await restored.pinnedVersions(f.project)).revisions).toEqual([]);
+    expect(await readFile(path.join(first.path, 'analysis.txt'), 'utf8')).toBe(firstBytes);
+    expect((await restored.list(f.project)).head?.id).toBe(second.id);
+    await expect(restored.pinVersion(f.project, randomUUID(), 'Missing')).rejects.toThrow(
+      'not found'
+    );
+  } finally {
+    await restored.close();
+    await f.manager.close();
+  }
+});
 it('finalizes the root working area without changing versions or admitting an unrelated area', async () => {
   const f = await fixture();
   await f.manager.bind(f.project, f.main, f.project, f.wa);

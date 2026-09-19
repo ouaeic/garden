@@ -139,6 +139,60 @@ it('binds project reads and mutations to signed membership and keeps unchecked p
   const published = await invoke('user', main, a, 'project.updates.write', publish);
   expect(published.statusCode).toBe(200);
   const revision = published.json<{ id: string }>();
+  const pin = (
+    role: 'agent' | 'user',
+    workspaceId: string,
+    scope: string,
+    label: string | null
+  ) => {
+    const pinUrl = `/v1/workspaces/${workspaceId}/projects/${project}/versions/${revision.id}/pin`;
+    const token = signCapabilityToken(
+      {
+        workspaceId,
+        sub: a,
+        role,
+        scopes: [scope],
+        nonce: randomUUID(),
+        aud: capabilityAudience('PUT', pinUrl)
+      },
+      secret,
+      60
+    );
+    return app.inject({
+      method: 'PUT',
+      url: pinUrl,
+      headers: { authorization: `Bearer ${token}` },
+      payload: { label }
+    });
+  };
+  expect((await pin('agent', wa, 'project.updates.write', 'No')).statusCode).not.toBe(200);
+  expect((await pin('user', wb, 'project.updates.write', 'No')).statusCode).not.toBe(200);
+  expect((await pin('user', main, 'project.updates.read', 'No')).statusCode).not.toBe(200);
+  expect((await manager.pinnedVersions(project)).revisions).toEqual([]);
+  const pinned = await pin('user', main, 'project.updates.write', 'Protected result');
+  expect(pinned.statusCode).toBe(200);
+  expect(pinned.json()).toMatchObject({ id: revision.id, pin: { label: 'Protected result' } });
+  const pinsUrl = `/v1/workspaces/${main}/projects/${project}/pinned-versions`;
+  const pinRead = signCapabilityToken(
+    {
+      workspaceId: main,
+      sub: a,
+      role: 'user',
+      scopes: ['project.updates.read'],
+      nonce: randomUUID(),
+      aud: capabilityAudience('GET', pinsUrl)
+    },
+    secret,
+    60
+  );
+  const listing = await app.inject({
+    url: pinsUrl,
+    headers: { authorization: `Bearer ${pinRead}` }
+  });
+  expect(listing.statusCode).toBe(200);
+  expect(listing.json<{ revisions: unknown[] }>().revisions).toHaveLength(1);
+  expect((await pin('user', main, 'project.updates.write', null)).statusCode).toBe(200);
+  expect((await manager.pinnedVersions(project)).revisions).toEqual([]);
   const url = `/v1/workspaces/${main}/projects/${project}/versions/${revision.id}/download?path=workspace/result.txt`;
   const token = signCapabilityToken(
     {

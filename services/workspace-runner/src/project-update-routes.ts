@@ -1,11 +1,46 @@
 import { registerFileReadRoutes } from './file-downloads.js';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { ProjectUpdateAction } from '@athanor/contracts';
+import {
+  ProjectUpdateAction,
+  ProjectVersionPinInput,
+  PinnedProjectVersionCursor
+} from '@athanor/contracts';
 import { requireScope } from './auth.js';
 import type { ProjectUpdatesManager } from './project-updates.js';
 
 export function registerProjectUpdateRoutes(app: FastifyInstance, manager: ProjectUpdatesManager) {
+  app.get<{ Params: { workspaceId: string; projectId: string } }>(
+    '/v1/workspaces/:workspaceId/projects/:projectId/pinned-versions',
+    async (request) => {
+      requireScope(request, 'project.updates.read');
+      const { projectId, workspaceId } = request.params;
+      if (
+        request.capability.role !== 'user' ||
+        (await manager.projectWorkspace(projectId)) !== workspaceId
+      )
+        throw new Error('Pinned versions require the project owner');
+      const query = z
+        .object({ before: PinnedProjectVersionCursor.optional() })
+        .strict()
+        .parse(request.query);
+      return manager.pinnedVersions(projectId, query.before);
+    }
+  );
+  app.put<{ Params: { workspaceId: string; projectId: string; revisionId: string } }>(
+    '/v1/workspaces/:workspaceId/projects/:projectId/versions/:revisionId/pin',
+    async (request) => {
+      requireScope(request, 'project.updates.write');
+      const { projectId, workspaceId, revisionId } = request.params;
+      if (
+        request.capability.role !== 'user' ||
+        (await manager.projectWorkspace(projectId)) !== workspaceId
+      )
+        throw new Error('Only the project owner can change version pins');
+      const input = ProjectVersionPinInput.parse(request.body);
+      return manager.pinVersion(projectId, revisionId, input.label);
+    }
+  );
   app.post<{ Params: { workspaceId: string; projectId: string } }>(
     '/v1/workspaces/:workspaceId/projects/:projectId/changes',
     async (request) => {

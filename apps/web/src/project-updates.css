@@ -57,6 +57,52 @@
 .project-version-path li small {
   display: block;
 }
+.project-version-history {
+  margin-top: 1rem;
+  min-width: 0;
+}
+.project-version-history > p {
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+.project-version-history-list {
+  list-style: none;
+  padding: 0;
+}
+.project-version-history-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.project-version-history-title {
+  min-width: 0;
+  flex: 1 1 14rem;
+}
+.project-version-history-title > .button {
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.project-version-history-title small {
+  margin-top: 0.45rem;
+}
+.project-version-history-title .project-version-pin-label {
+  display: flex;
+  gap: 0.35rem;
+  align-items: baseline;
+  overflow-wrap: anywhere;
+}
+.project-version-pin-label svg {
+  flex-shrink: 0;
+}
+.project-version-pin-actions {
+  flex-shrink: 0;
+}
 .project-update-list {
   display: grid;
   gap: 0.6rem;

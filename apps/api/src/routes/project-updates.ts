@@ -1,6 +1,10 @@
 import { downloadSignal, sendDownload } from '../download-response.js';
 import { AthanorError } from '@athanor/core';
-import { ProjectUpdateAction } from '@athanor/contracts';
+import {
+  ProjectUpdateAction,
+  ProjectVersionPinInput,
+  PinnedProjectVersionCursor
+} from '@athanor/contracts';
 import { z } from 'zod';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
@@ -37,6 +41,45 @@ export function registerProjectUpdateRoutes(context: RouteContext) {
     }
     return project;
   };
+  app.get<{ Params: { projectId: string } }>(
+    '/v1/projects/:projectId/pinned-versions',
+    async (request) => {
+      const user = requireUser(request.user),
+        project = await owned(user.id, request.params.projectId);
+      const query = z
+        .object({ before: PinnedProjectVersionCursor.optional() })
+        .strict()
+        .parse(request.query);
+      return runner.request({
+        workspaceId: project.workspaceId,
+        userId: user.id,
+        role: 'user',
+        scopes: ['project.updates.read'],
+        path: `/v1/workspaces/${project.workspaceId}/projects/${project.id}/pinned-versions${query.before ? '?' + new URLSearchParams({ before: query.before }).toString() : ''}`
+      });
+    }
+  );
+  app.put<{ Params: { projectId: string; revisionId: string } }>(
+    '/v1/projects/:projectId/versions/:revisionId/pin',
+    async (request, reply) => {
+      const user = requireUser(request.user),
+        project = await owned(user.id, request.params.projectId);
+      const revisionId = z.uuid().parse(request.params.revisionId);
+      const input = ProjectVersionPinInput.parse(request.body);
+      return context.idempotent(request, reply, user, () =>
+        runner.request({
+          workspaceId: project.workspaceId,
+          userId: user.id,
+          role: 'user',
+          scopes: ['project.updates.write'],
+          method: 'PUT',
+          path: `/v1/workspaces/${project.workspaceId}/projects/${project.id}/versions/${revisionId}/pin`,
+          contentType: 'application/json',
+          body: JSON.stringify(input)
+        })
+      );
+    }
+  );
   for (const source of ['versions', 'checks'] as const)
     for (const operation of ['directory', 'directory.zip', 'download', 'table'] as const) {
       const route = source === 'versions' ? 'versions/:revisionId' : 'checks/:updateId/:checkId';

@@ -14,6 +14,7 @@ import { useVisibleClock } from './visible-clock';
 import './project-updates.css';
 
 const DirectoryPanel = lazy(() => import('./DirectoryPanel'));
+const ProjectVersionHistory = lazy(() => import('./ProjectVersionHistory'));
 const stateLabel: Record<ProjectUpdate['state'], string> = {
   preparing: 'Preparing files',
   ready: 'Ready for checks',
@@ -297,20 +298,30 @@ export default function ProjectUpdates({
                   }}
                 />
               </Suspense>
-              <ol>
-                {data.revisions.map((revision) => (
-                  <li key={revision.id}>
-                    <Button onClick={() => inspect(revision.updateId)}>
-                      Version {revision.number} · {revision.title}
-                    </Button>
-                    <small>{stamp(revision.createdAt)}</small>
-                  </li>
-                ))}
-              </ol>
-              {data.nextRevisionCursor && (
-                <Button
-                  disabled={!!busy}
-                  onClick={() =>
+              <Suspense fallback={<Spinner label="Opening version history…" />}>
+                <ProjectVersionHistory
+                  key={projectId}
+                  projectId={projectId}
+                  revisions={data.revisions}
+                  nextCursor={data.nextRevisionCursor}
+                  loading={Boolean(busy)}
+                  onInspect={inspect}
+                  onChanged={(revision) => {
+                    if (activeProject.current !== projectId) return;
+                    request.current?.abort();
+                    setData((previous) =>
+                      previous
+                        ? {
+                            ...previous,
+                            head: previous.head?.id === revision.id ? revision : previous.head,
+                            revisions: previous.revisions.map((item) =>
+                              item.id === revision.id ? revision : item
+                            )
+                          }
+                        : previous
+                    );
+                  }}
+                  onEarlier={() =>
                     void perform('versions', async () => {
                       const page = await get<Updates>(
                         `${endpoint}?revisionsBefore=${data.nextRevisionCursor}`
@@ -333,10 +344,8 @@ export default function ProjectUpdates({
                       );
                     })
                   }
-                >
-                  Load earlier versions
-                </Button>
-              )}
+                />
+              </Suspense>
             </details>
           )}
           <div className="project-update-list">

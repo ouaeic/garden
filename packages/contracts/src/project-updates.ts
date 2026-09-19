@@ -80,6 +80,24 @@ export const ProjectUpdateAction = z.discriminatedUnion('action', [
 ]);
 export type ProjectUpdateAction = z.infer<typeof ProjectUpdateAction>;
 
+export const ProjectVersionPinInput = z
+  .object({ label: z.string().trim().max(120).nullable() })
+  .strict();
+export type ProjectVersionPinInput = z.infer<typeof ProjectVersionPinInput>;
+export const PinnedProjectVersionCursor = z
+  .string()
+  .regex(
+    /^[0-9]{16}_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.json$/i
+  );
+export interface ProjectVersionPin {
+  label: string;
+  createdAt: string;
+}
+export interface PinnedProjectVersions {
+  revisions: ProjectRevision[];
+  nextCursor: string | null;
+}
+
 export interface ProjectFileVersion {
   sha256: string;
   bytes: number;
@@ -165,6 +183,7 @@ export interface ProjectRevision {
   path: string;
   checks: ProjectCheck[];
   uncheckedReason: string | null;
+  pin?: ProjectVersionPin | null;
 }
 export interface ProjectUpdates {
   head: ProjectRevision | null;

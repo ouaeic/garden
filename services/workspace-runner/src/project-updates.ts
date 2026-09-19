@@ -13,6 +13,7 @@ import type {
 import { PrepareProjectUpdate } from '@athanor/contracts';
 import { ensureWorkspace, workspacePath, withWorkspaceDirectory } from './files.js';
 import { ProjectLiveChanges } from './project-live-changes.js';
+import { ProjectVersionPins } from './project-version-pins.js';
 import {
   ProjectVersionFiles,
   durableJson,
@@ -216,6 +217,48 @@ export class ProjectUpdatesManager {
   }
   async revisionRoot(projectId: string, revisionId: string): Promise<string> {
     return path.dirname((await this.revision(projectId, revisionId)).path);
+  }
+  private async revisionSummary(projectId: string, id: string): Promise<ProjectRevision> {
+    const revision =
+      (await readJson<ProjectRevision>(
+        this.file(projectId, `revision-summaries/${uuid(id)}.json`)
+      )) ?? this.revisionView(await this.revision(projectId, id));
+    return {
+      ...revision,
+      pin: await new ProjectVersionPins(this.file(projectId, 'pins')).get(
+        revision.number,
+        revision.id
+      )
+    };
+  }
+  async pinVersion(
+    projectId: string,
+    revisionId: string,
+    label: string | null
+  ): Promise<ProjectRevision> {
+    return this.locked(projectId, async () => {
+      await this.registry(projectId);
+      const revision = await this.revision(projectId, revisionId);
+      const pin = await new ProjectVersionPins(this.file(projectId, 'pins')).set(
+        revision.number,
+        revision.id,
+        label
+      );
+      return { ...this.revisionView(revision), pin };
+    });
+  }
+  async pinnedVersions(projectId: string, before?: string) {
+    await this.registry(projectId);
+    const page = await new ProjectVersionPins(this.file(projectId, 'pins')).page(before);
+    const revisions = await Promise.all(
+      page.pins.map(async (pin) => {
+        const revision = await this.revisionSummary(projectId, pin.revisionId);
+        if (revision.number !== pin.number)
+          throw new Error('Pinned version identity does not match the published version.');
+        return revision;
+      })
+    );
+    return { revisions, nextCursor: page.nextCursor };
   }
   async projectWorkspace(projectId: string): Promise<string> {
     return (await this.registry(projectId)).workspaceId;
@@ -1079,10 +1122,15 @@ export class ProjectUpdatesManager {
         b.id.localeCompare(a.id)
     );
     const revisions: ProjectRevision[] = [];
-    const revisionSummary = async (id: string): Promise<ProjectRevision> =>
-      (await readJson<ProjectRevision>(
-        this.file(projectId, `revision-summaries/${uuid(id)}.json`)
-      )) ?? this.revisionView(await this.revision(projectId, id));
+    const summaries = new Map<string, Promise<ProjectRevision>>();
+    const revisionSummary = (id: string): Promise<ProjectRevision> => {
+      let summary = summaries.get(id);
+      if (!summary) {
+        summary = this.revisionSummary(projectId, id);
+        summaries.set(id, summary);
+      }
+      return summary;
+    };
     const head = registry.head ? await revisionSummary(registry.head) : null;
     let revisionId = revisionsBefore
       ? (await revisionSummary(revisionsBefore)).parentId
