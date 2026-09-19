@@ -7,6 +7,7 @@ import { requireDownloadSupport } from './download-support';
 import { Button, ErrorNotice, Spinner } from './ui';
 import { processMemory } from './process-display';
 import './directories.css';
+import type { AnalysisSelection } from './computer/analysis-selection';
 
 const SourceInspector = lazy(() => import('./computer/SourceInspector'));
 const TablePreview = lazy(() => import('./computer/TablePreview'));
@@ -19,9 +20,13 @@ export default function DirectoryPanel({
   taskId,
   projectId,
   openRequest = 0,
-  readOnlyRoot
+  readOnlyRoot,
+  rerunWorkspaceId,
+  onRerunAnalysis
 }: {
   taskId?: string;
+  rerunWorkspaceId?: string;
+  onRerunAnalysis?: (selection: AnalysisSelection) => void;
   projectId?: string;
   openRequest?: number;
   readOnlyRoot?: { base: string; id: string; name: string; description: string };
@@ -349,6 +354,9 @@ export default function DirectoryPanel({
                     workspaceId={rootId}
                     path={file.path}
                     onDirtyChange={setDirty}
+                    {...(!readOnlyRoot && rootId === rerunWorkspaceId && onRerunAnalysis
+                      ? { onRerunAnalysis }
+                      : {})}
                   />
                 )}
               </Suspense>

@@ -5,6 +5,7 @@ import { message } from './format';
 import { readWorkspaceFile, saveWorkspaceFile } from './workspace-file';
 import type { WorkspaceTextFile } from './workspace-file';
 import '../computer.css';
+import type { AnalysisSelection } from './analysis-selection';
 
 export default function SourceInspector({
   workspaceId,
@@ -13,9 +14,11 @@ export default function SourceInspector({
   expectedHash,
   onDirtyChange,
   onSavingChange,
-  onSaved
+  onSaved,
+  onRerunAnalysis
 }: {
   workspaceId: string;
+  onRerunAnalysis?: (selection: AnalysisSelection) => void;
   path: string;
   line?: number;
   expectedHash?: string | null | undefined;
@@ -168,6 +171,8 @@ export default function SourceInspector({
               record={record}
               location={{ workspaceId, manifestPath: path }}
               onInspectingChange={setShowingProducer}
+              manifestSha256={file.sha}
+              {...(onRerunAnalysis && !busy && !dirty ? { onRerunAnalysis } : {})}
             />
           ) : file.binary ? (
             <p>Binary file. Download it to open it in its application.</p>

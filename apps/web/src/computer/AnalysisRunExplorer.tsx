@@ -8,17 +8,22 @@ import { checkedProducer } from './analysis-producer';
 import { readWorkspaceFile } from './workspace-file';
 import { message } from './format';
 import { apiUrl } from '../client';
+import { canRerunAnalysis, type AnalysisSelection } from './analysis-selection';
 
 const RECENT_VIEWS = 32;
 
 export default function AnalysisRunExplorer({
   record,
   location,
-  onInspectingChange
+  onInspectingChange,
+  manifestSha256,
+  onRerunAnalysis
 }: {
   record: AnalysisRunRecord;
   location: AnalysisLocation;
   onInspectingChange?: (value: boolean) => void;
+  manifestSha256?: string | null;
+  onRerunAnalysis?: (selection: AnalysisSelection) => void;
 }) {
   const [history, setHistory] = useState<ProducerSelection[]>([]);
   const [loaded, setLoaded] = useState<{
@@ -55,6 +60,9 @@ export default function AnalysisRunExplorer({
     navigated.current = Boolean(selection);
     onInspectingChange?.(Boolean(selection));
   }, [selection, onInspectingChange]);
+  const shown = selection ? current?.record : record;
+  const shownPath = selection?.path ?? location.manifestPath;
+  const shownHash = selection ? selection.input.producer?.sha256 : manifestSha256;
   return (
     <section
       ref={container}
@@ -111,6 +119,25 @@ export default function AnalysisRunExplorer({
             </p>
           </details>
         </section>
+      )}
+      {onRerunAnalysis && shown && shownPath && shownHash && canRerunAnalysis(shown) && (
+        <div className="row">
+          <button
+            className="button"
+            onClick={() =>
+              onRerunAnalysis({
+                kind: 'analysis',
+                workspaceId: location.workspaceId,
+                manifestPath: shownPath,
+                sha256: shownHash,
+                runId: shown.id,
+                name: shown.spec.name ?? ''
+              })
+            }
+          >
+            Rerun with changes
+          </button>
+        </div>
       )}
       {(!selection || current?.record) && (
         <AnalysisRunPreview

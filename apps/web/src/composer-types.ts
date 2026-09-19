@@ -1,5 +1,11 @@
 import type { ReactNode } from 'react';
-import type { Task, Workspace, Project, ConversationSource } from '@athanor/contracts';
+import type {
+  Task,
+  Workspace,
+  Project,
+  ConversationSource,
+  DirectionContext
+} from '@athanor/contracts';
 import type { Bootstrap, Draft } from './model';
 
 export interface ComposerProps {
@@ -10,7 +16,9 @@ export interface ComposerProps {
   task?: Task | null;
   bootstrap: Bootstrap;
   initialDraft?: Draft;
-  scope?: string;
+  context?: DirectionContext | null;
+  onEditingChange?: (locked: boolean) => void;
+  onContextChange?: (context: DirectionContext | null) => void;
   /** Extra trigger docked at the right of the attach/voice toolbar (shape selection lives there). */
   toolbarExtra?: ReactNode;
   onSent: (task: Task) => void;

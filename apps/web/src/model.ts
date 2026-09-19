@@ -1,6 +1,7 @@
 import type {
   Project,
   ConversationSource,
+  DirectionContext,
   TaskResult,
   ModelRelease,
   Task,
@@ -27,6 +28,7 @@ export interface Draft {
   revision?: number;
   recoveryId?: string;
   controls?: {
+    context?: DirectionContext;
     conversation?: {
       projectId: string;
       execution: 'independent' | 'shared';

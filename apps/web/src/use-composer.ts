@@ -21,6 +21,7 @@ import { DraftConflict, DraftSync } from './draft-sync';
 import { draftStorage, keepsDeviceDrafts, recoveryFor, writeDraft } from './draft-storage';
 import type { DictationConsent } from './dictation-preflight';
 import type { ComposerProps } from './composer-types';
+import { directionPrompt } from './direction-context';
 
 /** Owns draft persistence, delivery recovery and input operations for one composer scope. */
 export function useComposer({
@@ -31,10 +32,14 @@ export function useComposer({
   task = null,
   bootstrap,
   initialDraft,
-  scope,
+  context: suppliedContext,
+  onContextChange,
+  onEditingChange,
   onSent,
   onDraft
 }: ComposerProps) {
+  const context =
+    suppliedContext === undefined ? (initialDraft?.controls?.context ?? null) : suppliedContext;
   const [body, setBody] = useState(initialDraft?.body ?? '');
   const [attachments, setAttachments] = useState<DraftAttachment[]>(
     initialDraft?.attachments ?? []
@@ -178,6 +183,14 @@ export function useComposer({
           ...(source ? { source } : {})
         }
       : undefined;
+  const contextSignature = JSON.stringify(context);
+  const previousContext = useRef(JSON.stringify(initialDraft?.controls?.context ?? null));
+  useEffect(() => {
+    if (previousContext.current !== contextSignature) {
+      changed.current = true;
+      previousContext.current = contextSignature;
+    }
+  }, [contextSignature]);
   const conversationSignature = JSON.stringify(conversationDraft);
   const previousConversation = useRef(conversationSignature);
   useEffect(() => {
@@ -199,6 +212,7 @@ export function useComposer({
         securityMode,
         privacyRoute,
         spendCap: cap,
+        ...(context ? { context } : {}),
         ...(conversationDraft ? { conversation: conversationDraft } : {}),
         ...(!task ? { modelChoices } : {})
       }
@@ -232,6 +246,7 @@ export function useComposer({
   }, [
     body,
     conversationSignature,
+    contextSignature,
     attachments,
     modelId,
     modelChoices,
@@ -375,6 +390,8 @@ export function useComposer({
             workspace.securityMode
         );
         setCap(draft.controls?.spendCap ?? '');
+        previousContext.current = JSON.stringify(draft.controls?.context ?? null);
+        onContextChange?.(draft.controls?.context ?? null);
       }
       setDraftConflict(null);
       setError(null);
@@ -400,8 +417,10 @@ export function useComposer({
       return;
     }
     let limit: number | undefined;
+    let prompt: string;
     try {
       limit = spendCap(cap);
+      prompt = directionPrompt(body, context, task?.workspaceId ?? workspace.id);
     } catch (cause) {
       setError(cause);
       return;
@@ -411,9 +430,6 @@ export function useComposer({
     ++draftRevision.current;
     setBusy(true);
     setError(null);
-    const prompt = scope
-      ? `${body.trim()}\n\nSelected context for this direction:\n${scope}`
-      : body.trim();
     const payload = {
       prompt,
       attachments: attachments.map((file) => file.path),
@@ -436,6 +452,10 @@ export function useComposer({
     const signature = previous?.signature ?? JSON.stringify(payload);
     const submittedPayload: unknown = previous ? JSON.parse(previous.signature) : payload;
     try {
+      if (!previous && context?.kind === 'analysis') {
+        const { checkAnalysisSelection } = await import('./computer/analysis-selection');
+        await checkAnalysisSelection(context);
+      }
       await draftWrites.flush();
       const key = await draftWrites.prepareSubmission(
         signature,
@@ -451,6 +471,7 @@ export function useComposer({
             securityMode,
             privacyRoute,
             spendCap: cap,
+            ...(context ? { context } : {}),
             ...(conversationDraft ? { conversation: conversationDraft } : {})
           }
         }
@@ -515,6 +536,9 @@ export function useComposer({
   const recording = dictationState === 'recording';
   const voiceBusy = dictationState !== 'idle';
   const editingDisabled = busy || Boolean(pendingTask) || pendingSend;
+  useEffect(() => {
+    onEditingChange?.(editingDisabled);
+  }, [editingDisabled, onEditingChange]);
   const models = bootstrap.models.filter((model) => model.privacyRoute === privacyRoute);
   const projectModel = models.find((model) => model.id === (projectMain || task?.modelId));
   const selectedModel = models.find(
@@ -595,6 +619,7 @@ export function useComposer({
   const cancelUpload = () => uploadController.current?.abort();
   const cancelDictation = () => voice.current?.cancel();
   return {
+    context,
     body,
     attachments,
     modelId,

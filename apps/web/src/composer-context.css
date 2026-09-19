@@ -1,0 +1,33 @@
+.composer-context {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  margin: 0 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.composer-context-copy {
+  min-width: 0;
+  flex: 1;
+}
+.composer-context p {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 160px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+.composer-context code {
+  display: block;
+  overflow-wrap: anywhere;
+  margin-top: 8px;
+}
+.composer-context details {
+  margin-top: 8px;
+  font-size: 12px;
+}
+.composer-context > button {
+  flex-shrink: 0;
+}

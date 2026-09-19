@@ -43,10 +43,17 @@ import {
   shellInvocation
 } from './approval-common.js';
 
-// These utilities inspect files without executing helpers or opening sockets. A shell
-// redirection can open a socket on their behalf, so that syntax is checked separately.
+// Local inspection excludes helper execution and shell socket redirections.
 const LOCAL_INSPECTION_EXECUTABLES = new Set([
   'ls',
+  'cat',
+  'cut',
+  'tr',
+  'uniq',
+  'grep',
+  'egrep',
+  'fgrep',
+  'sort',
   'head',
   'tail',
   'wc',
@@ -54,6 +61,24 @@ const LOCAL_INSPECTION_EXECUTABLES = new Set([
   'sha256sum',
   'sha512sum'
 ]);
+
+const localInspectionCommand = (command: string, args: string[]): boolean => {
+  if (!LOCAL_INSPECTION_EXECUTABLES.has(command)) return false;
+  // sort can launch a compressor. Only fixed inspection options and literal operands qualify.
+  return (
+    command !== 'sort' ||
+    args.every((argument) => {
+      const value = argument.replace(/^['"]|['"]$/g, '');
+      return (
+        /^-[bdfghinMrsuVzcCm]+$/.test(value) ||
+        ['--unique', '--reverse', '--numeric-sort', '--stable', '--help', '--version'].includes(
+          value
+        ) ||
+        (!value.startsWith('-') && /^[\w./+]+$/.test(value))
+      );
+    })
+  );
+};
 
 export const shellApprovalRequirement = (
   name: string,
@@ -299,10 +324,10 @@ export const shellApprovalRequirement = (
     if (reachesOutside && !SECURITY_MODE_FLOOR[securityMode].asksBeforeReachingTheInternet) {
       const shellSocket = /\/dev\/(?:tcp|udp)\//.test(commandText(args));
       const unlisted = commands.find(
-        ([command = '']) =>
+        ([command = '', ...rest]) =>
           !(
             noEgressExecutables.has(command) ||
-            (!shellSocket && LOCAL_INSPECTION_EXECUTABLES.has(command)) ||
+            (!shellSocket && localInspectionCommand(command, rest)) ||
             safeNetworkExecutables.has(command) ||
             command === 'gh'
           )

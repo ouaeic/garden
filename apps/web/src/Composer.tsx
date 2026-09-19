@@ -11,6 +11,7 @@ import { Button, Dialog, ErrorNotice } from './ui';
 import { MAX_TASK_SPEND_USD } from './usage-model.js';
 import { useComposer } from './use-composer';
 import type { ComposerProps } from './composer-types';
+import './composer-context.css';
 export type { ComposerProps } from './composer-types';
 const PromptModelChoices = lazy(() => import('./PromptModels'));
 const LocalFolderAttachments = lazy(() => import('./LocalFolderAttachments.js'));
@@ -18,9 +19,10 @@ const DictationSetup = lazy(() => import('./DictationSetup'));
 
 export default function Composer(props: ComposerProps) {
   const permissionHelpId = useId();
-  const { workspace, task = null, bootstrap, scope, toolbarExtra } = props;
+  const { workspace, task = null, bootstrap, toolbarExtra } = props;
   const [advancedModels, setAdvancedModels] = useState(false);
   const {
+    context,
     body,
     attachments,
     modelId,
@@ -81,7 +83,41 @@ export default function Composer(props: ComposerProps) {
           <DictationSetup onClose={() => setDictationSetup(false)} onStart={startDictation} />
         </Suspense>
       )}
-      {scope && <div className="scope-label">This direction includes your selected context.</div>}
+      {context && (
+        <section
+          className="composer-context"
+          aria-label={context.kind === 'analysis' ? 'Selected analysis' : 'Selected context'}
+        >
+          <div className="composer-context-copy">
+            <span className="eyebrow">
+              {context.kind === 'analysis' ? 'Rerun with changes' : 'Selected context'}
+            </span>
+            <p>{context.kind === 'analysis' ? context.name || 'Analysis run' : context.text}</p>
+            {context.kind === 'analysis' && (
+              <>
+                <p className="muted">Describe the parameters or steps to change below.</p>
+                <details>
+                  <summary>Selected run</summary>
+                  <code>{context.manifestPath}</code>
+                  <p className="muted">
+                    Garden will check this record and prepare a separate run, preserving the
+                    original files.
+                  </p>
+                </details>
+              </>
+            )}
+          </div>
+          {props.onContextChange && (
+            <Button
+              disabled={editingDisabled}
+              onClick={() => props.onContextChange?.(null)}
+              aria-label="Clear selected context"
+            >
+              <X size={14} />
+            </Button>
+          )}
+        </section>
+      )}
       <label className="sr-only" htmlFor={`intent-${task?.id ?? 'new'}`}>
         {task ? 'Add direction to this work' : 'Describe what you want to do'}
       </label>

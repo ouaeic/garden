@@ -302,7 +302,9 @@ saved-result presentations, source editing, scoped downloads and phone layout. S
 `GARDEN_ANALYSIS_REPORT` to retain its screenshot and accessibility tree. The provenance drill
 checks explicit parent navigation, current hashes, missing/changed records, stale response
 cancellation and keyboard return using native run records. Set `GARDEN_PROVENANCE_REPORT` to retain
-its phone screenshot and request evidence.
+its phone screenshot and request evidence. The selected-rerun drill checks encrypted draft recovery,
+server conflicts, changed-record refusal, conversation submission and phone layout. Set
+`GARDEN_RERUN_REPORT` to retain its screenshot and request evidence.
 
 The account-connection drill checks scoped consent, callback completion and recovery when a provider
 severs the popup opener, using local fixtures. Set `GARDEN_ACCOUNT_REPORT` to retain its phone

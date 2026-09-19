@@ -2228,6 +2228,29 @@ export const OwnerPreferences = z.object({
 });
 export type OwnerPreferences = z.infer<typeof OwnerPreferences>;
 
+export const DirectionContext = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('selection'), text: z.string().min(1).max(12_000) }),
+  z.object({
+    kind: z.literal('analysis'),
+    workspaceId: Id,
+    manifestPath: z
+      .string()
+      .min(1)
+      .max(4096)
+      .refine(
+        (path) =>
+          path.startsWith('workspace/') &&
+          !path.includes('\\') &&
+          !/[\u0000-\u001f]/.test(path) &&
+          !path.split('/').some((part) => part === '..' || part === '.' || part === '')
+      ),
+    sha256: z.string().regex(/^[a-f0-9]{64}$/),
+    runId: Id,
+    name: z.string().max(200)
+  })
+]);
+export type DirectionContext = z.infer<typeof DirectionContext>;
+
 /** A half-typed message, saved against the conversation it belongs to, or none for a new one. */
 export const SaveDraftRequest = z.object({
   workspaceId: Id,
@@ -2237,6 +2260,7 @@ export const SaveDraftRequest = z.object({
   controls: z
     .object({
       modelId: z.string().max(300),
+      context: DirectionContext.optional(),
       conversation: z
         .object({
           projectId: Id,

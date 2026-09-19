@@ -68,6 +68,47 @@ describe('revisioned encrypted drafts', () => {
     expect(rows.rows[0]?.revision).toBe(1);
     expect(JSON.stringify(rows.rows)).not.toContain('private draft');
   });
+  it('preserves selected analysis context through encrypted storage and removes it when cleared', async () => {
+    const context = {
+      kind: 'analysis',
+      workspaceId,
+      manifestPath: 'workspace/private-run.json',
+      sha256: 'a'.repeat(64),
+      runId: randomUUID(),
+      name: 'Private analysis name'
+    };
+    const controls = {
+      modelId: '',
+      reasoningEffort: 'auto',
+      privacyRoute: 'provider_zdr',
+      spendCap: '',
+      context
+    };
+    const written = await app.inject({
+      method: 'PUT',
+      url: '/v1/drafts',
+      headers: { 'idempotency-key': randomUUID() },
+      payload: { workspaceId, body: '', controls }
+    });
+    expect(written.statusCode, written.body).toBe(200);
+    const current = await app.inject({
+      method: 'GET',
+      url: `/v1/drafts?workspaceId=${workspaceId}`
+    });
+    expect(current.json().controls.context).toEqual(context);
+    const rows = await database.query('SELECT * FROM message_drafts WHERE workspace_id=$1', [
+      workspaceId
+    ]);
+    expect(rows.rows).toHaveLength(1);
+    expect(JSON.stringify(rows.rows)).not.toContain('private-run.json');
+    expect(JSON.stringify(rows.rows)).not.toContain('Private analysis name');
+    expect((await save('', 1)).statusCode).toBe(200);
+    const cleared = await app.inject({
+      method: 'GET',
+      url: `/v1/drafts?workspaceId=${workspaceId}`
+    });
+    expect(cleared.json()).not.toHaveProperty('controls');
+  });
   it('refuses an old device after clearing a draft and exposes the current tombstone', async () => {
     expect((await save('old')).statusCode).toBe(200);
     expect((await save('', 1)).statusCode).toBe(200);

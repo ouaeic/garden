@@ -110,3 +110,14 @@ input mutation, missing outputs, duplicate requests, output mismatch, excessive 
 signals, path boundaries and local-package environment reconstruction. R-dependent cases report
 a skip when R is unavailable and require native acceptance on an R-equipped host. It runs in the repository gate. The native update drill also verifies
 that the installed executable matches the checkout.
+
+In a conversation's execution directory, a completed run offers **Rerun with changes**. Selecting it
+adds a checked record reference to the conversation draft; it does not execute anything. Describe
+the parameters or steps to change and send the direction. Garden checks the current record hash
+before submission, then the agent prepares a separate run through the existing tools and permission
+policy. The request includes the record identity and hash, rather than the entire record or commands.
+Selected text and analysis references are retained with encrypted drafts, including device recovery
+and conflict resolution. A changed or unreadable record requires selecting it again.
+
+The selector is available for the conversation's own execution directory. Other conversation
+directories remain browsable, but a run there must be continued from its owning conversation.

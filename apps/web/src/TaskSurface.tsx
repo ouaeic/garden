@@ -18,7 +18,14 @@ import {
   Terminal,
   X
 } from 'lucide-react';
-import type { Artifact, Task, TaskEvent, Workspace, ConversationSource } from '@athanor/contracts';
+import type {
+  Artifact,
+  Task,
+  TaskEvent,
+  Workspace,
+  ConversationSource,
+  DirectionContext
+} from '@athanor/contracts';
 import type { Bootstrap, Decision, Draft } from './model';
 import {
   activeQuestion,
@@ -127,8 +134,9 @@ export default function TaskSurface({
     'direction' | 'history' | 'plan' | 'settings' | 'share' | 'brief' | 'models' | 'stop' | null
   >(null);
   const [busy, setBusy] = useState(false);
+  const [composerLocked, setComposerLocked] = useState(false);
   const [composerExpanded, setComposerExpanded] = useState(
-    Boolean(draft?.body || draft?.attachments.length)
+    Boolean(draft?.body || draft?.attachments.length || draft?.controls?.context)
   );
   const [historyMore, setHistoryMore] = useState(false);
   const [fileRequest, setFileRequest] = useState(0);
@@ -139,7 +147,9 @@ export default function TaskSurface({
     setHistoryMore(initialPage.hasMore);
   }, [initialPage]);
   const [evidence, setEvidence] = useState<TaskEvent | null>(null);
-  const [scope, setScope] = useState('');
+  const [directionContext, setDirectionContext] = useState<DirectionContext | null>(
+    draft?.controls?.context ?? null
+  );
   const [questionAnswer, setQuestionAnswer] = useState('');
   const [deliverAnswer] = useState(createQuestionAnswerSender);
   const [originalBrief, setOriginalBrief] = useState<TaskEvent | null>(null);
@@ -147,7 +157,7 @@ export default function TaskSurface({
   const [noteSource, setNoteSource] = useState<ConversationSource | null>(null);
   const [branchEvent, setBranchEvent] = useState<TaskEvent | null>(null);
   const presentation = currentWork(storedPresentation, events);
-  const showComposer = !isFinished(task) || composerExpanded || Boolean(scope);
+  const showComposer = !isFinished(task) || composerExpanded || Boolean(directionContext);
   /*
    * The run summary's elapsed figure is a live clock, not a snapshot. Re-rendering on a half
    * minute keeps it honest while a task runs; a finished task's duration is fixed and the tick
@@ -339,7 +349,7 @@ export default function TaskSurface({
   }
   function selectedContext() {
     const selection = window.getSelection()?.toString().trim() ?? '';
-    setScope(selection.slice(0, 12000));
+    setDirectionContext(selection ? { kind: 'selection', text: selection.slice(0, 12000) } : null);
     document.getElementById(`intent-${task.id}`)?.focus();
   }
   const attentionPanel =
@@ -803,7 +813,27 @@ export default function TaskSurface({
               </div>
               <div id={`directories-${task.id}`}>
                 <Suspense fallback={null}>
-                  <DirectoryPanel key={task.id} taskId={task.id} openRequest={fileRequest} />
+                  <DirectoryPanel
+                    key={task.id}
+                    taskId={task.id}
+                    openRequest={fileRequest}
+                    {...(!task.parentMissionId && !composerLocked
+                      ? {
+                          rerunWorkspaceId: task.workspaceId,
+                          onRerunAnalysis: (
+                            selection: Extract<DirectionContext, { kind: 'analysis' }>
+                          ) => {
+                            setDirectionContext(selection);
+                            setComposerExpanded(true);
+                            requestAnimationFrame(() => {
+                              const input = document.getElementById(`intent-${task.id}`);
+                              input?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                              input?.focus({ preventScroll: true });
+                            });
+                          }
+                        }
+                      : {})}
+                  />
                 </Suspense>
               </div>
               {completionEvent && (
@@ -1022,32 +1052,29 @@ export default function TaskSurface({
             </div>
           ) : (
             <>
-              {scope && (
-                <div className="selected-context">
-                  <span className="eyebrow">Selected context</span>
-                  <p>{scope}</p>
-                  <Button onClick={() => setScope('')} aria-label="Clear selected context">
-                    <X size={14} />
-                  </Button>
-                </div>
-              )}
               <Suspense fallback={<Spinner />}>
                 <Composer
                   workspace={workspace}
                   task={task}
                   bootstrap={bootstrap}
                   toolbarExtra={
-                    <Button className="quiet-button" onClick={selectedContext}>
+                    <Button
+                      className="quiet-button"
+                      disabled={composerLocked}
+                      onClick={selectedContext}
+                    >
                       Shape selection
                       <ArrowUpRight size={14} />
                     </Button>
                   }
                   {...(draft ? { initialDraft: draft } : {})}
-                  {...(scope ? { scope } : {})}
+                  context={directionContext}
+                  onContextChange={setDirectionContext}
+                  onEditingChange={setComposerLocked}
                   onDraft={onDraft}
                   onSent={(result) => {
                     onTask(result);
-                    setScope('');
+                    setDirectionContext(null);
                     onRefresh();
                   }}
                 />
