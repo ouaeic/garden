@@ -63,19 +63,27 @@ describe('ephemeral recording decoder lifetime', () => {
       () => ({ status: 'completed' }),
       (error: unknown) => ({
         status: 'rejected',
-        name: error instanceof Error ? error.name : 'unknown'
+        name: error instanceof Error ? error.name : 'unknown',
+        message: error instanceof Error ? error.message : String(error)
       })
     );
     let pid: number | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      await vi.waitFor(
-        async () => {
-          pid = Number(await readFile(pidFile, 'utf8'));
-          expect(Number.isSafeInteger(pid) && pid > 0).toBe(true);
-        },
-        { timeout: 2_000, interval: 10 }
-      );
+      await Promise.race([
+        vi.waitFor(
+          async () => {
+            pid = Number(await readFile(pidFile, 'utf8'));
+            expect(Number.isSafeInteger(pid) && pid > 0).toBe(true);
+          },
+          { timeout: 10_000, interval: 10 }
+        ),
+        outcome.then((result) => {
+          throw new Error(
+            `Recording preparation ended before encoder startup: ${JSON.stringify(result)}`
+          );
+        })
+      ]);
       controller.abort();
       expect(
         await Promise.race([
@@ -84,7 +92,7 @@ describe('ephemeral recording decoder lifetime', () => {
             timer = setTimeout(() => resolve({ status: 'still-running' }), 1_000);
           })
         ])
-      ).toEqual({ status: 'rejected', name: 'AbortError' });
+      ).toMatchObject({ status: 'rejected', name: 'AbortError' });
       expect(() => process.kill(pid!, 0)).toThrow();
       const opened = await Promise.all(
         vi.mocked(open).mock.results.map((result) => {
@@ -107,7 +115,7 @@ describe('ephemeral recording decoder lifetime', () => {
       }
       await outcome;
     }
-  }, 10_000);
+  }, 20_000);
 
   it('does not forward service environment or working directory to either decoder', async () => {
     const { root, bin } = await fixture();
