@@ -12,8 +12,9 @@ resending identical evidence without adding a scheduling delay. Decisions are us
 planning and tool boundaries; the runtime cannot interrupt a provider's private reasoning stream
 to insert another model.
 
-The tool can reference the current owner request or prior tool-call IDs, so the lead does not spend
-output tokens copying evidence. References resolve only within the conversation's existing working
+The tool defaults to the current owner request and can reference prior tool-call IDs, so the lead
+does not spend output tokens copying evidence. Repeated classifications share choice definitions
+once, with short instruction strings per item. Extra context is separate from existing evidence. References resolve only within the conversation's existing working
 window. Missing or compacted evidence must be read again. References cannot reach arbitrary files,
 other conversations or credentials.
 

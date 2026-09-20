@@ -1823,10 +1823,14 @@ const commandDirectory = (cwd: string): string[] | null => {
   return rootRelative(bare ? `workspace/${cleaned}` : cleaned, []);
 };
 
-export const insideCheckpointContent = (target: string, cwd = 'workspace'): boolean => {
+export const insideCheckpointContent = (
+  target: string,
+  cwd = 'workspace',
+  emptyDirectory = false
+): boolean => {
   const base = commandDirectory(cwd);
   const resolved = base && target ? rootRelative(target, base) : null;
-  return resolved !== null && underCheckpointContent(resolved, true);
+  return resolved !== null && underCheckpointContent(resolved, !emptyDirectory);
 };
 
 /**
@@ -2034,7 +2038,8 @@ const mayRemoveSomething = (name: string, tokens: readonly string[]): boolean =>
 const REBASING_COMMANDS = new Set(['cd', 'chdir', 'pushd', 'popd']);
 
 /** The head of a decomposed command, as the bare program name this file compares. */
-const commandName = (head: string): string => (unquoted(head).split('/').pop() ?? '').toLowerCase();
+export const commandName = (head: string): string =>
+  (unquoted(head).split('/').pop() ?? '').toLowerCase();
 
 export const commandsChangeDirectory = (commands: readonly (readonly string[])[]): boolean =>
   commands.some(([head = '']) => REBASING_COMMANDS.has(commandName(head)));

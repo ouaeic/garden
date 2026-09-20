@@ -79,7 +79,11 @@ export async function runDecisions(
   if (boundCredits > task.maxComputeCredits - state.credits)
     return unavailable('The remaining task allowance cannot cover this decision.');
   const claim = await store.taskClaim(task.id).catch(() => null);
-  if (claim?.status !== 'running' || claim.leaseOwner !== context.config.WORKER_ID)
+  if (
+    !claim ||
+    !['planning', 'running'].includes(claim.status) ||
+    claim.leaseOwner !== context.config.WORKER_ID
+  )
     return unavailable('The task stopped before decision inference.');
   const connection = await context.gateway(task, model).catch(() => null);
   if (

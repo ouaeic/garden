@@ -4,6 +4,7 @@ import { type SecurityMode } from '@athanor/contracts';
 import { textValue } from './values.js';
 import {
   commandInterpreters,
+  commandName,
   commandCarriedIntoAnotherBox,
   commandsChangeDirectory,
   commandScript,
@@ -30,6 +31,7 @@ import {
   removesUncoveredFile,
   safeNetworkExecutables,
   scriptDestroysAStore,
+  scriptCommands,
   sendsDataOverNetwork,
   signalStopsThisComputer,
   type DestructionOperation
@@ -89,7 +91,8 @@ export const shellApprovalRequirement = (
   const destructiveCommand = (
     executable: string,
     commandArgs: string[],
-    rebased = false
+    rebased = false,
+    parsedShell = false
   ): {
     action: string;
     preview: string;
@@ -154,16 +157,26 @@ export const shellApprovalRequirement = (
         );
     const workingDirectory = textValue(args.cwd) || 'workspace';
     const uncovered = context.undoPoint?.uncovered;
-    if (
-      context.undoPoint?.id &&
-      uncovered !== undefined &&
-      removals?.every(
-        (target) =>
-          insideCheckpointContent(target, workingDirectory) &&
-          !removesUncoveredFile(target, workingDirectory, uncovered)
-      )
-    )
-      return null;
+    const covered = (command: string, target: string, shellSyntax: boolean): boolean => {
+      // A shell discard redirect is not a removal operand. Other redirects retain their checks.
+      if (shellSyntax && /^\d*>{1,2}\/dev\/null$/.test(target)) return true;
+      // rmdir cannot remove data; an empty checkpoint root can be recreated like its children.
+      return (
+        insideCheckpointContent(target, workingDirectory, command === 'rmdir') &&
+        uncovered !== undefined &&
+        !removesUncoveredFile(target, workingDirectory, uncovered)
+      );
+    };
+    const recoverable =
+      removals &&
+      (commandInterpreters.has(executable)
+        ? scriptCommands(commandScript(args)).every(([head = '', ...rest]) => {
+            const command = commandName(head);
+            const targets = removalTargets(command, rest);
+            return targets?.every((target) => covered(command, target, true)) ?? true;
+          })
+        : removals.every((target) => covered(executable, target, parsedShell)));
+    if (context.undoPoint?.id && uncovered !== undefined && recoverable) return null;
     if (rebased && context.undoPoint?.id && context.undoPoint.uncovered !== undefined)
       return {
         action: relocation ? 'Review a file move' : 'Review a file removal',
@@ -214,7 +227,9 @@ export const shellApprovalRequirement = (
     const destructive =
       destructiveCommand(executable, commandArgs, rebased) ??
       commands
-        .map(([command = '', ...rest]) => destructiveCommand(command, rest, rebased))
+        .map(([command = '', ...rest]) =>
+          destructiveCommand(command, rest, rebased, commandInterpreters.has(executable))
+        )
         .find(Boolean);
     if (destructive) return { sideEffect: 'external_consequential', ...destructive };
     const inScript = scriptDestroysAStore(commandScript(args), executable);

@@ -4065,6 +4065,33 @@ describe('where a delete lands, not what it is called', () => {
    */
   const undone = { undoPoint: { id: 'cp-1', uncovered: [] } } as const;
 
+  it('keeps workspace moves and empty-directory cleanup autonomous without freeing data loss', () => {
+    const cleanup =
+      'mkdir -p decision-acceptance && mv workspace/decision-acceptance/triage.csv decision-acceptance/triage.csv && rmdir workspace/decision-acceptance workspace 2>/dev/null; ls -l decision-acceptance/triage.csv';
+    expect(approvalRequirement('shell', script(cleanup), 'autonomous', undone)).toBeNull();
+    for (const command of [
+      'rm -rf workspace 2>/dev/null',
+      '"/bin/rm" -rf ~/.ssh && rmdir workspace 2>/dev/null',
+      'rmdir ~/.ssh 2>/dev/null',
+      'rmdir workspace > /etc/config',
+      'cd ~ && rmdir workspace 2>/dev/null',
+      'mv ~/.ssh decision-acceptance && rmdir workspace 2>/dev/null'
+    ]) {
+      expect(
+        approvalRequirement('shell', script(command), 'autonomous', undone),
+        command
+      ).not.toBeNull();
+    }
+    expect(
+      approvalRequirement('shell', script(cleanup), 'autonomous', {
+        undoPoint: { id: 'cp-1', uncovered: ['workspace/decision-acceptance/triage.csv'] }
+      })
+    ).not.toBeNull();
+    expect(
+      approvalRequirement('shell', { ...script(cleanup), cwd: '.home' }, 'autonomous', undone)
+    ).not.toBeNull();
+  });
+
   it('stops asking about a delete the turn can undo by itself', () => {
     const recoverable: Array<[string, Record<string, unknown>]> = [
       ['rm -rf dist', { executable: 'rm', args: ['-rf', 'dist'] }],
