@@ -69,18 +69,64 @@ describe('privilege escalation detection', () => {
 });
 
 describe('package manager detection', () => {
-  it('separates a direct apt run from a wrapped one', () => {
-    expect(packageManagerInvocation({ executable: 'apt-get', args: ['install'] })).toBe('direct');
-    expect(packageManagerInvocation({ executable: '/usr/bin/apt', args: ['update'] })).toBe(
+  it('separates a direct apt run from a wrapped one', async () => {
+    expect(await packageManagerInvocation({ executable: 'apt-get', args: ['install'] })).toBe(
       'direct'
     );
-    expect(packageManagerInvocation({ executable: 'env', args: ['apt-get', 'install'] })).toBe(
-      'wrapped'
+    expect(await packageManagerInvocation({ executable: '/usr/bin/apt', args: ['update'] })).toBe(
+      'direct'
     );
     expect(
-      packageManagerInvocation({ executable: 'sh', args: ['-c', 'apt-get install vim'] })
+      await packageManagerInvocation({ executable: 'env', args: ['apt-get', 'install'] })
     ).toBe('wrapped');
-    expect(packageManagerInvocation({ executable: 'ls', args: ['/etc/apt'] })).toBeUndefined();
+    expect(
+      await packageManagerInvocation({ executable: 'sh', args: ['-c', 'apt-get install vim'] })
+    ).toBe('wrapped');
+    expect(
+      await packageManagerInvocation({ executable: 'ls', args: ['/etc/apt'] })
+    ).toBeUndefined();
+  });
+});
+
+describe('package names in shell data', () => {
+  it.each([
+    "echo '== apt r-base-dev =='",
+    "printf '%s\\n' 'apt-get install example'; ls -l",
+    "cat <<'EOF'\napt update\nEOF",
+    'mkdir -p output && echo apt && sha256sum output/file',
+    'echo "apt" | wc -c'
+  ])('accepts literal output: %s', async (source) => {
+    expect(
+      await packageManagerInvocation({ executable: 'bash', args: ['-lc', source] })
+    ).toBeUndefined();
+  });
+  it.each([
+    'echo apt; apt-get install example',
+    'echo $(apt update)',
+    'cat <<EOF\n$(apt update)\nEOF',
+    'echo `apt update`',
+    'echo apt | sh',
+    "eval 'apt update'",
+    "bash -c 'apt update'",
+    'x=apt; $x install example',
+    'find . -exec apt update \\;',
+    'printf -v command apt; $command update',
+    'f(){ apt update; }; f',
+    "'apt' update",
+    "echo 'apt",
+    'echo apt; ' + ' '.repeat(128 * 1024)
+  ])('retains the conservative rule for executable or unknown content: %s', async (source) => {
+    expect(await packageManagerInvocation({ executable: 'sh', args: ['-c', source] })).toBe(
+      'wrapped'
+    );
+  });
+  it('does not apply a Bash parse to other shells or remove privilege checks', async () => {
+    expect(await packageManagerInvocation({ executable: 'fish', args: ['-c', 'echo apt'] })).toBe(
+      'wrapped'
+    );
+    expect(privilegeEscalationBinary({ executable: 'bash', args: ['-c', 'echo sudo apt'] })).toBe(
+      'sudo'
+    );
   });
 });
 

@@ -84,6 +84,17 @@ describe('bounded execution output', () => {
     expect(result.stderr).toBe('');
   });
 
+  it('runs package names as literal status text without invoking the package helper', async () => {
+    const root = await workspaceRoot();
+    const result = await execute(
+      root,
+      { executable: 'sh', args: ['-c', "echo '== apt r-base-dev =='"] },
+      { maximumSeconds: 30, allowSystemPackages: false }
+    );
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.trim()).toBe('== apt r-base-dev ==');
+  });
+
   it('routes approved host package installs through the fixed helper', async () => {
     const root = await workspaceRoot();
     const helper = path.join(root, 'package-helper');

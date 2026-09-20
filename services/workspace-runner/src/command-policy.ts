@@ -1,3 +1,4 @@
+import { packageNamesAreData } from './shell-package-data.js';
 import { constants } from 'node:fs';
 import { access, realpath } from 'node:fs/promises';
 import path from 'node:path';
@@ -145,9 +146,27 @@ export const resolveExecutable = async (
  * How this command reaches apt. `wrapped` invocations cannot be rewritten onto the
  * approved helper, so callers must reject them rather than execute them unchecked.
  */
-export const packageManagerInvocation = (
+export const packageManagerInvocation = async (
   command: CommandShape
-): 'direct' | 'wrapped' | undefined => {
-  if (PACKAGE_MANAGERS.has(binaryName(command.executable))) return 'direct';
-  return firstMatch(command, PACKAGE_MANAGERS) ? 'wrapped' : undefined;
+): Promise<'direct' | 'wrapped' | undefined> => {
+  const name = binaryName(command.executable);
+  if (PACKAGE_MANAGERS.has(name)) return 'direct';
+  const candidates = {
+    ...command,
+    args: argumentTokens(command.args).map((token) => token.replace(/^[A-Za-z_][A-Za-z0-9_]*=/, ''))
+  };
+  if (!firstMatch(command, PACKAGE_MANAGERS) && !firstMatch(candidates, PACKAGE_MANAGERS))
+    return undefined;
+  if (['bash', 'sh', 'dash'].includes(name)) {
+    const index = command.args.findIndex((arg) => /^-[a-zA-Z]*c[a-zA-Z]*$/.test(arg));
+    const source = command.args[index + 1];
+    if (
+      index >= 0 &&
+      source !== undefined &&
+      command.args.slice(0, index).every((arg) => /^-[a-zA-Z]+$/.test(arg)) &&
+      (await packageNamesAreData(source))
+    )
+      return undefined;
+  }
+  return 'wrapped';
 };

@@ -1563,8 +1563,8 @@ export class DesktopManager {
     if (
       privilegeEscalationBinary(request) ??
       privilegeEscalationBinary(asResolved) ??
-      packageManagerInvocation(request) ??
-      packageManagerInvocation(asResolved) ??
+      (await packageManagerInvocation(request)) ??
+      (await packageManagerInvocation(asResolved)) ??
       privilegedHelperInvocation(request, this.privilegedHelpers) ??
       privilegedHelperInvocation(asResolved, this.privilegedHelpers)
     ) {

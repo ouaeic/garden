@@ -760,7 +760,12 @@ export const prepareInvocation = async (
   let executable = request.executable;
   let args = request.args;
   let sandbox = policy.sandbox;
-  const packageManager = packageManagerInvocation(request) ?? packageManagerInvocation(asResolved);
+  const requestedPackage = await packageManagerInvocation(request);
+  const packageManager =
+    requestedPackage ??
+    (resolved && binaryName(resolved) !== binaryName(request.executable)
+      ? await packageManagerInvocation(asResolved)
+      : undefined);
 
   if (packagePolicy.mode === 'refused') {
     // One sentence for the whole family: on this path none of them is rewritten onto anything, so
@@ -809,7 +814,7 @@ export const prepareInvocation = async (
       // Whichever spelling matched is the manager: `packageManagerInvocation` answers `direct` only
       // for the executable's own basename, and the resolved form is the one the kernel will run.
       const manager =
-        packageManagerInvocation(request) === 'direct'
+        requestedPackage === 'direct'
           ? binaryName(request.executable)
           : binaryName(asResolved.executable);
       const asked = packageOperation(manager, request.args);
