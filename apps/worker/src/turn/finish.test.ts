@@ -13,6 +13,7 @@
  * `evals/bench/selftest.ts` and the note at `evals/bench/score.ts:159`.
  */
 import type { TaskRecord } from '@athanor/data';
+import { decryptJson } from '@athanor/core';
 import type { ModelToolCall } from '@athanor/model-gateway';
 import { describe, expect, it } from 'vitest';
 import type { AcceptanceRecord, AcceptanceResult } from '../acceptance.js';
@@ -24,7 +25,8 @@ import {
   ACCEPTANCE_EARLIER_TURN_CAVEAT,
   ACCEPTANCE_FAILED_CAVEAT,
   CAVEAT_BESIDE_THE_TICK,
-  MAX_ACCEPTANCE_FAILURES
+  MAX_ACCEPTANCE_FAILURES,
+  MAX_FINISH_REJECTIONS
 } from '../turn-bounds.js';
 import { handleFinishCall, type TurnFinishDeps } from './finish.js';
 
@@ -76,6 +78,8 @@ interface Completed {
 }
 
 interface Run {
+  readonly state: AgentState;
+  readonly events: Array<{ kind: string; summary: string }>;
   readonly outcome: 'held' | 'completed' | 'parked';
   readonly completed: Completed | null;
   /** What the model was told, when it was told anything, which is the hold's own half. */
@@ -109,6 +113,7 @@ const finish = async (
 ): Promise<Run> => {
   let completed: Completed | null = null;
   const ran: string[] = [];
+  const events: Run['events'] = [];
   const agentState = {
     messages: [],
     turn: 4,
@@ -125,7 +130,15 @@ const finish = async (
     // The timeline is not what this file is about, but the holds await their own event write
     // without catching it, so the stub has to answer.
     store: {
-      appendTaskEvent: async () => ({ id: 'event-1' }),
+      appendTaskEvent: async (row: Parameters<TurnFinishDeps['store']['appendTaskEvent']>[0]) => {
+        const value = decryptJson<{ summary: string }>(
+          row.payloadCiphertext!,
+          key,
+          `task-event:${task.id}`
+        );
+        events.push({ kind: row.kind, summary: value.summary });
+        return { id: 'event-1' };
+      },
       getLatestTaskPlan: async () => null,
       listMediaJobs: async () => []
     } as unknown as TurnFinishDeps['store'],
@@ -171,6 +184,8 @@ const finish = async (
     assistantText: 'The total is 1260.'
   });
   return {
+    state: agentState,
+    events,
     outcome,
     completed,
     toldTheModel: agentState.messages
@@ -179,6 +194,58 @@ const finish = async (
     ran
   };
 };
+
+describe('completion verification budget across later holds', () => {
+  it.each(['plan', 'acceptance', 'answer'] as const)(
+    'does not replenish verification attempts after a persisted %s hold',
+    async (hold) => {
+      const first = await finish(
+        hold === 'acceptance' ? null : [passed],
+        {
+          finishRejections: MAX_FINISH_REJECTIONS - 1,
+          turnToolResults: {},
+          answered: hold !== 'answer'
+        },
+        hold === 'plan' ? ['Publish the result'] : []
+      );
+      expect(first.outcome).toBe('held');
+      expect(first.completed).toBeNull();
+      expect(first.state.finishRejections).toBe(MAX_FINISH_REJECTIONS);
+      expect(first.events.length).toBeGreaterThan(0);
+      expect(first.events.some((event) => event.kind === 'warning')).toBe(false);
+      const resumed = JSON.parse(JSON.stringify(first.state)) as AgentState;
+      resumed.acceptance = record;
+      resumed.acceptanceTurn = 4;
+      const second = await finish([passed], resumed, [], 'The total is 1260.');
+      expect(second.outcome).toBe('completed');
+      expect(second.completed?.verification.status).toBe('not_applicable');
+      expect(second.completed?.verification.remainingRisks.length).toBeGreaterThan(0);
+      expect(second.ran).toEqual(['c1']);
+      expect(second.events.filter((event) => event.kind === 'warning')).toEqual([
+        { kind: 'warning', summary: 'Completion evidence could not be verified' }
+      ]);
+      expect(second.events.some((event) => event.summary === 'Completion needs verification')).toBe(
+        false
+      );
+    }
+  );
+
+  it('accepts newly valid evidence after a held finish without carrying an unverified warning', async () => {
+    const held = await finish(
+      [passed],
+      { finishRejections: MAX_FINISH_REJECTIONS - 1, turnToolResults: {} },
+      ['Publish the result']
+    );
+    expect(held.outcome).toBe('held');
+    const completed = await finish([passed], {
+      ...held.state,
+      turnToolResults: { 'call-1': { name: 'shell', success: true, mutating: true } }
+    });
+    expect(completed.outcome).toBe('completed');
+    expect(completed.completed?.verification.status).toBe('verified');
+    expect(completed.events.some((event) => event.kind === 'warning')).toBe(false);
+  });
+});
 
 describe('a turn that failed its own machine checks', () => {
   /**

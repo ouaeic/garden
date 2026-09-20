@@ -109,10 +109,13 @@ export const handleFinishCall = async (
    * already shows it. The owner sees what was made and is told plainly that athanor could
    * not prove it.
    */
-  const unverifiable = !checked.ok && (state.finishRejections ?? 0) + 1 >= MAX_FINISH_REJECTIONS;
+  // Later plan, acceptance and delivery holds share this budget across persisted retries.
+  state.finishRejections = checked.ok
+    ? 0
+    : Math.min((state.finishRejections ?? 0) + 1, MAX_FINISH_REJECTIONS);
+  const unverifiable = !checked.ok && state.finishRejections >= MAX_FINISH_REJECTIONS;
   if (!checked.ok && !unverifiable) {
-    const rejections = (state.finishRejections ?? 0) + 1;
-    state.finishRejections = rejections;
+    const rejections = state.finishRejections;
     state.repairStep = true;
     state.messages.push({
       role: 'tool',
@@ -129,12 +132,6 @@ export const handleFinishCall = async (
     });
     return 'held';
   }
-  if (unverifiable)
-    await event(deps.store, task, key, 'warning', 'Finished, but athanor could not verify it', {
-      reason: checked.ok ? '' : checked.reason,
-      attempts: MAX_FINISH_REJECTIONS
-    });
-  state.finishRejections = 0;
   // The plan is the one artefact the owner watches while long work runs, and until now the
   // harness force-marked every outstanding step completed on the way out - so a turn that
   // did four of nine steps and gave up left a panel reading nine of nine. Asked once, with
@@ -513,6 +510,12 @@ export const handleFinishCall = async (
       remainingRisks: [caveat, ...verification.remainingRisks].slice(0, 20)
     };
   }
+  if (unverifiable)
+    await event(deps.store, task, key, 'warning', 'Completion evidence could not be verified', {
+      reason: checked.ok ? '' : checked.reason,
+      attempts: MAX_FINISH_REJECTIONS
+    });
+  state.finishRejections = 0;
   state.messages.push({
     role: 'tool',
     toolCallId: call.id,
