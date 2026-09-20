@@ -14,11 +14,19 @@ import { ProcessManager } from './processes.js';
 const SANDBOX_STAND_IN = `#!/bin/sh
 shift 4
 [ "$1" = --spec ] || exit 125
-exec /usr/bin/python3 -I -S -c 'import os, sys
+exec /usr/bin/python3 -I -S -c 'import os, sys, json, subprocess
 data = open(sys.argv[1], "rb").read()
 os.unlink(sys.argv[1])
 words = data.split(b"\\0")[1:-1]
 os.chdir(words[0])
+lease = sys.argv[1][:-5] + ".lease"
+if os.path.exists(lease):
+    result = subprocess.run([b"env", b"-i"] + words[1:])
+    record = json.load(open(lease))
+    record["phase"] = "reaped"
+    with open(lease, "w") as output:
+        json.dump(record, output)
+    sys.exit(result.returncode)
 os.execv("/usr/bin/env", [b"env", b"-i"] + words[1:])' "$2"
 `;
 
@@ -735,7 +743,16 @@ describe('the host disk floor on the background path', () => {
       },
       30,
       false,
-      { sandbox: { elevate, helper, specDirectory: path.join(root, 'specs'), confineFilesystem } }
+      {
+        sandbox: {
+          elevate,
+          helper,
+          specDirectory: path.join(root, 'specs'),
+          confineFilesystem,
+          processIsolation: true,
+          retainedProcessTrees: true
+        }
+      }
     );
     const settled = await settledStatus(manager, started.sessionId);
     expect(settled.status).toBe('failed');

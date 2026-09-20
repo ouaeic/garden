@@ -1,6 +1,10 @@
 import { runnerLogger, failureCode } from './log.js';
 import { jobIdentity } from './job-identity.js';
-import { discardMissionInvocation, trackMissionInvocation } from './mission-processes.js';
+import {
+  discardMissionInvocation,
+  trackMissionInvocation,
+  processTreeObservation
+} from './mission-processes.js';
 import { spawnManagedProcess, type ManagedProcess } from './process-child.js';
 import { randomUUID } from 'node:crypto';
 import { scheduleDeadline } from './deadline.js';
@@ -88,6 +92,7 @@ interface Session {
   owner: string;
   command: string[];
   child: ManagedProcess;
+  processTreeLease?: string;
   launch: ServiceLaunch;
   retiredService?: ReturnType<typeof serviceView>;
   input: string;
@@ -407,7 +412,11 @@ export class ProcessManager {
     // a package manager is refused here, not rewritten onto the approved helper.
     const prepared = await prepareInvocation(
       workspaceRoot,
-      { ...request, superviseProcessTree: guards.superviseProcessTree === true },
+      {
+        ...request,
+        superviseProcessTree: guards.superviseProcessTree === true,
+        retainProcessTree: guards.sandbox?.confineFilesystem === true
+      },
       {
         isolateNetwork: options.isolateNetwork,
         sandbox: guards.sandbox,
@@ -450,6 +459,7 @@ export class ProcessManager {
       owner,
       command: [request.executable, ...request.args],
       child,
+      ...(prepared.processTreeLease ? { processTreeLease: prepared.processTreeLease } : {}),
       launch: ServiceLaunchSchema.parse(request),
       input: request.stdin ?? '',
       inputRevision: 0,
@@ -1566,7 +1576,10 @@ export class ProcessManager {
         .map((session) => ({
           id: session.id,
           pid: session.child.pid!,
-          generation: session.startedAt
+          generation: session.startedAt,
+          ...(session.processTreeLease
+            ? { namespace: () => processTreeObservation(session.processTreeLease!) }
+            : {})
         }))
     );
   }

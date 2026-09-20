@@ -10,6 +10,11 @@ import stat
 import time
 
 
+if sys.argv[1] == "--features":
+    print("retained-process-trees=yes")
+    sys.exit(0)
+
+
 def read_record(fd):
     os.lseek(fd, 0, os.SEEK_SET)
     return json.loads(os.read(fd, 8192))
@@ -60,7 +65,19 @@ if sys.argv[1] == "--status":
         raise RuntimeError("Invalid mission lease owner")
     record = read_record(fd)
     os.close(fd)
-    print(json.dumps({"namespaceAlive": alive(record.get("namespaceInit")), "supervisorAlive": alive(record.get("supervisor")), "groupAlive": alive(record.get("group"))}))
+    namespace = None
+    expected = record.get("namespaceInit")
+    namespace_alive = alive(expected)
+    if namespace_alive:
+        try:
+            with open("/proc/%s/stat" % expected["pid"]) as stream:
+                counters = stream.read()
+            inode = str(os.stat("/proc/%s/ns/pid" % expected["pid"]).st_ino)
+            if alive(expected):
+                namespace = {"id": inode, "stat": counters}
+        except FileNotFoundError:
+            namespace_alive = False
+    print(json.dumps({"namespaceAlive": namespace_alive, "supervisorAlive": alive(record.get("supervisor")), "groupAlive": alive(record.get("group")), "namespace": namespace}))
     sys.exit(0)
 
 
@@ -80,7 +97,48 @@ if sys.argv[1] == "--init":
     os.close(gate)
     mount = "/usr/bin/mount" if os.path.exists("/usr/bin/mount") else "/bin/mount"
     subprocess.run([mount, "-t", "proc", "-o", "nosuid,nodev,noexec", "proc", "/proc"], check=True)
-    os.execv(sys.argv[4], sys.argv[4:])
+    if record.get("retainDescendants") is not True:
+        os.execv(sys.argv[4], sys.argv[4:])
+
+    # PID 1 survives launcher exit so detached descendants remain accounted for and stoppable.
+    # Signals reach this namespace only; kill(-1) cannot address host or sibling-project work.
+    def forward(number, _frame):
+        try:
+            os.kill(-1, number)
+        except ProcessLookupError:
+            pass
+
+    for number in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        signal.signal(number, forward)
+    primary = os.fork()
+    if primary == 0:
+        for number in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            signal.signal(number, signal.SIG_DFL)
+        os.execv(sys.argv[4], sys.argv[4:])
+    # The command inherited the selected directory grants; init needs no held input descriptors.
+    for name in os.listdir("/proc/self/fd"):
+        if name.isdigit() and int(name) > 2:
+            try:
+                os.close(int(name))
+            except OSError:
+                pass
+    primary_result = None
+    descendant_result = 0
+    while True:
+        try:
+            pid, status = os.waitpid(-1, 0)
+        except InterruptedError:
+            continue
+        except ChildProcessError:
+            break
+        code = os.waitstatus_to_exitcode(status)
+        code = code if code >= 0 else 128 - code
+        if pid == primary:
+            primary_result = code
+        elif code and not descendant_result:
+            descendant_result = code
+    # A failed launcher or an unhandled orphan failure must not produce a successful receipt.
+    sys.exit(125 if primary_result is None else (primary_result or descendant_result))
 
 fd, gate, unshare = int(sys.argv[1]), int(sys.argv[2]), sys.argv[4]
 inputs = json.loads(sys.argv[3])

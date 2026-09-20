@@ -12,6 +12,7 @@ interface Identity {
 }
 interface Lease {
   purpose?: 'mission' | 'session';
+  retainDescendants?: boolean;
   controller?: Identity;
   workspaceRoot: string;
   launchExpiresAt: number;
@@ -59,7 +60,8 @@ export const createMissionLease = async (
   root: string,
   file: string,
   sandbox: AgentSandbox,
-  purpose: 'mission' | 'session' = 'mission'
+  purpose: 'mission' | 'session' = 'mission',
+  retainDescendants = false
 ): Promise<void> => {
   assertMissionWorkspaceOpen(root);
   const entry = { root, file, sandbox, purpose };
@@ -71,6 +73,7 @@ export const createMissionLease = async (
       JSON.stringify({
         workspaceRoot: root,
         purpose,
+        ...(retainDescendants ? { retainDescendants } : {}),
         ...(identity ? { controller: { pid: process.pid, identity } } : {}),
         phase: 'prepared',
         launchExpiresAt: Date.now() + 10_000
@@ -148,9 +151,13 @@ const readLease = async (file: string): Promise<Lease> => {
     throw new Error('Invalid mission process lease');
   return record;
 };
-const nativeStatus = (
-  entry: Entry
-): Promise<{ namespaceAlive: boolean; supervisorAlive: boolean; groupAlive: boolean }> =>
+interface NativeStatus {
+  namespaceAlive: boolean;
+  supervisorAlive: boolean;
+  groupAlive: boolean;
+  namespace?: { id: string; stat: string } | null;
+}
+const nativeStatus = (entry: Entry): Promise<NativeStatus> =>
   new Promise((resolve, reject) => {
     execFile(
       entry.sandbox.elevate,
@@ -169,15 +176,32 @@ const nativeStatus = (
             )
           )
             throw new Error('Invalid native mission status');
-          resolve(
-            value as { namespaceAlive: boolean; supervisorAlive: boolean; groupAlive: boolean }
-          );
+          resolve(value as unknown as NativeStatus);
         } catch (cause) {
           reject(cause instanceof Error ? cause : new Error('Invalid native mission status'));
         }
       }
     );
   });
+
+/** Only a live controller's private lease can select a namespace for resource accounting. */
+export const processTreeObservation = async (
+  file: string
+): Promise<{ id: string; stat: string } | null> => {
+  const entry = entries.get(file);
+  if (!entry?.child || entry.child.exitCode !== null || entry.child.signalCode !== null)
+    return null;
+  const result = await nativeStatus(entry).catch(() => null);
+  const observed = result?.namespace;
+  return result?.namespaceAlive &&
+    observed &&
+    /^\d+$/.test(observed.id) &&
+    typeof observed.stat === 'string' &&
+    entry.child.exitCode === null &&
+    entry.child.signalCode === null
+    ? observed
+    : null;
+};
 const forget = async (entry: Entry): Promise<void> => {
   await Promise.all([
     rm(entry.file, { force: true }),

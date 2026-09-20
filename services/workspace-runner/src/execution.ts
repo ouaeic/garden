@@ -670,6 +670,8 @@ export interface PreparedInvocation {
 export interface InvocationRequest {
   /** Runner-selected lifecycle containment; never copied from a command request body. */
   superviseProcessTree?: boolean;
+  /** Runner-selected lifetime for managed jobs; never accepted from command input. */
+  retainProcessTree?: boolean;
   /** Curated native capability restriction; never copied from a command request body. */
   requireNetworkIsolation?: boolean;
   executable: string;
@@ -852,7 +854,8 @@ export const prepareInvocation = async (
         // foreground command and the background session - arrive at this line.
         workspaceRoot,
         cwd,
-        request.superviseProcessTree === true
+        request.superviseProcessTree === true,
+        request.retainProcessTree === true
       )
     : { executable, args };
   const limited = limitedInvocation(sandboxed, policy.limits, policy.limiter);

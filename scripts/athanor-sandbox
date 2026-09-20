@@ -539,8 +539,10 @@ case "$mode" in
     fi
     if [ -r "$mission_supervisor" ] && /usr/bin/unshare --mount --pid --fork --kill-child --mount-proc -- /bin/sh -c '[ "$$" -eq 1 ]' >/dev/null 2>&1; then
       printf 'process-isolation=yes\n'
+      /usr/bin/python3 -I -S "$mission_supervisor" --features
     else
       printf 'process-isolation=no\n'
+      printf 'retained-process-trees=no\n'
     fi
     # The filesystem rung, reported rather than assumed. The installer reads this line and writes
     # CONFINE_AGENT_FILESYSTEM from it, so a kernel or a util-linux that cannot do this is told to

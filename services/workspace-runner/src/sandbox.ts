@@ -44,13 +44,19 @@ export interface AgentSandbox {
   confineFilesystem?: boolean;
   /** Measured helper support for supervised PID namespace teardown. */
   processIsolation?: boolean;
+  /** Measured helper support for waiting until detached descendants finish. */
+  retainedProcessTrees?: boolean;
   /** Measured helper support for a private network namespace. */
   networkIsolation?: boolean;
 }
 
 export const probeNativeIsolation = (
   sandbox: AgentSandbox
-): Promise<{ processIsolation: boolean; networkIsolation: boolean }> =>
+): Promise<{
+  processIsolation: boolean;
+  networkIsolation: boolean;
+  retainedProcessTrees: boolean;
+}> =>
   new Promise((resolve) => {
     execFile(
       sandbox.elevate,
@@ -59,6 +65,10 @@ export const probeNativeIsolation = (
       (error, output) =>
         resolve({
           processIsolation: !error && /^process-isolation=yes$/m.test(output),
+          retainedProcessTrees:
+            !error &&
+            /^process-isolation=yes$/m.test(output) &&
+            /^retained-process-trees=yes$/m.test(output),
           networkIsolation: !error && /^network-isolation=yes$/m.test(output)
         })
     );
@@ -254,7 +264,8 @@ export const sandboxedInvocation = async (
   isolateNetwork: boolean,
   confinementRoot: string | null,
   cwd: string,
-  superviseProcessTree = false
+  superviseProcessTree = false,
+  retainProcessTree = false
 ): Promise<Invocation & { processTreeLease?: string }> => {
   if (confinementRoot) assertMissionWorkspaceOpen(confinementRoot);
   assertSandboxableCommand(invocation, env);
@@ -267,10 +278,13 @@ export const sandboxedInvocation = async (
   if (mission && sandbox.networkIsolation !== true)
     throw new Error('Coding missions require measured native network isolation');
   const networkIsolated = mission || isolateNetwork;
-  const supervised = mission || superviseProcessTree;
+  const retained = retainProcessTree && !mission && !superviseProcessTree;
+  if (retained && sandbox.retainedProcessTrees !== true)
+    throw new Error('Managed jobs require measured native retained process-tree support');
+  const supervised = mission || superviseProcessTree || retained;
   if (supervised && (!confined || sandbox.processIsolation !== true))
     throw new Error(
-      'Coding missions require measured native filesystem and process-tree isolation'
+      'Managed commands require measured native filesystem and process-tree isolation'
     );
   const specPath = await writeSpec(sandbox.specDirectory, [
     cwd,
@@ -284,7 +298,8 @@ export const sandboxedInvocation = async (
       confinementRoot!,
       processTreeLease,
       sandbox,
-      mission ? 'mission' : 'session'
+      mission ? 'mission' : 'session',
+      retained
     );
   return {
     ...(processTreeLease ? { processTreeLease } : {}),

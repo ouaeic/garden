@@ -342,6 +342,14 @@ jobs accept long explicit deadlines without the timer-overflow limit of a single
 Responses include `deadlineAt` and `remainingMs` only when a deadline was requested. A service
 has no deadline. See [Project processes](PROJECT_PROCESSES.md) for visibility and resource readings.
 
+On a confined native installation, managed jobs, services and ordinary background sessions use a
+retained PID namespace. The launcher exiting does not finish the job while its descendants still
+run, even if they fork again or create new sessions. Stop and an explicit deadline terminate that
+same tree. Resource samples follow its verified namespace identity, including CPU already reaped
+by its init. A failed launcher or an unhandled adopted-child failure produces a failed result after
+the remaining descendants finish. The helper must advertise support before these commands launch.
+Isolated coding missions and validation commands keep their strict teardown lifetime.
+
 Declare finite work with `shell(background=true, job=...)`. Garden retains its identity, bounded
 logs, terminal result and original deadline across runner restarts. A completed job never runs again.
 A job interrupted without a recovery command is reported as interrupted, with its partial files
@@ -356,7 +364,7 @@ loop. `process(action=resume)` resolves and reviews the stored recovery command 
 retry. Cancellation and an expired deadline do not grant another run.
 
 The independent process supervisor holds running jobs while the request-serving runner restarts.
-An ordinary background session has no durable record and does not come back after the supervisor stops.
+An ordinary background session can retain terminal history but cannot resume after the supervisor stops.
 A computation session's in-memory interpreter state is also distinct from a finite job: use files and
 checkpointable stages when an analysis must recover after maintenance or a crash. Garden does not
 infer a checkpoint or reconstruct arbitrary program memory.

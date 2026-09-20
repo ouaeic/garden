@@ -160,6 +160,34 @@ it('preserves process leases when clearing stale command specs on startup', asyn
   expect((await readdir(sandbox.specDirectory)).some((name) => name.endsWith('.spec'))).toBe(false);
 });
 
+it('retains ordinary managed descendants only with measured support, while strict commands keep their teardown lifetime', async () => {
+  const { root, sandbox } = await fixture();
+  const prepare = (strict: boolean, retainedProcessTrees: boolean) =>
+    sandboxedInvocation(
+      { executable: '/bin/sh', args: [] },
+      {},
+      { ...sandbox, retainedProcessTrees },
+      false,
+      root,
+      path.join(root, 'workspace'),
+      strict,
+      true
+    );
+  await expect(prepare(false, false)).rejects.toThrow('measured native retained');
+  expect(await readdir(sandbox.specDirectory)).toEqual([]);
+  for (const strict of [false, true]) {
+    const command = await prepare(strict, !strict);
+    expect(command.processTreeLease).toBeTruthy();
+    const lease = JSON.parse(await readFile(command.processTreeLease!, 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    expect(lease.purpose).toBe('session');
+    expect(lease.retainDescendants).toBe(strict ? undefined : true);
+    await discardMissionInvocation(command);
+  }
+});
+
 it('waits past wrapper exit until the supervisor confirms namespace teardown', async () => {
   const { root, file, sandbox } = await fixture();
   await createMissionLease(root, file, sandbox);

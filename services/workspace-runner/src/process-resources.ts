@@ -20,6 +20,7 @@ export interface ProcessStat {
   started: number;
   residentPages: number;
   threads: number;
+  namespace?: string;
 }
 
 /** Field offsets follow proc_pid_stat(5); the parenthesized name may itself contain parentheses. */
@@ -72,17 +73,22 @@ uid = os.geteuid()
 if uid == 0:
     raise RuntimeError("Process observer requires an unprivileged account")
 stats = []
+namespaces = {}
 for entry in root.iterdir():
     if not entry.name.isdigit():
         continue
     try:
         if entry.stat().st_uid == uid:
             stats.append((entry / "stat").read_text())
+            try:
+                namespaces[entry.name] = str((entry / "ns/pid").stat().st_ino)
+            except OSError:
+                pass
     except (OSError, UnicodeError):
         continue
 print(json.dumps({"at": int(time.time() * 1000), "uid": uid,
     "ticksPerSecond": os.sysconf("SC_CLK_TCK"), "pageBytes": os.sysconf("SC_PAGE_SIZE"),
-    "uptimeSeconds": float((root / "uptime").read_text().split()[0]), "stats": stats}))
+    "uptimeSeconds": float((root / "uptime").read_text().split()[0]), "stats": stats, "namespaces": namespaces}))
 `;
 
 const KernelScan = z.object({
@@ -91,15 +97,22 @@ const KernelScan = z.object({
   ticksPerSecond: z.number().int().positive(),
   pageBytes: z.number().int().positive(),
   uptimeSeconds: z.number().finite().nonnegative(),
-  stats: z.array(z.string())
+  stats: z.array(z.string()),
+  namespaces: z.record(z.string(), z.string().regex(/^\d+$/)).default({})
 });
 
 export const parseAccountScan = (value: unknown): ProcessScan => {
-  const { stats, uid: _uid, ...scan } = KernelScan.parse(value);
+  const { stats, namespaces, uid: _uid, ...scan } = KernelScan.parse(value);
   return {
     ...scan,
     accountScoped: true,
-    processes: stats.map(parseProcessStat).filter((item): item is ProcessStat => item !== null)
+    processes: stats
+      .map(parseProcessStat)
+      .filter((item): item is ProcessStat => item !== null)
+      .map((item) => ({
+        ...item,
+        ...(namespaces[String(item.pid)] ? { namespace: namespaces[String(item.pid)] } : {})
+      }))
   };
 };
 
@@ -170,6 +183,7 @@ interface Target {
   id: string;
   pid: number;
   generation: string;
+  namespace?: () => Promise<{ id: string; stat: string } | null>;
 }
 interface Previous {
   generation: string;
@@ -177,6 +191,7 @@ interface Previous {
   started: number | null;
   at: number;
   ticks: number;
+  namespace?: string;
 }
 
 export class ProcessResources {
@@ -216,6 +231,18 @@ export class ProcessResources {
     for (const id of this.#states.keys()) if (!ids.has(id)) this.#states.delete(id);
     if (!targets.length) return;
     for (const target of targets) this.#states.set(target.id, 'unavailable');
+    const namespaces = new Map<string, { id: string; stat: string } | null>();
+    const pending = targets.filter((target) => target.namespace);
+    let next = 0;
+    // Native status uses a privileged read-only probe; bound concurrent observer processes.
+    await Promise.all(
+      Array.from({ length: Math.min(8, pending.length) }, async () => {
+        while (next < pending.length) {
+          const target = pending[next++]!;
+          namespaces.set(target.id, await target.namespace!().catch(() => null));
+        }
+      })
+    );
     const observation = await this.scan().catch(() => null);
     this.available = observation !== null;
     if (!observation) return;
@@ -227,20 +254,30 @@ export class ProcessResources {
       parents.set(item.parent, children);
     }
     for (const target of targets) {
-      const root = byPid.get(target.pid);
+      const namespace = namespaces.get(target.id);
+      const root = target.namespace
+        ? namespace
+          ? parseProcessStat(namespace.stat)
+          : null
+        : byPid.get(target.pid);
+      if (target.namespace && (!namespace || !root)) continue;
       const accountMembers = observation.accountScoped
         ? observation.processes.filter(
             (item) => item.group === target.pid || item.session === target.pid
           )
         : [];
-      if (root ? root.group !== target.pid || root.session !== target.pid : !accountMembers.length)
+      if (
+        !namespace &&
+        (root ? root.group !== target.pid || root.session !== target.pid : !accountMembers.length)
+      )
         continue;
       const prior = this.#previous.get(target.id);
       const before = prior?.generation === target.generation ? prior : undefined;
       if (
         before &&
         (before.pid !== target.pid ||
-          (root && before.started !== null && before.started !== root.started))
+          (root && before.started !== null && before.started !== root.started) ||
+          before.namespace !== namespace?.id)
       ) {
         this.#samples.delete(target.id);
         continue;
@@ -248,17 +285,24 @@ export class ProcessResources {
       const members = new Map<number, ProcessStat>();
       // A hidden sudo wrapper is still held by the live ChildProcess supplied by ProcessManager.
       // Its group cannot be reused while that process exists; count the visible analysis members.
-      const queue = root
-        ? observation.processes.filter((item) => item.session === root.session)
-        : accountMembers;
+      const queue = namespace
+        ? observation.processes.filter(
+            (item) => item.namespace === namespace.id && item.pid !== root!.pid
+          )
+        : root
+          ? observation.processes.filter((item) => item.session === root.session)
+          : accountMembers;
       // Include children that create a new session while their parent is still present.
       for (let index = 0; index < queue.length; index++) {
         const item = queue[index]!;
         if (members.has(item.pid)) continue;
         members.set(item.pid, item);
-        queue.push(...(parents.get(item.pid) ?? []));
+        if (!namespace) queue.push(...(parents.get(item.pid) ?? []));
       }
-      const ticks = [...members.values()].reduce((sum, item) => sum + item.ticks, 0);
+      const ticks = [...members.values()].reduce(
+        (sum, item) => sum + item.ticks,
+        namespace ? root!.ticks : 0
+      );
       const interval = before ? observation.at - before.at : 0;
       const cpu =
         before && interval > 0 && ticks >= before.ticks
@@ -296,7 +340,8 @@ export class ProcessResources {
         pid: target.pid,
         started: root?.started ?? before?.started ?? null,
         at: observation.at,
-        ticks
+        ticks,
+        ...(namespace ? { namespace: namespace.id } : {})
       });
     }
   }

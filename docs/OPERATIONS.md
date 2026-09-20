@@ -463,7 +463,7 @@ commands. Recovery depends on how the work was declared:
 - A **finite job** retains its identity, bounded logs, result and any explicitly requested deadline. An interrupted
   job resumes only through its declared checkpoint recovery command. Without one it remains
   interrupted and preserves partial files. Completed, cancelled and expired jobs do not restart.
-- An **ordinary background session** has no durable record and does not come back. Polling its old
+- An **ordinary background session** cannot resume after the supervisor stops. Polling its old
   session id reports that the process was not found.
 
 Both manual and unattended updates check unfinished background work as well as active tasks.

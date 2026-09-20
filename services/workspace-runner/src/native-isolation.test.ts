@@ -163,9 +163,26 @@ it('does not expose trusted lifecycle or network overrides in command requests',
   expect(parsed.executable).toBe('/bin/true');
   expect(parsed).not.toHaveProperty('requireNetworkIsolation');
   expect(parsed).not.toHaveProperty('superviseProcessTree');
+  expect(
+    ExecRequest.parse({ executable: '/bin/true', retainProcessTree: true })
+  ).not.toHaveProperty('retainProcessTree');
 });
 
 it.each([
+  {
+    output: 'process-isolation=yes\nnetwork-isolation=yes\nretained-process-trees=yes\n',
+    exit: 0,
+    process: true,
+    network: true,
+    retained: true
+  },
+  {
+    output: 'process-isolation=no\nnetwork-isolation=yes\nretained-process-trees=yes\n',
+    exit: 0,
+    process: false,
+    network: true,
+    retained: false
+  },
   {
     output: 'process-isolation=yes\nnetwork-isolation=yes\n',
     exit: 0,
@@ -206,6 +223,7 @@ it.each([
   await chmod(helper, 0o755);
   expect(await probeNativeIsolation({ ...sandbox, elevate: helper })).toEqual({
     processIsolation: value.process,
-    networkIsolation: value.network
+    networkIsolation: value.network,
+    retainedProcessTrees: 'retained' in value && value.retained
   });
 });

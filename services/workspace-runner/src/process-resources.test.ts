@@ -36,6 +36,44 @@ const scanAt = (at: number, processes: ProcessStat[]): ProcessScan => ({
 });
 
 describe('project process resource observations', () => {
+  it('follows a private native namespace after reparenting and retains CPU already reaped by its init', async () => {
+    let now = 1_000;
+    let reapedTicks = 100;
+    const child = stat(90, { parent: 70, namespace: '555', ticks: 200 });
+    const sameGroupElsewhere = stat(99, { parent: 70, group: 40, session: 40, namespace: '777' });
+    let observed = true;
+    const namespace = vi.fn(async () => {
+      if (!observed) return null;
+      const columns = Array.from({ length: 22 }, () => '0');
+      columns[0] = 'S';
+      columns[1] = '69';
+      columns[2] = '69';
+      columns[3] = '69';
+      columns[11] = String(reapedTicks);
+      columns[17] = '1';
+      columns[19] = '100';
+      return { id: '555', stat: `70 (namespace init) ${columns.join(' ')}` };
+    });
+    const sampler = new ProcessResources(
+      async () => ({ ...scanAt(now, [child, sameGroupElsewhere]), accountScoped: true }),
+      () => now
+    );
+    await sampler.refresh([{ ...target, namespace }]);
+    expect(sampler.sample('job')?.children.map((item) => item.pid)).toEqual([90]);
+    expect(sampler.sample('job')?.residentBytes).toBe(128 * 4096);
+    now += PROCESS_SAMPLE_MS;
+    reapedTicks += 6_000;
+    child.ticks += 6_000;
+    await sampler.refresh([{ ...target, namespace }]);
+    expect(sampler.sample('job')?.cpuPercent).toBe(100);
+    await sampler.refresh([{ ...target, namespace }]);
+    expect(namespace).toHaveBeenCalledTimes(2);
+    observed = false;
+    now += PROCESS_SAMPLE_MS;
+    await sampler.refresh([{ ...target, namespace }]);
+    expect(sampler.state('job')).toBe('unavailable');
+    expect(sampler.sample('job')?.sampledAt).toBe(new Date(now - PROCESS_SAMPLE_MS).toISOString());
+  });
   it('executes the fixed unprivileged observer against accounting fixtures without reading arguments or environment', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'garden-account-proc-'));
     try {
