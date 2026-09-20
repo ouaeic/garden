@@ -256,6 +256,7 @@ const requiredApiTokenScope = (method: string, route: string): ApiTokenScope | u
       return 'files:read';
     if (
       route === '/v1/workspaces/:workspaceId/computation' ||
+      route === '/v1/workspaces/:workspaceId/processes/history' ||
       route === '/v1/workspaces/:workspaceId/debugger' ||
       route === '/v1/workspaces/:workspaceId/computation/:session/control' ||
       route === '/v1/workspaces/:workspaceId/debugger/:session/control'

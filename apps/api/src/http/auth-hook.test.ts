@@ -167,6 +167,10 @@ const buildHarness = async (): Promise<Harness> => {
       return 'directory';
     });
   }
+  app.get('/v1/workspaces/:workspaceId/processes/history', async () => {
+    handlerRuns++;
+    return { privateInspection: true };
+  });
   for (const kind of ['computation', 'debugger']) {
     app.get(`/v1/workspaces/:workspaceId/${kind}`, async () => {
       handlerRuns++;
@@ -268,6 +272,8 @@ describe('workspace pre-handler', () => {
       `/v1/workspaces/${owner.workspaceId}/directory`,
       `/v1/workspaces/${owner.workspaceId}/directory.zip`,
       `/v1/workspaces/${owner.workspaceId}/computation`,
+      `/v1/workspaces/${owner.workspaceId}/processes/history?kind=processes`,
+      `/v1/workspaces/${owner.workspaceId}/processes/history?kind=computation`,
       `/v1/workspaces/${owner.workspaceId}/debugger`
     ]) {
       expect(
