@@ -80,7 +80,7 @@ describe('project saved history', () => {
           headers: { 'x-owner': 'owner' }
         });
         expect(response.statusCode).toBe(400);
-        expect(response.json().message).toContain('Refresh saved history');
+        expect(response.json<{ message: string }>().message).toContain('Refresh saved history');
         expect(runner.request).not.toHaveBeenCalled();
       } finally {
         await app.close();
