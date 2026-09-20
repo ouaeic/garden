@@ -405,19 +405,29 @@ export class ProjectRetention {
   async archive(raw: unknown): Promise<ProjectRetentionResult> {
     const input = ProjectRetentionApply.parse(raw),
       ids = selection({ versions: input.versions });
+    const filename = this.transactionFile(input.requestId);
+    const verifyRequest = (transaction: ArchiveTransaction) => {
+      if (
+        transaction.requestId !== input.requestId ||
+        transaction.digest !== input.digest ||
+        hash(transaction.versions.map((version) => version.id)) !== hash(ids)
+      )
+        conflict('Archive request identity changed. Review a new preview.');
+    };
+    // A completed receipt is immutable. Reading it must not interrupt work admitted afterward.
+    const recorded = await this.read(filename, Transaction);
+    if (recorded) {
+      verifyRequest(recorded);
+      if (recorded.completed) return this.result(recorded);
+    }
     return withProjectReference(this.root, this.projectId, 'write', async () => {
-      await this.assertIdle();
-      const filename = this.transactionFile(input.requestId);
       let transaction = await this.read(filename, Transaction);
       if (transaction) {
-        if (
-          transaction.requestId !== input.requestId ||
-          transaction.digest !== input.digest ||
-          hash(transaction.versions.map((version) => version.id)) !== hash(ids)
-        )
-          conflict('Archive request identity changed. Review a new preview.');
+        verifyRequest(transaction);
         if (transaction.completed) return this.result(transaction);
-      } else {
+      }
+      await this.assertIdle();
+      if (!transaction) {
         const inspected = await this.inspect(ids);
         if (inspected.preview.digest !== input.digest)
           conflict('Project history changed. Review a fresh archive preview.');

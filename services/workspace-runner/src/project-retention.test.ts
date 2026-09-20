@@ -227,6 +227,39 @@ it('requires a fresh preview after pin or publication changes and never archives
   expect(await readFile(path.join(f.first.path, 'result.txt'), 'utf8')).toBe('first result');
 });
 
+it('reconciles only completed matching receipts while subsequent work retains inputs', async () => {
+  const f = await fixture(),
+    input = await f.request(),
+    receipt = await f.retention.archive(input);
+  await f.retention.restore(f.first.id, input.requestId);
+  const next = await f.request();
+  const transaction = f.state(`retention/transactions/${input.requestId}.json`);
+  const before = await readFile(transaction, 'utf8');
+  const reader = await acquireProjectReference(f.root, f.project, 'read');
+  f.busy(true);
+  try {
+    const restarted = new ProjectUpdatesManager(f.root, f.execution, f.idle);
+    cleanups.push(() => restarted.close());
+    expect(await restarted.retention(f.project).archive(input)).toEqual(receipt);
+    expect(await readFile(transaction, 'utf8')).toBe(before);
+    expect(await f.retention.status(f.first.id)).toBeNull();
+    expect(await readFile(path.join(f.first.path, 'result.txt'), 'utf8')).toBe('first result');
+    await expect(f.retention.archive({ ...input, digest: 'a'.repeat(64) })).rejects.toThrow(
+      'identity changed'
+    );
+    await expect(f.retention.archive({ ...input, versions: [f.second.id] })).rejects.toThrow(
+      'identity changed'
+    );
+    await expect(f.retention.archive(next)).rejects.toMatchObject({ status: 409 });
+    const pending = JSON.parse(before) as { completed: boolean };
+    pending.completed = false;
+    await writeFile(transaction, JSON.stringify(pending));
+    await expect(f.retention.archive(input)).rejects.toMatchObject({ status: 409 });
+  } finally {
+    await reader.release();
+  }
+});
+
 it('retains older working-area baselines and the parent of an unfinished proposal', async () => {
   const f = await fixture(),
     otherWorkspace = randomUUID(),

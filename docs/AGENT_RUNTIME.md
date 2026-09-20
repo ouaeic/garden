@@ -419,6 +419,9 @@ recoverable storage. Its durable manifest binds the source identity and request,
 after an interrupted move. Archived file requests return restore guidance. Restore verifies file
 contents and performs an atomic move that refuses an occupied destination. Restore coordinates
 through private metadata and can proceed while ordinary input readers remain active.
+Completed archive requests can return their immutable receipt during later running work without
+moving files again. Incomplete requests still require the maintenance boundary, and changing a
+request's identity cannot reuse its receipt.
 
 Archiving does not free disk space. Shared content objects, candidates, check workspaces and
 recoverable version trees remain retained; permanent purge and object garbage collection require a
