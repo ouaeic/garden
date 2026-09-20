@@ -586,9 +586,15 @@ export const buildTaskPresentation = (input: PresentationInput): TaskPresentatio
    * event from an earlier direction, shown over work that is running now, would read as an ending
    * that has not happened.
    */
-  const finished = active
-    ? undefined
-    : [...events].reverse().find((event) => event.kind === 'completed');
+  const finished =
+    input.taskStatus === 'completed'
+      ? [...events]
+          .reverse()
+          .find(
+            (event) =>
+              event.kind === 'completed' && event.sequence >= (surface.direction?.sequence ?? 0)
+          )
+      : undefined;
   const finishPayload = finished ? record(finished.payload) : undefined;
   const finishVerification = record(finishPayload?.verification);
   /** Model-written lines, bounded and trimmed. Never addresses - see the contract's note. */

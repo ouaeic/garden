@@ -591,7 +591,9 @@ export function TaskProgress({
           <p>{progress.current.title}</p>
         </div>
       )}
-      {presentation.outcome && <Outcome outcome={presentation.outcome} />}
+      {presentation.taskStatus === 'completed' && presentation.outcome && (
+        <Outcome outcome={presentation.outcome} />
+      )}
       {phases.length > 0 && <PhaseList phases={phases} onPlan={onPlan} />}
       {/*
        * Everything the project did before the direction it is working now.

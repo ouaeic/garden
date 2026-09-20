@@ -109,6 +109,55 @@ export async function checkTaskRecovery({ context, origin, bootstrap, task, repo
     await page.getByRole('button', { name: 'Pause', exact: true }).waitFor();
     await reason.waitFor({ state: 'detached' });
     assert.deepEqual(actions, ['POST'], 'Only an explicit Retry now restarts provider work');
+
+    const recorded = (sequence, kind, payload) => ({
+      id: `recovery-${sequence}`,
+      taskId: task.id,
+      sequence,
+      kind,
+      payload,
+      summary: 'Recorded update',
+      createdAt: task.updatedAt
+    });
+    events.push(
+      recorded(1, 'assistant_delta', { markdown: 'Saved progress from this direction.' })
+    );
+    await page.reload();
+    await page.getByText('Writing…', { exact: true }).waitFor();
+    events.push(recorded(2, 'cost', {}));
+    await page.reload();
+    await page.getByText('Saved progress from this direction.', { exact: true }).waitFor();
+    assert.equal(await page.getByText('Writing…', { exact: true }).count(), 0);
+    for (const status of ['paused', 'awaiting_resource', 'awaiting_user', 'failed', 'cancelled']) {
+      currentTask = { ...currentTask, status };
+      await page.reload();
+      await page.getByText('Saved progress from this direction.', { exact: true }).waitFor();
+      assert.equal(await page.getByText('Writing…', { exact: true }).count(), 0, status);
+      assert.equal(await page.getByText('Taking shape', { exact: true }).count(), 0, status);
+      if (status === 'paused') {
+        await page
+          .getByText('Saved progress from this direction.', { exact: true })
+          .scrollIntoViewIfNeeded();
+        await page.screenshot({ path: resolve(report, 'task-paused-320.png'), fullPage: true });
+      }
+    }
+    currentTask = { ...currentTask, status: 'completed' };
+    events.push(
+      recorded(3, 'completed', {
+        summary: 'The saved result needs review.',
+        answer: 'The saved result needs review.',
+        verification: {
+          status: 'unverified',
+          evidence: [],
+          remainingRisks: ['Completion evidence could not be verified.']
+        }
+      })
+    );
+    await page.reload();
+    await page.getByText('Verification needs review', { exact: true }).waitFor();
+    assert.equal(await page.locator('.completion-record.needs-review').count(), 1);
+    assert.equal(await page.getByText('No executable checks needed', { exact: true }).count(), 0);
+    assert.deepEqual(actions, ['POST'], 'Inspecting recorded progress never resumes paid work');
   } finally {
     await page.close();
   }

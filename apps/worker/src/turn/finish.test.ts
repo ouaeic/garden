@@ -218,7 +218,7 @@ describe('completion verification budget across later holds', () => {
       resumed.acceptanceTurn = 4;
       const second = await finish([passed], resumed, [], 'The total is 1260.');
       expect(second.outcome).toBe('completed');
-      expect(second.completed?.verification.status).toBe('not_applicable');
+      expect(second.completed?.verification.status).toBe('unverified');
       expect(second.completed?.verification.remainingRisks.length).toBeGreaterThan(0);
       expect(second.ran).toEqual(['c1']);
       expect(second.events.filter((event) => event.kind === 'warning')).toEqual([

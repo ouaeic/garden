@@ -28,10 +28,15 @@ interface ScriptedTurn {
   delayMs?: number;
 }
 
-/** Only the fields these tests read; the event payload itself is deliberately opaque here. */
+/** Only the recorded fields these end-to-end contracts inspect. */
 interface TaskEventRow {
   readonly kind?: string;
   readonly summary?: string;
+  readonly sequence: number;
+  readonly payload?: {
+    verification?: { status?: string; remainingRisks?: unknown[] };
+    attempts?: number;
+  };
 }
 
 interface Harness {
@@ -108,6 +113,26 @@ const start = async (
         // Each route has to answer in the shape the worker parses. A generic {ok:true} reads as a
         // failed tool, which then fails verification - a real-looking failure with a fake cause.
         if (path.endsWith('/project-inputs')) return json({ sources: [] });
+        if (path.endsWith('/checkpoints')) {
+          if (init?.method !== 'POST' || typeof init.body !== 'string')
+            throw Error('Expected a JSON checkpoint request');
+          const body = JSON.parse(init.body) as { checkpointId: string };
+          expect(body.checkpointId).toEqual(expect.any(String));
+          return json({
+            id: body.checkpointId,
+            mechanism: 'content',
+            createdAt: new Date().toISOString(),
+            fileCount: 0,
+            totalBytes: 0,
+            storedBytes: 0,
+            changedFileCount: 0,
+            uncoveredFileCount: 0,
+            uncoveredPaths: [],
+            uncoveredPathsTruncated: false,
+            durationMs: 1,
+            pruned: []
+          });
+        }
         if (/^\/v1\/workspaces\/[0-9a-f-]{36}\/projects\/[0-9a-f-]{36}\/updates$/.test(path))
           return json({
             head: null,
@@ -478,14 +503,8 @@ describe('a task from prompt to completion', () => {
 
 describe('a completion that cannot be grounded', () => {
   test('finishes with the doubt recorded rather than throwing the work away', async () => {
-    // Two bounds, and they are not the same bound. Retrying until TASK_MAX_STEPS - around sixty
-    // billed calls against a full context - is waste, so the attempts are still capped at three.
-    // But the run used to be marked FAILED at that cap, and that was wrong: an agent built the page
-    // it was asked for, served it, published a working preview and summarised it correctly, and the
-    // whole thing was binned because every time it curled its own server to check the result, that
-    // call became the newest change and staled the evidence it had just cited. Verification failing
-    // is not the work failing. The turn completes and the reason travels with it, in the remaining
-    // risks the completion card already shows.
+    // Verification has its own retry bound: exhausting it must preserve the work and its
+    // uncertainty without spending the entire task budget on the same malformed evidence.
     const harness = await start(
       [
         { toolCalls: [toolCall('call-1', 'shell', { executable: 'echo', args: ['work'] })] },
@@ -504,13 +523,18 @@ describe('a completion that cannot be grounded', () => {
 
     const taskId = await harness.createTask('Do some work');
     expect(await harness.settle(taskId)).toBe('completed');
-    // The cap is what stops the budget being spent on the same malformed call: the step budget here
-    // is 40. It is not 5 any more because a finish that is allowed to land goes on through the plan
-    // and acceptance holds it used to be killed before reaching.
+    // Subsequent plan and acceptance holds must also settle within a bounded number of calls.
     expect(harness.completions()).toBeLessThanOrEqual(10);
 
-    const summaries = (await harness.events(taskId)).map((event) => event.summary ?? '');
-    expect(summaries.some((line) => line.includes('could not verify it'))).toBe(true);
+    const events = await harness.events(taskId);
+    const warnings = events.filter((event) => event.kind === 'warning');
+    const completed = events.filter((event) => event.kind === 'completed');
+    expect(warnings).toHaveLength(1);
+    expect(completed).toHaveLength(1);
+    expect(warnings[0]!.payload?.attempts).toBeGreaterThan(0);
+    expect(warnings[0]!.sequence).toBeLessThan(completed[0]!.sequence);
+    expect(completed[0]!.payload?.verification?.status).toBe('unverified');
+    expect((completed[0]!.payload?.verification?.remainingRisks ?? []).length).toBeGreaterThan(0);
   }, 30_000);
 });
 

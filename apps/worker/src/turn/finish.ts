@@ -227,7 +227,7 @@ export const handleFinishCall = async (
   let verification: CompletionVerification = checked.ok
     ? checked.verification
     : {
-        status: 'not_applicable',
+        status: 'unverified',
         evidence: [],
         remainingRisks: [
           'athanor could not tie this result to anything it did, so check it before relying on it.'

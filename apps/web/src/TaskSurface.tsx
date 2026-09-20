@@ -29,6 +29,7 @@ import type {
 import type { Bootstrap, Decision, Draft } from './model';
 import {
   activeQuestion,
+  answerIsStreaming,
   conversationResultSource,
   data,
   date,
@@ -195,6 +196,7 @@ export default function TaskSurface({
   const directionSequence = presentation?.surface?.direction?.sequence ?? 0;
   const currentEvents = events.filter((event) => event.sequence >= directionSequence);
   const answer = surfaceAnswer(currentEvents);
+  const writing = answer.partial && answerIsStreaming(currentEvents, task.status);
   const previousAnswer = directionSequence
     ? surfaceAnswer(events.filter((event) => event.sequence < directionSequence))
     : null;
@@ -749,7 +751,7 @@ export default function TaskSurface({
                 <article className="garden-answer">
                   <div className="result-toolbar">
                     <span className="eyebrow">
-                      {answer.partial
+                      {writing
                         ? 'Taking shape'
                         : answer.previous
                           ? 'Previous result'
@@ -775,7 +777,7 @@ export default function TaskSurface({
                       {answer.markdown}
                     </Markdown>
                   </Suspense>
-                  {answer.partial && (
+                  {writing && (
                     <div className="writing-indicator" role="status">
                       Writing…
                     </div>
@@ -838,7 +840,7 @@ export default function TaskSurface({
               </div>
               {completionEvent && (
                 <section
-                  className={`completion-record ${completion.interrupted || verification.status === 'checks_failed' || verification.status === 'checks_did_not_run' || verification.status === 'delivery_incomplete' ? 'needs-review' : ''}`}
+                  className={`completion-record ${completion.interrupted || verification.status === 'unverified' || verification.status === 'checks_failed' || verification.status === 'checks_did_not_run' || verification.status === 'delivery_incomplete' ? 'needs-review' : ''}`}
                 >
                   <div className="row between">
                     <span className="eyebrow">
@@ -867,7 +869,9 @@ export default function TaskSurface({
                                   ? 'Checks failed'
                                   : verification.status === 'checks_did_not_run'
                                     ? 'Checks did not run'
-                                    : 'Verification not recorded'}
+                                    : verification.status === 'unverified'
+                                      ? 'Verification needs review'
+                                      : 'Verification not recorded'}
                     </span>
                   </div>
                   {text(completion.summary) &&
@@ -957,7 +961,7 @@ export default function TaskSurface({
               </Suspense>
               {presentation && (
                 <TaskProgress
-                  presentation={presentation}
+                  presentation={{ ...presentation, taskStatus: task.status }}
                   onPlan={() => setPanel('plan')}
                   onEvidence={(id) => void inspectEvidence(id)}
                 />

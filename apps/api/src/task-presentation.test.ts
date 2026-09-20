@@ -851,14 +851,53 @@ describe('how a finished run says it went', () => {
     expect(JSON.stringify(result)).not.toContain('untrusted.test');
   });
 
-  it('says nothing about an ending while the run is going', () => {
+  it.each([
+    'running',
+    'planning',
+    'paused',
+    'awaiting_user',
+    'awaiting_resource',
+    'queued',
+    'failed',
+    'cancelled'
+  ] as const)('does not present an earlier ending over a %s direction', (taskStatus) => {
     const result = buildTaskPresentation(
       input({
-        taskStatus: 'running',
+        taskStatus,
         events: [event(1, 'completed', completion), event(2, 'user_message', {}, 'Now do April')]
       })
     );
     expect(result.outcome).toBeUndefined();
+  });
+
+  it('requires an ending from the current direction even if task status still says completed', () => {
+    const result = buildTaskPresentation(
+      input({
+        events: [event(1, 'completed', completion), event(2, 'user_message', {}, 'Now do April')]
+      })
+    );
+    expect(result.outcome).toBeUndefined();
+  });
+
+  it('keeps failed verification distinct from an answer with nothing external to check', () => {
+    const result = buildTaskPresentation(
+      input({
+        events: [
+          event(1, 'completed', {
+            summary: 'The result needs review.',
+            verification: {
+              status: 'unverified',
+              evidence: [],
+              remainingRisks: ['Completion evidence could not be verified.']
+            }
+          })
+        ]
+      })
+    );
+    expect(result.outcome).toMatchObject({
+      verification: 'unverified',
+      remainingRisks: ['Completion evidence could not be verified.']
+    });
   });
 
   it('shows the newest ending when a project has finished more than once', () => {

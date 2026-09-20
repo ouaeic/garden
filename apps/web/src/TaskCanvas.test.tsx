@@ -49,6 +49,37 @@ const presentation: TaskPresentation = {
 };
 
 describe('usable task delivery and recorded progress', () => {
+  it('does not show a cached completion while another direction is paused or waiting', () => {
+    const outcome = {
+      summary: 'An earlier direction finished.',
+      at: '2026-09-06T00:00:00Z',
+      verification: 'verified' as const,
+      evidence: 1,
+      remainingRisks: [],
+      openSteps: 0
+    };
+    const render = (taskStatus: NonNullable<TaskPresentation['taskStatus']>) =>
+      renderToStaticMarkup(
+        <TaskProgress
+          presentation={{ ...presentation, taskStatus, outcome }}
+          onPlan={() => undefined}
+          onEvidence={() => undefined}
+        />
+      );
+    expect(render('completed')).toContain('How it finished');
+    for (const status of [
+      'paused',
+      'running',
+      'awaiting_user',
+      'awaiting_resource',
+      'failed',
+      'cancelled'
+    ] as const) {
+      const html = render(status);
+      expect(html, status).not.toContain('How it finished');
+      expect(html, status).not.toContain(outcome.summary);
+    }
+  });
   it('serves the scoped archive address and distinguishes a manifest that has not been counted', () => {
     const html = renderToStaticMarkup(
       <TaskOutputs

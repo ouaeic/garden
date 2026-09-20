@@ -3,6 +3,7 @@ import { Task, type TaskEvent } from '@athanor/contracts';
 import type { Bootstrap } from './model.js';
 import {
   activeQuestion,
+  answerIsStreaming,
   hasOngoingWork,
   needsAttention,
   taskStatusLabel,
@@ -59,6 +60,31 @@ const bootstrap = (tasks: Task[], cursor: string | null): Bootstrap => ({
 });
 
 describe('the current work surface', () => {
+  it('keeps paused fragments readable without claiming that the model is writing', () => {
+    const events = [event(1, 'assistant_delta', { markdown: 'Checking the result.' })];
+    expect(answerIsStreaming(events, 'running')).toBe(true);
+    expect(answerIsStreaming(events, 'planning')).toBe(true);
+    for (const status of [
+      'paused',
+      'awaiting_user',
+      'awaiting_resource',
+      'queued',
+      'failed',
+      'cancelled',
+      'completed'
+    ] as const) {
+      expect(answerIsStreaming(events, status), status).toBe(false);
+      expect(surfaceAnswer(events).markdown).toBe('Checking the result.');
+    }
+    events.push(event(2, 'tool_started', { tool: 'shell' }));
+    expect(answerIsStreaming(events, 'running')).toBe(false);
+    events.push(event(3, 'assistant_delta', { markdown: 'The check passed.' }));
+    expect(answerIsStreaming(events, 'running')).toBe(true);
+    events.push(event(4, 'cost', {}));
+    expect(answerIsStreaming(events, 'running')).toBe(false);
+    events.push(event(5, 'assistant_delta', { markdown: 'Finishing.' }), event(6, 'status', {}));
+    expect(answerIsStreaming(events, 'running')).toBe(false);
+  });
   it('keeps delivery in progress visible and brings failed delivery back to attention', () => {
     const pending = { ...task, status: 'completed' as const, deliveryStatus: 'pending' as const };
     expect(hasOngoingWork(pending)).toBe(true);

@@ -214,6 +214,31 @@ export function activeQuestion(events: TaskEvent[], task: Task): TaskEvent | und
     ? undefined
     : question;
 }
+/** Stream fragments remain readable after a task pauses; only an active stream is still writing. */
+export function answerIsStreaming(events: TaskEvent[], status: Task['status']): boolean {
+  if (status !== 'running' && status !== 'planning') return false;
+  for (let index = events.length - 1; index >= 0; index--) {
+    const kind = events[index]!.kind;
+    if (kind === 'assistant_delta') return true;
+    if (
+      [
+        'assistant_message',
+        'user_message',
+        'tool_started',
+        'tool_result',
+        'cost',
+        'status',
+        'approval_requested',
+        'question_asked',
+        'completed',
+        'error'
+      ].includes(kind)
+    )
+      return false;
+  }
+  return false;
+}
+
 export function surfaceAnswer(events: TaskEvent[]): {
   markdown: string;
   partial: boolean;

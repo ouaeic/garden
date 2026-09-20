@@ -64,6 +64,7 @@ export const MODEL_DECLARED_VERIFICATION_STATUSES = ['verified', 'not_applicable
  */
 export type CompletionVerificationStatus =
   | (typeof MODEL_DECLARED_VERIFICATION_STATUSES)[number]
+  | 'unverified'
   | 'checks_failed'
   | 'checks_did_not_run'
   | 'delivery_incomplete'

@@ -1008,7 +1008,7 @@ describe('a status the harness writes and the model cannot', () => {
   });
 
   it('refuses a finish that tries to declare one of the harness’s own statuses', () => {
-    for (const status of ['checks_failed', 'checks_did_not_run']) {
+    for (const status of ['unverified', 'checks_failed', 'checks_did_not_run']) {
       const checked = completionVerification(
         { messages: [], turnToolResults: {} } as unknown as AgentState,
         { status, evidence: [] }
