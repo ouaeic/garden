@@ -14,12 +14,15 @@ export async function computationApproval(
 ): Promise<AgentApprovalRequirement | null> {
   const body = computationRequest(call.arguments);
   if (['list', 'status'].includes(body.action)) return null;
-  if (body.action === 'start')
+  if (body.action === 'start') {
+    // Startup is a fixed program; the runner refuses it without native filesystem/network isolation.
+    if (task.securityMode === 'autonomous') return null;
     return {
       sideEffect: context.taintSources?.length ? 'external_consequential' : 'external_reversible',
       action: `Start ${body.language ?? 'native'} computation`,
       preview: `Start a task-scoped ${body.language ?? 'unspecified'} interpreter in ${body.cwd}. Lifetime: ${body.lifetimeSeconds ?? 3600}s. Filesystem confined and network disabled. Values remain in this process until stopped or expired; restart loses memory and never replays cells.`
     };
+  }
   if (!body.sessionId) throw Error('Computation action requires sessionId');
   const stored = ComputationSessionSchema.parse(
     await runner.call(
@@ -32,17 +35,20 @@ export async function computationApproval(
   );
   if (stored.taskId !== task.id || stored.workspaceId !== task.workspaceId)
     throw Error('Computation session ownership mismatch');
-  if (['interrupt', 'stop'].includes(body.action))
+  if (['interrupt', 'stop'].includes(body.action)) {
+    if (task.securityMode === 'autonomous') return null;
     return {
       sideEffect: 'external_reversible',
       action: `${body.action === 'stop' ? 'Stop' : 'Interrupt'} ${stored.name}`,
       preview: `${body.action === 'stop' ? 'Discard the retained values and stop this interpreter.' : 'Interrupt the current cell; state is preserved only if the interpreter acknowledges it.'} Session ${stored.sessionId}, ${stored.language}, ${stored.cwd}.`
     };
+  }
   if (body.action === 'extend') {
     if (!body.lifetimeSeconds) throw Error('Extension requires total lifetimeSeconds');
     const deadline = new Date(
       Date.parse(stored.createdAt) + body.lifetimeSeconds * 1000
     ).toISOString();
+    if (task.securityMode === 'autonomous') return null;
     return {
       sideEffect: 'external_reversible',
       action: `Extend ${stored.name}`,
@@ -63,6 +69,7 @@ export async function computationApproval(
           context
         )
       : null;
+  if (task.securityMode === 'autonomous' && !classified) return null;
   return {
     sideEffect:
       classified?.sideEffect === 'external_consequential' || context.taintSources?.length
