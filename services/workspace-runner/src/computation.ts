@@ -1,6 +1,10 @@
 import { runnerLogger, failureCode } from './log.js';
 import { TerminalHistory } from './terminal-history.js';
-import { discardMissionInvocation, trackMissionInvocation } from './mission-processes.js';
+import {
+  discardMissionInvocation,
+  trackMissionInvocation,
+  processTreeObservation
+} from './mission-processes.js';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { mkdir, readFile, realpath, rename, writeFile } from 'node:fs/promises';
@@ -68,6 +72,7 @@ type Live = {
   record: RecordState;
   root: string;
   child: ChildProcessWithoutNullStreams;
+  processTreeLease?: string;
   token: string;
   wire?: ComputationWire;
   ready: () => void;
@@ -347,7 +352,10 @@ export class ComputationManager {
               {
                 id: live.record.view.sessionId,
                 pid: live.child.pid,
-                generation: live.record.view.createdAt
+                generation: live.record.view.createdAt,
+                ...(live.processTreeLease
+                  ? { namespace: () => processTreeObservation(live.processTreeLease!) }
+                  : {})
               }
             ]
           : []
@@ -519,6 +527,7 @@ export class ComputationManager {
         record,
         root,
         child,
+        ...(invocation.processTreeLease ? { processTreeLease: invocation.processTreeLease } : {}),
         token,
         ready,
         failReady,

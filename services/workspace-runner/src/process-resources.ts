@@ -286,9 +286,7 @@ export class ProcessResources {
       // A hidden sudo wrapper is still held by the live ChildProcess supplied by ProcessManager.
       // Its group cannot be reused while that process exists; count the visible analysis members.
       const queue = namespace
-        ? observation.processes.filter(
-            (item) => item.namespace === namespace.id && item.pid !== root!.pid
-          )
+        ? observation.processes.filter((item) => item.namespace === namespace.id)
         : root
           ? observation.processes.filter((item) => item.session === root.session)
           : accountMembers;
@@ -301,7 +299,9 @@ export class ProcessResources {
       }
       const ticks = [...members.values()].reduce(
         (sum, item) => sum + item.ticks,
-        namespace ? root!.ticks : 0
+        // Some runtimes execute as namespace init. Count that visible process's RAM and CPU once;
+        // a separate hidden supervisor contributes only its accumulated child CPU counters.
+        namespace && !members.has(root!.pid) ? root!.ticks : 0
       );
       const interval = before ? observation.at - before.at : 0;
       const cpu =
