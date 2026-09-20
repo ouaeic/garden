@@ -29,6 +29,7 @@ vi.mock('./host-storage.js', async (importOriginal) => ({
 }));
 import { prepareInvocation } from './execution.js';
 import { ComputationManager } from './computation.js';
+import { ComputationLedger } from './computation-ledger.js';
 const policy = {
   isolateNetwork: false,
   sandbox: {
@@ -74,6 +75,154 @@ async function cell(session: ComputationSession, code: string, cellId: string = 
   return manager.status(workspaceId, owner, session.sessionId);
 }
 describe('persistent native computation', () => {
+  it('continues beyond the in-memory ledger range and retains old retry results across restart', async () => {
+    const session = await start('javascript');
+    await cell(session, 'var n = 0', 'initialize');
+    const firstRequest = {
+      action: 'cell',
+      sessionId: session.sessionId,
+      cellId: 'first',
+      code: '++n'
+    };
+    const first = await cell(session, firstRequest.code, firstRequest.cellId);
+    const journalPath = path.join(directory, '.athanor/computation.json');
+    const initialBytes = (await readFile(journalPath)).length;
+    for (let index = 1; index < 270; index++) {
+      const result = await cell(session, '++n', `increment-${index}`);
+      expect(result.latestCell).toMatchObject({ state: 'completed', result: { value: index + 1 } });
+    }
+    const retry = (await manager.act(workspaceId, owner, firstRequest)) as ComputationSession;
+    expect(retry.latestCell).toEqual(first.latestCell);
+    expect((await cell(session, 'n', 'read-total')).latestCell?.result).toEqual({
+      type: 'number',
+      preview: '270',
+      value: 270
+    });
+    await expect(
+      manager.act(workspaceId, owner, { ...firstRequest, code: '++n + 1' })
+    ).rejects.toThrow('different code');
+    const journal = await readFile(journalPath);
+    expect(journal.length).toBeLessThan(initialBytes + 512);
+    const savedSessions = JSON.parse(journal.toString()) as unknown[];
+    expect(savedSessions).toHaveLength(1);
+    expect(savedSessions[0]).not.toHaveProperty('receipts');
+    await manager.close();
+    manager = new ComputationManager(directory, policy);
+    await manager.restore();
+    const restored = (await manager.act(workspaceId, owner, firstRequest)) as ComputationSession;
+    expect(restored).toMatchObject({ state: 'lost', stateRetained: false });
+    expect(restored.latestCell).toEqual(first.latestCell);
+    expect(vi.mocked(prepareInvocation)).toHaveBeenCalledTimes(1);
+  }, 60_000);
+
+  it('does not execute a concurrent duplicate cell twice', async () => {
+    const session = await start('javascript');
+    await cell(session, 'var executions = 0');
+    const request = {
+      action: 'cell',
+      sessionId: session.sessionId,
+      cellId: 'concurrent',
+      code: '++executions'
+    };
+    const replies = await Promise.allSettled([
+      manager.act(workspaceId, owner, request),
+      manager.act(workspaceId, owner, request)
+    ]);
+    expect(replies.filter((reply) => reply.status === 'fulfilled').length).toBeGreaterThan(0);
+    await vi.waitFor(() =>
+      expect(manager.status(workspaceId, owner, session.sessionId).state).toBe('idle')
+    );
+    expect((await cell(session, 'executions')).latestCell?.result).toEqual({
+      type: 'number',
+      preview: '1',
+      value: 1
+    });
+  });
+
+  it('migrates journal receipts durably before removing them from the session journal', async () => {
+    const session = await start('javascript');
+    const request = { action: 'cell', sessionId: session.sessionId, cellId: 'saved', code: '42' };
+    const result = await cell(session, request.code, request.cellId);
+    await manager.close();
+    const journal = path.join(directory, '.athanor/computation.json');
+    const records = JSON.parse(await readFile(journal, 'utf8')) as Array<Record<string, unknown>>;
+    expect(records).toHaveLength(1);
+    records[0]!.receipts = [
+      {
+        cellId: request.cellId,
+        hash: result.latestCell!.manifest!.requestSha256,
+        state: 'completed'
+      }
+    ];
+    await writeFile(journal, JSON.stringify(records));
+    await rm(path.join(directory, '.athanor/computation-receipts'), { recursive: true });
+    manager = new ComputationManager(directory, policy);
+    await manager.restore();
+    const migratedSessions = JSON.parse(await readFile(journal, 'utf8')) as unknown[];
+    expect(migratedSessions).toHaveLength(1);
+    expect(migratedSessions[0]).not.toHaveProperty('receipts');
+    const retry = (await manager.act(workspaceId, owner, request)) as ComputationSession;
+    expect(retry.latestCell).toEqual(result.latestCell);
+    await expect(manager.act(workspaceId, owner, { ...request, code: '43' })).rejects.toThrow(
+      'different code'
+    );
+    expect(vi.mocked(prepareInvocation)).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops all owned interpreters even when saving one receipt fails', async () => {
+    const first = await start('javascript');
+    const second = await start('javascript');
+    await cell(first, '1', 'corrupt');
+    await cell(second, '2', 'intact');
+    const filename = path.join(
+      directory,
+      '.athanor/computation-receipts',
+      first.sessionId,
+      `${createHash('sha256').update('corrupt').digest('hex')}.json`
+    );
+    await writeFile(filename, '{');
+    await expect(manager.stopOwner(workspaceId, owner)).rejects.toThrow('processes stopped');
+    const sessions = manager.list(workspaceId, owner);
+    expect(sessions).toHaveLength(2);
+    expect(sessions.every((session) => session.state === 'stopped' && !session.stateRetained)).toBe(
+      true
+    );
+    expect(manager.backgroundWork().commands).toBe(0);
+    const journal = JSON.parse(
+      await readFile(path.join(directory, '.athanor/computation.json'), 'utf8')
+    ) as Array<{ view: ComputationSession }>;
+    expect(journal).toHaveLength(2);
+    expect(journal.every((record) => record.view.state === 'stopped')).toBe(true);
+  });
+
+  it('never submits code when its durable request receipt cannot be written', async () => {
+    const session = await start('javascript');
+    const request = {
+      action: 'cell',
+      sessionId: session.sessionId,
+      cellId: 'unwritten',
+      code: "await (await import('node:fs/promises')).writeFile('must-not-exist', 'executed')"
+    };
+    const save = vi
+      .spyOn(ComputationLedger.prototype, 'put')
+      .mockRejectedValueOnce(Error('disk fault'));
+    try {
+      await expect(manager.act(workspaceId, owner, request)).rejects.toThrow('disk fault');
+      await expect(
+        readFile(path.join(directory, workspaceId, 'workspace/must-not-exist'))
+      ).rejects.toMatchObject({ code: 'ENOENT' });
+      const retry = (await manager.act(workspaceId, owner, request)) as ComputationSession;
+      expect(retry).toMatchObject({
+        state: 'lost',
+        stateRetained: false,
+        latestCell: { state: 'interrupted' }
+      });
+      expect(manager.backgroundWork().commands).toBe(0);
+    } finally {
+      save.mockRestore();
+    }
+  });
+
   it.each(['python', 'javascript'] as const)(
     'retains real %s bindings and awaits native asynchronous cells',
     async (language) => {

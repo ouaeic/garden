@@ -25,11 +25,11 @@ import { computationLaunch } from './computation-launch.js';
 import { ComputationWire } from './computation-wire.js';
 import { saveComputationArtifacts } from './computation-artifacts.js';
 import { computationInputs } from './computation-inputs.js';
+import { ComputationLedger } from './computation-ledger.js';
 import { ProcessResources, processScanner } from './process-resources.js';
 import { computationDeadline, scheduleComputationDeadline } from './computation-deadline.js';
 
 export const COMPUTATION_LIMIT = 8;
-export const COMPUTATION_CELL_LIMIT = 256;
 export const COMPUTATION_OUTPUT_BYTES = 16_384;
 const Packet = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('ready'), runtime: ComputationRuntimeSchema }),
@@ -57,10 +57,8 @@ const Packet = z.discriminatedUnion('kind', [
     artifacts: z.array(z.unknown()).max(4)
   })
 ]);
-type Receipt = { cellId: string; hash: string; state: ComputationCell['state'] };
 type RecordState = {
   view: ComputationSession;
-  receipts: Receipt[];
   pid?: number | undefined;
   identity?: string | undefined;
 };
@@ -102,12 +100,16 @@ export class ComputationManager {
   #flush: Promise<void> = Promise.resolve();
   #timer: NodeJS.Timeout;
   #resources: ProcessResources;
+  readonly #ledger: ComputationLedger;
   constructor(
     private readonly workspaceRoot: string,
     private readonly policy: InvocationPolicy,
     private readonly now: () => number = Date.now
   ) {
     this.#resources = new ProcessResources(processScanner('/proc', policy.sandbox), now);
+    this.#ledger = new ComputationLedger(
+      path.join(workspaceRoot, '.athanor', 'computation-receipts')
+    );
     this.#timer = setInterval(() => {
       void this.#sweep();
     }, 5000);
@@ -138,7 +140,8 @@ export class ComputationManager {
                 state: z.enum(['running', 'completed', 'failed', 'interrupted'])
               })
             )
-            .max(COMPUTATION_CELL_LIMIT),
+            .max(256)
+            .default([]),
           pid: z.number().int().positive().optional(),
           identity: z.string().optional()
         })
@@ -146,7 +149,7 @@ export class ComputationManager {
       .max(128)
       .parse(JSON.parse(text));
     for (const entry of records) {
-      const record: RecordState = entry;
+      const { receipts, ...record }: typeof entry = entry;
       if (active(record.view.state)) {
         if (record.pid && record.identity && (await identity(record.pid)) === record.identity) {
           try {
@@ -161,8 +164,18 @@ export class ComputationManager {
           'Runner restarted. In-memory values were lost; no cell was replayed. Restore an explicit JSON checkpoint in a new session if available.';
         if (record.view.latestCell?.state === 'running')
           record.view.latestCell.state = 'interrupted';
-        for (const receipt of record.receipts)
-          if (receipt.state === 'running') receipt.state = 'interrupted';
+      }
+      for (const receipt of receipts) {
+        const state = receipt.state === 'running' ? 'interrupted' : receipt.state;
+        const cell =
+          record.view.latestCell?.cellId === receipt.cellId
+            ? { ...record.view.latestCell, state }
+            : undefined;
+        await this.#ledger.put(record.view.sessionId, {
+          ...receipt,
+          state,
+          ...(cell ? { cell } : {})
+        });
       }
       this.#records.set(record.view.sessionId, record);
     }
@@ -242,9 +255,13 @@ export class ComputationManager {
     return this.#cell(record, request);
   }
   async stopOwner(workspaceId: string, owner: string): Promise<void> {
-    for (const record of this.#records.values())
-      if (record.view.workspaceId === workspaceId && record.view.taskId === owner)
-        await this.#stop(record, 'stopped', 'The owning task was cancelled.');
+    await this.#stopAll(
+      [...this.#records.values()].filter(
+        (record) => record.view.workspaceId === workspaceId && record.view.taskId === owner
+      ),
+      'stopped',
+      'The owning task was cancelled.'
+    );
   }
   isWorkspaceBusy(workspaceId: string): boolean {
     return [...this.#records.values()].some(
@@ -256,19 +273,33 @@ export class ComputationManager {
     await this.#flush;
   }
   async stopWorkspace(workspaceId: string): Promise<void> {
-    for (const record of this.#records.values())
-      if (record.view.workspaceId === workspaceId)
-        await this.#stop(record, 'stopped', 'Workspace state is being replaced.');
+    await this.#stopAll(
+      [...this.#records.values()].filter((record) => record.view.workspaceId === workspaceId),
+      'stopped',
+      'Workspace state is being replaced.'
+    );
   }
   async close(): Promise<void> {
     clearInterval(this.#timer);
-    for (const record of this.#records.values())
-      await this.#stop(
-        record,
-        'lost',
-        'Runner stopped. In-memory state was lost; no cell will replay.'
-      );
+    await this.#stopAll(
+      [...this.#records.values()],
+      'lost',
+      'Runner stopped. In-memory state was lost; no cell will replay.'
+    );
     await this.#flush;
+  }
+  async #stopAll(records: RecordState[], state: 'stopped' | 'lost', note: string): Promise<void> {
+    const results = await Promise.allSettled(
+      records.map((record) => this.#stop(record, state, note))
+    );
+    const errors = results
+      .filter((result) => result.status === 'rejected')
+      .map((result) => result.reason as unknown);
+    if (errors.length)
+      throw new AggregateError(
+        errors,
+        'Computation processes stopped, but their receipts could not all be saved'
+      );
   }
   #owned(workspaceId: string, owner: string | null, id: string): RecordState {
     const record = this.#records.get(id);
@@ -377,8 +408,7 @@ export class ComputationManager {
         deadlineAt: new Date(computationDeadline(createdAt, seconds)).toISOString(),
         stateRetained: false,
         variables: []
-      },
-      receipts: []
+      }
     };
     if (
       [...this.#records.values()].filter((record) => active(record.view.state)).length >=
@@ -483,26 +513,29 @@ export class ComputationManager {
     const id = request.cellId;
     if (!id) throw Error('Cell/checkpoint/restore requires a stable cellId for idempotency');
     const hash = createHash('sha256').update(JSON.stringify(request)).digest('hex');
-    const existing = record.receipts.find((receipt) => receipt.cellId === id);
+    const existing = await this.#ledger.get(record.view.sessionId, id);
     if (existing) {
       if (existing.hash !== hash)
         throw Error('This cellId already names different code or options');
-      return record.view.latestCell?.cellId === id
-        ? this.#view(record)
-        : {
-            sessionId: record.view.sessionId,
-            cellId: id,
-            state: existing.state,
-            outputRetained: false
-          };
+      if (existing.state === 'running' && this.#live.has(record.view.sessionId))
+        return this.#view(record);
+      if (existing.cell) {
+        const cell =
+          existing.state === 'running' && !this.#live.has(record.view.sessionId)
+            ? { ...existing.cell, state: 'interrupted' as const }
+            : existing.cell;
+        return { ...this.#view(record), latestCell: cell };
+      }
+      return {
+        sessionId: record.view.sessionId,
+        cellId: id,
+        state: existing.state === 'running' ? 'interrupted' : existing.state,
+        outputRetained: false
+      };
     }
     const live = this.#live.get(record.view.sessionId);
     if (!live || record.view.state !== 'idle')
       throw Error('Computation session must be idle with retained state');
-    if (record.receipts.length >= COMPUTATION_CELL_LIMIT)
-      throw Error(
-        'Session cell ledger is full; checkpoint selected values and start another session'
-      );
     if (request.action === 'cell' && !request.code) throw Error('Cell requires code');
     const seconds =
       request.timeoutSeconds ??
@@ -546,6 +579,7 @@ export class ComputationManager {
       : await computationInputs(live.root, request.inputs ?? []);
     if (this.#live.get(record.view.sessionId) !== live || record.view.state !== 'idle')
       throw Error('Computation session changed while preparing the cell');
+    const predecessorCellId = record.view.latestCell?.cellId;
     record.view.latestCell = {
       cellId: id,
       state: 'running',
@@ -560,18 +594,28 @@ export class ComputationManager {
         ...(request.code !== undefined
           ? { sourceSha256: createHash('sha256').update(request.code).digest('hex') }
           : {}),
-        ...(record.receipts.at(-1) ? { predecessorCellId: record.receipts.at(-1)!.cellId } : {}),
+        ...(predecessorCellId ? { predecessorCellId } : {}),
         ...(record.view.runtime ? { runtime: record.view.runtime } : {}),
         inputs,
         coverage: 'declared_inputs_before_execution'
       }
     };
-    record.receipts.push({ cellId: id, hash, state: 'running' });
     record.view.state = 'busy';
     live.request = request;
     live.stdout = boundedCollector(COMPUTATION_OUTPUT_BYTES);
     live.stderr = boundedCollector(COMPUTATION_OUTPUT_BYTES);
-    await this.#persist();
+    try {
+      await this.#ledger.put(record.view.sessionId, {
+        cellId: id,
+        hash,
+        state: 'running',
+        cell: record.view.latestCell
+      });
+      await this.#persist();
+    } catch (error) {
+      await this.#stop(record, 'lost', 'Cannot persist computation request').catch(() => undefined);
+      throw error;
+    }
     if (this.#live.get(record.view.sessionId) !== live)
       throw Error('Computation session stopped before cell submission');
     const completion = new Promise<void>((resolve) => {
@@ -639,6 +683,7 @@ export class ComputationManager {
   }
   async #finish(live: Live, packet: z.infer<typeof Packet> & { kind: 'done' }): Promise<void> {
     const cell = live.record.view.latestCell!;
+    const settle = live.settle;
     live.cellTimer?.();
     clearTimeout(live.forceTimer);
     try {
@@ -675,22 +720,34 @@ export class ComputationManager {
       }
       if (this.#live.get(live.record.view.sessionId) === live) {
         live.record.view.variables = packet.variables;
-        live.record.view.state = 'idle';
       }
     } catch (error) {
       cell.state = 'failed';
       cell.error = error instanceof Error ? error.message : String(error);
-      if (this.#live.get(live.record.view.sessionId) === live) live.record.view.state = 'idle';
     } finally {
       cell.finishedAt = new Date(this.now()).toISOString();
-      const receipt = live.record.receipts.find((item) => item.cellId === cell.cellId);
-      if (receipt) receipt.state = cell.state;
-      live.finishing = false;
-      await this.#persist().catch(() =>
-        this.#stop(live.record, 'lost', 'Cannot persist computation receipt')
-      );
-      live.settle?.();
+      try {
+        await this.#persistCell(live.record.view.sessionId, cell);
+        if (this.#live.get(live.record.view.sessionId) === live) {
+          live.finishing = false;
+          live.record.view.state = 'idle';
+        }
+        await this.#persist();
+      } catch {
+        await this.#stop(live.record, 'lost', 'Cannot persist computation receipt').catch(
+          () => undefined
+        );
+      } finally {
+        if (live.record.view.latestCell === cell) live.finishing = false;
+        settle?.();
+      }
     }
+  }
+  async #persistCell(sessionId: string, cell: ComputationCell): Promise<void> {
+    const hash =
+      cell.manifest?.requestSha256 ?? (await this.#ledger.get(sessionId, cell.cellId))?.hash;
+    if (!hash) throw Error('Computation request identity is missing');
+    await this.#ledger.put(sessionId, { cellId: cell.cellId, hash, state: cell.state, cell });
   }
   async #interrupt(record: RecordState): Promise<void> {
     const live = this.#live.get(record.view.sessionId);
@@ -735,9 +792,12 @@ export class ComputationManager {
         record.view.latestCell.stderr = live.stderr.text('stderr');
       }
     }
-    for (const receipt of record.receipts)
-      if (receipt.state === 'running') receipt.state = 'interrupted';
-    await this.#persist();
+    try {
+      if (record.view.latestCell)
+        await this.#persistCell(record.view.sessionId, record.view.latestCell);
+    } finally {
+      await this.#persist();
+    }
   }
   async #sweep(): Promise<void> {
     await this.refreshResources();
