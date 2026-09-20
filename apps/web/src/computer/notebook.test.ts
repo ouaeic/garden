@@ -112,7 +112,9 @@ describe('recorded notebook cells', () => {
     expect(html).toContain('stream-0-9');
     expect(html).not.toContain('stream-0-10');
     expect(html).not.toContain('source-20-');
-    expect(html).not.toContain('x'.repeat(17000));
+    const renderedSources = Array.from(html.matchAll(/<code>(source-\d+-x+)<\/code>/g));
+    expect(renderedSources).toHaveLength(20);
+    for (const source of renderedSources) expect(source[1]).toHaveLength(16000);
     expect(html).not.toContain('&quot;cell_type&quot;');
   });
 
