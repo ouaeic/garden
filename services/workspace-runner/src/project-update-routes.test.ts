@@ -5,6 +5,7 @@ import path from 'node:path';
 import Fastify from 'fastify';
 import { afterEach, expect, it } from 'vitest';
 import { capabilityAudience, signCapabilityToken } from '@athanor/core';
+import { ProjectStorageUsage } from '@athanor/contracts';
 import { authenticateRunnerRequest } from './auth.js';
 import { ensureWorkspace } from './files.js';
 import { ProjectUpdatesManager } from './project-updates.js';
@@ -138,6 +139,31 @@ it('binds project reads and mutations to signed membership and keeps unchecked p
   expect((await invoke('user', wb, a, 'project.updates.write', publish)).statusCode).not.toBe(200);
   const published = await invoke('user', main, a, 'project.updates.write', publish);
   expect(published.statusCode).toBe(200);
+  const storage = async (role: 'user' | 'agent', workspaceId: string, scope: string) => {
+    const url = `/v1/workspaces/${workspaceId}/projects/${project}/storage`;
+    const token = signCapabilityToken(
+      {
+        workspaceId,
+        sub: a,
+        role,
+        scopes: [scope],
+        nonce: randomUUID(),
+        aud: capabilityAudience('GET', url)
+      },
+      secret,
+      60
+    );
+    return app.inject({ method: 'GET', url, headers: { authorization: `Bearer ${token}` } });
+  };
+  const usage = await storage('user', main, 'project.updates.read');
+  expect(usage.statusCode).toBe(200);
+  const measured = ProjectStorageUsage.parse(usage.json());
+  expect(measured.fileReferences).toBeGreaterThan(0);
+  expect(measured.sharedCopies).toBeGreaterThan(0);
+  expect(measured.reclaimableBytes).toBeNull();
+  expect((await storage('agent', wa, 'project.updates.read')).statusCode).not.toBe(200);
+  expect((await storage('user', wa, 'project.updates.read')).statusCode).not.toBe(200);
+  expect((await storage('user', main, 'files.read')).statusCode).not.toBe(200);
   const revision = published.json<{ id: string }>();
   const pin = (
     role: 'agent' | 'user',

@@ -41,6 +41,17 @@ export function registerProjectUpdateRoutes(context: RouteContext) {
     }
     return project;
   };
+  app.get<{ Params: { projectId: string } }>('/v1/projects/:projectId/storage', async (request) => {
+    const user = requireUser(request.user),
+      project = await owned(user.id, request.params.projectId);
+    return runner.request({
+      workspaceId: project.workspaceId,
+      userId: user.id,
+      role: 'user',
+      scopes: ['project.updates.read'],
+      path: `/v1/workspaces/${project.workspaceId}/projects/${project.id}/storage`
+    });
+  });
   app.get<{ Params: { projectId: string } }>(
     '/v1/projects/:projectId/pinned-versions',
     async (request) => {

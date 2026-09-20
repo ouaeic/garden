@@ -11,6 +11,19 @@ import type { ProjectUpdatesManager } from './project-updates.js';
 
 export function registerProjectUpdateRoutes(app: FastifyInstance, manager: ProjectUpdatesManager) {
   app.get<{ Params: { workspaceId: string; projectId: string } }>(
+    '/v1/workspaces/:workspaceId/projects/:projectId/storage',
+    async (request) => {
+      requireScope(request, 'project.updates.read');
+      const { projectId, workspaceId } = request.params;
+      if (
+        request.capability.role !== 'user' ||
+        (await manager.projectWorkspace(projectId)) !== workspaceId
+      )
+        throw new Error('Project storage inspection requires the project owner');
+      return manager.storage(projectId);
+    }
+  );
+  app.get<{ Params: { workspaceId: string; projectId: string } }>(
     '/v1/workspaces/:workspaceId/projects/:projectId/pinned-versions',
     async (request) => {
       requireScope(request, 'project.updates.read');

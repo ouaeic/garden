@@ -14,6 +14,7 @@ import { PrepareProjectUpdate } from '@athanor/contracts';
 import { ensureWorkspace, workspacePath, withWorkspaceDirectory } from './files.js';
 import { ProjectLiveChanges } from './project-live-changes.js';
 import { ProjectVersionPins } from './project-version-pins.js';
+import { scanProjectStorage } from './project-storage.js';
 import {
   ProjectVersionFiles,
   durableJson,
@@ -85,6 +86,7 @@ export class ProjectUpdatesManager {
   readonly #live = new Map<string, StoredUpdate>();
   readonly #preparations = new Map<string, NonNullable<ProjectCheck['preparation']>>();
   readonly #watching = new Map<string, string>();
+  readonly #storageScans = new Map<string, ReturnType<typeof scanProjectStorage>>();
   #timer: NodeJS.Timeout | undefined;
   #observing = false;
   #closed = false;
@@ -152,6 +154,19 @@ export class ProjectUpdatesManager {
   }
   publicDirectory(projectId: string): string {
     return path.join(this.directory(projectId), 'public');
+  }
+  async storage(projectId: string) {
+    await this.registry(projectId);
+    const existing = this.#storageScans.get(projectId);
+    if (existing) return existing;
+    if (this.#storageScans.size >= 2) throw new Error('Storage inspection is busy; retry shortly.');
+    const scan = scanProjectStorage(this.root, this.directory(projectId));
+    this.#storageScans.set(projectId, scan);
+    try {
+      return await scan;
+    } finally {
+      if (this.#storageScans.get(projectId) === scan) this.#storageScans.delete(projectId);
+    }
   }
   private file(projectId: string, name: string): string {
     return path.join(this.directory(projectId), 'state', name);

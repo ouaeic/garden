@@ -2409,3 +2409,4 @@ export * from './project-updates.js';
 export * from './project-sessions.js';
 
 export * from './workflows.js';
+export { ProjectStorageUsage } from './project-storage.js';

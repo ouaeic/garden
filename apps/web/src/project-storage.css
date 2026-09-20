@@ -1,0 +1,50 @@
+.project-storage {
+  margin-block: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.project-storage > summary {
+  cursor: pointer;
+  padding: 0.85rem 1rem;
+}
+.project-storage-body {
+  padding: 0 1rem 1rem;
+  display: grid;
+  gap: 0.8rem;
+}
+.project-storage-body > p {
+  margin: 0;
+}
+.project-storage-body > button {
+  justify-self: start;
+}
+.project-storage-body > button[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: progress;
+}
+.project-storage-scope > summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.project-storage-scope p {
+  margin: 0.65rem 0 0;
+}
+.project-storage-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: 1rem;
+  margin: 0;
+}
+.project-storage-metrics dt {
+  font-size: 0.85rem;
+}
+.project-storage-metrics dd {
+  margin: 0.35rem 0 0;
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.project-storage-partial {
+  line-height: 1.5;
+}

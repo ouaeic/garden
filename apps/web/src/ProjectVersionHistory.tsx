@@ -3,6 +3,7 @@ import { Pin } from 'lucide-react';
 import type { PinnedProjectVersions, ProjectRevision } from '@athanor/contracts';
 import { get, put } from './client';
 import { Button, Dialog, ErrorNotice, Field, Spinner } from './ui';
+import ProjectStorage from './ProjectStorage';
 
 export default function ProjectVersionHistory({
   projectId,
@@ -124,6 +125,7 @@ export default function ProjectVersionHistory({
         Pin important versions to keep them easy to find. Unpinning keeps their files and history.
       </p>
       <ErrorNotice error={!editing ? error : null} />
+      <ProjectStorage key={projectId} projectId={projectId} />
       {pinnedOnly && !reading && page && !rows.length && (
         <p className="muted">No pinned versions yet.</p>
       )}
