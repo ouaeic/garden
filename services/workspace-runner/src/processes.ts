@@ -34,6 +34,7 @@ import {
   JOB_HISTORY_LIMIT,
   JOB_LOG_BYTES,
   JOB_CHECKPOINT_MS,
+  ProcessHistoryRecordSchema,
   ServiceLaunchSchema,
   workspaceDirectories,
   type ServiceLaunch,
@@ -638,16 +639,16 @@ export class ProcessManager {
     const launch = ServiceLaunchSchema.parse(request);
     await this.#retryHistory(workspaceId);
     await this.#pruneJobHistory(workspaceId);
-    const existing = id
-      ? (registry.list().find((record) => record.id === id) ??
-        (await registry.history.get(id, owner)))
-      : undefined;
+    const retained = id ? registry.list().find((record) => record.id === id) : undefined;
+    const existing = retained ?? (id ? await registry.history.get(id, owner) : undefined);
     if (existing) {
       if (JSON.stringify(existing.launch) !== JSON.stringify(launch))
         throw new Error('Command request identity was already used for different arguments');
       return this.#jobs.has(existing.id)
         ? this.action(workspaceId, owner, existing.id, { action: 'poll' })
-        : { ...this.#recordView(existing, true), archived: true };
+        : retained
+          ? this.#recordView(retained, true)
+          : this.#archivedView(existing, true);
     }
     if (this.#activePersistentCount() >= SERVICE_LIMIT_PER_WORKSPACE)
       throw new Error(
@@ -822,7 +823,7 @@ export class ProcessManager {
       collector.push(Buffer.from(session[stream].text(stream)));
       return collector.text(stream);
     };
-    const record: ProcessHistoryRecord = {
+    const record = ProcessHistoryRecordSchema.parse({
       id: session.id,
       workspaceId: session.workspaceId,
       owner: session.owner,
@@ -849,7 +850,7 @@ export class ProcessManager {
         bytes: session.stdout.bytes + session.stderr.bytes,
         savedAt: session.finishedAt!
       }
-    };
+    });
     return this.#saveHistory(session.workspaceId, async () => {
       await registry.history.put(record.id, record.owner, record);
       this.#rememberSavedSession(session);
@@ -880,17 +881,22 @@ export class ProcessManager {
     await this.#pruneJobHistory(workspaceId);
     const registry = this.#historyRegistry(workspaceId);
     if (!registry) return { entries: [], nextCursor: null };
-    return registry.history.page(owners, query, (value) => {
-      const view = this.#recordView(value, false);
-      const command = view.command.join(' ');
-      return {
-        ...view,
-        archived: true,
-        ...(command.length > 16_384
-          ? { command: `${command.slice(0, 16_384)}…`, commandTruncated: true }
-          : {})
-      };
-    });
+    return registry.history.page(owners, query, (value) => this.#archivedView(value, false));
+  }
+
+  #archivedView(record: ServiceRecord | ProcessHistoryRecord, includeLogs: boolean) {
+    const view = this.#recordView(record, includeLogs);
+    const command = view.command.join(' ');
+    return {
+      ...view,
+      archived: true,
+      service: view.service
+        ? { name: view.service.name, state: view.service.state, restarts: view.service.restarts }
+        : undefined,
+      ...(command.length > 16_384
+        ? { command: `${command.slice(0, 16_384)}…`, commandTruncated: true }
+        : {})
+    };
   }
 
   async readAction(workspaceId: string, owner: string | null, id: string, value: unknown) {
@@ -904,8 +910,7 @@ export class ProcessManager {
       ['poll', 'log'].includes(request.action)
     ) {
       const record = await this.#historyRegistry(workspaceId)?.history.get(id, owner);
-      if (record && record.workspaceId === workspaceId)
-        return { ...this.#recordView(record, true), archived: true };
+      if (record && record.workspaceId === workspaceId) return this.#archivedView(record, true);
     }
     return this.action(workspaceId, owner, id, value);
   }
@@ -1035,7 +1040,7 @@ export class ProcessManager {
     return this.#recordView(job.record, includeLogs);
   }
 
-  #recordView(record: ProcessHistoryRecord, includeLogs: boolean) {
+  #recordView(record: ServiceRecord | ProcessHistoryRecord, includeLogs: boolean) {
     const finished = record.state !== 'running';
     return {
       sessionId: record.id,

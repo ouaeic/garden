@@ -151,7 +151,8 @@ export const ServiceRecordSchema = z.object({
 
 export type ServiceRecord = z.infer<typeof ServiceRecordSchema>;
 export const ProcessHistoryRecordSchema = ServiceRecordSchema.extend({
-  kind: z.enum(['service', 'job', 'task'])
+  kind: z.enum(['service', 'job', 'task']),
+  state: z.enum(['completed', 'failed', 'timed_out', 'stopped'])
 });
 export type ProcessHistoryRecord = z.infer<typeof ProcessHistoryRecordSchema>;
 
@@ -184,7 +185,7 @@ export const newServiceRecord = (input: {
 };
 
 /** What it is, its command, when it started, how often it has come back, and how it last ended. */
-export const serviceView = (record: ProcessHistoryRecord) => ({
+export const serviceView = (record: ServiceRecord | ProcessHistoryRecord) => ({
   serviceId: record.id,
   name: record.name,
   state: record.state,
@@ -280,7 +281,7 @@ export class ServiceRegistry {
   async archive(record: ServiceRecord): Promise<void> {
     if (['running', 'restarting', 'interrupted', 'crash_looped'].includes(record.state))
       throw Error('Only terminal processes can enter saved history');
-    await this.history.put(record.id, record.owner, record);
+    await this.history.put(record.id, record.owner, ProcessHistoryRecordSchema.parse(record));
     await this.remove(record.id, true);
   }
 

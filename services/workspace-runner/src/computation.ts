@@ -360,7 +360,10 @@ export class ComputationManager {
     if (!history) {
       history = new TerminalHistory(
         path.join(this.workspaceRoot, '.athanor', 'computation-history', workspaceId),
-        ComputationSessionSchema
+        ComputationSessionSchema.refine(
+          (view) => !active(view.state) && !view.stateRetained,
+          'Only ended analysis sessions can enter saved history'
+        )
       );
       this.#history.set(workspaceId, history);
     }

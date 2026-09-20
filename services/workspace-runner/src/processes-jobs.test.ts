@@ -516,36 +516,41 @@ describe('saved process history beyond the recent list', () => {
   });
 });
 
-it('keeps large launch receipts while projecting bounded command previews for history pages', async () => {
-  const { root, current } = await setup();
-  const registry = new ServiceRegistry(root);
-  const args = Array.from({ length: 50 }, () => 'x'.repeat(65_536));
-  const record = newServiceRecord({
-    workspaceId: 'workspace-1',
-    owner: 'task-1',
-    name: 'Large argument list',
-    kind: 'job',
-    launch: {
-      executable: 'analysis',
-      args,
-      cwd: 'workspace',
-      env: {},
-      network: false,
-      maxOutputBytes: 4096
-    }
-  });
-  record.state = 'failed';
-  record.lastExit = {
-    at: record.startedAt,
-    exitCode: 1,
-    signal: null,
-    reason: 'Arguments refused by executable'
-  };
-  await registry.history.put(record.id, record.owner, record);
-  expect(await current.resumeWorkspace(root, 'workspace-1', false)).toBe(0);
-  const page = await current.history('workspace-1', ['task-1']);
-  expect(page.entries).toHaveLength(1);
-  expect(page.entries[0]!.value.commandTruncated).toBe(true);
-  expect(JSON.stringify(page).length).toBeLessThan(20_000);
-  expect((await registry.history.get(record.id, record.owner))?.launch.args).toEqual(args);
-});
+it.each(['job', 'service'] as const)(
+  'keeps large %s receipts while projecting bounded command previews for history pages',
+  async (kind) => {
+    const { root, current } = await setup();
+    const registry = new ServiceRegistry(root);
+    const args = Array.from({ length: 50 }, () => 'x'.repeat(65_536));
+    const record = newServiceRecord({
+      workspaceId: 'workspace-1',
+      owner: 'task-1',
+      name: 'Large argument list',
+      kind,
+      launch: {
+        executable: 'analysis',
+        args,
+        cwd: 'workspace',
+        env: {},
+        network: false,
+        maxOutputBytes: 4096
+      }
+    });
+    record.state = 'failed';
+    record.lastExit = {
+      at: record.startedAt,
+      exitCode: 1,
+      signal: null,
+      reason: 'Arguments refused by executable'
+    };
+    await registry.archive(record);
+    expect(await current.resumeWorkspace(root, 'workspace-1', false)).toBe(0);
+    const page = await current.history('workspace-1', ['task-1']);
+    expect(page.entries).toHaveLength(1);
+    expect(page.entries[0]!.value.commandTruncated).toBe(true);
+    expect(JSON.stringify(page).length).toBeLessThan(20_000);
+    const detail = await current.readAction('workspace-1', null, record.id, { action: 'log' });
+    expect(JSON.stringify(detail).length).toBeLessThan(20_000);
+    expect((await registry.history.get(record.id, record.owner))?.launch.args).toEqual(args);
+  }
+);
