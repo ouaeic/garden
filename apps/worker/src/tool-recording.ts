@@ -20,7 +20,7 @@ import type { DataStore, TaskRecord } from '@athanor/data';
 import type { ModelToolCall } from '@athanor/model-gateway';
 import type { AgentState, AgentWorkerConfig } from './agent-state.js';
 import { callDestinations } from './command-classification.js';
-import { shellObservation, processObservation } from './completion.js';
+import { completionReference, shellObservation, processObservation } from './completion.js';
 import {
   boundToolResultText,
   RECENT_TOOL_OUTPUT_CHARS,
@@ -653,7 +653,7 @@ export const recordToolResult = async (
   state.messages.push({
     role: 'tool',
     toolCallId: call.id,
-    content: `${forModel}${provenanceNotice ? `\n\n${provenanceNotice}` : ''}`
+    content: `${completionReference(state, call.id)}${forModel}${provenanceNotice ? `\n\n${provenanceNotice}` : ''}`
   });
   // A snapshot of a challenge page is a successful read, so the wall arrives here rather than in
   // the failure path - and it is the same thing to tell the owner about.

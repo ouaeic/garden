@@ -353,14 +353,45 @@ export const askOutcome = (
 };
 
 export const citableEvidence = (state: AgentState): string => {
-  const citable = Object.entries(state.turnToolResults ?? {}).filter(
-    ([, result]) => result.success && !AGENT_SPEECH.has(result.name)
-  );
+  const { floor } = evidenceFloor(state);
+  const citable = Object.entries(state.turnToolResults ?? {})
+    .map(([id, result], index) => ({ id, result, current: index >= floor || result.proseOnly }))
+    .filter(({ result }) => result.success && !result.skipped && !AGENT_SPEECH.has(result.name))
+    .reverse();
   if (!citable.length)
     return 'No successful tool call this turn can be cited. If the answer came from your own reasoning alone, use {"status":"not_applicable","evidence":[]}.';
-  return `Citable toolCallIds from this turn: ${citable
-    .map(([id, result]) => `${id} (${result.name})`)
-    .join(', ')}.`;
+  const current = citable.filter((item) => item.current);
+  const earlier = citable.filter((item) => !item.current);
+  // Bound repair context while keeping the observations that can prove the current state first.
+  const shown = [...current, ...earlier].slice(0, 16);
+  const list = (fresh: boolean) =>
+    shown
+      .filter((item) => Boolean(item.current) === fresh)
+      .map(
+        ({ id, result }) =>
+          `${id} (${result.name})${result.command ? ` [exit ${result.command.exitCode}]` : ''}`
+      )
+      .join(', ');
+  return [
+    current.length
+      ? `Current-state toolCallIds, newest first: ${list(true)}.`
+      : 'No result yet establishes the state after the last change; check that outcome before finishing.',
+    list(false) ? `Earlier toolCallIds (supporting evidence only): ${list(false)}.` : '',
+    shown.length < citable.length
+      ? 'Older successful results remain citable when relevant; only the most recent references are listed here.'
+      : '',
+    'Cite only claims the actual output supports. If the work is already checked, correct the references and call finish directly; do not run another command just to repair a citation.'
+  ]
+    .filter(Boolean)
+    .join('\n');
+};
+
+/** Make protocol IDs visible during completion repair without charging ordinary tool results. */
+export const completionReference = (state: AgentState, id: string): string => {
+  const result = state.turnToolResults?.[id];
+  if (!(state.finishRejections && result?.success && !result.skipped)) return '';
+  if (AGENT_SPEECH.has(result.name)) return '';
+  return `Result reference: ${id} (${result.name})${result.command ? ` [exit ${result.command.exitCode}]` : ''}. Cite only what this output establishes.\n`;
 };
 
 /**

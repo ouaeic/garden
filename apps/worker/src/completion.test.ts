@@ -8,6 +8,7 @@ import {
   MODEL_DECLARED_VERIFICATION_STATUSES,
   askOutcome,
   citableEvidence,
+  completionReference,
   completionVerification,
   evidenceFloor,
   harnessEvidence,
@@ -576,6 +577,83 @@ describe('when the agent is allowed to stop and ask', () => {
 });
 
 describe('finish rejection guidance', () => {
+  it('places fresh evidence before supporting history without changing the verification gate', () => {
+    const current: AgentState = {
+      messages: [],
+      step: 0,
+      credits: 0,
+      turnToolResults: {
+        old: { name: 'file_read', success: true },
+        write: { name: 'file_write', success: true, mutating: true },
+        check: {
+          name: 'shell',
+          success: true,
+          mutating: true,
+          command: { fingerprint: 'check', exitCode: 0 }
+        },
+        skipped: { name: 'file_read', success: true, skipped: true },
+        failed: { name: 'file_read', success: false }
+      }
+    };
+    const guidance = citableEvidence(current);
+    expect(guidance).toContain('Current-state toolCallIds, newest first: check (shell) [exit 0]');
+    expect(guidance.indexOf('check (shell)')).toBeLessThan(guidance.indexOf('old (file_read)'));
+    expect(guidance).not.toContain('skipped (');
+    expect(guidance).not.toContain('failed (');
+    const verification = (id: string) =>
+      completionVerification(current, {
+        status: 'verified',
+        evidence: [{ claim: 'The check passed', source: 'tool_result', toolCallId: id }]
+      });
+    expect(verification('old').ok).toBe(false);
+    expect(verification('check').ok).toBe(true);
+  });
+
+  it('bounds large guidance while retaining the most recent evidence and durable prose', () => {
+    const current: AgentState = {
+      messages: [],
+      step: 0,
+      credits: 0,
+      turnToolResults: Object.fromEntries(
+        Array.from({ length: 100 }, (_, index) => [
+          `read-${index}`,
+          { name: 'file_read', success: true }
+        ])
+      )
+    };
+    current.turnToolResults!.report = {
+      name: 'file_write',
+      success: true,
+      proseOnly: true,
+      mutating: true
+    };
+    current.turnToolResults!.change = { name: 'file_patch', success: true, mutating: true };
+    current.turnToolResults!.latest = { name: 'file_read', success: true };
+    const guidance = citableEvidence(current);
+    expect(guidance).toContain('latest (file_read), report (file_write)');
+    expect(guidance.match(/\((?:file_read|file_write|file_patch)\)/g)).toHaveLength(16);
+    expect(guidance).not.toContain('read-0 (');
+    expect(guidance).toContain('Older successful results remain citable');
+    expect(guidance).toContain('do not run another command just to repair a citation');
+  });
+
+  it('shows result IDs and exit status only during recovery, without promoting failed checks', () => {
+    const current: AgentState = {
+      messages: [],
+      step: 0,
+      credits: 0,
+      turnToolResults: {
+        check: { name: 'shell', success: true, command: { fingerprint: 'check', exitCode: 2 } }
+      }
+    };
+    expect(completionReference(current, 'check')).toBe('');
+    current.finishRejections = 1;
+    expect(completionReference(current, 'check')).toContain('check (shell) [exit 2]');
+    expect(completionReference(current, 'missing')).toBe('');
+    current.turnToolResults!.check!.skipped = true;
+    expect(completionReference(current, 'check')).toBe('');
+  });
+
   it('names the ids a retry is allowed to cite', () => {
     // A rejected finish that is only told it was wrong tends to resend the same shape, which is
     // what turned one malformed completion into a whole step budget of retries.
