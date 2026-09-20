@@ -90,6 +90,7 @@ export default function SavedProcessHistory({ endpoint }: { endpoint: string }) 
         {(['processes', 'computation'] as const).map((value) => (
           <Button
             key={value}
+            className={kind === value ? 'primary' : ''}
             aria-pressed={kind === value}
             onClick={() => {
               if (kind !== value) {
