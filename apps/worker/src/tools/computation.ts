@@ -25,7 +25,7 @@ export async function executeComputationTool(
       actions: {
         start:
           'Start an approved task-scoped Python, R or JavaScript interpreter with lifetimeSeconds chosen for the work, including multi-day analyses. Filesystem confined, network disabled; use governed tools for downloads/installations. Requires the native sandbox. R also requires jsonlite; rLibraryPaths may name its workspace library directories.',
-        cell: 'Execute code in the retained session. Use a unique stable cellId; retries never replay an accepted cell. Values remain server-side. Results return quickly or as a running handle; status reads cached outputs without executing code. Declare inputs as workspace file paths to capture bounded pre-execution hashes (include dependency lockfiles). Receipts include source/request hashes, interpreter identity and the previous cell; they do not capture all dependencies or freeze files.',
+        cell: 'Execute code in the retained session. Use a unique stable cellId; retries never replay an accepted cell. Values remain server-side. For a running cell, process action=wait with its sessionId resumes automatically when that exact cell ends; no polling or sleeping shell job is needed. status reads cached outputs. Declare inputs as workspace file paths to capture bounded pre-execution hashes (include dependency lockfiles). Receipts include source/request hashes, interpreter identity and the previous cell; they do not capture all dependencies or freeze files.',
         extend:
           'Increase total lifetimeSeconds measured from session creation. Safe to retry; never shortens or revives a session. Extend before expiry. An active cell keeps its own timeout.',
         list: 'List this task’s sessions.',
@@ -54,6 +54,7 @@ export async function executeComputationTool(
           options: { action: 'cell', cellId: 'summary-1', code: 'values = [2,3,5]\nsum(values)' }
         },
         { action: 'compute', sessionId: '<sessionId>', options: { action: 'status' } },
+        { action: 'wait', sessionId: '<sessionId>' },
         {
           action: 'compute',
           sessionId: '<sessionId>',
@@ -67,7 +68,7 @@ export async function executeComputationTool(
       plots:
         'Python: return a matplotlib Figure as the last expression for a PNG (when matplotlib is installed). R: visible final values print, and default plotting devices produce PNGs. Variable inspection lists names without forcing delayed or active bindings. JavaScript: garden.plot({title,xLabel,yLabel,points:[[x,y],...]}) produces a safe SVG artifact. Pass returned artifact paths directly to image_read or publish_artifact; runner artifacts need not be visible to shell commands. No HTML or tool bridge runs inside the session.',
       continuity:
-        'Values survive cells and turns until the declared deadline. Cancellation or explicit stop ends the session. Runner restart loses memory and never replays cells; use explicit file checkpoints for recovery.'
+        'Values survive cells and turns until the declared deadline. Cancellation or explicit stop ends the session. With the independent runtime controller, request-runner replacement retains cells and memory. Controller/host failure or an embedded runner restart can lose memory; no cells replay automatically. Use explicit file checkpoints for recovery.'
     };
   const body = computationRequest(call.arguments);
   return context.runner.call(

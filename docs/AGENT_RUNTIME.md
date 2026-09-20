@@ -369,6 +369,14 @@ with that controller; reconnecting the runner does not replay a cell. A controll
 for its jobs, interpreter sessions and pending admissions to finish. Explicit Stop and declared session
 lifetimes still apply.
 
+Use `process(action=wait)` with a running computation session ID to wait for its current cell.
+The worker records the cell and interpreter identities, releases its lease, and resumes the task
+when that cell ends. It can wait for jobs and cells together without model calls, polling commands
+or sleeping shell jobs. A later cell cannot replace the one being awaited. Missing or replaced
+work wakes with an unknown outcome; failure and interruption remain explicit. An owner pause
+stays paused. The resume message contains scheduling metadata; cell output is read through the
+normal tool path.
+
 A controller or machine failure can lose in-memory interpreter state. Garden reports that loss without
 replaying code. Use files and explicit checkpoints for recovery from those failures; Garden does not
 infer a checkpoint or reconstruct arbitrary program memory. An ordinary background session can retain

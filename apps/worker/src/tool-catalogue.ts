@@ -771,7 +771,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'process',
     description:
-      'wait releases this turn until finite jobs stop, then resumes automatically. Do other work first. Status/log/input/stop; resize takes options.columns and options.rows for a terminal. resume uses a declared checkpoint. describe lists computation, debugging and workflows; compute/debug/workflow take options.',
+      'wait releases this turn until jobs or current analysis cells finish, then resumes automatically; no polling or sleep commands. Do other work first. Status/log/input/stop; resize takes options.columns/rows. resume uses a declared checkpoint. describe lists computation, debugging and workflows; compute/debug/workflow take options.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -799,7 +799,7 @@ export const agentTools: ModelTool[] = [
           type: 'array',
           items: { type: 'string' },
           maxItems: 32,
-          description: 'Finite jobs to await together when action=wait.'
+          description: 'Job or computation session IDs to await together when action=wait.'
         },
         data: { type: 'string', description: 'Input when action=write.' },
         options: { type: 'object' }

@@ -8,6 +8,7 @@ import { z } from 'zod';
 import type { AgentState } from './agent-state.js';
 import type { TurnDispatchDeps } from './turn/dispatch.js';
 import { AgentRunnerClient, withRunnerAbort } from './runner-client.js';
+import { ComputationWaitIdentity, computationWaitObservation } from './computation-waits.js';
 
 const Observation = z.object({
   sessionId: z.string(),
@@ -24,10 +25,13 @@ const Observation = z.object({
   ]),
   lifetime: z.enum(['job', 'task', 'service']).optional()
 });
+const JobIdentity = z
+  .object({ sessionId: z.string().min(1).max(128), startedAt: z.string() })
+  .strict();
 const Dependencies = z.object({
   turn: z.number().int().nonnegative(),
   jobs: z
-    .array(z.object({ sessionId: z.string().min(1).max(128), startedAt: z.string() }))
+    .array(z.union([ComputationWaitIdentity, JobIdentity]))
     .min(1)
     .max(32)
 });
@@ -46,18 +50,30 @@ export async function parkProcessWait(
     .min(1)
     .max(32)
     .parse(call.arguments.sessionIds ?? [call.arguments.sessionId]);
-  const observed: z.infer<typeof Observation>[] = [];
+  const observed: Array<
+    z.infer<typeof Observation> | NonNullable<ReturnType<typeof computationWaitObservation>>
+  > = [];
   for (const sessionId of new Set(ids)) {
+    const computation = sessionId.startsWith('kernel-');
     const result = await deps.resume.execute(
       task,
-      { ...call, arguments: { action: 'poll', sessionId } },
+      {
+        ...call,
+        arguments: computation
+          ? { action: 'compute', sessionId, options: { action: 'status' } }
+          : { action: 'poll', sessionId }
+      },
       key,
       false,
       run.webPlan,
       state
     );
-    const item = Observation.parse(result);
-    if (item.lifetime === 'service')
+    const item = computation
+      ? computationWaitObservation(result, task, sessionId)
+      : Observation.parse(result);
+    if (!item)
+      throw new Error('This analysis session has no cell to wait for. Start its work first.');
+    if ('lifetime' in item && item.lifetime === 'service')
       throw new Error('A service runs until stopped. Wait on a finite job instead.');
     observed.push(item);
   }
@@ -73,8 +89,8 @@ export async function parkProcessWait(
       waiting,
       processes: observed,
       instruction: waiting
-        ? 'Execution will resume when these processes stop. No model polling is needed.'
-        : 'These processes have stopped. Inspect their logs and outputs before interpreting the outcome.'
+        ? 'Execution will resume when these jobs or analysis cells finish. No polling or sleeping command is needed.'
+        : 'This work has ended. Inspect its logs and cell receipts before interpreting the outcome.'
     },
     run.model,
     run.catalog
@@ -98,7 +114,17 @@ export async function parkProcessWait(
     dependenciesCiphertext: encryptJson(
       {
         turn: state.turn ?? 0,
-        jobs: observed.map(({ sessionId, startedAt }) => ({ sessionId, startedAt }))
+        jobs: observed.map((item) =>
+          'kind' in item
+            ? ComputationWaitIdentity.parse({
+                kind: item.kind,
+                sessionId: item.sessionId,
+                startedAt: item.startedAt,
+                cellId: item.cellId,
+                interpreterCreatedAt: item.interpreterCreatedAt
+              })
+            : JobIdentity.parse({ sessionId: item.sessionId, startedAt: item.startedAt })
+        )
       },
       key,
       `job-wait:${task.id}`
@@ -148,22 +174,37 @@ export async function reconcileJobWaits(
         `task-state:${task.id}`
       );
       if ((state.turn ?? 0) !== dependencies.turn || state.jobWaitId !== wait.id) continue;
-      const inventory = z
-        .object({ processes: z.array(z.unknown()) })
-        .parse(
-          await withRunnerAbort(AbortSignal.any([signal, AbortSignal.timeout(15_000)]), () =>
-            runner.call(
-              task.workspaceId,
-              task.id,
-              'exec',
-              `/v1/workspaces/${task.workspaceId}/processes`
-            )
-          )
-        );
+      const [inventory, computations] = await withRunnerAbort(
+        AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
+        () =>
+          Promise.all([
+            dependencies.jobs.some((job) => !('kind' in job))
+              ? runner
+                  .call(
+                    task.workspaceId,
+                    task.id,
+                    'exec',
+                    `/v1/workspaces/${task.workspaceId}/processes`
+                  )
+                  .then((value) => z.object({ processes: z.array(z.unknown()) }).parse(value))
+              : Promise.resolve({ processes: [] }),
+            dependencies.jobs.some((job) => 'kind' in job)
+              ? runner
+                  .call(
+                    task.workspaceId,
+                    task.id,
+                    'files.read',
+                    `/v1/workspaces/${task.workspaceId}/computation`
+                  )
+                  .then((value) => z.object({ sessions: z.array(z.unknown()) }).parse(value))
+              : Promise.resolve({ sessions: [] })
+          ])
+      );
       const outcomes = [];
       let ready = true;
       for (const job of dependencies.jobs) {
-        const entry = inventory.processes.find(
+        const computation = 'kind' in job;
+        const entry = (computation ? computations.sessions : inventory.processes).find(
           (item) =>
             typeof item === 'object' &&
             item !== null &&
@@ -174,10 +215,24 @@ export async function reconcileJobWaits(
           outcomes.push({ ...job, status: 'missing', outcomeUnknown: true });
           continue;
         }
-        const observed = Observation.parse(entry);
-        const replaced = observed.startedAt !== job.startedAt;
+        const observed = computation
+          ? computationWaitObservation(entry, task, job.sessionId)
+          : Observation.parse(entry);
+        if (!observed) {
+          outcomes.push({ ...job, status: 'missing', outcomeUnknown: true });
+          continue;
+        }
+        const replaced =
+          observed.startedAt !== job.startedAt ||
+          ('kind' in job &&
+            'kind' in observed &&
+            (job.cellId !== observed.cellId ||
+              job.interpreterCreatedAt !== observed.interpreterCreatedAt));
         if (!replaced && ['running', 'restarting'].includes(observed.status)) ready = false;
-        outcomes.push({ ...observed, ...(replaced ? { generationChanged: true } : {}) });
+        outcomes.push({
+          ...observed,
+          ...(replaced ? { generationChanged: true, outcomeUnknown: true } : {})
+        });
       }
       if (!ready) continue;
       // Only schema-checked process metadata enters the window. Command output is read through its normal taint path.
@@ -185,7 +240,7 @@ export async function reconcileJobWaits(
       delete state.jobWaitId;
       state.messages.push({
         role: 'system',
-        content: `Background process wait ended: ${JSON.stringify(outcomes)}. Inspect current logs and outputs, then continue the original task. A missing, stopped, failed, interrupted or replaced process is not a successful result. Do not relaunch a command without establishing its outcome.`
+        content: `Background process wait ended: ${JSON.stringify(outcomes)}. Inspect current logs and outputs, then continue the original task. Missing, stopped, failed, interrupted or replaced work is not a successful result. Do not replay a command or cell without establishing its outcome.`
       });
       const changed = await store.wakeTaskFromJobs({
         id: wait.id,

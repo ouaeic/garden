@@ -20,7 +20,7 @@ export async function computationApproval(
     return {
       sideEffect: context.taintSources?.length ? 'external_consequential' : 'external_reversible',
       action: `Start ${body.language ?? 'native'} computation`,
-      preview: `Start a task-scoped ${body.language ?? 'unspecified'} interpreter in ${body.cwd}. Lifetime: ${body.lifetimeSeconds ?? 3600}s. Filesystem confined and network disabled. Values remain in this process until stopped or expired; restart loses memory and never replays cells.`
+      preview: `Start a task-scoped ${body.language ?? 'unspecified'} interpreter in ${body.cwd}. Lifetime: ${body.lifetimeSeconds ?? 3600}s. Filesystem confined and network disabled. Values remain until stopped or expired. A controller or machine failure can lose memory; cells never replay automatically.`
     };
   }
   if (!body.sessionId) throw Error('Computation action requires sessionId');
