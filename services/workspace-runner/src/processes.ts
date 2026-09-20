@@ -1,3 +1,4 @@
+import { runnerLogger, failureCode } from './log.js';
 import { jobIdentity } from './job-identity.js';
 import { discardMissionInvocation, trackMissionInvocation } from './mission-processes.js';
 import { spawnManagedProcess, type ManagedProcess } from './process-child.js';
@@ -37,7 +38,8 @@ import {
   workspaceDirectories,
   type ServiceLaunch,
   type ServicePolicy,
-  type ServiceRecord
+  type ServiceRecord,
+  type ProcessHistoryRecord
 } from './services.js';
 import { agentAccountUid, agentListeningSockets, listeningSocketsOfGroup } from './listeners.js';
 import { reachOfBindAddress } from '@athanor/core';
@@ -86,6 +88,7 @@ interface Session {
   command: string[];
   child: ManagedProcess;
   launch: ServiceLaunch;
+  retiredService?: ReturnType<typeof serviceView>;
   input: string;
   inputRevision: number;
   inputGeneration: string;
@@ -225,11 +228,15 @@ export class ProcessManager {
   readonly #quiesced = new Set<string>();
   readonly #sessions = new Map<string, Session>();
   readonly #supervised = new Map<string, Supervised>();
+  readonly #savedSessions = new Set<string>();
+  readonly #historyRetries = new Map<string, Set<() => Promise<void>>>();
+  readonly #historyWrites = new Map<string, Promise<void>>();
   readonly #jobs = new Map<string, Supervised>();
   readonly #recoveries = new Map<string, Promise<boolean>>();
   #jobCheckpoint: NodeJS.Timeout | undefined;
   #resources = new ProcessResources();
   #resourceSweep: NodeJS.Timeout | undefined;
+  readonly #workspaceRoots = new Map<string, string>();
   readonly #registries = new Map<string, ServiceRegistry>();
   readonly #declarations = new Map<string, Promise<unknown>>();
   #declarationTail: Promise<unknown> = Promise.resolve();
@@ -300,7 +307,8 @@ export class ProcessManager {
       );
       if (request.yieldAfterMs === undefined) return launched;
       const session = this.#sessions.get(launched.sessionId);
-      if (!session) return this.action(workspaceId, owner, launched.sessionId, { action: 'poll' });
+      if (!session)
+        return this.readAction(workspaceId, owner, launched.sessionId, { action: 'poll' });
       let timer: NodeJS.Timeout | undefined;
       try {
         await Promise.race([
@@ -535,7 +543,12 @@ export class ProcessManager {
         options.onSettled(session);
         return;
       }
-      setTimeout(() => this.#sessions.delete(id), 60 * 60 * 1_000).unref();
+      void this.#saveTaskHistory(workspaceRoot, session).catch((cause: unknown) => {
+        runnerLogger.warn('process.history_write_failed', {
+          workspaceId,
+          code: failureCode(cause)
+        });
+      });
     };
     session.settled = awaitChildExit(child, this.#flushGraceMs).then(
       ({ exitCode, signal }) => settle(exitCode === 0 ? 'completed' : 'failed', exitCode, signal),
@@ -593,6 +606,7 @@ export class ProcessManager {
   #registry(root: string, workspaceId: string): ServiceRegistry {
     const existing = this.#registries.get(workspaceId);
     if (existing) return existing;
+    this.#workspaceRoots.set(workspaceId, root);
     const registry = new ServiceRegistry(root);
     this.#registries.set(workspaceId, registry);
     return registry;
@@ -622,11 +636,18 @@ export class ProcessManager {
     if (registry.list().length === 0) await registry.load();
     const id = request.requestId ? jobIdentity(workspaceId, owner, request.requestId) : undefined;
     const launch = ServiceLaunchSchema.parse(request);
-    const existing = id ? registry.list().find((record) => record.id === id) : undefined;
+    await this.#retryHistory(workspaceId);
+    await this.#pruneJobHistory(workspaceId);
+    const existing = id
+      ? (registry.list().find((record) => record.id === id) ??
+        (await registry.history.get(id, owner)))
+      : undefined;
     if (existing) {
       if (JSON.stringify(existing.launch) !== JSON.stringify(launch))
         throw new Error('Command request identity was already used for different arguments');
-      return this.action(workspaceId, owner, existing.id, { action: 'poll' });
+      return this.#jobs.has(existing.id)
+        ? this.action(workspaceId, owner, existing.id, { action: 'poll' })
+        : { ...this.#recordView(existing, true), archived: true };
     }
     if (this.#activePersistentCount() >= SERVICE_LIMIT_PER_WORKSPACE)
       throw new Error(
@@ -706,6 +727,8 @@ export class ProcessManager {
       collector.push(Buffer.from(text));
       return collector.text(stream);
     };
+    const sample = this.#resources.sample(session.id);
+    if (sample) job.record.resources = sample;
     job.record.output = {
       stdout: bounded(session.stdout.text('stdout'), 'stdout'),
       stderr: bounded(session.stderr.text('stderr'), 'stderr'),
@@ -731,26 +754,160 @@ export class ProcessManager {
     if (!job || !session || job.retiring) return;
     if (!session.child.pid && this.#recoveries.has(id)) return;
     this.#captureJob(job, session, true);
-    void this.#pruneJobHistory(job.record.workspaceId);
+    void this.#pruneJobHistory(job.record.workspaceId).catch((cause: unknown) => {
+      runnerLogger.warn('process.history_write_failed', {
+        workspaceId: job.record.workspaceId,
+        code: failureCode(cause)
+      });
+    });
   }
 
-  async #pruneJobHistory(workspaceId: string): Promise<void> {
-    const terminal = [...this.#jobs.values()]
-      .filter(
-        (job) =>
-          job.record.workspaceId === workspaceId &&
-          !['running', 'interrupted'].includes(job.record.state)
-      )
-      .sort(
-        (a, b) =>
-          Date.parse(a.record.lastExit?.at ?? a.record.createdAt) -
-          Date.parse(b.record.lastExit?.at ?? b.record.createdAt)
+  #saveHistory(workspaceId: string, save: () => Promise<void>): Promise<void> {
+    const pending = this.#historyWrites.get(workspaceId) ?? Promise.resolve();
+    const write = pending
+      .catch(() => undefined)
+      .then(save)
+      .then(
+        () => {
+          const retries = this.#historyRetries.get(workspaceId);
+          retries?.delete(save);
+          if (retries?.size === 0) this.#historyRetries.delete(workspaceId);
+        },
+        (cause: unknown) => {
+          const retries = this.#historyRetries.get(workspaceId) ?? new Set<() => Promise<void>>();
+          retries.add(save);
+          this.#historyRetries.set(workspaceId, retries);
+          throw cause;
+        }
       );
-    for (const job of terminal.slice(0, Math.max(0, terminal.length - JOB_HISTORY_LIMIT))) {
-      this.#jobs.delete(job.record.id);
-      this.#sessions.delete(job.record.id);
-      await job.registry.remove(job.record.id);
+    this.#historyWrites.set(workspaceId, write);
+    void write
+      .finally(() => {
+        if (this.#historyWrites.get(workspaceId) === write) this.#historyWrites.delete(workspaceId);
+      })
+      .catch(() => undefined);
+    return write;
+  }
+
+  async #retryHistory(workspaceId: string): Promise<void> {
+    for (const save of [...(this.#historyRetries.get(workspaceId) ?? [])])
+      await this.#saveHistory(workspaceId, save);
+  }
+
+  #pruneJobHistory(workspaceId: string): Promise<void> {
+    return this.#saveHistory(workspaceId, async () => {
+      const terminal = [...this.#jobs.values()]
+        .filter(
+          (job) =>
+            job.record.workspaceId === workspaceId &&
+            !['running', 'interrupted'].includes(job.record.state)
+        )
+        .sort(
+          (a, b) =>
+            Date.parse(a.record.lastExit?.at ?? a.record.createdAt) -
+            Date.parse(b.record.lastExit?.at ?? b.record.createdAt)
+        );
+      for (const job of terminal.slice(0, Math.max(0, terminal.length - JOB_HISTORY_LIMIT))) {
+        await job.registry.archive(job.record);
+        this.#jobs.delete(job.record.id);
+        this.#sessions.delete(job.record.id);
+      }
+    });
+  }
+
+  #saveTaskHistory(root: string, session: Session): Promise<void> {
+    const registry = this.#registry(root, session.workspaceId);
+    const output = (stream: 'stdout' | 'stderr') => {
+      const collector = boundedCollector(JOB_LOG_BYTES);
+      collector.push(Buffer.from(session[stream].text(stream)));
+      return collector.text(stream);
+    };
+    const record: ProcessHistoryRecord = {
+      id: session.id,
+      workspaceId: session.workspaceId,
+      owner: session.owner,
+      name: session.command[0] ?? 'Background process',
+      kind: 'task',
+      launch: session.launch,
+      createdAt: session.startedAt,
+      startedAt: session.startedAt,
+      state: session.status,
+      restarts: 0,
+      consecutiveFailures: 0,
+      ...(this.#resources.sample(session.id)
+        ? { resources: this.#resources.sample(session.id)! }
+        : {}),
+      lastExit: {
+        at: session.finishedAt!,
+        exitCode: session.exitCode ?? null,
+        signal: session.signal ?? null,
+        reason: session.status
+      },
+      output: {
+        stdout: output('stdout'),
+        stderr: output('stderr'),
+        bytes: session.stdout.bytes + session.stderr.bytes,
+        savedAt: session.finishedAt!
+      }
+    };
+    return this.#saveHistory(session.workspaceId, async () => {
+      await registry.history.put(record.id, record.owner, record);
+      this.#rememberSavedSession(session);
+    });
+  }
+
+  #rememberSavedSession(session: Session): void {
+    if (!this.#sessions.has(session.id)) return;
+    this.#savedSessions.add(session.id);
+    const finished = [...this.#sessions.values()].filter(
+      (entry) => entry.workspaceId === session.workspaceId && this.#savedSessions.has(entry.id)
+    );
+    for (const entry of finished.slice(0, Math.max(0, finished.length - JOB_HISTORY_LIMIT))) {
+      this.#sessions.delete(entry.id);
+      this.#savedSessions.delete(entry.id);
     }
+  }
+
+  #historyRegistry(workspaceId: string): ServiceRegistry | undefined {
+    const root = this.#workspaceRoots.get(workspaceId);
+    return (
+      this.#registries.get(workspaceId) ?? (root ? this.#registry(root, workspaceId) : undefined)
+    );
+  }
+
+  async history(workspaceId: string, owners: string[] | null, query: unknown = {}) {
+    await this.#retryHistory(workspaceId);
+    await this.#pruneJobHistory(workspaceId);
+    const registry = this.#historyRegistry(workspaceId);
+    if (!registry) return { entries: [], nextCursor: null };
+    return registry.history.page(owners, query, (value) => {
+      const view = this.#recordView(value, false);
+      const command = view.command.join(' ');
+      return {
+        ...view,
+        archived: true,
+        ...(command.length > 16_384
+          ? { command: `${command.slice(0, 16_384)}…`, commandTruncated: true }
+          : {})
+      };
+    });
+  }
+
+  async readAction(workspaceId: string, owner: string | null, id: string, value: unknown) {
+    const request = z
+      .object({ action: z.enum(['poll', 'log', 'kill', 'write', 'resize']) })
+      .passthrough()
+      .parse(value);
+    if (
+      !this.#sessions.has(id) &&
+      !this.#jobs.has(id) &&
+      ['poll', 'log'].includes(request.action)
+    ) {
+      const record = await this.#historyRegistry(workspaceId)?.history.get(id, owner);
+      if (record && record.workspaceId === workspaceId)
+        return { ...this.#recordView(record, true), archived: true };
+    }
+    return this.action(workspaceId, owner, id, value);
   }
 
   #resumeJob(job: Supervised): Promise<boolean> {
@@ -875,7 +1032,10 @@ export class ProcessManager {
   }
 
   #jobView(job: Supervised, includeLogs: boolean) {
-    const record = job.record;
+    return this.#recordView(job.record, includeLogs);
+  }
+
+  #recordView(record: ProcessHistoryRecord, includeLogs: boolean) {
     const finished = record.state !== 'running';
     return {
       sessionId: record.id,
@@ -891,7 +1051,10 @@ export class ProcessManager {
         ) - Date.parse(record.startedAt)
       ),
       outputBytes: record.output?.bytes ?? 0,
-      service: undefined,
+      service: record.kind === 'service' ? serviceView(record) : undefined,
+      ...(record.resources
+        ? { resources: record.resources, resourceState: 'available' as const }
+        : {}),
       ...(!finished && record.deadlineAt
         ? { remainingMs: Math.max(0, Date.parse(record.deadlineAt) - Date.now()) }
         : {}),
@@ -903,17 +1066,20 @@ export class ProcessManager {
             signal: record.lastExit.signal
           }
         : {}),
-      lifetime: 'job' as const,
-      job: {
-        jobId: record.id,
-        name: record.name,
-        state: record.state,
-        createdAt: record.createdAt,
-        startedAt: record.startedAt,
-        restarts: record.restarts,
-        checkpointResumable: Boolean(record.checkpointResume),
-        ...(record.lastExit ? { lastExit: record.lastExit } : {})
-      },
+      lifetime: record.kind,
+      job:
+        record.kind === 'job'
+          ? {
+              jobId: record.id,
+              name: record.name,
+              state: record.state,
+              createdAt: record.createdAt,
+              startedAt: record.startedAt,
+              restarts: record.restarts,
+              checkpointResumable: Boolean(record.checkpointResume),
+              ...(record.lastExit ? { lastExit: record.lastExit } : {})
+            }
+          : undefined,
       ...(includeLogs
         ? { stdout: record.output?.stdout ?? '', stderr: record.output?.stderr ?? '' }
         : {})
@@ -1232,6 +1398,10 @@ export class ProcessManager {
     await ensureWorkspace(root);
     let started = 0;
     for (const record of records) {
+      if (record.kind === 'service' && record.state === 'stopped') {
+        await registry.archive(record);
+        continue;
+      }
       if (record.kind === 'job') {
         if (this.#jobs.has(record.id)) continue;
         const job: Supervised = { record, registry, root, isolateNetwork, guards, retiring: false };
@@ -1262,14 +1432,37 @@ export class ProcessManager {
     return started;
   }
 
-  /** Stopping a service forgets it. A service the owner stopped must not return with the runner. */
+  /** Persist a stopped declaration before retiring it, so a restart cannot revive it. */
   #retireService(supervised: Supervised): void {
     supervised.retiring = true;
     if (supervised.restart) clearTimeout(supervised.restart);
     delete supervised.restart;
     this.#supervised.delete(supervised.record.id);
     this.#stopListenerSweepIfIdle();
-    void supervised.registry.remove(supervised.record.id);
+    supervised.record.state = 'stopped';
+    supervised.record.pid = undefined;
+    const session = this.#sessions.get(supervised.record.id);
+    const stopped = supervised.registry.put(supervised.record, true);
+    void stopped.catch(() => undefined);
+    let captured = false;
+    void this.#saveHistory(supervised.record.workspaceId, async () => {
+      await stopped.catch(() => supervised.registry.put(supervised.record, true));
+      await session?.settled;
+      if (session && !captured) {
+        this.#captureJob(supervised, session, true);
+        captured = true;
+      }
+      await supervised.registry.archive(supervised.record);
+      if (session) {
+        session.retiredService = serviceView(supervised.record);
+        this.#rememberSavedSession(session);
+      }
+    }).catch((cause: unknown) => {
+      runnerLogger.warn('process.history_write_failed', {
+        workspaceId: supervised.record.workspaceId,
+        code: failureCode(cause)
+      });
+    });
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -1570,11 +1763,13 @@ export class ProcessManager {
       if (session.status === 'running') this.#stop(session);
     }
     this.#sessions.clear();
+    this.#savedSessions.clear();
     this.#jobs.clear();
     return Promise.all(endings).then(() => this.flush());
   }
 
   async flush(): Promise<void> {
+    await Promise.all([...this.#historyWrites.values()]);
     await Promise.all([...this.#registries.values()].map((registry) => registry.flush()));
   }
 
@@ -1785,7 +1980,11 @@ export class ProcessManager {
       startedAt: session.startedAt,
       ranForMs: Math.max(0, ranToMs - Date.parse(session.startedAt)),
       outputBytes: session.stdout.bytes + session.stderr.bytes + (job?.outputOffset ?? 0),
-      lifetime: job ? ('job' as const) : supervised ? ('service' as const) : ('task' as const),
+      lifetime: job
+        ? ('job' as const)
+        : supervised || session.retiredService
+          ? ('service' as const)
+          : ('task' as const),
       ...(job ? { job: this.#jobView(job, false).job } : {}),
       ...(session.deadlineAt ? { deadlineAt: session.deadlineAt } : {}),
       ...(session.deadlineAt && !session.finishedAt
@@ -1816,7 +2015,9 @@ export class ProcessManager {
                   })
             }
           }
-        : {}),
+        : session.retiredService
+          ? { service: session.retiredService }
+          : {}),
       ...(includeLogs
         ? { stdout: session.stdout.text('stdout'), stderr: session.stderr.text('stderr') }
         : {})

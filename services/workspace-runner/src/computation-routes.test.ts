@@ -115,3 +115,36 @@ describe('signed computation route authority', () => {
     }
   });
 });
+
+describe('saved history route authority', () => {
+  it('ignores agent attempts to widen history owners and enforces workspace and read scope', async () => {
+    const workspaceId = randomUUID(),
+      secret = 'history-test-secret-at-least-thirty-two-characters';
+    const url = `/v1/workspaces/${workspaceId}/computation/history`;
+    const app = Fastify();
+    const history = vi.fn(async () => ({ entries: [], nextCursor: null }));
+    app.addHook('preHandler', authenticateRunnerRequest(secret));
+    registerComputationRoutes(app, { history } as unknown as ComputationManager);
+    const auth = (role: 'agent' | 'user', scopes = ['files.read'], workspace = workspaceId) => ({
+      authorization: `Bearer ${signCapabilityToken({ sub: 'task', workspaceId: workspace, role, scopes, nonce: randomUUID(), aud: capabilityAudience('GET', url) }, secret)}`
+    });
+    try {
+      const forged = `${url}?owners=${encodeURIComponent(JSON.stringify(['other-task']))}&limit=7`;
+      expect((await app.inject({ url: forged, headers: auth('agent') })).statusCode).toBe(200);
+      expect(history).toHaveBeenLastCalledWith(workspaceId, ['task'], {
+        cursor: undefined,
+        limit: 7
+      });
+      expect((await app.inject({ url: forged, headers: auth('user') })).statusCode).toBe(200);
+      expect(history).toHaveBeenLastCalledWith(workspaceId, ['other-task'], {
+        cursor: undefined,
+        limit: 7
+      });
+      for (const headers of [auth('agent', []), auth('user', ['files.read'], randomUUID())])
+        expect((await app.inject({ url, headers })).statusCode).toBeGreaterThanOrEqual(400);
+      expect(history).toHaveBeenCalledTimes(2);
+    } finally {
+      await app.close();
+    }
+  });
+});

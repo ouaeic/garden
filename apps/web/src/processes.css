@@ -238,3 +238,14 @@
 .workflow-files dd {
   margin: 2px 0 0;
 }
+
+.process-saved-history {
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+  margin-top: 1rem;
+  min-width: 0;
+}
+.process-saved-history h4 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

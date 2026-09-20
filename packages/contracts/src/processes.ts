@@ -23,6 +23,8 @@ export type ProcessResourceSample = z.infer<typeof ProcessResourceSampleSchema>;
 
 export interface ManagedProcess {
   sessionId: string;
+  archived?: boolean;
+  commandTruncated?: boolean;
   ownerTaskId?: string;
   workspaceId?: string;
   status: string;
@@ -67,4 +69,24 @@ export interface ProcessList {
   reachableFromOutsideThisComputer?: string[];
   note?: string;
   unavailableWorkspaces?: number;
+}
+
+export const ProcessHistoryQuery = z
+  .object({
+    cursor: z
+      .string()
+      .regex(/^\d{16}-[a-f0-9]{64}-[a-f0-9]{64}\.json$/)
+      .optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+    owners: z.string().max(32_768).optional()
+  })
+  .strict();
+export interface HistoryPage<T> {
+  entries: { cursor: string; value: T }[];
+  nextCursor: string | null;
+}
+export interface ProjectProcessHistory {
+  processes: ManagedProcess[];
+  computationSessions: ComputationSession[];
+  nextCursor: string | null;
 }

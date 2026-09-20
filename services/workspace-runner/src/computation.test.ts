@@ -638,3 +638,102 @@ describe('persistent native computation', () => {
     );
   });
 });
+
+describe('saved analysis sessions', () => {
+  it('keeps older session metadata and idempotent cell receipts after journal eviction and restart', async () => {
+    const first = await start('javascript');
+    const original = await cell(first, '42', 'old-cell');
+    await manager.act(workspaceId, owner, { action: 'stop', sessionId: first.sessionId });
+    await manager.close();
+    const journalPath = path.join(directory, '.athanor/computation.json');
+    const [record] = JSON.parse(await readFile(journalPath, 'utf8')) as {
+      view: ComputationSession;
+    }[];
+    expect(record).toBeDefined();
+    const records = [
+      record!,
+      ...Array.from({ length: 127 }, () => ({
+        view: { ...record!.view, sessionId: `kernel-${randomUUID()}` }
+      }))
+    ];
+    await writeFile(journalPath, JSON.stringify(records));
+    manager = new ComputationManager(directory, policy);
+    await manager.restore();
+    const newSession = await start('javascript');
+    await manager.act(workspaceId, owner, { action: 'stop', sessionId: newSession.sessionId });
+    expect(manager.list(workspaceId, owner)).toHaveLength(128);
+    const page = await manager.history(workspaceId, [owner]);
+    expect(page.entries).toHaveLength(1);
+    expect(page.entries[0]!.value).toMatchObject({
+      sessionId: first.sessionId,
+      archived: true,
+      state: 'stopped'
+    });
+    await manager.close();
+    manager = new ComputationManager(directory, policy);
+    await manager.restore();
+    const retry = (await manager.act(workspaceId, owner, {
+      action: 'cell',
+      sessionId: first.sessionId,
+      cellId: 'old-cell',
+      code: '42'
+    })) as ComputationSession;
+    expect(retry.latestCell).toEqual(original.latestCell);
+    expect(retry.archived).toBe(true);
+    expect(vi.mocked(prepareInvocation)).toHaveBeenCalledTimes(2);
+    await expect(
+      manager.act(workspaceId, 'foreign', { action: 'status', sessionId: first.sessionId })
+    ).rejects.toThrow('not found');
+    await expect(
+      manager.act(workspaceId, owner, {
+        action: 'extend',
+        sessionId: first.sessionId,
+        lifetimeSeconds: 99999
+      })
+    ).rejects.toThrow('cannot be controlled');
+    expect((await manager.history(workspaceId, ['foreign'])).entries).toEqual([]);
+  });
+});
+
+describe('computation shutdown durability', () => {
+  it('waits for an already stopping session whose terminal cell receipt is still being written', async () => {
+    const session = await start('javascript');
+    await cell(session, '42', 'final-cell');
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const ledger = new ComputationLedger(path.join(directory, '.athanor/computation-receipts'));
+    const original = ledger.put.bind(ledger);
+    const receipt = vi
+      .spyOn(ComputationLedger.prototype, 'put')
+      .mockImplementationOnce(async (...args) => {
+        await held;
+        return original(...args);
+      });
+    try {
+      const stopping = manager.act(workspaceId, owner, {
+        action: 'stop',
+        sessionId: session.sessionId
+      });
+      await vi.waitFor(() => expect(receipt).toHaveBeenCalledTimes(1));
+      let closed = false;
+      const closing = manager.close().then(() => {
+        closed = true;
+      });
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(closed).toBe(false);
+      release();
+      await Promise.all([stopping, closing]);
+      expect(closed).toBe(true);
+      const ledger = new ComputationLedger(path.join(directory, '.athanor/computation-receipts'));
+      expect(await ledger.get(session.sessionId, 'final-cell')).toMatchObject({
+        state: 'completed',
+        cell: { result: { value: 42 } }
+      });
+    } finally {
+      release();
+      receipt.mockRestore();
+    }
+  });
+});

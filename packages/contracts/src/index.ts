@@ -2402,7 +2402,7 @@ export type MemoryItemBody = z.infer<typeof MemoryItemBody>;
 export * from './debugger.js';
 export * from './dictation.js';
 export * from './voice.js';
-export type * from './processes.js';
+export * from './processes.js';
 export type * from './directories.js';
 export * from './project-updates.js';
 

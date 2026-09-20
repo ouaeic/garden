@@ -27,6 +27,8 @@ const METHODS = [
   'resourcesAvailable',
   'list',
   'listWorkspace',
+  'history',
+  'readAction',
   'stopOwner',
   'recoveryPlan',
   'resumeJob',

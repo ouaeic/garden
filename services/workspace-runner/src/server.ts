@@ -1,3 +1,4 @@
+import { ProcessHistoryQuery } from '@athanor/contracts';
 import { RepositoryMapper, registerRepositoryMapRoute } from './repository-map.js';
 import { WorkflowManager } from './workflows.js';
 import { registerWorkflowRoutes } from './workflow-routes.js';
@@ -718,7 +719,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       );
     },
     poll: (workspaceId, taskId, sessionId, logs) =>
-      processes.action(workspaceId, taskId, sessionId, { action: logs ? 'log' : 'poll' }),
+      processes.readAction(workspaceId, taskId, sessionId, { action: logs ? 'log' : 'poll' }),
     stop: async (workspaceId, taskId, sessionId) => {
       await processes.action(workspaceId, taskId, sessionId, { action: 'kill' });
     }
@@ -1024,6 +1025,24 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
   );
 
   app.get<{ Params: { workspaceId: string } }>(
+    '/v1/workspaces/:workspaceId/processes/history',
+    async (request) => {
+      requireScope(request, 'exec');
+      const query = ProcessHistoryQuery.parse(request.query);
+      const owners =
+        request.capability.role === 'agent'
+          ? [request.capability.sub]
+          : query.owners === undefined
+            ? null
+            : z.array(z.string().min(1).max(256)).max(512).parse(JSON.parse(query.owners));
+      return processes.history(request.params.workspaceId, owners, {
+        cursor: query.cursor,
+        limit: query.limit
+      });
+    }
+  );
+
+  app.get<{ Params: { workspaceId: string } }>(
     '/v1/workspaces/:workspaceId/processes',
     async (request) => {
       requireScope(request, 'exec');
@@ -1178,7 +1197,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
     '/v1/workspaces/:workspaceId/processes/:sessionId',
     async (request) => {
       requireScope(request, 'exec');
-      return processes.action(
+      return processes.readAction(
         request.params.workspaceId,
         // The same split the list above makes, for the same reason - and it matters more here.
         // A service outlives the task that started it, so a subject-scoped kill meant the owner

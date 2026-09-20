@@ -37,6 +37,10 @@ export type LogFields = Readonly<Record<string, LogValue>>;
  * and everything that varies has to go through the fields.
  */
 const events = {
+  'computation.record_write_failed':
+    'an analysis session stopped, but its final receipt could not be saved',
+  'process.history_write_failed':
+    'a terminal process receipt could not be saved; retained records have not been evicted',
   'services.record_write_failed':
     'could not record services in .athanor/services.json - services will not survive a restart',
   'command.limits_unavailable':

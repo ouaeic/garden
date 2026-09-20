@@ -127,6 +127,8 @@ export const ComputationSessionSchema = z
     createdAt: z.string().datetime(),
     deadlineAt: z.string().datetime(),
     stateRetained: z.boolean(),
+    archived: z.boolean().optional(),
+    finishedAt: z.string().datetime().optional(),
     resources: ProcessResourceSampleSchema.optional(),
     resourceState: z.enum(['pending', 'available', 'unavailable']).optional(),
     variables: z

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ProcessManager } from './processes.js';
-import { JOB_LOG_BYTES, ServiceRegistry } from './services.js';
+import { JOB_LOG_BYTES, ServiceRegistry, newServiceRecord } from './services.js';
 
 const roots: string[] = [];
 const managers: ProcessManager[] = [];
@@ -392,4 +392,160 @@ describe('durable finite jobs', () => {
     expect(current.backgroundWork().longestRemainingMs).toBeGreaterThan(129_590_000);
     expect(current.stopOwner('workspace-1', 'task-1', {}).stopped).toEqual([launched.sessionId]);
   });
+});
+
+describe('saved process history beyond the recent list', () => {
+  it('keeps older jobs readable after restart and never replays their original request', async () => {
+    const { root, current } = await setup();
+    const script = "require('fs').appendFileSync('runs','one\\n');console.log('original output')";
+    const first = await start(current, root, script, {
+      requestId: 'archived-request',
+      yieldAfterMs: 5000
+    });
+    await settled(current, first.sessionId);
+    await current.close();
+    const registry = new ServiceRegistry(root);
+    const [original] = await registry.load();
+    expect(original).toBeDefined();
+    for (let index = 0; index < 70; index++) {
+      await registry.put(
+        {
+          ...original!,
+          id: `job-saved-${index}`,
+          name: `Finished ${index}`,
+          createdAt: new Date(Date.now() + index + 1).toISOString(),
+          lastExit: { ...original!.lastExit!, at: new Date(Date.now() + index + 1).toISOString() }
+        },
+        true
+      );
+    }
+    const restored = manager();
+    expect(await restored.resumeWorkspace(root, 'workspace-1', false)).toBe(0);
+    expect(restored.listWorkspace('workspace-1')).toHaveLength(64);
+    const archive = await restored.history('workspace-1', ['task-1'], { limit: 3 });
+    expect(archive.entries).toHaveLength(3);
+    expect(archive.nextCursor).not.toBeNull();
+    const outputs = [...archive.entries];
+    let cursor = archive.nextCursor;
+    while (cursor) {
+      const page = await restored.history('workspace-1', ['task-1'], { cursor, limit: 3 });
+      outputs.push(...page.entries);
+      cursor = page.nextCursor;
+    }
+    expect(outputs).toHaveLength(7);
+    expect(new Set(outputs.map((entry) => entry.value.sessionId)).size).toBe(7);
+    expect(outputs.some((entry) => entry.value.sessionId === first.sessionId)).toBe(true);
+    const retried = await start(restored, root, script, {
+      requestId: 'archived-request',
+      yieldAfterMs: 5000
+    });
+    expect(retried).toMatchObject({
+      sessionId: first.sessionId,
+      status: 'completed',
+      stdout: 'original output\n',
+      archived: true
+    });
+    expect(await readFile(path.join(root, 'workspace/runs'), 'utf8')).toBe('one\n');
+    await expect(
+      restored.readAction('workspace-1', 'other-task', first.sessionId, { action: 'log' })
+    ).rejects.toThrow('not found');
+    await expect(
+      restored.readAction('workspace-1', null, first.sessionId, { action: 'kill' })
+    ).rejects.toThrow('not found');
+    await expect(
+      start(restored, root, 'console.log(99)', { requestId: 'archived-request' })
+    ).rejects.toThrow('different arguments');
+  });
+
+  it('retains terminal hot records when archiving fails, then recovers without loss', async () => {
+    const { root, current } = await setup();
+    const first = await start(current, root, "console.log('saved')", { yieldAfterMs: 5000 });
+    await settled(current, first.sessionId);
+    await current.close();
+    const registry = new ServiceRegistry(root);
+    const [record] = await registry.load();
+    expect(record).toBeDefined();
+    for (let id = 0; id < 66; id++) await registry.put({ ...record!, id: `job-${id}` }, true);
+    const history = path.join(root, '.athanor/process-history');
+    await mkdir(history);
+    await mkdir(path.join(history, 'invalid-entry'));
+    const restored = manager();
+    await expect(restored.resumeWorkspace(root, 'workspace-1', false)).rejects.toThrow(
+      'invalid directory'
+    );
+    expect(restored.listWorkspace('workspace-1')).toHaveLength(67);
+    expect(await new ServiceRegistry(root).load()).toHaveLength(67);
+    await rm(path.join(history, 'invalid-entry'), { recursive: true });
+    const page = await restored.history('workspace-1', null);
+    expect(page.entries).toHaveLength(3);
+    expect(restored.listWorkspace('workspace-1')).toHaveLength(64);
+  });
+
+  it('archives deliberately stopped services without restarting them and retains their output', async () => {
+    const { root, current } = await setup();
+    const launched = await current.start(
+      root,
+      'workspace-1',
+      'task-1',
+      {
+        ...command("console.log('service ready');setInterval(()=>{},1000)"),
+        service: 'Test service'
+      },
+      120,
+      false
+    );
+    await expect
+      .poll(() => current.action('workspace-1', null, launched.sessionId, { action: 'log' }).stdout)
+      .toContain('service ready');
+    current.action('workspace-1', null, launched.sessionId, { action: 'kill' });
+    await current.flush();
+    await current.close();
+    const restored = manager();
+    expect(await restored.resumeWorkspace(root, 'workspace-1', false)).toBe(0);
+    const page = await restored.history('workspace-1', null);
+    expect(page.entries).toHaveLength(1);
+    expect(page.entries[0]!.value).toMatchObject({
+      lifetime: 'service',
+      archived: true,
+      status: 'stopped',
+      service: { name: 'Test service' }
+    });
+    expect(
+      await restored.readAction('workspace-1', null, launched.sessionId, { action: 'log' })
+    ).toMatchObject({ stdout: 'service ready\n' });
+  });
+});
+
+it('keeps large launch receipts while projecting bounded command previews for history pages', async () => {
+  const { root, current } = await setup();
+  const registry = new ServiceRegistry(root);
+  const args = Array.from({ length: 50 }, () => 'x'.repeat(65_536));
+  const record = newServiceRecord({
+    workspaceId: 'workspace-1',
+    owner: 'task-1',
+    name: 'Large argument list',
+    kind: 'job',
+    launch: {
+      executable: 'analysis',
+      args,
+      cwd: 'workspace',
+      env: {},
+      network: false,
+      maxOutputBytes: 4096
+    }
+  });
+  record.state = 'failed';
+  record.lastExit = {
+    at: record.startedAt,
+    exitCode: 1,
+    signal: null,
+    reason: 'Arguments refused by executable'
+  };
+  await registry.history.put(record.id, record.owner, record);
+  expect(await current.resumeWorkspace(root, 'workspace-1', false)).toBe(0);
+  const page = await current.history('workspace-1', ['task-1']);
+  expect(page.entries).toHaveLength(1);
+  expect(page.entries[0]!.value.commandTruncated).toBe(true);
+  expect(JSON.stringify(page).length).toBeLessThan(20_000);
+  expect((await registry.history.get(record.id, record.owner))?.launch.args).toEqual(args);
 });

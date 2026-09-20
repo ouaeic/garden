@@ -16,6 +16,7 @@ import {
   processState
 } from './process-display';
 import './processes.css';
+const SavedProcessHistory = lazy(() => import('./SavedProcessHistory'));
 const ProjectComputations = lazy(() => import('./ProjectComputations'));
 
 export default function ProcessPanel({
@@ -39,6 +40,7 @@ export default function ProcessPanel({
   const [confirm, setConfirm] = useState<ManagedProcess | null>(null);
   const [logs, setLogs] = useState<Record<string, string>>({});
   const [showFinished, setShowFinished] = useState(false);
+  const [showSaved, setShowSaved] = useState(false);
   const [historyLimit, setHistoryLimit] = useState(10);
   const clock = useVisibleClock(
     Boolean(list?.processes.some(processActive)),
@@ -71,6 +73,7 @@ export default function ProcessPanel({
     setBusy(null);
     setError(null);
     setShowFinished(false);
+    setShowSaved(false);
     setHistoryLimit(10);
     void refresh();
     return () => {
@@ -199,7 +202,7 @@ export default function ProcessPanel({
                 ? 'No processes are running. Finished runs and their output are available below.'
                 : list.unavailableWorkspaces
                   ? 'No processes available to display from the reachable execution roots.'
-                  : 'No background processes have been reported for this project.'}
+                  : 'No background processes are running.'}
             </p>
           )}
           {Boolean(list.unavailableComputationWorkspaces) && (
@@ -396,6 +399,18 @@ export default function ProcessPanel({
                 ? 'Hide finished processes'
                 : `Show finished processes (${finished.length}${failed ? ` · ${failed} failed` : ''})`}
             </Button>
+          )}
+          <Button
+            className="process-history-toggle"
+            aria-expanded={showSaved}
+            onClick={() => setShowSaved((value) => !value)}
+          >
+            {showSaved ? 'Hide saved history' : 'Browse saved history'}
+          </Button>
+          {showSaved && (
+            <Suspense fallback={<Spinner label="Loading saved history…" />}>
+              <SavedProcessHistory key={endpoint} endpoint={endpoint} />
+            </Suspense>
           )}
         </>
       )}

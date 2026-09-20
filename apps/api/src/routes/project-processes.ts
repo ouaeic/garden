@@ -1,10 +1,13 @@
+import { registerProcessHistoryRoutes } from './process-history.js';
 import { z } from 'zod';
 import { AthanorError } from '@athanor/core';
 import type { ComputationSession, ProcessList } from '@athanor/contracts';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 
-export const registerProjectProcessRoutes = ({ app, store, runner }: RouteContext): void => {
+export const registerProjectProcessRoutes = (context: RouteContext): void => {
+  const { app, store, runner } = context;
+  registerProcessHistoryRoutes(context);
   app.post<{ Params: { workspaceId: string; workflowId: string } }>(
     '/v1/workspaces/:workspaceId/workflows/:workflowId/resume',
     async (request) => {

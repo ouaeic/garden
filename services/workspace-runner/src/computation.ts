@@ -1,3 +1,5 @@
+import { runnerLogger, failureCode } from './log.js';
+import { TerminalHistory } from './terminal-history.js';
 import { discardMissionInvocation, trackMissionInvocation } from './mission-processes.js';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
@@ -97,10 +99,12 @@ const identity = async (pid: number): Promise<string | undefined> => {
 export class ComputationManager {
   #records = new Map<string, RecordState>();
   #live = new Map<string, Live>();
+  #stopping = new Map<string, Promise<void>>();
   #flush: Promise<void> = Promise.resolve();
   #timer: NodeJS.Timeout;
   #resources: ProcessResources;
   readonly #ledger: ComputationLedger;
+  readonly #history = new Map<string, TerminalHistory<ComputationSession>>();
   constructor(
     private readonly workspaceRoot: string,
     private readonly policy: InvocationPolicy,
@@ -158,6 +162,7 @@ export class ComputationManager {
             /* The process may have exited between identity and signal. */
           }
         }
+        record.view.finishedAt = new Date(this.now()).toISOString();
         record.view.state = 'lost';
         record.view.stateRetained = false;
         record.view.note =
@@ -217,7 +222,17 @@ export class ComputationManager {
       return this.#start(workspaceId, owner, request);
     }
     if (!request.sessionId) throw Error('Computation action requires sessionId');
-    const record = this.#owned(workspaceId, owner, request.sessionId);
+    const record = this.#records.has(request.sessionId)
+      ? this.#owned(workspaceId, owner, request.sessionId)
+      : await this.#archive(workspaceId)
+          .get(request.sessionId, owner)
+          .then((view) => {
+            if (!view || view.workspaceId !== workspaceId)
+              throw Error('Computation session not found');
+            return { view: { ...view, archived: true } } satisfies RecordState;
+          });
+    if (record.view.archived && ['stop', 'interrupt', 'extend'].includes(request.action))
+      throw Error('An archived analysis session cannot be controlled');
     if (request.action === 'status') return this.#view(record);
     if (request.action === 'stop') {
       await this.#stop(
@@ -339,34 +354,68 @@ export class ComputationManager {
     }
     return structuredClone(record.view);
   }
-  async #persist(): Promise<void> {
-    const entries = [...this.#records.values()];
-    const finished = entries.filter((record) => !active(record.view.state));
-    while (this.#records.size > 128 && finished.length) {
-      const entry = finished.shift()!;
-      this.#records.delete(entry.view.sessionId);
+  #archive(workspaceId: string): TerminalHistory<ComputationSession> {
+    z.string().uuid().parse(workspaceId);
+    let history = this.#history.get(workspaceId);
+    if (!history) {
+      history = new TerminalHistory(
+        path.join(this.workspaceRoot, '.athanor', 'computation-history', workspaceId),
+        ComputationSessionSchema
+      );
+      this.#history.set(workspaceId, history);
     }
-    const data = JSON.stringify([...this.#records.values()]);
-    if (Buffer.byteLength(data) > 16 * 1024 * 1024)
-      throw Error('Computation journal exceeds limit');
+    return history;
+  }
+  async history(workspaceId: string, owners: string[] | null, query: unknown = {}) {
+    await this.#flush;
+    const page = await this.#archive(workspaceId).page(owners, query);
+    return {
+      ...page,
+      entries: page.entries.map(({ cursor, value }) => ({
+        cursor,
+        value: { ...value, archived: true }
+      }))
+    };
+  }
+  async #persist(): Promise<void> {
     const write = this.#flush
       .catch(() => undefined)
       .then(async () => {
+        const finished = [...this.#records.values()].filter(
+          (record) => !active(record.view.state) && !this.#stopping.has(record.view.sessionId)
+        );
+        const evicted = new Set<string>();
+        while (this.#records.size - evicted.size > 128 && finished.length) {
+          const entry = finished.shift()!;
+          await this.#archive(entry.view.workspaceId).put(
+            entry.view.sessionId,
+            entry.view.taskId,
+            entry.view
+          );
+          evicted.add(entry.view.sessionId);
+        }
+        const data = JSON.stringify(
+          [...this.#records.values()].filter((entry) => !evicted.has(entry.view.sessionId))
+        );
+        if (Buffer.byteLength(data) > 16 * 1024 * 1024)
+          throw Error('Computation journal exceeds limit');
         const directory = path.dirname(this.#journal);
         await mkdir(directory, { recursive: true, mode: 0o700 });
         const temporary = `${this.#journal}.${randomUUID()}.tmp`;
-        await writeFile(temporary, data, { mode: 0o600 });
+        await writeFile(temporary, data, { mode: 0o600, flush: true });
         await rename(temporary, this.#journal);
+        for (const id of evicted) this.#records.delete(id);
       });
     this.#flush = write;
     await write;
   }
+
   #scheduleLifetime(live: Live): void {
     live.deadline?.();
     live.deadline = scheduleComputationDeadline(
       Date.parse(live.record.view.deadlineAt),
       () => {
-        void this.#stop(live.record, 'expired', 'Declared computation lifetime elapsed.');
+        this.#stopLater(live.record, 'expired', 'Declared computation lifetime elapsed.');
       },
       this.now
     );
@@ -467,15 +516,15 @@ export class ComputationManager {
       child.stdout.on('data', (chunk: string) => this.#receive(live, chunk));
       child.stderr.on('data', (chunk: Buffer) => live.stderr.push(chunk));
       child.stdin.on('error', () => {
-        void this.#stop(record, 'lost', 'Computation input closed.');
+        this.#stopLater(record, 'lost', 'Computation input closed.');
       });
       child.once('error', (error) => {
         failReady(error);
-        void this.#stop(record, 'lost', error.message);
+        this.#stopLater(record, 'lost', error.message);
       });
       child.once('exit', () => {
         failReady(Error('Computation exited before initialization'));
-        void this.#stop(record, 'lost', 'Interpreter exited; its in-memory state was lost.');
+        this.#stopLater(record, 'lost', 'Interpreter exited; its in-memory state was lost.');
       });
       this.#scheduleLifetime(live);
       record.pid = child.pid;
@@ -660,7 +709,7 @@ export class ComputationManager {
           return;
         }
         if (packet.kind === 'fatal') {
-          void this.#stop(live.record, 'lost', packet.message);
+          this.#stopLater(live.record, 'lost', packet.message);
           return;
         }
         if (packet.cellId !== live.record.view.latestCell?.cellId || live.finishing) return;
@@ -674,7 +723,7 @@ export class ComputationManager {
     try {
       live.wire.push(chunk);
     } catch (error) {
-      void this.#stop(
+      this.#stopLater(
         live.record,
         'lost',
         error instanceof Error ? error.message : 'Invalid computation protocol packet'
@@ -755,7 +804,7 @@ export class ComputationManager {
     record.view.state = 'interrupted';
     killProcessTree(live.child, 'SIGINT');
     live.forceTimer = setTimeout(() => {
-      void this.#stop(
+      this.#stopLater(
         record,
         'lost',
         'Interpreter did not acknowledge interrupt; its process group was stopped and state was lost.'
@@ -764,7 +813,30 @@ export class ComputationManager {
     live.forceTimer.unref();
     await this.#persist();
   }
-  async #stop(
+  #stopLater(record: RecordState, state: 'stopped' | 'expired' | 'lost', note: string): void {
+    void this.#stop(record, state, note).catch((cause: unknown) => {
+      runnerLogger.warn('computation.record_write_failed', {
+        workspaceId: record.view.workspaceId,
+        code: failureCode(cause)
+      });
+    });
+  }
+  #stop(record: RecordState, state: 'stopped' | 'expired' | 'lost', note: string): Promise<void> {
+    const pending = this.#stopping.get(record.view.sessionId);
+    if (pending) return pending;
+    if (!this.#live.has(record.view.sessionId) && !active(record.view.state))
+      return Promise.resolve();
+    const ending = this.#finishStop(record, state, note);
+    this.#stopping.set(record.view.sessionId, ending);
+    void ending
+      .finally(() => {
+        if (this.#stopping.get(record.view.sessionId) === ending)
+          this.#stopping.delete(record.view.sessionId);
+      })
+      .catch(() => undefined);
+    return ending;
+  }
+  async #finishStop(
     record: RecordState,
     state: 'stopped' | 'expired' | 'lost',
     note: string
@@ -781,6 +853,7 @@ export class ComputationManager {
       live.failReady(Error(note));
       live.settle?.();
     }
+    record.view.finishedAt = new Date(this.now()).toISOString();
     record.view.state = state;
     record.view.stateRetained = false;
     record.view.note = note;

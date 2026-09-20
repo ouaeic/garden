@@ -3,6 +3,8 @@ import { mkdir, readdir, readFile, rename, unlink, writeFile } from 'node:fs/pro
 import { uptime } from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
+import { TerminalHistory } from './terminal-history.js';
+import { ProcessResourceSampleSchema } from '@athanor/contracts';
 import { failureCode, runnerLogger } from './log.js';
 
 /**
@@ -99,11 +101,10 @@ const ServiceExitSchema = z.object({
 
 /**
  * `running` means a process is up. `restarting` means it died and the backoff is counting.
- * `crash_looped` means supervision gave up and is telling the owner so. There is no `stopped`
- * record on disk: stopping a service forgets it, because a service the owner stopped should not
- * come back when the runner does.
+ * `crash_looped` means supervision gave up and is telling the owner so. A `stopped` declaration
+ * is terminal and is archived before removal; it must never restart during recovery.
  */
-const ServiceRecordSchema = z.object({
+export const ServiceRecordSchema = z.object({
   id: z.string().min(1).max(128),
   workspaceId: z.string().min(1).max(128),
   owner: z.string().min(1).max(256),
@@ -112,6 +113,7 @@ const ServiceRecordSchema = z.object({
   launch: ServiceLaunchSchema,
   checkpointResume: ServiceLaunchSchema.optional(),
   deadlineAt: z.string().optional(),
+  resources: ProcessResourceSampleSchema.optional(),
   output: z
     .object({
       stdout: z.string().max(JOB_LOG_BYTES * 2),
@@ -148,6 +150,10 @@ const ServiceRecordSchema = z.object({
 });
 
 export type ServiceRecord = z.infer<typeof ServiceRecordSchema>;
+export const ProcessHistoryRecordSchema = ServiceRecordSchema.extend({
+  kind: z.enum(['service', 'job', 'task'])
+});
+export type ProcessHistoryRecord = z.infer<typeof ProcessHistoryRecordSchema>;
 
 export const newServiceRecord = (input: {
   workspaceId: string;
@@ -178,7 +184,7 @@ export const newServiceRecord = (input: {
 };
 
 /** What it is, its command, when it started, how often it has come back, and how it last ended. */
-export const serviceView = (record: ServiceRecord) => ({
+export const serviceView = (record: ProcessHistoryRecord) => ({
   serviceId: record.id,
   name: record.name,
   state: record.state,
@@ -199,6 +205,7 @@ export const serviceView = (record: ServiceRecord) => ({
  */
 export class ServiceRegistry {
   readonly #file: string;
+  readonly history: TerminalHistory<ProcessHistoryRecord>;
   readonly #records = new Map<string, ServiceRecord>();
   #writes: Promise<void> = Promise.resolve();
   #revision = 0;
@@ -206,6 +213,11 @@ export class ServiceRegistry {
 
   constructor(workspaceRoot: string) {
     this.#file = path.join(workspaceRoot, '.athanor', 'services.json');
+    this.history = new TerminalHistory(
+      path.join(workspaceRoot, '.athanor', 'process-history'),
+      ProcessHistoryRecordSchema,
+      32 * 1024 * 1024
+    );
   }
 
   /**
@@ -254,15 +266,27 @@ export class ServiceRegistry {
     return strict ? this.#flush(true) : this.#writes;
   }
 
-  remove(id: string): Promise<void> {
-    if (!this.#records.delete(id)) return Promise.resolve();
-    return this.#flush();
+  async remove(id: string, strict = false): Promise<void> {
+    const previous = this.#records.get(id);
+    if (!this.#records.delete(id)) return;
+    try {
+      await this.#flush(strict);
+    } catch (cause) {
+      if (previous) this.#records.set(id, previous);
+      throw cause;
+    }
+  }
+
+  async archive(record: ServiceRecord): Promise<void> {
+    if (['running', 'restarting', 'interrupted', 'crash_looped'].includes(record.state))
+      throw Error('Only terminal processes can enter saved history');
+    await this.history.put(record.id, record.owner, record);
+    await this.remove(record.id, true);
   }
 
   /**
-   * Serialised, and always writing the whole set: two services settling in the same tick would
-   * otherwise interleave a read-modify-write and lose one of them. The set is at most
-   * `SERVICE_LIMIT_PER_WORKSPACE` small objects, so rewriting all of it costs nothing.
+   * Serialised and coalesced: concurrent updates cannot publish an older snapshot over a newer
+   * one. Only live declarations and bounded recent receipts stay in this journal.
    */
   #flush(strict = false): Promise<void> {
     const requested = ++this.#revision;
