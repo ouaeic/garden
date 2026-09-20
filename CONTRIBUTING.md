@@ -305,6 +305,9 @@ The browser layout drill is `pnpm test:ui`. It uses the runner’s installed Chr
 fixtures, with no provider credentials or network calls. It exercises responsive layout, keyboard
 focus, effort drafts, preview playback, downloads, and expansion without restarting the preview.
 Set `GARDEN_UI_REPORT` to a local directory to retain its screenshots.
+The SVG drill checks real image rendering from attachment responses, script and external-resource
+isolation, bounded streaming, failed loads, replacement cancellation and phone layout. Set
+`GARDEN_SVG_REPORT` to retain its screenshot and request evidence.
 The analysis-viewer drill also creates a real native run receipt and checks its project-file and
 saved-result presentations, source editing, scoped downloads and phone layout. Set
 `GARDEN_ANALYSIS_REPORT` to retain its screenshot and accessibility tree. The provenance drill

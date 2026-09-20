@@ -1,4 +1,4 @@
-import { responseError } from '../client';
+import { readBoundedText } from '../bounded-response';
 
 export const NOTEBOOK_PREVIEW_BYTES = 32 * 1024 * 1024;
 const IMAGE_BYTES = 4 * 1024 * 1024;
@@ -48,36 +48,11 @@ export function parseNotebook(text: string): Notebook {
 
 /** Bound actual streamed bytes even when a server omits or misstates its length. */
 export async function readNotebookResponse(response: Response): Promise<string> {
-  if (!response.ok) throw await responseError(response);
-  const tooLarge = () =>
-    new Error(
-      'This notebook is too large to preview here. Download the original to open all cells and outputs.'
-    );
-  if (Number(response.headers.get('content-length')) > NOTEBOOK_PREVIEW_BYTES) {
-    await response.body?.cancel();
-    throw tooLarge();
-  }
-  if (!response.body) throw new Error('The notebook response was empty.');
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder('utf-8', { fatal: true });
-  const parts: string[] = [];
-  let bytes = 0;
-  try {
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      bytes += value.byteLength;
-      if (bytes > NOTEBOOK_PREVIEW_BYTES) throw tooLarge();
-      parts.push(decoder.decode(value, { stream: true }));
-    }
-    parts.push(decoder.decode());
-    return parts.join('');
-  } catch (error) {
-    await reader.cancel().catch(() => undefined);
-    throw error;
-  } finally {
-    reader.releaseLock();
-  }
+  return readBoundedText(response, NOTEBOOK_PREVIEW_BYTES, {
+    tooLarge:
+      'This notebook is too large to preview here. Download the original to open all cells and outputs.',
+    empty: 'The notebook response was empty.'
+  });
 }
 
 export function notebookImage(data: unknown): string | null {

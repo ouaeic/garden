@@ -8,6 +8,7 @@ const Markdown = lazy(() => import('../MarkdownBody'));
 const PdfPreview = lazy(() => import('./PdfPreview'));
 const AnalysisJsonPreview = lazy(() => import('./AnalysisJsonPreview'));
 const NotebookPreview = lazy(() => import('./NotebookPreview'));
+const SvgPreview = lazy(() => import('./SvgPreview'));
 
 export function ResultPreview({
   artifact
@@ -50,8 +51,23 @@ export function ResultPreview({
         {error}
       </p>
     );
+  if (mime === 'image/svg+xml')
+    return (
+      <Suspense fallback={<p className="muted">Opening image…</p>}>
+        <SvgPreview key={artifact.id} url={url} name={artifact.name} bytes={artifact.sizeBytes} />
+      </Suspense>
+    );
   if (mime.startsWith('image/'))
-    return <img className="computer-result-image" src={url} alt={artifact.name} />;
+    return (
+      <img
+        className="computer-result-image"
+        src={url}
+        alt={artifact.name}
+        onError={() =>
+          setError('This image could not be displayed. Download it to open the original.')
+        }
+      />
+    );
   if (mime.startsWith('audio/'))
     return (
       // eslint-disable-next-line jsx-a11y/media-has-caption -- Owner artifacts do not supply a caption track; transcription must not be invented.
