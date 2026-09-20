@@ -472,6 +472,14 @@ export class ComputationManager {
     }
   }
   async #cell(record: RecordState, request: ComputationRequest): Promise<unknown> {
+    if (request.path && ['checkpoint', 'restore'].includes(request.action))
+      request = {
+        ...request,
+        path: assertUserDataPath(
+          path.join(this.workspaceRoot, record.view.workspaceId),
+          request.path
+        )
+      };
     const id = request.cellId;
     if (!id) throw Error('Cell/checkpoint/restore requires a stable cellId for idempotency');
     const hash = createHash('sha256').update(JSON.stringify(request)).digest('hex');

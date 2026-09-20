@@ -34,9 +34,9 @@ export async function executeComputationTool(
           'Interrupt the active cell. Acknowledged interrupts retain values; otherwise the interpreter is stopped and state is reported lost.',
         stop: 'End the session and discard in-memory values.',
         checkpoint:
-          'Save selected JSON-serializable variables to a new workspace path. R preserves data vectors, matrices, data frames, factors and their attributes as typed JSON. No pickle, RDS or arbitrary serialization hooks.',
+          'Save selected JSON-serializable variables to a new workspace path; supply a stable cellId. Bare paths resolve from workspace/, as with file_read. R preserves data vectors, matrices, data frames, factors and their attributes as typed JSON. No pickle, RDS or arbitrary serialization hooks.',
         restore:
-          'Restore an explicit JSON checkpoint into an idle session of the same language; source cells are never replayed.'
+          'Restore an explicit JSON checkpoint into an idle session of the same language; supply a stable cellId. Source cells are never replayed.'
       },
       examples: [
         {
@@ -65,7 +65,7 @@ export async function executeComputationTool(
         }
       ],
       plots:
-        'Python: return a matplotlib Figure as the last expression for a PNG (when matplotlib is installed). R: visible final values print, and default plotting devices produce PNGs. Variable inspection lists names without forcing delayed or active bindings. JavaScript: garden.plot({title,xLabel,yLabel,points:[[x,y],...]}) produces a safe SVG artifact. Artifacts are source-linked; no HTML or tool bridge runs inside the session.',
+        'Python: return a matplotlib Figure as the last expression for a PNG (when matplotlib is installed). R: visible final values print, and default plotting devices produce PNGs. Variable inspection lists names without forcing delayed or active bindings. JavaScript: garden.plot({title,xLabel,yLabel,points:[[x,y],...]}) produces a safe SVG artifact. Pass returned artifact paths directly to image_read or publish_artifact; runner artifacts need not be visible to shell commands. No HTML or tool bridge runs inside the session.',
       continuity:
         'Values survive cells and turns until the declared deadline. Cancellation or explicit stop ends the session. Runner restart loses memory and never replays cells; use explicit file checkpoints for recovery.'
     };

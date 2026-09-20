@@ -215,7 +215,7 @@ describe('persistent native computation', () => {
       sessionId: session.sessionId,
       cellId: 'save',
       variables: ['values'],
-      path: 'workspace/values.json'
+      path: 'values.json'
     })) as ComputationSession;
     expect(saved.latestCell).toMatchObject({
       state: 'completed',
@@ -229,12 +229,24 @@ describe('persistent native computation', () => {
       language: 'python',
       values: { values: [2, 3, 5] }
     });
+    await expect(readFile(path.join(directory, workspaceId, 'values.json'))).rejects.toMatchObject({
+      code: 'ENOENT'
+    });
+    expect(
+      await manager.act(workspaceId, owner, {
+        action: 'checkpoint',
+        sessionId: session.sessionId,
+        cellId: 'save',
+        variables: ['values'],
+        path: 'workspace/values.json'
+      })
+    ).toMatchObject({ latestCell: { state: 'completed', cellId: 'save' } });
     const another = await start('python');
     await manager.act(workspaceId, owner, {
       action: 'restore',
       sessionId: another.sessionId,
       cellId: 'restore',
-      path: 'workspace/values.json'
+      path: 'values.json'
     });
     const checkpointBytes = await readFile(
       path.join(directory, workspaceId, 'workspace/values.json')

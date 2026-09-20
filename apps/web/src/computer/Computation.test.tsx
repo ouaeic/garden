@@ -76,4 +76,26 @@ describe('owner computation session controls', () => {
     expect(html).toContain('End session');
     expect(html).not.toContain('Interrupt cell');
   });
+  it('distinguishes ended-session records from live values and resource use', () => {
+    const html = render({
+      ...session,
+      state: 'stopped',
+      stateRetained: false,
+      resources: {
+        sampledAt: '2026-09-06T00:01:00Z',
+        intervalMs: 120000,
+        cpuPercent: 0,
+        residentBytes: 100 * 1024 ** 2,
+        processCount: 1,
+        threadCount: 1,
+        children: []
+      }
+    });
+    expect(html).toContain('Recorded variables');
+    expect(html).toContain('20 rows, 4 columns');
+    expect(html).toContain('Last sample');
+    expect(html).not.toContain('Values in memory');
+    expect(html).not.toContain('End session');
+    expect(html).toContain('View execution history');
+  });
 });

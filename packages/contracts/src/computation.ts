@@ -20,7 +20,14 @@ export const ComputationRequest = z
     rLibraryPaths: z.array(z.string().min(1).max(4096)).max(16).optional(),
     cwd: z.string().max(4096).default('workspace'),
     lifetimeSeconds: z.number().int().positive().optional(),
-    cellId: z.string().min(1).max(120).optional(),
+    cellId: z
+      .string()
+      .min(1)
+      .max(120)
+      .describe(
+        'Required for cell, checkpoint and restore. Reuse the same ID only to retry the same operation.'
+      )
+      .optional(),
     code: z.string().max(100_000).optional(),
     timeoutSeconds: z.number().int().positive().optional(),
     variables: z.array(z.string().min(1).max(200)).max(100).optional(),

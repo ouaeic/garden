@@ -47,6 +47,7 @@ export function ComputationCard({
       {sample && (
         <details>
           <summary>
+            {!active && 'Last sample · '}
             CPU {sample.cpuPercent === null ? 'pending' : `${Math.round(sample.cpuPercent)}%`} · RAM{' '}
             {processMemory(sample.residentBytes)}
           </summary>
@@ -72,7 +73,10 @@ export function ComputationCard({
       {session.note && <p role="status">{session.note}</p>}
       {session.variables.length > 0 && (
         <details>
-          <summary>Values in memory · {session.variables.length}</summary>
+          <summary>
+            {session.stateRetained ? 'Values in memory' : 'Recorded variables'} ·{' '}
+            {session.variables.length}
+          </summary>
           <div className="garden-computation-values">
             {session.variables.map((variable) => (
               <div key={variable.name}>
