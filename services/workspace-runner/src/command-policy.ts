@@ -151,6 +151,7 @@ export const packageManagerInvocation = async (
 ): Promise<'direct' | 'wrapped' | undefined> => {
   const name = binaryName(command.executable);
   if (PACKAGE_MANAGERS.has(name)) return 'direct';
+  if (!COMMAND_WRAPPERS.has(name)) return undefined;
   const candidates = {
     ...command,
     args: argumentTokens(command.args).map((token) => token.replace(/^[A-Za-z_][A-Za-z0-9_]*=/, ''))
