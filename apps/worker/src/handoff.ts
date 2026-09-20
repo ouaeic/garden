@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { turnEvidenceCount } from './progress.js';
 import { taskReasoningEffort } from './reasoning.js';
 import type { ModelRelease, WebToolPlan } from '@athanor/contracts';
@@ -398,6 +399,7 @@ Nothing you produced was rolled back and none of it is lost. This same task cont
     model.reasoning
   );
   const flusher = createStreamFlusher();
+  const streamId = randomUUID();
   let streamEvents = Promise.resolve();
   // Swallowed for the reason the loop's own frame writer swallows it: this is the call that
   // writes the owner's handoff, and losing the turn's closing message over one failed delta row -
@@ -406,7 +408,8 @@ Nothing you produced was rolled back and none of it is lost. This same task cont
     streamEvents = streamEvents.then(async () => {
       await event(deps.store, task, key, 'assistant_delta', 'Agent response', {
         markdown: frame,
-        append: true
+        append: true,
+        streamId
       }).catch(() => undefined);
     });
   };

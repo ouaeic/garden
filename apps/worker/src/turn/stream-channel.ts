@@ -1,22 +1,5 @@
-/**
- * The three channels a generation writes to the owner's timeline while it is still being generated,
- * and the one rule that governs all three.
- *
- * Lifted out of `AgentWorker.run()`'s step loop unchanged. It was a hundred and nine lines of
- * closures declared inside the loop body, between the request being assembled and the request being
- * sent - so the two things the reader is there for, what goes to the provider and what comes back,
- * were a screen and a half apart. Nothing about it needs the loop: it needs the store, the task it
- * is writing on, and one question it must ask before every write.
- *
- * That question is `isDisowned`, and it is why this is one object rather than three functions.
- * `disowned` means another claimant is already running this task, and every row written from that
- * moment lands in the middle of *their* trajectory. All three channels have to ask it, at the door
- * and again inside the queue, and a fourth channel added later has to ask it too - which is much
- * harder to forget when they are declared together.
- *
- * The accessor is passed rather than the watch itself because the watch is created after this is:
- * the channels are built before the request, and the watch belongs to the request.
- */
+/** Stream writes stay ordered and stop when the worker loses ownership. */
+import { randomUUID } from 'node:crypto';
 import type { DataStore, TaskRecord } from '@athanor/data';
 import type { AgentState } from '../agent-state.js';
 import {
@@ -70,6 +53,7 @@ export const createStreamChannel = (
   const stallIntervalMs = deps.stallIntervalMs ?? STALL_HEARTBEAT_INTERVAL_MS;
   const now = deps.now ?? (() => Date.now());
   const streamFlusher = createStreamFlusher(STREAM_FLUSH_INTERVAL_MS, now);
+  const streamId = randomUUID();
   let streamEvents = Promise.resolve();
   /*
    * One lost frame is not a lost turn.
@@ -100,10 +84,9 @@ export const createStreamChannel = (
       { count: droppedFrames }
     ).catch(() => undefined);
   };
-  const emitStreamFrame = (frame: string): void => {
+  const emitStreamFrame = (frame: string, heartbeat = false): void => {
     if (disowned()) return;
-    // What the stall heartbeat re-asserts; the newest frame is the whole story so far.
-    lastFrame = frame;
+    hasFrame = true;
     streamEvents = streamEvents.then(async () => {
       // Checked again inside the queue as well as at the door: the frames are written one at a
       // time behind an awaited chain, so a halt that lands while three are queued would
@@ -112,7 +95,9 @@ export const createStreamChannel = (
       const write = () =>
         event(deps.store, task, key, 'assistant_delta', 'Agent response', {
           markdown: frame,
-          append: true
+          append: true,
+          streamId,
+          ...(heartbeat ? { heartbeat: true } : {})
         });
       /*
        * A failed frame is retried once on the next tick before it is counted lost, because the
@@ -131,22 +116,9 @@ export const createStreamChannel = (
       });
     });
   };
-  /*
-   * The "Now" line the owner watches is fed by frames; a long tool step or a reasoning pass
-   * longer than one flush window feeds it nothing, and a stalled channel reads on screen
-   * exactly like a dead one. The heartbeat re-asserts the last frame the channel would have
-   * shown once the silence outlasts the interval - a second copy of a frame the client already
-   * concatenated changes nothing it displays, and nothing is written on a turn that is still
-   * moving.
-   *
-   * Re-armed by every write attempt, including failed ones: a channel that is failing writes
-   * is saying so once through `droppedFrames`, and re-asserting frames into it would only
-   * lengthen the queue the loop settles on.
-   */
-  // `setInterval` here is Node's (the worker is a Node process, `types:["node"]`), so the handle
-  // is a `NodeJS.Timeout` with `unref`; annotating the narrower shape only fights `clearInterval`.
+  // An empty heartbeat keeps transport activity visible without repeating answer text.
   let heartbeat: NodeJS.Timeout | undefined;
-  let lastFrame: string | undefined;
+  let hasFrame = false;
   let lastWriteAt = now();
   const touched = (): void => {
     lastWriteAt = now();
@@ -170,8 +142,8 @@ export const createStreamChannel = (
       close();
       return;
     }
-    if (lastFrame === undefined || now() - lastWriteAt < stallIntervalMs) return;
-    emitStreamFrame(lastFrame);
+    if (!hasFrame || now() - lastWriteAt < stallIntervalMs) return;
+    emitStreamFrame('', true);
   }, stallIntervalMs);
   /* Settled with the write chain below, which is what stops it; never keep a worker alive. */
   heartbeat.unref();

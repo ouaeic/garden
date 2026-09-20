@@ -12,7 +12,7 @@
  * reads on screen exactly like one that has died.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { encryptJson } from '@athanor/core';
+import { decryptJson, encryptJson } from '@athanor/core';
 import { createDatabase, migrateDatabase, DataStore, type Database } from '@athanor/data';
 import type { AgentState } from '../agent-state.js';
 import { createStreamChannel } from './stream-channel.js';
@@ -78,7 +78,7 @@ describe('the frame channel', () => {
     expect(channel.settle).toBeTypeOf('function');
   });
 
-  it('re-asserts the last frame once the channel has been silent longer than the interval', async () => {
+  it('sends empty heartbeats without duplicating answer text', async () => {
     const { store, key, task, state } = await fixture();
     let clock = 0;
     const channel = createStreamChannel(
@@ -95,6 +95,24 @@ describe('the frame channel', () => {
     clock += 1_000;
     await until(async () => (await deltas(store, task.id)) > 1);
     await channel.settle();
+    const rows = (await store.listTaskEvents(task.id)).filter(
+      (row) => row.kind === 'assistant_delta'
+    );
+    expect(rows.length).toBeGreaterThan(1);
+    const payloads = rows.map(
+      (row) =>
+        decryptJson<{ payload: { markdown: string; streamId: string; heartbeat?: boolean } }>(
+          row.payloadCiphertext!,
+          key,
+          `task-event:${task.id}`
+        ).payload
+    );
+    expect(payloads.map((payload) => payload.markdown).join('')).toBe(
+      'The first half of the sentence'
+    );
+    expect(new Set(payloads.map((payload) => payload.streamId)).size).toBe(1);
+    expect(payloads[0]!.streamId).toMatch(/^[a-f0-9-]{36}$/);
+    expect(payloads.slice(1).every((payload) => payload.heartbeat === true)).toBe(true);
   });
 
   it('stops re-asserting once the turn has settled', async () => {

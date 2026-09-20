@@ -126,6 +126,24 @@ describe('the current work surface', () => {
     });
   });
 
+  it('separates responses while preserving chunks, reasoning interleaving and empty heartbeats', () => {
+    const events = [
+      event(1, 'assistant_delta', { markdown: 'Check', streamId: 'one' }),
+      event(2, 'assistant_reasoning', { markdown: 'Thinking' }),
+      event(3, 'assistant_delta', { markdown: 'ing.', streamId: 'one' }),
+      event(4, 'assistant_delta', { markdown: '', streamId: 'one', heartbeat: true }),
+      event(5, 'cost', {}),
+      event(6, 'assistant_delta', { markdown: 'Ready.', streamId: 'two' })
+    ];
+    expect(surfaceAnswer(events).markdown).toBe('Checking.\n\nReady.');
+    const recorded = [
+      event(1, 'assistant_delta', { markdown: 'First.' }),
+      event(2, 'tool_started', {}),
+      event(3, 'assistant_delta', { markdown: 'Second.' })
+    ];
+    expect(surfaceAnswer(recorded).markdown).toBe('First.\n\nSecond.');
+  });
+
   it('uses an explicit final answer independently of its short completion receipt', () => {
     const events = [
       event(1, 'user_message', { markdown: 'What is my current stored report label?' }),

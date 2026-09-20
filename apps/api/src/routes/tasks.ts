@@ -1,3 +1,4 @@
+import { taskResumeSpend } from '../task-spend.js';
 import { registerQuestionRoutes } from './questions.js';
 import { continueTaskOperation } from '../task-continuation.js';
 import {
@@ -696,30 +697,12 @@ export const registerTaskRoutes = (context: RouteContext): void => {
     return privateTaskPlanResponse(created, workspace);
   });
 
-  /**
-   * Why this run is stopped on money, and whether it would still be stopped if it started now.
-   *
-   * A halt writes one sentence into the task's events and sets `spend_paused_at`, and that was the
-   * whole account of it: no figures the owner could act on, and nothing that said whether the
-   * ceiling in question was one they had chosen or one this box supplied because nobody had asked
-   * them. The card that offers to raise it reads this.
-   *
-   * The verdict is recomputed rather than replayed from the halt, because it does not keep: a daily
-   * window rolls over and stops blocking, an open commitment settles for less than it reserved, and
-   * a card quoting last night's arithmetic would send the owner to raise a ceiling that is no longer
-   * in the way. `estimateUsd: 0` asks "where does this stand right now" rather than pricing a step
-   * nobody has decided to take.
-   */
+  /** The paused request is checked against current spending windows. */
   app.get<{ Params: { taskId: string } }>('/v1/tasks/:taskId/spend-block', async (request) => {
     const user = requireUser(request.user);
     const task = await store.getTask(user.id, request.params.taskId);
     if (!task) throw new AthanorError('task_not_found', 'Task not found');
-    const decision = await store.spendGuard({
-      userId: user.id,
-      taskId: task.id,
-      estimateUsd: 0,
-      includeOpenCommitments: true
-    });
+    const { decision, estimateSource } = await taskResumeSpend(store, task, masterKey);
     /*
      * The same test the caps route uses to decide a loosening needs a passkey: an epoch `updatedAt`
      * is a box whose owner has never answered the ceiling question, so the monthly ceiling stopping
@@ -732,6 +715,7 @@ export const registerTaskRoutes = (context: RouteContext): void => {
       taskId: task.id,
       spendPausedAt: task.spendPausedAt ?? null,
       blocked: decision.outcome === 'deny',
+      estimateSource,
       decision,
       summary: spendHalt(decision),
       unchosen
@@ -798,25 +782,7 @@ export const registerTaskRoutes = (context: RouteContext): void => {
             await stopCodingMissionFamily(context, task);
           } else {
             if (action === 'resume') {
-              /*
-               * Resume used to re-queue a run a ceiling had stopped, straight back into the same
-               * ceiling: the worker asks the guard again before its first step, gets the same denial,
-               * and pauses. From the outside that is a Resume button that does nothing - press it,
-               * watch the status flick to queued and back to paused, with no more explanation the
-               * second time than the first.
-               *
-               * The guard is therefore asked here, before anything is re-queued. It is asked and not
-               * assumed because the answer moves on its own: a daily window rolls over at midnight, so
-               * the run that could not resume last night resumes this morning with nothing changed.
-               * Only a ceiling that would still stop it refuses, and it refuses saying which one and
-               * with what figures, so the next thing the owner does can be the thing that works.
-               */
-              const verdict = await store.spendGuard({
-                userId: user.id,
-                taskId: task.id,
-                estimateUsd: 0,
-                includeOpenCommitments: true
-              });
+              const { decision: verdict } = await taskResumeSpend(store, task, masterKey);
               if (verdict.outcome === 'deny')
                 throw new AthanorError('spend_cap_reached', spendHalt(verdict));
               await ensureProjectExecution(context, task);

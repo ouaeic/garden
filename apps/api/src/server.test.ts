@@ -10101,6 +10101,82 @@ describe('a run a spending ceiling stopped', () => {
     });
   }, 30_000);
 
+  test('keeps a below-cap conversation paused when the recorded request would exceed its limit', async () => {
+    stubProviderFetch();
+    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-paused-estimate-'));
+    disposers.push(() => rm(directory, { recursive: true, force: true }));
+    const { app, database, store } = await buildServer(isolatedConfig(directory), { masterKey });
+    disposers.push(() => app.close());
+    const { cookie, taskId } = await seedOwnerWithTask(
+      app,
+      'paused-estimate',
+      'Check the analysis'
+    );
+    const rows = await database.query('SELECT user_id,workspace_id FROM tasks WHERE id=$1', [
+      taskId
+    ]);
+    const workspace = await store.getWorkspaceById(String(rows.rows[0]!.workspace_id));
+    const key = unwrapDataKey(workspace!.wrappedKey!, masterKey, workspace!.id);
+    await database.query(
+      `INSERT INTO usage_entries(id,user_id,workspace_id,task_id,kind,resource_class,quantity,unit,credits,cost_usd,state,idempotency_key)
+       VALUES ($1,$2,$3,$4,'model_inference','medium',1000,'tokens',1,1.17224,'settled','paused-estimate-spent')`,
+      [randomUUID(), rows.rows[0]!.user_id, workspace!.id, taskId]
+    );
+    await database.query('UPDATE tasks SET max_spend_usd=1.180226 WHERE id=$1', [taskId]);
+    const decision = await store.spendGuard({
+      userId: workspace!.userId,
+      taskId,
+      estimateUsd: 0.01,
+      includeOpenCommitments: true
+    });
+    expect(decision.outcome).toBe('deny');
+    await store.appendTaskEvent({
+      taskId,
+      kind: 'status',
+      summary: 'Encrypted status',
+      payloadCiphertext: encryptJson(
+        {
+          __athanorEventVersion: 1,
+          summary: 'Paused for spending',
+          payload: { blockedBy: decision.blockedBy, windows: decision.windows, estimateUsd: 0.01 }
+        },
+        key,
+        `task-event:${taskId}`
+      )
+    });
+    await database.query("UPDATE tasks SET status='paused',spend_paused_at=NOW() WHERE id=$1", [
+      taskId
+    ]);
+    const read = () =>
+      app.inject({ method: 'GET', url: `/v1/tasks/${taskId}/spend-block`, headers: { cookie } });
+    const block = await read();
+    expect(block.statusCode, block.body).toBe(200);
+    expect(block.json()).toMatchObject({
+      blocked: true,
+      estimateSource: 'paused_step',
+      decision: { estimateUsd: 0.01, blockedBy: 'task' }
+    });
+    const refused = await app.inject({
+      method: 'POST',
+      url: `/v1/tasks/${taskId}/resume`,
+      headers: { cookie, 'idempotency-key': 'paused-estimate-refused' }
+    });
+    expect(refused.statusCode, refused.body).toBe(402);
+    await database.query('UPDATE tasks SET max_spend_usd=1.20 WHERE id=$1', [taskId]);
+    expect((await read()).json()).toMatchObject({
+      blocked: false,
+      estimateSource: 'paused_step',
+      decision: { estimateUsd: 0.01 }
+    });
+    await database.query('UPDATE tasks SET max_spend_usd=1.180226 WHERE id=$1', [taskId]);
+    await store.appendTaskEvent({ taskId, kind: 'status', summary: 'A status without a price' });
+    expect((await read()).json()).toMatchObject({
+      blocked: false,
+      estimateSource: 'current_spend',
+      decision: { estimateUsd: 0 }
+    });
+  }, 30_000);
+
   test("moves a single run's own ceiling up and never down", async () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-task-ceiling-'));

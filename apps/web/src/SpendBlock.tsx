@@ -1,91 +1,86 @@
-/**
- * The card an owner sees when a spending ceiling has stopped a run.
- *
- * A halt used to be a status line in the activity log and a `paused` badge that looked exactly like
- * a pause the owner had pressed themselves. The one control on offer, Resume, re-queued the run
- * into the same ceiling and it stopped again a step later - so the honest reading of that interface
- * was that Resume was broken. What was missing was never a button; it was the question. This asks
- * it, in the shape the rest of the product asks questions in: the same card, the same two actions,
- * the figures that explain the stop, and the one change that actually lets the work continue.
- *
- * The figures are read from the server rather than computed here, and re-read when the card mounts,
- * because they move: a daily ceiling rolls over at midnight and the run that could not resume last
- * night resumes this morning untouched. A card drawn from a remembered halt would send its owner to
- * raise a limit that is no longer in the way.
- */
 import { useEffect, useState } from 'react';
 import { CircleDollarSign } from 'lucide-react';
 import type { SpendWindow, Task, TaskSpendBlock } from '@athanor/contracts';
 import { get, post, put, ApiError } from './client';
 import { stepUp } from './auth';
-import { Button, ErrorNotice, Spinner } from './ui';
+import { Button, ErrorNotice, Field, Spinner } from './ui';
 import { money } from './model';
+import { MAX_SPEND_CAP_USD, MAX_TASK_SPEND_USD } from './usage-model';
 
 const WINDOW_LABEL: Record<string, string> = {
-  task: 'this project',
+  task: 'this conversation',
   daily: 'today',
   monthly: 'this month'
 };
 
-/**
- * What to offer as the new ceiling: enough headroom that the work is not stopped again by the same
- * window within the hour, rounded to something an owner recognises as a decision rather than an
- * arithmetic result. Doubling is the rule, with a floor of five dollars over what has been
- * committed so a ceiling sitting just above a large spend still moves somewhere useful.
- */
+/** A modest editable suggestion must cover the recorded request, including open commitments. */
 export const suggestedCeiling = (window: SpendWindow): number => {
-  const committed = window.spentUsd + window.pendingUsd;
-  const doubled = Math.max((window.capUsd ?? committed) * 2, committed + 5);
-  return Math.max(1, Math.ceil(doubled));
+  const cap = window.capUsd ?? 0;
+  const limit = window.name === 'task' ? MAX_TASK_SPEND_USD : MAX_SPEND_CAP_USD;
+  return Math.min(
+    limit,
+    Math.ceil(Math.max(cap + Math.max(0.1, cap * 0.1), window.projectedUsd + 0.01) * 100) / 100
+  );
 };
 
-/** The per-run ceiling is a column on the task, so it moves through the task itself. */
-const patchTaskCeiling = async (taskId: string, maxSpendUsd: number): Promise<void> => {
-  await post(`/v1/tasks/${taskId}/spend-ceiling`, { maxSpendUsd });
-};
+export function spendBlockCopy(block: TaskSpendBlock): { title: string; description: string } {
+  if (block.blocked)
+    return { title: 'A spending limit paused this work', description: block.summary };
+  if (block.estimateSource === 'paused_step')
+    return {
+      title: 'There is room for the paused request',
+      description:
+        'Current limits cover its last recorded estimate. You can resume; each request is checked again before it runs.'
+    };
+  return {
+    title: 'Review spending before resuming',
+    description:
+      'Current spending is below the limits, but the next request has no saved estimate. Resume will check its cost before it runs and may pause again.'
+  };
+}
 
 export default function SpendBlock({ task, onResumed }: { task: Task; onResumed: () => void }) {
   const [block, setBlock] = useState<TaskSpendBlock | null>(null);
+  const [ceiling, setCeiling] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   useEffect(() => {
     let live = true;
     setBlock(null);
     setError(null);
+    setCeiling(null);
     get<TaskSpendBlock>(`/v1/tasks/${task.id}/spend-block`)
       .then((next) => live && setBlock(next))
       .catch((cause) => live && setError(cause));
     return () => {
       live = false;
     };
-  }, [task.id]);
+  }, [task.id, task.spendPausedAt, task.maxSpendUsd]);
   if (error && !block) return <ErrorNotice error={error} />;
-  if (!block) return <Spinner label="Reading why this stopped…" />;
+  if (!block) return <Spinner label="Checking spending…" />;
   const blocked = block.decision.windows.find((window) => window.name === block.decision.blockedBy);
-  /*
-   * The window may have rolled over between the halt and this card. Nothing needs raising then, and
-   * offering to raise a ceiling that is not in the way would be a lie about what is stopping the
-   * work - so the card says the run can simply carry on.
-   */
-  const clear = !block.blocked || !blocked;
-  const raiseTo = blocked ? suggestedCeiling(blocked) : null;
+  const clear = !block.blocked;
+  const raiseTo = ceiling ?? (blocked ? String(suggestedCeiling(blocked)) : '');
+  const copy = spendBlockCopy(block);
+  const maximum = blocked?.name === 'task' ? MAX_TASK_SPEND_USD : MAX_SPEND_CAP_USD;
+  const validCeiling =
+    Number.isFinite(Number(raiseTo)) &&
+    Number(raiseTo) > (blocked?.capUsd ?? 0) &&
+    Number(raiseTo) >= (blocked?.projectedUsd ?? 0) &&
+    Number(raiseTo) <= maximum;
 
-  async function act(raise: boolean) {
+  async function act() {
     setBusy(true);
     setError(null);
     try {
-      if (raise && blocked && raiseTo !== null) {
-        /*
-         * A task ceiling is a property of the run and the other two are account-wide, so they are
-         * raised through different routes. Loosening an account ceiling can demand a passkey - the
-         * same escalation the caps pane asks for - and that prompt belongs here rather than sending
-         * the owner to Settings to do by hand what this card just offered.
-         */
+      if (!clear && blocked) {
+        if (!validCeiling)
+          throw new Error('Enter a higher limit that covers the estimated request.');
         const body =
           blocked.name === 'daily'
-            ? { dailyCapUsd: raiseTo }
+            ? { dailyCapUsd: Number(raiseTo) }
             : blocked.name === 'monthly'
-              ? { monthlyCapUsd: raiseTo }
+              ? { monthlyCapUsd: Number(raiseTo) }
               : null;
         if (body) {
           try {
@@ -99,9 +94,11 @@ export default function SpendBlock({ task, onResumed }: { task: Task; onResumed:
             await stepUp();
             await put('/v1/spend-limits', body);
           }
-        } else {
-          await patchTaskCeiling(task.id, raiseTo);
-        }
+        } else await post(`/v1/tasks/${task.id}/spend-ceiling`, { maxSpendUsd: Number(raiseTo) });
+        const next = await get<TaskSpendBlock>(`/v1/tasks/${task.id}/spend-block`);
+        setBlock(next);
+        setCeiling(null);
+        if (next.blocked) return;
       }
       await post(`/v1/tasks/${task.id}/resume`);
       onResumed();
@@ -116,18 +113,12 @@ export default function SpendBlock({ task, onResumed }: { task: Task; onResumed:
     <article className="decision-card">
       <div className="eyebrow">
         <CircleDollarSign size={14} aria-hidden="true" />
-        {clear ? 'Stopped on spending' : 'Your decision'}
+        Spending
       </div>
-      <h3>{clear ? 'Nothing is over its limit now' : 'A spending limit stopped this work'}</h3>
-      <p>
-        {clear
-          ? 'The limit that stopped this run is no longer in the way — a daily limit resets, and work already open can settle for less than it reserved. It can carry on as it is.'
-          : block.summary}
-      </p>
+      <h3>{copy.title}</h3>
+      <p>{copy.description}</p>
       {block.unchosen && !clear && (
-        <p className="muted">
-          This is the ceiling garden applies until you set one of your own, not a limit you chose.
-        </p>
+        <p className="muted">This is the default ceiling until you choose one.</p>
       )}
       {blocked && (
         <dl className="facts">
@@ -141,8 +132,14 @@ export default function SpendBlock({ task, onResumed }: { task: Task; onResumed:
           </div>
           {blocked.pendingUsd > 0 && (
             <div>
-              <dt>Promised to open work</dt>
+              <dt>Reserved for open work</dt>
               <dd>{money(blocked.pendingUsd)}</dd>
+            </div>
+          )}
+          {block.estimateSource === 'paused_step' && (
+            <div>
+              <dt>Paused request estimate</dt>
+              <dd>{money(block.decision.estimateUsd)}</dd>
             </div>
           )}
           <div>
@@ -151,27 +148,57 @@ export default function SpendBlock({ task, onResumed }: { task: Task; onResumed:
           </div>
         </dl>
       )}
-      <ErrorNotice error={error} />
-      <div className="row decision-actions">
-        {clear ? (
-          <Button className="primary" busy={busy} onClick={() => act(false)}>
-            Carry on
-          </Button>
-        ) : (
-          <Button className="primary" busy={busy} onClick={() => act(true)}>
-            Raise to {money(raiseTo ?? 0)} and carry on
-          </Button>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void act();
+        }}
+      >
+        {!clear && blocked && (
+          <Field
+            label="New limit · USD"
+            hint={
+              blocked.name === 'task'
+                ? 'Applies only to this conversation.'
+                : 'Applies across all projects on your account.'
+            }
+          >
+            <input
+              type="number"
+              inputMode="decimal"
+              required
+              step="any"
+              min={Math.max((blocked.capUsd ?? 0) + 0.000001, blocked.projectedUsd)}
+              max={maximum}
+              value={raiseTo}
+              disabled={busy}
+              onChange={(event) => setCeiling(event.target.value)}
+            />
+          </Field>
         )}
-        {!clear && (
+        <ErrorNotice error={error} />
+        <div className="row decision-actions">
+          <Button
+            type="submit"
+            className="primary"
+            busy={busy}
+            disabled={!clear && (!blocked || !validCeiling)}
+          >
+            {clear
+              ? 'Resume'
+              : validCeiling
+                ? `Set limit to ${money(Number(raiseTo))} and resume`
+                : 'Set limit and resume'}
+          </Button>
           <Button disabled={busy} onClick={onResumed}>
-            Leave it stopped
+            Keep paused
           </Button>
-        )}
-      </div>
+        </div>
+      </form>
       <small>
         {clear
-          ? 'Nothing is changed by carrying on.'
-          : 'Raising the limit changes it for everything, not only this project. You can change it again in Spending.'}
+          ? 'Resuming keeps your spending limits unchanged.'
+          : 'This authorizes a spending ceiling, not a charge. Actual usage is billed as work runs.'}
       </small>
     </article>
   );

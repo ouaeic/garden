@@ -252,11 +252,27 @@ export function surfaceAnswer(events: TaskEvent[]): {
     lastEvent(events, 'user_message')?.sequence ?? 0,
     lastEvent(events, 'completed')?.sequence ?? 0
   );
-  const deltas = events.filter(
-    (event) => event.kind === 'assistant_delta' && event.sequence > boundary
-  );
-  if (deltas.length)
-    return { markdown: deltas.map(eventText).join(''), partial: true, previous: false };
+  let markdown = '';
+  let streamId = '';
+  let separated = false;
+  for (const event of events) {
+    if (event.sequence <= boundary) continue;
+    if (event.kind !== 'assistant_delta') {
+      if (['tool_started', 'tool_result', 'cost', 'status', 'error'].includes(event.kind))
+        separated = true;
+      continue;
+    }
+    const payload = data(event.payload);
+    if (payload.heartbeat === true) continue;
+    const nextId = text(payload.streamId);
+    const fragment = eventText(event);
+    if (!fragment) continue;
+    if (markdown && (nextId ? nextId !== streamId : separated)) markdown += '\n\n';
+    markdown += fragment;
+    streamId = nextId;
+    separated = false;
+  }
+  if (markdown) return { markdown, partial: true, previous: false };
   return {
     markdown:
       completed && completed.sequence > (message?.sequence ?? 0)

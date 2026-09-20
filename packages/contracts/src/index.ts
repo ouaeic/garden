@@ -1559,20 +1559,13 @@ export const SpendDecision = z.object({
 });
 export type SpendDecision = z.infer<typeof SpendDecision>;
 
-/**
- * Why a run is stopped on money, read fresh rather than remembered.
- *
- * A halt records a sentence in the task's events and nothing else, so the only account of it the
- * owner could reach was a line in a log - and the figures in that line go stale: a daily window
- * rolls over at midnight and stops blocking anything, while a monthly one keeps blocking until
- * somebody moves it. The verdict is therefore re-asked of the same guard the worker consults, so
- * the card the owner reads and the brake that stopped the work cannot quote different numbers.
- */
+/** Current spending windows, checked with the paused request estimate when available. */
 export const TaskSpendBlock = z.object({
   taskId: Id,
   /** When a ceiling stopped this run. Null for a task no ceiling stopped. */
   spendPausedAt: IsoDate.nullable(),
-  /** Whether a ceiling would still stop it right now, which is not the same question. */
+  estimateSource: z.enum(['paused_step', 'current_spend']),
+  /** Whether the current windows can cover the estimate in this decision. */
   blocked: z.boolean(),
   decision: SpendDecision,
   /** The sentence the owner reads, built by the same function the halt itself used. */
