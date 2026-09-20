@@ -48,6 +48,7 @@ const NON_MUTATING_TOOLS = new Set([
   'compact_context',
   'connector_list',
   'delegate',
+  'decide',
   'desktop_observe',
   'document_read',
   'document_search',

@@ -82,7 +82,7 @@ describe('owner-scoped media receipt settlement', () => {
       ).rows
     ).toEqual([{ state: 'released', cost_usd: 0 }]);
   });
-  it.each(['model:task-title', 'model:claim-review'])(
+  it.each(['model:task-title', 'model:claim-review', 'model:decisions'])(
     'counts held %s requests against allowance and settles their actual credits',
     async (resourceClass) => {
       const owner = await store.createUser({ username: randomUUID(), displayName: 'Owner' });

@@ -379,6 +379,8 @@ const unboundedOriginOfResult = (call: ModelToolCall, result: unknown): string |
     // named by what the specialist actually touched rather than by the fact that a delegate ran.
     // A mission that only read the owner's own workspace taints nothing, exactly as the same reads
     // in the lead's own turn would not.
+    case 'decide':
+      return 'decision model';
     case 'delegate': {
       const reports = Array.isArray(record?.reports) ? record.reports : [];
       const reported = reports.flatMap((report) => {

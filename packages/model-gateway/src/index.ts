@@ -9,6 +9,7 @@ export * from './openrouter-catalog.js';
 export * from './license-manifest.js';
 export * from './media.js';
 export * from './gateway.js';
+export * from './decisions.js';
 export * from './interrupted-response.js';
 export * from './media-capabilities.js';
 export * from './image-dimensions.js';

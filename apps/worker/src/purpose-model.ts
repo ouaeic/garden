@@ -36,19 +36,34 @@ async function preferences(
   };
 }
 
+export async function mainPurposeChoice(context: PurposeContext, task: TaskRecord) {
+  const { project, global, limits } = await preferences(context, task);
+  return { ...resolvePurposeChoice('main', project.choices, global), limits };
+}
+
 export async function resolveTaskPurposeModel(
   context: PurposeContext,
   task: TaskRecord,
-  purpose: 'specialist' | 'coding' | 'summarise' | 'title',
+  purpose: 'specialist' | 'coding' | 'summarise' | 'title' | 'decisions',
   catalog: readonly ModelRelease[]
 ): Promise<ModelRelease> {
   const { project, global, limits } = await preferences(context, task);
   const { choice } = resolvePurposeChoice(purpose, project.choices, global);
   const connected = await context.connectedModels(task, catalog);
+  const main = catalog.find((model) => model.id === task.modelId);
+  const eligible =
+    purpose === 'decisions'
+      ? connected.filter(
+          (model) =>
+            main &&
+            model.provider === 'openrouter' &&
+            (model.connectionId ?? model.provider) === (main.connectionId ?? main.provider)
+        )
+      : connected;
   const result = selectPurposeModel({
     purpose,
     choice,
-    catalog: connected,
+    catalog: eligible,
     privacyRoute: task.privacyRoute === 'provider_zdr' ? 'provider_zdr' : 'external',
     ceiling: limits
   });
@@ -138,7 +153,8 @@ export async function taskModelRoster(
 ): Promise<Array<{ job: string; model: string }>> {
   const jobs = [
     { purpose: 'specialist', job: 'research and review specialists (delegate)' },
-    { purpose: 'coding', job: 'repository changes (coding_agent)' }
+    { purpose: 'coding', job: 'repository changes (coding_agent)' },
+    { purpose: 'decisions', job: 'immediate bounded choices and ratings (decide)' }
   ] as const;
   const roster: Array<{ job: string; model: string }> = [];
   for (const entry of jobs) {

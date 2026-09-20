@@ -29,7 +29,8 @@ const purposeSurface = async (
   user: UserRecord,
   projectChoices: ProjectModelChoices,
   global: ProjectModelChoices,
-  privacyRoute: 'provider_zdr' | 'external'
+  privacyRoute: 'provider_zdr' | 'external',
+  taskModelId?: string
 ): Promise<ProjectModelPreferences['purposes']> => {
   const selection = mergeProjectModelChoices(global, projectChoices);
   const [media, models, limits] = await Promise.all([
@@ -37,6 +38,21 @@ const purposeSurface = async (
     context.modelsForUser(user),
     context.store.effectiveSpendLimits(user.id)
   ]);
+  const main =
+    models.find((model) => model.id === taskModelId) ??
+    selectPurposeModel({
+      purpose: 'main',
+      choice: resolvePurposeChoice('main', projectChoices, global).choice,
+      catalog: models,
+      privacyRoute,
+      ceiling: ownerPriceCeiling(limits)
+    }).model;
+  const compatibleDecision = (model: (typeof models)[number]) =>
+    Boolean(
+      main &&
+      model.provider === 'openrouter' &&
+      (model.connectionId ?? model.provider) === (main.connectionId ?? main.provider)
+    );
   return ModelPurpose.options.map((purpose) => {
     const resolved = resolvePurposeChoice(purpose, projectChoices, global);
     const modality = media.modalities.find((item) => item.modality === purpose);
@@ -57,6 +73,7 @@ const purposeSurface = async (
       purpose !== 'main' &&
       purpose !== 'specialist' &&
       purpose !== 'coding' &&
+      purpose !== 'decisions' &&
       purpose !== 'summarise' &&
       purpose !== 'title'
     )
@@ -71,7 +88,7 @@ const purposeSurface = async (
     const result = selectPurposeModel({
       purpose,
       choice: resolved.choice,
-      catalog: models,
+      catalog: purpose === 'decisions' ? models.filter(compatibleDecision) : models,
       privacyRoute,
       ceiling: ownerPriceCeiling(limits)
     });
@@ -79,16 +96,29 @@ const purposeSurface = async (
       purpose,
       ...resolved,
       effective: result.model,
-      options: models.map((model) => ({
-        ...model,
-        unavailableReason: selectPurposeModel({
-          purpose,
-          choice: { automatic: false, preference: resolved.choice.preference, modelId: model.id },
-          catalog: [model],
-          privacyRoute,
-          ceiling: ownerPriceCeiling(limits)
-        }).reason
-      })),
+      options: models
+        .filter((model) =>
+          purpose === 'decisions'
+            ? model.capabilities.includes('decisions')
+            : model.capabilities.includes('chat')
+        )
+        .map((model) => ({
+          ...model,
+          unavailableReason:
+            purpose === 'decisions' && !compatibleDecision(model)
+              ? 'Decisions use the same OpenRouter connection as the main model.'
+              : selectPurposeModel({
+                  purpose,
+                  choice: {
+                    automatic: false,
+                    preference: resolved.choice.preference,
+                    modelId: model.id
+                  },
+                  catalog: [model],
+                  privacyRoute,
+                  ceiling: ownerPriceCeiling(limits)
+                }).reason
+        })),
       available: Boolean(result.model),
       reason: result.reason
     };
@@ -140,7 +170,8 @@ export const projectModelSettings = async (
     (task?.privacyRoute ?? (secret.enforceZeroDataRetention ? 'provider_zdr' : 'external')) ===
       'provider_zdr'
       ? 'provider_zdr'
-      : 'external'
+      : 'external',
+    task?.modelId
   );
   return {
     ...preferences,

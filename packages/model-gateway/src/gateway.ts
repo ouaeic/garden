@@ -2,6 +2,7 @@ import { AthanorError } from '@athanor/core';
 import type { ModelAdapter, ModelRequest, ModelResponse, ProviderModel } from './protocol.js';
 import { defaultRetryPolicy, withRetry, type RetryPolicy } from './retry.js';
 import { interruptedResponseOf } from './interrupted-response.js';
+import type { DecisionAdapter, DecisionRequest, DecisionResponse } from './decisions.js';
 
 export type { RetryPolicy } from './retry.js';
 // The wall question, published beside the gateway that asks it: a caller deciding whether to park a
@@ -11,6 +12,7 @@ export { isProviderWall, isProviderWallStatus } from './retry.js';
 
 export class ModelGateway {
   readonly #adapters = new Map<string, ModelAdapter>();
+  readonly #decisions = new Map<string, DecisionAdapter>();
   readonly #retry: RetryPolicy;
 
   constructor(options: { retry?: RetryPolicy } = {}) {
@@ -24,6 +26,22 @@ export class ModelGateway {
 
   has(name: string): boolean {
     return this.#adapters.has(name);
+  }
+
+  registerDecisions(name: string, adapter: DecisionAdapter): this {
+    this.#decisions.set(name, adapter);
+    return this;
+  }
+
+  async decide(provider: string, request: DecisionRequest): Promise<DecisionResponse> {
+    const adapter = this.#decisions.get(provider);
+    if (!adapter)
+      throw new AthanorError(
+        'decision_route_unavailable',
+        'The selected connection does not offer decision inference.',
+        409
+      );
+    return adapter.decide(request);
   }
 
   async list(): Promise<ProviderModel[]> {

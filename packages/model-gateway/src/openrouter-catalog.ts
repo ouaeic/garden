@@ -421,9 +421,10 @@ export const refreshOpenRouterCatalog = async (
   const baseUrl = options.baseUrl.replace(/\/$/, '');
   const headers = { authorization: `Bearer ${options.apiKey}` };
   const [modelsResult, zdrResult] = await Promise.allSettled([
-    request(`${baseUrl}/models`, { headers, signal: AbortSignal.timeout(15_000) }).then(
-      (response) => checkedJson<unknown>(response, 'OpenRouter models')
-    ),
+    request(`${baseUrl}/models?output_modalities=all`, {
+      headers,
+      signal: AbortSignal.timeout(15_000)
+    }).then((response) => checkedJson<unknown>(response, 'OpenRouter models')),
     request(`${baseUrl}/endpoints/zdr`, {
       headers,
       signal: AbortSignal.timeout(15_000)
@@ -724,12 +725,14 @@ export const refreshOpenRouterCatalog = async (
                 )
               : null
         },
-        capabilities: [
-          'chat' as const,
-          ...(supported.has('tools') ? (['tools'] as const) : []),
-          ...(inputModalities.has('image') ? (['vision'] as const) : []),
-          ...(supported.has('reasoning') ? (['reasoning'] as const) : [])
-        ],
+        capabilities: live?.architecture.output_modalities.includes('decisions')
+          ? ['decisions' as const]
+          : [
+              'chat' as const,
+              ...(supported.has('tools') ? (['tools'] as const) : []),
+              ...(inputModalities.has('image') ? (['vision'] as const) : []),
+              ...(supported.has('reasoning') ? (['reasoning'] as const) : [])
+            ],
         measuredQuality: quality.measuredQuality,
         agenticQuality: quality.agenticQuality,
         codingQuality: quality.codingQuality,
@@ -826,7 +829,11 @@ export const refreshOpenRouterCatalog = async (
     if (reviewedIds.has(providerModelId)) continue;
     const outputModalities = live.architecture.output_modalities;
     // Image, audio and video generators are reached through the media service, not the chat loop.
-    if (outputModalities.length && !outputModalities.includes('text')) {
+    if (
+      outputModalities.length &&
+      !outputModalities.includes('text') &&
+      !outputModalities.includes('decisions')
+    ) {
       // ...unless the media service has no route for it either, in which case the model is gone
       // from both catalogues and this is the only place that can say so.
       if (!outputModalities.some((modality) => MEDIA_OUTPUT_MODALITIES.includes(modality)))

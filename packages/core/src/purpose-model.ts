@@ -20,7 +20,7 @@ import {
  * overflow, so it needs a large one, while a title is a sentence about a sentence.
  */
 const PURPOSE_REQUIREMENTS: Record<
-  Extract<ModelPurpose, 'main' | 'specialist' | 'coding' | 'summarise' | 'title'>,
+  Extract<ModelPurpose, 'main' | 'specialist' | 'coding' | 'summarise' | 'title' | 'decisions'>,
   { capabilities: ModelRelease['capabilities']; minContextTokens: number }
 > = {
   main: { capabilities: ['chat', 'tools'], minContextTokens: 16_000 },
@@ -29,12 +29,16 @@ const PURPOSE_REQUIREMENTS: Record<
   // 32k is `COMPACTION_MIN_CONTEXT_TOKENS`: below it the condensed transcript would not fit
   // alongside the brief it has to extend.
   summarise: { capabilities: ['chat'], minContextTokens: 32_000 },
-  title: { capabilities: ['chat'], minContextTokens: 8_000 }
+  title: { capabilities: ['chat'], minContextTokens: 8_000 },
+  decisions: { capabilities: ['decisions'], minContextTokens: 8_000 }
 };
 
 /** One selection contract for settings previews and the requests that use them. */
 export function selectPurposeModel(input: {
-  purpose: Extract<ModelPurpose, 'main' | 'specialist' | 'coding' | 'summarise' | 'title'>;
+  purpose: Extract<
+    ModelPurpose,
+    'main' | 'specialist' | 'coding' | 'summarise' | 'title' | 'decisions'
+  >;
   choice: PurposeModelChoice;
   catalog: readonly ModelRelease[];
   privacyRoute: PrivacyRoute;
@@ -51,7 +55,7 @@ export function selectPurposeModel(input: {
     requiredCapabilities: requirements.capabilities,
     requiredModalities: ['text'],
     minContextTokens: requirements.minContextTokens,
-    preference: input.choice.preference,
+    preference: input.purpose === 'decisions' ? 'fast' : input.choice.preference,
     taskKind:
       input.purpose === 'coding'
         ? 'coding'

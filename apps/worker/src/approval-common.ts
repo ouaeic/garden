@@ -4,6 +4,8 @@ import { type ResolvedMediaModel } from './media.js';
 import { textValue } from './values.js';
 
 export interface ApprovalContext {
+  /** Set only by the floor after resolving the same saved inference connection and privacy policy. */
+  decisionInference?: { boundToTaskConnection: true };
   nativeInput?: {
     model: string;
     reservationUsd: number;

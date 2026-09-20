@@ -39,6 +39,7 @@ import {
   ModelGateway,
   MediaRouteResolver,
   OpenAICompatibleAdapter,
+  OpenRouterDecisionAdapter,
   type ModelResponse,
   type ModelToolCall
 } from '@athanor/model-gateway';
@@ -65,6 +66,7 @@ import {
 } from './context.js';
 import { taskFailureRecord } from './failure-record.js';
 import { pinnedPurposeModel, taskModelRoster } from './purpose-model.js';
+import { resolveDecisionRoute } from './decision-route.js';
 import { workerLogger, type Logger } from './log.js';
 import {
   botWallSite,
@@ -407,6 +409,15 @@ export class AgentWorker {
       memoryConsolidatedAt: this.#memoryConsolidatedAt
     };
     this.#approvalFloor = {
+      decisionRoute: (task) =>
+        resolveDecisionRoute(
+          {
+            store,
+            masterKey: this.#masterKey,
+            connectedModels: (forTask, catalog) => this.#connectedModels(forTask, catalog)
+          },
+          task
+        ),
       store,
       masterKey: this.#masterKey,
       runner: this.#runner,
@@ -562,6 +573,26 @@ export class AgentWorker {
   }> {
     const gateway = new ModelGateway();
     const secret = await this.#credentialForModel(task, model);
+    if (
+      model.capabilities.includes('decisions') &&
+      secret.provider === 'openrouter' &&
+      secret.apiKey
+    ) {
+      const privateRoute = task.privacyRoute === 'provider_zdr' || secret.enforceZeroDataRetention;
+      gateway.registerDecisions(
+        model.provider,
+        new OpenRouterDecisionAdapter({
+          baseUrl: secret.baseUrl,
+          apiKey: secret.apiKey,
+          enforceZeroDataRetention: privateRoute
+        })
+      );
+      return {
+        gateway,
+        provider: model.provider,
+        credential: { provider: secret.provider, enforceZeroDataRetention: privateRoute }
+      };
+    }
     gateway.register(
       model.provider,
       nativeInputAdapter(

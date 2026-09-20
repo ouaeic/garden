@@ -256,6 +256,15 @@ export const approvalRequirement = (
   context: ApprovalContext = {}
 ): ApprovalRequirement | null => {
   const taintSources = context.taintSources ?? [];
+  if (name === 'decide')
+    return context.decisionInference?.boundToTaskConnection === true
+      ? null
+      : {
+          sideEffect: 'external_reversible',
+          action: 'Review decision inference',
+          preview:
+            'The decision destination has not been verified against this task’s saved model connection and privacy policy.'
+        };
   if (name === 'process' && args.action === 'describe') return null;
   if (name === 'process' && args.action === 'write')
     return {

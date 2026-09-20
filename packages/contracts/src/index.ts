@@ -1110,7 +1110,7 @@ export const ModelRelease = z.object({
   privacyRoute: PrivacyRoute,
   contextTokens: z.number().int().positive(),
   modalities: z.array(z.enum(['text', 'image', 'audio', 'video'])),
-  capabilities: z.array(z.enum(['chat', 'vision', 'tools', 'reasoning', 'embedding'])),
+  capabilities: z.array(z.enum(['chat', 'vision', 'tools', 'reasoning', 'embedding', 'decisions'])),
   reasoning: ReasoningOptions.optional(),
   nativeInputPricing: z
     .object({
@@ -1259,6 +1259,7 @@ export const ModelPurpose = z.enum([
   'main',
   'specialist',
   'coding',
+  'decisions',
   'image',
   'audio',
   'transcription',
@@ -1277,6 +1278,7 @@ export const ProjectModelChoices = z
     main: PurposeModelChoice.optional(),
     specialist: PurposeModelChoice.optional(),
     coding: PurposeModelChoice.optional(),
+    decisions: PurposeModelChoice.optional(),
     image: PurposeModelChoice.optional(),
     audio: PurposeModelChoice.optional(),
     transcription: PurposeModelChoice.optional(),
@@ -2176,6 +2178,7 @@ export const OwnerPreferences = z.object({
     .object({
       specialist: PurposeModelChoice.optional(),
       coding: PurposeModelChoice.optional(),
+      decisions: PurposeModelChoice.optional(),
       summarise: PurposeModelChoice.optional(),
       title: PurposeModelChoice.optional()
     })

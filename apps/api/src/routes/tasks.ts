@@ -231,7 +231,7 @@ export const registerTaskRoutes = (context: RouteContext): void => {
           );
       }
       const conversationChoices = project ? input.modelChoices : undefined;
-      const conversationOverride = Boolean(project && input.modelId && !input.modelChoices?.main);
+      const explicitModelOverride = Boolean(input.modelId && !input.modelChoices?.main);
       if (project && !input.modelId && !input.modelChoices?.main) {
         const defaults = await readProjectModelPreferences(store, masterKey, {
           id: project.id,
@@ -308,7 +308,8 @@ export const registerTaskRoutes = (context: RouteContext): void => {
         const created = await store.createTask({
           userId: user.id,
           workspaceId: workspace.id,
-          ...(project ? { projectId: project.id, modelOverride: conversationOverride } : {}),
+          ...(project ? { projectId: project.id } : {}),
+          modelOverride: explicitModelOverride,
           ...(conversationChoices
             ? {
                 modelChoicesCiphertext: encryptJson(

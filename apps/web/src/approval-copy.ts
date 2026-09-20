@@ -12,6 +12,7 @@ export const approvalIntroduction = (tool: string, action: string, detail: strin
 
 export const approvalToolPhrases: Record<string, string> = {
   audio_read: 'Read audio',
+  decide: 'Use decision inference',
   browser_action: 'Use the browser',
   coding_agent: 'Start a coding tool',
   code_diagnostics: 'Run code analysis',

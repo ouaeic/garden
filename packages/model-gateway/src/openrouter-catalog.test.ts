@@ -140,7 +140,7 @@ const respondWith = (body: unknown): Response =>
 const liveFetch = (options: { zdrStatus?: number } = {}) =>
   vi.fn(async (input: string | URL | Request) => {
     const url = input instanceof Request ? input.url : input.toString();
-    if (url.endsWith('/models')) return respondWith(modelsPayload);
+    if (url.split('?')[0]!.endsWith('/models')) return respondWith(modelsPayload);
     if (url.endsWith('/endpoints/zdr'))
       return options.zdrStatus && options.zdrStatus !== 200
         ? new Response('{"error":{"code":401}}', { status: options.zdrStatus })
@@ -167,7 +167,7 @@ describe('OpenRouter live catalog', () => {
           ''
         )
       )
-    ).toEqual(['/models', '/endpoints/zdr']);
+    ).toEqual(['/models?output_modalities=all', '/endpoints/zdr']);
     expect(
       result.find((model) => model.providerModelId === 'anthropic/claude-opus-5')
     ).toBeDefined();
@@ -339,7 +339,7 @@ describe('OpenRouter live catalog', () => {
   it('still fails when the model list itself cannot be read, because there is no catalogue without it', async () => {
     const request = vi.fn(async (input: string | URL | Request) => {
       const url = input instanceof Request ? input.url : input.toString();
-      if (url.endsWith('/models')) return new Response('nope', { status: 500 });
+      if (url.split('?')[0]!.endsWith('/models')) return new Response('nope', { status: 500 });
       return respondWith(zdrPayload);
     });
     await expect(
@@ -694,7 +694,7 @@ describe('benchmark populations', () => {
       apiKey: 'registry-key',
       fetch: vi.fn(async (input: string | URL | Request) => {
         const url = input instanceof Request ? input.url : input.toString();
-        if (url.endsWith('/models')) return respondWith(unevenColumns);
+        if (url.split('?')[0]!.endsWith('/models')) return respondWith(unevenColumns);
         return respondWith({ data: [] });
       }) as typeof fetch,
       now: NOW
@@ -831,7 +831,7 @@ describe('bounds on what the feed is allowed to say', () => {
   const boundedFetch = () =>
     vi.fn(async (input: string | URL | Request) => {
       const url = input instanceof Request ? input.url : input.toString();
-      if (url.endsWith('/models')) return respondWith(unbelievable);
+      if (url.split('?')[0]!.endsWith('/models')) return respondWith(unbelievable);
       return respondWith(unbelievableZdr);
     });
 
@@ -1009,7 +1009,7 @@ describe('the media catalogue the chat refresh throws away', () => {
       apiKey: 'owner-key',
       fetch: vi.fn(async (input: string | URL | Request) => {
         const url = input instanceof Request ? input.url : input.toString();
-        if (url.endsWith('/models')) return respondWith(pricedInTokens);
+        if (url.split('?')[0]!.endsWith('/models')) return respondWith(pricedInTokens);
         return respondWith({ data: [] });
       }) as typeof fetch,
       now: NOW
@@ -1062,7 +1062,7 @@ describe('a feed that changed shape underneath the parser', () => {
   const feedOf = (rows: unknown[]) =>
     vi.fn(async (input: string | URL | Request) => {
       const url = input instanceof Request ? input.url : input.toString();
-      if (url.endsWith('/models')) return respondWith({ data: rows });
+      if (url.split('?')[0]!.endsWith('/models')) return respondWith({ data: rows });
       return respondWith({ data: [] });
     }) as unknown as typeof fetch;
 
@@ -1251,7 +1251,7 @@ describe('shapes the feed is allowed to grow', () => {
   const feedOf = (rows: unknown[]) =>
     vi.fn(async (input: string | URL | Request) => {
       const url = input instanceof Request ? input.url : input.toString();
-      if (url.endsWith('/models')) return respondWith({ data: rows });
+      if (url.split('?')[0]!.endsWith('/models')) return respondWith({ data: rows });
       return respondWith({ data: [] });
     }) as unknown as typeof fetch;
 
@@ -1382,7 +1382,7 @@ describe('a model this build has no route for at all', () => {
   const feed = (rows: unknown[]) =>
     vi.fn(async (input: string | URL | Request) => {
       const url = input instanceof Request ? input.url : input.toString();
-      if (url.endsWith('/models')) return respondWith({ data: rows });
+      if (url.split('?')[0]!.endsWith('/models')) return respondWith({ data: rows });
       return respondWith({ data: [] });
     }) as unknown as typeof fetch;
 
@@ -1453,7 +1453,7 @@ describe('a model this build has no route for at all', () => {
 describe('an endpoint feed that changed shape underneath the parser', () => {
   const reshapedZdr = (input: string | URL | Request) => {
     const url = input instanceof Request ? input.url : input.toString();
-    if (url.endsWith('/models')) return Promise.resolve(respondWith(modelsPayload));
+    if (url.split('?')[0]!.endsWith('/models')) return Promise.resolve(respondWith(modelsPayload));
     return Promise.resolve(
       respondWith({ data: { 'z-ai/glm-5.2': { status: 0, uptime_last_1d: 99 } } })
     );
@@ -1493,7 +1493,8 @@ describe('an endpoint feed that changed shape underneath the parser', () => {
       apiKey: 'registry-key',
       fetch: vi.fn((input: string | URL | Request) => {
         const url = input instanceof Request ? input.url : input.toString();
-        if (url.endsWith('/models')) return Promise.resolve(respondWith(modelsPayload));
+        if (url.split('?')[0]!.endsWith('/models'))
+          return Promise.resolve(respondWith(modelsPayload));
         return Promise.resolve(respondWith({ data: [null, { model_id: 7 }, ...zdrPayload.data] }));
       }) as unknown as typeof fetch,
       now: NOW

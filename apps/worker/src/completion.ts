@@ -233,6 +233,9 @@ export const startTurnState = <T extends Record<string, unknown>>(
     nativeInputApprovals?: unknown;
     transcriptionApprovals?: unknown;
     mediaApprovals?: unknown;
+    decisionFloorBindings?: unknown;
+    decisionRouting?: unknown;
+    decisionReceipts?: unknown;
   };
   delete next.jobWaitId;
   delete next.codingMissionWaiting;
@@ -241,6 +244,9 @@ export const startTurnState = <T extends Record<string, unknown>>(
   delete next.nativeInputApprovals;
   delete next.transcriptionApprovals;
   delete next.mediaApprovals;
+  delete next.decisionFloorBindings;
+  delete next.decisionRouting;
+  delete next.decisionReceipts;
   delete next.reasoningFloor;
   delete next.compactedAtStep;
   // Per turn, like the counters above: a transcript write that failed while the last turn was

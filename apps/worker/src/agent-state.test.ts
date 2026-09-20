@@ -115,7 +115,10 @@ const FIELDS: ReadonlyArray<keyof AgentState> = [
   'codingMissionReviews',
   'mainModelPreference',
   'projectContextFingerprint',
-  'walledProviders'
+  'walledProviders',
+  'decisionFloorBindings',
+  'decisionRouting',
+  'decisionReceipts'
 ];
 
 /**
@@ -130,6 +133,19 @@ const FIELDS: ReadonlyArray<keyof AgentState> = [
 const FULL: Required<AgentState> = {
   enabledToolGroups: ['browser', 'documents'],
   mainModelPreference: '[true,"best",""]',
+  decisionFloorBindings: { call: 'a'.repeat(64) },
+  decisionRouting: { digest: 'b'.repeat(64), status: 'decided', kind: 'coding', groups: ['code'] },
+  decisionReceipts: {
+    digest: {
+      status: 'decided',
+      answers: { selected: { type: 'choice', choice: 'yes' } },
+      model: 'decision-version',
+      modelId: 'openrouter/decision',
+      latencyMs: 220,
+      costUsd: 0.00001,
+      usageCredits: 0.001
+    }
+  },
   projectContextFingerprint: 'f'.repeat(64),
   walledProviders: ['openrouter'],
   mediaApprovals: { image: { binding: 'a'.repeat(64), modelId: 'test/image' } },
@@ -383,7 +399,10 @@ describe('what a new turn inherits', () => {
       'mediaApprovals',
       'jobWaitId',
       'codingMissionWaiting',
-      'codingMissionReviews'
+      'codingMissionReviews',
+      'decisionFloorBindings',
+      'decisionRouting',
+      'decisionReceipts'
     ]);
     expect(reset).toEqual([
       // The trajectory gains the owner's new message; everything else here goes back to zero.

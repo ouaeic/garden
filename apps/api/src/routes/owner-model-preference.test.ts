@@ -188,7 +188,7 @@ const buildHarness = async (options: {
           status: 200,
           headers: { 'content-type': 'application/json' }
         });
-      if (url.endsWith('/models')) return json({ data: feed });
+      if (url.split('?')[0]!.endsWith('/models')) return json({ data: feed });
       if (url.endsWith('/endpoints/zdr'))
         return json({ data: feed.map((model) => ({ model_id: model.id, status: 0 })) });
       // Everything else on this box is the workspace runner, which answers nothing this suite reads.
@@ -392,6 +392,7 @@ describe('model choices across settings, drafts and the first prompt', () => {
     const parent = await create({ modelId: SWIFT });
     expect(parent.statusCode, parent.body).toBe(200);
     const parentId = parent.json<{ id: string }>().id;
+    expect((await harness.store.getTask(harness.userId, parentId))?.modelOverride).toBe(true);
     for (const item of [...cases, { model: { id: 'openrouter/test/missing' }, allowed: false }]) {
       const direct = await create({ modelId: item.model.id });
       const project = await create({
@@ -443,7 +444,14 @@ describe('model choices across settings, drafts and the first prompt', () => {
       method: 'PUT',
       url: '/v1/account/preferences',
       headers,
-      payload: { model: choice, modelPurposes: { summarise: choice, title: choice } }
+      payload: {
+        model: choice,
+        modelPurposes: {
+          summarise: choice,
+          title: choice,
+          decisions: { automatic: true, preference: 'balanced', modelId: '' }
+        }
+      }
     });
     expect(defaults.statusCode, defaults.body).toBe(200);
     const global = await harness.app.inject({
@@ -453,7 +461,12 @@ describe('model choices across settings, drafts and the first prompt', () => {
     });
     expect(global.statusCode, global.body).toBe(200);
     const surface = ProjectModelPreferences.parse(global.json());
-    expect(surface.choices).toMatchObject({ main: choice, summarise: choice, title: choice });
+    expect(surface.choices).toMatchObject({
+      main: choice,
+      summarise: choice,
+      title: choice,
+      decisions: { automatic: true, preference: 'balanced', modelId: '' }
+    });
     expect(surface.purposes).not.toHaveLength(0);
     expect(surface.purposes.find((item) => item.purpose === 'summarise')?.effective?.id).toBe(
       SWIFT
@@ -462,6 +475,7 @@ describe('model choices across settings, drafts and the first prompt', () => {
     const modelChoices = {
       main: { ...choice, modelId: MIDDLE },
       coding: choice,
+      decisions: { automatic: true, preference: 'balanced', modelId: '' },
       image: { automatic: true, preference: 'best', modelId: '' }
     };
     const controls = {

@@ -136,7 +136,7 @@ const stubUpstreams = (holdModel?: { reached: () => void; release: Promise<void>
         return json({
           data: seedModels().map((model) => ({ model_id: model.providerModelId, status: 0 }))
         });
-      if (url.endsWith('/models'))
+      if (url.split('?')[0]!.endsWith('/models'))
         return json({
           data: seedModels().map((model) => ({
             id: model.providerModelId,

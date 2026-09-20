@@ -3782,7 +3782,9 @@ export const fixtures: readonly Fixture[] = [
       tools: ['file_read'],
       status: 'completed',
       holds: [],
-      finalCatalogue: requestToolsFor(UNKNOWN_SURFACES, [], [], new Set()).map((tool) => tool.name),
+      finalCatalogue: requestToolsFor(UNKNOWN_SURFACES, [], [], new Set(['decide'])).map(
+        (tool) => tool.name
+      ),
       finalCatalogueUnchanged: true,
       catalogueStableThroughout: true
     }
@@ -3812,7 +3814,7 @@ export const fixtures: readonly Fixture[] = [
       tools: ['load_tools', 'document_read'],
       status: 'completed',
       holds: [],
-      finalCatalogue: requestToolsFor(UNKNOWN_SURFACES, [], ['documents'], new Set()).map(
+      finalCatalogue: requestToolsFor(UNKNOWN_SURFACES, [], ['documents'], new Set(['decide'])).map(
         (tool) => tool.name
       ),
       finalCatalogueUnchanged: true,

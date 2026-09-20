@@ -12,6 +12,7 @@ export const purposeLabels: Record<ModelPurpose, string> = {
   main: 'Main agent',
   specialist: 'Research specialists',
   coding: 'Coding agents',
+  decisions: 'Decisions',
   image: 'Images',
   audio: 'Speech',
   transcription: 'Transcription',
@@ -24,11 +25,19 @@ export const automaticChoice: PurposeModelChoice = {
   preference: 'balanced',
   modelId: ''
 };
-export const textPurposes = ['main', 'specialist', 'coding', 'summarise', 'title'] as const;
+export const textPurposes = [
+  'main',
+  'specialist',
+  'coding',
+  'decisions',
+  'summarise',
+  'title'
+] as const;
 const descriptions: Record<ModelPurpose, string> = {
   main: 'Leads the work and brings the results together.',
   specialist: 'Researches and reviews delegated work.',
   coding: 'Makes and verifies code changes.',
+  decisions: 'Resolves focused choices quickly as the work unfolds.',
   summarise: 'Keeps the working context concise.',
   title: 'Names your conversations.',
   image: 'Generates and edits images.',
@@ -125,24 +134,27 @@ export default function ModelChoiceFields({
                 )
               }
             />
-            {value === 'automatic' && item.purpose !== 'summarise' && item.purpose !== 'title' && (
-              <Field label={`${purposeLabels[item.purpose]} preference`}>
-                <select
-                  value={selected?.preference ?? 'balanced'}
-                  disabled={disabled}
-                  onChange={(event) =>
-                    change(item.purpose, {
-                      ...automaticChoice,
-                      preference: event.target.value as PurposeModelChoice['preference']
-                    })
-                  }
-                >
-                  <option value="balanced">Balanced</option>
-                  <option value="fast">Faster</option>
-                  <option value="best">Higher quality</option>
-                </select>
-              </Field>
-            )}
+            {value === 'automatic' &&
+              item.purpose !== 'summarise' &&
+              item.purpose !== 'title' &&
+              item.purpose !== 'decisions' && (
+                <Field label={`${purposeLabels[item.purpose]} preference`}>
+                  <select
+                    value={selected?.preference ?? 'balanced'}
+                    disabled={disabled}
+                    onChange={(event) =>
+                      change(item.purpose, {
+                        ...automaticChoice,
+                        preference: event.target.value as PurposeModelChoice['preference']
+                      })
+                    }
+                  >
+                    <option value="balanced">Balanced</option>
+                    <option value="fast">Faster</option>
+                    <option value="best">Higher quality</option>
+                  </select>
+                </Field>
+              )}
             <p className="model-choice-resolution muted">
               {effective
                 ? `${value === 'inherit' ? 'Inherits' : value === 'automatic' ? 'Currently' : 'Selected'}: ${effective.displayName}`

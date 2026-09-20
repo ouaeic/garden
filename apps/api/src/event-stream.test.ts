@@ -213,7 +213,7 @@ const start = async (
         return json({
           data: seedModels().map((m) => ({ model_id: m.providerModelId, status: 0 }))
         });
-      if (url.endsWith('/models'))
+      if (url.split('?')[0]!.endsWith('/models'))
         return json({
           data: seedModels().map((m) => ({
             id: m.providerModelId,

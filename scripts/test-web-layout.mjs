@@ -351,6 +351,16 @@ const modelCatalog = [
     availability: 'unavailable'
   }
 ];
+const decisionCatalog = [
+  {
+    ...modelCatalog[0],
+    id: 'openrouter/typesafe/jev-test',
+    providerModelId: 'typesafe/jev-test',
+    displayName: 'Decision fixture',
+    capabilities: ['decisions'],
+    contextTokens: 32000
+  }
+];
 const modelSurface = (project) => ({
   projectTaskId: project ? task.id : '',
   revision: project ? projectRevision : 0,
@@ -359,6 +369,7 @@ const modelSurface = (project) => ({
     'main',
     'specialist',
     'coding',
+    'decisions',
     'summarise',
     'title',
     'image',
@@ -377,8 +388,16 @@ const modelSurface = (project) => ({
             ? 'global'
             : 'automatic',
       choice,
-      options: ['image', 'audio', 'transcription', 'video'].includes(purpose) ? [] : modelCatalog,
-      effective: modelCatalog.find((model) => model.id === choice.modelId) ?? modelCatalog[0],
+      options:
+        purpose === 'decisions'
+          ? decisionCatalog
+          : ['image', 'audio', 'transcription', 'video'].includes(purpose)
+            ? []
+            : modelCatalog,
+      effective:
+        purpose === 'decisions'
+          ? decisionCatalog[0]
+          : (modelCatalog.find((model) => model.id === choice.modelId) ?? modelCatalog[0]),
       available: true,
       reason: null
     };
@@ -1121,7 +1140,7 @@ try {
     errors.push(`Unspecified UI fixture: ${route.request().method()} ${path}`);
     return route.fulfill({ status: 501, json: { error: { message: 'Unspecified UI fixture' } } });
   });
-  if (process.env.GARDEN_UI_FOCUS !== 'drafts') {
+  if (!['drafts', 'models'].includes(process.env.GARDEN_UI_FOCUS)) {
     await checkPermissionModes({ context, origin, bootstrap, task, project, workspace, report });
     await checkHumanInterventions({ context, origin, task, report });
     await checkRunningQuestion({ context, origin, bootstrap, task, report });
@@ -2488,6 +2507,8 @@ try {
     await approvalPage.getByText('No reusable permissions in this run.', { exact: true }).waitFor();
     await approvalPage.close();
     approvals = [];
+  }
+  if (process.env.GARDEN_UI_FOCUS !== 'drafts') {
     const modelsPage = await context.newPage();
     await modelsPage.goto(`${origin}/?task=${task.id}`);
     await modelsPage.locator('.garden-task-composer').waitFor();
@@ -2499,7 +2520,7 @@ try {
       .click();
     const advanced = modelsPage.getByRole('dialog', { name: 'Model choices', exact: true });
     await advanced.getByRole('region', { name: 'Coding agents', exact: true }).waitFor();
-    assert.equal(await advanced.locator('.model-choice-card').count(), 9);
+    assert.equal(await advanced.locator('.model-choice-card').count(), 10);
     const pick = async (surface, label, modelId) => {
       await surface.getByRole('button', { name: new RegExp(`^${label}:`) }).click();
       const search = modelsPage.getByRole('combobox', { name: 'Search models', exact: true });
@@ -2537,6 +2558,8 @@ try {
       .getByRole('button', { name: 'Close Conversation models', exact: true })
       .click();
 
+    if (await modelsPage.getByRole('button', { name: /^Add a direction/ }).isVisible())
+      await modelsPage.getByRole('button', { name: /^Add a direction/ }).click();
     await modelsPage.getByRole('button', { name: /^Model for this direction:/ }).click();
     const modelSearch = modelsPage.getByRole('combobox', { name: 'Search models', exact: true });
     await modelsPage
@@ -2576,6 +2599,7 @@ try {
       .click();
     await pick(advanced, 'Main agent', 'openrouter/alpha/model-78');
     await pick(advanced, 'Research specialists', 'openrouter/beta/model-79');
+    await pick(advanced, 'Decisions', 'openrouter/typesafe/jev-test');
     await advanced.getByRole('button', { name: 'Close Model choices', exact: true }).click();
     await newWork.getByText('Draft synced', { exact: true }).waitFor();
     assert.equal(modelDrafts.get(`new:${workspace.id}`).body, '');
@@ -2609,6 +2633,10 @@ try {
     await newWork.waitFor({ state: 'detached' });
     assert.equal(createdModelRequest.modelChoices.main.modelId, 'openrouter/alpha/model-78');
     assert.equal(createdModelRequest.modelChoices.specialist.modelId, 'openrouter/beta/model-79');
+    assert.equal(
+      createdModelRequest.modelChoices.decisions.modelId,
+      'openrouter/typesafe/jev-test'
+    );
     assert.equal(
       modelDrafts.get(`new:${workspace.id}`).body,
       '',
@@ -2671,6 +2699,7 @@ try {
 
     await pick(modelsPage, 'Condensing long work', 'openrouter/alpha/model-78');
     await pick(modelsPage, 'Naming a conversation', 'openrouter/beta/model-79');
+    await pick(modelsPage, 'Decisions', 'openrouter/typesafe/jev-test');
     failModelSave = true;
     await modelsPage.getByRole('button', { name: 'Save model defaults', exact: true }).click();
     await modelsPage
@@ -2684,6 +2713,7 @@ try {
     );
     await modelsPage.getByRole('button', { name: 'Save model defaults', exact: true }).click();
     await modelsPage.getByText('Model defaults saved', { exact: true }).waitFor();
+    assert.equal(defaultChoices.decisions.modelId, 'openrouter/typesafe/jev-test');
     await pick(modelsPage, 'image model', 'fixture/image-studio');
     await modelsPage.getByRole('button', { name: 'Save generation choices', exact: true }).click();
     await modelsPage.getByText('Generation choices saved', { exact: true }).waitFor();
@@ -2781,6 +2811,7 @@ try {
     await pick(modelsPage, 'Condensing long work', namedConnections[0].model.id);
     await modelsPage.getByRole('button', { name: 'Save model defaults', exact: true }).click();
     await modelsPage.getByText('Model defaults saved', { exact: true }).waitFor();
+    assert.equal(defaultChoices.decisions.modelId, 'openrouter/typesafe/jev-test');
     await modelsPage.reload();
     await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
     await modelsPage
@@ -2797,6 +2828,7 @@ try {
     await pick(modelsPage, 'Condensing long work', 'openrouter/alpha/model-78');
     await modelsPage.getByRole('button', { name: 'Save model defaults', exact: true }).click();
     await modelsPage.getByText('Model defaults saved', { exact: true }).waitFor();
+    assert.equal(defaultChoices.decisions.modelId, 'openrouter/typesafe/jev-test');
     for (const connection of namedConnections) {
       await modelsPage.getByRole('button', { name: connection.label, exact: true }).click();
       await modelsPage
@@ -2924,9 +2956,11 @@ try {
 
   assert.deepEqual(errors, [], 'The browser must not report uncaught errors');
   console.log(
-    process.env.GARDEN_UI_FOCUS === 'drafts'
-      ? 'Draft browser checks passed: encrypted IndexedDB, close and reopen, offline recovery without auto-send, lost save acknowledgement, conflict choice, and interrupted send receipt replay.'
-      : 'Browser checks passed: encrypted draft recovery, viewport layout, phone focus, effort drafts, playable links, downloads, state-preserving expansion, recorded evidence, mission review, media recovery, analysis sessions, device authorization, dictation consent, model selection persistence, and denial feedback with authentication retry.'
+    process.env.GARDEN_UI_FOCUS === 'models'
+      ? 'Model and draft browser checks passed: prompt, conversation and settings persistence, responsive controls, connection handling and draft recovery.'
+      : process.env.GARDEN_UI_FOCUS === 'drafts'
+        ? 'Draft browser checks passed: encrypted IndexedDB, close and reopen, offline recovery without auto-send, lost save acknowledgement, conflict choice, and interrupted send receipt replay.'
+        : 'Browser checks passed: encrypted draft recovery, viewport layout, phone focus, effort drafts, playable links, downloads, state-preserving expansion, recorded evidence, mission review, media recovery, analysis sessions, device authorization, dictation consent, model selection persistence, and denial feedback with authentication retry.'
   );
 } catch (error) {
   console.error(error);

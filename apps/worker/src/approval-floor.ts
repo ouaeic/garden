@@ -1,4 +1,5 @@
 import { workflowApproval } from './workflow-approval.js';
+import type { DecisionRoute } from './decision-route.js';
 import { projectUpdateApproval } from './project-updates.js';
 import { useTaskApproval } from './approval-grants.js';
 import { debuggerApproval } from './debugger-approval.js';
@@ -46,6 +47,7 @@ export interface ApprovalFloorDeps {
   readonly runner: AgentRunnerClient;
   inferenceCredential(task: TaskRecord, resolveMedia?: boolean): Promise<InferenceCredential>;
   destinationContext(state?: AgentState): DestinationContext;
+  decisionRoute?(task: TaskRecord): Promise<DecisionRoute | null>;
 }
 
 /**
@@ -181,6 +183,16 @@ export const approvalForCall = async (
     const strength = { review: 0, balanced: 1, autonomous: 2 };
     if (strength[parent.securityMode] < strength[task.securityMode])
       task.securityMode = parent.securityMode;
+  }
+  if (call.name === 'decide') {
+    const route = await deps.decisionRoute?.(task);
+    if (route && state) {
+      state.decisionFloorBindings = { [call.id]: route.binding };
+      return approvalRequirement(call.name, call.arguments, task.securityMode, {
+        decisionInference: { boundToTaskConnection: true }
+      });
+    }
+    return approvalRequirement(call.name, call.arguments, task.securityMode);
   }
   if (call.name === 'project_update')
     return projectUpdateApproval(deps.runner, task, call, {

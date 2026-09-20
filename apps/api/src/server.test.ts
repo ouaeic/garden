@@ -126,7 +126,7 @@ describe('API production boundaries', () => {
             { status: 200, headers: { 'content-type': 'application/json' } }
           );
         }
-        if (requestUrl.endsWith('/models')) {
+        if (requestUrl.split('?')[0]!.endsWith('/models')) {
           return new Response(
             JSON.stringify({
               data: seedModels().map((model) => ({
@@ -2168,7 +2168,7 @@ describe('conversation management', () => {
           });
         // Task creation refuses a model that has no live route, so the catalogue refresh that
         // runs on provider connect has to see one.
-        if (requestUrl.endsWith('/models'))
+        if (requestUrl.split('?')[0]!.endsWith('/models'))
           return json({
             data: seedModels().map((model) => ({
               id: model.providerModelId,
@@ -2537,7 +2537,7 @@ const stubProviderFetch = (onRunnerRequest?: (url: string) => void) =>
           status: 200,
           headers: { 'content-type': 'application/json' }
         });
-      if (requestUrl.endsWith('/models'))
+      if (requestUrl.split('?')[0]!.endsWith('/models'))
         return json({
           data: seedModels().map((model) => ({
             id: model.providerModelId,
@@ -4047,7 +4047,7 @@ const stubProviderAndRunner = (
             }
           ]
         });
-      if (requestUrl.endsWith('/models'))
+      if (requestUrl.split('?')[0]!.endsWith('/models'))
         return json({
           data: seedModels().map((model) => ({
             id: model.providerModelId,
@@ -5450,7 +5450,8 @@ describe('the settings and file surfaces the client already calls', () => {
           return json({ error: { message: 'No auth credentials found' } }, 401);
         }
         // Both catalogue routes answer, exactly as they do for a request carrying no key at all.
-        if (requestUrl.endsWith('/models')) return json({ data: [{ id: 'z-ai/glm-5.2' }] });
+        if (requestUrl.split('?')[0]!.endsWith('/models'))
+          return json({ data: [{ id: 'z-ai/glm-5.2' }] });
         if (requestUrl.endsWith('/endpoints/zdr')) return json({ data: [] });
         return json({
           storageBytes: 0,
@@ -5501,7 +5502,7 @@ describe('rewinding the computer, not only the conversation', () => {
             status,
             headers: { 'content-type': 'application/json' }
           });
-        if (requestUrl.endsWith('/models'))
+        if (requestUrl.split('?')[0]!.endsWith('/models'))
           return json({
             data: seedModels().map((model) => ({
               id: model.providerModelId,
@@ -8156,7 +8157,7 @@ describe('the doors the runner already had', () => {
             status,
             headers: { 'content-type': 'application/json' }
           });
-        if (requestUrl.endsWith('/models'))
+        if (requestUrl.split('?')[0]!.endsWith('/models'))
           return json({
             data: seedModels().map((model) => ({
               id: model.providerModelId,
@@ -8714,7 +8715,7 @@ describe('scheduled dispatch', () => {
             status: 200,
             headers: { 'content-type': 'application/json' }
           });
-        if (requestUrl.endsWith('/models'))
+        if (requestUrl.split('?')[0]!.endsWith('/models'))
           return json({
             data: seedModels().map((model) => ({
               id: model.providerModelId,
@@ -9424,7 +9425,7 @@ describe('what dictation costs', () => {
             usage: { seconds: 2, cost: transcriptionCalls === 1 ? 0.006 : 0.002 }
           });
         }
-        if (requestUrl.endsWith('/models'))
+        if (requestUrl.split('?')[0]!.endsWith('/models'))
           return json({
             data: [
               { id: 'whisper-1' },

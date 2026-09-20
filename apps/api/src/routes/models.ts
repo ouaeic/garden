@@ -84,7 +84,9 @@ export const registerModelRoutes = (context: RouteContext): void => {
       ]);
       const privacyRoute = request.query.privacyRoute === 'external' ? 'external' : 'provider_zdr';
       return catalog
-        .filter((model) => model.privacyRoute === privacyRoute)
+        .filter(
+          (model) => model.privacyRoute === privacyRoute && model.capabilities.includes('chat')
+        )
         .map((model) => ({
           ...model,
           unavailableReason: selectPurposeModel({
