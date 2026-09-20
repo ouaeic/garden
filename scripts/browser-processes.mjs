@@ -2,8 +2,34 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
 export function processFixture(workspaceId, taskId) {
-  const fixture = { rows: [], failRead: false, failStop: false, reads: 0, actions: [] };
+  const fixture = {
+    computationSessions: [],
+    rows: [],
+    failRead: false,
+    failStop: false,
+    reads: 0,
+    actions: []
+  };
   fixture.handle = async (route, pathname) => {
+    if (/\/computation\/[^/]+\/control$/.test(pathname)) {
+      if (!fixture.computationSessions.length) return false;
+      const session = fixture.computationSessions.find((item) =>
+        pathname.includes('/' + item.sessionId + '/')
+      );
+      assert(session, 'A computation action must refer to a displayed session');
+      assert.equal(
+        pathname,
+        `/v1/workspaces/${session.workspaceId}/computation/${session.sessionId}/control`
+      );
+      const body = route.request().postDataJSON();
+      assert(['interrupt', 'stop'].includes(body.action));
+      fixture.actions.push({ path: pathname, body });
+      session.state = body.action === 'interrupt' ? 'idle' : 'stopped';
+      session.stateRetained = body.action === 'interrupt';
+      if (session.latestCell?.state === 'running') session.latestCell.state = 'interrupted';
+      await route.fulfill({ json: session });
+      return true;
+    }
     if (/\/workflows\/[^/]+\/resume$/.test(pathname)) {
       const row = fixture.rows.find(
         (item) => item.workflow && pathname.includes('/' + item.workflow.workflowId + '/')
@@ -38,6 +64,7 @@ export function processFixture(workspaceId, taskId) {
             }
           : {
               processes: fixture.rows,
+              computationSessions: fixture.computationSessions,
               observedAt: new Date().toISOString(),
               refreshAfterMs: 120_000,
               resourcesAvailable: true,
@@ -402,11 +429,80 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
     await panel.scrollIntoViewIfNeeded();
     await panel.screenshot({ path: resolve(report, 'project-process-history-collapsed.png') });
 
+    const createdAt = new Date(Date.now() - 3 * 86400_000).toISOString();
+    fixture.computationSessions = [
+      {
+        sessionId: 'kernel-40000000-0000-4000-8000-000000000099',
+        taskId,
+        workspaceId: '10000000-0000-4000-8000-000000000088',
+        name: 'Retained R analysis',
+        language: 'r',
+        cwd: 'workspace',
+        state: 'busy',
+        stateRetained: true,
+        createdAt,
+        deadlineAt: new Date(Date.now() + 86400_000).toISOString(),
+        variables: [{ name: 'counts', type: 'R binding' }],
+        resources: {
+          sampledAt: new Date().toISOString(),
+          intervalMs: 120_000,
+          cpuPercent: 210,
+          residentBytes: 2 * 1024 ** 3,
+          processCount: 1,
+          threadCount: 3,
+          children: []
+        },
+        latestCell: {
+          cellId: 'cell-1',
+          state: 'running',
+          startedAt: createdAt,
+          stdout: 'Calculating percentages',
+          stderr: '',
+          artifacts: []
+        }
+      }
+    ];
+    await panel.getByRole('button', { name: 'Refresh processes' }).click();
+    const computation = panel.getByRole('region', { name: 'Project computation sessions' });
+    const kernel = computation.getByRole('article', { name: 'Retained R analysis', exact: true });
+    await kernel.waitFor();
+    assert((await kernel.innerText()).includes('Running for 3d'));
+    assert((await kernel.innerText()).includes('210%'));
+    assert((await kernel.innerText()).includes('2.0 GiB'));
+    assert(await kernel.evaluate((element) => element.scrollWidth <= element.clientWidth));
+    await kernel.getByRole('button', { name: 'Interrupt cell', exact: true }).click();
+    await kernel
+      .getByRole('button', { name: 'Interrupt cell', exact: true })
+      .waitFor({ state: 'detached' });
+    assert.equal(fixture.computationSessions[0].stateRetained, true);
+    await kernel.getByText('Latest cell · interrupted', { exact: true }).click();
+    await kernel.getByText('Calculating percentages', { exact: true }).waitFor();
+    await computation.screenshot({ path: resolve(report, 'project-r-session-360.png') });
+    await kernel.getByRole('button', { name: 'End session…', exact: true }).click();
+    await kernel.getByRole('button', { name: 'Keep session', exact: true }).click();
+    assert.equal(fixture.computationSessions[0].state, 'idle');
+    await kernel.getByRole('button', { name: 'End session…', exact: true }).click();
+    await kernel.getByRole('button', { name: 'End session', exact: true }).click();
+    await kernel.waitFor({ state: 'detached' });
+    await computation.getByRole('button', { name: 'Show ended sessions (1)', exact: true }).click();
+    await kernel.waitFor();
+    assert.equal(
+      await kernel.getByRole('button', { name: 'End session…', exact: true }).count(),
+      0
+    );
+    await kernel.getByText('Latest cell · interrupted', { exact: true }).click();
+    await kernel.getByText('Calculating percentages', { exact: true }).waitFor();
+    assert.equal(
+      fixture.actions.filter((action) => action.path.includes('/computation/')).length,
+      2
+    );
+
     console.log(
       'Project process browser checks passed: multi-day clocks, child resources, relaxed polling, responsive controls, checkpoint resume, log replacement, stale/error status and exact-root stop.'
     );
   } finally {
     await page.close();
+    fixture.computationSessions = [];
     fixture.rows = [];
     fixture.failRead = false;
     fixture.failStop = false;

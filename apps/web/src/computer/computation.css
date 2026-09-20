@@ -1,0 +1,60 @@
+.computation-card {
+  display: grid;
+  min-width: 0;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+}
+.computation-card > .row {
+  flex-wrap: wrap;
+}
+.computation-card strong {
+  overflow-wrap: anywhere;
+}
+.computation-card p {
+  margin: 0;
+}
+.computation-card pre {
+  max-height: 330px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, currentColor 4%, transparent);
+}
+.project-computations {
+  display: grid;
+  gap: 0.8rem;
+}
+.garden-computation-values {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.garden-computation-values > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem 0.75rem;
+  padding: 0.6rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+.garden-computation-values pre {
+  grid-column: 1 / -1;
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.garden-computation-files {
+  list-style: none;
+  padding: 0;
+}
+.garden-computation-files li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  overflow-wrap: anywhere;
+}

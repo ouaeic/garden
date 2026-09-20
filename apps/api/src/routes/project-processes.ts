@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { AthanorError } from '@athanor/core';
-import type { ProcessList } from '@athanor/contracts';
+import type { ComputationSession, ProcessList } from '@athanor/contracts';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 
@@ -45,6 +45,8 @@ export const registerProjectProcessRoutes = ({ app, store, runner }: RouteContex
         scopes.set(member.workspaceId, owners);
       }
       const results: ProcessList[] = [];
+      const computationSessions: ComputationSession[] = [];
+      let unavailableComputationWorkspaces = 0;
       let unavailableWorkspaces = 0,
         next = 0;
       const workspaces = [...scopes.entries()];
@@ -58,6 +60,25 @@ export const registerProjectProcessRoutes = ({ app, store, runner }: RouteContex
         Array.from({ length: Math.min(4, workspaces.length) }, async () => {
           while (next < workspaces.length) {
             const [workspaceId, owners] = workspaces[next++]!;
+            const computationRead = runner
+              .request<{ sessions: ComputationSession[] }>({
+                workspaceId,
+                userId: user.id,
+                role: 'user',
+                scopes: ['files.read'],
+                path: `/v1/workspaces/${workspaceId}/computation`,
+                method: 'GET',
+                timeoutMs: 5000
+              })
+              .then((value) => {
+                if (!Array.isArray(value.sessions)) throw Error('Computation status is incomplete');
+                for (const session of value.sessions)
+                  if (session.workspaceId === workspaceId && owners.has(session.taskId))
+                    computationSessions.push(session);
+              })
+              .catch(() => {
+                unavailableComputationWorkspaces++;
+              });
             try {
               const list = await runner.request<ProcessList>({
                 workspaceId,
@@ -77,22 +98,27 @@ export const registerProjectProcessRoutes = ({ app, store, runner }: RouteContex
             } catch {
               unavailableWorkspaces++;
             }
+            await computationRead;
           }
         })
       );
-      if (!results.length)
+      if (!results.length && !computationSessions.length)
         throw new AthanorError(
           'runner_unavailable',
           'Process status is temporarily unavailable',
           503
         );
-      const first = results[0]!;
+      const first = results[0];
       return {
         processes: results.flatMap((list) => list.processes),
+        computationSessions: computationSessions.sort(
+          (a, b) => b.createdAt.localeCompare(a.createdAt) || a.sessionId.localeCompare(b.sessionId)
+        ),
+        unavailableComputationWorkspaces,
         observedAt: new Date().toISOString(),
-        ...(first.refreshAfterMs ? { refreshAfterMs: first.refreshAfterMs } : {}),
+        ...(first?.refreshAfterMs ? { refreshAfterMs: first?.refreshAfterMs } : {}),
         resourcesAvailable: results.some((list) => list.resourcesAvailable),
-        ...(first.host ? { host: first.host } : {}),
+        ...(first?.host ? { host: first?.host } : {}),
         unavailableWorkspaces,
         ...(unavailableWorkspaces
           ? { note: 'Some project execution roots are unavailable. This list may be incomplete.' }

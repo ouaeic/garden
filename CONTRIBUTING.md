@@ -138,6 +138,14 @@ does not run is the saturated harness it exists to replace. It runs in CI in `ap
 `actions/checkout` and the drills alone, with no `setup-node` and no install, so it would fail
 there on the replay's first line.
 
+The native R computation drill runs against an installed `Rscript` and `jsonlite`, with no provider calls or network. Pass workspace library directories when the package is project-local:
+
+```bash
+python3 scripts/test-r-computation.py /path/to/project/R-library
+```
+
+It exercises native values, typed JSON checkpoints, multiple plots, error recovery and interrupts. Missing R or jsonlite fails explicitly; the TypeScript suite separately checks lifecycle, confinement and streaming protocol bounds.
+
 For the Tauri shell:
 
 ```bash

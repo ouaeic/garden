@@ -7,6 +7,7 @@ export function registerComputationRoutes(app: FastifyInstance, manager: Computa
     '/v1/workspaces/:workspaceId/computation',
     async (request) => {
       requireScope(request, 'files.read');
+      await manager.refreshResources();
       return {
         sessions: manager.list(
           request.params.workspaceId,

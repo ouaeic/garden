@@ -1,20 +1,25 @@
+import { z } from 'zod';
+import type { ComputationSession } from './computation.js';
 import type { WorkflowRun } from './workflows.js';
-export interface ProcessResourceSample {
-  sampledAt: string;
-  intervalMs: number | null;
-  cpuPercent: number | null;
-  residentBytes: number;
-  processCount: number;
-  threadCount: number;
-  children: Array<{
-    pid: number;
-    name: string;
-    state: string;
-    residentBytes: number;
-    threads: number;
-    ranForMs?: number;
-  }>;
-}
+export const ProcessResourceSampleSchema = z.object({
+  sampledAt: z.string(),
+  intervalMs: z.number().finite().nonnegative().nullable(),
+  cpuPercent: z.number().finite().nonnegative().nullable(),
+  residentBytes: z.number().int().nonnegative(),
+  processCount: z.number().int().nonnegative(),
+  threadCount: z.number().int().nonnegative(),
+  children: z.array(
+    z.object({
+      pid: z.number().int().positive(),
+      name: z.string(),
+      state: z.string(),
+      residentBytes: z.number().int().nonnegative(),
+      threads: z.number().int().nonnegative(),
+      ranForMs: z.number().finite().nonnegative().optional()
+    })
+  )
+});
+export type ProcessResourceSample = z.infer<typeof ProcessResourceSampleSchema>;
 
 export interface ManagedProcess {
   sessionId: string;
@@ -47,6 +52,8 @@ export interface ManagedProcess {
 }
 
 export interface ProcessList {
+  computationSessions?: ComputationSession[];
+  unavailableComputationWorkspaces?: number;
   processes: ManagedProcess[];
   observedAt?: string;
   refreshAfterMs?: number;

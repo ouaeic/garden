@@ -41,6 +41,27 @@ describe('owner computation session controls', () => {
     );
     expect(html).toContain('download="summary plot.png"');
   });
+  it('labels stale R resource readings while retaining the last measured values', () => {
+    const html = render({
+      ...session,
+      language: 'r',
+      resourceState: 'unavailable',
+      resources: {
+        sampledAt: '2026-09-06T00:01:00Z',
+        intervalMs: 120000,
+        cpuPercent: 210,
+        residentBytes: 2 * 1024 ** 3,
+        processCount: 1,
+        threadCount: 3,
+        children: []
+      }
+    });
+    expect(html).toContain('R');
+    expect(html).toContain('210%');
+    expect(html).toContain('2.0 GiB');
+    expect(html).toContain('showing the previous sample');
+    expect(html).not.toContain('Waiting for a resource sample');
+  });
   it('reports lost state without offering an unsafe automatic replay', () => {
     const html = render({ ...session, state: 'lost', stateRetained: false, variables: [] });
     expect(html).toContain('Runtime state was lost. Earlier cells have not been replayed.');

@@ -19,14 +19,42 @@ async function fixture() {
     )
   };
   const runner = {
-    request: vi.fn(async ({ workspaceId }: { workspaceId: string }) => ({
-      processes: [
-        { sessionId: `job-${workspaceId}`, ownerTaskId: workspaceId === 'one' ? 'root' : 'branch' },
-        { sessionId: 'unrelated', ownerTaskId: 'other-task' }
-      ],
-      refreshAfterMs: 120_000,
-      resourcesAvailable: true
-    }))
+    request: vi.fn(async ({ workspaceId, path }: { workspaceId: string; path: string }) =>
+      path.endsWith('/computation')
+        ? {
+            sessions: [
+              {
+                sessionId: `kernel-${workspaceId}`,
+                workspaceId,
+                taskId: workspaceId === 'one' ? 'root' : 'branch',
+                createdAt: '2026-09-20T00:00:00Z'
+              },
+              {
+                sessionId: 'foreign-task',
+                workspaceId,
+                taskId: 'other-task',
+                createdAt: '2026-09-20T00:00:00Z'
+              },
+              {
+                sessionId: 'foreign-root',
+                workspaceId: 'unrelated',
+                taskId: 'root',
+                createdAt: '2026-09-20T00:00:00Z'
+              }
+            ]
+          }
+        : {
+            processes: [
+              {
+                sessionId: `job-${workspaceId}`,
+                ownerTaskId: workspaceId === 'one' ? 'root' : 'branch'
+              },
+              { sessionId: 'unrelated', ownerTaskId: 'other-task' }
+            ],
+            refreshAfterMs: 120_000,
+            resourcesAvailable: true
+          }
+    )
   };
   app.decorateRequest('user', null);
   app.decorateRequest('apiToken', null);
@@ -57,7 +85,10 @@ describe('project process scope', () => {
         ])
       );
       expect(response.json<ProcessList>().processes).toHaveLength(2);
-      expect(runner.request).toHaveBeenCalledTimes(2);
+      expect(runner.request).toHaveBeenCalledTimes(4);
+      expect(
+        response.json<ProcessList>().computationSessions?.map((session) => session.sessionId)
+      ).toEqual(['kernel-one', 'kernel-two']);
       expect(runner.request).toHaveBeenCalledWith(
         expect.objectContaining({
           role: 'user',
@@ -92,7 +123,11 @@ describe('project process scope', () => {
   );
   it('retains reachable results and explicitly reports a partial list', async () => {
     const { app, runner } = await fixture();
-    runner.request.mockRejectedValueOnce(new Error('offline'));
+    const read = runner.request.getMockImplementation()!;
+    runner.request.mockImplementation(async (request) => {
+      if (request.workspaceId === 'one') throw Error('offline');
+      return read(request);
+    });
     try {
       const response = await app.inject({
         url: '/v1/tasks/root/processes',
@@ -102,6 +137,50 @@ describe('project process scope', () => {
       expect(response.json<ProcessList>().unavailableWorkspaces).toBe(1);
       expect(response.json<ProcessList>().note).toContain('incomplete');
       expect(response.json<ProcessList>().processes).toHaveLength(1);
+    } finally {
+      await app.close();
+    }
+  });
+  it('retains computation status when ordinary process status fails', async () => {
+    const { app, runner } = await fixture();
+    const read = runner.request.getMockImplementation()!;
+    runner.request.mockImplementation(async (request) => {
+      if (request.path.endsWith('/processes')) throw Error('process status offline');
+      return read(request);
+    });
+    try {
+      const response = await app.inject({
+        url: '/v1/tasks/root/processes',
+        headers: { 'x-owner': 'owner' }
+      });
+      expect(response.statusCode).toBe(200);
+      const result = response.json<ProcessList>();
+      expect(result.processes).toEqual([]);
+      expect(result.computationSessions).toHaveLength(2);
+      expect(result.unavailableWorkspaces).toBe(2);
+      expect(result.unavailableComputationWorkspaces).toBe(0);
+    } finally {
+      await app.close();
+    }
+  });
+  it('reports unavailable computations separately from successful process reads', async () => {
+    const { app, runner } = await fixture();
+    const read = runner.request.getMockImplementation()!;
+    runner.request.mockImplementation(async (request) => {
+      if (request.path.endsWith('/computation')) throw Error('computation status offline');
+      return read(request);
+    });
+    try {
+      const response = await app.inject({
+        url: '/v1/tasks/root/processes',
+        headers: { 'x-owner': 'owner' }
+      });
+      expect(response.statusCode).toBe(200);
+      const result = response.json<ProcessList>();
+      expect(result.processes).toHaveLength(2);
+      expect(result.computationSessions).toEqual([]);
+      expect(result.unavailableWorkspaces).toBe(0);
+      expect(result.unavailableComputationWorkspaces).toBe(2);
     } finally {
       await app.close();
     }

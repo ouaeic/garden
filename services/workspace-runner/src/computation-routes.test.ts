@@ -14,7 +14,11 @@ describe('signed computation route authority', () => {
       act = vi.fn(async () => ({ state: 'idle' })),
       list = vi.fn(() => []);
     app.addHook('preHandler', authenticateRunnerRequest(secret));
-    registerComputationRoutes(app, { act, list } as unknown as ComputationManager);
+    registerComputationRoutes(app, {
+      act,
+      list,
+      refreshResources: vi.fn(async () => undefined)
+    } as unknown as ComputationManager);
     const auth = (
       scopes: string[],
       role: 'user' | 'agent' = 'agent',

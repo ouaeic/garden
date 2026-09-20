@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ProcessResourceSampleSchema } from './processes.js';
 
 export const ComputationRequest = z
   .object({
@@ -13,8 +14,9 @@ export const ComputationRequest = z
       'restore'
     ]),
     sessionId: z.string().max(120).optional(),
-    language: z.enum(['python', 'javascript']).optional(),
+    language: z.enum(['python', 'javascript', 'r']).optional(),
     name: z.string().min(1).max(120).optional(),
+    rLibraryPaths: z.array(z.string().min(1).max(4096)).max(16).optional(),
     cwd: z.string().max(4096).default('workspace'),
     lifetimeSeconds: z.number().int().positive().optional(),
     cellId: z.string().min(1).max(120).optional(),
@@ -110,13 +112,15 @@ export const ComputationSessionSchema = z
     taskId: z.string().max(256),
     workspaceId: z.string().uuid(),
     name: z.string().max(120),
-    language: z.enum(['python', 'javascript']),
+    language: z.enum(['python', 'javascript', 'r']),
     runtime: ComputationRuntimeSchema.optional(),
     cwd: z.string().max(4096),
     state: ComputationState,
     createdAt: z.string().datetime(),
     deadlineAt: z.string().datetime(),
     stateRetained: z.boolean(),
+    resources: ProcessResourceSampleSchema.optional(),
+    resourceState: z.enum(['pending', 'available', 'unavailable']).optional(),
     variables: z
       .array(
         z.object({

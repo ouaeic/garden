@@ -26,9 +26,11 @@ import {
 } from './files.js';
 import { killProcessTree } from './subprocess.js';
 import { belowHostStorageFloor, hostStorage } from './host-storage.js';
-import { PYTHON_COMPUTATION, JAVASCRIPT_COMPUTATION } from './computation-programs.js';
+import { computationLaunch } from './computation-launch.js';
+import { ComputationWire } from './computation-wire.js';
 import { saveComputationArtifacts } from './computation-artifacts.js';
 import { computationInputs } from './computation-inputs.js';
+import { ProcessResources, processScanner } from './process-resources.js';
 
 export const COMPUTATION_LIMIT = 8;
 export const COMPUTATION_CELL_LIMIT = 256;
@@ -71,7 +73,7 @@ type Live = {
   root: string;
   child: ChildProcessWithoutNullStreams;
   token: string;
-  buffer: string;
+  wire?: ComputationWire;
   ready: () => void;
   failReady: (error: Error) => void;
   readyPromise: Promise<void>;
@@ -103,12 +105,14 @@ export class ComputationManager {
   #live = new Map<string, Live>();
   #flush: Promise<void> = Promise.resolve();
   #timer: NodeJS.Timeout;
+  #resources: ProcessResources;
   constructor(
     private readonly workspaceRoot: string,
     private readonly policy: InvocationPolicy,
     private readonly maximumSeconds: number,
     private readonly now: () => number = Date.now
   ) {
+    this.#resources = new ProcessResources(processScanner('/proc', policy.sandbox), now);
     this.#timer = setInterval(() => {
       void this.#sweep();
     }, 5000);
@@ -195,6 +199,8 @@ export class ComputationManager {
   }
   async act(workspaceId: string, owner: string | null, value: unknown): Promise<unknown> {
     const request = ComputationRequest.parse(value);
+    if (request.rLibraryPaths && (request.action !== 'start' || request.language !== 'r'))
+      throw Error('R libraries apply to starting R sessions only');
     if (request.inputs && request.action !== 'cell')
       throw Error('Declared inputs apply to code cells only');
     if (request.action === 'list') return { sessions: this.list(workspaceId, owner) };
@@ -259,8 +265,28 @@ export class ComputationManager {
       throw Error('Computation session not found');
     return record;
   }
+  async refreshResources(): Promise<void> {
+    await this.#resources.refresh(
+      [...this.#live.values()].flatMap((live) =>
+        live.child.pid
+          ? [
+              {
+                id: live.record.view.sessionId,
+                pid: live.child.pid,
+                generation: live.record.view.createdAt
+              }
+            ]
+          : []
+      )
+    );
+  }
   #view(record: RecordState): ComputationSession {
     const live = this.#live.get(record.view.sessionId);
+    if (live) {
+      const sample = this.#resources.sample(record.view.sessionId);
+      if (sample) record.view.resources = sample;
+      record.view.resourceState = this.#resources.state(record.view.sessionId);
+    }
     if (live && record.view.latestCell?.state === 'running') {
       record.view.latestCell.stdout = live.stdout.text('stdout');
       record.view.latestCell.stderr = live.stderr.text('stderr');
@@ -337,15 +363,15 @@ export class ComputationManager {
       throw Error('Computation session capacity reached');
     this.#records.set(id, record);
     await this.#persist();
+    let disposeBootstrap: (() => Promise<void>) | undefined;
     try {
+      const launch = await computationLaunch(root, request, token);
+      disposeBootstrap = launch.dispose;
       const invocation = await prepareInvocation(
         root,
         {
-          executable: request.language === 'python' ? 'python3' : process.execPath,
-          args:
-            request.language === 'python'
-              ? ['-u', '-c', PYTHON_COMPUTATION, token]
-              : ['-e', JAVASCRIPT_COMPUTATION, token],
+          executable: launch.executable,
+          args: launch.args,
           cwd: record.view.cwd,
           env: {},
           network: false,
@@ -375,7 +401,6 @@ export class ComputationManager {
         root,
         child,
         token,
-        buffer: '',
         ready,
         failReady,
         readyPromise,
@@ -421,6 +446,8 @@ export class ComputationManager {
     } catch (error) {
       await this.#stop(record, 'lost', error instanceof Error ? error.message : String(error));
       throw error;
+    } finally {
+      await disposeBootstrap?.().catch(() => undefined);
     }
   }
   async #cell(record: RecordState, request: ComputationRequest): Promise<unknown> {
@@ -469,7 +496,7 @@ export class ComputationManager {
         .object({
           format: z.literal('garden-computation-json-1'),
           language: z.literal(record.view.language),
-          values: z.record(z.string().regex(/^[A-Za-z$][\w$]*$/), z.unknown())
+          values: z.record(z.string().regex(/^[A-Za-z$][\w$.]*$/), z.unknown())
         })
         .strict()
         .parse(JSON.parse(content.content.toString('utf8')));
@@ -546,42 +573,37 @@ export class ComputationManager {
     return this.#view(record);
   }
   #receive(live: Live, chunk: string): void {
-    live.buffer += chunk;
-    if (Buffer.byteLength(live.buffer) > 4 * 1024 * 1024) {
-      void this.#stop(live.record, 'lost', 'Computation protocol packet exceeded limit');
-      return;
-    }
-    let newline: number;
-    while ((newline = live.buffer.indexOf('\n')) >= 0) {
-      const line = live.buffer.slice(0, newline);
-      live.buffer = live.buffer.slice(newline + 1);
-      const marker = line.indexOf(live.token);
-      if (marker < 0) {
-        live.stdout.push(Buffer.from(line + '\n'));
-        continue;
-      }
-      if (marker > 0) live.stdout.push(Buffer.from(line.slice(0, marker)));
-      try {
-        const packet = Packet.parse(JSON.parse(line.slice(marker + live.token.length)));
+    live.wire ??= new ComputationWire(
+      live.token,
+      (output) => live.stdout.push(Buffer.from(output)),
+      (value) => {
+        const packet = Packet.parse(JSON.parse(value));
         if (packet.kind === 'ready') {
-          if (live.record.view.state !== 'starting') continue;
+          if (live.record.view.state !== 'starting') return;
           live.record.view.runtime = packet.runtime;
           live.ready();
-          continue;
+          return;
         }
         if (packet.kind === 'fatal') {
           void this.#stop(live.record, 'lost', packet.message);
-          continue;
+          return;
         }
-        if (packet.cellId !== live.record.view.latestCell?.cellId || live.finishing) continue;
+        if (packet.cellId !== live.record.view.latestCell?.cellId || live.finishing) return;
         if (packet.kind === 'output') live[packet.stream].push(Buffer.from(packet.text));
         else {
           live.finishing = true;
           void this.#finish(live, packet);
         }
-      } catch {
-        void this.#stop(live.record, 'lost', 'Invalid computation protocol packet');
       }
+    );
+    try {
+      live.wire.push(chunk);
+    } catch (error) {
+      void this.#stop(
+        live.record,
+        'lost',
+        error instanceof Error ? error.message : 'Invalid computation protocol packet'
+      );
     }
   }
   async #finish(live: Live, packet: z.infer<typeof Packet> & { kind: 'done' }): Promise<void> {
@@ -662,6 +684,7 @@ export class ComputationManager {
     const live = this.#live.get(record.view.sessionId);
     if (!live && !active(record.view.state)) return;
     if (live) {
+      this.#view(record);
       this.#live.delete(record.view.sessionId);
       clearTimeout(live.deadline);
       clearTimeout(live.cellTimer);
@@ -686,6 +709,7 @@ export class ComputationManager {
     await this.#persist();
   }
   async #sweep(): Promise<void> {
+    await this.refreshResources();
     for (const live of this.#live.values())
       try {
         if (Date.parse(live.record.view.deadlineAt) <= this.now())

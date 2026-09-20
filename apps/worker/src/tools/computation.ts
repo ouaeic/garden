@@ -24,7 +24,7 @@ export async function executeComputationTool(
       options: z.toJSONSchema(ComputationRequest),
       actions: {
         start:
-          'Start an approved task-scoped Python or JavaScript interpreter with explicit lifetimeSeconds. Filesystem confined, network disabled; use governed tools for downloads/installations. Requires the native sandbox.',
+          'Start an approved task-scoped Python, R or JavaScript interpreter with explicit lifetimeSeconds. Filesystem confined, network disabled; use governed tools for downloads/installations. Requires the native sandbox. R also requires jsonlite; rLibraryPaths may name its workspace library directories.',
         cell: 'Execute code in the retained session. Use a unique stable cellId; retries never replay an accepted cell. Values remain server-side. Results return quickly or as a running handle; status reads cached outputs without executing code. Declare inputs as workspace file paths to capture bounded pre-execution hashes (include dependency lockfiles). Receipts include source/request hashes, interpreter identity and the previous cell; they do not capture all dependencies or freeze files.',
         list: 'List this task’s sessions.',
         status: 'Read cached session state, variables and latest cell receipt.',
@@ -32,7 +32,7 @@ export async function executeComputationTool(
           'Interrupt the active cell. Acknowledged interrupts retain values; otherwise the interpreter is stopped and state is reported lost.',
         stop: 'End the session and discard in-memory values.',
         checkpoint:
-          'Save selected JSON-serializable variables to a new workspace path. No pickle or arbitrary serialization hooks.',
+          'Save selected JSON-serializable variables to a new workspace path. R preserves data vectors, matrices, data frames, factors and their attributes as typed JSON. No pickle, RDS or arbitrary serialization hooks.',
         restore:
           'Restore an explicit JSON checkpoint into an idle session of the same language; source cells are never replayed.'
       },
@@ -63,7 +63,7 @@ export async function executeComputationTool(
         }
       ],
       plots:
-        'Python: return a matplotlib Figure as the last expression for a PNG (when matplotlib is installed). JavaScript: garden.plot({title,xLabel,yLabel,points:[[x,y],...]}) produces a safe SVG artifact. Artifacts are source-linked; no HTML or tool bridge runs inside the session.',
+        'Python: return a matplotlib Figure as the last expression for a PNG (when matplotlib is installed). R: visible final values print, and default plotting devices produce PNGs. Variable inspection lists names without forcing delayed or active bindings. JavaScript: garden.plot({title,xLabel,yLabel,points:[[x,y],...]}) produces a safe SVG artifact. Artifacts are source-linked; no HTML or tool bridge runs inside the session.',
       continuity:
         'Values survive cells and turns until the declared deadline. Cancellation or explicit stop ends the session. Runner restart loses memory and never replays cells; use explicit file checkpoints for recovery.'
     };

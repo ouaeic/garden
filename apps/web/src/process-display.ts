@@ -45,3 +45,6 @@ export const processMemory = (bytes: number): string => {
   if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MiB`;
   return `${Math.round(bytes / 1024)} KiB`;
 };
+
+export const computationActive = (state: string): boolean =>
+  ['starting', 'idle', 'busy', 'interrupted'].includes(state);

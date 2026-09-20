@@ -1,11 +1,12 @@
 import { WorkflowProgress } from './WorkflowProgress';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Activity, RefreshCw, Square } from 'lucide-react';
 import type { ManagedProcess, ProcessList } from '@athanor/contracts';
 import { get, post } from './client';
 import { Button, Dialog, ErrorNotice, Spinner } from './ui';
 import { useVisibleClock } from './visible-clock';
 import {
+  computationActive,
   processActive,
   processDuration,
   processElapsed,
@@ -15,6 +16,7 @@ import {
   processState
 } from './process-display';
 import './processes.css';
+const ProjectComputations = lazy(() => import('./ProjectComputations'));
 
 export default function ProcessPanel({
   workspaceId,
@@ -77,10 +79,13 @@ export default function ProcessPanel({
     };
   }, [refresh]);
   const refreshAfterMs = Math.max(60_000, list?.refreshAfterMs ?? 120_000);
+  const kernels = list?.computationSessions ?? [];
+  const kernelCount = kernels.filter((session) => computationActive(session.state)).length;
+  const pollAfterMs = kernels.some((session) => session.state === 'busy') ? 10_000 : refreshAfterMs;
   useEffect(() => {
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') void refresh();
-    }, refreshAfterMs);
+    }, pollAfterMs);
     const visible = () => {
       if (document.visibilityState === 'visible') void refresh();
     };
@@ -89,7 +94,7 @@ export default function ProcessPanel({
       clearInterval(interval);
       document.removeEventListener('visibilitychange', visible);
     };
-  }, [refresh, refreshAfterMs]);
+  }, [refresh, pollAfterMs]);
   const active = list?.processes.filter(processActive) ?? [];
   const attention = list?.processes.filter(processNeedsAttention) ?? [];
   const finished = (
@@ -142,11 +147,11 @@ export default function ProcessPanel({
         <div>
           <h2>
             <Activity size={19} aria-hidden="true" /> Processes{' '}
-            {list && <span className="process-count">{active.length} active</span>}
+            {list && <span className="process-count">{active.length + kernelCount} active</span>}
           </h2>
           <p>
             {taskId || projectId
-              ? 'Jobs and services from this project and its branches.'
+              ? 'Jobs, services and analysis sessions from this project and its branches.'
               : 'Background jobs and services on this computer.'}
           </p>
         </div>
@@ -188,7 +193,7 @@ export default function ProcessPanel({
               </p>
             </details>
           )}
-          {!active.length && !attention.length && (
+          {!active.length && !attention.length && !kernelCount && (
             <p className="process-empty">
               {finished.length
                 ? 'No processes are running. Finished runs and their output are available below.'
@@ -196,6 +201,14 @@ export default function ProcessPanel({
                   ? 'No processes available to display from the reachable execution roots.'
                   : 'No background processes have been reported for this project.'}
             </p>
+          )}
+          {Boolean(list.unavailableComputationWorkspaces) && (
+            <p role="status">Some analysis sessions could not be read. Refresh to try again.</p>
+          )}
+          {kernels.length > 0 && (
+            <Suspense fallback={<Spinner />}>
+              <ProjectComputations key={endpoint} sessions={kernels} onChange={refresh} />
+            </Suspense>
           )}
           <div className="process-list">
             {rows.map((process) => {

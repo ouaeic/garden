@@ -2,6 +2,9 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import type { ComputationSession } from '@athanor/contracts';
 import { get, post } from '../client';
 import { bytes, message } from './format';
+import { useVisibleClock } from '../visible-clock';
+import { computationActive, processDuration, processMemory } from '../process-display';
+import './computation.css';
 const ComputationHistory = lazy(() => import('./ComputationHistory'));
 
 export function ComputationCard({
@@ -15,14 +18,17 @@ export function ComputationCard({
 }) {
   const [confirmStop, setConfirmStop] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const active = ['starting', 'idle', 'busy', 'interrupted'].includes(session.state);
+  const active = computationActive(session.state);
+  const clock = useVisibleClock(active, 30_000, session.createdAt);
+  const sample = session.resources;
   const cell = session.latestCell;
   return (
-    <article className="computer-item stack">
+    <article className="computation-card" aria-label={session.name}>
       <div className="row between">
         <strong>{session.name}</strong>
         <span className="badge">
-          {session.language === 'python' ? 'Python' : 'JavaScript'} · {session.state}
+          {{ python: 'Python', javascript: 'JavaScript', r: 'R' }[session.language]} ·{' '}
+          {session.state}
         </span>
       </div>
       <p className="muted">
@@ -33,6 +39,36 @@ export function ComputationCard({
             : 'No retained runtime state is reported.'}
         {active ? ` Session ends ${new Date(session.deadlineAt).toLocaleString()}.` : ''}
       </p>
+      <p className="muted">
+        {active
+          ? `Running for ${processDuration(Math.max(0, clock - Date.parse(session.createdAt)))}`
+          : `Started ${new Date(session.createdAt).toLocaleString()}`}
+      </p>
+      {sample && (
+        <details>
+          <summary>
+            CPU {sample.cpuPercent === null ? 'pending' : `${Math.round(sample.cpuPercent)}%`} · RAM{' '}
+            {processMemory(sample.residentBytes)}
+          </summary>
+          <p className="muted">
+            Sampled {new Date(sample.sampledAt).toLocaleString()} · {sample.processCount} processes,{' '}
+            {sample.threadCount} threads. CPU is averaged between samples; 100% is one core. Shared
+            memory may be counted more than once.
+          </p>
+        </details>
+      )}
+      {active && sample && session.resourceState === 'unavailable' && (
+        <p className="muted">
+          The latest resource scan is unavailable; showing the previous sample.
+        </p>
+      )}
+      {active && !sample && (
+        <p className="muted">
+          {session.resourceState === 'unavailable'
+            ? 'Resource sampling is unavailable for this session.'
+            : 'Waiting for a resource sample.'}
+        </p>
+      )}
       {session.note && <p role="status">{session.note}</p>}
       {session.variables.length > 0 && (
         <details>
