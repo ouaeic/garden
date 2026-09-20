@@ -15,7 +15,7 @@ export async function taskFailure(
       return {
         code: 'background_jobs',
         summary:
-          'Processes are running on this computer. Work resumes automatically when they stop; no model calls are made while waiting.'
+          'Background work is running on this computer. Work resumes automatically when the awaited jobs or analysis cells finish; no model calls are made while waiting.'
       };
   } catch {
     // A corrupt checkpoint cannot supply a trustworthy waiting state.
