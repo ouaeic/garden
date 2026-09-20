@@ -28,7 +28,15 @@ describe('signed computation route authority', () => {
       authorization: `Bearer ${signCapabilityToken({ sub: 'task', workspaceId: workspace, role, scopes, nonce: randomUUID(), aud: capabilityAudience(method, url) }, secret, 60)}`
     });
     try {
-      for (const action of ['start', 'cell', 'checkpoint', 'restore', 'interrupt', 'stop'])
+      for (const action of [
+        'start',
+        'cell',
+        'checkpoint',
+        'restore',
+        'extend',
+        'interrupt',
+        'stop'
+      ])
         expect(
           (
             await app.inject({
@@ -39,7 +47,7 @@ describe('signed computation route authority', () => {
             })
           ).statusCode
         ).toBeGreaterThanOrEqual(400);
-      for (const action of ['start', 'cell', 'checkpoint', 'restore'])
+      for (const action of ['start', 'cell', 'checkpoint', 'restore', 'extend'])
         expect(
           (
             await app.inject({

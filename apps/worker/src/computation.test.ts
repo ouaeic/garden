@@ -40,7 +40,7 @@ describe('native computation authority and discovery', () => {
       actions: { checkpoint: expect.any(String) as unknown }
     });
     expect(call).not.toHaveBeenCalled();
-    for (const action of ['status', 'list', 'start', 'cell', 'checkpoint', 'stop']) {
+    for (const action of ['status', 'list', 'start', 'cell', 'checkpoint', 'extend', 'stop']) {
       await executeToolCall(context, {
         id: action,
         name: 'process',
@@ -137,6 +137,49 @@ describe('native computation authority and discovery', () => {
         {}
       )
     ).rejects.toThrow('ownership mismatch');
+  });
+  it('classifies R code using the stored R interpreter and keeps extension in the ownership floor', async () => {
+    const runner = {
+      call: vi.fn(async () => ({ ...stored, language: 'r' }))
+    } as unknown as AgentRunnerClient;
+    const classify = vi.spyOn(ApprovalPolicy, 'approvalRequirement');
+    await computationApproval(
+      runner,
+      task,
+      {
+        id: 'r',
+        name: 'process',
+        arguments: {
+          action: 'compute',
+          sessionId: stored.sessionId,
+          options: { action: 'cell', cellId: 'one', code: 'sum(c(2,3,5))' }
+        }
+      },
+      {}
+    );
+    expect(classify).toHaveBeenCalledWith(
+      'shell',
+      expect.objectContaining({ executable: 'Rscript', args: ['-e', 'sum(c(2,3,5))'] }),
+      'autonomous',
+      {}
+    );
+    const result = await computationApproval(
+      runner,
+      task,
+      {
+        id: 'extend',
+        name: 'process',
+        arguments: {
+          action: 'compute',
+          sessionId: stored.sessionId,
+          options: { action: 'extend', lifetimeSeconds: 172800 }
+        }
+      },
+      {}
+    );
+    expect(result).toMatchObject({ sideEffect: 'external_reversible', action: 'Extend Analysis' });
+    expect(result?.preview).toContain('2026-09-08T10:00:00.000Z');
+    expect(result?.preview).toContain(stored.sessionId);
   });
   it('requires launch approval even in autonomous mode and preserves taint strength', async () => {
     const runner = { call: vi.fn() } as unknown as AgentRunnerClient;

@@ -12,12 +12,7 @@ import {
   type ComputationInput,
   type ComputationSession
 } from '@athanor/contracts';
-import {
-  boundedCollector,
-  prepareInvocation,
-  refuseUnreachableTimeout,
-  type InvocationPolicy
-} from './execution.js';
+import { boundedCollector, prepareInvocation, type InvocationPolicy } from './execution.js';
 import {
   assertUserDataPath,
   readWorkspaceFile,
@@ -31,6 +26,7 @@ import { ComputationWire } from './computation-wire.js';
 import { saveComputationArtifacts } from './computation-artifacts.js';
 import { computationInputs } from './computation-inputs.js';
 import { ProcessResources, processScanner } from './process-resources.js';
+import { computationDeadline, scheduleComputationDeadline } from './computation-deadline.js';
 
 export const COMPUTATION_LIMIT = 8;
 export const COMPUTATION_CELL_LIMIT = 256;
@@ -80,8 +76,8 @@ type Live = {
   stdout: ReturnType<typeof boundedCollector>;
   stderr: ReturnType<typeof boundedCollector>;
   settle?: () => void;
-  deadline?: NodeJS.Timeout;
-  cellTimer?: NodeJS.Timeout;
+  deadline?: () => void;
+  cellTimer?: () => void;
   forceTimer?: NodeJS.Timeout;
   finishing: boolean;
   request?: ComputationRequest;
@@ -109,7 +105,6 @@ export class ComputationManager {
   constructor(
     private readonly workspaceRoot: string,
     private readonly policy: InvocationPolicy,
-    private readonly maximumSeconds: number,
     private readonly now: () => number = Date.now
   ) {
     this.#resources = new ProcessResources(processScanner('/proc', policy.sandbox), now);
@@ -223,7 +218,27 @@ export class ComputationManager {
       await this.#interrupt(record);
       return this.#view(record);
     }
-    if (!owner) throw Error('Cells and checkpoints require their owning task');
+    if (!owner) throw Error('Computation execution and extension require their owning task');
+    if (request.action === 'extend') {
+      const live = this.#live.get(record.view.sessionId);
+      if (!live || !record.view.stateRetained || !active(record.view.state))
+        throw Error('Only a retained session can be extended');
+      if (request.lifetimeSeconds === undefined)
+        throw Error('Extension requires total lifetimeSeconds from session creation');
+      const deadline = computationDeadline(
+        Date.parse(record.view.createdAt),
+        request.lifetimeSeconds
+      );
+      if (
+        deadline < Date.parse(record.view.deadlineAt) ||
+        Date.parse(record.view.deadlineAt) <= this.now()
+      )
+        throw Error('Extension cannot shorten or revive an expired session');
+      record.view.deadlineAt = new Date(deadline).toISOString();
+      this.#scheduleLifetime(live);
+      await this.#persist();
+      return this.#view(record);
+    }
     return this.#cell(record, request);
   }
   async stopOwner(workspaceId: string, owner: string): Promise<void> {
@@ -315,6 +330,16 @@ export class ComputationManager {
     this.#flush = write;
     await write;
   }
+  #scheduleLifetime(live: Live): void {
+    live.deadline?.();
+    live.deadline = scheduleComputationDeadline(
+      Date.parse(live.record.view.deadlineAt),
+      () => {
+        void this.#stop(live.record, 'expired', 'Declared computation lifetime elapsed.');
+      },
+      this.now
+    );
+  }
   async #start(
     workspaceId: string,
     owner: string,
@@ -332,7 +357,6 @@ export class ComputationManager {
     )
       throw Error('Computation session capacity reached');
     const seconds = request.lifetimeSeconds ?? 3600;
-    refuseUnreachableTimeout({ timeoutSeconds: seconds }, this.maximumSeconds, true);
     const root = path.join(this.workspaceRoot, workspaceId);
     const cwd = resolveCommandDirectory(root, request.cwd);
     if ((await realpath(cwd)) !== cwd) throw Error('Computation cwd cannot traverse symlinks');
@@ -350,7 +374,7 @@ export class ComputationManager {
         cwd: path.relative(root, cwd),
         state: 'starting',
         createdAt: new Date(createdAt).toISOString(),
-        deadlineAt: new Date(createdAt + seconds * 1000).toISOString(),
+        deadlineAt: new Date(computationDeadline(createdAt, seconds)).toISOString(),
         stateRetained: false,
         variables: []
       },
@@ -423,10 +447,7 @@ export class ComputationManager {
         failReady(Error('Computation exited before initialization'));
         void this.#stop(record, 'lost', 'Interpreter exited; its in-memory state was lost.');
       });
-      live.deadline = setTimeout(() => {
-        void this.#stop(record, 'expired', 'Declared computation lifetime elapsed.');
-      }, seconds * 1000);
-      live.deadline.unref();
+      this.#scheduleLifetime(live);
       record.pid = child.pid;
       record.identity = child.pid ? await identity(child.pid) : undefined;
       await this.#persist();
@@ -479,7 +500,6 @@ export class ComputationManager {
       request.timeoutSeconds ??
       Math.min(300, Math.floor((Date.parse(record.view.deadlineAt) - this.now()) / 1000));
     if (seconds < 1) throw Error('Computation lifetime has elapsed');
-    refuseUnreachableTimeout({ timeoutSeconds: seconds }, this.maximumSeconds, true);
     if (seconds * 1000 > Date.parse(record.view.deadlineAt) - this.now())
       throw Error('Cell timeout exceeds remaining session lifetime');
     const capturedAt = new Date(this.now()).toISOString();
@@ -549,10 +569,13 @@ export class ComputationManager {
     const completion = new Promise<void>((resolve) => {
       live.settle = resolve;
     });
-    live.cellTimer = setTimeout(() => {
-      void this.#interrupt(record);
-    }, seconds * 1000);
-    live.cellTimer.unref();
+    live.cellTimer = scheduleComputationDeadline(
+      computationDeadline(this.now(), seconds),
+      () => {
+        void this.#interrupt(record);
+      },
+      this.now
+    );
     live.child.stdin.write(
       JSON.stringify({
         action: request.action,
@@ -608,7 +631,7 @@ export class ComputationManager {
   }
   async #finish(live: Live, packet: z.infer<typeof Packet> & { kind: 'done' }): Promise<void> {
     const cell = live.record.view.latestCell!;
-    clearTimeout(live.cellTimer);
+    live.cellTimer?.();
     clearTimeout(live.forceTimer);
     try {
       if (!this.#live.has(live.record.view.sessionId)) return;
@@ -686,8 +709,8 @@ export class ComputationManager {
     if (live) {
       this.#view(record);
       this.#live.delete(record.view.sessionId);
-      clearTimeout(live.deadline);
-      clearTimeout(live.cellTimer);
+      live.deadline?.();
+      live.cellTimer?.();
       clearTimeout(live.forceTimer);
       killProcessTree(live.child, 'SIGKILL');
       live.failReady(Error(note));

@@ -24,8 +24,10 @@ export async function executeComputationTool(
       options: z.toJSONSchema(ComputationRequest),
       actions: {
         start:
-          'Start an approved task-scoped Python, R or JavaScript interpreter with explicit lifetimeSeconds. Filesystem confined, network disabled; use governed tools for downloads/installations. Requires the native sandbox. R also requires jsonlite; rLibraryPaths may name its workspace library directories.',
+          'Start an approved task-scoped Python, R or JavaScript interpreter with lifetimeSeconds chosen for the work, including multi-day analyses. Filesystem confined, network disabled; use governed tools for downloads/installations. Requires the native sandbox. R also requires jsonlite; rLibraryPaths may name its workspace library directories.',
         cell: 'Execute code in the retained session. Use a unique stable cellId; retries never replay an accepted cell. Values remain server-side. Results return quickly or as a running handle; status reads cached outputs without executing code. Declare inputs as workspace file paths to capture bounded pre-execution hashes (include dependency lockfiles). Receipts include source/request hashes, interpreter identity and the previous cell; they do not capture all dependencies or freeze files.',
+        extend:
+          'Increase total lifetimeSeconds measured from session creation. Safe to retry; never shortens or revives a session. Extend before expiry. An active cell keeps its own timeout.',
         list: 'List this task’s sessions.',
         status: 'Read cached session state, variables and latest cell receipt.',
         interrupt:

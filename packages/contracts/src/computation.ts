@@ -11,7 +11,8 @@ export const ComputationRequest = z
       'interrupt',
       'stop',
       'checkpoint',
-      'restore'
+      'restore',
+      'extend'
     ]),
     sessionId: z.string().max(120).optional(),
     language: z.enum(['python', 'javascript', 'r']).optional(),

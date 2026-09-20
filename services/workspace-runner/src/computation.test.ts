@@ -46,7 +46,7 @@ beforeEach(async () => {
   workspaceId = randomUUID();
   owner = randomUUID();
   await ensureWorkspace(path.join(directory, workspaceId));
-  manager = new ComputationManager(directory, policy, 172800);
+  manager = new ComputationManager(directory, policy);
 });
 afterEach(async () => {
   await manager.close();
@@ -276,7 +276,7 @@ describe('persistent native computation', () => {
     const session = await start('python');
     await cell(session, "open('counter.txt','w').write('once')");
     await manager.close();
-    manager = new ComputationManager(directory, policy, 172800);
+    manager = new ComputationManager(directory, policy);
     await manager.restore();
     expect(manager.status(workspaceId, owner, session.sessionId)).toMatchObject({
       state: 'lost',
@@ -285,11 +285,10 @@ describe('persistent native computation', () => {
     expect(await readFile(path.join(directory, workspaceId, 'workspace/counter.txt'), 'utf8')).toBe(
       'once'
     );
-    const unavailable = new ComputationManager(
-      directory,
-      { ...policy, sandbox: { ...policy.sandbox, networkIsolation: false } },
-      3600
-    );
+    const unavailable = new ComputationManager(directory, {
+      ...policy,
+      sandbox: { ...policy.sandbox, networkIsolation: false }
+    });
     try {
       await expect(
         unavailable.act(workspaceId, owner, { action: 'start', language: 'python' })
@@ -298,8 +297,87 @@ describe('persistent native computation', () => {
       await unavailable.close();
     }
   });
-  it('rejects lifetime requests above the enforceable owner ceiling', async () => {
-    await expect(start('python', 172801)).rejects.toThrow('172800');
+  it('runs multi-day cells beyond the native timer delay range without immediate interruption', async () => {
+    const session = await start('javascript', 60 * 86400);
+    expect(Date.parse(session.deadlineAt) - Date.parse(session.createdAt)).toBe(60 * 86400_000);
+    await manager.act(workspaceId, owner, {
+      action: 'cell',
+      sessionId: session.sessionId,
+      cellId: 'long',
+      timeoutSeconds: 40 * 86400,
+      code: 'await new Promise(r=>setTimeout(r,50)); 42'
+    });
+    await vi.waitFor(() =>
+      expect(manager.status(workspaceId, owner, session.sessionId).latestCell).toMatchObject({
+        state: 'completed',
+        result: { value: 42 }
+      })
+    );
+  });
+  it('extends an owned retained session idempotently without shortening, replaying or reviving it', async () => {
+    const session = await start('python');
+    await cell(session, 'answer=42');
+    const request = { action: 'extend', sessionId: session.sessionId, lifetimeSeconds: 7 * 86400 };
+    const result = (await manager.act(workspaceId, owner, request)) as ComputationSession;
+    expect(Date.parse(result.deadlineAt) - Date.parse(session.createdAt)).toBe(7 * 86400_000);
+    expect(await manager.act(workspaceId, owner, request)).toMatchObject({
+      deadlineAt: result.deadlineAt,
+      state: 'idle',
+      stateRetained: true
+    });
+    for (const invalid of [
+      { ...request, lifetimeSeconds: 3600 },
+      { ...request, lifetimeSeconds: undefined }
+    ])
+      await expect(manager.act(workspaceId, owner, invalid)).rejects.toThrow();
+    await expect(manager.act(workspaceId, 'other', request)).rejects.toThrow('not found');
+    await expect(manager.act(workspaceId, null, request)).rejects.toThrow('owning task');
+    expect((await cell(session, 'answer')).latestCell?.result).toMatchObject({ value: 42 });
+    await manager.act(workspaceId, owner, { action: 'stop', sessionId: session.sessionId });
+    await expect(manager.act(workspaceId, owner, request)).rejects.toThrow('retained session');
+  });
+  it('does not extend the timeout of an already running cell', async () => {
+    const session = await start('python', 10);
+    const running = manager.act(workspaceId, owner, {
+      action: 'cell',
+      sessionId: session.sessionId,
+      cellId: 'limited',
+      timeoutSeconds: 1,
+      code: 'import time\nanswer=42\ntime.sleep(20)'
+    });
+    await vi.waitFor(() =>
+      expect(manager.status(workspaceId, owner, session.sessionId).state).toBe('busy')
+    );
+    await manager.act(workspaceId, owner, {
+      action: 'extend',
+      sessionId: session.sessionId,
+      lifetimeSeconds: 20
+    });
+    await running;
+    await vi.waitFor(
+      () =>
+        expect(manager.status(workspaceId, owner, session.sessionId).latestCell?.state).toBe(
+          'interrupted'
+        ),
+      { timeout: 4000 }
+    );
+  });
+  it('does not revive an elapsed retained session before its sweep runs', async () => {
+    await manager.close();
+    let now = Date.now();
+    manager = new ComputationManager(directory, policy, () => now);
+    const session = await start('python', 10);
+    now += 11000;
+    await expect(
+      manager.act(workspaceId, owner, {
+        action: 'extend',
+        sessionId: session.sessionId,
+        lifetimeSeconds: 30
+      })
+    ).rejects.toThrow('expired');
+  });
+  it('refuses durations outside the supported calendar before starting a process', async () => {
+    await expect(start('python', Number.MAX_SAFE_INTEGER)).rejects.toThrow('calendar range');
     expect(prepareInvocation).not.toHaveBeenCalled();
   });
   it('loses an interrupted JavaScript await explicitly when the runtime cannot acknowledge it', async () => {
@@ -368,7 +446,7 @@ describe('persistent native computation', () => {
     records[0]!.view.state = 'busy';
     records[0]!.view.stateRetained = true;
     await writeFile(journal, JSON.stringify(records));
-    manager = new ComputationManager(directory, policy, 172800);
+    manager = new ComputationManager(directory, policy);
     await manager.restore();
     expect(manager.status(workspaceId, owner, session.sessionId)).toMatchObject({
       state: 'lost',

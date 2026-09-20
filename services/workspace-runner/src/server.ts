@@ -422,17 +422,13 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
     },
     processes
   );
-  const computations = new ComputationManager(
-    config.WORKSPACE_ROOT,
-    {
-      isolateNetwork: config.ISOLATE_AGENT_NETWORK,
-      sandbox,
-      limits,
-      limiter,
-      systemPackages: { mode: 'refused', helper: config.SYSTEM_PACKAGE_HELPER }
-    },
-    config.MAX_BACKGROUND_SECONDS
-  );
+  const computations = new ComputationManager(config.WORKSPACE_ROOT, {
+    isolateNetwork: config.ISOLATE_AGENT_NETWORK,
+    sandbox,
+    limits,
+    limiter,
+    systemPackages: { mode: 'refused', helper: config.SYSTEM_PACKAGE_HELPER }
+  });
   await computations.restore();
   const debuggers = new DebuggerManager(config.WORKSPACE_ROOT, {
     isolateNetwork: config.ISOLATE_AGENT_NETWORK,

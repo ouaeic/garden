@@ -18,7 +18,7 @@ export async function computationApproval(
     return {
       sideEffect: context.taintSources?.length ? 'external_consequential' : 'external_reversible',
       action: `Start ${body.language ?? 'native'} computation`,
-      preview: `Start a task-scoped ${body.language ?? 'unspecified'} interpreter in ${body.cwd}. Lifetime: ${body.lifetimeSeconds ?? 3600}s, bounded by this computer’s configured ceiling. Filesystem confined and network disabled. Values remain in this process until stopped or expired; restart loses memory and never replays cells.`
+      preview: `Start a task-scoped ${body.language ?? 'unspecified'} interpreter in ${body.cwd}. Lifetime: ${body.lifetimeSeconds ?? 3600}s. Filesystem confined and network disabled. Values remain in this process until stopped or expired; restart loses memory and never replays cells.`
     };
   if (!body.sessionId) throw Error('Computation action requires sessionId');
   const stored = ComputationSessionSchema.parse(
@@ -38,12 +38,23 @@ export async function computationApproval(
       action: `${body.action === 'stop' ? 'Stop' : 'Interrupt'} ${stored.name}`,
       preview: `${body.action === 'stop' ? 'Discard the retained values and stop this interpreter.' : 'Interrupt the current cell; state is preserved only if the interpreter acknowledges it.'} Session ${stored.sessionId}, ${stored.language}, ${stored.cwd}.`
     };
+  if (body.action === 'extend') {
+    if (!body.lifetimeSeconds) throw Error('Extension requires total lifetimeSeconds');
+    const deadline = new Date(
+      Date.parse(stored.createdAt) + body.lifetimeSeconds * 1000
+    ).toISOString();
+    return {
+      sideEffect: 'external_reversible',
+      action: `Extend ${stored.name}`,
+      preview: `Keep this task's retained ${stored.language} session until ${deadline}. Current deadline ${stored.deadlineAt}. The active cell's timeout and existing filesystem/network confinement do not change. Session ${stored.sessionId}, ${stored.cwd}.`
+    };
+  }
   const classified =
     body.action === 'cell'
       ? approvalRequirement(
           'shell',
           {
-            executable: stored.language === 'python' ? 'python3' : 'node',
+            executable: { python: 'python3', javascript: 'node', r: 'Rscript' }[stored.language],
             args: [stored.language === 'python' ? '-c' : '-e', body.code ?? ''],
             cwd: stored.cwd,
             network: false
