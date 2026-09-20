@@ -66,6 +66,24 @@ async function fixture() {
   return { app, members, entries, runner };
 }
 describe('project saved history', () => {
+  it.each(['tasks', 'projects', 'workspaces'])(
+    'refuses foreign %s before validating history parameters',
+    async (scope) => {
+      const { app, runner } = await fixture();
+      try {
+        for (const query of ['', '?kind=processes&cursor=invalid-json']) {
+          const response = await app.inject({
+            url: `/v1/${scope}/root/processes/history${query}`,
+            headers: { 'x-owner': 'other' }
+          });
+          expect(response.statusCode).toBe(404);
+        }
+        expect(runner.request).not.toHaveBeenCalled();
+      } finally {
+        await app.close();
+      }
+    }
+  );
   it.each([
     'invalid-json',
     Buffer.from('{}').toString('base64url'),
