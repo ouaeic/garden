@@ -129,6 +129,9 @@ export async function checkProjectDirectories({
     assert((await panel.innerText()).includes('.analysis-config'));
     await panel.getByRole('button', { name: 'Load more files', exact: true }).click();
     await panel.getByText('later-page-results.bam', { exact: true }).waitFor();
+    const endOfFiles = panel.getByRole('button', { name: 'All files loaded', exact: true });
+    assert.equal(await endOfFiles.getAttribute('aria-disabled'), 'true');
+    assert(await endOfFiles.evaluate((element) => element === document.activeElement));
     assert(fixture.reads.some((read) => read.cursor === 'page-two'));
     for (const width of [1440, 768, 320]) {
       await page.setViewportSize({ width, height: 1100 });
@@ -141,8 +144,11 @@ export async function checkProjectDirectories({
       assert(bounds && bounds.x >= 0 && bounds.x + bounds.width <= width + 1);
       await panel.screenshot({ path: resolve(report, `project-directories-${width}.png`) });
     }
-    await panel.getByRole('button', { name: 'results', exact: true }).click();
+    await panel.getByRole('button', { name: 'results', exact: true }).focus();
+    await page.keyboard.press('Enter');
     await panel.getByText('alignment.bam', { exact: true }).waitFor();
+    const breadcrumbs = panel.getByRole('navigation', { name: 'Project directory path' });
+    assert(await breadcrumbs.evaluate((element) => element === document.activeElement));
     const file = panel.getByRole('link', { name: 'Download alignment.bam', exact: true });
     assert.equal(
       await file.getAttribute('href'),
@@ -225,6 +231,11 @@ export async function checkProjectDirectories({
     fixture.failRead = true;
     await panel.getByRole('button', { name: 'Refresh directory', exact: true }).click();
     await panel.getByText('Directory temporarily unavailable', { exact: true }).waitFor();
+    assert(
+      await panel
+        .getByRole('button', { name: 'Refresh directory', exact: true })
+        .evaluate((element) => element === document.activeElement)
+    );
     assert(await file.isVisible());
     fixture.failRead = false;
     await panel.getByRole('button', { name: 'Try again', exact: true }).click();
@@ -250,6 +261,7 @@ export async function checkProjectDirectories({
       .getByRole('button', { name: 'workspace', exact: true })
       .click();
     await panel.getByRole('button', { name: 'results', exact: true }).waitFor();
+    assert(await breadcrumbs.evaluate((element) => element === document.activeElement));
     console.log(
       'Project directory browser checks passed: branch roots, breadcrumbs, paging, hidden files, large file links, folder ZIP links, empty folders, stale/error states and responsive controls.'
     );

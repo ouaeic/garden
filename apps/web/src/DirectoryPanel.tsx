@@ -45,9 +45,17 @@ export default function DirectoryPanel({
   const [fileView, setFileView] = useState<'source' | 'table' | 'notebook'>('source');
   const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [paged, setPaged] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [rootsRevision, setRootsRevision] = useState(0);
   const request = useRef<AbortController | null>(null);
+  const directoryPath = useRef<HTMLElement | null>(null);
+  const focusPath = useRef(false);
+  useEffect(() => {
+    if (!focusPath.current) return;
+    focusPath.current = false;
+    directoryPath.current?.focus();
+  }, [folder, rootId]);
   useEffect(() => {
     if (!expanded) return;
     if (readOnlyId && readOnlyName) {
@@ -92,18 +100,21 @@ export default function DirectoryPanel({
       request.current = controller;
       setLoading(true);
       setError(null);
+      if (!cursor) setPaged(false);
       try {
         const query = new URLSearchParams({ path: folder });
         if (cursor) query.set('cursor', cursor);
         const result = await get<DirectoryPage>(`${base}/directory?${query}`, {
           signal: controller.signal
         });
-        if (!controller.signal.aborted)
+        if (!controller.signal.aborted) {
+          if (cursor) setPaged(true);
           setListing((previous) =>
             cursor && previous
               ? { ...result, entries: [...previous.entries, ...result.entries] }
               : result
           );
+        }
       } catch (cause) {
         if (!controller.signal.aborted) setError(cause);
       } finally {
@@ -117,7 +128,9 @@ export default function DirectoryPanel({
     if (expanded) void load();
     return () => request.current?.abort();
   }, [load, expanded]);
-  const navigate = (next: string, workspace = rootId) => {
+  const navigate = (next: string, workspace = rootId, focus = true) => {
+    if (next === folder && workspace === rootId) return;
+    focusPath.current = focus;
     setFile(null);
     setRootId(workspace);
     setFolder(next);
@@ -172,7 +185,7 @@ export default function DirectoryPanel({
                     className="field"
                     value={rootId}
                     disabled={dirty}
-                    onChange={(event) => navigate('workspace', event.target.value)}
+                    onChange={(event) => navigate('workspace', event.target.value, false)}
                   >
                     {roots.map((item) => (
                       <option key={item.workspaceId} value={item.workspaceId}>
@@ -184,8 +197,10 @@ export default function DirectoryPanel({
                 </label>
                 <Button
                   aria-label="Refresh directory"
-                  disabled={loading}
-                  onClick={() => void load()}
+                  aria-disabled={loading}
+                  onClick={() => {
+                    if (!loading) void load();
+                  }}
                 >
                   <RefreshCw size={14} aria-hidden="true" /> Refresh
                 </Button>
@@ -193,7 +208,12 @@ export default function DirectoryPanel({
                   <Download size={14} aria-hidden="true" /> Download directory ZIP
                 </a>
               </div>
-              <nav className="directory-breadcrumbs" aria-label="Project directory path">
+              <nav
+                ref={directoryPath}
+                tabIndex={-1}
+                className="directory-breadcrumbs"
+                aria-label="Project directory path"
+              >
                 {folder.split('/').map((part, index, parts) => (
                   <span key={index}>
                     {index > 0 && <span aria-hidden="true"> / </span>}
@@ -308,9 +328,19 @@ export default function DirectoryPanel({
                   ) : (
                     <p className="muted">This directory is empty.</p>
                   )}
-                  {listing.nextCursor && (
-                    <Button disabled={loading} onClick={() => void load(listing.nextCursor!)}>
-                      Load more files
+                  {(listing.nextCursor || paged) && (
+                    <Button
+                      aria-disabled={loading || !listing.nextCursor}
+                      aria-busy={loading}
+                      onClick={() => {
+                        if (!loading && listing.nextCursor) void load(listing.nextCursor);
+                      }}
+                    >
+                      {loading
+                        ? 'Loading more files…'
+                        : listing.nextCursor
+                          ? 'Load more files'
+                          : 'All files loaded'}
                     </Button>
                   )}
                 </>

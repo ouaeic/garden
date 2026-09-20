@@ -49,6 +49,11 @@
   margin-block: 14px;
   font: 12px/1.7 monospace;
 }
+.directory-breadcrumbs:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
 .directory-breadcrumbs button {
   font: inherit;
   background: transparent;
