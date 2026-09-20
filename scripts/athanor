@@ -2520,7 +2520,7 @@ announce_outage() {
       "$((athanor_update_step_seconds / 60))"
   fi
   # The independently supervised jobs survive runner restarts; in-process sessions do not.
-  printf 'garden: supervised jobs keep running. Interactive analysis and debugger sessions may stop; declared services restart.\n'
+  printf 'garden: independently supervised jobs and analysis keep running. In-process sessions may stop; declared services restart.\n'
 }
 
 # What an update is about to destroy, asked of the one process on this box that knows.

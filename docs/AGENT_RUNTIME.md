@@ -363,11 +363,16 @@ current workspace isolation. A failed recovery remains visible; it does not beco
 loop. `process(action=resume)` resolves and reviews the stored recovery command before a manual
 retry. Cancellation and an expired deadline do not grant another run.
 
-The independent process supervisor holds running jobs while the request-serving runner restarts.
-An ordinary background session can retain terminal history but cannot resume after the supervisor stops.
-A computation session's in-memory interpreter state is also distinct from a finite job: use files and
-checkpointable stages when an analysis must recover after maintenance or a crash. Garden does not
-infer a checkpoint or reconstruct arbitrary program memory.
+The independent execution controller holds running jobs and native computation interpreters while the
+request-serving runner restarts. Interpreter variables, running cells and their request receipts remain
+with that controller; reconnecting the runner does not replay a cell. A controller release reload waits
+for its jobs, interpreter sessions and pending admissions to finish. Explicit Stop and declared session
+lifetimes still apply.
+
+A controller or machine failure can lose in-memory interpreter state. Garden reports that loss without
+replaying code. Use files and explicit checkpoints for recovery from those failures; Garden does not
+infer a checkpoint or reconstruct arbitrary program memory. An ordinary background session can retain
+terminal history but cannot resume after the controller stops.
 
 Set `shell.pty` for a program that needs a terminal. It uses the same prepared sandbox command,
 resource controls and process supervision as a pipe command. Standard output and errors share the

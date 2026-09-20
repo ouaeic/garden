@@ -12,7 +12,7 @@ const shutdown = async () => {
 process.on('SIGINT', () => void shutdown());
 process.on('SIGTERM', () => void shutdown());
 
-// A release reload waits for jobs to finish; a service restart remains an explicit interruption.
+// A release reload waits for jobs and interpreters; a service restart is an explicit interruption.
 let requested = false;
 const restartWhenIdle = () => {
   if (requested && !stopping && prepareSupervisorRestart(app)) void shutdown();

@@ -2,8 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { ComputationRequest, ProcessHistoryQuery } from '@athanor/contracts';
 import { requireScope } from './auth.js';
-import type { ComputationManager } from './computation.js';
-export function registerComputationRoutes(app: FastifyInstance, manager: ComputationManager): void {
+import type { ComputationService } from './computation-service.js';
+export function registerComputationRoutes(app: FastifyInstance, manager: ComputationService): void {
   app.get<{ Params: { workspaceId: string } }>(
     '/v1/workspaces/:workspaceId/computation/history',
     async (request) => {
@@ -27,7 +27,7 @@ export function registerComputationRoutes(app: FastifyInstance, manager: Computa
       requireScope(request, 'files.read');
       await manager.refreshResources();
       return {
-        sessions: manager.list(
+        sessions: await manager.list(
           request.params.workspaceId,
           request.capability.role === 'agent' ? request.capability.sub : null
         )

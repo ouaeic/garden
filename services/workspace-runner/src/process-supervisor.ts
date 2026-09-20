@@ -1,4 +1,3 @@
-import { request as httpRequest } from 'node:http';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { chmod, mkdir, unlink } from 'node:fs/promises';
 import path from 'node:path';
@@ -11,10 +10,25 @@ import type { RunnerConfig } from './config.js';
 import { commandLimits, resolveCommandLimiter } from './limits.js';
 import { resolveAgentSandbox, sandboxSpecDirectory, probeNativeIsolation } from './sandbox.js';
 import { hostStorage } from './host-storage.js';
+import { ComputationManager } from './computation.js';
+import { dispatchComputation } from './computation-service.js';
+import { supervisorRequest } from './supervisor-rpc.js';
 
-const managers = new WeakMap<FastifyInstance, ProcessManager>();
-export const prepareSupervisorRestart = (app: FastifyInstance): boolean =>
-  managers.get(app)?.prepareForRestart() ?? false;
+interface SupervisorRuntime {
+  processes: ProcessManager;
+  computations: ComputationManager;
+  pendingComputations: number;
+  draining: boolean;
+}
+const runtimes = new WeakMap<FastifyInstance, SupervisorRuntime>();
+export const prepareSupervisorRestart = (app: FastifyInstance): boolean => {
+  const runtime = runtimes.get(app);
+  if (!runtime || runtime.pendingComputations || runtime.computations.backgroundWork().commands)
+    return false;
+  if (!runtime.processes.prepareForRestart()) return false;
+  runtime.draining = true;
+  return true;
+};
 
 const METHODS = [
   'projectInputProtection',
@@ -43,7 +57,6 @@ const METHODS = [
 const Request = z
   .object({ version: z.literal(1), method: z.enum(METHODS), args: z.array(z.unknown()).max(8) })
   .strict();
-const MAX_RESPONSE_BYTES = 24 * 1024 * 1024;
 
 type AsyncMethod<T> = T extends (...args: infer A) => infer R
   ? (...args: A) => Promise<Awaited<R>>
@@ -60,62 +73,17 @@ export function connectProcessSupervisor(socket: string, secret: string): Proces
       if (!METHODS.includes(method as (typeof METHODS)[number]))
         throw new Error('Unknown process supervisor method');
       return (...args: unknown[]) =>
-        new Promise<unknown>((resolve, reject) => {
-          const body = JSON.stringify({ version: 1, method, args });
-          const request = httpRequest(
-            {
-              socketPath: socket,
-              path: '/rpc',
-              method: 'POST',
-              headers: {
-                authorization: `Bearer ${secret}`,
-                'content-type': 'application/json',
-                'content-length': Buffer.byteLength(body)
-              }
-            },
-            (response) => {
-              const chunks: Buffer[] = [];
-              let bytes = 0;
-              response.on('data', (chunk: Buffer) => {
-                bytes += chunk.length;
-                if (bytes > MAX_RESPONSE_BYTES) {
-                  request.destroy(new Error('Process supervisor response exceeds limit'));
-                  return;
-                }
-                chunks.push(chunk);
-              });
-              response.on('error', reject);
-              response.on('end', () => {
-                try {
-                  const result = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
-                    result?: unknown;
-                    error?: string;
-                  };
-                  if (response.statusCode !== 200)
-                    reject(new Error(result.error ?? 'Process supervisor refused the request'));
-                  else resolve(result.result);
-                } catch (cause) {
-                  reject(
-                    cause instanceof Error
-                      ? cause
-                      : new Error('Invalid process supervisor response', { cause })
-                  );
-                }
-              });
-            }
-          );
-          request.setTimeout(120_000, () =>
-            request.destroy(new Error('Process supervisor did not respond'))
-          );
-          request.on('error', reject);
-          request.end(body);
-        });
+        supervisorRequest(socket, secret, '/rpc', { version: 1, method, args });
     }
   });
 }
 
 /** This endpoint is private to the runner. All job creation still enters through its approval floor. */
-export async function buildProcessSupervisor(config: RunnerConfig, manager = new ProcessManager()) {
+export async function buildProcessSupervisor(
+  config: RunnerConfig,
+  manager = new ProcessManager(),
+  computationManager?: ComputationManager
+) {
   const app = Fastify({ logger: false, bodyLimit: config.MAX_FILE_BYTES });
   const sandbox = await resolveAgentSandbox(
     config.AGENT_SANDBOX_HELPER,
@@ -132,6 +100,21 @@ export async function buildProcessSupervisor(config: RunnerConfig, manager = new
     limiter: await resolveCommandLimiter(config.RESOURCE_LIMIT_EXECUTABLE),
     systemPackageHelper: config.SYSTEM_PACKAGE_HELPER,
     hostStorage
+  };
+  const computations =
+    computationManager ??
+    new ComputationManager(config.WORKSPACE_ROOT, {
+      isolateNetwork: config.ISOLATE_AGENT_NETWORK,
+      sandbox,
+      limits: guards.limits,
+      limiter: guards.limiter,
+      systemPackages: { mode: 'refused', helper: config.SYSTEM_PACKAGE_HELPER }
+    });
+  const runtime: SupervisorRuntime = {
+    processes: manager,
+    computations,
+    pendingComputations: 0,
+    draining: false
   };
   const expected = createHash('sha256').update(`Bearer ${config.RUNNER_SHARED_SECRET}`).digest();
   app.addHook('onRequest', async (request, reply) => {
@@ -180,11 +163,32 @@ export async function buildProcessSupervisor(config: RunnerConfig, manager = new
     const result: unknown = await Reflect.apply(manager[method], manager, args);
     return { result };
   });
-  await manager.resume(config.WORKSPACE_ROOT, config.ISOLATE_AGENT_NETWORK, guards);
-  app.addHook('onClose', async () => {
-    await manager.close();
+  app.post('/computation', async (request) => {
+    if (runtime.draining)
+      throw new Error('The execution controller is restarting. Try again shortly.');
+    runtime.pendingComputations += 1;
+    try {
+      return await dispatchComputation(computations, request.body);
+    } finally {
+      runtime.pendingComputations -= 1;
+    }
   });
-  managers.set(app, manager);
+  const close = async () => {
+    const results = await Promise.allSettled([computations.close(), manager.close()]);
+    const failures = results.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason as unknown] : []
+    );
+    if (failures.length) throw new AggregateError(failures, 'Execution controller cleanup failed');
+  };
+  try {
+    await manager.resume(config.WORKSPACE_ROOT, config.ISOLATE_AGENT_NETWORK, guards);
+    await computations.restore();
+  } catch (cause) {
+    await close();
+    throw cause;
+  }
+  app.addHook('onClose', close);
+  runtimes.set(app, runtime);
   return app;
 }
 

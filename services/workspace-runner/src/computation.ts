@@ -97,6 +97,7 @@ const identity = async (pid: number): Promise<string | undefined> => {
 };
 
 export class ComputationManager {
+  #restorationFailed = false;
   #records = new Map<string, RecordState>();
   #live = new Map<string, Live>();
   #stopping = new Map<string, Promise<void>>();
@@ -123,6 +124,16 @@ export class ComputationManager {
     return path.join(this.workspaceRoot, '.athanor', 'computation.json');
   }
   async restore(): Promise<void> {
+    try {
+      await this.#restoreJournal();
+    } catch (cause) {
+      // A failed startup must preserve the journal for diagnosis and recovery.
+      this.#restorationFailed = true;
+      clearInterval(this.#timer);
+      throw cause;
+    }
+  }
+  async #restoreJournal(): Promise<void> {
     let text: string;
     try {
       text = await readFile(this.#journal, 'utf8');
@@ -166,7 +177,7 @@ export class ComputationManager {
         record.view.state = 'lost';
         record.view.stateRetained = false;
         record.view.note =
-          'Runner restarted. In-memory values were lost; no cell was replayed. Restore an explicit JSON checkpoint in a new session if available.';
+          'Analysis runtime restarted. In-memory values were lost; no cell was replayed. Restore an explicit JSON checkpoint in a new session if available.';
         if (record.view.latestCell?.state === 'running')
           record.view.latestCell.state = 'interrupted';
       }
@@ -211,6 +222,7 @@ export class ComputationManager {
     };
   }
   async act(workspaceId: string, owner: string | null, value: unknown): Promise<unknown> {
+    if (this.#restorationFailed) throw Error('Analysis history could not be restored.');
     const request = ComputationRequest.parse(value);
     if (request.rLibraryPaths && (request.action !== 'start' || request.language !== 'r'))
       throw Error('R libraries apply to starting R sessions only');
@@ -296,10 +308,11 @@ export class ComputationManager {
   }
   async close(): Promise<void> {
     clearInterval(this.#timer);
+    if (this.#restorationFailed) return;
     await this.#stopAll(
       [...this.#records.values()],
       'lost',
-      'Runner stopped. In-memory state was lost; no cell will replay.'
+      'Analysis runtime stopped. In-memory state was lost; no cell will replay.'
     );
     await this.#flush;
   }

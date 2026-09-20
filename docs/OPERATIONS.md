@@ -734,3 +734,11 @@ An owner can hand out a read-only link to one conversation. Operationally:
   `Configured names:` and names anything the served certificate does not cover. The renewal timer
   reissues within six hours; `sudo athanor certificate issue` does it now.
 - **Low disk:** stop long jobs, back up, expand/mount storage, and restart.
+
+Native scientific interpreters use the independent execution controller when its socket is configured.
+Replacing the request-serving runner preserves interpreter variables and running cells. A requested
+controller release reload waits for both jobs and interpreter sessions, including idle sessions with
+retained memory. Stop sessions that are no longer needed to let that reload finish. An explicit
+controller restart or host failure can still lose memory; that state is reported without automatic cell
+replay. Embedded development runners keep their interpreters in-process and cannot retain them across
+runner replacement. Corrupt computation journals are preserved when startup fails.

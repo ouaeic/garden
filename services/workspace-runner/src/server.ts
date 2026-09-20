@@ -55,6 +55,7 @@ import { dampenBrowserCpu, linuxBrowserCpuDeps } from './browser-cpu.js';
 import { TAB_IDLE_MS, TAB_SWEEP_MS } from './browser-tabs.js';
 import { registerFileDownloadRoutes } from './file-downloads.js';
 import { ComputationManager } from './computation.js';
+import { connectComputationSupervisor, type ComputationService } from './computation-service.js';
 import { registerComputationRoutes } from './computation-routes.js';
 import { CodeIntelligenceManager } from './code-intelligence.js';
 import { registerCodeIntelligenceRoutes } from './code-intelligence-routes.js';
@@ -424,14 +425,24 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
     },
     processes
   );
-  const computations = new ComputationManager(config.WORKSPACE_ROOT, {
-    isolateNetwork: config.ISOLATE_AGENT_NETWORK,
-    sandbox,
-    limits,
-    limiter,
-    systemPackages: { mode: 'refused', helper: config.SYSTEM_PACKAGE_HELPER }
-  });
-  await computations.restore();
+  let computations: ComputationService;
+  if (config.JOB_SUPERVISOR_SOCKET) {
+    computations = connectComputationSupervisor(
+      config.JOB_SUPERVISOR_SOCKET,
+      config.RUNNER_SHARED_SECRET
+    );
+    await computations.backgroundWork();
+  } else {
+    const local = new ComputationManager(config.WORKSPACE_ROOT, {
+      isolateNetwork: config.ISOLATE_AGENT_NETWORK,
+      sandbox,
+      limits,
+      limiter,
+      systemPackages: { mode: 'refused', helper: config.SYSTEM_PACKAGE_HELPER }
+    });
+    await local.restore();
+    computations = local;
+  }
   const debuggers = new DebuggerManager(config.WORKSPACE_ROOT, {
     isolateNetwork: config.ISOLATE_AGENT_NETWORK,
     sandbox,
@@ -460,7 +471,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
         return (
           [...terminals.values()].includes(id) ||
           (await processes.isWorkspaceBusy(id)) ||
-          computations.isWorkspaceBusy(id) ||
+          (await computations.isWorkspaceBusy(id)) ||
           debuggers.isWorkspaceBusy(root) ||
           codeIntelligence.isWorkspaceBusy(root) ||
           managedWorkspaceBusy(root)
@@ -614,16 +625,16 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
   // control plane that tells the owner an agent shell is confined - has to be able to check.
   app.get('/healthz', async () => {
     const backgroundWork = await processes.backgroundWork();
-    const computationWork = computations.backgroundWork();
+    const computationWork = await computations.backgroundWork();
     const debuggerWork = debuggers.backgroundWork();
     const projectPreparations = projectUpdates.backgroundPreparations();
     return {
       ok: true,
       service: 'workspace-runner',
       processSupervisor: config.JOB_SUPERVISOR_SOCKET ? 'independent' : 'in_process',
+      computationSupervisor: config.JOB_SUPERVISOR_SOCKET ? 'independent' : 'in_process',
       runnerRestartUnsafeCommands:
-        (config.JOB_SUPERVISOR_SOCKET ? 0 : backgroundWork.commands) +
-        computationWork.commands +
+        (config.JOB_SUPERVISOR_SOCKET ? 0 : backgroundWork.commands + computationWork.commands) +
         debuggerWork.commands +
         projectPreparations,
       agentSandbox: Boolean(sandbox),
@@ -632,32 +643,9 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       // there is nothing to apply a ruleset with, and the setting alone would be a claim rather
       // than a fact. `athanor-sandbox check` is where the claim was measured, at install time.
       agentFilesystemConfined: Boolean(sandbox?.confineFilesystem),
-      /*
-       * What stopping this runner would destroy, published where the update path already reads.
-       *
-       * `athanor update` - by hand, and unattended in a weekly window - stops athanor.target, which
-       * SIGTERMs this runner and ends every background command it holds. Nothing brings one back
-       * and nothing records that it existed. The gate that was meant to prevent that reads
-       * `athanor_worker_active` from the worker's /metrics, which counts TURNS in flight, and a
-       * background command outlives the turn that started it by design - so that gate is
-       * structurally blind to exactly the work this box exists for. This process is the only one
-       * on the machine that knows, and `/healthz` is the route the update path can already reach:
-       * loopback-only, unauthenticated, and curled by scripts/athanor before an update runs, so
-       * this adds no surface and needs no credential.
-       *
-       * THE TWO NAMES ARE LOAD-BEARING. `runner_background_work` in scripts/athanor greps this
-       * body for the literals `"backgroundCommands"` and `"backgroundLongestRemainingMs"`, and
-       * treats a missing field as "could not tell" rather than as zero. Renaming either one breaks
-       * no compile anywhere; it silently turns the stand-down back into a line saying the update
-       * cannot tell, and proceeds. That is why the end-to-end case in long-work.test.ts runs the
-       * real shell functions, cut out of scripts/athanor at test time, against the real body of
-       * this route - a test that called `backgroundWork()` directly would pass either way.
-       *
-       * A declared service is deliberately not counted, because `resume` brings one back: this
-       * number is only the work a restart destroys. `backgroundLongestRemainingMs` is null when
-       * nothing is running, and is what lets an update say "the longest has about 6 hours left",
-       * which is the sentence that makes an operator wait where a bare count does not.
-       */
+      // Update and backup admission distinguish independently retained work from work this runner
+      // would interrupt. The shell consumes these literal field names; long-work.test.ts verifies
+      // the actual health body against that parser.
       missionProcessIsolation: sandbox?.processIsolation === true,
       nativeNetworkIsolation: sandbox?.networkIsolation === true,
       backgroundCommands:
@@ -688,8 +676,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
   const projectWorkspaces = new ProjectWorkspaces(config.WORKSPACE_ROOT, {
     ownedWriters: async (id, taskId) => [
       ...(await processes.taskWriters(id, taskId)),
-      ...computations
-        .list(id, taskId)
+      ...(await computations.list(id, taskId))
         .filter((session) => ['starting', 'busy'].includes(session.state))
         .map((session) => ({ id: session.sessionId, kind: 'computation' })),
       ...debuggers
