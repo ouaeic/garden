@@ -3,5 +3,5 @@
   // and it still covers the tests; this one drops them so they are never compiled into dist. The
   // reasoning, and why the two configurations must stay separate, is in tsconfig.base.json.
   "extends": "./tsconfig.json",
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts", "src/test-support"]
 }

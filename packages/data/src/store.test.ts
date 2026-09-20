@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { DatabaseFixtures, type DatabaseFixture } from './test-support/database-fixtures.js';
 import {
   CONVERSATION_NAME_INDEX_STAMP,
   MEMORY_KINDS,
@@ -92,6 +93,9 @@ const taskInput = (
 });
 
 describe('DataStore', () => {
+  const fixtures = new DatabaseFixtures();
+  let fixture: DatabaseFixture | undefined;
+  afterAll(() => fixtures.close());
   let database: Database;
   let store: DataStore;
   let billing: BillingStore;
@@ -100,8 +104,8 @@ describe('DataStore', () => {
   let workspaces: WorkspaceStore;
 
   beforeEach(async () => {
-    database = createDatabase({ driver: 'pglite', pglitePath: ':memory:' });
-    await migrateDatabase(database);
+    fixture = await fixtures.create();
+    database = fixture.database;
     store = new DataStore(database);
     // The same handle the facade holds, over the same connection. `TaskSignals` opens nothing until
     // something subscribes, so a second one costs a test nothing.
@@ -111,7 +115,10 @@ describe('DataStore', () => {
     workspaces = new WorkspaceStore(database);
   });
 
-  afterEach(async () => database.close());
+  afterEach(async () => {
+    await fixture?.dispose();
+    fixture = undefined;
+  });
 
   it('consumes authentication challenges exactly once', async () => {
     const id = await store.createChallenge({
