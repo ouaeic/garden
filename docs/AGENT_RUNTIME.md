@@ -369,6 +369,10 @@ with that controller; reconnecting the runner does not replay a cell. A controll
 for its jobs, interpreter sessions and pending admissions to finish. Explicit Stop and declared session
 lifetimes still apply.
 
+Provider recovery checks the current encrypted checkpoint before retrying a resource hold. It
+queues only that exact unchanged wait, preserving owner pauses and newer background or child waits.
+Saving a provider credential resumes provider holds without waking analyses that are still running.
+
 Use `process(action=wait)` with a running computation session ID to wait for its current cell.
 The worker records the cell and interpreter identities, releases its lease, and resumes the task
 when that cell ends. It can wait for jobs and cells together without model calls, polling commands

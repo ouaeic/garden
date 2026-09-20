@@ -1629,6 +1629,58 @@ export class TaskStore {
     return true;
   }
 
+  /** Recovery may resume only the exact resource wait it inspected. */
+  async resumeTaskFromResourceWait(input: {
+    userId: string;
+    taskId: string;
+    expectedUpdatedAt: string;
+    expectedStateCiphertext: EncryptedEnvelope | null;
+    eventSummary: string;
+    eventCiphertext: EncryptedEnvelope;
+  }): Promise<boolean> {
+    const resumed = await this.database.transaction(async (tx) => {
+      const held = await tx.query(
+        `SELECT t.id FROM tasks t
+         WHERE t.id=$1 AND t.user_id=$2 AND t.status='awaiting_resource'
+           AND t.lease_owner IS NULL AND t.lease_expires_at IS NULL AND t.attempt>0
+           AND t.updated_at=$3::timestamptz
+           AND t.agent_state_ciphertext IS NOT DISTINCT FROM $4::jsonb
+           AND NOT EXISTS (SELECT 1 FROM coding_families f
+             WHERE f.parent_task_id=t.id AND f.wait_requested=TRUE)
+           AND (t.parent_mission_id IS NULL OR EXISTS (
+             SELECT 1 FROM coding_missions m JOIN tasks p ON p.id=m.parent_task_id
+             WHERE m.child_task_id=t.id AND m.phase='active' AND NOT m.runner_sealed
+               AND p.status NOT IN ('failed','cancelled')
+           ))
+         FOR UPDATE OF t`,
+        [
+          input.taskId,
+          input.userId,
+          input.expectedUpdatedAt,
+          input.expectedStateCiphertext ? JSON.stringify(input.expectedStateCiphertext) : null
+        ]
+      );
+      if (!held.rows.length) return false;
+      await tx.query(
+        `INSERT INTO task_events(id,task_id,sequence,kind,summary,payload_ciphertext)
+         SELECT $1,$2,COALESCE(MAX(sequence),0)+1,'status',$3,$4::jsonb
+         FROM task_events WHERE task_id=$2`,
+        [randomUUID(), input.taskId, input.eventSummary, JSON.stringify(input.eventCiphertext)]
+      );
+      await tx.query(
+        `UPDATE tasks SET status='queued',attempt=0,spend_paused_at=NULL,
+           lease_owner=NULL,lease_expires_at=NULL,updated_at=NOW() WHERE id=$1`,
+        [input.taskId]
+      );
+      return true;
+    });
+    if (resumed) {
+      this.#signal(TASK_EVENT_CHANNEL, input.taskId);
+      this.#signal(TASK_QUEUE_CHANNEL, input.taskId);
+    }
+    return resumed;
+  }
+
   async cancelTaskAndReleaseReservations(userId: string, id: string): Promise<boolean> {
     const cancelled = await this.database.transaction(async (tx) => {
       const changed = await tx.query(

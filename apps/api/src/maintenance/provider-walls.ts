@@ -1,15 +1,4 @@
-/**
- * Work the provider turned away, picked back up - and the owner told when it will not be.
- *
- * A quota wall at two in the morning used to be the end of the night: `awaiting_resource` is in
- * none of the notification branches and in none of the other sweeps, so the run stopped, said
- * nothing, and waited for the owner to open the box.
- *
- * How many times a wall has been tried is counted from the log lines the retries themselves
- * write, so there is no column, no lock and nothing to reconcile after a restart.
- */
-
-import { encryptJson, unwrapDataKey } from '@athanor/core';
+import { encryptJson, unwrapDataKey, type EncryptedEnvelope } from '@athanor/core';
 import { agentNotificationAad } from '@athanor/data';
 import type { SupportedContext } from '../http/server-context.js';
 import { errorFields } from '../log.js';
@@ -69,16 +58,25 @@ const PROVIDER_WALL_NOTIFY_AFTER_RETRIES = 3;
  * The public label on every line this leaves in a conversation.
  *
  * Event payloads are encrypted, so the summary column is the only part of a work-log line SQL can
- * read - which makes counting these rows the whole of the retry's memory. No column, no lock and
- * nothing to reconcile after a restart: what has been tried is what is written in the log.
+ * read - which makes counting these rows the whole of the retry's memory. No separate counter to
+ * reconcile after a restart: what has been tried is what is written in the log.
  */
 const PROVIDER_WALL_EVENT_SUMMARY = 'Encrypted provider wall event';
 
 /** Kept apart from the count above: a key being saved is the owner acting, not a retry. */
 const PROVIDER_RECONNECTED_EVENT_SUMMARY = 'Encrypted provider reconnected event';
 
+type ProviderWaitRow = {
+  task_id: string;
+  workspace_id: string;
+  updated_at: string;
+  agent_state_ciphertext: EncryptedEnvelope | null;
+};
+
 export const createProviderWallMaintenance = (context: SupportedContext) => {
   const { log, database, store, masterKey } = context;
+  // Rotate bounded scans so long analysis waits cannot starve later provider holds.
+  let retryCursor: string | null = null;
   /**
    * One line in a conversation's work log about the wall it is behind.
    *
@@ -142,51 +140,29 @@ export const createProviderWallMaintenance = (context: SupportedContext) => {
       });
   };
 
-  /**
-   * The code the provider was last refused with, or null when the last thing that went wrong was
-   * not a refusal this understands. Reading it is what keeps this sweep off work that is parked for
-   * some other reason: nothing is retried unless the conversation says, in its own log, what wall
-   * it is behind.
-   */
-  const providerWallCode = async (taskId: string, key: Uint8Array): Promise<string | null> => {
-    return (await taskFailure(store, taskId, key))?.code ?? null;
+  const providerWallCode = async (
+    taskId: string,
+    key: Uint8Array,
+    stateCiphertext: EncryptedEnvelope | null
+  ): Promise<string | null> => {
+    return (await taskFailure(store, taskId, key, stateCiphertext))?.code ?? null;
   };
 
-  /**
-   * Work the provider turned away, picked back up.
-   *
-   * A quota wall at two in the morning used to be the end of the night: `awaiting_resource` is in
-   * none of the notification branches and in none of the other sweeps, so the run stopped, said
-   * nothing, and waited for the owner to open the box. This is both halves of that - the wall is
-   * tried again on a widening interval, and if it is still standing an hour later the owner is
-   * told on whatever device they have.
-   *
-   * How many times a wall has been tried is counted from the log lines the retries themselves
-   * write, over the last day. That is why the line saying athanor has given up is written with the
-   * same label as a retry: writing it is what carries the count past the ceiling, so it is written
-   * exactly once. A wall still standing tomorrow starts the count again, which is right - a day is
-   * long enough that it has become news for a second time.
-   */
   const retryProviderWalls = async (): Promise<number> => {
-    const parked = await database.query<{
-      task_id: string;
-      user_id: string;
-      workspace_id: string;
-      updated_at: string;
-      retries: string;
-    }>(
-      // `attempt > 0` is the same discriminator the schedule recovery above reads the other way:
-      // only a task a worker has actually leased can have been refused by a provider.
-      `SELECT t.id AS task_id, t.user_id, t.workspace_id, t.updated_at,
+    const parked = await database.query<ProviderWaitRow & { user_id: string; retries: string }>(
+      // A scheduled task that has never been leased needs workspace dispatch, not provider recovery.
+      `SELECT t.id AS task_id, t.user_id, t.workspace_id, t.updated_at::text AS updated_at, t.agent_state_ciphertext,
          (SELECT COUNT(*) FROM task_events e
            WHERE e.task_id = t.id AND e.summary = $1
              AND e.created_at > NOW() - INTERVAL '24 hours') AS retries
        FROM tasks t
-       WHERE t.status = 'awaiting_resource' AND t.attempt > 0
-       ORDER BY t.updated_at
+       WHERE t.status = 'awaiting_resource' AND t.attempt > 0 AND t.lease_owner IS NULL
+         AND ($2::uuid IS NULL OR t.id>$2::uuid)
+       ORDER BY t.id
        LIMIT 20`,
-      [PROVIDER_WALL_EVENT_SUMMARY]
+      [PROVIDER_WALL_EVENT_SUMMARY, retryCursor]
     );
+    retryCursor = parked.rows.length === 20 ? parked.rows.at(-1)!.task_id : null;
     let retried = 0;
     for (const row of parked.rows) {
       const taskId = String(row.task_id);
@@ -194,7 +170,7 @@ export const createProviderWallMaintenance = (context: SupportedContext) => {
       const workspace = await store.getWorkspaceById(String(row.workspace_id));
       if (!workspace?.wrappedKey) continue;
       const key = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
-      const code = await providerWallCode(taskId, key);
+      const code = await providerWallCode(taskId, key, row.agent_state_ciphertext);
       if (!code) continue;
       const wall = providerWalls[code];
       if (!wall) continue;
@@ -232,61 +208,73 @@ export const createProviderWallMaintenance = (context: SupportedContext) => {
         60_000 *
         (providerWallRetryMinutes[Math.min(retries, providerWallRetryMinutes.length - 1)] ?? 60);
       if (Date.now() - new Date(String(row.updated_at)).getTime() < waitMs) continue;
+      const resumed = await store.resumeTaskFromResourceWait({
+        userId,
+        taskId,
+        expectedUpdatedAt: row.updated_at,
+        expectedStateCiphertext: row.agent_state_ciphertext,
+        eventSummary: PROVIDER_WALL_EVENT_SUMMARY,
+        eventCiphertext: encryptJson(
+          {
+            __athanorEventVersion: 1,
+            summary: `Asking your provider again after it refused this work: attempt ${retries + 1} of ${PROVIDER_WALL_MAX_RETRIES}.`,
+            payload: { code }
+          },
+          key,
+          `task-event:${taskId}`
+        )
+      });
+      if (!resumed) continue;
       if (retries === PROVIDER_WALL_NOTIFY_AFTER_RETRIES)
         await tellOwnerAboutWall({ userId, taskId, key, notice: wall.notice });
-      // The line goes in before the status changes, so the timeline reads in the order things
-      // happened and the record of the attempt exists even if the requeue loses a race.
-      await sayWallInLog({
-        taskId,
-        key,
-        kind: 'status',
-        code,
-        summary: `Asking your provider again after it refused this work: attempt ${retries + 1} of ${PROVIDER_WALL_MAX_RETRIES}.`
-      });
-      if (!(await store.setTaskStatusForUser(userId, taskId, 'queued'))) continue;
       log.info('provider_wall.retried', { taskId, code, attempt: retries + 1 });
       retried += 1;
     }
     return retried;
   };
 
-  /**
-   * The wall a person takes down: a key is saved, so everything parked behind the provider goes
-   * back in the queue at once rather than waiting out a backoff that was measuring the wrong thing.
-   *
-   * No wall code is read here. A conversation a worker leased and parked in `awaiting_resource` was
-   * turned away by the provider, whichever of the three ways it was, and a new credential is a
-   * plausible answer to all of them - a different account has its own quota and its own endpoint.
-   * The one thing this must not touch is a scheduled run stranded mid-dispatch, which has never
-   * been leased and needs its workspace woken first; `attempt > 0` is what separates them.
-   */
+  /** Saving credentials retries provider holds, while preserving waits for other work. */
   const resumeTasksWaitingOnAProvider = async (userId: string): Promise<number> => {
-    const parked = await database.query<{ task_id: string; workspace_id: string }>(
-      `SELECT id AS task_id, workspace_id FROM tasks
-       WHERE user_id = $1 AND status = 'awaiting_resource' AND attempt > 0
-       ORDER BY updated_at LIMIT 50`,
-      [userId]
-    );
     let resumed = 0;
-    for (const row of parked.rows) {
-      const taskId = String(row.task_id);
-      const workspace = await store.getWorkspaceById(String(row.workspace_id));
-      if (workspace?.wrappedKey)
-        await store.appendTaskEvent({
-          taskId,
-          kind: 'status',
-          summary: PROVIDER_RECONNECTED_EVENT_SUMMARY,
-          payloadCiphertext: encryptJson(
-            {
-              __athanorEventVersion: 1,
-              summary: 'A provider key was saved, so this work is going again.',
-              payload: { code: 'provider_reconnected' }
-            },
-            unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id),
-            `task-event:${taskId}`
-          )
-        });
-      if (await store.setTaskStatusForUser(userId, taskId, 'queued')) resumed += 1;
+    let cursor: string | null = null;
+    for (;;) {
+      const parked: { rows: ProviderWaitRow[] } = await database.query<ProviderWaitRow>(
+        `SELECT id AS task_id, workspace_id, updated_at::text AS updated_at, agent_state_ciphertext
+       FROM tasks
+       WHERE user_id = $1 AND status = 'awaiting_resource' AND attempt > 0 AND lease_owner IS NULL
+         AND ($2::uuid IS NULL OR id>$2::uuid)
+       ORDER BY id LIMIT 50`,
+        [userId, cursor]
+      );
+      for (const row of parked.rows) {
+        const taskId = String(row.task_id);
+        const workspace = await store.getWorkspaceById(String(row.workspace_id));
+        if (!workspace?.wrappedKey) continue;
+        const key = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
+        const code = await providerWallCode(taskId, key, row.agent_state_ciphertext);
+        if (!code || !providerWalls[code]) continue;
+        if (
+          await store.resumeTaskFromResourceWait({
+            userId,
+            taskId,
+            expectedUpdatedAt: row.updated_at,
+            expectedStateCiphertext: row.agent_state_ciphertext,
+            eventSummary: PROVIDER_RECONNECTED_EVENT_SUMMARY,
+            eventCiphertext: encryptJson(
+              {
+                __athanorEventVersion: 1,
+                summary: 'A provider key was saved, so this work is going again.',
+                payload: { code: 'provider_reconnected' }
+              },
+              key,
+              `task-event:${taskId}`
+            )
+          })
+        )
+          resumed += 1;
+      }
+      if (parked.rows.length < 50) break;
+      cursor = parked.rows.at(-1)!.task_id;
     }
     if (resumed) log.info('provider_wall.resumed_on_connect', { userId, count: resumed });
     return resumed;

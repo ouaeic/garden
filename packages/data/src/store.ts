@@ -1059,6 +1059,10 @@ export class DataStore {
     return this.#tasks.setTaskStatusForUser(...args);
   }
 
+  resumeTaskFromResourceWait(...args: Parameters<TaskStore['resumeTaskFromResourceWait']>) {
+    return this.#tasks.resumeTaskFromResourceWait(...args);
+  }
+
   cancelTaskAndReleaseReservations(
     ...args: Parameters<TaskStore['cancelTaskAndReleaseReservations']>
   ) {
