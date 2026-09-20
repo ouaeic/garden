@@ -66,6 +66,27 @@ async function fixture() {
   return { app, members, entries, runner };
 }
 describe('project saved history', () => {
+  it.each([
+    'invalid-json',
+    Buffer.from('{}').toString('base64url'),
+    Buffer.from('null').toString('base64url')
+  ])(
+    'rejects malformed history cursors with refresh guidance before reading archives: %s',
+    async (cursor) => {
+      const { app, runner } = await fixture();
+      try {
+        const response = await app.inject({
+          url: `/v1/projects/project/processes/history?kind=processes&cursor=${cursor}`,
+          headers: { 'x-owner': 'owner' }
+        });
+        expect(response.statusCode).toBe(400);
+        expect(response.json().message).toContain('Refresh saved history');
+        expect(runner.request).not.toHaveBeenCalled();
+      } finally {
+        await app.close();
+      }
+    }
+  );
   it('merges bounded pages across execution roots without omissions as new runs finish', async () => {
     const { app, entries, runner } = await fixture();
     try {

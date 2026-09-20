@@ -119,7 +119,7 @@ export default function SavedProcessHistory({ endpoint }: { endpoint: string }) 
         onRetry={() =>
           void load(
             kind,
-            error instanceof ApiError && error.status === 409
+            error instanceof ApiError && (error.status === 400 || error.status === 409)
               ? undefined
               : (page?.nextCursor ?? undefined)
           )

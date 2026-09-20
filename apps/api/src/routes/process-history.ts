@@ -58,9 +58,20 @@ export function registerProcessHistoryRoutes({ app, store, runner }: RouteContex
           ])
         )
         .digest('hex');
-      const cursor = query.cursor
-        ? Cursor.parse(JSON.parse(Buffer.from(query.cursor, 'base64url').toString('utf8')))
-        : undefined;
+      let cursor: z.infer<typeof Cursor> | undefined;
+      if (query.cursor) {
+        try {
+          cursor = Cursor.parse(
+            JSON.parse(Buffer.from(query.cursor, 'base64url').toString('utf8'))
+          );
+        } catch {
+          throw new AthanorError(
+            'history_cursor_invalid',
+            'This history link is invalid. Refresh saved history.',
+            400
+          );
+        }
+      }
       if (cursor && cursor.scope !== scope)
         throw new AthanorError(
           'history_scope_changed',
