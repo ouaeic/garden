@@ -114,6 +114,102 @@ describe('durable operation receipts', () => {
     expect(await count()).toBe(1);
   });
 
+  it.each(['failed', 'running'])(
+    'reconciles an identity-journaled effect after an incomplete %s API receipt',
+    async (state) => {
+      let journaled: Awaited<ReturnType<typeof mutate>> | undefined;
+      const original = async () => (journaled ??= await mutate());
+      const reconcile = vi.fn(async () => {
+        expect(journaled).toBeDefined();
+        return journaled!;
+      });
+      vi.spyOn(store, 'completeOperation').mockRejectedValueOnce(new Error('receipt unavailable'));
+      await expect(wrap()(request, reply(), user, original, { reconcile })).rejects.toThrow(
+        'receipt unavailable'
+      );
+      if (state === 'running')
+        await database.query("UPDATE api_operations SET state='running' WHERE user_id=$1", [
+          user.id
+        ]);
+      const repeat = vi.fn(async () => {
+        throw new Error('Original effect was repeated');
+      });
+      const result = await wrap()(request, reply(), user, repeat, { reconcile });
+      expect(result).toEqual(journaled);
+      expect(reconcile).toHaveBeenCalledTimes(1);
+      expect(repeat).not.toHaveBeenCalled();
+      expect(await count()).toBe(1);
+      expect(await wrap()(request, reply(), user, repeat, { reconcile })).toEqual(journaled);
+      expect(reconcile).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('never reconciles a read-only receipt lookup or a changed request', async () => {
+    const uncertain = async () => {
+      throw new Error('acknowledgement missing');
+    };
+    await expect(wrap()(request, reply(), user, uncertain)).rejects.toThrow(
+      'acknowledgement missing'
+    );
+    const reconcile = vi.fn(mutate);
+    await expect(
+      wrap()(
+        {
+          ...request,
+          headers: { ...request.headers, 'idempotency-replay-only': 'true' }
+        } as FastifyRequest,
+        reply(),
+        user,
+        mutate,
+        { reconcile }
+      )
+    ).rejects.toMatchObject({ code: 'operation_outcome_unknown' });
+    await expect(
+      wrap()(
+        { ...request, body: { title: 'Different operation' } } as FastifyRequest,
+        reply(),
+        user,
+        mutate,
+        { reconcile }
+      )
+    ).rejects.toMatchObject({ code: 'idempotency_conflict' });
+    expect(reconcile).not.toHaveBeenCalled();
+    expect(await count()).toBe(0);
+  });
+
+  it('keeps the first committed receipt immutable when two reconciliations overlap', async () => {
+    const uncertain = async () => {
+      throw new Error('acknowledgement missing');
+    };
+    await expect(wrap()(request, reply(), user, uncertain)).rejects.toThrow(
+      'acknowledgement missing'
+    );
+    let entered!: () => void;
+    let release!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const slow = wrap()(request, reply(), user, uncertain, {
+      reconcile: async () => {
+        entered();
+        await pending;
+        return { observation: 'later' };
+      }
+    });
+    await started;
+    const first = await wrap()(request, reply(), user, uncertain, {
+      reconcile: async () => ({ observation: 'first' })
+    });
+    release();
+    expect(await slow).toEqual(first);
+    expect(first).toEqual({ observation: 'first' });
+    expect(await wrap()(request, reply(), user, uncertain)).toEqual(first);
+    expect(await count()).toBe(0);
+  });
+
   it('rolls a database mutation and its claim back when the receipt fails, allowing a safe retry', async () => {
     vi.spyOn(store, 'completeOperation').mockRejectedValueOnce(new Error('receipt unavailable'));
     await expect(wrap()(request, reply(), user, mutate, { databaseOnly: true })).rejects.toThrow(

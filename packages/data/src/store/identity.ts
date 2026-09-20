@@ -612,7 +612,7 @@ export class IdentityStore {
   ): Promise<void> {
     await this.database.query(
       `UPDATE api_operations SET state='completed',response_status=$3,response_body=NULL,response_ciphertext=$4::jsonb,updated_at=NOW()
-       WHERE user_id=$1 AND idempotency_key=$2`,
+       WHERE user_id=$1 AND idempotency_key=$2 AND state <> 'completed'`,
       [userId, idempotencyKey, status, JSON.stringify(body)]
     );
   }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { verifyCapabilityToken } from '@athanor/core';
+import { AthanorError, verifyCapabilityToken } from '@athanor/core';
 import { RunnerClient } from './runner-client.js';
 
 const secret = 'runner-secret-with-at-least-32-characters';
@@ -7,6 +7,100 @@ const secret = 'runner-secret-with-at-least-32-characters';
 afterEach(() => vi.unstubAllGlobals());
 
 describe('runner capability requests', () => {
+  it.each([400, 403, 404, 409, 410, 429, 507])(
+    'preserves an actionable runtime rejection with status %s',
+    async (status) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () =>
+          Response.json(
+            {
+              error: {
+                code: 'runner_request_failed',
+                message: 'Project history changed. Review a fresh archive preview.',
+                requestId: 'private-runtime-correlation'
+              }
+            },
+            { status }
+          )
+        )
+      );
+      await expect(
+        new RunnerClient('http://runner.test', secret).request({
+          workspaceId: 'workspace',
+          userId: 'owner',
+          role: 'user',
+          scopes: ['project.updates.write'],
+          path: '/archive',
+          method: 'POST'
+        })
+      ).rejects.toMatchObject({
+        name: 'AthanorError',
+        statusCode: status,
+        code: 'runner_request_failed',
+        message: 'Project history changed. Review a fresh archive preview.'
+      });
+    }
+  );
+
+  it.each([
+    '<html>Private proxy exception</html>',
+    JSON.stringify({ error: { code: 'authentication_required', message: 'Private error text' } }),
+    JSON.stringify({ error: { code: 'runner_request_failed', message: { private: 'object' } } }),
+    'null'
+  ])('does not expose an unrecognized runtime error body: %s', async (body) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(body, { status: 409 }))
+    );
+    await expect(
+      new RunnerClient('http://runner.test', secret).request({
+        workspaceId: 'workspace',
+        userId: 'owner',
+        role: 'user',
+        scopes: ['project.updates.write'],
+        path: '/archive'
+      })
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'workspace_request_rejected',
+      message: 'The workspace rejected this request. Refresh its status and try again.'
+    });
+  });
+
+  it('redacts and bounds a known runtime rejection before exposing it to the owner', async () => {
+    const key = 'sk-live-01234567890abcdefgh';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json(
+          {
+            error: {
+              code: 'runner_request_failed',
+              message: `OPENAI_KEY=${key} ${'x'.repeat(2000)}`
+            }
+          },
+          { status: 409 }
+        )
+      )
+    );
+    const result = await new RunnerClient('http://runner.test', secret)
+      .request({
+        workspaceId: 'workspace',
+        userId: 'owner',
+        role: 'user',
+        scopes: ['project.updates.write'],
+        path: '/archive'
+      })
+      .catch((error: unknown) => error);
+    expect(result).toBeInstanceOf(AthanorError);
+    const error = result as AthanorError;
+    expect(error.statusCode).toBe(409);
+    expect(error.message).not.toContain(key);
+    expect(error.message).toContain('[REDACTED]');
+    expect(error.message.length).toBeLessThanOrEqual(1000);
+  });
+
   it('propagates browser cancellation without imposing a short lifetime on a large download', async () => {
     let observed: AbortSignal | undefined;
     vi.stubGlobal(

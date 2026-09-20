@@ -340,6 +340,11 @@ controls. Retrying uses the saved identity; restoring refuses conflicting destin
 content that fails verification. Keep the private retention manifests and content together in
 backups. Removing them manually defeats recovery and is not a supported disk-cleanup procedure.
 
+The owner API reconciles an interrupted archive or restore against the runner's durable operation
+identity before completing its response receipt. Changed request parameters cannot reuse that
+identity. A stale preview reports the conflict and asks for a fresh preview; other rejected runtime
+requests retain their status and a redacted explanation. Unknown upstream responses remain generic.
+
 ## Moving to a new computer
 
 The backup carries `/etc/athanor` verbatim, which is what has to happen: the data key, the session

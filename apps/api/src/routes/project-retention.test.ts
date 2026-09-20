@@ -1,7 +1,77 @@
 import Fastify from 'fastify';
 import { expect, it, vi } from 'vitest';
-import type { RouteContext } from '../http/server-context.js';
+import type { RouteContext, ServerBase } from '../http/server-context.js';
+import { registerErrorHandler } from '../http/errors.js';
+import { RunnerClient } from '../runner-client.js';
+import { silentLogger } from '../log.js';
 import { registerProjectUpdateRoutes } from './project-updates.js';
+
+it('returns the runtime stale-preview conflict and guidance through the real API error boundary', async () => {
+  const app = Fastify();
+  app.decorateRequest('user', null);
+  app.addHook('onRequest', async (request) => {
+    request.user = { id: 'owner' } as never;
+  });
+  const project = '00000000-0000-4000-8000-000000000001';
+  const runner = new RunnerClient('http://runner.invalid', 'runner-secret-at-least-32-characters');
+  const context = {
+    app,
+    log: silentLogger,
+    requestStarted: new WeakMap(),
+    store: {
+      getProject: async () => ({ id: project, workspaceId: 'workspace' }),
+      listProjectConversations: async () => ({ tasks: [], nextCursor: null })
+    },
+    runner,
+    idempotent: async (
+      _request: unknown,
+      _reply: unknown,
+      _user: unknown,
+      action: () => Promise<unknown>
+    ) => action()
+  };
+  registerErrorHandler(context as unknown as ServerBase);
+  registerProjectUpdateRoutes(context as unknown as RouteContext);
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      Response.json(
+        {
+          error: {
+            code: 'runner_request_failed',
+            message: 'Project history changed. Review a fresh archive preview.',
+            requestId: 'runner-only-reference'
+          }
+        },
+        { status: 409 }
+      )
+    )
+  );
+  try {
+    const reply = await app.inject({
+      method: 'POST',
+      url: `/v1/projects/${project}/retention/archive`,
+      payload: {
+        versions: ['00000000-0000-4000-8000-000000000002'],
+        digest: 'a'.repeat(64),
+        requestId: '00000000-0000-4000-8000-000000000003'
+      }
+    });
+    expect(reply.statusCode).toBe(409);
+    const body = reply.json<{ error: { code: string; message: string; requestId: string } }>();
+    expect(body).toMatchObject({
+      error: {
+        code: 'runner_request_failed',
+        message: 'Project history changed. Review a fresh archive preview.'
+      }
+    });
+    expect(body.error.requestId).toMatch(/\S/);
+    expect(body.error.requestId).not.toBe('runner-only-reference');
+  } finally {
+    vi.unstubAllGlobals();
+    await app.close();
+  }
+});
 
 it('binds archive previews and mutations to the owner and preserves exact retry identity', async () => {
   const app = Fastify();

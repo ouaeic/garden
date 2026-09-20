@@ -10,9 +10,11 @@ import { idempotencyRequestHash } from '../context.js';
 import type { ServerBase } from './server-context.js';
 import { operationReceipts } from './operation-receipts.js';
 
-interface OperationOptions {
+interface OperationOptions<T> {
   /** Only use when the callback has no effects outside this database. */
   databaseOnly?: boolean;
+  /** Only for an operation with its own durable, identity-bound journal and safe retry protocol. */
+  reconcile?: () => Promise<T>;
 }
 
 /** The wrapper a route puts round the work it does not want done twice. */
@@ -21,7 +23,7 @@ export type IdempotentOperation = <T>(
   reply: FastifyReply,
   user: UserRecord,
   operation: () => Promise<T>,
-  options?: OperationOptions
+  options?: OperationOptions<T>
 ) => Promise<T>;
 
 export const createIdempotentOperation = (
@@ -34,7 +36,7 @@ export const createIdempotentOperation = (
     reply: FastifyReply,
     user: UserRecord,
     operation: () => Promise<T>,
-    options: OperationOptions = {}
+    options: OperationOptions<T> = {}
   ): Promise<T> => {
     const rawKey = request.headers['idempotency-key'];
     const key = Array.isArray(rawKey) ? rawKey[0] : rawKey;
@@ -62,6 +64,7 @@ export const createIdempotentOperation = (
         );
       const replayOnly = replayHeader === 'true';
       const existing = await store.beginOperation({ ...identity, replayOnly });
+      let work = operation;
       if (existing) {
         if (
           existing.method !== request.method ||
@@ -83,11 +86,13 @@ export const createIdempotentOperation = (
           reply.status(existing.responseStatus).header('idempotency-replayed', 'true');
           return receipts.open<T>(identity, existing.responseStatus, existing.responseCiphertext);
         }
-        throw new AthanorError(
-          existing.state === 'failed' ? 'operation_outcome_unknown' : 'operation_in_progress',
-          'The original request may have taken effect. Check its outcome before trying again.',
-          409
-        );
+        if (options.reconcile && !replayOnly) work = options.reconcile;
+        else
+          throw new AthanorError(
+            existing.state === 'failed' ? 'operation_outcome_unknown' : 'operation_in_progress',
+            'The original request may have taken effect. Check its outcome before trying again.',
+            409
+          );
       }
       if (replayOnly)
         throw new AthanorError(
@@ -96,13 +101,29 @@ export const createIdempotentOperation = (
           409
         );
       try {
-        const result = await operation();
+        const result = await work();
         await store.completeOperation(
           user.id,
           key,
           reply.statusCode,
           receipts.seal(identity, reply.statusCode, result)
         );
+        if (options.reconcile) {
+          // Concurrent journal reconciliation must return the same first committed API receipt.
+          const saved = await store.beginOperation({ ...identity, replayOnly: true });
+          if (
+            saved?.state !== 'completed' ||
+            saved.responseStatus === null ||
+            !saved.responseCiphertext
+          )
+            throw new AthanorError(
+              'operation_outcome_unknown',
+              'The saved response needs reconciliation before retrying.',
+              409
+            );
+          reply.status(saved.responseStatus);
+          return receipts.open<T>(identity, saved.responseStatus, saved.responseCiphertext);
+        }
         return result;
       } catch (error) {
         // A rollback is safe only when every effect belongs to this transaction.

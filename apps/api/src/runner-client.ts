@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
+  AthanorError,
   capabilityAudience,
   capabilityAudiences,
   redactText,
@@ -7,6 +8,37 @@ import {
 } from '@athanor/core';
 
 type Role = 'control' | 'agent' | 'user';
+
+const explainedRunnerErrors = new Set([
+  'runner_request_failed',
+  'runner_invalid_request',
+  'file_not_found',
+  'browser_bot_wall',
+  'checkpoint_host_disk_full',
+  'checkpoint_workspace_too_large'
+]);
+
+function rejectedRequest(status: number, body: string): AthanorError {
+  let explained: { code: string; message: string } | undefined;
+  try {
+    const value = JSON.parse(body) as { error?: { code?: unknown; message?: unknown } } | null;
+    const error = value?.error;
+    if (
+      typeof error?.code === 'string' &&
+      explainedRunnerErrors.has(error.code) &&
+      typeof error.message === 'string' &&
+      error.message.trim()
+    )
+      explained = { code: error.code, message: redactText(error.message).slice(0, 1000) };
+  } catch {
+    // Proxy pages and malformed upstream bodies are not owner-facing explanations.
+  }
+  return new AthanorError(
+    explained?.code ?? 'workspace_request_rejected',
+    explained?.message ?? 'The workspace rejected this request. Refresh its status and try again.',
+    status
+  );
+}
 
 export class RunnerClient {
   constructor(
@@ -116,6 +148,8 @@ export class RunnerClient {
       // The upstream body is quoted because it is usually the only description of what went wrong,
       // and scrubbed because it is a response the agent's own code may have written.
       const error = await response.text().catch(() => '');
+      if ((response.status >= 400 && response.status < 500) || response.status === 507)
+        throw rejectedRequest(response.status, error);
       throw new Error(
         `Workspace runtime returned ${response.status}${error ? `: ${redactText(error).slice(0, 250)}` : ''}`
       );

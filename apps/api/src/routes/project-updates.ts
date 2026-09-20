@@ -67,7 +67,9 @@ export function registerProjectUpdateRoutes(context: RouteContext) {
             contentType: 'application/json',
             body: JSON.stringify(input)
           });
-        return action === 'preview' ? run() : context.idempotent(request, reply, user, run);
+        return action === 'preview'
+          ? run()
+          : context.idempotent(request, reply, user, run, { reconcile: run });
       }
     );
   }
