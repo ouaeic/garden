@@ -1319,6 +1319,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
           'x-end-line': String(window.endLine),
           'x-file-bytes': String(window.sizeBytes),
           'x-truncated': String(window.truncated),
+          ...(window.sha256 === undefined ? {} : { 'x-content-sha256': window.sha256 }),
           // Whether the last row of the body is half a line. `x-truncated` says the window ended
           // early and does not say which of the two ways, and the caller's record of what it
           // displayed turns on exactly that.

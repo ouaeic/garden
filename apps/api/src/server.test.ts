@@ -8188,6 +8188,10 @@ describe('the doors the runner already had', () => {
         }
         if (requestUrl.includes('/file?') && method === 'GET') {
           fileQuery = requestUrl.split('/file?')[1]!;
+          if (fileQuery.includes('result.json'))
+            return new Response('{"value":1}\n', {
+              headers: { 'x-content-sha256': 'c'.repeat(64), 'x-truncated': 'false' }
+            });
           return new Response('line 41\nline 42\n', {
             status: 200,
             headers: {
@@ -8274,6 +8278,16 @@ describe('the doors the runner already had', () => {
     expect(window.headers['x-next-start-line']).toBe('43');
     expect(window.headers['x-truncated']).toBe('true');
     expect(window.headers['x-total-lines']).toBe('900');
+    expect(window.headers['x-content-sha256']).toBeUndefined();
+    const complete = await app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/file?path=workspace%2Fresult.json&startLine=1&maxBytes=262144`,
+      headers: { cookie }
+    });
+    expect(complete.statusCode).toBe(200);
+    expect(complete.body).toBe('{"value":1}\n');
+    expect(complete.headers['x-content-sha256']).toBe('c'.repeat(64));
+    expect(complete.headers['x-truncated']).toBe('false');
 
     /*
      * The claim about what is being replaced. Without it the later write wins silently: the Files

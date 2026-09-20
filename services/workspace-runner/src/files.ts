@@ -541,10 +541,15 @@ export const readWorkspaceFileLines = async (
   /** Whether one further line is included, cut short by the byte budget. */
   partialLine: boolean;
   sizeBytes: number;
+  /** Present only when the returned bytes contain the complete, unchanged file. */
+  sha256?: string;
 }> => {
   const target = resolveInside(root, requested);
   await rejectSymlinkComponents(root, target);
-  const handle = await open(target, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const handle = await open(
+    target,
+    constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK
+  );
   try {
     await assertOpenedInPlace(root, target, handle);
     const details = await handle.stat();
@@ -613,6 +618,19 @@ export const readWorkspaceFileLines = async (
       lastKeptTerminated = false;
     }
     const content = Buffer.concat(kept);
+    let sha256: string | undefined;
+    if (eof && !truncated && window.startLine === 1 && !lastKeptTerminated) {
+      const after = await handle.stat();
+      await assertOpenedInPlace(root, target, handle);
+      if (
+        details.size !== after.size ||
+        details.mtimeMs !== after.mtimeMs ||
+        details.ctimeMs !== after.ctimeMs ||
+        content.length !== after.size
+      )
+        throw new Error('The file changed while it was being read; read it again');
+      sha256 = createHash('sha256').update(content).digest('hex');
+    }
     /*
      * What this read actually put in front of its caller, remembered so a later write can be held
      * to it. A read cut short INSIDE a line stopped mid-line, and that line was not displayed:
@@ -653,7 +671,8 @@ export const readWorkspaceFileLines = async (
        * are what let the two seen-line ledgers disagree about the same prefix of the same file.
        */
       partialLine,
-      sizeBytes: details.size
+      sizeBytes: details.size,
+      ...(sha256 === undefined ? {} : { sha256 })
     };
   } finally {
     await handle.close();

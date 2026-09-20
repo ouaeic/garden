@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
@@ -449,6 +450,34 @@ describe('file organisation and toolchain routes', () => {
       );
     return { app, id, root, token };
   };
+
+  it('exposes file identity for a complete inspector window but never for a partial read', async () => {
+    const { app, id, root, token } = await harness();
+    const content = Buffer.from('{"value":"α"}\r\n');
+    await writeFile(path.join(root, 'workspace/result.json'), content);
+    for (const maxBytes of [262144, 5]) {
+      const route = `/v1/workspaces/${id}/file`;
+      const response = await app.inject({
+        method: 'GET',
+        url: `${route}?path=workspace/result.json&startLine=1&maxBytes=${maxBytes}`,
+        headers: {
+          authorization: `Bearer ${token(['files.read'], { method: 'GET', path: route })}`
+        }
+      });
+      expect(response.statusCode, response.body).toBe(200);
+      if (maxBytes === 262144) {
+        expect(response.rawPayload).toEqual(content);
+        expect(response.headers['x-content-sha256']).toBe(
+          createHash('sha256').update(content).digest('hex')
+        );
+        expect(response.headers['x-truncated']).toBe('false');
+      } else {
+        expect(response.rawPayload.length).toBeLessThanOrEqual(maxBytes);
+        expect(response.headers['x-content-sha256']).toBeUndefined();
+        expect(response.headers['x-truncated']).toBe('true');
+      }
+    }
+  });
 
   it('creates a folder and renames a file without ever overwriting one', async () => {
     const { app, id, root, token } = await harness();
