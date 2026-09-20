@@ -306,6 +306,7 @@ export default function ProjectUpdates({
                 <ProjectVersionHistory
                   key={projectId}
                   projectId={projectId}
+                  headId={data.head?.id ?? null}
                   revisions={data.revisions}
                   nextCursor={data.nextRevisionCursor}
                   loading={Boolean(busy)}

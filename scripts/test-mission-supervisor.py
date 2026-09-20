@@ -49,7 +49,7 @@ with open({str(root / 'observed')!r}, 'w') as stream:
 """)
         child.chmod(0o700)
         subprocess.run(
-            [sys.executable, str(supervisor), str(lease), str(gate), json.dumps(inputs), str(child), "/bin/true"],
+            [sys.executable, str(supervisor), str(lease), str(gate), json.dumps({"inputs": inputs, "locks": []}), str(child), "/bin/true"],
             pass_fds=(lease, gate, *inputs, stray),
             check=True,
             timeout=15,

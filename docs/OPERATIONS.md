@@ -322,6 +322,24 @@ sudo athanor restore . --yes
 copy arrived whole without holding the key. `SHA256SUMS`, decrypted with the rest, is what the
 restore itself verifies.
 
+## Recoverable version archives
+
+Project history offers an archive preview and restore controls. Archiving preserves the version's
+place in history and its files in project-local recoverable storage; it does not reclaim disk space.
+The head, pins, baseline inputs, unfinished updates, live commands and open downloads prevent
+destructive maintenance. Restoration can proceed alongside running readers because it only returns
+an absent public version tree.
+
+If the job controller cannot verify input protection, leave its work running. The archive preview
+reports that maintenance is unavailable until a compatible controller is active. Do not force a job
+restart to enable cleanup. An uncertain native lease remains protective until process teardown is
+verified.
+
+After an interrupted archive or restore, the affected version remains visible with recovery
+controls. Retrying uses the saved identity; restoring refuses conflicting destination files or
+content that fails verification. Keep the private retention manifests and content together in
+backups. Removing them manually defeats recovery and is not a supported disk-cleanup procedure.
+
 ## Moving to a new computer
 
 The backup carries `/etc/athanor` verbatim, which is what has to happen: the data key, the session

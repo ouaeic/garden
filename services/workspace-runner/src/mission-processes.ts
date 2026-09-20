@@ -13,6 +13,8 @@ interface Identity {
 interface Lease {
   purpose?: 'mission' | 'session';
   retainDescendants?: boolean;
+  projectInputLockProtocol?: 1;
+  projectInputs?: { projectId: string; device: string; inode: string }[];
   controller?: Identity;
   workspaceRoot: string;
   launchExpiresAt: number;
@@ -74,6 +76,7 @@ export const createMissionLease = async (
         workspaceRoot: root,
         purpose,
         ...(retainDescendants ? { retainDescendants } : {}),
+        ...(sandbox.projectInputLocks ? { projectInputLockProtocol: 1 as const } : {}),
         ...(identity ? { controller: { pid: process.pid, identity } } : {}),
         phase: 'prepared',
         launchExpiresAt: Date.now() + 10_000
@@ -201,6 +204,60 @@ export const processTreeObservation = async (
     entry.child.signalCode === null
     ? observed
     : null;
+};
+
+/** The caller holds the selected public directory exclusively, preventing a new grant. */
+export const assertProjectReferencesIdle = async (
+  sandbox: AgentSandbox,
+  projectId: string
+): Promise<void> => {
+  if (!sandbox.projectInputLocks || !sandbox.processIsolation || !sandbox.confineFilesystem)
+    throw new Error('Project cleanup requires verified native input lifetime protection.');
+  const names = await readdir(sandbox.specDirectory);
+  for (const name of names.filter((name) => name.endsWith('.lease'))) {
+    if (!/^[a-f0-9]+\.lease$/.test(name))
+      throw new Error('An unknown execution lease prevents project cleanup.');
+    const file = path.join(sandbox.specDirectory, name);
+    let record: Lease;
+    try {
+      record = await readLease(file);
+    } catch (cause) {
+      if ((cause as NodeJS.ErrnoException).code === 'ENOENT') continue;
+      throw new Error('An unreadable execution lease prevents project cleanup.', { cause });
+    }
+    if (record.phase === 'reaped') continue;
+    if (
+      record.projectInputLockProtocol !== 1 ||
+      !Array.isArray(record.projectInputs) ||
+      record.projectInputs.length > 64 ||
+      record.projectInputs.some(
+        (input) =>
+          !input ||
+          typeof input.projectId !== 'string' ||
+          !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(input.projectId) ||
+          typeof input.device !== 'string' ||
+          !/^\d+$/.test(input.device) ||
+          typeof input.inode !== 'string' ||
+          !/^\d+$/.test(input.inode)
+      )
+    )
+      throw new Error(
+        'An execution has not verified its input lifetime; project cleanup must wait.'
+      );
+    if (!record.projectInputs.some((input) => input.projectId === projectId)) continue;
+    const status = await nativeStatus({
+      file,
+      root: record.workspaceRoot,
+      sandbox,
+      purpose: record.purpose ?? 'mission'
+    });
+    if (
+      status.namespaceAlive ||
+      status.supervisorAlive ||
+      (!record.namespaceInit && Date.now() < record.launchExpiresAt)
+    )
+      throw new Error('A running or unfinished execution still protects this project history.');
+  }
 };
 const forget = async (entry: Entry): Promise<void> => {
   await Promise.all([

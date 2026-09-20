@@ -46,6 +46,8 @@ export interface AgentSandbox {
   processIsolation?: boolean;
   /** Measured helper support for waiting until detached descendants finish. */
   retainedProcessTrees?: boolean;
+  /** Native project read grants remain held until namespace teardown is proven. */
+  projectInputLocks?: boolean;
   /** Measured helper support for a private network namespace. */
   networkIsolation?: boolean;
 }
@@ -56,6 +58,7 @@ export const probeNativeIsolation = (
   processIsolation: boolean;
   networkIsolation: boolean;
   retainedProcessTrees: boolean;
+  projectInputLocks: boolean;
 }> =>
   new Promise((resolve) => {
     execFile(
@@ -69,6 +72,10 @@ export const probeNativeIsolation = (
             !error &&
             /^process-isolation=yes$/m.test(output) &&
             /^retained-process-trees=yes$/m.test(output),
+          projectInputLocks:
+            !error &&
+            /^process-isolation=yes$/m.test(output) &&
+            /^project-input-locks=yes$/m.test(output),
           networkIsolation: !error && /^network-isolation=yes$/m.test(output)
         })
     );
@@ -281,7 +288,8 @@ export const sandboxedInvocation = async (
   const retained = retainProcessTree && !mission && !superviseProcessTree;
   if (retained && sandbox.retainedProcessTrees !== true)
     throw new Error('Managed jobs require measured native retained process-tree support');
-  const supervised = mission || superviseProcessTree || retained;
+  const supervised =
+    mission || superviseProcessTree || retained || (confined && sandbox.projectInputLocks === true);
   if (supervised && (!confined || sandbox.processIsolation !== true))
     throw new Error(
       'Managed commands require measured native filesystem and process-tree isolation'

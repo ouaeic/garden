@@ -3,7 +3,9 @@ import { AthanorError } from '@athanor/core';
 import {
   ProjectUpdateAction,
   ProjectVersionPinInput,
-  PinnedProjectVersionCursor
+  PinnedProjectVersionCursor,
+  ProjectRetentionApply,
+  ProjectRetentionSelection
 } from '@athanor/contracts';
 import { z } from 'zod';
 import { requireUser } from '../http/auth-hook.js';
@@ -41,6 +43,34 @@ export function registerProjectUpdateRoutes(context: RouteContext) {
     }
     return project;
   };
+  for (const action of ['preview', 'archive', 'restore'] as const) {
+    app.post<{ Params: { projectId: string } }>(
+      `/v1/projects/:projectId/retention/${action}`,
+      async (request, reply) => {
+        const user = requireUser(request.user);
+        const input = (
+          action === 'preview'
+            ? ProjectRetentionSelection
+            : action === 'archive'
+              ? ProjectRetentionApply
+              : z.object({ revisionId: z.uuid(), requestId: z.uuid() }).strict()
+        ).parse(request.body);
+        const project = await owned(user.id, request.params.projectId);
+        const run = () =>
+          runner.request({
+            workspaceId: project.workspaceId,
+            userId: user.id,
+            role: 'user',
+            scopes: [action === 'preview' ? 'project.updates.read' : 'project.updates.write'],
+            method: 'POST',
+            path: `/v1/workspaces/${project.workspaceId}/projects/${project.id}/retention/${action}`,
+            contentType: 'application/json',
+            body: JSON.stringify(input)
+          });
+        return action === 'preview' ? run() : context.idempotent(request, reply, user, run);
+      }
+    );
+  }
   app.get<{ Params: { projectId: string } }>('/v1/projects/:projectId/storage', async (request) => {
     const user = requireUser(request.user),
       project = await owned(user.id, request.params.projectId);

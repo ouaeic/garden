@@ -67,6 +67,7 @@ describe('process lifetime independent of request-serving', () => {
       const { sessionId } = launch.json<{ sessionId: string }>();
       expect(sessionId).toBeTruthy();
       const client = connectProcessSupervisor(config.JOB_SUPERVISOR_SOCKET!, secret);
+      expect(await client.projectInputProtection()).toEqual({ protocol: 1, available: false });
       await expect
         .poll(() => readFile(path.join(root, 'workspace/launches.txt'), 'utf8'), { timeout: 5000 })
         .toMatch(/^\d+\n$/);

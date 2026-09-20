@@ -1,5 +1,5 @@
 import { cloneElement, useEffect, useId, useRef } from 'react';
-import type { ButtonHTMLAttributes, ReactElement, ReactNode } from 'react';
+import type { ComponentProps, ReactElement, ReactNode } from 'react';
 import { X, LoaderCircle } from 'lucide-react';
 
 export function Button({
@@ -7,7 +7,7 @@ export function Button({
   className = '',
   busy,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { busy?: boolean }) {
+}: ComponentProps<'button'> & { busy?: boolean }) {
   return (
     <button
       type="button"

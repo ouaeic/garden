@@ -12,6 +12,7 @@ import time
 
 if sys.argv[1] == "--features":
     print("retained-process-trees=yes")
+    print("project-input-locks=yes")
     sys.exit(0)
 
 
@@ -141,11 +142,18 @@ if sys.argv[1] == "--init":
     sys.exit(125 if primary_result is None else (primary_result or descendant_result))
 
 fd, gate, unshare = int(sys.argv[1]), int(sys.argv[2]), sys.argv[4]
-inputs = json.loads(sys.argv[3])
+descriptors = json.loads(sys.argv[3])
+if not isinstance(descriptors, dict) or set(descriptors) != {"inputs", "locks"}:
+    raise RuntimeError("Invalid mission descriptor groups")
+inputs, locks = descriptors["inputs"], descriptors["locks"]
 if not isinstance(inputs, list) or len(inputs) > 4160 or any(type(item) is not int or item < 3 or item in (fd, gate) for item in inputs):
     raise RuntimeError("Invalid mission input descriptors")
 if len(set(inputs)) != len(inputs) or any(not stat.S_ISDIR(os.fstat(item).st_mode) for item in inputs):
     raise RuntimeError("Mission inputs must be distinct held directories")
+if not isinstance(locks, list) or len(locks) > 64 or any(type(item) is not int or item < 3 or item in (fd, gate, *inputs) for item in locks):
+    raise RuntimeError("Invalid project input lock descriptors")
+if len(set(locks)) != len(locks) or any(not stat.S_ISDIR(os.fstat(item).st_mode) for item in locks):
+    raise RuntimeError("Project input locks must be distinct held directories")
 record = read_record(fd)
 record["supervisor"] = identity(os.getpid())
 record["group"] = identity(os.getpgrp())

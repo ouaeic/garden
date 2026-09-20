@@ -17,6 +17,7 @@ export const prepareSupervisorRestart = (app: FastifyInstance): boolean =>
   managers.get(app)?.prepareForRestart() ?? false;
 
 const METHODS = [
+  'projectInputProtection',
   'start',
   'resume',
   'resumeWorkspace',
@@ -47,7 +48,9 @@ const MAX_RESPONSE_BYTES = 24 * 1024 * 1024;
 type AsyncMethod<T> = T extends (...args: infer A) => infer R
   ? (...args: A) => Promise<Awaited<R>>
   : never;
-export type ProcessService = { [K in keyof ProcessManager]: AsyncMethod<ProcessManager[K]> };
+export type ProcessService = { [K in keyof ProcessManager]: AsyncMethod<ProcessManager[K]> } & {
+  projectInputProtection(): Promise<{ protocol: 1; available: boolean }>;
+};
 
 /** Closing a request client never changes the lifetime of the jobs it observed. */
 export function connectProcessSupervisor(socket: string, secret: string): ProcessService {
@@ -144,6 +147,17 @@ export async function buildProcessSupervisor(config: RunnerConfig, manager = new
   });
   app.post('/rpc', async (request) => {
     const { method, args } = Request.parse(request.body);
+    if (method === 'projectInputProtection') {
+      if (args.length) throw new Error('Input protection inspection takes no arguments');
+      return {
+        result: {
+          protocol: 1,
+          available: Boolean(
+            sandbox?.confineFilesystem && sandbox.processIsolation && sandbox.projectInputLocks
+          )
+        }
+      };
+    }
     // Invocation policy comes from the supervisor's own configuration, never a serialized closure.
     if (method === 'start' || method === 'resumeWorkspace') {
       const workspaceId = z

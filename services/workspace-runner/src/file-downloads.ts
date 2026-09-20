@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { open, opendir } from 'node:fs/promises';
 import path from 'node:path';
 import { Readable } from 'node:stream';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { ZipFile } from 'yazl';
 import { z } from 'zod';
 import { requireScope } from './auth.js';
@@ -233,8 +233,26 @@ export const registerFileDownloadRoutes = (
 export function registerFileReadRoutes(
   app: FastifyInstance,
   prefix: string,
-  rootFor: (request: FastifyRequest) => Promise<string>
+  rootFor: (request: FastifyRequest) => Promise<string | { root: string; release(): Promise<void> }>
 ): void {
+  const resolveRoot = async (request: FastifyRequest, reply: FastifyReply): Promise<string> => {
+    const opened = await rootFor(request);
+    if (typeof opened === 'string') return opened;
+    if (reply.raw.destroyed) {
+      await opened.release();
+      throw new Error('File request was closed');
+    }
+    const release = () => {
+      reply.raw.off('finish', release);
+      reply.raw.off('close', release);
+      void opened
+        .release()
+        .catch((err: unknown) => request.log.error({ err }, 'File reference release failed'));
+    };
+    reply.raw.once('finish', release);
+    reply.raw.once('close', release);
+    return opened.root;
+  };
   app.get<{ Querystring: { path?: string; cursor?: string } }>(
     `${prefix}/table`,
     async (request, reply) => {
@@ -248,7 +266,7 @@ export function registerFileReadRoutes(
       reply.raw.once('close', close);
       try {
         return await readTablePage(
-          await rootFor(request),
+          await resolveRoot(request, reply),
           query.path,
           query.cursor,
           100,
@@ -261,7 +279,7 @@ export function registerFileReadRoutes(
   );
   app.get<{ Params: { workspaceId: string }; Querystring: { path?: string; cursor?: string } }>(
     `${prefix}/directory`,
-    async (request) => {
+    async (request, reply) => {
       requireScope(request, 'files.read');
       const query = z
         .object({
@@ -269,7 +287,7 @@ export function registerFileReadRoutes(
           cursor: z.string().max(8192).optional()
         })
         .parse(request.query);
-      return listDirectory(await rootFor(request), query.path, query.cursor);
+      return listDirectory(await resolveRoot(request, reply), query.path, query.cursor);
     }
   );
   app.get<{ Params: { workspaceId: string }; Querystring: { path?: string } }>(
@@ -277,7 +295,7 @@ export function registerFileReadRoutes(
     async (request, reply) => {
       requireScope(request, 'files.read');
       const requested = z.string().min(1).max(4096).default('workspace').parse(request.query.path);
-      const stream = await directoryArchive(await rootFor(request), requested);
+      const stream = await directoryArchive(await resolveRoot(request, reply), requested);
       reply.raw.once('close', () => stream.destroy());
       return reply
         .type('application/zip')
@@ -291,7 +309,7 @@ export function registerFileReadRoutes(
     `${prefix}/download`,
     async (request, reply) => {
       requireScope(request, 'files.read');
-      const root = await rootFor(request);
+      const root = await resolveRoot(request, reply);
       const opened = await openDownloadFile(
         root,
         z.string().min(1).max(4096).parse(request.query.path)

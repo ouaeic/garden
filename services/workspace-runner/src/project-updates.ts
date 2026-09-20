@@ -15,6 +15,8 @@ import { ensureWorkspace, workspacePath, withWorkspaceDirectory } from './files.
 import { ProjectLiveChanges } from './project-live-changes.js';
 import { ProjectVersionPins } from './project-version-pins.js';
 import { scanProjectStorage } from './project-storage.js';
+import { ProjectReferences } from './project-reference-lock.js';
+import { ProjectRetention } from './project-retention.js';
 import {
   ProjectVersionFiles,
   durableJson,
@@ -80,6 +82,7 @@ export interface ProjectCheckExecution {
 /** The only mutable shared file is a durable head reference; working processes never use it as a pathname. */
 export class ProjectUpdatesManager {
   readonly #changes = new ProjectLiveChanges();
+  readonly references: ProjectReferences;
   readonly #locks = new Map<string, Promise<unknown>>();
   readonly #operations = new Map<string, Promise<void>>();
   readonly #cancelled = new Set<string>();
@@ -92,8 +95,13 @@ export class ProjectUpdatesManager {
   #closed = false;
   constructor(
     readonly root: string,
-    readonly execution: ProjectCheckExecution
-  ) {}
+    readonly execution: ProjectCheckExecution,
+    readonly assertRetentionIdle: (projectId: string) => Promise<void> = async () => {
+      throw new Error('Project archive requires verified running-work protection.');
+    }
+  ) {
+    this.references = new ProjectReferences(root);
+  }
   async restore(report: (error: unknown) => void = () => undefined): Promise<void> {
     const projects = await readdir(path.join(this.root, '.project-store')).catch(
       (error: NodeJS.ErrnoException) => {
@@ -155,6 +163,9 @@ export class ProjectUpdatesManager {
   publicDirectory(projectId: string): string {
     return path.join(this.directory(projectId), 'public');
   }
+  retention(projectId: string): ProjectRetention {
+    return new ProjectRetention(this.root, projectId, () => this.assertRetentionIdle(projectId));
+  }
   async storage(projectId: string) {
     await this.registry(projectId);
     const existing = this.#storageScans.get(projectId);
@@ -174,8 +185,9 @@ export class ProjectUpdatesManager {
   private files(projectId: string) {
     return new ProjectVersionFiles(this.file(projectId, 'content'));
   }
-  private locked<T>(id: string, action: () => Promise<T>): Promise<T> {
-    const run = (this.#locks.get(id) ?? Promise.resolve()).catch(() => undefined).then(action);
+  private locked<T>(projectId: string, id: string, action: () => Promise<T>): Promise<T> {
+    const previous = this.#locks.get(id) ?? Promise.resolve();
+    const run = this.references.run(projectId, () => previous.catch(() => undefined).then(action));
     this.#locks.set(id, run);
     void run
       .finally(() => {
@@ -198,7 +210,8 @@ export class ProjectUpdatesManager {
     uuid(projectWorkspaceId);
     uuid(taskId);
     uuid(workspaceId);
-    await this.locked(projectId, async () => {
+    await durableMkdir(this.publicDirectory(projectId), 0o755);
+    await this.locked(projectId, projectId, async () => {
       const registry = (await readJson<Registry>(this.file(projectId, 'registry.json'))) ?? {
         workspaceId: projectWorkspaceId,
         members: {},
@@ -215,7 +228,6 @@ export class ProjectUpdatesManager {
           throw new Error('Project working-area identity changed');
         registry.workspaceId = projectWorkspaceId;
       }
-      await durableMkdir(this.publicDirectory(projectId), 0o755);
       registry.members[taskId] = workspaceId;
       await durableJson(this.file(projectId, 'registry.json'), registry);
       const baseline = this.file(projectId, `baselines/${workspaceId}.json`);
@@ -231,7 +243,17 @@ export class ProjectUpdatesManager {
     return workspacePath(this.root, checkId);
   }
   async revisionRoot(projectId: string, revisionId: string): Promise<string> {
+    await this.retention(projectId).assertAvailable(revisionId);
     return path.dirname((await this.revision(projectId, revisionId)).path);
+  }
+  async openFiles(projectId: string, resolve: () => Promise<string>) {
+    const reference = await this.references.acquire(projectId);
+    try {
+      return { root: await resolve(), release: () => reference.release() };
+    } catch (error) {
+      await reference.release();
+      throw error;
+    }
   }
   private async revisionSummary(projectId: string, id: string): Promise<ProjectRevision> {
     const revision =
@@ -240,26 +262,35 @@ export class ProjectUpdatesManager {
       )) ?? this.revisionView(await this.revision(projectId, id));
     return {
       ...revision,
+      archive: await this.retention(projectId).status(id),
       pin: await new ProjectVersionPins(this.file(projectId, 'pins')).get(
         revision.number,
         revision.id
       )
     };
   }
+  async version(projectId: string, id: string): Promise<ProjectRevision> {
+    return this.revisionSummary(projectId, id);
+  }
   async pinVersion(
     projectId: string,
     revisionId: string,
     label: string | null
   ): Promise<ProjectRevision> {
-    return this.locked(projectId, async () => {
+    return this.locked(projectId, projectId, async () => {
       await this.registry(projectId);
       const revision = await this.revision(projectId, revisionId);
+      if (label !== null) await this.retention(projectId).assertAvailable(revisionId);
       const pin = await new ProjectVersionPins(this.file(projectId, 'pins')).set(
         revision.number,
         revision.id,
         label
       );
-      return { ...this.revisionView(revision), pin };
+      return {
+        ...this.revisionView(revision),
+        pin,
+        archive: await this.retention(projectId).status(revisionId)
+      };
     });
   }
   async pinnedVersions(projectId: string, before?: string) {
@@ -358,9 +389,9 @@ export class ProjectUpdatesManager {
     const { files: _files, ...view } = revision;
     return view;
   }
-  private launch(id: string, action: () => Promise<void>) {
+  private launch(projectId: string, id: string, action: () => Promise<void>) {
     if (this.#operations.has(id)) return;
-    const operation = action();
+    const operation = this.references.run(projectId, action);
     this.#operations.set(id, operation);
     void operation
       .finally(() => {
@@ -390,7 +421,7 @@ export class ProjectUpdatesManager {
     const requestDigest = createHash('sha256')
       .update(JSON.stringify({ taskId, sourceTaskId, input }))
       .digest('hex');
-    return this.locked(`prepare:${id}`, async () => {
+    return this.locked(projectId, `prepare:${id}`, async () => {
       const existing = await readJson<StoredUpdate>(this.file(projectId, `updates/${id}.json`));
       if (existing) {
         if (existing.requestDigest !== requestDigest)
@@ -454,7 +485,7 @@ export class ProjectUpdatesManager {
         throw new Error('Delete individual paths, not the whole project');
       await this.save(update);
       this.#live.set(id, update);
-      this.launch(id, () => this.capture(update));
+      this.launch(projectId, id, () => this.capture(update));
       return this.view(update);
     });
   }
@@ -606,7 +637,7 @@ export class ProjectUpdatesManager {
     id: string,
     requestId: string = randomUUID()
   ): Promise<ProjectUpdate> {
-    return this.locked(`prepare:${uuid(requestId)}`, async () => {
+    return this.locked(projectId, `prepare:${uuid(requestId)}`, async () => {
       const requestDigest = createHash('sha256').update(`rebase:${projectId}:${id}`).digest('hex');
       const existing = await readJson<StoredUpdate>(
         this.file(projectId, `updates/${requestId}.json`)
@@ -645,7 +676,7 @@ export class ProjectUpdatesManager {
       };
       await this.save(update);
       this.#live.set(update.id, update);
-      this.launch(update.id, async () => {
+      this.launch(projectId, update.id, async () => {
         try {
           if (previous.state === 'failed') await this.capture(update);
           else await this.assemble(update);
@@ -675,7 +706,8 @@ export class ProjectUpdatesManager {
     );
     if (!files.length) throw new Error('No published files match those paths');
     const baselineFile = this.file(projectId, `baselines/${workspaceId}.json`);
-    return this.locked(`checkout:${workspaceId}`, async () => {
+    return this.locked(projectId, `checkout:${workspaceId}`, async () => {
+      await this.retention(projectId).assertAvailable(id);
       const baseline = (await readJson<{ revision: string | null; files: VersionTree }>(
         baselineFile
       )) ?? { revision: null, files: {} };
@@ -714,7 +746,7 @@ export class ProjectUpdatesManager {
     checkId: string,
     expectedDigest: string
   ): Promise<ProjectUpdate> {
-    return this.locked(`update:${id}`, async () => {
+    return this.locked(projectId, `update:${id}`, async () => {
       const update = await this.update(projectId, id);
       const check = update.checks.find((item) => item.id === checkId);
       if (!check || !update.candidateDigest || update.candidateDigest !== expectedDigest)
@@ -734,7 +766,7 @@ export class ProjectUpdatesManager {
       update.state = 'checking';
       this.#watching.set(id, projectId);
       await this.save(update);
-      this.launch(check.id, async () => {
+      this.launch(projectId, check.id, async () => {
         const progress = {
           files: 0,
           bytes: 0,
@@ -776,7 +808,7 @@ export class ProjectUpdatesManager {
             check,
             `check-${check.id}`
           );
-          await this.locked(`update:${id}`, async () => {
+          await this.locked(projectId, `update:${id}`, async () => {
             const current = await this.update(projectId, id),
               saved = current.checks.find((item) => item.id === check.id)!;
             this.#preparations.delete(check.id);
@@ -789,7 +821,7 @@ export class ProjectUpdatesManager {
             await this.save(current);
           });
         } catch (error) {
-          await this.locked(`update:${id}`, async () => {
+          await this.locked(projectId, `update:${id}`, async () => {
             const current = await this.update(projectId, id),
               saved = current.checks.find((item) => item.id === check.id)!;
             this.#preparations.delete(check.id);
@@ -841,7 +873,7 @@ export class ProjectUpdatesManager {
       if (process.status === 'completed' && process.exitCode === 0) {
         check.status = 'verifying';
         check.detail = 'Command exited successfully. Verifying the captured source files.';
-        this.launch(check.id, async () => {
+        this.launch(update.projectId, check.id, async () => {
           let status: 'passed' | 'invalidated' | 'failed' = 'failed';
           let detail: string | null = null;
           try {
@@ -858,7 +890,7 @@ export class ProjectUpdatesManager {
           } catch (error) {
             detail = String(error);
           }
-          await this.locked(`update:${update.id}`, async () => {
+          await this.locked(update.projectId, `update:${update.id}`, async () => {
             const current = await this.update(update.projectId, update.id),
               saved = current.checks.find((item) => item.id === check.id)!;
             if (current.state === 'cancelled' || this.#cancelled.has(check.id)) return;
@@ -907,7 +939,7 @@ export class ProjectUpdatesManager {
     return update;
   }
   async inspect(projectId: string, id: string, changesAfter?: string): Promise<ProjectUpdate> {
-    return this.locked(`update:${id}`, async () => {
+    return this.locked(projectId, `update:${id}`, async () => {
       const update = await this.refresh(await this.update(projectId, id));
       const view = this.view(update, changesAfter);
       if (
@@ -927,7 +959,7 @@ export class ProjectUpdatesManager {
     checkId: string,
     stop = false
   ): Promise<CheckProcess | { status: string }> {
-    return this.locked(`update:${id}`, async () => {
+    return this.locked(projectId, `update:${id}`, async () => {
       const update = await this.update(projectId, id),
         check = update.checks.find((item) => item.id === checkId);
       if (!check) throw new Error('Project check not found');
@@ -947,7 +979,7 @@ export class ProjectUpdatesManager {
     });
   }
   async cancel(projectId: string, id: string): Promise<ProjectUpdate> {
-    return this.locked(`update:${id}`, async () => {
+    return this.locked(projectId, `update:${id}`, async () => {
       const update = await this.update(projectId, id);
       if (update.state === 'published')
         throw new Error('Published versions stay available to running work');
@@ -972,8 +1004,8 @@ export class ProjectUpdatesManager {
     expectedDigest: string,
     uncheckedReason?: string
   ): Promise<ProjectRevision> {
-    return this.locked(projectId, () =>
-      this.locked(`update:${id}`, async () => {
+    return this.locked(projectId, projectId, () =>
+      this.locked(projectId, `update:${id}`, async () => {
         const registry = await this.registry(projectId);
         const head = registry.head ? await this.revision(projectId, registry.head) : null;
         const update = await this.refresh(await this.update(projectId, id));
@@ -985,8 +1017,9 @@ export class ProjectUpdatesManager {
           update.state = 'published';
           update.publishedRevision = revision.id;
           await this.save(update);
-          await this.advanceBaseline(projectId, registry, update, revision.id);
-          return this.revisionView(revision);
+          const archive = await this.retention(projectId).status(revision.id);
+          if (!archive) await this.advanceBaseline(projectId, registry, update, revision.id);
+          return { ...this.revisionView(revision), ...(archive ? { archive } : {}) };
         }
         if (update.candidateDigest !== expectedDigest || update.parentRevision !== registry.head)
           throw new Error('The project version changed. Rebuild and check the combined update.');

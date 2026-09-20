@@ -170,6 +170,15 @@ it('does not expose trusted lifecycle or network overrides in command requests',
 
 it.each([
   {
+    output:
+      'process-isolation=yes\nnetwork-isolation=yes\nretained-process-trees=yes\nproject-input-locks=yes\n',
+    exit: 0,
+    process: true,
+    network: true,
+    retained: true,
+    inputLocks: true
+  },
+  {
     output: 'process-isolation=yes\nnetwork-isolation=yes\nretained-process-trees=yes\n',
     exit: 0,
     process: true,
@@ -224,6 +233,21 @@ it.each([
   expect(await probeNativeIsolation({ ...sandbox, elevate: helper })).toEqual({
     processIsolation: value.process,
     networkIsolation: value.network,
-    retainedProcessTrees: 'retained' in value && value.retained
+    retainedProcessTrees: 'retained' in value && value.retained,
+    projectInputLocks: 'inputLocks' in value && value.inputLocks
   });
+});
+
+it('supervises ordinary confined commands when native input protection is measured', async () => {
+  const { root, policy } = await fixture();
+  const invocation = await prepareInvocation(root, request(), {
+    ...policy,
+    sandbox: { ...policy.sandbox!, projectInputLocks: true }
+  });
+  try {
+    expect(invocation.processTreeLease).toMatch(/\.lease$/);
+    expect(invocation.args.slice(2, 5)).toEqual(['run', 'network', 'mission']);
+  } finally {
+    await discardMissionInvocation(invocation);
+  }
 });

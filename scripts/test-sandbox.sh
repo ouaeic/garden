@@ -92,8 +92,9 @@ exec "$@"'
 cat >"$fake_bin/mission-supervisor.py" <<'PYTHON'
 import json, os, stat, sys
 fd, gate = int(sys.argv[1]), int(sys.argv[2])
-inputs = json.loads(sys.argv[3])
+inputs = json.loads(sys.argv[3])["inputs"]
 assert all(stat.S_ISDIR(os.fstat(item).st_mode) for item in inputs)
+os.lseek(fd, 0, os.SEEK_SET)
 record = json.loads(os.read(fd, 8192))
 if record["phase"] != "prepared" or os.read(gate, 16) != b"go":
     raise RuntimeError("Mission was not authorized to launch")

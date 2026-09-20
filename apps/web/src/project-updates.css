@@ -103,6 +103,25 @@
 .project-version-pin-actions {
   flex-shrink: 0;
 }
+.project-version-select {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex: 0 0 auto;
+}
+.project-version-archive-preview {
+  margin: 0;
+  padding-left: 1.3rem;
+  max-height: 45vh;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+.project-version-archive-preview > li {
+  padding: 0.65rem 0.3rem;
+}
+.project-version-archive-preview > li > span {
+  display: block;
+  margin-top: 0.35rem;
+}
 .project-update-list {
   display: grid;
   gap: 0.6rem;

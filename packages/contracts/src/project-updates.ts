@@ -1,4 +1,5 @@
 import type { ProcessResourceSample } from './processes.js';
+import type { ProjectVersionArchive } from './project-retention.js';
 import { z } from 'zod';
 
 const ProjectPath = z
@@ -184,6 +185,7 @@ export interface ProjectRevision {
   checks: ProjectCheck[];
   uncheckedReason: string | null;
   pin?: ProjectVersionPin | null;
+  archive?: ProjectVersionArchive | null;
 }
 export interface ProjectUpdates {
   head: ProjectRevision | null;

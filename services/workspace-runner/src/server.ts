@@ -4,7 +4,7 @@ import { WorkflowManager } from './workflows.js';
 import { registerWorkflowRoutes } from './workflow-routes.js';
 import { registerDocumentRoutes } from './document-routes.js';
 import { registerBrowserActionRoutes } from './browser-action-routes.js';
-import { connectProcessSupervisor } from './process-supervisor.js';
+import { connectProcessSupervisor, type ProcessService } from './process-supervisor.js';
 import { OwnerStroke } from '@athanor/contracts';
 import { ProjectUpdatesManager } from './project-updates.js';
 import { registerProjectUpdateRoutes } from './project-update-routes.js';
@@ -16,7 +16,8 @@ import {
   freezeMissionWorkspace,
   managedWorkspaceBusy,
   quiesceManagedChildren,
-  recoverMissionProcesses
+  recoverMissionProcesses,
+  assertProjectReferencesIdle
 } from './mission-processes.js';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -700,30 +701,46 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
     ]
   });
   registerProjectWorkspaceRoutes(app, projectWorkspaces);
-  const projectUpdates = new ProjectUpdatesManager(config.WORKSPACE_ROOT, {
-    start: async (workspaceId, taskId, command, job) => {
-      if (!sandbox?.confineFilesystem || !sandbox.processIsolation || !sandbox.networkIsolation)
-        throw new Error(
-          'Project checks require measured filesystem, network and process-tree isolation'
+  const projectUpdates = new ProjectUpdatesManager(
+    config.WORKSPACE_ROOT,
+    {
+      start: async (workspaceId, taskId, command, job) => {
+        if (!sandbox?.confineFilesystem || !sandbox.processIsolation || !sandbox.networkIsolation)
+          throw new Error(
+            'Project checks require measured filesystem, network and process-tree isolation'
+          );
+        const root = workspacePath(config.WORKSPACE_ROOT, workspaceId);
+        await assertHostStorageWrite(root, 0, probeHostStorage);
+        return processes.start(
+          root,
+          workspaceId,
+          taskId,
+          { executable: command.executable, args: command.args, cwd: command.cwd, job },
+          config.MAX_BACKGROUND_SECONDS,
+          config.ISOLATE_AGENT_NETWORK,
+          { ...guards, superviseProcessTree: true }
         );
-      const root = workspacePath(config.WORKSPACE_ROOT, workspaceId);
-      await assertHostStorageWrite(root, 0, probeHostStorage);
-      return processes.start(
-        root,
-        workspaceId,
-        taskId,
-        { executable: command.executable, args: command.args, cwd: command.cwd, job },
-        config.MAX_BACKGROUND_SECONDS,
-        config.ISOLATE_AGENT_NETWORK,
-        { ...guards, superviseProcessTree: true }
-      );
+      },
+      poll: (workspaceId, taskId, sessionId, logs) =>
+        processes.readAction(workspaceId, taskId, sessionId, { action: logs ? 'log' : 'poll' }),
+      stop: async (workspaceId, taskId, sessionId) => {
+        await processes.action(workspaceId, taskId, sessionId, { action: 'kill' });
+      }
     },
-    poll: (workspaceId, taskId, sessionId, logs) =>
-      processes.readAction(workspaceId, taskId, sessionId, { action: logs ? 'log' : 'poll' }),
-    stop: async (workspaceId, taskId, sessionId) => {
-      await processes.action(workspaceId, taskId, sessionId, { action: 'kill' });
+    async (projectId) => {
+      if (!sandbox) throw new Error('Project archive requires verified native input protection.');
+      if (config.JOB_SUPERVISOR_SOCKET) {
+        const protection = await (processes as ProcessService)
+          .projectInputProtection()
+          .catch(() => null);
+        if (protection?.protocol !== 1 || protection.available !== true)
+          throw new Error(
+            'The job controller cannot verify input protection yet. Its running work will be left undisturbed.'
+          );
+      }
+      await assertProjectReferencesIdle(sandbox, projectId);
     }
-  });
+  );
   await projectUpdates.restore((error) =>
     app.log.warn({ err: error }, 'Project check status could not be refreshed')
   );

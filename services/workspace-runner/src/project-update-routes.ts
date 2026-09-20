@@ -1,5 +1,5 @@
 import { registerFileReadRoutes } from './file-downloads.js';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import {
   ProjectUpdateAction,
@@ -10,6 +10,43 @@ import { requireScope } from './auth.js';
 import type { ProjectUpdatesManager } from './project-updates.js';
 
 export function registerProjectUpdateRoutes(app: FastifyInstance, manager: ProjectUpdatesManager) {
+  const ownerRetention = async (
+    request: FastifyRequest,
+    scope: 'project.updates.read' | 'project.updates.write'
+  ) => {
+    requireScope(request, scope);
+    const { projectId, workspaceId } = z
+      .object({ projectId: z.uuid(), workspaceId: z.uuid() })
+      .parse(request.params);
+    if (
+      request.capability.role !== 'user' ||
+      (await manager.projectWorkspace(projectId)) !== workspaceId
+    )
+      throw new Error('Project archiving requires the project owner');
+    return manager.retention(projectId);
+  };
+  app.post('/v1/workspaces/:workspaceId/projects/:projectId/retention/preview', async (request) => {
+    return (await ownerRetention(request, 'project.updates.read')).preview(request.body);
+  });
+  app.post('/v1/workspaces/:workspaceId/projects/:projectId/retention/archive', async (request) => {
+    const retention = await ownerRetention(request, 'project.updates.write');
+    const result = await retention.archive(request.body);
+    return {
+      ...result,
+      revisions: await Promise.all(
+        result.versions.map((id) => manager.version(retention.projectId, id))
+      )
+    };
+  });
+  app.post('/v1/workspaces/:workspaceId/projects/:projectId/retention/restore', async (request) => {
+    const retention = await ownerRetention(request, 'project.updates.write');
+    const { revisionId, requestId } = z
+      .object({ revisionId: z.uuid(), requestId: z.uuid() })
+      .strict()
+      .parse(request.body);
+    await retention.restore(revisionId, requestId);
+    return { restored: true, revision: await manager.version(retention.projectId, revisionId) };
+  });
   app.get<{ Params: { workspaceId: string; projectId: string } }>(
     '/v1/workspaces/:workspaceId/projects/:projectId/storage',
     async (request) => {
@@ -83,7 +120,9 @@ export function registerProjectUpdateRoutes(app: FastifyInstance, manager: Proje
         (await manager.projectWorkspace(params.projectId)) !== params.workspaceId
       )
         throw new Error('Project files require the owner and project working area');
-      return manager.revisionRoot(params.projectId, params.revisionId);
+      return manager.openFiles(params.projectId, () =>
+        manager.revisionRoot(params.projectId, params.revisionId)
+      );
     }
   );
   registerFileReadRoutes(
@@ -103,7 +142,9 @@ export function registerProjectUpdateRoutes(app: FastifyInstance, manager: Proje
         (await manager.projectWorkspace(params.projectId)) !== params.workspaceId
       )
         throw new Error('Check files require the project owner');
-      return manager.checkRoot(params.projectId, params.updateId, params.checkId);
+      return manager.openFiles(params.projectId, () =>
+        manager.checkRoot(params.projectId, params.updateId, params.checkId)
+      );
     }
   );
   app.put<{ Params: { workspaceId: string; projectId: string } }>(

@@ -393,6 +393,33 @@ jobs. Declaring recovery is a safeguard against interruption, not permission to 
 work. [Operations](OPERATIONS.md#what-an-update-stops-and-what-comes-back) describes the update gate
 and the explicit operator override.
 
+## Recoverable project history
+
+Published version files can be archived from project history after the owner reviews an exact
+selection. Applying the preview verifies its digest against current references. The current head,
+pins, working baselines and unfinished updates retain their inputs. Unknown or unreadable reference
+metadata prevents archiving.
+
+Confined commands hold shared locks on their granted project directories in the native supervisor.
+The lock descriptors are separate from the descriptors inherited by command children. The native
+lease records the granted projects; membership changes do not release a running reader. Destructive
+maintenance requires an exclusive directory lock and verified native teardown evidence. An
+independent job controller must advertise measured input protection before archiving is enabled.
+Foreground commands, persistent interpreters and managed jobs enter this protection without adding
+a workload deadline or limiting their compute resources. Queued project operations and streamed
+version downloads retain their own references until they finish or abort.
+
+Archiving preserves lineage and summary records while moving the immutable tree into project-local
+recoverable storage. Its durable manifest binds the source identity and request, allowing retries
+after an interrupted move. Archived file requests return restore guidance. Restore verifies file
+contents and performs an atomic move that refuses an occupied destination. Restore coordinates
+through private metadata and can proceed while ordinary input readers remain active.
+
+Archiving does not free disk space. Shared content objects, candidates, check workspaces and
+recoverable version trees remain retained; permanent purge and object garbage collection require a
+separate retention policy. These protections cover managed input grants, not out-of-band root or
+owner filesystem operations.
+
 ## Web search
 
 `web_search` is one call that returns a page of ranked results — rank, title, url, site and snippet —

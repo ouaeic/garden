@@ -2410,3 +2410,9 @@ export * from './project-sessions.js';
 
 export * from './workflows.js';
 export { ProjectStorageUsage } from './project-storage.js';
+export { ProjectRetentionSelection, ProjectRetentionApply } from './project-retention.js';
+export type {
+  ProjectRetentionPreview,
+  ProjectVersionArchive,
+  ProjectRetentionResult
+} from './project-retention.js';
