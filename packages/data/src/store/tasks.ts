@@ -1645,6 +1645,7 @@ export class TaskStore {
            AND t.lease_owner IS NULL AND t.lease_expires_at IS NULL AND t.attempt>0
            AND t.updated_at=$3::timestamptz
            AND t.agent_state_ciphertext IS NOT DISTINCT FROM $4::jsonb
+           AND EXISTS (SELECT 1 FROM workspaces w WHERE w.id=t.workspace_id AND w.user_id=$2)
            AND NOT EXISTS (SELECT 1 FROM coding_families f
              WHERE f.parent_task_id=t.id AND f.wait_requested=TRUE)
            AND (t.parent_mission_id IS NULL OR EXISTS (

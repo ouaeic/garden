@@ -168,7 +168,7 @@ export const createProviderWallMaintenance = (context: SupportedContext) => {
       const taskId = String(row.task_id);
       const userId = String(row.user_id);
       const workspace = await store.getWorkspaceById(String(row.workspace_id));
-      if (!workspace?.wrappedKey) continue;
+      if (!workspace?.wrappedKey || workspace.userId !== userId) continue;
       const key = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
       const code = await providerWallCode(taskId, key, row.agent_state_ciphertext);
       if (!code) continue;
@@ -249,7 +249,7 @@ export const createProviderWallMaintenance = (context: SupportedContext) => {
       for (const row of parked.rows) {
         const taskId = String(row.task_id);
         const workspace = await store.getWorkspaceById(String(row.workspace_id));
-        if (!workspace?.wrappedKey) continue;
+        if (!workspace?.wrappedKey || workspace.userId !== userId) continue;
         const key = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
         const code = await providerWallCode(taskId, key, row.agent_state_ciphertext);
         if (!code || !providerWalls[code]) continue;

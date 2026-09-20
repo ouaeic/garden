@@ -157,7 +157,8 @@ describe('provider recovery preserves the reason a task is waiting', () => {
         'timestamp',
         'lease',
         'children',
-        'sealed_child'
+        'sealed_child',
+        'workspace_owner'
       ]) {
         const f = await fixture();
         const before = await store.listTaskEvents(f.task.id);
@@ -190,7 +191,16 @@ describe('provider recovery preserves the reason a task is waiting', () => {
                 'INSERT INTO coding_families(parent_task_id,ceiling_credits,initial_credits,wait_requested) VALUES ($1,1,0,TRUE)',
                 [f.task.id]
               );
-            else if (change === 'sealed_child')
+            else if (change === 'workspace_owner') {
+              const other = await store.createUser({
+                username: randomUUID(),
+                displayName: 'Other owner'
+              });
+              await database.query('UPDATE workspaces SET user_id=$2 WHERE id=$1', [
+                f.task.workspaceId,
+                other.id
+              ]);
+            } else if (change === 'sealed_child')
               await database.query('UPDATE tasks SET parent_mission_id=$2 WHERE id=$1', [
                 f.task.id,
                 randomUUID()
@@ -200,10 +210,18 @@ describe('provider recovery preserves the reason a task is waiting', () => {
           });
         expect(await recover(mode, f.user.id), change).toBe(0);
         expect(spy).toHaveBeenCalledOnce();
-        expect((await store.getTask(f.user.id, f.task.id))?.status).not.toBe('queued');
+        expect(
+          (await database.query('SELECT status FROM tasks WHERE id=$1', [f.task.id])).rows[0]
+            ?.status
+        ).toBe(
+          ['paused', 'cancelled', 'completed'].includes(change) ? change : 'awaiting_resource'
+        );
         expect(await store.listTaskEvents(f.task.id)).toEqual(before);
         spy.mockRestore();
-        await store.setTaskStatusForUser(f.user.id, f.task.id, 'paused');
+        await database.query(
+          "UPDATE tasks SET status='paused',lease_owner=NULL,lease_expires_at=NULL WHERE id=$1",
+          [f.task.id]
+        );
       }
     }
   );
@@ -242,6 +260,24 @@ describe('provider recovery preserves the reason a task is waiting', () => {
     ).toBe(false);
     expect(await store.listTaskEvents(f.task.id)).toEqual(before);
   });
+
+  it.each(['retry', 'credentials'])(
+    'keeps %s off a workspace owned by someone else',
+    async (mode) => {
+      const f = await fixture();
+      const other = await store.createUser({ username: randomUUID(), displayName: 'Other owner' });
+      await database.query('UPDATE workspaces SET user_id=$2 WHERE id=$1', [
+        f.task.workspaceId,
+        other.id
+      ]);
+      const before = await store.listTaskEvents(f.task.id);
+      expect(await recover(mode, f.user.id)).toBe(0);
+      expect(
+        (await database.query('SELECT status FROM tasks WHERE id=$1', [f.task.id])).rows[0]?.status
+      ).toBe('awaiting_resource');
+      expect(await store.listTaskEvents(f.task.id)).toEqual(before);
+    }
+  );
 
   it('rotates retry scans past a full page of analysis waits', async () => {
     const fixtures = [];
