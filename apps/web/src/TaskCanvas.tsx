@@ -367,7 +367,7 @@ export function TaskOutputs({
           {files.map((item) => (
             <article key={item.id} className="garden-delivery">
               <FileText size={20} />
-              <div>
+              <div className="garden-delivery-details">
                 <strong>{item.title}</strong>
                 <small>
                   {item.path?.replace(/^workspace\//, '') ?? item.mimeType ?? 'Artifact'}
@@ -376,17 +376,19 @@ export function TaskOutputs({
                 </small>
                 {item.detail && <small>{item.detail}</small>}
               </div>
-              {onDiscuss && <Button onClick={() => onDiscuss(item)}>Discuss</Button>}
-              {onRemember && <Button onClick={() => onRemember(item)}>Keep a note</Button>}
-              {item.artifactId && (
-                <Button onClick={() => onArtifact(item.artifactId!)}>View</Button>
-              )}
-              {item.downloadUrl && item.status !== 'unavailable' && (
-                <a className="button" href={item.downloadUrl} download={item.title}>
-                  <Download size={15} />
-                  <span>Download</span>
-                </a>
-              )}
+              <div className="garden-delivery-actions">
+                {onDiscuss && <Button onClick={() => onDiscuss(item)}>Discuss</Button>}
+                {onRemember && <Button onClick={() => onRemember(item)}>Keep a note</Button>}
+                {item.artifactId && (
+                  <Button onClick={() => onArtifact(item.artifactId!)}>View</Button>
+                )}
+                {item.downloadUrl && item.status !== 'unavailable' && (
+                  <a className="button" href={item.downloadUrl} download={item.title}>
+                    <Download size={15} />
+                    <span>Download</span>
+                  </a>
+                )}
+              </div>
             </article>
           ))}
         </div>

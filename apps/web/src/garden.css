@@ -597,11 +597,13 @@
   height: min(72dvh, 900px);
 }
 .garden-delivery-list {
+  container-type: inline-size;
   display: grid;
   gap: 8px;
 }
 .garden-delivery {
-  display: flex;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
   border: 1px solid var(--line);
@@ -612,19 +614,30 @@
   color: var(--muted);
   flex-shrink: 0;
 }
-.garden-delivery > div {
+.garden-delivery-details {
   min-width: 0;
-  flex: 1;
+}
+.garden-delivery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.garden-delivery-actions:empty {
+  display: none;
 }
 .garden-delivery strong {
-  font-size: 12px;
-  font-weight: 400;
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 .garden-delivery small {
   display: block;
   color: var(--dim);
-  font-size: 10px;
+  font-size: 11px;
+  line-height: 1.5;
   overflow-wrap: anywhere;
   margin-top: 3px;
 }
@@ -634,6 +647,19 @@
   min-height: 32px;
   text-decoration: none;
   flex-shrink: 0;
+}
+@container (max-width: 38rem) {
+  .garden-delivery {
+    grid-template-columns: 20px minmax(0, 1fr);
+  }
+  .garden-delivery-actions {
+    grid-column: 2 / -1;
+    justify-content: flex-start;
+  }
+  .garden-delivery-actions .button {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
 .garden-progress {
   min-width: 0;
