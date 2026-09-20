@@ -479,10 +479,29 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
     await kernel.getByText('Calculating percentages', { exact: true }).waitFor();
     await computation.screenshot({ path: resolve(report, 'project-r-session-360.png') });
     await kernel.getByRole('button', { name: 'End session…', exact: true }).click();
-    await kernel.getByRole('button', { name: 'Keep session', exact: true }).click();
+    const endDialog = page.getByRole('dialog', { name: 'End Retained R analysis?', exact: true });
+    await endDialog.waitFor();
+    await endDialog.getByRole('button', { name: 'Keep session', exact: true }).click();
+    assert(
+      await kernel
+        .getByRole('button', { name: 'End session…', exact: true })
+        .evaluate((element) => document.activeElement === element),
+      'Cancelling session termination returns keyboard focus to its opener'
+    );
     assert.equal(fixture.computationSessions[0].state, 'idle');
     await kernel.getByRole('button', { name: 'End session…', exact: true }).click();
-    await kernel.getByRole('button', { name: 'End session', exact: true }).click();
+    await endDialog.waitFor();
+    await page.keyboard.press('Escape');
+    await endDialog.waitFor({ state: 'detached' });
+    assert(
+      await kernel
+        .getByRole('button', { name: 'End session…', exact: true })
+        .evaluate((element) => document.activeElement === element),
+      'Escape cancels session termination and returns focus without stopping the session'
+    );
+    assert.equal(fixture.computationSessions[0].state, 'idle');
+    await kernel.getByRole('button', { name: 'End session…', exact: true }).click();
+    await endDialog.getByRole('button', { name: 'End session', exact: true }).click();
     await kernel.waitFor({ state: 'detached' });
     await computation.getByRole('button', { name: 'Show ended sessions (1)', exact: true }).click();
     await kernel.waitFor();

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import type { ComputationSession } from '@athanor/contracts';
 import { get, post } from '../client';
+import { Dialog } from '../ui';
 import { bytes, message } from './format';
 import { useVisibleClock } from '../visible-clock';
 import { computationActive, processDuration, processMemory } from '../process-display';
@@ -52,9 +53,10 @@ export function ComputationCard({
             {processMemory(sample.residentBytes)}
           </summary>
           <p className="muted">
-            Sampled {new Date(sample.sampledAt).toLocaleString()} · {sample.processCount} processes,{' '}
-            {sample.threadCount} threads. CPU is averaged between samples; 100% is one core. Shared
-            memory may be counted more than once.
+            Sampled {new Date(sample.sampledAt).toLocaleString()} · {sample.processCount}{' '}
+            {sample.processCount === 1 ? 'process' : 'processes'}, {sample.threadCount}{' '}
+            {sample.threadCount === 1 ? 'thread' : 'threads'}. CPU is averaged between samples; 100%
+            is one core. Shared memory may be counted more than once.
           </p>
         </details>
       )}
@@ -141,11 +143,8 @@ export function ComputationCard({
         </div>
       )}
       {confirmStop && active && (
-        <div className="computer-confirm" role="alert">
-          <p>
-            End this session? Values held in memory will be lost. Saved files and checkpoints remain
-            available.
-          </p>
+        <Dialog title={`End ${session.name}?`} onClose={() => setConfirmStop(false)}>
+          <p>Values held in memory will be lost. Saved files and checkpoints remain available.</p>
           <div className="row">
             <button className="button" disabled={busy} onClick={() => setConfirmStop(false)}>
               Keep session
@@ -161,7 +160,7 @@ export function ComputationCard({
               End session
             </button>
           </div>
-        </div>
+        </Dialog>
       )}
     </article>
   );
