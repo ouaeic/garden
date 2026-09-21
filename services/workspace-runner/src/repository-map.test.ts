@@ -13,7 +13,10 @@ const nativeMapper = () =>
     const request = ExecRequest.parse(input);
     return execute(
       root,
-      { ...request, executable: request.executable === 'rg' ? rgBinary : request.executable },
+      {
+        ...request,
+        executable: request.executable === '/usr/bin/rg' ? rgBinary : request.executable
+      },
       options
     );
   });

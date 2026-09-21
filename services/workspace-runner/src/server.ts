@@ -1,5 +1,6 @@
 import { ProcessHistoryQuery } from '@athanor/contracts';
 import { RepositoryMapper, registerRepositoryMapRoute } from './repository-map.js';
+import { registerRepositoryGitRoute } from './repository-git.js';
 import { WorkflowManager } from './workflows.js';
 import { registerWorkflowRoutes } from './workflow-routes.js';
 import { registerDocumentRoutes } from './document-routes.js';
@@ -1224,6 +1225,11 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
   registerRepositoryMapRoute(app, config.WORKSPACE_ROOT, repositoryMapper, {
     maximumSeconds: config.MAX_EXECUTION_SECONDS,
     isolateNetwork: config.ISOLATE_AGENT_NETWORK,
+    sandbox,
+    guards
+  });
+  registerRepositoryGitRoute(app, config.WORKSPACE_ROOT, {
+    maximumSeconds: config.MAX_EXECUTION_SECONDS,
     sandbox,
     guards
   });

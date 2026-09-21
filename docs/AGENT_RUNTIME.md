@@ -808,3 +808,7 @@ clocks. Model attempts and tool observations receive structural checks only. Rep
 a recorded tool, contacts a model or reconstructs the complete agent loop. Unsupported formats,
 missing records, open segments and changed decisions are reported rather than counted as agreement.
 A recording that starts or stops during a turn may deliberately contain an unfinished segment.
+
+### Repository metadata isolation
+
+Repository overview reads Git metadata through a confined native reader, with file changes denied, network isolation required and further program execution blocked after Git starts. Repository-configured filesystem monitors, filters and helpers do not receive execution authority from an overview request. A required filter or unavailable isolation produces an explicit metadata limitation; the source map remains available. Metadata reads do not refresh the index on disk. Source searches use the installed system ripgrep rather than a workspace-provided executable. Ordinary governed project commands retain their existing capabilities.

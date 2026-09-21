@@ -149,7 +149,7 @@ export class RepositoryMapper {
       const listing = await this.run(
         root,
         {
-          executable: 'rg',
+          executable: '/usr/bin/rg',
           args: [
             '--files',
             '--null',

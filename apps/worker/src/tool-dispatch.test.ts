@@ -1410,7 +1410,7 @@ describe('the repository arms', () => {
         path: `${root}/exec`,
         scopes: ['exec'],
         body: {
-          executable: 'rg',
+          executable: '/usr/bin/rg',
           args: [
             '--line-number',
             '--column',
@@ -1490,7 +1490,7 @@ describe('the repository arms', () => {
     );
     const symbols = executed.calls
       .map((entry) => entry.body as { executable: string; args: string[] })
-      .find((body) => body.executable === 'rg' && !body.args.includes('--files'));
+      .find((body) => body.executable === '/usr/bin/rg' && !body.args.includes('--files'));
     expect(symbols?.args.join(' ')).toContain('--sort path');
   });
 
@@ -1499,11 +1499,10 @@ describe('the repository arms', () => {
       { name: 'repo_overview', arguments: { path: 'workspace/app' } },
       {
         route: (url, init) => {
+          if (url.endsWith(`${root}/repository-git`))
+            return json({ status: '## main\n M a.ts\n', files: 'a.ts\0b.ts\0', limited: false });
           if (!url.endsWith(`${root}/exec`)) return undefined;
           const body = requestBody(init) as { executable: string; args: string[] };
-          if (body.executable === 'git' && body.args[0] === 'status')
-            return observation({ stdout: '## main\n M a.ts\n' });
-          if (body.executable === 'git') return observation({ stdout: 'a.ts\nb.ts\n' });
           if (body.args.includes('--files')) return observation({ stdout: 'README.md\n' });
           return observation({ stdout: 'a.ts:1:export const one = 1\n' });
         }
@@ -1511,25 +1510,24 @@ describe('the repository arms', () => {
     );
 
     const commands = executed.calls.filter((entry) => entry.path === `${root}/exec`);
-    expect(commands).toHaveLength(5);
+    expect(commands).toHaveLength(3);
     expect(commands.map((entry) => (entry.body as { executable: string }).executable)).toEqual([
-      'git',
-      'git',
-      'rg',
-      'rg',
-      'rg'
+      '/usr/bin/rg',
+      '/usr/bin/rg',
+      '/usr/bin/rg'
     ]);
     expect(commands.every((entry) => entry.scopes.join() === 'exec')).toBe(true);
     expect(executed.calls.filter((entry) => entry.path === `${root}/repository-map`)).toMatchObject(
       [{ scopes: ['files.read'], body: { path: 'workspace/app', query: '', maxSymbols: 120 } }]
     );
-    expect(executed.calls[0]?.body).toEqual({
-      executable: 'git',
-      args: ['status', '--short', '--branch'],
-      cwd: 'workspace/app',
-      timeoutSeconds: 90
-    });
-    expect(executed.calls[1]?.body).toMatchObject({ args: ['ls-files', '-z'] });
+    expect(executed.calls.filter((entry) => entry.path === `${root}/repository-git`)).toEqual([
+      {
+        method: 'POST',
+        path: `${root}/repository-git`,
+        scopes: ['files.read'],
+        body: { path: 'workspace/app' }
+      }
+    ]);
     expect(executed.result).toMatchObject({
       path: 'workspace/app',
       versionControl: '## main\n M a.ts',

@@ -79,9 +79,31 @@ export async function repositoryOverview(
       cwd: path,
       timeoutSeconds: 90
     });
-  const [status, tracked, structure, instructions] = await Promise.all([
-    run('git', ['status', '--short', '--branch']),
-    run('git', ['ls-files', '-z']),
+  const [git, structure, instructions] = await Promise.all([
+    context.runner
+      .call<{ status: string; files: string; limited: boolean; reason?: string }>(
+        task.workspaceId,
+        task.id,
+        'files.read',
+        `${root}/repository-git`,
+        { path }
+      )
+      .then((value) => {
+        if (
+          !value ||
+          typeof value.status !== 'string' ||
+          typeof value.files !== 'string' ||
+          typeof value.limited !== 'boolean'
+        )
+          throw new Error('Invalid repository metadata');
+        return value;
+      })
+      .catch(() => ({
+        status: '',
+        files: '',
+        limited: true,
+        reason: 'Read-only Git metadata is unavailable.'
+      })),
     context.runner
       .call<unknown>(task.workspaceId, task.id, 'files.read', `${root}/repository-map`, {
         path,
@@ -90,7 +112,7 @@ export async function repositoryOverview(
       })
       .then(asRecord)
       .catch(() => null),
-    run('rg', [
+    run('/usr/bin/rg', [
       '--files',
       ...SETTLED_ORDER,
       '--glob',
@@ -108,9 +130,9 @@ export async function repositoryOverview(
     ])
   ]);
   const paths = (value: string) => value.split(value.includes('\0') ? '\0' : '\n').filter(Boolean);
-  let files = paths(tracked.stdout);
+  let files = paths(git.files);
   if (!files.length)
-    files = paths((await run('rg', ['--files', '--null', ...SETTLED_ORDER])).stdout);
+    files = paths((await run('/usr/bin/rg', ['--files', '--null', ...SETTLED_ORDER])).stdout);
   const structural =
     structure?.engine === 'tree-sitter' &&
     Array.isArray(structure.importantSymbols) &&
@@ -128,7 +150,7 @@ export async function repositoryOverview(
     Number(coverage?.truncatedFileCount) > 0
   ) {
     const [symbols, imports] = await Promise.all([
-      run('rg', [
+      run('/usr/bin/rg', [
         '--line-number',
         '--no-heading',
         ...SETTLED_ORDER,
@@ -138,7 +160,7 @@ export async function repositoryOverview(
         SYMBOL_SWEEP_PATTERN,
         '.'
       ]),
-      run('rg', [
+      run('/usr/bin/rg', [
         '--multiline',
         '--no-filename',
         '--no-line-number',
@@ -161,7 +183,8 @@ export async function repositoryOverview(
   }
   return boundRepositoryOverview({
     path,
-    versionControl: status.stdout.trim() || 'No Git working tree detected',
+    versionControl: git.status.trim() || git.reason || 'No Git working tree detected',
+    ...(git.limited ? { versionControlLimited: true, versionControlLimitation: git.reason } : {}),
     files: strideAcross(files, maxFiles),
     fileCount: files.length,
     filesTruncated: files.length > maxFiles,

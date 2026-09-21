@@ -150,7 +150,7 @@ export async function executeRepositoryTool(
           task.id,
           'exec',
           `${root}/exec`,
-          { executable: 'rg', args, cwd: path, timeoutSeconds: 60 }
+          { executable: '/usr/bin/rg', args, cwd: path, timeoutSeconds: 60 }
         );
         if (![0, 1].includes(result.exitCode ?? -1))
           throw new AthanorError('code_search_failed', result.stderr || 'Code search failed');
