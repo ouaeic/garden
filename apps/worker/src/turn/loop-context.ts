@@ -56,8 +56,8 @@ export interface TurnLoopControl {
   drainCorrection(): Promise<boolean>;
   /** Republishes the active plan; `true` when the version moved under this turn. */
   refreshActivePlan(createFallback?: boolean): Promise<boolean>;
-  /** Re-pushes the tail block that carries the clock. Synchronous, and free where it is called. */
-  refreshRuntimeContext(): void;
+  /** Refreshes the owner's decision opt-out and the tail block that carries the clock. */
+  refreshRuntimeContext(): void | Promise<void>;
 }
 
 /** The two per-turn numbers every phase after the claim is written against. */

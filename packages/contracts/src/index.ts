@@ -1301,6 +1301,7 @@ export const UpdateProjectModelPreferences = z
   })
   .strict();
 export const ProjectModelPreferences = z.object({
+  decisionModelsEnabled: z.boolean().default(true),
   projectTaskId: z.union([Id, z.literal('')]),
   revision: z.number().int().nonnegative(),
   choices: ProjectModelChoices,
@@ -1308,6 +1309,7 @@ export const ProjectModelPreferences = z.object({
     z.object({
       purpose: ModelPurpose,
       source: z.enum(['project', 'global', 'automatic']),
+      disabled: z.boolean().optional(),
       choice: PurposeModelChoice,
       available: z.boolean(),
       reason: z.string().nullable(),
@@ -2178,6 +2180,7 @@ export const ProviderRouting = z.object({
 export type ProviderRouting = z.infer<typeof ProviderRouting>;
 
 export const OwnerPreferences = z.object({
+  decisionModelsEnabled: z.boolean().optional(),
   /** @see ProviderRouting - absent means the defaults, which is the owner's rule unchanged. */
   providerRouting: ProviderRouting.optional(),
   modelPurposes: z

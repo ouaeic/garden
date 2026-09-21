@@ -941,3 +941,13 @@ before submission. A lost reply triggers inspection of that operation rather tha
 An update is reconciled only when its operation marker and requested values are both present;
 absence after deletion establishes absence, without claiming who removed it or that notices were
 delivered. Providers without a verified conditional-event contract do not expose these mutations.
+
+### Optional decision models
+
+The owner can turn decision models off in Settings → Models. This preference overrides
+project and conversation model choices without deleting those choices. When off, automatic
+decision routing and explicit decision calls are unavailable. The model receives neither
+the decision tool definition nor its auxiliary-model roster entry. Running turns withdraw
+these at their next model step; an inference already submitted can finish. Turning the
+feature back on takes effect at the next turn. Existing conversation results remain part
+of the work history.

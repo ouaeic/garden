@@ -67,7 +67,7 @@ import {
   type PreparedContext
 } from './context.js';
 import { taskFailureRecord } from './failure-record.js';
-import { pinnedPurposeModel, taskModelRoster } from './purpose-model.js';
+import { decisionModelsEnabled, pinnedPurposeModel, taskModelRoster } from './purpose-model.js';
 import { resolveDecisionRoute } from './decision-route.js';
 import { workerLogger, type Logger } from './log.js';
 import {
@@ -1908,7 +1908,16 @@ export class AgentWorker {
       catalog,
       model.id
     ).catch(() => []);
-    const refreshRuntimeContext = (): void =>
+    const refreshRuntimeContext = async (): Promise<void> => {
+      if (
+        !run.withdrawnTools.has('decide') &&
+        !(await decisionModelsEnabled(this.store, task.userId).catch(() => false))
+      ) {
+        run.withdrawnTools.add('decide');
+        delete state.decisionFloorBindings;
+        delete state.decisionReceipts;
+        delete state.decisionRouting;
+      }
       refreshRuntimeContext_(this.#window, {
         workspace,
         task,
@@ -1918,11 +1927,14 @@ export class AgentWorker {
         machineSummary,
         unattended,
         webPlan,
-        modelRoster
+        modelRoster: run.withdrawnTools.has('decide')
+          ? modelRoster.filter((entry) => entry.purpose !== 'decisions')
+          : modelRoster
       });
+    };
     // Called here as well as in the step loop so a window saved when this block lived at index 1
     // is migrated before the preamble blocks below choose where they go.
-    refreshRuntimeContext();
+    await refreshRuntimeContext();
     // The preamble: the two frozen blocks, the recalled pack and the workspace brief, in the order
     // a provider's cache charges for. @see assemblePreamble in `window.ts`.
     await assemblePreamble(this.#window, {

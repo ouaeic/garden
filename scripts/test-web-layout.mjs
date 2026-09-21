@@ -362,7 +362,10 @@ const decisionCatalog = [
     contextTokens: 32000
   }
 ];
+let decisionModelsEnabled = true;
+let failDecisionSave = false;
 const modelSurface = (project) => ({
+  decisionModelsEnabled,
   projectTaskId: project ? task.id : '',
   revision: project ? projectRevision : 0,
   choices: project ? projectChoices : defaultChoices,
@@ -380,6 +383,17 @@ const modelSurface = (project) => ({
   ].map((purpose) => {
     const choice = (project && projectChoices[purpose]) ||
       defaultChoices[purpose] || { automatic: true, preference: 'balanced', modelId: '' };
+    if (purpose === 'decisions' && !decisionModelsEnabled)
+      return {
+        purpose,
+        choice,
+        source: 'global',
+        disabled: true,
+        options: [],
+        effective: null,
+        available: false,
+        reason: 'Decision models are turned off in Settings → Models.'
+      };
     return {
       purpose,
       source:
@@ -763,6 +777,16 @@ try {
             status: 503,
             json: { error: { message: 'Model defaults could not be saved' } }
           });
+        }
+        if (typeof input.decisionModelsEnabled === 'boolean') {
+          if (failDecisionSave) {
+            failDecisionSave = false;
+            return route.fulfill({
+              status: 503,
+              json: { error: { message: 'Decision preference could not be saved' } }
+            });
+          }
+          decisionModelsEnabled = input.decisionModelsEnabled;
         }
         if (input.model) defaultChoices.main = input.model;
         if (input.modelPurposes) defaultChoices = { ...defaultChoices, ...input.modelPurposes };
@@ -2721,6 +2745,33 @@ try {
     );
     await modelsPage.getByRole('button', { name: 'Save model defaults', exact: true }).click();
     await modelsPage.getByText('Model defaults saved', { exact: true }).waitFor();
+    assert.equal(defaultChoices.decisions.modelId, 'openrouter/typesafe/jev-test');
+    const decisionToggle = modelsPage.getByRole('checkbox', { name: 'Use decision models' });
+    assert.equal(await decisionToggle.isChecked(), true);
+    failDecisionSave = true;
+    await decisionToggle.click();
+    await modelsPage
+      .getByRole('alert')
+      .filter({ hasText: 'Decision preference could not be saved' })
+      .waitFor();
+    assert.equal(await decisionToggle.isChecked(), true);
+    assert.equal(decisionModelsEnabled, true);
+    await decisionToggle.click();
+    await modelsPage.getByText('Decision models turned off', { exact: true }).waitFor();
+    await modelsPage
+      .getByText('Decision models are turned off in Settings → Models.', { exact: true })
+      .waitFor();
+    assert.equal(decisionModelsEnabled, false);
+    assert.equal(await modelsPage.getByRole('button', { name: /^Decisions:/ }).count(), 0);
+    await modelsPage.reload();
+    await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
+    await modelsPage
+      .getByRole('navigation', { name: 'Settings sections' })
+      .getByRole('button', { name: 'Models', exact: true })
+      .click();
+    assert.equal(await decisionToggle.isChecked(), false);
+    await decisionToggle.click();
+    await modelsPage.getByText('Decision models turned on', { exact: true }).waitFor();
     assert.equal(defaultChoices.decisions.modelId, 'openrouter/typesafe/jev-test');
     await pick(modelsPage, 'image model', 'fixture/image-studio');
     await modelsPage.getByRole('button', { name: 'Save generation choices', exact: true }).click();

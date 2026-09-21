@@ -18,6 +18,7 @@ import type { AgentState } from './agent-state.js';
 import type { ToolContext } from './tool-dispatch.js';
 import type { AgentRunnerClient } from './runner-client.js';
 import { resolveDecisionInput } from './decision-input.js';
+import { taskModelRoster } from './purpose-model.js';
 
 const database = createDatabase({ driver: 'pglite', pglitePath: ':memory:' });
 const store = new DataStore(database),
@@ -442,4 +443,53 @@ it('uses semantic work classification for automatic selection, never a provider-
       privacyRoute: 'provider_zdr'
     }).model?.id
   ).toBe(decision.id);
+});
+
+it('lets the owner opt out across pinned projects, cached answers and automatic routing', async () => {
+  const f = await fixture();
+  const choice = { automatic: false, preference: 'fast' as const, modelId: decision.id };
+  await writeProjectModelPreferences(
+    store,
+    masterKey,
+    { userId: f.user.id, id: f.task.id },
+    { expectedRevision: 0, choices: { decisions: choice } }
+  );
+  expect(await runDecisions(f.context, input, 'warm')).toMatchObject({ status: 'decided' });
+  const route = await resolveDecisionRoute(f.context, f.task);
+  expect(route).not.toBeNull();
+  await store.mergeUserPreferences(f.user.id, { decisionModelsEnabled: false });
+  expect(await resolveDecisionRoute(f.context, f.task)).toBeNull();
+  await expect(
+    approvalForCall(
+      {
+        store,
+        masterKey,
+        runner: {} as AgentRunnerClient,
+        inferenceCredential: async () => {
+          throw new Error('Not needed');
+        },
+        destinationContext: () => ({ knownOrigins: [], ownerText: '' }),
+        decisionRoute: (task) => resolveDecisionRoute(f.context, task)
+      },
+      f.task,
+      { id: 'disabled', name: 'decide', arguments: { questions: input.questions } },
+      f.state
+    )
+  ).rejects.toThrow(/turned off/);
+  expect(await taskModelRoster(f.context, f.task, catalog, main.id)).not.toEqual(
+    expect.arrayContaining([expect.objectContaining({ purpose: 'decisions' })])
+  );
+  expect(await runDecisions(f.context, input, 'warm')).toMatchObject({ status: 'unavailable' });
+  f.state.decisionFloorBindings = { pending: route!.binding };
+  expect(
+    await executeDecisionTool(f.context as ToolContext, {
+      id: 'pending',
+      name: 'decide',
+      arguments: { questions: input.questions }
+    })
+  ).toMatchObject({ status: 'unavailable' });
+  await prepareDecisionRouting(f.context, key, catalog);
+  expect(f.decide).toHaveBeenCalledTimes(1);
+  await store.mergeUserPreferences(f.user.id, { decisionModelsEnabled: true });
+  expect((await resolveDecisionRoute(f.context, f.task))?.model.id).toBe(decision.id);
 });

@@ -9,6 +9,7 @@ export default function DefaultModels({ onChange }: { onChange: () => void }) {
   const resource = useResource<ProjectModelPreferences>('/v1/workspace-model-preferences');
   const [draft, setDraft] = useState<ProjectModelChoices | null>(null);
   const action = useAction();
+  const decisionAction = useAction();
   const current = resource.value;
   const choices = draft ?? current?.choices ?? {};
   const dirty = current && JSON.stringify(choices) !== JSON.stringify(current.choices);
@@ -17,6 +18,34 @@ export default function DefaultModels({ onChange }: { onChange: () => void }) {
       <ResourceState resource={resource} />
       {current && (
         <>
+          <div className="stack">
+            <label className="management-check">
+              <input
+                type="checkbox"
+                checked={current.decisionModelsEnabled !== false}
+                disabled={decisionAction.busy}
+                aria-describedby="decision-models-hint"
+                onChange={(event) => {
+                  const enabled = event.target.checked;
+                  void decisionAction.run(
+                    async () => {
+                      await put('/v1/account/preferences', { decisionModelsEnabled: enabled });
+                      resource.refresh();
+                      onChange();
+                    },
+                    enabled ? 'Decision models turned on' : 'Decision models turned off'
+                  );
+                }}
+              />
+              Use decision models
+            </label>
+            <p className="muted" id="decision-models-hint">
+              Let a fast model help with focused choices. Turning this off removes decision tools
+              and their instructions from future model steps across all projects. Calls already
+              underway may finish. Turning it on applies from the next turn.
+            </p>
+            <ActionFeedback action={decisionAction} />
+          </div>
           <ModelChoiceFields
             purposes={current.purposes.filter((item) =>
               textPurposes.some((purpose) => purpose === item.purpose)

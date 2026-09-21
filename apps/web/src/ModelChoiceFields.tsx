@@ -80,8 +80,9 @@ export default function ModelChoiceFields({
             ? 'automatic'
             : selected.modelId;
         const same = JSON.stringify(selected ?? automaticChoice) === JSON.stringify(item.choice);
-        const effective =
-          value === 'inherit'
+        const effective = item.disabled
+          ? null
+          : value === 'inherit'
             ? item.source !== 'project'
               ? item.effective
               : null
@@ -100,41 +101,44 @@ export default function ModelChoiceFields({
               <h3>{purposeLabels[item.purpose]}</h3>
               <p className="muted">{descriptions[item.purpose]}</p>
             </div>
-            <ModelPicker
-              label={purposeLabels[item.purpose]}
-              value={value}
-              models={item.options}
-              disabled={disabled}
-              shortcuts={[
-                ...(inherit
-                  ? [
-                      {
-                        value: 'inherit',
-                        label: inheritLabel,
-                        detail: inheritDetail
-                      }
-                    ]
-                  : []),
-                {
-                  value: 'automatic',
-                  label: 'Automatic',
-                  detail: 'Choose an available model for this purpose.'
+            {!item.disabled && (
+              <ModelPicker
+                label={purposeLabels[item.purpose]}
+                value={value}
+                models={item.options}
+                disabled={disabled}
+                shortcuts={[
+                  ...(inherit
+                    ? [
+                        {
+                          value: 'inherit',
+                          label: inheritLabel,
+                          detail: inheritDetail
+                        }
+                      ]
+                    : []),
+                  {
+                    value: 'automatic',
+                    label: 'Automatic',
+                    detail: 'Choose an available model for this purpose.'
+                  }
+                ]}
+                onChange={(next) =>
+                  change(
+                    item.purpose,
+                    next === 'inherit'
+                      ? undefined
+                      : {
+                          automatic: next === 'automatic',
+                          modelId: next === 'automatic' ? '' : next,
+                          preference: selected?.preference ?? item.choice.preference
+                        }
+                  )
                 }
-              ]}
-              onChange={(next) =>
-                change(
-                  item.purpose,
-                  next === 'inherit'
-                    ? undefined
-                    : {
-                        automatic: next === 'automatic',
-                        modelId: next === 'automatic' ? '' : next,
-                        preference: selected?.preference ?? item.choice.preference
-                      }
-                )
-              }
-            />
-            {value === 'automatic' &&
+              />
+            )}
+            {!item.disabled &&
+              value === 'automatic' &&
               item.purpose !== 'summarise' &&
               item.purpose !== 'title' &&
               item.purpose !== 'decisions' && (
@@ -156,13 +160,15 @@ export default function ModelChoiceFields({
                 </Field>
               )}
             <p className="model-choice-resolution muted">
-              {effective
-                ? `${value === 'inherit' ? 'Inherits' : value === 'automatic' ? 'Currently' : 'Selected'}: ${effective.displayName}`
-                : value === 'inherit'
-                  ? inheritDetail
-                  : value === 'automatic' && !same
-                    ? 'Resolves when applied.'
-                    : (item.reason ?? 'This saved model is unavailable.')}
+              {item.disabled
+                ? item.reason
+                : effective
+                  ? `${value === 'inherit' ? 'Inherits' : value === 'automatic' ? 'Currently' : 'Selected'}: ${effective.displayName}`
+                  : value === 'inherit'
+                    ? inheritDetail
+                    : value === 'automatic' && !same
+                      ? 'Resolves when applied.'
+                      : (item.reason ?? 'This saved model is unavailable.')}
             </p>
             {effective && 'unavailableReason' in effective && effective.unavailableReason && (
               <p className="model-unavailable">{effective.unavailableReason}</p>

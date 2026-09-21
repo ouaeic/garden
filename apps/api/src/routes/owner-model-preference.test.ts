@@ -436,6 +436,54 @@ describe('model choices across settings, drafts and the first prompt', () => {
     expect(await harness.store.getNextQueuedTaskMessage(parentId)).toBeNull();
   });
 
+  test('persists the decision opt-out while preserving saved model choices', async () => {
+    const harness = await buildHarness({ catalogScope: 'reviewed_open_weight' });
+    const headers = { cookie: harness.cookie };
+    const pin = { automatic: false, preference: 'fast', modelId: 'openrouter/decision-saved' };
+    const update = await harness.app.inject({
+      method: 'PUT',
+      url: '/v1/account/preferences',
+      headers,
+      payload: { decisionModelsEnabled: false, modelPurposes: { decisions: pin } }
+    });
+    expect(update.statusCode).toBe(200);
+    const read = await harness.app.inject({
+      method: 'GET',
+      url: '/v1/account/preferences',
+      headers
+    });
+    expect(read.json()).toMatchObject({
+      preferences: { decisionModelsEnabled: false, modelPurposes: { decisions: pin } }
+    });
+    const surface = await harness.app.inject({
+      method: 'GET',
+      url: '/v1/workspace-model-preferences',
+      headers
+    });
+    expect(surface.statusCode).toBe(200);
+    const preferences = ProjectModelPreferences.parse(surface.json());
+    expect(preferences.decisionModelsEnabled).toBe(false);
+    expect(preferences.purposes.find((item) => item.purpose === 'decisions')).toMatchObject({
+      disabled: true,
+      effective: null,
+      available: false
+    });
+    await harness.app.inject({
+      method: 'PUT',
+      url: '/v1/account/preferences',
+      headers,
+      payload: { decisionModelsEnabled: true }
+    });
+    const restored = await harness.app.inject({
+      method: 'GET',
+      url: '/v1/account/preferences',
+      headers
+    });
+    expect(restored.json()).toMatchObject({
+      preferences: { decisionModelsEnabled: true, modelPurposes: { decisions: pin } }
+    });
+  });
+
   test('round-trips auxiliary defaults and controls without prompt text, then creates the project with its choices', async () => {
     const harness = await buildHarness({ catalogScope: 'reviewed_open_weight' });
     const headers = { cookie: harness.cookie };

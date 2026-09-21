@@ -14,6 +14,11 @@ type PurposeContext = {
   connectedModels(task: TaskRecord, catalog: readonly ModelRelease[]): Promise<ModelRelease[]>;
 };
 
+export async function decisionModelsEnabled(store: DataStore, userId: string): Promise<boolean> {
+  const user = await store.getUserById(userId);
+  return Boolean(user && OwnerPreferences.parse(user.preferences).decisionModelsEnabled !== false);
+}
+
 async function preferences(
   context: PurposeContext,
   task: TaskRecord,
@@ -28,6 +33,7 @@ async function preferences(
   const owner = OwnerPreferences.parse(user.preferences);
   return {
     project,
+    decisionsEnabled: owner.decisionModelsEnabled !== false,
     global: { ...owner.modelPurposes, ...(owner.model ? { main: owner.model } : {}) },
     limits: {
       maxInputUsdPerMillionTokens: limits.maxInputUsdPerMillionTokens ?? null,
@@ -47,7 +53,13 @@ export async function resolveTaskPurposeModel(
   purpose: 'specialist' | 'coding' | 'summarise' | 'title' | 'decisions',
   catalog: readonly ModelRelease[]
 ): Promise<ModelRelease> {
-  const { project, global, limits } = await preferences(context, task);
+  const { project, global, limits, decisionsEnabled } = await preferences(context, task);
+  if (purpose === 'decisions' && !decisionsEnabled)
+    throw new AthanorError(
+      'decision_models_disabled',
+      'Decision models are turned off in Settings.',
+      409
+    );
   const { choice } = resolvePurposeChoice(purpose, project.choices, global);
   const connected = await context.connectedModels(task, catalog);
   const main = catalog.find((model) => model.id === task.modelId);
@@ -150,17 +162,18 @@ export async function taskModelRoster(
   task: TaskRecord,
   catalog: readonly ModelRelease[],
   leadModelId: string
-): Promise<Array<{ job: string; model: string }>> {
+): Promise<Array<{ purpose: string; job: string; model: string }>> {
   const jobs = [
     { purpose: 'specialist', job: 'research and review specialists (delegate)' },
     { purpose: 'coding', job: 'repository changes (coding_agent)' },
     { purpose: 'decisions', job: 'immediate bounded choices and ratings (decide)' }
   ] as const;
-  const roster: Array<{ job: string; model: string }> = [];
+  const roster: Array<{ purpose: string; job: string; model: string }> = [];
   for (const entry of jobs) {
     try {
       const model = await resolveTaskPurposeModel(context, task, entry.purpose, catalog);
-      if (model.id !== leadModelId) roster.push({ job: entry.job, model: model.displayName });
+      if (model.id !== leadModelId)
+        roster.push({ purpose: entry.purpose, job: entry.job, model: model.displayName });
     } catch {
       // A job whose route will not resolve is a job the model should not be told it has.
     }

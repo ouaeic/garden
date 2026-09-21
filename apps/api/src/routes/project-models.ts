@@ -32,6 +32,7 @@ const purposeSurface = async (
   privacyRoute: 'provider_zdr' | 'external',
   taskModelId?: string
 ): Promise<ProjectModelPreferences['purposes']> => {
+  const decisionsEnabled = OwnerPreferences.parse(user.preferences).decisionModelsEnabled !== false;
   const selection = mergeProjectModelChoices(global, projectChoices);
   const [media, models, limits] = await Promise.all([
     context.mediaSettings(user.id, selection),
@@ -55,6 +56,16 @@ const purposeSurface = async (
     );
   return ModelPurpose.options.map((purpose) => {
     const resolved = resolvePurposeChoice(purpose, projectChoices, global);
+    if (purpose === 'decisions' && !decisionsEnabled)
+      return {
+        purpose,
+        ...resolved,
+        disabled: true,
+        effective: null,
+        options: [],
+        available: false,
+        reason: 'Decision models are turned off in Settings → Models.'
+      };
     const modality = media.modalities.find((item) => item.modality === purpose);
     if (modality)
       return {
@@ -175,6 +186,7 @@ export const projectModelSettings = async (
   );
   return {
     ...preferences,
+    decisionModelsEnabled: owner.decisionModelsEnabled !== false,
     purposes
   };
 };
@@ -195,6 +207,7 @@ const workspaceModelSettings = async (
   const purposes = await purposeSurface(context, user, {}, global, privacyRoute);
   return {
     projectTaskId: '',
+    decisionModelsEnabled: owner.decisionModelsEnabled !== false,
     revision: 0,
     choices: global,
     purposes

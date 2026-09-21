@@ -77,7 +77,7 @@ export const openStep = async (
   // left where the next step's tool results bury it stops being free to change. At a step
   // boundary every tool call has been answered, so nothing here can split a call from its
   // result.
-  refreshRuntimeContext();
+  await refreshRuntimeContext();
   if (state.credits >= task.maxComputeCredits) {
     // The same closing call the step ceiling gets. A turn that stops because it ran out of
     // money has exactly as much to hand over as one that ran out of steps, and the owner is

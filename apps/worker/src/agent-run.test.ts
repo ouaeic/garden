@@ -1,3 +1,4 @@
+import { resolveTaskPurposeModel } from './purpose-model.js';
 import type { AgentState } from './agent-state.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -2347,6 +2348,70 @@ describe('the web route a run is pinned to', () => {
       .catch(() => undefined);
     return { log, probe };
   };
+
+  it.each(['disabled', 'disable-mid-turn'] as const)(
+    'removes decision definitions and hidden routing context on the wire: %s',
+    async (mode) => {
+      const task = standardTask();
+      const probe = probeStore(() => task);
+      const decisionModel: ModelRelease = {
+        ...openrouterModel,
+        id: 'decision-model',
+        providerModelId: 'typesafe/jev-fixture',
+        displayName: 'Fast decision fixture',
+        privacyRoute: 'external',
+        capabilities: ['decisions'],
+        inputUsdPerMillionTokens: 0.042,
+        outputUsdPerMillionTokens: 0
+      };
+      const log: FetchLog = { calls: [], modelRequests: [] };
+      const store = {
+        ...probe.store,
+        listModels: async () => [openrouterModel, decisionModel],
+        getUserById: async () => ({
+          preferences: {
+            decisionModelsEnabled:
+              mode === 'disable-mid-turn' &&
+              !log.modelRequests.some((request) => Array.isArray(request.messages))
+          }
+        })
+      } as unknown as DataStore;
+      if (mode === 'disable-mid-turn')
+        await expect(
+          resolveTaskPurposeModel(
+            { store, masterKey, connectedModels: async (_task, catalog) => [...catalog] },
+            task,
+            'decisions',
+            [openrouterModel, decisionModel]
+          )
+        ).resolves.toMatchObject({ id: decisionModel.id });
+      installFetch(
+        [toolFrame('read-local', 'read_file', { path: 'README.md' }), textFrame('Done.')],
+        log
+      );
+      await new AgentWorker(
+        store,
+        config({ ...serverConfig, TASK_MAX_STEPS: 2 }),
+        masterKey,
+        runnerSecret
+      )
+        .run(task)
+        .catch(() => undefined);
+      const requests = log.modelRequests.filter((request) => Array.isArray(request.messages));
+      expect(requests.length).toBeGreaterThanOrEqual(2);
+      const first = requests[0]!;
+      expect(toolNames(first).includes('decide')).toBe(mode === 'disable-mid-turn');
+      if (mode === 'disable-mid-turn')
+        expect(JSON.stringify(first)).toContain('Fast decision fixture');
+      for (const request of requests.slice(mode === 'disabled' ? 0 : 1)) {
+        expect(toolNames(request)).not.toContain('decide');
+        expect(JSON.stringify(request)).not.toContain('Fast decision fixture');
+        expect(JSON.stringify(request)).not.toContain(
+          'immediate bounded choices and ratings (decide)'
+        );
+      }
+    }
+  );
 
   /*
    * A brake that cannot answer stops the car.

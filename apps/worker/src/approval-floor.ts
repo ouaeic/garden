@@ -192,7 +192,7 @@ export const approvalForCall = async (
         decisionInference: { boundToTaskConnection: true }
       });
     }
-    return approvalRequirement(call.name, call.arguments, task.securityMode);
+    throw new Error('Decision models are unavailable or turned off. Continue with the main model.');
   }
   if (call.name === 'project_update')
     return projectUpdateApproval(deps.runner, task, call, {
