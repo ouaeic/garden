@@ -21,7 +21,7 @@
     #33b86a42 47%,
     #33b86a00 100%
   );
-  animation: garden-cell-drift 32s ease-in-out infinite alternate;
+  animation: garden-cell-drift 18s ease-in-out infinite alternate;
   animation-play-state: paused;
 }
 .garden-living-field i:nth-child(2) {
@@ -30,8 +30,8 @@
   width: 230px;
   height: 230px;
   opacity: 0.8;
-  animation-duration: 39s;
-  animation-delay: -23s;
+  animation-duration: 22s;
+  animation-delay: -13s;
 }
 .garden-living-field i:nth-child(3) {
   left: 44%;
@@ -40,8 +40,8 @@
   height: 190px;
   opacity: 0.45;
   background: radial-gradient(ellipse closest-side, #baff884d, #39c77533 25%, #39c77500 65%);
-  animation-duration: 43s;
-  animation-delay: -17s;
+  animation-duration: 24s;
+  animation-delay: -9.5s;
 }
 .garden-living-field i:nth-child(4) {
   left: 88%;
@@ -50,8 +50,8 @@
   height: 120px;
   opacity: 0.5;
   background: radial-gradient(ellipse closest-side, #c5ff914d, #64dc6726 20%, #64dc6700 66%);
-  animation-duration: 37s;
-  animation-delay: -9s;
+  animation-duration: 21s;
+  animation-delay: -5s;
 }
 .garden-living-field i:nth-child(5) {
   left: 10%;
@@ -59,8 +59,8 @@
   width: 420px;
   height: 420px;
   opacity: 0.35;
-  animation-duration: 46s;
-  animation-delay: -30s;
+  animation-duration: 26s;
+  animation-delay: -17s;
 }
 .garden-living-field::after {
   content: '';

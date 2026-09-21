@@ -98,12 +98,6 @@
   display: flex;
   flex-wrap: wrap;
 }
-.garden-shell .garden-sidebar-motion {
-  font-size: 11px;
-  color: var(--muted);
-  justify-content: flex-start;
-  border: 0;
-}
 .garden-prompt-options {
   color: var(--muted);
   font-size: 12px;

@@ -15,8 +15,6 @@ import {
   Monitor,
   Moon,
   Plus,
-  Pause,
-  Play,
   Search,
   Settings2,
   Sun
@@ -58,7 +56,7 @@ const NativeSetup = lazy(() => import('./NativeSetup'));
 import type { ComputerTool as Tool } from './Computer';
 const Login = lazy(() => import('./Login'));
 const SearchDialog = lazy(() => import('./SearchDialog'));
-function initialTheme() {
+function initialTheme(): 'light' | 'dark' {
   try {
     return localStorage.getItem('athanor-theme') === 'light' ? 'light' : 'dark';
   } catch {
@@ -703,14 +701,6 @@ function WorkspaceApp() {
         </nav>
         <div className="garden-sidebar-bottom">
           <Button
-            className="garden-sidebar-motion"
-            aria-pressed={motionPaused}
-            onClick={() => setMotionPaused((current) => !current)}
-          >
-            {motionPaused ? <Play size={14} /> : <Pause size={14} />}
-            {motionPaused ? 'Resume background motion' : 'Pause background motion'}
-          </Button>
-          <Button
             className="garden-sidebar-theme"
             aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -967,7 +957,14 @@ function WorkspaceApp() {
             </section>
           )}
           {navigation.view === 'settings' && (
-            <Settings workspace={workspace} onChange={requestRefresh} />
+            <Settings
+              workspace={workspace}
+              onChange={requestRefresh}
+              theme={theme}
+              onThemeChange={setTheme}
+              motionPaused={motionPaused}
+              onMotionPausedChange={setMotionPaused}
+            />
           )}
           {navigation.view === 'attention' && (
             <section>

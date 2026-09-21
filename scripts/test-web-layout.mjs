@@ -2648,6 +2648,10 @@ try {
     );
 
     await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
+    await modelsPage
+      .getByRole('navigation', { name: 'Settings sections' })
+      .getByRole('button', { name: 'Models', exact: true })
+      .click();
     await modelsPage.getByRole('heading', { name: 'Model defaults', exact: true }).waitFor();
     await modelsPage.getByRole('button', { name: 'Compatible endpoint', exact: true }).click();
     await modelsPage.getByRole('combobox', { name: 'Provider', exact: true }).waitFor();
@@ -2724,6 +2728,10 @@ try {
     assert.equal(generationChoices.image.modelId, 'fixture/image-studio');
     await modelsPage.reload();
     await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
+    await modelsPage
+      .getByRole('navigation', { name: 'Settings sections' })
+      .getByRole('button', { name: 'Models', exact: true })
+      .click();
     await modelsPage
       .getByRole('button', { name: 'Naming a conversation: Research model 79', exact: true })
       .waitFor();
@@ -2806,6 +2814,10 @@ try {
     assert.notEqual(namedConnections[0].connectionId, namedConnections[1].connectionId);
     await modelsPage.reload();
     await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
+    await modelsPage
+      .getByRole('navigation', { name: 'Settings sections' })
+      .getByRole('button', { name: 'Models', exact: true })
+      .click();
     await modelsPage.getByRole('button', { name: 'Work models', exact: true }).click();
     assert.equal(
       await modelsPage.getByLabel('Endpoint URL', { exact: true }).inputValue(),
@@ -2818,6 +2830,10 @@ try {
     assert.equal(defaultChoices.decisions.modelId, 'openrouter/typesafe/jev-test');
     await modelsPage.reload();
     await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
+    await modelsPage
+      .getByRole('navigation', { name: 'Settings sections' })
+      .getByRole('button', { name: 'Models', exact: true })
+      .click();
     await modelsPage
       .getByRole('button', {
         name: 'Condensing long work: Shared endpoint model · Work models',

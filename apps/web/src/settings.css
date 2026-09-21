@@ -33,7 +33,7 @@
 }
 .management-tabs button[aria-current='page'] {
   background: var(--paper, #e9eee2);
-  color: var(--field, #151d19);
+  color: var(--ink);
 }
 .management-tabs button:focus-visible {
   outline: 2px solid currentColor;
@@ -89,8 +89,8 @@
   box-sizing: border-box;
 }
 .management-section select option {
-  background: var(--field, #151d19);
-  color: var(--paper, #e9eee2);
+  background: var(--panel);
+  color: var(--text);
 }
 .management-section textarea {
   resize: vertical;

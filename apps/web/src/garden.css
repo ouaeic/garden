@@ -506,8 +506,8 @@
   padding: 5px 9px;
 }
 .garden-task-composer .intent-toolbar .primary {
-  background: var(--accent);
-  color: var(--bg);
+  background: var(--paper);
+  color: var(--ink);
 }
 .garden-task-composer .intent-footnote {
   margin-bottom: 0;

@@ -75,7 +75,7 @@
 }
 .library-view-toggle button[aria-pressed='true'] {
   background: var(--paper, #e9eee2);
-  color: var(--field, #151d19);
+  color: var(--ink);
 }
 .library-task-title {
   border: 0;
