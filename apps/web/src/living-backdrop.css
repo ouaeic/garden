@@ -8,59 +8,129 @@
   background: var(--living-ground);
 }
 .garden-living-field i {
+  --drift-time: calc(64s / 3);
+  --drift-phase: -7s;
+  --depth-time: 19.7s;
+  --depth-phase: -4s;
+  --x1: 22px;
+  --y1: -12px;
+  --x2: 40px;
+  --y2: 14px;
+  --x3: 6px;
+  --y3: 30px;
   position: absolute;
   width: 330px;
   height: 330px;
   left: 64%;
   top: -110px;
-  background: radial-gradient(
-    ellipse closest-side at 45% 44%,
-    #dcff8cb3 0%,
-    #8fec6999 14%,
-    #49d97880 32%,
-    #33b86a42 47%,
-    #33b86a00 100%
-  );
-  animation: garden-cell-drift 18s ease-in-out infinite alternate;
+  perspective: 600px;
+  animation: garden-cell-wander var(--drift-time) ease-in-out var(--drift-phase) infinite;
   animation-play-state: paused;
 }
 .garden-living-field i:nth-child(2) {
+  --drift-time: 26s;
+  --drift-phase: -19s;
+  --depth-time: 23.1s;
+  --depth-phase: -15s;
+  --x1: -28px;
+  --y1: 18px;
+  --x2: -8px;
+  --y2: 42px;
+  --x3: 24px;
+  --y3: 12px;
   left: 78%;
   top: 100px;
   width: 230px;
   height: 230px;
-  opacity: 0.8;
-  animation-duration: 22s;
-  animation-delay: -13s;
+  opacity: 0.85;
 }
 .garden-living-field i:nth-child(3) {
+  --drift-time: calc(86s / 3);
+  --drift-phase: -11s;
+  --depth-time: 17.9s;
+  --depth-phase: -11s;
+  --x1: 16px;
+  --y1: 28px;
+  --x2: -20px;
+  --y2: 40px;
+  --x3: -36px;
+  --y3: 8px;
   left: 44%;
   top: 70px;
   width: 190px;
   height: 190px;
-  opacity: 0.45;
-  background: radial-gradient(ellipse closest-side, #baff884d, #39c77533 25%, #39c77500 65%);
-  animation-duration: 24s;
-  animation-delay: -9.5s;
+  opacity: 0.65;
 }
 .garden-living-field i:nth-child(4) {
+  --drift-time: calc(74s / 3);
+  --drift-phase: -5s;
+  --depth-time: 22.7s;
+  --depth-phase: -18s;
+  --x1: -12px;
+  --y1: -26px;
+  --x2: 22px;
+  --y2: -38px;
+  --x3: 36px;
+  --y3: -6px;
   left: 88%;
   top: -35px;
   width: 120px;
   height: 120px;
-  opacity: 0.5;
-  background: radial-gradient(ellipse closest-side, #c5ff914d, #64dc6726 20%, #64dc6700 66%);
-  animation-duration: 21s;
-  animation-delay: -5s;
+  opacity: 0.6;
 }
 .garden-living-field i:nth-child(5) {
+  --drift-time: calc(92s / 3);
+  --drift-phase: -24s;
+  --depth-time: 31.3s;
+  --depth-phase: -23s;
+  --x1: -32px;
+  --y1: -8px;
+  --x2: -20px;
+  --y2: -34px;
+  --x3: 16px;
+  --y3: -22px;
   left: 10%;
   top: 200px;
   width: 420px;
   height: 420px;
   opacity: 0.35;
-  animation-duration: 26s;
-  animation-delay: -17s;
+}
+.garden-living-field i > span,
+.garden-living-field i > span::before,
+.garden-living-field i > span::after {
+  position: absolute;
+  inset: 0;
+}
+.garden-living-field i > span {
+  opacity: 0.65;
+  animation: garden-cell-depth var(--depth-time) ease-in-out var(--depth-phase) infinite;
+  animation-play-state: paused;
+}
+/* Fixed blur layers can be reused while perspective and opacity provide the depth cues. */
+.garden-living-field i > span::before {
+  content: '';
+  background: radial-gradient(
+    ellipse closest-side,
+    #3993698f 0%,
+    #31845c59 26%,
+    #296b4d26 56%,
+    #296b4d00 100%
+  );
+  filter: blur(16px);
+}
+.garden-living-field i > span::after {
+  content: '';
+  background: radial-gradient(
+    ellipse closest-side at 47% 46%,
+    #76efb3e6 0%,
+    #46d88ab3 18%,
+    #29b96e4d 40%,
+    #29b96e00 72%
+  );
+  filter: blur(2px);
+  opacity: 0.65;
+  animation: garden-cell-focus var(--depth-time) ease-in-out var(--depth-phase) infinite;
+  animation-play-state: paused;
 }
 .garden-living-field::after {
   content: '';
@@ -68,16 +138,55 @@
   inset: 0;
   background: linear-gradient(100deg, var(--living-veil) 8%, transparent 90%);
 }
-@keyframes garden-cell-drift {
-  from {
-    transform: translate(-18px, 8px) scale(0.82);
+@keyframes garden-cell-wander {
+  0%,
+  100% {
+    transform: translate(0, 0);
   }
-  to {
-    transform: translate(26px, 32px) scale(1.12);
+  24% {
+    transform: translate(var(--x1), var(--y1));
+  }
+  53% {
+    transform: translate(var(--x2), var(--y2));
+  }
+  79% {
+    transform: translate(var(--x3), var(--y3));
+  }
+}
+@keyframes garden-cell-depth {
+  0%,
+  100% {
+    transform: translateZ(-420px);
+    opacity: 0.24;
+  }
+  41% {
+    transform: translateZ(70px);
+    opacity: 0.94;
+  }
+  69% {
+    transform: translateZ(-90px);
+    opacity: 0.58;
+  }
+}
+@keyframes garden-cell-focus {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  41% {
+    opacity: 1;
+  }
+  69% {
+    opacity: 0.38;
   }
 }
 @media (prefers-reduced-motion: no-preference) {
-  :root:not([data-garden-motion='paused']) .garden-living-field[data-moving='true'] i {
+  :root:not([data-garden-motion='paused']) .garden-living-field[data-moving='true'] i,
+  :root:not([data-garden-motion='paused']) .garden-living-field[data-moving='true'] i > span,
+  :root:not([data-garden-motion='paused'])
+    .garden-living-field[data-moving='true']
+    i
+    > span::after {
     animation-play-state: running;
   }
 }

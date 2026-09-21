@@ -1483,7 +1483,7 @@ try {
       'Routine work must not reserve a footer for repeated slogans'
     );
     assert.equal(
-      await page.getByRole('button', { name: /^Switch to .* theme$/, includeHidden: true }).count(),
+      await page.getByRole('button', { name: /^Switch to .* mode$/, includeHidden: true }).count(),
       1,
       'Appearance has one control'
     );

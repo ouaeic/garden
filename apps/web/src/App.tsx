@@ -6,9 +6,6 @@ import {
   Bell,
   FolderOpen,
   Grid2X2,
-  Gauge,
-  HardDrive,
-  MemoryStick,
   PanelLeft,
   X,
   Sparkles,
@@ -26,6 +23,7 @@ import { createTaskNotifier } from './native-notices';
 import { subscribeWorkerNavigation } from './worker-navigation';
 import Brand from './Brand';
 import LivingBackdrop from './LivingBackdrop';
+import Stats from './Stats';
 import './living-interface.css';
 import { fileNavigationBlocked } from './file-navigation';
 import { initialNavigation } from './navigation';
@@ -34,8 +32,6 @@ import type { Bootstrap, Decision, Draft } from './model';
 import {
   hasOngoingWork,
   needsAttention,
-  money,
-  bytes,
   shortDate,
   taskStatusLabel,
   mergeTaskRefresh
@@ -581,17 +577,7 @@ function WorkspaceApp() {
             </Button>
           ))}
         </nav>
-        <details className="garden-health">
-          <summary>
-            <span className="garden-health-dot" data-state={workspace?.status ?? 'unavailable'} />
-            Computer
-          </summary>
-          <div className="garden-health-panel">
-            <strong>{workspace?.name ?? 'Your computer'}</strong>
-            <p className="muted">{workspace?.status ?? 'Unavailable'}</p>
-            <ComputerStatus bootstrap={bootstrap} workspace={workspace} />
-          </div>
-        </details>
+        <Stats bootstrap={bootstrap} workspace={workspace} />
         <div className="garden-masthead-end">
           <Button
             className="global-search"
@@ -702,11 +688,11 @@ function WorkspaceApp() {
         <div className="garden-sidebar-bottom">
           <Button
             className="garden-sidebar-theme"
-            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           >
             {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}{' '}
-            {theme === 'dark' ? 'Light' : 'Dark'} appearance
+            {theme === 'dark' ? 'Light' : 'Dark'} mode
           </Button>
         </div>
       </aside>
@@ -1062,86 +1048,6 @@ function WorkspaceApp() {
           />
         </Suspense>
       )}
-    </div>
-  );
-}
-function ComputerStatus({
-  bootstrap,
-  workspace
-}: {
-  bootstrap: Bootstrap;
-  workspace: Workspace | null;
-}) {
-  const computer = bootstrap.computer;
-  const plan = bootstrap.usage.plan;
-  const disk =
-    workspace?.hostStorageTotalBytes && workspace.hostStorageAvailableBytes !== undefined
-      ? `${Math.round((1 - workspace.hostStorageAvailableBytes / workspace.hostStorageTotalBytes) * 100)}%`
-      : null;
-  if (!computer && !disk && !bootstrap.usage.plan) return null;
-  return (
-    <div className="garden-computer-status" aria-label="Computer health">
-      {computer && (
-        <span title={`CPU load: ${computer.cpuPercent}%`}>
-          <Gauge size={13} />
-          CPU {computer.cpuPercent}%
-        </span>
-      )}
-      {computer && (
-        <span
-          title={`${bytes(computer.memoryUsedBytes)} of ${bytes(computer.memoryTotalBytes)} memory used`}
-        >
-          <MemoryStick size={13} />
-          RAM{' '}
-          {Math.round((computer.memoryUsedBytes / Math.max(1, computer.memoryTotalBytes)) * 100)}%
-        </span>
-      )}
-      {disk && (
-        <span title={`${bytes(workspace!.hostStorageAvailableBytes!)} free on host disk`}>
-          <HardDrive size={13} />
-          Disk {disk}
-        </span>
-      )}
-      {plan?.windows.map((window, index) => {
-        /*
-         * Two providers measure two different things, and the strip now renders each in its own
-         * unit rather than treating everything as a fraction of a plan. Ollama Cloud publishes how
-         * much of a window is used, so a percentage is the whole answer. OpenRouter publishes
-         * money, and what an owner wants from money is what is left - so the balance is shown as
-         * remaining, which is the number that decides whether the next run starts.
-         */
-        const remaining =
-          window.limit !== null && window.used !== null ? window.limit - window.used : null;
-        const label = window.label.startsWith('Session')
-          ? 'Session'
-          : window.label.startsWith('Weekly')
-            ? 'Week'
-            : window.label === 'Credit balance'
-              ? 'Balance'
-              : window.label === 'Key limit'
-                ? 'Key'
-                : window.label;
-        const shown =
-          window.unit === 'usd'
-            ? remaining === null
-              ? window.used === null
-                ? '—'
-                : `${money(window.used)} used`
-              : `${money(remaining)} left`
-            : window.used === null
-              ? '—'
-              : `${Math.round(window.used * 100)}%`;
-        const detail =
-          window.unit === 'usd'
-            ? `${window.label}: ${window.used === null ? 'spend unavailable' : `${money(window.used)} used`}${window.limit === null ? ', no limit set' : ` of ${money(window.limit)}`}`
-            : `${window.label}: ${window.used === null ? 'unavailable' : `${Math.round(window.used * 100)}% of plan`}${window.resetsAt ? `, resets at ${new Date(window.resetsAt).toLocaleString()}` : ''}`;
-        return (
-          <span key={`${window.label}-${index}`} title={detail}>
-            <Gauge size={13} />
-            {label} {shown}
-          </span>
-        );
-      })}
     </div>
   );
 }

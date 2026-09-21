@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import './living-backdrop.css';
 
-/** Soft edges are painted into gradients; only transforms change while the cells move. */
+/** Independent CSS motion and focus cycles keep depth off the JavaScript render loop. */
 export default function LivingBackdrop() {
   const field = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -24,11 +24,21 @@ export default function LivingBackdrop() {
   }, []);
   return (
     <div className="garden-living-field" ref={field} aria-hidden="true">
-      <i />
-      <i />
-      <i />
-      <i />
-      <i />
+      <i>
+        <span />
+      </i>
+      <i>
+        <span />
+      </i>
+      <i>
+        <span />
+      </i>
+      <i>
+        <span />
+      </i>
+      <i>
+        <span />
+      </i>
     </div>
   );
 }

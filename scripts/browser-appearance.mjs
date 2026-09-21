@@ -13,6 +13,15 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     route.fulfill({
       json: {
         ...bootstrap,
+        computer: { cpuPercent: 17, memoryUsedBytes: 256, memoryTotalBytes: 1024 },
+        usage: {
+          ...bootstrap.usage,
+          plan: {
+            provider: 'openrouter',
+            windows: [{ label: 'Credit balance', used: 3, limit: 20, unit: 'usd', resetsAt: null }],
+            queriedAt: new Date().toISOString()
+          }
+        },
         projects: titles.map((title, index) => ({
           ...project,
           id: index ? `appearance-${index}` : project.id,
@@ -27,6 +36,24 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
   await page.goto(origin);
   await page.getByRole('heading', { name: 'Where shall we begin?' }).waitFor();
   await page.locator('.intent-editor textarea').waitFor();
+  const stats = page.getByRole('button', { name: 'Stats', exact: true });
+  const statsPanel = page.getByRole('region', { name: 'Usage statistics', exact: true });
+  await stats.hover();
+  await statsPanel.waitFor();
+  await statsPanel.getByRole('heading', { name: 'Limits & credits', exact: true }).waitFor();
+  await statsPanel.getByText('CPU 17%', { exact: true }).hover();
+  assert.equal(await stats.getAttribute('aria-expanded'), 'true');
+  await page.screenshot({ path: resolve(report, 'stats-desktop.png') });
+  await page.getByRole('heading', { name: 'Where shall we begin?' }).hover();
+  await statsPanel.waitFor({ state: 'hidden' });
+  await stats.focus();
+  await page.keyboard.press('Enter');
+  await statsPanel.waitFor();
+  await page.keyboard.press('Escape');
+  await statsPanel.waitFor({ state: 'hidden' });
+  await stats.click();
+  await page.getByRole('heading', { name: 'Where shall we begin?' }).click();
+  await statsPanel.waitFor({ state: 'hidden' });
   const options = page.locator('.garden-prompt-options');
   assert.equal(
     await page.getByRole('combobox', { name: 'Approvals for this prompt' }).isVisible(),

@@ -15,7 +15,7 @@
   --dim: #8a9f90;
   --line: #c0ead518;
   --line-strong: #bddfca38;
-  --paper: #2c6448;
+  --paper: var(--living-ground);
   --ink: #f0f6ee;
   --accent: #9bcbae;
   --shadow: #00000030;
