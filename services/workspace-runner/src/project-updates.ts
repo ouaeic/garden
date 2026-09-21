@@ -1046,7 +1046,6 @@ export class ProjectUpdatesManager {
   ): Promise<ProjectRevision> {
     return this.locked(projectId, projectId, () =>
       this.locked(projectId, `update:${id}`, async () => {
-        await assertHistoryContentAvailable(this.retention(projectId), 'update', id);
         const registry = await this.registry(projectId);
         const head = registry.head ? await this.revision(projectId, registry.head) : null;
         const update = await this.refresh(await this.update(projectId, id));
@@ -1055,6 +1054,7 @@ export class ProjectUpdatesManager {
             head?.updateId === id
               ? head
               : await this.revision(projectId, update.publishedRevision!);
+          if (update.contentRemoval) return this.revisionSummary(projectId, revision.id);
           update.state = 'published';
           update.publishedRevision = revision.id;
           await this.save(update);
@@ -1062,6 +1062,7 @@ export class ProjectUpdatesManager {
           if (!archive) await this.advanceBaseline(projectId, registry, update, revision.id);
           return { ...this.revisionView(revision), ...(archive ? { archive } : {}) };
         }
+        await assertHistoryContentAvailable(this.retention(projectId), 'update', id);
         if (update.candidateDigest !== expectedDigest || update.parentRevision !== registry.head)
           throw new Error('The project version changed. Rebuild and check the combined update.');
         if (

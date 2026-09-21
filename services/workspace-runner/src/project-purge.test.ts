@@ -114,6 +114,10 @@ it('reclaims only selected unreferenced content and keeps history, baselines, sh
   expect((await f.manager.inspect(f.project, f.first.updateId)).contentRemoval?.state).toBe(
     'removed'
   );
+  expect(await f.manager.publish(f.project, f.first.updateId, f.first.digest)).toMatchObject({
+    id: f.first.id,
+    contentRemoval: { state: 'removed' }
+  });
   await expect(
     f.manager.retention(f.project).restore(f.first.id, f.archived.requestId)
   ).rejects.toMatchObject({ status: 410 });
