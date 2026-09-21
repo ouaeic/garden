@@ -345,6 +345,7 @@ export async function checkProjectConversations({
     assert.deepEqual(await tabs.getByRole('tab').allTextContents(), expandedOrder);
     tasks.splice(2);
     project.conversationCount = tasks.length;
+    await page.getByRole('heading', { name: root.title, exact: true }).waitFor();
     await page.goto(`${origin}/?task=${child.id}`, { waitUntil: 'domcontentloaded' });
     await page.getByRole('heading', { name: 'QC conversation', exact: true }).waitFor();
     for (const width of [1440, 390, 320]) {

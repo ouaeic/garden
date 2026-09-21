@@ -20,6 +20,7 @@ import { projectStatus } from './ProjectCollection';
 import { changeSummary, useProjectChanges } from './use-project-changes';
 import { permissionModeSummary } from './asking-rules';
 import './projects.css';
+import LivingBackdrop from './LivingBackdrop';
 import ConversationTabs from './ConversationTabs';
 const ProjectUpdates = lazy(() => import('./ProjectUpdates'));
 const ProjectNotes = lazy(() => import('./ProjectNotes'));
@@ -264,6 +265,7 @@ export default function ProjectSpace({
   return (
     <section className={`project-space${taskId ? ' has-conversation' : ''}`}>
       <header className="project-space-header">
+        <LivingBackdrop />
         <Button className="project-back" aria-label="All projects" onClick={onAllProjects}>
           <ArrowLeft size={15} />
           All projects

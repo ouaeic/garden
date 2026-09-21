@@ -1,39 +1,48 @@
 :root {
   font:
-    15px/1.55 Arial,
-    Helvetica,
+    15px/1.55 -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
     sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  --bg: #151d19;
-  --panel: #1d2921;
-  --raised: #243128;
-  --text: #e9eee2;
-  --muted: #a6b39f;
-  --dim: #82947c;
-  --line: #c4d4ae25;
-  --line-strong: #c4d4ae4a;
-  --paper: #e6ecd9;
-  --ink: #293726;
-  --shadow: #08100965;
-  --radius: 14px;
+  --bg: #080e0b;
+  --panel: #111b15;
+  --raised: #1a2920;
+  --text: #edf3ed;
+  --muted: #a3b6a8;
+  --dim: #8a9f90;
+  --line: #c0ead518;
+  --line-strong: #bddfca38;
+  --paper: #b4f58c;
+  --ink: #12351f;
+  --accent: #b4f58c;
+  --shadow: #00000030;
+  --radius: 18px;
+  --living-ground: #122e20;
+  --living-veil: #122e20e6;
+  --chrome: #0c1510;
   color: var(--text);
   background: var(--bg);
   color-scheme: dark;
 }
 :root[data-theme='light'] {
-  --bg: #efefe7;
-  --panel: #f8f9f2;
-  --raised: #e4e9db;
-  --text: #253427;
-  --muted: #5d6e59;
-  --dim: #6c7c66;
-  --line: #2f49252c;
-  --line-strong: #2f49254c;
-  --paper: #2a3c2b;
-  --ink: #eef1e2;
-  --shadow: #28382216;
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --raised: #edf4ed;
+  --text: #192c21;
+  --muted: #536c5c;
+  --dim: #65796b;
+  --line: #244d2e18;
+  --line-strong: #244d2e3b;
+  --paper: #237247;
+  --ink: #ffffff;
+  --accent: #237247;
+  --shadow: #203e2910;
+  --living-ground: #e5f2e3;
+  --living-veil: #e5f2e3e8;
+  --chrome: #f5f8f3;
   color-scheme: light;
 }
 * {
@@ -42,7 +51,7 @@
 body {
   margin: 0;
   min-width: 320px;
-  background: radial-gradient(ellipse at 65% -10%, #5272401f, transparent 60%), var(--bg);
+  background: var(--chrome);
 }
 button,
 input,
@@ -103,7 +112,7 @@ summary,
   outline-offset: 4px;
 }
 :focus-visible {
-  outline: 2px solid var(--muted);
+  outline: 2px solid var(--accent);
 }
 button {
   transition:
@@ -248,7 +257,7 @@ canvas {
   padding: 9px 14px;
   border: 1px solid var(--line);
   background: transparent;
-  border-radius: 9px;
+  border-radius: 11px;
   text-decoration: none;
   font-size: 13px;
   white-space: normal;
@@ -1079,12 +1088,12 @@ canvas {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: var(--raised);
+  background: var(--panel);
   border: 1px solid var(--line-strong);
-  border-radius: 14px;
+  border-radius: 20px;
   padding: 16px 18px 12px;
   position: relative;
-  box-shadow: 0 20px 60px #09110922;
+  box-shadow: 0 10px 30px var(--shadow);
 }
 .intent-editor > textarea {
   flex: 0 0 auto;
@@ -1181,7 +1190,7 @@ canvas {
   color: var(--text);
   background: var(--panel);
   border: 1px solid var(--line-strong);
-  border-radius: 6px 24px 6px 6px;
+  border-radius: 22px;
   box-shadow: 0 30px 100px #0008;
   width: min(640px, calc(100vw - 40px));
   max-height: calc(100svh - 60px);

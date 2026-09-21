@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { checkAppearance } from './browser-appearance.mjs';
 import { checkPermissionModes } from './browser-permissions.mjs';
 import { checkRunningQuestion } from './browser-questions.mjs';
 import { checkHumanInterventions } from './browser-interventions.mjs';
@@ -1140,7 +1141,9 @@ try {
     errors.push(`Unspecified UI fixture: ${route.request().method()} ${path}`);
     return route.fulfill({ status: 501, json: { error: { message: 'Unspecified UI fixture' } } });
   });
-  if (!['drafts', 'models'].includes(process.env.GARDEN_UI_FOCUS)) {
+  if (process.env.GARDEN_UI_FOCUS === 'appearance')
+    await checkAppearance({ context, origin, bootstrap, project, task, report });
+  if (!['drafts', 'models', 'appearance'].includes(process.env.GARDEN_UI_FOCUS)) {
     await checkPermissionModes({ context, origin, bootstrap, task, project, workspace, report });
     await checkHumanInterventions({ context, origin, task, report });
     await checkRunningQuestion({ context, origin, bootstrap, task, report });
@@ -1521,6 +1524,7 @@ try {
       'Removing text shrinks the direction editor'
     );
     await page.setViewportSize({ width: 320, height: 600 });
+    await page.locator('.garden-prompt-options > summary').click();
     const limit = page.getByRole('spinbutton', {
       name: 'Additional spend limit in USD',
       exact: true
@@ -2508,7 +2512,7 @@ try {
     await approvalPage.close();
     approvals = [];
   }
-  if (process.env.GARDEN_UI_FOCUS !== 'drafts') {
+  if (!['drafts', 'appearance'].includes(process.env.GARDEN_UI_FOCUS)) {
     const modelsPage = await context.newPage();
     await modelsPage.goto(`${origin}/?task=${task.id}`);
     await modelsPage.locator('.garden-task-composer').waitFor();
@@ -2590,9 +2594,9 @@ try {
       })
       .waitFor();
 
-    if (!(await modelsPage.getByRole('button', { name: 'Plant an idea', exact: true }).isVisible()))
+    if (!(await modelsPage.getByRole('button', { name: 'New project', exact: true }).isVisible()))
       await modelsPage.getByRole('button', { name: 'Show projects', exact: true }).click();
-    await modelsPage.getByRole('button', { name: 'Plant an idea', exact: true }).click();
+    await modelsPage.getByRole('button', { name: 'New project', exact: true }).click();
     const newWork = modelsPage.getByRole('dialog', { name: 'Begin something new', exact: true });
     await newWork
       .getByRole('button', { name: 'Model choices for this direction', exact: true })
@@ -2608,7 +2612,7 @@ try {
       'openrouter/beta/model-79'
     );
     await modelsPage.reload();
-    await modelsPage.getByRole('button', { name: 'Plant an idea', exact: true }).click();
+    await modelsPage.getByRole('button', { name: 'New project', exact: true }).click();
     await newWork
       .getByRole('button', { name: 'Model for this direction: Research model 78', exact: true })
       .waitFor();
@@ -2850,117 +2854,127 @@ try {
     await modelsPage.close();
   }
 
-  let draftPage = await context.newPage();
-  const openDraft = async () => {
-    await draftPage.goto(`${origin}/?task=${task.id}`);
-    await draftPage.getByRole('button', { name: 'Plant an idea', exact: true }).waitFor();
-    await draftPage.getByRole('button', { name: 'Plant an idea', exact: true }).click();
-    await draftPage.getByRole('dialog', { name: 'Begin something new', exact: true }).waitFor();
-  };
-  let draftDialog = draftPage.getByRole('dialog', { name: 'Begin something new', exact: true });
-  let draftInput = draftDialog.getByLabel('Describe what you want to do');
-  const draftKey = `new:${workspace.id}`;
-  const beforeOffline = taskCreations;
-  await openDraft();
-  draftOffline = true;
-  await draftInput.fill('PRIVATE OFFLINE DRAFT — retain this across a closed tab.');
-  await draftDialog.getByText('Saved on this device · waiting to sync', { exact: true }).waitFor();
-  const ciphertext = await draftPage.evaluate(async () => {
-    const db = await new Promise((resolve, reject) => {
-      const request = indexedDB.open('garden-private-drafts');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+  if (process.env.GARDEN_UI_FOCUS !== 'appearance') {
+    let draftPage = await context.newPage();
+    const openDraft = async () => {
+      await draftPage.goto(`${origin}/?task=${task.id}`);
+      await draftPage.getByRole('button', { name: 'New project', exact: true }).waitFor();
+      await draftPage.getByRole('button', { name: 'New project', exact: true }).click();
+      await draftPage.getByRole('dialog', { name: 'Begin something new', exact: true }).waitFor();
+    };
+    let draftDialog = draftPage.getByRole('dialog', { name: 'Begin something new', exact: true });
+    let draftInput = draftDialog.getByLabel('Describe what you want to do');
+    const draftKey = `new:${workspace.id}`;
+    const beforeOffline = taskCreations;
+    await openDraft();
+    draftOffline = true;
+    await draftInput.fill('PRIVATE OFFLINE DRAFT — retain this across a closed tab.');
+    await draftDialog
+      .getByText('Saved on this device · waiting to sync', { exact: true })
+      .waitFor();
+    const ciphertext = await draftPage.evaluate(async () => {
+      const db = await new Promise((resolve, reject) => {
+        const request = indexedDB.open('garden-private-drafts');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const rows = await new Promise((resolve, reject) => {
+        const request = db.transaction('drafts').objectStore('drafts').getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      db.close();
+      return JSON.stringify(rows);
     });
-    const rows = await new Promise((resolve, reject) => {
-      const request = db.transaction('drafts').objectStore('drafts').getAll();
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+    assert(ciphertext.includes('ciphertext'), 'The offline draft must reach IndexedDB');
+    assert(
+      !ciphertext.includes('PRIVATE OFFLINE DRAFT'),
+      'Device storage must not contain prompt plaintext'
+    );
+    await draftPage.close();
+    draftPage = await context.newPage();
+    draftDialog = draftPage.getByRole('dialog', { name: 'Begin something new', exact: true });
+    draftInput = draftDialog.getByLabel('Describe what you want to do');
+    await openDraft();
+    await draftInput.waitFor();
+    assert.equal(
+      await draftInput.inputValue(),
+      'PRIVATE OFFLINE DRAFT — retain this across a closed tab.'
+    );
+    assert.equal(taskCreations, beforeOffline, 'Reload must not submit a recovered draft');
+    draftOffline = false;
+    await draftPage.evaluate(() => window.dispatchEvent(new Event('online')));
+    await draftDialog.getByText('Draft synced', { exact: true }).waitFor();
+    assert.equal(taskCreations, beforeOffline, 'Reconnection must synchronize drafts only');
+
+    const draftCommit = new Promise((resolve) => {
+      lostDraftAcknowledgement = resolve;
     });
-    db.close();
-    return JSON.stringify(rows);
-  });
-  assert(ciphertext.includes('ciphertext'), 'The offline draft must reach IndexedDB');
-  assert(
-    !ciphertext.includes('PRIVATE OFFLINE DRAFT'),
-    'Device storage must not contain prompt plaintext'
-  );
-  await draftPage.close();
-  draftPage = await context.newPage();
-  draftDialog = draftPage.getByRole('dialog', { name: 'Begin something new', exact: true });
-  draftInput = draftDialog.getByLabel('Describe what you want to do');
-  await openDraft();
-  await draftInput.waitFor();
-  assert.equal(
-    await draftInput.inputValue(),
-    'PRIVATE OFFLINE DRAFT — retain this across a closed tab.'
-  );
-  assert.equal(taskCreations, beforeOffline, 'Reload must not submit a recovered draft');
-  draftOffline = false;
-  await draftPage.evaluate(() => window.dispatchEvent(new Event('online')));
-  await draftDialog.getByText('Draft synced', { exact: true }).waitFor();
-  assert.equal(taskCreations, beforeOffline, 'Reconnection must synchronize drafts only');
+    loseDraftAcknowledgement = true;
+    await draftInput.fill('Save committed, acknowledgement lost.');
+    await draftDialog
+      .getByText('Saved on this device · waiting to sync', { exact: true })
+      .waitFor();
+    // Wait for the request to commit, not merely for the immediate local persistence status.
+    await draftCommit;
+    const committedRevision = draftRevisions.get(draftKey);
+    assert.equal(modelDrafts.get(draftKey).body, 'Save committed, acknowledgement lost.');
+    await draftPage.reload();
+    await draftPage.getByRole('button', { name: 'New project', exact: true }).click();
+    await draftDialog.getByText('Draft synced', { exact: true }).waitFor();
+    assert.equal(await draftInput.inputValue(), 'Save committed, acknowledgement lost.');
+    assert.equal(
+      draftRevisions.get(draftKey),
+      committedRevision,
+      'An unanswered save must replay the same revision'
+    );
 
-  const draftCommit = new Promise((resolve) => {
-    lostDraftAcknowledgement = resolve;
-  });
-  loseDraftAcknowledgement = true;
-  await draftInput.fill('Save committed, acknowledgement lost.');
-  await draftDialog.getByText('Saved on this device · waiting to sync', { exact: true }).waitFor();
-  // Wait for the request to commit, not merely for the immediate local persistence status.
-  await draftCommit;
-  const committedRevision = draftRevisions.get(draftKey);
-  assert.equal(modelDrafts.get(draftKey).body, 'Save committed, acknowledgement lost.');
-  await draftPage.reload();
-  await draftPage.getByRole('button', { name: 'Plant an idea', exact: true }).click();
-  await draftDialog.getByText('Draft synced', { exact: true }).waitFor();
-  assert.equal(await draftInput.inputValue(), 'Save committed, acknowledgement lost.');
-  assert.equal(
-    draftRevisions.get(draftKey),
-    committedRevision,
-    'An unanswered save must replay the same revision'
-  );
+    modelDrafts.set(draftKey, {
+      ...modelDrafts.get(draftKey),
+      body: 'A draft from another device.',
+      revision: committedRevision + 1
+    });
+    draftRevisions.set(draftKey, committedRevision + 1);
+    await draftInput.fill('My conflicting local edit.');
+    await draftDialog
+      .getByText('A newer draft exists on another device.', { exact: true })
+      .waitFor();
+    assert.equal(modelDrafts.get(draftKey).body, 'A draft from another device.');
+    await draftDialog.getByRole('button', { name: 'Use other draft', exact: true }).click();
+    await draftPage.waitForFunction(() =>
+      [...document.querySelectorAll('textarea')].some(
+        (element) => element.value === 'A draft from another device.'
+      )
+    );
 
-  modelDrafts.set(draftKey, {
-    ...modelDrafts.get(draftKey),
-    body: 'A draft from another device.',
-    revision: committedRevision + 1
-  });
-  draftRevisions.set(draftKey, committedRevision + 1);
-  await draftInput.fill('My conflicting local edit.');
-  await draftDialog.getByText('A newer draft exists on another device.', { exact: true }).waitFor();
-  assert.equal(modelDrafts.get(draftKey).body, 'A draft from another device.');
-  await draftDialog.getByRole('button', { name: 'Use other draft', exact: true }).click();
-  await draftPage.waitForFunction(() =>
-    [...document.querySelectorAll('textarea')].some(
-      (element) => element.value === 'A draft from another device.'
-    )
-  );
-
-  loseSendAcknowledgement = true;
-  await draftInput.fill('Create this task exactly once.');
-  await draftDialog.getByRole('button', { name: 'Begin', exact: true }).click();
-  await draftDialog.getByRole('button', { name: 'Retry send', exact: true }).waitFor();
-  assert.equal(taskCreations, beforeOffline + 1);
-  await draftPage.reload();
-  await draftPage.getByRole('button', { name: 'Plant an idea', exact: true }).click();
-  await draftDialog.getByRole('button', { name: 'Retry send', exact: true }).waitFor();
-  assert.equal(await draftInput.inputValue(), 'Create this task exactly once.');
-  await draftDialog.getByRole('button', { name: 'Retry send', exact: true }).click();
-  await draftDialog.waitFor({ state: 'detached' });
-  assert.equal(
-    taskCreations,
-    beforeOffline + 1,
-    'Recovered send must replay its receipt without creating another task'
-  );
-  await draftPage.close();
+    loseSendAcknowledgement = true;
+    await draftInput.fill('Create this task exactly once.');
+    await draftDialog.getByRole('button', { name: 'Begin', exact: true }).click();
+    await draftDialog.getByRole('button', { name: 'Retry send', exact: true }).waitFor();
+    assert.equal(taskCreations, beforeOffline + 1);
+    await draftPage.reload();
+    await draftPage.getByRole('button', { name: 'New project', exact: true }).click();
+    await draftDialog.getByRole('button', { name: 'Retry send', exact: true }).waitFor();
+    assert.equal(await draftInput.inputValue(), 'Create this task exactly once.');
+    await draftDialog.getByRole('button', { name: 'Retry send', exact: true }).click();
+    await draftDialog.waitFor({ state: 'detached' });
+    assert.equal(
+      taskCreations,
+      beforeOffline + 1,
+      'Recovered send must replay its receipt without creating another task'
+    );
+    await draftPage.close();
+  }
 
   assert.deepEqual(errors, [], 'The browser must not report uncaught errors');
   console.log(
-    process.env.GARDEN_UI_FOCUS === 'models'
-      ? 'Model and draft browser checks passed: prompt, conversation and settings persistence, responsive controls, connection handling and draft recovery.'
-      : process.env.GARDEN_UI_FOCUS === 'drafts'
-        ? 'Draft browser checks passed: encrypted IndexedDB, close and reopen, offline recovery without auto-send, lost save acknowledgement, conflict choice, and interrupted send receipt replay.'
-        : 'Browser checks passed: encrypted draft recovery, viewport layout, phone focus, effort drafts, playable links, downloads, state-preserving expansion, recorded evidence, mission review, media recovery, analysis sessions, device authorization, dictation consent, model selection persistence, and denial feedback with authentication retry.'
+    process.env.GARDEN_UI_FOCUS === 'appearance'
+      ? 'Appearance checks passed: themes, responsive layouts, prompt disclosure, reduced motion, pause persistence and animation layout cost.'
+      : process.env.GARDEN_UI_FOCUS === 'models'
+        ? 'Model and draft browser checks passed: prompt, conversation and settings persistence, responsive controls, connection handling and draft recovery.'
+        : process.env.GARDEN_UI_FOCUS === 'drafts'
+          ? 'Draft browser checks passed: encrypted IndexedDB, close and reopen, offline recovery without auto-send, lost save acknowledgement, conflict choice, and interrupted send receipt replay.'
+          : 'Browser checks passed: encrypted draft recovery, viewport layout, phone focus, effort drafts, playable links, downloads, state-preserving expansion, recorded evidence, mission review, media recovery, analysis sessions, device authorization, dictation consent, model selection persistence, and denial feedback with authentication retry.'
   );
 } catch (error) {
   console.error(error);

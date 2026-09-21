@@ -34,7 +34,7 @@
     "native:configure": "node apps/desktop/configure-native.mjs",
     "desktop:dev": "pnpm --filter @athanor/desktop dev",
     "desktop:build": "pnpm --filter @athanor/desktop native:build",
-    "test:ui": "pnpm --filter @athanor/web build && node scripts/test-web-layout.mjs && node scripts/test-pdf-viewer.mjs && node scripts/test-svg-preview.mjs && node scripts/test-notebook-editor.mjs && node scripts/test-project-cleanup.mjs && node scripts/test-analysis-viewer.mjs && node scripts/test-analysis-provenance.mjs && node scripts/test-analysis-rerun.mjs && node scripts/test-account-connections.mjs && node scripts/test-private-diagnostics.mjs && node scripts/test-project-git.mjs && node scripts/test-voice-reconnect.mjs",
+    "test:ui": "pnpm --filter @athanor/web build && GARDEN_UI_FOCUS=appearance node scripts/test-web-layout.mjs && node scripts/test-web-layout.mjs && node scripts/test-pdf-viewer.mjs && node scripts/test-svg-preview.mjs && node scripts/test-notebook-editor.mjs && node scripts/test-project-cleanup.mjs && node scripts/test-analysis-viewer.mjs && node scripts/test-analysis-provenance.mjs && node scripts/test-analysis-rerun.mjs && node scripts/test-account-connections.mjs && node scripts/test-private-diagnostics.mjs && node scripts/test-project-git.mjs && node scripts/test-voice-reconnect.mjs",
     "diagnostic:replay": "NODE_OPTIONS=--conditions=development tsx packages/core/src/diagnostic-cli.ts",
     "eval:outcomes": "NODE_OPTIONS=--conditions=development tsx evals/outcomes/run.ts",
     "diagnostic:replay-private": "NODE_OPTIONS=--conditions=development tsx apps/worker/src/diagnostic-replay-cli.ts"

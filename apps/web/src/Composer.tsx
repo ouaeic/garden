@@ -304,6 +304,34 @@ export default function Composer(props: ComposerProps) {
               {permissionModeSummary(securityMode)}
             </span>
           </label>
+          {task && isWorking(task) && (
+            <label className="garden-route-control">
+              <span>Apply</span>
+              <select
+                value={interrupt ? 'now' : 'next'}
+                disabled={editingDisabled || uploading || voiceBusy}
+                onChange={(event) => setInterrupt(event.target.value === 'now')}
+                aria-label="Apply this direction"
+              >
+                <option value="now">Now</option>
+                <option value="next">Next run</option>
+              </select>
+            </label>
+          )}
+        </div>
+      </div>
+      <details className="garden-prompt-options">
+        <summary>
+          More options
+          {cap && (
+            <small>
+              ${cap} {task ? 'extra limit' : 'limit'}
+            </small>
+          )}
+          {reasoningEffort !== 'auto' && <small>{effortLabel(reasoningEffort)} effort</small>}
+          {privacyRoute === 'external' && <small>External route</small>}
+        </summary>
+        <div className="garden-prompt-options-grid">
           <label className="garden-effort-control">
             <span>Effort</span>
             <select
@@ -361,22 +389,8 @@ export default function Composer(props: ComposerProps) {
               aria-label={task ? 'Additional spend limit in USD' : 'Task spend limit in USD'}
             />
           </label>
-          {task && isWorking(task) && (
-            <label className="garden-route-control">
-              <span>Apply</span>
-              <select
-                value={interrupt ? 'now' : 'next'}
-                disabled={editingDisabled || uploading || voiceBusy}
-                onChange={(event) => setInterrupt(event.target.value === 'now')}
-                aria-label="Apply this direction"
-              >
-                <option value="now">Now</option>
-                <option value="next">Next run</option>
-              </select>
-            </label>
-          )}
         </div>
-      </div>
+      </details>
       {advancedModels && (
         <Dialog title="Model choices" onClose={() => setAdvancedModels(false)} wide>
           <Suspense fallback={<p className="muted">Loading…</p>}>

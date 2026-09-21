@@ -96,10 +96,13 @@
   gap: 0.85rem;
 }
 .project-summary-card {
+  position: relative;
   border: 1px solid var(--line);
-  border-radius: 1rem;
-  padding: 1rem;
+  border-radius: 1.25rem;
+  padding: 1.45rem;
   min-width: 0;
+  background: var(--panel);
+  box-shadow: 0 5px 18px var(--shadow);
 }
 .project-conversation-grid > button {
   display: flex;
@@ -124,7 +127,7 @@
 .project-open small {
   display: block;
   margin-top: 0.55rem;
-  opacity: 0.65;
+  color: var(--muted);
   font-size: 0.78rem;
 }
 .project-conversation-grid .garden-project-dot {
@@ -181,7 +184,7 @@
   flex-wrap: wrap;
   gap: 0.4rem;
   font-size: 0.75rem;
-  opacity: 0.65;
+  color: var(--muted);
   margin: 1rem 0 0;
 }
 .project-conversation-links {
@@ -291,7 +294,8 @@
 }
 .project-conversation .garden-work-heading h2 {
   margin: 0.35rem 0;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: inherit;
+  font-weight: 500;
   font-size: clamp(1.6rem, 2.5vw, 2.3rem);
   line-height: 1.18;
   overflow-wrap: anywhere;
@@ -335,7 +339,7 @@
   line-height: 1.6;
 }
 .project-note.superseded {
-  opacity: 0.65;
+  color: var(--muted);
 }
 
 @media (max-width: 600px) {

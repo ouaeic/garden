@@ -1,0 +1,96 @@
+.garden-living-field {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+  isolation: isolate;
+  background: var(--living-ground);
+}
+.garden-living-field i {
+  position: absolute;
+  width: 330px;
+  height: 330px;
+  left: 64%;
+  top: -110px;
+  background: radial-gradient(
+    ellipse closest-side at 45% 44%,
+    #dcff8cb3 0%,
+    #8fec6999 14%,
+    #49d97880 32%,
+    #33b86a42 47%,
+    #33b86a00 100%
+  );
+  animation: garden-cell-drift 32s ease-in-out infinite alternate;
+  animation-play-state: paused;
+}
+.garden-living-field i:nth-child(2) {
+  left: 78%;
+  top: 100px;
+  width: 230px;
+  height: 230px;
+  opacity: 0.8;
+  animation-duration: 39s;
+  animation-delay: -23s;
+}
+.garden-living-field i:nth-child(3) {
+  left: 44%;
+  top: 70px;
+  width: 190px;
+  height: 190px;
+  opacity: 0.45;
+  background: radial-gradient(ellipse closest-side, #baff884d, #39c77533 25%, #39c77500 65%);
+  animation-duration: 43s;
+  animation-delay: -17s;
+}
+.garden-living-field i:nth-child(4) {
+  left: 88%;
+  top: -35px;
+  width: 120px;
+  height: 120px;
+  opacity: 0.5;
+  background: radial-gradient(ellipse closest-side, #c5ff914d, #64dc6726 20%, #64dc6700 66%);
+  animation-duration: 37s;
+  animation-delay: -9s;
+}
+.garden-living-field i:nth-child(5) {
+  left: 10%;
+  top: 200px;
+  width: 420px;
+  height: 420px;
+  opacity: 0.35;
+  animation-duration: 46s;
+  animation-delay: -30s;
+}
+.garden-living-field::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, var(--living-veil) 8%, transparent 90%);
+}
+@keyframes garden-cell-drift {
+  from {
+    transform: translate(-18px, 8px) scale(0.82);
+  }
+  to {
+    transform: translate(26px, 32px) scale(1.12);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-garden-motion='paused']) .garden-living-field[data-moving='true'] i {
+    animation-play-state: running;
+  }
+}
+@media (max-width: 760px) {
+  .garden-living-field i {
+    left: 38%;
+  }
+  .garden-living-field i:nth-child(2) {
+    left: 65%;
+  }
+}
+@media (forced-colors: active) {
+  .garden-living-field {
+    display: none;
+  }
+}

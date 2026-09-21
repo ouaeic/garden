@@ -15,6 +15,8 @@ import {
   Monitor,
   Moon,
   Plus,
+  Pause,
+  Play,
   Search,
   Settings2,
   Sun
@@ -25,6 +27,8 @@ import type { NativeStatus } from './native';
 import { createTaskNotifier } from './native-notices';
 import { subscribeWorkerNavigation } from './worker-navigation';
 import Brand from './Brand';
+import LivingBackdrop from './LivingBackdrop';
+import './living-interface.css';
 import { fileNavigationBlocked } from './file-navigation';
 import { initialNavigation } from './navigation';
 import type { View } from './navigation';
@@ -106,6 +110,21 @@ function WorkspaceApp() {
     values: Record<string, Workspace>;
   }>({ ownerId: '', values: {} });
   const [theme, setTheme] = useState(initialTheme);
+  const [motionPaused, setMotionPaused] = useState(() => {
+    try {
+      return localStorage.getItem('garden-motion') === 'paused';
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    document.documentElement.dataset.gardenMotion = motionPaused ? 'paused' : 'auto';
+    try {
+      localStorage.setItem('garden-motion', motionPaused ? 'paused' : 'auto');
+    } catch {
+      /* Appearance remains usable without storage. */
+    }
+  }, [motionPaused]);
   const [mobile, setMobile] = useState(() => window.innerWidth <= 760);
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     try {
@@ -520,9 +539,6 @@ function WorkspaceApp() {
           : true
     )
     .filter((item) => item.title.toLowerCase().includes(search.toLowerCase()));
-  const personalTasks = visibleTasks
-    .filter((item) => !item.scheduleId)
-    .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt));
   const scheduleTasks = visibleTasks.filter((item) => item.scheduleId);
   return (
     <div
@@ -567,7 +583,17 @@ function WorkspaceApp() {
             </Button>
           ))}
         </nav>
-        <ComputerStatus bootstrap={bootstrap} workspace={workspace} />
+        <details className="garden-health">
+          <summary>
+            <span className="garden-health-dot" data-state={workspace?.status ?? 'unavailable'} />
+            Computer
+          </summary>
+          <div className="garden-health-panel">
+            <strong>{workspace?.name ?? 'Your computer'}</strong>
+            <p className="muted">{workspace?.status ?? 'Unavailable'}</p>
+            <ComputerStatus bootstrap={bootstrap} workspace={workspace} />
+          </div>
+        </details>
         <div className="garden-masthead-end">
           <Button
             className="global-search"
@@ -626,7 +652,7 @@ function WorkspaceApp() {
           }}
         >
           <Plus size={16} />
-          Plant an idea
+          New project
         </Button>
         {bootstrap.workspaces.length > 1 && (
           <select
@@ -676,6 +702,14 @@ function WorkspaceApp() {
           />
         </nav>
         <div className="garden-sidebar-bottom">
+          <Button
+            className="garden-sidebar-motion"
+            aria-pressed={motionPaused}
+            onClick={() => setMotionPaused((current) => !current)}
+          >
+            {motionPaused ? <Play size={14} /> : <Pause size={14} />}
+            {motionPaused ? 'Resume background motion' : 'Pause background motion'}
+          </Button>
           <Button
             className="garden-sidebar-theme"
             aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
@@ -755,36 +789,32 @@ function WorkspaceApp() {
               <Spinner label="Opening project…" />
             ) : (
               <section className="overview">
-                <div className="overview-top">
-                  <div>
-                    <div className="eyebrow">{workspace?.name ?? 'Your workspace'}</div>
-                    <h1>
-                      {personalTasks.length
-                        ? 'What’s taking shape.'
-                        : 'What would you like to bring to life?'}
-                    </h1>
+                <div className="garden-welcome">
+                  <LivingBackdrop />
+                  <div className="overview-top">
+                    <div>
+                      <div className="eyebrow">Your space to make things happen</div>
+                      <h1>Where shall we begin?</h1>
+                      <p>Ask a question, create something, or take an idea further.</p>
+                    </div>
                   </div>
-                  <div className="row">
-                    {bootstrap.workspaces.length > 1 && (
-                      <select
-                        aria-label="Computer workspace"
-                        value={workspaceId}
-                        onChange={(event) => setWorkspaceId(event.target.value)}
-                      >
-                        {bootstrap.workspaces.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.name}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                    {personalTasks.length > 0 && (
-                      <Button className="primary" onClick={() => setNewWork(true)}>
-                        <Plus size={17} />
-                        New work
-                      </Button>
-                    )}
-                  </div>
+                  {workspace && !newWork && (
+                    <div className="first-intent">
+                      <Composer
+                        key={`new:${workspace.id}`}
+                        workspace={workspace}
+                        bootstrap={bootstrap}
+                        {...(drafts[`new:${workspace.id}`]
+                          ? { initialDraft: drafts[`new:${workspace.id}`] }
+                          : {})}
+                        onDraft={saveDraft}
+                        onSent={(next) => {
+                          updateTask(next);
+                          requestRefresh();
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
                 {!bootstrap.instance.providerConfigured && (
                   <div className="setup-note">
@@ -818,26 +848,6 @@ function WorkspaceApp() {
                     )}
                   </div>
                 )}
-                {!bootstrap.projects?.length && filter === 'active' && !search && workspace && (
-                  <div className="first-intent">
-                    <Composer
-                      key={`new:${workspace.id}`}
-                      workspace={workspace}
-                      bootstrap={bootstrap}
-                      {...(drafts[`new:${workspace.id}`]
-                        ? { initialDraft: drafts[`new:${workspace.id}`] }
-                        : {})}
-                      onDraft={saveDraft}
-                      onSent={(next) => {
-                        updateTask(next);
-                        requestRefresh();
-                      }}
-                    />
-                    <p className="muted">
-                      Start with a question, a file, or something you want made.
-                    </p>
-                  </div>
-                )}
                 {attentionCount > 0 && (
                   <button className="attention-strip" onClick={() => navigate('attention')}>
                     <span>
@@ -854,6 +864,10 @@ function WorkspaceApp() {
                 )}
                 {(bootstrap.tasks.length > 0 || filter !== 'active') && (
                   <>
+                    <div className="garden-projects-heading">
+                      <h2>Your projects</h2>
+                      <span>Pick up where you left off.</span>
+                    </div>
                     <div className="work-filter">
                       <div className="segmented" aria-label="Filter work">
                         {(['active', 'running', 'complete', 'archived'] as const).map((value) => (

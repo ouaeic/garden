@@ -29,6 +29,11 @@ export function projectUpdateFixture(project, tasks) {
       });
       return true;
     }
+    if (url.pathname === `/v1/projects/${project.id}/cleanup/pending`) {
+      assert.equal(route.request().method(), 'POST');
+      await route.fulfill({ json: [] });
+      return true;
+    }
     if (url.pathname !== `/v1/projects/${project.id}/updates`) return false;
     if (fixture.fail) {
       await route.fulfill({
@@ -297,8 +302,8 @@ export async function checkProjectUpdates({ page, fixture, project, report }) {
     .locator('.project-version-head')
     .getByText('Version 43 · Published analysis 43', { exact: true })
     .waitFor();
-  await panel.locator('.project-version-path > summary').click();
-  const history = panel.locator('.project-version-path ol');
+  await panel.getByText('Published files and version history', { exact: true }).click();
+  const history = panel.locator('.project-version-history-list');
   assert.equal(
     await history.locator('li').count(),
     41,
@@ -319,7 +324,7 @@ export async function checkProjectUpdates({ page, fixture, project, report }) {
     await history.getByRole('button', { name: /^Version \d+ · / }).allTextContents(),
     fixture.revisions.map((item) => `Version ${item.number} · ${item.title}`)
   );
-  await panel.locator('.project-version-path > summary').click();
+  await panel.getByText('Published files and version history', { exact: true }).click();
   console.log(
     'Project update browser checks passed: preparation, parallel checks, elapsed days, resource samples, logs, scoped cancellation, stale evidence, reset checks, checked publication, paginated history retained across refresh and responsive layouts.'
   );
