@@ -14,7 +14,9 @@ to insert another model.
 
 The tool defaults to the current owner request and can reference prior tool-call IDs, so the lead
 does not spend output tokens copying evidence. Repeated classifications share choice definitions
-once, with short instruction strings per item. Extra context is separate from existing evidence. References resolve only within the conversation's existing working
+once. An item list applies shared question templates to each evidence ID and returns rows keyed by
+those IDs, so independent factors do not need repeated instructions. Code combines their answers
+and validates hard constraints. Extra context is separate from existing evidence. References resolve only within the conversation's existing working
 window. Missing or compacted evidence must be read again. References cannot reach arbitrary files,
 other conversations or credentials.
 
@@ -36,6 +38,8 @@ unknown answers, incomplete coverage and out-of-range scores are rejected. A con
 distribution concentration, not a guarantee of correctness. Evidence support is not source truth.
 
 Requests are bounded by published context, task allowance, owner spending limits and cancellation.
+The context guard applies to the decision input; typed answers are not generated into that input
+window. Spending reservations separately cover both input and reported output usage.
 Each attempt reserves its exposure before submission and settles reported usage, including answers
 that fail validation. A lost response retains its reservation; it is never retried silently.
 Automatic routing can fall back to deterministic selection when inference is unavailable. An

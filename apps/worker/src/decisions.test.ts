@@ -132,6 +132,39 @@ it('reuses exact conversation evidence without permitting arbitrary files or oth
   ).toThrow(/no longer/);
 });
 
+it('expands shared questions over explicit evidence IDs without copying the evidence', () => {
+  const state = { messages: [{ role: 'user', content: 'A: FASTQ; B: unknown' }] } as AgentState;
+  const value = {
+    items: ['A', 'B'],
+    choices: { fastq: 'FASTQ', unknown: 'Insufficient evidence' },
+    questions: {
+      format: 'Which format is described?',
+      paired: { type: 'noul', instructions: 'Are paired reads explicitly stated?' }
+    }
+  };
+  const resolved = resolveDecisionInput(state, value);
+  expect(Object.keys(resolved.questions)).toEqual(['i0_q0', 'i0_q1', 'i1_q0', 'i1_q1']);
+  expect(resolved.questions.i0_q0).toEqual({
+    type: 'choice',
+    instructions: 'For evidence item "A": Which format is described?',
+    criteria: value.choices
+  });
+  expect(resolved.questions.i1_q1).toEqual({
+    type: 'noul',
+    instructions: 'For evidence item "B": Are paired reads explicitly stated?'
+  });
+  expect(JSON.parse(resolved.state)).toEqual({
+    evidence: [{ id: '$request', text: 'A: FASTQ; B: unknown' }]
+  });
+  expect(() => resolveDecisionInput(state, { ...value, items: ['A', 'A'] })).toThrow(/unique/);
+  expect(() =>
+    resolveDecisionInput(state, {
+      ...value,
+      items: Array.from({ length: 33 }, (_, index) => `item${index}`)
+    })
+  ).toThrow(/64/);
+});
+
 beforeAll(async () => {
   await migrateDatabase(database);
   await store.upsertModels(catalog);
@@ -320,6 +353,42 @@ it('does not call a provider after Stop or with insufficient task allowance', as
   await database.query("UPDATE tasks SET status='paused' WHERE id=$1", [f.task.id]);
   expect(await runDecisions(f.context, input, 'stopped')).toMatchObject({ status: 'unavailable' });
   expect(f.decide).not.toHaveBeenCalled();
+});
+
+it('admits independent questions that fit the input window and preserves item rows on cached replay', async () => {
+  const f = await fixture();
+  f.state.messages = [{ role: 'user', content: 'Evidence. '.repeat(1800) }];
+  const call = {
+    id: 'factor-call',
+    name: 'decide',
+    arguments: {
+      items: Array.from({ length: 24 }, (_, index) => `sample${index}`),
+      choices: Object.fromEntries(
+        ['fastq', 'fasta', 'csv', 'tsv', 'json', 'unknown'].map((format) => [format, format])
+      ),
+      questions: { format: 'Which format is described?' }
+    }
+  };
+  const route = await resolveDecisionRoute(f.context, f.task);
+  expect(route).not.toBeNull();
+  f.state.decisionFloorBindings = { [call.id]: route!.binding };
+  const result = await executeDecisionTool(f.context as ToolContext, call);
+  expect(result).toMatchObject({
+    status: 'decided',
+    rows: call.arguments.items.map((id) => ({
+      id,
+      answers: { format: { type: 'choice', choice: 'fastq', confidence: 0.9 } }
+    }))
+  });
+  expect(result).not.toHaveProperty('answers');
+  const replay = await executeDecisionTool(f.context as ToolContext, call);
+  expect(replay).toMatchObject({ ...(result as object), usageCredits: 0 });
+  expect(f.decide).toHaveBeenCalledTimes(1);
+  f.state.messages = [{ role: 'user', content: 'Evidence. '.repeat(4000) }];
+  expect(await executeDecisionTool(f.context as ToolContext, call)).toMatchObject({
+    status: 'unavailable'
+  });
+  expect(f.decide).toHaveBeenCalledTimes(1);
 });
 
 it('prepares relevant tools once and keeps a pinned main model unchanged', async () => {

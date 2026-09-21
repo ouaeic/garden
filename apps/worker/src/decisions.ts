@@ -10,7 +10,7 @@ import { resolveDecisionRoute } from './decision-route.js';
 import { approvalRequirement } from './approval-policy.js';
 import { estimatedInferenceCostUsd, usageCredit } from './billing.js';
 import { startStopWatch } from './turn-lifecycle.js';
-import { resolveDecisionInput } from './decision-input.js';
+import { DecisionToolInput, resolveDecisionInput } from './decision-input.js';
 
 export type DecisionContext = Pick<
   ToolContext,
@@ -72,7 +72,9 @@ export async function runDecisions(
   const inputBound = Buffer.byteLength(JSON.stringify(input), 'utf8') + 2048;
   const outputBound = decisionOutputBound(input);
   const boundCredits = usageCredit(model, inputBound, outputBound);
-  if (inputBound + outputBound > model.contextTokens)
+  // Decision answers are computed independently, not generated into the input window.
+  // Billing still reserves both input and output exposure below.
+  if (inputBound > model.contextTokens)
     return unavailable(
       'The evidence and questions exceed the decision context. Split independent questions or narrow the evidence.'
     );
@@ -193,15 +195,31 @@ function decisionOutputBound(input: DecisionInput): number {
   );
 }
 
-export const executeDecisionTool: ToolContext['dispatch'] = (context, call) => {
+export const executeDecisionTool: ToolContext['dispatch'] = async (context, call) => {
   const binding = context.state.decisionFloorBindings?.[call.id];
   if (!binding)
-    return Promise.resolve({
+    return {
       status: 'unavailable',
       reason: 'The decision destination has not passed the approval floor.',
       usageCredits: 0
-    });
-  return runDecisions(context, resolveDecisionInput(context.state, call.arguments), call.id, {
+    };
+  const input = DecisionToolInput.parse(call.arguments);
+  const result = await runDecisions(context, resolveDecisionInput(context.state, input), call.id, {
     floorBinding: binding
   });
+  if (!input.items || result.status !== 'decided') return result;
+  const { answers, ...metadata } = result;
+  const questions = Object.keys(input.questions);
+  return {
+    ...metadata,
+    rows: input.items.map((id, itemIndex) => ({
+      id,
+      answers: Object.fromEntries(
+        questions.map((question, questionIndex) => [
+          question,
+          answers[`i${itemIndex}_q${questionIndex}`]!
+        ])
+      )
+    }))
+  };
 };

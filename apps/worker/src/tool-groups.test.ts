@@ -19,7 +19,7 @@ it('partitions all advanced capabilities into discoverable groups without duplic
   expect([...core.map((tool) => tool.name), ...grouped].sort()).toEqual(
     full.map((tool) => tool.name).sort()
   );
-  // The resident core with shared decision choices measures 30,633 bytes.
+  // The resident core with repeated decision factors measures 30,746 bytes.
   expect(Buffer.byteLength(JSON.stringify([...core, COMPACT_CONTEXT_TOOL]))).toBeLessThan(30_800);
 });
 

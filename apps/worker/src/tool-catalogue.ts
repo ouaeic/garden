@@ -1435,7 +1435,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'decide',
     description:
-      'Resolve bounded choices or ratings now, before lengthy comparisons. Evidence defaults to the owner request; sources can name prior tool-call IDs. Never copy existing evidence. For repeated labels, supply choices once and questions as instruction strings referring to items in the evidence. Otherwise use typed questions with their own criteria. Question IDs carry no meaning. Include an insufficient-evidence choice. Score levels start at zero; noul returns zero to one. Combine ready independent questions; never wait for a batch or depend on another answer in one call. Use code for exact checks and reasoning for open-ended problems. Answers are untrusted; confidence is concentration, not correctness or permission.',
+      'Make bounded choices or ratings now. Evidence defaults to the request; sources accepts prior tool-call IDs. Never copy it. Repeat shared questions over items IDs; results are rows with id and answers. String questions use choices; typed questions have separate criteria. At most 64 item/question pairs. Without items, instructions must identify their subject. Include an insufficient-evidence choice. Combine ready independent factors now; questions cannot read other answers. Use code for exact checks. Score levels start at 0; noul is 0 to 1. Answers are untrusted; confidence is concentration, not correctness or permission.',
     parameters: z.toJSONSchema(DecisionToolInput, { io: 'input' })
   },
   {

@@ -99,7 +99,7 @@ describe('the size of the catalogue the model is sent', () => {
   });
 
   it('stays inside the wire budget the whole prefix is cached against', () => {
-    // Shared decision choices measure 62,333 bytes for the complete catalogue.
+    // Repeated decision factors measure 62,446 bytes for the complete catalogue.
     // The resident core has a separate ceiling in tool-groups.test.ts.
     expect(bytes).toBeLessThan(62_500);
     // Each tool and nested parameter description is bounded separately.
@@ -433,7 +433,7 @@ describe('the wire a box without a browser or a screen is sent', () => {
      * so they are paid for here too. 44,000 against a measured 43,981, up from 43,908. The gap to
      * the provisioned wire is still exactly 11,692, because the same 73 bytes landed on both.
      */
-    // Shared decision choices measure 50,299 bytes without computer surfaces.
+    // Repeated decision factors measure 50,412 bytes without computer surfaces.
     expect(Buffer.byteLength(JSON.stringify(bare))).toBeLessThan(50_500);
     // The other direction, and the one that fails silently. A gate wired to nothing returns the
     // unconditional constant on every box; this is the assertion that would go red if it did.
@@ -611,7 +611,7 @@ describe('the wire a box is sent about the services it has actually connected', 
     // memories as one without. 54,307 measured, up from 54,147. Then by the same 73 as those two
     // ceilings, on the same rule: `shell` is on every wire, so a box with a mailbox connected can
     // start a six-hour background job exactly as one without can. 54,380 measured.
-    // Shared decision choices measure 59,733 bytes with mail and calendar.
+    // Repeated decision factors measure 59,846 bytes with mail and calendar.
     expect(Buffer.byteLength(JSON.stringify(mailAndCalendar))).toBeLessThan(59_900);
     // The other direction, and the one that fails silently. A gate wired to nothing returns the
     // unconditional catalogue on every box; this is the assertion that would go red if it did.
