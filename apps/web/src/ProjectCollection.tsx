@@ -199,7 +199,9 @@ export default function ProjectCollection({
               />
               <span>
                 <strong>{project.title}</strong>
-                {mode === 'grid' && <small>{projectStatus(project)}</small>}
+                {mode === 'grid' && (project.activeCount > 0 || project.attentionCount > 0) && (
+                  <small>{projectStatus(project)}</small>
+                )}
               </span>
               {project.pinned && <Pin size={13} />}
             </button>
