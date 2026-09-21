@@ -288,7 +288,9 @@ export const startGuiNamespace = async (
       environment: {
         ATHANOR_GUI_NAMESPACES: JSON.stringify({
           process: `/proc/${process.pid}/fd/${handles[0]?.fd}`,
-          root: `/proc/${process.pid}/fd/${handles[1]?.fd}`
+          root: `/proc/${process.pid}/fd/${handles[1]?.fd}`,
+          pid: info.pid,
+          startTime: info.startTime
         }),
         ATHANOR_GUI_ROOT: root,
         HOME: path.join(root, '.athanor/gui/home'),

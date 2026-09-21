@@ -26,15 +26,18 @@ LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET = 1
 
 def namespace_handles(serialized, parent_pid):
     value = json.loads(serialized)
-    if not isinstance(value, dict) or set(value) != set(NAMESPACE_KEYS):
+    if not isinstance(value, dict) or set(value) != {*NAMESPACE_KEYS, 'pid', 'startTime'}:
         raise ValueError('Invalid GUI namespace handles')
+    if (type(value['pid']) is not int or value['pid'] <= 0 or not isinstance(value['startTime'], str)
+            or not re.fullmatch(r'[0-9]+', value['startTime'])):
+        raise ValueError('Invalid GUI namespace identity')
     pattern = re.compile(r'/proc/' + str(parent_pid) + r'/fd/([0-9]+)')
     for key in NAMESPACE_KEYS:
         path = value[key]
         match = pattern.fullmatch(path) if isinstance(path, str) else None
         if not match or int(match.group(1)) < 3:
             raise ValueError('GUI namespace handles must belong to the launching runner')
-    if len(set(value.values())) != len(NAMESPACE_KEYS):
+    if value['process'] == value['root']:
         raise ValueError('GUI namespace handles must be distinct')
     return value
 
@@ -103,7 +106,8 @@ def main(args):
     # pidfd setns joins the namespace set atomically, including nested user-namespace ownership.
     def identity(value):
         return value.split(' ', 1)[0], value[value.rfind(')') + 2:].split()[19]
-    if identity(before) != identity(after) or select.select([target], [], [], 0)[0]:
+    if (identity(before) != (str(handles['pid']), handles['startTime']) or
+            identity(before) != identity(after) or select.select([target], [], [], 0)[0]):
         raise RuntimeError('GUI namespace lifetime ended')
     os.close(held_process)
     os.setns(target, GUI_NAMESPACES)

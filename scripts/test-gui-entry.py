@@ -27,11 +27,11 @@ broker = load('athanor-gui-broker')
 
 class NamespaceHandles(unittest.TestCase):
     def handles(self):
-        return {key: f'/proc/120/fd/{index + 3}' for index, key in enumerate(entry.NAMESPACE_KEYS)}
+        return {**{key: f'/proc/120/fd/{index + 3}' for index, key in enumerate(entry.NAMESPACE_KEYS)}, 'pid': 456, 'startTime': '12345'}
 
     def test_translates_only_explicit_namespace_handles(self):
         args = entry.namespace_handles(json.dumps(self.handles()), 120)
-        self.assertEqual(set(args), set(entry.NAMESPACE_KEYS))
+        self.assertEqual(set(args), {*entry.NAMESPACE_KEYS, 'pid', 'startTime'})
         self.assertEqual(args['process'], '/proc/120/fd/3')
 
     def test_refuses_foreign_processes_and_path_syntax(self):
@@ -44,7 +44,7 @@ class NamespaceHandles(unittest.TestCase):
 
     def test_refuses_missing_extra_duplicate_and_non_string_handles(self):
         value = self.handles()
-        cases = [[], {**value, 'extra': 'secret'}, {**value, 'root': value['process']}, {**value, 'root': 8}]
+        cases = [[], {**value, 'extra': 'secret'}, {**value, 'root': value['process']}, {**value, 'root': 8}, {**value, 'pid': True}, {**value, 'pid': 0}, {**value, 'startTime': 'bad'}, {**value, 'startTime': 1}]
         del value['process']
         cases.append(value)
         self.assertTrue(cases)
