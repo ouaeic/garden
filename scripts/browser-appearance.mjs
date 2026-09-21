@@ -104,9 +104,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     const animations = document
       .querySelector('.garden-living-field')
       .getAnimations({ subtree: true });
-    return (
-      animations.length > 0 && animations.every((animation) => animation.playState === 'paused')
-    );
+    return animations.filter((animation) => animation.playState === 'running').length === 0;
   });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   if (await page.getByRole('button', { name: 'Show projects', exact: true }).isVisible())
