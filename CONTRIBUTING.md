@@ -334,3 +334,9 @@ The voice recovery browser drill uses a local WebSocket service and simulated au
 reconnection without another session, preserved mute, paused capture, keyboard Stop and phone
 layout. Set `GARDEN_VOICE_SCREENSHOT` to retain its screenshot. Provider and physical audio-device
 acceptance remain separate checks.
+
+The native analysis recipe checks run when `GARDEN_TEST_MICROMAMBA` names a local micromamba
+executable and a C compiler is available. They build a fixture executable and shared library,
+exercise both archive formats, reproduce the result in a fresh directory, and reject dependency
+or installer drift. The repository gate explicitly reports skipped optional toolchain coverage;
+run installed native acceptance before releasing a change to that recipe.

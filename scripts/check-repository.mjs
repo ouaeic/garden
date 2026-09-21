@@ -148,7 +148,7 @@ else {
   const skipped = /OK \(skipped=(\d+)\)/.exec(analysisRuns.stderr);
   if (skipped)
     say(
-      `${skipped[1]} R-dependent analysis checks skipped; run native acceptance on an R-equipped host.`
+      `${skipped[1]} optional native-tool analysis checks skipped; run acceptance with R and a declared micromamba executable plus C compiler.`
     );
 }
 

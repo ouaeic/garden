@@ -235,7 +235,8 @@ describe('real scientific receipts', () => {
           ...record,
           environmentSetups: [
             { kind: 'python_wheels', directory: '.venv', status: 'ready' },
-            { kind: 'r_archives', directory: '.garden/r-library', status: 'installing' }
+            { kind: 'r_archives', directory: '.garden/r-library', status: 'installing' },
+            { kind: 'conda_packages', directory: '.garden/conda', status: 'ready' }
           ],
           spec: {
             ...record!.spec,
@@ -245,6 +246,11 @@ describe('real scientific receipts', () => {
                 interpreter: 'R',
                 directory: '.garden/r-library',
                 packages: [{ path: 'science.tar.gz', sha256: 'a'.repeat(64) }]
+              },
+              conda: {
+                directory: '.garden/conda',
+                manager: { path: 'manager/micromamba', sha256: 'b'.repeat(64) },
+                packages: [{ path: 'native.conda', sha256: 'c'.repeat(64) }]
               }
             }
           }
@@ -254,9 +260,11 @@ describe('real scientific receipts', () => {
       const mixedHtml = renderToStaticMarkup(createElement(AnalysisRunPreview, { record: mixed! }));
       expect(mixedHtml).toContain('Python environment');
       expect(mixedHtml).toContain('R library');
+      expect(mixedHtml).toContain('Native environment');
       expect(mixedHtml).toContain('Rebuilt from verified local packages');
       expect(mixedHtml).toContain('Preparation incomplete');
       expect(mixedHtml).toContain('.garden/r-library');
+      expect(mixedHtml).toContain('.garden/conda');
       expect(
         readAnalysisRecord(
           JSON.stringify({

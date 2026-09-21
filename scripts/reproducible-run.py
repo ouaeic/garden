@@ -132,7 +132,7 @@ def validate(spec):
                 raise ValueError("A producer record needs its expected SHA-256")
     input_paths = paths([item["path"] for item in spec["inputs"]])
     env = spec["environment"]
-    exact_keys(env, ["lockFiles", "probes"], ["runtimeOnly", "python", "r"])
+    exact_keys(env, ["lockFiles", "probes"], ["runtimeOnly", "python", "r", "conda"])
     if "runtimeOnly" in env and not isinstance(env["runtimeOnly"], bool):
         raise ValueError("runtimeOnly must be a boolean")
     env["lockFiles"] = paths(env["lockFiles"])
@@ -158,6 +158,7 @@ def validate(spec):
             or probe["name"] in names
             or ("python" in env and probe["name"] == "Garden rebuilt Python environment")
             or ("r" in env and probe["name"] == "Garden rebuilt R environment")
+            or ("conda" in env and probe["name"] == "Garden rebuilt native environment")
         ):
             raise ValueError("Environment probe names must be nonempty and unique")
         names.add(probe["name"])
@@ -223,6 +224,31 @@ def validate(spec):
             archives.add(package["path"])
         if any(Path(name).is_relative_to(directory.parent) for name in files + spec["outputs"]):
             raise ValueError("The disposable R environment cannot contain declared analysis files")
+    if "conda" in env:
+        recipe = env["conda"]
+        exact_keys(recipe, ["manager", "directory", "packages"])
+        exact_keys(recipe["manager"], ["path", "sha256"])
+        recipe["directory"] = relative(recipe["directory"])
+        directory = Path(recipe["directory"])
+        if tuple(directory.parts[-2:]) != (".garden", "conda"):
+            raise ValueError("Use a .garden/conda directory outside project snapshots")
+        if env.get("runtimeOnly"):
+            raise ValueError("A package environment cannot be runtimeOnly")
+        if not isinstance(recipe["packages"], list) or not 0 < len(recipe["packages"]) <= 4096:
+            raise ValueError("Declare the complete nonempty native package archive set")
+        names = set()
+        for package in [recipe["manager"]] + recipe["packages"]:
+            exact_keys(package, ["path", "sha256"])
+            package["path"] = relative(package["path"])
+            if (package["path"] not in env["lockFiles"] or Path(package["path"]).name in names
+                or not isinstance(package["sha256"], str)
+                or not re.fullmatch(r"[a-f0-9]{64}", package["sha256"])):
+                raise ValueError("Native packages and manager need unique lock files and SHA-256")
+            names.add(Path(package["path"]).name)
+        if any(not item["path"].endswith((".tar.bz2", ".conda")) for item in recipe["packages"]):
+            raise ValueError("Native packages must be local Conda archives")
+        if any(Path(name).is_relative_to(directory) for name in files + spec["outputs"]):
+            raise ValueError("The disposable native environment cannot contain analysis files")
     if "name" in spec and (
         not isinstance(spec["name"], str) or len(spec["name"]) > 200
     ):
@@ -393,6 +419,13 @@ def probes(spec, root, execution_env=None):
             "name": "Garden rebuilt R environment",
             "command": [r_recipe["interpreter"], "--vanilla", "--slave", "-e", R_INVENTORY],
         })
+    native = spec["environment"].get("conda")
+    if native:
+        declared.append({
+            "name": "Garden rebuilt native environment",
+            "command": [sys.executable, "-I", "-c", CONDA_INVENTORY,
+                str(Path(native["directory"]) / "environment/conda-meta")],
+        })
     for probe in declared:
         child = subprocess.Popen(
             probe["command"],
@@ -555,8 +588,8 @@ def capture(spec, root, cache, execution_env=None):
     }
 
 
-def setup_command(command, root, execution_env):
-    child = subprocess.Popen(command, cwd=root, env=execution_env, start_new_session=True)
+def setup_command(command, root, execution_env, stdout=None):
+    child = subprocess.Popen(command, cwd=root, env=execution_env, stdout=stdout, start_new_session=True)
     try:
         if child.wait():
             raise ValueError("Environment preparation failed; inspect the command log")
@@ -571,6 +604,12 @@ def verify_recipe_hashes(spec, captured):
         for package in recipe[field] if recipe else []:
             if identities[package["path"]] != package["sha256"]:
                 raise ValueError(description + " does not match its expected checksum: " + package["path"])
+
+    recipe = spec["environment"].get("conda")
+    if recipe:
+        for item in [recipe["manager"]] + recipe["packages"]:
+            if identities[item["path"]] != item["sha256"]:
+                raise ValueError("Native environment lock changed: " + item["path"])
 
 
 def setup_receipt(receipt, kind, directory):
@@ -651,10 +690,130 @@ def prepare_r(spec, root, receipt, filename, execution_env=None):
     return environment
 
 
-def prepare_python(spec, root, receipt, filename):
-    recipe = spec["environment"].get("python")
+CONDA_INVENTORY = """
+import json,sys
+from pathlib import Path
+root=Path(sys.argv[1]); files=sorted(root.glob('*.json'))
+if not files: raise SystemExit('Native environment inventory is empty')
+rows=[]
+for filename in files:
+    if filename.is_symlink() or filename.stat().st_size>1024*1024:
+        raise SystemExit('Native environment inventory is invalid')
+    item=json.loads(filename.read_text())
+    rows.append({key:item[key] for key in ['name','version','build','subdir','sha256']})
+print(json.dumps(sorted(rows,key=lambda row:row['name']),sort_keys=True))
+""".strip()
+
+
+def prepare_conda(spec, root, receipt, filename):
+    recipe = spec["environment"].get("conda")
     if not recipe:
         return None
+    directory = checked_path(root, recipe["directory"])
+    if filename.is_relative_to(directory):
+        raise ValueError("The manifest must be outside the disposable environment")
+    parent, name = parent_descriptor(root, str(directory.parent.relative_to(root)))
+    try:
+        try:
+            os.mkdir(name, WORKSPACE_DIRECTORY_MODE, dir_fd=parent)
+        except FileExistsError:
+            pass
+        os.fsync(parent)
+    finally:
+        os.close(parent)
+    parent, name = parent_descriptor(root, recipe["directory"])
+    try:
+        os.mkdir(name, WORKSPACE_DIRECTORY_MODE, dir_fd=parent)
+        os.fsync(parent)
+    finally:
+        os.close(parent)
+    prefix = directory / "environment"
+    home = directory / "installer-home"
+    home.mkdir(mode=WORKSPACE_DIRECTORY_MODE)
+    environment = {key: value for key, value in os.environ.items()
+        if not key.startswith(("PIP_", "PYTHON", "R_", "CONDA_", "MAMBA_", "DYLD_", "LD_"))
+        and key not in ("VIRTUAL_ENV", "LD_LIBRARY_PATH", "LD_PRELOAD", "CONDARC", "MAMBARC")}
+    installer_env = {**environment, "HOME": str(home),
+        **{key: str(home / key.lower()) for key in
+            ("XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME")}}
+    manager = checked_path(root, recipe["manager"]["path"])
+    if file_identity(root, recipe["manager"]["path"])["sha256"] != recipe["manager"]["sha256"]:
+        raise ValueError("Native package manager changed before preparation")
+    explicit = directory / "explicit.txt"
+    with explicit.open("x") as handle:
+        handle.write("@EXPLICIT\n")
+        for package in recipe["packages"]:
+            if file_identity(root, package["path"])["sha256"] != package["sha256"]:
+                raise ValueError("Native package changed before preparation: " + package["path"])
+            handle.write(checked_path(root, package["path"]).as_uri() + "#" + package["sha256"] + "\n")
+    setup = setup_receipt(receipt, "conda_packages", recipe["directory"])
+    atomic_write(filename, receipt)
+    base = [str(manager), "--no-rc", "--no-env", "--offline", "--root-prefix", str(directory / "cache")]
+    setup["status"] = "installing"
+    atomic_write(filename, receipt)
+    print("garden-run: installing verified local native packages", file=sys.stderr, flush=True)
+    setup_command(base + ["create", "--yes", "--always-copy", "--no-pyc", "--no-pin", "--no-py-pin",
+        "--prefix", str(prefix), "--file", str(explicit)], root, installer_env)
+    installed = sorted((prefix / "conda-meta").glob("*.json"))
+    expected = {Path(item["path"]).name: item["sha256"] for item in recipe["packages"]}
+    if not installed or len(installed) != len(expected):
+        raise ValueError("Installed native packages differ from the declared archives")
+    records = []
+    seen = set()
+    platform_name = {("Linux", "x86_64"): "linux-64", ("Linux", "aarch64"): "linux-aarch64",
+        ("Darwin", "arm64"): "osx-arm64", ("Darwin", "x86_64"): "osx-64"}.get((platform.system(), platform.machine()))
+    if not platform_name:
+        raise ValueError("Native reconstruction does not support this platform")
+    for metadata in installed:
+        checked_path(root, str(metadata.relative_to(root)))
+        item = read_json(metadata)
+        if (item.get("fn") not in expected or item.get("sha256") != expected[item["fn"]]
+            or item.get("name") in seen or item.get("subdir") not in (platform_name, "noarch")
+            or any(not isinstance(item.get(key), str) or not re.fullmatch(pattern, item[key])
+                for key, pattern in [("name", r"[a-z0-9][a-z0-9_.-]*"),
+                    ("version", r"[A-Za-z0-9][A-Za-z0-9_.+!-]*"),
+                    ("build", r"[A-Za-z0-9_][A-Za-z0-9_.+-]*")])):
+            raise ValueError("Installed native package identity does not match its lock")
+        seen.add(item["name"])
+        records.append(item)
+    # Solving from an empty prefix catches dependencies an explicit install does not check.
+    channel = directory / "validation-channel"
+    for subdir in (platform_name, "noarch"):
+        channel_dir = channel / subdir
+        channel_dir.mkdir(parents=True, mode=WORKSPACE_DIRECTORY_MODE)
+        packages = {item["fn"]: item for item in records if item["subdir"] == subdir}
+        (channel_dir / "repodata.json").write_text(json.dumps({"info": {"subdir": subdir},
+            "packages": {key: value for key, value in packages.items() if key.endswith(".tar.bz2")},
+            "packages.conda": {key: value for key, value in packages.items() if key.endswith(".conda")},
+            "repodata_version": 1}))
+    plan = directory / "dependency-plan.json"
+    print("garden-run: checking the complete native dependency set offline", file=sys.stderr, flush=True)
+    with plan.open("x") as output:
+        try:
+            setup_command(base + ["create", "--dry-run", "--json", "--no-pin", "--no-py-pin",
+                "--prefix", str(directory / "validation-prefix"), "--override-channels",
+                "--channel", channel.as_uri(),
+                *[item["name"] + "==" + item["version"] + "=" + item["build"] for item in records]],
+                root, installer_env, output)
+        except ValueError:
+            raise ValueError("Native dependencies are incomplete or incompatible; inspect " +
+                str(plan.relative_to(root))) from None
+    solved = read_json(plan, MAX_PRODUCER_BYTES)
+    chosen = solved.get("actions", {}).get("LINK", [])
+    identity = lambda item: (item.get("name"), item.get("version"), item.get("build_string", item.get("build")), item.get("sha256"))
+    if solved.get("success") is not True or not chosen or sorted(map(identity, chosen)) != sorted(map(identity, records)):
+        raise ValueError("Native dependency solution differs from the verified package set")
+    environment.update({"PATH": str(prefix / "bin") + os.pathsep + environment.get("PATH", os.defpath),
+        "CONDA_PREFIX": str(prefix), "PYTHONNOUSERSITE": "1"})
+    setup["status"] = "ready"
+    atomic_write(filename, receipt)
+    return environment
+
+
+def prepare_python(spec, root, receipt, filename, execution_env=None):
+    recipe = spec["environment"].get("python")
+    if not recipe:
+        return execution_env
     directory = checked_path(root, recipe["directory"])
     if filename.is_relative_to(directory):
         raise ValueError("The manifest must be outside the disposable environment")
@@ -666,7 +825,7 @@ def prepare_python(spec, root, receipt, filename):
         os.close(parent)
     environment = {
         key: value
-        for key, value in os.environ.items()
+        for key, value in (execution_env if execution_env is not None else os.environ).items()
         if not key.startswith(("PIP_", "PYTHON")) and key != "VIRTUAL_ENV"
     }
     environment.update({"PIP_CONFIG_FILE": os.devnull, "PYTHONNOUSERSITE": "1"})
@@ -738,7 +897,7 @@ def run(spec, root, filename, previous=None):
         "seedCoverage": "declared_by_caller_not_automatically_applied",
         "coverage": "declared_files_and_environment_probes",
         "note": (
-            "Only declared local Python wheel or R archive recipes rebuild dependencies. No source download. "
+            "Declared local Python, R and native-package recipes rebuild dependencies without fetching packages. Package installation code retains the ordinary command authority. "
             "Undeclared dependencies, external services and unsaved runtime state are not captured."
         ),
     }
@@ -759,7 +918,8 @@ def run(spec, root, filename, previous=None):
         ):
             raise ValueError("Inputs, source or environment locks changed; execution refused")
         verify_recipe_hashes(spec, files_before)
-        execution_env = prepare_python(spec, root, receipt, filename)
+        execution_env = prepare_conda(spec, root, receipt, filename)
+        execution_env = prepare_python(spec, root, receipt, filename, execution_env)
         execution_env = prepare_r(spec, root, receipt, filename, execution_env)
         before = capture(spec, root, hash_cache, execution_env)
         if any(before[key] != value for key, value in files_before.items()):

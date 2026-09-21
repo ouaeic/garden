@@ -177,7 +177,13 @@ export default function AnalysisRunPreview({
         </div>
         {setups.map((setup) => (
           <div key={setup.kind}>
-            <dt>{setup.kind === 'r_archives' ? 'R library' : 'Python environment'}</dt>
+            <dt>
+              {setup.kind === 'r_archives'
+                ? 'R library'
+                : setup.kind === 'conda_packages'
+                  ? 'Native environment'
+                  : 'Python environment'}
+            </dt>
             <dd>
               {setup.status === 'ready'
                 ? 'Rebuilt from verified local packages'
@@ -239,6 +245,12 @@ export default function AnalysisRunPreview({
           <p className="analysis-run-path">
             R library: <code>{record.spec.environment.r.directory}</code>. Local package archives
             are installed in their declared order.
+          </p>
+        )}
+        {record.spec.environment.conda && (
+          <p className="analysis-run-path">
+            Native environment: <code>{record.spec.environment.conda.directory}</code>. The saved
+            manager and archives are verified, then the full dependency set is checked offline.
           </p>
         )}
         {[

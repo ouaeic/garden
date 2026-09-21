@@ -843,3 +843,19 @@ pending recovery. A grace deadline, lost provider connection, ended controller o
 ends the session explicitly. Recovery does not recreate provider history after an API restart and
 does not forward additional task content. Saved proposals and billing receipts retain their existing
 durable recovery paths.
+
+### Declared native environments
+
+Analysis recipes can reconstruct a native toolchain from a checksum-identified local micromamba
+executable and complete local package archives. Preparation uses a fresh disposable prefix,
+ignores caller package-manager configuration and downloads no packages. It verifies the installed
+identities and performs an offline solve from an empty prefix against only the declared package
+metadata. Missing dependencies, incompatible host requirements or an altered package set refuse
+analysis. The recorded native inventory joins ordinary source, input, lock and output identities.
+
+The prefix leads the command path and can supply the base interpreters for Python and R recipes.
+Existing environments are never repaired implicitly. Installation scripts retain normal command
+authority; the recipe does not establish a new security boundary. Activation scripts, undeclared
+system libraries, services, kernel and live interpreter state are not recreated automatically.
+The agent chooses an appropriate recipe while preparing the work; no new initial prompt option
+is required.

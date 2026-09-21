@@ -6,7 +6,7 @@ compatibility: Needs python3 with the venv module, curl and the shell, all insta
 allowed-tools: shell process file_read file_write files_list set_plan set_acceptance notify
 metadata:
   athanor.tier: 'builtin'
-  athanor.version: '1.4.0'
+  athanor.version: '1.5.0'
   athanor.risk: 'workspace'
   athanor.domain: 'science'
 ---
@@ -90,10 +90,28 @@ archives in `lockFiles`; install system build dependencies through ordinary tool
 recorder verifies archives, installs into a new library and records rebuilt and base/recommended
 package versions. It does not fetch missing packages. Use R with `--vanilla` in commands and
 probes. Python and R recipes may coexist for a mixed pipeline. Library directories are disposable;
-retain source archives and native-tool probes for replay. Other toolchains retain explicit setup.
+retain source archives and native-tool probes for replay.
+
+For compiled tools and shared libraries, use a complete local Conda package set and a local
+micromamba executable. Verify the manager against its official release checksum through ordinary
+tools. Declare `environment.conda` with `directory` (a relative `.garden/conda` path), `manager`
+(an object with `path` and `sha256`), and `packages` (local `.conda` or `.tar.bz2` objects with
+`path` and `sha256`). Include the executable and every package in `lockFiles`. The recorder verifies
+their identities, installs without package downloads, and solves the complete pinned set offline
+against the host platform before running analysis. An incomplete or incompatible dependency set
+fails preparation. Existing environments are refused, and caller package-manager configuration
+cannot change the recipe.
+
+The rebuilt `environment/bin` leads `PATH`. Use installed command names in probes and analysis.
+Package installation scripts run under the existing command authority; this recipe is not a new
+sandbox. Package activation scripts are not automatically sourced into analysis. If a tool needs
+additional runtime configuration, make it explicit in the declared source and probes. Python and R
+recipes may layer on the native toolchain using its explicit interpreter paths. The package
+inventory and archive hashes support replay; operating-system services, kernel, hardware and
+unsaved interpreter state are outside this recipe. Preserve the complete local archive set.
 
 To reproduce, copy the unchanged source, inputs and dependency files into a clean directory, then
-run `garden-run replay --from-manifest /path/to/run.json --manifest rerun.json`. Recorded Python and R
+run `garden-run replay --from-manifest /path/to/run.json --manifest rerun.json`. Recorded Python, R and native-package
 recipes rebuild their environments; otherwise recreate dependencies through normal tools.
 Changed inputs, source, lock files, environment probes or platform cause refusal before execution.
 Output checksum differences fail the reproduction check. The manifest does not fetch data,

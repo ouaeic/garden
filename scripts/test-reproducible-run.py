@@ -17,11 +17,14 @@ import zipfile
 import tarfile
 import io
 import csv
+import platform
 import stat
 
 RUNNER = Path(__file__).with_name("reproducible-run.py").resolve()
 PYTHON = sys.executable
 R = shutil.which("R")
+MICROMAMBA = os.environ.get("GARDEN_TEST_MICROMAMBA")
+CC = shutil.which("cc")
 
 
 class AnalysisRuns(unittest.TestCase):
@@ -470,6 +473,108 @@ Path('result.json').write_text(json.dumps({'length': len(sequence), 'counts': co
         result = self.invoke()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("symbolic links", result.stderr)
+
+    def conda_recipe(self, dependency="garden-native-lib >=1.0", modern=False):
+        manager = self.first / "manager" / "micromamba"
+        manager.parent.mkdir()
+        shutil.copyfile(MICROMAMBA, manager)
+        manager.chmod(0o755)
+        build = self.root / "native-build"
+        build.mkdir()
+        (build / "lib.c").write_text("int garden_gc(const char*s){int n=0;while(*s){if(*s=='C'||*s=='G')n++;s++;}return n;}")
+        (build / "main.c").write_text('#include <stdio.h>\nextern int garden_gc(const char*);int main(int n,char**v){if(n!=2)return 2;printf("%d\\n",garden_gc(v[1]));return 0;}')
+        mac = platform.system() == "Darwin"
+        library = "libgarden.dylib" if mac else "libgarden.so"
+        subprocess.run([CC, "-shared", "-fPIC", str(build / "lib.c"), "-o", str(build / library),
+            *(["-Wl,-install_name,@rpath/" + library] if mac else [])], check=True, capture_output=True)
+        subprocess.run([CC, str(build / "main.c"), "-L" + str(build), "-lgarden",
+            "-Wl,-rpath," + ("@executable_path/../lib" if mac else "$ORIGIN/../lib"),
+            "-o", str(build / "garden-native-test")], check=True, capture_output=True)
+        archives = self.first / "native-packages"
+        archives.mkdir()
+        subdir = {("Darwin", "arm64"): "osx-arm64", ("Darwin", "x86_64"): "osx-64",
+            ("Linux", "x86_64"): "linux-64", ("Linux", "aarch64"): "linux-aarch64"}[(platform.system(), platform.machine())]
+        packages = []
+        for name, file, dest, depends in [
+            ("garden-native-lib", build / library, "lib/" + library, []),
+            ("garden-native-test", build / "garden-native-test", "bin/garden-native-test", [dependency])]:
+            filename = archives / (name + "-1.0-0.tar.bz2")
+            with tarfile.open(filename, "w:bz2") as tar:
+                for entry, content in {"info/index.json": json.dumps({"name": name, "version": "1.0", "build": "0", "build_number": 0, "subdir": subdir, "depends": depends}).encode(),
+                    "info/files": (dest + "\n").encode(), dest: file.read_bytes()}.items():
+                    item = tarfile.TarInfo(entry)
+                    item.size = len(content)
+                    item.mode = 0o755 if entry == dest else 0o644
+                    tar.addfile(item, io.BytesIO(content))
+            if modern:
+                converted = subprocess.run([str(manager), "--no-rc", "--no-env", "package", "transmute", str(filename)],
+                    cwd=build, capture_output=True, text=True, env={"PATH": os.defpath, "HOME": str(build)})
+                self.assertEqual(converted.returncode, 0, converted.stdout + converted.stderr)
+                filename = filename.with_name(name + "-1.0-0.conda")
+            packages.append({"path": str(filename.relative_to(self.first)), "sha256": hashlib.sha256(filename.read_bytes()).hexdigest()})
+        self.spec["environment"] = {
+            "lockFiles": [str(manager.relative_to(self.first))] + [item["path"] for item in packages],
+            "probes": [{"name": "Native GC tool", "command": ["garden-native-test", "ACGT"]}],
+            "conda": {"directory": ".garden/conda", "manager": {"path": str(manager.relative_to(self.first)), "sha256": hashlib.sha256(manager.read_bytes()).hexdigest()}, "packages": packages}}
+        self.source = self.source.replace("counts =", "import subprocess\nnative=int(subprocess.check_output(['garden-native-test',sequence]).strip())\ncounts =").replace("(counts['G'] + counts['C'])", "native")
+        self.populate(self.first)
+        return manager
+
+    @unittest.skipUnless(MICROMAMBA and CC, "Native recipe acceptance needs a declared micromamba binary and C compiler")
+    def test_native_environment_rebuilds_compiled_libraries_and_replays(self):
+        self.conda_recipe(modern=True)
+        result = self.invoke()
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        recorded = json.loads((self.first / "run.json").read_text())
+        self.assertEqual(recorded["environmentSetups"], [{"kind": "conda_packages", "directory": ".garden/conda", "status": "ready"}])
+        self.assertEqual(json.loads((self.first / "result.json").read_text())["gc"], 0.5)
+        self.assertEqual(recorded["before"]["probes"][-1]["name"], "Garden rebuilt native environment")
+        inventory = json.loads(recorded["before"]["probes"][-1]["output"])
+        self.assertEqual({item["name"] for item in inventory}, {"garden-native-lib", "garden-native-test"})
+        fresh = self.root / "fresh"
+        fresh.mkdir()
+        self.populate(fresh)
+        for name in ["manager", "native-packages"]:
+            shutil.copytree(self.first / name, fresh / name)
+        result = self.invoke(fresh, replay=self.first / "run.json")
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertTrue(json.loads((fresh / "run.json").read_text())["outputsMatchPrevious"])
+        self.assertEqual((fresh / "result.json").read_bytes(), (self.first / "result.json").read_bytes())
+
+    @unittest.skipUnless(MICROMAMBA and CC, "Native recipe acceptance needs a declared micromamba binary and C compiler")
+    def test_native_dependency_mismatch_is_refused_before_analysis(self):
+        self.conda_recipe("garden-native-lib >=2.0")
+        result = self.invoke()
+        self.assertNotEqual(result.returncode, 0)
+        receipt = json.loads((self.first / "run.json").read_text())
+        self.assertEqual(receipt["status"], "failed")
+        self.assertIn("incomplete or incompatible", receipt["error"])
+        self.assertFalse((self.first / "result.json").exists())
+
+    @unittest.skipUnless(MICROMAMBA and CC, "Native recipe acceptance needs a declared micromamba binary and C compiler")
+    def test_native_manager_drift_is_refused_before_installation(self):
+        manager = self.conda_recipe()
+        manager.write_bytes(manager.read_bytes() + b"changed")
+        result = self.invoke()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.first / ".garden").exists())
+        self.assertIn("lock changed", json.loads((self.first / "run.json").read_text())["error"])
+
+    @unittest.skipUnless(MICROMAMBA and CC, "Native recipe acceptance needs a declared micromamba binary and C compiler")
+    def test_native_preparation_ignores_caller_channels_and_leaves_existing_environments_intact(self):
+        self.conda_recipe()
+        forbidden = self.root / "not-the-cache"
+        result = self.invoke(env={**os.environ, "MAMBA_ROOT_PREFIX": str(forbidden), "CONDA_PKGS_DIRS": str(forbidden), "CONDA_PREFIX": str(forbidden), "CONDARC": str(forbidden)})
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertFalse(forbidden.exists())
+        (self.first / "run.json").unlink()
+        (self.first / "result.json").unlink()
+        sentinel = self.first / ".garden/conda/environment/owner.txt"
+        sentinel.write_text("keep")
+        result = self.invoke()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(sentinel.read_text(), "keep")
+        self.assertFalse((self.first / "result.json").exists())
 
     def wheel_recipe(self, dependency=None):
         wheel = self.first / "wheels" / "garden_test_science-1.0-py3-none-any.whl"

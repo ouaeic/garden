@@ -35,7 +35,7 @@ const probe = z.object({
 });
 
 const environmentSetup = z.object({
-  kind: z.enum(['python_wheels', 'r_archives']),
+  kind: z.enum(['python_wheels', 'r_archives', 'conda_packages']),
   directory: path,
   status: z.enum(['creating', 'installing', 'ready'])
 });
@@ -59,7 +59,7 @@ export const AnalysisRunRecord = z.object({
   environmentSetups: z
     .array(environmentSetup)
     .min(1)
-    .max(2)
+    .max(3)
     .refine((setups) => new Set(setups.map((setup) => setup.kind)).size === setups.length)
     .optional(),
   spec: z.object({
@@ -100,6 +100,16 @@ export const AnalysisRunRecord = z.object({
             .max(4096)
         })
         .optional(),
+      conda: z
+        .object({
+          manager: z.object({ path, sha256: hash }),
+          directory: path,
+          packages: z
+            .array(z.object({ path, sha256: hash }))
+            .min(1)
+            .max(4096)
+        })
+        .optional(),
       probes: z.array(z.object({ name: z.string().max(120), command })).max(32)
     }),
     seeds: z
@@ -113,7 +123,7 @@ export const AnalysisRunRecord = z.object({
       inputs: files,
       locks: files,
       // Declared probes plus one package inventory per reconstructible runtime.
-      probes: z.array(probe).max(32 + 2),
+      probes: z.array(probe).max(32 + 3),
       platform: z.object({ system: z.string(), release: z.string(), architecture: z.string() })
     })
     .optional(),
