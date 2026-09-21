@@ -22,9 +22,24 @@ async function fixture() {
     b = randomUUID();
   const wa = randomUUID(),
     wb = randomUUID();
+  const captures = new Map<string, string>();
   const execution: ProjectCheckExecution = {
+    captureGit: async (copy, output) => {
+      const source = path.join(root, copy.workspaceId, 'workspace', copy.path);
+      const head = (await command(source, ['rev-parse', 'HEAD'])).trim();
+      if (head !== copy.base)
+        await command(source, ['bundle', 'create', output, 'HEAD', '^' + copy.base]);
+      const sessionId = randomUUID();
+      captures.set(sessionId, JSON.stringify({ head, unchanged: head === copy.base }));
+      return { sessionId };
+    },
     start: async () => ({ sessionId: randomUUID() }),
-    poll: () => ({ status: 'completed', ranForMs: 1, exitCode: 0 }),
+    poll: (_workspace, _task, sessionId) => ({
+      status: 'completed',
+      ranForMs: 1,
+      exitCode: 0,
+      ...(captures.has(sessionId) ? { stdout: captures.get(sessionId)! } : {})
+    }),
     stop: () => {}
   };
   const manager = new ProjectUpdatesManager(root, execution, async () => {});
@@ -80,7 +95,7 @@ it.each(['sha1', 'sha256'] as const)(
       repository = await f.connect(format);
     await f.write(f.wa, 'src/one.ts', 'export const one = 3;\n');
     const update = await f.prepare(f.a, ['src/one.ts'], true);
-    expect(update.state).toBe('ready');
+    expect(update.state, update.detail ?? '').toBe('ready');
     expect(update.repositories).toHaveLength(1);
     const version = update.repositories![0]!;
     expect(version.base).toBe(repository.head);
@@ -249,7 +264,7 @@ it('rejects unsafe branch/path inputs and changed connection identities without 
   );
   await f.write(f.wa, 'src/one.ts', 'export const one = 5;\n');
   const update = await f.prepare(f.a, ['src/one.ts']);
-  expect(update.state).toBe('ready');
+  expect(update.state, update.detail ?? '').toBe('ready');
   await f.manager.publish(
     f.project,
     update.id,
@@ -418,7 +433,7 @@ it('keeps Unicode, newline and leading-dash source names as exact Git paths', as
   const name = 'src/-測定\nresult.txt';
   await f.write(f.wa, name, 'result\n');
   const update = await f.prepare(f.a, [name]);
-  expect(update.state).toBe('ready');
+  expect(update.state, update.detail ?? '').toBe('ready');
   expect(update.repositories).toHaveLength(1);
   const version = update.repositories![0]!;
   const git = path.join(
@@ -576,7 +591,7 @@ it.each(['sha1', 'sha256'] as const)(
     expect(await command(roots[1]!, ['status', '--porcelain'])).toBe('');
     expect((await f.manager.repositories(f.project).get(repository.id)).head).toBe(repository.head);
     const proposed = await f.prepare(f.a, ['src'], true);
-    expect(proposed.changeCount).toBe(1);
+    expect(proposed.changeCount, proposed.detail ?? '').toBe(1);
     expect(proposed.repositories?.[0]?.tree).not.toBe(repository.head);
     expect(proposed.changes.every((change) => !change.path.includes('.git'))).toBe(true);
   }
@@ -691,4 +706,109 @@ it('retries failed configuration without copying sources or resetting edits made
     'keep the new local edit\n'
   );
   expect((await f.prepare(f.b, ['src/one.ts'])).changes[0]?.kind).toBe('modified');
+});
+
+it.each(['sha1', 'sha256'] as const)(
+  'retains conversation %s commits without substituting their tree for the checked candidate',
+  async (format) => {
+    const f = await fixture(),
+      repository = await f.connect(format);
+    await f.manager.checkout(f.project, f.a, ['src']);
+    await f.manager.gitWorkingCopies(f.project).close();
+    const copy = (await f.manager.gitWorkingCopies(f.project).list())[0]!;
+    expect(copy).toMatchObject({ state: 'ready', taskId: f.a });
+    const source = path.join(f.root, f.wa, 'workspace/src');
+    await command(source, ['commit', '--allow-empty', '-m', 'Preserve intermediate reasoning']);
+    const head = (await command(source, ['rev-parse', 'HEAD'])).trim();
+    expect(head).not.toBe(repository.head);
+    const captured = new Map<string, string>();
+    f.execution.captureGit = async (working, output) => {
+      expect(working.taskId).toBe(f.a);
+      await command(source, ['bundle', 'create', output, 'HEAD', '^' + working.base]);
+      const sessionId = randomUUID();
+      captured.set(sessionId, JSON.stringify({ head, unchanged: false }));
+      return { sessionId };
+    };
+    const poll = f.execution.poll.bind(f.execution);
+    f.execution.poll = (workspace, task, session, logs) =>
+      captured.has(session)
+        ? { status: 'completed', exitCode: 0, ranForMs: 1, stdout: captured.get(session)! }
+        : poll(workspace, task, session, logs);
+    await f.write(f.wa, 'src/one.ts', 'export const one = 21;\n');
+    const update = await f.prepare(f.a, ['src/one.ts'], true);
+    expect(update.state, update.detail ?? '').toBe('ready');
+    const version = update.repositories![0]!;
+    expect(version.sourceCommit).toBe(head);
+    const managed = path.join(
+      f.manager.directory(f.project),
+      'state/repositories',
+      repository.id,
+      'repository.git'
+    );
+    expect(
+      (await command(managed, ['rev-list', '--parents', '-n', '1', version.commit]))
+        .trim()
+        .split(' ')
+    ).toEqual([version.commit, repository.head, head]);
+    expect(await command(managed, ['show', `${version.commit}:one.ts`])).toBe(
+      'export const one = 21;\n'
+    );
+    expect(await command(managed, ['show', `${head}:one.ts`])).toBe('export const one = 1;\n');
+    const resumed = await f.manager.rebase(f.project, update.id, randomUUID());
+    await f.manager.settle(resumed.id);
+    expect((await f.manager.inspect(f.project, resumed.id)).repositories![0]!.sourceCommit).toBe(
+      head
+    );
+    expect(captured.size).toBe(1);
+    const { readdir } = await import('node:fs/promises');
+    expect(
+      (await readdir(path.join(f.root, f.wa, 'workspace/.garden'))).filter((name) =>
+        name.startsWith('.garden-history-')
+      )
+    ).toEqual([]);
+  }
+);
+
+it('fails preparation explicitly when an installed conversation cannot safely capture its history', async () => {
+  const f = await fixture();
+  delete f.execution.captureGit;
+  await f.connect();
+  await f.manager.checkout(f.project, f.a, ['src']);
+  await f.manager.gitWorkingCopies(f.project).close();
+  await f.write(f.wa, 'src/one.ts', 'export const one = 22;\n');
+  const update = await f.prepare(f.a, ['src/one.ts']);
+  expect(update.state).toBe('failed');
+  expect(update.detail).toContain('Safe conversation Git capture is unavailable');
+  expect(await readFile(path.join(f.root, f.wa, 'workspace/src/one.ts'), 'utf8')).toBe(
+    'export const one = 22;\n'
+  );
+});
+
+it('can publish captured history with unchanged source files and refuses a second empty update', async () => {
+  const f = await fixture(),
+    repository = await f.connect();
+  await f.manager.checkout(f.project, f.a, ['src']);
+  await f.manager.gitWorkingCopies(f.project).close();
+  const source = path.join(f.root, f.wa, 'workspace/src');
+  await command(source, ['commit', '--allow-empty', '-m', 'Keep a reviewed checkpoint']);
+  const update = await f.prepare(f.a, ['src']);
+  expect(update.state, update.detail ?? '').toBe('ready');
+  expect(update.changeCount).toBe(0);
+  expect(update.repositories).toHaveLength(1);
+  expect(update.repositories![0]!.historyChanged).toBe(true);
+  const first = await f.manager.publish(
+    f.project,
+    update.id,
+    update.candidateDigest!,
+    'Synthetic history-only fixture'
+  );
+  expect(first.repositories![0]!.commit).not.toBe(repository.head);
+  expect(await readFile(path.join(first.path, 'src/one.ts'), 'utf8')).toBe(
+    'export const one = 1;\n'
+  );
+  const repeated = await f.prepare(f.a, ['src']);
+  expect(repeated.repositories![0]!.historyChanged).toBe(false);
+  await expect(
+    f.manager.publish(f.project, repeated.id, repeated.candidateDigest!, 'Duplicate')
+  ).rejects.toThrow('not ready');
 });

@@ -184,3 +184,31 @@ it('keeps status polling compact while preserving candidate and pagination metad
     exitCode: 1
   });
 });
+
+it('recognizes checked history-only publication while retaining review-mode confirmation', async () => {
+  const runner = new AgentRunnerClient('http://runner.invalid', 'x'.repeat(32));
+  vi.spyOn(runner, 'call').mockResolvedValue({
+    taskId: task.id,
+    candidateDigest: digest,
+    changes: [],
+    changeCount: 0,
+    nextChange: null,
+    repositories: [{ historyChanged: true }]
+  });
+  expect(
+    await projectUpdateApproval(
+      runner,
+      { ...task, securityMode: 'autonomous' },
+      call('publish', { updateId, digest }),
+      {}
+    )
+  ).toBeNull();
+  expect(
+    await projectUpdateApproval(
+      runner,
+      { ...task, securityMode: 'review' },
+      call('publish', { updateId, digest }),
+      {}
+    )
+  ).toMatchObject({ sideEffect: 'workspace_write' });
+});

@@ -34,7 +34,9 @@ const canStartChecks = (update: ProjectUpdate) =>
 const active = (check: ProjectCheck) =>
   ['preparing', 'running', 'verifying'].includes(check.status);
 const label = (update: ProjectUpdate) =>
-  update.state === 'ready' && update.changeCount === 0
+  update.state === 'ready' &&
+  update.changeCount === 0 &&
+  !update.repositories?.some((repository) => repository.historyChanged)
     ? 'No changed files'
     : update.state === 'ready' &&
         update.checks.length &&
@@ -649,6 +651,9 @@ export default function ProjectUpdates({
                     <code>{repository.commit}</code>
                     <small>Tree {repository.tree}</small>
                     <small>Based on {repository.base}</small>
+                    {repository.sourceCommit && (
+                      <small>Conversation history {repository.sourceCommit}</small>
+                    )}
                   </div>
                 ))}
               </details>
@@ -960,35 +965,40 @@ export default function ProjectUpdates({
                   </Button>
                 )}
             </div>
-            {selected.state === 'ready' && !selected.checks.length && selected.changeCount > 0 && (
-              <details>
-                <summary>Publish without automated checks</summary>
-                <p>This records your decision with the version. It will be labelled as untested.</p>
-                <Field label="Reason">
-                  <textarea
-                    rows={2}
-                    maxLength={600}
-                    value={reason}
-                    onChange={(event) => setReason(event.target.value)}
-                  />
-                </Field>
-                <Button
-                  disabled={!!busy || !reason.trim()}
-                  onClick={() =>
-                    void perform('publish', () =>
-                      act({
-                        action: 'publish',
-                        updateId: selected.id,
-                        digest: selected.candidateDigest!,
-                        uncheckedReason: reason
-                      })
-                    )
-                  }
-                >
-                  Publish untested version
-                </Button>
-              </details>
-            )}
+            {selected.state === 'ready' &&
+              !selected.checks.length &&
+              (selected.changeCount > 0 ||
+                selected.repositories?.some((repository) => repository.historyChanged)) && (
+                <details>
+                  <summary>Publish without automated checks</summary>
+                  <p>
+                    This records your decision with the version. It will be labelled as untested.
+                  </p>
+                  <Field label="Reason">
+                    <textarea
+                      rows={2}
+                      maxLength={600}
+                      value={reason}
+                      onChange={(event) => setReason(event.target.value)}
+                    />
+                  </Field>
+                  <Button
+                    disabled={!!busy || !reason.trim()}
+                    onClick={() =>
+                      void perform('publish', () =>
+                        act({
+                          action: 'publish',
+                          updateId: selected.id,
+                          digest: selected.candidateDigest!,
+                          uncheckedReason: reason
+                        })
+                      )
+                    }
+                  >
+                    Publish untested version
+                  </Button>
+                </details>
+              )}
             {selectedVersion?.contentRemoval && (
               <p>Published files were permanently removed. Their history remains available.</p>
             )}

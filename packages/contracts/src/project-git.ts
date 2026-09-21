@@ -34,6 +34,8 @@ export interface ProjectRepository {
   createdAt: string;
 }
 export interface ProjectGitVersion {
+  sourceCommit?: string;
+  historyChanged?: boolean;
   repositoryId: string;
   branch: string;
   base: string;

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
-import { open, readFile, readdir, rm, writeFile, rename } from 'node:fs/promises';
+import { open, readFile, readdir, rm, writeFile, rename, type FileHandle } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
 import {
@@ -9,6 +9,7 @@ import {
   ProjectRepositoryRemoval,
   ProjectRepositoryRemovalInput,
   type ProjectGitVersion,
+  type ProjectFileVersion,
   type ProjectRepository,
   type ProjectRepositoryHistory
 } from '@athanor/contracts';
@@ -20,7 +21,7 @@ import {
   syncDirectory,
   type VersionTree
 } from './project-version-files.js';
-import { projectGitCommand as command } from './project-git-command.js';
+import { projectGitCommand as command, projectGitIsAncestor } from './project-git-command.js';
 import { projectGitTree } from './project-git-tree.js';
 import { assertHostStorageWrite } from './host-storage.js';
 
@@ -236,33 +237,7 @@ export class ProjectGit {
     const filename = projectPath(`workspace/${selected}`);
     const fact = files[filename];
     if (!fact) throw Error('Choose a complete Git bundle from this published version');
-    const handle = await open(this.files.object(fact), constants.O_RDONLY | constants.O_NOFOLLOW);
-    const hash = createHash('sha256');
-    let size = 0;
-    try {
-      const chunks: AsyncIterable<unknown> = handle.createReadStream({ autoClose: false });
-      for await (const chunk of chunks) {
-        if (!Buffer.isBuffer(chunk)) throw Error('Invalid history bundle bytes');
-        hash.update(chunk);
-        size += chunk.length;
-      }
-    } finally {
-      await handle.close();
-    }
-    if (size !== fact.bytes || hash.digest('hex') !== fact.sha256)
-      throw Error('The history bundle changed');
-    await assertHostStorageWrite(this.directory, fact.bytes + 4096);
-    const bundle = this.files.object(fact);
-    await command(this.git(repositoryId), ['bundle', 'verify', bundle]);
-    const raw = await command(this.git(repositoryId), ['bundle', 'unbundle', bundle]);
-    const refs = raw
-      .trimEnd()
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => {
-        const split = line.indexOf(' ');
-        return { commit: object(line.slice(0, split)), name: line.slice(split + 1) };
-      });
+    const refs = await this.importBundle(repositoryId, fact);
     const target = refs.find((ref) => ref.name === `refs/heads/${branch}`);
     if (!target) throw Error('The selected branch is not present in the history bundle');
     await command(this.git(repositoryId), ['fsck', '--strict', '--no-reflogs', '--no-dangling']);
@@ -292,6 +267,108 @@ export class ProjectGit {
     return object(
       await command(this.git(repositoryId), ['rev-parse', '--verify', `${target.commit}^{commit}`])
     );
+  }
+  private async importBundle(repositoryId: string, fact: ProjectFileVersion) {
+    const handle = await open(this.files.object(fact), constants.O_RDONLY | constants.O_NOFOLLOW);
+    const hash = createHash('sha256');
+    let size = 0;
+    try {
+      const chunks: AsyncIterable<unknown> = handle.createReadStream({ autoClose: false });
+      for await (const chunk of chunks) {
+        if (!Buffer.isBuffer(chunk)) throw Error('Invalid history bundle bytes');
+        hash.update(chunk);
+        size += chunk.length;
+      }
+    } finally {
+      await handle.close();
+    }
+    if (size !== fact.bytes || hash.digest('hex') !== fact.sha256)
+      throw Error('The history bundle changed');
+    await assertHostStorageWrite(this.directory, fact.bytes + 4096);
+    const bundle = this.files.object(fact);
+    await command(this.git(repositoryId), ['bundle', 'verify', bundle]);
+    const raw = await command(this.git(repositoryId), ['bundle', 'unbundle', bundle]);
+    const refs = raw
+      .trimEnd()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        const split = line.indexOf(' ');
+        return { commit: object(line.slice(0, split)), name: line.slice(split + 1) };
+      });
+    return refs;
+  }
+  private conversationRef(taskId: string, updateId: string) {
+    return `refs/garden/conversations/${id(taskId)}/${id(updateId)}`;
+  }
+  async conversationHead(repositoryId: string, taskId: string, updateId: string) {
+    await this.get(repositoryId);
+    return command(this.git(repositoryId), [
+      'show-ref',
+      '--hash',
+      '--verify',
+      this.conversationRef(taskId, updateId)
+    ])
+      .then(object)
+      .catch(() => null);
+  }
+  async retainConversationHead(
+    repositoryId: string,
+    taskId: string,
+    updateId: string,
+    head: string
+  ) {
+    const commit = object(head);
+    await command(this.git(repositoryId), ['cat-file', '-e', `${commit}^{commit}`]);
+    const previous = await this.conversationHead(repositoryId, taskId, updateId);
+    if (previous && previous !== commit)
+      throw Error('Captured conversation history identity changed');
+    if (!previous)
+      await command(this.git(repositoryId), [
+        'update-ref',
+        '--no-deref',
+        this.conversationRef(taskId, updateId),
+        commit,
+        '0'.repeat(commit.length)
+      ]);
+    return commit;
+  }
+  async importConversationHistory(
+    repositoryId: string,
+    taskId: string,
+    updateId: string,
+    bundle: FileHandle,
+    expected: unknown
+  ) {
+    await this.get(repositoryId);
+    const head = GitObjectId.parse(expected);
+    const before = await bundle.stat({ bigint: true });
+    if (!before.isFile()) throw Error('Conversation history is not a regular file');
+    await assertHostStorageWrite(this.directory, Number(before.size) + 4096);
+    const options = { readFd: bundle.fd };
+    const raw = await command(
+      this.git(repositoryId),
+      ['bundle', 'unbundle', '/dev/fd/3'],
+      undefined,
+      options
+    );
+    if (raw.trim() !== `${head} HEAD`)
+      throw Error('Conversation HEAD changed during capture. Prepare the update again.');
+    const after = await bundle.stat({ bigint: true });
+    if (
+      before.size !== after.size ||
+      before.mtimeNs !== after.mtimeNs ||
+      before.ctimeNs !== after.ctimeNs
+    )
+      throw Error('Conversation history changed while importing. Prepare the update again.');
+    await command(this.git(repositoryId), [
+      'fsck',
+      '--strict',
+      '--no-reflogs',
+      '--no-dangling',
+      head
+    ]);
+    return this.retainConversationHead(repositoryId, taskId, updateId, head);
   }
   private tree(
     repositoryId: string,
@@ -334,16 +411,26 @@ export class ProjectGit {
   async prepare(
     update: { id: string; taskId: string; title: string; createdAt: string },
     files: VersionTree,
-    previous: ProjectGitVersion[] = []
+    previous: ProjectGitVersion[] = [],
+    sourceHeads: Record<string, string> = {}
   ): Promise<ProjectGitVersion[]> {
     const results: ProjectGitVersion[] = [];
     for (const repository of await this.list()) {
       const tree = await this.tree(repository.id, repository.path, files);
+      const sourceCommit = sourceHeads[repository.id];
+      const historyChanged = sourceCommit
+        ? !(await projectGitIsAncestor(
+            this.git(repository.id),
+            object(sourceCommit),
+            repository.head
+          ))
+        : false;
       const commit = await this.commit(
         repository.id,
         tree,
         [
           repository.head,
+          ...(sourceHeads[repository.id] ? [sourceHeads[repository.id]!] : []),
           ...previous
             .filter((item) => item.repositoryId === repository.id)
             .map((item) => item.commit)
@@ -370,6 +457,7 @@ export class ProjectGit {
           '0'.repeat(commit.length)
         ]);
       results.push({
+        ...(sourceCommit ? { sourceCommit, historyChanged } : {}),
         repositoryId: repository.id,
         branch: repository.branch,
         base: repository.head,

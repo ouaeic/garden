@@ -123,8 +123,16 @@ export async function projectUpdateApproval(
       changes.push(...page.changes);
       cursor = page.nextChange;
     }
-    if (!changes.length || changes.length !== update.changeCount)
+    const historyChanged =
+      update.repositories?.some((repository) => repository.historyChanged) === true;
+    if ((!changes.length && !historyChanged) || changes.length !== update.changeCount)
       throw new Error('Project update file review is incomplete');
+    if (!changes.length && historyChanged && task.securityMode === 'review')
+      required = {
+        sideEffect: 'workspace_write',
+        action: 'Preserve conversation commits',
+        preview: 'Publish the checked project version with its captured Git history.'
+      };
     for (const change of changes) {
       const result = approvalRequirement(
         'file_write',

@@ -1,3 +1,4 @@
+import { captureConversationHistory } from './project-git-capture.js';
 import { ProjectGitExports } from './project-git-exports.js';
 import { ProjectGitWorkingCopies } from './project-git-working-copies.js';
 import { MAX_CAPABILITY_TTL_SECONDS } from '@athanor/core';
@@ -62,6 +63,7 @@ type StoredUpdate = Omit<ProjectUpdate, 'changeCount' | 'nextChange'> & {
   baseline: VersionTree;
   sourceTaskId: string;
   requestDigest: string;
+  sourceHeads?: Record<string, string>;
 };
 type StoredRevision = ProjectRevision & { files: VersionTree };
 type Registry = { workspaceId: string; members: Record<string, string>; head: string | null };
@@ -76,6 +78,7 @@ type CheckProcess = {
   resources?: ProcessResourceSample;
 };
 export interface ProjectCheckExecution {
+  captureGit?(copy: ProjectGitWorkingCopy, output: string): Promise<{ sessionId: string }>;
   start(
     workspaceId: string,
     taskId: string,
@@ -621,6 +624,7 @@ export class ProjectUpdatesManager {
       baseline: _baseline,
       sourceTaskId: _sourceTask,
       requestDigest: _requestDigest,
+      sourceHeads: _sourceHeads,
       ...view
     } = update;
     const start = after ? update.changes.findIndex((change) => change.path === after) + 1 : 0;
@@ -772,6 +776,36 @@ export class ProjectUpdatesManager {
         )
       )
         throw new Error('A path cannot be both included and deleted');
+      update.sourceHeads ??= {};
+      const selected = [...update.selections.map(projectPath), ...update.deleted];
+      for (const copy of await this.gitWorkingCopies(update.projectId).list()) {
+        if (
+          copy.taskId !== update.sourceTaskId ||
+          copy.workspaceId !== update.sourceWorkspaceId ||
+          copy.state === 'cancelled' ||
+          !selected.some(
+            (name) =>
+              !name ||
+              !copy.path ||
+              name === copy.path ||
+              name.startsWith(copy.path + '/') ||
+              copy.path.startsWith(name + '/')
+          )
+        )
+          continue;
+        if (copy.state !== 'ready' && copy.state !== 'blocked')
+          throw Error('Wait for conversation Git setup before preparing this update');
+        update.progress.stage = 'Preserving conversation commits';
+        update.sourceHeads[copy.repositoryId] = await captureConversationHistory({
+          root: this.root,
+          git: this.repositories(update.projectId),
+          copy,
+          updateId: update.id,
+          execution: this.execution,
+          active: () => this.active(update.id)
+        });
+        await this.save(update);
+      }
       await this.assemble(update);
     } catch (error) {
       update.state = this.#cancelled.has(update.id) ? 'cancelled' : 'failed';
@@ -889,15 +923,16 @@ export class ProjectUpdatesManager {
       : await this.repositories(update.projectId).prepare(
           update,
           candidate,
-          update.repositories ?? []
+          update.repositories ?? [],
+          update.sourceHeads ?? {}
         );
     update.state = conflicted ? 'conflicted' : 'ready';
     update.progress.stage = conflicted
       ? 'Resolve conflicting files'
-      : changes.length
+      : changes.length || update.repositories?.some((repository) => repository.historyChanged)
         ? 'Ready for checks'
         : 'No changed files';
-    if (!changes.length)
+    if (!changes.length && !update.repositories?.some((repository) => repository.historyChanged))
       update.detail =
         'The selected files do not change the published project. There is nothing to publish.';
     await this.save(update);
@@ -1389,7 +1424,8 @@ export class ProjectUpdatesManager {
         if (
           this.#operations.has(id) ||
           update.state !== 'ready' ||
-          update.changes.length === 0 ||
+          (update.changes.length === 0 &&
+            !update.repositories?.some((repository) => repository.historyChanged)) ||
           update.changes.some((change) => change.conflict)
         )
           throw new Error('This update is not ready to publish');

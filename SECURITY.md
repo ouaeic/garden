@@ -403,3 +403,13 @@ repository controls and downloads require the registered project working area an
 A branch-history download reads a captured commit through an independent temporary repository;
 its object alternate refers only to the same managed repository. Open downloads retain a lock
 until the response closes, so cleanup cannot remove their files in flight.
+
+Conversation-history capture runs inside the existing command sandbox with network isolation and
+an additional read-only Landlock layer. The permitted executables are the fixed system Git binary,
+its object packer and their ELF loader. Hooks, filesystem monitors, alternate-reference commands,
+packing hooks, inherited system/global configuration and transport protocols are disabled explicitly. The only new
+project file it can write is a private history bundle through a pre-opened descriptor; working-copy files and indexes
+cannot be changed by the capture. Managed import holds the regular-file descriptor, checks its
+identity for concurrent changes, verifies object connectivity and binds the advertised commit before
+retaining a reference. Neither repository configuration nor a history bundle grants network or
+external-write authority.

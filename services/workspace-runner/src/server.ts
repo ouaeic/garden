@@ -1,3 +1,4 @@
+import { CAPTURE_GIT_HISTORY } from './project-git-capture.js';
 import { GuiNamespaceManager } from './gui-namespace.js';
 import { ProcessHistoryQuery } from '@athanor/contracts';
 import { RepositoryMapper, registerRepositoryMapRoute } from './repository-map.js';
@@ -705,6 +706,27 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
   const projectUpdates = new ProjectUpdatesManager(
     config.WORKSPACE_ROOT,
     {
+      captureGit: async (copy, output) => {
+        if (!sandbox?.confineFilesystem || !sandbox.processIsolation || !sandbox.networkIsolation)
+          throw Error('Conversation Git capture requires measured native isolation');
+        const root = workspacePath(config.WORKSPACE_ROOT, copy.workspaceId);
+        await assertHostStorageWrite(root, 0, probeHostStorage);
+        return processes.start(
+          root,
+          copy.workspaceId,
+          copy.taskId,
+          {
+            executable: '/usr/bin/python3',
+            args: ['-I', '-c', CAPTURE_GIT_HISTORY, copy.base, output],
+            cwd: `workspace/${copy.path}`,
+            network: false,
+            job: 'Preserve conversation commits'
+          },
+          config.MAX_BACKGROUND_SECONDS,
+          true,
+          { ...guards, superviseProcessTree: true }
+        );
+      },
       start: async (workspaceId, taskId, command, job) => {
         if (!sandbox?.confineFilesystem || !sandbox.processIsolation || !sandbox.networkIsolation)
           throw new Error(

@@ -881,9 +881,13 @@ exact prepared directory is added to the conversation's Git ownership exceptions
 isolated command executor; host Git configuration is unchanged.
 
 Publication continues to capture selected source files and verify the exact combined candidate.
-Local working-copy commits remain in that copy; their individual commit messages and intermediate
-history are not imported automatically into managed publication. Remote publication remains a
-separate governed command. A prepared working-copy receipt records initial setup, not an assertion
+For connected directories included in the selection, a supervised, network-isolated read captures
+conversation history without changing its index or files. An incremental bundle is opened through
+a held descriptor, verified in managed storage and retained under a durable proposal identity.
+Captured commits become parents of the exact candidate; they never replace its checked tree.
+Rebuilding retains that captured history. History-only updates can be checked and published;
+repeated history already reachable from the managed branch does not create an empty publication.
+Remote publication remains a separate governed command. A prepared working-copy receipt records initial setup, not an assertion
 that its current branch or files have stayed unchanged.
 
 ## Project GUI lifetime
