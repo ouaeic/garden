@@ -14,10 +14,12 @@ import { processDuration, processMemory } from './process-display';
 import { useVisibleClock } from './visible-clock';
 import './project-updates.css';
 
+const ProjectRepositories = lazy(() => import('./ProjectRepositories'));
 const DirectoryPanel = lazy(() => import('./DirectoryPanel'));
 const ProjectVersionHistory = lazy(() => import('./ProjectVersionHistory'));
 const stateLabel: Record<ProjectUpdate['state'], string> = {
   preparing: 'Preparing files',
+  publishing: 'Finishing publication',
   ready: 'Ready for checks',
   conflicted: 'Resolve conflicts',
   checking: 'Checks running',
@@ -53,6 +55,8 @@ export default function ProjectUpdates({
   onTask: (taskId: string) => void;
 }) {
   const endpoint = `/v1/projects/${projectId}/updates`;
+  const [showRepositories, setShowRepositories] = useState(false);
+  const [repositoriesOpened, setRepositoriesOpened] = useState(false);
   const [cleanup, setCleanup] = useState<CleanupRequest | null>(null);
   const [fileCheck, setFileCheck] = useState('');
   const [data, setData] = useState<Updates | null>(null),
@@ -358,6 +362,25 @@ export default function ProjectUpdates({
               </Suspense>
             </details>
           )}
+          <details
+            onToggle={(event) => {
+              setShowRepositories(event.currentTarget.open);
+              if (event.currentTarget.open) setRepositoriesOpened(true);
+            }}
+            className="project-version-path"
+          >
+            <summary>Git repositories</summary>
+            {repositoriesOpened && (
+              <Suspense fallback={<Spinner label="Opening repositories…" />}>
+                <ProjectRepositories
+                  key={projectId}
+                  projectId={projectId}
+                  revisionId={data.head?.id ?? null}
+                  active={showRepositories}
+                />
+              </Suspense>
+            )}
+          </details>
           <div className="project-update-list">
             {rows.map((update) => (
               <button
@@ -616,6 +639,38 @@ export default function ProjectUpdates({
                 : 'Initial project version'}{' '}
               · {stamp(selected.createdAt)}
             </p>
+            {!!selected.repositories?.length && (
+              <details>
+                <summary>Exact repository commits</summary>
+                {selected.repositories.map((repository) => (
+                  <div key={repository.repositoryId}>
+                    <strong>{repository.branch}</strong>
+                    <code>{repository.commit}</code>
+                    <small>Tree {repository.tree}</small>
+                    <small>Based on {repository.base}</small>
+                  </div>
+                ))}
+              </details>
+            )}
+            {selected.state === 'publishing' && (
+              <div role="status">
+                <p>Publication is being completed. The saved operation can be resumed safely.</p>
+                <Button
+                  disabled={!!busy}
+                  onClick={() =>
+                    void perform('recover', () =>
+                      act({
+                        action: 'publish',
+                        updateId: selected.id,
+                        digest: selected.candidateDigest!
+                      })
+                    )
+                  }
+                >
+                  Resume publication
+                </Button>
+              </div>
+            )}
             {selected.path && (
               <details>
                 <summary>Files in this candidate</summary>
@@ -856,7 +911,7 @@ export default function ProjectUpdates({
                   </Button>
                 )}
               {!selected.contentRemoval &&
-                ['outdated', 'checks_failed', 'failed'].includes(selected.state) && (
+                ['ready', 'outdated', 'checks_failed', 'failed'].includes(selected.state) && (
                   <Button
                     disabled={!!busy}
                     onClick={() =>
@@ -892,16 +947,17 @@ export default function ProjectUpdates({
                     Publish checked version
                   </Button>
                 )}
-              {!selected.contentRemoval && !['published', 'cancelled'].includes(selected.state) && (
-                <Button
-                  disabled={!!busy}
-                  onClick={() =>
-                    void perform('cancel', () => act({ action: 'cancel', updateId: selected.id }))
-                  }
-                >
-                  Cancel update and its checks
-                </Button>
-              )}
+              {!selected.contentRemoval &&
+                !['publishing', 'published', 'cancelled'].includes(selected.state) && (
+                  <Button
+                    disabled={!!busy}
+                    onClick={() =>
+                      void perform('cancel', () => act({ action: 'cancel', updateId: selected.id }))
+                    }
+                  >
+                    Cancel update and its checks
+                  </Button>
+                )}
             </div>
             {selected.state === 'ready' && !selected.checks.length && selected.changeCount > 0 && (
               <details>

@@ -1,3 +1,4 @@
+import { ProjectRepositoryOperation } from '@athanor/contracts';
 import { lstat } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
@@ -50,6 +51,7 @@ const Update = z
       'checking',
       'checks_failed',
       'outdated',
+      'publishing',
       'published',
       'failed',
       'cancelled'
@@ -170,6 +172,22 @@ export async function projectPurgeGraph(
     return value;
   };
   retainVersion(registry.head, 'Current published version');
+  const publishing = await metadata.read(
+    metadata.state('publishing.json'),
+    z.object({ updateId: z.uuid(), revisionId: z.uuid() })
+  );
+  snapshots.push(['publishing', publishing]);
+  if (publishing) retainVersion(publishing.revisionId, 'Publication recovery');
+  for (const name of await metadata.names('repository-operations')) {
+    const operation = await metadata.read(
+      metadata.state(`repository-operations/${name}`),
+      ProjectRepositoryOperation
+    );
+    if (!operation) throw new Error('A repository preparation reference changed.');
+    snapshots.push(['repository', operation]);
+    if (operation.state === 'preparing')
+      retainVersion(operation.input.revisionId, 'Repository preparation');
+  }
   for (const name of await metadata.names('baselines')) {
     const value = await metadata.read(
       metadata.state(`baselines/${name}`),

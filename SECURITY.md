@@ -379,3 +379,13 @@ Losing `DATA_MASTER_KEY` makes encrypted records unrecoverable. Rotating or repl
 Physical access to an unlocked client, deliberate host-root compromise, behavior of third-party
 services, model-quality disagreements, CAPTCHA bypass, bot-defense evasion, and unauthorized testing
 of other systems are not vulnerabilities in this repository.
+
+Managed project Git operations use private, Garden-owned repositories and fixed system Git
+commands. Source configuration and hooks are never copied into those repositories; bundles import
+objects and references. The adapter disables hooks, filesystem monitors, inherited system/global
+configuration, credential prompts, automatic maintenance and transport protocols. Source file
+content is length-delimited and path bytes are quoted before the streaming Git import. Owner
+repository controls and downloads require the registered project working area and signed scopes.
+A branch-history download reads a captured commit through an independent temporary repository;
+its object alternate refers only to the same managed repository. Open downloads retain a lock
+until the response closes, so cleanup cannot remove their files in flight.

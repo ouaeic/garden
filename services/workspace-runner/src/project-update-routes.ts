@@ -3,6 +3,10 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import {
   ProjectUpdateAction,
+  ProjectRepositoryInput,
+  ProjectGitExportInput,
+  ProjectRepositoryRemovalInput,
+  GitObjectId,
   ProjectVersionPinInput,
   PinnedProjectVersionCursor
 } from '@athanor/contracts';
@@ -12,7 +16,7 @@ import type { ProjectUpdatesManager } from './project-updates.js';
 export function registerProjectUpdateRoutes(app: FastifyInstance, manager: ProjectUpdatesManager) {
   const ownerRetention = async (
     request: FastifyRequest,
-    scope: 'project.updates.read' | 'project.updates.write'
+    scope: 'project.updates.read' | 'project.updates.write' | 'files.read'
   ) => {
     requireScope(request, scope);
     const { projectId, workspaceId } = z
@@ -22,9 +26,72 @@ export function registerProjectUpdateRoutes(app: FastifyInstance, manager: Proje
       request.capability.role !== 'user' ||
       (await manager.projectWorkspace(projectId)) !== workspaceId
     )
-      throw new Error('Project archiving requires the project owner');
+      throw new Error('Project controls require the project owner');
     return manager.retention(projectId);
   };
+  app.get('/v1/workspaces/:workspaceId/projects/:projectId/repositories', async (request) => {
+    const owner = await ownerRetention(request, 'project.updates.read');
+    return {
+      repositories: await manager.repositories(owner.projectId).list(),
+      operations: await manager.repositoryOperations(owner.projectId),
+      exports: await manager.gitExports(owner.projectId).list(),
+      removals: await manager.repositories(owner.projectId).removals()
+    };
+  });
+  app.post(
+    '/v1/workspaces/:workspaceId/projects/:projectId/repositories/:repositoryId/remove',
+    async (request) => {
+      const owner = await ownerRetention(request, 'project.updates.write');
+      const { repositoryId } = z.object({ repositoryId: z.uuid() }).parse(request.params);
+      return manager.removeRepository(
+        owner.projectId,
+        repositoryId,
+        ProjectRepositoryRemovalInput.parse(request.body)
+      );
+    }
+  );
+  app.post('/v1/workspaces/:workspaceId/projects/:projectId/repositories', async (request) => {
+    const owner = await ownerRetention(request, 'project.updates.write');
+    return manager.beginRepository(owner.projectId, ProjectRepositoryInput.parse(request.body));
+  });
+  app.get(
+    '/v1/workspaces/:workspaceId/projects/:projectId/repositories/:repositoryId',
+    async (request) => {
+      const owner = await ownerRetention(request, 'project.updates.read');
+      const { repositoryId } = z.object({ repositoryId: z.uuid() }).parse(request.params);
+      const { before } = z.object({ before: GitObjectId.optional() }).strict().parse(request.query);
+      return manager.repositories(owner.projectId).history(repositoryId, before);
+    }
+  );
+  app.post(
+    '/v1/workspaces/:workspaceId/projects/:projectId/repositories/:repositoryId/exports',
+    async (request) => {
+      const owner = await ownerRetention(request, 'project.updates.read');
+      const { repositoryId } = z.object({ repositoryId: z.uuid() }).parse(request.params);
+      return manager
+        .gitExports(owner.projectId)
+        .start(repositoryId, ProjectGitExportInput.parse(request.body));
+    }
+  );
+  app.post(
+    '/v1/workspaces/:workspaceId/projects/:projectId/repository-exports/:exportId/remove',
+    async (request) => {
+      const owner = await ownerRetention(request, 'project.updates.write');
+      const { exportId } = z.object({ exportId: z.uuid() }).parse(request.params);
+      z.object({}).strict().parse(request.body);
+      await manager.gitExports(owner.projectId).remove(exportId);
+      return { removed: true };
+    }
+  );
+  registerFileReadRoutes(
+    app,
+    '/v1/workspaces/:workspaceId/projects/:projectId/repository-exports/:exportId',
+    async (request) => {
+      const owner = await ownerRetention(request, 'files.read');
+      const { exportId } = z.object({ exportId: z.uuid() }).parse(request.params);
+      return manager.gitExports(owner.projectId).open(exportId);
+    }
+  );
   app.post('/v1/workspaces/:workspaceId/projects/:projectId/retention/preview', async (request) => {
     return (await ownerRetention(request, 'project.updates.read')).preview(request.body);
   });

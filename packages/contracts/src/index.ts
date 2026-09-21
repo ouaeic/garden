@@ -1,3 +1,4 @@
+export * from './project-git.js';
 export * from './diagnostic-capture.js';
 export * from './table-preview.js';
 export * from './json-proof.js';

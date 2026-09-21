@@ -325,3 +325,7 @@ The private-diagnostics browser drill checks opt-in controls, lost acknowledgeme
 scoped download links, deletion and phone/keyboard layout. Set `GARDEN_DIAGNOSTIC_SCREENSHOT` to
 retain its screenshot. The private replay command executes only recorded pure decision boundaries;
 keep it independent of inference and tool executors.
+
+The project Git browser drill checks durable setup identity after an interrupted response,
+scoped history downloads, cleanup of prepared downloads, and phone/keyboard layout. Set
+`GARDEN_GIT_SCREENSHOT` to retain its screenshot.

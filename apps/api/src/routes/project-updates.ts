@@ -2,6 +2,10 @@ import { downloadSignal, sendDownload } from '../download-response.js';
 import { AthanorError } from '@athanor/core';
 import {
   ProjectUpdateAction,
+  ProjectRepositoryInput,
+  ProjectGitExportInput,
+  ProjectRepositoryRemovalInput,
+  GitObjectId,
   ProjectVersionPinInput,
   PinnedProjectVersionCursor,
   ProjectPurgeApply,
@@ -45,6 +49,143 @@ export function registerProjectUpdateRoutes(context: RouteContext) {
     }
     return project;
   };
+  app.get<{ Params: { projectId: string } }>(
+    '/v1/projects/:projectId/repositories',
+    async (request) => {
+      const user = requireUser(request.user),
+        project = await owned(user.id, request.params.projectId);
+      return runner.request({
+        workspaceId: project.workspaceId,
+        userId: user.id,
+        role: 'user',
+        scopes: ['project.updates.read'],
+        path: `/v1/workspaces/${project.workspaceId}/projects/${project.id}/repositories`
+      });
+    }
+  );
+  app.post<{ Params: { projectId: string } }>(
+    '/v1/projects/:projectId/repositories',
+    async (request, reply) => {
+      const user = requireUser(request.user),
+        project = await owned(user.id, request.params.projectId);
+      const input = ProjectRepositoryInput.parse(request.body);
+      const run = () =>
+        runner.request({
+          workspaceId: project.workspaceId,
+          userId: user.id,
+          role: 'user',
+          scopes: ['project.updates.write'],
+          method: 'POST',
+          path: `/v1/workspaces/${project.workspaceId}/projects/${project.id}/repositories`,
+          contentType: 'application/json',
+          body: JSON.stringify(input)
+        });
+      return context.idempotent(request, reply, user, run, { reconcile: run });
+    }
+  );
+  app.get<{ Params: { projectId: string; repositoryId: string } }>(
+    '/v1/projects/:projectId/repositories/:repositoryId',
+    async (request) => {
+      const user = requireUser(request.user),
+        project = await owned(user.id, request.params.projectId);
+      const repositoryId = z.uuid().parse(request.params.repositoryId);
+      const { before } = z.object({ before: GitObjectId.optional() }).strict().parse(request.query);
+      return runner.request({
+        workspaceId: project.workspaceId,
+        userId: user.id,
+        role: 'user',
+        scopes: ['project.updates.read'],
+        path: `/v1/workspaces/${project.workspaceId}/projects/${project.id}/repositories/${repositoryId}${before ? '?before=' + before : ''}`
+      });
+    }
+  );
+  app.post<{ Params: { projectId: string; repositoryId: string } }>(
+    '/v1/projects/:projectId/repositories/:repositoryId/exports',
+    async (request, reply) => {
+      const user = requireUser(request.user),
+        project = await owned(user.id, request.params.projectId);
+      const repositoryId = z.uuid().parse(request.params.repositoryId),
+        input = ProjectGitExportInput.parse(request.body);
+      const run = () =>
+        runner.request({
+          workspaceId: project.workspaceId,
+          userId: user.id,
+          role: 'user',
+          scopes: ['project.updates.read'],
+          method: 'POST',
+          path: `/v1/workspaces/${project.workspaceId}/projects/${project.id}/repositories/${repositoryId}/exports`,
+          contentType: 'application/json',
+          body: JSON.stringify(input)
+        });
+      return context.idempotent(request, reply, user, run, { reconcile: run });
+    }
+  );
+  app.post<{ Params: { projectId: string; exportId: string } }>(
+    '/v1/projects/:projectId/repository-exports/:exportId/remove',
+    async (request, reply) => {
+      const user = requireUser(request.user),
+        project = await owned(user.id, request.params.projectId);
+      const exportId = z.uuid().parse(request.params.exportId);
+      z.object({}).strict().parse(request.body);
+      const run = () =>
+        runner.request({
+          workspaceId: project.workspaceId,
+          userId: user.id,
+          role: 'user',
+          scopes: ['project.updates.write'],
+          method: 'POST',
+          path: `/v1/workspaces/${project.workspaceId}/projects/${project.id}/repository-exports/${exportId}/remove`,
+          contentType: 'application/json',
+          body: '{}'
+        });
+      return context.idempotent(request, reply, user, run, { reconcile: run });
+    }
+  );
+  app.get<{ Params: { projectId: string; exportId: string } }>(
+    '/v1/projects/:projectId/repository-exports/:exportId/download',
+    async (request, reply) => {
+      const user = requireUser(request.user),
+        project = await owned(user.id, request.params.projectId);
+      const exportId = z.uuid().parse(request.params.exportId);
+      const headers: Record<string, string> = {};
+      for (const name of ['range', 'if-range'])
+        if (typeof request.headers[name] === 'string') headers[name] = request.headers[name];
+      return sendDownload(
+        reply,
+        await runner.raw({
+          workspaceId: project.workspaceId,
+          userId: user.id,
+          role: 'user',
+          scopes: ['files.read'],
+          path: `/v1/workspaces/${project.workspaceId}/projects/${project.id}/repository-exports/${exportId}/download?path=workspace/repository.bundle`,
+          headers,
+          signal: downloadSignal(reply),
+          acceptAnyStatus: true
+        })
+      );
+    }
+  );
+  app.post<{ Params: { projectId: string; repositoryId: string } }>(
+    '/v1/projects/:projectId/repositories/:repositoryId/remove',
+    async (request, reply) => {
+      const user = requireUser(request.user),
+        project = await owned(user.id, request.params.projectId);
+      const repositoryId = z.uuid().parse(request.params.repositoryId),
+        input = ProjectRepositoryRemovalInput.parse(request.body);
+      const run = () =>
+        runner.request({
+          workspaceId: project.workspaceId,
+          userId: user.id,
+          role: 'user',
+          scopes: ['project.updates.write'],
+          method: 'POST',
+          path: `/v1/workspaces/${project.workspaceId}/projects/${project.id}/repositories/${repositoryId}/remove`,
+          contentType: 'application/json',
+          body: JSON.stringify(input)
+        });
+      return context.idempotent(request, reply, user, run, { reconcile: run });
+    }
+  );
   for (const action of ['preview', 'archive', 'restore'] as const) {
     app.post<{ Params: { projectId: string } }>(
       `/v1/projects/:projectId/retention/${action}`,

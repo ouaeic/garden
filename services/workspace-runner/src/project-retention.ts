@@ -1,3 +1,4 @@
+import { ProjectRepositoryOperation } from '@athanor/contracts';
 import { createHash } from 'node:crypto';
 import { lstat, opendir } from 'node:fs/promises';
 import path from 'node:path';
@@ -135,6 +136,22 @@ export class ProjectRetention extends ProjectHistoryMetadata {
     };
     const facts: unknown[] = [registry];
     retain(registry.head, 'Current published version');
+    const publishing = await this.read(
+      this.state('publishing.json'),
+      z.object({ updateId: z.uuid(), revisionId: z.uuid() })
+    );
+    facts.push(['publishing', publishing]);
+    if (publishing) retain(publishing.revisionId, 'Publication recovery');
+    for (const name of await this.names('repository-operations')) {
+      const operation = await this.read(
+        this.state(`repository-operations/${name}`),
+        ProjectRepositoryOperation
+      );
+      if (!operation) throw new Error('A repository preparation reference changed.');
+      facts.push(['repository', operation]);
+      if (operation.state === 'preparing')
+        retain(operation.input.revisionId, 'Repository preparation');
+    }
     for (const name of await this.names('baselines')) {
       const baseline = await this.read(
         this.state(`baselines/${name}`),
@@ -158,6 +175,7 @@ export class ProjectRetention extends ProjectHistoryMetadata {
             'checking',
             'checks_failed',
             'outdated',
+            'publishing',
             'published',
             'failed',
             'cancelled'

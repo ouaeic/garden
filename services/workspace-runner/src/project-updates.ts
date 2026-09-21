@@ -1,3 +1,10 @@
+import { ProjectGitExports } from './project-git-exports.js';
+import { ProjectGit } from './project-git.js';
+import {
+  ProjectRepositoryInput,
+  ProjectRepositoryOperation,
+  ProjectRepositoryRemovalInput
+} from '@athanor/contracts';
 import { ProjectPurge } from './project-purge.js';
 import { contentRemoval, assertHistoryContentAvailable } from './project-content-state.js';
 import { createHash, randomUUID } from 'node:crypto';
@@ -112,6 +119,26 @@ export class ProjectUpdatesManager {
       }
     );
     for (const projectId of projects.filter((id) => /^[a-f0-9-]{36}$/.test(id))) {
+      const publishing = await readJson<{ updateId: string; revisionId: string }>(
+        this.file(projectId, 'publishing.json')
+      );
+      if (publishing) {
+        try {
+          await this.locked(projectId, projectId, () =>
+            this.completePublication(projectId, publishing)
+          );
+        } catch (error) {
+          report(error);
+        }
+      }
+      const git = this.repositories(projectId);
+      for (const receipt of await git.removals()) {
+        if (receipt.state === 'removing') await git.finishRemoval(receipt);
+      }
+      await this.gitExports(projectId).restore();
+      for (const operation of await this.repositoryOperations(projectId)) {
+        if (operation.state === 'preparing') await this.beginRepository(projectId, operation.input);
+      }
       const summaries = await readdir(this.file(projectId, 'summaries')).catch(
         (error: NodeJS.ErrnoException) => {
           if (error.code === 'ENOENT') return [];
@@ -150,6 +177,19 @@ export class ProjectUpdatesManager {
     this.#timer = setInterval(() => void observe(), 15_000);
     this.#timer.unref();
   }
+  readonly #exports = new Map<string, ProjectGitExports>();
+  gitExports(projectId: string): ProjectGitExports {
+    let exports = this.#exports.get(projectId);
+    if (!exports) {
+      exports = new ProjectGitExports(
+        this.root,
+        this.file(projectId, 'repository-exports'),
+        this.repositories(projectId)
+      );
+      this.#exports.set(projectId, exports);
+    }
+    return exports;
+  }
   readonly #purges = new Map<string, ProjectPurge>();
   purge(projectId: string): ProjectPurge {
     let purge = this.#purges.get(projectId);
@@ -162,6 +202,7 @@ export class ProjectUpdatesManager {
   backgroundPreparations(): number {
     return (
       this.#operations.size +
+      [...this.#exports.values()].reduce((sum, exports) => sum + exports.running.size, 0) +
       [...this.#purges.values()].reduce((sum, purge) => sum + purge.runningCount(), 0)
     );
   }
@@ -169,6 +210,7 @@ export class ProjectUpdatesManager {
     this.#closed = true;
     clearInterval(this.#timer);
     await this.#changes.close();
+    await Promise.allSettled([...this.#exports.values()].map((exports) => exports.close()));
     await Promise.allSettled([...this.#purges.values()].map((purge) => purge.close()));
     await Promise.allSettled([...this.#operations.values()]);
   }
@@ -180,6 +222,110 @@ export class ProjectUpdatesManager {
   }
   retention(projectId: string): ProjectRetention {
     return new ProjectRetention(this.root, projectId, () => this.assertRetentionIdle(projectId));
+  }
+  repositories(projectId: string): ProjectGit {
+    return new ProjectGit(this.file(projectId, 'repositories'), this.files(projectId));
+  }
+  async removeRepository(projectId: string, repositoryId: string, raw: unknown) {
+    return this.locked(projectId, projectId, async () => {
+      if (await readJson(this.file(projectId, 'publishing.json')))
+        throw new Error('Finish the pending publication before removing a repository');
+      const input = ProjectRepositoryRemovalInput.parse(raw);
+      const git = this.repositories(projectId);
+      const previous = (await git.removals()).find((item) => item.repositoryId === repositoryId);
+      if (previous && (previous.requestId !== input.requestId || previous.head !== input.head))
+        throw new Error('Repository removal identity changed');
+      if (previous && (previous.state === 'removed' || this.#operations.has(previous.requestId)))
+        return previous;
+      if (this.#operations.size || this.gitExports(projectId).running.size)
+        throw new Error(
+          'Wait for source preparation and Git exports to finish before removing a repository'
+        );
+      const receipt = await git.markRemoval(repositoryId, raw);
+      if (receipt.state !== 'removed')
+        this.launch(projectId, receipt.requestId, () => git.finishRemoval(receipt));
+      return structuredClone(receipt);
+    });
+  }
+  async repositoryOperations(projectId: string): Promise<ProjectRepositoryOperation[]> {
+    const names = await readdir(this.file(projectId, 'repository-operations')).catch(
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+      }
+    );
+    return Promise.all(
+      names
+        .filter((name) => /^[a-f0-9-]{36}\.json$/.test(name))
+        .sort()
+        .map(async (name) =>
+          ProjectRepositoryOperation.parse(
+            await readJson(this.file(projectId, `repository-operations/${name}`))
+          )
+        )
+    );
+  }
+  async beginRepository(projectId: string, raw: unknown): Promise<ProjectRepositoryOperation> {
+    const input = ProjectRepositoryInput.parse(raw);
+    return this.locked(projectId, `repository:${input.requestId}`, async () => {
+      await this.registry(projectId);
+      const file = this.file(projectId, `repository-operations/${input.requestId}.json`);
+      const previous = await readJson<ProjectRepositoryOperation>(file);
+      if (previous && JSON.stringify(previous.input) !== JSON.stringify(input))
+        throw new Error('Repository request identity changed');
+      if (previous?.state === 'ready' || this.#operations.has(input.requestId)) return previous!;
+      const operation: ProjectRepositoryOperation = previous ?? {
+        input,
+        state: 'preparing',
+        createdAt: now(),
+        updatedAt: now(),
+        files: 0,
+        bytes: 0,
+        detail: null
+      };
+      operation.state = 'preparing';
+      operation.detail = null;
+      operation.updatedAt = now();
+      await durableJson(file, operation);
+      this.launch(projectId, input.requestId, async () => {
+        try {
+          await this.createRepository(projectId, input, async (files, bytes) => {
+            operation.files = files;
+            operation.bytes = bytes;
+            operation.updatedAt = now();
+            await durableJson(file, operation);
+          });
+          operation.state = 'ready';
+        } catch (error) {
+          operation.state = 'failed';
+          operation.detail = String(error);
+        }
+        operation.updatedAt = now();
+        await durableJson(file, operation);
+      });
+      return structuredClone(operation);
+    });
+  }
+  async createRepository(
+    projectId: string,
+    raw: unknown,
+    progress?: (files: number, bytes: number) => Promise<void>
+  ) {
+    const input = ProjectRepositoryInput.parse(raw);
+    return this.locked(projectId, projectId, async () => {
+      const registry = await this.registry(projectId);
+      const existing = (await this.repositories(projectId).list()).find(
+        (item) => item.id === input.requestId
+      );
+      if (existing) return this.repositories(projectId).create(input, {}, progress);
+      if (await readJson(this.file(projectId, 'publishing.json')))
+        throw new Error('Finish the pending publication before changing repository connections');
+      if (registry.head !== input.revisionId)
+        throw new Error('The project version changed. Refresh before connecting a repository.');
+      const revision = await this.revision(projectId, input.revisionId);
+      await this.retention(projectId).assertAvailable(revision.id);
+      return this.repositories(projectId).create(input, revision.files, progress);
+    });
   }
   async storage(projectId: string) {
     await this.registry(projectId);
@@ -657,6 +803,13 @@ export class ProjectUpdatesManager {
       await syncDirectory(path.dirname(directory));
       update.path = path.join(directory, 'workspace');
     }
+    update.repositories = conflicted
+      ? []
+      : await this.repositories(update.projectId).prepare(
+          update,
+          candidate,
+          update.repositories ?? []
+        );
     update.state = conflicted ? 'conflicted' : 'ready';
     update.progress.stage = conflicted
       ? 'Resolve conflicting files'
@@ -685,7 +838,9 @@ export class ProjectUpdatesManager {
         return this.view(existing);
       }
       const previous = await this.update(projectId, id);
-      if (['preparing', 'checking', 'published', 'cancelled'].includes(previous.state))
+      if (
+        ['preparing', 'checking', 'publishing', 'published', 'cancelled'].includes(previous.state)
+      )
         throw new Error('Wait for this update to settle before rebuilding it');
       const update: StoredUpdate = {
         ...previous,
@@ -876,7 +1031,7 @@ export class ProjectUpdatesManager {
     });
   }
   private async refresh(update: StoredUpdate): Promise<StoredUpdate> {
-    if (['published', 'cancelled', 'failed'].includes(update.state)) return update;
+    if (['published', 'publishing', 'cancelled', 'failed'].includes(update.state)) return update;
     if (update.state === 'preparing' && !this.#operations.has(update.id)) {
       update.state = 'failed';
       update.detail =
@@ -982,7 +1137,7 @@ export class ProjectUpdatesManager {
       const update = await this.refresh(await this.update(projectId, id));
       const view = this.view(update, changesAfter);
       if (
-        !['preparing', 'published', 'failed', 'cancelled'].includes(view.state) &&
+        !['preparing', 'publishing', 'published', 'failed', 'cancelled'].includes(view.state) &&
         (await this.registry(projectId)).head !== view.parentRevision
       ) {
         view.state = 'outdated';
@@ -1021,7 +1176,7 @@ export class ProjectUpdatesManager {
   async cancel(projectId: string, id: string): Promise<ProjectUpdate> {
     return this.locked(projectId, `update:${id}`, async () => {
       const update = await this.update(projectId, id);
-      if (update.state === 'published')
+      if (['published', 'publishing'].includes(update.state))
         throw new Error('Published versions stay available to running work');
       this.#cancelled.add(id);
       for (const check of update.checks) {
@@ -1038,6 +1193,31 @@ export class ProjectUpdatesManager {
       return this.view(update);
     });
   }
+  private async completePublication(
+    projectId: string,
+    pending: { updateId: string; revisionId: string }
+  ): Promise<ProjectRevision> {
+    const registry = await this.registry(projectId);
+    const revision = await this.revision(projectId, pending.revisionId);
+    const update = await this.update(projectId, pending.updateId);
+    if (
+      revision.updateId !== update.id ||
+      revision.digest !== update.candidateDigest ||
+      (registry.head !== revision.parentId && registry.head !== revision.id)
+    )
+      throw new Error('Pending publication no longer matches the project version');
+    await this.repositories(projectId).publish(revision.repositories ?? []);
+    registry.head = revision.id;
+    await durableJson(this.file(projectId, 'registry.json'), registry);
+    update.state = 'published';
+    update.publishedRevision = revision.id;
+    update.uncheckedReason = revision.uncheckedReason;
+    await this.save(update);
+    await this.advanceBaseline(projectId, registry, update, revision.id);
+    await rm(this.file(projectId, 'publishing.json'));
+    await syncDirectory(this.file(projectId, ''));
+    return this.revisionView(revision);
+  }
   async publish(
     projectId: string,
     id: string,
@@ -1046,6 +1226,18 @@ export class ProjectUpdatesManager {
   ): Promise<ProjectRevision> {
     return this.locked(projectId, projectId, () =>
       this.locked(projectId, `update:${id}`, async () => {
+        const pending = await readJson<{ updateId: string; revisionId: string }>(
+          this.file(projectId, 'publishing.json')
+        );
+        if (pending) {
+          if (pending.updateId !== id)
+            throw new Error(
+              'A project publication is awaiting recovery. Resume that publication first.'
+            );
+          const revision = await this.revision(projectId, pending.revisionId);
+          if (revision.digest !== expectedDigest) throw new Error('Publication digest changed');
+          return this.completePublication(projectId, pending);
+        }
         const registry = await this.registry(projectId);
         const head = registry.head ? await this.revision(projectId, registry.head) : null;
         const update = await this.refresh(await this.update(projectId, id));
@@ -1084,6 +1276,7 @@ export class ProjectUpdatesManager {
           throw new Error(
             'No checks were run. Publishing requires an explicit owner decision and reason.'
           );
+        await this.repositories(projectId).assertCurrent(update.repositories ?? []);
         const revisionId = randomUUID(),
           publicRoot = path.join(this.publicDirectory(projectId), 'versions', revisionId);
         await this.files(projectId).materialize(
@@ -1104,6 +1297,7 @@ export class ProjectUpdatesManager {
           createdAt: now(),
           path: path.join(publicRoot, 'workspace'),
           files: update.candidate,
+          repositories: update.repositories ?? [],
           checks: structuredClone(update.checks),
           uncheckedReason: update.checks.length ? null : uncheckedReason!.trim()
         };
@@ -1112,14 +1306,11 @@ export class ProjectUpdatesManager {
           this.file(projectId, `revision-summaries/${revisionId}.json`),
           this.revisionView(revision)
         );
-        registry.head = revisionId;
-        await durableJson(this.file(projectId, 'registry.json'), registry);
-        update.state = 'published';
-        update.publishedRevision = revisionId;
-        update.uncheckedReason = revision.uncheckedReason;
+        const publication = { updateId: id, revisionId };
+        await durableJson(this.file(projectId, 'publishing.json'), publication);
+        update.state = 'publishing';
         await this.save(update);
-        await this.advanceBaseline(projectId, registry, update, revisionId);
-        return this.revisionView(revision);
+        return this.completePublication(projectId, publication);
       })
     );
   }
@@ -1182,7 +1373,7 @@ export class ProjectUpdatesManager {
               : summary
         );
         if (
-          !['preparing', 'published', 'failed', 'cancelled'].includes(value.state) &&
+          !['preparing', 'publishing', 'published', 'failed', 'cancelled'].includes(value.state) &&
           registry.head !== value.parentRevision
         )
           value.state = 'outdated';

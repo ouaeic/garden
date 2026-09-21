@@ -812,3 +812,18 @@ A recording that starts or stops during a turn may deliberately contain an unfin
 ### Repository metadata isolation
 
 Repository overview reads Git metadata through a confined native reader, with file changes denied, network isolation required and further program execution blocked after Git starts. Repository-configured filesystem monitors, filters and helpers do not receive execution authority from an overview request. A required filter or unavailable isolation produces an explicit metadata limitation; the source map remains available. Metadata reads do not refresh the index on disk. Source searches use the installed system ripgrep rather than a workspace-provided executable. Ordinary governed project commands retain their existing capabilities.
+
+Managed source repositories attach native Git commit and tree identities to immutable project
+candidates. The owner selects a published source directory; separate directories can use separate
+repositories. Complete Git bundles preserve imported history. Preparation streams source objects
+into Git and reuses content-addressed objects for unchanged files. Checks certify the captured
+candidate, and publication compares each target branch against its recorded base. A durable
+publication receipt recovers interrupted ref updates before advancing the project head. Rebuilding
+an update preserves its prior proposal as an integration parent and resets its checks.
+
+Repository setup and branch-history export continue after the browser closes. The project view
+shows setup status, exact commit identities, history and scoped downloads. A download represents a
+fixed branch tip. Removing a managed repository requires its current head, retains a removal
+receipt, and does not erase independent project versions or prepared downloads. Project history
+cleanup accounts for publication recovery and repository preparation references. Managed Git
+history is retained separately from the version-file store.

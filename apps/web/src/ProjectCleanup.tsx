@@ -138,6 +138,10 @@ export default function ProjectCleanup({
         </p>
         <ErrorNotice error={error} />
         {reading && <Spinner label="Checking files and their remaining uses…" />}
+        <p className="muted">
+          Managed Git repositories keep their committed history separately. Removing version files
+          does not remove those Git copies.
+        </p>
         {!receipt && preview && (
           <>
             <p>

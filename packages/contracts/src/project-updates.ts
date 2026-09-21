@@ -1,3 +1,4 @@
+import type { ProjectGitVersion } from './project-git.js';
 import type { ProjectContentRemoval } from './project-purge.js';
 import type { ProcessResourceSample } from './processes.js';
 import type { ProjectVersionArchive } from './project-retention.js';
@@ -142,6 +143,7 @@ export interface ProjectCheck extends ProjectCheckCommand {
   preparation?: { files: number; bytes: number; totalFiles: number; totalBytes: number };
 }
 export interface ProjectUpdate {
+  repositories?: ProjectGitVersion[];
   contentRemoval?: ProjectContentRemoval | null;
   id: string;
   projectId: string;
@@ -156,6 +158,7 @@ export interface ProjectUpdate {
     | 'checks_failed'
     | 'outdated'
     | 'published'
+    | 'publishing'
     | 'failed'
     | 'cancelled';
   parentRevision: string | null;
@@ -174,6 +177,7 @@ export interface ProjectUpdate {
   uncheckedReason: string | null;
 }
 export interface ProjectRevision {
+  repositories?: ProjectGitVersion[];
   contentRemoval?: ProjectContentRemoval | null;
   id: string;
   number: number;

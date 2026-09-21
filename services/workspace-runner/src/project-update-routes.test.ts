@@ -165,6 +165,142 @@ it('binds project reads and mutations to signed membership and keeps unchecked p
   expect((await storage('user', wa, 'project.updates.read')).statusCode).not.toBe(200);
   expect((await storage('user', main, 'files.read')).statusCode).not.toBe(200);
   const revision = published.json<{ id: string }>();
+  const repositoryRequest = async (
+    role: 'agent' | 'user',
+    workspaceId: string,
+    scope: string,
+    method: 'GET' | 'POST',
+    suffix = '',
+    payload?: unknown
+  ) => {
+    const url = `/v1/workspaces/${workspaceId}/projects/${project}/repositories${suffix}`;
+    const token = signCapabilityToken(
+      {
+        workspaceId,
+        sub: a,
+        role,
+        scopes: [scope],
+        nonce: randomUUID(),
+        aud: capabilityAudience(method, url)
+      },
+      secret,
+      60
+    );
+    return app.inject({
+      method,
+      url,
+      headers: { authorization: `Bearer ${token}` },
+      ...(payload ? { payload } : {})
+    });
+  };
+  expect((await repositoryRequest('agent', wa, 'project.updates.read', 'GET')).statusCode).not.toBe(
+    200
+  );
+  expect((await repositoryRequest('user', wb, 'project.updates.read', 'GET')).statusCode).not.toBe(
+    200
+  );
+  expect((await repositoryRequest('user', main, 'files.read', 'GET')).statusCode).not.toBe(200);
+  const repositoryInput = {
+    requestId: randomUUID(),
+    revisionId: revision.id,
+    name: 'Fixture source',
+    path: '',
+    branch: 'main'
+  };
+  expect(
+    (await repositoryRequest('user', main, 'project.updates.read', 'POST', '', repositoryInput))
+      .statusCode
+  ).not.toBe(200);
+  const creation = await repositoryRequest(
+    'user',
+    main,
+    'project.updates.write',
+    'POST',
+    '',
+    repositoryInput
+  );
+  expect(creation.statusCode).toBe(200);
+  expect(creation.json()).toMatchObject({
+    state: 'preparing',
+    input: { requestId: repositoryInput.requestId }
+  });
+  await manager.settle(repositoryInput.requestId);
+  const repositories = await repositoryRequest('user', main, 'project.updates.read', 'GET');
+  expect(repositories.statusCode).toBe(200);
+  expect(repositories.json<{ repositories: unknown[] }>().repositories).toHaveLength(1);
+  const history = await repositoryRequest(
+    'user',
+    main,
+    'project.updates.read',
+    'GET',
+    `/${repositoryInput.requestId}`
+  );
+  expect(history.statusCode).toBe(200);
+  expect(history.json<{ commits: unknown[] }>().commits).toHaveLength(1);
+  const exportId = randomUUID();
+  const exportInput = {
+    requestId: exportId,
+    commit: history.json<{ repository: { head: string } }>().repository.head
+  };
+  expect(
+    (
+      await repositoryRequest(
+        'agent',
+        wa,
+        'project.updates.read',
+        'POST',
+        `/${repositoryInput.requestId}/exports`,
+        exportInput
+      )
+    ).statusCode
+  ).not.toBe(200);
+  const exportRequest = await repositoryRequest(
+    'user',
+    main,
+    'project.updates.read',
+    'POST',
+    `/${repositoryInput.requestId}/exports`,
+    exportInput
+  );
+  expect(exportRequest.statusCode).toBe(200);
+  await manager.gitExports(project).close();
+  const exportDownload = async (workspaceId: string, role: 'user' | 'agent', scope: string) => {
+    const url = `/v1/workspaces/${workspaceId}/projects/${project}/repository-exports/${exportId}/download?path=workspace/repository.bundle`;
+    const token = signCapabilityToken(
+      {
+        workspaceId,
+        sub: a,
+        role,
+        scopes: [scope],
+        nonce: randomUUID(),
+        aud: capabilityAudience('GET', url)
+      },
+      secret,
+      60
+    );
+    return app.inject({ url, headers: { authorization: `Bearer ${token}`, range: 'bytes=0-15' } });
+  };
+  expect((await exportDownload(main, 'user', 'files.read')).statusCode).toBe(206);
+  expect((await exportDownload(wa, 'agent', 'files.read')).statusCode).not.toBe(200);
+  expect((await exportDownload(wb, 'user', 'files.read')).statusCode).not.toBe(200);
+  expect((await exportDownload(main, 'user', 'project.updates.read')).statusCode).not.toBe(200);
+
+  expect(
+    (await repositoryRequest('user', main, 'project.updates.read', 'GET', `/${randomUUID()}`))
+      .statusCode
+  ).not.toBe(200);
+  expect(
+    (
+      await repositoryRequest(
+        'user',
+        wb,
+        'project.updates.read',
+        'GET',
+        `/${repositoryInput.requestId}`
+      )
+    ).statusCode
+  ).not.toBe(200);
+
   const pin = (
     role: 'agent' | 'user',
     workspaceId: string,

@@ -251,3 +251,38 @@
   color: var(--ink);
   border-color: var(--paper);
 }
+
+.project-repositories {
+  min-width: 0;
+}
+.project-repository {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  min-width: 0;
+}
+.project-repository > .button {
+  justify-self: start;
+}
+.project-repositories p,
+.project-repositories small,
+.project-repositories code,
+.project-repositories li {
+  overflow-wrap: anywhere;
+}
+.project-repositories details > .stack {
+  padding-top: 1rem;
+}
+.project-git-history {
+  padding-left: 1.3rem;
+}
+.project-git-history li {
+  padding: 0.65rem 0;
+}
+.project-git-history small,
+.project-git-history code {
+  display: block;
+  margin-top: 0.4rem;
+}
