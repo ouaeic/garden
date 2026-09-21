@@ -606,6 +606,32 @@ const dispatch = async (
       if (url.includes('/endpoints')) return json({ data: { endpoints: [] } });
       if (typeof init?.body === 'string')
         modelRequests.push(JSON.parse(init.body) as Record<string, unknown>);
+      if (url === `${NATIVE_PROVIDER_URL}/responses`) {
+        expect(options.provider ?? []).toHaveLength(0);
+        const output =
+          !options.approved && served === 0
+            ? [
+                {
+                  type: 'function_call',
+                  id: 'native-item-1',
+                  call_id: id,
+                  name: call.name,
+                  arguments: JSON.stringify(call.arguments),
+                  status: 'completed'
+                }
+              ]
+            : [
+                {
+                  type: 'message',
+                  id: 'native-message-1',
+                  role: 'assistant',
+                  status: 'completed',
+                  content: [{ type: 'output_text', text: 'Out of steps.' }]
+                }
+              ];
+        served += 1;
+        return json({ id: `response-${served}`, status: 'completed', output });
+      }
       const next = bodies[Math.min(served, bodies.length - 1)] ?? '';
       served += 1;
       return new Response(next, { headers: { 'content-type': 'text/event-stream' } });
@@ -3336,6 +3362,7 @@ describe('the publishing arms', () => {
         body: `The regulator published guidance in March. ${'It applies from June. '.repeat(60)}`.trim()
       }
     ]);
+    expect(executed.providerPaths).toContain('/responses');
     expect(mediaUsage(executed)).toMatchObject({
       resourceClass: 'media:transcription',
       unit: 'second',
