@@ -696,6 +696,13 @@ const one = async (
         _url: string,
         body: { executable: string; args: readonly string[] }
       ) => {
+        if (_url.endsWith('/repository-git'))
+          return {
+            status: emit('git', ['status']),
+            files: emit('git', ['ls-files', '-z']),
+            limited: false
+          };
+        if (_url.endsWith('/repository-map')) return null;
         const stdout = emit(body.executable, body.args);
         return { exitCode: stdout ? 0 : 1, stdout, stderr: '', durationMs: 1, timedOut: false };
       }
@@ -1104,7 +1111,8 @@ describe('the symbol anchor and the reader that parses it back', () => {
      */
     let symbolArgs: readonly string[] = [];
     await one('repo_overview', {}, (executable, args) => {
-      if (executable === 'rg' && args.some((arg) => arg.startsWith('^'))) symbolArgs = args;
+      if (executable === '/usr/bin/rg' && args.some((arg) => arg.startsWith('^')))
+        symbolArgs = args;
       if (executable === 'git' && args[0] === 'ls-files') return 'src/index.ts';
       return '';
     });
@@ -1281,6 +1289,13 @@ const twice = async (
         _url: string,
         body: { executable: string; args: readonly string[] }
       ) => {
+        if (_url.endsWith('/repository-git'))
+          return {
+            status: emit('git', ['status']),
+            files: emit('git', ['ls-files', '-z']),
+            limited: false
+          };
+        if (_url.endsWith('/repository-map')) return null;
         const stdout = emit(body.executable, body.args);
         return { exitCode: stdout ? 0 : 1, stdout, stderr: '', durationMs: 1, timedOut: false };
       }
@@ -1516,7 +1531,7 @@ describe('a repository read answering the same thing twice', () => {
      */
     const executed: string[][] = [];
     await twice('repo_overview', {}, (executable, args) => {
-      if (executable === 'rg' && !args.includes('--files')) executed.push([...args]);
+      if (executable === '/usr/bin/rg' && !args.includes('--files')) executed.push([...args]);
       return executable === 'git' ? '## main' : 'a.ts:1:export const one = 1';
     });
     const globs = (args: readonly string[]): string[] =>
@@ -1626,6 +1641,8 @@ it('uses structural symbols without running duplicate lexical scans and forwards
         input: Record<string, unknown>
       ) => {
         requests.push({ scopes, route, input });
+        if (route.endsWith('/repository-git'))
+          return { status: '## main', files: 'analysis.py\0main.py\0', limited: false };
         if (route.endsWith('/repository-map'))
           return {
             engine: 'tree-sitter',
@@ -1635,15 +1652,7 @@ it('uses structural symbols without running duplicate lexical scans and forwards
             symbolsTruncated: false,
             coverage: { scanComplete: true, unsupportedSourceFiles: 0 }
           };
-        const args = input.args as string[];
-        return {
-          stdout:
-            args[0] === 'status'
-              ? '## main'
-              : input.executable === 'git'
-                ? 'analysis.py\nmain.py\n'
-                : 'README.md\n'
-        };
+        return { stdout: 'README.md\n' };
       }
     }
   } as unknown as ToolContext;
@@ -1652,12 +1661,12 @@ it('uses structural symbols without running duplicate lexical scans and forwards
     name: 'repo_overview',
     arguments: { query: 'countBases' }
   })) as Record<string, unknown>;
-  expect(requests).toHaveLength(4);
+  expect(requests).toHaveLength(3);
   expect(requests.find((request) => request.route.endsWith('/repository-map'))).toMatchObject({
     scopes: 'files.read',
     input: { query: 'countBases', path: 'workspace' }
   });
-  expect(requests.filter((request) => request.input.executable === 'rg')).toHaveLength(1);
+  expect(requests.filter((request) => request.input.executable === '/usr/bin/rg')).toHaveLength(1);
   expect(result.importantSymbols).toEqual([symbol]);
   expect(result.mapping).toMatchObject({ engine: 'tree-sitter' });
 });
