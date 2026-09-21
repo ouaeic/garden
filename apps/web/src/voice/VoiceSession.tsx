@@ -37,9 +37,9 @@ function VoiceSessionPanel({
   const [cap, setCap] = useState('');
   const [minutes, setMinutes] = useState('5');
   const [consent, setConsent] = useState(false);
-  const [status, setStatus] = useState<'idle' | 'starting' | 'connecting' | 'active' | 'stopped'>(
-    'idle'
-  );
+  const [status, setStatus] = useState<
+    'idle' | 'starting' | 'connecting' | 'reconnecting' | 'active' | 'stopped'
+  >('idle');
   const [muted, setMuted] = useState(false);
   const [level, setLevel] = useState(0);
   const [transcripts, setTranscripts] = useState<
@@ -61,7 +61,7 @@ function VoiceSessionPanel({
   const operation = useRef(false);
   selectedSession.current = current?.id ?? null;
   const option = catalogue?.options.find((item) => item.id === selected);
-  const running = ['starting', 'connecting', 'active'].includes(status);
+  const running = ['starting', 'connecting', 'reconnecting', 'active'].includes(status);
   const acceptSession = useCallback(
     (session: Session, select = true) => {
       if (!mounted.current) return;
@@ -457,11 +457,13 @@ function VoiceSessionPanel({
                   ? 'Preparing microphone…'
                   : status === 'connecting'
                     ? 'Connecting voice…'
-                    : running
-                      ? muted
-                        ? 'Microphone muted'
-                        : 'Microphone active'
-                      : (current?.status.replaceAll('_', ' ') ?? 'Stopped')}
+                    : status === 'reconnecting'
+                      ? 'Reconnecting · microphone paused…'
+                      : running
+                        ? muted
+                          ? 'Microphone muted'
+                          : 'Microphone active'
+                        : (current?.status.replaceAll('_', ' ') ?? 'Stopped')}
               </strong>
               <span>
                 {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, '0')}

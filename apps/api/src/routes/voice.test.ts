@@ -49,7 +49,7 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 afterAll(async () => database.close());
-async function fixture() {
+async function fixture(nativeTransport = false) {
   const user = await store.createUser({ username: randomUUID(), displayName: 'Owner' }),
     workspaceId = randomUUID(),
     token = randomUUID();
@@ -152,8 +152,18 @@ async function fixture() {
       headers: { ...customHeaders, 'idempotency-key': requestKey },
       payload: body as never
     });
+  const address = nativeTransport ? await app.listen({ host: '127.0.0.1', port: 0 }) : null;
+  const openSocket = async (socketPath: string) => {
+    if (!address) return app.injectWS(socketPath, { headers });
+    const socket = new WebSocket(address.replace('http:', 'ws:') + socketPath, { headers });
+    await new Promise<void>((resolve, reject) => {
+      socket.once('open', resolve);
+      socket.once('error', reject);
+    });
+    return socket;
+  };
   const connect = async (connection: VoiceConnection) => {
-    const socket = await app.injectWS(connection.socketPath, { headers });
+    const socket = await openSocket(connection.socketPath);
     const events: Record<string, unknown>[] = [],
       binary: Buffer[] = [];
     socket.on('message', (data, isBinary) => {
@@ -182,6 +192,7 @@ async function fixture() {
     secret,
     start,
     connect,
+    openSocket,
     providers,
     fetch
   };
@@ -803,4 +814,174 @@ describe('live voice owner route and provider loop', () => {
       spy.mockRestore();
     }
   });
+});
+
+describe('voice transport recovery', () => {
+  it('keeps one provider and settles an interrupted response before fresh microphone input', async () => {
+    const f = await fixture(true),
+      connection = await created(f),
+      c = await f.connect(connection);
+    const url = `/v1/tasks/${f.task.id}/voice-sessions/${connection.session.id}/reconnect`;
+    expect(
+      (
+        await f.app.inject({
+          method: 'POST',
+          url,
+          headers: f.headers,
+          payload: { recoveryKey: 'wrong-browser-recovery-key' }
+        })
+      ).statusCode
+    ).toBe(404);
+    await begin(c);
+    c.provider.event({
+      type: 'response.output_audio.delta',
+      response_id: 'resp_one',
+      item_id: 'item_one',
+      delta: Buffer.alloc(480).toString('base64')
+    });
+    await vi.waitFor(() => expect(c.binary).toHaveLength(1));
+    c.socket.send(JSON.stringify({ type: 'playback', epoch: 1, playedSamples: 120 }));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(f.app.websocketServer.clients.size).toBe(1);
+    [...f.app.websocketServer.clients][0]!.terminate();
+    await vi.waitFor(() =>
+      expect(c.provider.sent).toContainEqual({ type: 'response.cancel', response_id: 'resp_one' })
+    );
+    expect(c.provider.readyState).toBe(WebSocket.OPEN);
+    c.provider.event({ type: 'response.done', response: { id: 'resp_one', usage } });
+    await vi.waitFor(async () =>
+      expect(await voice.pending(f.user.id, connection.session.id)).toEqual([])
+    );
+    const issued = await f.app.inject({
+      method: 'POST',
+      url,
+      headers: f.headers,
+      payload: { recoveryKey: connection.recoveryKey }
+    });
+    expect(issued.statusCode, issued.body).toBe(200);
+    const resume = issued.json<VoiceConnection>();
+    expect(resume.ticket).not.toBe(connection.ticket);
+    const rows = await database.query(
+      'SELECT ticket_hash,connection FROM voice_sessions WHERE id=$1',
+      [connection.session.id]
+    );
+    expect(rows.rows).toHaveLength(1);
+    expect(JSON.stringify(rows.rows)).not.toContain(resume.ticket);
+    const socket = await f.openSocket(resume.socketPath);
+    const events: Record<string, unknown>[] = [];
+    socket.on('message', (data, binary) => {
+      if (!binary)
+        events.push(JSON.parse(Buffer.from(data as Buffer).toString()) as Record<string, unknown>);
+    });
+    socket.send(JSON.stringify({ type: 'ticket', ticket: resume.ticket }));
+    await vi.waitFor(() => expect(events.some((e) => e.type === 'ready')).toBe(true));
+    expect(f.providers).toHaveLength(1);
+    socket.send(JSON.stringify({ type: 'unmute' }));
+    await vi.waitFor(() => expect(events.some((e) => e.type === 'input')).toBe(true));
+    const input = events.find((e) => e.type === 'input')!;
+    expect(input.inputEpoch).toBeGreaterThan(1);
+    const before = c.provider.sent.filter((e) => e.type === 'input_audio_buffer.append').length;
+    socket.send(encodeVoiceFrame(input.inputEpoch as number, 0, new Uint8Array(480)));
+    await vi.waitFor(() =>
+      expect(c.provider.sent.filter((e) => e.type === 'input_audio_buffer.append')).toHaveLength(
+        before + 1
+      )
+    );
+    const duplicate = await f.app.injectWS(resume.socketPath, { headers: f.headers });
+    duplicate.send(JSON.stringify({ type: 'ticket', ticket: resume.ticket }));
+    await vi.waitFor(() => expect(duplicate.readyState).toBe(WebSocket.CLOSED));
+    expect(socket.readyState).toBe(WebSocket.OPEN);
+    expect(c.provider.sent.filter((e) => e.type === 'response.create')).toHaveLength(1);
+  });
+  it('rejects wrong tasks, automation tokens, superseded tickets and Stop racing recovery', async () => {
+    const f = await fixture(),
+      connection = await created(f),
+      c = await f.connect(connection);
+    expect(f.app.websocketServer.clients.size).toBe(1);
+    [...f.app.websocketServer.clients][0]!.terminate();
+    await vi.waitFor(() =>
+      expect(c.provider.sent).toContainEqual({ type: 'input_audio_buffer.clear' })
+    );
+    const url = `/v1/tasks/${f.task.id}/voice-sessions/${connection.session.id}/reconnect`;
+    const wrong = await f.app.inject({
+      method: 'POST',
+      url: url.replace(f.task.id, randomUUID()),
+      headers: f.headers,
+      payload: { recoveryKey: connection.recoveryKey }
+    });
+    expect(wrong.statusCode).toBe(404);
+    expect(
+      (
+        await f.app.inject({
+          method: 'POST',
+          url,
+          headers: { ...f.headers, 'x-token': 'automation' },
+          payload: { recoveryKey: connection.recoveryKey }
+        })
+      ).statusCode
+    ).toBe(403);
+    const first = (
+      await f.app.inject({
+        method: 'POST',
+        url,
+        headers: f.headers,
+        payload: { recoveryKey: connection.recoveryKey }
+      })
+    ).json<VoiceConnection>();
+    const second = (
+      await f.app.inject({
+        method: 'POST',
+        url,
+        headers: f.headers,
+        payload: { recoveryKey: connection.recoveryKey }
+      })
+    ).json<VoiceConnection>();
+    expect(first.ticket).not.toBe(second.ticket);
+    const stale = await f.app.injectWS(first.socketPath, { headers: f.headers });
+    stale.send(JSON.stringify({ type: 'ticket', ticket: first.ticket }));
+    await vi.waitFor(() => expect(stale.readyState).toBe(WebSocket.CLOSED));
+    expect(c.provider.readyState).toBe(WebSocket.OPEN);
+    await f.app.inject({
+      method: 'POST',
+      url: `/v1/tasks/${f.task.id}/voice-sessions/${connection.session.id}/stop`,
+      headers: f.headers,
+      payload: { recoveryKey: connection.recoveryKey }
+    });
+    const late = await f.app.injectWS(second.socketPath, { headers: f.headers });
+    late.send(JSON.stringify({ type: 'ticket', ticket: second.ticket }));
+    await vi.waitFor(() => expect(late.readyState).toBe(WebSocket.CLOSED));
+    expect(f.providers).toHaveLength(1);
+    expect((await voice.get(f.user.id, connection.session.id))?.session.status).toBe('ended');
+  });
+});
+
+it('replaces a stalled transport only with the original browser recovery key and acknowledges liveness', async () => {
+  const f = await fixture(),
+    connection = await created(f),
+    c = await f.connect(connection);
+  c.socket.send(JSON.stringify({ type: 'ping' }));
+  await vi.waitFor(() => expect(c.events).toContainEqual({ type: 'pong' }));
+  const issued = await f.app.inject({
+    method: 'POST',
+    url: `/v1/tasks/${f.task.id}/voice-sessions/${connection.session.id}/reconnect`,
+    headers: f.headers,
+    payload: { recoveryKey: connection.recoveryKey }
+  });
+  expect(issued.statusCode, issued.body).toBe(200);
+  const resume = issued.json<VoiceConnection>();
+  const socket = await f.openSocket(resume.socketPath);
+  const events: Record<string, unknown>[] = [];
+  socket.on('message', (data, binary) => {
+    if (!binary)
+      events.push(JSON.parse(Buffer.from(data as Buffer).toString()) as Record<string, unknown>);
+  });
+  socket.send(JSON.stringify({ type: 'ticket', ticket: resume.ticket }));
+  await vi.waitFor(() => expect(events.some((e) => e.type === 'ready')).toBe(true));
+  const ready = events.find((e) => e.type === 'ready')!;
+  expect(ready.inputEpoch).toBeGreaterThan(1);
+  expect(f.providers).toHaveLength(1);
+  expect(c.provider.sent.filter((e) => e.type === 'response.create')).toEqual([]);
+  expect(c.provider.sent).toContainEqual({ type: 'input_audio_buffer.clear' });
+  socket.send(JSON.stringify({ type: 'ping' }));
+  await vi.waitFor(() => expect(events).toContainEqual({ type: 'pong' }));
 });

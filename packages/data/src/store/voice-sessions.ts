@@ -296,6 +296,52 @@ export class VoiceStore {
       return map(row);
     });
   }
+  async reconnectTicket(input: {
+    userId: string;
+    id: string;
+    authHash: string;
+    controllerId: string;
+    ticketHash: string;
+    expiresAt: string;
+  }): Promise<VoiceSessionRecord> {
+    const row = (
+      await this.database.query(
+        `UPDATE voice_sessions SET ticket_hash=$5,ticket_expires_at=$6
+       WHERE id=$1 AND user_id=$2 AND auth_hash=$3 AND controller_id=$4
+       AND status IN ('listening','responding') AND lease_expires_at>NOW()
+       AND deadline_at>NOW() AND task_id IS NOT NULL RETURNING *`,
+        [
+          input.id,
+          input.userId,
+          input.authHash,
+          input.controllerId,
+          input.ticketHash,
+          input.expiresAt
+        ]
+      )
+    ).rows[0];
+    if (!row) throw unavailable();
+    return map(row);
+  }
+  async reconnect(input: {
+    userId: string;
+    id: string;
+    authHash: string;
+    controllerId: string;
+    ticketHash: string;
+  }): Promise<VoiceSessionRecord> {
+    const row = (
+      await this.database.query(
+        `UPDATE voice_sessions SET ticket_hash=NULL
+       WHERE id=$1 AND user_id=$2 AND auth_hash=$3 AND controller_id=$4 AND ticket_hash=$5
+       AND ticket_expires_at>NOW() AND lease_expires_at>NOW() AND deadline_at>NOW()
+       AND status IN ('listening','responding') AND task_id IS NOT NULL RETURNING *`,
+        [input.id, input.userId, input.authHash, input.controllerId, input.ticketHash]
+      )
+    ).rows[0];
+    if (!row) throw unavailable();
+    return map(row);
+  }
   async heartbeat(
     userId: string,
     id: string,

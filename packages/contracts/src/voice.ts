@@ -97,6 +97,7 @@ export interface VoiceSession {
 export interface VoiceConnection {
   session: VoiceSession;
   ticket: string;
+  recoveryKey: string;
   socketPath: string;
   ticketExpiresAt: string;
 }
@@ -131,6 +132,7 @@ const epoch = z.number().int().min(1).max(0xffffffff);
 const samples = z.number().int().min(0).max(0xffffffff);
 export const VoiceClientControl = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ticket'), ticket: z.string().min(20).max(128) }).strict(),
+  z.object({ type: z.literal('ping') }).strict(),
   z.object({ type: z.literal('mute') }).strict(),
   z.object({ type: z.literal('unmute') }).strict(),
   z.object({ type: z.literal('interrupt'), epoch, playedSamples: samples }).strict(),
@@ -139,6 +141,7 @@ export const VoiceClientControl = z.discriminatedUnion('type', [
 ]);
 export type VoiceClientControl = z.infer<typeof VoiceClientControl>;
 export type VoiceServerEvent =
+  | { type: 'pong' }
   | { type: 'ready'; session: VoiceSession; inputEpoch: number; sampleRate: 24000 }
   | { type: 'input'; inputEpoch: number; muted: boolean }
   | { type: 'session'; session: VoiceSession }

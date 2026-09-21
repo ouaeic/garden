@@ -329,3 +329,8 @@ keep it independent of inference and tool executors.
 The project Git browser drill checks durable setup identity after an interrupted response,
 scoped history downloads, cleanup of prepared downloads, and phone/keyboard layout. Set
 `GARDEN_GIT_SCREENSHOT` to retain its screenshot.
+
+The voice recovery browser drill uses a local WebSocket service and simulated audio. It checks
+reconnection without another session, preserved mute, paused capture, keyboard Stop and phone
+layout. Set `GARDEN_VOICE_SCREENSHOT` to retain its screenshot. Provider and physical audio-device
+acceptance remain separate checks.

@@ -58,6 +58,7 @@ function connection(): VoiceConnection {
   return {
     session: session('preparing'),
     ticket: 'one-use-ticket-that-must-not-reconnect',
+    recoveryKey: 'browser-only-separate-recovery-key',
     socketPath: `/v1/voice-sessions/${id}/socket`,
     ticketExpiresAt: new Date(Date.now() + 60000).toISOString()
   };
@@ -68,7 +69,7 @@ class Socket {
   binaryType = '';
   onopen: (() => void) | null = null;
   onmessage: ((event: { data: unknown }) => void) | null = null;
-  onclose: (() => void) | null = null;
+  onclose: ((event: { code: number }) => void) | null = null;
   onerror: (() => void) | null = null;
   send = vi.fn<(data: string | ArrayBuffer) => void>();
   close = vi.fn(() => {
@@ -118,6 +119,11 @@ function fixture(options: { ready?: Promise<void>; start?: Promise<VoiceConnecti
       }
     ),
     start: vi.fn(() => options.start ?? Promise.resolve(connection())),
+    reconnect: vi.fn(async () => ({
+      ...connection(),
+      session: session('listening'),
+      ticket: 'fresh-reconnect-ticket-for-this-session'
+    })),
     stop: vi.fn(async () => session('ended')),
     socket: vi.fn(() => socket as unknown as WebSocket)
   };
@@ -131,13 +137,15 @@ function fixture(options: { ready?: Promise<void>; start?: Promise<VoiceConnecti
     socket,
     captureAuthorized,
     captures: () => audioCallbacks,
-    ready: () =>
+    ready: () => {
       socket.event({
         type: 'ready',
         session: session('listening'),
         inputEpoch: 1,
         sampleRate: 24000
-      })
+      });
+      socket.event({ type: 'input', inputEpoch: 1, muted: false });
+    }
   };
 }
 
@@ -436,4 +444,104 @@ it('does not claim a ticket that expires while microphone permission is pending'
   expect(f.callbacks.onError).toHaveBeenCalledExactlyOnceWith(
     expect.objectContaining({ message: expect.stringContaining('ticket expired') as unknown })
   );
+});
+
+it('reconnects an acknowledged session with a fresh ticket and drops stale capture and playback', async () => {
+  vi.useFakeTimers();
+  const f = fixture();
+  await f.controller.start(request);
+  f.socket.open();
+  f.ready();
+  f.socket.event({
+    type: 'audio_start',
+    epoch: 1,
+    itemId: 'item',
+    responseId: 'response',
+    sampleRate: 24000
+  });
+  const oldHandler = f.socket.onmessage!;
+  const next = new Socket();
+  vi.mocked(f.dependencies.socket).mockReturnValue(next as unknown as WebSocket);
+  f.socket.readyState = 3;
+  f.socket.onclose?.({ code: 1006 });
+  expect(f.audio.setInput).toHaveBeenLastCalledWith(1, false);
+  expect(f.audio.flush).toHaveBeenCalledExactlyOnceWith(1);
+  expect(f.callbacks.onStatus).toHaveBeenLastCalledWith('reconnecting');
+  const capturesBefore = f.socket.send.mock.calls.length;
+  f.captures().onCapture(new ArrayBuffer(12));
+  expect(f.socket.send.mock.calls).toHaveLength(capturesBefore);
+  await vi.advanceTimersByTimeAsync(500);
+  expect(f.dependencies.reconnect).toHaveBeenCalledExactlyOnceWith(
+    taskId,
+    id,
+    connection().recoveryKey
+  );
+  next.open();
+  expect(JSON.parse(next.send.mock.calls[0]![0] as string)).toMatchObject({
+    ticket: 'fresh-reconnect-ticket-for-this-session'
+  });
+  next.event({ type: 'ready', session: session('listening'), inputEpoch: 3, sampleRate: 24000 });
+  expect(f.audio.setInput).toHaveBeenLastCalledWith(3, false);
+  next.event({ type: 'input', inputEpoch: 4, muted: false });
+  expect(f.audio.setInput).toHaveBeenLastCalledWith(4, true);
+  oldHandler({ data: JSON.stringify({ type: 'error', message: 'stale socket' }) });
+  expect(f.callbacks.onError).not.toHaveBeenCalled();
+  expect(f.dependencies.start).toHaveBeenCalledOnce();
+  expect(f.dependencies.stop).not.toHaveBeenCalled();
+});
+
+it('retains mute during recovery and cancels a late reconnect after Stop', async () => {
+  vi.useFakeTimers();
+  const f = fixture();
+  await f.controller.start(request);
+  f.socket.open();
+  f.ready();
+  f.controller.setMuted(true);
+  const pending = deferred<VoiceConnection>();
+  vi.mocked(f.dependencies.reconnect).mockReturnValue(pending.promise);
+  f.socket.readyState = 3;
+  f.socket.onclose?.({ code: 1006 });
+  await vi.advanceTimersByTimeAsync(500);
+  await f.controller.stop();
+  pending.resolve({ ...connection(), session: session('listening') });
+  await vi.advanceTimersByTimeAsync(30_000);
+  expect(f.dependencies.socket).toHaveBeenCalledOnce();
+  expect(f.dependencies.stop).toHaveBeenCalledOnce();
+  expect(f.dependencies.start).toHaveBeenCalledOnce();
+});
+
+it('ends recovery at its deadline without starting another provider session', async () => {
+  vi.useFakeTimers();
+  const f = fixture();
+  await f.controller.start(request);
+  f.socket.open();
+  f.ready();
+  vi.mocked(f.dependencies.reconnect).mockRejectedValue(new Error('offline'));
+  f.socket.readyState = 3;
+  f.socket.onclose?.({ code: 1006 });
+  await vi.advanceTimersByTimeAsync(30_001);
+  expect(f.dependencies.reconnect).toHaveBeenCalled();
+  expect(f.dependencies.start).toHaveBeenCalledOnce();
+  expect(f.dependencies.stop).toHaveBeenCalledOnce();
+  expect(f.callbacks.onStatus).toHaveBeenLastCalledWith('stopped');
+  expect(f.callbacks.onError).toHaveBeenCalledWith(
+    expect.objectContaining({ message: expect.stringContaining('could not reconnect') as unknown })
+  );
+});
+
+it('detects a silent broken connection and does not replay input while waiting for its new epoch', async () => {
+  vi.useFakeTimers();
+  const f = fixture();
+  await f.controller.start(request);
+  f.socket.open();
+  f.ready();
+  await vi.advanceTimersByTimeAsync(5_000);
+  expect(f.socket.send).toHaveBeenLastCalledWith(JSON.stringify({ type: 'ping' }));
+  f.socket.event({ type: 'pong' });
+  await vi.advanceTimersByTimeAsync(14_999);
+  expect(f.callbacks.onStatus).toHaveBeenLastCalledWith('active');
+  await vi.advanceTimersByTimeAsync(1);
+  expect(f.callbacks.onStatus).toHaveBeenLastCalledWith('reconnecting');
+  expect(f.audio.setInput).toHaveBeenLastCalledWith(1, false);
+  expect(f.dependencies.start).toHaveBeenCalledOnce();
 });

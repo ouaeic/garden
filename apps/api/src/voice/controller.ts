@@ -51,7 +51,8 @@ const instructions =
 
 export class VoiceController {
   readonly #o: VoiceControllerOptions;
-  readonly #browser: WebSocket;
+  #browser: WebSocket;
+  #detachedAt: number | null = null;
   #provider: WebSocket | null = null;
   #queue: Promise<void> = Promise.resolve();
   #queuedBytes = 0;
@@ -106,15 +107,7 @@ export class VoiceController {
       }
     );
     this.#provider = provider;
-    this.#browser.on('message', (data, binary) =>
-      this.#enqueue(raw(data).length, async () => this.#client(raw(data), binary))
-    );
-    this.#browser.on('close', () => {
-      void this.stop();
-    });
-    this.#browser.on('error', () => {
-      void this.stop();
-    });
+    this.#bindBrowser(this.#browser);
     provider.on('open', () => {
       if (this.#closing) {
         provider.close();
@@ -149,6 +142,66 @@ export class VoiceController {
       void this.#tick();
     }, 1_000);
     this.#timer.unref();
+  }
+  get reconnectable(): boolean {
+    return (
+      this.#ready &&
+      !this.#closing &&
+      (this.#detachedAt === null || Date.now() - this.#detachedAt < 30_000) &&
+      Date.now() < Date.parse(this.#o.session.deadlineAt)
+    );
+  }
+  #bindBrowser(browser: WebSocket): void {
+    browser.on('message', (data, binary) => {
+      if (browser !== this.#browser || this.#detachedAt !== null) return;
+      this.#enqueue(raw(data).length, async () => {
+        if (browser === this.#browser && this.#detachedAt === null)
+          await this.#client(raw(data), binary);
+      });
+    });
+    browser.on('close', () => this.#detach(browser));
+    browser.on('error', () => this.#detach(browser));
+  }
+  #detach(browser: WebSocket): void {
+    if (browser !== this.#browser || this.#closing || this.#detachedAt !== null) return;
+    if (!this.#ready) {
+      void this.stop('lost', 'voice_connection_failed');
+      return;
+    }
+    this.#detachedAt = Date.now();
+    this.#muted = true;
+    this.#inputEpoch++;
+    this.#inputOffset = 0;
+    this.#segmentSamples = 0;
+    try {
+      this.#interrupt('stopped');
+      this.#sendProvider({ type: 'input_audio_buffer.clear' });
+    } catch {
+      void this.stop('lost', 'voice_provider_connection_lost');
+    }
+    if (browser.readyState === WebSocket.OPEN) browser.close(1012, 'Reconnect voice');
+  }
+  async reconnect(browser: WebSocket): Promise<void> {
+    if (
+      !this.reconnectable ||
+      browser.readyState !== WebSocket.OPEN ||
+      !(await this.#o.authorize())
+    )
+      throw new Error('Voice reconnection is unavailable');
+    const record = await this.#o.store.get(this.#o.userId, this.#o.session.id);
+    if (!record || !this.reconnectable || browser.readyState !== WebSocket.OPEN)
+      throw new Error('Voice reconnection is unavailable');
+    this.#detach(this.#browser);
+    if (this.#closing) throw new Error('Voice reconnection ended');
+    this.#browser = browser;
+    this.#detachedAt = null;
+    this.#bindBrowser(browser);
+    this.#emit({
+      type: 'ready',
+      session: record.session,
+      inputEpoch: this.#inputEpoch,
+      sampleRate: VOICE_SAMPLE_RATE
+    });
   }
   #configuration() {
     return realtimeSessionConfiguration({
@@ -218,6 +271,10 @@ export class VoiceController {
     }
     if (!this.#ready) throw new Error('Voice configuration is not acknowledged');
     if (control.type === 'ticket') throw new Error('Voice tickets cannot be reused');
+    if (control.type === 'ping') {
+      this.#emit({ type: 'pong' });
+      return;
+    }
     if (control.type === 'mute' || control.type === 'unmute') {
       this.#muted = control.type === 'mute';
       this.#inputOffset = 0;
@@ -254,7 +311,14 @@ export class VoiceController {
       this.#sendProvider({ type: 'response.cancel', response_id: this.#response.providerId });
   }
   async #beginResponse(): Promise<void> {
-    if (this.#closing || !this.#ready || this.#response || !this.#pendingTurn) return;
+    if (
+      this.#closing ||
+      this.#detachedAt !== null ||
+      !this.#ready ||
+      this.#response ||
+      !this.#pendingTurn
+    )
+      return;
     if (++this.#turnResponses > 3) throw new Error('Voice response chain limit reached');
     if (!(await this.#o.authorize())) throw new Error('Voice authority ended');
     const id = await this.#o.store.reserve(
@@ -265,7 +329,7 @@ export class VoiceController {
     );
     this.#response = { id, providerId: null, toolCalls: 0, interrupted: false };
     this.#pendingTurn = false;
-    if (this.#closing) {
+    if (this.#closing || this.#detachedAt !== null) {
       await this.#o.store.settle(this.#o.userId, this.#o.session.id, id, {
         costUsd: 0,
         quantity: 0,
@@ -462,6 +526,10 @@ export class VoiceController {
     if (this.#tickRunning || this.#closing) return;
     this.#tickRunning = true;
     try {
+      if (this.#detachedAt !== null && Date.now() - this.#detachedAt >= 30_000) {
+        void this.stop('lost', 'voice_reconnect_expired');
+        return;
+      }
       if (Date.now() >= Date.parse(this.#o.session.deadlineAt)) {
         void this.stop('expired');
         return;

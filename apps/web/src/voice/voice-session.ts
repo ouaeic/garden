@@ -6,12 +6,12 @@ import type {
   VoiceStartRequest,
   VoiceWorkProposal
 } from '@athanor/contracts';
-import { post } from '../client';
+import { ApiError, post } from '../client';
 import { createVoiceAudio } from './voice-audio';
 
 export interface VoiceCallbacks {
   onSession: (session: VoiceSession) => void;
-  onStatus: (status: 'starting' | 'connecting' | 'active' | 'stopped') => void;
+  onStatus: (status: 'starting' | 'connecting' | 'reconnecting' | 'active' | 'stopped') => void;
   onMuted: (muted: boolean) => void;
   onLevel: (level: number) => void;
   onTranscript: (epoch: number, text: string, final: boolean) => void;
@@ -21,6 +21,7 @@ export interface VoiceCallbacks {
 export interface VoiceDependencies {
   audio: typeof createVoiceAudio;
   start: (taskId: string, request: VoiceStartRequest, key: string) => Promise<VoiceConnection>;
+  reconnect: (taskId: string, sessionId: string, recoveryKey: string) => Promise<VoiceConnection>;
   stop: (taskId: string, sessionId: string) => Promise<VoiceSession>;
   socket: (path: string) => WebSocket;
 }
@@ -28,6 +29,12 @@ const defaults: VoiceDependencies = {
   audio: createVoiceAudio,
   start: (taskId, request, key) =>
     post(`/v1/tasks/${taskId}/voice-sessions`, request, { idempotencyKey: key, retry: 1 }),
+  reconnect: (taskId, sessionId, recoveryKey) =>
+    post(
+      `/v1/tasks/${taskId}/voice-sessions/${sessionId}/reconnect`,
+      { recoveryKey },
+      { retry: 0 }
+    ),
   stop: (taskId, sessionId) =>
     post(`/v1/tasks/${taskId}/voice-sessions/${sessionId}/stop`, {}, { retry: 1, keepalive: true }),
   socket: (path) =>
@@ -44,6 +51,14 @@ export function createVoiceSessionController(
   let begun = false;
   let stopped = false;
   let connected = false;
+  let acknowledged = false;
+  let recovering = false;
+  let recoveryTimer: ReturnType<typeof setTimeout> | undefined;
+  let recoveryDeadline: ReturnType<typeof setTimeout> | undefined;
+  let recoveryAttempt = 0;
+  let recoveryKey = '';
+  let heartbeat: ReturnType<typeof setInterval> | undefined;
+  let lastPong = 0;
   let session: VoiceSession | null = null;
   let audio: ReturnType<typeof createVoiceAudio> | undefined;
   let socket: WebSocket | undefined;
@@ -72,6 +87,9 @@ export function createVoiceSessionController(
       connected = false;
       clearTimeout(handshake);
       clearTimeout(deadline);
+      clearTimeout(recoveryTimer);
+      clearTimeout(recoveryDeadline);
+      clearInterval(heartbeat);
       cancelSetup();
       try {
         audio?.stop();
@@ -126,6 +144,10 @@ export function createVoiceSessionController(
   };
   const receive = (event: VoiceServerEvent) => {
     switch (event.type) {
+      case 'pong':
+        if (!connected) throw new Error('Voice heartbeat arrived before readiness');
+        lastPong = Date.now();
+        return;
       case 'ready':
         if (
           connected ||
@@ -136,10 +158,22 @@ export function createVoiceSessionController(
           throw new Error('Invalid voice readiness response.');
         acceptSession(event.session);
         connected = true;
+        acknowledged = true;
+        recovering = false;
+        recoveryAttempt = 0;
+        clearTimeout(recoveryTimer);
+        clearTimeout(recoveryDeadline);
         clearTimeout(handshake);
         inputEpoch = event.inputEpoch;
-        audio?.setInput(inputEpoch, !muted);
-        if (muted) send({ type: 'mute' });
+        audio?.setInput(inputEpoch, false);
+        send({ type: muted ? 'mute' : 'unmute' });
+        lastPong = Date.now();
+        clearInterval(heartbeat);
+        heartbeat = setInterval(() => {
+          if (!connected || stopped) return;
+          if (Date.now() - lastPong >= 15_000) reconnect();
+          else send({ type: 'ping' });
+        }, 5_000);
         callbacks.onStatus('active');
         return;
       case 'input':
@@ -218,6 +252,114 @@ export function createVoiceSessionController(
         throw new Error('The server sent an unsupported voice event.');
     }
   };
+  const discardTransport = () => {
+    if (!socket) return;
+    socket.onopen = null;
+    socket.onmessage = null;
+    socket.onerror = null;
+    socket.onclose = null;
+    try {
+      socket.close();
+    } catch {
+      /* Reconnection does not reuse the old transport. */
+    }
+    socket = undefined;
+  };
+  const reconnect = () => {
+    if (stopped) return;
+    if (!acknowledged || !session) {
+      fail(new Error('Voice disconnected before it became ready. Please start again.'));
+      return;
+    }
+    if (!recovering) {
+      recovering = true;
+      recoveryAttempt = 0;
+      recoveryDeadline = setTimeout(
+        () =>
+          fail(
+            new Error('Voice could not reconnect. Audio has stopped; please start a new session.')
+          ),
+        30_000
+      );
+    }
+    connected = false;
+    clearInterval(heartbeat);
+    clearTimeout(handshake);
+    clearTimeout(recoveryTimer);
+    audio?.setInput(inputEpoch, false);
+    if (outputEpoch > flushedEpoch) {
+      flushedEpoch = outputEpoch;
+      audio?.flush(outputEpoch);
+    }
+    callbacks.onLevel(0);
+    callbacks.onStatus('reconnecting');
+    discardTransport();
+    recoveryTimer = setTimeout(
+      () => {
+        if (stopped || !session) return;
+        void Promise.race([dependencies.reconnect(taskId, session.id, recoveryKey), cancelled])
+          .then((value) => {
+            if (stopped || !value) return;
+            if (
+              value.session.id !== session?.id ||
+              value.session.taskId !== taskId ||
+              value.session.workspaceId !== session.workspaceId ||
+              !['listening', 'responding'].includes(value.session.status)
+            )
+              throw new Error('This voice session can no longer reconnect.');
+            openTransport(value);
+          })
+          .catch((cause: unknown) => {
+            if (stopped) return;
+            if (cause instanceof ApiError && [401, 403, 404, 409].includes(cause.status))
+              fail(cause);
+            else reconnect();
+          });
+      },
+      Math.min(500 * 2 ** recoveryAttempt++, 3_000)
+    );
+  };
+  const openTransport = (connection: VoiceConnection) => {
+    const path = `/v1/voice-sessions/${session!.id}/socket`;
+    if (
+      connection.socketPath !== path ||
+      !Number.isFinite(Date.parse(connection.ticketExpiresAt)) ||
+      Date.parse(connection.ticketExpiresAt) <= Date.now()
+    )
+      throw new Error('The voice connection is no longer available.');
+    const transport = dependencies.socket(path);
+    socket = transport;
+    transport.binaryType = 'arraybuffer';
+    transport.onopen = () => {
+      if (!stopped && socket === transport) send({ type: 'ticket', ticket: connection.ticket });
+    };
+    transport.onmessage = (message) => {
+      if (stopped || socket !== transport) return;
+      try {
+        if (message.data instanceof ArrayBuffer) {
+          if (!connected || !outputEpoch)
+            throw new Error('Voice audio arrived before its playback header.');
+          audio?.enqueue(message.data);
+        } else if (typeof message.data === 'string' && message.data.length <= 65536)
+          receive(JSON.parse(message.data) as VoiceServerEvent);
+        else throw new Error('Invalid voice message.');
+      } catch (cause) {
+        fail(cause);
+      }
+    };
+    transport.onerror = () => {
+      if (socket === transport) reconnect();
+    };
+    transport.onclose = (event) => {
+      if (stopped || socket !== transport) return;
+      if (event.code === 1000 || event.code === 1008)
+        fail(new Error('Live voice ended. Audio has stopped.'));
+      else reconnect();
+    };
+    handshake = setTimeout(() => {
+      if (socket === transport) reconnect();
+    }, 15_000);
+  };
   return {
     async start(request: VoiceStartRequest) {
       if (begun || stopped) return;
@@ -277,6 +419,9 @@ export function createVoiceSessionController(
         if (!connection || stopped) return;
         clearTimeout(handshake);
         session = connection.session;
+        recoveryKey = connection.recoveryKey;
+        if (typeof recoveryKey !== 'string' || recoveryKey.length < 20 || recoveryKey.length > 128)
+          throw new Error('Invalid voice recovery key.');
         callbacks.onSession(session);
         const path = `/v1/voice-sessions/${session.id}/socket`;
         if (connection.socketPath !== path)
@@ -302,41 +447,7 @@ export function createVoiceSessionController(
         if (ticketExpiresAt <= Date.now())
           throw new Error('The voice ticket expired during microphone setup. Start a new session.');
         callbacks.onStatus('connecting');
-        socket = dependencies.socket(path);
-        socket.binaryType = 'arraybuffer';
-        socket.onopen = () => {
-          if (!stopped) send({ type: 'ticket', ticket: connection.ticket });
-        };
-        socket.onmessage = (message) => {
-          if (stopped) return;
-          try {
-            if (message.data instanceof ArrayBuffer) {
-              if (!connected || !outputEpoch)
-                throw new Error('Voice audio arrived before its playback header.');
-              audio?.enqueue(message.data);
-            } else if (typeof message.data === 'string' && message.data.length <= 65536) {
-              receive(JSON.parse(message.data) as VoiceServerEvent);
-            } else throw new Error('Invalid voice message.');
-          } catch (cause) {
-            fail(cause);
-          }
-        };
-        socket.onerror = () =>
-          fail(
-            new Error(
-              'The live voice connection was interrupted. Start a new session when the connection is ready.'
-            )
-          );
-        socket.onclose = () => {
-          if (!stopped)
-            fail(
-              new Error('Live voice disconnected. Audio has stopped; no session was restarted.')
-            );
-        };
-        handshake = setTimeout(
-          () => fail(new Error('The voice service did not become ready.')),
-          15000
-        );
+        openTransport(connection);
       } catch (cause) {
         fail(cause);
       }

@@ -274,6 +274,7 @@ export async function registerVoiceRoutes(
     const connection: VoiceConnection = {
       session,
       ticket,
+      recoveryKey: randomBytes(32).toString('base64url'),
       socketPath: `/v1/voice-sessions/${id}/socket`,
       ticketExpiresAt
     };
@@ -418,6 +419,52 @@ export async function registerVoiceRoutes(
       return (await read(user.id, record.session.id)).session;
     }
   );
+  app.post<{ Params: { taskId: string; sessionId: string } }>(
+    '/v1/tasks/:taskId/voice-sessions/:sessionId/reconnect',
+    async (request): Promise<VoiceConnection> => {
+      const { user, authHash } = owner(request);
+      const saved = await read(user.id, request.params.sessionId);
+      const { recoveryKey } = z
+        .object({ recoveryKey: z.string().min(20).max(128) })
+        .strict()
+        .parse(request.body);
+      const original = decryptJson<VoiceConnection>(
+        saved.connection,
+        keyFor(context, user.id),
+        connectionAad(saved.session.id)
+      );
+      if (!original.recoveryKey || sha256(recoveryKey) !== sha256(original.recoveryKey))
+        throw unavailable();
+      const controller = controllers.get(saved.session.id);
+      if (
+        closing ||
+        saved.session.taskId !== request.params.taskId ||
+        saved.authHash !== authHash ||
+        !saved.controllerId ||
+        !controller?.reconnectable
+      )
+        throw unavailable();
+      const ticket = randomBytes(32).toString('base64url');
+      const ticketExpiresAt = new Date(
+        Math.min(Date.now() + 30_000, Date.parse(saved.session.deadlineAt))
+      ).toISOString();
+      const record = await voice.reconnectTicket({
+        userId: user.id,
+        id: saved.session.id,
+        authHash,
+        controllerId: saved.controllerId,
+        ticketHash: sha256(ticket),
+        expiresAt: ticketExpiresAt
+      });
+      return {
+        session: record.session,
+        ticket,
+        recoveryKey,
+        ticketExpiresAt,
+        socketPath: `/v1/voice-sessions/${saved.session.id}/socket`
+      };
+    }
+  );
   app.get<{ Params: { sessionId: string } }>(
     '/v1/voice-sessions/:sessionId/socket',
     { websocket: true },
@@ -462,6 +509,24 @@ export async function registerVoiceRoutes(
             );
           };
           const authorized = await authorize();
+          if (saved.session.status !== 'preparing') {
+            const controller = controllers.get(saved.session.id);
+            if (!authorized || !saved.controllerId || !controller?.reconnectable)
+              throw unavailable();
+            await voice.reconnect({
+              userId: user.id,
+              id: saved.session.id,
+              authHash,
+              controllerId: saved.controllerId,
+              ticketHash: sha256(control.ticket)
+            });
+            if (closing) throw unavailable();
+            await controller.reconnect(socket);
+            handshake = true;
+            clearTimeout(timeout);
+            socket.resume();
+            return;
+          }
           const controllerId = randomUUID();
           const record = await voice.claim(
             user.id,

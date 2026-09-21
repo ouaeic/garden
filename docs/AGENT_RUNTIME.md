@@ -827,3 +827,19 @@ fixed branch tip. Removing a managed repository requires its current head, retai
 receipt, and does not erase independent project versions or prepared downloads. Project history
 cleanup accounts for publication recovery and repository preparation references. Managed Git
 history is retained separately from the version-file store.
+
+### Voice transport recovery
+
+An acknowledged live voice session can recover a browser transport loss while its existing API
+controller and provider connection remain alive. Browser liveness checks detect a stalled socket.
+Capture pauses and queued playback is discarded during recovery. The originating browser presents
+a separate recovery key with its owner session to obtain a fresh one-use connection ticket. The
+server rechecks authority, replaces only that session's transport, clears unfinished input and
+requires a new microphone epoch. It interrupts unplayed replies and settles their existing usage;
+reconnection creates no additional provider session or response.
+
+Recovery preserves the owner's mute choice, original deadline and spending allowance. Stop cancels
+pending recovery. A grace deadline, lost provider connection, ended controller or revoked authority
+ends the session explicitly. Recovery does not recreate provider history after an API restart and
+does not forward additional task content. Saved proposals and billing receipts retain their existing
+durable recovery paths.

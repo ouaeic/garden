@@ -403,3 +403,44 @@ describe('durable voice authority and receipts', () => {
     expect(await voice.pending(f.user.id, f.id)).toEqual([]);
   });
 });
+
+it('binds recovery tickets to the live controller and consumes them atomically without more reservations', async () => {
+  const f = await fixture();
+  await f.connect();
+  const identity = {
+    userId: f.user.id,
+    id: f.id,
+    authHash: 'auth',
+    controllerId: f.controllerId,
+    ticketHash: 'resume'
+  };
+  const issue = { ...identity, expiresAt: new Date(Date.now() + 30_000).toISOString() };
+  for (const change of [
+    { userId: randomUUID() },
+    { authHash: 'other' },
+    { controllerId: randomUUID() }
+  ]) {
+    await expect(voice.reconnectTicket({ ...issue, ...change })).rejects.toMatchObject({
+      code: 'voice_session_unavailable'
+    });
+  }
+  await voice.reconnectTicket(issue);
+  const results = await Promise.allSettled([voice.reconnect(identity), voice.reconnect(identity)]);
+  expect(results.filter((value) => value.status === 'fulfilled')).toHaveLength(1);
+  expect(results.filter((value) => value.status === 'rejected')).toHaveLength(1);
+  expect((await voice.get(f.user.id, f.id))?.controllerId).toBe(f.controllerId);
+  expect(
+    (await database.query('SELECT id FROM usage_entries WHERE user_id=$1', [f.user.id])).rows
+  ).toEqual([]);
+  await voice.reconnectTicket(issue);
+  await database.query(
+    "UPDATE voice_sessions SET lease_expires_at=NOW()-INTERVAL '1 second' WHERE id=$1",
+    [f.id]
+  );
+  await expect(voice.reconnect(identity)).rejects.toMatchObject({
+    code: 'voice_session_unavailable'
+  });
+  await expect(voice.reconnectTicket(issue)).rejects.toMatchObject({
+    code: 'voice_session_unavailable'
+  });
+});

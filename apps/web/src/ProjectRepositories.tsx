@@ -92,10 +92,9 @@ export default function ProjectRepositories({
   return (
     <section className="project-repositories stack" aria-label="Git repositories">
       <p className="muted">
-        Track source directories with Git. Each prepared update records its exact commit;
-        publication advances the branch only after the combined files pass their checks. Data and
-        artifacts can stay outside Git. Git history is retained separately from project version
-        files.
+        Track source directories with Git. Each prepared update records its exact commit and the
+        files its checks apply to. Publication advances the project branch. Data and artifacts can
+        stay outside Git. Git history is retained separately from project version files.
       </p>
       <ErrorNotice error={error} />
       {!data && !error && <Spinner label="Reading repositories…" />}
