@@ -1,5 +1,7 @@
-import { stat, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { tmpdir } from 'node:os';
+import { createDatabase, migrateDatabase, type Database } from '../database.js';
 import { afterEach, expect, it } from 'vitest';
 import { DatabaseFixtures } from './database-fixtures.js';
 
@@ -68,4 +70,42 @@ it('joins creation during shutdown and removes its unfinished copy', async () =>
   await fixtures.close();
   await rejected;
   await expect(stat(path.dirname(first.directory))).rejects.toMatchObject({ code: 'ENOENT' });
+});
+
+it('hands independent closed copies to callers without overwriting or owning their state', async () => {
+  const fixtures = factory();
+  const root = await mkdtemp(path.join(tmpdir(), 'garden-db-copy-'));
+  const first = path.join(root, 'first');
+  const second = path.join(root, 'second');
+  const open: Database[] = [];
+  try {
+    await Promise.all([fixtures.copyTo(first), fixtures.copyTo(second)]);
+    await writeFile(path.join(first, 'caller-marker'), 'keep me');
+    await expect(fixtures.copyTo(first)).rejects.toMatchObject({ code: 'EEXIST' });
+    expect(await readFile(path.join(first, 'caller-marker'), 'utf8')).toBe('keep me');
+    await fixtures.close();
+    await expect(fixtures.copyTo(path.join(root, 'late'))).rejects.toThrow('closed');
+    for (const directory of [first, second]) {
+      const database = createDatabase({ driver: 'pglite', pglitePath: directory });
+      open.push(database);
+      await migrateDatabase(database);
+      expect((await database.query('SELECT COUNT(*)::int AS count FROM users')).rows).toEqual([
+        { count: 0 }
+      ]);
+    }
+    await open[0]!.exec('CREATE TABLE fixture_identity (value text)');
+    await open[0]!.query('INSERT INTO fixture_identity(value) VALUES ($1)', ['caller owned']);
+    expect(
+      (await open[1]!.query("SELECT to_regclass('public.fixture_identity') AS relation")).rows
+    ).toEqual([{ relation: null }]);
+    await open.shift()!.close();
+    const reopened = createDatabase({ driver: 'pglite', pglitePath: first });
+    open.push(reopened);
+    expect((await reopened.query('SELECT value FROM fixture_identity')).rows).toEqual([
+      { value: 'caller owned' }
+    ]);
+  } finally {
+    await Promise.all(open.map((database) => database.close()));
+    await rm(root, { recursive: true, force: true });
+  }
 });

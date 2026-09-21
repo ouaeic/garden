@@ -8,6 +8,10 @@
       "types": "./src/index.ts",
       "development": "./src/index.ts",
       "default": "./dist/index.js"
+    },
+    "./test-support/database-fixtures": {
+      "types": "./src/test-support/database-fixtures.ts",
+      "development": "./src/test-support/database-fixtures.ts"
     }
   },
   "scripts": {

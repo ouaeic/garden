@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { Duplex } from 'node:stream';
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, describe, expect, test, vi } from 'vitest';
 import { PREVIEW_IDLE_EXPIRY_DAYS } from '@athanor/contracts';
 import {
   buildConversationNameIndex,
@@ -31,11 +31,22 @@ import {
 } from '@athanor/core';
 import { agentNotificationAad, MAX_APPROVAL_PAGE } from '@athanor/data';
 import { seedModels } from '@athanor/model-gateway';
+import { DatabaseFixtures } from '@athanor/data/test-support/database-fixtures';
 import type { ApiConfig } from './config.js';
 import * as apiContext from './context.js';
 import { createLogger, silentLogger } from './log.js';
 import { RelaySupervisor } from './relay.js';
 import { buildServer, idempotencyRequestHash, UNREADABLE_AGENT_MESSAGE } from './server.js';
+
+const domainDatabases = new DatabaseFixtures();
+afterAll(() => domainDatabases.close());
+
+/** Route tests need independent persisted data; installation and recovery tests stay fresh. */
+const buildDomainServer: typeof buildServer = async (config, overrides) => {
+  if (config.DATABASE_DRIVER !== 'pglite') throw Error('Domain fixtures require PGlite');
+  await domainDatabases.copyTo(config.PGLITE_PATH);
+  return buildServer(config, overrides);
+};
 
 const disposers: Array<() => Promise<void>> = [];
 afterEach(async () => {
@@ -1874,7 +1885,7 @@ describe('workspace authorization boundaries', () => {
 
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-authz-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory));
+    const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
 
     const owner = sessionCookie(
@@ -2061,7 +2072,7 @@ describe('workspace authorization boundaries', () => {
     );
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-authz-all-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory));
+    const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
 
     const owner = sessionCookie(
@@ -2115,7 +2126,7 @@ describe('workspace authorization boundaries', () => {
   test('throttles repeated passkey ceremonies from one caller', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-rate-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory));
+    const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
 
     const attempt = () =>
@@ -2192,7 +2203,7 @@ describe('conversation management', () => {
     );
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-tasks-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory));
+    const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
 
     const owner = sessionCookie(
@@ -2320,7 +2331,7 @@ describe('conversation management', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-filing-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory));
+    const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -2398,7 +2409,7 @@ describe('conversation management', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-taskpage-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory));
+    const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -2471,7 +2482,7 @@ describe('conversation management', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-runcount-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, database } = await buildServer(isolatedConfig(directory));
+    const { app, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -3957,7 +3968,7 @@ describe('operator-facing logs', () => {
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-logs-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const lines: Array<Record<string, unknown>> = [];
-    const { app, runMaintenance } = await buildServer(isolatedConfig(directory), {
+    const { app, runMaintenance } = await buildDomainServer(isolatedConfig(directory), {
       masterKey,
       logger: createLogger({
         level: 'debug',
@@ -4083,7 +4094,7 @@ describe('spending caps', () => {
     stubProviderAndRunner();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-spend-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, database } = await buildServer(isolatedConfig(directory));
+    const { app, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
 
     const owner = sessionCookie(
@@ -4262,7 +4273,7 @@ describe('spending caps', () => {
     stubProviderAndRunner();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-seeded-caps-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory));
+    const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const connect = async (
       username: string,
@@ -4342,7 +4353,7 @@ describe('spending caps', () => {
     stubProviderAndRunner();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-first-answer-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, database } = await buildServer(isolatedConfig(directory));
+    const { app, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const signIn = async (username: string): Promise<string> =>
       sessionCookie(
@@ -4426,7 +4437,7 @@ describe('spending caps', () => {
     stubProviderAndRunner();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-seeded-caps-queue-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, store } = await buildServer(isolatedConfig(directory), { masterKey });
+    const { app, store } = await buildDomainServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -4522,7 +4533,7 @@ describe('spending caps', () => {
     });
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-price-ceiling-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, database } = await buildServer(isolatedConfig(directory));
+    const { app, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -4715,7 +4726,7 @@ describe('capability and preview boundaries', () => {
     stubProviderAndRunner();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-capability-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory));
+    const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
 
     const owner = sessionCookie(
@@ -5235,7 +5246,7 @@ describe('the settings and file surfaces the client already calls', () => {
     );
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-surfaces-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory));
+    const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -5463,7 +5474,7 @@ describe('the settings and file surfaces the client already calls', () => {
     );
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-provider-key-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory));
+    const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -5550,7 +5561,7 @@ describe('rewinding the computer, not only the conversation', () => {
     );
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-rewind-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, store } = await buildServer(isolatedConfig(directory));
+    const { app, store } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -5770,7 +5781,7 @@ describe('the standing record of what athanor said', () => {
   test('gives every notice a sentence, including one it can no longer read', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-notices-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, store } = await buildServer(isolatedConfig(directory));
+    const { app, store } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -5964,7 +5975,7 @@ describe('mail and calendar connectors', () => {
   ) => {
     const directory = await mkdtemp(join(tmpdir(), `athanor-api-${label}-`));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, database } = await buildServer(
+    const { app, database } = await buildDomainServer(
       { ...isolatedConfig(directory), CONNECTOR_ALLOWED_HOST_SUFFIXES: hostSuffixes },
       overrides
     );
@@ -6271,7 +6282,7 @@ describe('where web searches are answered', () => {
     config: ApiConfig,
     connect: { enforceZeroDataRetention: boolean } | null
   ) => {
-    const { app } = await buildServer(config);
+    const { app } = await buildDomainServer(config);
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -6302,7 +6313,7 @@ describe('where web searches are answered', () => {
     stubProviderCalls();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-websearch-bootstrap-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory));
+    const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -6412,7 +6423,7 @@ describe('where web searches are answered', () => {
     );
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-provider-facts-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer({
+    const { app } = await buildDomainServer({
       ...isolatedConfig(directory),
       // A configured endpoint on the owner's own network is the whole subject of this test.
       ALLOW_INSECURE_PROVIDER_URLS: true
@@ -6472,7 +6483,7 @@ describe('a half-typed message', () => {
     );
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-drafts-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, database } = await buildServer(isolatedConfig(directory));
+    const { app, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -6610,7 +6621,7 @@ describe('what the computer is running', () => {
     );
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-processes-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory));
+    const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -6698,7 +6709,7 @@ describe('what the computer is running', () => {
     );
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-process-stop-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory));
+    const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -7200,7 +7211,9 @@ describe('what the computer wrote down about its owner', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-memory-items-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, store, database } = await buildServer(isolatedConfig(directory), { masterKey });
+    const { app, store, database } = await buildDomainServer(isolatedConfig(directory), {
+      masterKey
+    });
     disposers.push(() => app.close());
     const { cookie, workspaceId, taskId } = await seedOwnerWithTask(
       app,
@@ -7396,7 +7409,7 @@ describe('what the computer wrote down about its owner', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-memory-origin-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, store } = await buildServer(isolatedConfig(directory), { masterKey });
+    const { app, store } = await buildDomainServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
     const { cookie, workspaceId, taskId } = await seedOwnerWithTask(
       app,
@@ -7535,7 +7548,9 @@ describe('what the computer wrote down about its owner', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-memory-review-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, store, database } = await buildServer(isolatedConfig(directory), { masterKey });
+    const { app, store, database } = await buildDomainServer(isolatedConfig(directory), {
+      masterKey
+    });
     disposers.push(() => app.close());
     const { cookie, workspaceId, taskId } = await seedOwnerWithTask(
       app,
@@ -7762,7 +7777,7 @@ describe('what the computer wrote down about its owner', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-memory-proposals-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, store } = await buildServer(isolatedConfig(directory), { masterKey });
+    const { app, store } = await buildDomainServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
     const { cookie, workspaceId, taskId } = await seedOwnerWithTask(
       app,
@@ -7883,7 +7898,7 @@ describe('what the computer wrote down about its owner', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-memory-group-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, store } = await buildServer(isolatedConfig(directory), { masterKey });
+    const { app, store } = await buildDomainServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
     const { cookie, workspaceId, taskId } = await seedOwnerWithTask(
       app,
@@ -8009,7 +8024,9 @@ describe('reading past the first page', () => {
     stubProviderAndRunner();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-paging-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, store, database } = await buildServer(isolatedConfig(directory), { masterKey });
+    const { app, store, database } = await buildDomainServer(isolatedConfig(directory), {
+      masterKey
+    });
     disposers.push(() => app.close());
     const { cookie, workspaceId, taskId } = await seedOwnerWithTask(
       app,
@@ -8217,7 +8234,7 @@ describe('the doors the runner already had', () => {
     );
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-runner-doors-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory));
+    const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -8333,7 +8350,9 @@ describe('the routes nothing had ever asked', () => {
     stubProviderAndRunner({}, true);
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-untested-routes-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, store, database } = await buildServer(isolatedConfig(directory), { masterKey });
+    const { app, store, database } = await buildDomainServer(isolatedConfig(directory), {
+      masterKey
+    });
     // This test takes the database away on purpose at the end, so the shutdown that closes it again
     // is allowed to find it already gone.
     disposers.push(() => app.close().catch(() => undefined));
@@ -8467,7 +8486,7 @@ describe('editing a standing instruction', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-schedule-edit-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, database } = await buildServer(isolatedConfig(directory));
+    const { app, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -8644,7 +8663,7 @@ describe('scheduled dispatch', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-schedule-drain-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, database, runScheduler } = await buildServer(isolatedConfig(directory));
+    const { app, database, runScheduler } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -8746,7 +8765,9 @@ describe('scheduled dispatch', () => {
     );
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-schedule-strand-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, store, database, runScheduler } = await buildServer(isolatedConfig(directory));
+    const { app, store, database, runScheduler } = await buildDomainServer(
+      isolatedConfig(directory)
+    );
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -8812,7 +8833,7 @@ describe('control-plane gates', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-legal-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, store } = await buildServer(isolatedConfig(directory));
+    const { app, store } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const countUsers = store.countUsers.bind(store);
     let counts = 0;
@@ -8837,7 +8858,7 @@ describe('control-plane gates', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-stream-cursor-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory));
+    const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const { cookie, taskId } = await seedOwnerWithTask(
       app,
@@ -8870,7 +8891,7 @@ describe('control-plane gates', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-file-guard-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, database } = await buildServer(isolatedConfig(directory));
+    const { app, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -8919,7 +8940,7 @@ describe('control-plane gates', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-token-rewind-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory));
+    const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const { cookie, taskId } = await seedOwnerWithTask(
       app,
@@ -8983,7 +9004,7 @@ describe('control-plane gates', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-token-mode-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory));
+    const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const { cookie, taskId } = await seedOwnerWithTask(
       app,
@@ -9054,7 +9075,7 @@ describe('control-plane gates', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-token-ws-mode-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory));
+    const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const { cookie, workspaceId } = await seedOwnerWithTask(
       app,
@@ -9114,7 +9135,7 @@ describe('control-plane gates', () => {
     const failing = { now: false };
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-connector-recheck-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(
+    const { app } = await buildDomainServer(
       { ...isolatedConfig(directory), CONNECTOR_ALLOWED_HOST_SUFFIXES: 'example.test' },
       {
         connectorTransport: async (input) => {
@@ -9173,7 +9194,7 @@ describe('control-plane gates', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-list-fanout-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, store, database } = await buildServer(isolatedConfig(directory));
+    const { app, store, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -9260,7 +9281,7 @@ describe('control-plane gates', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-idempotency-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, database } = await buildServer(isolatedConfig(directory));
+    const { app, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -9322,7 +9343,7 @@ describe('control-plane gates', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-account-delete-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer({
+    const { app } = await buildDomainServer({
       ...isolatedConfig(directory),
       PUBLIC_APP_URL: 'https://box.example'
     });
@@ -9378,7 +9399,7 @@ describe('live voice server assembly', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'garden-api-voice-assembly-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory));
+    const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const paths = ['/v1/voice/models', '/v1/voice-sessions'];
     expect(paths.length).toBeGreaterThan(0);
@@ -9451,7 +9472,7 @@ describe('what dictation costs', () => {
     );
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-dictation-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, database } = await buildServer(isolatedConfig(directory));
+    const { app, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
 
     const cookie = sessionCookie(
@@ -9601,7 +9622,7 @@ describe('round trips before the first token', () => {
     );
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-roundtrips-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, database } = await buildServer(isolatedConfig(directory));
+    const { app, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     await database.query("UPDATE model_releases SET availability='available'");
 
@@ -9764,7 +9785,7 @@ describe('the phone transport', () => {
     );
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-phone-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, database, store } = await buildServer(isolatedConfig(directory));
+    const { app, database, store } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
     const cookie = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -10007,7 +10028,7 @@ describe('a run a spending ceiling stopped', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-spend-pause-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, database } = await buildServer(isolatedConfig(directory), { masterKey });
+    const { app, database } = await buildDomainServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
     const { cookie, taskId } = await seedOwnerWithTask(
       app,
@@ -10106,7 +10127,9 @@ describe('a run a spending ceiling stopped', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-paused-estimate-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, database, store } = await buildServer(isolatedConfig(directory), { masterKey });
+    const { app, database, store } = await buildDomainServer(isolatedConfig(directory), {
+      masterKey
+    });
     disposers.push(() => app.close());
     const { cookie, taskId } = await seedOwnerWithTask(
       app,
@@ -10182,7 +10205,7 @@ describe('a run a spending ceiling stopped', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-task-ceiling-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app } = await buildServer(isolatedConfig(directory), { masterKey });
+    const { app } = await buildDomainServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
     const { cookie, taskId } = await seedOwnerWithTask(app, 'task-ceiling', 'Draft the summary');
 
@@ -10214,7 +10237,7 @@ describe('an account with more than one provider connected', () => {
     stubProviderFetch();
     const directory = await mkdtemp(join(tmpdir(), 'athanor-api-multi-provider-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    const { app, database } = await buildServer(isolatedConfig(directory), { masterKey });
+    const { app, database } = await buildDomainServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
     const owner = sessionCookie(
       await app.inject({ method: 'POST', url: '/v1/auth/dev', payload: { username: 'owner' } })
@@ -10256,7 +10279,7 @@ test('creates independent conversations with project defaults, selected context 
   stubProviderFetch();
   const directory = await mkdtemp(join(tmpdir(), 'garden-conversations-'));
   disposers.push(() => rm(directory, { recursive: true, force: true }));
-  const { app, store } = await buildServer(isolatedConfig(directory));
+  const { app, store } = await buildDomainServer(isolatedConfig(directory));
   disposers.push(() => app.close());
   const { cookie, taskId } = await seedOwnerWithTask(
     app,

@@ -17,7 +17,7 @@ const schemaIdentity = () => createHash('sha256').update(JSON.stringify(migratio
 async function copyTemplate(source: string, destination: string): Promise<void> {
   const files: string[] = [];
   const visit = async (relative: string): Promise<void> => {
-    await mkdir(path.join(destination, relative), { mode: 0o700 });
+    if (relative) await mkdir(path.join(destination, relative), { mode: 0o700 });
     for (const entry of await readdir(path.join(source, relative), { withFileTypes: true })) {
       const name = path.join(relative, entry.name);
       if (entry.isDirectory()) await visit(name);
@@ -48,7 +48,7 @@ async function copyTemplate(source: string, destination: string): Promise<void> 
 export class DatabaseFixtures {
   #root: string | undefined;
   #template: Promise<{ directory: string; identity: string }> | undefined;
-  #pending = new Set<Promise<DatabaseFixture>>();
+  #pending = new Set<Promise<unknown>>();
   #fixtures = new Set<DatabaseFixture>();
   #closing: Promise<void> | undefined;
 
@@ -86,7 +86,16 @@ export class DatabaseFixtures {
     return pending;
   }
 
-  async #create(): Promise<DatabaseFixture> {
+  /** Copies only a closed blank schema; the caller owns opening and removing the destination. */
+  copyTo(directory: string): Promise<void> {
+    if (this.#closing) return Promise.reject(Error('Database fixtures are closed'));
+    const pending = this.#copyTo(directory);
+    this.#pending.add(pending);
+    void pending.finally(() => this.#pending.delete(pending)).catch(() => undefined);
+    return pending;
+  }
+
+  async #copyTo(directory: string): Promise<void> {
     const template = await (this.#template ??= this.#prepare());
     if (this.#closing) throw Error('Database fixtures are closed');
     if (
@@ -94,11 +103,24 @@ export class DatabaseFixtures {
       (await readFile(path.join(this.#root!, 'schema.identity'), 'utf8')) !== template.identity
     )
       throw Error('The test template schema identity changed');
+    await mkdir(directory, { mode: 0o700 });
+    try {
+      await copyTemplate(template.directory, directory);
+      if (this.#closing) throw Error('Database fixtures are closed');
+    } catch (error) {
+      await rm(directory, { recursive: true, force: true });
+      throw error;
+    }
+  }
+
+  async #create(): Promise<DatabaseFixture> {
+    await (this.#template ??= this.#prepare());
+    if (this.#closing) throw Error('Database fixtures are closed');
     const directory = await mkdtemp(path.join(this.#root!, 'fixture-'));
     let database: Database | undefined;
     try {
       const databasePath = path.join(directory, 'database');
-      await copyTemplate(template.directory, databasePath);
+      await this.#copyTo(databasePath);
       database = createDatabase({ driver: 'pglite', pglitePath: databasePath });
       await migrateDatabase(database);
       if (this.#closing) throw Error('Database fixtures are closed');
