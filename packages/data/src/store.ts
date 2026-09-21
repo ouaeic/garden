@@ -1,3 +1,8 @@
+import { DiagnosticCaptureStore } from './store/diagnostic-capture.js';
+export type {
+  DiagnosticCaptureRecord,
+  DiagnosticStoredRecord
+} from './store/diagnostic-capture.js';
 import { ConnectorOperationStore } from './store/connector-operations.js';
 export { connectorOperationAad } from './store/connector-operations.js';
 export type {
@@ -96,6 +101,7 @@ export type {
 } from './store/memory.js';
 
 export class DataStore {
+  readonly diagnostics: DiagnosticCaptureStore;
   readonly #connectorOperations: ConnectorOperationStore;
 
   withConnectorOperation: ConnectorOperationStore['withOperation'];
@@ -139,6 +145,7 @@ export class DataStore {
   readonly #projectModelPreferences: ProjectModelPreferenceStore;
 
   constructor(database: Database) {
+    this.diagnostics = new DiagnosticCaptureStore(database);
     this.#connectorOperations = new ConnectorOperationStore(database);
     this.withConnectorOperation = this.#connectorOperations.withOperation.bind(
       this.#connectorOperations

@@ -15,7 +15,12 @@ import { evidenceProgressKey } from './progress.js';
  * cycle is the alternative.
  */
 import type { ModelRelease, TaskEventKind, WebToolPlan } from '@athanor/contracts';
-import { AthanorError, encryptJson } from '@athanor/core';
+import {
+  AthanorError,
+  encryptJson,
+  privateDiagnostics,
+  recordPrivateDiagnostic
+} from '@athanor/core';
 import type { DataStore, TaskRecord } from '@athanor/data';
 import type { ModelToolCall } from '@athanor/model-gateway';
 import type { AgentState, AgentWorkerConfig } from './agent-state.js';
@@ -149,8 +154,8 @@ export const event = async (
   summary: string,
   payload?: unknown,
   options?: { replacesEarlierFrames?: boolean }
-) =>
-  store.appendTaskEvent({
+) => {
+  const saved = await store.appendTaskEvent({
     taskId: task.id,
     kind,
     summary: `Encrypted ${kind.replaceAll('_', ' ')} event`,
@@ -161,6 +166,29 @@ export const event = async (
     ),
     ...(options?.replacesEarlierFrames ? { replacesEarlierFrames: true } : {})
   });
+  if (
+    privateDiagnostics() &&
+    [
+      'tool_started',
+      'tool_result',
+      'status',
+      'warning',
+      'error',
+      'completed',
+      'question_asked',
+      'approval_requested',
+      'approval_resolved'
+    ].includes(kind)
+  ) {
+    await recordPrivateDiagnostic('harness_event', {
+      sequence: saved.sequence,
+      kind,
+      summary,
+      payload
+    });
+  }
+  return saved;
+};
 
 /**
  * One record of a tool call that failed: the timeline event, the result the model reads, and the

@@ -3950,5 +3950,33 @@ CREATE TABLE IF NOT EXISTS model_throughput_ceiling (
       PRIMARY KEY(user_id,connector_id,operation_key)
     );
     CREATE INDEX IF NOT EXISTS connector_operation_requests_operation ON connector_operation_requests(operation_id);`
+  },
+  {
+    version: 110,
+    name: 'private_diagnostic_capture',
+    sql: `CREATE TABLE IF NOT EXISTS diagnostic_captures (
+      epoch UUID NOT NULL,
+      id UUID PRIMARY KEY,
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      task_id UUID NOT NULL UNIQUE REFERENCES tasks(id) ON DELETE CASCADE,
+      workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      state TEXT NOT NULL DEFAULT 'recording' CHECK(state IN ('recording','stopped','failed')),
+      started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      stopped_at TIMESTAMPTZ,
+      last_sequence INTEGER NOT NULL DEFAULT 0 CHECK(last_sequence>=0),
+      last_hash TEXT NOT NULL DEFAULT repeat('0',64) CHECK(last_hash ~ '^[a-f0-9]{64}$'),
+      stored_bytes BIGINT NOT NULL DEFAULT 0 CHECK(stored_bytes>=0),
+      active_segment UUID,
+      writer_id TEXT,
+      reason TEXT CHECK(reason IN ('record_too_large','storage_limit','write_failed','unsupported_record'))
+    );
+    CREATE TABLE IF NOT EXISTS diagnostic_capture_records (
+      capture_id UUID NOT NULL REFERENCES diagnostic_captures(id) ON DELETE CASCADE,
+      sequence INTEGER NOT NULL CHECK(sequence>0),
+      previous_hash TEXT NOT NULL CHECK(previous_hash ~ '^[a-f0-9]{64}$'),
+      hash TEXT NOT NULL CHECK(hash ~ '^[a-f0-9]{64}$'),
+      body_ciphertext JSONB NOT NULL,
+      PRIMARY KEY(capture_id,sequence)
+    );`
   }
 ] as const;

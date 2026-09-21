@@ -33,3 +33,4 @@ export * from './openrouter-generation.js';
 export * from './adapter.js';
 export * from './native-continuation.js';
 export * from './openai-responses.js';
+export * from './model-diagnostics.js';

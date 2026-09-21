@@ -1,3 +1,4 @@
+export * from './private-diagnostics.js';
 export * from './crypto.js';
 export * from './service-keys.js';
 export * from './capability-token.js';
@@ -28,3 +29,5 @@ export * from './account-oauth.js';
 export * from './account-connectors.js';
 
 export type { AccountOperation } from './account-operation.js';
+
+export * from './private-diagnostic-export.js';

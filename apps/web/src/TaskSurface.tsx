@@ -62,6 +62,7 @@ import { resourceWaitReason } from './resource-wait';
 const ProjectNoteEditor = lazy(() =>
   import('./ProjectNotes').then((module) => ({ default: module.ProjectNoteEditor }))
 );
+const PrivateDiagnostics = lazy(() => import('./PrivateDiagnostics'));
 const ProcessPanel = lazy(() => import('./ProcessPanel'));
 const DirectoryPanel = lazy(() => import('./DirectoryPanel'));
 const PlanEditor = lazy(() => import('./PlanEditor'));
@@ -1162,6 +1163,9 @@ export default function TaskSurface({
             >
               Download diagnostics
             </a>
+            <Suspense fallback={null}>
+              <PrivateDiagnostics key={task.id} taskId={task.id} />
+            </Suspense>
           </details>
           <ol className="activity-ledger">
             {historyPage

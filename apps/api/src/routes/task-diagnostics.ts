@@ -1,10 +1,13 @@
+import { registerPrivateDiagnosticRoutes } from './private-diagnostics.js';
 import { Readable } from 'node:stream';
 import { AthanorError, createDiagnosticProjector, decryptJson, unwrapDataKey } from '@athanor/core';
 import { revealedTaskEvent } from '../context.js';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 
-export function registerTaskDiagnosticRoutes({ app, store, masterKey }: RouteContext): void {
+export function registerTaskDiagnosticRoutes(context: RouteContext): void {
+  registerPrivateDiagnosticRoutes(context);
+  const { app, store, masterKey } = context;
   app.get<{ Params: { taskId: string } }>(
     '/v1/tasks/:taskId/diagnostics',
     async (request, reply) => {

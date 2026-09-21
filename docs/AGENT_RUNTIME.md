@@ -788,3 +788,23 @@ out-of-order records and reports unresolved calls, failures and approvals. A par
 export produces a nonzero exit status. The checkpoint and event boundary are separately observed
 and may differ while work is active. This is operational replay, not reproduction of exact model
 requests or semantic verification of a tool's answer; those contents are deliberately absent.
+
+Private recording is a separate owner opt-in in the same disclosure. It starts on the next worker
+turn and records normalized model requests, provider attempts and interrupted outcomes, decision
+inference, selected harness observations and the inputs/results of approval and request-derivation
+checks. It excludes connection credentials, authentication headers and callbacks; it is not an HTTP
+traffic archive. Bodies are encrypted with the original workspace key before database writes.
+Stopping or deleting fences queued writers. Bounded storage or write failures stop capture without
+stopping the task. The recording limits are defined in `packages/contracts/src/diagnostic-capture.ts`.
+
+A private download contains prompts and results in plaintext and should be shared deliberately.
+Nothing is uploaded automatically. Export fixes a record boundary, validates the encrypted chain,
+and marks missing or corrupt history incomplete. Its plaintext hash chain detects corruption; it
+does not authenticate the author of an imported file.
+
+Run `pnpm diagnostic:replay-private path/to/garden-private-diagnostic.ndjson` to re-evaluate recorded
+approval and request-derivation decisions against the installed pure functions, using captured
+clocks. Model attempts and tool observations receive structural checks only. Replay never dispatches
+a recorded tool, contacts a model or reconstructs the complete agent loop. Unsupported formats,
+missing records, open segments and changed decisions are reported rather than counted as agreement.
+A recording that starts or stops during a turn may deliberately contain an unfinished segment.

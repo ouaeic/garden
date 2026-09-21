@@ -1,3 +1,4 @@
+export * from './diagnostic-capture.js';
 export * from './table-preview.js';
 export * from './json-proof.js';
 export * from './browser-action-receipts.js';

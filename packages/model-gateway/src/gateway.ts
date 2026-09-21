@@ -1,4 +1,10 @@
-import { AthanorError } from '@athanor/core';
+import { randomUUID } from 'node:crypto';
+import { AthanorError, privateDiagnostics, recordPrivateDiagnostic } from '@athanor/core';
+import {
+  DiagnosticModelRequest,
+  diagnosticModelResponse,
+  diagnosticModelError
+} from './model-diagnostics.js';
 import type { ModelAdapter, ModelRequest, ModelResponse, ProviderModel } from './protocol.js';
 import { defaultRetryPolicy, withRetry, type RetryPolicy } from './retry.js';
 import { interruptedResponseOf } from './interrupted-response.js';
@@ -41,7 +47,56 @@ export class ModelGateway {
         'The selected connection does not offer decision inference.',
         409
       );
-    return adapter.decide(request);
+    const trace = privateDiagnostics() ? randomUUID() : null;
+    if (trace)
+      await recordPrivateDiagnostic('decision_request', () => ({
+        id: trace,
+        provider,
+        request: {
+          model: request.model,
+          state: request.state,
+          questions: request.questions,
+          inputRate: request.inputRate,
+          outputRate: request.outputRate,
+          sessionId: request.sessionId
+        }
+      }));
+    try {
+      const response = await adapter.decide(request);
+      if (trace)
+        await recordPrivateDiagnostic('decision_outcome', () => ({
+          id: trace,
+          outcome: 'completed',
+          response: {
+            answers: response.answers,
+            usage: {
+              inputTokens: response.usage.inputTokens,
+              outputTokens: response.usage.outputTokens,
+              totalTokens: response.usage.totalTokens,
+              ...(response.usage.costUsd === undefined ? {} : { costUsd: response.usage.costUsd })
+            },
+            metadata: {
+              model: response.metadata.model,
+              latencyMs: response.metadata.latencyMs,
+              ...(response.metadata.generationId === undefined
+                ? {}
+                : { generationId: response.metadata.generationId }),
+              ...(response.metadata.upstreamProvider === undefined
+                ? {}
+                : { upstreamProvider: response.metadata.upstreamProvider })
+            }
+          }
+        }));
+      return response;
+    } catch (error) {
+      if (trace)
+        await recordPrivateDiagnostic('decision_outcome', {
+          id: trace,
+          outcome: 'failed',
+          error: diagnosticModelError(error)
+        });
+      throw error;
+    }
   }
 
   async list(): Promise<ProviderModel[]> {
@@ -94,17 +149,65 @@ export class ModelGateway {
               : {})
           }
         : request;
-    return withRetry(
-      () =>
-        adapter.chat(attempted).catch((error: unknown) => {
-          if (interruptedResponseOf(error)) streamed = true;
-          throw error;
-        }),
-      {
-        policy: options?.retry === false ? { ...this.#retry, maxAttempts: 1 } : this.#retry,
-        hasStreamed: () => streamed,
-        ...(request.signal ? { signal: request.signal } : {})
-      }
-    );
+    const trace = privateDiagnostics() ? randomUUID() : null;
+    if (trace)
+      await recordPrivateDiagnostic('model_request', () => ({
+        id: trace,
+        provider,
+        privacyRoute: adapter.privacyRoute,
+        request: DiagnosticModelRequest.parse(request)
+      }));
+    let attempt = 0;
+    try {
+      const response = await withRetry(
+        async () => {
+          attempt++;
+          if (trace) await recordPrivateDiagnostic('model_attempt', { id: trace, attempt });
+          try {
+            const response = await adapter.chat(attempted);
+            if (trace)
+              await recordPrivateDiagnostic('model_outcome', () => ({
+                id: trace,
+                attempt,
+                outcome: 'completed',
+                response: diagnosticModelResponse(response)
+              }));
+            return response;
+          } catch (error) {
+            const partial = interruptedResponseOf(error);
+            if (partial) streamed = true;
+            if (trace)
+              await recordPrivateDiagnostic('model_outcome', () => ({
+                id: trace,
+                attempt,
+                outcome: partial ? 'interrupted' : 'failed',
+                error: diagnosticModelError(error),
+                ...(partial ? { response: diagnosticModelResponse(partial) } : {})
+              }));
+            throw error;
+          }
+        },
+        {
+          policy: options?.retry === false ? { ...this.#retry, maxAttempts: 1 } : this.#retry,
+          hasStreamed: () => streamed,
+          ...(request.signal ? { signal: request.signal } : {})
+        }
+      );
+      if (trace)
+        await recordPrivateDiagnostic('model_end', {
+          id: trace,
+          attempts: attempt,
+          outcome: 'completed'
+        });
+      return response;
+    } catch (error) {
+      if (trace)
+        await recordPrivateDiagnostic('model_end', {
+          id: trace,
+          attempts: attempt,
+          outcome: interruptedResponseOf(error) ? 'interrupted' : 'failed'
+        });
+      throw error;
+    }
   }
 }

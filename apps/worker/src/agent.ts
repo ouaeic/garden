@@ -1,3 +1,5 @@
+import { withPrivateDiagnostics } from '@athanor/core';
+import { TaskDiagnosticCapture } from './diagnostic-capture.js';
 import { askUser, parkBrowserHandoff, saveQuestion } from './questions.js';
 import { BrowserActionReceipt } from '@athanor/contracts';
 import { browserActionRequestId } from './browser-action-receipts.js';
@@ -1782,6 +1784,18 @@ export class AgentWorker {
   }
 
   async run(task: TaskRecord): Promise<void> {
+    const capture = await TaskDiagnosticCapture.open(
+      this.store,
+      task,
+      this.config.WORKER_ID,
+      this.#masterKey
+    );
+    return capture
+      ? capture.run(() => this.#run(task))
+      : withPrivateDiagnostics(undefined, () => this.#run(task));
+  }
+
+  async #run(task: TaskRecord): Promise<void> {
     /*
      * Everything this turn needs before it can say a word. @see claimTurn in `turn/claim.ts`,
      * where the hundred and five lines that gathered it now live - the workspace key, the model

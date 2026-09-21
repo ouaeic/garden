@@ -265,3 +265,29 @@
   margin: 8px 0 0;
   line-height: 1.65;
 }
+
+.private-diagnostic {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+.private-diagnostic-body {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  overflow-wrap: anywhere;
+}
+.private-diagnostic-body p {
+  margin: 0;
+}
+.private-diagnostic-body .row {
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.private-diagnostic-delete {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 0.75rem;
+}

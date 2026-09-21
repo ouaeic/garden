@@ -11,6 +11,8 @@
  * conversation gained a second copy of the batch.
  */
 import {
+  privateDiagnostics,
+  recordPrivateDiagnostic,
   ownerMessageContent,
   type OwnerMessage,
   AthanorError,
@@ -286,7 +288,7 @@ export const honorUserControl = async (
  * It returns the sentence rather than throwing so the caller decides what a breach costs; the loop
  * raises it, which is right - a request this side cannot account for must not be paid for.
  */
-export const requestDerivationBreach = (request: {
+const deriveRequestBreach = (request: {
   /** The window as prepared, and the window as re-derived from the log at send time. */
   prepared: readonly ModelMessage[];
   rederived: readonly ModelMessage[];
@@ -326,4 +328,11 @@ export const requestDerivationBreach = (request: {
       return `message ${at} (${message.role}) carries ${message.toolCalls?.length ?? 0} tool calls and the re-derived one carries ${again.toolCalls?.length ?? 0}`;
   }
   return null;
+};
+
+export const requestDerivationBreach = (request: Parameters<typeof deriveRequestBreach>[0]) => {
+  const result = deriveRequestBreach(request);
+  if (privateDiagnostics())
+    void recordPrivateDiagnostic('request_derivation', { input: request, result });
+  return result;
 };

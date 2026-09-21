@@ -1,6 +1,6 @@
 /** The strongest provenance, lifetime and ordinary-effect requirement is authoritative. */
 import { publishesPublicly, type SecurityMode } from '@athanor/contracts';
-import { connectorActions } from '@athanor/core';
+import { connectorActions, privateDiagnostics, recordPrivateDiagnostic } from '@athanor/core';
 import {
   classifyDestination,
   MAX_TURN_NOVEL_BYTES,
@@ -253,7 +253,24 @@ export const approvalRequirement = (
   name: string,
   args: Record<string, unknown>,
   securityMode: SecurityMode = 'balanced',
-  context: ApprovalContext = {}
+  context: ApprovalContext = {},
+  now = new Date()
+): ApprovalRequirement | null => {
+  const result = calculateApprovalRequirement(name, args, securityMode, context, now);
+  if (privateDiagnostics())
+    void recordPrivateDiagnostic('approval_decision', () => ({
+      input: { name, args, securityMode, context, now: now.toISOString() },
+      result
+    }));
+  return result;
+};
+
+const calculateApprovalRequirement = (
+  name: string,
+  args: Record<string, unknown>,
+  securityMode: SecurityMode,
+  context: ApprovalContext,
+  now: Date
 ): ApprovalRequirement | null => {
   const taintSources = context.taintSources ?? [];
   if (name === 'decide')
@@ -326,13 +343,13 @@ export const approvalRequirement = (
     taintSources.length ? taintedRequirement(name, args, context, taintSources) : null,
     strongestRequirement(
       serviceRequirement(name, args, taintSources),
-      ordinaryRequirement(name, args, securityMode, context)
+      ordinaryRequirement(name, args, securityMode, context, now)
     )
   );
   if (name !== 'shell') return original;
   const checkpoint = checkpointInvocation(args);
   if (!checkpoint) return original;
-  const recovery = approvalRequirement('shell', checkpoint, securityMode, context);
+  const recovery = approvalRequirement('shell', checkpoint, securityMode, context, now);
   const declaration: ApprovalRequirement = {
     sideEffect: taintSources.length ? 'external_consequential' : 'external_reversible',
     action: `Allow checkpoint recovery for ${textValue(args.job, 'this finite job')}`,
@@ -378,7 +395,8 @@ const ordinaryRequirement = (
   name: string,
   args: Record<string, unknown>,
   securityMode: SecurityMode,
-  context: ApprovalContext
+  context: ApprovalContext,
+  now: Date
 ): ApprovalRequirement | null => {
   if (name === 'code_diagnostics' && textValue(args.action) === 'start')
     return withTaskApproval(
@@ -419,7 +437,7 @@ const ordinaryRequirement = (
           : `${textValue(args.action)} schedule ${textValue(args.id, 'unknown')}`
     };
   if (name === 'memory') {
-    const reason = memoryApprovalReason(args, new Date(), context.taintSources ?? []);
+    const reason = memoryApprovalReason(args, now, context.taintSources ?? []);
     if (reason)
       return {
         sideEffect: 'workspace_write',
@@ -510,7 +528,8 @@ const ordinaryRequirement = (
           name,
           { ...bag, purpose: args.purpose },
           securityMode,
-          {}
+          {},
+          now
         );
         if (!requirement) return;
         if (
