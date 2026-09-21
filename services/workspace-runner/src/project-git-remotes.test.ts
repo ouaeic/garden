@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { mkdtemp, open, readFile, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import type { ProjectGitRemoteInput } from '@athanor/contracts';
 import { ensureWorkspace } from './files.js';
+import * as workspaceFiles from './files.js';
 import { ProjectVersionFiles } from './project-version-files.js';
 import { ProjectGit } from './project-git.js';
 import { ProjectGitRemotes } from './project-git-remotes.js';
@@ -14,6 +16,7 @@ import { projectGitCommand as command } from './project-git-command.js';
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {
   for (const dispose of cleanup.splice(0).reverse()) await dispose();
+  vi.restoreAllMocks();
 });
 const token = 'private-github-token-canary';
 async function fixture() {
@@ -264,11 +267,31 @@ it('delivers a complete captured bundle only to its conversation and preserves e
   await f.settle(service);
   const participant = { taskId: randomUUID(), workspaceId: randomUUID() };
   await ensureWorkspace(path.join(f.root, participant.workspaceId));
+  const anchoredDirectory = workspaceFiles.withWorkspaceDirectory;
+  let heldDirectoryFlushes = 0;
+  vi.spyOn(workspaceFiles, 'withWorkspaceDirectory').mockImplementation(
+    (root, directory, create, work) =>
+      anchoredDirectory(root, directory, create, async (anchored, held) => {
+        const handle = held ?? (await open(anchored, constants.O_RDONLY | constants.O_DIRECTORY));
+        const flush = handle.sync.bind(handle);
+        vi.spyOn(handle, 'sync').mockImplementation(async () => {
+          heldDirectoryFlushes++;
+          return flush();
+        });
+        try {
+          return await work(anchored, handle);
+        } finally {
+          if (!held) await handle.close();
+        }
+      })
+  );
   const input = f.input('fetch');
   await service.start(input, participant, token);
   await f.settle(service);
   const record = await service.get(String(input.requestId));
   expect(record.state).toBe('succeeded');
+  // The held directory is the durable identity; a proc descriptor path cannot be reopened without following its link.
+  expect(heldDirectoryFlushes).toBe(1);
   expect(record.bundlePath).toBeTruthy();
   const bundle = path.join(f.root, participant.workspaceId, record.bundlePath!);
   expect((await stat(bundle)).mode & 0o777).toBe(0o640);

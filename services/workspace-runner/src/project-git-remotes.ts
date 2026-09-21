@@ -201,7 +201,7 @@ export class ProjectGitRemotes {
       await chmod(path.join(stage, 'workspace/repository.bundle'), 0o640);
       const root = workspacePath(this.root, record.workspaceId);
       const relative = `workspace/.garden/remotes/${record.input.repositoryId}`;
-      await withWorkspaceDirectory(root, relative, true, async (directory) => {
+      await withWorkspaceDirectory(root, relative, true, async (directory, heldDirectory) => {
         const target = path.join(directory, record.input.requestId + '.bundle');
         try {
           await copyFile(
@@ -247,7 +247,8 @@ export class ProjectGitRemotes {
         } finally {
           await handle.close();
         }
-        await syncDirectory(directory);
+        if (heldDirectory) await heldDirectory.sync();
+        else await syncDirectory(directory);
       });
       record.bundlePath = `${relative}/${record.input.requestId}.bundle`;
       await rm(stage, { recursive: true, force: true });
