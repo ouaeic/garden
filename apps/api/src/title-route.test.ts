@@ -141,6 +141,25 @@ describe('bounded auxiliary title route', () => {
           );
         expect(beforeSubmit).toHaveBeenCalledOnce();
         calls.push(JSON.parse(init.body as string) as Record<string, unknown>);
+        if (native) {
+          expect(_url).toBe('https://api.openai.com/v1/responses');
+          return new Response(
+            JSON.stringify({
+              id: 'resp-title',
+              status: 'completed',
+              output: [
+                {
+                  id: 'msg-title',
+                  type: 'message',
+                  role: 'assistant',
+                  content: [{ type: 'output_text', text: 'Complete release pipeline repair' }]
+                }
+              ],
+              usage: { input_tokens: 100, output_tokens: 7, total_tokens: 107 }
+            }),
+            { headers: { 'content-type': 'application/json' } }
+          );
+        }
         return new Response(
           JSON.stringify({
             choices: [
@@ -167,12 +186,16 @@ describe('bounded auxiliary title route', () => {
         prompt: 'Fix the release pipeline',
         beforeSubmit
       });
-      expect(result).toMatchObject({ text: 'Complete release pipeline repair', costUsd: 0.0001 });
+      expect(result).toMatchObject({
+        text: 'Complete release pipeline repair',
+        costUsd: native ? (100 * 0.1 + 7 * 0.2) / 1_000_000 : 0.0001
+      });
       expect(calls).toHaveLength(1);
       if (native) {
         expect(calls[0]).toMatchObject({
-          max_completion_tokens: TITLE_OUTPUT_TOKENS,
-          reasoning_effort: 'none'
+          max_output_tokens: TITLE_OUTPUT_TOKENS,
+          reasoning: { effort: 'none' },
+          store: false
         });
         expect(calls[0]).not.toHaveProperty('max_tokens');
         expect(calls[0]).not.toHaveProperty('provider');
@@ -249,10 +272,20 @@ it('binds an auxiliary title to its named account instead of a cheaper sibling a
       model: body.model,
       authorization: new Headers(init.headers).get('authorization')
     });
+    expect(_url).toBe('https://api.openai.com/v1/responses');
     return new Response(
       JSON.stringify({
-        choices: [{ message: { content: 'Named account title' }, finish_reason: 'stop' }],
-        usage: { prompt_tokens: 20, completion_tokens: 4 }
+        id: 'resp-title',
+        status: 'completed',
+        output: [
+          {
+            id: 'msg-title',
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: 'Named account title' }]
+          }
+        ],
+        usage: { input_tokens: 20, output_tokens: 4, total_tokens: 24 }
       })
     );
   });
@@ -333,10 +366,20 @@ it('uses the selected connection credential when multiple accounts are connected
       authorization: new Headers(init?.headers).get('authorization'),
       model: (JSON.parse(init?.body as string) as Record<string, unknown>).model
     });
+    expect(_url).toBe('https://api.openai.com/v1/responses');
     return new Response(
       JSON.stringify({
-        choices: [{ message: { content: 'Selected title' }, finish_reason: 'stop' }],
-        usage: { prompt_tokens: 10, completion_tokens: 3 }
+        id: 'resp-title',
+        status: 'completed',
+        output: [
+          {
+            id: 'msg-title',
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: 'Selected title' }]
+          }
+        ],
+        usage: { input_tokens: 10, output_tokens: 3, total_tokens: 13 }
       })
     );
   });

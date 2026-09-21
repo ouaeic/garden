@@ -16,7 +16,7 @@ The tool defaults to the current owner request and can reference prior tool-call
 does not spend output tokens copying evidence. Repeated classifications share choice definitions
 once. An item list applies shared question templates to each evidence ID and returns rows keyed by
 those IDs, so independent factors do not need repeated instructions. Code combines their answers
-and validates hard constraints. Extra context is separate from existing evidence. References resolve only within the conversation's existing working
+and validates hard constraints. Evidence is supplied by reference; question instructions hold the rubric rather than copied records. References resolve only within the conversation's existing working
 window. Missing or compacted evidence must be read again. References cannot reach arbitrary files,
 other conversations or credentials.
 

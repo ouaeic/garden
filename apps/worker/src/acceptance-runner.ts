@@ -16,6 +16,7 @@
  * `ACCEPTANCE_COMMAND_TIMEOUT_SECONDS` each compose to two hours.
  */
 import type { DataStore, TaskRecord } from '@athanor/data';
+import type { JsonProofResult } from '@athanor/contracts';
 import {
   acceptanceAlreadyObserved,
   acceptanceCommandText,
@@ -28,6 +29,7 @@ import type { AgentState, ExecObservation } from './agent-state.js';
 import { evidenceFloor } from './completion.js';
 import type { AgentRunnerClient } from './runner-client.js';
 import { event } from './tool-recording.js';
+import { inspectAcceptanceChecks } from './acceptance-inspection.js';
 
 /**
  * How long the whole suite may take, in seconds.
@@ -209,6 +211,17 @@ export const acceptanceChecks = async (
   const deadlineAt = Date.now() + ACCEPTANCE_SUITE_DEADLINE_SECONDS * 1_000;
   for (const check of record.checks) {
     try {
+      const issues = await inspectAcceptanceChecks(deps.runner, task, [check]);
+      if (issues.length) {
+        results.push({
+          id: check.id,
+          label: check.label,
+          passed: false,
+          detail: `the check could not run: ${issues.join(' ')}`,
+          ...resultCommand(check)
+        });
+        continue;
+      }
       const already = options.observed ? acceptanceAlreadyObserved(check, options.observed) : null;
       if (already) {
         results.push(already);
@@ -307,16 +320,29 @@ export const acceptanceChecks = async (
               )
             )
           : undefined;
+      const json =
+        present && check.json
+          ? await deps.runner.call<JsonProofResult>(
+              task.workspaceId,
+              task.id,
+              'files.read',
+              `${root}/json-proof`,
+              {
+                path: check.path,
+                json: check.json
+              }
+            )
+          : undefined;
       results.push({
         id: check.id,
         label: check.label,
-        passed: present && (rendered?.passed ?? true),
+        passed: present && (rendered?.passed ?? true) && (json?.passed ?? true),
         detail: !entry
           ? `${check.path} does not exist`
           : entry.type !== 'file'
             ? `${check.path} is a ${entry.type}, not a file`
-            : rendered
-              ? rendered.detail
+            : rendered || json
+              ? (rendered ?? json)!.detail
               : `${entry.sizeBytes} bytes (needs at least ${check.minBytes})`
       });
     } catch (error) {

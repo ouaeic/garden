@@ -29,3 +29,7 @@ export { nativeTranscriptionBound, type TranscriptionBound } from './transcripti
 
 export * from './media-routing.js';
 export * from './openrouter-generation.js';
+
+export * from './adapter.js';
+export * from './native-continuation.js';
+export * from './openai-responses.js';

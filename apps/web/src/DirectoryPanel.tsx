@@ -366,7 +366,7 @@ export default function DirectoryPanel({
               </div>
               {dirty && (
                 <p className="muted" role="status">
-                  Save or reload this file before leaving it.
+                  Save or discard your edits before leaving this file.
                 </p>
               )}
               <Suspense fallback={<Spinner label="Opening file…" />}>
@@ -377,6 +377,15 @@ export default function DirectoryPanel({
                     key={`${base}:${file.path}`}
                     url={`${base}/download?${new URLSearchParams({ path: file.path })}`}
                     name={file.name}
+                    {...(!readOnlyRoot
+                      ? {
+                          editable: {
+                            workspaceId: rootId,
+                            path: file.path,
+                            onDirtyChange: setDirty
+                          }
+                        }
+                      : {})}
                   />
                 ) : (
                   <SourceInspector

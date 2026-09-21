@@ -24,6 +24,8 @@ import {
 } from '../acceptance.js';
 import type { AgentState } from '../agent-state.js';
 import { event } from '../tool-recording.js';
+import type { AgentRunnerClient } from '../runner-client.js';
+import { inspectAcceptanceChecks } from '../acceptance-inspection.js';
 import {
   ACCEPTANCE_ALREADY_PASSED_CAVEAT,
   MAX_ACCEPTANCE_BASELINE_REFUSALS,
@@ -34,6 +36,7 @@ import {
 /** What declaring an acceptance record needs from the worker that owns the turn. */
 export interface AcceptanceDeclarationDeps {
   readonly store: DataStore;
+  readonly runner: AgentRunnerClient;
   runAcceptanceChecks(
     task: TaskRecord,
     key: Uint8Array,
@@ -63,6 +66,16 @@ export const declareAcceptance = async (
       role: 'tool',
       toolCallId: call.id,
       content: `Acceptance record rejected: ${parsed.reason}`
+    });
+    state.turnToolResults[call.id] = { name: call.name, success: false };
+    return;
+  }
+  const issues = await inspectAcceptanceChecks(deps.runner, task, parsed.checks);
+  if (issues.length) {
+    state.messages.push({
+      role: 'tool',
+      toolCallId: call.id,
+      content: `Acceptance record rejected: ${issues.join(' ')} Use exact artifact JSON assertions when appropriate.`
     });
     state.turnToolResults[call.id] = { name: call.name, success: false };
     return;

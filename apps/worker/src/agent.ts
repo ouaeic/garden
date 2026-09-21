@@ -38,7 +38,7 @@ import {
   isProviderWall,
   ModelGateway,
   MediaRouteResolver,
-  OpenAICompatibleAdapter,
+  createModelAdapter,
   OpenRouterDecisionAdapter,
   type ModelResponse,
   type ModelToolCall
@@ -361,6 +361,7 @@ export class AgentWorker {
     };
     this.#acceptance = {
       store,
+      runner: this.#runner,
       runAcceptanceChecks: (task, key, record, options, state) =>
         this.#runAcceptanceChecks(task, key, record, options, state)
     };
@@ -597,7 +598,7 @@ export class AgentWorker {
       model.provider,
       nativeInputAdapter(
         codingMissionAdapter(
-          new OpenAICompatibleAdapter({
+          createModelAdapter({
             baseUrl: secret.baseUrl,
             ...(secret.apiKey ? { apiKey: secret.apiKey } : {}),
             provider: model.provider,

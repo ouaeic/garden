@@ -18,7 +18,7 @@ import {
   environmentInferenceSecret
 } from '@athanor/core';
 import {
-  OpenAICompatibleAdapter,
+  createModelAdapter,
   configuredModelCatalog,
   refreshOpenRouterCatalog,
   seedModels,
@@ -204,7 +204,7 @@ export const registerProviderRoutes = (context: RouteContext): void => {
           apiKey: apiKey!,
           ...(overrides.modelCatalogFetch ? { fetch: overrides.modelCatalogFetch } : {})
         });
-      const adapter = new OpenAICompatibleAdapter({
+      const adapter = createModelAdapter({
         baseUrl,
         ...(apiKey ? { apiKey } : {}),
         provider: input.provider === 'openrouter' ? 'openrouter' : 'custom',

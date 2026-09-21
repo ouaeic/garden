@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useFileNavigationGuard } from '../file-navigation';
 import { readAnalysisRecord } from './analysis-record';
 import AnalysisRunExplorer from './AnalysisRunExplorer';
 import { message } from './format';
@@ -42,6 +43,10 @@ export default function SourceInspector({
   const controller = useRef<AbortController | null>(null);
   const editor = useRef<HTMLTextAreaElement>(null);
   const dirty = file !== null && file.text !== file.original;
+  useFileNavigationGuard(dirty, () => {
+    setNotice('Save or discard file edits before leaving.');
+    editor.current?.focus();
+  });
   const dirtyListener = useRef(onDirtyChange);
   dirtyListener.current = onDirtyChange;
   useEffect(() => dirtyListener.current?.(dirty), [dirty]);

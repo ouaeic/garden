@@ -59,6 +59,8 @@ import { connectComputationSupervisor, type ComputationService } from './computa
 import { registerComputationRoutes } from './computation-routes.js';
 import { CodeIntelligenceManager } from './code-intelligence.js';
 import { registerCodeIntelligenceRoutes } from './code-intelligence-routes.js';
+import { registerJsonProofRoute } from './json-proof.js';
+import { registerAcceptanceInspection } from './acceptance-inspection.js';
 import { CheckpointRefusedError, WorkspaceCheckpoints } from './checkpoints.js';
 import type { RunnerConfig } from './config.js';
 import { DesktopManager, type DesktopStreamState } from './desktop.js';
@@ -1227,6 +1229,8 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
   });
   registerFileDownloadRoutes(app, config);
   registerCodeIntelligenceRoutes(app, config.WORKSPACE_ROOT, codeIntelligence);
+  registerJsonProofRoute(app, config.WORKSPACE_ROOT);
+  registerAcceptanceInspection(app);
   registerComputationRoutes(app, computations);
   registerWorkflowRoutes(app, workflows);
   registerDebuggerRoutes(app, debuggers);

@@ -25,6 +25,7 @@ import type { NativeStatus } from './native';
 import { createTaskNotifier } from './native-notices';
 import { subscribeWorkerNavigation } from './worker-navigation';
 import Brand from './Brand';
+import { fileNavigationBlocked } from './file-navigation';
 import { initialNavigation } from './navigation';
 import type { View } from './navigation';
 import type { Bootstrap, Decision, Draft } from './model';
@@ -98,6 +99,7 @@ function WorkspaceApp() {
   const [error, setError] = useState<unknown>(null);
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [navigation, setNavigation] = useState(initialNavigation);
+  const navigationUrl = useRef(location.pathname + location.search + location.hash);
   const [workspaceId, setWorkspaceId] = useState('');
   const [taskWorkspaces, setTaskWorkspaces] = useState<{
     ownerId: string;
@@ -304,6 +306,11 @@ function WorkspaceApp() {
       if (document.visibilityState === 'visible') requestRefresh();
     };
     const pop = () => {
+      if (fileNavigationBlocked()) {
+        history.pushState({}, '', navigationUrl.current);
+        return;
+      }
+      navigationUrl.current = location.pathname + location.search + location.hash;
       const next = initialNavigation();
       if (next.view === 'computer') setComputerOpened(true);
       setNavigation(next);
@@ -378,6 +385,7 @@ function WorkspaceApp() {
     return () => clearInterval(timer);
   }, [workspaceId, Boolean(bootstrap), authRequired]);
   function navigate(view: View, taskId: string | null = null, projectId: string | null = null) {
+    if (fileNavigationBlocked()) return;
     if (mobile) setSidebarOpen(false);
     if (view === 'computer') setComputerOpened(true);
     setNavigation({ view, taskId, projectId });
@@ -385,7 +393,8 @@ function WorkspaceApp() {
     if (taskId) params.set('task', taskId);
     if (projectId) params.set('project', projectId);
     if (view !== 'work') params.set('view', view);
-    history.pushState({}, '', `${location.pathname}${params.size ? '?' + params.toString() : ''}`);
+    navigationUrl.current = `${location.pathname}${params.size ? '?' + params.toString() : ''}`;
+    history.pushState({}, '', navigationUrl.current);
     document.getElementById('main')?.scrollTo({ top: 0, behavior: 'instant' });
   }
   const workspace =
@@ -418,6 +427,7 @@ function WorkspaceApp() {
     return () => controller.abort();
   }, [task?.workspaceId, taskWorkspace?.id, bootstrap?.user.id]);
   function openTask(id: string, projectId: string | null = null) {
+    if (fileNavigationBlocked()) return;
     if (window.innerWidth <= 760) setSidebarOpen(false);
     const target = bootstrapRef.current?.tasks.find((item) => item.id === id);
     if (

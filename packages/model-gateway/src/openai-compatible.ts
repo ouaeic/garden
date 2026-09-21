@@ -78,7 +78,7 @@ export const DEFAULT_MAX_REQUEST_BYTES = 16 * 1024 * 1024;
 const shedImageNotice = (count: number, ceilingBytes: number): string =>
   `[${count === 1 ? 'one image was' : `${count} images were`} dropped from this message: the assembled request was over the ${ceilingBytes}-byte transport ceiling and the oldest attachments went first. Read the file again if this step needs to see it.]`;
 
-interface Options {
+export interface CompatibleAdapterOptions {
   baseUrl: string;
   apiKey?: string;
   provider: string;
@@ -646,7 +646,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
   readonly #maxRequestBytes: number;
   #parameterCache: Promise<Map<string, ReadonlySet<string>>> | undefined;
 
-  constructor(options: Options) {
+  constructor(options: CompatibleAdapterOptions) {
     this.provider = options.provider;
     this.privacyRoute = options.privacyRoute;
     this.#baseUrl = options.baseUrl.replace(/\/$/, '');
@@ -997,9 +997,8 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
     const payload = (withReasoningDetails: boolean, shedImages: ReadonlySet<number>): string =>
       JSON.stringify({
         model: input.model,
-        ...(nativeOpenAI && nativeParts.length
-          ? { modalities: ['text'], store: false, service_tier: 'default' }
-          : {}),
+        ...(nativeOpenAI ? { store: false, service_tier: 'default' } : {}),
+        ...(nativeOpenAI && nativeParts.length ? { modalities: ['text'] } : {}),
         messages: input.messages.map((message, index) => ({
           role: message.role,
           content: ((): string | ContentBlock[] => {

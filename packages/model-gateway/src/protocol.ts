@@ -2,6 +2,7 @@ import type { ServerToolUse, WebCitation } from '@athanor/contracts';
 import { z } from 'zod';
 import type { GenerationCutoff } from './generation-budget.js';
 import { ReasoningEffort, ReasoningOptions } from './reasoning.js';
+import { NativeContinuation } from './native-continuation.js';
 import { NativeInputPart } from './native-input.js';
 
 export const ModelMessage = z.object({
@@ -11,6 +12,9 @@ export const ModelMessage = z.object({
   nativeInputs: z.array(NativeInputPart).max(4).optional(),
   reasoning: z.string().optional(),
   reasoningDetails: z.array(z.unknown()).optional(),
+  nativeContinuation: NativeContinuation.optional(),
+  /** Generated numerical budget feedback, not task content; it need not survive native replay. */
+  ephemeralNotice: z.boolean().optional(),
   toolCallId: z.string().optional(),
   toolCalls: z
     .array(
@@ -208,6 +212,7 @@ export interface ModelResponse {
    */
   reasoning?: string;
   reasoningDetails?: unknown[];
+  nativeContinuation?: NativeContinuation;
   toolCalls: ModelToolCall[];
   /**
    * The sources a provider-side tool grounded this answer in, when it attached any.

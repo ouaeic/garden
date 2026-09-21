@@ -1,5 +1,5 @@
 /* eslint jsx-a11y/no-noninteractive-tabindex: ["error", {"roles": ["region"]}] -- Long text remains keyboard-scrollable inside each labeled region. */
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Markdown from '../MarkdownBody';
 import { Button, ErrorNotice, Spinner } from '../ui';
 import { shareArtifactDocument } from '../share-html';
@@ -15,6 +15,7 @@ import {
 } from './notebook';
 import './notebook-preview.css';
 
+const NotebookEditor = lazy(() => import('./NotebookEditor'));
 const CELLS_PER_PAGE = 20;
 const OUTPUTS_PER_PAGE = 10;
 const TEXT_PER_PAGE = 16000;
@@ -199,7 +200,17 @@ function Output({ value, index, cell }: { value: unknown; index: number; cell: n
   );
 }
 
-function Cell({ value, index }: { value: unknown; index: number }) {
+export function NotebookCell({
+  value,
+  index,
+  controls,
+  editor
+}: {
+  value: unknown;
+  index: number;
+  controls?: ReactNode;
+  editor?: ReactNode;
+}) {
   const cell = notebookObject(value);
   const source = notebookText(cell?.source);
   const images = useMemo(() => notebookAttachments(cell?.attachments), [cell?.attachments]);
@@ -230,23 +241,30 @@ function Cell({ value, index }: { value: unknown; index: number }) {
           </span>
         )}
       </header>
-      {!known ? (
-        <RawValue value={value} label={`Cell ${number} JSON`} />
-      ) : source === null ? (
-        <>
-          <p className="muted">Cell source is missing or malformed.</p>
-          <RawValue value={value} label={`Cell ${number} JSON`} />
-        </>
-      ) : kind === 'markdown' && source.length <= MARKDOWN_LIMIT ? (
-        <Markdown imageSources={images}>{source}</Markdown>
-      ) : (
-        <>
-          {kind === 'markdown' && (
-            <p className="muted">Long Markdown is shown as paged source text.</p>
-          )}
-          <TextBlock text={source} label={`Cell ${number} source`} />
-        </>
+      {controls}
+      {notebookObject(cell?.metadata)?.garden_outputs_stale === true && (
+        <p className="notebook-stale" role="status">
+          Recorded outputs are stale: code or execution order has changed.
+        </p>
       )}
+      {editor ??
+        (!known ? (
+          <RawValue value={value} label={`Cell ${number} JSON`} />
+        ) : source === null ? (
+          <>
+            <p className="muted">Cell source is missing or malformed.</p>
+            <RawValue value={value} label={`Cell ${number} JSON`} />
+          </>
+        ) : kind === 'markdown' && source.length <= MARKDOWN_LIMIT ? (
+          <Markdown imageSources={images}>{source}</Markdown>
+        ) : (
+          <>
+            {kind === 'markdown' && (
+              <p className="muted">Long Markdown is shown as paged source text.</p>
+            )}
+            <TextBlock text={source} label={`Cell ${number} source`} />
+          </>
+        ))}
       {kind === 'code' &&
         (outputs ? (
           <>
@@ -317,7 +335,7 @@ export function NotebookDocument({ notebook, content }: { notebook: Notebook; co
           {notebook.cells
             .slice(page * CELLS_PER_PAGE, (page + 1) * CELLS_PER_PAGE)
             .map((value, offset) => (
-              <Cell
+              <NotebookCell
                 key={page * CELLS_PER_PAGE + offset}
                 value={value}
                 index={page * CELLS_PER_PAGE + offset}
@@ -338,11 +356,21 @@ export function NotebookDocument({ notebook, content }: { notebook: Notebook; co
   );
 }
 
-export default function NotebookPreview({ url, name }: { url: string; name: string }) {
+export default function NotebookPreview({
+  url,
+  name,
+  editable
+}: {
+  url: string;
+  name: string;
+  editable?: { workspaceId: string; path: string; onDirtyChange?: (dirty: boolean) => void };
+}) {
+  const [editing, setEditing] = useState(false);
   const [loaded, setLoaded] = useState<{ notebook: Notebook; content: string } | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [revision, setRevision] = useState(0);
   useEffect(() => {
+    if (editing) return;
     const controller = new AbortController();
     const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(30000)]);
     setLoaded(null);
@@ -357,11 +385,29 @@ export default function NotebookPreview({ url, name }: { url: string; name: stri
         if (!controller.signal.aborted) setError(cause);
       });
     return () => controller.abort();
-  }, [url, revision]);
+  }, [url, revision, editing]);
+  if (editing && editable)
+    return (
+      <Suspense fallback={<Spinner label="Opening notebook editor…" />}>
+        <NotebookEditor
+          {...editable}
+          name={name}
+          onClose={() => {
+            setEditing(false);
+            setRevision((value) => value + 1);
+          }}
+        />
+      </Suspense>
+    );
   return (
     <section aria-label={`Notebook preview for ${name}`}>
       <ErrorNotice error={error} onRetry={() => setRevision((value) => value + 1)} />
       {!error && !loaded && <Spinner label="Opening notebook…" />}
+      {loaded && editable && (
+        <div className="notebook-toolbar">
+          <Button onClick={() => setEditing(true)}>Edit notebook</Button>
+        </div>
+      )}
       {loaded && <NotebookDocument key={`${url}:${revision}`} {...loaded} />}
     </section>
   );

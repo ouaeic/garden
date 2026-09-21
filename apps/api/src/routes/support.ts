@@ -44,7 +44,7 @@ import type { ModelTaskKind, RoutableModel } from '@athanor/core';
 import type { MediaModelOption } from '@athanor/contracts';
 import type { UserRecord, WorkspaceRecord } from '@athanor/data';
 import {
-  OpenAICompatibleAdapter,
+  createModelAdapter,
   MediaRouteResolver,
   applyOpenRouterPrivacyPolicy,
   refreshOpenRouterCatalog,
@@ -384,7 +384,7 @@ export const createServerSupport = (context: ServerBase) => {
         if (!missing.length) return;
         const secret = connections.get('ollama-cloud')?.secret;
         if (!secret) return;
-        const adapter = new OpenAICompatibleAdapter({
+        const adapter = createModelAdapter({
           provider: 'custom',
           privacyRoute: 'external',
           baseUrl: secret.baseUrl,

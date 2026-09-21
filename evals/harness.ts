@@ -656,6 +656,11 @@ const streamOf = (
 /* ------------------------------------------------------------------------- the scripted runner */
 
 export interface RunnerStub {
+  /** Native syntax inspection outcomes; no submitted command executes in the offline harness. */
+  readonly acceptanceInspection?: {
+    readonly inspected: number;
+    readonly issues: readonly string[];
+  };
   /**
    * Exit codes handed to consecutive `/exec` calls; the last one repeats. This is what makes an
    * acceptance check fail on the unfinished job and pass on the finished one.
@@ -1064,6 +1069,8 @@ const runnerResponse = (
   // Before any branch decides what to answer, because the question this record answers is what the
   // loop ASKED for, and a route recorded inside a branch is a route somebody already modelled.
   state.observed.push(routeName(url, init));
+  if (url.endsWith('/acceptance/inspect'))
+    return json(stub.acceptanceInspection ?? { inspected: 0, issues: [] });
   if (url.endsWith('/repository-map'))
     return json({ available: false, reason: 'Lexical repository fixture' });
   if (url.endsWith('/documents')) {

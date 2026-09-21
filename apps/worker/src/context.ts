@@ -1,4 +1,5 @@
 import {
+  dropInvalidNativeContinuations,
   MAX_CACHE_BREAKPOINTS,
   MIN_CACHEABLE_TOKENS,
   type ModelMessage,
@@ -1334,7 +1335,12 @@ const estimatedTokens = (messages: ModelMessage[]): number =>
       const reasoning =
         (message.reasoning?.length ?? 0) +
         (message.reasoningDetails ? json(message.reasoningDetails).length : 0);
-      return total + message.content.length + toolCalls + images + reasoning + 24;
+      // A native envelope replaces the canonical assistant on the wire; it is not a second copy.
+      const characters = Math.max(
+        message.content.length + toolCalls + reasoning,
+        message.nativeContinuation ? json(message.nativeContinuation.items).length : 0
+      );
+      return total + characters + images + 24;
     }, 0) / 4
   );
 
@@ -2858,7 +2864,8 @@ const stablePrefixEnd = (
       // Images and reasoning are dropped outright rather than shortened, so carrying either is
       // always a pending rewrite.
       (!message.images?.length || index < imageBoundary) &&
-      ((!message.reasoning && !message.reasoningDetails?.length) || index < detailBoundary) &&
+      ((!message.reasoning && !message.reasoningDetails?.length && !message.nativeContinuation) ||
+        index < detailBoundary) &&
       (!message.toolCalls?.length ||
         index < detailBoundary ||
         message.toolCalls.every(
@@ -3230,12 +3237,15 @@ export const prepareModelContext = (
     if (message.role === 'assistant' && index < input.length - RECENT_DETAIL_MESSAGES) {
       omittedCharacters +=
         (message.reasoning?.length ?? 0) +
-        (message.reasoningDetails ? json(message.reasoningDetails).length : 0);
+        (message.reasoningDetails ? json(message.reasoningDetails).length : 0) +
+        (message.nativeContinuation ? json(message.nativeContinuation).length : 0);
       delete copy.reasoning;
       delete copy.reasoningDetails;
+      delete copy.nativeContinuation;
     }
     return copy;
   });
+  omittedCharacters += dropInvalidNativeContinuations(messages);
 
   /*
    * Retention by role, and why the two passes below never touch a `user` message.
@@ -3292,6 +3302,10 @@ export const prepareModelContext = (
           omittedCharacters += message.reasoning.length;
           delete message.reasoning;
         }
+        if (message.nativeContinuation) {
+          omittedCharacters += json(message.nativeContinuation).length;
+          delete message.nativeContinuation;
+        }
         if (message.reasoningDetails) {
           omittedCharacters += json(message.reasoningDetails).length;
           delete message.reasoningDetails;
@@ -3345,6 +3359,10 @@ export const prepareModelContext = (
       if (message.reasoning) {
         omittedCharacters += message.reasoning.length;
         delete message.reasoning;
+      }
+      if (message.nativeContinuation) {
+        omittedCharacters += json(message.nativeContinuation).length;
+        delete message.nativeContinuation;
       }
       if (message.reasoningDetails) {
         omittedCharacters += json(message.reasoningDetails).length;
@@ -3446,6 +3464,7 @@ export const prepareModelContext = (
    * describes one request, and a stale copy of it in the trajectory would be a wrong number the
    * model carries forward.
    */
+  omittedCharacters += dropInvalidNativeContinuations(messages);
   const budgetNotice = contextBudgetNotice(estimatedTokens(messages), inputBudget, olderFloor);
 
   // Breakpoints are chosen after every bound and compaction pass so they mark the text that is
@@ -3465,7 +3484,7 @@ export const prepareModelContext = (
    * exactly the array they were chosen on before this line existed, and the notice rides outside
    * every one of them where nothing can be anchored to it.
    */
-  if (budgetNotice) messages.push({ role: 'system', content: budgetNotice });
+  if (budgetNotice) messages.push({ role: 'system', content: budgetNotice, ephemeralNotice: true });
 
   return {
     messages,

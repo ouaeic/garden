@@ -104,3 +104,39 @@
   color: var(--ink);
   border-color: var(--paper);
 }
+
+.notebook-cell-actions {
+  margin-bottom: 0.75rem;
+}
+.notebook-cell-editor {
+  margin: 0.8rem 0;
+}
+.notebook-cell-editor label,
+.notebook-add-kind {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.notebook-cell-editor select,
+.notebook-add-kind select {
+  width: auto;
+}
+.notebook-source {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+  font-family: var(--mono, monospace);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  tab-size: 4;
+}
+.notebook-stale {
+  padding: 0.65rem 0.8rem;
+  border-left: 3px solid var(--muted);
+  background: var(--panel);
+  font-size: 0.85rem;
+}
+.notebook-editor .row {
+  flex-wrap: wrap;
+}

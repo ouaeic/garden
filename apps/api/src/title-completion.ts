@@ -5,7 +5,7 @@ import {
   priceCeilingFields,
   readRoutingMetadata
 } from '@athanor/core';
-import { OpenAICompatibleAdapter, isNativeOpenAIEndpoint } from '@athanor/model-gateway';
+import { createModelAdapter, isNativeOpenAIEndpoint } from '@athanor/model-gateway';
 import { ownerPriceCeiling, type InferenceSecret } from './context.js';
 import type { ServerBase } from './http/server-context.js';
 import { providerWalls } from './maintenance/provider-walls.js';
@@ -53,7 +53,7 @@ export const createTitleCompletion =
     const { secret } = connection;
     const native = isNativeOpenAIEndpoint(secret.baseUrl);
     let submitted = false;
-    const adapter = new OpenAICompatibleAdapter({
+    const adapter = createModelAdapter({
       baseUrl: secret.baseUrl,
       ...(secret.apiKey ? { apiKey: secret.apiKey } : {}),
       provider: model.provider,

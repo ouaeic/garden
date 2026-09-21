@@ -27,6 +27,7 @@ import {
   isDestructiveScript
 } from './command-classification.js';
 import { textValue } from './values.js';
+import { JsonProof } from '@athanor/contracts';
 
 /** A command the harness runs itself, with the arguments fixed before the work started. */
 export interface AcceptanceCommandCheck {
@@ -92,6 +93,7 @@ export interface AcceptanceArtifactCheck {
   readonly minBytes: number;
   /** Present when the file is a document and the claim is about its pages, not its size. */
   readonly render?: AcceptanceRenderClause;
+  readonly json?: JsonProof;
 }
 
 export type AcceptanceCheck = AcceptanceCommandCheck | AcceptanceArtifactCheck;
@@ -612,12 +614,24 @@ export const parseAcceptanceChecks = (
       if (!path) return { ok: false, reason: `Check ${index + 1} needs the path it expects.` };
       const render = parseRenderClause(record.render, path);
       if (!render.ok) return { ok: false, reason: `Check ${index + 1}: ${render.reason}` };
+      const json = record.json === undefined ? undefined : JsonProof.safeParse(record.json);
+      if (json && !json.success)
+        return {
+          ok: false,
+          reason: `Check ${index + 1}: supply bounded equals, lengths or uniqueBy JSON assertions using JSON Pointers.`
+        };
+      if (json && render.render)
+        return {
+          ok: false,
+          reason: `Check ${index + 1}: JSON assertions and page rendering need separate checks.`
+        };
       checks.push({
         id: checkId(index, 'check'),
         kind: 'artifact',
         label,
         path,
         minBytes: Math.max(1, Math.trunc(Number(record.minBytes)) || 1),
+        ...(json?.success ? { json: json.data } : {}),
         ...(render.render ? { render: render.render } : {})
       });
       continue;
@@ -706,7 +720,7 @@ export const describeAcceptanceCheck = (check: AcceptanceCheck): string =>
       }`
     : `${check.id} (${check.label}): ${check.path} exists and is at least ${check.minBytes} bytes${
         check.render ? `, and ${describeRenderClause(check.render)}` : ''
-      }`;
+      }${check.json ? `, JSON assertions ${JSON.stringify(check.json)}` : ''}`;
 
 /** What the window is told after a declaration, so the model knows what it will be held to. */
 export const acceptanceAcceptedResult = (record: AcceptanceRecord): string =>

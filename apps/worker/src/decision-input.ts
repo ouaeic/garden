@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import {
-  DecisionInput,
   DecisionQuestion,
   validateDecisionInput,
   type DecisionInput as Input
@@ -30,10 +29,7 @@ export const DecisionToolInput = z
     questions: z.record(
       z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/),
       z.union([z.string().min(1).max(6000), DecisionQuestion])
-    ),
-    context: DecisionInput.shape.state
-      .optional()
-      .describe('New context only. Existing evidence belongs in sources; do not copy it here.')
+    )
   })
   .strict();
 
@@ -52,7 +48,7 @@ export function resolveDecisionInput(state: AgentState, value: unknown): Input {
       );
     if (!message?.content)
       throw new Error(
-        `Decision evidence ${id} is no longer in the working context. Read the relevant evidence again or supply a concise state.`
+        `Decision evidence ${id} is no longer in the working context. Read the relevant evidence again and reference that tool-call ID.`
       );
     return { id, text: message.content };
   });
@@ -76,6 +72,6 @@ export function resolveDecisionInput(state: AgentState, value: unknown): Input {
     });
     questions = expanded;
   }
-  const text = JSON.stringify({ evidence, ...(input.context ? { context: input.context } : {}) });
+  const text = JSON.stringify({ evidence });
   return validateDecisionInput({ state: text, questions });
 }

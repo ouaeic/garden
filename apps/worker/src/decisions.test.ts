@@ -87,6 +87,9 @@ it('reuses exact conversation evidence without permitting arbitrary files or oth
     ]
   } as AgentState;
   const fromOwner = resolveDecisionInput(state, { questions: input.questions });
+  expect(() =>
+    resolveDecisionInput(state, { questions: input.questions, context: 'Copied evidence' })
+  ).toThrow();
   expect(JSON.parse(fromOwner.state)).toEqual({
     evidence: [{ id: '$request', text: 'Classify these records.' }]
   });
@@ -99,12 +102,10 @@ it('reuses exact conversation evidence without permitting arbitrary files or oth
   });
   const shared = resolveDecisionInput(state, {
     choices: { fasta: 'FASTA', fastq: 'FASTQ', unknown: 'Insufficient evidence' },
-    questions: { first: 'Classify the first record.', second: 'Classify the second record.' },
-    context: 'Classify formats, not record quality.'
+    questions: { first: 'Classify the first record.', second: 'Classify the second record.' }
   });
   expect(JSON.parse(shared.state)).toEqual({
-    evidence: [{ id: '$request', text: 'Classify these records.' }],
-    context: 'Classify formats, not record quality.'
+    evidence: [{ id: '$request', text: 'Classify these records.' }]
   });
   expect(shared.questions).toEqual({
     first: {

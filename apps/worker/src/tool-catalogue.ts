@@ -596,7 +596,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'set_acceptance',
     description:
-      'State what would prove this job is done, before you do it. The harness runs these itself when you call finish, and refuses the finish while any of them fails - so they are the definition of done rather than a claim about it. Name checks that would actually fail if the work were wrong: the command that builds it, the test that exercises it, the extraction that shows the document says what you were asked to make it say, the file that has to exist and not be empty - and on a document, render, because a byte count cannot tell a deck whose text runs off slide four from one that does not. Call it again to correct a check; both versions are shown to the user, because weakening your own test is a different act from passing it.',
+      'Declare falsifiable checks before material work; the harness runs them at finish. Use artifact json assertions for exact values, array lengths and unique IDs without generating test code. Use commands for behavior, and render for document pages and clipping. A successful exit proves only the executed assertions; never suppress failures. Revised checks remain visible.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -628,6 +628,20 @@ export const agentTools: ModelTool[] = [
               timeoutSeconds: { type: 'integer', minimum: 1, maximum: 900 },
               path: { type: 'string', description: 'artifact checks: the workspace path.' },
               minBytes: { type: 'integer', minimum: 1 },
+              json: {
+                type: 'object',
+                additionalProperties: false,
+                description:
+                  'artifact checks: JSON Pointer keys. equals compares exact values; lengths checks arrays; uniqueBy requires nonempty records with distinct IDs. For large data, check a computed summary.',
+                properties: {
+                  equals: { type: 'object', additionalProperties: true },
+                  lengths: {
+                    type: 'object',
+                    additionalProperties: { type: 'integer', minimum: 0 }
+                  },
+                  uniqueBy: { type: 'object', additionalProperties: { type: 'string' } }
+                }
+              },
               render: {
                 type: 'object',
                 additionalProperties: false,

@@ -347,6 +347,7 @@ ${clockLine(new Date(), timeZone)}
       content: response.text,
       ...(response.reasoning ? { reasoning: response.reasoning } : {}),
       ...(response.reasoningDetails?.length ? { reasoningDetails: response.reasoningDetails } : {}),
+      ...(response.nativeContinuation ? { nativeContinuation: response.nativeContinuation } : {}),
       ...(response.toolCalls.length ? { toolCalls: response.toolCalls } : {})
     });
     if (!response.toolCalls.length) {

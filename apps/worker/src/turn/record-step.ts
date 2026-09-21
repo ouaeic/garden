@@ -73,6 +73,7 @@ export const recordAssistantStep = async (
     content: assistantText,
     ...(response.reasoning ? { reasoning: response.reasoning } : {}),
     ...(response.reasoningDetails?.length ? { reasoningDetails: response.reasoningDetails } : {}),
+    ...(response.nativeContinuation ? { nativeContinuation: response.nativeContinuation } : {}),
     ...(response.toolCalls.length ? { toolCalls: response.toolCalls } : {})
   });
   /*
