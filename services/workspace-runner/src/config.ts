@@ -8,6 +8,7 @@ const Config = z.object({
   WORKSPACE_ROOT: z.string().default('.athanor/workspaces'),
   TAR_EXECUTABLE: z.string().default('/usr/bin/tar'),
   SNAPSHOT_EXECUTABLE: z.string().default('/usr/local/lib/athanor/athanor-snapshot'),
+  GUI_NAMESPACE_HELPER: z.string().optional(),
   BROWSER_EXECUTABLE_PATH: z.string().optional(),
   // On by default: run the browser on the workspace's own X server rather than headless. Headless
   // Chromium tells every site it has no hover and a coarse pointer, so responsive pages serve it

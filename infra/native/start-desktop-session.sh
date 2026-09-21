@@ -63,7 +63,7 @@ mkdir -p "$state_dir"
 [ -d "$runtime_dir" ] || mkdir -m 0700 "$runtime_dir"
 rm -f "$environment_file"
 
-export HOME="$workspace_root"
+export HOME="${HOME:-$workspace_root}"
 export DISPLAY=":$display_number"
 export XAUTHORITY="$state_dir/Xauthority"
 # X11 uses a public local socket; a private cookie keeps other sessions and agent commands out.
@@ -101,7 +101,7 @@ exec /usr/bin/dbus-run-session -- /bin/sh -c '
     -screen 0 "${ATHANOR_MAX_RES}x24" \
     +extension RANDR +extension DAMAGE +extension XFIXES +extension MIT-SHM \
     +extension Composite \
-    -dpi 96 -nolisten tcp -noreset &
+    -dpi 96 -nolisten tcp -nolisten local -noreset &
   xvfb_pid=$!
   cleanup() {
     kill "$xvfb_pid" 2>/dev/null || true

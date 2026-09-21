@@ -45,6 +45,8 @@ const events = {
     'could not record services in .athanor/services.json - services will not survive a restart',
   'command.limits_unavailable':
     'the resource limiter is missing, so commands run without memory, file-size and process limits. Install util-linux to restore them.',
+  'browser.cleanup_failed': 'the project browser namespace could not be released',
+  'desktop.cleanup_failed': 'the project desktop namespace could not be released',
   'browser.frame_scan_failed': 'a frame could not be scanned for controls',
   'browser.download_cleanup_failed': 'a temporary browser download could not be removed',
   'sessions.retirement_failed': 'an idle browser or empty desktop could not be retired',

@@ -1,0 +1,157 @@
+#!/usr/bin/python3 -I
+"""Enter held project GUI namespaces without granting host privileges."""
+import ctypes
+import json
+import os
+import re
+import select
+import signal
+import subprocess
+import sys
+
+NAMESPACE_KEYS = ('process', 'root')
+CLONE_NEWUSER = 0x10000000
+CLONE_NEWNS = 0x00020000
+CLONE_NEWPID = 0x20000000
+CLONE_NEWIPC = 0x08000000
+CLONE_NEWUTS = 0x04000000
+GUI_NAMESPACES = CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWPID | CLONE_NEWIPC | CLONE_NEWUTS
+PR_SET_PDEATHSIG = 1
+PR_SET_NO_NEW_PRIVS = 38
+LANDLOCK_CREATE_RULESET = 444
+LANDLOCK_RESTRICT_SELF = 446
+LANDLOCK_CREATE_RULESET_VERSION = 1
+LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET = 1
+
+
+def namespace_handles(serialized, parent_pid):
+    value = json.loads(serialized)
+    if not isinstance(value, dict) or set(value) != set(NAMESPACE_KEYS):
+        raise ValueError('Invalid GUI namespace handles')
+    pattern = re.compile(r'/proc/' + str(parent_pid) + r'/fd/([0-9]+)')
+    for key in NAMESPACE_KEYS:
+        path = value[key]
+        match = pattern.fullmatch(path) if isinstance(path, str) else None
+        if not match or int(match.group(1)) < 3:
+            raise ValueError('GUI namespace handles must belong to the launching runner')
+    if len(set(value.values())) != len(NAMESPACE_KEYS):
+        raise ValueError('GUI namespace handles must be distinct')
+    return value
+
+
+def restrict_abstract_sockets():
+    # Pathname sockets remain available inside the project's private filesystem. Abstract
+    # sockets have no pathname to confine, so only this process and its descendants may share them.
+    if os.uname().machine not in ('x86_64', 'aarch64'):
+        raise RuntimeError('GUI socket isolation is unsupported on this architecture')
+    libc = ctypes.CDLL(None, use_errno=True)
+    if libc.syscall(LANDLOCK_CREATE_RULESET, 0, 0, LANDLOCK_CREATE_RULESET_VERSION) < 6:
+        raise RuntimeError('GUI socket isolation requires Landlock scope support')
+
+    class Ruleset(ctypes.Structure):
+        _fields_ = [('fs', ctypes.c_uint64), ('net', ctypes.c_uint64), ('scoped', ctypes.c_uint64)]
+
+    rules = Ruleset(0, 0, LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET)
+    fd = libc.syscall(LANDLOCK_CREATE_RULESET, ctypes.byref(rules), ctypes.sizeof(rules), 0)
+    if fd < 0:
+        raise OSError(ctypes.get_errno(), 'Cannot create GUI socket boundary')
+    try:
+        if libc.prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) or libc.syscall(LANDLOCK_RESTRICT_SELF, fd, 0):
+            raise OSError(ctypes.get_errno(), 'Cannot enforce GUI socket boundary')
+    finally:
+        os.close(fd)
+
+
+def main(args):
+    environment = dict(os.environ)
+    environment.pop('ATHANOR_GUI_HELPER', None)
+    if args and args[0] == '--inside':
+        if len(args) < 2:
+            raise ValueError('GUI executable is missing')
+        restrict_abstract_sockets()
+        if os.getuid() == 0:
+            raise RuntimeError('GUI applications cannot run as root')
+        with open('/proc/self/status') as status:
+            for line in status:
+                if line.startswith(('CapEff:', 'CapPrm:', 'CapInh:')) and int(line.split(':', 1)[1], 16):
+                    raise RuntimeError('GUI application retained capabilities')
+        os.execvpe(args[1], args[1:], environment)
+    executable = environment.pop('ATHANOR_GUI_BROWSER', '')
+    if not args or args[0] != '--run':
+        if not executable.startswith('/'):
+            raise ValueError('GUI browser executable is missing')
+        command = [executable, *args]
+    else:
+        if len(args) < 2:
+            raise ValueError('GUI executable is missing')
+        command = args[1:]
+    working_directory = os.getcwd()
+    inherited_fds = [int(fd) for fd in os.listdir('/proc/self/fd')]
+    handles = namespace_handles(environment.pop('ATHANOR_GUI_NAMESPACES', ''), os.getppid())
+    root = environment.pop('ATHANOR_GUI_ROOT', '')
+    if not root.startswith('/') or '\0' in root:
+        raise ValueError('GUI working directory is missing')
+    held_process = os.open(handles['process'], os.O_RDONLY | os.O_DIRECTORY)
+    held_root = os.open(handles['root'], os.O_RDONLY | os.O_DIRECTORY)
+    with os.fdopen(os.open('stat', os.O_RDONLY, dir_fd=held_process)) as record:
+        before = record.read()
+    pid = int(before.split(' ', 1)[0])
+    target = os.pidfd_open(pid)
+    with os.fdopen(os.open('stat', os.O_RDONLY, dir_fd=held_process)) as record:
+        after = record.read()
+    # A held proc directory refers to its original process, even after numeric PID reuse.
+    # pidfd setns joins the namespace set atomically, including nested user-namespace ownership.
+    def identity(value):
+        return value.split(' ', 1)[0], value[value.rfind(')') + 2:].split()[19]
+    if identity(before) != identity(after) or select.select([target], [], [], 0)[0]:
+        raise RuntimeError('GUI namespace lifetime ended')
+    os.close(held_process)
+    os.setns(target, GUI_NAMESPACES)
+    os.close(target)
+    os.fchdir(held_root)
+    os.chroot('.')
+    os.close(held_root)
+    # Explicit desktop working directories survive entry; a runner host cwd is never used inside.
+    if os.path.commonpath((root, working_directory)) != root:
+        working_directory = root
+    os.chdir(working_directory)
+    parent = os.pidfd_open(os.getpid())
+    child = os.fork()
+    if child == 0:
+        libc = ctypes.CDLL(None, use_errno=True)
+        if libc.prctl(PR_SET_PDEATHSIG, signal.SIGKILL, 0, 0, 0) or select.select([parent], [], [], 0)[0]:
+            os._exit(125)
+        os.close(parent)
+        executable = '/usr/bin/setpriv'
+        arguments = [executable, '--no-new-privs', '--inh-caps=-all', '--ambient-caps=-all', '--',
+                     '/usr/bin/python3', '-I', '-S', os.path.realpath(__file__), '--inside', *command]
+        os.execve(executable, arguments, environment)
+    os.close(parent)
+    child_handle = os.pidfd_open(child)
+    def forward(number, _frame):
+        try:
+            signal.pidfd_send_signal(child_handle, number)
+        except ProcessLookupError:
+            pass
+    for number in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
+        signal.signal(number, forward)
+    # Only the program may hold the browser transport's extra pipe ends.
+    for fd in inherited_fds:
+        if fd > 2 and fd != child_handle:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+    _, status = os.waitpid(child, 0)
+    os.close(child_handle)
+    code = os.waitstatus_to_exitcode(status)
+    sys.exit(code if code >= 0 else 128 - code)
+
+
+if __name__ == '__main__':
+    try:
+        main(sys.argv[1:])
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+        # Namespace specifications and command arguments are private to the current project.
+        sys.stderr.write('Garden could not enter this project\'s isolated GUI. Run garden doctor.\n')
+        sys.exit(125)

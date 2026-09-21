@@ -198,6 +198,8 @@ cp "$repository_root/scripts/athanor" \
   "$repository_root/scripts/athanor-office-convert" \
   "$repository_root/scripts/athanor-pdf-tables" \
   "$repository_root/scripts/athanor-document-proof" \
+  "$repository_root/scripts/athanor-gui" \
+  "$repository_root/scripts/athanor-gui-broker" \
   "$repository_root/scripts/athanor-snapshot" \
   "$seed/scripts/"
 cat >"$seed/scripts/athanor-native-runtime" <<'NATIVE_FIXTURE'
@@ -211,6 +213,7 @@ cp "$repository_root/infra/native/start-desktop-session.sh" \
   "$repository_root/infra/native/athanor@.service" \
   "$repository_root/infra/native/athanor-runner.service" \
   "$repository_root/infra/native/athanor-jobs.service" \
+  "$repository_root/infra/native/athanor-gui.service" \
   "$repository_root/infra/native/athanor-work.slice" \
   "$repository_root/infra/native/athanor.target" \
   "$repository_root/infra/native/athanor-network-refresh.service" \
@@ -1846,6 +1849,7 @@ fi
 for removed in \
   /etc/systemd/system/athanor.target \
   /etc/systemd/system/athanor-runner.service \
+  /etc/systemd/system/athanor-gui.service \
   /etc/nginx/sites-available/athanor \
   /etc/nginx/conf.d/athanor.conf \
   /etc/nginx/snippets/athanor-security-headers.conf \

@@ -1,3 +1,4 @@
+import type { GuiLease, GuiNamespaceManager } from './gui-namespace.js';
 import type { BrowserActionProgress } from './browser-action-journal.js';
 import { BrowserTabJournal, recoverableTabUrl } from './browser-tab-journal.js';
 import type { BrowserRecovery } from '@athanor/contracts';
@@ -141,6 +142,7 @@ export class BrowserDownloadHistory {
 }
 
 interface Session {
+  gui?: GuiLease | undefined;
   recovery?: BrowserRecovery;
   recoveryTimer?: NodeJS.Timeout;
   recoverySignature?: string;
@@ -1687,12 +1689,16 @@ export const browserLaunchEnvironment = (
     'TMPDIR'
   ];
   const combined = { ...source, ...desktop };
-  return Object.fromEntries(
-    allowed.flatMap((name) => {
-      const value = combined[name];
-      return typeof value === 'string' ? [[name, value]] : [];
-    })
-  );
+  return {
+    ...Object.fromEntries(
+      allowed.flatMap((name) => {
+        const value = combined[name];
+        return typeof value === 'string' ? [[name, value]] : [];
+      })
+    ),
+    // A minimal D-Bus session has no desktop preference daemon to enable native accessibility.
+    ...(desktop.DISPLAY ? { ACCESSIBILITY_ENABLED: '1' } : {})
+  };
 };
 
 export const launchSandboxedResearchBrowser = async (
@@ -1701,6 +1707,7 @@ export const launchSandboxedResearchBrowser = async (
     executablePath?: string | undefined;
     runningAsRoot: boolean;
     environment: NodeJS.ProcessEnv;
+    guiEnvironment?: NodeJS.ProcessEnv | undefined;
   }
 ): Promise<Browser> => {
   browserLaunchLadder({ displayAvailable: false, runningAsRoot: input.runningAsRoot });
@@ -1709,7 +1716,7 @@ export const launchSandboxedResearchBrowser = async (
       ...(input.executablePath ? { executablePath: input.executablePath } : {}),
       headless: true,
       chromiumSandbox: true,
-      env: browserLaunchEnvironment(input.environment),
+      env: { ...browserLaunchEnvironment(input.environment), ...input.guiEnvironment },
       ignoreDefaultArgs: HEADLESS_DEVICE_ARGUMENTS,
       args: ['--no-first-run', '--disable-background-networking', '--disable-component-update']
     });
@@ -1731,7 +1738,10 @@ export const browserLaunchOptions = (attempt: BrowserLaunchAttempt) => ({
     '--disable-component-update',
     ...(attempt.headless
       ? []
-      : [`--window-size=${BROWSER_VIEWPORT.width},${BROWSER_VIEWPORT.height}`])
+      : [
+          '--force-renderer-accessibility=complete',
+          `--window-size=${BROWSER_VIEWPORT.width},${BROWSER_VIEWPORT.height}`
+        ])
   ],
   viewport: { ...BROWSER_VIEWPORT }
 });
@@ -1830,6 +1840,7 @@ export class BrowserManager {
   constructor(
     private readonly options: {
       recoverySecret?: string;
+      gui?: GuiNamespaceManager | undefined;
       executablePath?: string | undefined;
       /**
        * How far down the scheduler this workspace's browser sits, and what applies it.
@@ -2254,6 +2265,7 @@ export class BrowserManager {
       runningAsRoot: typeof process.getuid === 'function' && process.getuid() === 0
     });
     const chromium = await chromiumDriver();
+    const gui = await this.options.gui?.acquire(root);
     let context: BrowserContext | undefined;
     let refused: unknown;
     let settled: BrowserLaunchAttempt | undefined;
@@ -2261,12 +2273,23 @@ export class BrowserManager {
       settled = attempt;
       try {
         context = await chromium.launchPersistentContext(profile, {
-          ...(this.options.executablePath ? { executablePath: this.options.executablePath } : {}),
+          ...(gui
+            ? { executablePath: gui.executable }
+            : this.options.executablePath
+              ? { executablePath: this.options.executablePath }
+              : {}),
           ...browserLaunchOptions(attempt),
-          env: browserLaunchEnvironment(
-            process.env,
-            attempt.headless ? {} : (displayEnvironment ?? {})
-          ),
+          env: {
+            ...browserLaunchEnvironment(
+              process.env,
+              attempt.headless ? {} : (displayEnvironment ?? {})
+            ),
+            ...gui?.environment,
+            ...(gui
+              ? { ATHANOR_GUI_BROWSER: this.options.executablePath ?? chromium.executablePath() }
+              : {}),
+            ...(attempt.headless ? {} : displayEnvironment)
+          },
           acceptDownloads: true,
           // Without this Playwright stages downloads in a temp directory it deletes on close,
           // which both loses late arrivals and puts the bytes outside storage accounting.
@@ -2277,11 +2300,13 @@ export class BrowserManager {
         refused = cause;
       }
     }
-    if (!context)
+    if (!context) {
+      await gui?.release();
       throw new Error(
         'The browser could not start with its renderer sandbox. Run garden doctor to inspect this host.',
         { cause: refused }
       );
+    }
     /*
      * Applied as soon as there is something to apply it to, and again on the sweep below.
      *
@@ -2296,6 +2321,9 @@ export class BrowserManager {
     // Page creation and desktop control can both await while Chromium exits.
     context.once('close', () => {
       closed = true;
+      void gui?.release().catch(() => {
+        runnerLogger.warn('browser.cleanup_failed', { workspaceId });
+      });
       if (!active) return;
       active.ending = true;
       if (active.recoveryTimer) clearTimeout(active.recoveryTimer);
@@ -2320,6 +2348,7 @@ export class BrowserManager {
         context,
         page,
         root,
+        gui,
         // The desktop was started a few lines above, by `#displayEnvironment`, precisely so this
         // browser could run on its screen - so if this workspace has a desktop at all its control
         // exists by now and this browser joins it rather than minting a rival.
@@ -2511,9 +2540,13 @@ export class BrowserManager {
     } catch (cause) {
       try {
         await context.close();
+        await gui?.release();
       } catch (cleanupFailure) {
         const unfinished = context;
-        this.#failedStarts.set(workspaceId, () => unfinished.close());
+        this.#failedStarts.set(workspaceId, async () => {
+          await unfinished.close();
+          await gui?.release();
+        });
         throw new AggregateError([cause, cleanupFailure], 'Browser startup cleanup failed');
       }
       throw cause;
@@ -2864,7 +2897,11 @@ export class BrowserManager {
    * has nothing to say about a paper on another - and the owner holding the browser to deal with
    * one is no reason for the research half of the task to stop.
    */
-  async readMany(urls: string[], maxCharactersPerPage: number): Promise<ParallelWebReadResult> {
+  async readMany(
+    root: string,
+    urls: string[],
+    maxCharactersPerPage: number
+  ): Promise<ParallelWebReadResult> {
     const unique = [...new Set(urls)].slice(0, 12);
     if (unique.some((url) => !isPublicHttpUrl(url)))
       throw new Error('Parallel web reading accepts public HTTP(S) URLs only');
@@ -2873,7 +2910,8 @@ export class BrowserManager {
       error: 'Source was not read'
     }));
     let cursor = 0;
-    const researchBrowser = await this.#launchIsolatedBrowser();
+    const research = await this.#launchIsolatedBrowser(root);
+    const researchBrowser = research.browser;
     const readNext = async () => {
       for (;;) {
         const index = cursor++;
@@ -2900,7 +2938,7 @@ export class BrowserManager {
       await Promise.all(Array.from({ length: Math.min(4, unique.length) }, () => readNext()));
       return { sources: results, requested: urls.length, read: unique.length };
     } finally {
-      await researchBrowser.close();
+      await research.close();
     }
   }
 
@@ -2919,6 +2957,7 @@ export class BrowserManager {
    */
   async search(
     workspaceId: string,
+    root: string,
     input: { query: string; limit: number },
     actor: 'agent' | 'user'
   ): Promise<{
@@ -2950,7 +2989,7 @@ export class BrowserManager {
           if (!session) continue;
           return { ...(await this.#searchInSession(session, searchUrl, input)), route };
         }
-        return { ...(await this.#searchIsolated(workspaceId, searchUrl, input)), route };
+        return { ...(await this.#searchIsolated(workspaceId, root, searchUrl, input)), route };
       } catch (cause) {
         if (!(cause instanceof BotWallError) && !(cause instanceof SearchWallError)) throw cause;
         stopped = cause;
@@ -2970,10 +3009,12 @@ export class BrowserManager {
    */
   async #searchIsolated(
     workspaceId: string,
+    root: string,
     searchUrl: string,
     input: { query: string; limit: number }
   ): Promise<{ engine: string; query: string; results: WebSearchResult[] }> {
-    const browser = await this.#launchIsolatedBrowser();
+    const research = await this.#launchIsolatedBrowser(root);
+    const browser = research.browser;
     try {
       const context = await browser.newContext({
         acceptDownloads: false,
@@ -3008,7 +3049,7 @@ export class BrowserManager {
         results: searchResults(await page.evaluate(readSearchRows), input.limit)
       };
     } finally {
-      await browser.close().catch(() => undefined);
+      await research.close();
     }
   }
 
@@ -3060,13 +3101,41 @@ export class BrowserManager {
    * a session: the research fan-out and the search route. Headless because nobody is watching it,
    * and one per call because the isolation is the point.
    */
-  async #launchIsolatedBrowser(): Promise<Browser> {
-    if (this.options.launchIsolatedBrowser) return this.options.launchIsolatedBrowser();
-    return launchSandboxedResearchBrowser(await chromiumDriver(), {
-      executablePath: this.options.executablePath,
-      runningAsRoot: typeof process.getuid === 'function' && process.getuid() === 0,
-      environment: process.env
-    });
+  async #launchIsolatedBrowser(
+    root: string
+  ): Promise<{ browser: Browser; close(): Promise<void> }> {
+    const gui = await this.options.gui?.acquireTemporary(root);
+    try {
+      const launch = async () => {
+        if (this.options.launchIsolatedBrowser) return this.options.launchIsolatedBrowser();
+        const driver = await chromiumDriver();
+        return launchSandboxedResearchBrowser(driver, {
+          executablePath: gui?.executable ?? this.options.executablePath,
+          runningAsRoot: typeof process.getuid === 'function' && process.getuid() === 0,
+          environment: process.env,
+          guiEnvironment: gui
+            ? {
+                ...gui.environment,
+                ATHANOR_GUI_BROWSER: this.options.executablePath ?? driver.executablePath()
+              }
+            : undefined
+        });
+      };
+      const browser = await launch();
+      return {
+        browser,
+        close: async () => {
+          try {
+            await browser.close();
+          } finally {
+            await gui?.release();
+          }
+        }
+      };
+    } catch (cause) {
+      await gui?.release();
+      throw cause;
+    }
   }
 
   async #readResearchSource(
@@ -4010,6 +4079,18 @@ export class BrowserManager {
     return { holder: state.holder };
   }
 
+  async closeAll(): Promise<void> {
+    await Promise.all(
+      [
+        ...new Set([
+          ...this.#sessions.keys(),
+          ...this.#starting.keys(),
+          ...this.#failedStarts.keys()
+        ])
+      ].map((id) => this.close(id))
+    );
+  }
+
   async close(workspaceId: string): Promise<void> {
     const pending = this.#closing.get(workspaceId);
     if (pending) return pending;
@@ -4045,6 +4126,7 @@ export class BrowserManager {
     session.ending = true;
     if (session.recoveryTimer) clearTimeout(session.recoveryTimer);
     await session.context.close();
+    await session.gui?.release();
     await clearStagedUploads(session.root);
   }
 }

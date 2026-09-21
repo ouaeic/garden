@@ -885,3 +885,17 @@ Local working-copy commits remain in that copy; their individual commit messages
 history are not imported automatically into managed publication. Remote publication remains a
 separate governed command. A prepared working-copy receipt records initial setup, not an assertion
 that its current branch or files have stayed unchanged.
+
+## Project GUI lifetime
+
+The native GUI broker owns workspace-specific mount, process and IPC namespaces without a root
+launch path. A private socket binds each keeper to its runner lease; disconnect, workspace removal
+and final lease release stop the keeper and its namespace processes. Browser and desktop control
+share one namespace within an execution workspace, while research uses disposable isolated roots.
+The browser profile remains on disk across restarts. A namespace failure is surfaced instead of
+retrying outside isolation. Existing approval and secure-input rules still govern every action.
+
+The installed service shares the project execution slice. GUI launchers join through held proc
+and root descriptors, validate process lifetime, and discard capabilities before application entry.
+The native helper's abstract-socket boundary requires Landlock scope support. Development setups
+without the installed helper retain their explicitly unconfigured GUI boundary in runner health.

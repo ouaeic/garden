@@ -8,6 +8,7 @@ import { BrowserDownloadHistory, BrowserManager } from './browser.js';
 import { DesktopControl } from './holder.js';
 import { runnerLogger } from './log.js';
 import { TAB_IDLE_MS } from './browser-tabs.js';
+import { GuiNamespaceManager } from './gui-namespace.js';
 import { BrowserTabJournal } from './browser-tab-journal.js';
 
 const deferred = <T>() => {
@@ -67,6 +68,43 @@ afterEach(async () => {
 });
 
 describe('persistent browser ownership', () => {
+  it('keeps the project boundary through every launch attempt and releases it after close', async () => {
+    const stop = vi.fn(async () => undefined);
+    const start = vi.fn(async () => ({
+      environment: { ATHANOR_GUI_ROOT: '/project', HOME: '/private/gui' },
+      stop
+    }));
+    const gui = new GuiNamespaceManager('/trusted/gui', start);
+    const { manager, root } = await setup({ gui, executablePath: '/usr/bin/chromium' });
+    await manager.ensure(workspace, root);
+    expect(driver.launchPersistentContext).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        executablePath: '/trusted/gui',
+        chromiumSandbox: true,
+        env: expect.objectContaining({
+          ATHANOR_GUI_ROOT: '/project',
+          ATHANOR_GUI_BROWSER: '/usr/bin/chromium',
+          HOME: '/private/gui'
+        }) as unknown
+      })
+    );
+    expect(stop).not.toHaveBeenCalled();
+    await manager.close(workspace);
+    expect(stop).toHaveBeenCalledTimes(1);
+    await gui.close();
+  });
+
+  it('never launches unconfined after a project namespace failure', async () => {
+    const gui = new GuiNamespaceManager('/trusted/gui', async () => {
+      throw new Error('boundary unavailable');
+    });
+    const { manager, root } = await setup({ gui, executablePath: '/usr/bin/chromium' });
+    await expect(manager.ensure(workspace, root)).rejects.toThrow('boundary unavailable');
+    expect(driver.launchPersistentContext).not.toHaveBeenCalled();
+    await gui.close();
+  });
+
   it('retains lost tab metadata without reopening or replaying a page', async () => {
     const { manager, root } = await setup({ recoverySecret: 'test-recovery-key' });
     const first = await manager.ensure(workspace, root);

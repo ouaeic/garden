@@ -33,6 +33,14 @@ def atspi():
     return _ATSPI
 
 
+def fresh_desktop():
+    desktop = atspi().Registry.getDesktop(0)
+    # A request loop blocks between commands, so queued native change events cannot be the
+    # authority for a later action. Retain caches within a request, then invalidate descendants.
+    desktop.clear_cache()
+    return desktop
+
+
 def desktop_coords():
     """The coordinate type AT-SPI reports screen positions in.
 
@@ -55,22 +63,14 @@ def children(node):
 
 
 def state_name(value):
-    """The full AT-SPI state name, lowercased.
-
-    pyatspi prints a state as its C constant - `STATE_READ_ONLY`, `STATE_SINGLE_LINE` - and this
-    used to take `split("_")[-1]`, which keeps only the last word. Every multi-word state was
-    therefore emitted under a name that is not its own: `read only` arrived as `only`, and both
-    `SINGLE_LINE` and `MULTI_LINE` arrived as `line`, which is the same string for two opposite
-    facts. The runner's own vocabulary was written against the real names, so its `read-only`
-    check could never match and a field that refuses input was indistinguishable from one that
-    takes it. The prefix comes off, the rest stays whole, and the underscores are the spelling
-    both sides now agree on.
-
-    Matched rather than sliced because the GObject-introspection wrapper prints the same constant
-    inside `<enum ATSPI_STATE_READ_ONLY of type Atspi.StateType>`, and a bridge that emitted a
-    different vocabulary depending on which pyatspi is installed would be worse than either.
-    """
-    text = str(value)
+    """Normalize both pyatspi constants and GObject enum values to the shared state vocabulary."""
+    nickname = getattr(value, "value_nick", None)
+    text = nickname if isinstance(nickname, str) and nickname else str(value)
+    if text.isdecimal():
+        try:
+            text = str(atspi().StateType(int(text)))
+        except Exception:
+            return "unknown"
     match = re.search(r"STATE_([A-Z0-9_]+)", text)
     if match:
         return match.group(1).lower()
@@ -120,7 +120,7 @@ def node_at(node_id, root=None):
     between the check and the action - but it converts a silent wrong action into a refusal the
     agent can answer by observing again, which is the difference this is for.
     """
-    node = atspi().Registry.getDesktop(0) if root is None else root
+    node = fresh_desktop() if root is None else root
     path, _, fingerprint = str(node_id).partition("#")
     if path not in ("", "root"):
         for raw_index in path.split("/"):
@@ -188,7 +188,7 @@ def describe(node, path, parent_id):
 
 
 def observe(max_nodes, desktop=None):
-    desktop = atspi().Registry.getDesktop(0) if desktop is None else desktop
+    desktop = fresh_desktop() if desktop is None else desktop
     nodes = []
     queue = [(child, str(index), None) for index, child in enumerate(children(desktop))]
     while queue and len(nodes) < max_nodes:

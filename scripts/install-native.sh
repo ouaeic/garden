@@ -331,6 +331,7 @@ release_step_runner_settings() {
   set_env_value "$runner_env" RUNNER_PORT 4300
   set_env_value "$runner_env" WORKSPACE_ROOT /home/athanor
   set_env_value "$runner_env" TAR_EXECUTABLE /usr/bin/tar
+  set_env_value "$runner_env" GUI_NAMESPACE_HELPER /usr/local/lib/athanor/athanor-gui
   set_env_value "$runner_env" SNAPSHOT_EXECUTABLE /usr/local/lib/athanor/athanor-snapshot
   set_env_value "$runner_env" DESKTOP_BRIDGE_EXECUTABLE \
     /usr/local/lib/athanor/athanor-desktop-bridge.py
@@ -701,6 +702,10 @@ install_asset 0755 "$athanor_root/scripts/athanor-office-convert" \
 install_asset 0755 "$athanor_root/scripts/athanor-pdf-tables" /usr/local/bin/athanor-pdf-tables
 install_asset 0755 "$athanor_root/scripts/athanor-document-proof" \
   /usr/local/lib/athanor/athanor-document-proof
+install_asset 0755 "$athanor_root/scripts/athanor-gui" \
+  /usr/local/lib/athanor/athanor-gui
+install_asset 0755 "$athanor_root/scripts/athanor-gui-broker" \
+  /usr/local/lib/athanor/athanor-gui-broker
 install_asset 0755 "$athanor_root/scripts/athanor-snapshot" \
   /usr/local/lib/athanor/athanor-snapshot
 install_asset 0755 "$athanor_root/infra/native/start-desktop-session.sh" \
@@ -710,6 +715,7 @@ install_asset 0755 "$athanor_root/infra/native/athanor-desktop-bridge.py" \
 install_asset 0644 "$athanor_root/infra/native/athanor@.service" \
   /etc/systemd/system/athanor@.service
 install_asset 0644 "$athanor_root/infra/native/athanor-jobs.service" /etc/systemd/system/athanor-jobs.service
+install_asset 0644 "$athanor_root/infra/native/athanor-gui.service" /etc/systemd/system/athanor-gui.service
 install_asset 0644 "$athanor_root/infra/native/athanor-work.slice" /etc/systemd/system/athanor-work.slice
 install_asset 0644 "$athanor_root/infra/native/athanor-runner.service" \
   /etc/systemd/system/athanor-runner.service
@@ -1294,7 +1300,7 @@ instances_must_match "scripts/athanor" "$(sed -n 's/^service_units="//p' \
   "$athanor_root/scripts/athanor" | tr ' ' '\n' |
   sed -n 's/^athanor@\(.*\)\.service$/\1/p' | sort | tr '\n' ' ')"
 
-athanor_units="athanor-jobs.service athanor-runner.service"
+athanor_units="athanor-jobs.service athanor-gui.service athanor-runner.service"
 for service_name in $athanor_services; do
   athanor_units="$athanor_units athanor@$service_name.service"
 done
@@ -1310,6 +1316,7 @@ systemctl enable --now athanor-network-watch.service athanor-network-refresh.tim
   athanor-network-refresh.path athanor-backup.timer
 systemctl restart avahi-daemon
 systemctl reload-or-restart athanor-jobs.service
+systemctl restart athanor-gui.service
 systemctl restart athanor-runner.service
 for service_name in $athanor_services; do
   systemctl restart "athanor@$service_name.service"

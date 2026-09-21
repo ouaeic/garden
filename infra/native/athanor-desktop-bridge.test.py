@@ -162,6 +162,22 @@ def tree():
 
 
 class StateVocabulary(unittest.TestCase):
+    def test_introspection_enum_nicknames_survive_numeric_string_conversion(self):
+        class NumericState:
+            value_nick = "read-only"
+            def __str__(self):
+                return "43"
+        self.assertEqual(bridge.state_name(NumericState()), "read_only")
+
+    def test_numeric_states_use_the_installed_binding_vocabulary(self):
+        from unittest.mock import patch
+        class Binding:
+            @staticmethod
+            def StateType(value):
+                return FakeStateType("STATE_FOCUSED") if value == 12 else FakeStateType("STATE_INVALID")
+        with patch.object(bridge, "atspi", return_value=Binding):
+            self.assertEqual(bridge.state_name(12), "focused")
+
     def test_keeps_the_whole_name_rather_than_its_last_word(self):
         self.assertEqual(bridge.state_name(FakeStateType("STATE_READ_ONLY")), "read_only")
         self.assertEqual(bridge.state_name(FakeStateType("STATE_SINGLE_LINE")), "single_line")

@@ -295,6 +295,31 @@ describe('which accessibility nodes an observation carries', () => {
     expect(kept.length + omitted).toBe(nodes.length);
   });
 
+  it('retains form fields when generic native panels expose ancestor and context-menu actions', () => {
+    const nodes = [
+      ...Array.from({ length: 300 }, (_, index) =>
+        node(`panel-${index}`, {
+          name: '',
+          role: 'panel',
+          actions: ['clickAncestor', 'showContextMenu']
+        })
+      ),
+      node('answer', {
+        name: 'Project answer',
+        role: 'entry',
+        states: FOCUSED_ENTRY,
+        actions: ['activate'],
+        interfaces: ['component', 'text']
+      }),
+      node('accept', { name: 'Accept example', actions: ['press'] })
+    ];
+    const { kept, omitted } = selectDesktopNodes(nodes, 1_500);
+    expect(kept.map((item) => item.id)).toContain('answer');
+    expect(kept.map((item) => item.id)).toContain('accept');
+    expect(omitted).toBeGreaterThan(0);
+    expect(JSON.stringify(kept).length).toBeLessThanOrEqual(1_501);
+  });
+
   it('fits inside the budget a tool result actually has', () => {
     const nodes = Array.from({ length: 900 }, (_, index) => node(`n-${index}`));
     const { kept, omitted } = selectDesktopNodes(nodes);

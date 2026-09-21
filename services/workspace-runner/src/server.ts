@@ -1,3 +1,4 @@
+import { GuiNamespaceManager } from './gui-namespace.js';
 import { ProcessHistoryQuery } from '@athanor/contracts';
 import { RepositoryMapper, registerRepositoryMapRoute } from './repository-map.js';
 import { registerRepositoryGitRoute } from './repository-git.js';
@@ -308,19 +309,28 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
     if (!(await recoverMissionProcesses(sandbox))) sandbox.processIsolation = false;
   }
   const terminals = new Map<object, string>();
-  const privilegedHelpers = [config.SYSTEM_PACKAGE_HELPER, sandbox?.helper];
+  const privilegedHelpers = [
+    config.SYSTEM_PACKAGE_HELPER,
+    sandbox?.helper,
+    config.GUI_NAMESPACE_HELPER
+  ];
+  const gui = config.GUI_NAMESPACE_HELPER
+    ? new GuiNamespaceManager(config.GUI_NAMESPACE_HELPER)
+    : undefined;
   const probeHostStorage = options.hostStorage ?? hostStorage;
   const desktop =
     options.desktop ??
     new DesktopManager(
       config.DESKTOP_BRIDGE_EXECUTABLE,
       config.DESKTOP_SESSION_EXECUTABLE,
-      privilegedHelpers
+      privilegedHelpers,
+      gui
     );
   // The browser runs on the workspace's own X server when there is one, so a page sees an
   // ordinary desktop and a person taking over finds the browser on the screen they are watching.
   const browser = new BrowserManager({
     recoverySecret: config.RUNNER_SHARED_SECRET,
+    gui,
     executablePath: config.BROWSER_EXECUTABLE_PATH,
     /*
      * The session browser yields to the work it is meant to be serving.
@@ -640,6 +650,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
         (config.JOB_SUPERVISOR_SOCKET ? 0 : backgroundWork.commands + computationWork.commands) +
         debuggerWork.commands +
         projectPreparations,
+      guiIsolation: gui ? 'project_namespaces' : 'none',
       agentSandbox: Boolean(sandbox),
       agentNetworkIsolated: config.ISOLATE_AGENT_NETWORK,
       // The rung this box is actually on, not the one its configuration asked for: with no helper
@@ -790,6 +801,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       await projectUpdates.cancelWorkspace(request.params.workspaceId);
       await browser.close(request.params.workspaceId);
       await desktop.close(request.params.workspaceId);
+      await gui?.closeRoot(workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId));
       // `forget` because the workspace is going: a service must not be restarted into a tree that
       // no longer exists, and the record itself goes with the `.athanor` directory below.
       await computations.stopWorkspace(request.params.workspaceId);
@@ -827,6 +839,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       await processes.flush();
       await browser.close(request.params.workspaceId);
       await desktop.close(request.params.workspaceId);
+      await gui?.closeRoot(workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId));
       try {
         return await createSnapshot({
           snapshotExecutable: config.SNAPSHOT_EXECUTABLE,
@@ -871,6 +884,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       await processes.flush();
       await browser.close(request.params.workspaceId);
       await desktop.close(request.params.workspaceId);
+      await gui?.closeRoot(workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId));
       // In a `finally`, like the snapshot and checkpoint routes above and below: a restore that
       // throws has still stopped the services, and leaving them down is the worse half of the
       // failure - the owner loses their dashboard as well as their rewind, and nothing brings it
@@ -1931,20 +1945,24 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
     async (request) => {
       requireScope(request, 'browser.read');
       const input = WebFetchRequest.parse(request.body);
-      return browser.readMany(input.urls, input.maxCharactersPerPage);
+      await ensureWorkspace(workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId));
+      return browser.readMany(
+        workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId),
+        input.urls,
+        input.maxCharactersPerPage
+      );
     }
   );
 
-  // Search as a call rather than as a browsing procedure: the engine's own results page, read on
-  // this side, so the model gets ten titles, links and snippets instead of a screenshot of them.
-  // It answers from a browser of its own, so unlike every other route here it neither needs the
-  // workspace's session browser nor a runtime workspace on disk to have been prepared for it.
+  // Research uses a separate profile within the requesting project boundary.
   app.post<{ Params: { workspaceId: string } }>(
     '/v1/workspaces/:workspaceId/browser/search',
     async (request) => {
       requireScope(request, 'browser.read');
+      await ensureWorkspace(workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId));
       return browser.search(
         request.params.workspaceId,
+        workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId),
         WebSearchRequest.parse(request.body),
         request.capability.role === 'user' ? 'user' : 'agent'
       );
@@ -2315,6 +2333,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       await processes.flush();
       await browser.close(request.params.workspaceId);
       await desktop.close(request.params.workspaceId);
+      await gui?.closeRoot(workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId));
       return { id: request.params.workspaceId, state: 'hibernated' };
     }
   );
@@ -2530,6 +2549,11 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
     repositoryMapper.close();
     await codeIntelligence.close();
     await processes.close();
+    try {
+      await Promise.all([browser.closeAll(), desktop.closeAll()]);
+    } finally {
+      await gui?.close();
+    }
   });
   return app;
 };

@@ -22,7 +22,7 @@ athanor_update_step_seconds="${ATHANOR_UPDATE_STEP_SECONDS:-1800}"
 # for a socket to open. Overridable for a server slow enough to need it.
 athanor_ready_timeout_seconds="${ATHANOR_READY_TIMEOUT_SECONDS:-180}"
 athanor_runtime_prefix="${ATHANOR_RUNTIME_PREFIX:-}"
-service_units="athanor-jobs.service athanor-runner.service athanor@api.service athanor@worker.service athanor@registry.service athanor@notifications.service athanor-network-watch.service"
+service_units="athanor-jobs.service athanor-gui.service athanor-runner.service athanor@api.service athanor@worker.service athanor@registry.service athanor@notifications.service athanor-network-watch.service"
 auto_update_timer="athanor-auto-update.timer"
 backup_timer="athanor-backup.timer"
 # What the last backup run did, beside the certificate and dynamic DNS files the same way: the
@@ -1100,6 +1100,11 @@ doctor() {
   # The revision, not the directory. Asking whether ~/.cache/ms-playwright exists answered yes on a
   # box whose browser was a release behind the code that launches it, which is the state every box
   # reaches the first time the pinned Playwright is bumped.
+  if runuser -u athanor -- /usr/local/lib/athanor/athanor-gui-broker check >/dev/null 2>&1; then
+    check_ok "unprivileged project GUI namespace broker"
+  else
+    check_fail "project GUI isolation is unavailable; check athanor-gui.service and run garden update"
+  fi
   chromium_wanted=$(managed_chromium_revision)
   if [ -z "$chromium_wanted" ]; then
     check_fail "which Chromium this release wants could not be read; the pinned Playwright dependency is missing from the workspace runner"
@@ -2264,6 +2269,10 @@ install_runtime_files() {
     "$(runtime_path /usr/local/bin/athanor-pdf-tables)"
   install -D -m 0755 scripts/athanor-document-proof \
     "$(runtime_path /usr/local/lib/athanor/athanor-document-proof)"
+  install -D -m 0755 scripts/athanor-gui \
+    "$(runtime_path /usr/local/lib/athanor/athanor-gui)"
+  install -D -m 0755 scripts/athanor-gui-broker \
+    "$(runtime_path /usr/local/lib/athanor/athanor-gui-broker)"
   install -D -m 0755 scripts/athanor-snapshot \
     "$(runtime_path /usr/local/lib/athanor/athanor-snapshot)"
   install -D -m 0755 infra/native/start-desktop-session.sh \
@@ -2273,6 +2282,7 @@ install_runtime_files() {
   install -D -m 0644 infra/native/athanor@.service \
     "$(runtime_path /etc/systemd/system/athanor@.service)"
   install -D -m 0644 infra/native/athanor-jobs.service "$(runtime_path /etc/systemd/system/athanor-jobs.service)"
+  install -D -m 0644 infra/native/athanor-gui.service "$(runtime_path /etc/systemd/system/athanor-gui.service)"
   install -D -m 0644 infra/native/athanor-work.slice "$(runtime_path /etc/systemd/system/athanor-work.slice)"
   install -D -m 0644 infra/native/athanor-runner.service \
     "$(runtime_path /etc/systemd/system/athanor-runner.service)"
@@ -3239,7 +3249,7 @@ uninstall_athanor() {
   # writes a fresh archive of the database, the workspaces and every server key into
   # /var/backups/athanor until the disk fills. On a self-hosted product this command is a promise
   # about the owner's own machine.
-  systemctl disable --now athanor-jobs.service athanor-network-watch.service athanor-network-refresh.timer \
+  systemctl disable --now athanor-jobs.service athanor-gui.service athanor-network-watch.service athanor-network-refresh.timer \
     athanor-network-refresh.path athanor-auto-update.timer athanor-certificate-renew.timer \
     "$backup_timer" \
     >/dev/null 2>&1 || true
@@ -3250,6 +3260,7 @@ uninstall_athanor() {
     "$(runtime_path /etc/systemd/system/athanor@.service)" \
     "$(runtime_path /etc/systemd/system/athanor-runner.service)" \
     "$(runtime_path /etc/systemd/system/athanor-jobs.service)" \
+    "$(runtime_path /etc/systemd/system/athanor-gui.service)" \
     "$(runtime_path /etc/systemd/system/athanor-work.slice)" \
     "$(runtime_path /etc/systemd/system/athanor-network-refresh.service)" \
     "$(runtime_path /etc/systemd/system/athanor-network-refresh.timer)" \

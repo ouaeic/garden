@@ -1,5 +1,6 @@
 import { signatureControl } from './human-input.js';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { type ChildProcess } from 'node:child_process';
+import { spawnGui as spawn, type GuiLease, type GuiNamespaceManager } from './gui-namespace.js';
 import { captureSpawnFailure, spawnFailureMessage } from './spawn-guard.js';
 import { chromiumDriver } from './playwright.js';
 import { existsSync } from 'node:fs';
@@ -129,37 +130,32 @@ export const DESKTOP_STATE = {
  */
 const NODE_BUDGET_CHARS = 18_000;
 
-/**
- * Which nodes survive when they cannot all fit.
- *
- * In three tiers, tree order preserved inside each so the structure still reads: a node the agent
- * could act on and can see; then anything else it could act on; then the named furniture that gives
- * those controls their context. Unnamed structural nodes go first - a `filler` with no name and no
- * actions is the cheapest thing on the screen to lose.
- */
+/** Keep focused fields and visible controls ahead of generic tree structure. */
 export const selectDesktopNodes = (
   nodes: readonly DesktopNode[],
   budget = NODE_BUDGET_CHARS
 ): { kept: DesktopNode[]; omitted: number } => {
   const onScreen = (node: DesktopNode): boolean =>
-    node.bounds !== null && node.bounds.width > 0 && node.bounds.height > 0;
-  /**
-   * A control the user could actually operate: it has an accessibility action, and AT-SPI says it
-   * is sensitive - which is the toolkit's own word for "not greyed out".
-   *
-   * This used to read `!node.states.includes('disabled')`, and no AT-SPI node has ever carried
-   * `'disabled'`; the vocabulary has `sensitive` and its absence. So the test was constant-true for
-   * anything with an action, the top tier filled with greyed-out menu items and toolbar buttons,
-   * and the named labels that say what the screen is were dropped underneath them - out of a
-   * budget that only holds about seventy nodes.
-   */
+    node.bounds !== null &&
+    node.bounds.width > 0 &&
+    node.bounds.height > 0 &&
+    node.states.includes('showing');
+  const editable = (node: DesktopNode): boolean =>
+    node.states.includes('editable') && !node.states.includes(DESKTOP_STATE.readOnly);
+  // Chromium exposes ancestor clicks and context menus even on empty layout panels.
   const actionable = (node: DesktopNode): boolean =>
-    node.actions.length > 0 && node.states.includes(DESKTOP_STATE.sensitive);
+    node.states.includes(DESKTOP_STATE.sensitive) &&
+    (editable(node) ||
+      node.actions.some(
+        (action) => action.trim() !== '' && !/^(?:clickAncestor|showContextMenu)$/i.test(action)
+      ));
   const tier = (node: DesktopNode): number => {
-    if (actionable(node) && onScreen(node)) return 0;
-    if (actionable(node)) return 1;
-    if (node.name.trim() || node.text?.trim()) return 2;
-    return 3;
+    if (actionable(node) && node.states.includes(DESKTOP_STATE.focused)) return 0;
+    if (actionable(node) && editable(node) && onScreen(node)) return 1;
+    if (actionable(node) && onScreen(node)) return 2;
+    if (actionable(node)) return 3;
+    if (node.name.trim() || node.text?.trim()) return 4;
+    return 5;
   };
   const ranked = nodes
     .map((node, index) => ({ node, index, tier: tier(node) }))
@@ -231,6 +227,7 @@ export interface DesktopSubscriber {
 
 interface DesktopSession {
   root: string;
+  gui?: GuiLease | undefined;
   process: ChildProcess;
   env: NodeJS.ProcessEnv;
   control: DesktopControl;
@@ -840,7 +837,8 @@ export class DesktopManager {
     private readonly bridgeExecutable?: string,
     private readonly sessionExecutable?: string,
     /** Root-owned helpers a launched program may not name; see `launch`. */
-    private readonly privilegedHelpers: readonly (string | undefined)[] = []
+    private readonly privilegedHelpers: readonly (string | undefined)[] = [],
+    private readonly gui?: GuiNamespaceManager
   ) {}
 
   get configured(): boolean {
@@ -1017,12 +1015,14 @@ export class DesktopManager {
     this.#reservedDisplays.add(display);
     let child: ChildProcess | undefined;
     let session: DesktopSession | undefined;
+    let gui: GuiLease | undefined;
     try {
+      gui = await this.gui?.acquire(root);
       const envFile = path.join(root, '.athanor', 'desktop', 'environment');
       await rm(envFile, { force: true });
       const process = spawn(this.sessionExecutable!, [root, display], {
         cwd: root,
-        env: { ...processEnv(root) },
+        env: { ...processEnv(root), ...gui?.environment },
         // The session's own stderr is the only account of why it did not come up, and discarding it
         // left "GUI desktop session failed to start" as the whole story - which cost a long
         // afternoon the first time a real box refused. Kept to a few kilobytes because this is a
@@ -1097,6 +1097,7 @@ export class DesktopManager {
       const boot = parseGeometry(values.ATHANOR_BOOT_RES, DEFAULT_BOOT_GEOMETRY);
       const env: NodeJS.ProcessEnv = {
         ...processEnv(root),
+        ...gui?.environment,
         DISPLAY: values.DISPLAY,
         XAUTHORITY: values.XAUTHORITY,
         DBUS_SESSION_BUS_ADDRESS: values.DBUS_SESSION_BUS_ADDRESS,
@@ -1109,6 +1110,7 @@ export class DesktopManager {
       };
       session = {
         root,
+        gui,
         process,
         env,
         control,
@@ -1162,7 +1164,9 @@ export class DesktopManager {
       const active = session;
       process.once('exit', () => {
         this.#teardown(active);
-        if (this.#sessions.get(workspaceId) === active) this.#sessions.delete(workspaceId);
+        void this.close(workspaceId).catch(() => {
+          runnerLogger.warn('desktop.cleanup_failed', { workspaceId });
+        });
       });
       await this.#adoptDisplay(session);
       if (process.exitCode !== null || process.signalCode !== null)
@@ -1178,11 +1182,13 @@ export class DesktopManager {
           const unfinished = child;
           this.#failedStarts.set(workspaceId, async () => {
             await this.#stopProcess(unfinished);
+            await gui?.release();
             this.#reservedDisplays.delete(display);
           });
           throw new AggregateError([cause, cleanupFailure], 'GUI desktop startup cleanup failed');
         }
       }
+      await gui?.release();
       throw cause;
     } finally {
       if (!this.#failedStarts.has(workspaceId)) this.#reservedDisplays.delete(display);
@@ -2087,6 +2093,18 @@ export class DesktopManager {
     };
   }
 
+  async closeAll(): Promise<void> {
+    await Promise.all(
+      [
+        ...new Set([
+          ...this.#sessions.keys(),
+          ...this.#starting.keys(),
+          ...this.#failedStarts.keys()
+        ])
+      ].map((id) => this.close(id))
+    );
+  }
+
   async close(workspaceId: string): Promise<void> {
     const pending = this.#closing.get(workspaceId);
     if (pending) return pending;
@@ -2112,6 +2130,7 @@ export class DesktopManager {
     await this.#stopProcess(session.process);
     if (this.#sessions.get(workspaceId) === session) this.#sessions.delete(workspaceId);
     this.#signalApplications(session, 'SIGKILL');
+    await session.gui?.release();
   }
 
   async #stopProcess(child: ChildProcess): Promise<void> {

@@ -558,7 +558,7 @@ describe('parallel research URL policy', () => {
       'https://metadata.google.internal/computeMetadata/v1',
       'file:///etc/passwd'
     ])
-      await expect(manager.readMany([url], 1_000)).rejects.toThrow(
+      await expect(manager.readMany('/workspace', [url], 1_000)).rejects.toThrow(
         'Parallel web reading accepts public HTTP(S) URLs only'
       );
   });
@@ -1222,7 +1222,8 @@ describe('browser launch realism', () => {
       PATH: '/usr/bin',
       HOME: '/home/athanor',
       DISPLAY: ':9',
-      XDG_RUNTIME_DIR: '/run/garden-display'
+      XDG_RUNTIME_DIR: '/run/garden-display',
+      ACCESSIBILITY_ENABLED: '1'
     });
   });
 
@@ -1393,6 +1394,7 @@ describe('search route', () => {
     });
     const answer = await manager.search(
       'workspace-1',
+      '/workspace',
       { query: 'uk corporation tax', limit: 10 },
       'agent'
     );
@@ -1419,7 +1421,12 @@ describe('search route', () => {
       // A session browser could only be reached by launching one, and this would refuse to.
       executablePath: '/nonexistent/chromium'
     });
-    const answer = await manager.search('workspace-2', { query: 'board deck', limit: 10 }, 'agent');
+    const answer = await manager.search(
+      'workspace-2',
+      '/workspace',
+      { query: 'board deck', limit: 10 },
+      'agent'
+    );
     expect(answer.results).toHaveLength(1);
   });
 
@@ -1441,7 +1448,7 @@ describe('search route', () => {
       launchIsolatedBrowser: challenged.launch
     });
     const refusal = await manager
-      .search('workspace-3', { query: 'anything', limit: 10 }, 'agent')
+      .search('workspace-3', '/workspace', { query: 'anything', limit: 10 }, 'agent')
       .then(() => new Error('the search was answered when it should have been refused'))
       .catch((cause: unknown) => cause as Error);
     // Not a BotWallError: that one reaches the owner's phone as a takeover, and there is no page
@@ -1451,7 +1458,7 @@ describe('search route', () => {
     expect(refusal.message).not.toContain('closed to you');
     // Backing off, and saying so from memory rather than launching a second browser to be refused.
     await expect(
-      manager.search('workspace-3', { query: 'something else', limit: 10 }, 'agent')
+      manager.search('workspace-3', '/workspace', { query: 'something else', limit: 10 }, 'agent')
     ).rejects.toThrow('anti-bot challenge instead of results');
     expect(challenged.opened).toHaveLength(1);
     expect(challenged.closedCount()).toBe(1);
@@ -1493,12 +1500,12 @@ describe('search route', () => {
       launchIsolatedBrowser: challenged.launch
     });
     await expect(
-      manager.search('workspace-4', { query: 'anything', limit: 10 }, 'agent')
+      manager.search('workspace-4', '/workspace', { query: 'anything', limit: 10 }, 'agent')
     ).rejects.toThrow();
     expect(challenged.closedCount()).toBe(1);
     await manager.close('workspace-4');
     await expect(
-      manager.search('workspace-4', { query: 'anything', limit: 10 }, 'agent')
+      manager.search('workspace-4', '/workspace', { query: 'anything', limit: 10 }, 'agent')
     ).rejects.toThrow();
     // A second launch is the proof: the remembered wall would have answered without one.
     expect(challenged.closedCount()).toBe(2);
@@ -1511,7 +1518,7 @@ describe('search route', () => {
       launchIsolatedBrowser: isolated.launch
     });
     await expect(
-      manager.search('workspace-5', { query: '   ', limit: 10 }, 'agent')
+      manager.search('workspace-5', '/workspace', { query: '   ', limit: 10 }, 'agent')
     ).rejects.toThrow('needs a query');
     expect(isolated.closedCount()).toBe(0);
   });

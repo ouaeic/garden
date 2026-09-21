@@ -135,6 +135,17 @@ if (shellcheck.error?.code === 'ENOENT') {
  * second and works on a developer's laptop.
  */
 // Native package compilation and reconstruction run here alongside the recorder's file checks.
+for (const drill of ['scripts/test-gui-entry.py', 'infra/native/athanor-desktop-bridge.test.py']) {
+  const result = spawnSync('python3', [drill], {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+    timeout: 30_000
+  });
+  if (result.status !== 0)
+    fail(`GUI isolation or accessibility contract failed (${drill}): ${result.stderr}`);
+}
+say('GUI isolation and native accessibility contracts passed.');
+
 const analysisRuns = spawnSync('python3', ['scripts/test-reproducible-run.py'], {
   cwd: repositoryRoot,
   encoding: 'utf8',

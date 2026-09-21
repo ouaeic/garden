@@ -127,6 +127,7 @@ athanor_package_table() {
   # DNF resolves file provides, so X11 utilities work with both split and grouped RPM packages.
   cat <<'TABLE'
 capability	debian	rhel	arch	suse
+bubblewrap	bubblewrap	bubblewrap	bubblewrap	bubblewrap
 accessibility	at-spi2-core	at-spi2-core	at-spi2-core	at-spi2-core
 avahi	avahi-daemon	avahi	avahi	avahi
 certificates	ca-certificates	ca-certificates	ca-certificates	ca-certificates

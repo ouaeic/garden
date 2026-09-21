@@ -123,16 +123,30 @@ The agent computer is the installed Linux host. Shell commands, background proce
 publisher CLIs and software started through the shell run as `athanor-agent`, an unprivileged
 account separate from the runner's `athanor` account.
 
-Chromium and desktop sessions currently share the runner's OS identity. Chromium requires its
-renderer sandbox, including when it falls back from a display to headless mode; a sandbox startup
-failure stops browsing. Its child environment contains desktop and locale settings rather than
-runner credentials. These controls do not isolate the browser parent or desktop applications from
-runner-owned files. Desktop D-Bus, accessibility processes, private browser profiles and session
-bookkeeping require a coherent identity boundary; changing only an application launch UID would
-break the session bus without establishing that boundary.
+The installed GUI broker creates a private user, mount, PID, IPC and UTS namespace for each
+execution workspace. It runs as `athanor` with no capabilities and `NoNewPrivileges`; it does not
+receive the runner's environment or a sudo grant. Its private Unix socket checks the peer identity,
+accepts only validated execution roots, and holds one namespace for the lifetime of a runner lease.
+A disconnected runner releases its keepers. Browser and desktop leases share their own namespace,
+while transient research uses a fresh namespace and profile.
 
-The desktop uses the common approval policy and command checks. Treat browser-parent and desktop
-process compromise as compromise of the runner account until OS identity separation is verified.
+The mount view contains that workspace, selected read-only system resources, and private scratch
+and device mounts. Other workspaces, service configuration and host processes are absent. Held
+directory descriptors prevent path replacement from changing the workspace selected for a bind.
+The launch helper validates held process identity, joins its namespaces, drops capabilities and
+sets `no_new_privs` before executing any GUI application. Landlock scope prevents connections to
+outside abstract Unix sockets; desktop D-Bus uses a private pathname socket. GUI environment
+variables contain desktop and locale settings rather than runner credentials, and namespace
+handles are removed before application entry. The native entry requires Linux user namespaces,
+bubblewrap, Python namespace APIs and Landlock scope support; setup failure does not fall back to
+an unconfined GUI.
+
+Chromium also requires its renderer sandbox, including headless research. The desktop uses the
+common approval policy and command checks. Network connections retain the host network policy;
+these namespaces do not create separate project IP networks. Kernel compromise remains outside
+this application boundary. The credential-bearing runner keeps its existing service restrictions;
+the separate broker needs the complete parent proc mount to create a private proc filesystem.
+
 Shell commands reach their separate account through a
 root-owned helper that only ever hands back less privilege than it was called with, and that sets
 `no_new_privs` — which is inherited by every descendant and cannot be removed, so a set-user-ID
