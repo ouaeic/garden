@@ -67,6 +67,11 @@ export const connectorApprovalCard = (
     .join('\n');
   const mailbox = textValue(input.mailbox, 'INBOX');
   switch (action) {
+    case 'github_git_push':
+      return {
+        action: `Publish Git history to ${textValue(input.owner)}/${textValue(input.repository)}`,
+        preview: `Branch: ${textValue(input.branch)}\nPublished version: ${textValue(input.revisionId)}\nCommit: ${textValue(input.commit)}\nExpected remote head: ${input.expectedHead === null ? 'new branch' : textValue(input.expectedHead)}\nThe selected commit and its reachable history are sent to this repository. Existing remote history is preserved.`
+      };
     case 'mail_send':
       return {
         action: `Send an email to ${recipients || 'the named recipients'}`,

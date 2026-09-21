@@ -472,3 +472,61 @@ describe('what a connector read is, for the label that travels with it', () => {
     expect(connectorContentOrigin('something_new')).toBe('something_new');
   });
 });
+
+it('requires explicit repository read and write grants before delegating native Git', async () => {
+  let calls = 0;
+  const action = {
+    action: 'github_git_push',
+    requestId: '00000000-0000-4000-8000-000000000001',
+    repositoryId: '00000000-0000-4000-8000-000000000002',
+    revisionId: '00000000-0000-4000-8000-000000000003',
+    owner: 'owner',
+    repository: 'repository',
+    branch: 'main',
+    commit: 'a'.repeat(40),
+    expectedHead: null
+  };
+  const common = {
+    kind: 'github' as const,
+    baseUrl: 'https://api.github.com',
+    secret: { token: 'private-token' },
+    action,
+    allowedHostSuffixes: [],
+    projectGit: async () => {
+      calls++;
+      return {
+        action: 'github_git_push' as const,
+        result: { state: 'running' },
+        statusCode: 202,
+        requestBytes: 0,
+        responseBytes: 0,
+        durationMs: 0
+      };
+    }
+  };
+  await expect(
+    executeConnectorAction({ ...common, scopes: ['github:repository.read'] })
+  ).rejects.toThrow('has not granted');
+  await expect(
+    executeConnectorAction({ ...common, scopes: ['github:repository.write'] })
+  ).rejects.toThrow('read access');
+  expect(calls).toBe(0);
+  await expect(
+    executeConnectorAction({
+      ...common,
+      scopes: ['github:repository.read', 'github:repository.write']
+    })
+  ).resolves.toMatchObject({ result: { state: 'running' } });
+  expect(calls).toBe(1);
+  await expect(
+    executeConnectorAction({
+      kind: common.kind,
+      baseUrl: common.baseUrl,
+      secret: common.secret,
+      action,
+      allowedHostSuffixes: [],
+      scopes: ['github:repository.read', 'github:repository.write']
+    })
+  ).rejects.toThrow('project conversation');
+  expect(calls).toBe(1);
+});

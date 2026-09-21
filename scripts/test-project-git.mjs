@@ -21,10 +21,19 @@ test(
     let server, browser;
     const project = '00000000-0000-4000-8000-000000000001',
       revision = '00000000-0000-4000-8000-000000000002';
+    const connectorId = '00000000-0000-4000-8000-000000000003';
+    const transfers = [];
     const head = 'a'.repeat(40),
       prior = 'b'.repeat(40);
     const base = `/v1/projects/${project}`;
-    const data = { repositories: [], operations: [], exports: [], removals: [], workingCopies: [] };
+    const data = {
+      repositories: [],
+      operations: [],
+      exports: [],
+      removals: [],
+      workingCopies: [],
+      remoteOperations: []
+    };
     const creations = [],
       removals = [],
       retries = [],
@@ -43,7 +52,7 @@ test(
             resolveId: (id) => (id === 'virtual:proof' ? '\0proof.js' : null),
             load: (id) =>
               id === '\0proof.js'
-                ? `import ${JSON.stringify(path.join(root, 'src/styles.css'))};import ${JSON.stringify(path.join(root, 'src/project-updates.css'))};import React from 'react';import{createRoot}from'react-dom/client';import Repositories from ${JSON.stringify(path.join(root, 'src/ProjectRepositories.tsx'))};createRoot(document.getElementById('root')).render(React.createElement(Repositories,{projectId:${JSON.stringify(project)},revisionId:${JSON.stringify(revision)}}));`
+                ? `import ${JSON.stringify(path.join(root, 'src/styles.css'))};import ${JSON.stringify(path.join(root, 'src/project-updates.css'))};import React from 'react';import{createRoot}from'react-dom/client';import Repositories from ${JSON.stringify(path.join(root, 'src/ProjectRepositories.tsx'))};createRoot(document.getElementById('root')).render(React.createElement(Repositories,{projectId:${JSON.stringify(project)},revisionId:${JSON.stringify(revision)},conversations:[{id:${JSON.stringify(project)},title:"Analysis"}]}));`
                 : null
           }
         ],
@@ -66,6 +75,58 @@ test(
           return res.end(
             `<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">${css}<main style="max-width:900px;margin:auto;padding:16px"><div id="root"></div></main><script type="module" src="/proof.js"></script>`
           );
+        if (url.pathname === '/v1/connectors')
+          return json([
+            {
+              id: connectorId,
+              kind: 'github',
+              label: 'Repository account',
+              enabled: true,
+              scopes: ['github:repository.read', 'github:repository.write']
+            }
+          ]);
+        if (url.pathname === base + '/git-remote') {
+          const chunks = [];
+          for await (const chunk of req) chunks.push(chunk);
+          const input = JSON.parse(Buffer.concat(chunks).toString());
+          assert.equal(input.connectorId, connectorId);
+          if (input.operation.action === 'github_git_status') {
+            const record = data.remoteOperations.find(
+              (item) => item.input.requestId === input.operation.requestId
+            );
+            assert.ok(record);
+            record.state = 'succeeded';
+            record.detail = null;
+            record.commit = head;
+            return json(record);
+          }
+          transfers.push(input);
+          const push = input.operation.action === 'github_git_push';
+          if (push) {
+            assert.equal(input.operation.commit, head);
+            assert.equal(input.operation.expectedHead, prior);
+            assert.equal(input.operation.revisionId, revision);
+            if (
+              transfers.filter((item) => item.operation.action === 'github_git_push').length === 1
+            )
+              return json({ error: { code: 'interrupted', message: 'Transfer reply lost.' } }, 502);
+            assert.deepEqual(transfers.at(-1), transfers.at(-2));
+          }
+          const record = {
+            input: { ...input.operation, action: push ? 'push' : 'fetch', connectorId },
+            taskId: project,
+            workspaceId: revision,
+            state: push ? 'uncertain' : 'succeeded',
+            phase: 'finished',
+            commit: prior,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            detail: push ? 'Inspect this remote outcome.' : null,
+            bundlePath: push ? null : 'workspace/.garden/remotes/captured.bundle'
+          };
+          data.remoteOperations.unshift(record);
+          return json(record);
+        }
         if (url.pathname === base + '/repositories') {
           if (req.method === 'GET') return json(data);
           const chunks = [];
@@ -194,6 +255,27 @@ test(
       await page.getByText('Independent Git working copy prepared', { exact: false }).waitFor();
       assert.equal(retries.length, 1);
       await page.getByText('garden/conversations/' + project, { exact: true }).waitFor();
+      await page.getByText('Remote Git', { exact: true }).click();
+      await page.getByLabel('GitHub owner').fill('fixture');
+      await page.getByLabel('Repository', { exact: true }).fill('analysis');
+      await page.getByRole('button', { name: 'Fetch branch', exact: true }).click();
+      await page.getByText('workspace/.garden/remotes/captured.bundle', { exact: true }).waitFor();
+      assert.equal(transfers[0].taskId, project);
+      await page.getByRole('button', { name: 'Publish version…' }).click();
+      await page.getByRole('button', { name: 'Publish this commit' }).click();
+      await page.getByRole('dialog').getByText('Transfer reply lost.', { exact: true }).waitFor();
+      await page.getByRole('button', { name: 'Publish this commit' }).click();
+      await page.getByRole('button', { name: 'Inspect remote outcome' }).waitFor();
+      assert.equal(
+        await page.getByRole('button', { name: 'Fetch branch', exact: true }).isDisabled(),
+        false
+      );
+      await page.getByRole('button', { name: 'Inspect remote outcome' }).click();
+      await page.getByText('Publish · Complete', { exact: true }).waitFor();
+      assert.equal(
+        transfers.filter((item) => item.operation.action === 'github_git_push').length,
+        2
+      );
       await page.getByRole('button', { name: 'View history' }).click();
       await page.getByText('Checked source update', { exact: true }).waitFor();
       assert.equal(creations.length, 2);

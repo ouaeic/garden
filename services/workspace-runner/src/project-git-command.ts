@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import type { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { awaitChildExit, killProcessTree, stopProcessTree } from './subprocess.js';
 
 export class ProjectGitError extends Error {
   constructor(
@@ -24,6 +25,7 @@ export async function projectGitCommand(
     readFd?: number;
   } = {}
 ): Promise<string> {
+  options.signal?.throwIfAborted();
   const child = spawn(
     '/usr/bin/git',
     [
@@ -51,7 +53,7 @@ export async function projectGitCommand(
     {
       cwd: directory,
       stdio: ['pipe', 'pipe', 'pipe', ...(options.readFd === undefined ? [] : [options.readFd])],
-      signal: options.signal,
+      detached: true,
       env: {
         PATH: '/usr/bin:/bin',
         LANG: 'C.UTF-8',
@@ -69,32 +71,43 @@ export async function projectGitCommand(
   let size = 0,
     errorSize = 0,
     overflow = false;
+  let escalation: NodeJS.Timeout | undefined;
+  const stop = () => {
+    escalation ??= stopProcessTree(child);
+  };
+  options.signal?.addEventListener('abort', stop, { once: true });
+  if (options.signal?.aborted) stop();
   child.stdout!.on('data', (chunk: Buffer) => {
     size += chunk.length;
     if (size > (options.maxBytes ?? 1_048_576)) {
       overflow = true;
-      child.kill();
+      stop();
     } else stdout.push(chunk);
   });
   child.stderr!.on('data', (chunk: Buffer) => {
     errorSize += chunk.length;
     if (errorSize <= 8192) stderr.push(chunk);
   });
-  const finished = new Promise<void>((resolve, reject) => {
-    child.once('error', reject);
-    child.once('close', (code) => {
+  const finished = awaitChildExit(child)
+    .then(({ exitCode: code }) => {
+      options.signal?.throwIfAborted();
       if (overflow)
-        reject(Error('Repository metadata exceeds the display limit. Narrow the selection.'));
+        throw Error('Repository metadata exceeds the display limit. Narrow the selection.');
       else if (code !== 0)
-        reject(
-          new ProjectGitError(
-            `Git operation failed: ${Buffer.concat(stderr).toString('utf8').slice(0, 2000)}`,
-            code
-          )
+        throw new ProjectGitError(
+          `Git operation failed: ${Buffer.concat(stderr).toString('utf8').slice(0, 2000)}`,
+          code
         );
-      else resolve();
+    })
+    .finally(() => {
+      options.signal?.removeEventListener('abort', stop);
+      if (escalation) clearTimeout(escalation);
+      // A transport helper must not outlive its managed command, even after the parent exits.
+      killProcessTree(child, 'SIGKILL');
+      child.stdin!.destroy();
+      child.stdout!.destroy();
+      child.stderr!.destroy();
     });
-  });
   const write =
     typeof input === 'object'
       ? pipeline(input, child.stdin!)
@@ -105,7 +118,7 @@ export async function projectGitCommand(
   const outcomes = await Promise.allSettled([
     finished,
     write.catch((error: unknown) => {
-      child.kill();
+      stop();
       throw error;
     })
   ]);

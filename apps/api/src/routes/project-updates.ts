@@ -1,3 +1,4 @@
+import { registerProjectGitRoutes } from './project-git.js';
 import { downloadSignal, sendDownload } from '../download-response.js';
 import { AthanorError } from '@athanor/core';
 import {
@@ -49,6 +50,7 @@ export function registerProjectUpdateRoutes(context: RouteContext) {
     }
     return project;
   };
+  registerProjectGitRoutes(context, owned);
   app.get<{ Params: { projectId: string } }>(
     '/v1/projects/:projectId/repositories',
     async (request) => {

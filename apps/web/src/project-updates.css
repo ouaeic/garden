@@ -286,3 +286,18 @@
   display: block;
   margin-top: 0.4rem;
 }
+
+.project-git-transfer {
+  padding: 0.9rem 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+.project-git-remote > .row {
+  flex-wrap: wrap;
+}
+.project-git-remote .field {
+  min-width: 0;
+}
+.project-git-remote > .row > .field {
+  flex: 1 1 12rem;
+}

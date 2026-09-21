@@ -1,3 +1,4 @@
+import { GitHubProjectActions, type GitHubProjectAction } from '@athanor/contracts';
 import type { AccountOperation } from './account-operation.js';
 import {
   secureConnectorRequest,
@@ -104,7 +105,8 @@ export const connectorCatalog: ConnectorDefinition[] = [
   {
     kind: 'github',
     name: 'GitHub',
-    description: 'Read repositories and, when explicitly granted, create issues or pull requests.',
+    description:
+      'Read repositories and, when granted, publish project Git branches, issues or pull requests.',
     dataAccess: 'Only the selected account and repository capabilities are sent to GitHub.',
     tokenLocation:
       'Encrypted in the athanor control-plane secret store; never placed in a model prompt.',
@@ -113,6 +115,7 @@ export const connectorCatalog: ConnectorDefinition[] = [
     scopes: [
       { id: 'github:profile.read', label: 'Read profile', sideEffect: 'read' },
       { id: 'github:repository.read', label: 'Read repositories and files', sideEffect: 'read' },
+      { id: 'github:repository.write', label: 'Publish project Git branches', sideEffect: 'write' },
       { id: 'github:issues.read', label: 'Read issues', sideEffect: 'read' },
       { id: 'github:issues.write', label: 'Create issues', sideEffect: 'write' },
       { id: 'github:pull_requests.write', label: 'Create pull requests', sideEffect: 'write' }
@@ -157,6 +160,9 @@ export const connectorCatalog: ConnectorDefinition[] = [
 ];
 
 export const connectorActions = {
+  github_git_fetch: { kinds: ['github'], scope: 'github:repository.read', sideEffect: 'read' },
+  github_git_push: { kinds: ['github'], scope: 'github:repository.write', sideEffect: 'write' },
+  github_git_status: { kinds: ['github'], scope: 'github:repository.read', sideEffect: 'read' },
   github_list_repositories: {
     kinds: ['github'],
     scope: 'github:repository.read',
@@ -244,6 +250,7 @@ const connectorPath = z
   .max(4096)
   .refine((value) => !value.includes('\0'));
 const connectorActionInput = z.discriminatedUnion('action', [
+  ...GitHubProjectActions,
   z.object({
     action: z.literal('github_list_repositories'),
     limit: z.number().int().min(1).max(100).default(30)
@@ -735,6 +742,7 @@ const webdavHeaders = (secret: ConnectorSecret): Record<string, string> => {
 };
 
 export interface ConnectorExecutionInput {
+  projectGit?: (action: GitHubProjectAction) => Promise<ConnectorExecutionResult>;
   operation?: AccountOperation;
   kind: AnyConnectorKind;
   baseUrl: string;
@@ -831,6 +839,23 @@ export const executeConnectorAction = async (
       'connector_scope_denied',
       `Connector has not granted ${definition.scope}`
     );
+  if (
+    parsed.action === 'github_git_fetch' ||
+    parsed.action === 'github_git_push' ||
+    parsed.action === 'github_git_status'
+  ) {
+    if (!input.scopes.includes('github:repository.read'))
+      throw new AthanorError(
+        'connector_scope_denied',
+        'Git synchronization also requires repository read access'
+      );
+    if (!input.projectGit)
+      throw new AthanorError(
+        'project_required',
+        'Git synchronization requires a project conversation'
+      );
+    return input.projectGit(parsed);
+  }
   if (isAccountConnectorKind(input.kind))
     return executeAccountConnector(input, input.transport ?? secureConnectorRequest);
   if (isMailConnectorKind(input.kind)) {

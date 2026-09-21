@@ -1,4 +1,5 @@
 import { captureConversationHistory } from './project-git-capture.js';
+import { ProjectGitRemotes } from './project-git-remotes.js';
 import { ProjectGitExports } from './project-git-exports.js';
 import { ProjectGitWorkingCopies } from './project-git-working-copies.js';
 import { MAX_CAPABILITY_TTL_SECONDS } from '@athanor/core';
@@ -142,6 +143,7 @@ export class ProjectUpdatesManager {
       for (const receipt of await git.removals()) {
         if (receipt.state === 'removing') await git.finishRemoval(receipt);
       }
+      await this.gitRemotes(projectId).restore();
       await this.gitExports(projectId).restore();
       await this.gitWorkingCopies(projectId).restore();
       for (const operation of await this.repositoryOperations(projectId)) {
@@ -184,6 +186,53 @@ export class ProjectUpdatesManager {
     await observe();
     this.#timer = setInterval(() => void observe(), 15_000);
     this.#timer.unref();
+  }
+  async startGitRemote(
+    projectId: string,
+    input: unknown,
+    actor: { taskId: string | null; workspaceId: string | null },
+    credential: string
+  ) {
+    return this.locked(projectId, projectId, async () => {
+      if (this.#closed || (actor.workspaceId && this.#removedWorkspaces.has(actor.workspaceId)))
+        throw Error('This conversation is stopping');
+      return this.gitRemotes(projectId).start(input, actor, credential);
+    });
+  }
+  readonly #remotes = new Map<string, ProjectGitRemotes>();
+  gitRemotes(projectId: string): ProjectGitRemotes {
+    let remotes = this.#remotes.get(projectId);
+    if (!remotes) {
+      remotes = new ProjectGitRemotes(
+        this.root,
+        this.file(projectId, 'repository-remotes'),
+        this.repositories(projectId),
+        async (input) => {
+          const revision = await this.version(projectId, input.revisionId);
+          const repository = await this.repositories(projectId).get(input.repositoryId);
+          const registered =
+            revision.repositories?.some(
+              (item) => item.repositoryId === input.repositoryId && item.commit === input.commit
+            ) ||
+            (repository.initialPublication?.revisionId === revision.id &&
+              repository.initialPublication.commit === input.commit);
+          if (!registered)
+            throw Error('Choose the exact commit recorded in a published project version');
+          if (
+            revision.checks.some(
+              (check) => check.status !== 'passed' || check.candidateDigest !== revision.digest
+            ) ||
+            (!revision.checks.length && !revision.uncheckedReason)
+          )
+            throw Error(
+              'The published version needs passing checks or an explicit owner publication decision'
+            );
+        },
+        (run) => this.references.run(projectId, run)
+      );
+      this.#remotes.set(projectId, remotes);
+    }
+    return remotes;
   }
   readonly #exports = new Map<string, ProjectGitExports>();
   readonly #workingCopies = new Map<string, ProjectGitWorkingCopies>();
@@ -268,6 +317,7 @@ export class ProjectUpdatesManager {
   backgroundPreparations(): number {
     return (
       this.#operations.size +
+      [...this.#remotes.values()].reduce((sum, remotes) => sum + remotes.running.size, 0) +
       [...this.#workingCopies.values()].reduce((sum, copies) => sum + copies.running.size, 0) +
       [...this.#exports.values()].reduce((sum, exports) => sum + exports.running.size, 0) +
       [...this.#purges.values()].reduce((sum, purge) => sum + purge.runningCount(), 0)
@@ -277,6 +327,7 @@ export class ProjectUpdatesManager {
     this.#closed = true;
     clearInterval(this.#timer);
     await this.#changes.close();
+    await Promise.allSettled([...this.#remotes.values()].map((remotes) => remotes.close()));
     await Promise.allSettled([...this.#workingCopies.values()].map((copies) => copies.close()));
     await Promise.allSettled([...this.#exports.values()].map((exports) => exports.close()));
     await Promise.allSettled([...this.#purges.values()].map((purge) => purge.close()));
@@ -290,6 +341,9 @@ export class ProjectUpdatesManager {
       (MAX_CAPABILITY_TTL_SECONDS + 60) * 1000
     ).unref();
     await this.#locks.get(`checkout:${workspaceId}`)?.catch(() => undefined);
+    await Promise.all(
+      [...this.#remotes.values()].map((remotes) => remotes.cancelWorkspace(workspaceId))
+    );
     await Promise.all(
       [...this.#workingCopies.values()].map((copies) => copies.cancelWorkspace(workspaceId))
     );
@@ -319,6 +373,7 @@ export class ProjectUpdatesManager {
         return previous;
       if (
         this.#operations.size ||
+        this.gitRemotes(projectId).running.size ||
         this.gitExports(projectId).running.size ||
         this.gitWorkingCopies(projectId).running.size
       )

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { ProjectGitRemoteOperation } from './project-git-remote.js';
 
 export const GitObjectId = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/);
 export const ProjectRepositoryInput = z
@@ -25,6 +26,7 @@ export const ProjectRepositoryInput = z
 export type ProjectRepositoryInput = z.infer<typeof ProjectRepositoryInput>;
 
 export interface ProjectRepository {
+  initialPublication?: { revisionId: string; commit: string };
   id: string;
   name: string;
   path: string;
@@ -68,6 +70,7 @@ export const ProjectRepositoryOperation = z.object({
 });
 export type ProjectRepositoryOperation = z.infer<typeof ProjectRepositoryOperation>;
 export interface ProjectRepositories {
+  remoteOperations?: ProjectGitRemoteOperation[];
   repositories: ProjectRepository[];
   operations: ProjectRepositoryOperation[];
   exports: ProjectGitExport[];

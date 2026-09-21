@@ -123,6 +123,12 @@ const addresseeSchema = {
  * is preserved by the filter that reads it, which is deliberate: the bag opens a cached prefix.
  */
 const CONNECTOR_INPUT_PROPERTIES: Record<string, unknown> = {
+  repositoryId: { type: 'string' },
+  revisionId: { type: 'string' },
+  requestId: { type: 'string' },
+  branch: { type: 'string' },
+  commit: { type: 'string' },
+  expectedHead: { type: ['string', 'null'] },
   owner: { type: 'string' },
   repository: { type: 'string' },
   path: { type: 'string' },
@@ -313,6 +319,29 @@ export const CONNECTOR_ACTION_INPUTS = {
   calendar_respond_invitation: {
     fields: ['eventUrl', 'response'],
     clause: 'eventUrl, response'
+  },
+  github_git_fetch: {
+    fields: ['repositoryId', 'owner', 'repository', 'branch', 'requestId'],
+    clause:
+      'repositoryId, owner, repository, branch; captures a bundle without changing published files'
+  },
+  github_git_push: {
+    fields: [
+      'repositoryId',
+      'owner',
+      'repository',
+      'branch',
+      'revisionId',
+      'commit',
+      'expectedHead',
+      'requestId'
+    ],
+    clause:
+      'repositoryId, owner, repository, branch, published revisionId, commit, expectedHead (null for a new branch)'
+  },
+  github_git_status: {
+    fields: ['requestId'],
+    clause: 'requestId; inspect progress or reconcile a lost reply without repeating a push'
   },
   github_list_repositories: { fields: ['limit'], clause: 'limit' },
   github_read_file: {

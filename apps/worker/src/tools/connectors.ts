@@ -1,3 +1,4 @@
+import { executeProjectGitConnector } from '../project-git-connector.js';
 import {
   connectorActions,
   isAccountConnectorKind,
@@ -44,7 +45,7 @@ export async function executeConnectorTool(
       const connectorId = textValue(call.arguments.connectorId);
       const operation = textValue(call.arguments.action, 'unknown_connector_action');
       const connector = await context.store.getConnector(task.userId, connectorId);
-      if (!connector)
+      if (!connector || !connector.enabled)
         throw new AthanorError('connector_not_found', 'Connected service is unavailable');
       if (connector.secretCiphertext.aad !== `connector:${task.userId}:${connector.id}`)
         throw new AthanorError(
@@ -101,6 +102,8 @@ export async function executeConnectorTool(
             const execute = (accountOperation?: AccountOperation) =>
               executeConnectorAction({
                 ...(accountOperation ? { operation: accountOperation } : {}),
+                projectGit: (action) =>
+                  executeProjectGitConnector(context, call, connector.id, secret, action),
                 kind: connector.kind,
                 baseUrl: connector.baseUrl,
                 scopes: connector.scopes,

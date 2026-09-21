@@ -286,6 +286,7 @@ export type ConnectorKind = z.infer<typeof ConnectorKind>;
 export const ConnectorScope = z.enum([
   'github:profile.read',
   'github:repository.read',
+  'github:repository.write',
   'github:issues.read',
   'github:issues.write',
   'github:pull_requests.write',
@@ -2424,3 +2425,5 @@ export type {
 } from './project-retention.js';
 
 export * from './project-purge.js';
+
+export * from './project-git-remote.js';

@@ -903,3 +903,26 @@ The installed service shares the project execution slice. GUI launchers join thr
 and root descriptors, validate process lifetime, and discard capabilities before application entry.
 The native helper's abstract-socket boundary requires Landlock scope support. Development setups
 without the installed helper retain their explicitly unconfigured GUI boundary in runner health.
+
+### Connected remote Git
+
+Remote Git controls live with a project's source repositories. The existing GitHub connection
+provides repository read access and a separate, explicit repository publishing grant. Fetch captures
+a branch in managed storage and delivers a complete bundle to the selected conversation. The agent
+can integrate that bundle in its independent working copy, resolve conflicts and prepare a checked
+project update. Fetching does not move published files or another conversation's branch. A missing
+remote branch is reported explicitly.
+
+Publication names a published project version, its exact repository commit, the destination branch
+and the expected remote head. The managed store verifies this identity and the recorded checks or
+explicit owner publication decision. An ancestry check forbids replacement of existing history; an
+explicit remote lease rejects changes made after inspection. Agent requests pass the normal
+connected-service approval floor. Owner controls show the destination and commit before sending.
+
+Transfers retain durable intent and progress, survive a closed browser and can be stopped from the
+project. Cancellation terminates Git and its helpers. Restart never repeats a push: an interrupted
+publication requires inspection with its original connection. A matching remote head establishes
+the observed outcome; a different head remains uncertain because another writer may have changed
+it after acceptance. A fresh fetch can prepare a new, explicit publication. Credentials are
+decrypted only in the control plane and passed privately to the runner's fixed HTTPS transport;
+they are absent from Git URLs, command arguments, model results and transfer records.

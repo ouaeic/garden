@@ -219,6 +219,7 @@ export class ProjectGit {
         '0'.repeat(commit.length)
       ]);
     await durableJson(path.join(directory, 'connection.json'), {
+      initialPublication: { revisionId: input.revisionId, commit },
       id: input.requestId,
       name: input.name,
       path: prefix,
@@ -513,6 +514,38 @@ export class ProjectGit {
       object(commit),
       repository.head
     ]);
+    return this.writeBundle(repositoryId, commit, repository.branch, destination);
+  }
+  async nativeDirectory(repositoryId: string) {
+    await this.get(repositoryId);
+    return this.git(repositoryId);
+  }
+  async exportRemoteBundle(
+    repositoryId: string,
+    requestId: string,
+    branch: string,
+    destination: string,
+    signal?: AbortSignal
+  ) {
+    await this.get(repositoryId);
+    const commit = object(
+      await command(this.git(repositoryId), [
+        'rev-parse',
+        '--verify',
+        `refs/garden/remotes/${id(requestId)}^{commit}`
+      ])
+    );
+    await command(this.git(repositoryId), ['check-ref-format', `refs/heads/${branch}`]);
+    return this.writeBundle(repositoryId, commit, branch, destination, signal);
+  }
+  private async writeBundle(
+    repositoryId: string,
+    commit: string,
+    branch: string,
+    destination: string,
+    signal?: AbortSignal
+  ) {
+    const repository = await this.get(repositoryId);
     const usage = await command(this.git(repositoryId), ['count-objects', '-v']);
     const sizes = usage.split('\n').flatMap((line) => {
       const match = /^(?:size|size-pack): ([0-9]+)$/.exec(line);
@@ -542,7 +575,7 @@ export class ProjectGit {
     await command(staging, [
       'update-ref',
       '--no-deref',
-      `refs/heads/${repository.branch}`,
+      `refs/heads/${branch}`,
       object(commit),
       '0'.repeat(commit.length)
     ]);
@@ -551,7 +584,12 @@ export class ProjectGit {
     const partial = path.join(output, 'repository.bundle.partial');
     await rm(partial, { force: true });
     await rm(partial + '.lock', { force: true });
-    await command(staging, ['bundle', 'create', partial, `refs/heads/${repository.branch}`]);
+    await command(
+      staging,
+      ['bundle', 'create', partial, `refs/heads/${branch}`],
+      undefined,
+      signal ? { signal } : {}
+    );
     const handle = await open(partial, constants.O_RDONLY | constants.O_NOFOLLOW);
     let size: number;
     try {

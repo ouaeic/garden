@@ -18,7 +18,8 @@ import {
 } from './host-storage.js';
 import { limitedInvocation, type CommandLimits } from './limits.js';
 import { isCodingMissionWorkspace, sandboxedInvocation, type AgentSandbox } from './sandbox.js';
-import { awaitChildExit, killProcessTree, type ProcessHandle } from './subprocess.js';
+import { awaitChildExit, killProcessTree, stopProcessTree } from './subprocess.js';
+export { stopProcessTree } from './subprocess.js';
 
 /** Native commands share the owner's workspace, resource ceilings and approval floor. */
 
@@ -873,29 +874,6 @@ export const prepareInvocation = async (
     // The sandbox helper installs the environment itself, from the spec, because sudo resets it.
     env: sandbox ? {} : environment
   };
-};
-
-/**
- * How long a process gets to answer SIGTERM before it is sent the signal it cannot catch.
- *
- * One declaration because the number was written out at four call sites across the two files, and
- * a grace that differs between the path that runs a command and the path that runs the same command
- * in the background is a difference nobody chose.
- */
-const TERMINATION_GRACE_MS = 2_000;
-
-/**
- * Stops a command's whole process group: the polite signal, then the certain one.
- *
- * Returns the escalation timer so a caller still holding the child can cancel it once the process
- * has actually gone; a caller with nothing left to wait for can ignore it, because the timer is
- * unreferenced and cannot by itself hold the runner open.
- */
-export const stopProcessTree = (child: ProcessHandle): NodeJS.Timeout => {
-  killProcessTree(child, 'SIGTERM');
-  const escalation = setTimeout(() => killProcessTree(child, 'SIGKILL'), TERMINATION_GRACE_MS);
-  escalation.unref();
-  return escalation;
 };
 
 /**

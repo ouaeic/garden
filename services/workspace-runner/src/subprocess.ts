@@ -54,3 +54,11 @@ export const killProcessTree = (child: ProcessHandle, signal: NodeJS.Signals): v
     child.kill(signal);
   }
 };
+
+/** Stop the whole group, allowing a short flush before escalation. */
+export const stopProcessTree = (child: ProcessHandle): NodeJS.Timeout => {
+  killProcessTree(child, 'SIGTERM');
+  const escalation = setTimeout(() => killProcessTree(child, 'SIGKILL'), 2_000);
+  escalation.unref();
+  return escalation;
+};

@@ -1,3 +1,4 @@
+import { registerProjectGitRemoteRoutes } from './project-git-remote-routes.js';
 import { registerFileReadRoutes } from './file-downloads.js';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -14,6 +15,7 @@ import { requireScope } from './auth.js';
 import type { ProjectUpdatesManager } from './project-updates.js';
 
 export function registerProjectUpdateRoutes(app: FastifyInstance, manager: ProjectUpdatesManager) {
+  registerProjectGitRemoteRoutes(app, manager);
   const ownerRetention = async (
     request: FastifyRequest,
     scope: 'project.updates.read' | 'project.updates.write' | 'files.read'
@@ -32,6 +34,7 @@ export function registerProjectUpdateRoutes(app: FastifyInstance, manager: Proje
   app.get('/v1/workspaces/:workspaceId/projects/:projectId/repositories', async (request) => {
     const owner = await ownerRetention(request, 'project.updates.read');
     return {
+      remoteOperations: await manager.gitRemotes(owner.projectId).list(),
       repositories: await manager.repositories(owner.projectId).list(),
       operations: await manager.repositoryOperations(owner.projectId),
       exports: await manager.gitExports(owner.projectId).list(),

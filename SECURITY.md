@@ -413,3 +413,19 @@ cannot be changed by the capture. Managed import holds the regular-file descript
 identity for concurrent changes, verifies object connectivity and binds the advertised commit before
 retaining a reference. Neither repository configuration nor a history bundle grants network or
 external-write authority.
+
+Remote Git is a dedicated connected-account boundary. It accepts only fixed GitHub HTTPS URLs
+assembled from validated owner and repository names, with redirects disabled and TLS verification
+enabled. Its transport explicitly enables HTTPS; other managed Git operations retain disabled
+protocols. Source configuration, hooks, credential helpers, signing and recursive submodule
+transports are not inherited. A connection needs repository read access and a separate explicit
+repository publishing grant for pushes. No existing grant is widened by enabling this feature.
+
+Signed capabilities separate fetch, push, inspection and cancellation and bind agent requests to
+the conversation's registered project and working area. Agent pushes pass the approval floor;
+owner UI requests are authenticated and show the exact destination and commit. Only commits bound
+to published project versions are eligible. Fast-forward ancestry and an explicit expected-head
+lease protect remote history. Transfers retain intent before network writes and never repeat an
+ambiguous push during recovery. Tokens exist only in the trusted transport child's environment;
+provider diagnostics are replaced with credential-free status. Fetched bundles remain untrusted
+content and confer no command or publication authority.

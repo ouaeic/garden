@@ -1,3 +1,4 @@
+import { ProjectGitRemote } from './ProjectGitRemote';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   ProjectRepositories as Repositories,
@@ -152,6 +153,16 @@ export default function ProjectRepositories({
                 )}
               </div>
             ))}
+          <ProjectGitRemote
+            projectId={projectId}
+            repository={repository}
+            revisionId={revisionId}
+            conversations={conversations}
+            operations={(data.remoteOperations ?? []).filter(
+              (item) => item.input.repositoryId === repository.id
+            )}
+            refresh={refresh}
+          />
           <Button disabled={busy} onClick={() => void run(() => readHistory(repository.id))}>
             View history
           </Button>
