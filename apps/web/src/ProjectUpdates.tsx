@@ -7,6 +7,7 @@ import type {
   ProjectUpdates as Updates,
   Task
 } from '@athanor/contracts';
+import ProjectCleanup, { type CleanupRequest } from './ProjectCleanup';
 import { get, post } from './client';
 import { Button, Dialog, ErrorNotice, Field, Spinner } from './ui';
 import { processDuration, processMemory } from './process-display';
@@ -27,7 +28,7 @@ const stateLabel: Record<ProjectUpdate['state'], string> = {
   cancelled: 'Cancelled'
 };
 const canStartChecks = (update: ProjectUpdate) =>
-  ['ready', 'checking', 'checks_failed'].includes(update.state);
+  !update.contentRemoval && ['ready', 'checking', 'checks_failed'].includes(update.state);
 const active = (check: ProjectCheck) =>
   ['preparing', 'running', 'verifying'].includes(check.status);
 const label = (update: ProjectUpdate) =>
@@ -52,6 +53,7 @@ export default function ProjectUpdates({
   onTask: (taskId: string) => void;
 }) {
   const endpoint = `/v1/projects/${projectId}/updates`;
+  const [cleanup, setCleanup] = useState<CleanupRequest | null>(null);
   const [fileCheck, setFileCheck] = useState('');
   const [data, setData] = useState<Updates | null>(null),
     [error, setError] = useState<unknown>(null);
@@ -68,6 +70,9 @@ export default function ProjectUpdates({
     [reason, setReason] = useState('');
   const [logs, setLogs] = useState<{ check: string; text: string } | null>(null),
     [history, setHistory] = useState(false);
+  const selectedVersion = selected?.publishedRevision
+    ? data?.revisions.find((item) => item.id === selected.publishedRevision)
+    : null;
   const ticking = (check: ProjectCheck) => ['preparing', 'running'].includes(check.status);
   const clock = useVisibleClock(
     Boolean(
@@ -560,7 +565,7 @@ export default function ProjectUpdates({
           </form>
         </Dialog>
       )}
-      {selected && (
+      {selected && !cleanup && (
         <Dialog
           title={selected.title}
           onClose={() => {
@@ -583,6 +588,28 @@ export default function ProjectUpdates({
               </Button>
             </div>
             {selected.detail && <p>{selected.detail}</p>}
+            {selected.contentRemoval && (
+              <p role="status">
+                {selected.contentRemoval.state === 'removed'
+                  ? 'Candidate files permanently removed. Their change summary and check receipts remain.'
+                  : 'Candidate cleanup is incomplete.'}
+              </p>
+            )}
+            {['published', 'failed', 'cancelled'].includes(selected.state) &&
+              selected.contentRemoval?.state !== 'removed' && (
+                <Button
+                  onClick={() =>
+                    setCleanup({
+                      selection: { versions: [], updates: [selected.id], checks: [] },
+                      ...(selected.contentRemoval
+                        ? { requestId: selected.contentRemoval.requestId }
+                        : {})
+                    })
+                  }
+                >
+                  {selected.contentRemoval ? 'View cleanup' : 'Remove candidate files…'}
+                </Button>
+              )}
             <p className="muted">
               {selected.parentRevision
                 ? `Based on version ${data?.revisions.find((revision) => revision.id === selected.parentRevision)?.number ?? selected.parentRevision}`
@@ -622,7 +649,29 @@ export default function ProjectUpdates({
                   {check.exitCode !== null && <p>Exit code {check.exitCode}</p>}
                 </details>
                 {check.detail && <p>{check.detail}</p>}
-                {check.sessionId && (
+                {check.contentRemoval && (
+                  <p className="muted">
+                    {check.contentRemoval.state === 'removed'
+                      ? 'Files and output permanently removed. This check receipt is preserved.'
+                      : 'Check files are awaiting cleanup.'}
+                  </p>
+                )}
+                {!['pending', 'preparing', 'running', 'verifying'].includes(check.status) &&
+                  check.contentRemoval?.state !== 'removed' && (
+                    <Button
+                      onClick={() =>
+                        setCleanup({
+                          selection: { versions: [], updates: [], checks: [check.id] },
+                          ...(check.contentRemoval
+                            ? { requestId: check.contentRemoval.requestId }
+                            : {})
+                        })
+                      }
+                    >
+                      {check.contentRemoval ? 'View cleanup' : 'Remove check files and output…'}
+                    </Button>
+                  )}
+                {check.sessionId && !check.contentRemoval && (
                   <details
                     onToggle={(event) => {
                       if (event.currentTarget.open) setFileCheck(check.id);
@@ -680,7 +729,7 @@ export default function ProjectUpdates({
                       Run check
                     </Button>
                   )}
-                  {check.sessionId && (
+                  {check.sessionId && !check.contentRemoval && (
                     <Button
                       disabled={!!busy}
                       onClick={() =>
@@ -806,23 +855,24 @@ export default function ProjectUpdates({
                     Run pending checks
                   </Button>
                 )}
-              {['outdated', 'checks_failed', 'failed'].includes(selected.state) && (
-                <Button
-                  disabled={!!busy}
-                  onClick={() =>
-                    void perform('rebase', async () => {
-                      const next = await act({
-                        action: 'rebase',
-                        updateId: selected.id,
-                        requestId: crypto.randomUUID()
-                      });
-                      setSelected(next);
-                    })
-                  }
-                >
-                  Rebuild and reset checks
-                </Button>
-              )}
+              {!selected.contentRemoval &&
+                ['outdated', 'checks_failed', 'failed'].includes(selected.state) && (
+                  <Button
+                    disabled={!!busy}
+                    onClick={() =>
+                      void perform('rebase', async () => {
+                        const next = await act({
+                          action: 'rebase',
+                          updateId: selected.id,
+                          requestId: crypto.randomUUID()
+                        });
+                        setSelected(next);
+                      })
+                    }
+                  >
+                    Rebuild and reset checks
+                  </Button>
+                )}
               {selected.state === 'ready' &&
                 selected.checks.length > 0 &&
                 selected.checks.every((check) => check.status === 'passed') && (
@@ -842,7 +892,7 @@ export default function ProjectUpdates({
                     Publish checked version
                   </Button>
                 )}
-              {!['published', 'cancelled'].includes(selected.state) && (
+              {!selected.contentRemoval && !['published', 'cancelled'].includes(selected.state) && (
                 <Button
                   disabled={!!busy}
                   onClick={() =>
@@ -882,18 +932,26 @@ export default function ProjectUpdates({
                 </Button>
               </details>
             )}
-            {selected.publishedRevision && (
-              <Suspense fallback={<Spinner />}>
-                <DirectoryPanel
-                  readOnlyRoot={{
-                    id: selected.publishedRevision,
-                    name: selected.title,
-                    base: `/v1/projects/${projectId}/versions/${selected.publishedRevision}`,
-                    description: 'Immutable files from this published project version.'
-                  }}
-                />
-              </Suspense>
+            {selectedVersion?.contentRemoval && (
+              <p>Published files were permanently removed. Their history remains available.</p>
             )}
+            {selectedVersion?.archive && !selectedVersion.contentRemoval && (
+              <p>Published files are archived. Restore them from version history to browse them.</p>
+            )}
+            {selected.publishedRevision &&
+              !selectedVersion?.archive &&
+              !selectedVersion?.contentRemoval && (
+                <Suspense fallback={<Spinner />}>
+                  <DirectoryPanel
+                    readOnlyRoot={{
+                      id: selected.publishedRevision,
+                      name: selected.title,
+                      base: `/v1/projects/${projectId}/versions/${selected.publishedRevision}`,
+                      description: 'Immutable files from this published project version.'
+                    }}
+                  />
+                </Suspense>
+              )}
             {selected.uncheckedReason && (
               <p>Owner’s publication reason: {selected.uncheckedReason}</p>
             )}
@@ -906,6 +964,17 @@ export default function ProjectUpdates({
             <ErrorNotice error={error} />
           </div>
         </Dialog>
+      )}
+      {cleanup && (
+        <ProjectCleanup
+          projectId={projectId}
+          request={cleanup}
+          onChanged={() => void refresh()}
+          onClose={() => {
+            setCleanup(null);
+            void refresh();
+          }}
+        />
       )}
     </section>
   );

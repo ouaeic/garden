@@ -4,6 +4,7 @@ import type { PinnedProjectVersions, ProjectRevision } from '@athanor/contracts'
 import { get, post, put } from './client';
 import { Button, Dialog, ErrorNotice, Field, Spinner } from './ui';
 import ProjectStorage from './ProjectStorage';
+import ProjectCleanup, { PendingCleanup, type CleanupRequest } from './ProjectCleanup';
 import ProjectVersionArchive from './ProjectVersionArchive';
 
 export default function ProjectVersionHistory({
@@ -35,16 +36,19 @@ export default function ProjectVersionHistory({
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [archivePreview, setArchivePreview] = useState<string[] | null>(null);
+  const [cleanup, setCleanup] = useState<CleanupRequest | null>(null);
+  const [cleanupGeneration, setCleanupGeneration] = useState(0);
+  const [cleanupMode, setCleanupMode] = useState(false);
   const [notice, setNotice] = useState('');
   const archiveTrigger = useRef<HTMLButtonElement>(null);
   const versionButtons = useRef(new Map<string, HTMLButtonElement>());
   const focusAfterChange = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
-    if (focusAfterChange.current?.isConnected && !busy && !archivePreview) {
+    if (focusAfterChange.current?.isConnected && !busy && !archivePreview && !cleanup) {
       focusAfterChange.current.focus();
       focusAfterChange.current = null;
     }
-  }, [busy, archivePreview]);
+  }, [busy, archivePreview, cleanup]);
   const request = useRef<AbortController | null>(null);
   const endpoint = `/v1/projects/${projectId}/pinned-versions`;
   const readPins = useCallback(
@@ -164,6 +168,7 @@ export default function ProjectVersionHistory({
       </p>
       <ErrorNotice error={!editing ? error : null} />
       <ProjectStorage key={projectId} projectId={projectId} />
+      <PendingCleanup projectId={projectId} generation={cleanupGeneration} onOpen={setCleanup} />
       <p role="status" className="muted">
         {notice}
       </p>
@@ -174,17 +179,33 @@ export default function ProjectVersionHistory({
             disabled={Boolean(busy)}
             aria-pressed={selecting}
             onClick={() => {
-              setSelecting((value) => !value);
+              setCleanupMode(false);
+              setSelecting((value) => cleanupMode || !value);
               setSelected(new Set());
             }}
           >
-            {selecting ? 'Done selecting' : 'Archive versions…'}
+            {selecting && !cleanupMode ? 'Done selecting' : 'Archive versions…'}
+          </Button>
+          <Button
+            disabled={Boolean(busy)}
+            aria-pressed={selecting && cleanupMode}
+            onClick={() => {
+              setCleanupMode(true);
+              setSelecting((value) => !cleanupMode || !value);
+              setSelected(new Set());
+            }}
+          >
+            {selecting && cleanupMode ? 'Done selecting' : 'Free storage…'}
           </Button>
           {selecting && (
             <Button
               className="primary"
               disabled={!selected.size || Boolean(busy)}
-              onClick={() => setArchivePreview([...selected])}
+              onClick={() =>
+                cleanupMode
+                  ? setCleanup({ selection: { versions: [...selected], updates: [], checks: [] } })
+                  : setArchivePreview([...selected])
+              }
             >
               Review {selected.size} selected
             </Button>
@@ -193,8 +214,9 @@ export default function ProjectVersionHistory({
       )}
       {selecting && (
         <p className="muted">
-          Select up to 40 versions. Current and pinned versions stay available. The preview checks
-          other references before anything moves.
+          {cleanupMode
+            ? 'Select archived versions to permanently remove their files. The preview retains anything needed elsewhere.'
+            : 'Select up to 40 versions. Current and pinned versions stay available. The preview checks other references before anything moves.'}
         </p>
       )}
       {pinnedOnly && !reading && page && !rows.length && (
@@ -207,11 +229,14 @@ export default function ProjectVersionHistory({
               <input
                 type="checkbox"
                 className="project-version-select"
-                aria-label={`Select version ${revision.number} to archive`}
+                aria-label={`Select version ${revision.number} to ${cleanupMode ? 'remove permanently' : 'archive'}`}
                 checked={selected.has(revision.id)}
                 disabled={
                   revision.id === headId ||
-                  Boolean(revision.pin || revision.archive) ||
+                  Boolean(revision.pin || revision.contentRemoval) ||
+                  (cleanupMode
+                    ? revision.archive?.state !== 'archived'
+                    : Boolean(revision.archive)) ||
                   (!selected.has(revision.id) && selected.size >= 40)
                 }
                 onChange={(event) => {
@@ -236,11 +261,18 @@ export default function ProjectVersionHistory({
                 Version {revision.number} · {revision.title}
               </Button>
               <small>{new Date(revision.createdAt).toLocaleString()}</small>
-              {revision.archive && (
+              {revision.archive && !revision.contentRemoval && (
                 <small>
                   {revision.archive.state === 'archived'
                     ? 'Archived · files can be restored'
                     : 'Archive operation needs recovery'}
+                </small>
+              )}
+              {revision.contentRemoval && (
+                <small>
+                  {revision.contentRemoval.state === 'removed'
+                    ? 'Files permanently removed · history retained'
+                    : 'Saved cleanup is incomplete'}
                 </small>
               )}
               {revision.pin && (
@@ -250,7 +282,7 @@ export default function ProjectVersionHistory({
               )}
             </div>
             <div className="row project-version-pin-actions">
-              {revision.archive && (
+              {revision.archive && !revision.contentRemoval && (
                 <Button
                   disabled={Boolean(busy)}
                   busy={busy === revision.id}
@@ -260,10 +292,22 @@ export default function ProjectVersionHistory({
                   Restore files
                 </Button>
               )}
+              {revision.contentRemoval?.state === 'removing' && (
+                <Button
+                  onClick={() =>
+                    setCleanup({
+                      selection: { versions: [revision.id], updates: [], checks: [] },
+                      requestId: revision.contentRemoval!.requestId
+                    })
+                  }
+                >
+                  View cleanup
+                </Button>
+              )}
               <Button
                 aria-label={`${revision.pin ? 'Unpin' : 'Pin'} version ${revision.number}`}
                 aria-pressed={Boolean(revision.pin)}
-                disabled={Boolean(busy) || Boolean(revision.archive)}
+                disabled={Boolean(busy) || Boolean(revision.archive || revision.contentRemoval)}
                 busy={busy === revision.id}
                 onClick={() => void save(revision, revision.pin ? null : '')}
               >
@@ -318,6 +362,23 @@ export default function ProjectVersionHistory({
             </Button>
           </form>
         </Dialog>
+      )}
+      {cleanup && (
+        <ProjectCleanup
+          projectId={projectId}
+          request={cleanup}
+          onChanged={(values) => {
+            for (const revision of values) onChanged(revision);
+            setNotice('Selected files permanently removed. History and check receipts remain.');
+          }}
+          onClose={() => {
+            focusAfterChange.current = archiveTrigger.current;
+            setCleanup(null);
+            setSelected(new Set());
+            setSelecting(false);
+            setCleanupGeneration((value) => value + 1);
+          }}
+        />
       )}
       {archivePreview && (
         <ProjectVersionArchive

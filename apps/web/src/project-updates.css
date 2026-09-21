@@ -89,7 +89,10 @@
   max-width: 100%;
 }
 .project-version-history-title small {
+  display: block;
   margin-top: 0.45rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 .project-version-history-title .project-version-pin-label {
   display: flex;

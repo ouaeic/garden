@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { chmod, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -90,5 +92,26 @@ it('overlapping pooled readers retain protection after their originating operati
   await expect(references.acquire(project)).rejects.toMatchObject({ status: 409 });
   await exclusive.release();
   await references.run(project, async () => undefined);
+  await expect(acquire(root, project, 'write')).resolves.toBeDefined();
+});
+
+it('an executor retains exclusion after the originating descriptor closes', async () => {
+  const { root, project } = await fixture(),
+    lock = await acquire(root, project, 'write');
+  const child = spawn(
+    '/usr/bin/python3',
+    ['-I', '-S', '-c', 'import os,sys; os.fstat(3); print("ready",flush=True); sys.stdin.read()'],
+    { env: {}, stdio: ['pipe', 'pipe', 'ignore', lock.descriptor] }
+  );
+  try {
+    await once(child.stdout!, 'data');
+    await lock.release();
+    await expect(acquire(root, project, 'read')).rejects.toMatchObject({ status: 409 });
+    await expect(acquire(root, project, 'write')).rejects.toMatchObject({ status: 409 });
+  } finally {
+    const closed = once(child, 'close');
+    child.kill('SIGKILL');
+    await closed;
+  }
   await expect(acquire(root, project, 'write')).resolves.toBeDefined();
 });

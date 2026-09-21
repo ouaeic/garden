@@ -4,6 +4,8 @@ import {
   ProjectUpdateAction,
   ProjectVersionPinInput,
   PinnedProjectVersionCursor,
+  ProjectPurgeApply,
+  ProjectPurgeSelection,
   ProjectRetentionApply,
   ProjectRetentionSelection
 } from '@athanor/contracts';
@@ -70,6 +72,38 @@ export function registerProjectUpdateRoutes(context: RouteContext) {
         return action === 'preview'
           ? run()
           : context.idempotent(request, reply, user, run, { reconcile: run });
+      }
+    );
+  }
+  for (const action of ['preview', 'apply', 'status', 'pending'] as const) {
+    app.post<{ Params: { projectId: string } }>(
+      `/v1/projects/:projectId/cleanup/${action}`,
+      async (request, reply) => {
+        const user = requireUser(request.user);
+        const input = (
+          action === 'preview'
+            ? ProjectPurgeSelection
+            : action === 'apply'
+              ? ProjectPurgeApply
+              : action === 'pending'
+                ? z.object({}).strict()
+                : z.object({ requestId: z.uuid() }).strict()
+        ).parse(request.body);
+        const project = await owned(user.id, request.params.projectId);
+        const run = () =>
+          runner.request({
+            workspaceId: project.workspaceId,
+            userId: user.id,
+            role: 'user',
+            scopes: [action === 'apply' ? 'project.updates.write' : 'project.updates.read'],
+            method: 'POST',
+            path: `/v1/workspaces/${project.workspaceId}/projects/${project.id}/cleanup/${action}`,
+            contentType: 'application/json',
+            body: JSON.stringify(input)
+          });
+        return action === 'apply'
+          ? context.idempotent(request, reply, user, run, { reconcile: run })
+          : run();
       }
     );
   }

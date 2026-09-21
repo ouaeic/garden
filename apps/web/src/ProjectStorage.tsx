@@ -37,7 +37,8 @@ export function ProjectStorageDetails({ usage }: { usage: ProjectStorageUsage })
         </p>
       )}
       <p className="muted">
-        Shared copies reuse storage. Space recoverable by cleanup has not been measured.
+        Shared copies reuse storage. A cleanup preview estimates the space released by its selected
+        files.
       </p>
       <details className="project-storage-scope">
         <summary>What this measures</summary>

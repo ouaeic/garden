@@ -435,10 +435,28 @@ Completed archive requests can return their immutable receipt during later runni
 moving files again. Incomplete requests still require the maintenance boundary, and changing a
 request's identity cannot reuse its receipt.
 
-Archiving does not free disk space. Shared content objects, candidates, check workspaces and
-recoverable version trees remain retained; permanent purge and object garbage collection require a
-separate retention policy. These protections cover managed input grants, not out-of-band root or
-owner filesystem operations.
+Archiving does not free disk space. Permanent cleanup is a separate owner operation for archived
+versions, settled candidate files, and settled check workspaces and output. The preview examines
+retained versions, working baselines, pins and every retained candidate's reconstruction facts.
+Shared content is removed only when the exact selection leaves it unreferenced. Missing or
+inconsistent metadata and invalid required content prevent cleanup. This does not scan for arbitrary
+orphaned files outside the selection.
+
+The irreversible operation records a reviewed filesystem manifest before unlinking. Saved identities
+bind every path to its inode and mode; check directories additionally require their project ownership
+marker. The executor walks anchored directory descriptors without following symlinks, removes
+selected symlinks themselves, synchronizes parent directories and inherits the exclusive project
+lock. It continues on the server after the browser closes. A crashed operation remains visible and
+resumable. Replacement files and added children cannot enter its saved deletion list. New references
+can only narrow that list during recovery. Finalization separately records that file deletion has
+finished, so a crash while removing saved diff bodies can finish without repeating deletion.
+
+Version lineage, change counts and check receipts remain readable after cleanup. Their file views
+explain permanent removal; restore, candidate rebuild and file download cannot reconstruct removed
+content. The preview distinguishes selected logical bytes from an estimate based on allocated blocks
+and remaining hard links. It does not present whole-disk free-space changes as exact attribution.
+Snapshots and files retained outside Garden can affect space actually released. These protections
+cover managed input grants, not out-of-band root or owner filesystem operations.
 
 ## Web search
 

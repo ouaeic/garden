@@ -99,18 +99,54 @@ it('binds archive previews and mutations to the owner and preserves exact retry 
   } as unknown as RouteContext);
   const input = { versions: [version], digest: 'a'.repeat(64), requestId };
   try {
-    const cases = [
-      { action: 'preview', payload: { versions: [version] }, scope: 'project.updates.read' },
-      { action: 'archive', payload: input, scope: 'project.updates.write' },
+    const cases: Array<{
+      family: string;
+      action: string;
+      payload: Record<string, unknown>;
+      scope: string;
+    }> = [
       {
+        family: 'retention',
+        action: 'preview',
+        payload: { versions: [version] },
+        scope: 'project.updates.read'
+      },
+      { family: 'retention', action: 'archive', payload: input, scope: 'project.updates.write' },
+      {
+        family: 'retention',
         action: 'restore',
         payload: { revisionId: version, requestId },
         scope: 'project.updates.write'
       }
     ];
+    cases.push(
+      {
+        family: 'cleanup',
+        action: 'preview',
+        payload: { versions: [version], updates: [], checks: [] },
+        scope: 'project.updates.read'
+      },
+      {
+        family: 'cleanup',
+        action: 'apply',
+        payload: {
+          selection: { versions: [version], updates: [], checks: [] },
+          digest: input.digest,
+          requestId
+        },
+        scope: 'project.updates.write'
+      },
+      {
+        family: 'cleanup',
+        action: 'status',
+        payload: { requestId },
+        scope: 'project.updates.read'
+      },
+      { family: 'cleanup', action: 'pending', payload: {}, scope: 'project.updates.read' }
+    );
     expect(cases.length).toBeGreaterThan(0);
     for (const item of cases) {
-      const url = `/v1/projects/${project}/retention/${item.action}`;
+      const url = `/v1/projects/${project}/${item.family}/${item.action}`;
       expect((await app.inject({ method: 'POST', url, payload: item.payload })).statusCode).toBe(
         200
       );
@@ -119,7 +155,7 @@ it('binds archive previews and mutations to the owner and preserves exact retry 
           role: 'user',
           scopes: [item.scope],
           body: JSON.stringify(item.payload),
-          path: `/v1/workspaces/execution/projects/${project}/retention/${item.action}`
+          path: `/v1/workspaces/execution/projects/${project}/${item.family}/${item.action}`
         })
       );
       const calls = invoke.mock.calls.length;
@@ -139,7 +175,7 @@ it('binds archive previews and mutations to the owner and preserves exact retry 
       ).not.toBe(200);
       expect(invoke).toHaveBeenCalledTimes(calls);
     }
-    expect(idempotent).toHaveBeenCalledTimes(2);
+    expect(idempotent).toHaveBeenCalledTimes(3);
     const url = `/v1/projects/${project}/retention/archive`;
     expect(
       (await app.inject({ method: 'POST', url, payload: { ...input, digest: 'wrong' } })).statusCode

@@ -47,6 +47,32 @@ export function registerProjectUpdateRoutes(app: FastifyInstance, manager: Proje
     await retention.restore(revisionId, requestId);
     return { restored: true, revision: await manager.version(retention.projectId, revisionId) };
   });
+  for (const action of ['preview', 'apply', 'status', 'pending'] as const) {
+    app.post(
+      '/v1/workspaces/:workspaceId/projects/:projectId/cleanup/' + action,
+      async (request) => {
+        const owner = await ownerRetention(
+          request,
+          action === 'apply' ? 'project.updates.write' : 'project.updates.read'
+        );
+        const purge = manager.purge(owner.projectId);
+        if (action === 'pending') {
+          z.object({}).strict().parse(request.body);
+          return purge.pendingRequests();
+        }
+        if (action === 'preview') return purge.preview(request.body);
+        if (action === 'apply') return purge.apply(request.body);
+        const input = z.object({ requestId: z.uuid() }).strict().parse(request.body);
+        const result = await purge.status(input.requestId);
+        return {
+          ...result,
+          revisions: await Promise.all(
+            result.selection.versions.map((id) => manager.version(owner.projectId, id))
+          )
+        };
+      }
+    );
+  }
   app.get<{ Params: { workspaceId: string; projectId: string } }>(
     '/v1/workspaces/:workspaceId/projects/:projectId/storage',
     async (request) => {

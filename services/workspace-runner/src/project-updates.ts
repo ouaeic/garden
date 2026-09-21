@@ -1,3 +1,5 @@
+import { ProjectPurge } from './project-purge.js';
+import { contentRemoval, assertHistoryContentAvailable } from './project-content-state.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, readdir, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
@@ -148,13 +150,26 @@ export class ProjectUpdatesManager {
     this.#timer = setInterval(() => void observe(), 15_000);
     this.#timer.unref();
   }
+  readonly #purges = new Map<string, ProjectPurge>();
+  purge(projectId: string): ProjectPurge {
+    let purge = this.#purges.get(projectId);
+    if (!purge) {
+      purge = new ProjectPurge(this.root, projectId, () => this.assertRetentionIdle(projectId));
+      this.#purges.set(projectId, purge);
+    }
+    return purge;
+  }
   backgroundPreparations(): number {
-    return this.#operations.size;
+    return (
+      this.#operations.size +
+      [...this.#purges.values()].reduce((sum, purge) => sum + purge.runningCount(), 0)
+    );
   }
   async close(): Promise<void> {
     this.#closed = true;
     clearInterval(this.#timer);
     await this.#changes.close();
+    await Promise.allSettled([...this.#purges.values()].map((purge) => purge.close()));
     await Promise.allSettled([...this.#operations.values()]);
   }
   directory(projectId: string): string {
@@ -237,6 +252,7 @@ export class ProjectUpdatesManager {
     });
   }
   async checkRoot(projectId: string, updateId: string, checkId: string): Promise<string> {
+    await assertHistoryContentAvailable(this.retention(projectId), 'check', checkId);
     const update = await this.update(projectId, updateId);
     if (!update.checks.some((check) => check.id === checkId && check.sessionId))
       throw new Error('Check files are not available');
@@ -262,6 +278,8 @@ export class ProjectUpdatesManager {
       )) ?? this.revisionView(await this.revision(projectId, id));
     return {
       ...revision,
+      contentRemoval: await contentRemoval(this.retention(projectId), 'version', id),
+      checks: await this.contentChecks(projectId, revision.checks),
       archive: await this.retention(projectId).status(id),
       pin: await new ProjectVersionPins(this.file(projectId, 'pins')).get(
         revision.number,
@@ -332,12 +350,29 @@ export class ProjectUpdatesManager {
     if (!revision) throw new Error('Published project version not found');
     return revision;
   }
+  private async contentChecks(projectId: string, checks: ProjectCheck[]) {
+    return Promise.all(
+      checks.map(async (check) => ({
+        ...check,
+        contentRemoval: await contentRemoval(this.retention(projectId), 'check', check.id)
+      }))
+    );
+  }
+  private async contentView<T extends Pick<ProjectUpdate, 'id' | 'projectId' | 'checks'>>(
+    update: T
+  ): Promise<T> {
+    return {
+      ...update,
+      contentRemoval: await contentRemoval(this.retention(update.projectId), 'update', update.id),
+      checks: await this.contentChecks(update.projectId, update.checks)
+    };
+  }
   async update(projectId: string, id: string): Promise<StoredUpdate> {
     const live = this.#live.get(id);
     if (live?.projectId === projectId) return live;
     const update = await readJson<StoredUpdate>(this.file(projectId, `updates/${uuid(id)}.json`));
     if (!update) throw new Error('Project update not found');
-    return update;
+    return this.contentView(update);
   }
   private async save(update: StoredUpdate) {
     update.updatedAt = now();
@@ -366,13 +401,14 @@ export class ProjectUpdatesManager {
     const changes = update.changes.slice(start, start + 100);
     return {
       ...view,
+      ...(view.contentRemoval ? { path: null } : {}),
       checks: view.checks.map((check) => ({
         ...check,
         ...(this.#preparations.has(check.id)
           ? { preparation: this.#preparations.get(check.id)! }
           : {})
       })),
-      changes,
+      changes: view.contentRemoval ? changes.map((change) => ({ ...change, diff: null })) : changes,
       changeCount: update.changes.length,
       lineChanges: update.changes.reduce(
         (total, change) => ({
@@ -638,6 +674,7 @@ export class ProjectUpdatesManager {
     requestId: string = randomUUID()
   ): Promise<ProjectUpdate> {
     return this.locked(projectId, `prepare:${uuid(requestId)}`, async () => {
+      await assertHistoryContentAvailable(this.retention(projectId), 'update', id);
       const requestDigest = createHash('sha256').update(`rebase:${projectId}:${id}`).digest('hex');
       const existing = await readJson<StoredUpdate>(
         this.file(projectId, `updates/${requestId}.json`)
@@ -747,6 +784,8 @@ export class ProjectUpdatesManager {
     expectedDigest: string
   ): Promise<ProjectUpdate> {
     return this.locked(projectId, `update:${id}`, async () => {
+      await assertHistoryContentAvailable(this.retention(projectId), 'update', id);
+      await assertHistoryContentAvailable(this.retention(projectId), 'check', checkId);
       const update = await this.update(projectId, id);
       const check = update.checks.find((item) => item.id === checkId);
       if (!check || !update.candidateDigest || update.candidateDigest !== expectedDigest)
@@ -960,6 +999,7 @@ export class ProjectUpdatesManager {
     stop = false
   ): Promise<CheckProcess | { status: string }> {
     return this.locked(projectId, `update:${id}`, async () => {
+      await assertHistoryContentAvailable(this.retention(projectId), 'check', checkId);
       const update = await this.update(projectId, id),
         check = update.checks.find((item) => item.id === checkId);
       if (!check) throw new Error('Project check not found');
@@ -1006,6 +1046,7 @@ export class ProjectUpdatesManager {
   ): Promise<ProjectRevision> {
     return this.locked(projectId, projectId, () =>
       this.locked(projectId, `update:${id}`, async () => {
+        await assertHistoryContentAvailable(this.retention(projectId), 'update', id);
         const registry = await this.registry(projectId);
         const head = registry.head ? await this.revision(projectId, registry.head) : null;
         const update = await this.refresh(await this.update(projectId, id));
@@ -1132,11 +1173,13 @@ export class ProjectUpdatesManager {
       page.map(async (name) => {
         const summary = (await readJson<ProjectUpdate>(this.file(projectId, `summaries/${name}`)))!;
         const live = this.#live.get(summary.id);
-        const value = live
-          ? this.view(live)
-          : ['preparing', 'checking'].includes(summary.state)
-            ? await this.inspect(projectId, summary.id)
-            : summary;
+        const value = await this.contentView(
+          live
+            ? this.view(live)
+            : ['preparing', 'checking'].includes(summary.state)
+              ? await this.inspect(projectId, summary.id)
+              : summary
+        );
         if (
           !['preparing', 'published', 'failed', 'cancelled'].includes(value.state) &&
           registry.head !== value.parentRevision

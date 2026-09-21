@@ -19,6 +19,8 @@ except BlockingIOError:
 `;
 
 export interface ProjectReferenceLock {
+  /** Inherit this descriptor when an executor must retain exclusion after its parent exits. */
+  readonly descriptor: number;
   release(): Promise<void>;
 }
 
@@ -44,8 +46,8 @@ export class ProjectReferences {
         }
       })());
     try {
-      await current.lock;
-      return { release };
+      const lock = await current.lock;
+      return { descriptor: lock.descriptor, release };
     } catch (error) {
       await release().catch(() => undefined);
       throw error;
@@ -121,7 +123,7 @@ export async function acquireDirectoryReference(
     });
     await assertOpenedInPlace(root, directory, held);
     let released: Promise<void> | undefined;
-    return { release: () => (released ??= held.close()) };
+    return { descriptor: held.fd, release: () => (released ??= held.close()) };
   } catch (error) {
     await held.close();
     throw error;

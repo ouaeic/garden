@@ -1,3 +1,4 @@
+import type { ProjectContentRemoval } from './project-purge.js';
 import type { ProcessResourceSample } from './processes.js';
 import type { ProjectVersionArchive } from './project-retention.js';
 import { z } from 'zod';
@@ -118,6 +119,7 @@ export interface ProjectFileChange {
   lines?: { added: number; removed: number } | null;
 }
 export interface ProjectCheck extends ProjectCheckCommand {
+  contentRemoval?: ProjectContentRemoval | null;
   id: string;
   status:
     | 'pending'
@@ -140,6 +142,7 @@ export interface ProjectCheck extends ProjectCheckCommand {
   preparation?: { files: number; bytes: number; totalFiles: number; totalBytes: number };
 }
 export interface ProjectUpdate {
+  contentRemoval?: ProjectContentRemoval | null;
   id: string;
   projectId: string;
   taskId: string;
@@ -171,6 +174,7 @@ export interface ProjectUpdate {
   uncheckedReason: string | null;
 }
 export interface ProjectRevision {
+  contentRemoval?: ProjectContentRemoval | null;
   id: string;
   number: number;
   parentId: string | null;

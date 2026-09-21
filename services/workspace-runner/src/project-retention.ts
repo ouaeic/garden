@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
-import { constants } from 'node:fs';
-import { lstat, open, opendir } from 'node:fs/promises';
+import { lstat, opendir } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
 import {
@@ -12,36 +11,21 @@ import {
 } from '@athanor/contracts';
 import { withWorkspaceDirectory, WorkspaceFileError } from './files.js';
 import { acquireDirectoryReference, withProjectReference } from './project-reference-lock.js';
+import {
+  ProjectHistoryMetadata,
+  HistoryDigest as Digest,
+  HistoryTree as Tree
+} from './project-history-metadata.js';
+import { assertHistoryContentAvailable } from './project-content-state.js';
 import { ProjectVersionPins } from './project-version-pins.js';
 import { moveVersionDirectory } from './project-retention-move.js';
 import {
   durableJson,
   durableMkdir,
   syncDirectory,
-  treeDigest,
   ProjectVersionFiles
 } from './project-version-files.js';
 
-const Digest = z.string().regex(/^[a-f0-9]{64}$/);
-const Tree = z.record(
-  z.string(),
-  z
-    .object({
-      sha256: Digest,
-      bytes: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-      executable: z.boolean()
-    })
-    .strict()
-);
-const Revision = z.object({
-  id: z.uuid(),
-  number: z.number().int().positive(),
-  title: z.string(),
-  digest: Digest,
-  fileCount: z.number().int().nonnegative(),
-  bytes: z.number().int().nonnegative(),
-  files: Tree
-});
 const Identity = z
   .object({ device: z.string().regex(/^\d+$/), inode: z.string().regex(/^\d+$/), tree: Digest })
   .strict();
@@ -88,17 +72,13 @@ const selection = (raw: unknown): string[] =>
   [...new Set(ProjectRetentionSelection.parse(raw).versions)].sort();
 
 /** Keeps lineage metadata in place; only immutable version trees enter recoverable storage. */
-export class ProjectRetention {
-  readonly directory: string;
+export class ProjectRetention extends ProjectHistoryMetadata {
   constructor(
-    readonly root: string,
-    readonly projectId: string,
+    root: string,
+    projectId: string,
     readonly assertIdle: () => Promise<void>
   ) {
-    this.directory = path.join(root, '.project-store', z.uuid().parse(projectId));
-  }
-  private state(relative: string) {
-    return path.join(this.directory, 'state', relative);
+    super(root, projectId);
   }
   private recordFile(id: string) {
     return this.state(`retention/records/${z.uuid().parse(id)}.json`);
@@ -113,72 +93,6 @@ export class ProjectRetention {
     return this.state(`retention/transactions/${z.uuid().parse(id)}.json`);
   }
 
-  private async read<T>(filename: string, schema: z.ZodType<T>): Promise<T | null> {
-    try {
-      return await withWorkspaceDirectory(
-        this.root,
-        path.dirname(filename),
-        false,
-        async (directory) => {
-          const handle = await open(
-            path.join(directory, path.basename(filename)),
-            constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK
-          );
-          try {
-            const info = await handle.stat();
-            if (!info.isFile() || info.size > 64 * 1024 * 1024)
-              throw new Error('Project retention metadata cannot be verified.');
-            const data = await handle.readFile('utf8');
-            if (Buffer.byteLength(data) > 64 * 1024 * 1024)
-              throw new Error('Project retention metadata exceeds the inspection limit.');
-            return schema.parse(JSON.parse(data));
-          } finally {
-            await handle.close();
-          }
-        }
-      );
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
-      throw error;
-    }
-  }
-  private async names(relative: string): Promise<string[]> {
-    try {
-      return await withWorkspaceDirectory(
-        this.root,
-        this.state(relative),
-        false,
-        async (directory) => {
-          const names: string[] = [];
-          for await (const entry of await opendir(directory)) {
-            if (entry.name.endsWith('.tmp')) continue;
-            if (!entry.isFile() || !/^[a-f0-9-]{36}\.json$/i.test(entry.name))
-              throw new Error('Project references contain unknown metadata.');
-            z.uuid().parse(entry.name.slice(0, -5));
-            names.push(entry.name);
-            if (names.length > 10_000)
-              throw new Error('Project references exceed the maintenance inspection limit.');
-          }
-          return names.sort();
-        }
-      );
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
-      throw error;
-    }
-  }
-  private async revision(id: string) {
-    const revision = await this.read(this.state(`revisions/${z.uuid().parse(id)}.json`), Revision);
-    if (
-      !revision ||
-      revision.id !== id ||
-      treeDigest(revision.files) !== revision.digest ||
-      Object.keys(revision.files).length !== revision.fileCount ||
-      Object.values(revision.files).reduce((sum, file) => sum + file.bytes, 0) !== revision.bytes
-    )
-      throw new Error('Published version metadata cannot be verified.');
-    return revision;
-  }
   private async record(id: string) {
     const value = await this.read(this.recordFile(id), Record);
     if (value && value.revisionId !== id) throw new Error('Archived version identity changed.');
@@ -195,6 +109,7 @@ export class ProjectRetention {
       : null;
   }
   async assertAvailable(id: string): Promise<void> {
+    await assertHistoryContentAvailable(this, 'version', id);
     if (await this.status(id))
       throw new WorkspaceFileError(
         'This version is archived. Restore it from project history to open its files.',
@@ -345,6 +260,7 @@ export class ProjectRetention {
     }> = [];
     for (const id of ids) {
       const revision = await this.revision(id);
+      await assertHistoryContentAvailable(this, 'version', id);
       const record = await this.record(id);
       const reasons = [...(references.reasons.get(id) ?? [])];
       if (record && record.state !== 'restored')
@@ -518,6 +434,7 @@ export class ProjectRetention {
         'Another version is being restored. Try again shortly.'
       );
       try {
+        await assertHistoryContentAvailable(this, 'version', revisionId);
         const record = await this.record(revisionId);
         if (!record || record.requestId !== requestId)
           conflict('The archived version changed. Refresh project history.');

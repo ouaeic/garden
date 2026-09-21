@@ -2420,3 +2420,5 @@ export type {
   ProjectVersionArchive,
   ProjectRetentionResult
 } from './project-retention.js';
+
+export * from './project-purge.js';
