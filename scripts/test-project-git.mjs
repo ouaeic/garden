@@ -24,9 +24,10 @@ test(
     const head = 'a'.repeat(40),
       prior = 'b'.repeat(40);
     const base = `/v1/projects/${project}`;
-    const data = { repositories: [], operations: [], exports: [], removals: [] };
+    const data = { repositories: [], operations: [], exports: [], removals: [], workingCopies: [] };
     const creations = [],
       removals = [],
+      retries = [],
       errors = [];
     try {
       const root = path.resolve(import.meta.dirname, '../apps/web'),
@@ -80,7 +81,39 @@ test(
           data.repositories = [
             { id: input.requestId, ...input, head, createdAt: new Date().toISOString() }
           ];
+          data.workingCopies = [
+            {
+              repositoryId: input.requestId,
+              taskId: project,
+              workspaceId: revision,
+              revisionId: revision,
+              path: 'src',
+              branch: 'garden/conversations/' + project,
+              base: head,
+              state: 'failed',
+              createdAt: new Date().toISOString(),
+              detail: 'The Git copy needs its conversation configuration.'
+            }
+          ];
           return json({ input, state: 'preparing' });
+        }
+        if (url.pathname === base + '/updates' && req.method === 'POST') {
+          const chunks = [];
+          for await (const chunk of req) chunks.push(chunk);
+          const input = JSON.parse(Buffer.concat(chunks).toString());
+          assert.deepEqual(input, {
+            taskId: project,
+            operation: {
+              action: 'checkout',
+              paths: ['workspace/src'],
+              revisionId: revision,
+              gitOnly: true
+            }
+          });
+          retries.push(input);
+          data.workingCopies[0].state = 'ready';
+          data.workingCopies[0].detail = null;
+          return json({ revisionId: revision, files: [], workingCopies: data.workingCopies });
         }
         const repository = data.repositories[0];
         if (repository && url.pathname === `${base}/repositories/${repository.id}/remove`) {
@@ -157,6 +190,10 @@ test(
       await page.getByRole('button', { name: 'Create repository', exact: true }).click();
       await page.getByText('The response was interrupted.', { exact: true }).waitFor();
       await page.getByRole('button', { name: 'Create repository', exact: true }).click();
+      await page.getByRole('button', { name: 'Retry Git setup' }).click();
+      await page.getByText('Independent Git working copy prepared', { exact: false }).waitFor();
+      assert.equal(retries.length, 1);
+      await page.getByText('garden/conversations/' + project, { exact: true }).waitFor();
       await page.getByRole('button', { name: 'View history' }).click();
       await page.getByText('Checked source update', { exact: true }).waitFor();
       assert.equal(creations.length, 2);

@@ -376,6 +376,7 @@ export default function ProjectUpdates({
                   key={projectId}
                   projectId={projectId}
                   revisionId={data.head?.id ?? null}
+                  conversations={tasks}
                   active={showRepositories}
                 />
               </Suspense>

@@ -543,3 +543,152 @@ it('requires the current branch identity for removal and preserves project files
     )
   ).rejects.toMatchObject({ code: 'ENOENT' });
 });
+
+it.each(['sha1', 'sha256'] as const)(
+  'prepares independent native %s conversation branches with isolated indexes and objects',
+  async (format) => {
+    const f = await fixture(),
+      repository = await f.connect(format);
+    const left = await f.manager.checkout(f.project, f.a, ['src']);
+    const right = await f.manager.checkout(f.project, f.b, ['src']);
+    expect(left.workingCopies).toHaveLength(1);
+    expect(right.workingCopies).toHaveLength(1);
+    await f.manager.gitWorkingCopies(f.project).close();
+    const copies = await f.manager.gitWorkingCopies(f.project).list();
+    expect(copies).toHaveLength(2);
+    expect(copies.every((copy) => copy.state === 'ready')).toBe(true);
+    const roots = [f.wa, f.wb].map((id) => path.join(f.root, id, 'workspace/src'));
+    for (const [index, root] of roots.entries()) {
+      expect((await command(root, ['rev-parse', 'HEAD'])).trim()).toBe(repository.head);
+      expect((await command(root, ['symbolic-ref', '--short', 'HEAD'])).trim()).toBe(
+        `garden/conversations/${index === 0 ? f.a : f.b}`
+      );
+      expect(await command(root, ['status', '--porcelain'])).toBe('');
+      await expect(readFile(path.join(root, '.git/objects/info/alternates'))).rejects.toMatchObject(
+        { code: 'ENOENT' }
+      );
+    }
+    await f.write(f.wa, 'src/one.ts', 'export const one = 8;\n');
+    await command(roots[0]!, ['add', '--', 'one.ts']);
+    await command(roots[0]!, ['commit', '-m', 'Isolated conversation commit']);
+    expect((await command(roots[0]!, ['rev-parse', 'HEAD'])).trim()).not.toBe(repository.head);
+    expect((await command(roots[1]!, ['rev-parse', 'HEAD'])).trim()).toBe(repository.head);
+    expect(await command(roots[1]!, ['status', '--porcelain'])).toBe('');
+    expect((await f.manager.repositories(f.project).get(repository.id)).head).toBe(repository.head);
+    const proposed = await f.prepare(f.a, ['src'], true);
+    expect(proposed.changeCount).toBe(1);
+    expect(proposed.repositories?.[0]?.tree).not.toBe(repository.head);
+    expect(proposed.changes.every((change) => !change.path.includes('.git'))).toBe(true);
+  }
+);
+
+it('keeps an existing repository and does not prepare Git for a partial directory selection', async () => {
+  const f = await fixture();
+  await f.connect();
+  expect((await f.manager.checkout(f.project, f.b, ['src/one.ts'])).workingCopies).toEqual([]);
+  const git = path.join(f.root, f.wb, 'workspace/src/.git');
+  await writeFile(git, 'gitdir: /not-a-Garden-repository\n');
+  await f.manager.checkout(f.project, f.b, ['src']);
+  await f.manager.gitWorkingCopies(f.project).close();
+  const copies = await f.manager.gitWorkingCopies(f.project).list();
+  expect(copies).toHaveLength(1);
+  expect(copies[0]?.state).toBe('blocked');
+  expect(await readFile(git, 'utf8')).toBe('gitdir: /not-a-Garden-repository\n');
+});
+
+it('recovers an installed Git directory after a lost final acknowledgement without resetting owner commits', async () => {
+  const f = await fixture(),
+    repository = await f.connect();
+  await f.manager.checkout(f.project, f.b, ['src']);
+  await f.manager.gitWorkingCopies(f.project).close();
+  const copy = (await f.manager.gitWorkingCopies(f.project).list())[0]!;
+  expect(copy.state).toBe('ready');
+  const root = path.join(f.root, f.wb, 'workspace/src');
+  await f.write(f.wb, 'src/one.ts', 'owner commit\n');
+  await command(root, ['add', '--', 'one.ts']);
+  await command(root, ['commit', '-m', 'Keep this commit']);
+  const commit = (await command(root, ['rev-parse', 'HEAD'])).trim();
+  const record = path.join(
+    f.manager.directory(f.project),
+    'state/git-working-copies',
+    `${f.wb}_${repository.id}.json`
+  );
+  await writeFile(record, JSON.stringify({ ...copy, state: 'installing' }));
+  const restarted = new ProjectUpdatesManager(f.root, f.execution, async () => {});
+  dispose.push(() => restarted.close());
+  await restarted.restore();
+  await restarted.gitWorkingCopies(f.project).close();
+  expect((await restarted.gitWorkingCopies(f.project).list())[0]?.state).toBe('ready');
+  expect((await command(root, ['rev-parse', 'HEAD'])).trim()).toBe(commit);
+  expect(await readFile(path.join(root, 'one.ts'), 'utf8')).toBe('owner commit\n');
+});
+
+it('keeps a prepared working copy usable after managed repository history is removed', async () => {
+  const f = await fixture(),
+    repository = await f.connect();
+  await f.manager.checkout(f.project, f.b, ['src']);
+  await f.manager.gitWorkingCopies(f.project).close();
+  const root = path.join(f.root, f.wb, 'workspace/src');
+  const git = f.manager.repositories(f.project);
+  await git.finishRemoval(
+    await git.markRemoval(repository.id, { requestId: randomUUID(), head: repository.head })
+  );
+  expect((await command(root, ['rev-parse', 'HEAD'])).trim()).toBe(repository.head);
+  expect(await command(root, ['show', 'HEAD:one.ts'])).toBe('export const one = 1;\n');
+});
+
+it('drains preparation before a working-area removal and does not recreate cancelled metadata', async () => {
+  const f = await fixture();
+  await f.connect();
+  let proceed!: () => void, started!: () => void;
+  const hold = new Promise<void>((resolve) => {
+    proceed = resolve;
+  });
+  const observed = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const real = ProjectGit.prototype.exportBundle.bind(f.manager.repositories(f.project));
+  vi.spyOn(ProjectGit.prototype, 'exportBundle').mockImplementation(async (...args) => {
+    started();
+    await hold;
+    return real(...args);
+  });
+  await f.manager.checkout(f.project, f.b, ['src']);
+  await observed;
+  let deleted = false;
+  const remove = f.manager.cancelWorkspace(f.wb).then(async () => {
+    await rm(path.join(f.root, f.wb), { recursive: true, force: true });
+    deleted = true;
+  });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  expect(deleted).toBe(false);
+  proceed();
+  await remove;
+  expect((await f.manager.gitWorkingCopies(f.project).list())[0]?.state).toBe('cancelled');
+  await f.manager.gitWorkingCopies(f.project).restore();
+  await f.manager.gitWorkingCopies(f.project).close();
+  await expect(f.manager.checkout(f.project, f.b, ['src'])).rejects.toThrow(/being removed/);
+  await expect(readFile(path.join(f.root, f.wb, 'workspace/src/.git/HEAD'))).rejects.toMatchObject({
+    code: 'ENOENT'
+  });
+});
+
+it('retries failed configuration without copying sources or resetting edits made after setup', async () => {
+  const f = await fixture();
+  await f.connect();
+  vi.spyOn(f.execution, 'start').mockRejectedValueOnce(
+    Error('Synthetic command-controller interruption')
+  );
+  await f.manager.checkout(f.project, f.b, ['src']);
+  await f.manager.gitWorkingCopies(f.project).close();
+  expect((await f.manager.gitWorkingCopies(f.project).list())[0]?.state).toBe('failed');
+  await f.write(f.wb, 'src/one.ts', 'keep the new local edit\n');
+  const retried = await f.manager.checkout(f.project, f.b, ['src'], undefined, true);
+  expect(retried.files).toEqual([]);
+  await f.manager.gitWorkingCopies(f.project).close();
+  expect((await f.manager.gitWorkingCopies(f.project).list())[0]?.state).toBe('ready');
+  expect(await readFile(path.join(f.root, f.wb, 'workspace/src/one.ts'), 'utf8')).toBe(
+    'keep the new local edit\n'
+  );
+  expect((await f.prepare(f.b, ['src/one.ts'])).changes[0]?.kind).toBe('modified');
+});

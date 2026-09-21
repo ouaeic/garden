@@ -13,10 +13,12 @@ import { processMemory } from './process-display';
 export default function ProjectRepositories({
   projectId,
   revisionId,
+  conversations = [],
   active = true
 }: {
   projectId: string;
   revisionId: string | null;
+  conversations?: Array<{ id: string; title: string }>;
   active?: boolean;
 }) {
   const endpoint = `/v1/projects/${projectId}/repositories`;
@@ -94,7 +96,8 @@ export default function ProjectRepositories({
       <p className="muted">
         Track source directories with Git. Each prepared update records its exact commit and the
         files its checks apply to. Publication advances the project branch. Data and artifacts can
-        stay outside Git. Git history is retained separately from project version files.
+        stay outside Git. Full-directory checkouts prepare independent conversation branches. Git
+        history is retained separately from project version files.
       </p>
       <ErrorNotice error={error} />
       {!data && !error && <Spinner label="Reading repositories…" />}
@@ -105,6 +108,50 @@ export default function ProjectRepositories({
             {repository.path || 'Project root'} · {repository.branch}
           </small>
           <code title="Published branch commit">{repository.head}</code>
+          {data.workingCopies
+            ?.filter((copy) => copy.repositoryId === repository.id)
+            .map((copy) => (
+              <div className="stack" key={copy.workspaceId}>
+                <small>
+                  {conversations.find((task) => task.id === copy.taskId)?.title ?? 'Conversation'} ·{' '}
+                  {copy.state === 'ready'
+                    ? 'Independent Git working copy prepared'
+                    : ['preparing', 'installing'].includes(copy.state)
+                      ? 'Preparing Git working copy…'
+                      : copy.state === 'cancelled'
+                        ? 'Working area removed'
+                        : copy.state === 'blocked'
+                          ? 'Existing repository kept'
+                          : 'Git setup needs attention'}
+                </small>
+                <code>{copy.branch}</code>
+                <small>
+                  Initial base <code>{copy.base}</code>
+                </small>
+                {copy.detail && <p className="muted">{copy.detail}</p>}
+                {copy.state === 'failed' && (
+                  <Button
+                    disabled={busy}
+                    onClick={() =>
+                      void run(async () => {
+                        await post(`/v1/projects/${projectId}/updates`, {
+                          taskId: copy.taskId,
+                          operation: {
+                            action: 'checkout',
+                            paths: [`workspace/${copy.path}`],
+                            revisionId: copy.revisionId,
+                            gitOnly: true
+                          }
+                        });
+                        await refresh();
+                      })
+                    }
+                  >
+                    Retry Git setup
+                  </Button>
+                )}
+              </div>
+            ))}
           <Button disabled={busy} onClick={() => void run(() => readHistory(repository.id))}>
             View history
           </Button>
@@ -264,8 +311,8 @@ export default function ProjectRepositories({
               references.
             </p>
             <p>
-              Project versions, conversation files and prepared downloads remain available.
-              Unpublished updates must be rebuilt before publishing again.
+              Project versions, conversation files, their Git copies and prepared downloads remain
+              available. Unpublished updates must be rebuilt before publishing again.
             </p>
             <code>{removing.repository.head}</code>
             <ErrorNotice error={error} />

@@ -67,7 +67,8 @@ try:
            'GIT_CONFIG_GLOBAL': '/dev/null', 'GIT_TERMINAL_PROMPT': '0', 'GIT_OPTIONAL_LOCKS': '0',
            'GIT_NO_LAZY_FETCH': '1'}
     os.execve(git, ['git', '--no-optional-locks', '-c', 'core.fsmonitor=false',
-        '-c', 'core.hooksPath=/dev/null', '-c', 'core.untrackedCache=false', *command], env)
+        '-c', 'core.hooksPath=/dev/null', '-c', 'core.untrackedCache=false',
+        '-c', 'safe.directory=' + os.getcwd(), *command], env)
 except Exception:
     sys.stderr.write('Read-only Git metadata is unavailable; no unrestricted fallback was run.\n')
     sys.exit(125)

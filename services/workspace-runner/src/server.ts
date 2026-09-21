@@ -787,6 +787,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
     async (request, reply) => {
       requireScope(request, 'workspace.manage');
       await projectWorkspaces.cancelWorkspace(request.params.workspaceId);
+      await projectUpdates.cancelWorkspace(request.params.workspaceId);
       await browser.close(request.params.workspaceId);
       await desktop.close(request.params.workspaceId);
       // `forget` because the workspace is going: a service must not be restarted into a tree that

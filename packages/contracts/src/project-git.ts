@@ -70,7 +70,23 @@ export interface ProjectRepositories {
   operations: ProjectRepositoryOperation[];
   exports: ProjectGitExport[];
   removals: ProjectRepositoryRemoval[];
+  workingCopies?: ProjectGitWorkingCopy[];
 }
+
+export const ProjectGitWorkingCopy = z.object({
+  repositoryId: z.uuid(),
+  taskId: z.uuid(),
+  workspaceId: z.uuid(),
+  revisionId: z.uuid(),
+  path: z.string(),
+  branch: z.string(),
+  base: GitObjectId,
+  state: z.enum(['preparing', 'installing', 'ready', 'blocked', 'failed', 'cancelled']),
+  createdAt: z.iso.datetime(),
+  detail: z.string().nullable(),
+  identity: z.object({ dev: z.number(), ino: z.number() }).optional()
+});
+export type ProjectGitWorkingCopy = z.infer<typeof ProjectGitWorkingCopy>;
 
 export const ProjectGitExportInput = z
   .object({ requestId: z.uuid(), commit: GitObjectId })

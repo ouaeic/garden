@@ -859,3 +859,29 @@ authority; the recipe does not establish a new security boundary. Activation scr
 system libraries, services, kernel and live interpreter state are not recreated automatically.
 The agent chooses an appropriate recipe while preparing the work; no new initial prompt option
 is required.
+
+### Conversation Git working copies
+
+Checking out a complete connected source directory prepares an independent Git working copy in
+that conversation. File-only selections do not add Git history. Preparation runs in the background;
+project status and the repository details show its branch, initial base and outcome. The source
+files are still copied without overwriting edits, and the initial Git tree must match the selected
+published version exactly. Versions predating an applicable Git identity retain ordinary file
+checkout.
+
+The copy has its own branch, index and complete reachable history. Its object files are independent
+of the managed store and other conversations, so local commits, resets and later managed-history
+removal cannot invalidate another working copy. This deliberately costs additional disk space.
+Workspace Git metadata is never executed by the managed preparation adapter. Existing repositories
+are kept; installation uses a descriptor-relative no-replace move. A durable directory identity
+recovers a lost final acknowledgement without resetting subsequent edits or commits. Working-area
+removal drains preparation and cancels its retained receipt. Failed setup can be retried in the
+repository details or with checkout's `gitOnly` option without recopying source files. Only the
+exact prepared directory is added to the conversation's Git ownership exceptions through the
+isolated command executor; host Git configuration is unchanged.
+
+Publication continues to capture selected source files and verify the exact combined candidate.
+Local working-copy commits remain in that copy; their individual commit messages and intermediate
+history are not imported automatically into managed publication. Remote publication remains a
+separate governed command. A prepared working-copy receipt records initial setup, not an assertion
+that its current branch or files have stayed unchanged.

@@ -35,6 +35,7 @@ export function registerProjectUpdateRoutes(app: FastifyInstance, manager: Proje
       repositories: await manager.repositories(owner.projectId).list(),
       operations: await manager.repositoryOperations(owner.projectId),
       exports: await manager.gitExports(owner.projectId).list(),
+      workingCopies: await manager.gitWorkingCopies(owner.projectId).list(),
       removals: await manager.repositories(owner.projectId).removals()
     };
   });
@@ -312,7 +313,13 @@ export function registerProjectUpdateRoutes(app: FastifyInstance, manager: Proje
           );
         case 'checkout':
           if (!taskId) throw new Error('Choose a conversation working area');
-          return manager.checkout(projectId, taskId, action.paths, action.revisionId);
+          return manager.checkout(
+            projectId,
+            taskId,
+            action.paths,
+            action.revisionId,
+            action.gitOnly
+          );
         case 'rebase':
           return manager.rebase(projectId, action.updateId, action.requestId);
         case 'check':

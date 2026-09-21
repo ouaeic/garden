@@ -1,4 +1,6 @@
 import { ProjectGitExports } from './project-git-exports.js';
+import { ProjectGitWorkingCopies } from './project-git-working-copies.js';
+import { MAX_CAPABILITY_TTL_SECONDS } from '@athanor/core';
 import { ProjectGit } from './project-git.js';
 import {
   ProjectRepositoryInput,
@@ -17,7 +19,8 @@ import type {
   ProjectFileChange,
   ProjectRevision,
   ProjectUpdate,
-  ProjectUpdates
+  ProjectUpdates,
+  ProjectGitWorkingCopy
 } from '@athanor/contracts';
 import { PrepareProjectUpdate } from '@athanor/contracts';
 import { ensureWorkspace, workspacePath, withWorkspaceDirectory } from './files.js';
@@ -95,6 +98,7 @@ export class ProjectUpdatesManager {
   readonly #locks = new Map<string, Promise<unknown>>();
   readonly #operations = new Map<string, Promise<void>>();
   readonly #cancelled = new Set<string>();
+  readonly #removedWorkspaces = new Set<string>();
   readonly #live = new Map<string, StoredUpdate>();
   readonly #preparations = new Map<string, NonNullable<ProjectCheck['preparation']>>();
   readonly #watching = new Map<string, string>();
@@ -136,6 +140,7 @@ export class ProjectUpdatesManager {
         if (receipt.state === 'removing') await git.finishRemoval(receipt);
       }
       await this.gitExports(projectId).restore();
+      await this.gitWorkingCopies(projectId).restore();
       for (const operation of await this.repositoryOperations(projectId)) {
         if (operation.state === 'preparing') await this.beginRepository(projectId, operation.input);
       }
@@ -178,6 +183,64 @@ export class ProjectUpdatesManager {
     this.#timer.unref();
   }
   readonly #exports = new Map<string, ProjectGitExports>();
+  readonly #workingCopies = new Map<string, ProjectGitWorkingCopies>();
+  gitWorkingCopies(projectId: string): ProjectGitWorkingCopies {
+    let copies = this.#workingCopies.get(projectId);
+    if (!copies) {
+      copies = new ProjectGitWorkingCopies(
+        this.root,
+        this.file(projectId, 'git-working-copies'),
+        this.repositories(projectId),
+        async (copy) => {
+          const directory = path.join(
+            workspacePath(this.root, copy.workspaceId),
+            'workspace',
+            copy.path
+          );
+          // Git's ownership check otherwise rejects runner-created files for the command account.
+          const process = await this.execution.start(
+            copy.workspaceId,
+            copy.taskId,
+            {
+              name: 'Configure conversation Git',
+              executable: '/usr/bin/git',
+              cwd: 'workspace',
+              args: [
+                'config',
+                '--global',
+                '--fixed-value',
+                '--replace-all',
+                'safe.directory',
+                directory,
+                directory
+              ]
+            },
+            'Configure conversation Git'
+          );
+          const deadline = Date.now() + 30_000;
+          for (;;) {
+            const result = await this.execution.poll(
+              copy.workspaceId,
+              copy.taskId,
+              process.sessionId,
+              false
+            );
+            if (result.status === 'completed' && result.exitCode === 0) return;
+            if (result.status !== 'running' || Date.now() >= deadline) {
+              if (result.status === 'running')
+                await this.execution.stop(copy.workspaceId, copy.taskId, process.sessionId);
+              throw Error(
+                'The Git working copy is installed, but its conversation configuration did not finish. Retry checkout.'
+              );
+            }
+            await new Promise((resolve) => setTimeout(resolve, 250));
+          }
+        }
+      );
+      this.#workingCopies.set(projectId, copies);
+    }
+    return copies;
+  }
   gitExports(projectId: string): ProjectGitExports {
     let exports = this.#exports.get(projectId);
     if (!exports) {
@@ -202,6 +265,7 @@ export class ProjectUpdatesManager {
   backgroundPreparations(): number {
     return (
       this.#operations.size +
+      [...this.#workingCopies.values()].reduce((sum, copies) => sum + copies.running.size, 0) +
       [...this.#exports.values()].reduce((sum, exports) => sum + exports.running.size, 0) +
       [...this.#purges.values()].reduce((sum, purge) => sum + purge.runningCount(), 0)
     );
@@ -210,9 +274,22 @@ export class ProjectUpdatesManager {
     this.#closed = true;
     clearInterval(this.#timer);
     await this.#changes.close();
+    await Promise.allSettled([...this.#workingCopies.values()].map((copies) => copies.close()));
     await Promise.allSettled([...this.#exports.values()].map((exports) => exports.close()));
     await Promise.allSettled([...this.#purges.values()].map((purge) => purge.close()));
     await Promise.allSettled([...this.#operations.values()]);
+  }
+  async cancelWorkspace(workspaceId: string): Promise<void> {
+    uuid(workspaceId);
+    this.#removedWorkspaces.add(workspaceId);
+    setTimeout(
+      () => this.#removedWorkspaces.delete(workspaceId),
+      (MAX_CAPABILITY_TTL_SECONDS + 60) * 1000
+    ).unref();
+    await this.#locks.get(`checkout:${workspaceId}`)?.catch(() => undefined);
+    await Promise.all(
+      [...this.#workingCopies.values()].map((copies) => copies.cancelWorkspace(workspaceId))
+    );
   }
   directory(projectId: string): string {
     return path.join(this.root, '.project-store', uuid(projectId));
@@ -237,7 +314,11 @@ export class ProjectUpdatesManager {
         throw new Error('Repository removal identity changed');
       if (previous && (previous.state === 'removed' || this.#operations.has(previous.requestId)))
         return previous;
-      if (this.#operations.size || this.gitExports(projectId).running.size)
+      if (
+        this.#operations.size ||
+        this.gitExports(projectId).running.size ||
+        this.gitWorkingCopies(projectId).running.size
+      )
         throw new Error(
           'Wait for source preparation and Git exports to finish before removing a repository'
         );
@@ -885,8 +966,9 @@ export class ProjectUpdatesManager {
     projectId: string,
     taskId: string,
     paths: string[],
-    revisionId?: string
-  ): Promise<{ revisionId: string; files: string[] }> {
+    revisionId?: string,
+    gitOnly = false
+  ): Promise<{ revisionId: string; files: string[]; workingCopies: ProjectGitWorkingCopy[] }> {
     const workspaceId = await this.member(projectId, taskId);
     const id = revisionId ?? (await this.registry(projectId)).head;
     if (!id) throw new Error('Publish an initial project version before checking out files');
@@ -899,6 +981,28 @@ export class ProjectUpdatesManager {
     if (!files.length) throw new Error('No published files match those paths');
     const baselineFile = this.file(projectId, `baselines/${workspaceId}.json`);
     return this.locked(projectId, `checkout:${workspaceId}`, async () => {
+      if (this.#removedWorkspaces.has(workspaceId))
+        throw Error('This working area is being removed');
+      if (gitOnly) {
+        const existing = (await this.gitWorkingCopies(projectId).list()).filter(
+          (copy) =>
+            copy.workspaceId === workspaceId &&
+            copy.taskId === taskId &&
+            selected.some(
+              (prefix) => !prefix || copy.path === prefix || copy.path.startsWith(prefix + '/')
+            )
+        );
+        if (!existing.length) throw Error('No prepared conversation Git copy matches those paths');
+        const workingCopies: ProjectGitWorkingCopy[] = [];
+        for (const copy of existing)
+          workingCopies.push(
+            await this.gitWorkingCopies(projectId).start(
+              await this.repositories(projectId).get(copy.repositoryId),
+              copy
+            )
+          );
+        return { revisionId: id, files: [], workingCopies };
+      }
       await this.retention(projectId).assertAvailable(id);
       const baseline = (await readJson<{ revision: string | null; files: VersionTree }>(
         baselineFile
@@ -928,7 +1032,32 @@ export class ProjectUpdatesManager {
       }
       baseline.revision = id;
       await durableJson(baselineFile, baseline);
-      return { revisionId: id, files };
+      const workingCopies: ProjectGitWorkingCopy[] = [];
+      const git = this.repositories(projectId);
+      for (const repository of await git.list()) {
+        if (
+          !selected.some(
+            (prefix) =>
+              !prefix || repository.path === prefix || repository.path.startsWith(prefix + '/')
+          )
+        )
+          continue;
+        const base = await git.checkoutBase(
+          repository.id,
+          revision.files,
+          revision.repositories?.find((item) => item.repositoryId === repository.id)?.commit
+        );
+        if (base)
+          workingCopies.push(
+            await this.gitWorkingCopies(projectId).start(repository, {
+              taskId,
+              workspaceId,
+              revisionId: id,
+              base
+            })
+          );
+      }
+      return { revisionId: id, files, workingCopies };
     });
   }
 
@@ -1428,6 +1557,7 @@ export class ProjectUpdatesManager {
     }
     return {
       head,
+      workingCopies: await this.gitWorkingCopies(projectId).list(),
       updates: all,
       revisions,
       nextCursor: names.length > cursorIndex + 41 ? visible.at(-1)!.id : null,

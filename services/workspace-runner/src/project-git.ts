@@ -477,6 +477,23 @@ export class ProjectGit {
     await rm(staging, { recursive: true, force: true });
     return size;
   }
+  async checkoutBase(
+    repositoryId: string,
+    files: VersionTree,
+    recorded?: string
+  ): Promise<string | null> {
+    const repository = await this.get(repositoryId);
+    const commit = recorded ? object(recorded) : repository.head;
+    const expected = await this.tree(repositoryId, repository.path, files, async () => {});
+    const actual = object(
+      await command(this.git(repositoryId), ['rev-parse', '--verify', `${commit}^{tree}`])
+    );
+    if (expected !== actual) {
+      if (recorded) throw Error('The published Git identity does not match its source files');
+      return null;
+    }
+    return commit;
+  }
   async history(repositoryId: string, before?: string): Promise<ProjectRepositoryHistory> {
     const repository = await this.get(repositoryId);
     const start = before ? object(before) : repository.head;

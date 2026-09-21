@@ -1,4 +1,4 @@
-import type { ProjectGitVersion } from './project-git.js';
+import type { ProjectGitVersion, ProjectGitWorkingCopy } from './project-git.js';
 import type { ProjectContentRemoval } from './project-purge.js';
 import type { ProcessResourceSample } from './processes.js';
 import type { ProjectVersionArchive } from './project-retention.js';
@@ -68,6 +68,7 @@ export const ProjectUpdateAction = z.discriminatedUnion('action', [
     .object({
       action: z.literal('checkout'),
       paths: z.array(ProjectPath).min(1).max(1024),
+      gitOnly: z.boolean().optional(),
       revisionId: z.uuid().optional()
     })
     .strict(),
@@ -196,6 +197,7 @@ export interface ProjectRevision {
   archive?: ProjectVersionArchive | null;
 }
 export interface ProjectUpdates {
+  workingCopies?: ProjectGitWorkingCopy[];
   head: ProjectRevision | null;
   updates: ProjectUpdate[];
   revisions: ProjectRevision[];

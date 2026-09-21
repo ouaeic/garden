@@ -670,7 +670,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'project_update',
     description:
-      'Combine parallel project work using immutable versions. status shows head, updates and checks. prepare captures selected paths (missing files never delete); checkout copies published paths into your area without overwriting files. Checks run independently on the combined candidate with no implicit deadline. Publish only after its checks pass; rebase onto a newer head resets checks. Resolve conflicts in your own files; prepare with resolvedPaths and expectedRevision to record the resolution. Running jobs keep their inputs. Use log for check output; stop only stops that check.',
+      'Integrate parallel work as immutable versions. status shows head, updates, checks and Git setup. prepare captures paths (missing files never delete); checkout copies published paths without overwriting. Full connected-directory checkout prepares an isolated Git branch; poll status until ready. Checks use the combined candidate with no implicit deadline. Publish after checks pass; rebase resets checks. Resolve conflicts in your files, then prepare with resolvedPaths and expectedRevision. Jobs retain inputs. log shows check output; stop ends that check.',
     parameters: {
       type: 'object',
       required: ['action'],
@@ -693,7 +693,7 @@ export const agentTools: ModelTool[] = [
         options: {
           type: 'object',
           description:
-            'status: updateId, before, revisionsBefore, changesAfter, includeDiff. prepare: update:{title,paths,deletePaths?,resolvedPaths?,expectedRevision?,checks:[{name,executable,args,cwd?}]}, sourceTaskId?. checkout: paths, revisionId?. Others: updateId; check/log/stop: checkId; check/publish: digest from status.',
+            'status: updateId, before, revisionsBefore, changesAfter, includeDiff. prepare: update:{title,paths,deletePaths?,resolvedPaths?,expectedRevision?,checks:[{name,executable,args,cwd?}]}, sourceTaskId?. checkout: paths, revisionId?, gitOnly? (retry setup without file copies). Others: updateId; check/log/stop: checkId; check/publish: digest.',
           additionalProperties: true
         }
       }
