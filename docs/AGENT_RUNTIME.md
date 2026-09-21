@@ -926,3 +926,18 @@ the observed outcome; a different head remains uncertain because another writer 
 it after acceptance. A fresh fetch can prepare a new, explicit publication. Credentials are
 decrypted only in the control plane and passed privately to the runner's fixed HTTPS transport;
 they are absent from Git URLs, command arguments, model results and transfer records.
+
+### Conditional calendar changes
+
+Connected Google calendars expose separate grants for creating, editing and deleting events.
+An edit or deletion identifies an observed event version and explicitly selects a single event,
+one occurrence or the recurring series. The provider's conditional write rejects concurrent
+changes. Partial edits preserve unrelated event fields, conference details and retained attendees'
+responses; timed series use a declared calendar time zone. Attendees may receive provider notices.
+
+The existing connected-service approval floor governs each mutation. Its card previews the change,
+with full arguments available for inspection. The encrypted account operation records its intent
+before submission. A lost reply triggers inspection of that operation rather than another write.
+An update is reconciled only when its operation marker and requested values are both present;
+absence after deletion establishes absence, without claiming who removed it or that notices were
+delivered. Providers without a verified conditional-event contract do not expose these mutations.

@@ -47,7 +47,9 @@ const routes = {
       'mail:message.write': 'https://www.googleapis.com/auth/gmail.modify',
       'mail:message.send': 'https://www.googleapis.com/auth/gmail.send',
       'calendar:calendars.read': 'https://www.googleapis.com/auth/calendar.readonly',
-      'calendar:events.write': 'https://www.googleapis.com/auth/calendar.events'
+      'calendar:events.write': 'https://www.googleapis.com/auth/calendar.events',
+      'calendar:events.edit': 'https://www.googleapis.com/auth/calendar.events',
+      'calendar:events.delete': 'https://www.googleapis.com/auth/calendar.events'
     }
   },
   microsoft: {

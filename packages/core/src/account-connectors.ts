@@ -1,3 +1,9 @@
+import {
+  AccountCalendarUpdate,
+  AccountCalendarDelete,
+  mutateAccountCalendarEvent,
+  readAccountCalendarEvent
+} from './account-calendar-mutation.js';
 import { AccountCalendarCreate, createAccountCalendarEvent } from './account-calendar-write.js';
 import { z } from 'zod';
 import type {
@@ -32,6 +38,17 @@ export const accountConnectorActions = {
   account_mail_read: read('mail:mailbox.read'),
   account_mail_attachments: read('mail:mailbox.read'),
   account_mail_attachment: read('mail:mailbox.read'),
+  account_calendar_read: read('calendar:calendars.read'),
+  account_calendar_update: {
+    kinds: ['google'] as const,
+    scope: 'calendar:events.edit' as const,
+    sideEffect: 'write' as const
+  },
+  account_calendar_delete: {
+    kinds: ['google'] as const,
+    scope: 'calendar:events.delete' as const,
+    sideEffect: 'delete' as const
+  },
   account_calendar_list: read('calendar:calendars.read'),
   account_calendar_range: read('calendar:calendars.read'),
   account_calendar_create: {
@@ -45,6 +62,15 @@ const page = {
   cursor: z.string().max(16384).optional()
 };
 export const accountConnectorInputs = [
+  z
+    .object({
+      action: z.literal('account_calendar_read'),
+      eventId: accountResourceId,
+      calendarId: accountResourceId.optional()
+    })
+    .strict(),
+  AccountCalendarUpdate.extend({ action: z.literal('account_calendar_update') }),
+  AccountCalendarDelete.extend({ action: z.literal('account_calendar_delete') }),
   AccountCalendarCreate.safeExtend({ action: z.literal('account_calendar_create') }),
   z.object({
     action: z.literal('account_mail_search'),
@@ -85,7 +111,9 @@ export const accountConnectorCatalog: ConnectorDefinition[] = (
   kind,
   name: kind === 'google' ? 'Google mail and calendar' : 'Microsoft mail and calendar',
   description:
-    'Search and read mail, download attachments, read calendars, and create events through the account API.',
+    kind === 'google'
+      ? 'Read mail and attachments, read calendars, and create, edit or delete events with separately granted access.'
+      : 'Search and read mail, download attachments, read calendars, and create events through the account API.',
   dataAccess: 'Only the selected account and granted mail or calendar access are used.',
   tokenLocation:
     'Authorization and refresh tokens are encrypted on your Garden server and never sent to a model.',
@@ -95,7 +123,21 @@ export const accountConnectorCatalog: ConnectorDefinition[] = (
   scopes: [
     { id: 'mail:mailbox.read', label: 'Read mail and attachments', sideEffect: 'read' },
     { id: 'calendar:calendars.read', label: 'Read calendars', sideEffect: 'read' },
-    { id: 'calendar:events.write', label: 'Create calendar events', sideEffect: 'write' }
+    { id: 'calendar:events.write', label: 'Create calendar events', sideEffect: 'write' },
+    ...(kind === 'google'
+      ? [
+          {
+            id: 'calendar:events.edit' as const,
+            label: 'Edit calendar events',
+            sideEffect: 'write' as const
+          },
+          {
+            id: 'calendar:events.delete' as const,
+            label: 'Delete calendar events',
+            sideEffect: 'delete' as const
+          }
+        ]
+      : [])
   ]
 }));
 
@@ -169,6 +211,25 @@ export async function executeAccountConnector(
         partId: action.partId,
         maxBytes: action.maxBytes
       });
+      break;
+    case 'account_calendar_read':
+      result = await readAccountCalendarEvent(api, action);
+      break;
+    case 'account_calendar_update':
+    case 'account_calendar_delete':
+      if (!input.operation)
+        throw new AthanorError(
+          'connector_operation_required',
+          'Calendar changes need a durable operation receipt.'
+        );
+      result = await mutateAccountCalendarEvent(
+        api,
+        action.action === 'account_calendar_update'
+          ? { ...action, action: 'update' }
+          : { ...action, action: 'delete' },
+        input.operation,
+        input.scopes
+      );
       break;
     case 'account_calendar_create':
       if (!input.operation)

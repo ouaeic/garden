@@ -8,7 +8,7 @@ export const accountResourceId = z
   .string()
   .min(1)
   .max(2048)
-  .refine((value) => !/[\r\n\0]/.test(value));
+  .refine((value) => !['.', '..'].includes(value) && !/[\r\n\0]/.test(value));
 const endpoints = {
   gmail: {
     provider: 'google',
@@ -115,7 +115,7 @@ export class AccountApi {
   async request(
     url: URL,
     options: {
-      method?: 'GET' | 'POST' | 'PATCH';
+      method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
       body?: unknown;
       maxBytes?: number;
       headers?: Record<string, string>;

@@ -299,7 +299,9 @@ export const ConnectorScope = z.enum([
   'mail:message.write',
   'mail:message.send',
   'calendar:calendars.read',
-  'calendar:events.write'
+  'calendar:events.write',
+  'calendar:events.edit',
+  'calendar:events.delete'
 ]);
 export type ConnectorScope = z.infer<typeof ConnectorScope>;
 

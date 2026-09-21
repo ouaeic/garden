@@ -131,7 +131,12 @@ export async function executeConnectorTool(
                 }
               });
             const nativeWrite =
-              isAccountConnectorKind(connector.kind) && operation === 'account_calendar_create';
+              isAccountConnectorKind(connector.kind) &&
+              [
+                'account_calendar_create',
+                'account_calendar_update',
+                'account_calendar_delete'
+              ].includes(operation);
             const executed = nativeWrite
               ? await withAccountOperation({
                   store: context.store,

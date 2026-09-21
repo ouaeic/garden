@@ -2,6 +2,7 @@ import type { AgentState } from './agent-state.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AthanorError,
+  connectorActions,
   decryptJson,
   encryptJson,
   generateDataKey,
@@ -1834,7 +1835,7 @@ describe('what actually reaches the provider', () => {
       'mail_send',
       'mail_reply'
     ]);
-    // Named rather than counted, because the point is which eleven went. Every one of these is
+    // Named rather than counted, because the point is which actions are unavailable. Each is
     // refused by `executeConnectorAction` on a connector of kind `imap` before it reads a scope.
     const wire = JSON.stringify(connector);
     for (const gone of ['github_read_file', 'webdav_write', 'mcp_call_tool', 'calendar_list'])
@@ -1842,19 +1843,24 @@ describe('what actually reaches the provider', () => {
     // And the saving is real on the request that left the process, measured against the same run
     // on a box that has connected all five kinds - which is the only comparison that isolates this
     // gate, because a box with nothing connected loses the whole tool to the withdrawal above.
-    // 2,511 bytes, which is where the figure in tool-catalogue.test.ts comes from.
+    // The catalogue test owns the measured request budget.
+    const connectedKinds = ['imap', 'caldav', 'github', 'webdav', 'mcp_http'];
     const everything = await withConnectors(
-      ['imap', 'caldav', 'github', 'webdav', 'mcp_http'].map((kind) => ({ kind, enabled: true }))
+      connectedKinds.map((kind) => ({ kind, enabled: true }))
     );
     expect(Buffer.byteLength(JSON.stringify(tools))).toBeLessThan(
       Buffer.byteLength(JSON.stringify(everything)) - 2_400
     );
     // The other direction, and the one that fails quietly: a box that has connected everything is
     // sent everything. Nothing here is a capability withdrawal.
+    const supported = Object.entries(connectorActions)
+      .filter(([, action]) => action.kinds.some((kind) => connectedKinds.includes(kind)))
+      .map(([name]) => name);
+    expect(supported.length).toBeGreaterThan(0);
     expect(
       everything.find((tool) => tool.function?.name === 'connector_action')?.function?.parameters
         ?.properties?.action?.enum
-    ).toHaveLength(24);
+    ).toEqual(supported);
   });
 
   it('puts the built-in skill library in front of the model', async () => {

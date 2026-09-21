@@ -100,9 +100,9 @@ describe('the size of the catalogue the model is sent', () => {
   });
 
   it('stays inside the wire budget the whole prefix is cached against', () => {
-    // Remote Git actions measure 63,001 bytes for the complete catalogue.
+    // Conditional calendar changes measure 64,096 bytes for the complete catalogue.
     // The resident core has a separate ceiling in tool-groups.test.ts.
-    expect(bytes).toBeLessThan(63_100);
+    expect(bytes).toBeLessThan(64_150);
     // Each tool and nested parameter description is bounded separately.
     for (const tool of sent)
       expect(Buffer.byteLength(tool.description), `${tool.name} description`).toBeLessThan(1_400);
@@ -125,9 +125,9 @@ describe('the size of the catalogue the model is sent', () => {
     // is exactly how the top-level cap missed 1,741 bytes for as long as it did.
     expect(nested.length).toBeGreaterThan(30);
     for (const [where, size] of nested) {
-      // Native account reads, calendar creation and remote Git measure 2,718 bytes.
+      // Native account actions including conditional calendar changes measure 3,026 bytes.
       expect(size, where).toBeLessThan(
-        where === 'connector_action.properties.input.description' ? 2_750 : 1_750
+        where === 'connector_action.properties.input.description' ? 3_100 : 1_750
       );
     }
   });
@@ -434,8 +434,8 @@ describe('the wire a box without a browser or a screen is sent', () => {
      * so they are paid for here too. 44,000 against a measured 43,981, up from 43,908. The gap to
      * the provisioned wire is still exactly 11,692, because the same 73 bytes landed on both.
      */
-    // Remote Git actions measure 50,967 bytes without computer surfaces.
-    expect(Buffer.byteLength(JSON.stringify(bare))).toBeLessThan(51_000);
+    // Conditional calendar changes measure 52,062 bytes without computer surfaces.
+    expect(Buffer.byteLength(JSON.stringify(bare))).toBeLessThan(52_100);
     // The other direction, and the one that fails silently. A gate wired to nothing returns the
     // unconditional constant on every box; this is the assertion that would go red if it did.
     expect(Buffer.byteLength(JSON.stringify(bare))).toBeLessThan(

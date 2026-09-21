@@ -123,6 +123,30 @@ const addresseeSchema = {
  * is preserved by the filter that reads it, which is deliberate: the bag opens a cached prefix.
  */
 const CONNECTOR_INPUT_PROPERTIES: Record<string, unknown> = {
+  eventId: { type: 'string' },
+  expectedVersion: { type: 'string' },
+  target: { type: 'string', enum: ['single', 'occurrence', 'series'] },
+  changes: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      summary: { type: 'string' },
+      description: { type: 'string' },
+      location: { type: 'string' },
+      time: {
+        type: 'object',
+        required: ['start', 'end', 'allDay'],
+        additionalProperties: false,
+        properties: {
+          start: { type: 'string' },
+          end: { type: 'string' },
+          allDay: { type: 'boolean' },
+          timeZone: { type: 'string' }
+        }
+      },
+      attendees: { type: 'array', items: addresseeSchema }
+    }
+  },
   repositoryId: { type: 'string' },
   revisionId: { type: 'string' },
   requestId: { type: 'string' },
@@ -385,6 +409,19 @@ export const CONNECTOR_ACTION_INPUTS = {
     fields: ['messageId', 'partId', 'maxBytes', 'saveTo'],
     clause:
       'messageId, partId from account_mail_read, optional maxBytes, saveTo; saves the file in the workspace'
+  },
+  account_calendar_read: {
+    fields: ['eventId', 'calendarId'],
+    clause: 'eventId, optional calendarId; returns the event version and recurring target'
+  },
+  account_calendar_update: {
+    fields: ['eventId', 'calendarId', 'expectedVersion', 'target', 'changes'],
+    clause:
+      'eventId, expectedVersion, target from read; changes only desired fields; notifies attendees'
+  },
+  account_calendar_delete: {
+    fields: ['eventId', 'calendarId', 'expectedVersion', 'target'],
+    clause: 'eventId, expectedVersion, target from read; notifies attendees'
   },
   account_calendar_list: { fields: ['limit', 'cursor'], clause: 'optional limit, cursor' },
   account_calendar_create: {

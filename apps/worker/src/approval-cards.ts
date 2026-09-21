@@ -5,7 +5,7 @@ import {
   scanSkillBodyForSecrets,
   SKILL_BUDGET
 } from './skills.js';
-import { textValue } from './values.js';
+import { asRecord, textValue } from './values.js';
 import type { ApprovalContext } from './approval-policy.js';
 
 /*
@@ -98,6 +98,36 @@ export const connectorApprovalCard = (
       return {
         action: `Mark ${count} message${count === 1 ? '' : 's'} in ${mailbox}`,
         preview: `Mark ${count} message${count === 1 ? '' : 's'} in ${mailbox} as ${flags || 'changed'}.`
+      };
+    }
+    case 'account_calendar_update':
+    case 'account_calendar_delete': {
+      const removing = action === 'account_calendar_delete';
+      const changes = asRecord(input.changes) ?? {};
+      const time = asRecord(changes.time);
+      const excerpt = (value: string, limit: number) =>
+        value.length > limit ? value.slice(0, limit) + '… (see full action)' : value;
+      const attendees = Array.isArray(changes.attendees) ? changes.attendees : null;
+      const fields = [
+        typeof changes.summary === 'string' ? `Title: ${excerpt(changes.summary, 200)}` : '',
+        typeof changes.description === 'string'
+          ? `Description: ${excerpt(changes.description, 500) || '(clear)'}`
+          : '',
+        typeof changes.location === 'string'
+          ? `Location: ${excerpt(changes.location, 200) || '(clear)'}`
+          : '',
+        time
+          ? `Time: ${textValue(time.start)} to ${textValue(time.end)}${time.allDay ? ' (all day)' : ''}${textValue(time.timeZone) ? ' · ' + textValue(time.timeZone) : ''}`
+          : '',
+        attendees
+          ? `Attendees: ${addressLine(attendees.slice(0, 5)) || '(remove all)'}${attendees.length > 5 ? ` and ${attendees.length - 5} more (see full action)` : ''}`
+          : ''
+      ]
+        .filter(Boolean)
+        .join('\n');
+      return {
+        action: `${removing ? 'Delete' : 'Edit'} ${input.target === 'series' ? 'the recurring series' : input.target === 'occurrence' ? 'one occurrence' : 'a calendar event'}`,
+        preview: `Event: ${textValue(input.eventId)}\nCalendar: ${textValue(input.calendarId, 'primary')}\nVersion: ${textValue(input.expectedVersion)}${fields ? '\n' + fields : ''}\nAttendees may receive ${removing ? 'cancellation' : 'update'} notifications. A concurrent edit stops this change.`
       };
     }
     case 'account_calendar_create':
