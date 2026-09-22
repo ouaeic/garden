@@ -15,6 +15,7 @@ import { evidenceProgressKey } from './progress.js';
  * cycle is the alternative.
  */
 import type { ModelRelease, TaskEventKind, WebToolPlan } from '@athanor/contracts';
+import { ZodError } from 'zod';
 import {
   AthanorError,
   encryptJson,
@@ -208,7 +209,8 @@ export const recordToolFailure = async (
 ): Promise<void> => {
   if (isMutatingToolCall(call.name, call.arguments) || call.name === 'code_diagnostics')
     invalidateWorkspaceReadCache(state);
-  const message = error instanceof Error ? error.message : 'Tool failed';
+  const message =
+    error instanceof Error || error instanceof ZodError ? error.message : 'Tool failed';
   const wall = botWallFromError(error);
   await event(deps.store, task, key, 'error', `${call.name} failed`, {
     toolCallId: call.id,

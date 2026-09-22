@@ -2348,7 +2348,7 @@ describe('the web route a run is pinned to', () => {
     return { log, probe };
   };
 
-  it.each(['absent', 'available', 'disabled', 'unavailable'] as const)(
+  it.each(['absent', 'available', 'disabled', 'unavailable', 'stale'] as const)(
     'completes ordinary work with identical main-model capability when decisions are %s',
     async (mode) => {
       const task = standardTask();
@@ -2373,6 +2373,7 @@ describe('the web route a run is pinned to', () => {
       } as unknown as DataStore;
       installFetch(
         [
+          ...(mode === 'stale' ? [toolFrame('old-decision', 'decide', {})] : []),
           toolFrame('load-code', 'load_tools', { groups: ['code'] }),
           toolFrame('read-note', 'file_read', { path: 'workspace/notes.txt' }),
           toolFrame('finish-note', 'finish', {
@@ -2401,9 +2402,16 @@ describe('the web route a run is pinned to', () => {
         masterKey,
         runnerSecret
       ).run(task);
-      expect(log.modelRequests, JSON.stringify(probe.events)).toHaveLength(3);
+      expect(log.modelRequests, JSON.stringify(probe.events)).toHaveLength(
+        mode === 'stale' ? 4 : 3
+      );
       expect(probe.events.some((entry) => entry.kind === 'completed')).toBe(true);
-      expect(toolNames(log.modelRequests[1])).toContain('code_search');
+      expect(probe.events.some((entry) => entry.kind === 'approval_requested')).toBe(false);
+      expect(toolNames(log.modelRequests[mode === 'stale' ? 2 : 1])).toContain('code_search');
+      if (mode === 'stale')
+        expect(JSON.stringify(log.modelRequests[1]?.messages)).toContain(
+          'Decision workflows are inactive. Complete this work with the main model.'
+        );
       for (const request of log.modelRequests) {
         expect(request.model).toBe(openrouterModel.providerModelId);
         expect(toolNames(request)).toContain('file_read');

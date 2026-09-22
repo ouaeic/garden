@@ -15,6 +15,7 @@ import { prepareNativeInputApproval } from './native-input.js';
  * second evaluation went.
  */
 import { createHmac } from 'node:crypto';
+import { ZodError } from 'zod';
 import { AthanorError, unwrapDataKey } from '@athanor/core';
 import type { DataStore, TaskRecord } from '@athanor/data';
 import { isNativeOpenAIEndpoint, type ModelToolCall } from '@athanor/model-gateway';
@@ -183,7 +184,14 @@ export const approvalForCall = async (
       task.securityMode = parent.securityMode;
   }
   if (call.name === 'decide')
-    throw new Error('Decision workflows are inactive. Complete this work with the main model.');
+    // An unavailable tool is invalid model input: the loop records it and continues the turn.
+    throw new ZodError([
+      {
+        code: 'custom',
+        path: ['name'],
+        message: 'Decision workflows are inactive. Complete this work with the main model.'
+      }
+    ]);
   if (call.name === 'project_update')
     return projectUpdateApproval(deps.runner, task, call, {
       ...(state?.taint ? { taintSources: state.taint.sources } : {}),
