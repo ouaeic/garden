@@ -52,7 +52,7 @@ describe('the dormant rules are read at the step boundary', () => {
       'await noteStepBudget(deps.handoff, task, key, state, stepCeiling(deps.handoff, state));'
     );
     const rules = lineOf('applyDormantRules(state.messages');
-    const runtime = lineOf('  await refreshRuntimeContext();');
+    const runtime = lineOf('refreshRuntimeContext();');
     expect(rules).toBeGreaterThan(budget);
     expect(rules).toBeLessThan(runtime);
   });

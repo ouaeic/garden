@@ -1913,7 +1913,7 @@ export class AgentWorker {
     };
     // Called here as well as in the step loop so a window saved when this block lived at index 1
     // is migrated before the preamble blocks below choose where they go.
-    await refreshRuntimeContext();
+    refreshRuntimeContext();
     // The preamble: the two frozen blocks, the recalled pack and the workspace brief, in the order
     // a provider's cache charges for. @see assemblePreamble in `window.ts`.
     await assemblePreamble(this.#window, {

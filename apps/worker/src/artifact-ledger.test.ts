@@ -779,7 +779,7 @@ describe('every step opens with the block re-rendered at the tail', () => {
         .length
     ).toBe(1);
     expect(lineOf('refreshArtifactLedger(state.messages')).toBeLessThan(
-      lineOf('  await refreshRuntimeContext();')
+      lineOf('refreshRuntimeContext();')
     );
   });
 });
