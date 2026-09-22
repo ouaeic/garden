@@ -19,8 +19,8 @@ it('partitions all advanced capabilities into discoverable groups without duplic
   expect([...core.map((tool) => tool.name), ...grouped].sort()).toEqual(
     full.map((tool) => tool.name).sort()
   );
-  // The resident core with repeated decision factors measures 30,746 bytes.
-  expect(Buffer.byteLength(JSON.stringify([...core, COMPACT_CONTEXT_TOOL]))).toBeLessThan(30_800);
+  // Keep the resident core within its serialized byte ceiling.
+  expect(Buffer.byteLength(JSON.stringify([...core, COMPACT_CONTEXT_TOOL]))).toBeLessThan(28_000);
 });
 
 it('adds chosen groups in activation order while preserving the entire existing prefix', () => {

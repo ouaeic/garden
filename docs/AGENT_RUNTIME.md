@@ -944,10 +944,13 @@ delivered. Providers without a verified conditional-event contract do not expose
 
 ### Optional decision models
 
-The owner can turn decision models off in Settings → Models. This preference overrides
-project and conversation model choices without deleting those choices. When off, automatic
-decision routing and explicit decision calls are unavailable. The model receives neither
-the decision tool definition nor its auxiliary-model roster entry. Running turns withdraw
-these at their next model step; an inference already submitted can finish. Turning the
-feature back on takes effect at the next turn. Existing conversation results remain part
-of the work history.
+Every task capability and completion check works without a decision model. Decision-model
+support is an optional inference adapter, not a requirement for task execution, tool discovery,
+model selection or approvals. No decision workflow is currently enabled. General task requests
+carry no decision tool definition or auxiliary-model hint, and do not trigger decision inference.
+A stale decision-tool request returns control to the main model without an approval card.
+
+Settings → Models retains the owner's allowance and saved choices for decision models. The
+purpose surface reports the inactive workflow instead of advertising an effective model.
+A future workflow must demonstrate a meaningful whole-workflow benefit with comparable quality,
+retain the same completion requirements without an auxiliary model, and honor the owner opt-out.

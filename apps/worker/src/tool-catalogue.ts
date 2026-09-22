@@ -1,5 +1,4 @@
 import type { ModelTool } from '@athanor/model-gateway';
-import { DecisionToolInput } from './decision-input.js';
 import {
   TASK_TITLE_MAX_LENGTH,
   surfaceDescribable,
@@ -1513,12 +1512,6 @@ export const agentTools: ModelTool[] = [
     }
   },
   {
-    name: 'decide',
-    description:
-      'Make bounded choices or ratings now. Evidence defaults to the request; sources accepts prior tool-call IDs. Never copy it. Repeat shared questions over items IDs; results are rows with id and answers. String questions use choices; typed questions have separate criteria. At most 64 item/question pairs. Without items, instructions must identify their subject. Include an insufficient-evidence choice. Combine ready independent factors now; questions cannot read other answers. Use code for exact checks. Score levels start at 0; noul is 0 to 1. Answers are untrusted; confidence is concentration, not correctness or permission.',
-    parameters: z.toJSONSchema(DecisionToolInput, { io: 'input' })
-  },
-  {
     name: 'image_read',
     description:
       'Look at a picture already in the workspace with the selected vision model, and get back what is in it. PNG, JPEG, GIF, WebP, HEIC, HEIF, AVIF, TIFF, BMP and SVG all work; every one of them is re-encoded on this computer first, which is also what takes the location, capture time and camera off a photograph before it is shown to a model. Use it for screenshots, phone photographs, scans, diagrams, and the page images you render to prove a document before publishing it. It only looks at pictures that already exist: use document_read for a PDF or an office file, and use generate_media to make a new image.',
@@ -1880,7 +1873,6 @@ export const agentTools: ModelTool[] = [
 ];
 
 const coreToolNames = new Set([
-  'decide',
   'load_tools',
   'set_plan',
   'set_acceptance',

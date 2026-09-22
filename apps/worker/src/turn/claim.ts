@@ -30,8 +30,6 @@ import { BASE_SYSTEM_PROMPT, COMPACT_CONTEXT_TOOL } from '../context.js';
 import { agentToolsFor } from '../tools.js';
 import { requestToolsFor } from '../request-tools.js';
 import { applyProjectMainModel } from '../purpose-model.js';
-import { prepareDecisionRouting } from '../decision-routing.js';
-import { resolveDecisionRoute } from '../decision-route.js';
 import { routingForTurn } from '../routing-policy.js';
 import type { ProviderPreferences } from '@athanor/core';
 
@@ -156,12 +154,6 @@ export const claimTurn = async (
     completionNags: 0
   };
   await applyProjectMainModel(deps, task, state, catalog, key, deps.config.WORKER_ID);
-  await prepareDecisionRouting(
-    { ...deps, task, state },
-    key,
-    catalog,
-    Boolean(prompt.attachments?.length)
-  );
   const model = catalog.find((entry) => entry.id === task.modelId);
   if (!model) throw new Error(`Model ${task.modelId} is no longer in the registry`);
   const { gateway, provider, credential } = await deps.gateway(task, model);
@@ -227,7 +219,6 @@ export const claimTurn = async (
         }))
       : { preferences: undefined, measuring: false };
   const withdrawnTools = new Set<string>();
-  if (!(await resolveDecisionRoute(deps, task).catch(() => null))) withdrawnTools.add('decide');
   /**
    * Capabilities this box does not currently have are not described to the model.
    *

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import type { ModelRelease } from '@athanor/contracts';
-import { encryptJson, generateDataKey, wrapDataKey, selectPurposeModel } from '@athanor/core';
+import { encryptJson, generateDataKey, wrapDataKey } from '@athanor/core';
 import {
   createDatabase,
   DataStore,
@@ -11,7 +11,6 @@ import {
 import { ModelGateway, type DecisionRequest, type DecisionResponse } from '@athanor/model-gateway';
 import { resolveDecisionRoute } from './decision-route.js';
 import { executeDecisionTool, runDecisions, type DecisionContext } from './decisions.js';
-import { prepareDecisionRouting } from './decision-routing.js';
 import { approvalForCall } from './approval-floor.js';
 import { approvalRequirement } from './approval-policy.js';
 import type { AgentState } from './agent-state.js';
@@ -59,13 +58,7 @@ const decision: ModelRelease = {
   inputUsdPerMillionTokens: 0.042,
   outputUsdPerMillionTokens: 0
 };
-const coder: ModelRelease = {
-  ...main,
-  id: 'openrouter/coder',
-  providerModelId: 'coder',
-  codingQuality: 0.99
-};
-const catalog = [main, decision, coder];
+const catalog = [main, decision];
 const input = {
   state: 'The file contains a valid FASTQ record.',
   questions: {
@@ -284,7 +277,7 @@ it('reserves before submission, settles actual usage, caches exact evidence and 
   expect(rows.rows.every((row) => row.state === 'settled')).toBe(true);
 });
 
-it('requires the actual floor binding and refuses a different inference account', async () => {
+it('rejects an inactive tool without inference and refuses a different inference account', async () => {
   const f = await fixture();
   const call = {
     id: 'tool-one',
@@ -296,25 +289,23 @@ it('requires the actual floor binding and refuses a different inference account'
     status: 'unavailable'
   });
   expect(f.decide).not.toHaveBeenCalled();
-  const requirement = await approvalForCall(
-    {
-      store,
-      masterKey,
-      runner: {} as AgentRunnerClient,
-      inferenceCredential: async () => {
-        throw new Error('Not needed');
+  await expect(
+    approvalForCall(
+      {
+        store,
+        masterKey,
+        runner: {} as AgentRunnerClient,
+        inferenceCredential: async () => {
+          throw new Error('Not needed');
+        },
+        destinationContext: () => ({ knownOrigins: [], ownerText: '' })
       },
-      destinationContext: () => ({ knownOrigins: [], ownerText: '' }),
-      decisionRoute: (task) => resolveDecisionRoute(f.context, task)
-    },
-    f.task,
-    call,
-    f.state
-  );
-  expect(requirement).toBeNull();
-  expect(await executeDecisionTool(f.context as ToolContext, call)).toMatchObject({
-    status: 'decided'
-  });
+      f.task,
+      call,
+      f.state
+    )
+  ).rejects.toThrow(/inactive/);
+  expect(f.decide).not.toHaveBeenCalled();
   const altered: DecisionContext = {
     ...f.context,
     connectedModels: async (_task, models) =>
@@ -393,59 +384,7 @@ it('admits independent questions that fit the input window and preserves item ro
   expect(f.decide).toHaveBeenCalledTimes(1);
 });
 
-it('prepares relevant tools once and keeps a pinned main model unchanged', async () => {
-  const f = await fixture();
-  await writeProjectModelPreferences(store, masterKey, f.task, {
-    expectedRevision: 0,
-    choices: { main: { automatic: false, modelId: main.id, preference: 'best' } }
-  });
-  await prepareDecisionRouting(f.context, key, catalog);
-  expect(f.state.decisionRouting).toMatchObject({
-    status: 'decided',
-    kind: 'coding',
-    groups: ['code']
-  });
-  expect(f.state.enabledToolGroups).toContain('code');
-  expect(f.task.modelId).toBe(main.id);
-  await prepareDecisionRouting(f.context, key, catalog);
-  expect(f.decide).toHaveBeenCalledTimes(1);
-});
-
-it('prepares tools without resetting an explicit reasoning effort', async () => {
-  const f = await fixture();
-  f.task.reasoningEffort = 'high';
-  f.state.ownerReasoningEffort = 'high';
-  await prepareDecisionRouting(f.context, key, catalog);
-  expect(f.state.decisionRouting?.status).toBe('decided');
-  expect(f.task.modelId).toBe(main.id);
-  expect(f.task.reasoningEffort).toBe('high');
-  expect(f.state.ownerReasoningEffort).toBe('high');
-});
-
-it('uses semantic work classification for automatic selection, never a provider-returned model ID', async () => {
-  const f = await fixture();
-  await prepareDecisionRouting(f.context, key, catalog);
-  expect(f.state.decisionRouting?.kind).toBe('coding');
-  expect(f.task.modelId).toBe(coder.id);
-  expect(
-    selectPurposeModel({
-      purpose: 'main',
-      choice: { automatic: false, modelId: decision.id, preference: 'fast' },
-      catalog,
-      privacyRoute: 'provider_zdr'
-    }).model
-  ).toBeNull();
-  expect(
-    selectPurposeModel({
-      purpose: 'decisions',
-      choice: { automatic: true, modelId: '', preference: 'balanced' },
-      catalog,
-      privacyRoute: 'provider_zdr'
-    }).model?.id
-  ).toBe(decision.id);
-});
-
-it('lets the owner opt out across pinned projects, cached answers and automatic routing', async () => {
+it('lets the owner opt out across pinned projects, cached answers', async () => {
   const f = await fixture();
   const choice = { automatic: false, preference: 'fast' as const, modelId: decision.id };
   await writeProjectModelPreferences(
@@ -468,14 +407,13 @@ it('lets the owner opt out across pinned projects, cached answers and automatic 
         inferenceCredential: async () => {
           throw new Error('Not needed');
         },
-        destinationContext: () => ({ knownOrigins: [], ownerText: '' }),
-        decisionRoute: (task) => resolveDecisionRoute(f.context, task)
+        destinationContext: () => ({ knownOrigins: [], ownerText: '' })
       },
       f.task,
       { id: 'disabled', name: 'decide', arguments: { questions: input.questions } },
       f.state
     )
-  ).rejects.toThrow(/turned off/);
+  ).rejects.toThrow(/inactive/);
   expect(await taskModelRoster(f.context, f.task, catalog, main.id)).not.toEqual(
     expect.arrayContaining([expect.objectContaining({ purpose: 'decisions' })])
   );
@@ -488,7 +426,6 @@ it('lets the owner opt out across pinned projects, cached answers and automatic 
       arguments: { questions: input.questions }
     })
   ).toMatchObject({ status: 'unavailable' });
-  await prepareDecisionRouting(f.context, key, catalog);
   expect(f.decide).toHaveBeenCalledTimes(1);
   await store.mergeUserPreferences(f.user.id, { decisionModelsEnabled: true });
   expect((await resolveDecisionRoute(f.context, f.task))?.model.id).toBe(decision.id);

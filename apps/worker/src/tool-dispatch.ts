@@ -6,7 +6,6 @@ import type { DataStore, TaskRecord } from '@athanor/data';
 import type { ModelGateway, ModelToolCall } from '@athanor/model-gateway';
 import type { AgentState, AgentWorkerConfig, InferenceCredential } from './agent-state.js';
 import { executeDelegateTool } from './delegate.js';
-import { executeDecisionTool } from './decisions.js';
 import type { DestinationContext } from './egress.js';
 import type { WebSearchAnswer } from './provider-search.js';
 import type { AgentRunnerClient } from './runner-client.js';
@@ -148,7 +147,6 @@ type ToolDomain = (context: ToolContext, call: ModelToolCall) => Promise<unknown
  * `Unknown tool` the switch's `default` threw.
  */
 const DOMAIN_OF: Readonly<Record<string, ToolDomain>> = {
-  decide: executeDecisionTool,
   load_tools: async (context, call) => enableToolGroups(context.state, call.arguments),
   set_plan: executePlanTool,
   project_update: executeProjectUpdate,

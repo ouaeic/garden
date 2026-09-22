@@ -14,11 +14,6 @@ type PurposeContext = {
   connectedModels(task: TaskRecord, catalog: readonly ModelRelease[]): Promise<ModelRelease[]>;
 };
 
-export async function decisionModelsEnabled(store: DataStore, userId: string): Promise<boolean> {
-  const user = await store.getUserById(userId);
-  return Boolean(user && OwnerPreferences.parse(user.preferences).decisionModelsEnabled !== false);
-}
-
 async function preferences(
   context: PurposeContext,
   task: TaskRecord,
@@ -165,8 +160,7 @@ export async function taskModelRoster(
 ): Promise<Array<{ purpose: string; job: string; model: string }>> {
   const jobs = [
     { purpose: 'specialist', job: 'research and review specialists (delegate)' },
-    { purpose: 'coding', job: 'repository changes (coding_agent)' },
-    { purpose: 'decisions', job: 'immediate bounded choices and ratings (decide)' }
+    { purpose: 'coding', job: 'repository changes (coding_agent)' }
   ] as const;
   const roster: Array<{ purpose: string; job: string; model: string }> = [];
   for (const entry of jobs) {

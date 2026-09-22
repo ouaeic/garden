@@ -482,6 +482,23 @@ describe('model choices across settings, drafts and the first prompt', () => {
     expect(restored.json()).toMatchObject({
       preferences: { decisionModelsEnabled: true, modelPurposes: { decisions: pin } }
     });
+    const inactive = await harness.app.inject({
+      method: 'GET',
+      url: '/v1/workspace-model-preferences',
+      headers
+    });
+    expect(inactive.statusCode).toBe(200);
+    expect(
+      ProjectModelPreferences.parse(inactive.json()).purposes.find(
+        (item) => item.purpose === 'decisions'
+      )
+    ).toMatchObject({
+      disabled: true,
+      effective: null,
+      available: false,
+      options: [],
+      reason: 'Decision models are not in use. All features work without one.'
+    });
   });
 
   test('round-trips auxiliary defaults and controls without prompt text, then creates the project with its choices', async () => {

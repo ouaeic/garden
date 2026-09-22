@@ -29,8 +29,7 @@ const purposeSurface = async (
   user: UserRecord,
   projectChoices: ProjectModelChoices,
   global: ProjectModelChoices,
-  privacyRoute: 'provider_zdr' | 'external',
-  taskModelId?: string
+  privacyRoute: 'provider_zdr' | 'external'
 ): Promise<ProjectModelPreferences['purposes']> => {
   const decisionsEnabled = OwnerPreferences.parse(user.preferences).decisionModelsEnabled !== false;
   const selection = mergeProjectModelChoices(global, projectChoices);
@@ -39,24 +38,9 @@ const purposeSurface = async (
     context.modelsForUser(user),
     context.store.effectiveSpendLimits(user.id)
   ]);
-  const main =
-    models.find((model) => model.id === taskModelId) ??
-    selectPurposeModel({
-      purpose: 'main',
-      choice: resolvePurposeChoice('main', projectChoices, global).choice,
-      catalog: models,
-      privacyRoute,
-      ceiling: ownerPriceCeiling(limits)
-    }).model;
-  const compatibleDecision = (model: (typeof models)[number]) =>
-    Boolean(
-      main &&
-      model.provider === 'openrouter' &&
-      (model.connectionId ?? model.provider) === (main.connectionId ?? main.provider)
-    );
   return ModelPurpose.options.map((purpose) => {
     const resolved = resolvePurposeChoice(purpose, projectChoices, global);
-    if (purpose === 'decisions' && !decisionsEnabled)
+    if (purpose === 'decisions')
       return {
         purpose,
         ...resolved,
@@ -64,7 +48,9 @@ const purposeSurface = async (
         effective: null,
         options: [],
         available: false,
-        reason: 'Decision models are turned off in Settings → Models.'
+        reason: decisionsEnabled
+          ? 'Decision models are not in use. All features work without one.'
+          : 'Decision models are turned off in Settings → Models.'
       };
     const modality = media.modalities.find((item) => item.modality === purpose);
     if (modality)
@@ -84,7 +70,6 @@ const purposeSurface = async (
       purpose !== 'main' &&
       purpose !== 'specialist' &&
       purpose !== 'coding' &&
-      purpose !== 'decisions' &&
       purpose !== 'summarise' &&
       purpose !== 'title'
     )
@@ -99,7 +84,7 @@ const purposeSurface = async (
     const result = selectPurposeModel({
       purpose,
       choice: resolved.choice,
-      catalog: purpose === 'decisions' ? models.filter(compatibleDecision) : models,
+      catalog: models,
       privacyRoute,
       ceiling: ownerPriceCeiling(limits)
     });
@@ -108,27 +93,20 @@ const purposeSurface = async (
       ...resolved,
       effective: result.model,
       options: models
-        .filter((model) =>
-          purpose === 'decisions'
-            ? model.capabilities.includes('decisions')
-            : model.capabilities.includes('chat')
-        )
+        .filter((model) => model.capabilities.includes('chat'))
         .map((model) => ({
           ...model,
-          unavailableReason:
-            purpose === 'decisions' && !compatibleDecision(model)
-              ? 'Decisions use the same OpenRouter connection as the main model.'
-              : selectPurposeModel({
-                  purpose,
-                  choice: {
-                    automatic: false,
-                    preference: resolved.choice.preference,
-                    modelId: model.id
-                  },
-                  catalog: [model],
-                  privacyRoute,
-                  ceiling: ownerPriceCeiling(limits)
-                }).reason
+          unavailableReason: selectPurposeModel({
+            purpose,
+            choice: {
+              automatic: false,
+              preference: resolved.choice.preference,
+              modelId: model.id
+            },
+            catalog: [model],
+            privacyRoute,
+            ceiling: ownerPriceCeiling(limits)
+          }).reason
         })),
       available: Boolean(result.model),
       reason: result.reason
@@ -181,8 +159,7 @@ export const projectModelSettings = async (
     (task?.privacyRoute ?? (secret.enforceZeroDataRetention ? 'provider_zdr' : 'external')) ===
       'provider_zdr'
       ? 'provider_zdr'
-      : 'external',
-    task?.modelId
+      : 'external'
   );
   return {
     ...preferences,

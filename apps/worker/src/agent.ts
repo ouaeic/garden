@@ -67,8 +67,7 @@ import {
   type PreparedContext
 } from './context.js';
 import { taskFailureRecord } from './failure-record.js';
-import { decisionModelsEnabled, pinnedPurposeModel, taskModelRoster } from './purpose-model.js';
-import { resolveDecisionRoute } from './decision-route.js';
+import { pinnedPurposeModel, taskModelRoster } from './purpose-model.js';
 import { workerLogger, type Logger } from './log.js';
 import {
   botWallSite,
@@ -412,15 +411,6 @@ export class AgentWorker {
       memoryConsolidatedAt: this.#memoryConsolidatedAt
     };
     this.#approvalFloor = {
-      decisionRoute: (task) =>
-        resolveDecisionRoute(
-          {
-            store,
-            masterKey: this.#masterKey,
-            connectedModels: (forTask, catalog) => this.#connectedModels(forTask, catalog)
-          },
-          task
-        ),
       store,
       masterKey: this.#masterKey,
       runner: this.#runner,
@@ -1894,8 +1884,8 @@ export class AgentWorker {
      * Resolved once for the turn, not once per step.
      *
      * The runtime block is rewritten on every step because its tail position makes rewriting free
-     * in cache terms - but "free to write" is not "free to compute": the roster costs three store
-     * reads and two selections, and none of that changes inside a turn. It is read here and
+     * in cache terms - but "free to write" is not "free to compute": the roster reads stored
+     * preferences and selects models. Its choices stay fixed inside a turn. It is read here and
      * captured, so the per-step rewrite is a string interpolation.
      */
     const modelRoster = await taskModelRoster(
@@ -1908,16 +1898,7 @@ export class AgentWorker {
       catalog,
       model.id
     ).catch(() => []);
-    const refreshRuntimeContext = async (): Promise<void> => {
-      if (
-        !run.withdrawnTools.has('decide') &&
-        !(await decisionModelsEnabled(this.store, task.userId).catch(() => false))
-      ) {
-        run.withdrawnTools.add('decide');
-        delete state.decisionFloorBindings;
-        delete state.decisionReceipts;
-        delete state.decisionRouting;
-      }
+    const refreshRuntimeContext = (): void => {
       refreshRuntimeContext_(this.#window, {
         workspace,
         task,
@@ -1927,9 +1908,7 @@ export class AgentWorker {
         machineSummary,
         unattended,
         webPlan,
-        modelRoster: run.withdrawnTools.has('decide')
-          ? modelRoster.filter((entry) => entry.purpose !== 'decisions')
-          : modelRoster
+        modelRoster
       });
     };
     // Called here as well as in the step loop so a window saved when this block lived at index 1

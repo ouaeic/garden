@@ -256,7 +256,9 @@ let lostDraftAcknowledgement;
 let taskCreations = 0;
 let projectChoices = {},
   projectRevision = 0,
-  defaultChoices = {};
+  defaultChoices = {
+    decisions: { automatic: false, preference: 'balanced', modelId: 'openrouter/typesafe/jev-test' }
+  };
 let failModelSave = false,
   createdModelRequest;
 let generationChoices = {};
@@ -352,16 +354,6 @@ const modelCatalog = [
     availability: 'unavailable'
   }
 ];
-const decisionCatalog = [
-  {
-    ...modelCatalog[0],
-    id: 'openrouter/typesafe/jev-test',
-    providerModelId: 'typesafe/jev-test',
-    displayName: 'Decision fixture',
-    capabilities: ['decisions'],
-    contextTokens: 32000
-  }
-];
 let decisionModelsEnabled = true;
 let failDecisionSave = false;
 const modelSurface = (project) => ({
@@ -383,7 +375,7 @@ const modelSurface = (project) => ({
   ].map((purpose) => {
     const choice = (project && projectChoices[purpose]) ||
       defaultChoices[purpose] || { automatic: true, preference: 'balanced', modelId: '' };
-    if (purpose === 'decisions' && !decisionModelsEnabled)
+    if (purpose === 'decisions')
       return {
         purpose,
         choice,
@@ -392,7 +384,9 @@ const modelSurface = (project) => ({
         options: [],
         effective: null,
         available: false,
-        reason: 'Decision models are turned off in Settings → Models.'
+        reason: decisionModelsEnabled
+          ? 'Decision models are not in use. All features work without one.'
+          : 'Decision models are turned off in Settings → Models.'
       };
     return {
       purpose,
@@ -403,16 +397,8 @@ const modelSurface = (project) => ({
             ? 'global'
             : 'automatic',
       choice,
-      options:
-        purpose === 'decisions'
-          ? decisionCatalog
-          : ['image', 'audio', 'transcription', 'video'].includes(purpose)
-            ? []
-            : modelCatalog,
-      effective:
-        purpose === 'decisions'
-          ? decisionCatalog[0]
-          : (modelCatalog.find((model) => model.id === choice.modelId) ?? modelCatalog[0]),
+      options: ['image', 'audio', 'transcription', 'video'].includes(purpose) ? [] : modelCatalog,
+      effective: modelCatalog.find((model) => model.id === choice.modelId) ?? modelCatalog[0],
       available: true,
       reason: null
     };
@@ -2627,7 +2613,12 @@ try {
       .click();
     await pick(advanced, 'Main agent', 'openrouter/alpha/model-78');
     await pick(advanced, 'Research specialists', 'openrouter/beta/model-79');
-    await pick(advanced, 'Decisions', 'openrouter/typesafe/jev-test');
+    assert.equal(await advanced.getByRole('button', { name: /^Decisions:/ }).count(), 0);
+    await advanced
+      .getByText('Decision models are not in use. All features work without one.', {
+        exact: true
+      })
+      .waitFor();
     await advanced.getByRole('button', { name: 'Close Model choices', exact: true }).click();
     await newWork.getByText('Draft synced', { exact: true }).waitFor();
     assert.equal(modelDrafts.get(`new:${workspace.id}`).body, '');
@@ -2661,10 +2652,7 @@ try {
     await newWork.waitFor({ state: 'detached' });
     assert.equal(createdModelRequest.modelChoices.main.modelId, 'openrouter/alpha/model-78');
     assert.equal(createdModelRequest.modelChoices.specialist.modelId, 'openrouter/beta/model-79');
-    assert.equal(
-      createdModelRequest.modelChoices.decisions.modelId,
-      'openrouter/typesafe/jev-test'
-    );
+    assert.equal(createdModelRequest.modelChoices.decisions, undefined);
     assert.equal(
       modelDrafts.get(`new:${workspace.id}`).body,
       '',
@@ -2731,7 +2719,7 @@ try {
 
     await pick(modelsPage, 'Condensing long work', 'openrouter/alpha/model-78');
     await pick(modelsPage, 'Naming a conversation', 'openrouter/beta/model-79');
-    await pick(modelsPage, 'Decisions', 'openrouter/typesafe/jev-test');
+    assert.equal(await modelsPage.getByRole('button', { name: /^Decisions:/ }).count(), 0);
     failModelSave = true;
     await modelsPage.getByRole('button', { name: 'Save model defaults', exact: true }).click();
     await modelsPage
@@ -2746,7 +2734,7 @@ try {
     await modelsPage.getByRole('button', { name: 'Save model defaults', exact: true }).click();
     await modelsPage.getByText('Model defaults saved', { exact: true }).waitFor();
     assert.equal(defaultChoices.decisions.modelId, 'openrouter/typesafe/jev-test');
-    const decisionToggle = modelsPage.getByRole('checkbox', { name: 'Use decision models' });
+    const decisionToggle = modelsPage.getByRole('checkbox', { name: 'Allow decision models' });
     assert.equal(await decisionToggle.isChecked(), true);
     failDecisionSave = true;
     await decisionToggle.click();
@@ -2757,7 +2745,7 @@ try {
     assert.equal(await decisionToggle.isChecked(), true);
     assert.equal(decisionModelsEnabled, true);
     await decisionToggle.click();
-    await modelsPage.getByText('Decision models turned off', { exact: true }).waitFor();
+    await modelsPage.getByText('Decision models disabled', { exact: true }).waitFor();
     await modelsPage
       .getByText('Decision models are turned off in Settings → Models.', { exact: true })
       .waitFor();
@@ -2771,7 +2759,13 @@ try {
       .click();
     assert.equal(await decisionToggle.isChecked(), false);
     await decisionToggle.click();
-    await modelsPage.getByText('Decision models turned on', { exact: true }).waitFor();
+    await modelsPage.getByText('Decision models allowed', { exact: true }).waitFor();
+    await modelsPage
+      .getByText('Decision models are not in use. All features work without one.', {
+        exact: true
+      })
+      .waitFor();
+    assert.equal(await modelsPage.getByRole('button', { name: /^Decisions:/ }).count(), 0);
     assert.equal(defaultChoices.decisions.modelId, 'openrouter/typesafe/jev-test');
     await pick(modelsPage, 'image model', 'fixture/image-studio');
     await modelsPage.getByRole('button', { name: 'Save generation choices', exact: true }).click();

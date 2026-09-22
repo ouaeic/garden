@@ -33,16 +33,15 @@ export default function DefaultModels({ onChange }: { onChange: () => void }) {
                       resource.refresh();
                       onChange();
                     },
-                    enabled ? 'Decision models turned on' : 'Decision models turned off'
+                    enabled ? 'Decision models allowed' : 'Decision models disabled'
                   );
                 }}
               />
-              Use decision models
+              Allow decision models
             </label>
             <p className="muted" id="decision-models-hint">
-              Let a fast model help with focused choices. Turning this off removes decision tools
-              and their instructions from future model steps across all projects. Calls already
-              underway may finish. Turning it on applies from the next turn.
+              Allow decision models in workflows with a verified benefit. Garden works fully without
+              a decision model.
             </p>
             <ActionFeedback action={decisionAction} />
           </div>

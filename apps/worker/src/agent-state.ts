@@ -11,7 +11,6 @@ import type { ArtifactLedger, ContextBrief } from './context.js';
 import type { StoredMediaRoutes } from './media.js';
 import type { NativeInputReference, NativeInputApproval } from './native-input.js';
 import type { TranscriptionApproval } from './transcription-approval.js';
-import type { ModelTaskKind } from '@athanor/core';
 import type { DecisionResult } from './decisions.js';
 import type { MediaGenerationApproval } from './media-approval.js';
 
@@ -21,14 +20,6 @@ export interface AgentState {
   /** Last applied project main choice; subsequent explicit turn choices remain authoritative. */
   mainModelPreference?: string;
   decisionFloorBindings?: Record<string, string>;
-  decisionRouting?: {
-    digest: string;
-    status: 'decided' | 'unavailable';
-    kind?: ModelTaskKind;
-    groups?: string[];
-    model?: string;
-    latencyMs?: number;
-  };
   decisionReceipts?: Record<string, Extract<DecisionResult, { status: 'decided' }>>;
   projectContextFingerprint?: string;
   /**

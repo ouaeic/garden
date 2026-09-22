@@ -117,7 +117,6 @@ const FIELDS: ReadonlyArray<keyof AgentState> = [
   'projectContextFingerprint',
   'walledProviders',
   'decisionFloorBindings',
-  'decisionRouting',
   'decisionReceipts'
 ];
 
@@ -134,7 +133,6 @@ const FULL: Required<AgentState> = {
   enabledToolGroups: ['browser', 'documents'],
   mainModelPreference: '[true,"best",""]',
   decisionFloorBindings: { call: 'a'.repeat(64) },
-  decisionRouting: { digest: 'b'.repeat(64), status: 'decided', kind: 'coding', groups: ['code'] },
   decisionReceipts: {
     digest: {
       status: 'decided',
@@ -401,7 +399,6 @@ describe('what a new turn inherits', () => {
       'codingMissionWaiting',
       'codingMissionReviews',
       'decisionFloorBindings',
-      'decisionRouting',
       'decisionReceipts'
     ]);
     expect(reset).toEqual([
