@@ -19,9 +19,9 @@
   },
   "dependencies": {
     "@athanor/relay": "workspace:*",
-    "zod": "4.4.3"
+    "zod": "4.6.5"
   },
   "devDependencies": {
-    "tsx": "4.23.12"
+    "tsx": "4.23.15"
   }
 }

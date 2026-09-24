@@ -18,10 +18,10 @@
   "dependencies": {
     "@athanor/contracts": "workspace:*",
     "@athanor/core": "workspace:*",
-    "@electric-sql/pglite": "0.5.4",
+    "@electric-sql/pglite": "0.5.8",
     "pg": "8.23.0"
   },
   "devDependencies": {
-    "@types/pg": "8.21.0"
+    "@types/pg": "8.23.1"
   }
 }

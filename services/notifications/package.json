@@ -13,7 +13,7 @@
   "dependencies": {
     "@athanor/data": "workspace:*",
     "web-push": "3.6.7",
-    "zod": "4.4.3"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@types/web-push": "3.6.4"

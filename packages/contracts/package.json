@@ -21,6 +21,6 @@
     "test": "NODE_OPTIONS=--conditions=development vitest run"
   },
   "dependencies": {
-    "zod": "4.4.3"
+    "zod": "4.6.5"
   }
 }

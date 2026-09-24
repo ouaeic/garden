@@ -13,18 +13,18 @@
   "dependencies": {
     "@fastify/cookie": "11.1.2",
     "@fastify/cors": "11.3.0",
-    "@fastify/helmet": "13.1.0",
-    "@fastify/websocket": "11.3.0",
+    "@fastify/helmet": "13.1.1",
+    "@fastify/websocket": "11.3.1",
     "@athanor/contracts": "workspace:*",
     "@athanor/core": "workspace:*",
     "@athanor/data": "workspace:*",
     "@athanor/model-gateway": "workspace:*",
     "@athanor/relay-client": "workspace:*",
     "@athanor/worker": "workspace:*",
-    "@simplewebauthn/server": "13.3.2",
-    "fastify": "5.12.1",
+    "@simplewebauthn/server": "14.0.2",
+    "fastify": "5.12.5",
     "ws": "8.21.3",
-    "zod": "4.4.3"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@types/ws": "8.18.1"
