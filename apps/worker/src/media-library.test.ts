@@ -1,5 +1,6 @@
+import { OPENAI_VIDEO_RETIREMENT_AT } from '@athanor/model-gateway';
 import { randomUUID } from 'node:crypto';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { decryptJson, encryptJson } from '@athanor/core';
 import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
 import { executeMediaLibrary, mediaAssetAad } from './media-library.js';
@@ -8,6 +9,10 @@ import { mediaJobAad, type StoredVideoRequest } from './media-job-domain.js';
 import { approvalRequirement } from './approval-policy.js';
 import type { InferenceCredential } from './agent-state.js';
 import type { ToolContext } from './tool-dispatch.js';
+beforeEach(() => {
+  vi.spyOn(Date, 'now').mockReturnValue(Date.parse(OPENAI_VIDEO_RETIREMENT_AT) - 1);
+});
+afterEach(() => vi.restoreAllMocks());
 const key = Buffer.alloc(32, 4),
   mp4 = Buffer.from('0000ftypisom0000');
 const secret: InferenceCredential = {

@@ -1,14 +1,21 @@
 import { randomUUID } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { encryptJson, wrapDataKey } from '@athanor/core';
 import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
-import { NativeMediaSubmissionUncertainError } from '@athanor/model-gateway';
+import {
+  NativeMediaSubmissionUncertainError,
+  OPENAI_VIDEO_RETIREMENT_AT
+} from '@athanor/model-gateway';
 import { MediaBatchWorker, queueVideoBatch } from './media-batches.js';
 import { MediaJobWorker } from './media-jobs.js';
 import { approvalRequirement } from './approval-policy.js';
 import { resolvedMediaModel } from './media.js';
 import type { InferenceCredential } from './agent-state.js';
 import type { ToolContext } from './tool-dispatch.js';
+beforeEach(() => {
+  vi.spyOn(Date, 'now').mockReturnValue(Date.parse(OPENAI_VIDEO_RETIREMENT_AT) - 1);
+});
+afterEach(() => vi.restoreAllMocks());
 const masterKey = Buffer.alloc(32, 31),
   key = Buffer.alloc(32, 32),
   mp4 = Buffer.from('0000ftypisom0000');

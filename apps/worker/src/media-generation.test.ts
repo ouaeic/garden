@@ -1,9 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
+import { OPENAI_VIDEO_RETIREMENT_AT } from '@athanor/model-gateway';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { decryptJson, encryptJson } from '@athanor/core';
 import { queueVideoGeneration } from './media-generation.js';
 import { mediaJobAad, type StoredVideoRequest } from './media-job-domain.js';
 import type { ToolContext } from './tool-dispatch.js';
 import type { InferenceCredential } from './agent-state.js';
+beforeEach(() => {
+  vi.spyOn(Date, 'now').mockReturnValue(Date.parse(OPENAI_VIDEO_RETIREMENT_AT) - 1);
+});
+afterEach(() => vi.restoreAllMocks());
 const key = Buffer.alloc(32, 7);
 const sourceId = '11111111-1111-4111-8111-111111111111';
 const original: StoredVideoRequest = {
