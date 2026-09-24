@@ -37,7 +37,7 @@ const descriptions: Record<ModelPurpose, string> = {
   main: 'Leads the work and brings the results together.',
   specialist: 'Researches and reviews delegated work.',
   coding: 'Makes and verifies code changes.',
-  decisions: 'Resolves focused choices quickly as the work unfolds.',
+  decisions: 'Used only in workflows with a verified benefit; currently inactive.',
   summarise: 'Keeps the working context concise.',
   title: 'Names your conversations.',
   image: 'Generates and edits images.',
@@ -70,117 +70,126 @@ export default function ModelChoiceFields({
   };
   return (
     <div className="model-choice-grid">
-      {purposes.map((item) => {
-        const selected = choices[item.purpose];
-        const value = !selected
-          ? inherit
-            ? 'inherit'
-            : 'automatic'
-          : selected.automatic
-            ? 'automatic'
-            : selected.modelId;
-        const same = JSON.stringify(selected ?? automaticChoice) === JSON.stringify(item.choice);
-        const effective = item.disabled
-          ? null
-          : value === 'inherit'
-            ? item.source !== 'project'
-              ? item.effective
-              : null
-            : value === 'automatic'
-              ? same
-                ? item.effective
-                : null
-              : item.options.find((option) => option.id === value);
-        return (
-          <section
-            className="model-choice-card"
-            key={item.purpose}
-            aria-label={purposeLabels[item.purpose]}
-          >
-            <div>
-              <h3>{purposeLabels[item.purpose]}</h3>
-              <p className="muted">{descriptions[item.purpose]}</p>
-            </div>
-            {!item.disabled && (
-              <ModelPicker
-                label={purposeLabels[item.purpose]}
-                value={value}
-                models={item.options}
-                disabled={disabled}
-                shortcuts={[
-                  ...(inherit
-                    ? [
-                        {
-                          value: 'inherit',
-                          label: inheritLabel,
-                          detail: inheritDetail
-                        }
-                      ]
-                    : []),
-                  {
-                    value: 'automatic',
-                    label: 'Automatic',
-                    detail: 'Choose an available model for this purpose.'
-                  }
-                ]}
-                onChange={(next) =>
-                  change(
-                    item.purpose,
-                    next === 'inherit'
-                      ? undefined
-                      : {
-                          automatic: next === 'automatic',
-                          modelId: next === 'automatic' ? '' : next,
-                          preference: selected?.preference ?? item.choice.preference
-                        }
-                  )
-                }
-              />
-            )}
-            {!item.disabled &&
-              value === 'automatic' &&
-              item.purpose !== 'summarise' &&
-              item.purpose !== 'title' &&
-              item.purpose !== 'decisions' && (
-                <Field label={`${purposeLabels[item.purpose]} preference`}>
-                  <select
-                    value={selected?.preference ?? 'balanced'}
-                    disabled={disabled}
-                    onChange={(event) =>
-                      change(item.purpose, {
-                        ...automaticChoice,
-                        preference: event.target.value as PurposeModelChoice['preference']
-                      })
-                    }
-                  >
-                    <option value="balanced">Balanced</option>
-                    <option value="fast">Faster</option>
-                    <option value="best">Higher quality</option>
-                  </select>
-                </Field>
-              )}
-            <p className="model-choice-resolution muted">
-              {item.disabled
-                ? item.reason
-                : effective
-                  ? `${value === 'inherit' ? 'Inherits' : value === 'automatic' ? 'Currently' : 'Selected'}: ${effective.displayName}`
-                  : value === 'inherit'
-                    ? inheritDetail
-                    : value === 'automatic' && !same
-                      ? 'Resolves when applied.'
-                      : (item.reason ?? 'This saved model is unavailable.')}
-            </p>
-            {effective && 'unavailableReason' in effective && effective.unavailableReason && (
-              <p className="model-unavailable">{effective.unavailableReason}</p>
-            )}
-            {effective &&
-              'requiresRetentionApproval' in effective &&
-              effective.requiresRetentionApproval && (
-                <p className="muted">Each request asks before temporary provider retention.</p>
-              )}
-          </section>
-        );
-      })}
+      {purposes.filter((item) => item.purpose === 'main').map(renderChoice)}
+      {purposes.some((item) => item.purpose !== 'main') && (
+        <details className="advanced-model-choices">
+          <summary>Advanced model choices</summary>
+          <div className="model-choice-grid">
+            {purposes.filter((item) => item.purpose !== 'main').map(renderChoice)}
+          </div>
+        </details>
+      )}
     </div>
   );
+  function renderChoice(item: ProjectModelPreferences['purposes'][number]) {
+    const selected = choices[item.purpose];
+    const value = !selected
+      ? inherit
+        ? 'inherit'
+        : 'automatic'
+      : selected.automatic
+        ? 'automatic'
+        : selected.modelId;
+    const same = JSON.stringify(selected ?? automaticChoice) === JSON.stringify(item.choice);
+    const effective = item.disabled
+      ? null
+      : value === 'inherit'
+        ? item.source !== 'project'
+          ? item.effective
+          : null
+        : value === 'automatic'
+          ? same
+            ? item.effective
+            : null
+          : item.options.find((option) => option.id === value);
+    return (
+      <section
+        className="model-choice-card"
+        key={item.purpose}
+        aria-label={purposeLabels[item.purpose]}
+      >
+        <div>
+          <h3>{purposeLabels[item.purpose]}</h3>
+          <p className="muted">{descriptions[item.purpose]}</p>
+        </div>
+        {!item.disabled && (
+          <ModelPicker
+            label={purposeLabels[item.purpose]}
+            value={value}
+            models={item.options}
+            disabled={disabled}
+            shortcuts={[
+              ...(inherit
+                ? [
+                    {
+                      value: 'inherit',
+                      label: inheritLabel,
+                      detail: inheritDetail
+                    }
+                  ]
+                : []),
+              {
+                value: 'automatic',
+                label: 'Automatic',
+                detail: 'Choose an available model for this purpose.'
+              }
+            ]}
+            onChange={(next) =>
+              change(
+                item.purpose,
+                next === 'inherit'
+                  ? undefined
+                  : {
+                      automatic: next === 'automatic',
+                      modelId: next === 'automatic' ? '' : next,
+                      preference: selected?.preference ?? item.choice.preference
+                    }
+              )
+            }
+          />
+        )}
+        {!item.disabled &&
+          value === 'automatic' &&
+          item.purpose !== 'summarise' &&
+          item.purpose !== 'title' &&
+          item.purpose !== 'decisions' && (
+            <Field label={`${purposeLabels[item.purpose]} preference`}>
+              <select
+                value={selected?.preference ?? 'balanced'}
+                disabled={disabled}
+                onChange={(event) =>
+                  change(item.purpose, {
+                    ...automaticChoice,
+                    preference: event.target.value as PurposeModelChoice['preference']
+                  })
+                }
+              >
+                <option value="balanced">Balanced</option>
+                <option value="fast">Faster</option>
+                <option value="best">Higher quality</option>
+              </select>
+            </Field>
+          )}
+        <p className="model-choice-resolution muted">
+          {item.disabled
+            ? item.reason
+            : effective
+              ? `${value === 'inherit' ? 'Inherits' : value === 'automatic' ? 'Currently' : 'Selected'}: ${effective.displayName}`
+              : value === 'inherit'
+                ? inheritDetail
+                : value === 'automatic' && !same
+                  ? 'Resolves when applied.'
+                  : (item.reason ?? 'This saved model is unavailable.')}
+        </p>
+        {effective && 'unavailableReason' in effective && effective.unavailableReason && (
+          <p className="model-unavailable">{effective.unavailableReason}</p>
+        )}
+        {effective &&
+          'requiresRetentionApproval' in effective &&
+          effective.requiresRetentionApproval && (
+            <p className="muted">Each request asks before temporary provider retention.</p>
+          )}
+      </section>
+    );
+  }
 }

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { checkWorkspaceNavigation } from './browser-workspace.mjs';
 import { checkAppearance } from './browser-appearance.mjs';
 import { checkPermissionModes } from './browser-permissions.mjs';
 import { checkRunningQuestion } from './browser-questions.mjs';
@@ -913,6 +914,11 @@ try {
       return json({ ok: true });
     }
     if (path.endsWith('/artifacts')) return json([]);
+    if (path.endsWith('/browser-token'))
+      return route.fulfill({
+        status: 503,
+        json: { error: { message: 'No browser session in this fixture.' } }
+      });
     if (path.endsWith('/media-jobs')) return json(path.includes(childTask.id) ? [] : mediaJobs);
     if (path.endsWith('/media-assets')) return json(path.includes(childTask.id) ? [] : mediaAssets);
     if (path.endsWith('/media-batches'))
@@ -1151,24 +1157,14 @@ try {
     errors.push(`Unspecified UI fixture: ${route.request().method()} ${path}`);
     return route.fulfill({ status: 501, json: { error: { message: 'Unspecified UI fixture' } } });
   });
-  if (process.env.GARDEN_UI_FOCUS === 'appearance')
-    await checkAppearance({ context, origin, bootstrap, project, task, report });
-  if (!['drafts', 'models', 'appearance'].includes(process.env.GARDEN_UI_FOCUS)) {
-    await checkPermissionModes({ context, origin, bootstrap, task, project, workspace, report });
+  if (process.env.GARDEN_UI_FOCUS === 'workspace') {
+    await checkWorkspaceNavigation({ context, origin, task, report });
     await checkHumanInterventions({ context, origin, task, report });
     await checkRunningQuestion({ context, origin, bootstrap, task, report });
-    await checkProjectConversations({
-      context,
-      origin,
-      bootstrap,
-      task,
-      workspace,
-      presentation,
-      models: modelCatalog,
-      modelSurface: () => modelSurface(true),
-      report,
-      errors
-    });
+  }
+  if (process.env.GARDEN_UI_FOCUS === 'appearance')
+    await checkAppearance({ context, origin, bootstrap, project, task, report });
+  if (process.env.GARDEN_UI_FOCUS === 'files-jobs') {
     await checkTaskRecovery({ context, origin, bootstrap, task, report, errors });
     await checkArtifactLinks({ context, origin, task, workspace, presentation, report, errors });
     await checkProjectDirectories({
@@ -1188,6 +1184,62 @@ try {
       report,
       errors
     });
+  }
+  if (process.env.GARDEN_UI_FOCUS === 'conversations') {
+    await checkProjectConversations({
+      context,
+      origin,
+      bootstrap,
+      task,
+      workspace,
+      presentation,
+      models: modelCatalog,
+      modelSurface: () => modelSurface(true),
+      report,
+      errors
+    });
+  }
+  if (
+    !['drafts', 'models', 'appearance', 'workspace', 'files-jobs', 'conversations'].includes(
+      process.env.GARDEN_UI_FOCUS
+    )
+  ) {
+    if (process.env.GARDEN_UI_FOCUS !== 'journeys') {
+      await checkPermissionModes({ context, origin, bootstrap, task, project, workspace, report });
+      await checkHumanInterventions({ context, origin, task, report });
+      await checkRunningQuestion({ context, origin, bootstrap, task, report });
+      await checkProjectConversations({
+        context,
+        origin,
+        bootstrap,
+        task,
+        workspace,
+        presentation,
+        models: modelCatalog,
+        modelSurface: () => modelSurface(true),
+        report,
+        errors
+      });
+      await checkTaskRecovery({ context, origin, bootstrap, task, report, errors });
+      await checkArtifactLinks({ context, origin, task, workspace, presentation, report, errors });
+      await checkProjectDirectories({
+        context,
+        origin,
+        taskId: task.id,
+        workspaceId: workspace.id,
+        fixture: directoryUi,
+        report,
+        errors
+      });
+      await checkProjectProcesses({
+        context,
+        origin,
+        taskId: task.id,
+        fixture: processUi,
+        report,
+        errors
+      });
+    }
     const page = await context.newPage();
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto(`${origin}/?task=${task.id}`);
@@ -1214,16 +1266,19 @@ try {
     assert(
       await page.evaluate(
         () =>
-          document.querySelector('.garden-top-tools').getBoundingClientRect().top <
+          document.querySelector('.project-view-nav').getBoundingClientRect().top <
           document.querySelector('.run-summary').getBoundingClientRect().top
       ),
       'Project tools must precede the running work'
     );
-    await page.getByRole('button', { name: /^Add a direction/ }).click();
-    await page.getByText('Tools & activity', { exact: true }).click();
+    await page.getByRole('button', { name: /^Continue this conversation/ }).click();
     assert(projectEventRequests.length > 0, 'Opening a project must load its event page');
     assert.equal(projectEventRequests[0], null, 'Open the most recent page without a sentinel');
-    await page.getByRole('button', { name: 'Activity', exact: true }).click();
+    await page
+      .getByRole('navigation', { name: 'Project views' })
+      .getByRole('button', { name: 'Activity', exact: true })
+      .click();
+    await page.getByRole('button', { name: 'Full activity', exact: true }).click();
     const activity = page.getByRole('dialog', { name: 'Activity and directions', exact: true });
     await activity.getByText('Troubleshooting', { exact: true }).click();
     const diagnosticLink = activity.getByRole('link', {
@@ -1284,7 +1339,7 @@ try {
     await activity
       .getByRole('button', { name: 'Close Activity and directions', exact: true })
       .click();
-    await page.getByRole('button', { name: 'Plan', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit plan', exact: true }).click();
     const planDialog = page.getByRole('dialog', { name: 'The plan', exact: true });
     await planDialog
       .getByRole('textbox', { name: 'Step 1', exact: true })
@@ -1373,6 +1428,10 @@ try {
     );
     await planDialog.getByRole('button', { name: 'Close The plan', exact: true }).click();
     await page.setViewportSize({ width: 1440, height: 1000 });
+    await page
+      .getByRole('navigation', { name: 'Project views' })
+      .getByRole('button', { name: 'Work', exact: true })
+      .click();
     const autonomy = page.getByRole('combobox', { name: 'Approvals for this prompt', exact: true });
     await autonomy.selectOption('autonomous');
     assert.equal(
@@ -1418,7 +1477,7 @@ try {
       );
       assert(
         layout.scroll.bottom <= layout.composer.top + 1,
-        'The composer must not overlap the work'
+        `The composer must not overlap the work: ${JSON.stringify(layout)}`
       );
       assert(
         layout.composer.bottom <= layout.viewportHeight + 1,
@@ -1700,6 +1759,10 @@ try {
     await page.reload();
     await page.locator('.garden-answer').getByText('harbor-cobalt-46', { exact: true }).waitFor();
     await page
+      .getByRole('navigation', { name: 'Project views' })
+      .getByRole('button', { name: 'Activity', exact: true })
+      .click();
+    await page
       .locator('.completion-record .badge')
       .getByText('Completion recorded', { exact: true })
       .waitFor();
@@ -1754,6 +1817,10 @@ try {
       'Created maze/index.html'
     );
     await page.screenshot({ path: resolve(report, 'recorded-trace.png') });
+    await page
+      .getByRole('navigation', { name: 'Project views' })
+      .getByRole('button', { name: 'Work', exact: true })
+      .click();
     task.deliveryStatus = 'pending';
     task.pendingDeliveryCount = 1;
     presentation.delivery = { status: 'pending', pendingJobs: 1, failedJobs: 0, completedJobs: 0 };
@@ -1828,6 +1895,10 @@ try {
     await batchCard.getByText('The provider is cancelling this batch.', { exact: false }).waitFor();
     assert.equal(await batchCard.locator('.badge').textContent(), 'Rendering');
     assert.equal(await batchCard.getByText('Cancelled', { exact: true }).count(), 0);
+    await page
+      .getByRole('navigation', { name: 'Project views' })
+      .getByRole('button', { name: 'Activity', exact: true })
+      .click();
     await page.getByRole('button', { name: 'Review changes', exact: true }).click();
     const reviewDialog = page.getByRole('dialog', {
       name: 'Review Keyboard controls',
@@ -1913,15 +1984,15 @@ try {
     );
     await page.getByRole('button', { name: 'Open work', exact: true }).click();
     await page.getByRole('button', { name: 'Return to parent work', exact: true }).waitFor();
-    assert.match(
-      await page.locator('.garden-work-heading').textContent(),
-      /Isolated controls workspace/
-    );
+    assert.equal(new URL(page.url()).searchParams.get('task'), childTask.id);
     assert(
       !(await page.locator('#garden-sidebar').textContent()).includes(childWorkspace.name),
       'Internal specialist workspaces must not become projects'
     );
-    await page.getByRole('button', { name: 'Computer', exact: true }).click();
+    await page
+      .getByRole('navigation', { name: 'Project views' })
+      .getByRole('button', { name: 'Tools', exact: true })
+      .click();
     await page.locator('.computer.panel').waitFor();
     assert.equal(
       await page.locator('.computer.panel').getAttribute('aria-label'),
@@ -2001,8 +2072,9 @@ try {
     await page.getByRole('button', { name: 'Record receipt', exact: true }).click();
     await page.getByText('Provider charge $0.01', { exact: true }).waitFor();
     assert.deepEqual(recordedReceipt, { providerCharacterId: 'char_recorded', costUsd: 0.0125 });
-    await page.getByRole('button', { name: 'Computer', exact: true }).click();
-    await page.getByRole('button', { name: 'Processes', exact: true }).click();
+    await page.getByRole('button', { name: 'Stats', exact: true }).click();
+    await page.getByRole('button', { name: 'All computer work', exact: true }).click();
+    await page.getByRole('button', { name: 'Jobs', exact: true }).click();
     await page.getByRole('button', { name: 'View execution history', exact: true }).click();
     const history = page.getByRole('region', { name: 'Execution history', exact: true });
     await history.getByText('cell-latest', { exact: true }).click();
@@ -2157,8 +2229,10 @@ try {
     });
     await dictationPage.goto(`${origin}/?task=${task.id}`);
     await dictationPage.locator('.garden-task-composer').waitFor();
-    if (await dictationPage.getByRole('button', { name: /^Add a direction/ }).isVisible())
-      await dictationPage.getByRole('button', { name: /^Add a direction/ }).click();
+    if (
+      await dictationPage.getByRole('button', { name: /^Continue this conversation/ }).isVisible()
+    )
+      await dictationPage.getByRole('button', { name: /^Continue this conversation/ }).click();
     await dictationPage.getByRole('button', { name: 'Dictate direction', exact: true }).click();
     let dictationDialog = dictationPage.getByRole('dialog', {
       name: 'Dictate a direction',
@@ -2522,20 +2596,46 @@ try {
     await approvalPage.close();
     approvals = [];
   }
-  if (!['drafts', 'appearance'].includes(process.env.GARDEN_UI_FOCUS)) {
+  if (
+    !['drafts', 'appearance', 'workspace', 'files-jobs', 'conversations', 'journeys'].includes(
+      process.env.GARDEN_UI_FOCUS
+    )
+  ) {
+    const revealDefaults = async () => {
+      await modelsPage.getByRole('region', { name: 'Main agent', exact: true }).waitFor();
+      for (const label of [
+        'Advanced model choices',
+        'Decision model preference',
+        'Manage model connections'
+      ]) {
+        const details = modelsPage.locator('details').filter({
+          has: modelsPage.locator('summary').filter({ hasText: new RegExp(`^${label}$`) })
+        });
+        if ((await details.count()) && (await details.getAttribute('open')) === null)
+          await details.locator(':scope > summary').click();
+      }
+    };
     const modelsPage = await context.newPage();
     await modelsPage.goto(`${origin}/?task=${task.id}`);
     await modelsPage.locator('.garden-task-composer').waitFor();
-    if (await modelsPage.getByRole('button', { name: /^Add a direction/ }).isVisible())
-      await modelsPage.getByRole('button', { name: /^Add a direction/ }).click();
-    await modelsPage.getByText('Tools & activity', { exact: true }).click();
+    if (await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).isVisible())
+      await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).click();
+    await modelsPage.locator('.garden-prompt-options > summary').click();
     await modelsPage
       .getByRole('button', { name: 'Model choices for this direction', exact: true })
       .click();
     const advanced = modelsPage.getByRole('dialog', { name: 'Model choices', exact: true });
+    await advanced.getByText('Advanced model choices', { exact: true }).click();
     await advanced.getByRole('region', { name: 'Coding agents', exact: true }).waitFor();
     assert.equal(await advanced.locator('.model-choice-card').count(), 10);
     const pick = async (surface, label, modelId) => {
+      const advancedOptions = surface.locator('details.advanced-model-choices');
+      if (
+        label !== 'Main agent' &&
+        (await advancedOptions.count()) &&
+        (await advancedOptions.getAttribute('open')) === null
+      )
+        await advancedOptions.locator('summary').click();
       await surface.getByRole('button', { name: new RegExp(`^${label}:`) }).click();
       const search = modelsPage.getByRole('combobox', { name: 'Search models', exact: true });
       await search.fill(modelId);
@@ -2559,12 +2659,12 @@ try {
     await modelsPage.screenshot({ path: resolve(report, 'models-project-desktop.png') });
     await advanced.getByRole('button', { name: 'Close Model choices', exact: true }).click();
     await modelsPage.reload();
-    await modelsPage.getByText('Tools & activity', { exact: true }).click();
     await modelsPage.getByRole('button', { name: 'Models', exact: true }).click();
     const projectModels = modelsPage.getByRole('dialog', {
       name: 'Conversation models',
       exact: true
     });
+    await projectModels.getByText('Advanced model choices', { exact: true }).click();
     await projectModels
       .getByRole('button', { name: 'Coding agents: Research model 79', exact: true })
       .waitFor();
@@ -2572,8 +2672,8 @@ try {
       .getByRole('button', { name: 'Close Conversation models', exact: true })
       .click();
 
-    if (await modelsPage.getByRole('button', { name: /^Add a direction/ }).isVisible())
-      await modelsPage.getByRole('button', { name: /^Add a direction/ }).click();
+    if (await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).isVisible())
+      await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).click();
     await modelsPage.getByRole('button', { name: /^Model for this direction:/ }).click();
     const modelSearch = modelsPage.getByRole('combobox', { name: 'Search models', exact: true });
     await modelsPage
@@ -2608,6 +2708,7 @@ try {
       await modelsPage.getByRole('button', { name: 'Show projects', exact: true }).click();
     await modelsPage.getByRole('button', { name: 'New project', exact: true }).click();
     const newWork = modelsPage.getByRole('dialog', { name: 'Begin something new', exact: true });
+    await newWork.locator('.garden-prompt-options > summary').click();
     await newWork
       .getByRole('button', { name: 'Model choices for this direction', exact: true })
       .click();
@@ -2648,7 +2749,7 @@ try {
     await newWork
       .getByLabel('Describe what you want to do')
       .fill('Use my saved project model choices.');
-    await newWork.getByRole('button', { name: 'Begin', exact: true }).click();
+    await newWork.getByRole('button', { name: 'Start', exact: true }).click();
     await newWork.waitFor({ state: 'detached' });
     assert.equal(createdModelRequest.modelChoices.main.modelId, 'openrouter/alpha/model-78');
     assert.equal(createdModelRequest.modelChoices.specialist.modelId, 'openrouter/beta/model-79');
@@ -2659,11 +2760,15 @@ try {
       'Successful delivery must clear the saved draft while retaining its revision'
     );
 
+    await modelsPage.getByRole('button', { name: 'garden · All work', exact: true }).waitFor();
+    if (!(await modelsPage.getByRole('button', { name: 'Settings', exact: true }).isVisible()))
+      await modelsPage.getByRole('button', { name: 'Show projects', exact: true }).click();
     await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
     await modelsPage
       .getByRole('navigation', { name: 'Settings sections' })
       .getByRole('button', { name: 'Models', exact: true })
       .click();
+    await revealDefaults();
     await modelsPage.getByRole('heading', { name: 'Model defaults', exact: true }).waitFor();
     await modelsPage.getByRole('button', { name: 'Compatible endpoint', exact: true }).click();
     await modelsPage.getByRole('combobox', { name: 'Provider', exact: true }).waitFor();
@@ -2734,6 +2839,7 @@ try {
     await modelsPage.getByRole('button', { name: 'Save model defaults', exact: true }).click();
     await modelsPage.getByText('Model defaults saved', { exact: true }).waitFor();
     assert.equal(defaultChoices.decisions.modelId, 'openrouter/typesafe/jev-test');
+    await revealDefaults();
     const decisionToggle = modelsPage.getByRole('checkbox', { name: 'Allow decision models' });
     assert.equal(await decisionToggle.isChecked(), true);
     failDecisionSave = true;
@@ -2752,11 +2858,15 @@ try {
     assert.equal(decisionModelsEnabled, false);
     assert.equal(await modelsPage.getByRole('button', { name: /^Decisions:/ }).count(), 0);
     await modelsPage.reload();
+    await modelsPage.getByRole('button', { name: 'garden · All work', exact: true }).waitFor();
+    if (!(await modelsPage.getByRole('button', { name: 'Settings', exact: true }).isVisible()))
+      await modelsPage.getByRole('button', { name: 'Show projects', exact: true }).click();
     await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
     await modelsPage
       .getByRole('navigation', { name: 'Settings sections' })
       .getByRole('button', { name: 'Models', exact: true })
       .click();
+    await revealDefaults();
     assert.equal(await decisionToggle.isChecked(), false);
     await decisionToggle.click();
     await modelsPage.getByText('Decision models allowed', { exact: true }).waitFor();
@@ -2772,11 +2882,15 @@ try {
     await modelsPage.getByText('Generation choices saved', { exact: true }).waitFor();
     assert.equal(generationChoices.image.modelId, 'fixture/image-studio');
     await modelsPage.reload();
+    await modelsPage.getByRole('button', { name: 'garden · All work', exact: true }).waitFor();
+    if (!(await modelsPage.getByRole('button', { name: 'Settings', exact: true }).isVisible()))
+      await modelsPage.getByRole('button', { name: 'Show projects', exact: true }).click();
     await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
     await modelsPage
       .getByRole('navigation', { name: 'Settings sections' })
       .getByRole('button', { name: 'Models', exact: true })
       .click();
+    await revealDefaults();
     await modelsPage
       .getByRole('button', { name: 'Naming a conversation: Research model 79', exact: true })
       .waitFor();
@@ -2858,11 +2972,15 @@ try {
     }
     assert.notEqual(namedConnections[0].connectionId, namedConnections[1].connectionId);
     await modelsPage.reload();
+    await modelsPage.getByRole('button', { name: 'garden · All work', exact: true }).waitFor();
+    if (!(await modelsPage.getByRole('button', { name: 'Settings', exact: true }).isVisible()))
+      await modelsPage.getByRole('button', { name: 'Show projects', exact: true }).click();
     await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
     await modelsPage
       .getByRole('navigation', { name: 'Settings sections' })
       .getByRole('button', { name: 'Models', exact: true })
       .click();
+    await revealDefaults();
     await modelsPage.getByRole('button', { name: 'Work models', exact: true }).click();
     assert.equal(
       await modelsPage.getByLabel('Endpoint URL', { exact: true }).inputValue(),
@@ -2874,11 +2992,15 @@ try {
     await modelsPage.getByText('Model defaults saved', { exact: true }).waitFor();
     assert.equal(defaultChoices.decisions.modelId, 'openrouter/typesafe/jev-test');
     await modelsPage.reload();
+    await modelsPage.getByRole('button', { name: 'garden · All work', exact: true }).waitFor();
+    if (!(await modelsPage.getByRole('button', { name: 'Settings', exact: true }).isVisible()))
+      await modelsPage.getByRole('button', { name: 'Show projects', exact: true }).click();
     await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
     await modelsPage
       .getByRole('navigation', { name: 'Settings sections' })
       .getByRole('button', { name: 'Models', exact: true })
       .click();
+    await revealDefaults();
     await modelsPage
       .getByRole('button', {
         name: 'Condensing long work: Shared endpoint model · Work models',
@@ -2915,7 +3037,11 @@ try {
     await modelsPage.close();
   }
 
-  if (process.env.GARDEN_UI_FOCUS !== 'appearance') {
+  if (
+    !['appearance', 'workspace', 'files-jobs', 'conversations', 'models', 'journeys'].includes(
+      process.env.GARDEN_UI_FOCUS
+    )
+  ) {
     let draftPage = await context.newPage();
     const openDraft = async () => {
       await draftPage.goto(`${origin}/?task=${task.id}`);
@@ -3010,7 +3136,7 @@ try {
 
     loseSendAcknowledgement = true;
     await draftInput.fill('Create this task exactly once.');
-    await draftDialog.getByRole('button', { name: 'Begin', exact: true }).click();
+    await draftDialog.getByRole('button', { name: 'Start', exact: true }).click();
     await draftDialog.getByRole('button', { name: 'Retry send', exact: true }).waitFor();
     assert.equal(taskCreations, beforeOffline + 1);
     await draftPage.reload();
@@ -3029,13 +3155,17 @@ try {
 
   assert.deepEqual(errors, [], 'The browser must not report uncaught errors');
   console.log(
-    process.env.GARDEN_UI_FOCUS === 'appearance'
-      ? 'Appearance checks passed: themes, responsive layouts, prompt disclosure, reduced motion, pause persistence and animation layout cost.'
-      : process.env.GARDEN_UI_FOCUS === 'models'
-        ? 'Model and draft browser checks passed: prompt, conversation and settings persistence, responsive controls, connection handling and draft recovery.'
-        : process.env.GARDEN_UI_FOCUS === 'drafts'
-          ? 'Draft browser checks passed: encrypted IndexedDB, close and reopen, offline recovery without auto-send, lost save acknowledgement, conflict choice, and interrupted send receipt replay.'
-          : 'Browser checks passed: encrypted draft recovery, viewport layout, phone focus, effort drafts, playable links, downloads, state-preserving expansion, recorded evidence, mission review, media recovery, analysis sessions, device authorization, dictation consent, model selection persistence, and denial feedback with authentication retry.'
+    process.env.GARDEN_UI_FOCUS === 'conversations'
+      ? 'Project conversations and checked updates passed.'
+      : process.env.GARDEN_UI_FOCUS === 'workspace'
+        ? 'Workspace navigation and human intervention checks passed.'
+        : process.env.GARDEN_UI_FOCUS === 'appearance'
+          ? 'Appearance checks passed: themes, responsive layouts, prompt disclosure, reduced motion, pause persistence and animation layout cost.'
+          : process.env.GARDEN_UI_FOCUS === 'models'
+            ? 'Model and draft browser checks passed: prompt, conversation and settings persistence, responsive controls, connection handling and draft recovery.'
+            : process.env.GARDEN_UI_FOCUS === 'drafts'
+              ? 'Draft browser checks passed: encrypted IndexedDB, close and reopen, offline recovery without auto-send, lost save acknowledgement, conflict choice, and interrupted send receipt replay.'
+              : 'Browser checks passed: encrypted draft recovery, viewport layout, phone focus, effort drafts, playable links, downloads, state-preserving expansion, recorded evidence, mission review, media recovery, analysis sessions, device authorization, dictation consent, model selection persistence, and denial feedback with authentication retry.'
   );
 } catch (error) {
   console.error(error);

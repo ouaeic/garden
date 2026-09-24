@@ -55,7 +55,7 @@ export async function checkPermissionModes({
   });
   try {
     await page.goto(`${origin}/?task=${task.id}`);
-    await page.getByRole('button', { name: /^Add a direction/ }).click();
+    await page.getByRole('button', { name: /^Continue this conversation/ }).click();
     const descriptions = new Map();
     const prompt = page.getByRole('combobox', { name: 'Approvals for this prompt', exact: true });
     for (const mode of ['review', 'balanced', 'autonomous']) {
@@ -83,7 +83,7 @@ export async function checkPermissionModes({
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page
       .getByRole('navigation', { name: 'Settings sections' })
-      .getByRole('button', { name: 'Computer', exact: true })
+      .getByRole('button', { name: 'Computer & maintenance', exact: true })
       .click();
     const control = page.getByLabel('Review level for new work', { exact: true });
     for (const mode of ['review', 'balanced', 'autonomous']) {
@@ -97,7 +97,7 @@ export async function checkPermissionModes({
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page
       .getByRole('navigation', { name: 'Settings sections' })
-      .getByRole('button', { name: 'Computer', exact: true })
+      .getByRole('button', { name: 'Computer & maintenance', exact: true })
       .click();
     assert.equal(await control.inputValue(), 'autonomous');
     const form = control.locator('xpath=ancestor::form');

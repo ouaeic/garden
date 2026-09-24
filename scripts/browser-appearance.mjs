@@ -34,7 +34,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     })
   );
   await page.goto(origin);
-  await page.getByRole('heading', { name: 'Where shall we begin?' }).waitFor();
+  await page.getByRole('heading', { name: 'What’s next?' }).waitFor();
   await page.locator('.intent-editor textarea').waitFor();
   const stats = page.getByRole('button', { name: 'Stats', exact: true });
   const statsPanel = page.getByRole('region', { name: 'Usage statistics', exact: true });
@@ -44,7 +44,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
   await statsPanel.getByText('CPU 17%', { exact: true }).hover();
   assert.equal(await stats.getAttribute('aria-expanded'), 'true');
   await page.screenshot({ path: resolve(report, 'stats-desktop.png') });
-  await page.getByRole('heading', { name: 'Where shall we begin?' }).hover();
+  await page.getByRole('heading', { name: 'What’s next?' }).hover();
   await statsPanel.waitFor({ state: 'hidden' });
   await stats.focus();
   await page.keyboard.press('Enter');
@@ -52,7 +52,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
   await page.keyboard.press('Escape');
   await statsPanel.waitFor({ state: 'hidden' });
   await stats.click();
-  await page.getByRole('heading', { name: 'Where shall we begin?' }).click();
+  await page.getByRole('heading', { name: 'What’s next?' }).click();
   await statsPanel.waitFor({ state: 'hidden' });
   const options = page.locator('.garden-prompt-options');
   assert.equal(
@@ -134,6 +134,8 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     return animations.filter((animation) => animation.playState === 'running').length === 0;
   });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
+  if (!(await page.getByRole('button', { name: 'Settings', exact: true }).isVisible()))
+    await page.getByRole('button', { name: 'Show projects', exact: true }).click();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const motion = page.getByRole('checkbox', { name: 'Background motion', exact: true });
   assert.equal(await motion.isChecked(), true);
@@ -142,7 +144,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
   await motion.waitFor();
   assert.equal(await motion.isChecked(), false);
   await page.goto(origin);
-  await page.getByRole('heading', { name: 'Where shall we begin?' }).waitFor();
+  await page.getByRole('heading', { name: 'What’s next?' }).waitFor();
   assert.equal(
     await page.locator('.garden-living-field').evaluate((element) => {
       const animations = element.getAnimations({ subtree: true });
@@ -152,6 +154,8 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     }),
     true
   );
+  if (!(await page.getByRole('button', { name: 'Settings', exact: true }).isVisible()))
+    await page.getByRole('button', { name: 'Show projects', exact: true }).click();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await motion.check();
   for (const theme of ['dark', 'light']) {
@@ -163,7 +167,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     }
   }
   await page.goto(origin);
-  await page.getByRole('heading', { name: 'Where shall we begin?' }).waitFor();
+  await page.getByRole('heading', { name: 'What’s next?' }).waitFor();
   await page.setViewportSize({ width: 390, height: 500 });
   await page.locator('.garden-main').evaluate((element) => {
     element.scrollTop = element.scrollHeight;

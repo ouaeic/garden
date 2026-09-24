@@ -7,8 +7,10 @@ import { Button } from './ui';
 
 export default function Stats({
   bootstrap,
-  workspace
+  workspace,
+  onComputer
 }: {
+  onComputer?: () => void;
   bootstrap: Bootstrap;
   workspace: Workspace | null;
 }) {
@@ -79,6 +81,7 @@ export default function Stats({
         <div className="garden-health-popover" id={id} role="region" aria-label="Usage statistics">
           <div className="garden-health-panel">
             <StatsContent bootstrap={bootstrap} workspace={workspace} />
+            {onComputer && <Button onClick={onComputer}>All computer work</Button>}
           </div>
         </div>
       )}

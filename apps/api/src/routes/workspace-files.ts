@@ -141,7 +141,7 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
 
   app.put<{
     Params: { workspaceId: string };
-    Querystring: { path: string; expectSha256?: string };
+    Querystring: { path: string; expectSha256?: string; createOnly?: string };
     Body: Buffer;
   }>('/v1/workspaces/:workspaceId/file', async (request, reply) => {
     const user = requireUser(request.user);
@@ -182,17 +182,21 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
         scopes: ['files.write'],
         path: `/v1/workspaces/${workspace.id}/file?${new URLSearchParams({
           path: request.query.path,
-          ...(request.query.expectSha256 ? { expectSha256: request.query.expectSha256 } : {})
+          ...(request.query.expectSha256 ? { expectSha256: request.query.expectSha256 } : {}),
+          ...(request.query.createOnly === 'true' ? { createOnly: 'true' } : {})
         })}`,
         method: 'PUT',
         body: Uint8Array.from(request.body).buffer,
         contentType: 'application/octet-stream',
-        acceptAnyStatus: request.query.expectSha256 !== undefined
+        acceptAnyStatus:
+          request.query.expectSha256 !== undefined || request.query.createOnly === 'true'
       });
       if (response.status === 409)
         throw new AthanorError(
-          'file_changed',
-          'This file changed after you read it, so writing it whole would discard that change. Read it again and reapply your edit.',
+          request.query.createOnly === 'true' ? 'file_exists' : 'file_changed',
+          request.query.createOnly === 'true'
+            ? 'A file with this name already exists. Choose another name.'
+            : 'This file changed after you read it, so writing it whole would discard that change. Read it again and reapply your edit.',
           409
         );
       if (!response.ok) throw new Error(`Workspace runtime returned ${response.status}`);

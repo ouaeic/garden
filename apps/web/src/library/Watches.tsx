@@ -1,3 +1,4 @@
+import ModelPicker from '../ModelPicker';
 import { useState } from 'react';
 import type { ModelRelease, TaskSchedule, TaskScheduleSpec, Workspace } from '@athanor/contracts';
 import { del, patch, post } from '../client.js';
@@ -51,7 +52,7 @@ export function WatchesLibrary({
         description="Standing instructions that run while you are away."
       >
         <Button disabled={!workspace} onClick={() => setEditing('new')}>
-          Create a watch
+          New automation
         </Button>
         <ResourceState resource={watches} />
         <div className="stack management-filter">
@@ -70,7 +71,7 @@ export function WatchesLibrary({
               </div>
               <p className="library-instruction">
                 {watch.prompt ||
-                  'The saved instruction could not be decrypted. Edit the watch to replace it.'}
+                  'The saved instruction could not be decrypted. Edit the automation to replace it.'}
               </p>
               <p className="muted management-metadata">
                 {watch.maxSpendUsd === null
@@ -86,7 +87,7 @@ export function WatchesLibrary({
                   <summary>Inbound trigger</summary>
                   <p className="muted">
                     Signed deliveries may start a run, at most once every{' '}
-                    {watch.trigger.minGapMinutes} minutes. This watch also retains its clock
+                    {watch.trigger.minGapMinutes} minutes. This automation also retains its clock
                     schedule.
                   </p>
                   {watch.triggerUrlPath && (
@@ -96,8 +97,8 @@ export function WatchesLibrary({
                     />
                   )}
                   <p className="muted">
-                    The signing secret was shown when this watch was created. Recreate the watch to
-                    replace its trigger secret.
+                    The signing secret was shown when this automation was created. Recreate the
+                    automation to replace its trigger secret.
                   </p>
                 </details>
               )}
@@ -115,7 +116,7 @@ export function WatchesLibrary({
                   onClick={() =>
                     void action.run(
                       () => post(`/v1/schedules/${watch.id}/${watch.enabled ? 'pause' : 'resume'}`),
-                      watch.enabled ? 'Watch paused' : 'Watch resumed'
+                      watch.enabled ? 'Automation paused' : 'Automation resumed'
                     )
                   }
                 >
@@ -126,7 +127,7 @@ export function WatchesLibrary({
                   <Button onClick={() => onOpenTask(watch.lastTaskId!)}>Latest work</Button>
                 )}
                 <ConfirmButton
-                  label="Delete watch"
+                  label="Delete automation"
                   description={`Delete “${watch.title}” and its future timing${watch.trigger ? ' and inbound trigger' : ''}. Work it has already produced remains available.`}
                   action={async () => {
                     await del(`/v1/schedules/${watch.id}`);
@@ -192,6 +193,7 @@ function WatchEditor({
   onClose: () => void;
   onSaved: (watch: TaskSchedule & { triggerSecret?: string }) => void;
 }) {
+  const [modelId, setModelId] = useState('');
   const [kind, setKind] = useState<TaskScheduleSpec['kind']>(watch?.spec.kind ?? 'daily');
   const action = useAction();
   const source = watch?.spec;
@@ -208,7 +210,7 @@ function WatchEditor({
         : 'external')
   );
   return (
-    <Dialog title={watch ? 'Edit watch' : 'Create a watch'} onClose={onClose} wide>
+    <Dialog title={watch ? 'Edit automation' : 'New automation'} onClose={onClose} wide>
       <form
         className="stack"
         onSubmit={(event) => {
@@ -220,7 +222,7 @@ function WatchEditor({
               ? await patch<TaskSchedule>(`/v1/schedules/${watch.id}`, input)
               : await post<TaskSchedule & { triggerSecret?: string }>('/v1/schedules', input);
             onSaved(saved);
-          }, 'Watch saved');
+          }, 'Automation saved');
         }}
       >
         <Field label="Name">
@@ -229,7 +231,7 @@ function WatchEditor({
             required
             maxLength={160}
             defaultValue={watch?.title ?? ''}
-            placeholder="A useful name for this watch"
+            placeholder="A useful name for this automation"
           />
         </Field>
         <Field label="Standing instruction">
@@ -327,27 +329,25 @@ function WatchEditor({
         )}
         {!watch && (
           <div className="management-grid">
+            <input type="hidden" name="modelId" value={modelId} />
             <Field label="Model">
-              <select name="modelId" defaultValue="" key={privacy}>
-                <option value="">Automatic for this instruction</option>
-                {models
-                  .filter((model) => model.privacyRoute === privacy)
-                  .map((model) => (
-                    <option
-                      key={model.id}
-                      value={model.id}
-                      disabled={model.availability !== 'available'}
-                    >
-                      {model.displayName}
-                    </option>
-                  ))}
-              </select>
+              <ModelPicker
+                label="Automation model"
+                value={modelId}
+                models={models.filter((model) => model.privacyRoute === privacy)}
+                privacyRoute={privacy}
+                shortcuts={[{ value: '', label: 'Automatic for this instruction' }]}
+                onChange={setModelId}
+              />
             </Field>
             <Field label="Privacy route">
               <select
                 name="privacyRoute"
                 value={privacy}
-                onChange={(event) => setPrivacy(event.target.value as typeof privacy)}
+                onChange={(event) => {
+                  setPrivacy(event.target.value as typeof privacy);
+                  setModelId('');
+                }}
               >
                 <option value="provider_zdr">Zero retention</option>
                 <option value="external">External provider route</option>
@@ -357,10 +357,10 @@ function WatchEditor({
         )}
         {watch && (
           <p className="management-note">
-            This watch retains{' '}
+            This automation retains{' '}
             {models.find((model) => model.id === watch.modelId)?.displayName ?? watch.modelId} and
             its {watch.privacyRoute === 'provider_zdr' ? 'zero-retention' : 'external'} route.
-            Create a new watch to change its model.
+            Create a new automation to change its model.
           </p>
         )}
         <details>
@@ -407,7 +407,7 @@ function WatchEditor({
           )}
         </details>
         <Button type="submit" busy={action.busy} className="primary">
-          {watch ? 'Save watch' : 'Create watch'}
+          {watch ? 'Save automation' : 'Create automation'}
         </Button>
         <ActionFeedback action={action} />
       </form>

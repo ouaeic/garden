@@ -119,7 +119,7 @@ export const statusLabel: Record<Task['status'], string> = {
   awaiting_user: 'Needs you',
   awaiting_resource: 'Waiting for resources',
   paused: 'Paused',
-  completed: 'Complete',
+  completed: 'Run ended',
   failed: 'Needs recovery',
   cancelled: 'Cancelled'
 };
@@ -134,16 +134,34 @@ export const needsAttention = (task: Task): boolean =>
   (['awaiting_user', 'awaiting_resource', 'failed'].includes(task.status) &&
     task.resourceWait?.code !== 'background_jobs') ||
   (task.status === 'completed' && task.deliveryStatus === 'incomplete');
-export const taskStatusLabel = (task: Task): string =>
-  task.hasOpenQuestion && isWorking(task)
-    ? 'Working · answer requested'
-    : task.status === 'awaiting_resource' && task.resourceWait?.code === 'background_jobs'
-      ? 'Background work is running'
-      : task.status === 'completed' && task.deliveryStatus === 'pending'
-        ? 'Generating media'
-        : task.status === 'completed' && task.deliveryStatus === 'incomplete'
-          ? 'Delivery needs attention'
-          : statusLabel[task.status];
+export const taskStatusLabel = (
+  task: Task,
+  evidence?: { openSteps: number; interrupted: boolean; verification: string | null }
+): string => {
+  const openSteps =
+    evidence?.openSteps ??
+    (task.activity
+      ? Math.max(
+          0,
+          task.activity.stepsTotal -
+            task.activity.stepsCompleted -
+            (task.activity.stepsSkipped ?? 0)
+        )
+      : 0);
+  const interrupted = evidence?.interrupted ?? task.activity?.ending?.interrupted;
+  const verification = evidence?.verification ?? task.activity?.ending?.verification;
+  if (task.hasOpenQuestion && isWorking(task)) return 'Working · answer requested';
+  if (task.status === 'awaiting_resource' && task.resourceWait?.code === 'background_jobs')
+    return 'Background work is running';
+  if (task.status !== 'completed') return statusLabel[task.status];
+  if (task.deliveryStatus === 'pending') return 'Generating media';
+  if (task.deliveryStatus === 'incomplete') return 'Delivery needs attention';
+  if (openSteps > 0) return `Stopped with ${openSteps} step${openSteps === 1 ? '' : 's'} open`;
+  if (interrupted) return 'Interrupted · review needed';
+  if (verification)
+    return ['verified', 'not_applicable'].includes(verification) ? 'Completed' : 'Needs review';
+  return 'Run ended';
+};
 export const isFinished = (task: Task): boolean =>
   ['completed', 'failed', 'cancelled'].includes(task.status);
 export const data = (value: unknown): Record<string, unknown> =>

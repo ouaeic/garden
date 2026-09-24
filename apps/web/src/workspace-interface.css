@@ -1,0 +1,683 @@
+/* The project work surface keeps navigation separate from the artifact and its tools. */
+.garden-shell [hidden] {
+  display: none !important;
+}
+.garden-location {
+  font-size: 13px;
+  color: var(--muted);
+  margin-left: 16px;
+}
+.garden-primary-navigation {
+  display: grid;
+  gap: 3px;
+  padding: 4px 0 16px;
+  border-bottom: 1px solid var(--line);
+}
+.garden-primary-navigation button {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 40px;
+  padding: 9px 12px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.garden-primary-navigation button:hover,
+.garden-primary-navigation button[aria-current] {
+  background: var(--raised);
+  color: var(--text);
+}
+.garden-primary-navigation small {
+  margin-left: auto;
+  padding: 1px 6px;
+  background: var(--panel);
+  border-radius: 20px;
+}
+.sidebar-project-label {
+  margin-top: 18px;
+}
+.garden-sidebar {
+  gap: 10px;
+}
+.garden-sidebar-heading > .eyebrow {
+  display: none;
+}
+.garden-sidebar-heading {
+  min-height: 0;
+}
+.garden-sidebar-bottom {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.garden-sidebar-bottom > .button {
+  justify-content: flex-start;
+}
+.garden-sidebar .garden-new-work {
+  min-height: 40px;
+}
+.returning-home .garden-welcome {
+  padding: 24px 28px;
+  margin-bottom: 24px;
+  border-radius: 20px;
+}
+.returning-home .garden-welcome .overview-top {
+  margin-bottom: 16px;
+}
+.returning-home .garden-welcome h1 {
+  font-size: 32px;
+  margin: 0 0 6px;
+}
+.returning-home .garden-welcome .eyebrow {
+  display: none;
+}
+.returning-home .garden-welcome .overview-top p {
+  margin: 0;
+}
+.returning-home .garden-welcome .intent-editor > textarea {
+  min-height: 60px;
+}
+.home-current-work {
+  margin-block: 22px 28px;
+}
+.home-current-work h2 {
+  font-size: 18px;
+  font-weight: 500;
+}
+.home-current-work > button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 14px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+}
+.home-current-work > button > span:nth-child(2) {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.home-current-work strong {
+  font-weight: 500;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.home-current-work small {
+  color: var(--muted);
+}
+.garden-shell .project-space-header {
+  border-radius: 16px;
+  padding: 20px 24px;
+  margin-bottom: 12px;
+}
+.garden-shell .has-conversation .project-space-header {
+  margin: 16px 24px 0;
+  padding: 16px 20px;
+  border-radius: 16px;
+}
+.project-workspace-bar {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.has-conversation .project-workspace-bar {
+  margin: 0 24px;
+}
+.project-conversation-switcher {
+  flex: 1;
+  min-width: 0;
+  max-width: 32rem;
+}
+.project-conversation-switcher select {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-overflow: ellipsis;
+  font-size: 14px;
+  padding: 9px 26px 9px 0;
+}
+.project-view-nav {
+  display: flex;
+  gap: 4px;
+}
+.project-view-nav .button {
+  border-color: transparent;
+  background: transparent;
+  min-height: 38px;
+  padding: 8px 14px;
+}
+.project-view-nav .button[aria-current] {
+  background: var(--raised);
+  color: var(--text);
+}
+.project-space.has-conversation > .project-view-content {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.garden-task-scroll {
+  padding-top: 12px;
+}
+.garden-task .garden-work-navigation {
+  float: left;
+  margin: 0;
+  min-height: 38px;
+  gap: 12px;
+}
+.garden-task .garden-work-navigation > .eyebrow {
+  display: none;
+}
+.conversation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  min-height: 38px;
+  margin-bottom: 8px;
+}
+.conversation-actions .button {
+  background: transparent;
+  border-color: transparent;
+  font-size: 12px;
+}
+.garden-task .run-summary {
+  clear: both;
+  padding: 10px 0 18px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 20px;
+}
+.garden-shell .garden-task-layout {
+  display: block;
+}
+.garden-shell .garden-task-primary {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  max-width: 1120px;
+  margin-inline: auto;
+}
+.garden-shell .garden-answer {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+}
+.garden-task .garden-answer .markdown {
+  max-width: 78ch;
+}
+.garden-shell .garden-delivery {
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+.garden-delivery-list {
+  gap: 0;
+}
+.garden-delivery-actions > .button {
+  font-size: 12px;
+  min-height: 34px;
+}
+.garden-delivery-actions > .button:not(:hover) {
+  background: transparent;
+}
+.garden-task .garden-outputs:empty {
+  display: none;
+}
+.conversation-activity {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+.conversation-activity h2,
+.project-overview h2,
+.management-content h2 {
+  font-family: inherit;
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.3px;
+}
+.conversation-activity .garden-task-aside {
+  grid-area: auto;
+  padding: 0;
+  border: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.conversation-activity .garden-progress {
+  display: block;
+}
+.conversation-activity .garden-milestone-disclosure {
+  margin-top: 20px;
+}
+.project-view-files .project-directories,
+.workspace-view-files .project-directories {
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+.workspace-view-tools .computer {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.computer-tabs {
+  gap: 6px;
+}
+.computer-tabs .button {
+  min-height: 40px;
+}
+.project-overview {
+  padding-top: 12px;
+}
+.project-result-group {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 20px;
+}
+.project-result-group .project-section-heading > button {
+  font-weight: 500;
+  font-size: 15px;
+}
+.settings-disclosure {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.settings-disclosure > summary,
+.advanced-model-choices > summary {
+  font-size: 14px;
+  font-weight: 500;
+  min-height: 36px;
+  cursor: pointer;
+  padding: 8px 0;
+}
+.settings-disclosure[open] > summary,
+.advanced-model-choices[open] > summary {
+  margin-bottom: 14px;
+}
+.advanced-model-choices {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.model-choice-card {
+  min-width: 0;
+}
+.management-content .model-choice-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.advanced-model-choices .model-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr));
+}
+.library-project-results {
+  margin-top: 26px;
+}
+.library-project-results h3 {
+  font-size: 15px;
+  font-weight: 500;
+  margin: 0 0 12px;
+}
+.library-page .library-results {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+.library-page .library-result {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: start;
+  gap: 18px;
+  padding: 18px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+.library-page .library-art,
+.library-page .library-file-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  object-fit: cover;
+  font-size: 11px;
+}
+.library-page .library-result-body {
+  padding: 0;
+  min-width: 0;
+}
+.library-page .library-result h4 {
+  margin: 0 0 5px;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.library-page .management-metadata {
+  font-size: 12px;
+  margin: 0 0 9px;
+}
+.result-management {
+  padding: 7px 4px;
+  min-width: 0;
+}
+.result-management > summary {
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.result-management[open] {
+  flex-basis: 100%;
+}
+.result-management[open] > summary {
+  margin-bottom: 12px;
+}
+.result-management .row {
+  margin-top: 8px;
+}
+.garden-shell .attention-task {
+  padding: 18px 0;
+  border-radius: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+}
+.attention-task strong {
+  font-size: 15px;
+  font-weight: 500;
+}
+.attention-task span {
+  display: grid;
+  gap: 6px;
+}
+.garden-shell .management-heading {
+  margin-bottom: 24px;
+}
+.garden-shell .management-heading h1 {
+  font-size: 36px;
+}
+.garden-shell .management-tabs {
+  flex-wrap: wrap;
+}
+.garden-shell button:focus-visible,
+.garden-shell summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+@media (max-width: 960px) {
+  .garden-shell .garden-health {
+    display: block;
+  }
+  .garden-location {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .garden-shell .garden-masthead-end {
+    margin-left: auto;
+    gap: 3px;
+  }
+  .garden-shell .garden-masthead-end .global-search {
+    display: inline-flex;
+  }
+  .garden-shell .garden-health {
+    margin-left: auto;
+  }
+  .garden-masthead .brand-button {
+    margin-right: 0;
+  }
+  .garden-shell .garden-stats-trigger {
+    min-width: 40px;
+    padding: 8px;
+    font-size: 12px;
+    gap: 4px;
+  }
+  .garden-shell .garden-stats-trigger svg {
+    width: 18px;
+    height: 18px;
+  }
+  .garden-shell .garden-health-popover {
+    position: fixed;
+    top: calc(60px + env(safe-area-inset-top, 0px));
+    right: 12px;
+    padding-top: 4px;
+  }
+  .garden-shell .garden-main {
+    border-radius: 0;
+  }
+  .garden-shell .has-conversation .project-space-header {
+    margin: 10px 12px 0;
+    padding: 12px;
+  }
+  .garden-shell .project-space-title {
+    min-width: 0;
+  }
+  .garden-shell .project-space-title h1 {
+    font-size: 18px;
+  }
+  .has-conversation .project-workspace-bar {
+    margin-inline: 12px;
+    gap: 4px;
+    padding-block: 4px 8px;
+  }
+  .project-conversation-switcher {
+    flex-basis: 100%;
+    max-width: none;
+  }
+  .project-view-nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .project-view-nav .button {
+    flex: 1;
+    padding-inline: 10px;
+    min-height: 40px;
+  }
+  .garden-task-scroll {
+    padding-inline: 16px;
+  }
+  .garden-task .garden-work-navigation {
+    float: none;
+    justify-content: space-between;
+  }
+  .conversation-actions {
+    margin-top: -38px;
+    padding-right: 38px;
+  }
+  .conversation-actions .button {
+    padding-inline: 8px;
+  }
+  .garden-work-navigation .connection {
+    max-width: 105px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .garden-task .run-summary {
+    gap: 8px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+  }
+  .garden-task .run-summary > .row {
+    font-size: 11px;
+  }
+  .returning-home .garden-welcome {
+    padding: 20px 16px;
+    margin-bottom: 20px;
+  }
+  .returning-home .garden-welcome h1 {
+    font-size: 29px;
+  }
+  .garden-shell .garden-task-composer {
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  .library-page .library-result {
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 12px;
+  }
+  .library-page .library-art,
+  .library-page .library-file-icon {
+    width: 44px;
+    height: 48px;
+  }
+  .garden-shell .management-tabs button {
+    min-height: 40px;
+  }
+  .garden-shell .management-heading h1 {
+    font-size: 30px;
+  }
+}
+
+.file-new > summary {
+  cursor: pointer;
+  padding: 10px 0;
+}
+.file-new[open] > summary {
+  margin-bottom: 10px;
+}
+.computer-file-layout.no-file {
+  grid-template-columns: minmax(0, 1fr);
+}
+.computer-file-layout.no-file > :not(.computer-file-list) {
+  display: none;
+}
+.directory-hidden-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.garden-sidebar {
+  padding-top: 16px;
+  gap: 8px;
+}
+.garden-primary-navigation {
+  padding-bottom: 8px;
+  gap: 1px;
+}
+.garden-primary-navigation button {
+  min-height: 36px;
+  padding-block: 7px;
+}
+.garden-sidebar-heading:has(.garden-sidebar-close) {
+  flex: 0 0 0;
+}
+.garden-sidebar-bottom {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+.garden-sidebar-bottom > .button {
+  padding: 7px 5px;
+  min-height: 34px;
+  border: 0;
+  font-size: 12px;
+}
+.garden-sidebar-theme {
+  grid-column: 1 / -1;
+}
+.returning-home .garden-welcome {
+  padding: 20px 24px;
+}
+.returning-home .garden-welcome .overview-top {
+  margin-bottom: 12px;
+}
+.returning-home .intent-editor {
+  padding: 8px 12px;
+}
+.returning-home .intent-editor > textarea {
+  padding: 6px 4px;
+  min-height: 44px;
+  font-size: 16px;
+}
+.returning-home .intent-toolbar {
+  padding-top: 0;
+}
+.returning-home .intent-toolbar .button {
+  min-height: 34px;
+  padding: 7px 12px;
+}
+@media (max-width: 760px) {
+  .garden-sidebar-heading:has(.garden-sidebar-close) {
+    flex: 0 0 30px;
+  }
+  .garden-shell .garden-sidebar {
+    padding-top: 8px;
+  }
+}
+
+.project-directories .computer-upload {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+.project-directories .computer-upload input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.project-directories .computer-upload:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.project-directories .directory-toolbar {
+  align-items: end;
+}
+.project-jobs-link {
+  font-size: 12px;
+}
+
+.project-shortcuts {
+  display: flex;
+  gap: 6px;
+  margin: 0 24px 8px;
+  flex-shrink: 0;
+}
+.project-shortcuts .button {
+  min-height: 32px;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.garden-shell .library-page .management-section {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+.garden-shell .library-project-results > h3 {
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+}
+.library-page .library-result .management-actions {
+  align-items: center;
+  margin-top: 10px;
+}
+.garden-shell .library-result .result-management {
+  padding: 7px 4px;
+  border: 0;
+  background: transparent;
+}
+
+/* Reserve a readable work strip when a short viewport squeezes the expanded composer. */
+.garden-shell .garden-task {
+  grid-template-rows: minmax(64px, 1fr) minmax(0, auto);
+}

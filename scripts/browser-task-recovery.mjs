@@ -154,6 +154,7 @@ export async function checkTaskRecovery({ context, origin, bootstrap, task, repo
       })
     );
     await page.reload();
+    await page.getByRole('button', { name: 'View checks & activity', exact: true }).click();
     await page.getByText('Verification needs review', { exact: true }).waitFor();
     assert.equal(await page.locator('.completion-record.needs-review').count(), 1);
     assert.equal(await page.getByText('No executable checks needed', { exact: true }).count(), 0);

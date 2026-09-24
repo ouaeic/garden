@@ -585,6 +585,10 @@ export const Task = z.object({
     .object({
       currentStep: z.string().nullable(),
       stepsCompleted: z.number(),
+      stepsSkipped: z.number().optional(),
+      ending: z
+        .object({ interrupted: z.boolean(), verification: z.string().nullable() })
+        .optional(),
       stepsTotal: z.number(),
       latest: z.string(),
       eventId: z.string().nullable(),

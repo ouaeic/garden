@@ -1,10 +1,11 @@
+import { setSurfaceLocation, useProjectView, useProjectTool } from './surface-location';
+import type { ComputerTool } from './Computer';
 import { readQuestionDraft, writeQuestionDraft } from './draft-storage';
 import { useVisibleClock } from './visible-clock';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowUpRight,
-  ChevronRight,
   FileText,
   GitBranch,
   History,
@@ -15,7 +16,6 @@ import {
   Play,
   Plus,
   Share2,
-  Terminal,
   X
 } from 'lucide-react';
 import type {
@@ -63,7 +63,7 @@ const ProjectNoteEditor = lazy(() =>
   import('./ProjectNotes').then((module) => ({ default: module.ProjectNoteEditor }))
 );
 const PrivateDiagnostics = lazy(() => import('./PrivateDiagnostics'));
-const ProcessPanel = lazy(() => import('./ProcessPanel'));
+const Computer = lazy(() => import('./Computer'));
 const DirectoryPanel = lazy(() => import('./DirectoryPanel'));
 const PlanEditor = lazy(() => import('./PlanEditor'));
 const TaskOptions = lazy(() => import('./TaskOptions'));
@@ -141,7 +141,22 @@ export default function TaskSurface({
     Boolean(draft?.body || draft?.attachments.length || draft?.controls?.context)
   );
   const [historyMore, setHistoryMore] = useState(false);
-  const [fileRequest, setFileRequest] = useState(0);
+  const [view, selectView] = useProjectView();
+  const [selectedTool] = useProjectTool(task.projectId ?? task.id);
+  const [filesOpened, setFilesOpened] = useState(view === 'files');
+  const [toolsOpened, setToolsOpened] = useState(view === 'tools');
+  useEffect(() => {
+    if (view === 'files') setFilesOpened(true);
+    if (view === 'tools') setToolsOpened(true);
+  }, [view]);
+  const tool = (
+    ['terminal', 'browser', 'desktop', 'previews', 'processes', 'checkpoints'].includes(
+      selectedTool
+    )
+      ? selectedTool
+      : 'browser'
+  ) as ComputerTool;
+
   const [historyPage, setHistoryPage] = useState<TaskEvent[]>([]);
   useEffect(() => {
     if (!initialPage) return;
@@ -219,17 +234,20 @@ export default function TaskSurface({
   const openPhases = (presentation?.progress?.phases ?? []).filter(
     (phase) => phase.status !== 'completed' && phase.status !== 'skipped'
   ).length;
-  const partlyDone = task.status === 'completed' && openPhases > 0;
   const waitingReason =
     task.status === 'awaiting_resource' ? resourceWaitReason(events, task.resourceWait) : null;
   const displayStatus =
-    task.status === 'completed' && pendingDelivery
-      ? 'Generating media'
-      : task.status === 'completed' && deliveryFailed
-        ? 'Delivery needs attention'
-        : partlyDone
-          ? `Stopped with ${openPhases} step${openPhases === 1 ? '' : 's'} open`
-          : (waitingReason?.label ?? taskStatusLabel(task));
+    waitingReason?.label ??
+    taskStatusLabel(
+      { ...task, deliveryStatus: presentation?.delivery?.status ?? task.deliveryStatus },
+      completionEvent
+        ? {
+            openSteps: openPhases,
+            interrupted: completion.interrupted === true,
+            verification: text(verification.status) || null
+          }
+        : undefined
+    );
   const question = activeQuestion(events, task);
   const questionDraftKey = question ? `garden:question:${task.id}:${question.id}` : null;
   const questionDraftWrites = useRef(Promise.resolve());
@@ -422,10 +440,69 @@ export default function TaskSurface({
         )}
       </aside>
     ) : null;
+  const resultAnswer = answer.markdown ? (
+    <article className="garden-answer">
+      <div className="result-toolbar">
+        <span className="eyebrow">
+          {writing
+            ? 'Taking shape'
+            : answer.previous
+              ? 'Previous result'
+              : task.status !== 'completed'
+                ? 'Latest update'
+                : completion.interrupted
+                  ? 'Unverified answer'
+                  : 'The result'}
+        </span>
+        <div className="row">
+          <Button
+            className="quiet-button"
+            onClick={() => navigator.clipboard.writeText(answer.markdown).catch(setError)}
+          >
+            Copy
+          </Button>
+        </div>
+      </div>
+      <Suspense fallback={<Spinner label="Opening the result…" />}>
+        <Markdown artifacts={artifacts} onArtifact={showArtifact}>
+          {answer.markdown}
+        </Markdown>
+      </Suspense>
+      {writing && (
+        <div className="writing-indicator" role="status">
+          Writing…
+        </div>
+      )}
+    </article>
+  ) : attentionPanel ? null : (
+    <article className="garden-working-note">
+      <span className="eyebrow">{statusLabel[task.status]}</span>
+      <h2>
+        {task.status === 'awaiting_user'
+          ? 'Your input will shape the next step.'
+          : task.status === 'paused'
+            ? 'Ready to continue.'
+            : task.status === 'failed'
+              ? 'This work needs attention.'
+              : task.status === 'cancelled'
+                ? 'This work has stopped.'
+                : 'Making room for your idea.'}
+      </h2>
+      <p>
+        {presentation?.progress.current?.title ??
+          latestActivity?.summary ??
+          'The first recorded update will appear here.'}
+      </p>
+      <Button className="quiet-button" onClick={() => setPanel('brief')}>
+        Read your brief
+        <ArrowUpRight size={14} />
+      </Button>
+    </article>
+  );
   return (
-    <section className="garden-task">
+    <section className={`garden-task workspace-view-${view}`}>
       <div className="garden-task-scroll">
-        <div className="garden-work-navigation">
+        <div className="garden-work-navigation" hidden={view === 'files' || view === 'tools'}>
           {onDiscuss && !task.parentTaskId ? (
             <span className="eyebrow">Conversation</span>
           ) : (
@@ -465,74 +542,25 @@ export default function TaskSurface({
             </Button>
           </div>
         </div>
-        <div className="garden-work-heading">
-          <div>
-            <div className="eyebrow">
-              {workspace.name}
-              <ChevronRight size={12} /> {displayStatus}
-            </div>
-            {onDiscuss ? <h2>{task.title}</h2> : <h1>{task.title}</h1>}
-          </div>
-          <div className="garden-heading-actions">
-            <Button onClick={() => setPanel('share')} aria-label="Share this work">
-              <Share2 size={17} />
-              <span>Share</span>
-            </Button>
-            <Button
-              className="primary"
-              onClick={() => {
-                setComposerExpanded(true);
-                requestAnimationFrame(() => document.getElementById(`intent-${task.id}`)?.focus());
-              }}
-            >
-              <Plus size={17} />
-              Add direction
-            </Button>
-          </div>
+        <div className="conversation-actions" hidden={view === 'files' || view === 'tools'}>
+          <h2 className="sr-only">{task.title}</h2>
+          <Button onClick={() => setPanel('share')} aria-label="Share this work">
+            <Share2 size={15} />
+            Share
+          </Button>
+          <Button onClick={() => setPanel('models')}>Models</Button>
+          <Button
+            onClick={() => {
+              selectView('work');
+              setComposerExpanded(true);
+              requestAnimationFrame(() => document.getElementById(`intent-${task.id}`)?.focus());
+            }}
+          >
+            Continue
+          </Button>
         </div>
         {attentionPanel}
-        <details className="garden-project-tools">
-          <summary>Tools & activity</summary>
-          <div className="work-tools garden-top-tools">
-            <Button onClick={() => onComputer('terminal')}>
-              <Terminal size={16} />
-              Terminal
-            </Button>
-            <Button onClick={() => onComputer('browser')}>Browser</Button>
-            <Button onClick={() => onComputer('desktop')}>Desktop</Button>
-            <Button
-              onClick={() => {
-                setFileRequest((value) => value + 1);
-                document
-                  .getElementById(`directories-${task.id}`)
-                  ?.scrollIntoView({ block: 'start' });
-              }}
-            >
-              Files
-            </Button>
-            <Button onClick={() => onComputer('previews')}>Previews</Button>
-            <Button
-              onClick={() =>
-                document.getElementById(`processes-${task.id}`)?.scrollIntoView({ block: 'start' })
-              }
-            >
-              Processes
-            </Button>
-            <Button onClick={() => setPanel('models')}>Models</Button>
-            <Button
-              onClick={() => {
-                setHistoryPage(events.slice(-250));
-                setHistoryMore((events.at(-250)?.sequence ?? events[0]?.sequence ?? 1) > 1);
-                setPanel('history');
-              }}
-            >
-              <History size={16} />
-              Activity
-            </Button>
-            <Button onClick={() => setPanel('plan')}>Plan</Button>
-          </div>
-        </details>
-        <div className="run-summary">
+        <div className="run-summary" hidden={view === 'files' || view === 'tools'}>
           <div className={`status-line ${isWorking(task) || pendingDelivery ? 'active' : ''}`}>
             <i />
             <span>{displayStatus}</span>
@@ -541,6 +569,11 @@ export default function TaskSurface({
             )}
           </div>
           <div className="row">
+            {isFinished(task) && (
+              <Button className="quiet-button" onClick={() => selectView('activity')}>
+                View checks & activity
+              </Button>
+            )}
             {/*
              * Labelled, because an unattributed currency figure beside a status line is a number
              * the owner cannot check: it could be this project, today, or the account. It is this
@@ -616,6 +649,7 @@ export default function TaskSurface({
           </aside>
         )}
         <ErrorNotice
+          context="Could not complete this conversation action."
           error={error}
           onRetry={() => {
             setError(null);
@@ -625,7 +659,7 @@ export default function TaskSurface({
         {loading ? (
           <Spinner label="Opening this work…" />
         ) : (
-          <div className="garden-task-layout">
+          <div className="garden-task-layout" hidden={view !== 'work'}>
             <div className="garden-task-primary">
               {/*
                * A run a ceiling stopped is the one pause that has an answer, and the answer is a
@@ -638,34 +672,10 @@ export default function TaskSurface({
                   <SpendBlock task={task} onResumed={reload} />
                 </Suspense>
               )}
-              {presentation?.surface && (
-                <details
-                  className="garden-task-directions"
-                  key={`${task.id}:${isFinished(task)}`}
-                  open={!isFinished(task)}
-                >
-                  <summary>Your directions</summary>
-                  <Suspense fallback={null}>
-                    <WorkDirections
-                      surface={presentation.surface}
-                      {...(onDiscuss
-                        ? {
-                            onDiscuss: (eventId: string) => onDiscuss({ taskId: task.id, eventId })
-                          }
-                        : {})}
-                      onRevisit={(eventId) => {
-                        const event = events.find((item) => item.id === eventId);
-                        if (event) setBranchEvent(event);
-                      }}
-                    />
-                  </Suspense>
-                </details>
-              )}
-              <SubagentLanes events={events} />
               <Suspense fallback={null}>
                 <MediaJobs taskId={task.id} onDelivered={reload} />
               </Suspense>
-              {presentation && (
+              {presentation ? (
                 <TaskOutputs
                   {...(task.projectId
                     ? {
@@ -696,28 +706,17 @@ export default function TaskSurface({
                       : presentation
                   }
                   onArtifact={(id) => showArtifact(id)}
+                  afterPreview={resultAnswer}
                 />
-              )}
-              {presentation && (
-                <WorkTrace
-                  progress={presentation.progress}
-                  {...(presentation.surface ? { surface: presentation.surface } : {})}
-                  onEvidence={(id) => void inspectEvidence(id)}
-                  onResult={(kind, id) => {
-                    if (kind === 'artifact') showArtifact(id);
-                    else
-                      document
-                        .getElementById(`preview-${id}`)
-                        ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                  }}
-                />
+              ) : (
+                resultAnswer
               )}
               {presentation?.surface &&
                 presentation.results.some(
                   (result) => !presentation.surface!.currentResultIds.includes(result.id)
                 ) && (
                   <details className="garden-previous-results">
-                    <summary>Results from earlier directions</summary>
+                    <summary>Earlier results</summary>
                     <TaskOutputs
                       {...(onDiscuss
                         ? {
@@ -740,192 +739,13 @@ export default function TaskSurface({
                 )}
               {previousAnswer?.markdown && (
                 <details className="garden-previous-answer">
-                  <summary>Answer from an earlier direction</summary>
+                  <summary>Earlier answer</summary>
                   <Suspense fallback={null}>
                     <Markdown artifacts={artifacts} onArtifact={showArtifact}>
                       {previousAnswer.markdown}
                     </Markdown>
                   </Suspense>
                 </details>
-              )}
-              {answer.markdown ? (
-                <article className="garden-answer">
-                  <div className="result-toolbar">
-                    <span className="eyebrow">
-                      {writing
-                        ? 'Taking shape'
-                        : answer.previous
-                          ? 'Previous result'
-                          : task.status !== 'completed'
-                            ? 'Latest update'
-                            : completion.interrupted
-                              ? 'Unverified answer'
-                              : 'The result'}
-                    </span>
-                    <div className="row">
-                      <Button
-                        className="quiet-button"
-                        onClick={() =>
-                          navigator.clipboard.writeText(answer.markdown).catch(setError)
-                        }
-                      >
-                        Copy
-                      </Button>
-                    </div>
-                  </div>
-                  <Suspense fallback={<Spinner label="Opening the result…" />}>
-                    <Markdown artifacts={artifacts} onArtifact={showArtifact}>
-                      {answer.markdown}
-                    </Markdown>
-                  </Suspense>
-                  {writing && (
-                    <div className="writing-indicator" role="status">
-                      Writing…
-                    </div>
-                  )}
-                </article>
-              ) : attentionPanel ? null : (
-                <article className="garden-working-note">
-                  <span className="eyebrow">{statusLabel[task.status]}</span>
-                  <h2>
-                    {task.status === 'awaiting_user'
-                      ? 'Your input will shape the next step.'
-                      : task.status === 'paused'
-                        ? 'Ready to continue.'
-                        : task.status === 'failed'
-                          ? 'This work needs attention.'
-                          : task.status === 'cancelled'
-                            ? 'This work has stopped.'
-                            : 'Making room for your idea.'}
-                  </h2>
-                  <p>
-                    {presentation?.progress.current?.title ??
-                      latestActivity?.summary ??
-                      'The first recorded update will appear here.'}
-                  </p>
-                  <Button className="quiet-button" onClick={() => setPanel('brief')}>
-                    Read your brief
-                    <ArrowUpRight size={14} />
-                  </Button>
-                </article>
-              )}
-              <div id={`processes-${task.id}`}>
-                <Suspense fallback={null}>
-                  <ProcessPanel key={task.id} workspaceId={workspace.id} taskId={task.id} />
-                </Suspense>
-              </div>
-              <div id={`directories-${task.id}`}>
-                <Suspense fallback={null}>
-                  <DirectoryPanel
-                    key={task.id}
-                    taskId={task.id}
-                    openRequest={fileRequest}
-                    {...(!task.parentMissionId && !composerLocked
-                      ? {
-                          rerunWorkspaceId: task.workspaceId,
-                          onRerunAnalysis: (
-                            selection: Extract<DirectionContext, { kind: 'analysis' }>
-                          ) => {
-                            setDirectionContext(selection);
-                            setComposerExpanded(true);
-                            requestAnimationFrame(() => {
-                              const input = document.getElementById(`intent-${task.id}`);
-                              input?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                              input?.focus({ preventScroll: true });
-                            });
-                          }
-                        }
-                      : {})}
-                  />
-                </Suspense>
-              </div>
-              {completionEvent && (
-                <section
-                  className={`completion-record ${completion.interrupted || verification.status === 'unverified' || verification.status === 'checks_failed' || verification.status === 'checks_did_not_run' || verification.status === 'delivery_incomplete' ? 'needs-review' : ''}`}
-                >
-                  <div className="row between">
-                    <span className="eyebrow">
-                      {(lastEvent(events, 'user_message')?.sequence ?? 0) > completionEvent.sequence
-                        ? 'Previous completion'
-                        : 'Completion record'}
-                    </span>
-                    <span className="badge">
-                      {completion.interrupted
-                        ? 'Review needed'
-                        : verification.status === 'delivery_pending'
-                          ? pendingDelivery
-                            ? 'Generation continues'
-                            : deliveryFailed
-                              ? 'Delivery needs attention'
-                              : presentation?.delivery?.status === 'ready'
-                                ? 'Delivered'
-                                : 'Checking delivery'
-                          : verification.status === 'delivery_incomplete'
-                            ? 'Delivery needs attention'
-                            : verification.status === 'verified'
-                              ? checks.label
-                              : verification.status === 'not_applicable'
-                                ? 'No executable checks needed'
-                                : verification.status === 'checks_failed'
-                                  ? 'Checks failed'
-                                  : verification.status === 'checks_did_not_run'
-                                    ? 'Checks did not run'
-                                    : verification.status === 'unverified'
-                                      ? 'Verification needs review'
-                                      : 'Verification not recorded'}
-                    </span>
-                  </div>
-                  {text(completion.summary) &&
-                    text(completion.summary).trim() !== answer.markdown.trim() && (
-                      <p>{text(completion.summary)}</p>
-                    )}
-                  {strings(verification.remainingRisks).length > 0 && (
-                    <div className="remaining-risks">
-                      <strong>Still to consider</strong>
-                      <ul>
-                        {strings(verification.remainingRisks).map((risk, index) => (
-                          <li key={index}>{risk}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {(checks.evidence.length > 0 || acceptance.length > 0) && (
-                    <details>
-                      <summary>Evidence and checks</summary>
-                      <ul className="evidence-list">
-                        {checks.evidence.map((record, index) => {
-                          const call = text(record.toolCallId);
-                          const source = events.find(
-                            (event) =>
-                              text(data(event.payload).toolCallId) === call &&
-                              event.kind === 'tool_result'
-                          );
-                          return (
-                            <li key={index}>
-                              <span>{text(record.claim)}</span>
-                              <small>{evidenceSource(record.source)}</small>
-                              {source && (
-                                <Button onClick={() => setEvidence(source)}>
-                                  Inspect evidence
-                                </Button>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                      {acceptance.length > 0 && (
-                        <div className="completion-acceptance">
-                          <strong>Check results</strong>
-                          <ul>
-                            {acceptance.map((result, index) => (
-                              <li key={index}>{result}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </details>
-                  )}
-                </section>
               )}
               {!presentation && artifacts.length > 0 && (
                 <section className="result-shelf">
@@ -956,6 +776,151 @@ export default function TaskSurface({
                 </section>
               )}
             </div>
+          </div>
+        )}
+        {view === 'activity' && (
+          <section className="conversation-activity" aria-label="Conversation activity">
+            <div className="section-heading">
+              <h2>Activity</h2>
+              <div className="row">
+                <Button onClick={() => setPanel('plan')}>Edit plan</Button>
+                <Button
+                  onClick={() => {
+                    setHistoryPage(events.slice(-250));
+                    setHistoryMore((events.at(-250)?.sequence ?? events[0]?.sequence ?? 1) > 1);
+                    setPanel('history');
+                  }}
+                >
+                  <History size={15} />
+                  Full activity
+                </Button>
+              </div>
+            </div>
+            {completionEvent && (
+              <section
+                className={`completion-record ${completion.interrupted || verification.status === 'unverified' || verification.status === 'checks_failed' || verification.status === 'checks_did_not_run' || verification.status === 'delivery_incomplete' ? 'needs-review' : ''}`}
+              >
+                <div className="row between">
+                  <span className="eyebrow">
+                    {(lastEvent(events, 'user_message')?.sequence ?? 0) > completionEvent.sequence
+                      ? 'Previous completion'
+                      : 'Completion record'}
+                  </span>
+                  <span className="badge">
+                    {completion.interrupted
+                      ? 'Review needed'
+                      : verification.status === 'delivery_pending'
+                        ? pendingDelivery
+                          ? 'Generation continues'
+                          : deliveryFailed
+                            ? 'Delivery needs attention'
+                            : presentation?.delivery?.status === 'ready'
+                              ? 'Delivered'
+                              : 'Checking delivery'
+                        : verification.status === 'delivery_incomplete'
+                          ? 'Delivery needs attention'
+                          : verification.status === 'verified'
+                            ? checks.label
+                            : verification.status === 'not_applicable'
+                              ? 'No executable checks needed'
+                              : verification.status === 'checks_failed'
+                                ? 'Checks failed'
+                                : verification.status === 'checks_did_not_run'
+                                  ? 'Checks did not run'
+                                  : verification.status === 'unverified'
+                                    ? 'Verification needs review'
+                                    : 'Verification not recorded'}
+                  </span>
+                </div>
+                {text(completion.summary) &&
+                  text(completion.summary).trim() !== answer.markdown.trim() && (
+                    <p>{text(completion.summary)}</p>
+                  )}
+                {strings(verification.remainingRisks).length > 0 && (
+                  <div className="remaining-risks">
+                    <strong>Still to consider</strong>
+                    <ul>
+                      {strings(verification.remainingRisks).map((risk, index) => (
+                        <li key={index}>{risk}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {(checks.evidence.length > 0 || acceptance.length > 0) && (
+                  <details>
+                    <summary>Evidence and checks</summary>
+                    <ul className="evidence-list">
+                      {checks.evidence.map((record, index) => {
+                        const call = text(record.toolCallId);
+                        const source = events.find(
+                          (event) =>
+                            text(data(event.payload).toolCallId) === call &&
+                            event.kind === 'tool_result'
+                        );
+                        return (
+                          <li key={index}>
+                            <span>{text(record.claim)}</span>
+                            <small>{evidenceSource(record.source)}</small>
+                            {source && (
+                              <Button onClick={() => setEvidence(source)}>Inspect evidence</Button>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {acceptance.length > 0 && (
+                      <div className="completion-acceptance">
+                        <strong>Check results</strong>
+                        <ul>
+                          {acceptance.map((result, index) => (
+                            <li key={index}>{result}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </details>
+                )}
+              </section>
+            )}
+            {presentation?.surface && (
+              <details
+                className="garden-task-directions"
+                key={`${task.id}:${isFinished(task)}`}
+                open={!isFinished(task)}
+              >
+                <summary>Your messages</summary>
+                <Suspense fallback={null}>
+                  <WorkDirections
+                    surface={presentation.surface}
+                    {...(onDiscuss
+                      ? {
+                          onDiscuss: (eventId: string) => onDiscuss({ taskId: task.id, eventId })
+                        }
+                      : {})}
+                    onRevisit={(eventId) => {
+                      const event = events.find((item) => item.id === eventId);
+                      if (event) setBranchEvent(event);
+                    }}
+                  />
+                </Suspense>
+              </details>
+            )}
+            <SubagentLanes events={events} />
+
+            {presentation && (
+              <WorkTrace
+                progress={presentation.progress}
+                {...(presentation.surface ? { surface: presentation.surface } : {})}
+                onEvidence={(id) => void inspectEvidence(id)}
+                onResult={(kind, id) => {
+                  if (kind === 'artifact') showArtifact(id);
+                  else
+                    document
+                      .getElementById(`preview-${id}`)
+                      ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                }}
+              />
+            )}
             <div className="garden-task-aside">
               <Suspense fallback={null}>
                 <CodingMissions taskId={task.id} onOpenTask={onOpenTask} onChange={reload} />
@@ -963,14 +928,58 @@ export default function TaskSurface({
               {presentation && (
                 <TaskProgress
                   presentation={{ ...presentation, taskStatus: task.status }}
+                  showOutcome={!completionEvent}
                   onPlan={() => setPanel('plan')}
                   onEvidence={(id) => void inspectEvidence(id)}
                 />
               )}
             </div>
+          </section>
+        )}
+        {filesOpened && (
+          <div id={`directories-${task.id}`} hidden={view !== 'files'}>
+            <Suspense fallback={null}>
+              <DirectoryPanel
+                key={task.id}
+                taskId={task.id}
+                openRequest={1}
+                {...(!task.parentMissionId && !composerLocked
+                  ? {
+                      rerunWorkspaceId: task.workspaceId,
+                      onRerunAnalysis: (
+                        selection: Extract<DirectionContext, { kind: 'analysis' }>
+                      ) => {
+                        selectView('work');
+                        setDirectionContext(selection);
+                        setComposerExpanded(true);
+                        requestAnimationFrame(() => {
+                          const input = document.getElementById(`intent-${task.id}`);
+                          input?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                          input?.focus({ preventScroll: true });
+                        });
+                      }
+                    }
+                  : {})}
+              />
+            </Suspense>
           </div>
         )}
-        {notices.length > 0 && (
+        {toolsOpened && (
+          <div hidden={view !== 'tools'}>
+            <Suspense fallback={<Spinner />}>
+              <Computer
+                workspace={workspace}
+                task={task}
+                initialTool={tool}
+                embedded
+                visible={view === 'tools'}
+                onToolChange={(next) => setSurfaceLocation({ tool: next })}
+                onChange={reload}
+              />
+            </Suspense>
+          </div>
+        )}
+        {view === 'activity' && notices.length > 0 && (
           <details className="notices">
             <summary>
               {notices.length} recent {notices.length === 1 ? 'notice' : 'notices'}
@@ -992,7 +1001,7 @@ export default function TaskSurface({
           </Suspense>
         </Dialog>
       )}
-      <div className="garden-task-composer">
+      <div className="garden-task-composer" hidden={view !== 'work'}>
         {attentionPanel && (
           <Button
             className="primary garden-attention-jump"
@@ -1014,7 +1023,7 @@ export default function TaskSurface({
               requestAnimationFrame(() => document.getElementById(`intent-${task.id}`)?.focus());
             }}
           >
-            <Plus size={18} /> Add a direction…
+            <Plus size={18} /> Continue this conversation…
             <span>Continue this work</span>
           </Button>
         )}
@@ -1197,9 +1206,13 @@ export default function TaskSurface({
         <Dialog title="Stop this work?" onClose={() => setPanel(null)}>
           <p>
             The run stops where it is. Its files, its published links and everything it recorded
-            stay exactly as they are — send another direction later and the work picks up from here.
+            stay available. You can send a new message later to continue from the saved work.
           </p>
-          <p className="muted">To hold it without ending it, close this and use Pause instead.</p>
+          <p className="muted">
+            Long-running server jobs are managed separately in Tools → Jobs. Review them there if
+            you want to stop them too. To pause the agent without ending this run, use Pause
+            instead.
+          </p>
           <ErrorNotice error={error} />
           <div className="row">
             <Button

@@ -242,3 +242,32 @@ it('projects recorded progress for the visible owned conversations without impor
     ).size
   ).toBe(0);
 });
+
+it('keeps interrupted and unverified endings in project summaries without applying old endings to a resumed run', async () => {
+  const f = await fixture();
+  await f.store.appendTaskEvent({
+    taskId: f.task.id,
+    kind: 'completed',
+    summary: 'Protected ending',
+    payloadCiphertext: encryptJson(
+      {
+        __athanorEventVersion: 1,
+        summary: 'Stopped before checks',
+        payload: { interrupted: true, verification: { status: 'unverified' } }
+      },
+      f.key,
+      `task-event:${f.task.id}`
+    )
+  });
+  await f.store.setTaskStatusForUser(f.user.id, f.task.id, 'completed');
+  const summary = () =>
+    projectActivity(f.context as unknown as RouteContext, f.user.id, f.task.projectId!, [
+      f.task.id
+    ]);
+  expect((await summary()).get(f.task.id)?.ending).toEqual({
+    interrupted: true,
+    verification: 'unverified'
+  });
+  await f.store.setTaskStatusForUser(f.user.id, f.task.id, 'running');
+  expect((await summary()).get(f.task.id)?.ending).toBeUndefined();
+});

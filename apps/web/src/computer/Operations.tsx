@@ -338,7 +338,11 @@ export function Operations({
       )}
       {tool === 'processes' && (
         <>
-          <ProcessPanel key={workspace.id} workspaceId={workspace.id} />
+          <ProcessPanel
+            key={workspace.id}
+            workspaceId={workspace.id}
+            {...(task ? { taskId: task.id } : {})}
+          />
           <Computation key={workspace.id} workspaceId={workspace.id} />
           <DebugSessions key={`debug-${workspace.id}`} workspaceId={workspace.id} />
         </>

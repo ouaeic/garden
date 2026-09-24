@@ -79,7 +79,7 @@ export default function ProjectSessions({
                     {tab.title || 'Untitled tab'}
                     <small>{tab.url}</small>
                   </span>
-                  <span>{tab.active ? 'Active · ' : ''}Take control</span>
+                  <span>{tab.active ? 'Active · ' : ''}Open tab</span>
                 </Button>
               ))}
               <Button onClick={() => onOpen(session.taskId, 'browser')}>View browser</Button>

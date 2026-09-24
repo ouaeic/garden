@@ -54,9 +54,14 @@ export default function SearchDialog({
   }, [query, workspace?.id]);
   const commands = [
     { label: 'Start new work', action: onNew },
-    { label: 'All work', action: () => onView('work') },
-    { label: 'Files, terminal, browser and desktop', action: () => onView('computer') },
-    { label: 'Memory, skills, connectors and schedules', action: () => onView('library') },
+    { label: 'Home', action: () => onView('work') },
+    { label: 'Projects', action: () => onView('projects') },
+    { label: 'Automations and schedules', action: () => onView('automations') },
+    {
+      label: 'All computer work: files, terminal, browser and desktop',
+      action: () => onView('computer')
+    },
+    { label: 'Library: results, memory and skills', action: () => onView('library') },
     { label: 'Models, access and settings', action: () => onView('settings') },
     { label: 'Decisions and attention', action: () => onView('attention') }
   ];

@@ -187,7 +187,7 @@ export async function checkProjectUpdates({ page, fixture, project, report }) {
     .getByText('+23 −4 lines · 2 changed files · 1 unmeasured', { exact: true })
     .waitFor();
   const panel = page.getByRole('region', { name: 'Project updates and checks', exact: true });
-  await panel.getByText('No published version yet', { exact: true }).waitFor();
+  await panel.getByText('No saved project version yet', { exact: true }).waitFor();
   await panel.getByRole('button', { name: 'Prepare update', exact: true }).click();
   let dialog = page.getByRole('dialog', { name: 'Prepare a project update', exact: true });
   await dialog
@@ -203,7 +203,7 @@ export async function checkProjectUpdates({ page, fixture, project, report }) {
   dialog = page.getByRole('dialog', { name: 'Cohort validation', exact: true });
   await dialog.waitFor();
   assert.equal(
-    await dialog.getByRole('button', { name: 'Publish checked version', exact: true }).count(),
+    await dialog.getByRole('button', { name: 'Apply checked update', exact: true }).count(),
     0
   );
   await dialog.getByRole('button', { name: 'Run check', exact: true }).first().click();
@@ -240,7 +240,7 @@ export async function checkProjectUpdates({ page, fixture, project, report }) {
   dialog = page.getByRole('dialog', { name: 'Cohort validation', exact: true });
   await dialog.getByText('Any earlier passing checks apply', { exact: false }).waitFor();
   assert.equal(
-    await dialog.getByRole('button', { name: 'Publish checked version', exact: true }).count(),
+    await dialog.getByRole('button', { name: 'Apply checked update', exact: true }).count(),
     0
   );
   await dialog.getByRole('button', { name: 'Rebuild and reset checks', exact: true }).click();
@@ -252,10 +252,10 @@ export async function checkProjectUpdates({ page, fixture, project, report }) {
     check.exitCode = 0;
   });
   await panel.getByRole('button', { name: 'Refresh project updates', exact: true }).click();
-  await panel.getByRole('button', { name: /Ready to publish.*Cohort validation/ }).click();
+  await panel.getByRole('button', { name: /Ready to apply.*Cohort validation/ }).click();
   dialog = page.getByRole('dialog', { name: 'Cohort validation', exact: true });
-  await dialog.getByRole('button', { name: 'Publish checked version', exact: true }).click();
-  await dialog.getByText('Published', { exact: true }).waitFor();
+  await dialog.getByRole('button', { name: 'Apply checked update', exact: true }).click();
+  await dialog.getByText('Applied', { exact: true }).waitFor();
   await dialog.getByRole('button', { name: 'Close Cohort validation', exact: true }).click();
   await panel
     .locator('.project-version-head')
@@ -302,7 +302,7 @@ export async function checkProjectUpdates({ page, fixture, project, report }) {
     .locator('.project-version-head')
     .getByText('Version 43 · Published analysis 43', { exact: true })
     .waitFor();
-  await panel.getByText('Published files and version history', { exact: true }).click();
+  await panel.getByText('Project files and version history', { exact: true }).click();
   const history = panel.locator('.project-version-history-list');
   assert.equal(
     await history.locator('li').count(),
@@ -324,7 +324,7 @@ export async function checkProjectUpdates({ page, fixture, project, report }) {
     await history.getByRole('button', { name: /^Version \d+ · / }).allTextContents(),
     fixture.revisions.map((item) => `Version ${item.number} · ${item.title}`)
   );
-  await panel.getByText('Published files and version history', { exact: true }).click();
+  await panel.getByText('Project files and version history', { exact: true }).click();
   console.log(
     'Project update browser checks passed: preparation, parallel checks, elapsed days, resource samples, logs, scoped cancellation, stale evidence, reset checks, checked publication, paginated history retained across refresh and responsive layouts.'
   );

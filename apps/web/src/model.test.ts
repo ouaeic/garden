@@ -257,3 +257,40 @@ describe('questions while work continues', () => {
     expect(activeQuestion([question], { ...task, status: 'cancelled' })).toBeUndefined();
   });
 });
+
+describe('completion wording follows recorded outcome', () => {
+  const ended = { ...task, status: 'completed' as const };
+  const activity = {
+    currentStep: null,
+    stepsCompleted: 1,
+    stepsSkipped: 1,
+    stepsTotal: 2,
+    latest: '',
+    eventId: null,
+    observedAt: null
+  };
+  it('does not describe an ended worker as a successful request without evidence', () => {
+    expect(taskStatusLabel(ended)).toBe('Run ended');
+    expect(taskStatusLabel({ ...ended, activity: { ...activity, stepsSkipped: 0 } })).toBe(
+      'Stopped with 1 step open'
+    );
+    expect(
+      taskStatusLabel({
+        ...ended,
+        activity: { ...activity, ending: { interrupted: true, verification: 'verified' } }
+      })
+    ).toBe('Interrupted · review needed');
+    expect(
+      taskStatusLabel({
+        ...ended,
+        activity: { ...activity, ending: { interrupted: false, verification: 'unverified' } }
+      })
+    ).toBe('Needs review');
+    expect(
+      taskStatusLabel({
+        ...ended,
+        activity: { ...activity, ending: { interrupted: false, verification: 'verified' } }
+      })
+    ).toBe('Completed');
+  });
+});

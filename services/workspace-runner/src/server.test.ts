@@ -451,6 +451,24 @@ describe('file organisation and toolchain routes', () => {
     return { app, id, root, token };
   };
 
+  it('never replaces an existing file when a browser upload asks to create a new one', async () => {
+    const { app, id, root, token } = await harness();
+    const route = `/v1/workspaces/${id}/file`;
+    const create = (content: string) =>
+      app.inject({
+        method: 'PUT',
+        url: `${route}?path=workspace/upload.txt&createOnly=true`,
+        headers: {
+          authorization: `Bearer ${token(['files.write'], { method: 'PUT', path: route })}`,
+          'content-type': 'application/octet-stream'
+        },
+        payload: Buffer.from(content)
+      });
+    expect((await create('original')).statusCode).toBe(200);
+    expect((await create('replacement')).statusCode).toBe(409);
+    expect(await readFile(path.join(root, 'workspace/upload.txt'), 'utf8')).toBe('original');
+  });
+
   it('exposes file identity for a complete inspector window but never for a partial read', async () => {
     const { app, id, root, token } = await harness();
     const content = Buffer.from('{"value":"α"}\r\n');

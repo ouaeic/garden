@@ -19,13 +19,13 @@ const DirectoryPanel = lazy(() => import('./DirectoryPanel'));
 const ProjectVersionHistory = lazy(() => import('./ProjectVersionHistory'));
 const stateLabel: Record<ProjectUpdate['state'], string> = {
   preparing: 'Preparing files',
-  publishing: 'Finishing publication',
+  publishing: 'Applying update',
   ready: 'Ready for checks',
   conflicted: 'Resolve conflicts',
   checking: 'Checks running',
   checks_failed: 'Checks need attention',
   outdated: 'Newer version available',
-  published: 'Published',
+  published: 'Applied',
   failed: 'Preparation failed',
   cancelled: 'Cancelled'
 };
@@ -41,7 +41,7 @@ const label = (update: ProjectUpdate) =>
     : update.state === 'ready' &&
         update.checks.length &&
         update.checks.every((check) => check.status === 'passed')
-      ? 'Ready to publish'
+      ? 'Ready to apply'
       : update.state === 'ready' && !update.checks.length
         ? 'No checks declared'
         : stateLabel[update.state];
@@ -232,7 +232,8 @@ export default function ProjectUpdates({
             <Layers size={18} /> Project versions
           </h2>
           <p className="muted">
-            Combine work when it is ready. Running jobs keep their existing inputs.
+            Review changes, check them, then apply them to the project. This does not publish
+            anything online. Running jobs keep their existing inputs.
           </p>
         </div>
         <div className="row">
@@ -272,15 +273,16 @@ export default function ProjectUpdates({
                   <small>
                     {data.head.checks.length
                       ? `${data.head.checks.length} ${data.head.checks.length === 1 ? 'check' : 'checks'} passed for this version`
-                      : 'Published by owner without automated checks'}{' '}
+                      : 'Applied by owner without automated checks'}{' '}
                     · {stamp(data.head.createdAt)}
                   </small>
                 </>
               ) : (
                 <>
-                  <strong>No published version yet</strong>
+                  <strong>No saved project version yet</strong>
                   <small>
-                    Conversation results stay in their working areas until an update is published.
+                    Conversation results stay in their working areas until you apply a project
+                    update.
                   </small>
                 </>
               )}
@@ -289,15 +291,15 @@ export default function ProjectUpdates({
               {running
                 ? `${running} ${running === 1 ? 'check' : 'checks'} running`
                 : pending.length
-                  ? `${pending.length}${data.nextCursor ? '+' : ''} unpublished ${pending.length === 1 && !data.nextCursor ? 'update' : 'updates'}`
+                  ? `${pending.length}${data.nextCursor ? '+' : ''} pending ${pending.length === 1 && !data.nextCursor ? 'update' : 'updates'}`
                   : data.nextCursor
                     ? 'More update history available'
-                    : 'No unpublished updates'}
+                    : 'No pending updates'}
             </span>
           </div>
           {data.head && (
             <details className="project-version-path">
-              <summary>Published files and version history</summary>
+              <summary>Project files and version history</summary>
               <p>
                 Use the exact path below as a fixed input for an analysis. Later publications leave
                 it intact.
@@ -307,7 +309,7 @@ export default function ProjectUpdates({
                 <DirectoryPanel
                   readOnlyRoot={{
                     base: `/v1/projects/${projectId}/versions/${data.head.id}`,
-                    description: 'Immutable files from this published project version.',
+                    description: 'Immutable files from this saved project version.',
                     id: data.head.id,
                     name: `Version ${data.head.number}`
                   }}
@@ -426,7 +428,7 @@ export default function ProjectUpdates({
             <p className="muted">
               {data.head
                 ? 'No pending updates. Conversations can keep working independently.'
-                : 'Prepare selected files from a conversation, run checks, then publish a project version.'}
+                : 'Prepare selected files from a conversation, run checks, then apply a project update.'}
             </p>
           )}
           <div className="row">
@@ -519,9 +521,8 @@ export default function ProjectUpdates({
             }}
           >
             <p>
-              Capture only the files this update should contribute. Other files in the published
-              project stay in place. Credentials, installed dependencies and runtime state are
-              excluded.
+              Capture only the files this update should contribute. Other files in the saved project
+              stay in place. Credentials, installed dependencies and runtime state are excluded.
             </p>
             <Field label="Conversation">
               <select value={taskId} onChange={(event) => setTaskId(event.target.value)}>
@@ -564,7 +565,7 @@ export default function ProjectUpdates({
             <details>
               <summary>Advanced options</summary>
               <div className="stack">
-                <Field label="Files with conflicts you have resolved against the current published version">
+                <Field label="Files with conflicts you have resolved against the current project version">
                   <textarea
                     rows={2}
                     value={resolvedPaths}
@@ -950,7 +951,7 @@ export default function ProjectUpdates({
                       )
                     }
                   >
-                    Publish checked version
+                    Apply checked update
                   </Button>
                 )}
               {!selected.contentRemoval &&
@@ -970,7 +971,7 @@ export default function ProjectUpdates({
               (selected.changeCount > 0 ||
                 selected.repositories?.some((repository) => repository.historyChanged)) && (
                 <details>
-                  <summary>Publish without automated checks</summary>
+                  <summary>Apply without automated checks</summary>
                   <p>
                     This records your decision with the version. It will be labelled as untested.
                   </p>
@@ -995,15 +996,17 @@ export default function ProjectUpdates({
                       )
                     }
                   >
-                    Publish untested version
+                    Apply untested update
                   </Button>
                 </details>
               )}
             {selectedVersion?.contentRemoval && (
-              <p>Published files were permanently removed. Their history remains available.</p>
+              <p>Saved version files were permanently removed. Their history remains available.</p>
             )}
             {selectedVersion?.archive && !selectedVersion.contentRemoval && (
-              <p>Published files are archived. Restore them from version history to browse them.</p>
+              <p>
+                Saved version files are archived. Restore them from version history to browse them.
+              </p>
             )}
             {selected.publishedRevision &&
               !selectedVersion?.archive &&
@@ -1014,7 +1017,7 @@ export default function ProjectUpdates({
                       id: selected.publishedRevision,
                       name: selected.title,
                       base: `/v1/projects/${projectId}/versions/${selected.publishedRevision}`,
-                      description: 'Immutable files from this published project version.'
+                      description: 'Immutable files from this saved project version.'
                     }}
                   />
                 </Suspense>

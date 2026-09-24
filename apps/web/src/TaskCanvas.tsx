@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowUpRight, Check, Download, FileText, Globe, Maximize2, X } from 'lucide-react';
 import type { Artifact, TaskPresentation, TaskResult, TaskEvent } from '@athanor/contracts';
 import { isNativeClient, post } from './client';
@@ -22,7 +22,9 @@ export function TaskOutputs({
   onArtifact,
   onDiscuss,
   onRemember,
-  autoPreview = true
+  autoPreview = true,
+  compact = true,
+  afterPreview
 }: {
   presentation: TaskPresentation;
   events?: TaskEvent[];
@@ -31,7 +33,10 @@ export function TaskOutputs({
   onDiscuss?: (result: TaskPresentation['results'][number]) => void;
   onRemember?: (result: TaskPresentation['results'][number]) => void;
   autoPreview?: boolean;
+  compact?: boolean;
+  afterPreview?: ReactNode;
 }) {
+  const [showAll, setShowAll] = useState(false);
   const [opened, setOpened] = useState<{ id: string; url: string } | null>(null);
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [frameState, setFrameState] = useState<'loading' | 'loaded' | 'slow' | 'failed'>('loading');
@@ -349,6 +354,7 @@ export function TaskOutputs({
             ))}
         </article>
       )}
+      {afterPreview}
       {presentation.sourceBundle && presentation.results.length > 0 && (
         <div className="garden-source-bundle">
           <a className="button" href={presentation.sourceBundle.downloadUrl} download>
@@ -364,7 +370,7 @@ export function TaskOutputs({
       )}
       {files.length > 0 && (
         <div className="garden-delivery-list">
-          {files.map((item) => (
+          {(compact && !showAll ? files.slice(0, 3) : files).map((item) => (
             <article key={item.id} className="garden-delivery">
               <FileText size={20} />
               <div className="garden-delivery-details">
@@ -391,6 +397,15 @@ export function TaskOutputs({
               </div>
             </article>
           ))}
+          {compact && files.length > 3 && (
+            <Button
+              className="quiet-button"
+              aria-expanded={showAll}
+              onClick={() => setShowAll((value) => !value)}
+            >
+              {showAll ? 'Show fewer outputs' : `All ${files.length} outputs`}
+            </Button>
+          )}
         </div>
       )}
     </section>
@@ -540,8 +555,10 @@ function Outcome({ outcome }: { outcome: NonNullable<TaskPresentation['outcome']
 export function TaskProgress({
   presentation,
   onEvidence,
-  onPlan
+  onPlan,
+  showOutcome = true
 }: {
+  showOutcome?: boolean;
   presentation: TaskPresentation;
   onEvidence: (id: string) => void;
   onPlan: () => void;
@@ -593,7 +610,7 @@ export function TaskProgress({
           <p>{progress.current.title}</p>
         </div>
       )}
-      {presentation.taskStatus === 'completed' && presentation.outcome && (
+      {showOutcome && presentation.taskStatus === 'completed' && presentation.outcome && (
         <Outcome outcome={presentation.outcome} />
       )}
       {phases.length > 0 && <PhaseList phases={phases} onPlan={onPlan} />}

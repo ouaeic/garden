@@ -28,11 +28,20 @@ export function Spinner({ label = 'Loading…' }: { label?: string }) {
     </div>
   );
 }
-export function ErrorNotice({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+export function ErrorNotice({
+  error,
+  onRetry,
+  context
+}: {
+  error: unknown;
+  onRetry?: () => void;
+  context?: string;
+}) {
   if (!error) return null;
   return (
     <div className="error" role="alert">
       <span>
+        {context && <strong>{context} </strong>}
         {error instanceof Error
           ? error.message
           : typeof error === 'string'

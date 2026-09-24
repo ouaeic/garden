@@ -242,10 +242,18 @@ export async function checkProjectConversations({
     await page.goto(`${origin}/?project=${project.id}`);
     await page.getByRole('heading', { name: project.title, exact: true }).waitFor();
     await page
+      .getByRole('navigation', { name: 'Project views' })
+      .getByRole('button', { name: 'Tools', exact: true })
+      .click();
+    await page
       .getByRole('region', { name: 'Project browser and desktop' })
       .getByRole('button', { name: /Assembly reference/ })
       .waitFor();
     await page.getByText('Alignment viewer', { exact: true }).waitFor();
+    await page
+      .getByRole('navigation', { name: 'Project views' })
+      .getByRole('button', { name: 'Work', exact: true })
+      .click();
     const result = page.locator('.garden-delivery').filter({ hasText: resultArtifact.title });
     await result.getByRole('button', { name: 'View', exact: true }).click();
     const resultDialog = page.getByRole('dialog', { name: resultArtifact.title, exact: true });
@@ -288,7 +296,7 @@ export async function checkProjectConversations({
     dialog = page.getByRole('dialog', { name: 'New conversation', exact: true });
     input = dialog.getByPlaceholder('Describe what you want to do…');
     assert.equal(await input.inputValue(), 'Review quality without changing the assembly.');
-    await dialog.getByRole('button', { name: 'Begin', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Start', exact: true }).click();
     await dialog.waitFor({ state: 'detached' });
     await page.getByRole('heading', { name: 'QC conversation', exact: true }).waitFor();
     assert.equal(requests.length, 1);
@@ -297,14 +305,18 @@ export async function checkProjectConversations({
     assert.equal(requests[0].securityMode, 'autonomous');
     await page.reload();
     await page.getByRole('heading', { name: 'QC conversation', exact: true }).waitFor();
-    const tabs = page.getByRole('navigation', { name: 'Project conversations' });
-    const initialOrder = ['Overview', 'Assembly analysis', 'QC conversation'];
-    assert.deepEqual(await tabs.getByRole('tab').allTextContents(), initialOrder);
-    for (const name of ['Assembly analysis', 'QC conversation', 'Overview', 'QC conversation']) {
-      const selected = tabs.getByRole('tab', { name, exact: true });
-      await selected.click();
-      assert.equal(await selected.getAttribute('aria-current'), 'page');
-      assert.deepEqual(await tabs.getByRole('tab').allTextContents(), initialOrder);
+    const tabs = page.getByRole('combobox', { name: 'Current conversation', exact: true });
+    const initialOrder = ['Project overview', 'Assembly analysis', 'QC conversation'];
+    assert.deepEqual(await tabs.locator('option').allTextContents(), initialOrder);
+    for (const name of [
+      'Assembly analysis',
+      'QC conversation',
+      'Project overview',
+      'QC conversation'
+    ]) {
+      await tabs.selectOption({ label: name });
+      assert.equal(await tabs.locator('option:checked').textContent(), name);
+      assert.deepEqual(await tabs.locator('option').allTextContents(), initialOrder);
     }
     root.updatedAt = new Date(Date.now() + 60_000).toISOString();
     const child = tasks[1];
@@ -318,31 +330,23 @@ export async function checkProjectConversations({
     tasks.push(...additional);
     project.conversationCount = tasks.length;
     await page.reload();
-    await tabs.getByRole('tab', { name: 'Discussion 7', exact: true }).waitFor();
+    await tabs.locator('option').filter({ hasText: 'Discussion 7' }).waitFor({ state: 'attached' });
     const expandedOrder = [
-      'Overview',
+      'Project overview',
       'Discussion 7',
       'Assembly analysis',
       'QC conversation',
       ...additional.slice(0, 6).map((task) => task.title)
     ];
-    assert.deepEqual(await tabs.getByRole('tab').allTextContents(), expandedOrder);
+    assert.deepEqual(await tabs.locator('option').allTextContents(), expandedOrder);
     await page.setViewportSize({ width: 320, height: 900 });
-    await tabs.getByRole('tab', { name: 'Discussion 6', exact: true }).click();
+    await tabs.selectOption({ label: 'Discussion 6' });
     await page.reload();
-    const activeTab = tabs.getByRole('tab', { name: 'Discussion 6', exact: true });
-    await activeTab.waitFor();
-    await page.waitForFunction(() => {
-      const row = document.querySelector('.project-conversation-tabs');
-      const active = row?.querySelector('[aria-current="page"]');
-      if (!row || !active) return false;
-      const frame = row.getBoundingClientRect(),
-        selected = active.getBoundingClientRect();
-      return selected.left >= frame.left - 1 && selected.right <= frame.right + 1;
-    });
-    assert.deepEqual(await tabs.getByRole('tab').allTextContents(), expandedOrder);
-    await tabs.getByRole('tab', { name: 'Assembly analysis', exact: true }).click();
-    assert.deepEqual(await tabs.getByRole('tab').allTextContents(), expandedOrder);
+    await tabs.waitFor();
+    assert.equal(await tabs.locator('option:checked').textContent(), 'Discussion 6');
+    assert.deepEqual(await tabs.locator('option').allTextContents(), expandedOrder);
+    await tabs.selectOption({ label: 'Assembly analysis' });
+    assert.deepEqual(await tabs.locator('option').allTextContents(), expandedOrder);
     tasks.splice(2);
     project.conversationCount = tasks.length;
     await page.getByRole('heading', { name: root.title, exact: true }).waitFor();
@@ -358,9 +362,10 @@ export async function checkProjectConversations({
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
       await page.screenshot({ path: resolve(report, `conversations-${width}.png`) });
     }
+    await tabs.selectOption('');
     await page
-      .getByRole('navigation', { name: 'Project conversations' })
-      .getByRole('tab', { name: 'Overview', exact: true })
+      .getByRole('navigation', { name: 'Project views' })
+      .getByRole('button', { name: 'Activity', exact: true })
       .click();
     const journal = page.getByRole('region', { name: 'Project notes' });
     await journal.getByRole('button', { name: 'Add note' }).click();
@@ -384,6 +389,10 @@ export async function checkProjectConversations({
       .getByText('Use assembly version two; version one failed coverage.', { exact: true })
       .waitFor();
     await page.screenshot({ path: resolve(report, 'project-note-history.png') });
+    await page
+      .getByRole('navigation', { name: 'Project views' })
+      .getByRole('button', { name: 'Work', exact: true })
+      .click();
     await page.getByRole('button', { name: 'Discuss', exact: true }).first().click();
     const linked = page.getByRole('dialog', { name: 'New conversation', exact: true });
     await linked.getByPlaceholder('Describe what you want to do…').fill('Explain this result.');
@@ -398,9 +407,10 @@ export async function checkProjectConversations({
       'The selected result identity must survive draft recovery'
     );
     await linked.getByRole('button', { name: 'Close New conversation', exact: true }).click();
+    await tabs.selectOption('');
     await page
-      .getByRole('navigation', { name: 'Project conversations' })
-      .getByRole('tab', { name: 'Overview', exact: true })
+      .getByRole('navigation', { name: 'Project views' })
+      .getByRole('button', { name: 'Activity', exact: true })
       .click();
     await checkProjectUpdates({ page, fixture: updates, project, report });
     const dense = Array.from({ length: 248 }, (_, index) => ({
@@ -425,48 +435,30 @@ export async function checkProjectConversations({
     await page.clock.install();
     const began = performance.now();
     await page.goto(`${origin}/?project=${project.id}`);
-    await page.getByRole('tab').nth(50).waitFor();
+    await tabs.locator('option').nth(50).waitFor({ state: 'attached' });
     const initialReadyMs = performance.now() - began;
-    assert.equal(await page.getByRole('tab').count(), 51);
-    assert.equal(await page.locator('[role="tab"][tabindex="0"]').count(), 1);
-    const overviewTab = tabs.getByRole('tab', { name: 'Overview', exact: true });
-    await overviewTab.focus();
-    await overviewTab.press('End');
-    assert(
-      await tabs
-        .getByRole('tab')
-        .last()
-        .evaluate((el) => document.activeElement === el)
-    );
-    assert.equal(await overviewTab.getAttribute('aria-selected'), 'true');
-    await page.keyboard.press('Tab');
-    assert(await page.getByRole('tabpanel').evaluate((el) => document.activeElement === el));
-    await page.keyboard.press('Shift+Tab');
-    assert(
-      await tabs
-        .getByRole('tab')
-        .last()
-        .evaluate((el) => document.activeElement === el)
-    );
-    await page.keyboard.press('Home');
-    assert(await overviewTab.evaluate((el) => document.activeElement === el));
-    await page.keyboard.press('ArrowRight');
-    const focusedTitle = await page.locator(':focus').textContent();
+    assert.equal(await tabs.locator('option').count(), 51);
+    await tabs.focus();
     await Promise.all([
       page.waitForResponse(
         (response) => new URL(response.url()).pathname === `/v1/projects/${project.id}`
       ),
       page.clock.runFor(15_100)
     ]);
-    assert.equal(await page.locator(':focus').textContent(), focusedTitle);
-    assert.equal(await page.locator('[role="tab"][tabindex="0"]').count(), 1);
+    assert(
+      await tabs.evaluate((element) => element === document.activeElement),
+      'Refreshing progress must not steal conversation focus'
+    );
+    await page
+      .getByRole('navigation', { name: 'Project views' })
+      .getByRole('button', { name: 'Activity', exact: true })
+      .click();
     await page
       .getByRole('region', { name: 'Conversations', exact: true })
       .getByRole('button', { name: 'More conversations', exact: true })
       .click();
-    await page.getByRole('tab').nth(100).waitFor();
-    assert.equal(await page.getByRole('tab').count(), 101);
-    assert.equal(await page.locator('[role="tab"][tabindex="0"]').count(), 1);
+    await tabs.locator('option').nth(100).waitFor({ state: 'attached' });
+    assert.equal(await tabs.locator('option').count(), 101);
     assert(
       await page
         .getByRole('region', { name: 'Conversations', exact: true })
@@ -500,22 +492,24 @@ export async function checkProjectConversations({
       enteredTask();
       await taskPending;
     };
-    const olderTab = tabs.getByRole('tab').nth(30);
-    const olderName = await olderTab.textContent();
-    await olderTab.focus();
-    await olderTab.press('Enter');
+    const olderOption = tabs.locator('option').nth(30);
+    const olderName = await olderOption.textContent();
+    await tabs.focus();
+    await tabs.selectOption({ label: olderName });
     await taskEntered;
-    assert(await olderTab.evaluate((el) => document.activeElement === el));
-    assert.equal(await olderTab.getAttribute('aria-selected'), 'true');
-    assert.equal(await tabs.getByRole('tab').count(), 101);
+    assert.equal(await tabs.locator('option:checked').textContent(), olderName);
+    assert.equal(await tabs.locator('option').count(), 101);
     releaseTask();
     delayTask = null;
     await page.getByRole('heading', { name: olderName, exact: true }).waitFor();
-    assert(await olderTab.evaluate((el) => document.activeElement === el));
-    await olderTab.press('Home');
-    await page.keyboard.press('Enter');
+    assert(await tabs.evaluate((el) => document.activeElement === el));
+    await tabs.selectOption('');
+    await page
+      .getByRole('navigation', { name: 'Project views' })
+      .getByRole('button', { name: 'Activity', exact: true })
+      .click();
     await page.getByRole('region', { name: 'Conversations', exact: true }).waitFor();
-    assert.equal(await tabs.getByRole('tab').count(), 101);
+    assert.equal(await tabs.locator('option').count(), 101);
     const smallInput = page.getByRole('textbox', { name: 'Find a conversation', exact: true });
     await page.setViewportSize({ width: 360, height: 340 });
     await smallInput.scrollIntoViewIfNeeded();
@@ -559,12 +553,15 @@ export async function checkProjectConversations({
       .click();
     await entered;
     await page.getByRole('checkbox', { name: 'Archived', exact: true }).check();
-    await tabs.getByRole('tab', { name: archivedTask.title, exact: true }).waitFor();
+    await tabs
+      .locator('option')
+      .filter({ hasText: archivedTask.title })
+      .waitFor({ state: 'attached' });
     releasePage();
     await cancelledPage;
     await page.clock.runFor(100);
-    assert.deepEqual(await tabs.getByRole('tab').allTextContents(), [
-      'Overview',
+    assert.deepEqual(await tabs.locator('option').allTextContents(), [
+      'Project overview',
       archivedTask.title
     ]);
     assert.equal(
@@ -582,7 +579,7 @@ export async function checkProjectConversations({
     await writeFile(resolve(report, 'project-scale.json'), JSON.stringify(metrics, null, 2) + '\n');
     await writeFile(resolve(report, 'project-tabs-accessibility.txt'), await tabs.ariaSnapshot());
     console.log(
-      'Project conversation browser checks passed: persistent working-area drafts, inherited autonomy, independent creation, stable tab order across navigation and activity, pinned tabs, scrollable overflow and restored selection, reloads, responsive names and controls, notes with correction history, and exact result references.'
+      'Project conversation browser checks passed: persistent working-area drafts, inherited autonomy, independent creation, stable conversation order across navigation and activity, pinned conversations and restored selection, reloads, responsive names and controls, notes with correction history, and exact result references.'
     );
   } finally {
     releaseTask?.();

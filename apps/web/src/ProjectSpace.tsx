@@ -21,7 +21,9 @@ import { changeSummary, useProjectChanges } from './use-project-changes';
 import { permissionModeSummary } from './asking-rules';
 import './projects.css';
 import LivingBackdrop from './LivingBackdrop';
-import ConversationTabs from './ConversationTabs';
+import { fileNavigationBlocked } from './file-navigation';
+import { projectViews, useProjectView, setSurfaceLocation } from './surface-location';
+const ProjectJobsLink = lazy(() => import('./ProjectJobsLink'));
 const ProjectUpdates = lazy(() => import('./ProjectUpdates'));
 const ProjectNotes = lazy(() => import('./ProjectNotes'));
 const ProcessPanel = lazy(() => import('./ProcessPanel'));
@@ -92,7 +94,7 @@ function ConversationResults({
           />
         </Suspense>
       )}
-      <ErrorNotice error={error} />
+      <ErrorNotice context="Could not refresh this project." error={error} />
       {preview && (
         <Dialog title={preview.name} wide onClose={() => setPreview(null)}>
           <Suspense fallback={<Spinner label="Opening result" />}>
@@ -137,7 +139,38 @@ export default function ProjectSpace({
   onComputer: (taskId: string, surface: 'browser' | 'desktop', tabId?: string) => void;
 }) {
   const permissionHelpId = useId();
-  const tabPrefix = useId();
+  const [view, selectView] = useProjectView();
+  const [shortcuts, setShortcuts] = useState<string[]>(() => {
+    try {
+      const saved: unknown = JSON.parse(
+        localStorage.getItem(`garden:shortcuts:${projectId}`) ?? '[]'
+      );
+      return Array.isArray(saved)
+        ? saved.filter(
+            (value: unknown): value is string =>
+              typeof value === 'string' && ['Files', 'Jobs', 'Browser'].includes(value)
+          )
+        : [];
+    } catch {
+      return [];
+    }
+  });
+  function toggleShortcut(name: string) {
+    const next = shortcuts.includes(name)
+      ? shortcuts.filter((item) => item !== name)
+      : [...shortcuts, name];
+    setShortcuts(next);
+    try {
+      localStorage.setItem(`garden:shortcuts:${projectId}`, JSON.stringify(next));
+    } catch {
+      /* Device preferences are optional. */
+    }
+  }
+
+  const [filesOpened, setFilesOpened] = useState(view === 'files');
+  useEffect(() => {
+    if (view === 'files') setFilesOpened(true);
+  }, [view]);
   const [project, setProject] = useState<Project | null>(null),
     [tasks, setTasks] = useState<Task[]>([]),
     [cursor, setCursor] = useState<string | null>(null),
@@ -149,12 +182,12 @@ export default function ProjectSpace({
     [query, setQuery] = useState(''),
     [activityTick, setActivityTick] = useState(0);
   useEffect(() => {
-    if (taskId) return;
+    if (taskId || view !== 'work') return;
     const timer = setInterval(() => {
       if (document.visibilityState === 'visible') setActivityTick((value) => value + 1);
     }, 15_000);
     return () => clearInterval(timer);
-  }, [taskId]);
+  }, [taskId, view]);
   const loadedScope = useRef('');
   const paged = useRef(false);
   const moreRequest = useRef<AbortController | null>(null);
@@ -162,7 +195,7 @@ export default function ProjectSpace({
   const changes = useProjectChanges(
     projectId,
     conversationGrid,
-    Boolean(project) && !taskId,
+    Boolean(project) && !taskId && view === 'activity',
     `${query}:${archived}:${tasks.map((task) => task.id).join(',')}`
   );
   useEffect(() => {
@@ -255,13 +288,18 @@ export default function ProjectSpace({
   if (!project)
     return (
       <>
-        <ErrorNotice error={error} />
+        <ErrorNotice context="Could not refresh this project." error={error} />
         {!error && <Spinner label="Opening project…" />}
       </>
     );
   const visible = tasks
     .filter((task) => task.title.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
-    .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt));
+    .sort(
+      (a, b) =>
+        Number(b.pinned) - Number(a.pinned) ||
+        a.createdAt.localeCompare(b.createdAt) ||
+        a.id.localeCompare(b.id)
+    );
   return (
     <section className={`project-space${taskId ? ' has-conversation' : ''}`}>
       <header className="project-space-header">
@@ -297,165 +335,261 @@ export default function ProjectSpace({
           </Button>
         </div>
       </header>
-      <ConversationTabs
-        prefix={tabPrefix}
-        selected={taskId}
-        onOverview={onOverview}
-        onTask={onTask}
-        tasks={[
-          ...new Map(
-            [...tasks, ...(currentTask ? [currentTask] : [])].map((task) => [task.id, task])
-          ).values()
-        ]}
-      />
-      <ErrorNotice error={error} />
-      <div
-        id={`${tabPrefix}-panel`}
-        role="tabpanel"
-        aria-labelledby={`${tabPrefix}-tab-${taskId ?? 'overview'}`}
-        tabIndex={0}
-      >
+      <div className="project-workspace-bar">
+        <label className="project-conversation-switcher">
+          <span className="sr-only">Current conversation</span>
+          <select
+            aria-label="Current conversation"
+            value={taskId ?? ''}
+            onChange={(event) => {
+              if (fileNavigationBlocked()) return;
+              if (event.target.value) onTask(event.target.value);
+              else onOverview();
+            }}
+          >
+            <option value="">Project overview</option>
+            {[
+              ...new Map(
+                [...tasks, ...(currentTask ? [currentTask] : [])].map((task) => [task.id, task])
+              ).values()
+            ]
+              .sort(
+                (a, b) =>
+                  Number(b.pinned) - Number(a.pinned) ||
+                  a.createdAt.localeCompare(b.createdAt) ||
+                  a.id.localeCompare(b.id)
+              )
+              .map((task) => (
+                <option key={task.id} value={task.id}>
+                  {task.title === project.title ? 'Main conversation' : task.title}
+                </option>
+              ))}
+          </select>
+        </label>
+        <Suspense fallback={null}>
+          <ProjectJobsLink
+            projectId={projectId}
+            onOpen={() => {
+              if (fileNavigationBlocked()) return;
+              onOverview();
+              setSurfaceLocation({ panel: 'tools', tool: 'processes' }, true);
+            }}
+          />
+        </Suspense>
+        <nav className="project-view-nav" aria-label="Project views">
+          {projectViews.map((item) => (
+            <Button
+              key={item}
+              aria-current={view === item ? 'page' : undefined}
+              onClick={() => selectView(item)}
+            >
+              {item[0]!.toUpperCase() + item.slice(1)}
+            </Button>
+          ))}
+        </nav>
+      </div>
+      {shortcuts.length > 0 && (
+        <nav className="project-shortcuts" aria-label="Project shortcuts">
+          {shortcuts.map((name) => (
+            <Button
+              key={name}
+              onClick={() => {
+                if (fileNavigationBlocked()) return;
+                if (name === 'Files') selectView('files');
+                else if (name === 'Jobs') {
+                  onOverview();
+                  setSurfaceLocation({ panel: 'tools', tool: 'processes' }, true);
+                } else {
+                  if (!taskId && tasks[0]) onTask(tasks[0].id);
+                  setSurfaceLocation({ panel: 'tools', tool: 'browser' }, true);
+                }
+              }}
+            >
+              {name}
+            </Button>
+          ))}
+        </nav>
+      )}
+      <ErrorNotice context="Could not refresh this project." error={error} />
+      <div className="project-view-content">
         {taskId ? (
           <div className="project-conversation">
             <Suspense fallback={<Spinner label="Opening conversation…" />}>{children}</Suspense>
           </div>
         ) : (
-          <div className="project-overview">
-            {!archived && tasks.some((task) => needsAttention(task) || hasOngoingWork(task)) && (
-              <section aria-label="Current work" className="project-current-work">
-                <h2>Current work</h2>
-                <div className="project-conversation-grid">
-                  {tasks
-                    .filter((task) => needsAttention(task) || hasOngoingWork(task))
-                    .map((task) => (
-                      <button key={task.id} onClick={() => onTask(task.id)}>
+          <div className={`project-overview project-view-${view}`}>
+            {view === 'work' && (
+              <>
+                {!archived &&
+                  tasks.some((task) => needsAttention(task) || hasOngoingWork(task)) && (
+                    <section aria-label="Current work" className="project-current-work">
+                      <h2>Current work</h2>
+                      <div className="project-conversation-grid">
+                        {tasks
+                          .filter((task) => needsAttention(task) || hasOngoingWork(task))
+                          .map((task) => (
+                            <button key={task.id} onClick={() => onTask(task.id)}>
+                              <span className={`garden-project-dot status-${task.status}`} />
+                              <span>
+                                <strong>{task.title}</strong>
+                                <small>{taskStatusLabel(task)}</small>
+                              </span>
+                            </button>
+                          ))}
+                      </div>
+                    </section>
+                  )}
+                {!archived && (
+                  <section aria-label="Project results">
+                    <h2>Results</h2>
+                    {tasks
+                      .slice()
+                      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+                      .slice(0, 4)
+                      .map((task) => (
+                        <ConversationResults
+                          key={task.id}
+                          task={task}
+                          onOpen={() => onTask(task.id)}
+                          onDiscuss={(source) => onNewConversation(project, source)}
+                        />
+                      ))}
+                    {tasks.length > 4 && (
+                      <p className="muted">
+                        Recent conversation results are shown here. Open any conversation for its
+                        complete results.
+                      </p>
+                    )}
+                  </section>
+                )}
+                {project.brief && (
+                  <details className="project-brief">
+                    <summary>Project brief</summary>
+                    <p>{project.brief}</p>
+                  </details>
+                )}
+              </>
+            )}
+            {view === 'activity' && (
+              <>
+                <Suspense fallback={<Spinner />}>
+                  <ProjectUpdates projectId={project.id} tasks={tasks} onTask={onTask} />
+                  <ProjectNotes
+                    projectId={project.id}
+                    revision={project.updatedAt}
+                    onTask={onTask}
+                  />
+                </Suspense>
+                <section aria-label="Conversations">
+                  <div className="project-section-heading">
+                    <h2>Conversations</h2>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={archived}
+                        onChange={(event) => setArchived(event.target.checked)}
+                      />{' '}
+                      Archived
+                    </label>
+                  </div>
+                  <input
+                    className="project-conversation-search"
+                    aria-label="Find a conversation"
+                    placeholder={cursor ? 'Find in loaded conversations…' : 'Find a conversation…'}
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                  />
+                  <div className="project-conversation-grid" ref={conversationGrid}>
+                    {visible.map((task) => (
+                      <button key={task.id} data-task-id={task.id} onClick={() => onTask(task.id)}>
                         <span className={`garden-project-dot status-${task.status}`} />
                         <span>
                           <strong>{task.title}</strong>
-                          <small>{taskStatusLabel(task)}</small>
+                          <small>
+                            {taskStatusLabel(task)} · {money(task.spentUsd)}
+                          </small>
+                          {changeSummary(changes[task.id]) && (
+                            <small
+                              title={`Compared with this conversation's last published or checked-out files. Large files, binary data and dependency environments are excluded from line counts.${changes[task.id]?.measurement ? ` Measured ${new Date(changes[task.id]!.measurement!.observedAt).toLocaleString()}.` : ''}`}
+                            >
+                              {changeSummary(changes[task.id])}
+                            </small>
+                          )}
+                          {task.activity && (
+                            <>
+                              <small className="project-activity-detail">
+                                {task.activity.currentStep ?? task.activity.latest}
+                              </small>
+                              <small>
+                                {task.activity.stepsTotal > 0 &&
+                                  `Plan: ${task.activity.stepsCompleted} of ${task.activity.stepsTotal} marked complete · `}
+                                {task.activity.observedAt &&
+                                  `Last activity ${new Date(task.activity.observedAt).toLocaleTimeString()}`}
+                              </small>
+                            </>
+                          )}
                         </span>
                       </button>
                     ))}
-                </div>
-              </section>
+                  </div>
+                  {!visible.length && (
+                    <p className="muted">
+                      {query
+                        ? 'No matching conversations in this list.'
+                        : archived
+                          ? 'No archived conversations.'
+                          : 'Start a conversation to explore another aspect of this project.'}
+                    </p>
+                  )}
+                  {cursor && (
+                    <Button aria-busy={busy} aria-disabled={busy} onClick={() => void more()}>
+                      {busy ? 'Loading conversations…' : 'More conversations'}
+                    </Button>
+                  )}
+                </section>
+              </>
             )}
-            {!archived && (
-              <section aria-label="Project results">
-                <h2>Results</h2>
-                {tasks
-                  .slice()
-                  .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-                  .slice(0, 4)
-                  .map((task) => (
-                    <ConversationResults
-                      key={task.id}
-                      task={task}
-                      onOpen={() => onTask(task.id)}
-                      onDiscuss={(source) => onNewConversation(project, source)}
-                    />
-                  ))}
-                {tasks.length > 4 && (
-                  <p className="muted">
-                    Recent conversation results are shown here. Open any conversation for its
-                    complete results.
-                  </p>
-                )}
-              </section>
-            )}
-            <section aria-label="Conversations">
-              <div className="project-section-heading">
-                <h2>Conversations</h2>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={archived}
-                    onChange={(event) => setArchived(event.target.checked)}
-                  />{' '}
-                  Archived
-                </label>
+            {filesOpened && (
+              <div hidden={view !== 'files'}>
+                <Suspense fallback={<Spinner />}>
+                  <DirectoryPanel projectId={project.id} openRequest={1} />
+                </Suspense>
               </div>
-              <input
-                className="project-conversation-search"
-                aria-label="Find a conversation"
-                placeholder={cursor ? 'Find in loaded conversations…' : 'Find a conversation…'}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-              <div className="project-conversation-grid" ref={conversationGrid}>
-                {visible.map((task) => (
-                  <button key={task.id} data-task-id={task.id} onClick={() => onTask(task.id)}>
-                    <span className={`garden-project-dot status-${task.status}`} />
-                    <span>
-                      <strong>{task.title}</strong>
-                      <small>
-                        {task.status === 'completed'
-                          ? 'Conversation finished'
-                          : taskStatusLabel(task)}{' '}
-                        · {money(task.spentUsd)}
-                      </small>
-                      {changeSummary(changes[task.id]) && (
-                        <small
-                          title={`Compared with this conversation's last published or checked-out files. Large files, binary data and dependency environments are excluded from line counts.${changes[task.id]?.measurement ? ` Measured ${new Date(changes[task.id]!.measurement!.observedAt).toLocaleString()}.` : ''}`}
-                        >
-                          {changeSummary(changes[task.id])}
-                        </small>
-                      )}
-                      {task.activity && (
-                        <>
-                          <small className="project-activity-detail">
-                            {task.activity.currentStep ?? task.activity.latest}
-                          </small>
-                          <small>
-                            {task.activity.stepsTotal > 0 &&
-                              `Plan: ${task.activity.stepsCompleted} of ${task.activity.stepsTotal} marked complete · `}
-                            {task.activity.observedAt &&
-                              `Last activity ${new Date(task.activity.observedAt).toLocaleTimeString()}`}
-                          </small>
-                        </>
-                      )}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              {!visible.length && (
-                <p className="muted">
-                  {query
-                    ? 'No matching conversations in this list.'
-                    : archived
-                      ? 'No archived conversations.'
-                      : 'Start a conversation to explore another aspect of this project.'}
-                </p>
-              )}
-              {cursor && (
-                <Button aria-busy={busy} aria-disabled={busy} onClick={() => void more()}>
-                  {busy ? 'Loading conversations…' : 'More conversations'}
-                </Button>
-              )}
-            </section>
-
-            {project.brief && (
-              <details className="project-brief">
-                <summary>Project brief</summary>
-                <p>{project.brief}</p>
-              </details>
             )}
-            <Suspense fallback={<Spinner />}>
-              <ProjectUpdates projectId={project.id} tasks={tasks} onTask={onTask} />
-              <ProjectNotes projectId={project.id} revision={project.updatedAt} onTask={onTask} />
-            </Suspense>
-            {
+            {view === 'tools' && (
               <Suspense fallback={<Spinner />}>
                 <ProjectSessions projectId={project.id} onOpen={onComputer} />
                 <ProcessPanel workspaceId={project.workspaceId} projectId={project.id} />
-                <DirectoryPanel projectId={project.id} />
+                <p className="muted">
+                  Choose a conversation above to open its terminal, browser or desktop. Each
+                  conversation keeps its own working copy and sessions.
+                </p>
               </Suspense>
-            }
+            )}
           </div>
         )}
       </div>
       {settings && (
         <Dialog title="Project settings" onClose={() => setSettings(false)}>
           <div className="stack">
+            <fieldset>
+              <legend>Quick access on this device</legend>
+              <div className="row">
+                {['Files', 'Jobs', 'Browser'].map((name) => (
+                  <label className="check" key={name}>
+                    <input
+                      type="checkbox"
+                      checked={shortcuts.includes(name)}
+                      onChange={() => toggleShortcut(name)}
+                    />
+                    {name}
+                  </label>
+                ))}
+              </div>
+              <p className="muted">
+                Pinned shortcuts appear beneath the project navigation. Saved immediately.
+              </p>
+            </fieldset>
             <form
               className="stack"
               onSubmit={(event) => {
@@ -523,7 +657,7 @@ export default function ProjectSpace({
             <Suspense fallback={<Spinner />}>
               <ProjectModels projectId={project.id} />
             </Suspense>
-            <ErrorNotice error={error} />
+            <ErrorNotice context="Could not refresh this project." error={error} />
           </div>
         </Dialog>
       )}

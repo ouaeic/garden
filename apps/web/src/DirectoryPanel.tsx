@@ -1,10 +1,11 @@
+import { setSurfaceLocation, useSurfaceLocation } from './surface-location';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import { Download, Folder, FolderOpen, File, RefreshCw } from 'lucide-react';
 import type { DirectoryEntry, DirectoryPage, ProjectDirectory } from '@athanor/contracts';
-import { get, isNativeClient } from './client';
+import { get, post, request as writeRequest, isNativeClient } from './client';
 import { requireDownloadSupport } from './download-support';
-import { Button, ErrorNotice, Spinner } from './ui';
+import { Button, Dialog, ErrorNotice, Field, Spinner } from './ui';
 import { processMemory } from './process-display';
 import './directories.css';
 import type { AnalysisSelection } from './computer/analysis-selection';
@@ -33,13 +34,22 @@ export default function DirectoryPanel({
 }) {
   const readOnlyId = readOnlyRoot?.id,
     readOnlyName = readOnlyRoot?.name;
-  const [expanded, setExpanded] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newKind, setNewKind] = useState<'file' | 'folder'>('file');
+  const [newName, setNewName] = useState('');
+  const [writing, setWriting] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
+  const [expanded, setExpanded] = useState(Boolean(openRequest));
   useEffect(() => {
     if (openRequest) setExpanded(true);
   }, [openRequest]);
   const [roots, setRoots] = useState<ProjectDirectory[]>([]);
   const [rootId, setRootId] = useState('');
-  const [folder, setFolder] = useState('workspace');
+  const [locationFolder] = useSurfaceLocation('folder', 'workspace');
+  const [locationRoot] = useSurfaceLocation('root', '');
+  const [locationFile] = useSurfaceLocation('file', '');
+  const [locationFileView] = useSurfaceLocation('fileView', 'source');
+  const [folder, setFolder] = useState(!readOnlyRoot ? locationFolder : 'workspace');
   const [listing, setListing] = useState<DirectoryPage | null>(null);
   const [file, setFile] = useState<DirectoryEntry | null>(null);
   const [fileView, setFileView] = useState<'source' | 'table' | 'notebook'>('source');
@@ -79,7 +89,10 @@ export default function DirectoryPanel({
         setRootId((previous) =>
           result.directories.some((root) => root.workspaceId === previous)
             ? previous
-            : (result.directories[0]?.workspaceId ?? '')
+            : (result.directories.find((root) => !readOnlyRoot && root.workspaceId === locationRoot)
+                ?.workspaceId ??
+              result.directories[0]?.workspaceId ??
+              '')
         );
       })
       .catch((cause) => {
@@ -128,8 +141,50 @@ export default function DirectoryPanel({
     if (expanded) void load();
     return () => request.current?.abort();
   }, [load, expanded]);
+  useEffect(() => {
+    if (readOnlyRoot || dirty) return;
+    setFolder(locationFolder);
+    if (roots.some((root) => root.workspaceId === locationRoot)) setRootId(locationRoot);
+    if (!locationFile) setFile(null);
+    else if (listing?.path === locationFolder) {
+      const entry = listing.entries.find(
+        (entry) => entry.path === locationFile && entry.type === 'file'
+      );
+      if (entry) {
+        setFile(entry);
+        setFileView(
+          locationFileView === 'table'
+            ? 'table'
+            : locationFileView === 'notebook'
+              ? 'notebook'
+              : 'source'
+        );
+      } else if (listing.nextCursor && !loading && !error) {
+        void load(listing.nextCursor);
+      }
+    }
+  }, [
+    load,
+    loading,
+    error,
+    locationFolder,
+    locationRoot,
+    locationFile,
+    locationFileView,
+    roots,
+    listing,
+    readOnlyRoot,
+    dirty
+  ]);
+  function chooseFile(entry: DirectoryEntry, view: 'source' | 'table' | 'notebook') {
+    setFileView(view);
+    setFile(entry);
+    if (!readOnlyRoot)
+      setSurfaceLocation({ root: rootId, folder, file: entry.path, fileView: view }, true);
+  }
   const navigate = (next: string, workspace = rootId, focus = true) => {
     if (next === folder && workspace === rootId) return;
+    if (!readOnlyRoot && !setSurfaceLocation({ root: workspace, folder: next, file: null })) return;
     focusPath.current = focus;
     setFile(null);
     setRootId(workspace);
@@ -149,6 +204,36 @@ export default function DirectoryPanel({
       })
       .catch(setError);
   };
+  async function createEntry(files?: File[]) {
+    if (writing || !rootId || readOnlyRoot) return;
+    setWriting(true);
+    setError(null);
+    try {
+      const existing = new Set((listing?.entries ?? []).map((entry) => entry.path));
+      for (const name of files ? files.map((file) => file.name) : [newName.trim()]) {
+        if (!name || name === '.' || name === '..' || /[\\/]/.test(name))
+          throw new Error('Use a file name without a directory path.');
+        if (existing.has(`${folder}/${name}`))
+          throw new Error(`${name} already exists. Choose a different name.`);
+        const path = `${folder}/${name}`;
+        if (!files && newKind === 'folder') await post(`${base}/files/folder`, { path });
+        else
+          await writeRequest(`${base}/file?${new URLSearchParams({ path, createOnly: 'true' })}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/octet-stream' },
+            body: files?.find((file) => file.name === name) ?? ''
+          });
+        existing.add(path);
+      }
+      setCreating(false);
+      setNewName('');
+      await load();
+    } catch (cause) {
+      setError(cause);
+    } finally {
+      setWriting(false);
+    }
+  }
   return (
     <section className="project-directories" aria-label="Project files">
       <div className="directory-heading">
@@ -159,20 +244,23 @@ export default function DirectoryPanel({
           <p className="muted">
             {readOnlyRoot
               ? readOnlyRoot.description
-              : 'Scripts, data and results in your project’s execution directories.'}
+              : 'Browse working copies, scripts, data and results. Edits apply to the selected copy.'}
           </p>
         </div>
-        <Button
-          disabled={dirty}
-          aria-expanded={expanded}
-          onClick={() => setExpanded((value) => !value)}
-        >
-          {expanded ? 'Hide files' : 'Browse files'}
-        </Button>
+        {!openRequest && (
+          <Button
+            disabled={dirty}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((value) => !value)}
+          >
+            {expanded ? 'Hide files' : 'Browse files'}
+          </Button>
+        )}
       </div>
       {expanded && (
         <>
           <ErrorNotice
+            context="Could not refresh files."
             error={error}
             onRetry={() => (rootId ? void load() : setRootsRevision((value) => value + 1))}
           />
@@ -180,7 +268,7 @@ export default function DirectoryPanel({
             <>
               <div className="directory-toolbar">
                 <label className="directory-root">
-                  {readOnlyRoot ? 'File source' : 'Execution directory'}
+                  {readOnlyRoot ? 'File source' : 'Working copy'}
                   <select
                     className="field"
                     value={rootId}
@@ -189,11 +277,39 @@ export default function DirectoryPanel({
                   >
                     {roots.map((item) => (
                       <option key={item.workspaceId} value={item.workspaceId}>
-                        {item.name}
-                        {item.current ? ' · current' : ' · ' + item.workspaceId.slice(0, 8)}
+                        {item.name === 'Project execution' ? 'This conversation' : item.name}
+                        {item.current ? ' · current' : ''}
                       </option>
                     ))}
                   </select>
+                </label>
+                {!readOnlyRoot && (
+                  <>
+                    <Button disabled={dirty || writing} onClick={() => setCreating(true)}>
+                      New
+                    </Button>
+                    <label className="button computer-upload">
+                      Upload
+                      <input
+                        type="file"
+                        multiple
+                        disabled={dirty || writing}
+                        onChange={(event) => {
+                          const files = Array.from(event.target.files ?? []);
+                          event.target.value = '';
+                          if (files.length) void createEntry(files);
+                        }}
+                      />
+                    </label>
+                  </>
+                )}
+                <label className="directory-hidden-toggle">
+                  <input
+                    type="checkbox"
+                    checked={showHidden}
+                    onChange={(event) => setShowHidden(event.target.checked)}
+                  />{' '}
+                  Hidden files
                 </label>
                 <Button
                   aria-label="Refresh directory"
@@ -246,84 +362,89 @@ export default function DirectoryPanel({
                 <>
                   {listing.entries.length ? (
                     <ul className="directory-list" aria-label="Directory contents">
-                      {listing.entries.map((entry) => (
-                        <li key={entry.path}>
-                          <span className="directory-entry-icon" aria-hidden="true">
-                            {entry.type === 'directory' ? <Folder size={17} /> : <File size={17} />}
-                          </span>
-                          <div className="directory-entry-name">
-                            {entry.type === 'directory' ? (
-                              <button disabled={dirty} onClick={() => navigate(entry.path)}>
-                                {entry.name}
-                              </button>
-                            ) : (
-                              <span>{entry.name}</span>
-                            )}
-                            <small className="muted">
-                              {entry.type === 'file'
-                                ? processMemory(entry.sizeBytes)
-                                : entry.type === 'symlink'
-                                  ? 'Symbolic link · preserved in ZIP'
-                                  : entry.type === 'special'
-                                    ? 'Special file'
-                                    : 'Folder'}
-                            </small>
-                          </div>
-                          <div className="directory-entry-actions">
-                            {entry.type === 'file' && /\.ipynb$/i.test(entry.name) && (
-                              <Button
-                                disabled={dirty}
-                                onClick={() => {
-                                  setFileView('notebook');
-                                  setFile(entry);
-                                }}
-                              >
-                                Open notebook<span className="sr-only"> {entry.name}</span>
-                              </Button>
-                            )}
-                            {entry.type === 'file' && tableFile.test(entry.name) && (
-                              <Button
-                                disabled={dirty}
-                                onClick={() => {
-                                  setFileView('table');
-                                  setFile(entry);
-                                }}
-                              >
-                                View table<span className="sr-only"> {entry.name}</span>
-                              </Button>
-                            )}
-                            {entry.type === 'file' &&
-                              !readOnlyRoot &&
-                              textFile.test(entry.name) && (
+                      {listing.entries
+                        .filter(
+                          (entry) => showHidden || !entry.path.split('/').at(-1)?.startsWith('.')
+                        )
+                        .map((entry) => (
+                          <li key={entry.path}>
+                            <span className="directory-entry-icon" aria-hidden="true">
+                              {entry.type === 'directory' ? (
+                                <Folder size={17} />
+                              ) : (
+                                <File size={17} />
+                              )}
+                            </span>
+                            <div className="directory-entry-name">
+                              {entry.type === 'directory' ? (
+                                <button disabled={dirty} onClick={() => navigate(entry.path)}>
+                                  {entry.name}
+                                </button>
+                              ) : (
+                                <span>{entry.name}</span>
+                              )}
+                              <small className="muted">
+                                {entry.type === 'file'
+                                  ? processMemory(entry.sizeBytes)
+                                  : entry.type === 'symlink'
+                                    ? 'Symbolic link · preserved in ZIP'
+                                    : entry.type === 'special'
+                                      ? 'Special file'
+                                      : 'Folder'}
+                              </small>
+                            </div>
+                            <div className="directory-entry-actions">
+                              {entry.type === 'file' && /\.ipynb$/i.test(entry.name) && (
                                 <Button
                                   disabled={dirty}
                                   onClick={() => {
-                                    setFileView('source');
-                                    setFile(entry);
+                                    chooseFile(entry, 'notebook');
                                   }}
                                 >
-                                  Inspect<span className="sr-only"> {entry.name}</span>
+                                  Open notebook<span className="sr-only"> {entry.name}</span>
                                 </Button>
                               )}
-                            {(entry.type === 'file' || entry.type === 'directory') && (
-                              <a
-                                className="button"
-                                href={
-                                  entry.type === 'directory'
-                                    ? zipUrl(entry.path)
-                                    : `${base}/download?${new URLSearchParams({ path: entry.path })}`
-                                }
-                                download
-                                onClick={downloadClick}
-                                aria-label={`Download ${entry.name}${entry.type === 'directory' ? ' as ZIP' : ''}`}
-                              >
-                                <Download size={14} aria-hidden="true" />
-                                <span>{entry.type === 'directory' ? 'ZIP' : 'Download'}</span>
-                              </a>
-                            )}
-                          </div>
-                        </li>
-                      ))}
+                              {entry.type === 'file' && tableFile.test(entry.name) && (
+                                <Button
+                                  disabled={dirty}
+                                  onClick={() => {
+                                    chooseFile(entry, 'table');
+                                  }}
+                                >
+                                  View table<span className="sr-only"> {entry.name}</span>
+                                </Button>
+                              )}
+                              {entry.type === 'file' &&
+                                !readOnlyRoot &&
+                                textFile.test(entry.name) && (
+                                  <Button
+                                    disabled={dirty}
+                                    onClick={() => {
+                                      chooseFile(entry, 'source');
+                                    }}
+                                  >
+                                    Inspect<span className="sr-only"> {entry.name}</span>
+                                  </Button>
+                                )}
+                              {(entry.type === 'file' || entry.type === 'directory') && (
+                                <a
+                                  className="button"
+                                  href={
+                                    entry.type === 'directory'
+                                      ? zipUrl(entry.path)
+                                      : `${base}/download?${new URLSearchParams({ path: entry.path })}`
+                                  }
+                                  download
+                                  onClick={downloadClick}
+                                  aria-label={`Download ${entry.name}${entry.type === 'directory' ? ' as ZIP' : ''}`}
+                                >
+                                  <Download size={14} aria-hidden="true" />
+                                  <span>{entry.type === 'directory' ? 'ZIP' : 'Download'}</span>
+                                </a>
+                              )}
+                            </div>
+                          </li>
+                        ))}
                     </ul>
                   ) : (
                     <p className="muted">This directory is empty.</p>
@@ -347,20 +468,26 @@ export default function DirectoryPanel({
               )}
               <p className="directory-note muted">
                 Downloads stream directly to your device. ZIPs include hidden files and empty
-                folders. Finish writing files before downloading a consistent copy. Files may be
-                shared with other projects using this execution directory.
+                folders. Finish writing files before downloading a consistent copy. Downloads use
+                the selected working copy; running jobs keep their original inputs.
               </p>
             </>
           )}
           {loading && <Spinner label="Loading directory…" />}
           {!loading && !error && roots.length === 0 && (
-            <p className="muted">No execution directory is available yet.</p>
+            <p className="muted">A working copy will appear here when the conversation starts.</p>
           )}
           {file && (
             <div className="directory-inspector">
               <div className="directory-heading">
                 <strong>{file.path}</strong>
-                <Button disabled={dirty} onClick={() => setFile(null)}>
+                <Button
+                  disabled={dirty}
+                  onClick={() => {
+                    if (!readOnlyRoot) setSurfaceLocation({ file: null }, true);
+                    setFile(null);
+                  }}
+                >
                   Close file
                 </Button>
               </div>
@@ -402,6 +529,46 @@ export default function DirectoryPanel({
             </div>
           )}
         </>
+      )}
+      {creating && (
+        <Dialog
+          title="New file or folder"
+          onClose={() => {
+            if (!writing) setCreating(false);
+          }}
+        >
+          <form
+            className="stack"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void createEntry();
+            }}
+          >
+            <p className="muted">
+              In {root?.name} · {folder}
+            </p>
+            <Field label="Kind">
+              <select
+                value={newKind}
+                onChange={(event) => setNewKind(event.target.value as 'file' | 'folder')}
+              >
+                <option value="file">Text file</option>
+                <option value="folder">Folder</option>
+              </select>
+            </Field>
+            <Field label="Name">
+              <input
+                required
+                value={newName}
+                onChange={(event) => setNewName(event.target.value)}
+              />
+            </Field>
+            <Button type="submit" className="primary" busy={writing} disabled={!newName.trim()}>
+              Create {newKind}
+            </Button>
+            <ErrorNotice error={error} />
+          </form>
+        </Dialog>
       )}
     </section>
   );

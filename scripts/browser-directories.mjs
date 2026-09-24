@@ -121,9 +121,9 @@ export async function checkProjectDirectories({
   const page = await context.newPage();
   page.on('pageerror', (error) => errors.push(error.message));
   try {
-    await page.goto(`${origin}/?task=${taskId}`);
+    await page.goto(`${origin}/?task=${taskId}&panel=files`);
     const panel = page.getByRole('region', { name: 'Project files', exact: true });
-    await panel.getByRole('button', { name: 'Browse files', exact: true }).click();
+    await panel.getByRole('checkbox', { name: 'Hidden files', exact: true }).check();
     await panel.getByRole('button', { name: 'results', exact: true }).waitFor();
     assert((await panel.innerText()).includes('8.0 GiB'));
     assert((await panel.innerText()).includes('.analysis-config'));
@@ -230,7 +230,10 @@ export async function checkProjectDirectories({
     assert(fixture.tableReads.some((read) => read.cursor === 'next-table-page'));
     fixture.failRead = true;
     await panel.getByRole('button', { name: 'Refresh directory', exact: true }).click();
-    await panel.getByText('Directory temporarily unavailable', { exact: true }).waitFor();
+    await panel
+      .getByRole('alert')
+      .filter({ hasText: 'Directory temporarily unavailable' })
+      .waitFor();
     assert(
       await panel
         .getByRole('button', { name: 'Refresh directory', exact: true })
@@ -240,9 +243,10 @@ export async function checkProjectDirectories({
     fixture.failRead = false;
     await panel.getByRole('button', { name: 'Try again', exact: true }).click();
     await panel
-      .getByText('Directory temporarily unavailable', { exact: true })
+      .getByRole('alert')
+      .filter({ hasText: 'Directory temporarily unavailable' })
       .waitFor({ state: 'detached' });
-    await panel.getByRole('combobox', { name: 'Execution directory' }).selectOption(fixture.branch);
+    await panel.getByRole('combobox', { name: 'Working copy' }).selectOption(fixture.branch);
     await panel.getByRole('button', { name: 'empty', exact: true }).click();
     await panel.getByText('This directory is empty.', { exact: true }).waitFor();
     assert.equal(

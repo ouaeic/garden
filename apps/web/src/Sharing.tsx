@@ -160,24 +160,27 @@ export default function Sharing({
           </select>
         </Field>
       </div>
-      <label className="check">
-        <input
-          type="checkbox"
-          disabled={busy}
-          checked={reasoning}
-          onChange={(event) => setReasoning(event.target.checked)}
-        />
-        Include model reasoning
-      </label>
-      <label className="check">
-        <input
-          type="checkbox"
-          disabled={busy}
-          checked={toolResults}
-          onChange={(event) => setToolResults(event.target.checked)}
-        />
-        Include raw tool results
-      </label>
+      <details className="settings-disclosure">
+        <summary>Advanced inclusions</summary>{' '}
+        <label className="check">
+          <input
+            type="checkbox"
+            disabled={busy}
+            checked={reasoning}
+            onChange={(event) => setReasoning(event.target.checked)}
+          />
+          Include model reasoning
+        </label>
+        <label className="check">
+          <input
+            type="checkbox"
+            disabled={busy}
+            checked={toolResults}
+            onChange={(event) => setToolResults(event.target.checked)}
+          />
+          Include raw tool results
+        </label>
+      </details>{' '}
       {artifacts.length > 0 && (
         <fieldset disabled={busy}>
           <legend>Files to include</legend>
@@ -207,7 +210,7 @@ export default function Sharing({
         <section className="panel stack">
           <h3>{preview.title}</h3>
           <p className="muted">These are the messages and files that will be included.</p>
-          <details>
+          <details open>
             <summary>Read included content</summary>
             {preview.events.map((event, index) => (
               <article key={index}>

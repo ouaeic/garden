@@ -99,6 +99,7 @@ import {
   workspacePath,
   workspaceUsage,
   writeWorkspaceFile,
+  createWorkspaceFile,
   WorkspaceFileError
 } from './files.js';
 import { readerFor } from './seen-lines.js';
@@ -1491,7 +1492,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
 
   app.put<{
     Params: { workspaceId: string };
-    Querystring: { path: string; expectSha256?: string };
+    Querystring: { path: string; expectSha256?: string; createOnly?: string };
   }>('/v1/workspaces/:workspaceId/file', async (request) => {
     requireScope(request, 'files.write');
     const root = workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId);
@@ -1516,6 +1517,18 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
      * landing on a name still arrive unclaimed and stay unguarded, because neither of them said it
      * had read anything.
      */
+    if (request.query.createOnly === 'true') {
+      try {
+        return await createWorkspaceFile(root, requestedPath, body, config.MAX_FILE_BYTES);
+      } catch (cause) {
+        if ((cause as NodeJS.ErrnoException).code === 'EEXIST')
+          throw new WorkspaceFileError(
+            'A file with this name already exists. Choose another name.',
+            409
+          );
+        throw cause;
+      }
+    }
     return writeWorkspaceFile(
       root,
       requestedPath,

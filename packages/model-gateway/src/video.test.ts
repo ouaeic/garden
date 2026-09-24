@@ -1,4 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { OPENAI_VIDEO_RETIREMENT_AT } from './openai-media-catalog.js';
+
+// Protocol fixtures exercise the active route; retirement has a separate boundary case.
+beforeEach(() => vi.spyOn(Date, 'now').mockReturnValue(Date.parse(OPENAI_VIDEO_RETIREMENT_AT) - 1));
+afterEach(() => vi.restoreAllMocks());
 import { VideoClient, VideoSubmissionUncertainError } from './video.js';
 
 const input = {
@@ -175,4 +180,23 @@ describe('durable video provider operations', () => {
     ).rejects.toThrow('invalid video job ID');
     expect(fetch).not.toHaveBeenCalled();
   });
+});
+
+it('refuses new native video at the retirement boundary before HTTP', async () => {
+  vi.spyOn(Date, 'now').mockReturnValue(Date.parse(OPENAI_VIDEO_RETIREMENT_AT));
+  const fetch = vi.fn();
+  await expect(
+    new VideoClient({
+      ...options,
+      baseUrl: 'https://api.openai.com/v1',
+      apiProtocol: 'openai',
+      fetch
+    }).submit({
+      model: 'sora-2',
+      prompt: 'A seedling',
+      duration: 8,
+      size: '1280x720'
+    })
+  ).rejects.toThrow('retired');
+  expect(fetch).not.toHaveBeenCalled();
 });

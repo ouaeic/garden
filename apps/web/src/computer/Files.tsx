@@ -128,7 +128,7 @@ export function Files({
                       `${upload.name} already exists. Rename it before uploading another file with that name.`
                     );
                   await request(
-                    `${base}/file?path=${encodeURIComponent(`${folder}/${upload.name}`)}`,
+                    `${base}/file?path=${encodeURIComponent(`${folder}/${upload.name}`)}&createOnly=true`,
                     {
                       method: 'PUT',
                       headers: { 'Content-Type': 'application/octet-stream' },
@@ -178,50 +178,53 @@ export function Files({
           </button>
         </div>
       )}
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void run(async () => {
-            if (entries.some((entry) => entry.name === newName))
-              throw new Error(`${newName} already exists. Choose another name.`);
-            const path = `${folder}/${newName}`;
-            if (newKind === 'folder') await post(`${base}/files/folder`, { path });
-            else
-              await request(`${base}/file?path=${encodeURIComponent(path)}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/octet-stream' },
-                body: ''
-              });
-            setNewName('');
-            await load();
-            if (newKind === 'file') navigate(() => void run(() => read(path, 1, true)));
-          });
-        }}
-      >
-        <input
-          className="field"
-          aria-label={`New ${newKind} name`}
-          placeholder={`New ${newKind} name`}
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          required
-          pattern="[^/\\]+"
-        />
-        <select
-          className="field"
-          aria-label="Create kind"
-          value={newKind}
-          onChange={(event) => setNewKind(event.target.value as 'folder' | 'file')}
+      <details className="file-new">
+        <summary>New file or folder</summary>
+        <form
+          className="row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run(async () => {
+              if (entries.some((entry) => entry.name === newName))
+                throw new Error(`${newName} already exists. Choose another name.`);
+              const path = `${folder}/${newName}`;
+              if (newKind === 'folder') await post(`${base}/files/folder`, { path });
+              else
+                await request(`${base}/file?path=${encodeURIComponent(path)}&createOnly=true`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/octet-stream' },
+                  body: ''
+                });
+              setNewName('');
+              await load();
+              if (newKind === 'file') navigate(() => void run(() => read(path, 1, true)));
+            });
+          }}
         >
-          <option value="folder">Folder</option>
-          <option value="file">Text file</option>
-        </select>
-        <button className="button" disabled={busy || !newName.trim()}>
-          Create {newKind}
-        </button>
-      </form>
-      <div className="computer-file-layout">
+          <input
+            className="field"
+            aria-label={`New ${newKind} name`}
+            placeholder={`New ${newKind} name`}
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            required
+            pattern="[^/\\]+"
+          />
+          <select
+            className="field"
+            aria-label="Create kind"
+            value={newKind}
+            onChange={(event) => setNewKind(event.target.value as 'folder' | 'file')}
+          >
+            <option value="folder">Folder</option>
+            <option value="file">Text file</option>
+          </select>
+          <button className="button" disabled={busy || !newName.trim()}>
+            Create {newKind}
+          </button>
+        </form>
+      </details>
+      <div className={`computer-file-layout ${file ? 'has-file' : 'no-file'}`}>
         <div className="computer-file-list" aria-label="Files">
           {entries.length ? (
             entries.map((entry) => (

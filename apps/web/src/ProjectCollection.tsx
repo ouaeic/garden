@@ -67,7 +67,12 @@ function ConversationLinks({
   return (
     <div className="project-conversation-links">
       {[...tasks]
-        .sort((a, b) => Number(b.pinned) - Number(a.pinned))
+        .sort(
+          (a, b) =>
+            Number(b.pinned) - Number(a.pinned) ||
+            a.createdAt.localeCompare(b.createdAt) ||
+            a.id.localeCompare(b.id)
+        )
         .map((task) => (
           <ProjectLink
             key={task.id}

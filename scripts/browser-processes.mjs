@@ -8,6 +8,7 @@ export function processFixture(workspaceId, taskId) {
     failRead: false,
     failStop: false,
     reads: 0,
+    projectReads: 0,
     actions: []
   };
   fixture.handle = async (route, pathname) => {
@@ -53,7 +54,8 @@ export function processFixture(workspaceId, taskId) {
     if (!/\/processes(?:\/[^/]+(?:\/resume)?)?$/.test(pathname)) return false;
     const json = (body, status = 200) => route.fulfill({ status, json: body });
     if (pathname.endsWith('/processes')) {
-      fixture.reads++;
+      if (pathname === `/v1/tasks/${taskId}/processes`) fixture.reads++;
+      else if (pathname.startsWith('/v1/projects/')) fixture.projectReads++;
       await json(
         fixture.failRead
           ? {
@@ -249,7 +251,7 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
   page.on('pageerror', (error) => errors.push(error.message));
   await page.clock.install({ time: new Date() });
   try {
-    await page.goto(`${origin}/?task=${taskId}`);
+    await page.goto(`${origin}/?task=${taskId}&panel=tools&tool=processes`);
     const panel = page.getByRole('region', { name: 'Project processes', exact: true });
     const card = panel.getByRole('article', { name: 'Whole-genome analysis', exact: true });
     await card.waitFor();
@@ -271,14 +273,25 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
     const interrupted = panel.getByRole('article', { name: 'Checkpointed assembly' });
     assert(await interrupted.isVisible(), 'Interrupted work stays visible without opening history');
     const before = fixture.reads;
+    const projectBefore = fixture.projectReads;
     await page.clock.runFor(119_000);
     assert.equal(fixture.reads, before, 'No fast polling while a long job runs');
+    assert.equal(
+      fixture.projectReads,
+      projectBefore,
+      'The project job shortcut also avoids fast polling'
+    );
     const next = page.waitForResponse((response) =>
       response.url().endsWith(`/tasks/${taskId}/processes`)
     );
     await page.clock.runFor(2_000);
     await next;
     assert.equal(fixture.reads, before + 1, 'Refresh process status on the relaxed interval');
+    assert.equal(
+      fixture.projectReads,
+      projectBefore + 1,
+      'Refresh the project job shortcut on the relaxed interval'
+    );
     await card.getByText('Command & details', { exact: true }).click();
     await card.getByText('Interactive terminal · 120 × 36.', { exact: false }).waitFor();
     assert((await card.innerText()).includes('aligner · R · 2d'));

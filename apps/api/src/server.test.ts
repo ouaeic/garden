@@ -8197,7 +8197,7 @@ describe('the doors the runner already had', () => {
         }
         if (requestUrl.includes('/file?') && method === 'PUT') {
           writeQuery = requestUrl.split('/file?')[1]!;
-          if (writeQuery.includes('expectSha256'))
+          if (writeQuery.includes('expectSha256') || writeQuery.includes('createOnly=true'))
             return json(
               { error: { code: 'file_changed', message: 'This file changed after you read it' } },
               409
@@ -8340,6 +8340,19 @@ describe('the doors the runner already had', () => {
     expect(written.statusCode, written.body).toBe(200);
     expect(written.json<{ sizeBytes: number }>().sizeBytes).toBe(4);
     expect(writeQuery).not.toContain('expectSha256');
+    const exists = await app.inject({
+      method: 'PUT',
+      url: `/v1/workspaces/${workspaceId}/file?path=workspace%2Fnotes.md&createOnly=true`,
+      headers: {
+        cookie,
+        'content-type': 'application/octet-stream',
+        'idempotency-key': 'create-only-upload'
+      },
+      payload: Buffer.from('new upload')
+    });
+    expect(exists.statusCode).toBe(409);
+    expect(exists.json<{ error: { code: string } }>().error.code).toBe('file_exists');
+    expect(writeQuery).toContain('createOnly=true');
   }, 30_000);
 });
 

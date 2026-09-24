@@ -1,4 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { OPENAI_VIDEO_RETIREMENT_AT } from './openai-media-catalog.js';
+
+// Protocol fixtures exercise the active route; retirement has a separate boundary case.
+beforeEach(() => vi.spyOn(Date, 'now').mockReturnValue(Date.parse(OPENAI_VIDEO_RETIREMENT_AT) - 1));
+afterEach(() => vi.restoreAllMocks());
 import {
   NativeMediaLibraryClient,
   NativeMediaSubmissionUncertainError
@@ -168,4 +173,13 @@ describe('native batch cancellation receipts', () => {
       expect.objectContaining({ method: 'POST', redirect: 'error' })
     );
   });
+});
+
+it('refuses character and batch creation at the retirement boundary before HTTP', async () => {
+  vi.spyOn(Date, 'now').mockReturnValue(Date.parse(OPENAI_VIDEO_RETIREMENT_AT));
+  const fetch = vi.fn();
+  const client = new NativeMediaLibraryClient({ ...options, fetch });
+  await expect(client.createCharacter({ name: 'Moss', bytes: mp4 })).rejects.toThrow('retired');
+  await expect(client.submitBatch('file_1')).rejects.toThrow('retired');
+  expect(fetch).not.toHaveBeenCalled();
 });

@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import type { Task, Workspace } from '@athanor/contracts';
-import { Files } from './computer/Files.js';
+const Files = lazy(() =>
+  import('./computer/Files.js').then((module) => ({ default: module.Files }))
+);
 import { Operations } from './computer/Operations.js';
 import './computer.css';
 
@@ -20,6 +22,8 @@ export interface ComputerProps {
   initialTool?: ComputerTool;
   visible?: boolean;
   onChange: () => void;
+  embedded?: boolean;
+  onToolChange?: (tool: ComputerTool) => void;
 }
 
 export default function Computer({
@@ -27,17 +31,23 @@ export default function Computer({
   task,
   initialTool = 'files',
   visible = true,
+  embedded = false,
+  onToolChange,
   onChange
 }: ComputerProps) {
   const [tool, setTool] = useState<ComputerTool>(initialTool);
+  const [filesOpened, setFilesOpened] = useState(initialTool === 'files');
   const [terminalOpened, setTerminalOpened] = useState(initialTool === 'terminal');
   useEffect(() => {
     setTool(initialTool);
+    if (initialTool === 'files') setFilesOpened(true);
     if (initialTool === 'terminal') setTerminalOpened(true);
   }, [initialTool]);
   const select = (next: ComputerTool) => {
     if (next === 'terminal') setTerminalOpened(true);
+    if (next === 'files') setFilesOpened(true);
     setTool(next);
+    onToolChange?.(next);
   };
   if (!workspace)
     return (
@@ -45,13 +55,15 @@ export default function Computer({
     );
   return (
     <section className="computer panel" aria-label={`${workspace.name} computer`}>
-      <header className="section-heading">
-        <div>
-          <p className="eyebrow">Your computer</p>
-          <h2>{task?.title ?? workspace.name}</h2>
-        </div>
-        <span className="muted">{workspace.status}</span>
-      </header>
+      {!embedded && (
+        <header className="section-heading">
+          <div>
+            <p className="eyebrow">All computer work</p>
+            <h2>{task?.title ?? workspace.name}</h2>
+          </div>
+          <span className="muted">{workspace.status}</span>
+        </header>
+      )}
       <nav className="computer-tabs" aria-label="Computer tools">
         {(
           [
@@ -63,17 +75,23 @@ export default function Computer({
             'processes',
             'checkpoints'
           ] as const
-        ).map((name) => (
-          <button
-            type="button"
-            key={name}
-            className={tool === name ? 'button active' : 'button'}
-            aria-pressed={tool === name}
-            onClick={() => select(name)}
-          >
-            {name === 'checkpoints' ? 'Recovery' : name[0]!.toUpperCase() + name.slice(1)}
-          </button>
-        ))}
+        )
+          .filter((name) => !embedded || name !== 'files')
+          .map((name) => (
+            <button
+              type="button"
+              key={name}
+              className={tool === name ? 'button active' : 'button'}
+              aria-pressed={tool === name}
+              onClick={() => select(name)}
+            >
+              {name === 'checkpoints'
+                ? 'Recovery'
+                : name === 'processes'
+                  ? 'Jobs'
+                  : name[0]!.toUpperCase() + name.slice(1)}
+            </button>
+          ))}
       </nav>
       <Suspense
         fallback={
@@ -82,14 +100,16 @@ export default function Computer({
           </p>
         }
       >
-        <div hidden={tool !== 'files'}>
-          <Files
-            key={workspace.id}
-            workspace={workspace}
-            taskId={task?.id ?? null}
-            onChange={onChange}
-          />
-        </div>
+        {filesOpened && (
+          <div hidden={tool !== 'files'}>
+            <Files
+              key={workspace.id}
+              workspace={workspace}
+              taskId={task?.id ?? null}
+              onChange={onChange}
+            />
+          </div>
+        )}
         {terminalOpened && (
           <div hidden={tool !== 'terminal'}>
             <Terminal
@@ -107,7 +127,7 @@ export default function Computer({
             surface={tool}
           />
         )}
-        {(tool === 'previews' || tool === 'processes' || tool === 'checkpoints') && (
+        {visible && (tool === 'previews' || tool === 'processes' || tool === 'checkpoints') && (
           <Operations
             key={`${workspace.id}:${tool}`}
             workspace={workspace}

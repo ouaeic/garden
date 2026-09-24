@@ -62,284 +62,301 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
     saved?.provider ?? (selected.startsWith('openai-compatible:') ? 'openai-compatible' : selected);
   return (
     <>
-      <AudioReceipts />
-      <Section
-        title="Model connections"
-        description="Bring your own provider. Your computer uses your credentials directly."
-      >
-        <ResourceState resource={provider} />
-        {Boolean(provider.value?.connections?.length) && (
-          <div className="row model-connection-tabs" aria-label="Saved model connections">
-            {provider.value?.connections?.map((entry) => (
-              <Button
-                key={entry.connectionId ?? entry.provider}
-                type="button"
-                aria-pressed={selected === (entry.connectionId ?? entry.provider)}
-                onClick={() => setChoice(entry.connectionId ?? entry.provider)}
-              >
-                {entry.label ??
-                  (entry.provider === 'openrouter'
-                    ? 'OpenRouter'
-                    : entry.provider === 'ollama-cloud'
-                      ? 'Ollama Cloud'
-                      : 'Compatible endpoint')}
-              </Button>
-            ))}
-          </div>
-        )}
-        <Button type="button" onClick={() => setChoice(`openai-compatible:${crypto.randomUUID()}`)}>
-          Add custom endpoint
-        </Button>
-        {provider.value && preferences.value && (
-          <form
-            className="stack"
-            key={selected + (saved?.baseUrl ?? '') + (saved?.modelId ?? '')}
-            onSubmit={(event) => {
-              event.preventDefault();
-              const form = new FormData(event.currentTarget);
-              const apiKey = fieldValue(form, 'apiKey');
-              void action.run(async () => {
-                await sensitive(() =>
-                  put('/v1/providers', {
-                    provider: selectedProvider,
-                    connectionId: selected,
-                    ...(selectedProvider === 'openai-compatible'
-                      ? { label: fieldValue(form, 'label') }
-                      : {}),
-                    ...(apiKey ? { apiKey } : {}),
-                    ...(selectedProvider === 'openai-compatible'
-                      ? {
-                          baseUrl: fieldValue(form, 'baseUrl'),
-                          ...(fieldValue(form, 'modelId')
-                            ? { modelId: fieldValue(form, 'modelId') }
-                            : {}),
-                          contextTokens: Number(form.get('contextTokens')),
-                          capabilities: [
-                            'chat',
-                            'tools',
-                            ...(form.has('vision') ? ['vision'] : []),
-                            ...(form.has('reasoning') ? ['reasoning'] : [])
-                          ],
-                          modalities: ['text', ...(form.has('vision') ? ['image'] : [])]
-                        }
-                      : {}),
-                    enforceZeroDataRetention: form.has('zdr')
-                  })
-                );
-                if (selectedProvider === 'openrouter') {
-                  try {
-                    await put('/v1/account/preferences', {
-                      providerRouting: {
-                        objective: fieldValue(form, 'routingObjective'),
-                        throughputFloorPercent: Number(form.get('throughputFloorPercent') ?? 40),
-                        ignoredProviders: fieldValue(form, 'ignoredProviders')
-                          .split(',')
-                          .map((name) => name.trim())
-                          .filter(Boolean)
-                      }
-                    });
-                  } catch (cause) {
-                    throw new Error(
-                      'Connection saved, but operator routing was not saved. Retry Verify and save.',
-                      { cause }
-                    );
-                  }
-                }
-              }, 'Connection and routing verified and saved');
-            }}
-          >
-            <div className="management-note">
-              {saved && saved.configured !== false
-                ? `Connected through ${saved?.source === 'server_environment' ? 'server configuration' : 'your saved settings'}. ${saved?.hasApiKey ? 'A key is securely stored.' : 'This endpoint uses no saved key.'}`
-                : 'Add this provider alongside your other connections.'}
-            </div>
-            <div className="management-grid">
-              <Field label="Provider">
-                <select
-                  value={selectedProvider}
-                  disabled={selected !== selectedProvider}
-                  onChange={(event) => setChoice(event.target.value)}
-                >
-                  <option value="openrouter">OpenRouter</option>
-                  <option value="ollama-cloud">Ollama Cloud</option>
-                  <option value="openai-compatible">Compatible endpoint</option>
-                </select>
-              </Field>
-              <Field
-                label="API key"
-                hint="Leave empty to keep this connection’s key. Changing its endpoint requires a new key."
-              >
-                <input
-                  name="apiKey"
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder={saved?.hasApiKey ? 'Stored securely' : 'Paste your key'}
-                />
-              </Field>
-              {selectedProvider === 'openai-compatible' && (
-                <>
-                  <Field
-                    label="Connection name"
-                    hint="Optional. A named connection uses its endpoint hostname by default."
-                  >
-                    <input
-                      name="label"
-                      maxLength={80}
-                      defaultValue={saved?.label ?? ''}
-                      placeholder="Work models"
-                    />
-                  </Field>
-                  <Field label="Endpoint URL">
-                    <input
-                      required
-                      name="baseUrl"
-                      type="url"
-                      defaultValue={saved?.baseUrl ?? ''}
-                      placeholder="https://provider.example/v1"
-                    />
-                  </Field>
-                  <Field
-                    label="Restrict to model ID"
-                    hint="Optional. Leave empty to discover every model this endpoint offers."
-                  >
-                    <input name="modelId" defaultValue={saved?.modelId ?? ''} />
-                  </Field>
-                  <Field label="Context window in tokens">
-                    <input
-                      name="contextTokens"
-                      type="number"
-                      min={4096}
-                      max={10000000}
-                      defaultValue={saved?.contextTokens ?? 128000}
-                      required
-                    />
-                  </Field>
-                  <div className="stack">
-                    <label className="management-check">
-                      <input
-                        name="vision"
-                        type="checkbox"
-                        defaultChecked={saved?.capabilities?.includes('vision')}
-                      />
-                      Accepts images
-                    </label>
-                    <label className="management-check">
-                      <input
-                        name="reasoning"
-                        type="checkbox"
-                        defaultChecked={saved?.capabilities?.includes('reasoning') ?? true}
-                      />
-                      Supports reasoning
-                    </label>
-                  </div>
-                </>
-              )}
-            </div>
-            {selectedProvider === 'openrouter' && (
-              /*
-               * Which operator serves a model, when several do.
-               *
-               * The aggregator lists a handful for most models at different prices and wildly
-               * different speeds, and given no preference it picks among the cheapest weighted by
-               * the inverse square of price - so a model whose fastest operator runs at 142 tokens
-               * a second and whose cheapest runs at 3 lands on the second one most of the time. For
-               * a chat box that is a slower reply; for an agent it is a task that takes a day
-               * instead of twenty minutes, because a turn is dozens of sequential calls.
-               *
-               * Behind a disclosure because the defaults are the right answer for almost everyone,
-               * and open to be edited because the trade is the owner's to make.
-               */
-              <details className="stack">
-                <summary>Which operator serves a model</summary>
-                <p className="muted">
-                  Several companies serve most models, at different prices and very different
-                  speeds, and left alone OpenRouter picks among the cheapest — which for agent work
-                  is usually the slowest. Your computer asks for the cheapest company that still
-                  reaches a share of the fastest one's speed on that model. Both comparisons are
-                  OpenRouter's own, across every request it serves. Companies that log or retain
-                  your data are already excluded by the zero-data-retention setting.
-                </p>
-                <div className="management-grid">
-                  <Field label="Choose">
-                    <select
-                      name="routingObjective"
-                      defaultValue={
-                        preferences.value?.preferences.providerRouting?.objective ??
-                        'cheapest_fast_enough'
-                      }
-                    >
-                      <option value="cheapest_fast_enough">The cheapest that is fast enough</option>
-                      <option value="fastest">The fastest, whatever it costs</option>
-                      <option value="cheapest">The cheapest, however slow</option>
-                    </select>
-                  </Field>
-                  <Field
-                    label="Fast enough means"
-                    hint="Percentage of the speed the quickest company reaches on that model, so it scales with what the model can actually do."
-                  >
-                    <input
-                      name="throughputFloorPercent"
-                      type="number"
-                      min={0}
-                      max={100}
-                      defaultValue={
-                        preferences.value?.preferences.providerRouting?.throughputFloorPercent ?? 40
-                      }
-                    />
-                  </Field>
-                  <Field label="Never use" hint="Operator names, separated by commas.">
-                    <input
-                      name="ignoredProviders"
-                      placeholder="e.g. Together, Chutes"
-                      defaultValue={(
-                        preferences.value?.preferences.providerRouting?.ignoredProviders ?? []
-                      ).join(', ')}
-                    />
-                  </Field>
-                </div>
-              </details>
-            )}
-            <label className="management-check">
-              <input
-                name="zdr"
-                type="checkbox"
-                defaultChecked={saved?.enforceZeroDataRetention ?? true}
-              />
-              <span>
-                Require zero data retention
-                <small className="muted">
-                  Use only the provider route approved for this privacy choice.
-                </small>
-              </span>
-            </label>
-            <div className="row">
-              <Button type="submit" className="primary" busy={action.busy}>
-                Verify and save
-              </Button>
-              {saved?.source === 'encrypted_database' && (
-                <ConfirmButton
-                  label="Remove saved connection"
-                  description="Remove this saved connection. Tasks that need it will wait until it is connected again. Other saved providers remain available."
-                  action={async () => {
-                    await sensitive(() =>
-                      del(`/v1/providers?connectionId=${encodeURIComponent(selected)}`)
-                    );
-                    provider.refresh();
-                    models.refresh();
-                    onChange();
-                  }}
-                />
-              )}
-            </div>
-            <ActionFeedback action={action} />
-          </form>
-        )}
-      </Section>
       <Section
         title="Model defaults"
         description="Choose the main agent and the models behind its specialist work. New projects inherit these defaults."
       >
         <DefaultModels key={provider.value?.provider ?? 'loading'} onChange={onChange} />
+      </Section>
+      <details className="settings-disclosure">
+        <summary>Audio generation history</summary>
+        <AudioReceipts />
+      </details>
+      <Section
+        title="Model connections"
+        description="Bring your own provider. Your computer uses your credentials directly."
+      >
+        <ResourceState resource={provider} />
+        <p className="connection-summary">
+          {provider.value?.configured
+            ? 'Connected · Your provider credentials are stored on your computer.'
+            : 'Connect a provider to start working.'}
+        </p>
+        <details className="settings-disclosure" open={provider.value?.configured === false}>
+          <summary>Manage model connections</summary>
+          {Boolean(provider.value?.connections?.length) && (
+            <div className="row model-connection-tabs" aria-label="Saved model connections">
+              {provider.value?.connections?.map((entry) => (
+                <Button
+                  key={entry.connectionId ?? entry.provider}
+                  type="button"
+                  aria-pressed={selected === (entry.connectionId ?? entry.provider)}
+                  onClick={() => setChoice(entry.connectionId ?? entry.provider)}
+                >
+                  {entry.label ??
+                    (entry.provider === 'openrouter'
+                      ? 'OpenRouter'
+                      : entry.provider === 'ollama-cloud'
+                        ? 'Ollama Cloud'
+                        : 'Compatible endpoint')}
+                </Button>
+              ))}
+            </div>
+          )}
+          <Button
+            type="button"
+            onClick={() => setChoice(`openai-compatible:${crypto.randomUUID()}`)}
+          >
+            Add custom endpoint
+          </Button>
+          {provider.value && preferences.value && (
+            <form
+              className="stack"
+              key={selected + (saved?.baseUrl ?? '') + (saved?.modelId ?? '')}
+              onSubmit={(event) => {
+                event.preventDefault();
+                const form = new FormData(event.currentTarget);
+                const apiKey = fieldValue(form, 'apiKey');
+                void action.run(async () => {
+                  await sensitive(() =>
+                    put('/v1/providers', {
+                      provider: selectedProvider,
+                      connectionId: selected,
+                      ...(selectedProvider === 'openai-compatible'
+                        ? { label: fieldValue(form, 'label') }
+                        : {}),
+                      ...(apiKey ? { apiKey } : {}),
+                      ...(selectedProvider === 'openai-compatible'
+                        ? {
+                            baseUrl: fieldValue(form, 'baseUrl'),
+                            ...(fieldValue(form, 'modelId')
+                              ? { modelId: fieldValue(form, 'modelId') }
+                              : {}),
+                            contextTokens: Number(form.get('contextTokens')),
+                            capabilities: [
+                              'chat',
+                              'tools',
+                              ...(form.has('vision') ? ['vision'] : []),
+                              ...(form.has('reasoning') ? ['reasoning'] : [])
+                            ],
+                            modalities: ['text', ...(form.has('vision') ? ['image'] : [])]
+                          }
+                        : {}),
+                      enforceZeroDataRetention: form.has('zdr')
+                    })
+                  );
+                  if (selectedProvider === 'openrouter') {
+                    try {
+                      await put('/v1/account/preferences', {
+                        providerRouting: {
+                          objective: fieldValue(form, 'routingObjective'),
+                          throughputFloorPercent: Number(form.get('throughputFloorPercent') ?? 40),
+                          ignoredProviders: fieldValue(form, 'ignoredProviders')
+                            .split(',')
+                            .map((name) => name.trim())
+                            .filter(Boolean)
+                        }
+                      });
+                    } catch (cause) {
+                      throw new Error(
+                        'Connection saved, but operator routing was not saved. Retry Verify and save.',
+                        { cause }
+                      );
+                    }
+                  }
+                }, 'Connection and routing verified and saved');
+              }}
+            >
+              <div className="management-note">
+                {saved && saved.configured !== false
+                  ? `Connected through ${saved?.source === 'server_environment' ? 'server configuration' : 'your saved settings'}. ${saved?.hasApiKey ? 'A key is securely stored.' : 'This endpoint uses no saved key.'}`
+                  : 'Add this provider alongside your other connections.'}
+              </div>
+              <div className="management-grid">
+                <Field label="Provider">
+                  <select
+                    value={selectedProvider}
+                    disabled={selected !== selectedProvider}
+                    onChange={(event) => setChoice(event.target.value)}
+                  >
+                    <option value="openrouter">OpenRouter</option>
+                    <option value="ollama-cloud">Ollama Cloud</option>
+                    <option value="openai-compatible">Compatible endpoint</option>
+                  </select>
+                </Field>
+                <Field
+                  label="API key"
+                  hint="Leave empty to keep this connection’s key. Changing its endpoint requires a new key."
+                >
+                  <input
+                    name="apiKey"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder={saved?.hasApiKey ? 'Stored securely' : 'Paste your key'}
+                  />
+                </Field>
+                {selectedProvider === 'openai-compatible' && (
+                  <>
+                    <Field
+                      label="Connection name"
+                      hint="Optional. A named connection uses its endpoint hostname by default."
+                    >
+                      <input
+                        name="label"
+                        maxLength={80}
+                        defaultValue={saved?.label ?? ''}
+                        placeholder="Work models"
+                      />
+                    </Field>
+                    <Field label="Endpoint URL">
+                      <input
+                        required
+                        name="baseUrl"
+                        type="url"
+                        defaultValue={saved?.baseUrl ?? ''}
+                        placeholder="https://provider.example/v1"
+                      />
+                    </Field>
+                    <Field
+                      label="Restrict to model ID"
+                      hint="Optional. Leave empty to discover every model this endpoint offers."
+                    >
+                      <input name="modelId" defaultValue={saved?.modelId ?? ''} />
+                    </Field>
+                    <Field label="Context window in tokens">
+                      <input
+                        name="contextTokens"
+                        type="number"
+                        min={4096}
+                        max={10000000}
+                        defaultValue={saved?.contextTokens ?? 128000}
+                        required
+                      />
+                    </Field>
+                    <div className="stack">
+                      <label className="management-check">
+                        <input
+                          name="vision"
+                          type="checkbox"
+                          defaultChecked={saved?.capabilities?.includes('vision')}
+                        />
+                        Accepts images
+                      </label>
+                      <label className="management-check">
+                        <input
+                          name="reasoning"
+                          type="checkbox"
+                          defaultChecked={saved?.capabilities?.includes('reasoning') ?? true}
+                        />
+                        Supports reasoning
+                      </label>
+                    </div>
+                  </>
+                )}
+              </div>
+              {selectedProvider === 'openrouter' && (
+                /*
+                 * Which operator serves a model, when several do.
+                 *
+                 * The aggregator lists a handful for most models at different prices and wildly
+                 * different speeds, and given no preference it picks among the cheapest weighted by
+                 * the inverse square of price - so a model whose fastest operator runs at 142 tokens
+                 * a second and whose cheapest runs at 3 lands on the second one most of the time. For
+                 * a chat box that is a slower reply; for an agent it is a task that takes a day
+                 * instead of twenty minutes, because a turn is dozens of sequential calls.
+                 *
+                 * Behind a disclosure because the defaults are the right answer for almost everyone,
+                 * and open to be edited because the trade is the owner's to make.
+                 */
+                <details className="stack">
+                  <summary>Which operator serves a model</summary>
+                  <p className="muted">
+                    Several companies serve most models, at different prices and very different
+                    speeds, and left alone OpenRouter picks among the cheapest — which for agent
+                    work is usually the slowest. Your computer asks for the cheapest company that
+                    still reaches a share of the fastest one's speed on that model. Both comparisons
+                    are OpenRouter's own, across every request it serves. Companies that log or
+                    retain your data are already excluded by the zero-data-retention setting.
+                  </p>
+                  <div className="management-grid">
+                    <Field label="Choose">
+                      <select
+                        name="routingObjective"
+                        defaultValue={
+                          preferences.value?.preferences.providerRouting?.objective ??
+                          'cheapest_fast_enough'
+                        }
+                      >
+                        <option value="cheapest_fast_enough">
+                          The cheapest that is fast enough
+                        </option>
+                        <option value="fastest">The fastest, whatever it costs</option>
+                        <option value="cheapest">The cheapest, however slow</option>
+                      </select>
+                    </Field>
+                    <Field
+                      label="Fast enough means"
+                      hint="Percentage of the speed the quickest company reaches on that model, so it scales with what the model can actually do."
+                    >
+                      <input
+                        name="throughputFloorPercent"
+                        type="number"
+                        min={0}
+                        max={100}
+                        defaultValue={
+                          preferences.value?.preferences.providerRouting?.throughputFloorPercent ??
+                          40
+                        }
+                      />
+                    </Field>
+                    <Field label="Never use" hint="Operator names, separated by commas.">
+                      <input
+                        name="ignoredProviders"
+                        placeholder="e.g. Together, Chutes"
+                        defaultValue={(
+                          preferences.value?.preferences.providerRouting?.ignoredProviders ?? []
+                        ).join(', ')}
+                      />
+                    </Field>
+                  </div>
+                </details>
+              )}
+              <label className="management-check">
+                <input
+                  name="zdr"
+                  type="checkbox"
+                  defaultChecked={saved?.enforceZeroDataRetention ?? true}
+                />
+                <span>
+                  Require zero data retention
+                  <small className="muted">
+                    Use only the provider route approved for this privacy choice.
+                  </small>
+                </span>
+              </label>
+              <div className="row">
+                <Button type="submit" className="primary" busy={action.busy}>
+                  Verify and save
+                </Button>
+                {saved?.source === 'encrypted_database' && (
+                  <ConfirmButton
+                    label="Remove saved connection"
+                    description="Remove this saved connection. Tasks that need it will wait until it is connected again. Other saved providers remain available."
+                    action={async () => {
+                      await sensitive(() =>
+                        del(`/v1/providers?connectionId=${encodeURIComponent(selected)}`)
+                      );
+                      provider.refresh();
+                      models.refresh();
+                      onChange();
+                    }}
+                  />
+                )}
+              </div>
+              <ActionFeedback action={action} />
+            </form>
+          )}
+        </details>
       </Section>
       <Section
         title="Images, video, voice and transcription"
@@ -489,13 +506,16 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
           </form>
         )}
       </Section>
-      <Section
-        title="Model catalog"
-        description="Availability, context and pricing from the connected catalog."
-      >
-        <ResourceState resource={models} />
-        {models.value && <ModelCatalog models={models.value} />}
-      </Section>
+      <details className="settings-disclosure">
+        <summary>Explore the full model catalog</summary>{' '}
+        <Section
+          title="Model catalog"
+          description="Availability, context and pricing from the connected catalog."
+        >
+          <ResourceState resource={models} />
+          {models.value && <ModelCatalog models={models.value} />}
+        </Section>
+      </details>
     </>
   );
 }

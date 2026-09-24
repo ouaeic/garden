@@ -214,7 +214,7 @@ export default function Composer(props: ComposerProps) {
                   ? 'Update run'
                   : 'Queue next'
                 : 'Send'
-              : 'Begin'}
+              : 'Start'}
           <ArrowUpRight size={18} />
         </Button>
       </div>
@@ -278,14 +278,6 @@ export default function Composer(props: ComposerProps) {
               onChange={changeModel}
             />
           </div>
-          <Button
-            aria-label="Model choices for this direction"
-            aria-expanded={advancedModels}
-            title="Model choices for this direction"
-            onClick={() => setAdvancedModels((open) => !open)}
-          >
-            <SlidersHorizontal size={14} />
-          </Button>
           <label className="garden-approval-select">
             <span>Approvals</span>
             <select
@@ -306,15 +298,15 @@ export default function Composer(props: ComposerProps) {
           </label>
           {task && isWorking(task) && (
             <label className="garden-route-control">
-              <span>Apply</span>
+              <span>Send</span>
               <select
                 value={interrupt ? 'now' : 'next'}
                 disabled={editingDisabled || uploading || voiceBusy}
                 onChange={(event) => setInterrupt(event.target.value === 'now')}
-                aria-label="Apply this direction"
+                aria-label="Message timing"
               >
-                <option value="now">Now</option>
-                <option value="next">Next run</option>
+                <option value="now">Send now</option>
+                <option value="next">Queue for next run</option>
               </select>
             </label>
           )}
@@ -322,7 +314,7 @@ export default function Composer(props: ComposerProps) {
       </div>
       <details className="garden-prompt-options">
         <summary>
-          More options
+          Options
           {cap && (
             <small>
               ${cap} {task ? 'extra limit' : 'limit'}
@@ -332,6 +324,16 @@ export default function Composer(props: ComposerProps) {
           {privacyRoute === 'external' && <small>External route</small>}
         </summary>
         <div className="garden-prompt-options-grid">
+          <Button
+            aria-label="Model choices for this direction"
+            aria-expanded={advancedModels}
+            title="Model choices for this direction"
+            onClick={() => setAdvancedModels((open) => !open)}
+          >
+            <SlidersHorizontal size={14} />
+            Advanced models
+          </Button>
+
           <label className="garden-effort-control">
             <span>Effort</span>
             <select
@@ -368,8 +370,8 @@ export default function Composer(props: ComposerProps) {
                 changePrivacy(event.target.value === 'external' ? 'external' : 'provider_zdr')
               }
             >
-              <option value="provider_zdr">Private</option>
-              <option value="external">External</option>
+              <option value="provider_zdr">Zero provider retention</option>
+              <option value="external">Provider retention allowed</option>
             </select>
           </label>
           <label className="garden-cap-control">

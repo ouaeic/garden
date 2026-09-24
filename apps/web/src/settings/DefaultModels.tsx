@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ProjectModelChoices, ProjectModelPreferences } from '@athanor/contracts';
 import { put } from '../client.js';
 import { Button } from '../ui.js';
@@ -10,7 +10,12 @@ export default function DefaultModels({ onChange }: { onChange: () => void }) {
   const [draft, setDraft] = useState<ProjectModelChoices | null>(null);
   const action = useAction();
   const decisionAction = useAction();
-  const current = resource.value;
+  const [lastReceived, setLastReceived] = useState<ProjectModelPreferences | null>(null);
+  useEffect(() => {
+    if (resource.value) setLastReceived(resource.value);
+  }, [resource.value]);
+  // Keep controls and disclosure focus mounted while saved preferences refresh.
+  const current = resource.value ?? lastReceived;
   const choices = draft ?? current?.choices ?? {};
   const dirty = current && JSON.stringify(choices) !== JSON.stringify(current.choices);
   return (
@@ -18,33 +23,6 @@ export default function DefaultModels({ onChange }: { onChange: () => void }) {
       <ResourceState resource={resource} />
       {current && (
         <>
-          <div className="stack">
-            <label className="management-check">
-              <input
-                type="checkbox"
-                checked={current.decisionModelsEnabled !== false}
-                disabled={decisionAction.busy}
-                aria-describedby="decision-models-hint"
-                onChange={(event) => {
-                  const enabled = event.target.checked;
-                  void decisionAction.run(
-                    async () => {
-                      await put('/v1/account/preferences', { decisionModelsEnabled: enabled });
-                      resource.refresh();
-                      onChange();
-                    },
-                    enabled ? 'Decision models allowed' : 'Decision models disabled'
-                  );
-                }}
-              />
-              Allow decision models
-            </label>
-            <p className="muted" id="decision-models-hint">
-              Allow decision models in workflows with a verified benefit. Garden works fully without
-              a decision model.
-            </p>
-            <ActionFeedback action={decisionAction} />
-          </div>
           <ModelChoiceFields
             purposes={current.purposes.filter((item) =>
               textPurposes.some((purpose) => purpose === item.purpose)
@@ -54,6 +32,36 @@ export default function DefaultModels({ onChange }: { onChange: () => void }) {
             disabled={action.busy}
             inherit={false}
           />
+          <details className="settings-disclosure">
+            <summary>Decision model preference</summary>{' '}
+            <div className="stack">
+              <label className="management-check">
+                <input
+                  type="checkbox"
+                  checked={current.decisionModelsEnabled !== false}
+                  disabled={decisionAction.busy}
+                  aria-describedby="decision-models-hint"
+                  onChange={(event) => {
+                    const enabled = event.target.checked;
+                    void decisionAction.run(
+                      async () => {
+                        await put('/v1/account/preferences', { decisionModelsEnabled: enabled });
+                        resource.refresh();
+                        onChange();
+                      },
+                      enabled ? 'Decision models allowed' : 'Decision models disabled'
+                    );
+                  }}
+                />
+                Allow decision models
+              </label>
+              <p className="muted" id="decision-models-hint">
+                Allow decision models in workflows with a verified benefit. Garden works fully
+                without a decision model.
+              </p>
+              <ActionFeedback action={decisionAction} />
+            </div>
+          </details>{' '}
           <div className="model-choice-actions">
             <Button
               className="primary"
