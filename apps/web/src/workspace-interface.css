@@ -722,11 +722,6 @@
 .scroll-region[data-overflow] {
   border-block: 1px solid var(--line);
 }
-.scroll-region .directory-list {
-  max-height: none;
-  overflow: visible;
-  margin-block: 0;
-}
 .project-current-work .scroll-region,
 .project-updates .scroll-region {
   max-block-size: min(24rem, 42dvh);

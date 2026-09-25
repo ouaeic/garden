@@ -308,7 +308,7 @@ export async function checkProjectConversations({
     const tabs = page.getByRole('combobox', { name: 'Current conversation', exact: true });
     const initialOrder = ['Open a conversation…', 'Assembly analysis', 'QC conversation'];
     assert.deepEqual(await tabs.locator('option').allTextContents(), initialOrder);
-    for (const name of ['Assembly analysis', 'QC conversation', 'QC conversation']) {
+    for (const name of ['Assembly analysis', 'QC conversation']) {
       await tabs.selectOption({ label: name });
       assert.equal(await tabs.locator('option:checked').textContent(), name);
       assert.deepEqual(await tabs.locator('option').allTextContents(), initialOrder);

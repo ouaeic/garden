@@ -148,6 +148,7 @@
 }
 .process-history-toggle {
   margin-top: 14px;
+  margin-inline-end: 6px;
 }
 .process-children {
   padding: 0;

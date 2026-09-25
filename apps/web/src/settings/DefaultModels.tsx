@@ -5,8 +5,18 @@ import { Button } from '../ui.js';
 import { ActionFeedback, ResourceState, useAction, useResource } from '../management.js';
 import ModelChoiceFields, { automaticChoice, textPurposes } from '../ModelChoiceFields.js';
 
-export default function DefaultModels({ onChange }: { onChange: () => void }) {
+export default function DefaultModels({
+  onChange,
+  connectionRevision
+}: {
+  onChange: () => void;
+  connectionRevision: number;
+}) {
   const resource = useResource<ProjectModelPreferences>('/v1/workspace-model-preferences');
+  const { refresh } = resource;
+  useEffect(() => {
+    if (connectionRevision) refresh();
+  }, [connectionRevision, refresh]);
   const [draft, setDraft] = useState<ProjectModelChoices | null>(null);
   const action = useAction();
   const decisionAction = useAction();

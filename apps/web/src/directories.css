@@ -69,10 +69,8 @@
 }
 .directory-list {
   list-style: none;
-  margin: 14px 0;
+  margin: 0;
   padding: 0;
-  max-height: 480px;
-  overflow-y: auto;
 }
 .directory-list li {
   display: flex;

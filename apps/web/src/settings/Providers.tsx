@@ -39,7 +39,9 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
   const models = useResource<ModelRelease[]>('/v1/models');
   const media = useResource<MediaSettings>('/v1/media/models');
   const preferences = useResource<{ preferences: OwnerPreferences }>('/v1/account/preferences');
+  const [connectionRevision, setConnectionRevision] = useState(0);
   const action = useAction(() => {
+    setConnectionRevision((value) => value + 1);
     provider.refresh();
     models.refresh();
     media.refresh();
@@ -66,7 +68,7 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
         title="Model defaults"
         description="Choose the main agent and the models behind its specialist work. New projects inherit these defaults."
       >
-        <DefaultModels key={provider.value?.provider ?? 'loading'} onChange={onChange} />
+        <DefaultModels connectionRevision={connectionRevision} onChange={onChange} />
       </Section>
       <details className="settings-disclosure">
         <summary>Audio generation history</summary>

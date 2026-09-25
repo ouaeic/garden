@@ -313,6 +313,7 @@ export default function ProjectSpace({
           <h1 aria-label={project.title}>
             <button
               className="project-overview-link"
+              title={project.title}
               aria-label={`${project.title} · Project overview`}
               aria-current={!taskId ? 'page' : undefined}
               onClick={() => {

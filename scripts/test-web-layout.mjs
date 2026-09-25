@@ -2777,6 +2777,7 @@ try {
       .click();
     await revealDefaults();
     await modelsPage.getByRole('heading', { name: 'Model defaults', exact: true }).waitFor();
+    await pick(modelsPage, 'Condensing long work', 'openrouter/alpha/model-78');
     await modelsPage.getByRole('button', { name: 'Compatible endpoint', exact: true }).click();
     await modelsPage.getByRole('combobox', { name: 'Provider', exact: true }).waitFor();
     const accessibility = await context.newCDPSession(modelsPage);
@@ -2828,6 +2829,14 @@ try {
     assert.equal(providerWrites[0].contextTokens, 65536);
     assert.equal(providerWrites[0].apiKey, undefined);
     assert.equal(providerWrites[0].modelId, undefined);
+    await modelsPage
+      .getByRole('button', { name: 'Condensing long work: Research model 78', exact: true })
+      .waitFor();
+    assert.notEqual(
+      await modelsPage.locator('details.advanced-model-choices').getAttribute('open'),
+      null,
+      'Saving a connection preserves open settings and unsaved model choices'
+    );
 
     await pick(modelsPage, 'Condensing long work', 'openrouter/alpha/model-78');
     await pick(modelsPage, 'Naming a conversation', 'openrouter/beta/model-79');
