@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComputationSession } from '@athanor/contracts';
 import { post } from './client';
-import { Button, ErrorNotice } from './ui';
+import { ErrorNotice } from './ui';
 import { ComputationCard } from './computer/Computation';
-import { computationActive } from './process-display';
 
 export default function ProjectComputations({
   sessions,
@@ -14,8 +13,6 @@ export default function ProjectComputations({
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(null);
-  const [history, setHistory] = useState(false);
-  const [limit, setLimit] = useState(10);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -23,8 +20,6 @@ export default function ProjectComputations({
       mounted.current = false;
     };
   }, []);
-  const active = sessions.filter((session) => computationActive(session.state));
-  const finished = sessions.filter((session) => !computationActive(session.state));
   const control = async (session: ComputationSession, action: 'interrupt' | 'stop') => {
     setBusy(session.sessionId);
     setError(null);
@@ -42,9 +37,8 @@ export default function ProjectComputations({
   };
   return (
     <section className="project-computations" aria-label="Project computation sessions">
-      <h3>Analysis sessions</h3>
       <ErrorNotice error={error} />
-      {[...active, ...(history ? finished.slice(0, limit) : [])].map((session) => (
+      {sessions.map((session) => (
         <ComputationCard
           key={`${session.workspaceId}/${session.sessionId}`}
           session={session}
@@ -52,20 +46,6 @@ export default function ProjectComputations({
           onControl={(action) => void control(session, action)}
         />
       ))}
-      {finished.length > 0 && (
-        <Button
-          aria-expanded={history}
-          onClick={() => {
-            setHistory((value) => !value);
-            setLimit(10);
-          }}
-        >
-          {history ? 'Hide ended sessions' : `Show ended sessions (${finished.length})`}
-        </Button>
-      )}
-      {history && limit < finished.length && (
-        <Button onClick={() => setLimit((value) => value + 10)}>Show earlier sessions</Button>
-      )}
     </section>
   );
 }

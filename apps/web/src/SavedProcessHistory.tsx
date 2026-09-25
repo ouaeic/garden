@@ -1,3 +1,4 @@
+import ScrollRegion from './ScrollRegion';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ProjectProcessHistory, ManagedProcess, ComputationSession } from '@athanor/contracts';
 import { ApiError, get, post } from './client';
@@ -134,70 +135,75 @@ export default function SavedProcessHistory({ endpoint }: { endpoint: string }) 
           listed above.
         </p>
       )}
-      <div className="process-list">
-        {page?.processes.map((process) => {
-          const id = `${process.workspaceId}/${process.sessionId}`;
-          return (
-            <article key={id} className="process-card" aria-label={processName(process)}>
-              <div className="process-card-heading">
-                <h4>{processName(process)}</h4>
-                <span className="process-status">{processState(process).replaceAll('_', ' ')}</span>
-              </div>
-              <p>
-                {new Date(process.startedAt).toLocaleString()} · {processDuration(process.ranForMs)}
-                {process.exitCode != null ? ` · Exit ${process.exitCode}` : ''}
-              </p>
-              <details className="process-details">
-                <summary>Command & details</summary>
-                <pre>
-                  {Array.isArray(process.command) ? process.command.join(' ') : process.command}
-                </pre>
-                {process.commandTruncated && (
-                  <p>
-                    The command preview is shortened. The saved receipt retains the complete
-                    command.
-                  </p>
+      <ScrollRegion label="Saved job records">
+        <div className="process-list">
+          {page?.processes.map((process) => {
+            const id = `${process.workspaceId}/${process.sessionId}`;
+            return (
+              <article key={id} className="process-card" aria-label={processName(process)}>
+                <div className="process-card-heading">
+                  <h4>{processName(process)}</h4>
+                  <span className="process-status">
+                    {processState(process).replaceAll('_', ' ')}
+                  </span>
+                </div>
+                <p>
+                  {new Date(process.startedAt).toLocaleString()} ·{' '}
+                  {processDuration(process.ranForMs)}
+                  {process.exitCode != null ? ` · Exit ${process.exitCode}` : ''}
+                </p>
+                <details className="process-details">
+                  <summary>Command & details</summary>
+                  <pre>
+                    {Array.isArray(process.command) ? process.command.join(' ') : process.command}
+                  </pre>
+                  {process.commandTruncated && (
+                    <p>
+                      The command preview is shortened. The saved receipt retains the complete
+                      command.
+                    </p>
+                  )}
+                  {process.resources && (
+                    <p>
+                      Last sample: {new Date(process.resources.sampledAt).toLocaleString()} · CPU{' '}
+                      {process.resources.cpuPercent == null
+                        ? 'unavailable'
+                        : `${Math.round(process.resources.cpuPercent)}%`}{' '}
+                      · RAM {(process.resources.residentBytes / 1024 ** 2).toFixed(1)} MiB.
+                    </p>
+                  )}
+                  {process.job?.lastExit?.reason && <p>{process.job.lastExit.reason}</p>}
+                </details>
+                <Button
+                  aria-disabled={logBusy !== null}
+                  onClick={() => {
+                    if (logBusy === null) void output(process);
+                  }}
+                >
+                  {logBusy === id ? 'Reading output…' : 'Read saved output'}
+                </Button>
+                {logs[id] !== undefined && (
+                  <textarea
+                    className="process-output"
+                    rows={6}
+                    readOnly
+                    aria-label={`Saved output from ${processName(process)}`}
+                    value={logs[id] || 'No captured output.'}
+                  />
                 )}
-                {process.resources && (
-                  <p>
-                    Last sample: {new Date(process.resources.sampledAt).toLocaleString()} · CPU{' '}
-                    {process.resources.cpuPercent == null
-                      ? 'unavailable'
-                      : `${Math.round(process.resources.cpuPercent)}%`}{' '}
-                    · RAM {(process.resources.residentBytes / 1024 ** 2).toFixed(1)} MiB.
-                  </p>
-                )}
-                {process.job?.lastExit?.reason && <p>{process.job.lastExit.reason}</p>}
-              </details>
-              <Button
-                aria-disabled={logBusy !== null}
-                onClick={() => {
-                  if (logBusy === null) void output(process);
-                }}
-              >
-                {logBusy === id ? 'Reading output…' : 'Read saved output'}
-              </Button>
-              {logs[id] !== undefined && (
-                <textarea
-                  className="process-output"
-                  rows={6}
-                  readOnly
-                  aria-label={`Saved output from ${processName(process)}`}
-                  value={logs[id] || 'No captured output.'}
-                />
-              )}
-            </article>
-          );
-        })}
-        {page?.computationSessions.map((session) => (
-          <ComputationCard
-            key={`${session.workspaceId}/${session.sessionId}`}
-            session={session}
-            busy={false}
-            onControl={() => undefined}
-          />
-        ))}
-      </div>
+              </article>
+            );
+          })}
+          {page?.computationSessions.map((session) => (
+            <ComputationCard
+              key={`${session.workspaceId}/${session.sessionId}`}
+              session={session}
+              busy={false}
+              onControl={() => undefined}
+            />
+          ))}
+        </div>
+      </ScrollRegion>
       {page && (page.processes.length > 0 || page.computationSessions.length > 0) && (
         <Button
           aria-disabled={busy || !page.nextCursor}

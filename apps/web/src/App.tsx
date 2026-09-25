@@ -698,10 +698,6 @@ function WorkspaceApp() {
           />
         </nav>
         <div className="garden-sidebar-bottom">
-          <Button onClick={() => setSearchOpen(true)}>
-            <Search size={15} />
-            Search
-          </Button>
           <Button onClick={() => navigate('settings')}>
             <Settings2 size={15} />
             Settings

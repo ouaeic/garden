@@ -1,3 +1,4 @@
+import ScrollRegion from './ScrollRegion';
 import { useEffect, useState } from 'react';
 import { ChevronDown, ChevronRight, Pin } from 'lucide-react';
 import type { Project, Task } from '@athanor/contracts';
@@ -176,8 +177,8 @@ export default function ProjectCollection({
         (filter !== 'complete' || (!project.activeCount && !project.attentionCount))
     )
     .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt));
-  return (
-    <div className={mode === 'grid' ? 'project-grid' : 'project-navigation'}>
+  const cards = (
+    <>
       {projects.map((project) => (
         <div
           key={project.id}
@@ -229,6 +230,17 @@ export default function ProjectCollection({
           )}
         </div>
       ))}
+    </>
+  );
+  return (
+    <div className={mode === 'grid' ? 'project-collection' : 'project-navigation'}>
+      {mode === 'grid' ? (
+        <ScrollRegion label="Projects" resetKey={`${filter}/${search}`}>
+          <div className="project-grid">{cards}</div>
+        </ScrollRegion>
+      ) : (
+        cards
+      )}
       {!projects.length && (
         <p className="muted">
           {search ? 'No loaded projects match this search.' : 'Projects will appear here.'}

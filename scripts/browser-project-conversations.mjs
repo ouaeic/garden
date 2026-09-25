@@ -306,14 +306,9 @@ export async function checkProjectConversations({
     await page.reload();
     await page.getByRole('heading', { name: 'QC conversation', exact: true }).waitFor();
     const tabs = page.getByRole('combobox', { name: 'Current conversation', exact: true });
-    const initialOrder = ['Project overview', 'Assembly analysis', 'QC conversation'];
+    const initialOrder = ['Open a conversation…', 'Assembly analysis', 'QC conversation'];
     assert.deepEqual(await tabs.locator('option').allTextContents(), initialOrder);
-    for (const name of [
-      'Assembly analysis',
-      'QC conversation',
-      'Project overview',
-      'QC conversation'
-    ]) {
+    for (const name of ['Assembly analysis', 'QC conversation', 'QC conversation']) {
       await tabs.selectOption({ label: name });
       assert.equal(await tabs.locator('option:checked').textContent(), name);
       assert.deepEqual(await tabs.locator('option').allTextContents(), initialOrder);
@@ -332,7 +327,7 @@ export async function checkProjectConversations({
     await page.reload();
     await tabs.locator('option').filter({ hasText: 'Discussion 7' }).waitFor({ state: 'attached' });
     const expandedOrder = [
-      'Project overview',
+      'Open a conversation…',
       'Discussion 7',
       'Assembly analysis',
       'QC conversation',
@@ -362,7 +357,9 @@ export async function checkProjectConversations({
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
       await page.screenshot({ path: resolve(report, `conversations-${width}.png`) });
     }
-    await tabs.selectOption('');
+    await page
+      .getByRole('button', { name: `${project.title} · Project overview`, exact: true })
+      .click();
     await page
       .getByRole('navigation', { name: 'Project views' })
       .getByRole('button', { name: 'Activity', exact: true })
@@ -407,7 +404,9 @@ export async function checkProjectConversations({
       'The selected result identity must survive draft recovery'
     );
     await linked.getByRole('button', { name: 'Close New conversation', exact: true }).click();
-    await tabs.selectOption('');
+    await page
+      .getByRole('button', { name: `${project.title} · Project overview`, exact: true })
+      .click();
     await page
       .getByRole('navigation', { name: 'Project views' })
       .getByRole('button', { name: 'Activity', exact: true })
@@ -503,7 +502,9 @@ export async function checkProjectConversations({
     delayTask = null;
     await page.getByRole('heading', { name: olderName, exact: true }).waitFor();
     assert(await tabs.evaluate((el) => document.activeElement === el));
-    await tabs.selectOption('');
+    await page
+      .getByRole('button', { name: `${project.title} · Project overview`, exact: true })
+      .click();
     await page
       .getByRole('navigation', { name: 'Project views' })
       .getByRole('button', { name: 'Activity', exact: true })
@@ -561,7 +562,7 @@ export async function checkProjectConversations({
     await cancelledPage;
     await page.clock.runFor(100);
     assert.deepEqual(await tabs.locator('option').allTextContents(), [
-      'Project overview',
+      'Open a conversation…',
       archivedTask.title
     ]);
     assert.equal(

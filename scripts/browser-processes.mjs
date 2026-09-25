@@ -337,9 +337,10 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
         }
       await panel.screenshot({ path: resolve(report, `project-processes-${width}.png`) });
     }
-    await panel.getByRole('button', { name: 'Show finished processes (1)', exact: true }).click();
+    await panel.getByRole('button', { name: 'History 1', exact: true }).click();
     const finished = panel.getByRole('article', { name: 'Completed quality control' });
     assert.equal(await finished.getByRole('button', { name: 'Stop', exact: true }).count(), 0);
+    await panel.getByRole('button', { name: /^Current / }).click();
     await interrupted.getByRole('button', { name: 'Resume checkpoint', exact: true }).click();
     assert(fixture.actions.some((action) => action.path.endsWith('/job_interrupted/resume')));
     fixture.failRead = true;
@@ -366,6 +367,7 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
     await dialog.getByRole('button', { name: 'Stop process', exact: true }).click();
     await dialog.waitFor({ state: 'detached' });
     assert.equal(fixture.rows[0].status, 'stopped');
+    await panel.getByRole('button', { name: /^History / }).click();
     assert.equal(await card.getByRole('button', { name: 'Stop', exact: true }).count(), 0);
     await card.getByRole('button', { name: 'Resume workflow', exact: true }).click();
     assert(
@@ -374,6 +376,7 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
       )
     );
     assert.equal(fixture.rows[0].workflow.attempt, 3);
+    await panel.getByRole('button', { name: /^Current / }).click();
     await card
       .getByRole('button', { name: 'Resume workflow', exact: true })
       .waitFor({ state: 'detached' });
@@ -395,7 +398,7 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
     }));
     await page.reload();
     const history = panel.getByRole('button', {
-      name: 'Show finished processes (45 · 1 failed)',
+      name: 'History 45 · 1 failed',
       exact: true
     });
     await history.waitFor();
@@ -410,10 +413,10 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
       await panel.getByRole('article').first().getAttribute('aria-label'),
       'python3 analysis-44.py'
     );
-    for (const remaining of [35, 25, 15, 5])
+    for (let pageIndex = 0; pageIndex < 4; pageIndex++)
       await panel
         .getByRole('button', {
-          name: `Show earlier processes (${remaining} remaining)`,
+          name: 'Show earlier jobs',
           exact: true
         })
         .click();
@@ -422,12 +425,21 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
       45,
       'Every finished process remains accessible'
     );
+    assert(
+      await panel
+        .getByRole('region', { name: 'Recent job history' })
+        .evaluate(
+          (element) =>
+            element.scrollHeight > element.clientHeight * 2 &&
+            element.clientHeight <= innerHeight * 0.55
+        )
+    );
     await panel
       .getByRole('article', { name: 'python3 analysis-0.py', exact: true })
       .getByRole('button', { name: 'Read output', exact: true })
       .click();
     await panel.getByRole('textbox', { name: 'Output from python3 analysis-0.py' }).waitFor();
-    await panel.getByRole('button', { name: 'Hide finished processes', exact: true }).click();
+    await panel.getByRole('button', { name: /^Current / }).click();
     assert.equal(await panel.getByRole('article').count(), 0);
     await history.click();
     assert.equal(
@@ -437,7 +449,7 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
     );
     await page.setViewportSize({ width: 1440, height: 1000 });
     await panel.screenshot({ path: resolve(report, 'project-process-history.png') });
-    await panel.getByRole('button', { name: 'Hide finished processes', exact: true }).click();
+    await panel.getByRole('button', { name: /^Current / }).click();
     await page.setViewportSize({ width: 360, height: 900 });
     await panel.scrollIntoViewIfNeeded();
     await panel.screenshot({ path: resolve(report, 'project-process-history-collapsed.png') });
@@ -490,7 +502,7 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
     assert.equal(fixture.computationSessions[0].stateRetained, true);
     await kernel.getByText('Latest cell · interrupted', { exact: true }).click();
     await kernel.getByText('Calculating percentages', { exact: true }).waitFor();
-    await computation.screenshot({ path: resolve(report, 'project-r-session-360.png') });
+    await panel.screenshot({ path: resolve(report, 'project-r-session-360.png') });
     await kernel.getByRole('button', { name: 'End session…', exact: true }).click();
     const endDialog = page.getByRole('dialog', { name: 'End Retained R analysis?', exact: true });
     await endDialog.waitFor();
@@ -516,7 +528,7 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
     await kernel.getByRole('button', { name: 'End session…', exact: true }).click();
     await endDialog.getByRole('button', { name: 'End session', exact: true }).click();
     await kernel.waitFor({ state: 'detached' });
-    await computation.getByRole('button', { name: 'Show ended sessions (1)', exact: true }).click();
+    await panel.getByRole('button', { name: /^History / }).click();
     await kernel.waitFor();
     assert.equal(
       await kernel.getByRole('button', { name: 'End session…', exact: true }).count(),

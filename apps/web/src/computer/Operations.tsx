@@ -10,7 +10,6 @@ import { del, get, isNativeClient, post } from '../client.js';
 import { previewIsolated, previewUrl } from '../preview-url';
 import { stepUp } from '../auth.js';
 import { bytes, message } from './format.js';
-import Computation from './Computation';
 import ProcessPanel from '../ProcessPanel';
 import DebugSessions from './DebugSessions';
 
@@ -35,6 +34,7 @@ export function Operations({
   const [path, setPath] = useState('/');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [debugOpened, setDebugOpened] = useState(false);
   const [confirm, setConfirm] = useState<{
     id: string;
     action: 'restore' | 'delete' | 'publish' | 'rotate';
@@ -113,18 +113,14 @@ export function Operations({
   };
   return (
     <div className="stack">
-      <div className="row">
-        <h3>
-          {tool === 'previews'
-            ? 'Apps and previews'
-            : tool === 'processes'
-              ? 'Background work'
-              : 'Recovery points'}
-        </h3>
-        <button className="button" disabled={busy} onClick={() => void run(load)}>
-          Refresh
-        </button>
-      </div>
+      {tool !== 'processes' && (
+        <div className="row">
+          <h3>{tool === 'previews' ? 'Apps and previews' : 'Recovery points'}</h3>
+          <button className="button" disabled={busy} onClick={() => void run(load)}>
+            Refresh
+          </button>
+        </div>
+      )}
       {error && (
         <p className="error" role="alert">
           {error}
@@ -343,8 +339,17 @@ export function Operations({
             workspaceId={workspace.id}
             {...(task ? { taskId: task.id } : {})}
           />
-          <Computation key={workspace.id} workspaceId={workspace.id} />
-          <DebugSessions key={`debug-${workspace.id}`} workspaceId={workspace.id} />
+          <details
+            className="job-debugging"
+            onToggle={(event) => {
+              if (event.currentTarget.open) setDebugOpened(true);
+            }}
+          >
+            <summary>Debug a program</summary>
+            {debugOpened && (
+              <DebugSessions key={`debug-${workspace.id}`} workspaceId={workspace.id} />
+            )}
+          </details>
         </>
       )}
       {tool === 'checkpoints' && (

@@ -1,3 +1,4 @@
+import ScrollRegion from './ScrollRegion';
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowUpRight, Check, Download, FileText, Globe, Maximize2, X } from 'lucide-react';
 import type { Artifact, TaskPresentation, TaskResult, TaskEvent } from '@athanor/contracts';
@@ -369,34 +370,38 @@ export function TaskOutputs({
         </div>
       )}
       {files.length > 0 && (
-        <div className="garden-delivery-list">
-          {(compact && !showAll ? files.slice(0, 3) : files).map((item) => (
-            <article key={item.id} className="garden-delivery">
-              <FileText size={20} />
-              <div className="garden-delivery-details">
-                <strong>{item.title}</strong>
-                <small>
-                  {item.path?.replace(/^workspace\//, '') ?? item.mimeType ?? 'Artifact'}
-                  {item.sizeBytes !== undefined &&
-                    ` · ${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(item.sizeBytes / 1024)} KB`}
-                </small>
-                {item.detail && <small>{item.detail}</small>}
-              </div>
-              <div className="garden-delivery-actions">
-                {onDiscuss && <Button onClick={() => onDiscuss(item)}>Discuss</Button>}
-                {onRemember && <Button onClick={() => onRemember(item)}>Keep a note</Button>}
-                {item.artifactId && (
-                  <Button onClick={() => onArtifact(item.artifactId!)}>View</Button>
-                )}
-                {item.downloadUrl && item.status !== 'unavailable' && (
-                  <a className="button" href={item.downloadUrl} download={item.title}>
-                    <Download size={15} />
-                    <span>Download</span>
-                  </a>
-                )}
-              </div>
-            </article>
-          ))}
+        <>
+          <ScrollRegion label="Output files">
+            <div className="garden-delivery-list">
+              {(compact && !showAll ? files.slice(0, 3) : files).map((item) => (
+                <article key={item.id} className="garden-delivery">
+                  <FileText size={20} />
+                  <div className="garden-delivery-details">
+                    <strong>{item.title}</strong>
+                    <small>
+                      {item.path?.replace(/^workspace\//, '') ?? item.mimeType ?? 'Artifact'}
+                      {item.sizeBytes !== undefined &&
+                        ` · ${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(item.sizeBytes / 1024)} KB`}
+                    </small>
+                    {item.detail && <small>{item.detail}</small>}
+                  </div>
+                  <div className="garden-delivery-actions">
+                    {onDiscuss && <Button onClick={() => onDiscuss(item)}>Discuss</Button>}
+                    {onRemember && <Button onClick={() => onRemember(item)}>Keep a note</Button>}
+                    {item.artifactId && (
+                      <Button onClick={() => onArtifact(item.artifactId!)}>View</Button>
+                    )}
+                    {item.downloadUrl && item.status !== 'unavailable' && (
+                      <a className="button" href={item.downloadUrl} download={item.title}>
+                        <Download size={15} />
+                        <span>Download</span>
+                      </a>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </ScrollRegion>
           {compact && files.length > 3 && (
             <Button
               className="quiet-button"
@@ -406,7 +411,7 @@ export function TaskOutputs({
               {showAll ? 'Show fewer outputs' : `All ${files.length} outputs`}
             </Button>
           )}
-        </div>
+        </>
       )}
     </section>
   );

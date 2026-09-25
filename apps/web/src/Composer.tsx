@@ -19,6 +19,8 @@ const DictationSetup = lazy(() => import('./DictationSetup'));
 
 export default function Composer(props: ComposerProps) {
   const permissionHelpId = useId();
+  const promptSettingsId = useId();
+  const [promptSettingsOpen, setPromptSettingsOpen] = useState(false);
   const { workspace, task = null, bootstrap, toolbarExtra } = props;
   const [advancedModels, setAdvancedModels] = useState(false);
   const {
@@ -253,146 +255,162 @@ export default function Composer(props: ComposerProps) {
           </Button>
         </div>
       )}
-      <div className="garden-model-controls">
-        <div className="garden-model-settings">
-          <div className="garden-model-select">
-            <span>Model</span>
-            <ModelPicker
-              label="Model for this direction"
-              loadDetails
-              privacyRoute={privacyRoute}
-              value={!task && modelChoices.main?.automatic ? '__automatic' : modelId}
-              models={models}
-              shortcuts={[
-                {
-                  value: '',
-                  label: task
-                    ? (projectModel?.displayName ?? 'Current conversation model')
-                    : props.project
-                      ? 'Use project default'
-                      : 'Use global default'
-                },
-                ...(!task ? [{ value: '__automatic', label: 'Automatic for this project' }] : [])
-              ]}
-              disabled={editingDisabled || uploading || voiceBusy}
-              onChange={changeModel}
-            />
-          </div>
-          <label className="garden-approval-select">
-            <span>Approvals</span>
-            <select
-              aria-label="Approvals for this prompt"
-              title={permissionModeSummary(securityMode)}
-              aria-describedby={permissionHelpId}
-              value={securityMode}
-              disabled={editingDisabled}
-              onChange={(event) => changeSecurityMode(event.target.value as Task['securityMode'])}
-            >
-              <option value="review">Review</option>
-              <option value="balanced">Balanced</option>
-              <option value="autonomous">Autonomous</option>
-            </select>
-            <span className="sr-only" id={permissionHelpId}>
-              {permissionModeSummary(securityMode)}
-            </span>
-          </label>
-          {task && isWorking(task) && (
-            <label className="garden-route-control">
-              <span>Send</span>
-              <select
-                value={interrupt ? 'now' : 'next'}
+      <Button
+        className="compact-prompt-settings"
+        aria-label="Prompt settings"
+        aria-expanded={promptSettingsOpen}
+        aria-controls={promptSettingsId}
+        onClick={() => setPromptSettingsOpen((open) => !open)}
+      >
+        <SlidersHorizontal size={15} />
+        <span>{selectedModel?.displayName ?? projectModel?.displayName ?? 'Default model'}</span>
+        <span>{securityMode[0]!.toUpperCase() + securityMode.slice(1)}</span>
+      </Button>
+      <div
+        id={promptSettingsId}
+        className={`prompt-settings-content${promptSettingsOpen ? ' is-open' : ''}`}
+      >
+        <div className="garden-model-controls">
+          <div className="garden-model-settings">
+            <div className="garden-model-select">
+              <span>Model</span>
+              <ModelPicker
+                label="Model for this direction"
+                loadDetails
+                privacyRoute={privacyRoute}
+                value={!task && modelChoices.main?.automatic ? '__automatic' : modelId}
+                models={models}
+                shortcuts={[
+                  {
+                    value: '',
+                    label: task
+                      ? (projectModel?.displayName ?? 'Current conversation model')
+                      : props.project
+                        ? 'Use project default'
+                        : 'Use global default'
+                  },
+                  ...(!task ? [{ value: '__automatic', label: 'Automatic for this project' }] : [])
+                ]}
                 disabled={editingDisabled || uploading || voiceBusy}
-                onChange={(event) => setInterrupt(event.target.value === 'now')}
-                aria-label="Message timing"
+                onChange={changeModel}
+              />
+            </div>
+            <label className="garden-approval-select">
+              <span>Approvals</span>
+              <select
+                aria-label="Approvals for this prompt"
+                title={permissionModeSummary(securityMode)}
+                aria-describedby={permissionHelpId}
+                value={securityMode}
+                disabled={editingDisabled}
+                onChange={(event) => changeSecurityMode(event.target.value as Task['securityMode'])}
               >
-                <option value="now">Send now</option>
-                <option value="next">Queue for next run</option>
+                <option value="review">Review</option>
+                <option value="balanced">Balanced</option>
+                <option value="autonomous">Autonomous</option>
+              </select>
+              <span className="sr-only" id={permissionHelpId}>
+                {permissionModeSummary(securityMode)}
+              </span>
+            </label>
+            {task && isWorking(task) && (
+              <label className="garden-route-control">
+                <span>Send</span>
+                <select
+                  value={interrupt ? 'now' : 'next'}
+                  disabled={editingDisabled || uploading || voiceBusy}
+                  onChange={(event) => setInterrupt(event.target.value === 'now')}
+                  aria-label="Message timing"
+                >
+                  <option value="now">Send now</option>
+                  <option value="next">Queue for next run</option>
+                </select>
+              </label>
+            )}
+          </div>
+        </div>
+        <details className="garden-prompt-options">
+          <summary>
+            Options
+            {cap && (
+              <small>
+                ${cap} {task ? 'extra limit' : 'limit'}
+              </small>
+            )}
+            {reasoningEffort !== 'auto' && <small>{effortLabel(reasoningEffort)} effort</small>}
+            {privacyRoute === 'external' && <small>External route</small>}
+          </summary>
+          <div className="garden-prompt-options-grid">
+            <Button
+              aria-label="Model choices for this direction"
+              aria-expanded={advancedModels}
+              title="Model choices for this direction"
+              onClick={() => setAdvancedModels((open) => !open)}
+            >
+              <SlidersHorizontal size={14} />
+              Advanced models
+            </Button>
+
+            <label className="garden-effort-control">
+              <span>Effort</span>
+              <select
+                aria-label="Model reasoning effort"
+                title={
+                  efforts.length < 2
+                    ? selectedModel
+                      ? 'This model does not expose adjustable effort'
+                      : 'Select a model to choose its effort'
+                    : 'Reasoning effort'
+                }
+                value={efforts.includes(reasoningEffort) ? reasoningEffort : 'auto'}
+                disabled={editingDisabled || efforts.length < 2}
+                onChange={(event) => changeEffort(event.target.value as TaskReasoningEffort)}
+              >
+                {efforts.map((effort) => (
+                  <option key={effort} value={effort}>
+                    {effortLabel(effort)}
+                  </option>
+                ))}
               </select>
             </label>
-          )}
-        </div>
+            <label className="garden-route-control">
+              <span>Privacy</span>
+              <select
+                value={privacyRoute}
+                disabled={
+                  editingDisabled ||
+                  uploading ||
+                  voiceBusy ||
+                  bootstrap.instance.enforceZeroDataRetention
+                }
+                onChange={(event) =>
+                  changePrivacy(event.target.value === 'external' ? 'external' : 'provider_zdr')
+                }
+              >
+                <option value="provider_zdr">Zero provider retention</option>
+                <option value="external">Provider retention allowed</option>
+              </select>
+            </label>
+            <label className="garden-cap-control">
+              <span>{task ? 'Extra limit' : 'Limit'}</span>
+              <input
+                type="number"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') event.preventDefault();
+                }}
+                min="0.01"
+                max={MAX_TASK_SPEND_USD}
+                disabled={editingDisabled || uploading || voiceBusy}
+                step="0.01"
+                value={cap}
+                onChange={(event) => changeCap(event.target.value)}
+                placeholder="USD"
+                aria-label={task ? 'Additional spend limit in USD' : 'Task spend limit in USD'}
+              />
+            </label>
+          </div>
+        </details>
       </div>
-      <details className="garden-prompt-options">
-        <summary>
-          Options
-          {cap && (
-            <small>
-              ${cap} {task ? 'extra limit' : 'limit'}
-            </small>
-          )}
-          {reasoningEffort !== 'auto' && <small>{effortLabel(reasoningEffort)} effort</small>}
-          {privacyRoute === 'external' && <small>External route</small>}
-        </summary>
-        <div className="garden-prompt-options-grid">
-          <Button
-            aria-label="Model choices for this direction"
-            aria-expanded={advancedModels}
-            title="Model choices for this direction"
-            onClick={() => setAdvancedModels((open) => !open)}
-          >
-            <SlidersHorizontal size={14} />
-            Advanced models
-          </Button>
-
-          <label className="garden-effort-control">
-            <span>Effort</span>
-            <select
-              aria-label="Model reasoning effort"
-              title={
-                efforts.length < 2
-                  ? selectedModel
-                    ? 'This model does not expose adjustable effort'
-                    : 'Select a model to choose its effort'
-                  : 'Reasoning effort'
-              }
-              value={efforts.includes(reasoningEffort) ? reasoningEffort : 'auto'}
-              disabled={editingDisabled || efforts.length < 2}
-              onChange={(event) => changeEffort(event.target.value as TaskReasoningEffort)}
-            >
-              {efforts.map((effort) => (
-                <option key={effort} value={effort}>
-                  {effortLabel(effort)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="garden-route-control">
-            <span>Privacy</span>
-            <select
-              value={privacyRoute}
-              disabled={
-                editingDisabled ||
-                uploading ||
-                voiceBusy ||
-                bootstrap.instance.enforceZeroDataRetention
-              }
-              onChange={(event) =>
-                changePrivacy(event.target.value === 'external' ? 'external' : 'provider_zdr')
-              }
-            >
-              <option value="provider_zdr">Zero provider retention</option>
-              <option value="external">Provider retention allowed</option>
-            </select>
-          </label>
-          <label className="garden-cap-control">
-            <span>{task ? 'Extra limit' : 'Limit'}</span>
-            <input
-              type="number"
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') event.preventDefault();
-              }}
-              min="0.01"
-              max={MAX_TASK_SPEND_USD}
-              disabled={editingDisabled || uploading || voiceBusy}
-              step="0.01"
-              value={cap}
-              onChange={(event) => changeCap(event.target.value)}
-              placeholder="USD"
-              aria-label={task ? 'Additional spend limit in USD' : 'Task spend limit in USD'}
-            />
-          </label>
-        </div>
-      </details>
       {advancedModels && (
         <Dialog title="Model choices" onClose={() => setAdvancedModels(false)} wide>
           <Suspense fallback={<p className="muted">Loading…</p>}>

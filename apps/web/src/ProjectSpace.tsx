@@ -1,3 +1,4 @@
+import ScrollRegion from './ScrollRegion';
 import { lazy, Suspense, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, MessageSquarePlus, Settings2 } from 'lucide-react';
 import type {
@@ -306,18 +307,59 @@ export default function ProjectSpace({
         <LivingBackdrop />
         <Button className="project-back" aria-label="All projects" onClick={onAllProjects}>
           <ArrowLeft size={15} />
-          All projects
         </Button>
         <div className="project-space-title">
           <div className="eyebrow">Project</div>
-          <h1>{project.title}</h1>
+          <h1 aria-label={project.title}>
+            <button
+              className="project-overview-link"
+              aria-label={`${project.title} · Project overview`}
+              aria-current={!taskId ? 'page' : undefined}
+              onClick={() => {
+                if (!fileNavigationBlocked()) onOverview();
+              }}
+            >
+              {project.title}
+            </button>
+          </h1>
           <p>
             {projectStatus(project)} <span>· {money(project.spentUsd)} spent</span>
           </p>
+          <label className="project-conversation-switcher">
+            <span className="sr-only">Current conversation</span>
+            <select
+              aria-label="Current conversation"
+              value={taskId ?? ''}
+              onChange={(event) => {
+                if (fileNavigationBlocked()) return;
+                if (event.target.value) onTask(event.target.value);
+              }}
+            >
+              <option value="" disabled>
+                Open a conversation…
+              </option>
+              {[
+                ...new Map(
+                  [...tasks, ...(currentTask ? [currentTask] : [])].map((task) => [task.id, task])
+                ).values()
+              ]
+                .sort(
+                  (a, b) =>
+                    Number(b.pinned) - Number(a.pinned) ||
+                    a.createdAt.localeCompare(b.createdAt) ||
+                    a.id.localeCompare(b.id)
+                )
+                .map((task) => (
+                  <option key={task.id} value={task.id}>
+                    {task.title === project.title ? 'Main conversation' : task.title}
+                  </option>
+                ))}
+            </select>
+          </label>
         </div>
         <div className="row">
           <Button
-            className="primary"
+            className="project-new-conversation"
             aria-label="New conversation"
             onClick={() => onNewConversation(project)}
           >
@@ -336,36 +378,6 @@ export default function ProjectSpace({
         </div>
       </header>
       <div className="project-workspace-bar">
-        <label className="project-conversation-switcher">
-          <span className="sr-only">Current conversation</span>
-          <select
-            aria-label="Current conversation"
-            value={taskId ?? ''}
-            onChange={(event) => {
-              if (fileNavigationBlocked()) return;
-              if (event.target.value) onTask(event.target.value);
-              else onOverview();
-            }}
-          >
-            <option value="">Project overview</option>
-            {[
-              ...new Map(
-                [...tasks, ...(currentTask ? [currentTask] : [])].map((task) => [task.id, task])
-              ).values()
-            ]
-              .sort(
-                (a, b) =>
-                  Number(b.pinned) - Number(a.pinned) ||
-                  a.createdAt.localeCompare(b.createdAt) ||
-                  a.id.localeCompare(b.id)
-              )
-              .map((task) => (
-                <option key={task.id} value={task.id}>
-                  {task.title === project.title ? 'Main conversation' : task.title}
-                </option>
-              ))}
-          </select>
-        </label>
         <Suspense fallback={null}>
           <ProjectJobsLink
             projectId={projectId}
@@ -424,19 +436,21 @@ export default function ProjectSpace({
                   tasks.some((task) => needsAttention(task) || hasOngoingWork(task)) && (
                     <section aria-label="Current work" className="project-current-work">
                       <h2>Current work</h2>
-                      <div className="project-conversation-grid">
-                        {tasks
-                          .filter((task) => needsAttention(task) || hasOngoingWork(task))
-                          .map((task) => (
-                            <button key={task.id} onClick={() => onTask(task.id)}>
-                              <span className={`garden-project-dot status-${task.status}`} />
-                              <span>
-                                <strong>{task.title}</strong>
-                                <small>{taskStatusLabel(task)}</small>
-                              </span>
-                            </button>
-                          ))}
-                      </div>
+                      <ScrollRegion label="Current project work">
+                        <div className="project-conversation-grid">
+                          {tasks
+                            .filter((task) => needsAttention(task) || hasOngoingWork(task))
+                            .map((task) => (
+                              <button key={task.id} onClick={() => onTask(task.id)}>
+                                <span className={`garden-project-dot status-${task.status}`} />
+                                <span>
+                                  <strong>{task.title}</strong>
+                                  <small>{taskStatusLabel(task)}</small>
+                                </span>
+                              </button>
+                            ))}
+                        </div>
+                      </ScrollRegion>
                     </section>
                   )}
                 {!archived && (
@@ -499,39 +513,45 @@ export default function ProjectSpace({
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                   />
-                  <div className="project-conversation-grid" ref={conversationGrid}>
-                    {visible.map((task) => (
-                      <button key={task.id} data-task-id={task.id} onClick={() => onTask(task.id)}>
-                        <span className={`garden-project-dot status-${task.status}`} />
-                        <span>
-                          <strong>{task.title}</strong>
-                          <small>
-                            {taskStatusLabel(task)} · {money(task.spentUsd)}
-                          </small>
-                          {changeSummary(changes[task.id]) && (
-                            <small
-                              title={`Compared with this conversation's last published or checked-out files. Large files, binary data and dependency environments are excluded from line counts.${changes[task.id]?.measurement ? ` Measured ${new Date(changes[task.id]!.measurement!.observedAt).toLocaleString()}.` : ''}`}
-                            >
-                              {changeSummary(changes[task.id])}
+                  <ScrollRegion label="Project conversations" resetKey={`${archived}/${query}`}>
+                    <div className="project-conversation-grid" ref={conversationGrid}>
+                      {visible.map((task) => (
+                        <button
+                          key={task.id}
+                          data-task-id={task.id}
+                          onClick={() => onTask(task.id)}
+                        >
+                          <span className={`garden-project-dot status-${task.status}`} />
+                          <span>
+                            <strong>{task.title}</strong>
+                            <small>
+                              {taskStatusLabel(task)} · {money(task.spentUsd)}
                             </small>
-                          )}
-                          {task.activity && (
-                            <>
-                              <small className="project-activity-detail">
-                                {task.activity.currentStep ?? task.activity.latest}
+                            {changeSummary(changes[task.id]) && (
+                              <small
+                                title={`Compared with this conversation's last published or checked-out files. Large files, binary data and dependency environments are excluded from line counts.${changes[task.id]?.measurement ? ` Measured ${new Date(changes[task.id]!.measurement!.observedAt).toLocaleString()}.` : ''}`}
+                              >
+                                {changeSummary(changes[task.id])}
                               </small>
-                              <small>
-                                {task.activity.stepsTotal > 0 &&
-                                  `Plan: ${task.activity.stepsCompleted} of ${task.activity.stepsTotal} marked complete · `}
-                                {task.activity.observedAt &&
-                                  `Last activity ${new Date(task.activity.observedAt).toLocaleTimeString()}`}
-                              </small>
-                            </>
-                          )}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
+                            )}
+                            {task.activity && (
+                              <>
+                                <small className="project-activity-detail">
+                                  {task.activity.currentStep ?? task.activity.latest}
+                                </small>
+                                <small>
+                                  {task.activity.stepsTotal > 0 &&
+                                    `Plan: ${task.activity.stepsCompleted} of ${task.activity.stepsTotal} marked complete · `}
+                                  {task.activity.observedAt &&
+                                    `Last activity ${new Date(task.activity.observedAt).toLocaleTimeString()}`}
+                                </small>
+                              </>
+                            )}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </ScrollRegion>
                   {!visible.length && (
                     <p className="muted">
                       {query

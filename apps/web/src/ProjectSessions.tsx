@@ -1,3 +1,4 @@
+import ScrollRegion from './ScrollRegion';
 import { useEffect, useState } from 'react';
 import type { ProjectSessions as Sessions } from '@athanor/contracts';
 import { get } from './client';
@@ -56,45 +57,47 @@ export default function ProjectSessions({
       {value && !active.length && (
         <p className="muted">No open computer sessions in this project.</p>
       )}
-      {active.map((session) => (
-        <article className="project-session" key={session.workspaceId}>
-          <h3>{session.title}</h3>
-          {session.browser && (
-            <div className="stack">
-              <span className="muted">
-                Browser ·{' '}
-                {session.browser.holder === 'agent'
-                  ? 'Agent has control'
-                  : session.browser.holder === 'secure_input'
-                    ? 'Private input — tabs hidden'
-                    : 'You have control'}
-              </span>
-              {session.browser.tabs.map((tab) => (
-                <Button
-                  key={tab.tabId}
-                  onClick={() => onOpen(session.taskId, 'browser', tab.tabId)}
-                  title={tab.url}
-                >
-                  <span>
-                    {tab.title || 'Untitled tab'}
-                    <small>{tab.url}</small>
-                  </span>
-                  <span>{tab.active ? 'Active · ' : ''}Open tab</span>
-                </Button>
-              ))}
-              <Button onClick={() => onOpen(session.taskId, 'browser')}>View browser</Button>
-            </div>
-          )}
-          {session.desktop && (
-            <div className="stack">
-              <Button onClick={() => onOpen(session.taskId, 'desktop')}>Open desktop</Button>
-              {session.desktop.windows.map((window) => (
-                <span key={window.id}>{window.name || window.role}</span>
-              ))}
-            </div>
-          )}
-        </article>
-      ))}
+      <ScrollRegion label="Open project sessions" resetKey={projectId}>
+        {active.map((session) => (
+          <article className="project-session" key={session.workspaceId}>
+            <h3>{session.title}</h3>
+            {session.browser && (
+              <div className="stack">
+                <span className="muted">
+                  Browser ·{' '}
+                  {session.browser.holder === 'agent'
+                    ? 'Agent has control'
+                    : session.browser.holder === 'secure_input'
+                      ? 'Private input — tabs hidden'
+                      : 'You have control'}
+                </span>
+                {session.browser.tabs.map((tab) => (
+                  <Button
+                    key={tab.tabId}
+                    onClick={() => onOpen(session.taskId, 'browser', tab.tabId)}
+                    title={tab.url}
+                  >
+                    <span>
+                      {tab.title || 'Untitled tab'}
+                      <small>{tab.url}</small>
+                    </span>
+                    <span>{tab.active ? 'Active · ' : ''}Open tab</span>
+                  </Button>
+                ))}
+                <Button onClick={() => onOpen(session.taskId, 'browser')}>View browser</Button>
+              </div>
+            )}
+            {session.desktop && (
+              <div className="stack">
+                <Button onClick={() => onOpen(session.taskId, 'desktop')}>Open desktop</Button>
+                {session.desktop.windows.map((window) => (
+                  <span key={window.id}>{window.name || window.role}</span>
+                ))}
+              </div>
+            )}
+          </article>
+        ))}
+      </ScrollRegion>
       {Boolean(value?.unavailableWorkspaces) && (
         <p role="status">
           Some sessions are unavailable or use a shared legacy workspace. Only isolated project

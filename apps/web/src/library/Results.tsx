@@ -1,3 +1,4 @@
+import ScrollRegion from '../ScrollRegion';
 import { useEffect, useRef, useState } from 'react';
 import type { Artifact, Project, ShareRecord, Task, TaskPage, Workspace } from '@athanor/contracts';
 import { del, get, patch } from '../client.js';
@@ -153,84 +154,86 @@ export function ResultsLibrary({
             placeholder="File, project or conversation…"
           />
         </Field>
-        {Array.from(groups)
-          .slice(0, resultLimit)
-          .map(([id, group]) => (
-            <section key={id} className="library-project-results">
-              <h3>{group.title}</h3>
-              <div className="library-results">
-                {Array.from(group.results, ([identity, versions]) => {
-                  const artifact = versions[0]!;
-                  const source = artifact.taskId ? taskRecords.get(artifact.taskId) : undefined;
-                  return (
-                    <article className="library-result" key={identity}>
-                      {/^image\/(png|jpeg|gif|webp|avif)$/.test(artifact.mimeType) ? (
-                        <img
-                          className="library-art"
-                          loading="lazy"
-                          src={`/v1/artifacts/${artifact.id}/content`}
-                          alt=""
-                        />
-                      ) : (
-                        <div className="library-file-icon" aria-hidden="true">
-                          {artifact.name.split('.').at(-1)?.slice(0, 5).toUpperCase() || 'FILE'}
-                        </div>
-                      )}
-                      <div className="library-result-body">
-                        <h4>{artifact.name}</h4>
-                        <p className="muted management-metadata">
-                          {source?.title ? `${source.title} · ` : ''}Version {artifact.version} ·{' '}
-                          {bytes(artifact.sizeBytes)} · {date(artifact.createdAt)}
-                        </p>
-                        <div className="management-actions">
-                          <Button onClick={() => setPreview(artifact)}>Open</Button>
-                          <Button
-                            disabled={action.busy}
-                            onClick={() =>
-                              void action.run(
-                                () =>
-                                  download(`/v1/artifacts/${artifact.id}/content`, artifact.name),
-                                'Download started'
-                              )
-                            }
-                          >
-                            Download
-                          </Button>
-                          <details className="result-management">
-                            <summary>
-                              {versions.length > 1
-                                ? `${versions.length} versions & actions`
-                                : 'More'}
-                            </summary>
-                            {artifact.taskId && (
-                              <Button onClick={() => onOpenTask(artifact.taskId!)}>
-                                Open conversation
-                              </Button>
-                            )}
-                            {versions.map((version) => (
-                              <div className="row" key={version.id}>
-                                <Button onClick={() => setPreview(version)}>
-                                  Version {version.version} · {date(version.createdAt)}
+        <ScrollRegion label="Saved results" resetKey={resultQuery}>
+          {Array.from(groups)
+            .slice(0, resultLimit)
+            .map(([id, group]) => (
+              <section key={id} className="library-project-results">
+                <h3>{group.title}</h3>
+                <div className="library-results">
+                  {Array.from(group.results, ([identity, versions]) => {
+                    const artifact = versions[0]!;
+                    const source = artifact.taskId ? taskRecords.get(artifact.taskId) : undefined;
+                    return (
+                      <article className="library-result" key={identity}>
+                        {/^image\/(png|jpeg|gif|webp|avif)$/.test(artifact.mimeType) ? (
+                          <img
+                            className="library-art"
+                            loading="lazy"
+                            src={`/v1/artifacts/${artifact.id}/content`}
+                            alt=""
+                          />
+                        ) : (
+                          <div className="library-file-icon" aria-hidden="true">
+                            {artifact.name.split('.').at(-1)?.slice(0, 5).toUpperCase() || 'FILE'}
+                          </div>
+                        )}
+                        <div className="library-result-body">
+                          <h4>{artifact.name}</h4>
+                          <p className="muted management-metadata">
+                            {source?.title ? `${source.title} · ` : ''}Version {artifact.version} ·{' '}
+                            {bytes(artifact.sizeBytes)} · {date(artifact.createdAt)}
+                          </p>
+                          <div className="management-actions">
+                            <Button onClick={() => setPreview(artifact)}>Open</Button>
+                            <Button
+                              disabled={action.busy}
+                              onClick={() =>
+                                void action.run(
+                                  () =>
+                                    download(`/v1/artifacts/${artifact.id}/content`, artifact.name),
+                                  'Download started'
+                                )
+                              }
+                            >
+                              Download
+                            </Button>
+                            <details className="result-management">
+                              <summary>
+                                {versions.length > 1
+                                  ? `${versions.length} versions & actions`
+                                  : 'More'}
+                              </summary>
+                              {artifact.taskId && (
+                                <Button onClick={() => onOpenTask(artifact.taskId!)}>
+                                  Open conversation
                                 </Button>
-                                <ConfirmButton
-                                  label="Delete version"
-                                  description={`Delete saved result “${version.name}”, version ${version.version}. Other versions and working files remain available.`}
-                                  action={async () => {
-                                    await del(`/v1/artifacts/${version.id}`);
-                                    artifacts.refresh();
-                                  }}
-                                />
-                              </div>
-                            ))}
-                          </details>
+                              )}
+                              {versions.map((version) => (
+                                <div className="row" key={version.id}>
+                                  <Button onClick={() => setPreview(version)}>
+                                    Version {version.version} · {date(version.createdAt)}
+                                  </Button>
+                                  <ConfirmButton
+                                    label="Delete version"
+                                    description={`Delete saved result “${version.name}”, version ${version.version}. Other versions and working files remain available.`}
+                                    action={async () => {
+                                      await del(`/v1/artifacts/${version.id}`);
+                                      artifacts.refresh();
+                                    }}
+                                  />
+                                </div>
+                              ))}
+                            </details>
+                          </div>
                         </div>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+        </ScrollRegion>
         {groups.size > resultLimit && (
           <Button onClick={() => setResultLimit((value) => value + 40)}>
             More project results

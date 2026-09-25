@@ -502,10 +502,8 @@ export default function TaskSurface({
   return (
     <section className={`garden-task workspace-view-${view}`}>
       <div className="garden-task-scroll">
-        <div className="garden-work-navigation" hidden={view === 'files' || view === 'tools'}>
-          {onDiscuss && !task.parentTaskId ? (
-            <span className="eyebrow">Conversation</span>
-          ) : (
+        <div className="garden-parent-navigation" hidden={view === 'files' || view === 'tools'}>
+          {(!onDiscuss || task.parentTaskId) && (
             <Button
               className="quiet-button"
               onClick={() => (task.parentTaskId ? onOpenTask(task.parentTaskId) : onBack())}
@@ -514,9 +512,26 @@ export default function TaskSurface({
               {task.parentTaskId ? 'Return to parent work' : 'All work'}
             </Button>
           )}
+        </div>
+        {attentionPanel}
+        <div className="run-summary" hidden={view === 'files' || view === 'tools'}>
+          <h2 className="sr-only">{task.title}</h2>
+          <div className={`status-line ${isWorking(task) || pendingDelivery ? 'active' : ''}`}>
+            <i />
+            <button
+              className="run-status-button"
+              onClick={() => selectView('activity')}
+              title="View checks and activity"
+            >
+              {displayStatus}
+            </button>
+            {task.queuedMessageCount > 0 && (
+              <span className="badge">{task.queuedMessageCount} queued</span>
+            )}
+          </div>
           <div className="row">
             <span
-              className={`connection ${connection}`}
+              className={`connection ${connection} ${connection === 'connected' || connection === 'idle' ? 'connection-quiet' : ''}`}
               title={
                 connection === 'connected'
                   ? 'Live updates connected'
@@ -527,53 +542,25 @@ export default function TaskSurface({
             >
               {' '}
               <i />
-              {connection === 'connected'
-                ? 'Live'
-                : connection === 'idle'
-                  ? 'Up to date'
-                  : connection === 'closed'
-                    ? 'Disconnected'
-                    : connection === 'connecting'
-                      ? 'Connecting'
-                      : 'Reconnecting'}
+              <span>
+                {connection === 'connected'
+                  ? 'Live'
+                  : connection === 'idle'
+                    ? 'Up to date'
+                    : connection === 'closed'
+                      ? 'Disconnected'
+                      : connection === 'connecting'
+                        ? 'Connecting'
+                        : 'Reconnecting'}
+              </span>
             </span>
-            <Button aria-label="Work options" onClick={() => setPanel('settings')}>
+            <Button
+              aria-label="Work options"
+              title="Work options"
+              onClick={() => setPanel('settings')}
+            >
               <MoreHorizontal size={19} />
             </Button>
-          </div>
-        </div>
-        <div className="conversation-actions" hidden={view === 'files' || view === 'tools'}>
-          <h2 className="sr-only">{task.title}</h2>
-          <Button onClick={() => setPanel('share')} aria-label="Share this work">
-            <Share2 size={15} />
-            Share
-          </Button>
-          <Button onClick={() => setPanel('models')}>Models</Button>
-          <Button
-            onClick={() => {
-              selectView('work');
-              setComposerExpanded(true);
-              requestAnimationFrame(() => document.getElementById(`intent-${task.id}`)?.focus());
-            }}
-          >
-            Continue
-          </Button>
-        </div>
-        {attentionPanel}
-        <div className="run-summary" hidden={view === 'files' || view === 'tools'}>
-          <div className={`status-line ${isWorking(task) || pendingDelivery ? 'active' : ''}`}>
-            <i />
-            <span>{displayStatus}</span>
-            {task.queuedMessageCount > 0 && (
-              <span className="badge">{task.queuedMessageCount} queued</span>
-            )}
-          </div>
-          <div className="row">
-            {isFinished(task) && (
-              <Button className="quiet-button" onClick={() => selectView('activity')}>
-                View checks & activity
-              </Button>
-            )}
             {/*
              * Labelled, because an unattributed currency figure beside a status line is a number
              * the owner cannot check: it could be this project, today, or the account. It is this
@@ -581,7 +568,7 @@ export default function TaskSurface({
              * figure that can be verified against the spending pane and one that can only be
              * doubted.
              */}
-            <span className="muted">
+            <span className="muted run-cost">
               <span title="Settled provider cost for this project">
                 {money(task.spentUsd)} spent
                 {task.maxSpendUsd !== null && ` of ${money(task.maxSpendUsd)}`}
@@ -1024,7 +1011,6 @@ export default function TaskSurface({
             }}
           >
             <Plus size={18} /> Continue this conversation…
-            <span>Continue this work</span>
           </Button>
         )}
         <div hidden={Boolean(attentionPanel) || (!task.parentMissionId && !showComposer)}>
@@ -1033,8 +1019,10 @@ export default function TaskSurface({
               className="garden-compose-collapse"
               aria-label="Collapse composer"
               onClick={() => setComposerExpanded(false)}
+              title="Keep draft and collapse"
             >
-              <X size={14} /> Keep draft and collapse
+              <X size={14} />
+              <span className="sr-only">Keep draft and collapse</span>
             </Button>
           )}
           {task.parentMissionId ? (
@@ -1245,6 +1233,17 @@ export default function TaskSurface({
       )}
       {panel === 'settings' && (
         <Dialog title="Work options" onClose={() => setPanel(null)}>
+          <p className="muted">
+            {money(task.spentUsd)} spent
+            {task.maxSpendUsd !== null && ` of ${money(task.maxSpendUsd)}`}
+            {elapsed && ` · ${elapsed}`}
+          </p>
+          <div className="row">
+            <Button onClick={() => setPanel('share')} aria-label="Share this work">
+              <Share2 size={15} /> Share
+            </Button>
+            <Button onClick={() => setPanel('models')}>Models</Button>
+          </div>
           <Suspense fallback={<Spinner label="Opening work options…" />}>
             <TaskOptions task={task} onTask={onTask} onRefresh={onRefresh} />
           </Suspense>

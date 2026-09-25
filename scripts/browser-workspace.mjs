@@ -20,9 +20,7 @@ export async function checkWorkspaceNavigation({ context, origin, task, report }
     await page.goto(`${origin}/?task=${task.id}`);
     const views = page.getByRole('navigation', { name: 'Project views', exact: true });
     await views.getByRole('button', { name: 'Work', exact: true }).waitFor();
-    await page
-      .getByRole('button', { name: 'Continue this conversation… Continue this work', exact: true })
-      .waitFor();
+    await page.getByRole('button', { name: 'Continue this conversation…', exact: true }).waitFor();
     assert.equal(
       reads.some((path) => path.endsWith('/directories')),
       false,
@@ -84,11 +82,31 @@ export async function checkWorkspaceNavigation({ context, origin, task, report }
           await views.getByRole('button', { name: label, exact: true }).isVisible(),
           true
         );
+      if (width <= 760) {
+        const settings = page.getByRole('button', { name: 'Prompt settings', exact: true });
+        const mode = page.getByRole('combobox', { name: 'Approvals for this prompt', exact: true });
+        assert.equal(await mode.isVisible(), false, 'Secondary controls start folded on mobile');
+        assert(
+          await page
+            .locator('.garden-task-composer')
+            .evaluate((element) => element.clientHeight <= innerHeight * 0.4)
+        );
+        await settings.click();
+        assert.equal(await mode.isVisible(), true, 'Advanced controls remain directly accessible');
+        const saved = await mode.inputValue();
+        await mode.selectOption('autonomous');
+        await settings.click();
+        await settings.click();
+        assert.equal(await mode.inputValue(), 'autonomous', 'Folding settings preserves choices');
+        await mode.selectOption(saved);
+        await settings.click();
+      }
       await page.screenshot({ path: resolve(report, `workspace-${width}.png`) });
     }
     await page.goto(`${origin}/?view=settings&section=Models`);
     await page.getByRole('heading', { name: 'Model defaults', exact: true }).waitFor();
     const defaults = page.getByRole('region', { name: 'Main agent', exact: true });
+    await defaults.waitFor();
     assert.equal(await defaults.isVisible(), true);
     assert.equal(
       await page.getByRole('region', { name: 'Coding agents', exact: true }).isVisible(),

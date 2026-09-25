@@ -1,3 +1,4 @@
+import ScrollRegion from './ScrollRegion';
 import { useEffect, useState } from 'react';
 import type { ConversationSource, ProjectNote } from '@athanor/contracts';
 import { get, post, request } from './client';
@@ -165,27 +166,32 @@ export default function ProjectNotes({
       </div>
       <p className="muted">Findings, decisions and open questions shared across conversations.</p>
       {loading && <Spinner />}
-      {notes.map((note) => (
-        <article key={note.id} className={`project-note${note.supersededBy ? ' superseded' : ''}`}>
-          <div className="row between">
-            <small>
-              {note.kind}
-              {note.supersededBy ? ' · corrected' : ''} ·{' '}
-              {new Date(note.createdAt).toLocaleDateString()}
-            </small>
-            {note.source && (
-              <Button onClick={() => onTask(note.source!.taskId)}>Source conversation</Button>
-            )}
-          </div>
-          <p>{note.body}</p>
-          <div className="row">
-            {!note.supersededBy && <Button onClick={() => setEditor(note)}>Correct</Button>}
-            <Button busy={busy} onClick={() => void remove(note)}>
-              Remove
-            </Button>
-          </div>
-        </article>
-      ))}
+      <ScrollRegion label="Project note entries" resetKey={projectId}>
+        {notes.map((note) => (
+          <article
+            key={note.id}
+            className={`project-note${note.supersededBy ? ' superseded' : ''}`}
+          >
+            <div className="row between">
+              <small>
+                {note.kind}
+                {note.supersededBy ? ' · corrected' : ''} ·{' '}
+                {new Date(note.createdAt).toLocaleDateString()}
+              </small>
+              {note.source && (
+                <Button onClick={() => onTask(note.source!.taskId)}>Source conversation</Button>
+              )}
+            </div>
+            <p>{note.body}</p>
+            <div className="row">
+              {!note.supersededBy && <Button onClick={() => setEditor(note)}>Correct</Button>}
+              <Button busy={busy} onClick={() => void remove(note)}>
+                Remove
+              </Button>
+            </div>
+          </article>
+        ))}
+      </ScrollRegion>
       {!loading && !notes.length && (
         <p className="muted">Keep a note here when a finding should inform other conversations.</p>
       )}

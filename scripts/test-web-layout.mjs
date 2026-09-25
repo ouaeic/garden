@@ -1593,6 +1593,7 @@ try {
       'Removing text shrinks the direction editor'
     );
     await page.setViewportSize({ width: 320, height: 600 });
+    await page.getByRole('button', { name: 'Prompt settings', exact: true }).click();
     await page.locator('.garden-prompt-options > summary').click();
     const limit = page.getByRole('spinbutton', {
       name: 'Additional spend limit in USD',
@@ -2138,8 +2139,13 @@ try {
     );
     await page.getByRole('button', { name: 'End session…', exact: true }).click();
     await page.getByRole('button', { name: 'End session', exact: true }).click();
+    await page
+      .getByRole('navigation', { name: 'Job views' })
+      .getByRole('button', { name: /^History / })
+      .click();
     await page.getByText('Python · stopped', { exact: true }).waitFor();
     assert.deepEqual(computationControls, [{ action: 'interrupt' }, { action: 'stop' }]);
+    await page.getByText('Debug a program', { exact: true }).click();
     await page.getByText('workspace/main.py:2', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'workspace/main.py:2', exact: true }).click();
     const debugSource = page.getByRole('region', { name: 'Source workspace/main.py', exact: true });
@@ -2659,6 +2665,7 @@ try {
     await modelsPage.screenshot({ path: resolve(report, 'models-project-desktop.png') });
     await advanced.getByRole('button', { name: 'Close Model choices', exact: true }).click();
     await modelsPage.reload();
+    await modelsPage.getByRole('button', { name: 'Work options', exact: true }).click();
     await modelsPage.getByRole('button', { name: 'Models', exact: true }).click();
     const projectModels = modelsPage.getByRole('dialog', {
       name: 'Conversation models',

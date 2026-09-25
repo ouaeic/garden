@@ -1,8 +1,7 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import type { ComputationSession } from '@athanor/contracts';
-import { get, post } from '../client';
 import { Dialog } from '../ui';
-import { bytes, message } from './format';
+import { bytes } from './format';
 import { useVisibleClock } from '../visible-clock';
 import { computationActive, processDuration, processMemory } from '../process-display';
 import './computation.css';
@@ -163,84 +162,5 @@ export function ComputationCard({
         </Dialog>
       )}
     </article>
-  );
-}
-
-export default function Computation({ workspaceId }: { workspaceId: string }) {
-  const [sessions, setSessions] = useState<ComputationSession[]>([]);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState<string | null>(null);
-  const [revision, setRevision] = useState(0);
-  const base = `/v1/workspaces/${workspaceId}/computation`;
-  useEffect(() => {
-    const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout>;
-    async function load() {
-      try {
-        const result = await get<{ sessions: ComputationSession[] }>(base, {
-          signal: controller.signal
-        });
-        if (controller.signal.aborted) return;
-        setSessions(result.sessions);
-        setError('');
-      } catch (cause) {
-        if (!controller.signal.aborted) setError(message(cause));
-      }
-      if (!controller.signal.aborted)
-        timer = setTimeout(
-          () => void load(),
-          document.visibilityState === 'visible' ? 5000 : 30000
-        );
-    }
-    void load();
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
-  }, [base, revision]);
-  async function control(sessionId: string, action: 'interrupt' | 'stop') {
-    setBusy(sessionId);
-    setError('');
-    try {
-      await post(`${base}/${encodeURIComponent(sessionId)}/control`, { action });
-      setRevision((value) => value + 1);
-    } catch (cause) {
-      setError(message(cause));
-    } finally {
-      setBusy(null);
-    }
-  }
-  return (
-    <section className="stack" aria-label="Computation sessions">
-      <div className="row between">
-        <h3>Computation sessions</h3>
-        <button
-          className="button"
-          disabled={busy !== null}
-          onClick={() => setRevision((value) => value + 1)}
-        >
-          Refresh sessions
-        </button>
-      </div>
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
-      {sessions.map((session) => (
-        <ComputationCard
-          key={session.sessionId}
-          session={session}
-          busy={busy === session.sessionId}
-          onControl={(action) => void control(session.sessionId, action)}
-        />
-      ))}
-      {!sessions.length && !error && (
-        <p className="muted">
-          No active or saved computation sessions. Sessions appear here when a task starts an
-          analysis that keeps values between cells.
-        </p>
-      )}
-    </section>
   );
 }

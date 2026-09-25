@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 export function directoryFixture(workspaceId) {
   const fixture = {
     failRead: false,
+    longList: false,
     tableStale: false,
     tableReads: [],
     reads: [],
@@ -96,7 +97,10 @@ export function directoryFixture(workspaceId) {
                 entry('results', 'directory'),
                 entry('empty', 'directory'),
                 entry('cohort-with-a-long-name-'.repeat(6) + '.fastq.gz'),
-                entry('.analysis-config', 'file', 220)
+                entry('.analysis-config', 'file', 220),
+                ...(fixture.longList
+                  ? Array.from({ length: 70 }, (_, i) => entry(`sample-${i}.fastq.gz`))
+                  : [])
               ]
             : folder === 'workspace/empty'
               ? []
@@ -121,12 +125,26 @@ export async function checkProjectDirectories({
   const page = await context.newPage();
   page.on('pageerror', (error) => errors.push(error.message));
   try {
+    fixture.longList = true;
     await page.goto(`${origin}/?task=${taskId}&panel=files`);
     const panel = page.getByRole('region', { name: 'Project files', exact: true });
     await panel.getByRole('checkbox', { name: 'Hidden files', exact: true }).check();
     await panel.getByRole('button', { name: 'results', exact: true }).waitFor();
     assert((await panel.innerText()).includes('8.0 GiB'));
     assert((await panel.innerText()).includes('.analysis-config'));
+    const fileList = panel.getByRole('region', { name: 'Project directory files', exact: true });
+    await fileList.locator('li').last().waitFor();
+    await page.waitForFunction(
+      () => document.querySelector('[aria-label="Project directory files"]').tabIndex === 0
+    );
+    assert(await fileList.evaluate((element) => element.scrollHeight > element.clientHeight * 2));
+    await fileList.focus();
+    await page.keyboard.press('PageDown');
+    await page.waitForFunction(
+      () => document.querySelector('[aria-label="Project directory files"]').scrollTop > 0
+    );
+    assert(await fileList.evaluate((element) => element.clientHeight <= window.innerHeight * 0.55));
+
     await panel.getByRole('button', { name: 'Load more files', exact: true }).click();
     await panel.getByText('later-page-results.bam', { exact: true }).waitFor();
     const endOfFiles = panel.getByRole('button', { name: 'All files loaded', exact: true });
@@ -147,6 +165,11 @@ export async function checkProjectDirectories({
     await panel.getByRole('button', { name: 'results', exact: true }).focus();
     await page.keyboard.press('Enter');
     await panel.getByText('alignment.bam', { exact: true }).waitFor();
+    assert.equal(
+      await fileList.evaluate((element) => element.scrollTop),
+      0,
+      'Opening a folder resets its list scroll'
+    );
     const breadcrumbs = panel.getByRole('navigation', { name: 'Project directory path' });
     assert(await breadcrumbs.evaluate((element) => element === document.activeElement));
     const file = panel.getByRole('link', { name: 'Download alignment.bam', exact: true });
@@ -271,6 +294,7 @@ export async function checkProjectDirectories({
     );
   } finally {
     fixture.failRead = false;
+    fixture.longList = false;
     await page.close();
   }
 }

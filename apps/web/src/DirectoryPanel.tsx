@@ -1,3 +1,4 @@
+import ScrollRegion from './ScrollRegion';
 import { setSurfaceLocation, useSurfaceLocation } from './surface-location';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
@@ -361,91 +362,93 @@ export default function DirectoryPanel({
               {listing && (
                 <>
                   {listing.entries.length ? (
-                    <ul className="directory-list" aria-label="Directory contents">
-                      {listing.entries
-                        .filter(
-                          (entry) => showHidden || !entry.path.split('/').at(-1)?.startsWith('.')
-                        )
-                        .map((entry) => (
-                          <li key={entry.path}>
-                            <span className="directory-entry-icon" aria-hidden="true">
-                              {entry.type === 'directory' ? (
-                                <Folder size={17} />
-                              ) : (
-                                <File size={17} />
-                              )}
-                            </span>
-                            <div className="directory-entry-name">
-                              {entry.type === 'directory' ? (
-                                <button disabled={dirty} onClick={() => navigate(entry.path)}>
-                                  {entry.name}
-                                </button>
-                              ) : (
-                                <span>{entry.name}</span>
-                              )}
-                              <small className="muted">
-                                {entry.type === 'file'
-                                  ? processMemory(entry.sizeBytes)
-                                  : entry.type === 'symlink'
-                                    ? 'Symbolic link · preserved in ZIP'
-                                    : entry.type === 'special'
-                                      ? 'Special file'
-                                      : 'Folder'}
-                              </small>
-                            </div>
-                            <div className="directory-entry-actions">
-                              {entry.type === 'file' && /\.ipynb$/i.test(entry.name) && (
-                                <Button
-                                  disabled={dirty}
-                                  onClick={() => {
-                                    chooseFile(entry, 'notebook');
-                                  }}
-                                >
-                                  Open notebook<span className="sr-only"> {entry.name}</span>
-                                </Button>
-                              )}
-                              {entry.type === 'file' && tableFile.test(entry.name) && (
-                                <Button
-                                  disabled={dirty}
-                                  onClick={() => {
-                                    chooseFile(entry, 'table');
-                                  }}
-                                >
-                                  View table<span className="sr-only"> {entry.name}</span>
-                                </Button>
-                              )}
-                              {entry.type === 'file' &&
-                                !readOnlyRoot &&
-                                textFile.test(entry.name) && (
+                    <ScrollRegion label="Project directory files" resetKey={`${rootId}/${folder}`}>
+                      <ul className="directory-list" aria-label="Directory contents">
+                        {listing.entries
+                          .filter(
+                            (entry) => showHidden || !entry.path.split('/').at(-1)?.startsWith('.')
+                          )
+                          .map((entry) => (
+                            <li key={entry.path}>
+                              <span className="directory-entry-icon" aria-hidden="true">
+                                {entry.type === 'directory' ? (
+                                  <Folder size={17} />
+                                ) : (
+                                  <File size={17} />
+                                )}
+                              </span>
+                              <div className="directory-entry-name">
+                                {entry.type === 'directory' ? (
+                                  <button disabled={dirty} onClick={() => navigate(entry.path)}>
+                                    {entry.name}
+                                  </button>
+                                ) : (
+                                  <span>{entry.name}</span>
+                                )}
+                                <small className="muted">
+                                  {entry.type === 'file'
+                                    ? processMemory(entry.sizeBytes)
+                                    : entry.type === 'symlink'
+                                      ? 'Symbolic link · preserved in ZIP'
+                                      : entry.type === 'special'
+                                        ? 'Special file'
+                                        : 'Folder'}
+                                </small>
+                              </div>
+                              <div className="directory-entry-actions">
+                                {entry.type === 'file' && /\.ipynb$/i.test(entry.name) && (
                                   <Button
                                     disabled={dirty}
                                     onClick={() => {
-                                      chooseFile(entry, 'source');
+                                      chooseFile(entry, 'notebook');
                                     }}
                                   >
-                                    Inspect<span className="sr-only"> {entry.name}</span>
+                                    Open notebook<span className="sr-only"> {entry.name}</span>
                                   </Button>
                                 )}
-                              {(entry.type === 'file' || entry.type === 'directory') && (
-                                <a
-                                  className="button"
-                                  href={
-                                    entry.type === 'directory'
-                                      ? zipUrl(entry.path)
-                                      : `${base}/download?${new URLSearchParams({ path: entry.path })}`
-                                  }
-                                  download
-                                  onClick={downloadClick}
-                                  aria-label={`Download ${entry.name}${entry.type === 'directory' ? ' as ZIP' : ''}`}
-                                >
-                                  <Download size={14} aria-hidden="true" />
-                                  <span>{entry.type === 'directory' ? 'ZIP' : 'Download'}</span>
-                                </a>
-                              )}
-                            </div>
-                          </li>
-                        ))}
-                    </ul>
+                                {entry.type === 'file' && tableFile.test(entry.name) && (
+                                  <Button
+                                    disabled={dirty}
+                                    onClick={() => {
+                                      chooseFile(entry, 'table');
+                                    }}
+                                  >
+                                    View table<span className="sr-only"> {entry.name}</span>
+                                  </Button>
+                                )}
+                                {entry.type === 'file' &&
+                                  !readOnlyRoot &&
+                                  textFile.test(entry.name) && (
+                                    <Button
+                                      disabled={dirty}
+                                      onClick={() => {
+                                        chooseFile(entry, 'source');
+                                      }}
+                                    >
+                                      Inspect<span className="sr-only"> {entry.name}</span>
+                                    </Button>
+                                  )}
+                                {(entry.type === 'file' || entry.type === 'directory') && (
+                                  <a
+                                    className="button"
+                                    href={
+                                      entry.type === 'directory'
+                                        ? zipUrl(entry.path)
+                                        : `${base}/download?${new URLSearchParams({ path: entry.path })}`
+                                    }
+                                    download
+                                    onClick={downloadClick}
+                                    aria-label={`Download ${entry.name}${entry.type === 'directory' ? ' as ZIP' : ''}`}
+                                  >
+                                    <Download size={14} aria-hidden="true" />
+                                    <span>{entry.type === 'directory' ? 'ZIP' : 'Download'}</span>
+                                  </a>
+                                )}
+                              </div>
+                            </li>
+                          ))}
+                      </ul>
+                    </ScrollRegion>
                   ) : (
                     <p className="muted">This directory is empty.</p>
                   )}

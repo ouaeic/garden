@@ -1,3 +1,4 @@
+import ScrollRegion from './ScrollRegion';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, GitMerge, Layers, Plus, RefreshCw, Square } from 'lucide-react';
 import type {
@@ -386,44 +387,46 @@ export default function ProjectUpdates({
               </Suspense>
             )}
           </details>
-          <div className="project-update-list">
-            {rows.map((update) => (
-              <button
-                className="project-update-row"
-                key={update.id}
-                onClick={() => inspect(update.id)}
-              >
-                <span className={`project-update-state state-${update.state}`}>
-                  {label(update)}
-                </span>
-                <span className="project-update-title">
-                  <strong>{update.title}</strong>
-                  <small>
-                    {tasks.find((task) => task.id === update.taskId)?.title ?? 'Conversation'} ·{' '}
-                    {update.changeCount} changed {update.changeCount === 1 ? 'file' : 'files'} ·{' '}
-                    {stamp(update.updatedAt)}
-                  </small>
-                  {update.lineChanges && (
-                    <small className="project-line-changes">
-                      <span>+{update.lineChanges.added.toLocaleString()}</span>{' '}
-                      <span>−{update.lineChanges.removed.toLocaleString()}</span> lines
-                      {update.lineChanges.unmeasuredFiles > 0 &&
-                        ` · ${update.lineChanges.unmeasuredFiles} files unmeasured`}
+          <ScrollRegion label="Project updates">
+            <div className="project-update-list">
+              {rows.map((update) => (
+                <button
+                  className="project-update-row"
+                  key={update.id}
+                  onClick={() => inspect(update.id)}
+                >
+                  <span className={`project-update-state state-${update.state}`}>
+                    {label(update)}
+                  </span>
+                  <span className="project-update-title">
+                    <strong>{update.title}</strong>
+                    <small>
+                      {tasks.find((task) => task.id === update.taskId)?.title ?? 'Conversation'} ·{' '}
+                      {update.changeCount} changed {update.changeCount === 1 ? 'file' : 'files'} ·{' '}
+                      {stamp(update.updatedAt)}
                     </small>
-                  )}
-                </span>
-                <span>
-                  {update.state === 'preparing'
-                    ? `${update.progress.files} files · ${processMemory(update.progress.bytes)}`
-                    : update.checks.length
-                      ? update.state === 'outdated'
-                        ? 'Earlier checks · rebuild required'
-                        : `${update.checks.filter((check) => check.status === 'passed').length}/${update.checks.length} checks passed`
-                      : 'No automated checks'}
-                </span>
-              </button>
-            ))}
-          </div>
+                    {update.lineChanges && (
+                      <small className="project-line-changes">
+                        <span>+{update.lineChanges.added.toLocaleString()}</span>{' '}
+                        <span>−{update.lineChanges.removed.toLocaleString()}</span> lines
+                        {update.lineChanges.unmeasuredFiles > 0 &&
+                          ` · ${update.lineChanges.unmeasuredFiles} files unmeasured`}
+                      </small>
+                    )}
+                  </span>
+                  <span>
+                    {update.state === 'preparing'
+                      ? `${update.progress.files} files · ${processMemory(update.progress.bytes)}`
+                      : update.checks.length
+                        ? update.state === 'outdated'
+                          ? 'Earlier checks · rebuild required'
+                          : `${update.checks.filter((check) => check.status === 'passed').length}/${update.checks.length} checks passed`
+                        : 'No automated checks'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </ScrollRegion>
           {!rows.length && (
             <p className="muted">
               {data.head

@@ -115,12 +115,12 @@
 }
 .garden-shell .project-space-header {
   border-radius: 16px;
-  padding: 20px 24px;
-  margin-bottom: 12px;
+  padding: 12px 20px;
+  margin-bottom: 8px;
 }
 .garden-shell .has-conversation .project-space-header {
-  margin: 16px 24px 0;
-  padding: 16px 20px;
+  margin: 12px 24px 0;
+  padding: 10px 16px;
   border-radius: 16px;
 }
 .project-workspace-bar {
@@ -129,8 +129,8 @@
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 0;
-  margin-bottom: 12px;
+  padding: 6px 0;
+  margin-bottom: 6px;
   border-bottom: 1px solid var(--line);
   flex-shrink: 0;
 }
@@ -138,6 +138,8 @@
   margin: 0 24px;
 }
 .project-conversation-switcher {
+  display: block;
+  width: 100%;
   flex: 1;
   min-width: 0;
   max-width: 32rem;
@@ -148,8 +150,9 @@
   background: transparent;
   color: var(--text);
   text-overflow: ellipsis;
-  font-size: 14px;
-  padding: 9px 26px 9px 0;
+  font-size: 12px;
+  min-height: 28px;
+  padding: 3px 24px 3px 0;
 }
 .project-view-nav {
   display: flex;
@@ -175,32 +178,59 @@
 .garden-task-scroll {
   padding-top: 12px;
 }
-.garden-task .garden-work-navigation {
-  float: left;
-  margin: 0;
-  min-height: 38px;
-  gap: 12px;
-}
-.garden-task .garden-work-navigation > .eyebrow {
+.garden-parent-navigation:empty {
   display: none;
 }
-.conversation-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-  min-height: 38px;
-  margin-bottom: 8px;
-}
-.conversation-actions .button {
-  background: transparent;
-  border-color: transparent;
-  font-size: 12px;
-}
 .garden-task .run-summary {
-  clear: both;
-  padding: 10px 0 18px;
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 20px;
+  padding: 4px 0 10px;
+  border: 0;
+  margin-bottom: 10px;
+  gap: 8px;
+}
+.run-summary > .row {
+  gap: 8px;
+}
+.run-status-button {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  padding: 4px 0;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 4px;
+}
+.connection-quiet {
+  gap: 0;
+}
+.connection-quiet > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.project-overview-link {
+  display: block;
+  max-width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.project-overview-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 .garden-shell .garden-task-layout {
   display: block;
@@ -489,29 +519,16 @@
   .garden-task-scroll {
     padding-inline: 16px;
   }
-  .garden-task .garden-work-navigation {
-    float: none;
-    justify-content: space-between;
-  }
-  .conversation-actions {
-    margin-top: -38px;
-    padding-right: 38px;
-  }
-  .conversation-actions .button {
-    padding-inline: 8px;
-  }
-  .garden-work-navigation .connection {
-    max-width: 105px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
   .garden-task .run-summary {
-    gap: 8px;
-    margin-bottom: 16px;
-    padding-bottom: 12px;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
   }
   .garden-task .run-summary > .row {
     font-size: 11px;
+    gap: 5px;
+  }
+  .garden-task .run-cost {
+    display: none;
   }
   .returning-home .garden-welcome {
     padding: 20px 16px;
@@ -578,7 +595,7 @@
 }
 .garden-sidebar-bottom {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 4px;
 }
 .garden-sidebar-bottom > .button {
@@ -680,4 +697,171 @@
 /* Reserve a readable work strip when a short viewport squeezes the expanded composer. */
 .garden-shell .garden-task {
   grid-template-rows: minmax(64px, 1fr) minmax(0, auto);
+}
+
+.scroll-region {
+  max-block-size: min(28rem, 52dvh);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scroll-padding-block: 8px;
+  min-width: 0;
+  min-height: 0;
+  padding: 3px;
+}
+.scroll-region-content {
+  display: flow-root;
+  min-width: 0;
+}
+.scroll-region:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.scroll-region[data-overflow] {
+  border-block: 1px solid var(--line);
+}
+.scroll-region .directory-list {
+  max-height: none;
+  overflow: visible;
+  margin-block: 0;
+}
+.project-current-work .scroll-region,
+.project-updates .scroll-region {
+  max-block-size: min(24rem, 42dvh);
+}
+.library-page .scroll-region {
+  max-block-size: 62dvh;
+}
+.job-view-nav {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0;
+}
+.job-view-nav .button {
+  background: transparent;
+  border-color: transparent;
+}
+.job-view-nav .button[aria-pressed='true'] {
+  background: var(--raised);
+  border-color: var(--line);
+}
+.job-view-nav span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.project-processes .project-computations {
+  display: contents;
+}
+.process-list .computation-card {
+  margin: 0;
+}
+.job-debugging {
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+  padding: 12px 0;
+}
+.job-debugging > summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--muted);
+}
+.job-debugging[open] > summary {
+  margin-bottom: 12px;
+}
+.compact-prompt-settings {
+  display: none;
+}
+.garden-task-composer {
+  position: relative;
+}
+.garden-shell .garden-compose-collapse {
+  position: absolute;
+  top: 4px;
+  right: 12px;
+  z-index: 1;
+  min-height: 28px;
+  min-width: 28px;
+  padding: 5px;
+  margin: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--panel);
+}
+@media (max-width: 760px) {
+  .garden-shell .has-conversation .project-space-header {
+    padding: 8px 10px;
+    margin-top: 8px;
+  }
+  .project-space-header .project-back {
+    min-width: 28px;
+    padding-inline: 5px;
+  }
+  .project-space-header .project-space-title h1 {
+    font-size: 17px;
+  }
+  .project-space-header .project-conversation-switcher {
+    max-width: 100%;
+  }
+  .project-workspace-bar {
+    padding-block: 3px;
+  }
+  .garden-task-scroll {
+    padding-top: 4px;
+  }
+  .garden-task .run-summary {
+    align-items: center;
+  }
+  .run-summary > .row {
+    margin-left: auto;
+  }
+  .run-summary > .row > .button {
+    padding: 5px 7px;
+    min-height: 34px;
+  }
+  .compact-prompt-settings {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 32px;
+    gap: 7px;
+    background: transparent;
+    border: 0;
+    padding: 5px 0;
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .compact-prompt-settings > span:first-of-type {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+  }
+  .prompt-settings-content:not(.is-open) {
+    display: none;
+  }
+  .garden-shell .garden-task-composer {
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+    max-height: 40dvh;
+  }
+  .garden-shell .garden-task-composer .intent-editor {
+    padding: 8px 12px 4px;
+  }
+  .garden-task-composer .intent-editor > textarea {
+    min-height: 38px;
+    max-height: 16dvh;
+  }
+  .garden-task-composer .draft-status {
+    margin-top: 2px;
+    font-size: 10px;
+  }
+  .garden-task-composer .intent-toolbar {
+    margin-top: 0;
+  }
+  .scroll-region {
+    max-block-size: 44dvh;
+  }
 }
