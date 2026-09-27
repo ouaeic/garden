@@ -78,9 +78,11 @@ export default function DeskHome({
             <ScrollRegion label="Current project summary" className="desk-card-scroll">
               <span className="eyebrow">Continue your work</span>
               <h2>{resumeProject?.title ?? resume.title}</h2>
-              <p>
-                {resume.activity?.currentStep ?? resume.activity?.latest ?? taskStatusLabel(resume)}
-              </p>
+              {(resume.activity?.currentStep ?? resume.activity?.latest) &&
+                (resume.activity?.currentStep ?? resume.activity?.latest) !==
+                  taskStatusLabel(resume) && (
+                  <p>{resume.activity?.currentStep ?? resume.activity?.latest}</p>
+                )}
               <span className="desk-resume-status">
                 <i className={`garden-project-dot status-${resume.status}`} />
                 {taskStatusLabel(resume)}

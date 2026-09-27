@@ -2,6 +2,12 @@ import { useEffect, useState } from 'react';
 import { fileNavigationBlocked } from './file-navigation';
 
 const eventName = 'garden:surface-location';
+export function sheetHistoryDepth(): number {
+  const state: unknown = history.state;
+  if (!state || typeof state !== 'object') return 0;
+  const depth = (state as Record<string, unknown>).gardenSheetDepth;
+  return typeof depth === 'number' && Number.isSafeInteger(depth) && depth > 0 ? depth : 0;
+}
 export const projectViews = ['work', 'files', 'activity', 'tools'] as const;
 export type ProjectView = (typeof projectViews)[number];
 
@@ -13,7 +19,15 @@ export function setSurfaceLocation(values: Record<string, string | null>, replac
     if (value) url.searchParams.set(key, value);
     else url.searchParams.delete(key);
   }
-  if (url.href !== location.href) history[replace ? 'replaceState' : 'pushState']({}, '', url);
+  if (url.href !== location.href) {
+    const depth = sheetHistoryDepth();
+    // Panel sections share one close destination, including after Back and Forward.
+    history[replace ? 'replaceState' : 'pushState'](
+      depth ? { gardenSheetDepth: replace ? depth : depth + 1 } : {},
+      '',
+      url
+    );
+  }
   window.dispatchEvent(new Event(eventName));
   return true;
 }

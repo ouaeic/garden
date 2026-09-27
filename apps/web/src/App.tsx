@@ -5,16 +5,12 @@ import {
   ArrowUpRight,
   Bell,
   FolderOpen,
-  Grid2X2,
-  PanelLeft,
-  X,
+  LibraryBig,
   Sparkles,
   Clock3,
-  Moon,
   Plus,
   Search,
-  Settings2,
-  Sun
+  Settings2
 } from 'lucide-react';
 import type { Task, Workspace, Project, ConversationSource } from '@athanor/contracts';
 import { get, ApiError, post, isNativeClient } from './client';
@@ -38,7 +34,7 @@ import './workspace-interface.css';
 import './desk.css';
 import { useWorkspaceViewport } from './use-workspace-viewport';
 const DeskHome = lazy(() => import('./DeskHome'));
-import { setSurfaceLocation } from './surface-location';
+import { setSurfaceLocation, sheetHistoryDepth } from './surface-location';
 const Composer = lazy(() => import('./Composer'));
 const TaskSurface = lazy(() => import('./TaskSurface'));
 const ProjectSpace = lazy(() => import('./ProjectSpace'));
@@ -48,6 +44,13 @@ const Automations = lazy(() =>
   import('./library/Watches').then((module) => ({ default: module.WatchesLibrary }))
 );
 const Library = lazy(() => import('./Library'));
+const sheetTitles: Partial<Record<View, string>> = {
+  projects: 'Projects',
+  library: 'Library',
+  settings: 'Settings',
+  automations: 'Automations',
+  attention: 'Needs you'
+};
 const Settings = lazy(() => import('./Settings'));
 const NativeSetup = lazy(() => import('./NativeSetup'));
 import type { ComputerTool as Tool } from './Computer';
@@ -121,49 +124,6 @@ function WorkspaceApp() {
       /* Appearance remains usable without storage. */
     }
   }, [motionPaused]);
-  const [mobile, setMobile] = useState(() => window.innerWidth <= 760);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  useEffect(() => {
-    const query = window.matchMedia('(max-width: 760px)');
-    const resize = () => {
-      setMobile(query.matches);
-      if (query.matches) setSidebarOpen(false);
-    };
-    query.addEventListener('change', resize);
-    return () => query.removeEventListener('change', resize);
-  }, []);
-  useEffect(() => {
-    if (!sidebarOpen) return;
-    const close = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setSidebarOpen(false);
-        document.querySelector<HTMLButtonElement>('[aria-controls="garden-sidebar"]')?.focus();
-      }
-      if (event.key === 'Tab') {
-        const items = [
-          ...document.querySelectorAll<HTMLElement>(
-            '#garden-sidebar button:not(:disabled), #garden-sidebar input, #garden-sidebar a[href]'
-          )
-        ].filter((item) => item.getClientRects().length > 0);
-        const next = event.shiftKey ? items.at(-1) : items[0];
-        const boundary = event.shiftKey ? items[0] : items.at(-1);
-        if (
-          next &&
-          (document.activeElement === boundary ||
-            !items.includes(document.activeElement as HTMLElement))
-        ) {
-          event.preventDefault();
-          next.focus();
-        }
-      }
-    };
-    document.addEventListener('keydown', close);
-    document.querySelector<HTMLButtonElement>('.garden-sidebar-close')?.focus();
-    return () => document.removeEventListener('keydown', close);
-  }, [mobile, sidebarOpen]);
-  function toggleSidebar() {
-    setSidebarOpen((current) => !current);
-  }
   const [newWork, setNewWork] = useState(false);
   const [newConversation, setNewConversation] = useState<{
     project: Project;
@@ -171,7 +131,10 @@ function WorkspaceApp() {
   } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [tool, setTool] = useState<Tool>('files');
-  const [computerOpened, setComputerOpened] = useState(initialNavigation().view === 'computer');
+  const [computerOpened, setComputerOpened] = useState(
+    initialNavigation().view === 'computer' ||
+      new URLSearchParams(location.search).get('behind') === 'computer'
+  );
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [filter, setFilter] = useState<'active' | 'running' | 'complete' | 'archived'>('active');
   const [search, setSearch] = useState('');
@@ -315,7 +278,11 @@ function WorkspaceApp() {
       }
       navigationUrl.current = location.pathname + location.search + location.hash;
       const next = initialNavigation();
-      if (next.view === 'computer') setComputerOpened(true);
+      if (
+        next.view === 'computer' ||
+        new URLSearchParams(location.search).get('behind') === 'computer'
+      )
+        setComputerOpened(true);
       setNavigation(next);
     };
     const surface = () => {
@@ -392,19 +359,51 @@ function WorkspaceApp() {
     const timer = setInterval(heartbeat, 60000);
     return () => clearInterval(timer);
   }, [workspaceId, Boolean(bootstrap), authRequired]);
+  const sheetTitle = sheetTitles[navigation.view];
+  const baseView = sheetTitle
+    ? new URLSearchParams(location.search).get('behind') === 'computer'
+      ? 'computer'
+      : 'work'
+    : navigation.view;
   function navigate(view: View, taskId: string | null = null, projectId: string | null = null) {
     if (fileNavigationBlocked()) return;
-    setSidebarOpen(false);
+    const floating = Boolean(sheetTitles[view]);
     if (view === 'computer') setComputerOpened(true);
-    setNavigation({ view, taskId, projectId });
-    const params = new URLSearchParams();
-    if (taskId) params.set('task', taskId);
-    if (projectId) params.set('project', projectId);
+    const params = floating ? new URLSearchParams(location.search) : new URLSearchParams();
+    if (!floating) {
+      if (taskId) params.set('task', taskId);
+      if (projectId) params.set('project', projectId);
+    } else {
+      taskId = navigation.taskId;
+      projectId = navigation.projectId;
+      params.delete('section');
+      if (baseView === 'computer') params.set('behind', 'computer');
+    }
     if (view !== 'work') params.set('view', view);
+    setNavigation({ view, taskId, projectId });
     navigationUrl.current = `${location.pathname}${params.size ? '?' + params.toString() : ''}`;
-    history.pushState({}, '', navigationUrl.current);
+    const depth = sheetHistoryDepth();
+    history.pushState(
+      floating ? { gardenSheetDepth: sheetTitle && depth > 0 ? depth + 1 : 1 } : {},
+      '',
+      navigationUrl.current
+    );
     window.dispatchEvent(new Event('garden:surface-location'));
-    document.getElementById('main')?.scrollTo({ top: 0, behavior: 'instant' });
+  }
+  function closeSheet() {
+    if (fileNavigationBlocked()) return;
+    const depth = sheetHistoryDepth();
+    if (depth > 0) {
+      history.go(-depth);
+      return;
+    }
+    const params = new URLSearchParams(location.search);
+    for (const key of ['view', 'section', 'behind']) params.delete(key);
+    if (baseView === 'computer') params.set('view', 'computer');
+    navigationUrl.current = `${location.pathname}${params.size ? '?' + params.toString() : ''}`;
+    history.replaceState({}, '', navigationUrl.current);
+    setNavigation(initialNavigation());
+    window.dispatchEvent(new Event('garden:surface-location'));
   }
   const workspace =
     bootstrap?.workspaces.find((item) => item.id === workspaceId) ??
@@ -437,7 +436,6 @@ function WorkspaceApp() {
   }, [task?.workspaceId, taskWorkspace?.id, bootstrap?.user.id]);
   function openTask(id: string, projectId: string | null = null) {
     if (fileNavigationBlocked()) return;
-    setSidebarOpen(false);
     const target = bootstrapRef.current?.tasks.find((item) => item.id === id);
     if (
       target &&
@@ -448,14 +446,14 @@ function WorkspaceApp() {
       setWorkspaceId(target.parentWorkspaceId ?? target.workspaceId);
     navigate('work', id, projectId ?? target?.projectId ?? null);
   }
-  function updateTask(next: Task) {
+  function updateTask(next: Task, open = false) {
     if (deletedTasks.current.has(next.id)) return;
     setBootstrap((current) =>
       current
         ? { ...current, tasks: [next, ...current.tasks.filter((item) => item.id !== next.id)] }
         : current
     );
-    if (next.id !== navigation.taskId) openTask(next.id);
+    if (open || next.id !== navigation.taskId) openTask(next.id, next.projectId);
   }
   function saveDraft(draft: Draft) {
     setDrafts((current) => ({ ...current, [draft.taskId ?? `new:${draft.workspaceId}`]: draft }));
@@ -516,9 +514,7 @@ function WorkspaceApp() {
     ...attentionTasks.map((item) => item.id)
   ]).size;
   return (
-    <div
-      className={`garden-shell desk-shell ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'} ${task && navigation.view === 'work' ? 'task-open' : ''}`}
-    >
+    <div className={`garden-shell desk-shell ${task && baseView === 'work' ? 'task-open' : ''}`}>
       <a className="skip-link" href="#main">
         Skip to work
       </a>
@@ -530,28 +526,22 @@ function WorkspaceApp() {
         >
           <Brand />
         </button>
-        <Button
-          aria-label={sidebarOpen ? 'Hide projects' : 'Show projects'}
-          aria-expanded={sidebarOpen}
-          aria-controls="garden-sidebar"
-          onClick={toggleSidebar}
-        >
-          <PanelLeft size={19} />
-        </Button>
         <nav className="desk-navigation" aria-label="Workspace navigation">
           {(
             [
-              ['work', 'Home'],
-              ['projects', 'Projects'],
-              ['library', 'Library']
+              ['projects', 'Projects', FolderOpen],
+              ['library', 'Library', LibraryBig]
             ] as const
-          ).map(([view, label]) => (
+          ).map(([view, label, Icon]) => (
             <Button
               key={view}
-              aria-current={navigation.view === view && !activeProjectId ? 'page' : undefined}
+              aria-label={label}
+              aria-haspopup="dialog"
+              aria-expanded={navigation.view === view}
               onClick={() => navigate(view)}
             >
-              {label}
+              <Icon size={17} />
+              <span>{label}</span>
             </Button>
           ))}
         </nav>
@@ -578,131 +568,29 @@ function WorkspaceApp() {
             <Bell size={18} />
             {attentionCount > 0 && <span className="notification-count">{attentionCount}</span>}
           </Button>
-          <Button aria-label="Settings" onClick={() => navigate('settings')}>
+          <Button
+            aria-label="Settings"
+            aria-haspopup="dialog"
+            aria-expanded={navigation.view === 'settings'}
+            onClick={() => navigate('settings')}
+          >
             <Settings2 size={17} />
           </Button>
         </div>
       </header>
-      {sidebarOpen && (
-        <button
-          className="garden-sidebar-scrim"
-          aria-label="Close projects"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-      <aside
-        id="garden-sidebar"
-        className="garden-sidebar"
-        aria-label="Projects"
-        inert={!sidebarOpen}
-      >
-        <div className="garden-sidebar-heading">
-          <span className="eyebrow">Your projects</span>
-          <Button
-            className="garden-sidebar-close"
-            aria-label="Close projects"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <X size={16} />
-          </Button>
-        </div>
-        <Button
-          className="garden-new-work"
-          onClick={() => {
-            setNewWork(true);
-            setSidebarOpen(false);
-          }}
-        >
-          <Plus size={16} />
-          New project
-        </Button>
-        {bootstrap.workspaces.length > 1 && (
-          <select
-            aria-label="Project computer"
-            value={workspaceId}
-            onChange={(event) => {
-              setWorkspaceId(event.target.value);
-              navigate('work');
-            }}
-          >
-            {bootstrap.workspaces.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        )}
-        <nav className="garden-primary-navigation" aria-label="Main navigation">
-          {(
-            [
-              { id: 'work', label: 'Home', icon: Grid2X2 },
-              { id: 'projects', label: 'Projects', icon: FolderOpen },
-              { id: 'library', label: 'Library', icon: FolderOpen },
-              { id: 'automations', label: 'Automations', icon: Clock3 },
-              { id: 'attention', label: 'Needs you', icon: Bell }
-            ] as const
-          ).map((item) => (
-            <button
-              key={item.id}
-              aria-current={navigation.view === item.id && !activeProjectId ? 'page' : undefined}
-              onClick={() => navigate(item.id)}
-            >
-              <item.icon size={16} />
-              <span>{item.label}</span>
-              {item.id === 'attention' && attentionCount > 0 && <small>{attentionCount}</small>}
-            </button>
-          ))}
-        </nav>
-        <span className="eyebrow sidebar-project-label">Your projects</span>
-        <label className="garden-sidebar-search">
-          <Search size={14} />
-          <input
-            aria-label="Find a project"
-            placeholder="Find a project…"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </label>
-        <nav className="garden-project-list" aria-label="Project work">
-          <ProjectCollection
-            initial={bootstrap.projects ?? []}
-            cursor={bootstrap.projectsCursor ?? null}
-            currentProjectId={navigation.projectId ?? task?.projectId ?? null}
-            currentTaskId={task?.id ?? null}
-            workspaceId={workspaceId}
-            search={search}
-            onProject={(id) => navigate('work', null, id)}
-            onTask={openTask}
-          />
-        </nav>
-        <div className="garden-sidebar-bottom">
-          <Button onClick={() => navigate('settings')}>
-            <Settings2 size={15} />
-            Settings
-          </Button>
-          <Button
-            className="garden-sidebar-theme"
-            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          >
-            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}{' '}
-            {theme === 'dark' ? 'Light' : 'Dark'} mode
-          </Button>
-        </div>
-      </aside>
       {offline && (
         <div className="offline-banner" role="status">
           You’re offline. Your work continues on the computer; updates will reconnect here.
         </div>
       )}
-      <main id="main" inert={sidebarOpen} className={`garden-main view-${navigation.view}`}>
+      <main id="main" className={`garden-main view-${baseView}`}>
         <ErrorNotice
           context="Could not refresh the workspace."
           error={error}
           onRetry={requestRefresh}
         />
         <Suspense fallback={<Spinner label="Opening this surface…" />}>
-          {(navigation.view === 'work' || navigation.view === 'projects') &&
+          {baseView === 'work' &&
             (activeProjectId ? (
               <ProjectSpace
                 onComputer={(id, surface, tabId) => {
@@ -761,7 +649,7 @@ function WorkspaceApp() {
               </ProjectSpace>
             ) : navigation.taskId ? (
               <Spinner label="Opening project…" />
-            ) : navigation.view === 'work' ? (
+            ) : (
               <DeskHome
                 projects={(bootstrap.projects ?? []).filter(
                   (project) => project.parentWorkspaceId === workspaceId
@@ -841,15 +729,62 @@ function WorkspaceApp() {
                   )
                 }
               />
-            ) : (
+            ))}
+          {computerOpened && (
+            <section hidden={baseView !== 'computer'}>
+              {navigation.taskId && !computerWorkspace ? (
+                <Spinner />
+              ) : (
+                <Computer
+                  key={computerWorkspace?.id}
+                  workspace={computerWorkspace}
+                  task={task}
+                  initialTool={tool}
+                  visible={baseView === 'computer' && !sheetTitle}
+                  onChange={requestRefresh}
+                />
+              )}
+            </section>
+          )}
+        </Suspense>
+      </main>
+      {sheetTitle && (
+        <Dialog
+          title={sheetTitle}
+          onClose={closeSheet}
+          className={`desk-sheet desk-sheet-${navigation.view}`}
+          dismissOnBackdrop
+        >
+          <Suspense fallback={<Spinner label={`Opening ${sheetTitle.toLowerCase()}…`} />}>
+            {navigation.view === 'projects' && (
               <section className="overview projects-index desk-project-index">
                 <header className="management-heading">
                   <h1>Projects</h1>
+                  <Button onClick={() => navigate('automations')}>
+                    <Clock3 size={15} />
+                    Automations
+                  </Button>
                   <Button className="primary" onClick={() => setNewWork(true)}>
                     <Plus size={16} />
                     New project
                   </Button>
                 </header>
+                {bootstrap.workspaces.length > 1 && (
+                  <select
+                    aria-label="Project computer"
+                    value={workspaceId}
+                    onChange={(event) => {
+                      setWorkspaceId(event.target.value);
+                      navigate('work');
+                    }}
+                  >
+                    {bootstrap.workspaces.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <div className="work-filter">
                   <div className="segmented" aria-label="Filter work">
                     {(['active', 'running', 'complete', 'archived'] as const).map((value) => (
@@ -889,120 +824,105 @@ function WorkspaceApp() {
                   onTask={openTask}
                 />
               </section>
-            ))}
-          {navigation.view === 'automations' && (
-            <section className="management-page">
-              <header className="management-heading">
-                <p className="eyebrow">While you’re away</p>
-                <h1>Automations</h1>
-                <p className="muted">Schedule useful work and return to the results.</p>
-              </header>
-              <div className="management-content">
-                <Automations
-                  workspace={workspace}
-                  onOpenTask={openTask}
-                  onChange={requestRefresh}
-                />
-              </div>
-            </section>
-          )}
-          {navigation.view === 'library' && (
-            <Library
-              workspace={workspace}
-              onOpenTask={openTask}
-              onChange={requestRefresh}
-              projects={bootstrap.projects ?? []}
-              knownTasks={bootstrap.tasks}
-              onTaskDeleted={(id) => {
-                deletedTasks.current.add(id);
-                setBootstrap((current) =>
-                  current
-                    ? { ...current, tasks: current.tasks.filter((task) => task.id !== id) }
-                    : current
-                );
-              }}
-            />
-          )}
-          {computerOpened && (
-            <section hidden={navigation.view !== 'computer'}>
-              {navigation.taskId && !computerWorkspace ? (
-                <Spinner />
-              ) : (
-                <Computer
-                  key={computerWorkspace?.id}
-                  workspace={computerWorkspace}
-                  task={task}
-                  initialTool={tool}
-                  visible={navigation.view === 'computer'}
-                  onChange={requestRefresh}
-                />
-              )}
-            </section>
-          )}
-          {navigation.view === 'settings' && (
-            <Settings
-              workspace={workspace}
-              onChange={requestRefresh}
-              theme={theme}
-              onThemeChange={setTheme}
-              motionPaused={motionPaused}
-              onMotionPausedChange={setMotionPaused}
-              onComputer={() => navigate('computer')}
-            />
-          )}
-          {navigation.view === 'attention' && (
-            <section>
-              <div className="section-intro">
-                <div className="eyebrow">Your attention, well spent</div>
-                <h1>Needs you</h1>
-                <p className="muted">
-                  Questions, requests and interrupted work. Open an item to see what it needs.
-                </p>
-              </div>
-              <DecisionQueue
-                decisions={decisions}
-                tasks={bootstrap.tasks}
-                onResolved={requestRefresh}
+            )}
+            {navigation.view === 'automations' && (
+              <section className="management-page">
+                <header className="management-heading">
+                  <p className="eyebrow">While you’re away</p>
+                  <h1>Automations</h1>
+                  <p className="muted">Schedule useful work and return to the results.</p>
+                </header>
+                <div className="management-content">
+                  <Automations
+                    workspace={workspace}
+                    onOpenTask={openTask}
+                    onChange={requestRefresh}
+                  />
+                </div>
+              </section>
+            )}
+            {navigation.view === 'library' && (
+              <Library
+                workspace={workspace}
                 onOpenTask={openTask}
+                onChange={requestRefresh}
+                projects={bootstrap.projects ?? []}
+                knownTasks={bootstrap.tasks}
+                onTaskDeleted={(id) => {
+                  deletedTasks.current.add(id);
+                  setBootstrap((current) =>
+                    current
+                      ? { ...current, tasks: current.tasks.filter((task) => task.id !== id) }
+                      : current
+                  );
+                }}
               />
-              {attentionTasks
-                .filter((item) => !decisions.some((decision) => decision.taskId === item.id))
-                .sort(
-                  (a, b) =>
-                    Number(Boolean(b.hasOpenQuestion || b.status === 'awaiting_user')) -
-                      Number(Boolean(a.hasOpenQuestion || a.status === 'awaiting_user')) ||
-                    b.updatedAt.localeCompare(a.updatedAt)
-                )
-                .map((item) => (
-                  <button
-                    className="attention-task"
-                    key={item.id}
-                    onClick={() => openTask(item.id)}
-                  >
-                    <span>
-                      <small>
-                        {item.hasOpenQuestion
-                          ? 'Answer a question'
-                          : item.status === 'awaiting_user'
-                            ? 'Review request'
-                            : 'Recover interrupted work'}{' '}
-                        · {shortDate(item.updatedAt)}
-                      </small>
-                      <strong>{item.title}</strong>
-                      <small>{item.activity?.latest ?? taskStatusLabel(item)}</small>
-                    </span>
-                    <ArrowUpRight size={20} />
-                  </button>
-                ))}
-              {attentionCount === 0 && (
-                <Empty title="Nothing needs you right now.">
-                  Your active work can carry on. Come back when there’s something worth deciding.
-                </Empty>
-              )}
-            </section>
-          )}
-        </Suspense>
-      </main>
+            )}
+            {navigation.view === 'settings' && (
+              <Settings
+                workspace={workspace}
+                onChange={requestRefresh}
+                theme={theme}
+                onThemeChange={setTheme}
+                motionPaused={motionPaused}
+                onMotionPausedChange={setMotionPaused}
+                onComputer={() => navigate('computer')}
+              />
+            )}
+            {navigation.view === 'attention' && (
+              <section>
+                <div className="section-intro">
+                  <div className="eyebrow">Your attention, well spent</div>
+                  <h1>Needs you</h1>
+                  <p className="muted">
+                    Questions, requests and interrupted work. Open an item to see what it needs.
+                  </p>
+                </div>
+                <DecisionQueue
+                  decisions={decisions}
+                  tasks={bootstrap.tasks}
+                  onResolved={requestRefresh}
+                  onOpenTask={openTask}
+                />
+                {attentionTasks
+                  .filter((item) => !decisions.some((decision) => decision.taskId === item.id))
+                  .sort(
+                    (a, b) =>
+                      Number(Boolean(b.hasOpenQuestion || b.status === 'awaiting_user')) -
+                        Number(Boolean(a.hasOpenQuestion || a.status === 'awaiting_user')) ||
+                      b.updatedAt.localeCompare(a.updatedAt)
+                  )
+                  .map((item) => (
+                    <button
+                      className="attention-task"
+                      key={item.id}
+                      onClick={() => openTask(item.id)}
+                    >
+                      <span>
+                        <small>
+                          {item.hasOpenQuestion
+                            ? 'Answer a question'
+                            : item.status === 'awaiting_user'
+                              ? 'Review request'
+                              : 'Recover interrupted work'}{' '}
+                          · {shortDate(item.updatedAt)}
+                        </small>
+                        <strong>{item.title}</strong>
+                        <small>{item.activity?.latest ?? taskStatusLabel(item)}</small>
+                      </span>
+                      <ArrowUpRight size={20} />
+                    </button>
+                  ))}
+                {attentionCount === 0 && (
+                  <Empty title="Nothing needs you right now.">
+                    Your active work can carry on. Come back when there’s something worth deciding.
+                  </Empty>
+                )}
+              </section>
+            )}
+          </Suspense>
+        </Dialog>
+      )}
       {newConversation && (
         <Suspense fallback={<Spinner />}>
           <NewConversation
@@ -1035,7 +955,7 @@ function WorkspaceApp() {
               onDraft={saveDraft}
               onSent={(next) => {
                 setNewWork(false);
-                updateTask(next);
+                updateTask(next, true);
                 requestRefresh();
               }}
             />

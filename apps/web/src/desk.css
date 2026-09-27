@@ -10,7 +10,8 @@ body:has(.desk-shell),
 .garden-shell.desk-shell {
   height: min(var(--garden-viewport-height, 100dvh), 100dvh);
   grid-template-columns: 0 minmax(0, 1fr);
-  grid-template-rows: calc(56px + env(safe-area-inset-top, 0px)) minmax(0, 1fr);
+  --desk-bar-height: calc(56px + env(safe-area-inset-top, 0px));
+  grid-template-rows: var(--desk-bar-height) minmax(0, 1fr);
 }
 .desk-shell .garden-masthead {
   gap: 12px;
@@ -31,7 +32,7 @@ body:has(.desk-shell),
   font-size: 12px;
   color: var(--muted);
 }
-.desk-navigation .button[aria-current] {
+.desk-navigation .button[aria-expanded='true'] {
   color: var(--text);
   background: var(--raised);
 }
@@ -41,35 +42,6 @@ body:has(.desk-shell),
 .desk-shell .global-search span,
 .desk-shell .global-search kbd {
   display: none;
-}
-.desk-shell .garden-sidebar {
-  position: absolute;
-  z-index: 42;
-  top: calc(56px + env(safe-area-inset-top, 0px));
-  bottom: 0;
-  left: 0;
-  width: min(288px, 88vw);
-  height: auto;
-  background: var(--chrome);
-  transform: translateX(-100%);
-  visibility: hidden;
-  border-right: 1px solid var(--line);
-  box-shadow: 16px 0 40px var(--shadow);
-}
-.desk-shell.sidebar-open .garden-sidebar {
-  transform: none;
-  visibility: visible;
-}
-.desk-shell .garden-sidebar-scrim {
-  display: block;
-  position: absolute;
-  inset: 56px 0 0;
-  z-index: 41;
-  background: var(--scrim, #0005);
-  border: 0;
-}
-.desk-shell .garden-sidebar-close {
-  display: inline-flex;
 }
 .garden-shell.desk-shell .garden-main {
   padding: 0;
@@ -256,7 +228,7 @@ body:has(.desk-shell),
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: minmax(100px, 0.85fr) minmax(100px, 1.2fr) minmax(70px, 1fr);
+  grid-template-rows: minmax(112px, max-content) minmax(140px, min(300px, 32dvh)) minmax(70px, 1fr);
   gap: clamp(14px, 2.4vh, 26px);
   padding: clamp(18px, 3vh, 32px) clamp(22px, 4vw, 64px);
 }
@@ -271,6 +243,7 @@ body:has(.desk-shell),
 }
 .desk-home-intro {
   align-items: center;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
 }
 .desk-home-intro header {
   min-width: 0;
@@ -287,8 +260,7 @@ body:has(.desk-shell),
 .desk-start-card {
   min-width: 0;
   min-height: 0;
-  max-height: 100%;
-  height: 100%;
+  max-height: min(240px, 30dvh);
   display: flex;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -297,6 +269,7 @@ body:has(.desk-shell),
 }
 .desk-shell .desk-start-card .desk-card-scroll {
   padding: 0;
+  flex: 1 1 auto;
 }
 .desk-start-card .intent-editor {
   border: 0;
@@ -447,7 +420,7 @@ body:has(.desk-shell),
   max-width: 50ch;
 }
 .desk-home.is-empty {
-  grid-template-rows: minmax(150px, 1fr) minmax(130px, 1fr);
+  grid-template-rows: minmax(112px, max-content) minmax(130px, 1fr);
 }
 .desk-home.is-empty .desk-home-bottom {
   display: none;
@@ -1006,10 +979,13 @@ body:has(.desk-shell),
   justify-content: flex-start;
   background: var(--panel);
 }
-.desk-shell .compact-prompt-settings {
+.desk-shell .intent-toolbar .row > .compact-prompt-settings {
   display: flex;
   align-items: center;
-  width: 100%;
+  min-width: 0;
+  flex: 1 1 150px;
+  width: auto;
+  max-width: 250px;
   gap: 7px;
   min-height: 28px;
   padding: 4px 0;
@@ -1030,9 +1006,31 @@ body:has(.desk-shell),
   display: none;
 }
 .desk-shell .intent-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
   margin-top: 0;
   padding-top: 0;
 }
+.desk-shell .intent-toolbar > .row {
+  min-width: 0;
+}
+.desk-shell .intent-toolbar .toolbar-extra {
+  margin-left: 0;
+  order: 1;
+}
+.desk-shell .intent-toolbar .row > .compact-prompt-settings > span:last-child {
+  flex-shrink: 0;
+}
+.desk-shell .desk-start-card .intent-toolbar .row > .button:not(.compact-prompt-settings) {
+  padding: 6px;
+}
+.desk-shell .desk-start-card .intent-toolbar > .primary {
+  padding: 7px 12px;
+  min-height: 34px;
+}
+
 .desk-shell .draft-status {
   font-size: 10px;
   margin-top: 3px;
@@ -1041,6 +1039,9 @@ body:has(.desk-shell),
   display: flex;
   justify-content: flex-end;
   padding-top: 5px;
+}
+.desk-conversation-footer > .button:last-child {
+  margin-left: auto;
 }
 .desk-conversation-footer .button {
   min-height: 25px;
@@ -1145,7 +1146,7 @@ body:has(.desk-shell),
 .desk-project-index .project-summary-card .project-open::after {
   display: none;
 }
-.desk-shell .garden-main > .management-page {
+.desk-shell .management-page {
   flex: 1;
   min-height: 0;
   min-width: 0;
@@ -1184,7 +1185,7 @@ body:has(.desk-shell),
   background: var(--panel);
   border-radius: 13px;
 }
-.desk-shell .view-attention > section,
+.desk-sheet-attention > .dialog-body > section,
 .desk-shell .view-computer > section:not([hidden]) {
   flex: 1;
   min-height: 0;
@@ -1198,21 +1199,39 @@ body:has(.desk-shell),
   border: 1px solid var(--line);
   border-radius: 13px;
 }
-.desk-shell .view-attention .section-intro {
+.desk-sheet-attention .section-intro {
   margin: 0 0 20px;
 }
 
 @media (max-width: 760px), (max-height: 540px) {
   .desk-shell .garden-masthead {
-    padding-inline: 12px;
-    gap: 6px;
+    padding-inline: 10px;
+    gap: 4px;
   }
   .desk-navigation {
+    gap: 0;
+  }
+  .desk-navigation .button span {
     display: none;
   }
+  .desk-shell .garden-masthead .garden-stats-trigger {
+    font-size: 0;
+    gap: 0;
+  }
+  .desk-shell .garden-health,
+  .desk-shell .garden-masthead-end {
+    margin-left: 0;
+  }
+  .desk-shell .garden-health {
+    margin-left: auto;
+  }
+  .desk-shell .garden-masthead .global-search {
+    margin-right: 0;
+  }
   .desk-shell .garden-masthead .button {
-    min-height: 32px;
-    padding: 5px 7px;
+    min-width: 32px;
+    min-height: 36px;
+    padding: 5px 6px;
   }
   .desk-shell .garden-masthead-end {
     gap: 1px;
@@ -1263,6 +1282,7 @@ body:has(.desk-shell),
     grid-row: 2;
     min-height: 0;
     height: 100%;
+    max-height: none;
   }
   .desk-home[data-home-panel='new'] .desk-start-card,
   .desk-home[data-home-panel='continue'] .desk-resume-card,
@@ -1301,7 +1321,7 @@ body:has(.desk-shell),
     margin-top: 20px;
   }
   .desk-shell .desk-project-index,
-  .desk-shell .garden-main > .management-page {
+  .desk-shell .management-page {
     padding: 14px;
   }
   .desk-project-index .management-heading h1,
@@ -1326,7 +1346,7 @@ body:has(.desk-shell),
   .desk-shell .management-content {
     padding: 14px;
   }
-  .desk-shell .view-attention > section,
+  .desk-sheet-attention > .dialog-body > section,
   .desk-shell .view-computer > section:not([hidden]) {
     margin: 12px;
     padding: 14px;
@@ -1397,10 +1417,6 @@ body:has(.desk-shell),
     font-size: 16px;
     max-height: 14dvh;
   }
-  .desk-shell .garden-compose-collapse {
-    top: 0;
-    right: 3px;
-  }
   .desk-shell .garden-task-composer .intent-toolbar .row {
     gap: 2px;
   }
@@ -1423,13 +1439,7 @@ body:has(.desk-shell),
   }
 }
 html[data-workspace-short='true'] .garden-shell.desk-shell {
-  grid-template-rows: 44px minmax(0, 1fr);
-}
-html[data-workspace-short='true'] .desk-shell .garden-sidebar {
-  top: 44px;
-}
-html[data-workspace-short='true'] .desk-shell .garden-sidebar-scrim {
-  top: 44px;
+  --desk-bar-height: 44px;
 }
 html[data-workspace-short='true'] .garden-shell.desk-shell .desk-project .project-space-header {
   padding-top: 5px;
@@ -1474,4 +1484,133 @@ html[data-workspace-short='true'] .desk-shell .management-heading p {
 .desk-shell .dialog {
   max-height: calc(var(--garden-viewport-height, 100dvh) - 24px);
   inset-block: 0 calc(100dvh - var(--garden-viewport-height, 100dvh));
+}
+
+/* Navigation floats over the current work without remounting its preview or draft. */
+.desk-shell .desk-sheet[open] {
+  display: flex;
+  flex-direction: column;
+  inset: calc(var(--desk-bar-height) + 14px) 0 auto auto;
+  margin: 0 18px 0 0;
+  width: min(780px, calc(100vw - 36px));
+  height: min(720px, calc(var(--garden-viewport-height, 100dvh) - var(--desk-bar-height) - 32px));
+  max-height: calc(var(--garden-viewport-height, 100dvh) - var(--desk-bar-height) - 32px);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 18px 65px #0005;
+}
+.desk-shell .desk-sheet-projects[open] {
+  width: min(600px, calc(100vw - 36px));
+}
+.desk-shell .desk-sheet::backdrop {
+  background: #06110950;
+  backdrop-filter: blur(3px);
+}
+.desk-sheet > .dialog-heading {
+  flex-shrink: 0;
+  padding: 12px 18px;
+  position: static;
+}
+.desk-sheet > .dialog-heading h2 {
+  font-size: 23px;
+}
+.desk-sheet > .dialog-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+.desk-shell .desk-sheet .management-page,
+.desk-shell .desk-sheet .desk-project-index {
+  padding: 16px 18px;
+}
+.desk-sheet .management-heading h1,
+.desk-sheet .management-heading .eyebrow,
+.desk-sheet .section-intro h1,
+.desk-sheet .section-intro .eyebrow {
+  display: none;
+}
+.desk-sheet .management-heading {
+  margin-bottom: 12px;
+}
+.desk-sheet .management-heading p {
+  margin: 0;
+}
+.desk-sheet .desk-project-index .management-heading {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.desk-sheet .work-filter {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+.desk-sheet .work-filter .inline-search {
+  width: 100%;
+}
+.desk-sheet .inline-search input {
+  width: 100%;
+  min-width: 0;
+}
+.desk-sheet .project-collection > .button {
+  flex: 0 0 auto;
+  margin-top: 8px;
+}
+.desk-sheet .project-collection {
+  background: transparent;
+  padding: 0;
+  border: 0;
+}
+.desk-sheet .project-summary-card {
+  display: block;
+}
+.desk-sheet .project-card-meta {
+  margin: 8px 0 0;
+}
+.desk-sheet .management-content {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+}
+.desk-sheet .management-tabs {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+}
+.desk-sheet .management-tabs button {
+  flex-shrink: 0;
+}
+.desk-shell:has(> .offline-banner) {
+  grid-template-rows: var(--desk-bar-height) auto minmax(0, 1fr);
+}
+.desk-shell > .offline-banner {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  position: static;
+  padding: 6px 12px;
+}
+.desk-shell:has(> .offline-banner) > .garden-main {
+  grid-row: 3;
+}
+@media (max-width: 760px), (max-height: 540px) {
+  .desk-shell .desk-sheet[open] {
+    width: calc(100vw - 16px);
+    margin-right: 8px;
+    inset-block-start: 8px;
+    height: calc(var(--garden-viewport-height, 100dvh) - 16px);
+    max-height: calc(var(--garden-viewport-height, 100dvh) - 16px);
+    border-radius: 13px;
+  }
+  .desk-sheet > .dialog-heading {
+    padding: 9px 14px;
+  }
+  .desk-sheet > .dialog-heading h2 {
+    font-size: 21px;
+  }
+  .desk-shell .desk-sheet .management-page,
+  .desk-shell .desk-sheet .desk-project-index {
+    padding: 12px 14px;
+  }
 }

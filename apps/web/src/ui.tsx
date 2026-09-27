@@ -83,12 +83,16 @@ export function Dialog({
   title,
   children,
   onClose,
-  wide = false
+  wide = false,
+  className = '',
+  dismissOnBackdrop = false
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
+  className?: string;
+  dismissOnBackdrop?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -101,11 +105,29 @@ export function Dialog({
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
     };
   }, []);
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog || !dismissOnBackdrop) return;
+    // The native backdrop has no DOM element; Escape and the close button share this action.
+    const dismiss = (event: MouseEvent) => {
+      if (event.target !== dialog) return;
+      const bounds = dialog.getBoundingClientRect();
+      if (
+        event.clientX < bounds.left ||
+        event.clientX > bounds.right ||
+        event.clientY < bounds.top ||
+        event.clientY > bounds.bottom
+      )
+        onClose();
+    };
+    dialog.addEventListener('click', dismiss);
+    return () => dialog.removeEventListener('click', dismiss);
+  }, [dismissOnBackdrop, onClose]);
   return (
     <dialog
       ref={ref}
       aria-labelledby={titleId}
-      className={`dialog ${wide ? 'wide' : ''}`}
+      className={`dialog ${wide ? 'wide' : ''} ${className}`}
       onCancel={(event) => {
         event.preventDefault();
         event.stopPropagation();

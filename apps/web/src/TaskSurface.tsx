@@ -1039,17 +1039,6 @@ export default function TaskSurface({
           </Button>
         )}
         <div hidden={Boolean(attentionPanel) || (!task.parentMissionId && !showComposer)}>
-          {!attentionPanel && !task.parentMissionId && isFinished(task) && showComposer && (
-            <Button
-              className="garden-compose-collapse"
-              aria-label="Collapse composer"
-              onClick={() => setComposerExpanded(false)}
-              title="Keep draft and collapse"
-            >
-              <X size={14} />
-              <span className="sr-only">Keep draft and collapse</span>
-            </Button>
-          )}
           {task.parentMissionId ? (
             <div className="selected-context garden-mission-context">
               <p>This specialist uses the model and budget assigned by its parent work.</p>
@@ -1110,6 +1099,18 @@ export default function TaskSurface({
           )}
         </div>
         <div className="desk-conversation-footer">
+          {!attentionPanel && !task.parentMissionId && isFinished(task) && showComposer && (
+            <Button
+              className="quiet-button"
+              aria-label="Collapse composer"
+              onClick={() => setComposerExpanded(false)}
+              title="Keep draft and collapse"
+            >
+              <X size={14} />
+              <span>Hide prompt</span>
+            </Button>
+          )}
+
           <Button className="quiet-button" onClick={() => setPanel('conversation')}>
             <MessageSquare size={14} />
             Open conversation

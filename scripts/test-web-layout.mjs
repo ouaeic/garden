@@ -251,12 +251,17 @@ async function revealPromptSettings(surface) {
   if ((await settings.getAttribute('aria-expanded')) === 'false') await settings.click();
 }
 async function openNewProject(page) {
-  await page.getByRole('button', { name: 'Show projects', exact: true }).click();
+  const trigger = page
+    .getByRole('navigation', { name: 'Workspace navigation' })
+    .getByRole('button', { name: 'Projects', exact: true });
+  await trigger.waitFor();
+  if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
   await page
-    .locator('#garden-sidebar')
+    .getByRole('dialog', { name: 'Projects', exact: true })
     .getByRole('button', { name: 'New project', exact: true })
     .click();
 }
+
 const errors = [];
 let draft;
 const modelDrafts = new Map();
@@ -689,6 +694,18 @@ try {
     if (path === '/v1/tasks' && route.request().method() === 'GET')
       return json({ tasks: [task], nextCursor: null });
     if (path === '/v1/shares' || path === '/v1/schedules') return json([]);
+    if (
+      [
+        `/v1/workspaces/${workspace.id}/memories`,
+        `/v1/workspaces/${workspace.id}/memory-items`,
+        `/v1/workspaces/${workspace.id}/skills`
+      ].includes(path)
+    )
+      return json([]);
+    if (path === `/v1/workspaces/${workspace.id}/memory-review`)
+      return json({ procedures: [], disputed: [], proposals: [] });
+    if (path === '/v1/account/memory-block')
+      return json({ text: '', bytes: 0, limit: 4096, version: 1, updatedAt: null });
     if (path === '/v1/bootstrap')
       return json({ ...bootstrap, models: modelCatalog, drafts: [...modelDrafts.values()] });
     if (path.endsWith('/updates') && path.startsWith('/v1/projects/'))
@@ -1528,62 +1545,21 @@ try {
       );
       await page.screenshot({ path: resolve(report, `task-${width}.png`) });
     }
-    await page.getByRole('button', { name: 'Show projects', exact: true }).click();
-    const projectLink = page
-      .getByRole('navigation', { name: 'Project work', exact: true })
-      .getByRole('button')
-      .filter({ hasText: task.title });
-    assert.equal(await projectLink.count(), 1);
-    const titleBox = projectLink.locator('.garden-project-title');
-    assert(
-      await titleBox.evaluate(
-        (element) => element.clientHeight <= parseFloat(getComputedStyle(element).lineHeight) + 1
-      ),
-      'Project titles must occupy one line'
-    );
-    await page.emulateMedia({ reducedMotion: 'no-preference' });
-    await projectLink.hover();
-    await page.waitForFunction(() => {
-      const title = document.querySelector('.garden-project-title[data-overflow="true"] strong');
-      return (
-        title &&
-        getComputedStyle(title).transform !== 'none' &&
-        getComputedStyle(title).transform !== 'matrix(1, 0, 0, 1, 0, 0)'
-      );
-    });
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    assert.equal(
-      await titleBox
-        .locator('strong')
-        .evaluate((element) => getComputedStyle(element).animationName),
-      'none'
-    );
-    assert(
-      (await projectLink.getAttribute('aria-label')).includes(task.title),
-      'The full title must remain available without animation'
-    );
-    await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page
-      .getByRole('button', { name: 'Close projects', exact: true })
-      .filter({ has: page.locator('svg') })
-      .focus();
-    await page.waitForFunction(() =>
-      document.activeElement.classList.contains('garden-sidebar-close')
-    );
+      .getByRole('navigation', { name: 'Workspace navigation' })
+      .getByRole('button', { name: 'Projects', exact: true })
+      .click();
+    const projectPanel = page.getByRole('dialog', { name: 'Projects', exact: true });
+    await projectPanel.waitFor();
     for (let i = 0; i < 12; i++) {
       await page.keyboard.press('Tab');
       assert(
-        await page.evaluate(() => Boolean(document.activeElement.closest('#garden-sidebar'))),
-        'Phone project navigation must contain keyboard focus'
+        await page.evaluate(() => Boolean(document.activeElement.closest('.desk-sheet-projects'))),
+        'Project navigation must contain keyboard focus'
       );
     }
     await page.keyboard.press('Escape');
-    assert.equal(
-      await page
-        .getByRole('button', { name: 'Show projects', exact: true })
-        .getAttribute('aria-expanded'),
-      'false'
-    );
+    await projectPanel.waitFor({ state: 'detached' });
     await page.setViewportSize({ width: 1440, height: 1000 });
     assert.equal(
       await page.locator('.garden-status-footer').count(),
@@ -1592,8 +1568,8 @@ try {
     );
     assert.equal(
       await page.getByRole('button', { name: /^Switch to .* mode$/, includeHidden: true }).count(),
-      1,
-      'Appearance has one control'
+      0,
+      'Appearance is available in Settings without duplicate navigation controls'
     );
     const alignment = await page.evaluate(() => {
       const header = document.querySelector('.garden-masthead').getBoundingClientRect();
@@ -1790,11 +1766,19 @@ try {
     await isolatedFrame.getByRole('button', { name: '0', exact: true }).click();
     assert.equal(await isolatedFrame.getByRole('button').textContent(), '1');
     await page.getByRole('button', { name: 'Close embedded preview' }).click();
-    await page.getByRole('button', { name: 'Show projects', exact: true }).click();
-    await page.getByRole('button', { name: /Switch to light/ }).click();
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.getByRole('combobox', { name: 'Theme', exact: true }).selectOption('light');
+    await page.getByRole('button', { name: 'Close Settings', exact: true }).click();
+    await page
+      .getByRole('dialog', { name: 'Settings', exact: true })
+      .waitFor({ state: 'detached' });
     await page.screenshot({ path: resolve(report, 'task-light.png') });
-    await page.getByRole('button', { name: /Switch to dark/ }).click();
-    await page.getByRole('button', { name: 'Hide projects', exact: true }).click();
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.getByRole('combobox', { name: 'Theme', exact: true }).selectOption('dark');
+    await page.getByRole('button', { name: 'Close Settings', exact: true }).click();
+    await page
+      .getByRole('dialog', { name: 'Settings', exact: true })
+      .waitFor({ state: 'detached' });
     recordedReply = 'harbor-cobalt-46';
     await page.reload();
     await page
@@ -2029,10 +2013,20 @@ try {
     await page.getByRole('button', { name: 'Open work', exact: true }).click();
     await page.getByRole('button', { name: 'Return to parent work', exact: true }).waitFor();
     assert.equal(new URL(page.url()).searchParams.get('task'), childTask.id);
+    await page
+      .getByRole('navigation', { name: 'Workspace navigation' })
+      .getByRole('button', { name: 'Projects', exact: true })
+      .click();
     assert(
-      !(await page.locator('#garden-sidebar').textContent()).includes(childWorkspace.name),
+      !(await page.getByRole('dialog', { name: 'Projects', exact: true }).textContent()).includes(
+        childWorkspace.name
+      ),
       'Internal specialist workspaces must not become projects'
     );
+    await page.getByRole('button', { name: 'Close Projects', exact: true }).click();
+    await page
+      .getByRole('dialog', { name: 'Projects', exact: true })
+      .waitFor({ state: 'detached' });
     await page
       .getByRole('navigation', { name: 'Project views' })
       .getByRole('button', { name: 'Tools', exact: true })
@@ -2821,9 +2815,12 @@ try {
     );
 
     await modelsPage.getByRole('button', { name: 'garden · All work', exact: true }).waitFor();
-    if (!(await modelsPage.getByRole('button', { name: 'Settings', exact: true }).isVisible()))
-      await modelsPage.getByRole('button', { name: 'Show projects', exact: true }).click();
-    await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
+    if (
+      (await modelsPage
+        .getByRole('button', { name: 'Settings', exact: true })
+        .getAttribute('aria-expanded')) !== 'true'
+    )
+      await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
     await modelsPage
       .getByRole('navigation', { name: 'Settings sections' })
       .getByRole('button', { name: 'Models', exact: true })
@@ -2928,9 +2925,12 @@ try {
     assert.equal(await modelsPage.getByRole('button', { name: /^Decisions:/ }).count(), 0);
     await modelsPage.reload();
     await modelsPage.getByRole('button', { name: 'garden · All work', exact: true }).waitFor();
-    if (!(await modelsPage.getByRole('button', { name: 'Settings', exact: true }).isVisible()))
-      await modelsPage.getByRole('button', { name: 'Show projects', exact: true }).click();
-    await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
+    if (
+      (await modelsPage
+        .getByRole('button', { name: 'Settings', exact: true })
+        .getAttribute('aria-expanded')) !== 'true'
+    )
+      await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
     await modelsPage
       .getByRole('navigation', { name: 'Settings sections' })
       .getByRole('button', { name: 'Models', exact: true })
@@ -2952,9 +2952,12 @@ try {
     assert.equal(generationChoices.image.modelId, 'fixture/image-studio');
     await modelsPage.reload();
     await modelsPage.getByRole('button', { name: 'garden · All work', exact: true }).waitFor();
-    if (!(await modelsPage.getByRole('button', { name: 'Settings', exact: true }).isVisible()))
-      await modelsPage.getByRole('button', { name: 'Show projects', exact: true }).click();
-    await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
+    if (
+      (await modelsPage
+        .getByRole('button', { name: 'Settings', exact: true })
+        .getAttribute('aria-expanded')) !== 'true'
+    )
+      await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
     await modelsPage
       .getByRole('navigation', { name: 'Settings sections' })
       .getByRole('button', { name: 'Models', exact: true })
@@ -3042,9 +3045,12 @@ try {
     assert.notEqual(namedConnections[0].connectionId, namedConnections[1].connectionId);
     await modelsPage.reload();
     await modelsPage.getByRole('button', { name: 'garden · All work', exact: true }).waitFor();
-    if (!(await modelsPage.getByRole('button', { name: 'Settings', exact: true }).isVisible()))
-      await modelsPage.getByRole('button', { name: 'Show projects', exact: true }).click();
-    await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
+    if (
+      (await modelsPage
+        .getByRole('button', { name: 'Settings', exact: true })
+        .getAttribute('aria-expanded')) !== 'true'
+    )
+      await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
     await modelsPage
       .getByRole('navigation', { name: 'Settings sections' })
       .getByRole('button', { name: 'Models', exact: true })
@@ -3062,9 +3068,12 @@ try {
     assert.equal(defaultChoices.decisions.modelId, 'openrouter/typesafe/jev-test');
     await modelsPage.reload();
     await modelsPage.getByRole('button', { name: 'garden · All work', exact: true }).waitFor();
-    if (!(await modelsPage.getByRole('button', { name: 'Settings', exact: true }).isVisible()))
-      await modelsPage.getByRole('button', { name: 'Show projects', exact: true }).click();
-    await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
+    if (
+      (await modelsPage
+        .getByRole('button', { name: 'Settings', exact: true })
+        .getAttribute('aria-expanded')) !== 'true'
+    )
+      await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
     await modelsPage
       .getByRole('navigation', { name: 'Settings sections' })
       .getByRole('button', { name: 'Models', exact: true })

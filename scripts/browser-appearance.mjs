@@ -140,8 +140,6 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     return animations.filter((animation) => animation.playState === 'running').length === 0;
   });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  if (!(await page.getByRole('button', { name: 'Settings', exact: true }).isVisible()))
-    await page.getByRole('button', { name: 'Show projects', exact: true }).click();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const motion = page.getByRole('checkbox', { name: 'Background motion', exact: true });
   assert.equal(await motion.isChecked(), true);
@@ -160,8 +158,6 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     }),
     true
   );
-  if (!(await page.getByRole('button', { name: 'Settings', exact: true }).isVisible()))
-    await page.getByRole('button', { name: 'Show projects', exact: true }).click();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await motion.check();
   for (const theme of ['dark', 'light']) {

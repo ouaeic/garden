@@ -85,6 +85,43 @@ export async function checkDesk({
       await page.goto(origin);
       await page.locator('.desk-home').waitFor();
       await fit();
+      const headerButtons = await page.locator('.garden-masthead button').evaluateAll((elements) =>
+        elements
+          .filter((element) => element.getClientRects().length)
+          .map((element) => {
+            const r = element.getBoundingClientRect();
+            return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+          })
+      );
+      assert(headerButtons.length > 0);
+      for (const bounds of headerButtons)
+        assert(
+          bounds.left >= 0 && bounds.right <= width,
+          'Every header control must fit on screen'
+        );
+      for (let i = 0; i < headerButtons.length; i++)
+        for (let j = i + 1; j < headerButtons.length; j++) {
+          const a = headerButtons[i],
+            b = headerButtons[j];
+          assert(
+            a.right <= b.left + 1 ||
+              b.right <= a.left + 1 ||
+              a.bottom <= b.top + 1 ||
+              b.bottom <= a.top + 1,
+            'Header buttons must not overlap'
+          );
+        }
+      if (width > 760 && height > 540) {
+        const prompt = await page.locator('.desk-start-card').boundingBox();
+        const editor = await page.locator('.desk-start-card .intent-editor').boundingBox();
+        const intro = await page.locator('.desk-home-intro > header').boundingBox();
+        assert(prompt && editor && intro);
+        assert(prompt.height <= editor.height + 4, 'The prompt card must fit its contents');
+        assert(
+          Math.abs(prompt.y + prompt.height / 2 - intro.y - intro.height / 2) < 2,
+          'The greeting and prompt must align'
+        );
+      }
       if (width <= 760 || height <= 540) {
         const cards = page.getByRole('navigation', { name: 'Home cards' });
         await cards.getByRole('button', { name: 'New project', exact: true }).click();
@@ -149,6 +186,44 @@ export async function checkDesk({
       const draft = page.locator('.garden-task-composer textarea');
       await draft.fill('Keep this direction while I inspect my work.');
       await inWindow(draft);
+      const inputBox = await draft.boundingBox();
+      const controlsBox = await page.locator('.garden-task-composer .intent-toolbar').boundingBox();
+      const collapseBox = await page
+        .getByRole('button', { name: 'Collapse composer', exact: true })
+        .boundingBox();
+      assert(inputBox && controlsBox && collapseBox);
+      assert(
+        inputBox.y + inputBox.height <= controlsBox.y + 1,
+        'Prompt controls must be outside the text area'
+      );
+      assert(inputBox.y + inputBox.height <= collapseBox.y, 'Collapse must not cover typing');
+      const workUrl = page.url();
+      const libraryTrigger = page
+        .getByRole('navigation', { name: 'Workspace navigation' })
+        .getByRole('button', { name: 'Library', exact: true });
+      await libraryTrigger.click();
+      const library = page.getByRole('dialog', { name: 'Library', exact: true });
+      await library.waitFor();
+      await inWindow(library);
+      await library.getByRole('button', { name: 'Memory', exact: true }).click();
+      await library.getByRole('button', { name: 'Skills', exact: true }).click();
+      await library.getByRole('button', { name: 'Close Library', exact: true }).click();
+      await library.waitFor({ state: 'detached' });
+      assert.equal(page.url(), workUrl, 'Closing a panel must restore the exact project location');
+      assert.equal(await draft.inputValue(), 'Keep this direction while I inspect my work.');
+      await page
+        .frameLocator('.garden-preview-frame')
+        .getByRole('button', { name: '1', exact: true })
+        .waitFor();
+      await libraryTrigger.click();
+      await library.waitFor();
+      await page.goBack();
+      await library.waitFor({ state: 'detached' });
+      await page.goForward();
+      await library.waitFor();
+      await page.keyboard.press('Escape');
+      await library.waitFor({ state: 'detached' });
+
       if (width === 390) {
         await page.evaluate(() => {
           Object.defineProperty(window.visualViewport, 'height', {
@@ -206,18 +281,21 @@ export async function checkDesk({
     }
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(origin);
-    await page.getByRole('button', { name: 'Show projects', exact: true }).click();
     await page
-      .getByRole('navigation', { name: 'Main navigation', exact: true })
+      .getByRole('navigation', { name: 'Workspace navigation', exact: true })
       .getByRole('button', { name: 'Projects', exact: true })
       .click();
-    assert.equal(await page.locator('.garden-main').getAttribute('inert'), null);
+    await page.getByRole('dialog', { name: 'Projects', exact: true }).waitFor();
+    assert.equal(await page.locator('.garden-sidebar').count(), 0);
     await page.locator('.desk-project-index').waitFor();
     await fit();
+    await page.screenshot({ path: resolve(report, 'desk-projects-panel.png') });
     for (const view of ['settings', 'library', 'automations', 'attention', 'computer']) {
       await page.goto(`${origin}/?view=${view}`);
       await page
-        .locator('.garden-main > .management-page, .garden-main > section:not([hidden])')
+        .locator(
+          '.desk-sheet .management-page, .desk-sheet-attention .section-intro, .garden-main > section:not([hidden])'
+        )
         .first()
         .waitFor();
       await fit();

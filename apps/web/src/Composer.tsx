@@ -195,6 +195,19 @@ export default function Composer(props: ComposerProps) {
               {recording ? <Square size={16} /> : <Mic size={18} />}
             </Button>
           )}
+          <Button
+            className="compact-prompt-settings"
+            aria-label="Prompt settings"
+            aria-expanded={promptSettingsOpen}
+            aria-controls={promptSettingsId}
+            onClick={() => setPromptSettingsOpen((open) => !open)}
+          >
+            <SlidersHorizontal size={15} />
+            <span>
+              {selectedModel?.displayName ?? projectModel?.displayName ?? 'Default model'}
+            </span>
+            <span>{securityMode[0]!.toUpperCase() + securityMode.slice(1)}</span>
+          </Button>
         </div>
         <Button
           type="submit"
@@ -255,17 +268,6 @@ export default function Composer(props: ComposerProps) {
           </Button>
         </div>
       )}
-      <Button
-        className="compact-prompt-settings"
-        aria-label="Prompt settings"
-        aria-expanded={promptSettingsOpen}
-        aria-controls={promptSettingsId}
-        onClick={() => setPromptSettingsOpen((open) => !open)}
-      >
-        <SlidersHorizontal size={15} />
-        <span>{selectedModel?.displayName ?? projectModel?.displayName ?? 'Default model'}</span>
-        <span>{securityMode[0]!.toUpperCase() + securityMode.slice(1)}</span>
-      </Button>
       <div
         id={promptSettingsId}
         className={`prompt-settings-content${promptSettingsOpen ? ' is-open' : ''}`}
