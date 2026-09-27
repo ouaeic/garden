@@ -72,8 +72,10 @@ export async function checkDesk({
       `Control must be in the viewport: ${JSON.stringify(box)}`
     );
   };
-  const checkComposer = async (editor) => {
-    const saved = editor.getByRole('status', { name: 'Draft synced', exact: true });
+  const checkComposer = async (editor, settled = true) => {
+    const saved = settled
+      ? editor.getByRole('status', { name: 'Draft synced', exact: true })
+      : editor.locator('.draft-status');
     await saved.waitFor();
     const saveBox = await saved.boundingBox();
     const send = editor.locator('button[type="submit"]');
@@ -355,6 +357,48 @@ export async function checkDesk({
         .first()
         .waitFor();
       await fit();
+    }
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.goto(`${origin}/?task=${task.id}`);
+    await page.getByRole('button', { name: 'Continue this conversation…', exact: true }).click();
+    const sendingEditor = page.locator('.garden-task-composer .intent-editor');
+    await sendingEditor
+      .locator('textarea')
+      .fill('Keep this draft if the send needs to be retried.');
+    await checkComposer(sendingEditor);
+    let releaseSend;
+    const heldSend = new Promise((resolve) => {
+      releaseSend = resolve;
+    });
+    const routePath = `**/v1/tasks/${task.id}/messages`;
+    const hold = async (route) => {
+      await heldSend;
+      await route.fulfill({
+        status: 503,
+        json: { error: { message: 'Send temporarily unavailable' } }
+      });
+    };
+    await page.route(routePath, hold);
+    try {
+      await sendingEditor.getByRole('button', { name: 'Send', exact: true }).click();
+      const sending = sendingEditor.getByRole('button', { name: 'Sending…', exact: true });
+      await sending.waitFor();
+      assert(await sending.isDisabled());
+      await checkComposer(sendingEditor, false);
+      await page.screenshot({ path: resolve(report, 'desk-sending-phone.png') });
+      releaseSend();
+      const retry = sendingEditor.getByRole('button', { name: 'Retry send', exact: true });
+      await retry.waitFor();
+      await retry.scrollIntoViewIfNeeded();
+      await checkComposer(sendingEditor, false);
+      assert.equal(
+        await sendingEditor.locator('textarea').inputValue(),
+        'Keep this draft if the send needs to be retried.'
+      );
+      await page.screenshot({ path: resolve(report, 'desk-retry-phone.png') });
+    } finally {
+      releaseSend();
+      await page.unroute(routePath, hold);
     }
     assert.deepEqual(failures, []);
     console.log(

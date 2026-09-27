@@ -268,16 +268,20 @@ export default function Composer(props: ComposerProps) {
             }
             busy={busy}
           >
-            {pendingSend
-              ? 'Retry send'
-              : task
-                ? isWorking(task)
-                  ? interrupt
-                    ? 'Update run'
-                    : 'Queue next'
-                  : 'Send'
-                : 'Start'}
-            <ArrowUpRight size={18} />
+            {busy
+              ? pendingTask
+                ? 'Opening…'
+                : 'Sending…'
+              : pendingSend
+                ? 'Retry send'
+                : task
+                  ? isWorking(task)
+                    ? interrupt
+                      ? 'Update run'
+                      : 'Queue next'
+                    : 'Send'
+                  : 'Start'}
+            {!busy && <ArrowUpRight size={18} />}
           </Button>
         </div>
       </div>

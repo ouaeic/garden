@@ -23,6 +23,10 @@
   flex-shrink: 0;
   gap: 2px;
 }
+.composer-tools {
+  min-width: 0;
+  flex-wrap: wrap;
+}
 .composer-submit {
   gap: 10px;
   margin-left: auto;
