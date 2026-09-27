@@ -151,6 +151,7 @@ export class AccountApi {
       allowedHostSuffixes: [url.hostname],
       timeoutMs: 20_000,
       ...(this.signal ? { signal: this.signal } : {}),
+      maxRequestBytes: 40_000_000,
       maxResponseBytes: maxBytes
     });
     this.metrics.requestBytes += body?.length ?? 0;
@@ -204,6 +205,72 @@ export class AccountApi {
     options?: Parameters<AccountApi['request']>[1]
   ): Promise<Record<string, unknown>> {
     return accountResponseObject(await this.request(url, options));
+  }
+
+  /** Upload capabilities come only from Graph and never receive the account bearer token. */
+  async uploadMailRange(value: string, bytes: Buffer, offset: number, total: number) {
+    let url: URL;
+    try {
+      url = new URL(value);
+      if (
+        this.secret.provider !== 'microsoft' ||
+        url.origin !== 'https://outlook.office.com' ||
+        url.username ||
+        url.password ||
+        url.hash ||
+        !/^\/api\/(?:v1\.0|v2\.0|gv1\.0)\/users\('[^/]+?'\)\/messages\('[^/]+?'\)\/attachmentsessions\('[^/]+?'\)$/i.test(
+          url.pathname
+        ) ||
+        !url.searchParams.get('authtoken') ||
+        !Number.isSafeInteger(offset) ||
+        offset < 0 ||
+        !Number.isSafeInteger(total) ||
+        total < 1 ||
+        total > 10_000_000 ||
+        bytes.length < 1 ||
+        bytes.length > 3 * 1024 * 1024 ||
+        offset + bytes.length > total
+      )
+        throw new Error('invalid upload');
+    } catch {
+      throw new AthanorError(
+        'connector_upload_invalid',
+        'The mail upload capability or byte range is invalid.'
+      );
+    }
+    this.signal?.throwIfAborted();
+    let response: ConnectorRequestResult;
+    try {
+      response = await this.transport({
+        url,
+        method: 'PUT',
+        body: bytes,
+        headers: {
+          'content-type': 'application/octet-stream',
+          'content-range': `bytes ${offset}-${offset + bytes.length - 1}/${total}`
+        },
+        allowedHostSuffixes: ['outlook.office.com'],
+        maxRequestBytes: 3 * 1024 * 1024,
+        maxResponseBytes: 100_000,
+        timeoutMs: 60_000,
+        ...(this.signal ? { signal: this.signal } : {})
+      });
+    } catch {
+      throw new AthanorError(
+        'connector_upload_interrupted',
+        'The mail attachment upload was interrupted.'
+      );
+    }
+    this.metrics.requestBytes += bytes.length;
+    this.metrics.responseBytes += response.body.length;
+    this.metrics.durationMs += response.durationMs;
+    this.metrics.statusCode = response.status;
+    if (![200, 201].includes(response.status) || response.body.length > 100_000)
+      throw new AthanorError(
+        'connector_upload_failed',
+        'The mail attachment upload needs reconciliation.'
+      );
+    return response;
   }
 
   pageUrl(collection: URL, cursor?: string): URL {

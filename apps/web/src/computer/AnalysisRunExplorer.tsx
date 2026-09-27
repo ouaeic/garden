@@ -115,7 +115,7 @@ export default function AnalysisRunExplorer({
             <p className="muted">
               The complete file is checked against the recorded SHA-256, run identity and output.
               Opening never runs commands. Each link is checked separately; this does not establish
-              scientific validity or verify the whole chain.
+              result correctness or verify the whole chain.
             </p>
           </details>
         </section>

@@ -145,6 +145,7 @@ test(
             ],
             reason: null
           });
+        if (url.pathname === `/v1/tasks/${taskId}/voice-discussion`) return json(null);
         if (url.pathname === prefix) {
           if (req.method === 'GET') return json(starts ? [session] : []);
           starts++;

@@ -133,6 +133,8 @@ export async function executeConnectorTool(
             const nativeWrite =
               isAccountConnectorKind(connector.kind) &&
               [
+                'account_mail_draft',
+                'account_mail_send',
                 'account_calendar_create',
                 'account_calendar_update',
                 'account_calendar_delete'

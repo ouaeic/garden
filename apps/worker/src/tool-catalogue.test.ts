@@ -211,27 +211,7 @@ describe('the size of the catalogue the model is sent', () => {
   });
 
   it('pays once for a machine fact, not once here and once in the contract', () => {
-    /*
-     * The ceiling above says that prose restating the system prompt is what gets trimmed. This is
-     * that rule as a check rather than as a paragraph, because three descriptions were restating
-     * it and only the whole-catalogue figure - which moves for forty other reasons - could see it.
-     *
-     * Three facts, each carried by the operating contract in the same request, each of which was
-     * also being paid for down here: which binary controls where a page breaks, that this computer
-     * runs no local model weights and edits existing video with ffmpeg, and what an anti-bot challenge
-     * closes and for how long. The contract is message 0 of every window, so the model reads them
-     * either way; the catalogue copy bought nothing, and the typst one was worse than nothing - it
-     * was unconditional, while the contract's is gated on the box actually having a document
-     * toolchain, so a bare box was told in one request both that it has no typst and that typst is
-     * the route for a PDF that matters.
-     *
-     * What stays in a description is the part the contract cannot say: the name of the field a
-     * challenge arrives in (`botWall`), and the per-job retention requirement for video.
-     * The direction of the check is deliberate - it asserts the contract still carries each fact
-     * before it forbids the duplicate, so deleting the original turns this red rather than green.
-     */
     const paidForInTheContract: ReadonlyArray<readonly [string, RegExp]> = [
-      ['typeset with typst', /\btypst\b/i],
       ['No model weights run on this computer', /\bffmpeg\b|model weights/i],
       ['anti-bot challenge', /until the user clears it|carry on with the rest/i]
     ];

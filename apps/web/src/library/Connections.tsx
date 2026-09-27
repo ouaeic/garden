@@ -530,6 +530,12 @@ export function ConnectionsLibrary({ onChange }: { onChange: () => void }) {
                   </label>
                 ))}
               </div>
+              {nativeAccount && (
+                <p className="muted">
+                  Creating drafts and sending need mailbox access to recover interrupted requests.
+                  Microsoft sending also needs draft access.
+                </p>
+              )}
             </fieldset>
             {definition && (
               <details>

@@ -62,6 +62,45 @@ const unavailable = () =>
 const active = ['preparing', 'connecting', 'listening', 'responding', 'stopping'];
 export class VoiceStore {
   constructor(readonly database: Database) {}
+  async discussion(userId: string, taskId: string) {
+    const row = (
+      await this.database.query(
+        `SELECT n.* FROM voice_discussion_notes n JOIN tasks t ON t.id=n.task_id
+       WHERE n.user_id=$1 AND n.task_id=$2 AND t.user_id=$1 AND t.workspace_id=n.workspace_id`,
+        [userId, taskId]
+      )
+    ).rows[0];
+    return row
+      ? {
+          ciphertext: json<EncryptedEnvelope>(row.ciphertext),
+          updatedAt: iso(row.updated_at),
+          workspaceId: String(row.workspace_id)
+        }
+      : null;
+  }
+  async saveDiscussion(
+    userId: string,
+    sessionId: string,
+    controllerId: string,
+    ciphertext: EncryptedEnvelope
+  ) {
+    const result = await this.database.query(
+      `INSERT INTO voice_discussion_notes(task_id,user_id,workspace_id,session_id,ciphertext)
+       SELECT s.task_id,s.user_id,s.workspace_id,s.id,$4 FROM voice_sessions s JOIN tasks t ON t.id=s.task_id
+       WHERE s.id=$1 AND s.user_id=$2 AND s.controller_id=$3 AND s.status IN ('listening','responding')
+       AND s.lease_expires_at>NOW() AND s.deadline_at>NOW() AND s.details->>'shareTaskContext'='true'
+       AND t.user_id=$2 AND t.workspace_id=s.workspace_id
+       ON CONFLICT(task_id) DO UPDATE SET ciphertext=EXCLUDED.ciphertext,session_id=EXCLUDED.session_id,updated_at=NOW()`,
+      [sessionId, userId, controllerId, JSON.stringify(ciphertext)]
+    );
+    if (result.rowCount !== 1) throw unavailable();
+  }
+  async clearDiscussion(userId: string, taskId: string) {
+    await this.database.query(
+      'DELETE FROM voice_discussion_notes WHERE user_id=$1 AND task_id=$2',
+      [userId, taskId]
+    );
+  }
   async #assertAffordable(
     tx: Database,
     userId: string,
@@ -322,6 +361,87 @@ export class VoiceStore {
     ).rows[0];
     if (!row) throw unavailable();
     return map(row);
+  }
+  async recoveryTicket(input: {
+    userId: string;
+    id: string;
+    authHash: string;
+    ticketHash: string;
+    expiresAt: string;
+    minimumReservationUsd: number;
+  }): Promise<VoiceSessionRecord> {
+    return this.database.transaction(async (tx) => {
+      await tx.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [input.userId]);
+      const candidate = (
+        await tx.query(
+          `SELECT * FROM voice_sessions WHERE id=$1 AND user_id=$2 AND auth_hash=$3 AND deadline_at>NOW()
+         AND task_id IS NOT NULL AND details->>'shareTaskContext'='true' FOR UPDATE`,
+          [input.id, input.userId, input.authHash]
+        )
+      ).rows[0];
+      if (!candidate) throw unavailable();
+      const session = map(candidate).session;
+      if (session.status === 'preparing' && (session.providerGeneration ?? 0) > 0) {
+        const row = (
+          await tx.query(
+            'UPDATE voice_sessions SET ticket_hash=$2,ticket_expires_at=$3 WHERE id=$1 RETURNING *',
+            [input.id, input.ticketHash, input.expiresAt]
+          )
+        ).rows[0]!;
+        return map(row);
+      }
+      const stale =
+        ['connecting', 'listening', 'responding'].includes(session.status) &&
+        candidate.lease_expires_at &&
+        Date.parse(iso(candidate.lease_expires_at)) <= Date.now();
+      const lost =
+        ['lost', 'usage_uncertain'].includes(session.status) &&
+        [
+          'voice_provider_connection_lost',
+          'voice_connection_lost',
+          'voice_server_restart'
+        ].includes(session.errorCode ?? '');
+      if (!stale && !lost) {
+        if (['connecting', 'listening', 'responding'].includes(session.status))
+          throw new AthanorError(
+            'voice_recovery_wait',
+            'Waiting for the previous voice connection to release its lease.',
+            503
+          );
+        throw unavailable();
+      }
+      if ((session.providerGeneration ?? 0) >= 2) throw unavailable();
+      if (
+        (
+          await tx.query(
+            'SELECT id FROM voice_sessions WHERE user_id=$1 AND id<>$2 AND status=ANY($3::text[])',
+            [input.userId, input.id, active]
+          )
+        ).rowCount
+      )
+        throw unavailable();
+      if (
+        session.settledUsd + session.pendingUsd + input.minimumReservationUsd >
+        session.maxSpendUsd
+      )
+        throw new AthanorError(
+          'voice_budget_unavailable',
+          'Unconfirmed usage remains held. Review the session allowance before continuing.',
+          402
+        );
+      await this.#assertAffordable(tx, input.userId, session, input.minimumReservationUsd);
+      const row = (
+        await tx.query(
+          `UPDATE voice_sessions SET status='preparing',ticket_hash=$2,ticket_expires_at=$3,controller_id=NULL,
+         cleanup_pending=FALSE,lease_expires_at=NULL,current_response_id=NULL,ended_at=NULL,error_code=NULL,
+         details=jsonb_set(details,'{providerGeneration}',to_jsonb($4::integer)),
+         note='Voice recovered from saved conversation context. The last unsaved exchange may need repeating; unconfirmed usage remains held.'
+         WHERE id=$1 RETURNING *`,
+          [input.id, input.ticketHash, input.expiresAt, (session.providerGeneration ?? 0) + 1]
+        )
+      ).rows[0]!;
+      return map(row);
+    });
   }
   async reconnect(input: {
     userId: string;

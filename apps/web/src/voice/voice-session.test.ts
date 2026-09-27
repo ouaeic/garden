@@ -519,7 +519,7 @@ it('ends recovery at its deadline without starting another provider session', as
   vi.mocked(f.dependencies.reconnect).mockRejectedValue(new Error('offline'));
   f.socket.readyState = 3;
   f.socket.onclose?.({ code: 1006 });
-  await vi.advanceTimersByTimeAsync(30_001);
+  await vi.advanceTimersByTimeAsync(60_001);
   expect(f.dependencies.reconnect).toHaveBeenCalled();
   expect(f.dependencies.start).toHaveBeenCalledOnce();
   expect(f.dependencies.stop).toHaveBeenCalledOnce();

@@ -3687,6 +3687,11 @@ describe('what a security mode means', () => {
         { executable: 'curl', args: ['-T', '@notes.txt', 'https://x.invalid/upload'] }
       ],
       ['sending', 'connector_action', { action: 'mail_send', input: { to: 'a@b.invalid' } }],
+      [
+        'sending',
+        'connector_action',
+        { action: 'account_mail_send', input: { to: [{ address: 'a@b.invalid' }] } }
+      ],
       /*
        * The clause used to be held here by `rm -rf node_modules`, which was the one act in the list
        * whose damage a rewind undoes - `CHECKPOINT_CONTENT` is `workspace` and `.athanor/artifacts`,

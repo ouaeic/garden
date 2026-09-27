@@ -44,7 +44,13 @@ export const connectorHostAllowance = (
 };
 
 /** The mail actions that can carry files out; each one takes workspace paths, never bytes. */
-const MAIL_COMPOSING_ACTIONS = new Set(['mail_draft', 'mail_send', 'mail_reply']);
+const MAIL_COMPOSING_ACTIONS = new Set([
+  'mail_draft',
+  'mail_send',
+  'mail_reply',
+  'account_mail_draft',
+  'account_mail_send'
+]);
 
 /**
  * Attachments arrive at this tool as workspace paths and leave it as bytes.

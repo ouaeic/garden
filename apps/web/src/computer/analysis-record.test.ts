@@ -158,7 +158,7 @@ describe('real scientific receipts', () => {
       expect(html).toContain(parentRecord!.id);
       expect(html).toContain(expectedHash);
       expect(html).toContain('path=workspace%2Fchild%2Fprevious+run.json');
-      expect(html).toContain('does not independently establish origin or scientific validity');
+      expect(html).toContain('does not independently establish origin or result correctness');
       const unlocated = renderToStaticMarkup(
         createElement(AnalysisRunPreview, { record: record! })
       );

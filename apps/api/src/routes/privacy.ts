@@ -11,6 +11,8 @@ import { revealedTaskEvent } from '../context.js';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 import { recordSecurityEvent } from '../security-events.js';
+import { VoiceStore } from '@athanor/data';
+import { readVoiceDiscussion } from '../voice/context.js';
 
 export const registerPrivacyRoutes = (context: RouteContext): void => {
   const {
@@ -123,7 +125,18 @@ export const registerPrivacyRoutes = (context: RouteContext): void => {
             cursor = page.nextCursor;
             if (!page.hasMore) break;
           }
-          yield ']}';
+          let discussion: unknown;
+          try {
+            discussion = await readVoiceDiscussion(
+              context,
+              user.id,
+              task.id,
+              new VoiceStore(context.database)
+            );
+          } catch {
+            discussion = { unreadable: true };
+          }
+          yield `],"voiceDiscussion":${JSON.stringify(discussion)}}`;
           for (const plan of await store.listTaskPlans(task.id))
             taskPlans.push(await privateTaskPlanResponse(plan, workspace));
         }

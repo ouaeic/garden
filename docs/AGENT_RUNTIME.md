@@ -839,10 +839,14 @@ requires a new microphone epoch. It interrupts unplayed replies and settles thei
 reconnection creates no additional provider session or response.
 
 Recovery preserves the owner's mute choice, original deadline and spending allowance. Stop cancels
-pending recovery. A grace deadline, lost provider connection, ended controller or revoked authority
-ends the session explicitly. Recovery does not recreate provider history after an API restart and
-does not forward additional task content. Saved proposals and billing receipts retain their existing
-durable recovery paths.
+pending recovery. A grace deadline or revoked authority ends the session explicitly. Optional
+conversation context sharing also permits a replacement provider connection after provider loss or
+an expired API controller lease. The replacement receives bounded selected-conversation excerpts
+and encrypted discussion notes, not the original provider history. Notes are model interpretations,
+visible and removable by the owner; the last unsaved exchange may need repeating. Recovery retains
+unresolved usage reservations and never extends the original allowance. With context sharing off,
+the context tools and their instructions are absent. Saved proposals and billing receipts retain
+their existing durable recovery paths.
 
 ### Declared native environments
 
@@ -941,6 +945,21 @@ before submission. A lost reply triggers inspection of that operation rather tha
 An update is reconciled only when its operation marker and requested values are both present;
 absence after deletion establishes absence, without claiming who removed it or that notices were
 delivered. Providers without a verified conditional-event contract do not expose these mutations.
+
+### Native account mail
+
+Connected Google and Microsoft accounts expose separate grants for reading mail, saving drafts and
+sending. Composition uses explicit recipients, subject and body, with workspace attachments read
+only after the existing approval floor admits the action. Sending uses the consequential-action
+floor. Existing accounts acquire no additional permissions automatically. Receipt recovery requires
+mail reading; Microsoft sends also require draft creation access.
+
+Each mutation starts with encrypted intent. Gmail messages retain a stable Message-ID; Microsoft
+drafts retain an operation marker and immutable message identity. Attachment uploads checkpoint
+their progress and use provider-issued capabilities confined to the account transport. Interrupted
+operations reconcile their saved identity; absence or an ambiguous reply never permits another
+send. A provider receipt means acceptance, not recipient delivery. An operation rejected before
+acceptance can be retried with the same intent after the rejection is resolved.
 
 ### Optional decision models
 

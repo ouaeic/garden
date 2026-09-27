@@ -279,7 +279,7 @@ export const CONNECTOR_ACTION_INPUTS = {
   mail_read_attachment: {
     fields: ['uid', 'partId', 'mailbox', 'maxBytes', 'saveTo'],
     clause:
-      'uid, partId from mail_read_message, optional mailbox, maxBytes and saveTo; the file is written into the workspace and you get its path back, never its bytes'
+      'uid, partId from mail_read_message; optional mailbox, maxBytes, saveTo; returns a saved path'
   },
   mail_mark: {
     fields: ['uids', 'seen', 'flagged', 'mailbox'],
@@ -305,8 +305,7 @@ export const CONNECTOR_ACTION_INPUTS = {
   },
   mail_reply: {
     fields: ['uid', 'text', 'mailbox', 'replyAll', 'attachments'],
-    clause:
-      'uid, text, optional mailbox, replyAll, attachments - the recipients and the subject come from the message being answered'
+    clause: 'uid, text; optional mailbox, replyAll, attachments; replies to the original sender'
   },
   calendar_list: { fields: [], clause: 'none' },
   calendar_read_range: {
@@ -396,6 +395,14 @@ export const CONNECTOR_ACTION_INPUTS = {
     fields: ['query', 'limit', 'cursor'],
     clause: 'optional query, limit, cursor'
   },
+  account_mail_draft: {
+    fields: ['to', 'subject', 'text', 'cc', 'bcc', 'attachments', 'messageId'],
+    clause: 'to, subject, text; optional cc, bcc, attachments, reply messageId'
+  },
+  account_mail_send: {
+    fields: ['to', 'subject', 'text', 'cc', 'bcc', 'attachments', 'messageId'],
+    clause: 'to, subject, text; optional cc, bcc, attachments, reply messageId'
+  },
   account_mail_read: {
     fields: ['messageId', 'maxCharacters'],
     clause: 'messageId, optional maxCharacters'
@@ -407,7 +414,7 @@ export const CONNECTOR_ACTION_INPUTS = {
   account_mail_attachment: {
     fields: ['messageId', 'partId', 'maxBytes', 'saveTo'],
     clause:
-      'messageId, partId from account_mail_read, optional maxBytes, saveTo; saves the file in the workspace'
+      'messageId, partId from account_mail_read; optional maxBytes, saveTo; returns a saved path'
   },
   account_calendar_read: {
     fields: ['eventId', 'calendarId'],

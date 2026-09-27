@@ -444,3 +444,40 @@ it('binds recovery tickets to the live controller and consumes them atomically w
     code: 'voice_session_unavailable'
   });
 });
+
+it('recovers an expired API controller lease without clearing reservations or extending owner limits', async () => {
+  const f = await fixture(false);
+  f.input.session.shareTaskContext = true;
+  await voice.create(f.input);
+  await f.connect();
+  const reservation = await voice.reserve(f.user.id, f.id, f.controllerId, 0.1);
+  const request = {
+    userId: f.user.id,
+    id: f.id,
+    authHash: 'auth',
+    ticketHash: 'replacement',
+    expiresAt: new Date(Date.now() + 30000).toISOString(),
+    minimumReservationUsd: 0.02
+  };
+  await expect(voice.recoveryTicket(request)).rejects.toMatchObject({
+    code: 'voice_recovery_wait'
+  });
+  await database.query(
+    "UPDATE voice_sessions SET lease_expires_at=NOW()-INTERVAL '1 second' WHERE id=$1",
+    [f.id]
+  );
+  const restored = await voice.recoveryTicket(request);
+  expect(restored.session).toMatchObject({
+    status: 'preparing',
+    providerGeneration: 1,
+    pendingUsd: 0.1,
+    deadlineAt: f.input.session.deadlineAt,
+    maxSpendUsd: f.input.session.maxSpendUsd
+  });
+  expect((await voice.pending(f.user.id, f.id)).map((row) => row.id)).toEqual([reservation]);
+  await expect(
+    voice.recoveryTicket({ ...request, authHash: 'wrong-owner-session' })
+  ).rejects.toThrow('no longer available');
+  await voice.finish(f.user.id, f.id, null, 'ended');
+  await expect(voice.recoveryTicket(request)).rejects.toThrow('no longer available');
+});

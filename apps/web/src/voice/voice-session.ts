@@ -279,7 +279,7 @@ export function createVoiceSessionController(
           fail(
             new Error('Voice could not reconnect. Audio has stopped; please start a new session.')
           ),
-        30_000
+        60_000
       );
     }
     connected = false;
@@ -304,7 +304,7 @@ export function createVoiceSessionController(
               value.session.id !== session?.id ||
               value.session.taskId !== taskId ||
               value.session.workspaceId !== session.workspaceId ||
-              !['listening', 'responding'].includes(value.session.status)
+              !['preparing', 'listening', 'responding'].includes(value.session.status)
             )
               throw new Error('This voice session can no longer reconnect.');
             openTransport(value);

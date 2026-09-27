@@ -1525,21 +1525,13 @@ describe('the operating contract in the window', () => {
     expect(BASE_SYSTEM_PROMPT).not.toMatch(/navigating to a search engine/);
   });
 
-  it('states the mail route the worker leaves standing, in whichever direction it withdrew', () => {
-    /*
-     * The one sentence in the contract that `agent.ts` reasons about by name. It withdraws
-     * connector_action when the owner has nothing connected and keeps connector_list, on the
-     * argument that "the contract already tells it to drive webmail in the browser and say that
-     * connecting is the better route" - so that sentence has to exist on the withdrawn side, and
-     * must not be the one shown when the connector IS there.
-     */
+  it('describes available account capabilities without assigning unrelated account work', () => {
     const provisioned = baseSystemPrompt({ tools: ['connector_action', 'connector_list'] });
-    expect(provisioned).toContain('connector_action is the route to it');
-    expect(provisioned).not.toMatch(/webmail in the browser is the only route/);
+    expect(provisioned).toContain('Use connector_action for supported operations');
     const bare = baseSystemPrompt({ tools: ['connector_list'] });
     expect(bare).not.toContain('connector_action');
-    expect(bare).toMatch(/webmail in the browser is the only route/);
-    expect(bare).toMatch(/connecting the mailbox is the better route/);
+    expect(bare).not.toContain('webmail');
+    expect(bare).not.toContain('connecting the mailbox');
   });
 
   it('says a message is untrusted because of where it came from, not because it looks odd', () => {
@@ -1700,12 +1692,6 @@ describe('the contract as a function of the box it is on', () => {
     // app has to bind for the owner to reach it.
     for (const fact of [
       '/usr/local/lib/athanor/python/bin/python3',
-      'athanor-office-convert',
-      'typeset with typst',
-      'print_pdf captures a page the browser is showing',
-      'pdftoppm',
-      'image_read',
-      'Document toolchain',
       'No model weights run on this computer',
       '127.0.0.1',
       'anti-bot challenge'
@@ -1760,25 +1746,19 @@ describe('the contract as a function of the box it is on', () => {
     expect(BASE_SYSTEM_PROMPT).not.toContain('## Doing the work well');
   });
 
-  it('drops the document facts on a box the runner says has no toolchain, and only then', () => {
+  it('keeps environment facts separate from task-specific procedures', () => {
     const provisioned = baseSystemPrompt({
       toolchainSummary: 'Available on this computer: office-authoring, typeset-pdf.'
     });
     expect(provisioned).toContain('/usr/local/lib/athanor/python/bin/python3');
-    expect(provisioned).toContain('typeset with typst');
+    expect(provisioned).not.toContain('Run every document or analysis script');
+    expect(provisioned).not.toContain('typeset with typst');
+    expect(provisioned).not.toContain('Publishing an Office file');
     const bare = baseSystemPrompt({
       toolchainSummary: 'No document toolchain is installed on this computer.'
     });
     expect(bare).not.toContain('/usr/local/lib/athanor/python/bin/python3');
-    expect(bare).not.toContain('typeset with typst');
-    // The wrapper is still named, because what the bare box needs is the fact that it is ABSENT -
-    // silence would be worse than the paragraph, since a model with no toolchain line and no tool
-    // that fails early starts a .pptx build and finds out one shell call at a time. What must not
-    // survive is the instruction to run it.
-    expect(bare).not.toContain('athanor-office-convert IN OUT');
-    expect(bare).toContain('no athanor-office-convert');
-    expect(bare).toContain('no document toolchain');
-    // An unreachable runner returns no summary at all, and an unknown must never remove a fact.
+    expect(bare).toContain('toolchain is unavailable');
     expect(baseSystemPrompt({ toolchainSummary: '' })).toBe(BASE_SYSTEM_PROMPT);
     expect(baseSystemPrompt()).toBe(BASE_SYSTEM_PROMPT);
   });

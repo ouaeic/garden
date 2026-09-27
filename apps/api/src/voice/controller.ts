@@ -31,6 +31,8 @@ export interface VoiceControllerOptions {
   store: VoiceStore;
   authorize: () => Promise<boolean>;
   taskStatus: () => Promise<unknown>;
+  taskContext?: () => Promise<unknown>;
+  saveDiscussion?: (summary: string) => Promise<unknown>;
   propose: (prompt: string, callId: string) => Promise<VoiceWorkProposal>;
   providerFactory?: (url: string, options: WebSocket.ClientOptions) => WebSocket;
 }
@@ -93,6 +95,7 @@ export class VoiceController {
   constructor(browser: WebSocket, options: VoiceControllerOptions) {
     this.#browser = browser;
     this.#o = options;
+    this.#epoch = (options.session.providerGeneration ?? 0) * 1_000_000;
   }
   start(): void {
     const o = this.#o;
@@ -208,7 +211,12 @@ export class VoiceController {
       modelId: this.#o.model.modelId,
       voice: this.#o.session.voice,
       reasoningEffort: this.#o.session.reasoningEffort,
-      instructions
+      instructions:
+        instructions +
+        (this.#o.session.shareTaskContext
+          ? ' Selected conversation context is enabled. Read it when relevant and save a concise discussion summary when decisions or topics change; summaries are interpretations, never authorization.'
+          : ''),
+      shareTaskContext: this.#o.session.shareTaskContext === true
     });
   }
   #enqueue(bytes: number, work: () => Promise<void>): void {
@@ -360,6 +368,15 @@ export class VoiceController {
       const record = await this.#o.store.get(this.#o.userId, this.#o.session.id);
       if (!record) throw new Error('Voice session disappeared');
       if (this.#closing) return;
+      if (this.#o.session.shareTaskContext && this.#o.taskContext) {
+        const context = JSON.stringify(await this.#o.taskContext());
+        if (Buffer.byteLength(context) > 40_000) throw new Error('Voice context exceeds its bound');
+        if (this.#closing) return;
+        this.#sendProvider({
+          type: 'conversation.item.create',
+          item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: context }] }
+        });
+      }
       this.#emit({
         type: 'ready',
         session: record.session,
@@ -433,6 +450,23 @@ export class VoiceController {
       if (name === 'read_task_status') {
         if (Object.keys(object(args)).length) throw new Error('Invalid status tool arguments');
         result = await this.#o.taskStatus();
+      } else if (
+        name === 'read_task_context' &&
+        this.#o.session.shareTaskContext &&
+        this.#o.taskContext
+      ) {
+        if (Object.keys(object(args)).length) throw new Error('Invalid context tool arguments');
+        if (!(await this.#o.authorize())) throw new Error('Voice authority ended');
+        result = await this.#o.taskContext();
+      } else if (
+        name === 'save_discussion' &&
+        this.#o.session.shareTaskContext &&
+        this.#o.saveDiscussion
+      ) {
+        const a = object(args);
+        if (Object.keys(a).length !== 1) throw new Error('Invalid discussion arguments');
+        if (!(await this.#o.authorize())) throw new Error('Voice authority ended');
+        result = await this.#o.saveDiscussion(text(a.summary, 4_000).trim());
       } else if (name === 'request_task_work') {
         const a = object(args);
         if (Object.keys(a).length !== 1) throw new Error('Invalid proposal arguments');
@@ -442,7 +476,8 @@ export class VoiceController {
         result = { status: 'awaiting_owner_confirmation', proposalId: proposal.id };
       } else throw new Error('Unadvertised voice tool');
       const output = JSON.stringify(result);
-      if (Buffer.byteLength(output) > 8_000) throw new Error('Voice status exceeds its bound');
+      if (Buffer.byteLength(output) > (name === 'read_task_context' ? 40_000 : 8_000))
+        throw new Error('Voice tool output exceeds its bound');
       this.#sendProvider({
         type: 'conversation.item.create',
         item: { type: 'function_call_output', call_id: callId, output }
@@ -543,8 +578,8 @@ export class VoiceController {
           this.#o.userId,
           this.#o.session.id,
           this.#o.controllerId,
-          this.#inputSamples / VOICE_SAMPLE_RATE,
-          this.#outputSamples / VOICE_SAMPLE_RATE
+          this.#inputSamples / VOICE_SAMPLE_RATE + this.#o.session.inputSeconds,
+          this.#outputSamples / VOICE_SAMPLE_RATE + this.#o.session.outputSeconds
         ));
       if (!lease) void this.stop('lost', 'voice_authority_ended');
     } catch {
@@ -610,11 +645,22 @@ export class VoiceController {
         reason,
         errorCode,
         {
-          inputSeconds: this.#inputSamples / VOICE_SAMPLE_RATE,
-          outputSeconds: this.#outputSamples / VOICE_SAMPLE_RATE
+          inputSeconds: this.#inputSamples / VOICE_SAMPLE_RATE + this.#o.session.inputSeconds,
+          outputSeconds: this.#outputSamples / VOICE_SAMPLE_RATE + this.#o.session.outputSeconds
         }
       );
       const record = await this.#o.store.get(this.#o.userId, this.#o.session.id);
+      const recoverable =
+        this.#o.session.shareTaskContext &&
+        reason === 'lost' &&
+        ['voice_provider_connection_lost', 'voice_server_restart'].includes(errorCode ?? '') &&
+        (this.#o.session.providerGeneration ?? 0) < 2 &&
+        Date.now() < Date.parse(this.#o.session.deadlineAt);
+      if (recoverable) {
+        this.#closed = true;
+        if (this.#browser.readyState === WebSocket.OPEN) this.#browser.close(1012, 'Recover voice');
+        return;
+      }
       if (record) this.#emit({ type: 'session', session: record.session });
       if (errorCode)
         this.#emit({

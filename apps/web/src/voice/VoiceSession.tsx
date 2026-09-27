@@ -9,7 +9,7 @@ import type {
   VoiceWorkProposal,
   VoiceReasoningEffort
 } from '@athanor/contracts';
-import { get, post } from '../client';
+import { get, post, del } from '../client';
 import { money, statusLabel } from '../model';
 import { Button, Dialog, ErrorNotice, Field, Spinner } from '../ui';
 import AudioReceipts from '../AudioReceipts';
@@ -37,6 +37,8 @@ function VoiceSessionPanel({
   const [cap, setCap] = useState('');
   const [minutes, setMinutes] = useState('5');
   const [consent, setConsent] = useState(false);
+  const [shareTaskContext, setShareTaskContext] = useState(false);
+  const [discussion, setDiscussion] = useState<{ summary: string; updatedAt: string } | null>(null);
   const [status, setStatus] = useState<
     'idle' | 'starting' | 'connecting' | 'reconnecting' | 'active' | 'stopped'
   >('idle');
@@ -77,6 +79,9 @@ function VoiceSessionPanel({
     const version = ++refreshVersion.current;
     const revision = sessionRevision.current;
     const rows = await get<Session[]>(`/v1/tasks/${task.id}/voice-sessions`);
+    const note = await get<{ summary: string; updatedAt: string } | null>(
+      `/v1/tasks/${task.id}/voice-discussion`
+    );
     if (
       !mounted.current ||
       version !== refreshVersion.current ||
@@ -86,6 +91,7 @@ function VoiceSessionPanel({
     if (rows.some((row) => row.taskId !== task.id || row.workspaceId !== task.workspaceId))
       throw new Error('The voice history belongs to another task.');
     setSessions(rows);
+    setDiscussion(note);
     setHistoryReady(true);
     setCurrent((previous) =>
       previous && (!terminal(previous) || previous.cleanupPending || controllerRunning.current)
@@ -237,6 +243,7 @@ function VoiceSessionPanel({
         if (relevant()) {
           controllerRunning.current = next !== 'stopped';
           setStatus(next);
+          if (next === 'stopped') void refresh().catch(setError);
         }
       },
       onMuted: (next) => {
@@ -273,7 +280,8 @@ function VoiceSessionPanel({
       privacyRoute,
       maxSpendUsd: amount,
       lifetimeSeconds: seconds,
-      expectedRouteProof: option.routeProof
+      expectedRouteProof: option.routeProof,
+      shareTaskContext
     });
   };
   const unresolved =
@@ -436,6 +444,18 @@ function VoiceSessionPanel({
                 ) : (
                   <p className="muted">This route requires provider zero data retention.</p>
                 )}
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={shareTaskContext}
+                    onChange={(event) => setShareTaskContext(event.target.checked)}
+                  />
+                  <span>
+                    Include this conversation and save discussion notes. The selected voice provider
+                    can read its opening request, recent messages and saved notes. Other
+                    conversations, files and private form inputs stay out.
+                  </span>
+                </label>
                 <Button
                   className="primary"
                   onClick={start}
@@ -443,7 +463,8 @@ function VoiceSessionPanel({
                     !historyReady || unresolved || !cap.trim() || (Boolean(external) && !consent)
                   }
                 >
-                  <Mic size={17} /> Start live voice
+                  <Mic size={17} />{' '}
+                  {shareTaskContext && discussion ? 'Continue live voice' : 'Start live voice'}
                 </Button>
               </div>
             )}
@@ -509,6 +530,37 @@ function VoiceSessionPanel({
               )}
             </div>
           </section>
+        )}
+        {discussion && (
+          <details>
+            <summary>Saved discussion</summary>
+            <p className="muted">
+              Model interpretation, not an exact transcript. Included in future voice sessions only
+              when context is enabled.
+            </p>
+            <p
+              style={{
+                whiteSpace: 'pre-wrap',
+                overflowWrap: 'anywhere',
+                maxHeight: '16rem',
+                overflowY: 'auto'
+              }}
+            >
+              {discussion.summary}
+            </p>
+            <Button
+              disabled={running || unresolved || busy !== null}
+              onClick={() => {
+                setBusy('clear-discussion');
+                void del(`/v1/tasks/${task.id}/voice-discussion`)
+                  .then(() => setDiscussion(null))
+                  .catch(setError)
+                  .finally(() => setBusy(null));
+              }}
+            >
+              Clear saved discussion
+            </Button>
+          </details>
         )}
         {sessions
           .filter(

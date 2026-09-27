@@ -99,7 +99,7 @@ function FileGroup({
                       )}
                       <p className="muted">
                         A checksum links the recorded bytes; it does not independently establish
-                        origin or scientific validity. The current record may have changed.
+                        origin or result correctness. The current record may have changed.
                       </p>
                     </details>
                   )}
@@ -291,8 +291,8 @@ export default function AnalysisRunPreview({
           <p className="analysis-run-path">Reproduces run: {record.replayedFrom}</p>
         )}
         <p>
-          Checks cover declared files and environment probes. They do not establish scientific
-          validity or capture undeclared dependencies.
+          Checks cover declared files and environment probes. They do not establish result
+          correctness or capture undeclared dependencies.
         </p>
         {location && record.directoryFromManifest !== undefined && (
           <p>

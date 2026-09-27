@@ -219,22 +219,7 @@ export const claimTurn = async (
         }))
       : { preferences: undefined, measuring: false };
   const withdrawnTools = new Set<string>();
-  /**
-   * Capabilities this box does not currently have are not described to the model.
-   *
-   * The catalogue is sent whole on every request and is the largest fixed cost in a turn, and
-   * connector_action is the biggest single tool in it - most of that being the declared shape of
-   * mail, calendar, repository and WebDAV operations. With nothing connected, none of those calls
-   * can do anything but fail, so describing them buys nothing and is paid for on every step of
-   * every task. connector_list stays, because it is how the model finds out, and the contract
-   * already tells it to drive webmail in the browser and say that connecting is the better route.
-   *
-   * This is now the only tool any run withdraws, and it is the one case where withdrawing is
-   * honest: what is missing is the capability itself, and connector_list is in the catalogue
-   * precisely to say so. Withdrawing a tool whose capability the box still has - which is what
-   * this set used to do to `web_search` on the provider's route - leaves the model reading
-   * descriptions of a computer it is not on.
-   */
+  // Keep discovery available without advertising actions for disconnected services.
   /**
    * And when something *is* connected, only the actions that connection can actually run.
    *

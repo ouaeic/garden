@@ -145,39 +145,42 @@ describe('reaching a connected service', () => {
     );
   });
 
-  it('sends the workspace files the model named, as the bytes the protocol needs', async () => {
-    const sent: Array<Record<string, unknown>> = [];
-    const result = await performConnectorAction({
-      connectorId: 'test-account',
-      kind: 'imap',
-      action: 'mail_send',
-      requested: {
-        to: [{ address: 'hiring@example.com' }],
-        subject: 'Application',
-        text: 'Attached.',
-        attachments: ['workspace/applications/cv.pdf']
-      },
-      readFile: async (path) => ({
-        mimeType: 'application/pdf',
-        bytes: Buffer.from(`bytes of ${path}`)
-      }),
-      writeFile: async () => undefined,
-      execute: async (actionInput) => {
-        sent.push(actionInput);
-        return { sent: true, messageId: '<1@athanor>' };
-      }
-    });
+  it.each(['mail_send', 'account_mail_draft', 'account_mail_send'])(
+    'materializes only named workspace files for %s',
+    async (action) => {
+      const sent: Array<Record<string, unknown>> = [];
+      const result = await performConnectorAction({
+        connectorId: 'test-account',
+        kind: 'imap',
+        action,
+        requested: {
+          to: [{ address: 'hiring@example.com' }],
+          subject: 'Application',
+          text: 'Attached.',
+          attachments: ['workspace/applications/cv.pdf']
+        },
+        readFile: async (path) => ({
+          mimeType: 'application/pdf',
+          bytes: Buffer.from(`bytes of ${path}`)
+        }),
+        writeFile: async () => undefined,
+        execute: async (actionInput) => {
+          sent.push(actionInput);
+          return { sent: true, messageId: '<1@athanor>' };
+        }
+      });
 
-    expect(sent[0]?.attachments).toEqual([
-      {
-        filename: 'cv.pdf',
-        contentType: 'application/pdf',
-        contentBase64: Buffer.from('bytes of workspace/applications/cv.pdf').toString('base64')
-      }
-    ]);
-    // A sent message is the agent's own words, so it is not relabelled as somebody else's.
-    expect(result).toEqual({ sent: true, messageId: '<1@athanor>' });
-  });
+      expect(sent[0]?.attachments).toEqual([
+        {
+          filename: 'cv.pdf',
+          contentType: 'application/pdf',
+          contentBase64: Buffer.from('bytes of workspace/applications/cv.pdf').toString('base64')
+        }
+      ]);
+      // A sent message is the agent's own words, so it is not relabelled as somebody else's.
+      expect(result).toEqual({ sent: true, messageId: '<1@athanor>' });
+    }
+  );
 
   it('refuses to send a message whose attachments it could not read as paths', async () => {
     // Silently dropping them is the worst available outcome: the recipient gets a covering letter

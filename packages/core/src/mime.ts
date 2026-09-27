@@ -506,6 +506,8 @@ export interface OutgoingMessage {
   references?: string[];
   attachments?: OutgoingAttachment[];
   date?: Date;
+  messageId?: string;
+  includeBcc?: boolean;
 }
 
 /**
@@ -597,11 +599,16 @@ const base64Lines = (content: Buffer): string =>
  */
 export const composeMessage = (message: OutgoingMessage): { raw: Buffer; messageId: string } => {
   const domain = message.from.address.split('@')[1] ?? 'localhost';
-  const messageId = `<${randomUUID()}@${domain}>`;
+  const messageId = message.messageId ?? `<${randomUUID()}@${domain}>`;
+  if (!/^<[^<>\s@]+@[^<>\s@]+>$/.test(messageId))
+    throw new AthanorError('mail_message_id_invalid', 'Invalid message identity.');
   const headers: string[] = [
     `From: ${formatAddress(message.from)}`,
     `To: ${message.to.map(formatAddress).join(', ')}`,
     ...(message.cc.length ? [`Cc: ${message.cc.map(formatAddress).join(', ')}`] : []),
+    ...(message.includeBcc && message.bcc.length
+      ? [`Bcc: ${message.bcc.map(formatAddress).join(', ')}`]
+      : []),
     `Subject: ${encodeWord(assertHeaderSafe(message.subject, 'subject'))}`,
     `Date: ${rfc5322Date(message.date ?? new Date())}`,
     `Message-ID: ${messageId}`,

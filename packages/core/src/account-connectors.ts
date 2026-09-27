@@ -1,3 +1,4 @@
+import { AccountMailComposition, composeAccountMail } from './account-mail-compose.js';
 import {
   AccountCalendarUpdate,
   AccountCalendarDelete,
@@ -34,6 +35,16 @@ const read = (scope: 'mail:mailbox.read' | 'calendar:calendars.read') => ({
   sideEffect: 'read' as const
 });
 export const accountConnectorActions = {
+  account_mail_draft: {
+    kinds: ['google', 'microsoft'] as const,
+    scope: 'mail:message.write' as const,
+    sideEffect: 'write' as const
+  },
+  account_mail_send: {
+    kinds: ['google', 'microsoft'] as const,
+    scope: 'mail:message.send' as const,
+    sideEffect: 'delete' as const
+  },
   account_mail_search: read('mail:mailbox.read'),
   account_mail_read: read('mail:mailbox.read'),
   account_mail_attachments: read('mail:mailbox.read'),
@@ -62,6 +73,8 @@ const page = {
   cursor: z.string().max(16384).optional()
 };
 export const accountConnectorInputs = [
+  AccountMailComposition.safeExtend({ action: z.literal('account_mail_draft') }),
+  AccountMailComposition.safeExtend({ action: z.literal('account_mail_send') }),
   z
     .object({
       action: z.literal('account_calendar_read'),
@@ -112,8 +125,8 @@ export const accountConnectorCatalog: ConnectorDefinition[] = (
   name: kind === 'google' ? 'Google mail and calendar' : 'Microsoft mail and calendar',
   description:
     kind === 'google'
-      ? 'Read mail and attachments, read calendars, and create, edit or delete events with separately granted access.'
-      : 'Search and read mail, download attachments, read calendars, and create events through the account API.',
+      ? 'Read and compose mail with attachments, and manage calendar events with separately granted access.'
+      : 'Read and compose mail with attachments, read calendars, and create events through the account API.',
   dataAccess: 'Only the selected account and granted mail or calendar access are used.',
   tokenLocation:
     'Authorization and refresh tokens are encrypted on your Garden server and never sent to a model.',
@@ -121,6 +134,8 @@ export const accountConnectorCatalog: ConnectorDefinition[] = (
   requirements:
     'Register an OAuth web application with the provider, then choose the account during sign-in.',
   scopes: [
+    { id: 'mail:message.write', label: 'Create mail drafts and attachments', sideEffect: 'write' },
+    { id: 'mail:message.send', label: 'Send mail with confirmation', sideEffect: 'delete' },
     { id: 'mail:mailbox.read', label: 'Read mail and attachments', sideEffect: 'read' },
     { id: 'calendar:calendars.read', label: 'Read calendars', sideEffect: 'read' },
     { id: 'calendar:events.write', label: 'Create calendar events', sideEffect: 'write' },
@@ -193,6 +208,21 @@ export async function executeAccountConnector(
     );
   let result: unknown;
   switch (action.action) {
+    case 'account_mail_draft':
+    case 'account_mail_send':
+      if (!input.operation)
+        throw new AthanorError(
+          'connector_operation_required',
+          'Mail changes need a durable operation receipt.'
+        );
+      result = await composeAccountMail(
+        api,
+        Object.fromEntries(Object.entries(action).filter(([key]) => key !== 'action')),
+        action.action === 'account_mail_send' ? 'send' : 'draft',
+        input.operation,
+        input.scopes
+      );
+      break;
     case 'account_mail_search':
       result = await listAccountMessages(api, action);
       break;

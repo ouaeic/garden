@@ -73,6 +73,7 @@ export const connectorApprovalCard = (
         preview: `Branch: ${textValue(input.branch)}\nPublished version: ${textValue(input.revisionId)}\nCommit: ${textValue(input.commit)}\nExpected remote head: ${input.expectedHead === null ? 'new branch' : textValue(input.expectedHead)}\nThe selected commit and its reachable history are sent to this repository. Existing remote history is preserved.`
       };
     case 'mail_send':
+    case 'account_mail_send':
       return {
         action: `Send an email to ${recipients || 'the named recipients'}`,
         preview: `To: ${recipients || 'unknown'}\n${copies ? `${copies}\n` : ''}Subject: ${textValue(input.subject, '(no subject)')}\n\n${body}\n\nThis is sent from the connected mailbox, as the user, and cannot be recalled.`
@@ -83,6 +84,7 @@ export const connectorApprovalCard = (
         preview: `${copies ? `${copies}\n` : ''}${body}\n\nIt goes to whoever sent the original${input.replyAll === true ? ' and to everyone it was addressed to' : ''}, from the connected mailbox, and cannot be recalled.`
       };
     case 'mail_draft':
+    case 'account_mail_draft':
       return {
         action: `Save a draft to ${recipients || 'the named recipients'}`,
         preview: `To: ${recipients || 'unknown'}\n${copies ? `${copies}\n` : ''}Subject: ${textValue(input.subject, '(no subject)')}\n\n${body}\n\nSaved in ${textValue(input.mailbox, 'the Drafts mailbox')}. Nothing is sent.`

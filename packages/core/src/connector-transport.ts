@@ -13,6 +13,7 @@ export interface ConnectorRequestInput {
   allowedHostSuffixes: string[];
   timeoutMs?: number;
   maxResponseBytes?: number;
+  maxRequestBytes?: number;
   signal?: AbortSignal;
 }
 
@@ -51,8 +52,14 @@ export const assertConnectorUrl = (url: URL, allowedHostSuffixes: string[]): voi
 export const secureConnectorRequest: ConnectorTransport = async (input) => {
   assertConnectorUrl(input.url, input.allowedHostSuffixes);
   const body = input.body ? Buffer.from(input.body) : undefined;
-  if (body && body.byteLength > 1_000_000)
-    throw new AthanorError('connector_request_too_large', 'Connector request exceeds 1 MB');
+  const maxRequestBytes = input.maxRequestBytes ?? 1_000_000;
+  if (!Number.isSafeInteger(maxRequestBytes) || maxRequestBytes < 1 || maxRequestBytes > 40_000_000)
+    throw new AthanorError('connector_request_invalid', 'Invalid connector transfer bounds');
+  if (body && body.byteLength > maxRequestBytes)
+    throw new AthanorError(
+      'connector_request_too_large',
+      'Connector request exceeds its transfer limit'
+    );
   const timeoutMs = input.timeoutMs ?? 15_000;
   const maxResponseBytes = input.maxResponseBytes ?? 1_000_000;
   if (

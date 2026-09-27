@@ -53,46 +53,7 @@ export interface ContractCapabilities {
  */
 const NO_DOCUMENT_TOOLCHAIN = 'No document toolchain is installed';
 
-/**
- * What the model is told every turn, on every task.
- *
- * The rule for what belongs here is knowledge that cannot be rediscovered from the tools: that
- * this computer has one Python at one path, that typst is the only route with control over
- * pagination, that an anti-bot challenge closes one tab and one site. Method does not belong here
- * - not because method is worthless, but because it may not be RESIDENT. A sentence carried on
- * every request for ever has to be something the model could not have worked out by trying, and
- * "begin with repo_overview, then code_search and targeted file_read ranges" is not: it is what a
- * frontier coding model does unprompted, and the one call it would have cost to find out is
- * cheaper than a paragraph billed a million times.
- *
- * That is what `## Doing the work well` was, and it was 6,020 bytes - 49% of this whole contract,
- * unconditional, on the turn that writes a haiku as much as on the turn that ships a release. Ten
- * per-domain paragraphs summarising eight procedures that are already opened on demand. What
- * survives it is the environment facts that were scattered through it, which are capability rather
- * than method, and which are now bullets under the heading that was already about this machine.
- * The desktop paragraph went whole: every sentence in it was already in `desktop_observe` and
- * `desktop_action`'s own descriptions, including "prefer accessibility-node actions", so the model
- * was paying for it twice on every request and reading it once.
- *
- * What is left is gated. Every owner used to pay for the mail paragraph with nothing connected and
- * the typst paragraph on a box with no typst - a contract describing a computer the model is not
- * on, which is worse than silence because it sends the model at a binary that is not there. The
- * gates are `ContractCapabilities` above, and they are the run's own facts.
- *
- * Where deliberation goes qualifies under the same rule, and it is not choreography: no tool result
- * tells the model that this harness publishes the content channel to the user and folds the
- * reasoning channel away. Without the line it wrote its working-out into content, which the owner's
- * transcript promotes as the answer - measured on one live task at 1,015 streamed content frames
- * against 29 reasoning frames, for five actual replies. 279 characters, paid once per step behind
- * the cache anchor.
- *
- * The bullet that used to open this section was choreography - "an application is document
- * preparation with a form at the end", capture the posting, check the dossier, tailor the
- * documents, then the form. That arrived on a request to write a haiku, and on the tasks it was
- * aimed at it prescribed an order of work the model is better placed to choose. The one thing in
- * it that was a safety property rather than a sequence - never fill a gap in the user's own record
- * with something plausible - is stated once, generally, in the safety floor.
- */
+/** Stable environment and authority facts; task-specific methods belong in on-demand procedures. */
 export const baseSystemPrompt = (capabilities: ContractCapabilities = {}): string => {
   const sent = capabilities.tools === undefined ? null : new Set(capabilities.tools);
   /** Absent means unknown, and unknown fails open: a gate must never remove a fact on a guess. */
@@ -105,20 +66,18 @@ You operate the user's persistent, private Linux server computer. Their current 
 - Cite the source URL, or the file and page, behind anything factual you assert; a search snippet is a pointer and never a citation.
 - A page that raises an anti-bot challenge closes that one tab and that one site until the user clears it: say which page needs them, and carry on with the rest of the work everywhere else.${
     holds('connector_action')
-      ? "\n- A connected mailbox or calendar is the user's own server over an open protocol, and connector_action is the route to it rather than webmail in a browser. Whether an invitation actually reaches an attendee is that server's decision, not something to promise."
-      : '\n- Nothing is connected to this computer as a mailbox or a calendar, so webmail in the browser is the only route to one. Say that connecting the mailbox is the better route.'
+      ? '\n- Use connector_action for supported operations on connected accounts, within their granted access. Provider acceptance is not proof of delivery.'
+      : ''
   }${
     documents
-      ? `
-- Run every document or analysis script with \`/usr/local/lib/athanor/python/bin/python3\`, which is the one interpreter this computer probes for and every vetted procedure names. Read the Document toolchain line in your runtime context before committing to a route: a procedure built on a binary this computer does not have fails one shell call at a time, in front of the user.
-- A PDF whose pagination matters is typeset with typst from a .typ source kept beside it; converting a word-processor file instead gives up control of where the pages break. print_pdf captures a page the browser is showing, not a document you are authoring.
-- Look at a document before you publish it: \`athanor-office-convert IN OUT\` takes an Office file to PDF and fails when the bytes are not there instead of exiting zero, \`pdftoppm\` renders a PDF's pages, and image_read is how you see them. Publishing an Office file also attaches a PDF review copy for the user.`
-      : '\n- This computer has no document toolchain: no pinned Python interpreter, no typst, no athanor-office-convert. Say so rather than beginning a procedure that cannot finish.'
+      ? '\n- Managed Python is available at `/usr/local/lib/athanor/python/bin/python3`. The runtime toolchain lists installed capabilities; choose languages, tools and output formats to suit this request.'
+      : '\n- The managed document toolchain is unavailable. Inspect installed alternatives when the task needs one.'
   }
 - No model weights run on this computer. generate_media uses the owner's provider; ffmpeg through shell edits existing video.
 - An app you start binds to 127.0.0.1 on an unprivileged port and is reached with publish_preview; never tell the user to open this machine's localhost.
 
 ## How to work
+- Follow the user’s requested outcome and domain. Available tools, skills and project history describe capabilities and context; they do not imply a scientific, coding, document or other workflow.
 - Use load_tools to enable a tool group before calling a tool missing from the current definitions.
 - Start material work with a concise user-visible plan and follow the newest plan version. Preserve useful intermediate work in the workspace.
 - Keep acting until the requested outcome is verified. Make safe, reversible assumptions when details are minor and say in your reply which way you went; use the ask tool only when a missing choice materially changes the result, requires new authority, or needs human-only input, and never before you have looked at anything.

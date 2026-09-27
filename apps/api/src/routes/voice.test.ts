@@ -985,3 +985,113 @@ it('replaces a stalled transport only with the original browser recovery key and
   socket.send(JSON.stringify({ type: 'ping' }));
   await vi.waitFor(() => expect(events).toContainEqual({ type: 'pong' }));
 });
+
+it('keeps project context and discussion tools absent without explicit voice context selection', async () => {
+  const f = await fixture();
+  const readEvents = vi.spyOn(store, 'listTaskEvents');
+  try {
+    const c = await f.connect(await created(f));
+    const configuration = c.provider.sent[0]!.session as { tools: { name: string }[] };
+    expect(configuration.tools.map((tool) => tool.name)).toEqual([
+      'read_task_status',
+      'request_task_work'
+    ]);
+    expect(c.provider.sent.filter((event) => event.type === 'conversation.item.create')).toEqual(
+      []
+    );
+    expect(readEvents).not.toHaveBeenCalled();
+  } finally {
+    readEvents.mockRestore();
+  }
+});
+
+it('restores an opted-in discussion after provider loss while holding the original uncertain receipt', async () => {
+  const f = await fixture();
+  await database.query('UPDATE tasks SET prompt_ciphertext=$2 WHERE id=$1', [
+    f.task.id,
+    JSON.stringify(
+      encryptJson(
+        { prompt: 'Plan a family holiday. OPENING_CANARY' },
+        key,
+        `task-prompt:${f.task.workspaceId}`
+      )
+    )
+  ]);
+  await store.appendTaskEvent({
+    taskId: f.task.id,
+    kind: 'tool_result',
+    summary: 'Private output',
+    payloadCiphertext: encryptJson(
+      { secret: 'PRIVATE_TOOL_CANARY' },
+      key,
+      `task-event:${f.task.id}`
+    )
+  });
+  const started = await f.start(randomUUID(), { ...f.selection, shareTaskContext: true });
+  expect(started.statusCode, started.body).toBe(200);
+  const connection = started.json<VoiceConnection>();
+  const c = await f.connect(connection);
+  const initial = JSON.stringify(c.provider.sent);
+  expect(initial).toContain('OPENING_CANARY');
+  expect(initial).not.toContain('PRIVATE_TOOL_CANARY');
+  await begin(c);
+  c.provider.event({
+    type: 'response.function_call_arguments.done',
+    response_id: 'resp_one',
+    name: 'save_discussion',
+    call_id: 'discussion-one',
+    arguments: JSON.stringify({ summary: 'Prefer trains and a quiet hotel. NOTE_CANARY' })
+  });
+  await vi.waitFor(async () => expect(await voice.discussion(f.user.id, f.task.id)).not.toBeNull());
+  const saved = await database.query(
+    'SELECT ciphertext FROM voice_discussion_notes WHERE task_id=$1',
+    [f.task.id]
+  );
+  expect(saved.rows).toHaveLength(1);
+  expect(JSON.stringify(saved.rows)).not.toContain('NOTE_CANARY');
+  c.provider.close();
+  await vi.waitFor(async () =>
+    expect((await voice.get(f.user.id, connection.session.id))?.session.cleanupPending).toBe(false)
+  );
+  const receipt = await voice.pending(f.user.id, connection.session.id);
+  expect(receipt).toHaveLength(1);
+  const recovered = await f.app.inject({
+    method: 'POST',
+    url: `/v1/tasks/${f.task.id}/voice-sessions/${connection.session.id}/reconnect`,
+    headers: f.headers,
+    payload: { recoveryKey: connection.recoveryKey }
+  });
+  expect(recovered.statusCode, recovered.body).toBe(200);
+  const next = recovered.json<VoiceConnection>();
+  expect(next.session).toMatchObject({
+    id: connection.session.id,
+    status: 'preparing',
+    providerGeneration: 1,
+    pendingUsd: receipt[0]!.reservedUsd,
+    maxSpendUsd: connection.session.maxSpendUsd,
+    deadlineAt: connection.session.deadlineAt
+  });
+  const socket = await f.openSocket(next.socketPath);
+  const events: Record<string, unknown>[] = [];
+  socket.on('message', (data) =>
+    events.push(JSON.parse(Buffer.from(data as Buffer).toString()) as Record<string, unknown>)
+  );
+  socket.send(JSON.stringify({ type: 'ticket', ticket: next.ticket }));
+  await vi.waitFor(() => expect(f.providers).toHaveLength(2));
+  const provider = f.providers[1]!;
+  await vi.waitFor(() => expect(provider.sent[0]?.type).toBe('session.update'));
+  provider.event({ type: 'session.updated', session: provider.sent[0]!.session });
+  await vi.waitFor(() => expect(events.some((event) => event.type === 'ready')).toBe(true));
+  expect(JSON.stringify(provider.sent)).toContain('NOTE_CANARY');
+  expect(provider.sent.some((event) => event.type === 'response.create')).toBe(false);
+  expect(await voice.pending(f.user.id, connection.session.id)).toEqual(receipt);
+  const note = await f.app.inject({
+    url: `/v1/tasks/${f.task.id}/voice-discussion`,
+    headers: f.headers
+  });
+  expect(note.json()).toMatchObject({
+    summary: 'Prefer trains and a quiet hotel. NOTE_CANARY',
+    interpretation: true
+  });
+  socket.close();
+});

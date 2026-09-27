@@ -16,7 +16,7 @@ export const workflowDescription = () => ({
   recovery:
     'Resume explicitly with workflowId and optional changed parameters. Completed unchanged stages may be cached; changed inputs or code invalidate their dependents. Keep both the cache and work directories. Lost launch replies are reconciled without repeating a command. Cancel stops the job and children; wait for exit before resuming.',
   verification:
-    'Inspect failed stage exit codes and logs. Independently validate final scientific results. Engine completion is not scientific validation.'
+    'Inspect failed stage exit codes and logs. Check final results against the requested outcome; successful execution alone does not establish correctness.'
 });
 export async function executeWorkflowTool(
   context: ToolContext,

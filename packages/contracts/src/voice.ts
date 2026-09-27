@@ -30,7 +30,8 @@ export const VoiceStartRequest = z
     privacyRoute: z.enum(['provider_zdr', 'external']),
     maxSpendUsd: z.number().finite().positive().max(VOICE_MAX_SPEND_USD),
     lifetimeSeconds: z.number().int().min(30).max(VOICE_MAX_SESSION_SECONDS).default(600),
-    expectedRouteProof: z.string().min(1).max(128)
+    expectedRouteProof: z.string().min(1).max(128),
+    shareTaskContext: z.boolean().optional()
   })
   .strict();
 export type VoiceStartRequest = z.infer<typeof VoiceStartRequest>;
@@ -70,6 +71,8 @@ export type VoiceSessionStatus =
   | 'lost'
   | 'usage_uncertain';
 export interface VoiceSession {
+  shareTaskContext?: boolean;
+  providerGeneration?: number;
   id: string;
   taskId: string;
   workspaceId: string;

@@ -3978,5 +3978,17 @@ CREATE TABLE IF NOT EXISTS model_throughput_ceiling (
       body_ciphertext JSONB NOT NULL,
       PRIMARY KEY(capture_id,sequence)
     );`
+  },
+  {
+    version: 111,
+    name: 'voice_discussion_notes',
+    sql: `CREATE TABLE voice_discussion_notes (
+      task_id UUID PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE,
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      session_id UUID NOT NULL REFERENCES voice_sessions(id) ON DELETE CASCADE,
+      ciphertext JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`
   }
 ] as const;

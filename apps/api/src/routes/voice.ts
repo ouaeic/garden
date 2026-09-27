@@ -32,6 +32,7 @@ import {
   type TaskContinuationSnapshot
 } from '../task-continuation.js';
 import { VoiceController } from '../voice/controller.js';
+import { readVoiceDiscussion, saveVoiceDiscussion, voiceTaskContext } from '../voice/context.js';
 import type { FastifyRequest } from 'fastify';
 
 interface VoiceConfiguration {
@@ -187,6 +188,28 @@ export async function registerVoiceRoutes(
   };
   app.get('/v1/voice-sessions', async (request) => voice.listOwner(owner(request).user.id));
   app.get('/v1/voice/models', async (request) => modelOptions(owner(request).user.id));
+  app.get<{ Params: { taskId: string } }>('/v1/tasks/:taskId/voice-discussion', async (request) =>
+    readVoiceDiscussion(context, owner(request).user.id, request.params.taskId, voice)
+  );
+  app.delete<{ Params: { taskId: string } }>(
+    '/v1/tasks/:taskId/voice-discussion',
+    async (request) => {
+      const { user } = owner(request);
+      if (!(await store.getTask(user.id, request.params.taskId))) throw unavailable();
+      if (
+        (await voice.list(user.id, request.params.taskId)).some((session) =>
+          active.has(session.status)
+        )
+      )
+        throw new AthanorError(
+          'voice_still_active',
+          'End live voice before clearing its saved discussion.',
+          409
+        );
+      await voice.clearDiscussion(user.id, request.params.taskId);
+      return { cleared: true };
+    }
+  );
   app.post<{ Params: { taskId: string } }>('/v1/tasks/:taskId/voice-sessions', async (request) => {
     const { user, authHash } = owner(request),
       selection = VoiceStartRequest.parse(request.body);
@@ -246,6 +269,7 @@ export async function registerVoiceRoutes(
     const session: VoiceSession = {
       id,
       taskId: task.id,
+      shareTaskContext: selection.shareTaskContext === true,
       workspaceId: task.workspaceId,
       provider: 'openai',
       providerModelId: model.modelId,
@@ -314,7 +338,7 @@ export async function registerVoiceRoutes(
         record = await read(user.id, request.params.sessionId);
       if (record.session.taskId !== request.params.taskId) throw unavailable();
       const controller = controllers.get(record.session.id);
-      if (controller) {
+      if (controller && !controller.closed) {
         await controller.stop();
         controllers.delete(record.session.id);
       } else if (record.session.status === 'preparing')
@@ -436,26 +460,44 @@ export async function registerVoiceRoutes(
       if (!original.recoveryKey || sha256(recoveryKey) !== sha256(original.recoveryKey))
         throw unavailable();
       const controller = controllers.get(saved.session.id);
-      if (
-        closing ||
-        saved.session.taskId !== request.params.taskId ||
-        saved.authHash !== authHash ||
-        !saved.controllerId ||
-        !controller?.reconnectable
-      )
+      if (closing || saved.session.taskId !== request.params.taskId || saved.authHash !== authHash)
         throw unavailable();
       const ticket = randomBytes(32).toString('base64url');
       const ticketExpiresAt = new Date(
         Math.min(Date.now() + 30_000, Date.parse(saved.session.deadlineAt))
       ).toISOString();
-      const record = await voice.reconnectTicket({
-        userId: user.id,
-        id: saved.session.id,
-        authHash,
-        controllerId: saved.controllerId,
-        ticketHash: sha256(ticket),
-        expiresAt: ticketExpiresAt
-      });
+      const configuration = decryptJson<VoiceConfiguration>(
+        saved.configuration,
+        keyFor(context, user.id),
+        configAad(saved.session.id)
+      );
+      if (!controller?.reconnectable && !configuration.selection.shareTaskContext)
+        throw unavailable();
+      if (controller && !controller.reconnectable && !controller.closed)
+        throw new AthanorError(
+          'voice_recovery_wait',
+          'Voice is releasing its previous connection.',
+          503
+        );
+      const record =
+        controller?.reconnectable && saved.controllerId
+          ? await voice.reconnectTicket({
+              userId: user.id,
+              id: saved.session.id,
+              authHash,
+              controllerId: saved.controllerId,
+              ticketHash: sha256(ticket),
+              expiresAt: ticketExpiresAt
+            })
+          : await voice.recoveryTicket({
+              userId: user.id,
+              id: saved.session.id,
+              authHash,
+              ticketHash: sha256(ticket),
+              expiresAt: ticketExpiresAt,
+              minimumReservationUsd: realtimeReservationUsd(configuration.model)
+            });
+      if (controller?.closed) controllers.delete(saved.session.id);
       return {
         session: record.session,
         ticket,
@@ -565,6 +607,22 @@ export async function registerVoiceRoutes(
             model: configuration.model,
             store: voice,
             authorize,
+            ...(configuration.selection.shareTaskContext
+              ? {
+                  taskContext: () =>
+                    voiceTaskContext(context, user.id, record.session.taskId, voice, true),
+                  saveDiscussion: (summary: string) =>
+                    saveVoiceDiscussion(
+                      context,
+                      user.id,
+                      record.session.taskId,
+                      voice,
+                      record.session.id,
+                      controllerId,
+                      summary
+                    )
+                }
+              : {}),
             taskStatus: async () => {
               const task = await store.getTask(user.id, record.session.taskId);
               return task
@@ -662,7 +720,9 @@ export async function registerVoiceRoutes(
   app.addHook('onClose', async () => {
     closing = true;
     clearInterval(timer);
-    await Promise.allSettled([...controllers.values()].map((c) => c.stop()));
+    await Promise.allSettled(
+      [...controllers.values()].map((c) => c.stop('lost', 'voice_server_restart'))
+    );
     controllers.clear();
     cache.clear();
   });
