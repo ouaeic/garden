@@ -182,18 +182,19 @@ export default function DeskSupport({
                   setSurfaceLocation({ panel: 'activity' }, true);
                 }}
               >
-                <time>
-                  {new Date(task.updatedAt).toLocaleTimeString(undefined, {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </time>
+                <i className={`garden-project-dot status-${task.status}`} aria-hidden="true" />
                 <span>
                   <strong>{task.title}</strong>
                   <small>{task.activity?.latest ?? taskStatusLabel(task)}</small>
                   {task.id === taskId && changeSummary(changes[task.id]) && (
                     <small>{changeSummary(changes[task.id])}</small>
                   )}
+                  <time dateTime={task.updatedAt}>
+                    {new Date(task.updatedAt).toLocaleTimeString(undefined, {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </time>
                 </span>
               </button>
             ))}

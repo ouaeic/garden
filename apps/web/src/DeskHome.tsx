@@ -43,7 +43,9 @@ export default function DeskHome({
       <div className="desk-home-intro">
         <header>
           <p className="eyebrow">Your garden</p>
-          <h1>Space for your next idea.</h1>
+          <h1>
+            Space for your <em>next idea.</em>
+          </h1>
           <p className="muted">
             {resume
               ? 'Your work is here. Pick up where you left off.'
@@ -74,21 +76,27 @@ export default function DeskHome({
           <section className="desk-resume-card" aria-label="Continue your work">
             <LivingBackdrop />
             <ScrollRegion label="Current project summary" className="desk-card-scroll">
-              <span className="eyebrow">Continue your work</span>
+              <span className="desk-resume-eyebrow eyebrow">
+                <span className="desk-seed" aria-hidden="true" />
+                Continue your work
+              </span>
               <h2>{resumeProject?.title ?? resume.title}</h2>
               {(resume.activity?.currentStep ?? resume.activity?.latest) &&
                 (resume.activity?.currentStep ?? resume.activity?.latest) !==
                   taskStatusLabel(resume) && (
                   <p>{resume.activity?.currentStep ?? resume.activity?.latest}</p>
                 )}
-              <span className="desk-resume-status">
-                <i className={`garden-project-dot status-${resume.status}`} />
-                {taskStatusLabel(resume)}
-                {working.length > 1 && ` · ${working.length} conversations working`}
-              </span>
             </ScrollRegion>
-            <Button onClick={() => onTask(resume.id)}>
-              Open project <ArrowRight size={16} />
+            <span className="desk-resume-status">
+              <i className={`garden-project-dot status-${resume.status}`} />
+              {taskStatusLabel(resume)}
+              {working.length > 1 && ` · ${working.length} conversations working`}
+            </span>
+            <Button className="desk-resume-open" onClick={() => onTask(resume.id)}>
+              <span>Open project</span>
+              <span className="desk-resume-arrow" aria-hidden="true">
+                <ArrowRight size={19} />
+              </span>
             </Button>
           </section>
         ) : (
@@ -118,8 +126,8 @@ export default function DeskHome({
               return (
                 <button className="desk-action-row" key={task.id} onClick={() => onTask(task.id)}>
                   <span className="desk-action-copy">
-                    <span className="eyebrow">{taskStatusLabel(task)}</span>
                     <strong>{title}</strong>
+                    <span className="desk-action-status">{taskStatusLabel(task)}</span>
                     {detail && detail !== title && detail !== taskStatusLabel(task) && (
                       <span>{detail}</span>
                     )}
@@ -130,10 +138,11 @@ export default function DeskHome({
             })}
             {updates.map((task) => (
               <button className="desk-update-row" key={task.id} onClick={() => onTask(task.id)}>
-                <time>{shortDate(task.updatedAt)}</time>
-                <span>
+                <i className={`garden-project-dot status-${task.status}`} aria-hidden="true" />
+                <span className="desk-update-copy">
                   <strong>{task.title}</strong>
                   <small>{task.activity?.latest ?? taskStatusLabel(task)}</small>
+                  <time dateTime={task.updatedAt}>{shortDate(task.updatedAt)}</time>
                 </span>
                 <ArrowUpRight size={14} aria-hidden="true" />
               </button>
@@ -162,8 +171,10 @@ export default function DeskHome({
                 key={project.id}
                 onClick={() => onProject(project.id)}
               >
-                <FolderOpen size={19} />
-                <span>
+                <span className="desk-project-icon" aria-hidden="true">
+                  <FolderOpen size={19} strokeWidth={1.5} />
+                </span>
+                <span className="desk-project-copy">
                   <strong>{project.title}</strong>
                   <small>
                     {project.attentionCount

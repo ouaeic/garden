@@ -317,14 +317,20 @@ export function TaskOutputs({
                 </figcaption>
               </figure>
             ) : (
-              <div className="garden-preview-state" role="status">
-                {preview.status !== 'ready'
-                  ? (preview.detail ?? 'The live app is not available right now.')
-                  : dismissed === previewKey
-                    ? 'Embedded preview closed. Open the app or view it here when you are ready.'
-                    : frameState === 'failed'
-                      ? 'The app could not be opened. Use View here to retry.'
-                      : 'Opening the live app…'}
+              <div className="garden-preview-state garden-preview-placeholder" role="status">
+                <Globe size={28} strokeWidth={1.25} aria-hidden="true" />
+                <strong>
+                  {preview.status !== 'ready' ? 'Preview unavailable' : 'Project preview'}
+                </strong>
+                <p>
+                  {preview.status !== 'ready'
+                    ? (preview.detail ?? 'The live app is not available right now.')
+                    : dismissed === previewKey
+                      ? 'Embedded preview closed. Open the app or view it here when you are ready.'
+                      : frameState === 'failed'
+                        ? 'The app could not be opened. Use View here to retry.'
+                        : 'Opening the live app…'}
+                </p>
               </div>
             )}
             <div className="garden-output-actions">
@@ -375,7 +381,9 @@ export function TaskOutputs({
                   Download {files.length === 1 ? 'source' : 'file'}
                 </a>
               )}
-              {preview.detail && <p className="muted">{preview.detail}</p>}
+              {preview.detail && (preview.status === 'ready' || captured) && (
+                <p className="muted">{preview.detail}</p>
+              )}
             </div>
             {sharedLink?.id === preview.id &&
               (sharedLink.copied ? (
