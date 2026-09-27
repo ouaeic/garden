@@ -1,3 +1,5 @@
+import { runtimeValue } from '@athanor/core';
+import { runtimeDate, runtimeUUID } from '@athanor/core';
 import { conversationContext } from './conversation-context.js';
 /**
  * The window itself: what goes in front of the trajectory, what is refreshed at the tail on every
@@ -13,7 +15,7 @@ import { conversationContext } from './conversation-context.js';
  * (#82) - so this is a pure move. The comments those fixes left behind are the record of it and are
  * carried across byte for byte.
  */
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import type { TaskPlanStep, WebToolPlan } from '@athanor/contracts';
 import {
   ownerMessageContent,
@@ -353,7 +355,7 @@ export const refreshRuntimeContext = (deps: WindowDeps, input: RuntimeContextInp
   let content = runtimeContext(
     { ...workspace, securityMode: task.securityMode },
     deps.config.PREVIEW_BASE_URL,
-    { now: new Date(), timeZone },
+    { now: runtimeDate(), timeZone },
     toolchainSummary,
     machineSummary,
     unattended,
@@ -645,7 +647,9 @@ export const assemblePreamble = async (deps: WindowDeps, input: PreambleInput): 
   // from the day it was written, and none of it ever reached a model: the only caller of
   // builtinSkillLibrary() was a name-collision check, while the preamble told the model to
   // consult an index that was not in its context. This block is the wire.
-  const builtinSkills = skillCatalogBlock(builtinSkillLibrary());
+  const builtinSkills = runtimeValue('skills.catalog', () =>
+    skillCatalogBlock(builtinSkillLibrary())
+  );
   {
     const userMemory = memoryEntries
       .filter((entry) => entry.target === 'user')
@@ -814,17 +818,17 @@ export const refreshActivePlan = async (
   if (!plan && createFallback) {
     const steps: TaskPlanStep[] = [
       {
-        id: randomUUID(),
+        id: runtimeUUID(),
         title: 'Inspect the request, inputs, and current workspace state',
         status: 'in_progress'
       },
       {
-        id: randomUUID(),
+        id: runtimeUUID(),
         title: 'Complete the requested work and preserve useful intermediate results',
         status: 'pending'
       },
       {
-        id: randomUUID(),
+        id: runtimeUUID(),
         title: 'Verify the outcome and publish every finished deliverable',
         status: 'pending'
       }

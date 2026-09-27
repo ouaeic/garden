@@ -1,5 +1,6 @@
+import { runtimeUUID } from '@athanor/core';
 import { botWallSite } from './provenance.js';
-import { randomUUID } from 'node:crypto';
+
 import { AthanorError, encryptJson } from '@athanor/core';
 import type { DataStore, TaskRecord } from '@athanor/data';
 import type { ModelToolCall } from '@athanor/model-gateway';
@@ -97,7 +98,7 @@ export async function askUser(
     .trim()
     .replace(/\s+/g, ' ')
     .slice(0, 400);
-  const id = randomUUID();
+  const id = runtimeUUID();
   state.questionsAsked = (state.questionsAsked ?? 0) + 1;
   state.question = {
     id,
@@ -168,7 +169,7 @@ export async function parkBrowserHandoff(
     url: wall.url,
     ...(wall.tabId ? { tabId: wall.tabId } : {})
   };
-  state.question = { id: randomUUID(), question, askedAtStep: state.step, waiting: true, handoff };
+  state.question = { id: runtimeUUID(), question, askedAtStep: state.step, waiting: true, handoff };
   delete state.browserHandoff;
   state.messages.push({
     role: 'assistant',

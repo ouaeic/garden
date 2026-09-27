@@ -1,3 +1,4 @@
+import { runtimeNow, runtimeUUID } from '@athanor/core';
 /**
  * Parking a turn on an approval card: the card, the calls behind it, and the saved state.
  *
@@ -15,7 +16,7 @@
  * can answer the decision before the exact pending call is available to the next worker.
  */
 import { encryptJson } from '@athanor/core';
-import { randomUUID } from 'node:crypto';
+
 import type { DataStore, TaskRecord } from '@athanor/data';
 import type { ModelToolCall } from '@athanor/model-gateway';
 import type { AgentState, AgentWorkerConfig } from '../agent-state.js';
@@ -42,7 +43,7 @@ export const parkForApproval = async (
   deferredCalls: readonly ModelToolCall[]
 ): Promise<void> => {
   const origin = approvalOrigin(state);
-  const approvalId = randomUUID();
+  const approvalId = runtimeUUID();
   state.pending = {
     approvalId,
     toolCall: call,
@@ -104,7 +105,7 @@ export const parkForApproval = async (
       `approval:${task.id}`
     ),
     previewHash: approvalPreviewHash(key, call.name, call.arguments),
-    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    expiresAt: new Date(runtimeNow() + 24 * 60 * 60 * 1000),
     actualComputeCredits: state.credits,
     agentStateCiphertext: encryptJson(state, key, `task-state:${task.id}`)
   });

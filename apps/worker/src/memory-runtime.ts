@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto';
+import { runtimeDate, runtimeUUID } from '@athanor/core';
+
 import {
   AthanorError,
   buildMemoryItemIndex,
@@ -444,7 +445,7 @@ export const recallMemory = async (input: MemoryRecallInput): Promise<MemoryReca
   const candidates = await input.store.recallMemoryCandidates({
     workspaceId: input.workspaceId,
     plan: planMemoryQuery(query, memoryIndexKey(input.dataKey)),
-    now: input.now ?? new Date(),
+    now: input.now ?? runtimeDate(),
     // A fixed budget, not a clamped request. There used to be a `budgetTokens` input clamped
     // between 256 and a 4,000 ceiling, and nothing could ever set it: the tool schema is
     // `additionalProperties: false` and never declared the field, so every recall this computer
@@ -2688,7 +2689,7 @@ export const recordTurnEpisode = async (input: {
     ...(input.remainingRisks ? { remainingRisks: input.remainingRisks.map(redactText) } : {}),
     ...(input.artifacts ? { artifacts: input.artifacts.map(redactText) } : {})
   });
-  const episodeId = randomUUID();
+  const episodeId = runtimeUUID();
   await input.store.createMemoryItem({
     id: episodeId,
     userId: input.userId,
@@ -3021,7 +3022,7 @@ export const recordTurnEpisode = async (input: {
       const { content, index } = procedureFromCheck(check, indexKey);
       await input.store
         .createMemoryItem({
-          id: randomUUID(),
+          id: runtimeUUID(),
           userId: input.userId,
           workspaceId: input.workspaceId,
           kind: 'procedure',

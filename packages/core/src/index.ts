@@ -31,3 +31,4 @@ export * from './account-connectors.js';
 export type { AccountOperation } from './account-operation.js';
 
 export * from './private-diagnostic-export.js';
+export * from './runtime-observations.js';

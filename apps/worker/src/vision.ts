@@ -1,3 +1,4 @@
+import { runtimeNow } from '@athanor/core';
 /**
  * Who looks at a picture the lead model cannot see, and what the registry rows that decision is
  * taken against cost to read.
@@ -76,7 +77,7 @@ export const currentCatalog = async (
   deps: Pick<VisionDeps, 'store' | 'catalogCache' | 'now'>,
   fallback: ModelRelease[]
 ): Promise<ModelRelease[]> => {
-  const now = deps.now?.() ?? Date.now();
+  const now = deps.now?.() ?? runtimeNow();
   const cached = deps.catalogCache.current;
   if (cached && now - cached.readAt < MODEL_CATALOG_CACHE_MS) return cached.rows;
   const rows = (await deps.store.listModels().catch(() => [])) as unknown as ModelRelease[];

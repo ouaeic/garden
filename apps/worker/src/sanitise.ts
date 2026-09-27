@@ -1,3 +1,4 @@
+import { runtimeValue } from '@athanor/core';
 /**
  * The two things done to untrusted text on its way into a window: the characters a person reading
  * the same page cannot see are removed, and what is left is fenced off as data.
@@ -87,7 +88,8 @@ export const sanitiseUntrusted = <T>(value: T): T => {
  * attacker would have to land is a one-shot one: the token is new for every result and a page that
  * closes the wrong fence closes nothing.
  */
-const fenceToken = (): string => randomBytes(4).toString('hex');
+const fenceToken = (): string =>
+  runtimeValue('untrusted.fence', () => randomBytes(4).toString('hex'));
 
 /** The opening marker for a token, exported so a test can assert on the exact shape. */
 export const untrustedFenceOpen = (token: string): string => `[untrusted-data ${token}]`;

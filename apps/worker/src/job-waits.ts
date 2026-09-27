@@ -1,5 +1,6 @@
+import { runtimeClearTimer, runtimeSetTimeout, runtimeUUID } from '@athanor/core';
 import { invalidateWorkspaceReadCache } from './read-invalidation.js';
-import { randomUUID } from 'node:crypto';
+
 import { decryptJson, encryptJson, unwrapDataKey } from '@athanor/core';
 import type { DataStore, TaskRecord } from '@athanor/data';
 import type { ModelRelease, WebToolPlan } from '@athanor/contracts';
@@ -105,7 +106,7 @@ export async function parkProcessWait(
     });
   delete state.inFlight;
   state.step += 1;
-  const id = randomUUID();
+  const id = runtimeUUID();
   state.jobWaitId = id;
   await deps.store.parkTaskForJobs({
     id,
@@ -292,11 +293,11 @@ export async function runJobWaitLoop(options: {
     }
     await new Promise<void>((resolve) => {
       const finish = () => {
-        clearTimeout(timer);
+        runtimeClearTimer(timer);
         options.signal.removeEventListener('abort', finish);
         resolve();
       };
-      const timer = setTimeout(finish, 15_000);
+      const timer = runtimeSetTimeout(finish, 15_000);
       options.signal.addEventListener('abort', finish, { once: true });
       if (options.signal.aborted) finish();
     });

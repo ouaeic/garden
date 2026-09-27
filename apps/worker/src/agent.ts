@@ -1,12 +1,24 @@
-import { withPrivateDiagnostics } from '@athanor/core';
+import {
+  runtimeClearTimer,
+  runtimeDate,
+  runtimeSetInterval,
+  runtimeSleep,
+  runtimeUUID
+} from '@athanor/core';
+import {
+  withPrivateDiagnostics,
+  observedObject,
+  runtimeObservations,
+  runtimeCall,
+  runtimeValue
+} from '@athanor/core';
 import { TaskDiagnosticCapture } from './diagnostic-capture.js';
 import { askUser, parkBrowserHandoff, saveQuestion } from './questions.js';
 import { BrowserActionReceipt } from '@athanor/contracts';
 import { browserActionRequestId } from './browser-action-receipts.js';
 import { codingMissionAdapter } from './coding-mission-gateway.js';
 import type { ReasoningEffort } from '@athanor/contracts';
-import { randomUUID } from 'node:crypto';
-import { setTimeout as delay } from 'node:timers/promises';
+
 import {
   MAX_AGENT_NOTIFICATIONS_PER_TASK,
   UNKNOWN_SURFACES,
@@ -312,7 +324,13 @@ export class AgentWorker {
   ) {
     if (masterKey.byteLength !== 32) throw new Error('Agent worker master key must be 32 bytes');
     this.#masterKey = Buffer.from(masterKey);
-    this.#runner = new AgentRunnerClient(config.WORKSPACE_RUNNER_URL, runnerSharedSecret);
+    store = observedObject(store, 'store');
+    this.store = store;
+    this.mediaRouting = observedObject(mediaRouting, 'mediaRouting');
+    this.#runner = observedObject(
+      new AgentRunnerClient(config.WORKSPACE_RUNNER_URL, runnerSharedSecret),
+      'runner'
+    );
     this.#claim = {
       store,
       config,
@@ -574,11 +592,14 @@ export class AgentWorker {
       const privateRoute = task.privacyRoute === 'provider_zdr' || secret.enforceZeroDataRetention;
       gateway.registerDecisions(
         model.provider,
-        new OpenRouterDecisionAdapter({
-          baseUrl: secret.baseUrl,
-          apiKey: secret.apiKey,
-          enforceZeroDataRetention: privateRoute
-        })
+        observedObject(
+          new OpenRouterDecisionAdapter({
+            baseUrl: secret.baseUrl,
+            apiKey: secret.apiKey,
+            enforceZeroDataRetention: privateRoute
+          }),
+          'decision'
+        )
       );
       return {
         gateway,
@@ -590,16 +611,19 @@ export class AgentWorker {
       model.provider,
       nativeInputAdapter(
         codingMissionAdapter(
-          createModelAdapter({
-            baseUrl: secret.baseUrl,
-            ...(secret.apiKey ? { apiKey: secret.apiKey } : {}),
-            provider: model.provider,
-            privacyRoute: model.privacyRoute,
-            appUrl: this.config.PUBLIC_APP_URL,
-            appTitle: 'garden',
-            enforceZeroDataRetention:
-              secret.provider === 'openrouter' && secret.enforceZeroDataRetention
-          }),
+          observedObject(
+            createModelAdapter({
+              baseUrl: secret.baseUrl,
+              ...(secret.apiKey ? { apiKey: secret.apiKey } : {}),
+              provider: model.provider,
+              privacyRoute: model.privacyRoute,
+              appUrl: this.config.PUBLIC_APP_URL,
+              appTitle: 'garden',
+              enforceZeroDataRetention:
+                secret.provider === 'openrouter' && secret.enforceZeroDataRetention
+            }),
+            'model'
+          ),
           this.store,
           task,
           model,
@@ -608,9 +632,8 @@ export class AgentWorker {
         this.store,
         task,
         model,
-        nativeCredentialBinding(secret),
-        async () =>
-          nativeCredentialBinding(await this.#credentialForModel(task, model), task.privacyRoute),
+        runtimeValue('nativeCredentialBinding', () => nativeCredentialBinding(secret)),
+        async () => this.#observedCredentialBinding(task, model),
         this.config.WORKER_ID
       )
     );
@@ -622,6 +645,13 @@ export class AgentWorker {
         enforceZeroDataRetention: secret.enforceZeroDataRetention
       }
     };
+  }
+
+  async #observedCredentialBinding(task: TaskRecord, model: ModelRelease) {
+    const secret = await this.#credentialForModel(task, model);
+    return runtimeValue('nativeCredentialBinding', () =>
+      nativeCredentialBinding(secret, task.privacyRoute)
+    );
   }
 
   async #withLeaseRenewal<T>(task: TaskRecord, operation: () => Promise<T>): Promise<T> {
@@ -662,7 +692,7 @@ export class AgentWorker {
   ): Promise<void> {
     const turn = state.turn ?? 0;
     if (CHECKPOINT_EXEMPT_TOOLS.has(tool) || state.checkpoint?.turn === turn) return;
-    const checkpointId = randomUUID();
+    const checkpointId = runtimeUUID();
     try {
       const created = await this.#withLeaseRenewal(task, () =>
         this.#runner.checkpoint(task.workspaceId, task.id, { checkpointId, turn })
@@ -992,7 +1022,7 @@ export class AgentWorker {
         // nothing, because the only two writes that should set this column never set it. An
         // ordinary Pause deliberately leaves it null; a resume clears it in the same statement that
         // re-queues the task, so nothing here has to.
-        spendPausedAt: new Date(),
+        spendPausedAt: runtimeDate(),
         agentStateCiphertext: encryptJson(state, key, `task-state:${task.id}`),
         clearLease: true
       });
@@ -1028,7 +1058,7 @@ export class AgentWorker {
       actualComputeCredits: state.credits,
       // The column that tells a pause the owner asked for from one the ceiling imposed. Everything
       // downstream of `spend_paused` reads it and nothing used to write it.
-      spendPausedAt: new Date(),
+      spendPausedAt: runtimeDate(),
       agentStateCiphertext: encryptJson(state, key, `task-state:${task.id}`),
       clearLease: true
     });
@@ -1058,7 +1088,7 @@ export class AgentWorker {
      * see: a task re-queued or re-leased under a running tool call is no longer this run's to
      * finish, and carrying on with it means writing over whoever holds it now.
      */
-    const poll = setInterval(() => {
+    const poll = runtimeSetInterval(() => {
       void this.store
         .taskClaim(task.id)
         .then((claim) => {
@@ -1070,7 +1100,7 @@ export class AgentWorker {
     try {
       return await withRunnerAbort(controller.signal, operation);
     } finally {
-      clearInterval(poll);
+      runtimeClearTimer(poll);
     }
   }
 
@@ -1536,6 +1566,55 @@ export class AgentWorker {
     webPlan: WebToolPlan,
     state: AgentState
   ): Promise<unknown> {
+    if (runtimeObservations()) {
+      const before = structuredClone(state);
+      return runtimeCall(
+        'tool.execute',
+        [call, consequentialApproved, webPlan, before],
+        async () => {
+          let result: unknown;
+          let failed = false;
+          try {
+            result = await this.#executeUnobserved(
+              task,
+              call,
+              key,
+              consequentialApproved,
+              webPlan,
+              state
+            );
+          } catch (error) {
+            result = error;
+            failed = true;
+          }
+          const changed = Object.fromEntries(
+            Object.entries(state).filter(
+              ([name, value]) => JSON.stringify(value) !== JSON.stringify(Reflect.get(before, name))
+            )
+          );
+          const removed = Object.keys(before).filter((name) => !Object.hasOwn(state, name));
+          return { result, failed, changed, removed };
+        }
+      ).then(({ result, failed, changed, removed }) => {
+        if (runtimeObservations()?.mode === 'replay') {
+          Object.assign(state, changed);
+          for (const name of removed) Reflect.deleteProperty(state, name);
+        }
+        if (failed) throw result;
+        return result;
+      });
+    }
+    return this.#executeUnobserved(task, call, key, consequentialApproved, webPlan, state);
+  }
+
+  #executeUnobserved(
+    task: TaskRecord,
+    call: ModelToolCall,
+    key: Uint8Array,
+    consequentialApproved: boolean,
+    webPlan: WebToolPlan,
+    state: AgentState
+  ): Promise<unknown> {
     return executeToolCall(
       {
         store: this.store,
@@ -1769,11 +1848,12 @@ export class AgentWorker {
         if (!latest || ['paused', 'cancelled', 'completed'].includes(latest.status)) return false;
         return this.store.renewTaskLease(task.id, this.config.WORKER_ID, TASK_LEASE_SECONDS);
       },
-      sleep: (milliseconds) => delay(milliseconds)
+      sleep: (milliseconds) => runtimeSleep(milliseconds)
     });
   }
 
   async run(task: TaskRecord): Promise<void> {
+    if (runtimeObservations()?.mode === 'replay') return this.#run(task);
     const capture = await TaskDiagnosticCapture.open(
       this.store,
       task,
@@ -1781,8 +1861,28 @@ export class AgentWorker {
       this.#masterKey
     );
     return capture
-      ? capture.run(() => this.#run(task))
+      ? capture.run(() => this.#run(task), {
+          config: this.config,
+          masterKey: this.#masterKey,
+          caches: this.replayCaches(task.workspaceId)
+        })
       : withPrivateDiagnostics(undefined, () => this.#run(task));
+  }
+
+  replayCaches(workspaceId: string) {
+    return {
+      catalog: this.#catalogCache.current,
+      binaries: this.#presentBinaries.get(workspaceId),
+      memoryAt: this.#memoryConsolidatedAt.get(workspaceId)
+    };
+  }
+
+  restoreReplayCaches(workspaceId: string, caches: ReturnType<AgentWorker['replayCaches']>) {
+    if (runtimeObservations()?.mode !== 'replay')
+      throw new Error('Replay state requires an offline runtime');
+    this.#catalogCache.current = caches.catalog;
+    if (caches.binaries) this.#presentBinaries.set(workspaceId, caches.binaries);
+    if (caches.memoryAt !== undefined) this.#memoryConsolidatedAt.set(workspaceId, caches.memoryAt);
   }
 
   async #run(task: TaskRecord): Promise<void> {
@@ -2285,11 +2385,17 @@ export class AgentWorker {
     try {
       const credential = await this.#credentialForModel(task, model);
       if (credential.provider !== 'openrouter' || !credential.apiKey) return;
-      const measured = await fetchGenerationThroughput({
-        baseUrl: this.config.OPENROUTER_BASE_URL,
-        apiKey: credential.apiKey,
-        generationId
-      });
+      const apiKey = credential.apiKey;
+      const measured = await runtimeCall(
+        'provider.throughput',
+        [{ baseUrl: this.config.OPENROUTER_BASE_URL, generationId }],
+        () =>
+          fetchGenerationThroughput({
+            baseUrl: this.config.OPENROUTER_BASE_URL,
+            apiKey,
+            generationId
+          })
+      );
       if (!measured) return;
       await this.store.recordModelThroughputCeiling({
         modelId: model.id,
@@ -2302,6 +2408,26 @@ export class AgentWorker {
   }
 
   async fail(task: TaskRecord, error: unknown, durationMs?: number): Promise<void> {
+    if (runtimeObservations()?.mode === 'replay') return this.#fail(task, error, durationMs);
+    const capture = await TaskDiagnosticCapture.open(
+      this.store,
+      task,
+      this.config.WORKER_ID,
+      this.#masterKey
+    );
+    return capture
+      ? capture.run(() => this.#fail(task, error, durationMs), {
+          config: this.config,
+          masterKey: this.#masterKey,
+          caches: this.replayCaches(task.workspaceId),
+          entry: 'fail',
+          error,
+          durationMs
+        })
+      : withPrivateDiagnostics(undefined, () => this.#fail(task, error, durationMs));
+  }
+
+  async #fail(task: TaskRecord, error: unknown, durationMs?: number): Promise<void> {
     const workspace = await this.store.getWorkspaceById(task.workspaceId).catch(() => null);
     if (
       task.hasCodingFamily &&

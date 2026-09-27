@@ -2230,6 +2230,7 @@ install_runtime_files() {
   install -D -m 0755 scripts/athanor "$(runtime_path /usr/local/bin/athanor)"
   install -D -m 0755 scripts/athanor "$(runtime_path /usr/local/bin/garden)"
   install -D -m 0755 scripts/reproducible-run.py "$(runtime_path /usr/local/bin/garden-run)"
+  install -D -m 0644 scripts/garden_system.py "$(runtime_path /usr/local/lib/athanor/garden_system.py)"
   # Deliberately outside every directory on the agent's PATH, and not executable by the account
   # agent commands run as: named directly it would be a root package install with no capability
   # scope and no approval. An update also removes the copy earlier releases left on the PATH.
@@ -3307,6 +3308,10 @@ uninstall_athanor() {
   run_manifest_path="$(runtime_path /usr/local/bin/garden-run)"
   if cmp -s "$athanor_root/scripts/reproducible-run.py" "$run_manifest_path"; then
     rm -f "$run_manifest_path"
+  fi
+  system_recipe_path="$(runtime_path /usr/local/lib/athanor/garden_system.py)"
+  if cmp -s "$athanor_root/scripts/garden_system.py" "$system_recipe_path"; then
+    rm -f "$system_recipe_path"
   fi
   systemctl daemon-reload
   systemctl reload nginx >/dev/null 2>&1 || true

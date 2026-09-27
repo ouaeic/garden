@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto';
+import { runtimeUUID } from '@athanor/core';
+
 import { AthanorError, privateDiagnostics, recordPrivateDiagnostic } from '@athanor/core';
 import {
   DiagnosticModelRequest,
@@ -47,7 +48,7 @@ export class ModelGateway {
         'The selected connection does not offer decision inference.',
         409
       );
-    const trace = privateDiagnostics() ? randomUUID() : null;
+    const trace = privateDiagnostics() ? runtimeUUID() : null;
     if (trace)
       await recordPrivateDiagnostic('decision_request', () => ({
         id: trace,
@@ -149,7 +150,7 @@ export class ModelGateway {
               : {})
           }
         : request;
-    const trace = privateDiagnostics() ? randomUUID() : null;
+    const trace = privateDiagnostics() ? runtimeUUID() : null;
     if (trace)
       await recordPrivateDiagnostic('model_request', () => ({
         id: trace,

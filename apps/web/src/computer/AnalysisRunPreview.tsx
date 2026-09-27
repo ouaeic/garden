@@ -182,11 +182,15 @@ export default function AnalysisRunPreview({
                 ? 'R library'
                 : setup.kind === 'conda_packages'
                   ? 'Native environment'
-                  : 'Python environment'}
+                  : setup.kind === 'linux_userland'
+                    ? 'Linux environment'
+                    : 'Python environment'}
             </dt>
             <dd>
               {setup.status === 'ready'
-                ? 'Rebuilt from verified local packages'
+                ? setup.kind === 'linux_userland'
+                  ? 'Rebuilt from verified image and saved data'
+                  : 'Rebuilt from verified local packages'
                 : 'Preparation incomplete'}
             </dd>
           </div>
@@ -200,6 +204,43 @@ export default function AnalysisRunPreview({
           </div>
         )}
       </dl>
+      {!!record.services?.length && (
+        <details className="analysis-run-group">
+          <summary>Recorded services ({record.services.length})</summary>
+          <ul className="analysis-run-files">
+            {record.services.map((service) => {
+              const log =
+                location &&
+                analysisFilePath(location.manifestPath, record.directoryFromManifest, service.log);
+              return (
+                <li key={service.name}>
+                  <strong>{service.name}</strong>
+                  <span>
+                    Recorded: {service.status} · process {service.pid}
+                  </span>
+                  <span className="muted">
+                    Started {new Date(service.startedAt).toLocaleString()}
+                    {service.finishedAt && (
+                      <> · stopped {new Date(service.finishedAt).toLocaleString()}</>
+                    )}
+                    {service.exitCode != null && <> · exit {service.exitCode}</>}
+                  </span>
+                  {log && location && (
+                    <a
+                      href={apiUrl(
+                        `/v1/workspaces/${location.workspaceId}/download?${new URLSearchParams({ path: log })}`
+                      )}
+                      download
+                    >
+                      Download current log
+                    </a>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </details>
+      )}
       <FileGroup
         title="Outputs"
         declared={record.spec.outputs}

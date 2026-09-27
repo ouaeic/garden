@@ -1,3 +1,4 @@
+import { runtimeNow } from '@athanor/core';
 /**
  * Turning a model's output into something the timeline can show and the window can hold.
  *
@@ -60,7 +61,7 @@ export const STALL_HEARTBEAT_INTERVAL_MS = 5_000;
  */
 export const createStreamFlusher = (
   intervalMs = STREAM_FLUSH_INTERVAL_MS,
-  now: () => number = () => Date.now()
+  now: () => number = () => runtimeNow()
 ): { push: (delta: string) => string | null; drain: () => string | null } => {
   let pending = '';
   let lastFlush: number | null = null;

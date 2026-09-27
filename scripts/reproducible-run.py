@@ -15,6 +15,9 @@ import subprocess
 import sys
 import uuid
 import re
+import importlib.util
+from functools import lru_cache
+from types import SimpleNamespace
 
 FORMAT = "garden-analysis-run-1"
 MAX_SPEC_BYTES = 1024 * 1024
@@ -22,6 +25,24 @@ MAX_PRODUCER_BYTES = 64 * 1024 * 1024
 # The command and file-viewer identities share the private workspace group.
 WORKSPACE_FILE_MODE = 0o660
 WORKSPACE_DIRECTORY_MODE = 0o770
+
+
+@lru_cache(maxsize=1)
+def system_module():
+    filename = Path(__file__).with_name("garden_system.py")
+    if not filename.is_file():
+        filename = Path("/usr/local/lib/athanor/garden_system.py")
+    definition = importlib.util.spec_from_file_location("garden_system", filename)
+    module = importlib.util.module_from_spec(definition)
+    definition.loader.exec_module(module)
+    return module
+
+
+def system_api():
+    return SimpleNamespace(**{name: globals()[name] for name in [
+        "exact_keys", "relative", "argv", "open_relative", "stat_stamp", "checked_path",
+        "file_identity", "setup_receipt", "atomic_write", "now", "stop_group"
+    ]})
 
 
 def now():
@@ -132,7 +153,7 @@ def validate(spec):
                 raise ValueError("A producer record needs its expected SHA-256")
     input_paths = paths([item["path"] for item in spec["inputs"]])
     env = spec["environment"]
-    exact_keys(env, ["lockFiles", "probes"], ["runtimeOnly", "python", "r", "conda"])
+    exact_keys(env, ["lockFiles", "probes"], ["runtimeOnly", "python", "r", "conda", "system"])
     if "runtimeOnly" in env and not isinstance(env["runtimeOnly"], bool):
         raise ValueError("runtimeOnly must be a boolean")
     env["lockFiles"] = paths(env["lockFiles"])
@@ -159,6 +180,7 @@ def validate(spec):
             or ("python" in env and probe["name"] == "Garden rebuilt Python environment")
             or ("r" in env and probe["name"] == "Garden rebuilt R environment")
             or ("conda" in env and probe["name"] == "Garden rebuilt native environment")
+            or ("system" in env and probe["name"] == "Garden rebuilt Linux environment")
         ):
             raise ValueError("Environment probe names must be nonempty and unique")
         names.add(probe["name"])
@@ -170,6 +192,8 @@ def validate(spec):
     if producer_paths & set(spec["outputs"]):
         raise ValueError("Producer records cannot be analysis outputs")
     files += sorted(producer_paths)
+    if "system" in env:
+        system_module().validate(env["system"], env, files + spec["outputs"], system_api())
     if "python" in env:
         recipe = env["python"]
         exact_keys(recipe, ["interpreter", "directory", "wheels"])
@@ -394,8 +418,8 @@ def stop_group(child):
     child.wait()
 
 
-def probes(spec, root, execution_env=None):
-    result = []
+def probes(spec, root, execution_env=None, system=None):
+    result = [system.identity()] if system else []
     remaining = 256 * 1024
     declared = list(spec["environment"]["probes"])
     recipe = spec["environment"].get("python")
@@ -428,7 +452,7 @@ def probes(spec, root, execution_env=None):
         })
     for probe in declared:
         child = subprocess.Popen(
-            probe["command"],
+            system.command(probe["command"]) if system else probe["command"],
             cwd=root,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -459,7 +483,7 @@ def probes(spec, root, execution_env=None):
                     content.extend(chunk)
             code = child.wait(timeout=max(0.01, deadline - time.monotonic()))
             if code:
-                raise ValueError("Environment probe failed: " + probe["name"])
+                raise ValueError("Environment probe failed (exit " + str(code) + "): " + probe["name"] + ": " + bytes(content).decode("utf-8", errors="replace")[-2000:])
         finally:
             stop_group(child)
             child.stdout.close()
@@ -576,10 +600,10 @@ def read_producer(root, filename, remaining):
     }
 
 
-def capture(spec, root, cache, execution_env=None):
+def capture(spec, root, cache, execution_env=None, system=None):
     return {
         **capture_files(spec, root, cache),
-        "probes": probes(spec, root, execution_env),
+        "probes": probes(spec, root, execution_env, system),
         "platform": {
             "system": platform.system(),
             "release": platform.release(),
@@ -610,6 +634,11 @@ def verify_recipe_hashes(spec, captured):
         for item in [recipe["manager"]] + recipe["packages"]:
             if identities[item["path"]] != item["sha256"]:
                 raise ValueError("Native environment lock changed: " + item["path"])
+    recipe = spec["environment"].get("system")
+    if recipe:
+        for item in system_module().locks(recipe):
+            if identities[item["path"]] != item["sha256"]:
+                raise ValueError("System environment lock changed: " + item["path"])
 
 
 def setup_receipt(receipt, kind, directory):
@@ -897,14 +926,15 @@ def run(spec, root, filename, previous=None):
         "seedCoverage": "declared_by_caller_not_automatically_applied",
         "coverage": "declared_files_and_environment_probes",
         "note": (
-            "Declared local Python, R and native-package recipes rebuild dependencies without fetching packages. Package installation code retains the ordinary command authority. "
-            "Undeclared dependencies, external services and unsaved runtime state are not captured."
+            "Declared local packages or Linux userland images rebuild dependencies without fetching them. Declared service data is restored from its retained archive. "
+            "Commands retain the caller's authority. The host kernel, undeclared dependencies, remote services and unsaved process memory are not restored."
         ),
     }
     if previous:
         receipt["replayedFrom"] = previous["id"]
     atomic_write(filename, receipt)
     child = None
+    system = None
     hash_cache = {}
     try:
         print(
@@ -921,7 +951,10 @@ def run(spec, root, filename, previous=None):
         execution_env = prepare_conda(spec, root, receipt, filename)
         execution_env = prepare_python(spec, root, receipt, filename, execution_env)
         execution_env = prepare_r(spec, root, receipt, filename, execution_env)
-        before = capture(spec, root, hash_cache, execution_env)
+        if "system" in spec["environment"]:
+            system = system_module().SystemEnvironment(spec, root, receipt, filename, system_api())
+            execution_env = system.environment
+        before = capture(spec, root, hash_cache, execution_env, system)
         if any(before[key] != value for key, value in files_before.items()):
             raise ValueError("Declared files changed during environment preparation")
         receipt["before"] = before
@@ -929,14 +962,27 @@ def run(spec, root, filename, previous=None):
             raise ValueError(
                 "Inputs, source, environment locks, version probes or platform changed; execution refused"
             )
+        if system:
+            system.start()
         receipt["status"] = "running"
         receipt["startedAt"] = now()
         atomic_write(filename, receipt)
         print("garden-run: running analysis", file=sys.stderr, flush=True)
-        child = subprocess.Popen(spec["command"], cwd=root, start_new_session=True, env=execution_env)
+        command = system.command(spec["command"]) if system else spec["command"]
+        child = subprocess.Popen(command, cwd=root, start_new_session=True, env=execution_env)
         receipt["pid"] = child.pid
         atomic_write(filename, receipt)
-        code = child.wait()
+        if system and system.services:
+            while True:
+                system.check()
+                try:
+                    code = child.wait(timeout=1)
+                    break
+                except subprocess.TimeoutExpired:
+                    pass
+            system.check()
+        else:
+            code = child.wait()
         receipt["exitCode"] = code
         receipt["commandFinishedAt"] = now()
         receipt["status"] = "verifying"
@@ -946,7 +992,7 @@ def run(spec, root, filename, previous=None):
             file=sys.stderr,
             flush=True,
         )
-        after = capture(spec, root, hash_cache, execution_env)
+        after = capture(spec, root, hash_cache, execution_env, system)
         receipt["dependenciesUnchanged"] = before == after
         if not receipt["dependenciesUnchanged"]:
             raise ValueError(
@@ -974,12 +1020,14 @@ def run(spec, root, filename, previous=None):
     finally:
         if child is not None:
             stop_group(child)
+        if system:
+            system.close()
         receipt["finishedAt"] = now()
         atomic_write(filename, receipt)
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, epilog="Recipes can record existing runtimes or rebuild Python/R packages, native packages, or a Linux userland with saved service data. The installed recipe reference is /opt/athanor/docs/AGENT_RUNTIME.md under Declared native environments.")
     sub = parser.add_subparsers(dest="action", required=True)
     launch = sub.add_parser(
         "run", help="Record a declared run in the current directory"

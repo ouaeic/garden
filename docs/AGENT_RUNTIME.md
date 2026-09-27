@@ -308,7 +308,7 @@ stand alone. The lead remains responsible for every decision, every change, and 
 
 ## Native persistent computer
 
-There is one Linux userland: the host itself. The runner executes as the dedicated `athanor` account
+The default execution environment is the host Linux userland. The runner executes as the dedicated `athanor` account
 with `HOME=/home/athanor`; commands the agent runs get their own `athanor-agent` account, so a
 command cannot read the runner’s process, its capability signing secret, or the browser profile the
 owner’s logins live in. Files, installed programs, browser state, CLI publisher credentials, and
@@ -690,16 +690,17 @@ the boundary, not a stepping stone to another index.
 | Balanced   | Allow               | Confirm                 | Confirm                 |
 | Autonomous | Allow               | Allow                   | Owner-authorized        |
 
-Autonomous is the owner's standing permission for browser and desktop work within the requested
-scope, including uploads, submissions and confirmations. The worker still evaluates the common
+Autonomous is the owner's standing permission for browser, desktop and native mail/calendar work
+within the requested scope, including uploads, submissions, sending and calendar changes. Account
+actions remain limited by the connection's separately granted scopes. The worker evaluates the common
 approval floor and broker preflight; the saved mode supplies the signed consequential-action
 capability. Tool arguments cannot select that mode. The broker checks every action again, including
 batch steps, and still requires takeover for private input or a CAPTCHA. Mode downgrades inherited
 from a parent task remove this authorization. Preparing a draft never authorizes submission.
 
 Provenance checks, private-address restrictions, credential isolation and owner takeover remain
-active. Non-surface tools retain their approval floors for external writes, public publishing,
-destructive operations, durable configuration, connected services and remote execution.
+active. Other tools retain their approval floors for external writes, public publishing,
+destructive operations, durable configuration, other connected services and remote execution.
 
 **A read is a read, however it is spelled.** The floor judges what a shell command does, not what
 shape the model wrote it in. A command wrapped in an inline script — which the catalogue itself tells
@@ -791,8 +792,8 @@ requests or semantic verification of a tool's answer; those contents are deliber
 
 Private recording is a separate owner opt-in in the same disclosure. It starts on the next worker
 turn and records normalized model requests, provider attempts and interrupted outcomes, decision
-inference, selected harness observations and the inputs/results of approval and request-derivation
-checks. It excludes connection credentials, authentication headers and callbacks; it is not an HTTP
+inference, external store/runner observations, tool results and state changes, clocks, random
+identities, callbacks and timers, plus the inputs/results of approval and request-derivation checks. Configured credential values are replaced with placeholders; callbacks are observations rather than executable code; it is not an HTTP
 traffic archive. Bodies are encrypted with the original workspace key before database writes.
 Stopping or deleting fences queued writers. Bounded storage or write failures stop capture without
 stopping the task. The recording limits are defined in `packages/contracts/src/diagnostic-capture.ts`.
@@ -803,10 +804,16 @@ and marks missing or corrupt history incomplete. Its plaintext hash chain detect
 does not authenticate the author of an imported file.
 
 Run `pnpm diagnostic:replay-private path/to/garden-private-diagnostic.ndjson` to re-evaluate recorded
-approval and request-derivation decisions against the installed pure functions, using captured
-clocks. Model attempts and tool observations receive structural checks only. Replay never dispatches
-a recorded tool, contacts a model or reconstructs the complete agent loop. Unsupported formats,
-missing records, open segments and changed decisions are reported rather than counted as agreement.
+approval and request-derivation decisions and replay captured worker turns through the installed
+agent loop. The replay supplies recorded external observations through explicit boundaries; no
+database, provider or tool execution is used. Credentials and encryption keys are replaced with
+synthetic values. Request construction, retries, approval/question transitions, waits, completion
+and failure handling run their real controller logic. Changed requests, missing or extra records,
+unsupported observations and unfinished turns stop replay. Imported files are data, never executable
+callbacks. Older captures without runtime observations report that coverage as unavailable. External
+services, tool implementations, scheduler activity between worker turns and inference are observations,
+not independently reconstructed systems. Agreement demonstrates controller reproducibility, not
+the correctness of a model answer or an external result.
 A recording that starts or stops during a turn may deliberately contain an unfinished segment.
 
 ### Repository metadata isolation
@@ -860,9 +867,30 @@ analysis. The recorded native inventory joins ordinary source, input, lock and o
 The prefix leads the command path and can supply the base interpreters for Python and R recipes.
 Existing environments are never repaired implicitly. Installation scripts retain normal command
 authority; the recipe does not establish a new security boundary. Activation scripts, undeclared
-system libraries, services, kernel and live interpreter state are not recreated automatically.
+system libraries, services, kernel and live interpreter state are not recreated by package recipes.
 The agent chooses an appropriate recipe while preparing the work; no new initial prompt option
 is required.
+
+Linux recipes may instead declare `environment.system`: a local root filesystem archive, optional
+saved service-data archive, and an installed `/usr/bin/bwrap` or `/usr/bin/proot` launcher, each pinned by SHA-256. Archives
+must also appear in `environment.lockFiles`. A fresh `.garden/system` directory holds the restored
+image and data. The image supplies its complete userland; it cannot be combined with package
+recipes. Regular files, directories and confined links are accepted; devices and escaping paths
+are refused. The parent command's approval, network policy and project isolation still apply.
+
+The project appears at `/work` and saved service data at `/state`. Bubblewrap mounts the image
+read-only with fresh temporary, process and device mounts. Where the parent sandbox prevents user
+namespace setup, an explicitly selected PRoot recipe translates guest paths under the existing
+sandbox; it provides temporary storage and selected standard devices, without a host process mount.
+The restored image tree is checksummed before and after execution. PRoot uses ptrace rather than
+CPU emulation and can add overhead for workloads with many system calls; ordinary host jobs do not
+use it. There is no automatic launcher fallback or sandbox relaxation. No host root, credential directory or daemon socket
+is supplied. Declared services have a command and readiness probe. They start before the run,
+remain monitored, and stop when it finishes or fails. Startup deadlines do not limit calculation
+duration. The receipt includes service process identities, timestamps, exit codes and project-local
+logs. A failed service or changed archive prevents a successful receipt. Reconstruction covers
+the declared userland and saved data; the host kernel, remote services, undeclared dependencies
+and live interpreter memory remain outside its scope.
 
 ### Conversation Git working copies
 
@@ -939,8 +967,9 @@ one occurrence or the recurring series. The provider's conditional write rejects
 changes. Partial edits preserve unrelated event fields, conference details and retained attendees'
 responses; timed series use a declared calendar time zone. Attendees may receive provider notices.
 
-The existing connected-service approval floor governs each mutation. Its card previews the change,
-with full arguments available for inspection. The encrypted account operation records its intent
+The connected-service approval floor governs each mutation. Balanced and Review show the change
+with full arguments available for inspection; Autonomous supplies standing task authorization.
+The encrypted account operation records its intent
 before submission. A lost reply triggers inspection of that operation rather than another write.
 An update is reconciled only when its operation marker and requested values are both present;
 absence after deletion establishes absence, without claiming who removed it or that notices were
@@ -950,8 +979,8 @@ delivered. Providers without a verified conditional-event contract do not expose
 
 Connected Google and Microsoft accounts expose separate grants for reading mail, saving drafts and
 sending. Composition uses explicit recipients, subject and body, with workspace attachments read
-only after the existing approval floor admits the action. Sending uses the consequential-action
-floor. Existing accounts acquire no additional permissions automatically. Receipt recovery requires
+only after the approval floor admits the action. Sending uses the consequential-action floor,
+with standing task authorization in Autonomous. Existing accounts acquire no additional permissions automatically. Receipt recovery requires
 mail reading; Microsoft sends also require draft creation access.
 
 Each mutation starts with encrypted intent. Gmail messages retain a stable Message-ID; Microsoft

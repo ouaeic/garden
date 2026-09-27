@@ -60,7 +60,7 @@ export const COVERAGE = {
   send_email: {
     kind: 'direct',
     athanor: 'connector_action{mail_send}',
-    why: 'the connected mailbox sends as the owner; mail_send carries the always-ask tier'
+    why: 'the connected mailbox sends as the owner under the selected permission mode and account grant'
   },
   delete_email: {
     kind: 'absent',

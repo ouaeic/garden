@@ -6,7 +6,7 @@ compatibility: Needs python3 with the venv module, curl and the shell, all insta
 allowed-tools: shell process file_read file_write files_list set_plan set_acceptance notify
 metadata:
   athanor.tier: 'builtin'
-  athanor.version: '1.5.0'
+  athanor.version: '1.6.0'
   athanor.risk: 'workspace'
   athanor.domain: 'science'
 ---
@@ -110,8 +110,27 @@ recipes may layer on the native toolchain using its explicit interpreter paths. 
 inventory and archive hashes support replay; operating-system services, kernel, hardware and
 unsaved interpreter state are outside this recipe. Preserve the complete local archive set.
 
+For a complete Linux userland or a service with saved local data, declare `environment.system`
+instead of package recipes. It takes `directory: ".garden/system"`, an `image` object with local
+archive `path` and `sha256`, an optional `data` archive of the same shape, and `launcher` with the
+installed `/usr/bin/bwrap` or `/usr/bin/proot` path and SHA-256. Put both archives in `lockFiles`.
+Choose the host architecture and include all required interpreters, libraries and configuration
+inside the image. Probe launcher availability through governed commands first. Use PRoot where
+Garden's filesystem sandbox prevents Bubblewrap namespace setup; never relax the sandbox. PRoot
+adds system-call overhead, so keep ordinary host execution for work that needs no image replay.
+
+Optional `services` contain distinct `name`, `command`, `ready` command, and `readySeconds` startup
+deadline. The guest sees project files at `/work`, saved service data at `/state` and temporary
+storage at `/tmp`. Prefer project-local sockets or explicitly configured unprivileged ports.
+Service commands must remain in the foreground. The recorder waits for readiness, monitors them,
+and stops them with the run. Logs and process timestamps appear in the receipt. Preserve a
+consistent data snapshot, not a copy of a database changing during export. Image archives must
+contain regular files, directories and confined links, without device nodes. Restored image
+changes, changed locks or failed services prevent a successful reproduction. This does not
+reconstruct a guest kernel, remote services or unsaved process memory.
+
 To reproduce, copy the unchanged source, inputs and dependency files into a clean directory, then
-run `garden-run replay --from-manifest /path/to/run.json --manifest rerun.json`. Recorded Python, R and native-package
+run `garden-run replay --from-manifest /path/to/run.json --manifest rerun.json`. Recorded Python, R, native-package and Linux-userland
 recipes rebuild their environments; otherwise recreate dependencies through normal tools.
 Changed inputs, source, lock files, environment probes or platform cause refusal before execution.
 Output checksum differences fail the reproduction check. The manifest does not fetch data,

@@ -109,6 +109,10 @@ export class PrivateDecisionReplay {
       return;
     }
     this.#observations++;
+    if (body.kind.startsWith('runtime_')) {
+      object.parse(value);
+      return;
+    }
     if (body.kind === 'harness_event') {
       object.parse(value);
       return;

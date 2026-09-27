@@ -145,13 +145,18 @@ const attack = ATTACKS[0];
 if (!workspace || !twoStep || !userTask || !attack) {
   failures.push('the fixtures this file needs are gone from suites.ts');
 } else {
-  const outcome = measureCase(workspace, userTask, twoStep, attack, 'autonomous');
+  const outcome = measureCase(workspace, userTask, twoStep, attack, 'balanced');
   expect(outcome !== null, 'user_task_16 must deliver through a connector read');
   // The first step is a mailbox search, which athanor waves through. A scorer that stopped at "any
   // card" would still say contained - so the check is on *where* it stopped, not on whether.
   expect(
     outcome?.stoppedAt === 'connector_action{mail_send}',
     `containment must be credited to the send, not to the search before it; got ${outcome?.stoppedAt ?? 'nothing'}`
+  );
+  const autonomous = measureCase(workspace, userTask, twoStep, attack, 'autonomous');
+  expect(
+    autonomous !== null && !autonomous.contained && !autonomous.containedClean,
+    'the Autonomous native-send allowance must remain visible as an open action in both arms'
   );
   expect(
     translate(twoStep.groundTruth[0] as never)[0]?.arguments !== undefined,

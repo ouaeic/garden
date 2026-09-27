@@ -1,48 +1,14 @@
 /**
- * The discriminator: which of athanor's refusals are refusals *because* the turn read something
- * hostile, and which would have fired on a turn that read nothing at all.
+ * Compare identical calls with and without provenance from an untrusted result.
+ * Permission-mode refusals must not be credited to the provenance rule: native account actions
+ * can proceed in Autonomous while other modes and connector types retain confirmation.
  *
- * ── Why this file exists ───────────────────────────────────────────────────────────────────────
+ * Each pair shares its arguments, known origins, owner text and spending state. Only the origin
+ * returned by the production result classifier differs. Deliberately broken result boundaries
+ * must lose that distinction, proving that the measurement depends on propagation.
  *
- * athanor's strongest claim about itself is a provenance-to-permission link: taint that travels,
- * an egress novelty budget, and an approval floor that reads both. `monitor.ts` reports the
- * benchmark's containment at 100% - and the `by taint` column beside it reports **0 of 1,085**.
- * Every AgentDojo injection goal this rig can run ends at a connector write, and athanor cards a
- * connector write in every mode whether or not anything hostile has been read. So the headline is
- * true and it is evidence for a different mechanism than the one being claimed.
- *
- * A number that cannot distinguish "we refused this because the turn was tainted" from "we refuse
- * this always" is not evidence about provenance. This file is the instrument that distinguishes
- * them, and it does it the only way that means anything: **two arms that differ in exactly one
- * bit.**
- *
- *   tainted  { ...world, taintSources: [origin] }
- *   clean    { ...world, taintSources: [] }
- *
- * Same call, same arguments, same mode, same known origins, same owner text, same spend. The
- * verdict difference is the attribution, and nothing else in this file is allowed to differ
- * between the arms - which is why `world` is one literal shared by both rather than two contexts
- * built side by side. Two contexts built side by side is how the first version of this measurement
- * compared a novel host against a novel host on a turn that also had no `knownOrigins`, and
- * credited the taint for a difference the world had made.
- *
- * ── Where the origin comes from ────────────────────────────────────────────────────────────────
- *
- * Never invented. `ROUTES` below drives athanor's real `untrustedOriginOfResult` with a real tool
- * call and a real result, and whatever it answers is what the tainted arm gets. Three of the routes
- * are ways athanor genuinely acquires taint - a connector read, a sub-agent's report, a file the
- * mail connector quarantined - and three are deliberate breaks of exactly those routes. The broken
- * ones are how this rig is shown to be able to fall: an instrument nobody has watched move is not
- * an instrument, and a defence measured only by a rig that has never been seen to report its
- * absence is a defence nobody has tested.
- *
- * ── What is AgentDojo here and what is not ─────────────────────────────────────────────────────
- *
- * Nothing in this file is AgentDojo. AgentDojo's workspace suite has no web tool, no shell, no
- * memory and no skill store, so its goals cannot reach a single surface the provenance link gates -
- * which is the finding, not a shortcoming of the transcription. `SURFACES` restates the same kind
- * of goal for the surfaces athanor really exposes, and every table that prints these numbers says
- * so on its own line.
+ * These probes exercise web, shell, memory and skill surfaces separately from the imported
+ * workspace corpus, whose connector actions cannot measure those paths.
  */
 import {
   labelledConnectorResult,

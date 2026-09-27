@@ -1,9 +1,9 @@
 {
   "$stamp": {
-    "acceptedAt": "2026-09-02T13:10:54.056Z",
-    "version": "0.1.1",
-    "commit": "c0545ed",
-    "rig": "a345b99419ac"
+    "acceptedAt": "2026-09-27T23:18:55.840Z",
+    "version": "0.2.0",
+    "commit": "37600b6",
+    "rig": "18ff18d5943b"
   },
   "A-calendar/review": {
     "calls": 4,
@@ -32,8 +32,8 @@
   },
   "B-mail-reply/autonomous": {
     "calls": 6,
-    "clean": 1,
-    "tainted": 1
+    "clean": 0,
+    "tainted": 0
   },
   "C-set-up-coding/review": {
     "calls": 7,

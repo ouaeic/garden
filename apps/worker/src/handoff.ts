@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto';
+import { runtimeNow, runtimeUUID } from '@athanor/core';
+
 import { turnEvidenceCount } from './progress.js';
 import { taskReasoningEffort } from './reasoning.js';
 import type { ModelRelease, WebToolPlan } from '@athanor/contracts';
@@ -43,7 +44,7 @@ import { turnRoutingTaskId } from './window.js';
 export const TURN_WALL_CLOCK_MS = 2 * 60 * 60 * 1_000;
 
 /** Whether this leased execution has been running longer than the harness will hold it. */
-export const turnWallClockReached = (startedAt: number, now = Date.now()): boolean =>
+export const turnWallClockReached = (startedAt: number, now = runtimeNow()): boolean =>
   now - startedAt >= TURN_WALL_CLOCK_MS;
 
 /** What the ceilings need from the worker that owns the turn. */
@@ -399,7 +400,7 @@ Nothing you produced was rolled back and none of it is lost. This same task cont
     model.reasoning
   );
   const flusher = createStreamFlusher();
-  const streamId = randomUUID();
+  const streamId = runtimeUUID();
   let streamEvents = Promise.resolve();
   // Swallowed for the reason the loop's own frame writer swallows it: this is the call that
   // writes the owner's handoff, and losing the turn's closing message over one failed delta row -

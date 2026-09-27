@@ -1,3 +1,4 @@
+import { runtimeValue, runtimeObservations } from './runtime-observations.js';
 import { createHash, createHmac, hkdfSync } from 'node:crypto';
 import { AthanorError } from './errors.js';
 
@@ -481,8 +482,17 @@ export const OWNER_MEMORY_MAX_CHARS = 6_000;
 /** The workspace tier's character budget. Wider, because those rows die with the computer. */
 export const WORKSPACE_MEMORY_MAX_CHARS = 12_000;
 
-const keyedToken = (domain: string, value: string, key: Uint8Array, chars: number): string =>
-  encodeToken(createHmac('sha256', key).update(`${domain} ${value}`).digest(), chars);
+const keyedToken = (domain: string, value: string, key: Uint8Array, chars: number): string => {
+  const read = () =>
+    encodeToken(createHmac('sha256', key).update(`${domain} ${value}`).digest(), chars);
+  if (!runtimeObservations()) return read();
+  return runtimeValue(
+    `memory.token:${createHash('sha256')
+      .update(JSON.stringify([domain, value, chars]))
+      .digest('hex')}`,
+    read
+  );
+};
 
 /**
  * Every index token is drawn from a 16-letter alphabet with no digits and no punctuation. That is

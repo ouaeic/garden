@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto';
+import { runtimeUUID } from '@athanor/core';
+
 import { AthanorError, decryptJson, encryptJson, sha256, unwrapDataKey } from '@athanor/core';
 import type { DataStore, MediaBatchRecord } from '@athanor/data';
 import {
@@ -93,7 +94,7 @@ export const queueVideoBatch = async (
       )
     );
   }
-  const id = randomUUID();
+  const id = runtimeUUID();
   for (const item of prepared) {
     // Standard native video batches use their published half-rate; an unknown quote stays unknown.
     item.request.quoteUsd = item.request.quoteUsd === null ? null : item.request.quoteUsd / 2;
@@ -153,7 +154,7 @@ export class MediaBatchWorker {
   async tick(signal?: AbortSignal): Promise<boolean> {
     signal?.throwIfAborted();
     const { store } = this.options,
-      leaseOwner = `${this.options.workerId}:batch:${randomUUID()}`;
+      leaseOwner = `${this.options.workerId}:batch:${runtimeUUID()}`;
     const batch = await store.leaseMediaBatch(leaseOwner);
     if (!batch) return false;
     const workspace = await store.getWorkspaceById(batch.workspaceId);

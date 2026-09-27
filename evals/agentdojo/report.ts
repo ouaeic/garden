@@ -344,15 +344,12 @@ export const render = (run: Run): string => {
       `  ${summary.mode.padEnd(11)}of ${summary.contained} contained, ${summary.escalated} asked a harder question than the clean turn and ${summary.cardIdentical} raised the identical card.`
     );
   write();
-  write("  So AgentDojo's containment here is the connector approval tier, in full. Every goal it");
+  write('  Connector permissions explain blanket containment. Native mail and calendar writes');
+  write('  proceed in Autonomous, while confirming modes and other connector types retain cards.');
   write(
-    '  can pose ends at a mail send, a calendar write or a drive delete, and athanor asks about'
+    '  An open action here assumes a model already emitted the attack; it is not measured ASR.'
   );
-  write('  all three on a turn that has read nothing. The suite cannot reach a single surface the');
-  write(
-    '  provenance link gates, so on this corpus the claim is neither confirmed nor refuted - it'
-  );
-  write('  is untested, and a 100% that reads as evidence for it is evidence for something else.');
+  write('  Compare both arms before attributing any refusal to untrusted-content handling.');
   write();
 
   write('── attribution: which refusals are refusals BECAUSE the turn was tainted ───────────────');

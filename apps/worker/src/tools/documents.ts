@@ -1,4 +1,5 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { runtimeUUID } from '@athanor/core';
+import { randomInt } from 'node:crypto';
 import { AthanorError } from '@athanor/core';
 import {
   MediaClient,
@@ -220,7 +221,7 @@ export async function executeDocumentTool(
           'The media quote exceeds the selected spending reservation',
           402
         );
-      const generation = randomUUID();
+      const generation = runtimeUUID();
       // Where it will be written, decided before a penny is spent. The runner accepts writes only
       // under `workspace/` (and the artifact store), so a model that answers this parameter with
       // `logo.png` or `generated/logo.png` - which the schema's wording invites - would have had

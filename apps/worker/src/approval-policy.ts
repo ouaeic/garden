@@ -1,3 +1,4 @@
+import { runtimeDate } from '@athanor/core';
 /** The strongest provenance, lifetime and ordinary-effect requirement is authoritative. */
 import { publishesPublicly, type SecurityMode } from '@athanor/contracts';
 import { connectorActions, privateDiagnostics, recordPrivateDiagnostic } from '@athanor/core';
@@ -50,7 +51,7 @@ export const MEMORY_SELF_EXPIRY_HORIZON_MS = 366 * 24 * 60 * 60 * 1000;
 
 export const memoryApprovalReason = (
   args: Record<string, unknown>,
-  now = new Date(),
+  now = runtimeDate(),
   taintSources: readonly string[] = []
 ): string | null => {
   const action = textValue(args.action);
@@ -254,7 +255,7 @@ export const approvalRequirement = (
   args: Record<string, unknown>,
   securityMode: SecurityMode = 'balanced',
   context: ApprovalContext = {},
-  now = new Date()
+  now = runtimeDate()
 ): ApprovalRequirement | null => {
   const result = calculateApprovalRequirement(name, args, securityMode, context, now);
   if (privateDiagnostics())
@@ -616,6 +617,12 @@ const ordinaryRequirement = (
     const action = textValue(args.action);
     const definition = connectorActions[action as keyof typeof connectorActions];
     if (definition?.sideEffect === 'read') return null;
+    if (
+      SECURITY_MODE_FLOOR[securityMode].authorizesAccountActions &&
+      definition?.kinds.length &&
+      definition.kinds.every((kind) => ['google', 'microsoft', 'imap', 'caldav'].includes(kind))
+    )
+      return null;
     if (definition?.sideEffect === 'delete' || definition?.sideEffect === 'write')
       return {
         sideEffect:

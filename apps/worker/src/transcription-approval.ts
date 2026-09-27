@@ -1,3 +1,4 @@
+import { runtimeValue } from '@athanor/core';
 import { createHmac } from 'node:crypto';
 import { AthanorError } from '@athanor/core';
 import {
@@ -75,38 +76,40 @@ export const transcriptionBinding = (
     secret.mediaRoutes,
     secret.provider !== 'openrouter' && isNativeOpenAIEndpoint(secret.baseUrl)
   );
-  return createHmac('sha256', key)
-    .update(
-      canonicalJson({
-        version: 1,
-        task: task.id,
-        workspace: task.workspaceId,
-        taskPrivacy: task.privacyRoute,
-        turn: state.turn ?? 0,
-        arguments: call.arguments,
-        provider: secret.provider,
-        baseUrl: secret.baseUrl,
-        apiKey: secret.apiKey ?? '',
-        enforceZeroDataRetention: secret.enforceZeroDataRetention,
-        privacyRoute: transcriptionPrivacy(secret, call),
-        route: route
-          ? {
-              id: route.id,
-              providerModelId: route.providerModelId,
-              provider: route.provider,
-              apiProtocol: route.apiProtocol,
-              zeroDataRetentionAvailable: route.zeroDataRetentionAvailable,
-              requiresRetentionApproval: route.requiresRetentionApproval,
-              unavailableReason: route.unavailableReason ?? null,
-              pricing: route.pricing ?? [],
-              priceSource: route.priceSource,
-              usdPerMinute: route.usdPerMinute,
-              bound: model?.transcriptionBound ?? null
-            }
-          : null
-      })
-    )
-    .digest('hex');
+  return runtimeValue('transcription.binding', () =>
+    createHmac('sha256', key)
+      .update(
+        canonicalJson({
+          version: 1,
+          task: task.id,
+          workspace: task.workspaceId,
+          taskPrivacy: task.privacyRoute,
+          turn: state.turn ?? 0,
+          arguments: call.arguments,
+          provider: secret.provider,
+          baseUrl: secret.baseUrl,
+          apiKey: secret.apiKey ?? '',
+          enforceZeroDataRetention: secret.enforceZeroDataRetention,
+          privacyRoute: transcriptionPrivacy(secret, call),
+          route: route
+            ? {
+                id: route.id,
+                providerModelId: route.providerModelId,
+                provider: route.provider,
+                apiProtocol: route.apiProtocol,
+                zeroDataRetentionAvailable: route.zeroDataRetentionAvailable,
+                requiresRetentionApproval: route.requiresRetentionApproval,
+                unavailableReason: route.unavailableReason ?? null,
+                pricing: route.pricing ?? [],
+                priceSource: route.priceSource,
+                usdPerMinute: route.usdPerMinute,
+                bound: model?.transcriptionBound ?? null
+              }
+            : null
+        })
+      )
+      .digest('hex')
+  );
 };
 
 export const pinTranscriptionApproval = async (

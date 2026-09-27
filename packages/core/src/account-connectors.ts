@@ -135,7 +135,7 @@ export const accountConnectorCatalog: ConnectorDefinition[] = (
     'Register an OAuth web application with the provider, then choose the account during sign-in.',
   scopes: [
     { id: 'mail:message.write', label: 'Create mail drafts and attachments', sideEffect: 'write' },
-    { id: 'mail:message.send', label: 'Send mail with confirmation', sideEffect: 'delete' },
+    { id: 'mail:message.send', label: 'Send mail', sideEffect: 'delete' },
     { id: 'mail:mailbox.read', label: 'Read mail and attachments', sideEffect: 'read' },
     { id: 'calendar:calendars.read', label: 'Read calendars', sideEffect: 'read' },
     { id: 'calendar:events.write', label: 'Create calendar events', sideEffect: 'write' },

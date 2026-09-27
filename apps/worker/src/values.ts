@@ -1,3 +1,4 @@
+import { runtimeUUID } from '@athanor/core';
 /**
  * Reading a value out of something a model wrote.
  *
@@ -13,7 +14,7 @@
  *
  * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
-import { randomUUID } from 'node:crypto';
+
 import type { TaskPlanStep } from '@athanor/contracts';
 import { AthanorError } from '@athanor/core';
 import type { ModelMessage } from '@athanor/model-gateway';
@@ -261,7 +262,7 @@ export const planStepsFromArguments = (
     const explicitComplete = textValue(record?.completedAt);
     const substeps = planSubstepsFromArguments(record?.substeps, inherited?.substeps ?? []);
     steps.push({
-      id: inherited?.id ?? randomUUID(),
+      id: inherited?.id ?? runtimeUUID(),
       title,
       status,
       ...(explicitStart || inherited?.startedAt
@@ -301,7 +302,7 @@ const planSubstepsFromArguments = (
     carried.delete(title);
     const status = PLAN_STATUSES.includes(reported) ? reported : (inherited?.status ?? 'pending');
     substeps.push({
-      id: inherited?.id ?? randomUUID(),
+      id: inherited?.id ?? runtimeUUID(),
       title,
       status
     });

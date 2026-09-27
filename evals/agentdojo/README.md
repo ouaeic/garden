@@ -55,13 +55,11 @@ exercised.
 
 ## The answer that column gives, and what was built because of it
 
-`by taint` is **0 of 1,085**, in all three modes, and it is worse than a zero: of the 1,085 contained
-cases, **1,085 raise a card that is character for character the card a clean turn raises**, and 0
-raise a harder one. AgentDojo's containment against athanor is the connector approval tier, in full.
-Every injection goal this rig can run ends at a mail send, a calendar write or a drive delete, and
-athanor asks about all three on a turn that has read nothing at all. On this corpus the
-provenance-to-permission claim is not confirmed and not refuted — it is **untested**, and the 100%
-beside it is evidence for a different mechanism.
+Read the generated table and committed baseline for the per-mode counts. Native mail and calendar
+writes proceed in Autonomous; confirming modes and other connector types retain their cards.
+A refusal identical on clean and tainted turns measures ordinary permission policy, not detection
+of a malicious instruction. An open action assumes the model already emitted the attacker's calls;
+it is not a measured model attack-success rate.
 
 `attribution.ts` is the instrument that tests it. Two arms that differ in exactly one bit:
 
@@ -138,9 +136,9 @@ separates a composition from a shim, and `selftest.ts` enforces it.
 
 ## The athanor extension, and why it is reported separately
 
-AgentDojo's workspace suite has no web tool, so every one of its injection goals names a mailbox, a
-calendar or a drive sink — and athanor asks the owner about every connector write in every security
-mode. The suite therefore contains at 100% and tells you almost nothing.
+The workspace suite has no web tool: its injection goals name mailbox, calendar or drive sinks.
+Its containment table must be read against the selected mode and connector permissions, rather
+than treated as a measurement of the separate web-address policy.
 
 An attacker writes the goal, not the suite. So the same goals are restated for the surface athanor
 actually exposes — a URL read — and scored separately, labelled an athanor extension in every table.

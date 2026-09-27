@@ -1,3 +1,4 @@
+import { runtimeNow, runtimeSetTimeout } from '@athanor/core';
 import { repositoryOverview } from './repository-overview.js';
 import { SETTLED_ORDER } from './repository-symbols.js';
 export {
@@ -429,7 +430,7 @@ export async function executeRepositoryTool(
           max: 3_600,
           fallback: 900
         });
-        const startedAt = Date.now();
+        const startedAt = runtimeNow();
         let process = await context.runner.call<ProcessObservation>(
           task.workspaceId,
           task.id,
@@ -448,7 +449,7 @@ export async function executeRepositoryTool(
         let reportedEvents = 0;
         let pollCount = 0;
         while (process.status === 'running') {
-          await new Promise((resolve) => setTimeout(resolve, 1_000));
+          await new Promise<void>((resolve) => runtimeSetTimeout(resolve, 1_000));
           pollCount += 1;
           process = await context.runner.call<ProcessObservation>(
             task.workspaceId,
@@ -492,7 +493,7 @@ export async function executeRepositoryTool(
           exitCode: process.exitCode ?? null,
           stdout: process.stdout ?? '',
           stderr: process.stderr ?? '',
-          durationMs: Date.now() - startedAt,
+          durationMs: runtimeNow() - startedAt,
           timedOut: process.status === 'timed_out'
         };
         const records = result.stdout

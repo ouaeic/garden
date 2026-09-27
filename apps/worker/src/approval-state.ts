@@ -1,3 +1,4 @@
+import { runtimeNow, runtimeValue } from '@athanor/core';
 /**
  * Matching an owner's answer to the thing they were asked about.
  *
@@ -38,9 +39,13 @@ export const approvalPreviewHash = (
   callName: string,
   toolArguments: Record<string, unknown>
 ): string =>
-  createHmac('sha256', key)
-    .update(canonicalJson({ tool: callName, arguments: toolArguments }))
-    .digest('hex');
+  runtimeValue(
+    `approval.binding:${canonicalJson({ tool: callName, arguments: toolArguments })}`,
+    () =>
+      createHmac('sha256', key)
+        .update(canonicalJson({ tool: callName, arguments: toolArguments }))
+        .digest('hex')
+  );
 
 /**
  * Recomputed before an approved call runs: approval and execution are separated by a database
@@ -72,7 +77,7 @@ export type ApprovalOutcome = 'approved' | 'denied' | 'expired' | 'waiting';
  */
 export const approvalOutcome = (
   approval: { status?: unknown; expiresAt?: unknown } | null | undefined,
-  now = Date.now()
+  now = runtimeNow()
 ): ApprovalOutcome => {
   if (!approval) return 'waiting';
   const status = textValue(approval.status);

@@ -65,7 +65,7 @@ export const mailConnectorCatalog: ConnectorDefinition[] = [
     description:
       'Read, search, draft and send mail on a mailbox that speaks IMAP and SMTP submission over TLS.',
     dataAccess:
-      'Only the mailboxes and messages a task names are read; sending always asks you first.',
+      'Only the mailboxes and messages a task names are read; the task permission mode governs sending.',
     tokenLocation:
       'The username and app password are encrypted in the athanor secret store and never placed in a model prompt.',
     providerLogging:
@@ -75,7 +75,7 @@ export const mailConnectorCatalog: ConnectorDefinition[] = [
     scopes: [
       { id: 'mail:mailbox.read', label: 'Read and search mail', sideEffect: 'read' },
       { id: 'mail:message.write', label: 'Save drafts and mark messages', sideEffect: 'write' },
-      { id: 'mail:message.send', label: 'Send mail with confirmation', sideEffect: 'delete' }
+      { id: 'mail:message.send', label: 'Send mail', sideEffect: 'delete' }
     ]
   },
   {
@@ -111,12 +111,7 @@ export const mailConnectorActions = {
   mail_read_attachment: { kinds: ['imap'], scope: 'mail:mailbox.read', sideEffect: 'read' },
   mail_mark: { kinds: ['imap'], scope: 'mail:message.write', sideEffect: 'write' },
   mail_draft: { kinds: ['imap'], scope: 'mail:message.write', sideEffect: 'write' },
-  /**
-   * Sending carries the connector layer's always-ask tier rather than the reversible one. A sent
-   * message cannot be recalled, it is attributed to the owner personally, and it reaches someone
-   * the owner has a relationship with - so it belongs on the same floor as an MCP tool call, and
-   * no security mode is allowed to wave it through.
-   */
+  /** Sending is consequential; only the owner's saved Autonomous mode preauthorizes it. */
   mail_send: { kinds: ['imap'], scope: 'mail:message.send', sideEffect: 'delete' },
   mail_reply: { kinds: ['imap'], scope: 'mail:message.send', sideEffect: 'delete' },
   calendar_list: { kinds: ['caldav'], scope: 'calendar:calendars.read', sideEffect: 'read' },

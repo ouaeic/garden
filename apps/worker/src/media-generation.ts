@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto';
+import { runtimeUUID } from '@athanor/core';
+
 import { AthanorError, decryptJson, encryptJson, sha256 } from '@athanor/core';
 import type { ModelToolCall, VideoGenerationRequest } from '@athanor/model-gateway';
 import { VideoClient } from '@athanor/model-gateway';
@@ -177,7 +178,7 @@ export const prepareVideoGeneration = async (
       'The provider quote exceeds the requested video spending limit',
       402
     );
-  const id = randomUUID();
+  const id = runtimeUUID();
   const named = input.path?.replace(/^\.\//, '') || `generated/${id}.mp4`;
   if (
     named.startsWith('/') ||

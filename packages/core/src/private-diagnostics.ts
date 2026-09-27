@@ -14,7 +14,10 @@ export const PrivateDiagnosticKind = z.enum([
   'decision_outcome',
   'approval_decision',
   'request_derivation',
-  'harness_event'
+  'harness_event',
+  'runtime_start',
+  'runtime_event',
+  'runtime_end'
 ]);
 export type PrivateDiagnosticKind = z.infer<typeof PrivateDiagnosticKind>;
 export const PrivateDiagnosticBody = z

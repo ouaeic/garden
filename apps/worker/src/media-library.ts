@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto';
+import { runtimeUUID } from '@athanor/core';
+
 import { AthanorError, decryptJson, encryptJson, sha256 } from '@athanor/core';
 import {
   NativeMediaLibraryClient,
@@ -110,7 +111,7 @@ export const executeMediaLibrary = async (
       'Choose a valid MP4 character reference',
       400
     );
-  const id = randomUUID();
+  const id = runtimeUUID();
   await context.store.createMediaAsset({
     id,
     userId: context.task.userId,

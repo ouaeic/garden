@@ -1,3 +1,4 @@
+import { runtimeDate, runtimeNow } from '@athanor/core';
 import type { ModelRelease, SubagentLane, WebToolPlan } from '@athanor/contracts';
 import { AthanorError, sha256 } from '@athanor/core';
 import type { TaskRecord } from '@athanor/data';
@@ -97,14 +98,14 @@ async function runDelegatedMission(
   untrustedSources?: string[];
 }> {
   const laneId = `${parentCallId}:${missionIndex}`;
-  const laneStartedAt = Date.now();
+  const laneStartedAt = runtimeNow();
   const announceLane = (status: SubagentLane['status'], patch?: Partial<SubagentLane>): void => {
     emitSubagentLane(context.store, task, key, {
       laneId,
       lane: 'research',
       name: boundedKnowledge(mission.name, 80),
       status,
-      elapsedMs: Date.now() - laneStartedAt,
+      elapsedMs: runtimeNow() - laneStartedAt,
       ...patch
     }).catch(() => undefined);
   };
@@ -195,7 +196,7 @@ Your whole output is one report to the lead, and it is the only thing that survi
 {"answer": "<the answer to the mission, in prose, leading with the conclusion>", "evidence": [{"claim": "<what this supports>", "source": "<the exact URL or workspace path>", "quotedSpan": "<a short span copied verbatim from that source>"}], "couldNotEstablish": ["<what the evidence did not settle>"]}
 The harness re-reads two of your sources and checks the quoted spans are really there, so a span you did not copy from the page is a report the lead is told not to trust. You have ${DELEGATE_MAX_STEPS} steps; spend them on evidence rather than on narration.
 
-${clockLine(new Date(), timeZone)}
+${clockLine(runtimeDate(), timeZone)}
 - Working root: workspace
 - On the web, search for the addresses first and then read the pages behind them; a search snippet is a pointer, never a citation.${
         webPlan.mode === 'server'

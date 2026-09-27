@@ -1,3 +1,4 @@
+import { runtimeValue } from '@athanor/core';
 import { textValue } from './values.js';
 import { createHmac } from 'node:crypto';
 import { posix } from 'node:path';
@@ -119,9 +120,10 @@ export const useTaskApproval = async (
   const workspace = await deps.store.getWorkspaceById(task.workspaceId);
   if (!workspace?.wrappedKey) return false;
   const key = unwrapDataKey(workspace.wrappedKey, deps.masterKey, workspace.id);
-  const hash = createHmac('sha256', key)
-    .update(canonicalApprovalScope(requirement.taskGrant))
-    .digest('hex');
+  const scope = canonicalApprovalScope(requirement.taskGrant);
+  const hash = runtimeValue(`approval.scope:${scope}`, () =>
+    createHmac('sha256', key).update(scope).digest('hex')
+  );
   return deps.store.hasTaskApprovalGrant(
     task.userId,
     task.id,

@@ -1,3 +1,4 @@
+import { runtimeNow } from '@athanor/core';
 /**
  * What the model was actually shown, so a line number means something.
  *
@@ -176,7 +177,7 @@ export const recordRead = (
   path: string,
   startLine: number,
   text: string,
-  now = Date.now()
+  now = runtimeNow()
 ): void => {
   if (startLine < 1) return;
   const lines = toLines(text);
@@ -206,7 +207,7 @@ export const recordRead = (
 };
 
 /** Every remembered read of this file, newest last. Empty means no opinion, never "nothing seen". */
-export const readsOf = (taskId: string, path: string, now = Date.now()): readonly Snapshot[] =>
+export const readsOf = (taskId: string, path: string, now = runtimeNow()): readonly Snapshot[] =>
   live(keyOf(taskId, path), now)?.snapshots ?? [];
 
 /**
@@ -219,7 +220,7 @@ export const readsOf = (taskId: string, path: string, now = Date.now()): readonl
 export const displayedRanges = (
   taskId: string,
   path: string,
-  now = Date.now()
+  now = runtimeNow()
 ): readonly LineRange[] =>
   (live(keyOf(taskId, path), now)?.covered ?? []).map(({ start, end }) => ({ start, end }));
 
@@ -267,7 +268,7 @@ export const recordWrite = (
   path: string,
   text: string,
   changed?: readonly LineChange[],
-  now = Date.now()
+  now = runtimeNow()
 ): void => {
   const key = keyOf(taskId, path);
   const lines = toLines(text);

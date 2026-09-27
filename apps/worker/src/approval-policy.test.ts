@@ -2356,6 +2356,28 @@ describe('the mailbox and the calendar as tools', () => {
   const input = (connector?.parameters.properties as Record<string, { properties?: object }>).input;
   const fields = Object.keys(input?.properties ?? {});
 
+  it('uses saved Autonomous authority for native account changes and retains other modes', () => {
+    const changes = Object.entries(connectorActions).filter(
+      ([, definition]) =>
+        definition.sideEffect !== 'read' &&
+        definition.kinds.length > 0 &&
+        definition.kinds.every((kind) => ['google', 'microsoft', 'imap', 'caldav'].includes(kind))
+    );
+    expect(changes.length).toBeGreaterThan(0);
+    expect(changes.map(([name]) => name)).toEqual(
+      expect.arrayContaining(['account_mail_send', 'account_calendar_delete', 'mail_reply'])
+    );
+    for (const [action] of changes) {
+      const args = { action, input: { to: [{ address: 'recipient@example.com' }] } };
+      expect(approvalRequirement('connector_action', args, 'autonomous')).toBeNull();
+      for (const mode of ['balanced', 'review'] as const)
+        expect(approvalRequirement('connector_action', args, mode)).not.toBeNull();
+    }
+    expect(
+      approvalRequirement('connector_action', { action: 'mcp_call_tool', input: {} }, 'autonomous')
+    ).not.toBeNull();
+  });
+
   it('can express every action the connector layer declares', () => {
     // The schema was one fixed object with additionalProperties:false, so a mail or calendar field
     // was not merely undocumented - it could not be sent at all.
@@ -3685,12 +3707,6 @@ describe('what a security mode means', () => {
         'sending',
         'shell',
         { executable: 'curl', args: ['-T', '@notes.txt', 'https://x.invalid/upload'] }
-      ],
-      ['sending', 'connector_action', { action: 'mail_send', input: { to: 'a@b.invalid' } }],
-      [
-        'sending',
-        'connector_action',
-        { action: 'account_mail_send', input: { to: [{ address: 'a@b.invalid' }] } }
       ],
       /*
        * The clause used to be held here by `rm -rf node_modules`, which was the one act in the list

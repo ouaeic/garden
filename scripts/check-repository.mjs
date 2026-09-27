@@ -163,6 +163,22 @@ else {
     );
 }
 
+const systemEnvironment = spawnSync('python3', ['scripts/test-system-environment.py'], {
+  cwd: repositoryRoot,
+  encoding: 'utf8',
+  timeout: 120_000
+});
+if (systemEnvironment.status !== 0)
+  fail(`Linux environment reconstruction failed: ${systemEnvironment.stderr}`);
+else {
+  say('Linux image extraction contracts passed.');
+  if (systemEnvironment.stderr.includes('skipped='))
+    say(
+      'Native Linux service reconstruction needs acceptance on a Linux host with bwrap and a C compiler.'
+    );
+  else say('Native Linux service reconstruction passed.');
+}
+
 const systemPackages = spawnSync('/bin/sh', ['scripts/test-system-packages.sh'], {
   cwd: repositoryRoot,
   encoding: 'utf8'

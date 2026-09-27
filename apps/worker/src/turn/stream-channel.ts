@@ -1,5 +1,12 @@
+import {
+  runtimeClearTimer,
+  runtimeNow,
+  runtimeSetInterval,
+  runtimeSetTimeout,
+  runtimeUUID
+} from '@athanor/core';
 /** Stream writes stay ordered and stop when the worker loses ownership. */
-import { randomUUID } from 'node:crypto';
+
 import type { DataStore, TaskRecord } from '@athanor/data';
 import type { AgentState } from '../agent-state.js';
 import {
@@ -51,9 +58,9 @@ export const createStreamChannel = (
   disowned: () => boolean
 ): StreamChannel => {
   const stallIntervalMs = deps.stallIntervalMs ?? STALL_HEARTBEAT_INTERVAL_MS;
-  const now = deps.now ?? (() => Date.now());
+  const now = deps.now ?? (() => runtimeNow());
   const streamFlusher = createStreamFlusher(STREAM_FLUSH_INTERVAL_MS, now);
-  const streamId = randomUUID();
+  const streamId = runtimeUUID();
   let streamEvents = Promise.resolve();
   /*
    * One lost frame is not a lost turn.
@@ -108,7 +115,7 @@ export const createStreamChannel = (
        */
       touched();
       await write().catch(async () => {
-        await new Promise<void>((resolve) => setTimeout(resolve, STREAM_FLUSH_INTERVAL_MS));
+        await new Promise<void>((resolve) => runtimeSetTimeout(resolve, STREAM_FLUSH_INTERVAL_MS));
         if (disowned()) return;
         await write().catch(() => {
           droppedFrames += 1;
@@ -124,7 +131,7 @@ export const createStreamChannel = (
     lastWriteAt = now();
   };
   const close = (): void => {
-    clearInterval(heartbeat);
+    runtimeClearTimer(heartbeat);
     heartbeat = undefined;
   };
   /*
@@ -137,7 +144,7 @@ export const createStreamChannel = (
    * tick is a whole interval away, by which time the watch exists, and the tick's own guard closes
    * the timer the moment the answer is yes.
    */
-  heartbeat = setInterval(() => {
+  heartbeat = runtimeSetInterval(() => {
     if (disowned()) {
       close();
       return;

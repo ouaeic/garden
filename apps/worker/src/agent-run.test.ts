@@ -1,3 +1,17 @@
+import { execFile } from 'node:child_process';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
+import { DIAGNOSTIC_CAPTURE_BYTES } from '@athanor/contracts';
+import { CapturedRuntimeReplay, replayRuntime, type RuntimeSegment } from './runtime-replay.js';
+import {
+  diagnosticPlainHash,
+  diagnosticCipherHash,
+  DIAGNOSTIC_EMPTY_HASH,
+  type PrivateDiagnosticBody
+} from '@athanor/core';
 import type { AgentState } from './agent-state.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -9824,4 +9838,372 @@ describe('the output-limit continuation ceiling', () => {
       interrupted: true
     });
   });
+});
+
+describe('real runtime replay', () => {
+  it.each([
+    'finish',
+    'parallel reads',
+    'concurrent update conflict',
+    'question',
+    'approval',
+    'approval resume',
+    'failed verification',
+    'provider retry',
+    'interrupted stream',
+    'question resume',
+    'job wait',
+    'failure handling'
+  ])(
+    'reconstructs %s without live calls',
+    async (scenario) => {
+      const task = makeTask();
+      const probe = probeStore(() => task);
+      const bodies: PrivateDiagnosticBody[] = [];
+      let previous = DIAGNOSTIC_EMPTY_HASH;
+      const fail = vi.fn(async () => undefined);
+      Object.assign(probe.store, {
+        getWorkspace: async () => workspace,
+        readOwnerBlock: async () => null,
+        recallMemoryCandidates: async () => [],
+        saveMemoryPack: async (input: unknown) => input,
+        diagnostics: {
+          get: async () => ({
+            status: { id: '55555555-5555-4555-8555-555555555555', state: 'recording' },
+            workspaceId,
+            epoch: 'epoch'
+          }),
+          fail,
+          append: async (input: Parameters<DataStore['diagnostics']['append']>[0]) => {
+            const sealed = input.seal(bodies.length + 1, previous);
+            bodies.push(decryptJson<PrivateDiagnosticBody>(sealed, dataKey, sealed.aad));
+            previous = diagnosticCipherHash(sealed);
+            return true;
+          }
+        }
+      });
+      const finish = toolFrame('finish-replay', 'finish', {
+        summary: 'The notes need no changes.',
+        verification: { status: 'not_applicable', evidence: [] }
+      });
+      const read = toolFrame('read-replay', 'file_read', { path: 'workspace/notes.md' });
+      const command = { executable: 'rm', args: ['-rf', 'workspace/old'] };
+      let frames: Array<BodyInit | ((init?: RequestInit) => BodyInit)> = [finish];
+      if (scenario === 'parallel reads')
+        frames = [
+          batchFrame(
+            ['a', 'b', 'c'].map((name) => ({
+              id: name,
+              name: 'file_read',
+              args: { path: `workspace/${name}.md` }
+            }))
+          ),
+          finish
+        ];
+      if (scenario === 'concurrent update conflict')
+        frames = [
+          batchFrame(
+            ['first', 'second'].map((content) => ({
+              id: content,
+              name: 'file_write',
+              args: { path: 'workspace/shared.md', content }
+            }))
+          ),
+          finish
+        ];
+      if (scenario === 'question')
+        frames = [
+          read,
+          toolFrame('ask-replay', 'ask', {
+            question: 'Which folder should contain the summary?',
+            why: 'Two destinations are available.',
+            options: ['Shared', 'Personal']
+          })
+        ];
+      if (scenario === 'approval') frames = [toolFrame('shell-replay', 'shell', command)];
+      if (scenario === 'approval resume') {
+        const call = { id: 'shell-replay', name: 'shell', arguments: command };
+        Object.assign(
+          task,
+          makeTask({
+            messages: [
+              { role: 'user', content: 'Clear the old folder' },
+              { role: 'assistant', content: '', toolCalls: [call] }
+            ],
+            step: 1,
+            credits: 0,
+            pending: { approvalId: 'approval-1', toolCall: call }
+          })
+        );
+        Object.assign(probe.store, {
+          getApproval: async () => ({
+            id: 'approval-1',
+            status: 'approved',
+            previewHash: approvalPreviewHash(dataKey, 'shell', command),
+            expiresAt: '2099-01-01T00:00:00.000Z'
+          })
+        });
+      }
+      if (scenario === 'question resume') {
+        Object.assign(
+          task,
+          makeTask({
+            messages: [{ role: 'user', content: 'Choose a folder' }],
+            step: 1,
+            credits: 0,
+            question: { question: 'Which folder?', askedAtStep: 1 }
+          })
+        );
+        let answered = false;
+        Object.assign(probe.store, {
+          getNextQueuedTaskMessage: async () =>
+            answered
+              ? null
+              : {
+                  id: 'answer-replay',
+                  interrupt: false,
+                  promptCiphertext: encryptJson(
+                    { prompt: 'Shared' },
+                    dataKey,
+                    `task-message:${task.id}`
+                  ),
+                  modelId: model.id,
+                  privacyRoute: 'provider_zdr',
+                  maxComputeCredits: 5,
+                  maxSpendUsd: null
+                },
+          consumeQueuedTaskMessageInTurn: async () => {
+            answered = true;
+            return true;
+          }
+        });
+      }
+      if (scenario === 'job wait') {
+        frames = [toolFrame('wait-replay', 'process', { action: 'wait', sessionId: 'job-replay' })];
+        Object.assign(probe.store, {
+          parkTaskForJobs: async (input: Record<string, unknown>) => {
+            probe.checkpoints.push({ ...input, status: 'awaiting_resource' });
+            return true;
+          }
+        });
+      }
+      if (scenario === 'failed verification')
+        frames = [
+          toolFrame('finish-invalid', 'finish', {
+            summary: 'Done',
+            verification: {
+              status: 'verified',
+              evidence: [{ toolCallId: 'invented', claim: 'Passed' }]
+            }
+          })
+        ];
+      if (scenario === 'interrupted stream')
+        frames = [
+          () => {
+            let pull = 0;
+            return new ReadableStream({
+              pull(controller) {
+                if (pull++ === 0)
+                  controller.enqueue(
+                    encode(
+                      `data: ${JSON.stringify({ choices: [{ delta: { content: 'Partial answer' } }] })}\n\n`
+                    )
+                  );
+                else controller.error(new Error('Connection lost'));
+              }
+            });
+          },
+          finish
+        ];
+      const log: FetchLog = { calls: [], modelRequests: [] };
+      Object.assign(probe.store, {
+        parkTaskForApproval: async (input: Record<string, unknown>) => {
+          probe.checkpoints.push({ ...input, status: 'awaiting_user' });
+          return { id: input.id };
+        }
+      });
+      let writes = 0;
+      installFetch(frames, log, {
+        route: (url, init) => {
+          if (
+            scenario === 'concurrent update conflict' &&
+            url.includes('/file') &&
+            init?.method === 'PUT'
+          ) {
+            writes++;
+            return writes === 1
+              ? jsonResponse({ ok: true })
+              : new Response(
+                  JSON.stringify({
+                    error: {
+                      code: 'file_changed',
+                      message:
+                        'Another conversation changed the file. Read it again before editing.'
+                    }
+                  }),
+                  { status: 409, headers: { 'content-type': 'application/json' } }
+                );
+          }
+          return scenario === 'question' && url.includes('/file?')
+            ? jsonResponse({ content: 'Shared and personal destinations exist.' })
+            : scenario === 'job wait' && url.includes('/processes/')
+              ? jsonResponse({
+                  sessionId: 'job-replay',
+                  startedAt: '2026-09-27T00:00:00.000Z',
+                  status: 'running',
+                  lifetime: 'job'
+                })
+              : undefined;
+        }
+      });
+      if (scenario === 'provider retry') {
+        const installed = globalThis.fetch;
+        let refused = false;
+        vi.stubGlobal('fetch', (async (url: string | URL | Request, options?: RequestInit) => {
+          if (
+            !refused &&
+            (url instanceof Request ? url.url : url.toString()).endsWith('/chat/completions')
+          ) {
+            refused = true;
+            return new Response('Unavailable', { status: 503 });
+          }
+          return installed(url, options);
+        }) as typeof fetch);
+      }
+      const worker = new AgentWorker(
+        probe.store,
+        config({ TASK_MAX_STEPS: 4 }),
+        masterKey,
+        runnerSecret
+      );
+      if (scenario === 'failure handling')
+        await worker.fail(task, new AthanorError('provider_unavailable', 'Provider offline'), 100);
+      else
+        await worker.run(task).catch((error) => {
+          if (scenario !== 'interrupted stream') throw error;
+        });
+      if (scenario === 'job wait' || scenario === 'failure handling')
+        expect(probe.checkpoints.at(-1)?.status).toBe('awaiting_resource');
+      if (scenario === 'parallel reads')
+        expect(log.calls.filter((row) => /[abc]\.md/.test(row))).toHaveLength(3);
+      if (scenario === 'question resume')
+        expect(JSON.stringify(log.modelRequests)).toContain('Shared');
+      if (scenario === 'finish' || scenario === 'provider retry')
+        expect(probe.events.some((row) => row.kind === 'completed')).toBe(true);
+      if (scenario === 'approval' || scenario === 'question')
+        expect(probe.checkpoints.at(-1)?.status).toBe('awaiting_user');
+      if (scenario === 'failed verification') {
+        const completed = probe.events.find((row) => row.kind === 'completed');
+        expect(completed).toBeDefined();
+        expect(completed?.payload).toMatchObject({ verification: { status: 'unverified' } });
+      }
+      if (scenario === 'approval resume')
+        expect(log.calls.some((row) => row.includes('/exec'))).toBe(true);
+
+      if (scenario === 'concurrent update conflict') {
+        expect(writes).toBe(2);
+        expect(JSON.stringify(log.modelRequests.at(-1))).toContain(
+          'Another conversation changed the file'
+        );
+      }
+
+      expect(fail).not.toHaveBeenCalled();
+      const value = (row: PrivateDiagnosticBody) => (row.data as { value: unknown }).value;
+      const start = bodies.find((row) => row.kind === 'runtime_start');
+      const end = bodies.find((row) => row.kind === 'runtime_end');
+      expect(start).toBeDefined();
+      expect(end).toBeDefined();
+      const segment: RuntimeSegment = {
+        start: value(start!) as RuntimeSegment['start'],
+        events: bodies
+          .filter((row) => row.kind === 'runtime_event')
+          .map((row) => value(row) as RuntimeSegment['events'][number]),
+        end: value(end!) as RuntimeSegment['end']
+      };
+      expect(segment.events.length).toBeGreaterThan(0);
+      expect(JSON.stringify(segment)).not.toContain('provider-key');
+      const external = vi.fn(() => {
+        throw new Error('Replay reached a live transport');
+      });
+      vi.stubGlobal('fetch', external);
+      const result = await replayRuntime(segment);
+      expect(result).toMatchObject({ complete: true, divergence: null });
+      expect(external).not.toHaveBeenCalled();
+      if (scenario === 'finish' || scenario === 'failure handling') {
+        const captured = new CapturedRuntimeReplay();
+        const rows: unknown[] = [];
+        const accept = (row: unknown) => {
+          rows.push(row);
+          captured.accept(row);
+        };
+        const id = '55555555-5555-4555-8555-555555555555';
+        accept({
+          type: 'private_capture',
+          format: 'garden-private-diagnostic',
+          version: 1,
+          id,
+          taskId,
+          workspaceId,
+          through: bodies.length,
+          status: {
+            id,
+            state: 'stopped',
+            startedAt: bodies[0]!.at,
+            stoppedAt: bodies.at(-1)!.at,
+            records: bodies.length,
+            bytes: JSON.stringify(bodies).length,
+            limitBytes: DIAGNOSTIC_CAPTURE_BYTES,
+            reason: null
+          }
+        });
+        let hash = DIAGNOSTIC_EMPTY_HASH;
+        for (const [index, body] of bodies.entries()) {
+          const previousHash = hash;
+          hash = diagnosticPlainHash(index + 1, previousHash, body);
+          accept({ type: 'record', sequence: index + 1, previousHash, hash, body });
+        }
+        accept({ type: 'footer', records: bodies.length, hash, complete: true });
+        expect(await captured.replay()).toMatchObject({
+          available: true,
+          complete: true,
+          segments: 1
+        });
+        if (scenario === 'failure handling') {
+          const directory = await mkdtemp(join(tmpdir(), 'garden-runtime-cli-'));
+          try {
+            const filename = join(directory, 'capture.jsonl');
+            await writeFile(filename, rows.map((row) => JSON.stringify(row)).join('\n'));
+            const result = await promisify(execFile)(
+              process.execPath,
+              [
+                '--conditions=development',
+                '--import',
+                'tsx',
+                fileURLToPath(new URL('./diagnostic-replay-cli.ts', import.meta.url)),
+                filename
+              ],
+              { timeout: 15_000, env: { PATH: process.env.PATH } }
+            );
+            expect(JSON.parse(result.stdout)).toMatchObject({
+              complete: true,
+              runtime: { available: true, complete: true },
+              semantic: { approvalDecisions: 0, requestDerivations: 0 }
+            });
+          } finally {
+            await rm(directory, { recursive: true, force: true });
+          }
+        }
+        const altered = structuredClone(segment);
+        altered.events[0]!.name = 'unexpected';
+        await expect(replayRuntime(altered)).rejects.toThrow('diverged');
+        const missing = { ...segment, events: segment.events.slice(0, -1) };
+        await expect(replayRuntime(missing)).rejects.toThrow('diverged');
+        await expect(
+          replayRuntime({ ...segment, events: [...segment.events, segment.events[0]!] })
+        ).rejects.toThrow('diverged');
+        expect(external).not.toHaveBeenCalled();
+      }
+    },
+    20_000
+  );
 });

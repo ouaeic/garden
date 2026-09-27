@@ -97,6 +97,7 @@ fixtures. They need no root, no network and no server, and they finish in second
 python3 scripts/test-gui-entry.py      # namespace handles, pinned mounts and private GUI state
 python3 infra/native/athanor-desktop-bridge.test.py # native accessibility identity and states
 python3 scripts/test-reproducible-run.py # analysis manifests, clean rerun and changed-dependency refusal
+python3 scripts/test-system-environment.py # confined image extraction; Linux service/data replay with bwrap and cc
 sh scripts/test-sandbox.sh          # which account an agent command really lands on
 sh scripts/test-certificate.sh      # renewal, reissue and the recorded failure alarm
 sh scripts/test-relay-endpoint.sh   # what the connection manifest advertises, relay on and off
@@ -325,8 +326,8 @@ screenshot and accessibility tree.
 
 The private-diagnostics browser drill checks opt-in controls, lost acknowledgement recovery,
 scoped download links, deletion and phone/keyboard layout. Set `GARDEN_DIAGNOSTIC_SCREENSHOT` to
-retain its screenshot. The private replay command executes only recorded pure decision boundaries;
-keep it independent of inference and tool executors.
+retain its screenshot. The private replay command executes the real worker controller against recorded observations.
+Every external boundary must refuse live fallback; tests disable transports during playback.
 
 The project Git browser drill checks durable setup identity after an interrupted response,
 scoped history downloads, cleanup of prepared downloads, and phone/keyboard layout. Set

@@ -1,3 +1,4 @@
+import { runtimeDate } from '@athanor/core';
 import { z } from 'zod';
 import type { ModelRelease } from '@athanor/contracts';
 import type { ModelMessage } from '@athanor/model-gateway';
@@ -133,7 +134,7 @@ export async function reviewClaims(
     method: 'independent_model_review' as const,
     model: model.displayName,
     modelId: model.id,
-    checkedAt: new Date().toISOString(),
+    checkedAt: runtimeDate().toISOString(),
     sources: evidence.sources.map((source) => ({
       id: source.id,
       source: source.source,
@@ -170,7 +171,7 @@ export async function reviewClaims(
     { role: 'system', content: CONTRACT },
     {
       role: 'user',
-      content: `Review date: ${new Date().toISOString().slice(0, 10)}\n${untrustedEnvelope('target claims, re-read sources and background context', sanitiseUntrustedText(JSON.stringify({ targets: evidence.targets, sources: evidence.sources.map(({ id, source, text }) => ({ id, source, text })), background: { question: question.slice(0, 4_000), report: report.slice(0, 8_000) } })))}`
+      content: `Review date: ${runtimeDate().toISOString().slice(0, 10)}\n${untrustedEnvelope('target claims, re-read sources and background context', sanitiseUntrustedText(JSON.stringify({ targets: evidence.targets, sources: evidence.sources.map(({ id, source, text }) => ({ id, source, text })), background: { question: question.slice(0, 4_000), report: report.slice(0, 8_000) } })))}`
     }
   ];
   const route = routeTo(model);

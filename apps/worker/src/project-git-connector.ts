@@ -1,3 +1,4 @@
+import { runtimeNow } from '@athanor/core';
 import { createHash } from 'node:crypto';
 import type { GitHubProjectAction } from '@athanor/contracts';
 import type { ConnectorExecutionResult, ConnectorSecret } from '@athanor/core';
@@ -21,7 +22,7 @@ export async function executeProjectGitConnector(
   const requestId =
     input.requestId ??
     `${digest.slice(0, 8)}-${digest.slice(8, 12)}-4${digest.slice(13, 16)}-a${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
-  const started = Date.now();
+  const started = runtimeNow();
   const status = input.action === 'github_git_status';
   const result = await context.runner.call(
     task.workspaceId,
@@ -51,6 +52,6 @@ export async function executeProjectGitConnector(
     statusCode: 202,
     requestBytes: 0,
     responseBytes: 0,
-    durationMs: Date.now() - started
+    durationMs: runtimeNow() - started
   };
 }

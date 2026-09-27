@@ -1,3 +1,4 @@
+import { runtimeClearTimer, runtimeSetTimeout } from '@athanor/core';
 import type { CodingMissionRecord, DataStore } from '@athanor/data';
 import { AgentRunnerClient } from './runner-client.js';
 
@@ -92,11 +93,11 @@ export async function runCodingMissionLoop(options: {
     }
     await new Promise<void>((resolve) => {
       const finish = () => {
-        clearTimeout(timer);
+        runtimeClearTimer(timer);
         options.signal.removeEventListener('abort', finish);
         resolve();
       };
-      const timer = setTimeout(finish, 2000);
+      const timer = runtimeSetTimeout(finish, 2000);
       options.signal.addEventListener('abort', finish, { once: true });
       if (options.signal.aborted) finish();
     });

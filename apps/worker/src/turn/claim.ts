@@ -1,3 +1,4 @@
+import { runtimeNow } from '@athanor/core';
 import { CODING_CHILD_TOOLS } from '../coding-missions.js';
 import { codingMissionView } from '@athanor/data';
 /**
@@ -133,7 +134,7 @@ export const claimTurn = async (
    * resumed turn gets a fresh allowance exactly as a new turn does. Persisting it would bound the
    * conversation instead, which the API's own resume contract does not.
    */
-  const turnStartedAt = Date.now();
+  const turnStartedAt = runtimeNow();
   const workspace = await deps.store.getWorkspaceById(task.workspaceId);
   if (!workspace?.wrappedKey) throw new Error('Workspace key not found');
   const key = unwrapDataKey(workspace.wrappedKey, deps.masterKey, workspace.id);

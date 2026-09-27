@@ -1,3 +1,4 @@
+import { runtimeNow } from '@athanor/core';
 import { resolveArtifactReference } from '@athanor/contracts/artifact-reference';
 import { deliveryFilePath, TaskOutputIntents, type TaskOutputIntent } from '@athanor/contracts';
 import { decryptJson } from '@athanor/core';
@@ -114,7 +115,7 @@ export const resolveDelivery = async (
   const isLive = (preview: (typeof previews)[number]): Promise<boolean> => {
     if (
       preview.status !== 'active' ||
-      (preview.expiresAt && Date.parse(preview.expiresAt) <= Date.now())
+      (preview.expiresAt && Date.parse(preview.expiresAt) <= runtimeNow())
     )
       return Promise.resolve(false);
     const existing = previewChecks.get(preview.id);

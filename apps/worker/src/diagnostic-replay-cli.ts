@@ -1,3 +1,5 @@
+import { ReplayDivergence } from './runtime-tape.js';
+import { CapturedRuntimeReplay } from './runtime-replay.js';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
@@ -18,18 +20,24 @@ async function main() {
     lines.close();
   });
   const replay = new PrivateDecisionReplay();
+  const runtime = new CapturedRuntimeReplay();
   try {
     for await (const line of lines) {
       if (Buffer.byteLength(line) > DIAGNOSTIC_RECORD_BYTES) throw new Error('Record too large');
-      if (line.trim()) replay.accept(JSON.parse(line));
+      if (line.trim()) {
+        const row: unknown = JSON.parse(line);
+        replay.accept(row);
+        runtime.accept(row);
+      }
     }
     if (sourceError) throw sourceError;
-    const result = replay.result();
+    const result = { ...replay.result(), runtime: await runtime.replay() };
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     if (
       !result.complete ||
       result.semantic.divergences.length ||
-      result.semantic.approvalDecisions + result.semantic.requestDerivations === 0
+      (result.semantic.approvalDecisions + result.semantic.requestDerivations === 0 &&
+        !result.runtime.complete)
     )
       process.exitCode = 2;
   } finally {
@@ -37,7 +45,14 @@ async function main() {
     source.destroy();
   }
 }
-void main().catch(() => {
+void main().catch((error: unknown) => {
+  if (error instanceof ReplayDivergence) {
+    process.stdout.write(
+      `${JSON.stringify({ complete: false, runtime: { divergence: { sequence: error.sequence, boundary: error.boundary } } }, null, 2)}\n`
+    );
+    process.exitCode = 2;
+    return;
+  }
   process.stderr.write(
     'Private capture could not be validated. Use pnpm diagnostic:replay-private <file>. No recorded action was executed.\n'
   );

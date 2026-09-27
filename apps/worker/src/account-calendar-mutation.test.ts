@@ -4,7 +4,7 @@ import { connectorActions, connectorCatalog, accountOAuthScopes } from '@athanor
 import { approvalRequirement } from './approval-policy.js';
 import { agentToolsFor } from './tool-catalogue.js';
 
-it('keeps exact calendar changes behind their granted action cards in every security mode', () => {
+it('describes exact calendar changes when the selected mode requires confirmation', () => {
   const input = {
     calendarId: 'owner@example.org',
     eventId: 'meeting',
@@ -16,7 +16,7 @@ it('keeps exact calendar changes behind their granted action cards in every secu
       attendees: [{ address: 'colleague@example.org' }]
     }
   };
-  for (const mode of ['autonomous', 'balanced', 'review'] as const) {
+  for (const mode of ['balanced', 'review'] as const) {
     const edit = approvalRequirement(
       'connector_action',
       { action: 'account_calendar_update', input },

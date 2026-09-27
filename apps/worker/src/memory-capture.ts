@@ -1,3 +1,4 @@
+import { runtimeDate, runtimeNow } from '@athanor/core';
 /**
  * What a finished turn deposits in the tiered store: the episode, and the cautions the harness
  * earned by watching an acceptance command fail.
@@ -69,7 +70,7 @@ export const captureMemory = async (
   /** The commands it watched fail on that same run, which is the other half of the same lesson. */
   deadEnds: readonly MemoryDeadEndCheck[] = []
 ): Promise<void> => {
-  const occurredAt = new Date();
+  const occurredAt = runtimeDate();
   try {
     const { request, artifacts } = extractTurn(state.messages);
     // What this turn touched, including the steps a compaction removed from the window. Carried
@@ -218,7 +219,7 @@ export const captureMemory = async (
         // request, so an entry and the request overlap by construction.
         request
       });
-    const now = Date.now();
+    const now = runtimeNow();
     if (shouldConsolidateMemory(deps.memoryConsolidatedAt.get(task.workspaceId), now)) {
       // Claimed before the await so a second turn finishing concurrently does not run it twice.
       deps.memoryConsolidatedAt.set(task.workspaceId, now);

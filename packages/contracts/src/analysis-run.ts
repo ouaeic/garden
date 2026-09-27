@@ -35,7 +35,7 @@ const probe = z.object({
 });
 
 const environmentSetup = z.object({
-  kind: z.enum(['python_wheels', 'r_archives', 'conda_packages']),
+  kind: z.enum(['python_wheels', 'r_archives', 'conda_packages', 'linux_userland']),
   directory: path,
   status: z.enum(['creating', 'installing', 'ready'])
 });
@@ -59,8 +59,22 @@ export const AnalysisRunRecord = z.object({
   environmentSetups: z
     .array(environmentSetup)
     .min(1)
-    .max(3)
+    .max(4)
     .refine((setups) => new Set(setups.map((setup) => setup.kind)).size === setups.length)
+    .optional(),
+  services: z
+    .array(
+      z.object({
+        name: z.string().regex(/^[a-z][a-z0-9-]{0,62}$/),
+        pid: z.number().int().positive(),
+        status: z.enum(['starting', 'ready', 'stopped']),
+        log: path,
+        startedAt: at,
+        finishedAt: at.optional(),
+        exitCode: z.number().int().nullable().optional()
+      })
+    )
+    .max(32)
     .optional(),
   spec: z.object({
     name: z.string().max(200).optional(),
@@ -110,6 +124,25 @@ export const AnalysisRunRecord = z.object({
             .max(4096)
         })
         .optional(),
+      system: z
+        .object({
+          launcher: z.object({ path: z.enum(['/usr/bin/bwrap', '/usr/bin/proot']), sha256: hash }),
+          image: z.object({ path, sha256: hash }),
+          data: z.object({ path, sha256: hash }).optional(),
+          directory: path,
+          services: z
+            .array(
+              z.object({
+                name: z.string().regex(/^[a-z][a-z0-9-]{0,62}$/),
+                command,
+                ready: command,
+                readySeconds: z.number().int().positive().optional()
+              })
+            )
+            .max(32)
+            .optional()
+        })
+        .optional(),
       probes: z.array(z.object({ name: z.string().max(120), command })).max(32)
     }),
     seeds: z
@@ -123,7 +156,7 @@ export const AnalysisRunRecord = z.object({
       inputs: files,
       locks: files,
       // Declared probes plus one package inventory per reconstructible runtime.
-      probes: z.array(probe).max(32 + 3),
+      probes: z.array(probe).max(32 + 4),
       platform: z.object({ system: z.string(), release: z.string(), architecture: z.string() })
     })
     .optional(),

@@ -1,3 +1,4 @@
+import { runtimeNow } from '@athanor/core';
 /**
  * The bound on a patch sent again byte for byte after it was refused.
  *
@@ -77,7 +78,7 @@ export const boundRepeatedRefusal = (
   refusal: EditRefusal,
   lines: readonly string[],
   fullyShown: boolean,
-  now = Date.now()
+  now = runtimeNow()
 ): EditRefusal => {
   const key = keyOf(taskId, path);
   const digest = digestOf(edit);

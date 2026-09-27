@@ -1,3 +1,4 @@
+import { runtimeClearTimer, runtimeSetInterval, runtimeSetTimeout } from '@athanor/core';
 /**
  * Holding a task, and letting go of it.
  *
@@ -95,7 +96,7 @@ export const withRequestDeadline = async <T>(
   milliseconds = MODEL_REQUEST_TIMEOUT_MS
 ): Promise<T> => {
   const controller = new AbortController();
-  const timer = setTimeout(() => {
+  const timer = runtimeSetTimeout(() => {
     controller.abort(
       new AthanorError(
         'model_request_timeout',
@@ -107,7 +108,7 @@ export const withRequestDeadline = async <T>(
   try {
     return await operation(controller.signal);
   } finally {
-    clearTimeout(timer);
+    runtimeClearTimer(timer);
   }
 };
 
@@ -120,7 +121,7 @@ export const withPeriodicRenewal = async <T>(
   renew: () => Promise<unknown>,
   intervalMs = LEASE_RENEWAL_INTERVAL_MS
 ): Promise<T> => {
-  const timer = setInterval(() => {
+  const timer = runtimeSetInterval(() => {
     void Promise.resolve()
       .then(renew)
       .catch(() => undefined);
@@ -129,7 +130,7 @@ export const withPeriodicRenewal = async <T>(
   try {
     return await operation();
   } finally {
-    clearInterval(timer);
+    runtimeClearTimer(timer);
   }
 };
 
@@ -192,7 +193,7 @@ export const startStopWatch = (
   const controller = new AbortController();
   let halt: StepHalt | null = null;
   let reading = false;
-  const timer = setInterval(() => {
+  const timer = runtimeSetInterval(() => {
     // One read in flight at a time: a database that has become slow must not queue a poll per tick.
     if (reading || controller.signal.aborted) return;
     reading = true;
@@ -214,6 +215,6 @@ export const startStopWatch = (
     get halt() {
       return halt;
     },
-    stop: () => clearInterval(timer)
+    stop: () => runtimeClearTimer(timer)
   };
 };

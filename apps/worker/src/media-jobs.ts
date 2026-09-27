@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto';
+import { runtimeNow, runtimeUUID } from '@athanor/core';
+
 import { setTimeout as sleep } from 'node:timers/promises';
 import { decryptJson, encryptJson, sha256, unwrapDataKey } from '@athanor/core';
 import { agentNotificationAad, type DataStore, type MediaJobRecord } from '@athanor/data';
@@ -44,7 +45,7 @@ export class MediaJobWorker {
   constructor(private readonly options: MediaJobWorkerOptions) {}
   private async publishPendingDelivery(): Promise<boolean> {
     const { store, masterKey } = this.options;
-    const leaseOwner = `${this.options.workerId}:media-delivery:${randomUUID()}`;
+    const leaseOwner = `${this.options.workerId}:media-delivery:${runtimeUUID()}`;
     const delivery = await store.leaseMediaDelivery(leaseOwner);
     if (!delivery) return false;
     try {
@@ -81,7 +82,7 @@ export class MediaJobWorker {
     signal?.throwIfAborted();
     const { store, masterKey, runner } = this.options;
     const published = await this.deliverReady();
-    const leaseOwner = `${this.options.workerId}:media:${randomUUID()}`;
+    const leaseOwner = `${this.options.workerId}:media:${runtimeUUID()}`;
     const job = await store.leaseMediaJob(leaseOwner);
     if (!job) return published;
     const workspace = await store.getWorkspaceById(job.workspaceId);
@@ -200,7 +201,8 @@ export class MediaJobWorker {
         await report(status);
     } catch (error) {
       const deliveryExpired =
-        job.status === 'delivering' && Date.now() - Date.parse(job.createdAt) > 24 * 60 * 60 * 1000;
+        job.status === 'delivering' &&
+        runtimeNow() - Date.parse(job.createdAt) > 24 * 60 * 60 * 1000;
       await fail(
         job.status === 'submitting'
           ? 'submission_uncertain'

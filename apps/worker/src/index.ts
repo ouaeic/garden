@@ -1,3 +1,4 @@
+import { runtimeNow } from '@athanor/core';
 import { runJobWaitLoop } from './job-waits.js';
 import { createServer } from 'node:http';
 import {
@@ -133,14 +134,14 @@ await runLeaseLoops({
   running: () => running,
   lease: () => store.leaseNextTask(config.WORKER_ID, 120),
   run: async (task) => {
-    startedAt.set(task.id, Date.now());
+    startedAt.set(task.id, runtimeNow());
     await worker.run(task);
     startedAt.delete(task.id);
   },
   fail: async (task, error) => {
     const began = startedAt.get(task.id);
     startedAt.delete(task.id);
-    await worker.fail(task, error, began === undefined ? undefined : Date.now() - began);
+    await worker.fail(task, error, began === undefined ? undefined : runtimeNow() - began);
   },
   /*
    * Waits on the write rather than on the clock, which is what every announcement into the queue

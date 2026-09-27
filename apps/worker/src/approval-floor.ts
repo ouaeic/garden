@@ -1,3 +1,4 @@
+import { runtimeValue } from '@athanor/core';
 import { workflowApproval } from './workflow-approval.js';
 import { projectUpdateApproval } from './project-updates.js';
 import { useTaskApproval } from './approval-grants.js';
@@ -110,7 +111,9 @@ export const existingSkillFor = async (
     const workspace = await deps.store.getWorkspaceById(task.workspaceId);
     if (!workspace?.wrappedKey) return undefined;
     const key = unwrapDataKey(workspace.wrappedKey, deps.masterKey, workspace.id);
-    const nameHash = createHmac('sha256', key).update(`athanor-skill:${name}`).digest('hex');
+    const nameHash = runtimeValue(`skill.binding:${name}`, () =>
+      createHmac('sha256', key).update(`athanor-skill:${name}`).digest('hex')
+    );
     const saved = (await deps.store.listWorkspaceSkills(task.userId, task.workspaceId)).find(
       (skill) => skill.nameHash === nameHash
     );

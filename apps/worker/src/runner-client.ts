@@ -1,5 +1,6 @@
+import { runtimeClearTimer, runtimeSetTimeout, runtimeUUID } from '@athanor/core';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { randomUUID } from 'node:crypto';
+
 import { readBoundedMediaBody } from '@athanor/model-gateway';
 import { AthanorError, capabilityAudience, signCapabilityToken } from '@athanor/core';
 
@@ -100,11 +101,11 @@ const pause = (milliseconds: number, signal?: AbortSignal | null): Promise<void>
       return;
     }
     const done = (): void => {
-      clearTimeout(timer);
+      runtimeClearTimer(timer);
       signal?.removeEventListener('abort', done);
       resolve();
     };
-    const timer = setTimeout(done, milliseconds);
+    const timer = runtimeSetTimeout(done, milliseconds);
     signal?.addEventListener('abort', done, { once: true });
   });
 
@@ -203,7 +204,7 @@ export class AgentRunnerClient {
         role: 'agent',
         scopes: Array.isArray(scope) ? scope : [scope],
         aud: capabilityAudience(method, path),
-        nonce: randomUUID()
+        nonce: runtimeUUID()
       },
       this.secret,
       90
@@ -274,7 +275,7 @@ export class AgentRunnerClient {
         role: 'agent',
         scopes: ['workspace.manage'],
         aud: capabilityAudience('POST', route),
-        nonce: randomUUID()
+        nonce: runtimeUUID()
       },
       this.secret,
       90
@@ -339,7 +340,7 @@ export class AgentRunnerClient {
         role: 'agent',
         scopes: ['files.read'],
         aud: capabilityAudience('GET', `/v1/workspaces/${workspaceId}/file`),
-        nonce: randomUUID()
+        nonce: runtimeUUID()
       },
       this.secret,
       90
@@ -369,7 +370,7 @@ export class AgentRunnerClient {
         role: 'agent',
         scopes: ['files.read'],
         aud: capabilityAudience('GET', `/v1/workspaces/${workspaceId}/file`),
-        nonce: randomUUID()
+        nonce: runtimeUUID()
       },
       this.secret,
       90
@@ -421,7 +422,7 @@ export class AgentRunnerClient {
         role: 'agent',
         scopes: ['files.read'],
         aud: capabilityAudience('GET', `/v1/workspaces/${workspaceId}/file`),
-        nonce: randomUUID()
+        nonce: runtimeUUID()
       },
       this.secret,
       90
@@ -491,7 +492,7 @@ export class AgentRunnerClient {
         role: 'agent',
         scopes: ['files.read'],
         aud: capabilityAudience('GET', `/v1/workspaces/${workspaceId}/file`),
-        nonce: randomUUID()
+        nonce: runtimeUUID()
       },
       this.secret,
       90
@@ -550,7 +551,7 @@ export class AgentRunnerClient {
         role: 'agent',
         scopes: ['files.read'],
         aud: capabilityAudience('GET', `/v1/workspaces/${workspaceId}/image`),
-        nonce: randomUUID()
+        nonce: runtimeUUID()
       },
       this.secret,
       90
@@ -597,7 +598,7 @@ export class AgentRunnerClient {
         role: 'agent',
         scopes: ['files.read'],
         aud: capabilityAudience('GET', `/v1/workspaces/${workspaceId}/file`),
-        nonce: randomUUID()
+        nonce: runtimeUUID()
       },
       this.secret,
       90
@@ -666,7 +667,7 @@ export class AgentRunnerClient {
         role: 'agent',
         scopes: ['files.read'],
         aud: capabilityAudience('POST', path),
-        nonce: randomUUID()
+        nonce: runtimeUUID()
       },
       this.secret,
       90
@@ -739,7 +740,7 @@ export class AgentRunnerClient {
         role: 'agent',
         scopes: ['files.read'],
         aud: capabilityAudience('POST', `/v1/workspaces/${workspaceId}/audio/prepare`),
-        nonce: randomUUID()
+        nonce: runtimeUUID()
       },
       this.secret,
       90
@@ -814,7 +815,7 @@ export class AgentRunnerClient {
         role: 'agent',
         scopes: ['files.write'],
         aud: capabilityAudience('PUT', `/v1/workspaces/${workspaceId}/file`),
-        nonce: randomUUID()
+        nonce: runtimeUUID()
       },
       this.secret,
       90
@@ -847,7 +848,7 @@ export class AgentRunnerClient {
         role: 'agent',
         scopes: ['files.write'],
         aud: capabilityAudience('PUT', `/v1/workspaces/${workspaceId}/file`),
-        nonce: randomUUID()
+        nonce: runtimeUUID()
       },
       this.secret,
       90

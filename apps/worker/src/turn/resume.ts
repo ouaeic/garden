@@ -1,3 +1,4 @@
+import { runtimeDate } from '@athanor/core';
 /**
  * What a turn has to settle before it can take another step: everything the last one left behind.
  *
@@ -268,7 +269,7 @@ export const resumeParkedTurn = async (
         state.inFlight = {
           toolCallId: call.id,
           tool: call.name,
-          startedAt: new Date().toISOString()
+          startedAt: runtimeDate().toISOString()
         };
         await deps.checkpoint(task, key, state);
         try {

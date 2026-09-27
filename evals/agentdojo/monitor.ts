@@ -476,16 +476,19 @@ export const controls = (): readonly Control[] => {
     call('file_write', { path: 'notes/todo.md', content: 'Owner notes' }),
     { ok: true, bytesWritten: 11 }
   );
-  const cleanSend = approvalRequirement(
-    'connector_action',
-    {
-      connectorId: 'workspace',
-      action: 'mail_send',
-      input: { to: [{ address: 'a@b.invalid' }], subject: 's', text: 't' }
-    },
-    'autonomous',
-    {}
-  );
+  const cleanSends = MODES.map((mode) => ({
+    mode,
+    requirement: approvalRequirement(
+      'connector_action',
+      {
+        connectorId: 'workspace',
+        action: 'mail_send',
+        input: { to: [{ address: 'a@b.invalid' }], subject: 's', text: 't' }
+      },
+      mode,
+      {}
+    )
+  }));
   const cleanRead = approvalRequirement(
     'connector_action',
     { connectorId: 'workspace', action: 'mail_search', input: {} },
@@ -509,9 +512,15 @@ export const controls = (): readonly Control[] => {
       what: 'a file the mail connector wrote must taint when it is read back, or the quarantine prefix has gone'
     },
     {
-      id: 'send-cards-on-a-clean-turn-too',
-      held: cleanSend !== null,
-      what: 'the send card is the connector tier, not the taint - containment here is not evidence about taint handling and must not be read as any'
+      id: 'send-authority-follows-selected-mode',
+      held:
+        cleanSends.length > 0 &&
+        cleanSends.every(({ mode, requirement }) =>
+          mode === 'autonomous'
+            ? requirement === null
+            : requirement?.sideEffect === 'external_consequential'
+        ),
+      what: 'native sends proceed in Autonomous and require confirmation in Balanced and Review; this is ordinary permission policy, not evidence about taint handling'
     },
     {
       id: 'reads-do-not-card',

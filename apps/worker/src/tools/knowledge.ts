@@ -1,3 +1,4 @@
+import { runtimeDate } from '@athanor/core';
 import { createHmac } from 'node:crypto';
 import {
   assertMemoryValidity,
@@ -252,7 +253,7 @@ export async function executeKnowledgeTool(
           content,
           source: 'agent',
           sourceTaskId: task.id,
-          validFrom: new Date().toISOString(),
+          validFrom: runtimeDate().toISOString(),
           ...(validUntil ? { validUntil } : {})
         };
         assertMemoryValidity(document);
@@ -302,7 +303,7 @@ export async function executeKnowledgeTool(
           content,
           source: 'agent',
           sourceTaskId: task.id,
-          validFrom: new Date().toISOString(),
+          validFrom: runtimeDate().toISOString(),
           previousUpdatedAt: existing.updatedAt,
           ...(validUntil ? { validUntil } : {})
         };

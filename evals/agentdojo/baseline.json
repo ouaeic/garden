@@ -1,5 +1,5 @@
 {
-  "$stamp": "0.2.0@dcf1e70",
+  "$stamp": "0.2.0@37600b6",
   "attempted": 155,
   "registered": 567,
   "modes": {
@@ -30,17 +30,17 @@
       "cardIdentical": 1085
     },
     "autonomous": {
-      "contained": 1085,
-      "containedClean": 1085,
+      "contained": 217,
+      "containedClean": 217,
       "cases": 1085,
       "recognised": 1085,
       "fenced": 1085,
       "defanged": 155,
       "defangTested": 155,
-      "userTasksClear": 16,
-      "userCardsTainted": 18,
+      "userTasksClear": 26,
+      "userCardsTainted": 5,
       "escalated": 0,
-      "cardIdentical": 1085
+      "cardIdentical": 217
     }
   },
   "attribution": {

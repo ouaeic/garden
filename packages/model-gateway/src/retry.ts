@@ -1,3 +1,4 @@
+import { runtimeClearTimer, runtimeNow, runtimeRandom, runtimeSetTimeout } from '@athanor/core';
 import { AthanorError } from '@athanor/core';
 
 /**
@@ -41,11 +42,11 @@ const wait = (ms: number, signal?: AbortSignal): Promise<void> =>
       return;
     }
     const finish = (): void => {
-      clearTimeout(timer);
+      runtimeClearTimer(timer);
       signal?.removeEventListener('abort', finish);
       resolve();
     };
-    const timer = setTimeout(finish, ms);
+    const timer = runtimeSetTimeout(finish, ms);
     signal?.addEventListener('abort', finish, { once: true });
   });
 
@@ -57,7 +58,7 @@ export const defaultRetryPolicy: RetryPolicy = {
   baseDelayMs: 500,
   maxDelayMs: 20_000,
   maxRetryAfterMs: DEFAULT_MAX_RETRY_AFTER_MS,
-  random: Math.random,
+  random: runtimeRandom,
   sleep: wait
 };
 
@@ -95,7 +96,7 @@ const parseRetryAfter = (value: unknown): number | undefined => {
   const asSeconds = Number(value.trim());
   if (Number.isFinite(asSeconds)) return Math.max(0, asSeconds * 1000);
   const asDate = Date.parse(value.trim());
-  return Number.isFinite(asDate) ? Math.max(0, asDate - Date.now()) : undefined;
+  return Number.isFinite(asDate) ? Math.max(0, asDate - runtimeNow()) : undefined;
 };
 
 export const retryAfterMsOf = (error: unknown): number | undefined => {

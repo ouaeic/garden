@@ -1,5 +1,5 @@
 id: scientific-computing
-version: 1.5.0
+version: 1.6.0
 catalog_line: 'Install scientific tools, size large jobs and record reproducible analysis manifests.'
 
 lineage:

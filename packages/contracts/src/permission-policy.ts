@@ -8,6 +8,7 @@ export const SECURITY_MODE_FLOOR: Record<
     readonly asksBeforeReachingTheInternet: boolean;
     readonly asksBeforeInstallingSoftware: boolean;
     readonly authorizesSurfaceActions: boolean;
+    readonly authorizesAccountActions: boolean;
     readonly sentence: string;
   }
 > = {
@@ -16,6 +17,7 @@ export const SECURITY_MODE_FLOOR: Record<
     asksBeforeReachingTheInternet: true,
     asksBeforeInstallingSoftware: true,
     authorizesSurfaceActions: false,
+    authorizesAccountActions: false,
     sentence:
       'Every command, every file written, and every browser or desktop action, on top of everything Balanced asks about.'
   },
@@ -24,6 +26,7 @@ export const SECURITY_MODE_FLOOR: Record<
     asksBeforeReachingTheInternet: true,
     asksBeforeInstallingSoftware: true,
     authorizesSurfaceActions: false,
+    authorizesAccountActions: false,
     sentence:
       'Asks before consequential browser or desktop actions, a command reaching the internet, and installing software; the built-in web tools read without asking. Other safeguards also apply.'
   },
@@ -32,8 +35,9 @@ export const SECURITY_MODE_FLOOR: Record<
     asksBeforeReachingTheInternet: false,
     asksBeforeInstallingSoftware: false,
     authorizesSurfaceActions: true,
+    authorizesAccountActions: true,
     sentence:
-      'Completes browser and desktop work, including uploads and submissions, without approval. CAPTCHA and private input need you. Other tools still ask about external changes, destructive operations, a durable instruction, schedule, service or tool configuration, and unverifiable network destinations.'
+      'Completes browser, desktop, mail and calendar work within your granted access without approval, including uploads, submissions and sending. CAPTCHA and private input need you. Other tools still ask about external changes, destructive operations, a durable instruction, schedule, service or tool configuration, and unverifiable network destinations.'
   }
 };
 

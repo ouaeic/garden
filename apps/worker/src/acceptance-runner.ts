@@ -1,3 +1,4 @@
+import { runtimeNow } from '@athanor/core';
 /**
  * Running the acceptance record in the harness: once per state of the workspace, and inside one
  * deadline for the suite rather than one per check.
@@ -208,7 +209,7 @@ export const acceptanceChecks = async (
    * bounded is how long the turn is held, which includes the round trips and a runner that answers
    * slowly, not only the time a command was running.
    */
-  const deadlineAt = Date.now() + ACCEPTANCE_SUITE_DEADLINE_SECONDS * 1_000;
+  const deadlineAt = runtimeNow() + ACCEPTANCE_SUITE_DEADLINE_SECONDS * 1_000;
   for (const check of record.checks) {
     try {
       const issues = await inspectAcceptanceChecks(deps.runner, task, [check]);
@@ -230,7 +231,7 @@ export const acceptanceChecks = async (
       // Asked after the free answer above, deliberately: a check the harness already watched run
       // costs nothing to report, and a suite that is out of time is still allowed to say what it
       // already knows.
-      const remainingSeconds = Math.ceil((deadlineAt - Date.now()) / 1_000);
+      const remainingSeconds = Math.ceil((deadlineAt - runtimeNow()) / 1_000);
       if (remainingSeconds <= 0) {
         // A failure, on the same rule as every other check that could not run: "the suite ran out
         // of time" is a true statement about this computer and it is not evidence of the work.

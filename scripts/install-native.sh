@@ -672,6 +672,7 @@ fi
 install_asset 0755 "$athanor_root/scripts/athanor" /usr/local/bin/athanor
 install_asset 0755 "$athanor_root/scripts/athanor" /usr/local/bin/garden
 install_asset 0755 "$athanor_root/scripts/reproducible-run.py" /usr/local/bin/garden-run
+install_asset 0644 "$athanor_root/scripts/garden_system.py" /usr/local/lib/athanor/garden_system.py
 # Outside every directory on the agent's PATH, and not executable by the agent's account. On
 # /usr/local/bin it was a root package install with no capability scope and no approval card, one
 # command name away from anything running on this box.

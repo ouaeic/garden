@@ -1,3 +1,4 @@
+import { runtimeDate } from '@athanor/core';
 import { TaskScheduleSpec } from '@athanor/contracts';
 import { decryptJson, encryptJson, nextScheduleRun, AthanorError } from '@athanor/core';
 import { type ModelToolCall } from '@athanor/model-gateway';
@@ -194,7 +195,7 @@ export async function executeSchedulingTool(
           task.userId,
           existing.id,
           true,
-          new Date()
+          runtimeDate()
         );
         if (!updated) throw new AthanorError('schedule_not_found', 'Schedule not found');
         return { ...materialize(updated), queuedNow: true };

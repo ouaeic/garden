@@ -1,4 +1,5 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { runtimeUUID } from '@athanor/core';
+import { randomBytes } from 'node:crypto';
 import { publishesPublicly } from '@athanor/contracts';
 import { encryptJson, sha256, AthanorError } from '@athanor/core';
 import { type ModelToolCall } from '@athanor/model-gateway';
@@ -79,7 +80,7 @@ export async function executePublishingTool(
         requestedMime
       );
       const mimeType = (!scriptableMime && requestedMime) || source.mimeType;
-      const storageKey = `.athanor/artifacts/${randomUUID()}`;
+      const storageKey = `.athanor/artifacts/${runtimeUUID()}`;
       await context.runner.writeBytes(task.workspaceId, task.id, storageKey, source.bytes);
       const artifact = await context.store.createArtifact({
         userId: task.userId,
@@ -103,7 +104,7 @@ export async function executePublishingTool(
         | undefined;
       const extension = sourcePath.split('.').at(-1)?.toLowerCase() ?? '';
       if (['pptx', 'docx', 'xlsx', 'odp', 'odt', 'ods'].includes(extension)) {
-        const previewPath = `workspace/.athanor/renders/${randomUUID()}.pdf`;
+        const previewPath = `workspace/.athanor/renders/${runtimeUUID()}.pdf`;
         try {
           // The same wrapper every vetted procedure names, rather than bare LibreOffice. It
           // writes the file where it is told instead of choosing a name from the input stem, it
@@ -130,7 +131,7 @@ export async function executePublishingTool(
             task.id,
             previewPath
           );
-          const previewStorageKey = `.athanor/artifacts/${randomUUID()}`;
+          const previewStorageKey = `.athanor/artifacts/${runtimeUUID()}`;
           await context.runner.writeBytes(
             task.workspaceId,
             task.id,

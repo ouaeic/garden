@@ -273,9 +273,10 @@ host is on rather than taking a preference for it.
 **When it stops and asks you.** Three positions, each one everything the position below it asks
 about plus more.
 
-- _Autonomous_ authorizes browser and desktop actions for the requested task, including uploads,
-  form submissions and confirmations. CAPTCHA, private input and provenance checks still apply.
-  Non-surface tools retain their external, destructive and durable-operation approval rules.
+- _Autonomous_ authorizes browser, desktop and native mail/calendar actions for the requested task,
+  including uploads, form submissions, sending and calendar changes. Existing account grants still
+  limit access. CAPTCHA, private input and provenance checks still apply. Other tools retain their
+  external, destructive and durable-operation approval rules.
 - _Balanced_ also asks before consequential browser and desktop actions, commands reaching the
   internet, and software installation.
 - _Review_ is Balanced plus a card in front of every command, every file written, and every browser

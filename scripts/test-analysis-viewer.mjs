@@ -84,6 +84,21 @@ with zipfile.ZipFile('${wheel}', 'w') as archive:
         { cwd: run }
       );
       let current = await readFile(path.join(run, 'records/run.json'), 'utf8');
+      // Service metadata is a viewer fixture; Linux execution has its own native acceptance drill.
+      current = JSON.stringify({
+        ...JSON.parse(current),
+        services: [
+          {
+            name: 'reference-service',
+            pid: 9001,
+            status: 'stopped',
+            log: '.garden/system/reference-service.log',
+            startedAt: '2026-09-27T10:00:00.000Z',
+            finishedAt: '2026-09-27T10:01:00.000Z',
+            exitCode: 0
+          }
+        ]
+      });
       const saved = current;
       const record = JSON.parse(current);
       const failed = JSON.stringify({
@@ -180,6 +195,14 @@ with zipfile.ZipFile('${wheel}', 'w') as archive:
       await page.getByRole('link', { name: 'Download current result.txt', exact: true }).click();
       await downloadReady;
       assert.deepEqual(downloads, ['workspace/analysis/result.txt']);
+      await page.getByText('Recorded services (1)', { exact: true }).click();
+      await page.getByText('Recorded: stopped · process 9001', { exact: true }).waitFor();
+      const logLink = page.getByRole('link', { name: 'Download current log', exact: true });
+      assert.equal(
+        new URL(await logLink.getAttribute('href'), page.url()).searchParams.get('path'),
+        'workspace/analysis/.garden/system/reference-service.log'
+      );
+
       await page.getByRole('button', { name: 'Source JSON', exact: true }).click();
       const editor = page.getByRole('textbox');
       await editor.fill(saved.replace('Reference analysis', 'Renamed analysis'));

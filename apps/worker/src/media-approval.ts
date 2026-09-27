@@ -1,3 +1,4 @@
+import { runtimeValue } from '@athanor/core';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { AthanorError } from '@athanor/core';
 import type { ModelToolCall } from '@athanor/model-gateway';
@@ -36,23 +37,25 @@ const binding = (
   } = route;
   return {
     modelId: route.providerModelId,
-    binding: createHmac('sha256', key)
-      .update(
-        canonicalJson({
-          taskId: task.id,
-          workspaceId: task.workspaceId,
-          turn: state.turn ?? 0,
-          taskPrivacy: task.privacyRoute,
-          tool: call.name,
-          arguments: call.arguments,
-          provider: secret.provider,
-          baseUrl: secret.baseUrl,
-          apiKey: secret.apiKey ?? '',
-          enforceZeroDataRetention: secret.enforceZeroDataRetention,
-          route: identity
-        })
-      )
-      .digest('hex')
+    binding: runtimeValue('media.binding', () =>
+      createHmac('sha256', key)
+        .update(
+          canonicalJson({
+            taskId: task.id,
+            workspaceId: task.workspaceId,
+            turn: state.turn ?? 0,
+            taskPrivacy: task.privacyRoute,
+            tool: call.name,
+            arguments: call.arguments,
+            provider: secret.provider,
+            baseUrl: secret.baseUrl,
+            apiKey: secret.apiKey ?? '',
+            enforceZeroDataRetention: secret.enforceZeroDataRetention,
+            route: identity
+          })
+        )
+        .digest('hex')
+    )
   };
 };
 
