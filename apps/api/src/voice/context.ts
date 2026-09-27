@@ -34,7 +34,7 @@ export async function voiceTaskContext(
   const { task, key } = await taskKey(context, userId, taskId);
   const records = (
     await Promise.all(
-      (['user_message', 'assistant_message'] as const).map((kind) =>
+      (['user_message', 'assistant_message', 'completed'] as const).map((kind) =>
         context.store.listTaskEvents(task.id, 0, { kind, limit: 6 })
       )
     )
@@ -50,7 +50,12 @@ export async function voiceTaskContext(
     );
     const payload = record(revealed.payload);
     // Only ordinary visible messages: never tool payloads, form answers or handoff fields.
-    const content = text(payload.markdown ?? payload.prompt ?? payload.content, 1500);
+    const content = text(
+      event.kind === 'completed'
+        ? (payload.answer ?? payload.summary)
+        : (payload.markdown ?? payload.prompt ?? payload.content),
+      1500
+    );
     return content
       ? [{ role: event.kind === 'user_message' ? 'user' : 'assistant', text: content }]
       : [];

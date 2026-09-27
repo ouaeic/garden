@@ -1027,13 +1027,28 @@ it('restores an opted-in discussion after provider loss while holding the origin
       `task-event:${f.task.id}`
     )
   });
+  await store.appendTaskEvent({
+    taskId: f.task.id,
+    kind: 'completed',
+    summary: 'Holiday options',
+    payloadCiphertext: encryptJson(
+      {
+        answer: 'Three rail routes suit this trip. FINAL_ANSWER_CANARY',
+        deliverables: [{ path: 'PRIVATE_ARTIFACT_PATH_CANARY' }]
+      },
+      key,
+      `task-event:${f.task.id}`
+    )
+  });
   const started = await f.start(randomUUID(), { ...f.selection, shareTaskContext: true });
   expect(started.statusCode, started.body).toBe(200);
   const connection = started.json<VoiceConnection>();
   const c = await f.connect(connection);
   const initial = JSON.stringify(c.provider.sent);
   expect(initial).toContain('OPENING_CANARY');
+  expect(initial).toContain('FINAL_ANSWER_CANARY');
   expect(initial).not.toContain('PRIVATE_TOOL_CANARY');
+  expect(initial).not.toContain('PRIVATE_ARTIFACT_PATH_CANARY');
   await begin(c);
   c.provider.event({
     type: 'response.function_call_arguments.done',

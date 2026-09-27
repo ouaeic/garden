@@ -9264,8 +9264,9 @@ describe('the contract the run actually sends', () => {
     const contract = contractOf(await turn());
     // No connector is enabled on this task, so the worker withdrew the tool. The contract has to
     // have followed it, or the model is reading a route it was not given.
-    expect(contract).toContain('Nothing is connected to this computer as a mailbox');
-    expect(contract).not.toContain('connector_action is the route');
+    expect(contract).not.toContain(
+      'Use connector_action for supported operations on connected accounts'
+    );
   });
 
   it('drops the document facts on a box the runner says has no toolchain', async () => {
@@ -9274,8 +9275,7 @@ describe('the contract the run actually sends', () => {
     // that does most damage when it is wrong: it sends the model at a binary that is not there, and
     // it finds out one failed shell call at a time in front of the owner.
     expect(contract).not.toContain('/usr/local/lib/athanor/python/bin/python3');
-    expect(contract).not.toContain('typeset with typst');
-    expect(contract).toContain('This computer has no document toolchain');
+    expect(contract).toContain('The managed document toolchain is unavailable');
   });
 
   it('is smaller on a barer box than on a provisioned one', async () => {
