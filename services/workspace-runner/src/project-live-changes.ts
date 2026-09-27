@@ -46,17 +46,28 @@ async function boundedRead(file: FileHandle): Promise<Buffer | null> {
 
 async function diffLines(before: FileHandle, after: FileHandle, signal: AbortSignal) {
   return new Promise<{ added: number; removed: number } | null>((resolve) => {
-    const descriptors = process.platform === 'linux' ? '/proc/self/fd' : '/dev/fd';
+    const linux = process.platform === 'linux';
+    const descriptors = linux ? '/proc/self/fd' : '/dev/fd';
+    // Git measures the procfs symlink targets instead of their open file contents.
     const child = spawn(
-      '/usr/bin/git',
+      linux ? '/usr/bin/diff' : '/usr/bin/git',
       [
-        '-c',
-        'core.hooksPath=/dev/null',
-        'diff',
-        '--no-index',
-        '--no-ext-diff',
-        '--no-textconv',
-        '--numstat',
+        ...(linux
+          ? [
+              '--old-group-format=%dn\t0\n',
+              '--new-group-format=0\t%dN\n',
+              '--changed-group-format=%dn\t%dN\n',
+              '--unchanged-group-format='
+            ]
+          : [
+              '-c',
+              'core.hooksPath=/dev/null',
+              'diff',
+              '--no-index',
+              '--no-ext-diff',
+              '--no-textconv',
+              '--numstat'
+            ]),
         '--',
         `${descriptors}/3`,
         `${descriptors}/4`
@@ -76,6 +87,26 @@ async function diffLines(before: FileHandle, after: FileHandle, signal: AbortSig
     });
     child.once('error', () => resolve(null));
     child.once('close', (code) => {
+      if (linux) {
+        const groups = output.trim().split('\n');
+        if (
+          (code !== 0 && code !== 1) ||
+          output.length > 8192 ||
+          (output && !groups.every((group) => /^\d+\t\d+$/.test(group)))
+        ) {
+          resolve(null);
+          return;
+        }
+        const counts = { added: 0, removed: 0 };
+        if (output)
+          for (const group of groups) {
+            const [removed, added] = group.split('\t').map(Number);
+            counts.added += added!;
+            counts.removed += removed!;
+          }
+        resolve(counts);
+        return;
+      }
       const match = /^(\d+)\t(\d+)\t/.exec(output);
       resolve(
         (code === 0 || code === 1) && match && output.length <= 8192
