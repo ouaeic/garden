@@ -334,6 +334,21 @@ export async function checkDesk({
       await page.getByRole('button', { name: 'Open conversation', exact: true }).click();
       await page.getByRole('dialog', { name: 'Conversation', exact: true }).waitFor();
       await page.keyboard.press('Escape');
+      const voice = page.getByRole('button', { name: 'Live voice', exact: true });
+      await inWindow(voice);
+      await voice.click();
+      const voiceDialog = page.getByRole('dialog', { name: 'Live voice', exact: true });
+      const contextChoice = voiceDialog.getByRole('checkbox', {
+        name: /Include this conversation and save discussion notes/
+      });
+      await contextChoice.waitFor();
+      assert.equal(await contextChoice.isChecked(), false);
+      assert((await voiceDialog.innerText()).includes(task.title));
+      await inWindow(voiceDialog);
+      if (width === 390 || width === 1440)
+        await voiceDialog.screenshot({ path: resolve(report, `desk-voice-${width}.png`) });
+      await page.keyboard.press('Escape');
+      await voiceDialog.waitFor({ state: 'detached' });
       await draft.fill('');
       await page.waitForTimeout(600);
     }

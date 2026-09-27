@@ -880,6 +880,7 @@ try {
       );
       return json([voiceSession]);
     }
+    if (path === `/v1/tasks/${task.id}/voice-discussion`) return json(null);
     if (path === '/v1/voice-sessions') return json([voiceSession]);
     if (path === '/v1/audio/transcriptions/receipts') return json([]);
     if (path === `/v1/voice-sessions/${voiceSession.id}/proposals`) return json([voiceProposal]);

@@ -6,6 +6,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowUpRight,
+  AudioLines,
   FileText,
   GitBranch,
   History,
@@ -64,6 +65,7 @@ const ProjectNoteEditor = lazy(() =>
   import('./ProjectNotes').then((module) => ({ default: module.ProjectNoteEditor }))
 );
 const PrivateDiagnostics = lazy(() => import('./PrivateDiagnostics'));
+const VoiceSession = lazy(() => import('./voice/VoiceSession'));
 const Computer = lazy(() => import('./Computer'));
 const DirectoryPanel = lazy(() => import('./DirectoryPanel'));
 const PlanEditor = lazy(() => import('./PlanEditor'));
@@ -143,6 +145,7 @@ export default function TaskSurface({
     | 'models'
     | 'stop'
     | 'conversation'
+    | 'voice'
     | null
   >(null);
   const [busy, setBusy] = useState(false);
@@ -535,6 +538,9 @@ export default function TaskSurface({
             onClick={() => setPanel('conversation')}
           >
             <MessageSquare size={17} />
+          </Button>
+          <Button aria-label="Live voice" title="Live voice" onClick={() => setPanel('voice')}>
+            <AudioLines size={17} />
           </Button>
           <span
             className={`connection ${connection} ${connection === 'connected' || connection === 'idle' ? 'connection-quiet' : ''}`}
@@ -1014,6 +1020,18 @@ export default function TaskSurface({
           </details>
         )}
       </div>
+      {panel === 'voice' && (
+        <Suspense fallback={<Spinner label="Opening live voice…" />}>
+          <VoiceSession
+            task={task}
+            onClose={() => setPanel(null)}
+            onTaskChanged={() => {
+              void reload();
+              onRefresh();
+            }}
+          />
+        </Suspense>
+      )}
       {panel === 'models' && (
         <Dialog title="Conversation models" onClose={() => setPanel(null)} wide>
           <Suspense fallback={<Spinner />}>
