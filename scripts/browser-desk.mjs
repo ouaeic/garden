@@ -72,6 +72,48 @@ export async function checkDesk({
       `Control must be in the viewport: ${JSON.stringify(box)}`
     );
   };
+  const checkComposer = async (editor) => {
+    const saved = editor.getByRole('status', { name: 'Draft synced', exact: true });
+    await saved.waitFor();
+    const saveBox = await saved.boundingBox();
+    const send = editor.locator('button[type="submit"]');
+    const sendBox = await send.boundingBox();
+    assert(saveBox && sendBox);
+    assert(
+      Math.abs(saveBox.y + saveBox.height / 2 - sendBox.y - sendBox.height / 2) < 2,
+      'Draft status must share the send row, without a separate footer'
+    );
+    await inWindow(send);
+    const bounds = await editor.locator('.intent-toolbar button').evaluateAll((buttons) =>
+      buttons
+        .filter((button) => button.getClientRects().length)
+        .map((button) => {
+          const box = button.getBoundingClientRect();
+          return { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
+        })
+    );
+    assert(bounds.length > 0);
+    const editorBox = await editor.boundingBox();
+    assert(editorBox);
+    for (const box of bounds) {
+      assert(
+        box.left >= editorBox.x && box.right <= editorBox.x + editorBox.width,
+        'Composer controls must fit inside the card'
+      );
+    }
+    for (let i = 0; i < bounds.length; i++)
+      for (let j = i + 1; j < bounds.length; j++) {
+        const a = bounds[i],
+          b = bounds[j];
+        assert(
+          a.right <= b.left + 1 ||
+            b.right <= a.left + 1 ||
+            a.bottom <= b.top + 1 ||
+            b.bottom <= a.top + 1,
+          'Composer controls must not overlap'
+        );
+      }
+  };
   try {
     for (const [width, height] of [
       [1440, 900],
@@ -125,10 +167,22 @@ export async function checkDesk({
       if (width <= 760 || height <= 540) {
         const cards = page.getByRole('navigation', { name: 'Home cards' });
         await cards.getByRole('button', { name: 'New project', exact: true }).click();
-        await page.getByLabel('Describe what you want to do').fill('A useful new project');
-        await inWindow(page.getByRole('button', { name: 'Start', exact: true }));
-        await cards.getByRole('button', { name: 'Projects', exact: true }).click();
       }
+      await page.getByLabel('Describe what you want to do').fill('A useful new project');
+      await checkComposer(page.locator('.desk-start-card .intent-editor'));
+      const promptBox = await page.locator('.desk-start-card').boundingBox();
+      const promptForm = await page.locator('.desk-start-card .intent-editor').boundingBox();
+      assert(promptBox && promptForm);
+      assert(
+        promptBox.height <= promptForm.height + 4,
+        'The prompt must not stretch into an empty card'
+      );
+      await page.screenshot({ path: resolve(report, `desk-prompt-${width}-${height}.png`) });
+      if (width <= 760 || height <= 540)
+        await page
+          .getByRole('navigation', { name: 'Home cards' })
+          .getByRole('button', { name: 'Projects', exact: true })
+          .click();
       const recent = page.locator('.desk-recent .scroll-region');
       assert(await recent.evaluate((element) => element.scrollHeight > element.clientHeight));
       await recent.evaluate((element) => {
@@ -185,6 +239,8 @@ export async function checkDesk({
       await composer.click();
       const draft = page.locator('.garden-task-composer textarea');
       await draft.fill('Keep this direction while I inspect my work.');
+      await checkComposer(page.locator('.garden-task-composer .intent-editor'));
+      await page.screenshot({ path: resolve(report, `desk-composer-${width}-${height}.png`) });
       await inWindow(draft);
       const inputBox = await draft.boundingBox();
       const controlsBox = await page.locator('.garden-task-composer .intent-toolbar').boundingBox();

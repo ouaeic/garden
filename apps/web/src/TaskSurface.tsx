@@ -16,6 +16,7 @@ import {
   Play,
   Plus,
   Share2,
+  TextSelect,
   X
 } from 'lucide-react';
 import type {
@@ -528,6 +529,13 @@ export default function TaskSurface({
           )}
         </div>
         <div className="row">
+          <Button
+            aria-label="Open conversation"
+            title="Open conversation"
+            onClick={() => setPanel('conversation')}
+          >
+            <MessageSquare size={17} />
+          </Button>
           <span
             className={`connection ${connection} ${connection === 'connected' || connection === 'idle' ? 'connection-quiet' : ''}`}
             title={
@@ -1074,14 +1082,27 @@ export default function TaskSurface({
                   task={task}
                   bootstrap={bootstrap}
                   toolbarExtra={
-                    <Button
-                      className="quiet-button"
-                      disabled={composerLocked}
-                      onClick={selectedContext}
-                    >
-                      Shape selection
-                      <ArrowUpRight size={14} />
-                    </Button>
+                    <>
+                      <Button
+                        className="quiet-button"
+                        aria-label="Use selected text"
+                        title="Use selected text as context"
+                        disabled={composerLocked}
+                        onClick={selectedContext}
+                      >
+                        <TextSelect size={17} />
+                      </Button>
+                      {isFinished(task) && (
+                        <Button
+                          aria-label="Collapse composer"
+                          title="Keep draft and collapse"
+                          disabled={composerLocked}
+                          onClick={() => setComposerExpanded(false)}
+                        >
+                          <X size={17} />
+                        </Button>
+                      )}
+                    </>
                   }
                   {...(draft ? { initialDraft: draft } : {})}
                   context={directionContext}
@@ -1097,24 +1118,6 @@ export default function TaskSurface({
               </Suspense>
             </>
           )}
-        </div>
-        <div className="desk-conversation-footer">
-          {!attentionPanel && !task.parentMissionId && isFinished(task) && showComposer && (
-            <Button
-              className="quiet-button"
-              aria-label="Collapse composer"
-              onClick={() => setComposerExpanded(false)}
-              title="Keep draft and collapse"
-            >
-              <X size={14} />
-              <span>Hide prompt</span>
-            </Button>
-          )}
-
-          <Button className="quiet-button" onClick={() => setPanel('conversation')}>
-            <MessageSquare size={14} />
-            Open conversation
-          </Button>
         </div>
       </div>
       {panel === 'conversation' && (

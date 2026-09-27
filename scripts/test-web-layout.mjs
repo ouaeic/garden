@@ -2774,7 +2774,7 @@ try {
       })
       .waitFor();
     await advanced.getByRole('button', { name: 'Close Model choices', exact: true }).click();
-    await newWork.getByText('Draft synced', { exact: true }).waitFor();
+    await newWork.getByRole('status', { name: 'Draft synced', exact: true }).waitFor();
     assert.equal(modelDrafts.get(`new:${workspace.id}`).body, '');
     assert.equal(
       modelDrafts.get(`new:${workspace.id}`).controls.modelChoices.specialist.modelId,
@@ -3174,7 +3174,7 @@ try {
     assert.equal(taskCreations, beforeOffline, 'Reload must not submit a recovered draft');
     draftOffline = false;
     await draftPage.evaluate(() => window.dispatchEvent(new Event('online')));
-    await draftDialog.getByText('Draft synced', { exact: true }).waitFor();
+    await draftDialog.getByRole('status', { name: 'Draft synced', exact: true }).waitFor();
     assert.equal(taskCreations, beforeOffline, 'Reconnection must synchronize drafts only');
 
     const draftCommit = new Promise((resolve) => {
@@ -3191,7 +3191,7 @@ try {
     assert.equal(modelDrafts.get(draftKey).body, 'Save committed, acknowledgement lost.');
     await draftPage.reload();
     await openNewProject(draftPage);
-    await draftDialog.getByText('Draft synced', { exact: true }).waitFor();
+    await draftDialog.getByRole('status', { name: 'Draft synced', exact: true }).waitFor();
     assert.equal(await draftInput.inputValue(), 'Save committed, acknowledgement lost.');
     assert.equal(
       draftRevisions.get(draftKey),

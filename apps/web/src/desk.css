@@ -228,6 +228,7 @@ body:has(.desk-shell),
   min-width: 0;
   min-height: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
   grid-template-rows: minmax(112px, max-content) minmax(140px, min(300px, 32dvh)) minmax(70px, 1fr);
   gap: clamp(14px, 2.4vh, 26px);
   padding: clamp(18px, 3vh, 32px) clamp(22px, 4vw, 64px);
@@ -242,6 +243,7 @@ body:has(.desk-shell),
   gap: clamp(18px, 3vw, 38px);
 }
 .desk-home-intro {
+  grid-column: 1 / -1;
   align-items: center;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
 }
@@ -276,6 +278,7 @@ body:has(.desk-shell),
   background: transparent;
   margin: 0;
   padding: 12px 15px;
+  border-radius: 13px;
   box-shadow: none;
 }
 .desk-start-card .intent-editor > textarea {
@@ -293,10 +296,23 @@ body:has(.desk-shell),
   font-size: 14px;
 }
 .desk-home-middle {
-  grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+  display: contents;
+}
+.desk-home-bottom {
+  display: contents;
+}
+.desk-home-attention {
+  grid-column: 2;
+  grid-row: 2 / 4;
+}
+.desk-recent {
+  grid-column: 1;
+  grid-row: 3;
 }
 .desk-resume-card,
 .desk-empty-card {
+  grid-column: 1;
+  grid-row: 2;
   position: relative;
   isolation: isolate;
   min-width: 0;
@@ -374,8 +390,14 @@ body:has(.desk-shell),
   padding: 0;
 }
 .desk-action-row {
-  display: block;
-  padding: 14px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+}
+.desk-action-copy {
+  flex: 1;
+  min-width: 0;
 }
 .desk-action-row .eyebrow {
   font-size: 10px;
@@ -384,10 +406,10 @@ body:has(.desk-shell),
 .desk-action-row strong {
   display: block;
   font-size: 14px;
-  margin: 8px 0 5px;
+  margin: 5px 0 0;
   font-weight: 500;
 }
-.desk-action-row > span:not(.eyebrow) {
+.desk-action-copy > span:not(.eyebrow) {
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -395,14 +417,7 @@ body:has(.desk-shell),
   color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
-}
-.desk-action-row small {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--accent);
-  font-size: 11px;
-  margin-top: 9px;
+  margin-top: 5px;
 }
 .desk-home-switcher {
   display: none;
@@ -421,6 +436,9 @@ body:has(.desk-shell),
 }
 .desk-home.is-empty {
   grid-template-rows: minmax(112px, max-content) minmax(130px, 1fr);
+}
+.desk-home.is-empty .desk-home-attention {
+  grid-row: 2;
 }
 .desk-home.is-empty .desk-home-bottom {
   display: none;
@@ -961,7 +979,7 @@ body:has(.desk-shell),
   overflow: auto;
 }
 .desk-shell .garden-task-composer .intent-editor {
-  padding: 9px 13px 5px;
+  padding: 9px 13px;
   border-color: var(--line);
   border-radius: 12px;
 }
@@ -978,77 +996,6 @@ body:has(.desk-shell),
   font-size: 13px;
   justify-content: flex-start;
   background: var(--panel);
-}
-.desk-shell .intent-toolbar .row > .compact-prompt-settings {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  flex: 1 1 150px;
-  width: auto;
-  max-width: 250px;
-  gap: 7px;
-  min-height: 28px;
-  padding: 4px 0;
-  background: transparent;
-  border: 0;
-  font-size: 11px;
-  color: var(--muted);
-}
-.desk-shell .compact-prompt-settings > span:first-of-type {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: left;
-}
-.desk-shell .prompt-settings-content:not(.is-open) {
-  display: none;
-}
-.desk-shell .intent-toolbar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: end;
-  margin-top: 0;
-  padding-top: 0;
-}
-.desk-shell .intent-toolbar > .row {
-  min-width: 0;
-}
-.desk-shell .intent-toolbar .toolbar-extra {
-  margin-left: 0;
-  order: 1;
-}
-.desk-shell .intent-toolbar .row > .compact-prompt-settings > span:last-child {
-  flex-shrink: 0;
-}
-.desk-shell .desk-start-card .intent-toolbar .row > .button:not(.compact-prompt-settings) {
-  padding: 6px;
-}
-.desk-shell .desk-start-card .intent-toolbar > .primary {
-  padding: 7px 12px;
-  min-height: 34px;
-}
-
-.desk-shell .draft-status {
-  font-size: 10px;
-  margin-top: 3px;
-}
-.desk-conversation-footer {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 5px;
-}
-.desk-conversation-footer > .button:last-child {
-  margin-left: auto;
-}
-.desk-conversation-footer .button {
-  min-height: 25px;
-  padding: 2px 0;
-  font-size: 11px;
-  border: 0;
-  background: transparent;
 }
 .desk-conversation-history {
   display: grid;
@@ -1241,6 +1188,7 @@ body:has(.desk-shell),
   }
   .desk-home {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
     gap: 12px;
     padding: 14px;
@@ -1251,8 +1199,7 @@ body:has(.desk-shell),
     display: contents;
   }
   .desk-home-intro > header,
-  .desk-home .desk-empty-card,
-  .desk-home-updates {
+  .desk-home .desk-empty-card {
     display: none;
   }
   .desk-home-switcher {
@@ -1279,6 +1226,7 @@ body:has(.desk-shell),
   .desk-home .desk-home-attention,
   .desk-home .desk-recent {
     display: none;
+    grid-column: 1;
     grid-row: 2;
     min-height: 0;
     height: 100%;
@@ -1289,6 +1237,11 @@ body:has(.desk-shell),
   .desk-home[data-home-panel='attention'] .desk-home-attention,
   .desk-home[data-home-panel='recent'] .desk-recent {
     display: flex;
+  }
+  .desk-home .desk-start-card {
+    align-self: start;
+    height: auto;
+    max-height: 100%;
   }
   .desk-home.is-empty {
     grid-template-rows: auto minmax(0, 1fr);
@@ -1417,13 +1370,6 @@ body:has(.desk-shell),
     font-size: 16px;
     max-height: 14dvh;
   }
-  .desk-shell .garden-task-composer .intent-toolbar .row {
-    gap: 2px;
-  }
-  .desk-shell .garden-task-composer .intent-toolbar .button {
-    padding: 4px 6px;
-    font-size: 11px;
-  }
   .desk-shell .is-fitted .garden-output-header {
     padding: 9px 12px;
   }
@@ -1452,9 +1398,6 @@ html[data-workspace-short='true'] .desk-shell .desk-project .project-workspace-b
 }
 html[data-workspace-short='true'] .desk-shell .desk-project .garden-task-composer {
   max-height: min(calc(var(--garden-viewport-height, 100dvh) * 0.44), 44dvh);
-}
-html[data-workspace-short='true'] .desk-conversation-footer {
-  padding-top: 1px;
 }
 html[data-workspace-short='true'] .desk-shell .management-heading p {
   display: none;
@@ -1535,6 +1478,10 @@ html[data-workspace-short='true'] .desk-shell .management-heading p {
 .desk-sheet .management-heading {
   margin-bottom: 12px;
 }
+.desk-sheet-library .management-heading,
+.desk-sheet-settings .management-heading {
+  display: none;
+}
 .desk-sheet .management-heading p {
   margin: 0;
 }
@@ -1543,12 +1490,14 @@ html[data-workspace-short='true'] .desk-shell .management-heading p {
   flex-wrap: wrap;
 }
 .desk-sheet .work-filter {
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   align-items: stretch;
-  gap: 12px;
+  gap: 8px;
 }
 .desk-sheet .work-filter .inline-search {
-  width: 100%;
+  flex: 1 1 150px;
+  width: auto;
 }
 .desk-sheet .inline-search input {
   width: 100%;

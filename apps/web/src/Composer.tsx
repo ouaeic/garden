@@ -1,5 +1,16 @@
 import { lazy, Suspense, useId, useState } from 'react';
-import { ArrowUpRight, Paperclip, X, Mic, Square, SlidersHorizontal } from 'lucide-react';
+import {
+  ArrowUpRight,
+  Check,
+  CircleAlert,
+  CloudUpload,
+  LoaderCircle,
+  Paperclip,
+  X,
+  Mic,
+  Square,
+  SlidersHorizontal
+} from 'lucide-react';
 import type { Task, TaskReasoningEffort } from '@athanor/contracts';
 import { permissionModeSummary } from './asking-rules';
 import { effortLabel } from './reasoning-options';
@@ -12,10 +23,22 @@ import { MAX_TASK_SPEND_USD } from './usage-model.js';
 import { useComposer } from './use-composer';
 import type { ComposerProps } from './composer-types';
 import './composer-context.css';
+import './composer-controls.css';
 export type { ComposerProps } from './composer-types';
 const PromptModelChoices = lazy(() => import('./PromptModels'));
 const LocalFolderAttachments = lazy(() => import('./LocalFolderAttachments.js'));
 const DictationSetup = lazy(() => import('./DictationSetup'));
+const draftLabels: Record<string, string> = {
+  'Draft synced': 'Saved',
+  'Saving draft…': 'Saving…',
+  'Saved on this device · waiting to sync': 'On device',
+  'Recovered draft from this device': 'Recovered',
+  'Draft not synced': 'Not synced',
+  'Draft not saved': 'Not saved',
+  'Choose a draft version': 'Conflict',
+  'Send not confirmed · retry safely below': 'Unconfirmed',
+  'Work sent · draft not synced': 'Not synced'
+};
 
 export default function Composer(props: ComposerProps) {
   const permissionHelpId = useId();
@@ -72,6 +95,14 @@ export default function Composer(props: ComposerProps) {
     cancelUpload,
     cancelDictation
   } = useComposer(props);
+  const DraftIcon =
+    saved === 'Draft synced'
+      ? Check
+      : saved === 'Saving draft…'
+        ? LoaderCircle
+        : saved === 'Saved on this device · waiting to sync'
+          ? CloudUpload
+          : CircleAlert;
   return (
     <form
       className={`intent-editor ${task ? 'follow-up' : ''}`}
@@ -157,7 +188,7 @@ export default function Composer(props: ComposerProps) {
         </div>
       )}
       <div className="intent-toolbar">
-        <div className="row">
+        <div className="composer-tools">
           <input
             ref={fileInput}
             type="file"
@@ -170,6 +201,7 @@ export default function Composer(props: ComposerProps) {
           />
           <Button
             aria-label="Attach files"
+            title="Attach files"
             onClick={() => fileInput.current?.click()}
             disabled={editingDisabled || uploading || voiceBusy}
           >
@@ -185,53 +217,69 @@ export default function Composer(props: ComposerProps) {
               />
             </Suspense>
           )}
-          {toolbarExtra && <div className="toolbar-extra">{toolbarExtra}</div>}
           {typeof MediaRecorder !== 'undefined' && (
             <Button
               aria-label={recording ? 'Stop dictation' : 'Dictate direction'}
+              title={recording ? 'Stop dictation' : 'Dictate direction'}
               onClick={dictate}
               disabled={editingDisabled || uploading || (voiceBusy && !recording)}
             >
               {recording ? <Square size={16} /> : <Mic size={18} />}
             </Button>
           )}
-          <Button
-            className="compact-prompt-settings"
-            aria-label="Prompt settings"
-            aria-expanded={promptSettingsOpen}
-            aria-controls={promptSettingsId}
-            onClick={() => setPromptSettingsOpen((open) => !open)}
-          >
-            <SlidersHorizontal size={15} />
-            <span>
-              {selectedModel?.displayName ?? projectModel?.displayName ?? 'Default model'}
-            </span>
-            <span>{securityMode[0]!.toUpperCase() + securityMode.slice(1)}</span>
-          </Button>
+          {toolbarExtra}
         </div>
         <Button
-          type="submit"
-          className="primary"
-          disabled={
-            !body.trim() ||
-            uploading ||
-            voiceBusy ||
-            Boolean(pendingTask) ||
-            workspace.status !== 'running'
-          }
-          busy={busy}
+          className="compact-prompt-settings"
+          aria-label="Prompt settings"
+          title={`${selectedModel?.displayName ?? projectModel?.displayName ?? 'Default model'} · ${securityMode} · Prompt settings`}
+          aria-expanded={promptSettingsOpen}
+          aria-controls={promptSettingsId}
+          onClick={() => setPromptSettingsOpen((open) => !open)}
         >
-          {pendingSend
-            ? 'Retry send'
-            : task
-              ? isWorking(task)
-                ? interrupt
-                  ? 'Update run'
-                  : 'Queue next'
-                : 'Send'
-              : 'Start'}
-          <ArrowUpRight size={18} />
+          <SlidersHorizontal size={15} />
+          <span className="composer-model-label">
+            {selectedModel?.displayName ?? projectModel?.displayName ?? 'Default model'}
+          </span>
+          <span className="composer-mode-label">
+            {securityMode[0]!.toUpperCase() + securityMode.slice(1)}
+          </span>
         </Button>
+        <div className="composer-submit">
+          {saved && (
+            <small className="draft-status" role="status" aria-label={saved} title={saved}>
+              <DraftIcon
+                size={13}
+                className={saved === 'Saving draft…' ? 'spin' : ''}
+                aria-hidden="true"
+              />
+              <span aria-hidden="true">{draftLabels[saved] ?? 'Draft status'}</span>
+            </small>
+          )}
+          <Button
+            type="submit"
+            className="primary"
+            disabled={
+              !body.trim() ||
+              uploading ||
+              voiceBusy ||
+              Boolean(pendingTask) ||
+              workspace.status !== 'running'
+            }
+            busy={busy}
+          >
+            {pendingSend
+              ? 'Retry send'
+              : task
+                ? isWorking(task)
+                  ? interrupt
+                    ? 'Update run'
+                    : 'Queue next'
+                  : 'Send'
+                : 'Start'}
+            <ArrowUpRight size={18} />
+          </Button>
+        </div>
       </div>
       {uploading && (
         <div className="row muted" role="status">
@@ -445,11 +493,6 @@ export default function Composer(props: ComposerProps) {
             </Button>
           </div>
         </div>
-      )}
-      {saved && (
-        <small className="draft-status" role="status">
-          {saved}
-        </small>
       )}
     </form>
   );

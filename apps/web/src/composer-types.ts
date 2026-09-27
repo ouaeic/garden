@@ -19,7 +19,7 @@ export interface ComposerProps {
   context?: DirectionContext | null;
   onEditingChange?: (locked: boolean) => void;
   onContextChange?: (context: DirectionContext | null) => void;
-  /** Extra trigger docked at the right of the attach/voice toolbar (shape selection lives there). */
+  /** Contextual actions alongside attachments and dictation. */
   toolbarExtra?: ReactNode;
   onSent: (task: Task) => void;
   onDraft: (draft: Draft) => void;

@@ -30,11 +30,9 @@ export default function DeskHome({
   const recent = [...tasks].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const working = recent.filter(hasOngoingWork);
   const attention = recent.filter(needsAttention);
-  const ready = recent.filter(
-    (task) => task.status === 'completed' && !hasOngoingWork(task) && !needsAttention(task)
-  );
   const resume = working[0] ?? recent[0];
   const resumeProject = projects.find((project) => project.id === resume?.projectId);
+  const updates = recent.filter((task) => !needsAttention(task));
   const [panel, setPanel] = useState('continue');
   const selected = !resume && panel === 'continue' ? 'new' : panel;
   const sortedProjects = [...projects].sort(
@@ -102,34 +100,47 @@ export default function DeskHome({
             </p>
           </section>
         )}
-        <section className="desk-card desk-home-attention" aria-label="Next actions">
+        <section className="desk-card desk-home-attention" aria-label="Updates and next actions">
           <header className="desk-card-heading">
-            <h2>{attention.length ? 'Needs you' : 'Ready to explore'}</h2>
+            <h2>Updates</h2>
             {attention.length > 0 && (
               <Button onClick={onAttention}>
                 <Bell size={14} />
-                View all
+                Needs you · {attention.length}
               </Button>
             )}
           </header>
-          <ScrollRegion label="Next actions" className="desk-card-scroll">
-            {[...attention, ...ready.filter((task) => task.id !== resume?.id)].map((task) => (
-              <button className="desk-action-row" key={task.id} onClick={() => onTask(task.id)}>
-                <span className="eyebrow">
-                  {needsAttention(task) ? taskStatusLabel(task) : 'Ready to explore'}
+          <ScrollRegion label="Updates and next actions" className="desk-card-scroll">
+            {attention.map((task) => {
+              const title =
+                projects.find((project) => project.id === task.projectId)?.title ?? task.title;
+              const detail = task.activity?.latest;
+              return (
+                <button className="desk-action-row" key={task.id} onClick={() => onTask(task.id)}>
+                  <span className="desk-action-copy">
+                    <span className="eyebrow">{taskStatusLabel(task)}</span>
+                    <strong>{title}</strong>
+                    {detail && detail !== title && detail !== taskStatusLabel(task) && (
+                      <span>{detail}</span>
+                    )}
+                  </span>
+                  <ArrowUpRight size={14} aria-hidden="true" />
+                </button>
+              );
+            })}
+            {updates.map((task) => (
+              <button className="desk-update-row" key={task.id} onClick={() => onTask(task.id)}>
+                <time>{shortDate(task.updatedAt)}</time>
+                <span>
+                  <strong>{task.title}</strong>
+                  <small>{task.activity?.latest ?? taskStatusLabel(task)}</small>
                 </span>
-                <strong>
-                  {projects.find((project) => project.id === task.projectId)?.title ?? task.title}
-                </strong>
-                <span>{task.activity?.latest ?? task.title}</span>
-                <small>
-                  {needsAttention(task) ? 'Open request' : 'Open result'} <ArrowUpRight size={13} />
-                </small>
+                <ArrowUpRight size={14} aria-hidden="true" />
               </button>
             ))}
-            {!attention.length && !ready.some((task) => task.id !== resume?.id) && (
+            {!recent.length && (
               <div className="desk-empty-state">
-                <p>Nothing needs your attention.</p>
+                <p>Your work will appear here.</p>
                 <span className="muted">Updates and finished work will appear here.</span>
               </div>
             )}
@@ -170,25 +181,6 @@ export default function DeskHome({
                 <Plus size={16} />
                 Start your first project
               </Button>
-            )}
-          </ScrollRegion>
-        </section>
-        <section className="desk-card desk-home-updates" aria-label="Latest from Garden">
-          <header className="desk-card-heading">
-            <h2>Latest from Garden</h2>
-          </header>
-          <ScrollRegion label="Recent work updates" className="desk-card-scroll">
-            {recent.slice(0, 12).map((task) => (
-              <button className="desk-update-row" key={task.id} onClick={() => onTask(task.id)}>
-                <time>{shortDate(task.updatedAt)}</time>
-                <span>
-                  <strong>{task.title}</strong>
-                  <small>{task.activity?.latest ?? taskStatusLabel(task)}</small>
-                </span>
-              </button>
-            ))}
-            {!recent.length && (
-              <p className="muted desk-empty-state">Your projects’ progress will appear here.</p>
             )}
           </ScrollRegion>
         </section>

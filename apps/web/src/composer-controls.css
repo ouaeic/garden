@@ -1,0 +1,127 @@
+.intent-editor {
+  container: composer / inline-size;
+}
+.intent-editor:has(> textarea:focus-visible) {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.intent-editor > textarea:focus {
+  outline: none;
+  box-shadow: none;
+}
+.intent-editor .intent-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  gap: 8px;
+  padding-top: 4px;
+}
+.composer-tools,
+.composer-submit {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 2px;
+}
+.composer-submit {
+  gap: 10px;
+  margin-left: auto;
+}
+.intent-editor .composer-tools > .button {
+  width: 32px;
+  min-height: 34px;
+  padding: 6px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+.intent-editor .compact-prompt-settings {
+  display: inline-flex;
+  flex: 0 1 auto;
+  min-width: 32px;
+  max-width: 300px;
+  min-height: 34px;
+  width: auto;
+  gap: 7px;
+  padding: 6px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+}
+.intent-editor .compact-prompt-settings[aria-expanded='true'] {
+  background: var(--raised);
+  color: var(--text);
+}
+.compact-prompt-settings .composer-model-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.composer-mode-label {
+  flex-shrink: 0;
+  border-left: 1px solid var(--line-strong);
+  padding-left: 7px;
+}
+.intent-editor .composer-submit > .primary {
+  min-height: 34px;
+  padding: 7px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.intent-editor .draft-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 70px;
+  color: var(--muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.prompt-settings-content:not(.is-open) {
+  display: none;
+}
+.prompt-settings-content.is-open {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+@container composer (max-width: 520px) {
+  .composer-mode-label {
+    display: none;
+  }
+  .intent-editor .intent-toolbar {
+    gap: 4px;
+  }
+  .composer-submit {
+    gap: 6px;
+  }
+}
+@container composer (max-width: 420px) {
+  .follow-up .intent-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .follow-up .compact-prompt-settings {
+    grid-row: 1;
+    grid-column: 1 / -1;
+    justify-self: start;
+    max-width: 100%;
+  }
+  .follow-up .composer-tools,
+  .follow-up .composer-submit {
+    grid-row: 2;
+  }
+  .follow-up .composer-mode-label {
+    display: inline;
+  }
+}
+@container composer (max-width: 340px) {
+  .intent-editor .draft-status {
+    min-width: 13px;
+  }
+  .draft-status > span {
+    display: none;
+  }
+}
