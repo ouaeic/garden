@@ -23,15 +23,19 @@ export async function checkWorkspaceNavigation({ context, origin, task, report }
     await page.getByRole('button', { name: 'Continue this conversation…', exact: true }).waitFor();
     assert.equal(
       reads.some((path) => path.endsWith('/directories')),
-      false,
-      'File trees wait until Files is opened'
+      true,
+      'Desktop file shortcuts show the active working copy'
     );
     assert.equal(
       await page.getByRole('navigation', { name: 'Project conversations' }).count(),
-      0,
-      'The main canvas does not repeat a conversation tab strip'
+      1,
+      'Desktop conversations have a stable tab strip'
     );
-    const conversations = page.getByRole('combobox', { name: 'Current conversation', exact: true });
+    const conversations = page.getByRole('combobox', {
+      name: 'Current conversation',
+      exact: true,
+      includeHidden: true
+    });
     const order = await conversations.locator('option').allTextContents();
     assert(order.length > 1);
     await views.getByRole('button', { name: 'Files', exact: true }).click();

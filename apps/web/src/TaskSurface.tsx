@@ -133,7 +133,16 @@ export default function TaskSurface({
   });
   const [preview, setPreview] = useState<Artifact | null>(null);
   const [panel, setPanel] = useState<
-    'direction' | 'history' | 'plan' | 'settings' | 'share' | 'brief' | 'models' | 'stop' | null
+    | 'direction'
+    | 'history'
+    | 'plan'
+    | 'settings'
+    | 'share'
+    | 'brief'
+    | 'models'
+    | 'stop'
+    | 'conversation'
+    | null
   >(null);
   const [busy, setBusy] = useState(false);
   const [composerLocked, setComposerLocked] = useState(false);
@@ -500,8 +509,134 @@ export default function TaskSurface({
     </article>
   );
   return (
-    <section className={`garden-task workspace-view-${view}`}>
-      <div className="garden-task-scroll">
+    <section
+      className={`garden-task workspace-view-${view}${attentionPanel ? ' has-attention' : ''}`}
+    >
+      <div className="run-summary" hidden={view === 'files' || view === 'tools'}>
+        <h2 className="sr-only">{task.title}</h2>
+        <div className={`status-line ${isWorking(task) || pendingDelivery ? 'active' : ''}`}>
+          <i />
+          <button
+            className="run-status-button"
+            onClick={() => selectView('activity')}
+            title="View checks and activity"
+          >
+            {displayStatus}
+          </button>
+          {task.queuedMessageCount > 0 && (
+            <span className="badge">{task.queuedMessageCount} queued</span>
+          )}
+        </div>
+        <div className="row">
+          <span
+            className={`connection ${connection} ${connection === 'connected' || connection === 'idle' ? 'connection-quiet' : ''}`}
+            title={
+              connection === 'connected'
+                ? 'Live updates connected'
+                : connection === 'idle'
+                  ? 'Checking for late updates'
+                  : 'Connection to project activity updates; separate from task execution'
+            }
+          >
+            {' '}
+            <i />
+            <span>
+              {connection === 'connected'
+                ? 'Live'
+                : connection === 'idle'
+                  ? 'Up to date'
+                  : connection === 'closed'
+                    ? 'Disconnected'
+                    : connection === 'connecting'
+                      ? 'Connecting'
+                      : 'Reconnecting'}
+            </span>
+          </span>
+          <Button
+            aria-label="Work options"
+            title="Work options"
+            onClick={() => setPanel('settings')}
+          >
+            <MoreHorizontal size={19} />
+          </Button>
+          {/*
+           * Labelled, because an unattributed currency figure beside a status line is a number
+           * the owner cannot check: it could be this project, today, or the account. It is this
+           * project's own settled provider cost, and saying so is the difference between a
+           * figure that can be verified against the spending pane and one that can only be
+           * doubted.
+           */}
+          <span className="muted run-cost">
+            <span title="Settled provider cost for this project">
+              {money(task.spentUsd)} spent
+              {task.maxSpendUsd !== null && ` of ${money(task.maxSpendUsd)}`}
+            </span>
+            {elapsed && ` · ${elapsed}${isFinished(task) ? '' : ' so far'}`}
+          </span>
+          {!isFinished(task) && (
+            <>
+              <Button
+                className="quiet-button"
+                busy={busy}
+                onClick={() =>
+                  action(
+                    task.status === 'paused' ||
+                      (task.status === 'awaiting_resource' &&
+                        task.resourceWait?.code !== 'background_jobs')
+                      ? 'resume'
+                      : 'pause'
+                  )
+                }
+              >
+                {task.status === 'paused' ||
+                (task.status === 'awaiting_resource' &&
+                  task.resourceWait?.code !== 'background_jobs') ? (
+                  <Play size={14} />
+                ) : (
+                  <Pause size={14} />
+                )}{' '}
+                {task.status === 'awaiting_resource'
+                  ? task.resourceWait?.code === 'background_jobs'
+                    ? 'Pause follow-up'
+                    : 'Retry now'
+                  : task.status === 'paused'
+                    ? 'Resume'
+                    : 'Pause'}
+              </Button>
+              {/*
+               * Stop belongs beside Pause, not two clicks into Work options.
+               *
+               * Pausing and stopping are the two things an owner wants from a run that is going
+               * wrong, and only one of them was on the screen: the other sat inside a settings
+               * dialog, which is not where anybody looks for a brake. It asks first, because
+               * unlike Pause it cannot be undone - the run does not continue afterwards, though
+               * the files and the history stay and a new direction can pick the work back up.
+               */}
+              <Button
+                className="quiet-button"
+                busy={busy}
+                onClick={() => setPanel('stop')}
+                aria-label="Stop this work"
+              >
+                <Square size={14} /> Stop
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+      <div
+        className="garden-task-scroll"
+        role="region"
+        aria-label={
+          view === 'work'
+            ? 'Project output'
+            : view === 'files'
+              ? 'Project files view'
+              : view === 'activity'
+                ? 'Conversation activity view'
+                : 'Project tools view'
+        }
+      >
         <div className="garden-parent-navigation" hidden={view === 'files' || view === 'tools'}>
           {(!onDiscuss || task.parentTaskId) && (
             <Button
@@ -514,118 +649,6 @@ export default function TaskSurface({
           )}
         </div>
         {attentionPanel}
-        <div className="run-summary" hidden={view === 'files' || view === 'tools'}>
-          <h2 className="sr-only">{task.title}</h2>
-          <div className={`status-line ${isWorking(task) || pendingDelivery ? 'active' : ''}`}>
-            <i />
-            <button
-              className="run-status-button"
-              onClick={() => selectView('activity')}
-              title="View checks and activity"
-            >
-              {displayStatus}
-            </button>
-            {task.queuedMessageCount > 0 && (
-              <span className="badge">{task.queuedMessageCount} queued</span>
-            )}
-          </div>
-          <div className="row">
-            <span
-              className={`connection ${connection} ${connection === 'connected' || connection === 'idle' ? 'connection-quiet' : ''}`}
-              title={
-                connection === 'connected'
-                  ? 'Live updates connected'
-                  : connection === 'idle'
-                    ? 'Checking for late updates'
-                    : 'Connection to project activity updates; separate from task execution'
-              }
-            >
-              {' '}
-              <i />
-              <span>
-                {connection === 'connected'
-                  ? 'Live'
-                  : connection === 'idle'
-                    ? 'Up to date'
-                    : connection === 'closed'
-                      ? 'Disconnected'
-                      : connection === 'connecting'
-                        ? 'Connecting'
-                        : 'Reconnecting'}
-              </span>
-            </span>
-            <Button
-              aria-label="Work options"
-              title="Work options"
-              onClick={() => setPanel('settings')}
-            >
-              <MoreHorizontal size={19} />
-            </Button>
-            {/*
-             * Labelled, because an unattributed currency figure beside a status line is a number
-             * the owner cannot check: it could be this project, today, or the account. It is this
-             * project's own settled provider cost, and saying so is the difference between a
-             * figure that can be verified against the spending pane and one that can only be
-             * doubted.
-             */}
-            <span className="muted run-cost">
-              <span title="Settled provider cost for this project">
-                {money(task.spentUsd)} spent
-                {task.maxSpendUsd !== null && ` of ${money(task.maxSpendUsd)}`}
-              </span>
-              {elapsed && ` · ${elapsed}${isFinished(task) ? '' : ' so far'}`}
-            </span>
-            {!isFinished(task) && (
-              <>
-                <Button
-                  className="quiet-button"
-                  busy={busy}
-                  onClick={() =>
-                    action(
-                      task.status === 'paused' ||
-                        (task.status === 'awaiting_resource' &&
-                          task.resourceWait?.code !== 'background_jobs')
-                        ? 'resume'
-                        : 'pause'
-                    )
-                  }
-                >
-                  {task.status === 'paused' ||
-                  (task.status === 'awaiting_resource' &&
-                    task.resourceWait?.code !== 'background_jobs') ? (
-                    <Play size={14} />
-                  ) : (
-                    <Pause size={14} />
-                  )}{' '}
-                  {task.status === 'awaiting_resource'
-                    ? task.resourceWait?.code === 'background_jobs'
-                      ? 'Pause follow-up'
-                      : 'Retry now'
-                    : task.status === 'paused'
-                      ? 'Resume'
-                      : 'Pause'}
-                </Button>
-                {/*
-                 * Stop belongs beside Pause, not two clicks into Work options.
-                 *
-                 * Pausing and stopping are the two things an owner wants from a run that is going
-                 * wrong, and only one of them was on the screen: the other sat inside a settings
-                 * dialog, which is not where anybody looks for a brake. It asks first, because
-                 * unlike Pause it cannot be undone - the run does not continue afterwards, though
-                 * the files and the history stay and a new direction can pick the work back up.
-                 */}
-                <Button
-                  className="quiet-button"
-                  busy={busy}
-                  onClick={() => setPanel('stop')}
-                  aria-label="Stop this work"
-                >
-                  <Square size={14} /> Stop
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
         {waitingReason && (
           <aside className="resource-wait-note" role="status" aria-label="Why this work is waiting">
             <strong>{waitingReason.label}</strong>
@@ -664,6 +687,8 @@ export default function TaskSurface({
               </Suspense>
               {presentation ? (
                 <TaskOutputs
+                  fitted={!attentionPanel}
+                  preferSummary={task.status !== 'completed'}
                   {...(task.projectId
                     ? {
                         onRemember: (result) =>
@@ -1084,7 +1109,74 @@ export default function TaskSurface({
             </>
           )}
         </div>
+        <div className="desk-conversation-footer">
+          <Button className="quiet-button" onClick={() => setPanel('conversation')}>
+            <MessageSquare size={14} />
+            Open conversation
+          </Button>
+        </div>
       </div>
+      {panel === 'conversation' && (
+        <Dialog title="Conversation" onClose={() => setPanel(null)} wide>
+          <div className="desk-conversation-history">
+            {events
+              .filter((event) =>
+                ['user_message', 'assistant_message', 'queued_message'].includes(event.kind)
+              )
+              .slice(-40)
+              .map((event) => (
+                <article
+                  className={
+                    event.kind === 'assistant_message'
+                      ? 'desk-message garden-message'
+                      : 'desk-message owner-message'
+                  }
+                  key={event.id}
+                >
+                  <header>
+                    <strong>
+                      {event.kind === 'assistant_message' ? 'Garden' : 'You'}
+                      {event.kind === 'queued_message' ? ' · queued' : ''}
+                    </strong>
+                    <time>{date(event.createdAt)}</time>
+                  </header>
+                  <Suspense fallback={<p>{event.summary}</p>}>
+                    <Markdown artifacts={artifacts} onArtifact={showArtifact}>
+                      {eventText(event)}
+                    </Markdown>
+                  </Suspense>
+                  <MessageAttachmentList
+                    workspaceId={task.workspaceId}
+                    paths={data(event.payload).attachments}
+                  />
+                </article>
+              ))}
+            <div className="row">
+              <Button
+                onClick={() => {
+                  setHistoryPage(events.slice(-250));
+                  setHistoryMore((events.at(-250)?.sequence ?? events[0]?.sequence ?? 1) > 1);
+                  setPanel('history');
+                }}
+              >
+                Full activity & earlier messages
+              </Button>
+              <Button
+                className="primary"
+                onClick={() => {
+                  setPanel(null);
+                  setComposerExpanded(true);
+                  requestAnimationFrame(() =>
+                    document.getElementById(`intent-${task.id}`)?.focus({ preventScroll: true })
+                  );
+                }}
+              >
+                Continue conversation
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
       {panel === 'brief' && (
         <Dialog title="What you asked" wide onClose={() => setPanel(null)}>
           <p className="muted">

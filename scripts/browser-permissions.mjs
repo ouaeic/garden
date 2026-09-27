@@ -56,6 +56,7 @@ export async function checkPermissionModes({
   try {
     await page.goto(`${origin}/?task=${task.id}`);
     await page.getByRole('button', { name: /^Continue this conversation/ }).click();
+    await page.getByRole('button', { name: 'Prompt settings', exact: true }).click();
     const descriptions = new Map();
     const prompt = page.getByRole('combobox', { name: 'Approvals for this prompt', exact: true });
     for (const mode of ['review', 'balanced', 'autonomous']) {

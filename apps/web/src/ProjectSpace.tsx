@@ -21,9 +21,9 @@ import { projectStatus } from './ProjectCollection';
 import { changeSummary, useProjectChanges } from './use-project-changes';
 import { permissionModeSummary } from './asking-rules';
 import './projects.css';
-import LivingBackdrop from './LivingBackdrop';
 import { fileNavigationBlocked } from './file-navigation';
 import { projectViews, useProjectView, setSurfaceLocation } from './surface-location';
+const DeskSupport = lazy(() => import('./DeskSupport'));
 const ProjectJobsLink = lazy(() => import('./ProjectJobsLink'));
 const ProjectUpdates = lazy(() => import('./ProjectUpdates'));
 const ProjectNotes = lazy(() => import('./ProjectNotes'));
@@ -140,6 +140,15 @@ export default function ProjectSpace({
   onComputer: (taskId: string, surface: 'browser' | 'desktop', tabId?: string) => void;
 }) {
   const permissionHelpId = useId();
+  const [wide, setWide] = useState(
+    () => window.matchMedia('(min-width: 960px) and (min-height: 540px)').matches
+  );
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 960px) and (min-height: 540px)');
+    const update = () => setWide(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
   const [view, selectView] = useProjectView();
   const [shortcuts, setShortcuts] = useState<string[]>(() => {
     try {
@@ -301,10 +310,26 @@ export default function ProjectSpace({
         a.createdAt.localeCompare(b.createdAt) ||
         a.id.localeCompare(b.id)
     );
+  const conversations = [
+    ...new Map(
+      [...tasks, ...(currentTask ? [currentTask] : [])].map((task) => [task.id, task])
+    ).values()
+  ].sort(
+    (a, b) =>
+      Number(b.pinned) - Number(a.pinned) ||
+      a.createdAt.localeCompare(b.createdAt) ||
+      a.id.localeCompare(b.id)
+  );
+  const openProcesses = () => {
+    if (fileNavigationBlocked()) return;
+    onOverview();
+    setSurfaceLocation({ panel: 'tools', tool: 'processes' }, true);
+  };
   return (
-    <section className={`project-space${taskId ? ' has-conversation' : ''}`}>
+    <section
+      className={`project-space desk-project project-view-${view}${taskId ? ' has-conversation' : ''}`}
+    >
       <header className="project-space-header">
-        <LivingBackdrop />
         <Button className="project-back" aria-label="All projects" onClick={onAllProjects}>
           <ArrowLeft size={15} />
         </Button>
@@ -339,22 +364,11 @@ export default function ProjectSpace({
               <option value="" disabled>
                 Open a conversation…
               </option>
-              {[
-                ...new Map(
-                  [...tasks, ...(currentTask ? [currentTask] : [])].map((task) => [task.id, task])
-                ).values()
-              ]
-                .sort(
-                  (a, b) =>
-                    Number(b.pinned) - Number(a.pinned) ||
-                    a.createdAt.localeCompare(b.createdAt) ||
-                    a.id.localeCompare(b.id)
-                )
-                .map((task) => (
-                  <option key={task.id} value={task.id}>
-                    {task.title === project.title ? 'Main conversation' : task.title}
-                  </option>
-                ))}
+              {conversations.map((task) => (
+                <option key={task.id} value={task.id}>
+                  {task.title === project.title ? 'Main conversation' : task.title}
+                </option>
+              ))}
             </select>
           </label>
         </div>
@@ -379,16 +393,26 @@ export default function ProjectSpace({
         </div>
       </header>
       <div className="project-workspace-bar">
-        <Suspense fallback={null}>
-          <ProjectJobsLink
-            projectId={projectId}
-            onOpen={() => {
-              if (fileNavigationBlocked()) return;
-              onOverview();
-              setSurfaceLocation({ panel: 'tools', tool: 'processes' }, true);
-            }}
-          />
-        </Suspense>
+        <nav className="project-conversation-tabs" aria-label="Project conversations">
+          {conversations.map((conversation) => (
+            <Button
+              key={conversation.id}
+              aria-current={taskId === conversation.id ? 'page' : undefined}
+              title={conversation.title}
+              onClick={() => {
+                if (!fileNavigationBlocked()) onTask(conversation.id);
+              }}
+            >
+              {conversation.title === project.title ? 'Main conversation' : conversation.title}
+            </Button>
+          ))}
+          {cursor && <Button onClick={() => selectView('activity')}>All conversations</Button>}
+        </nav>
+        {!wide && view === 'work' && (
+          <Suspense fallback={null}>
+            <ProjectJobsLink projectId={projectId} onOpen={openProcesses} />
+          </Suspense>
+        )}
         <nav className="project-view-nav" aria-label="Project views">
           {projectViews.map((item) => (
             <Button
@@ -424,170 +448,185 @@ export default function ProjectSpace({
         </nav>
       )}
       <ErrorNotice context="Could not refresh this project." error={error} />
-      <div className="project-view-content">
-        {taskId ? (
-          <div className="project-conversation">
-            <Suspense fallback={<Spinner label="Opening conversation…" />}>{children}</Suspense>
-          </div>
-        ) : (
-          <div className={`project-overview project-view-${view}`}>
-            {view === 'work' && (
-              <>
-                {!archived &&
-                  tasks.some((task) => needsAttention(task) || hasOngoingWork(task)) && (
-                    <section aria-label="Current work" className="project-current-work">
-                      <h2>Current work</h2>
-                      <ScrollRegion label="Current project work">
-                        <div className="project-conversation-grid">
-                          {tasks
-                            .filter((task) => needsAttention(task) || hasOngoingWork(task))
-                            .map((task) => (
-                              <button key={task.id} onClick={() => onTask(task.id)}>
-                                <span className={`garden-project-dot status-${task.status}`} />
-                                <span>
-                                  <strong>{task.title}</strong>
-                                  <small>{taskStatusLabel(task)}</small>
-                                </span>
-                              </button>
-                            ))}
-                        </div>
-                      </ScrollRegion>
+      <div className={`project-view-content${wide && view === 'work' ? ' desk-with-support' : ''}`}>
+        <div className="desk-work-card">
+          {taskId ? (
+            <div className="project-conversation">
+              <Suspense fallback={<Spinner label="Opening conversation…" />}>{children}</Suspense>
+            </div>
+          ) : (
+            <div className={`project-overview project-view-${view}`}>
+              {view === 'work' && (
+                <>
+                  {!archived &&
+                    tasks.some((task) => needsAttention(task) || hasOngoingWork(task)) && (
+                      <section aria-label="Current work" className="project-current-work">
+                        <h2>Current work</h2>
+                        <ScrollRegion label="Current project work">
+                          <div className="project-conversation-grid">
+                            {tasks
+                              .filter((task) => needsAttention(task) || hasOngoingWork(task))
+                              .map((task) => (
+                                <button key={task.id} onClick={() => onTask(task.id)}>
+                                  <span className={`garden-project-dot status-${task.status}`} />
+                                  <span>
+                                    <strong>{task.title}</strong>
+                                    <small>{taskStatusLabel(task)}</small>
+                                  </span>
+                                </button>
+                              ))}
+                          </div>
+                        </ScrollRegion>
+                      </section>
+                    )}
+                  {!archived && (
+                    <section aria-label="Project results">
+                      <h2>Results</h2>
+                      {tasks
+                        .slice()
+                        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+                        .slice(0, 4)
+                        .map((task) => (
+                          <ConversationResults
+                            key={task.id}
+                            task={task}
+                            onOpen={() => onTask(task.id)}
+                            onDiscuss={(source) => onNewConversation(project, source)}
+                          />
+                        ))}
+                      {tasks.length > 4 && (
+                        <p className="muted">
+                          Recent conversation results are shown here. Open any conversation for its
+                          complete results.
+                        </p>
+                      )}
                     </section>
                   )}
-                {!archived && (
-                  <section aria-label="Project results">
-                    <h2>Results</h2>
-                    {tasks
-                      .slice()
-                      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-                      .slice(0, 4)
-                      .map((task) => (
-                        <ConversationResults
-                          key={task.id}
-                          task={task}
-                          onOpen={() => onTask(task.id)}
-                          onDiscuss={(source) => onNewConversation(project, source)}
-                        />
-                      ))}
-                    {tasks.length > 4 && (
+                  {project.brief && (
+                    <details className="project-brief">
+                      <summary>Project brief</summary>
+                      <p>{project.brief}</p>
+                    </details>
+                  )}
+                </>
+              )}
+              {view === 'activity' && (
+                <>
+                  <Suspense fallback={<Spinner />}>
+                    <ProjectUpdates projectId={project.id} tasks={tasks} onTask={onTask} />
+                    <ProjectNotes
+                      projectId={project.id}
+                      revision={project.updatedAt}
+                      onTask={onTask}
+                    />
+                  </Suspense>
+                  <section aria-label="Conversations">
+                    <div className="project-section-heading">
+                      <h2>Conversations</h2>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={archived}
+                          onChange={(event) => setArchived(event.target.checked)}
+                        />{' '}
+                        Archived
+                      </label>
+                    </div>
+                    <input
+                      className="project-conversation-search"
+                      aria-label="Find a conversation"
+                      placeholder={
+                        cursor ? 'Find in loaded conversations…' : 'Find a conversation…'
+                      }
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                    />
+                    <ScrollRegion label="Project conversations" resetKey={`${archived}/${query}`}>
+                      <div className="project-conversation-grid" ref={conversationGrid}>
+                        {visible.map((task) => (
+                          <button
+                            key={task.id}
+                            data-task-id={task.id}
+                            onClick={() => onTask(task.id)}
+                          >
+                            <span className={`garden-project-dot status-${task.status}`} />
+                            <span>
+                              <strong>{task.title}</strong>
+                              <small>
+                                {taskStatusLabel(task)} · {money(task.spentUsd)}
+                              </small>
+                              {changeSummary(changes[task.id]) && (
+                                <small
+                                  title={`Compared with this conversation's last published or checked-out files. Large files, binary data and dependency environments are excluded from line counts.${changes[task.id]?.measurement ? ` Measured ${new Date(changes[task.id]!.measurement!.observedAt).toLocaleString()}.` : ''}`}
+                                >
+                                  {changeSummary(changes[task.id])}
+                                </small>
+                              )}
+                              {task.activity && (
+                                <>
+                                  <small className="project-activity-detail">
+                                    {task.activity.currentStep ?? task.activity.latest}
+                                  </small>
+                                  <small>
+                                    {task.activity.stepsTotal > 0 &&
+                                      `Plan: ${task.activity.stepsCompleted} of ${task.activity.stepsTotal} marked complete · `}
+                                    {task.activity.observedAt &&
+                                      `Last activity ${new Date(task.activity.observedAt).toLocaleTimeString()}`}
+                                  </small>
+                                </>
+                              )}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </ScrollRegion>
+                    {!visible.length && (
                       <p className="muted">
-                        Recent conversation results are shown here. Open any conversation for its
-                        complete results.
+                        {query
+                          ? 'No matching conversations in this list.'
+                          : archived
+                            ? 'No archived conversations.'
+                            : 'Start a conversation to explore another aspect of this project.'}
                       </p>
                     )}
+                    {cursor && (
+                      <Button aria-busy={busy} aria-disabled={busy} onClick={() => void more()}>
+                        {busy ? 'Loading conversations…' : 'More conversations'}
+                      </Button>
+                    )}
                   </section>
-                )}
-                {project.brief && (
-                  <details className="project-brief">
-                    <summary>Project brief</summary>
-                    <p>{project.brief}</p>
-                  </details>
-                )}
-              </>
-            )}
-            {view === 'activity' && (
-              <>
+                </>
+              )}
+              {filesOpened && (
+                <div hidden={view !== 'files'}>
+                  <Suspense fallback={<Spinner />}>
+                    <DirectoryPanel projectId={project.id} openRequest={1} />
+                  </Suspense>
+                </div>
+              )}
+              {view === 'tools' && (
                 <Suspense fallback={<Spinner />}>
-                  <ProjectUpdates projectId={project.id} tasks={tasks} onTask={onTask} />
-                  <ProjectNotes
-                    projectId={project.id}
-                    revision={project.updatedAt}
-                    onTask={onTask}
-                  />
+                  <ProjectSessions projectId={project.id} onOpen={onComputer} />
+                  <ProcessPanel workspaceId={project.workspaceId} projectId={project.id} />
+                  <p className="muted">
+                    Choose a conversation above to open its terminal, browser or desktop. Each
+                    conversation keeps its own working copy and sessions.
+                  </p>
                 </Suspense>
-                <section aria-label="Conversations">
-                  <div className="project-section-heading">
-                    <h2>Conversations</h2>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={archived}
-                        onChange={(event) => setArchived(event.target.checked)}
-                      />{' '}
-                      Archived
-                    </label>
-                  </div>
-                  <input
-                    className="project-conversation-search"
-                    aria-label="Find a conversation"
-                    placeholder={cursor ? 'Find in loaded conversations…' : 'Find a conversation…'}
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                  />
-                  <ScrollRegion label="Project conversations" resetKey={`${archived}/${query}`}>
-                    <div className="project-conversation-grid" ref={conversationGrid}>
-                      {visible.map((task) => (
-                        <button
-                          key={task.id}
-                          data-task-id={task.id}
-                          onClick={() => onTask(task.id)}
-                        >
-                          <span className={`garden-project-dot status-${task.status}`} />
-                          <span>
-                            <strong>{task.title}</strong>
-                            <small>
-                              {taskStatusLabel(task)} · {money(task.spentUsd)}
-                            </small>
-                            {changeSummary(changes[task.id]) && (
-                              <small
-                                title={`Compared with this conversation's last published or checked-out files. Large files, binary data and dependency environments are excluded from line counts.${changes[task.id]?.measurement ? ` Measured ${new Date(changes[task.id]!.measurement!.observedAt).toLocaleString()}.` : ''}`}
-                              >
-                                {changeSummary(changes[task.id])}
-                              </small>
-                            )}
-                            {task.activity && (
-                              <>
-                                <small className="project-activity-detail">
-                                  {task.activity.currentStep ?? task.activity.latest}
-                                </small>
-                                <small>
-                                  {task.activity.stepsTotal > 0 &&
-                                    `Plan: ${task.activity.stepsCompleted} of ${task.activity.stepsTotal} marked complete · `}
-                                  {task.activity.observedAt &&
-                                    `Last activity ${new Date(task.activity.observedAt).toLocaleTimeString()}`}
-                                </small>
-                              </>
-                            )}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </ScrollRegion>
-                  {!visible.length && (
-                    <p className="muted">
-                      {query
-                        ? 'No matching conversations in this list.'
-                        : archived
-                          ? 'No archived conversations.'
-                          : 'Start a conversation to explore another aspect of this project.'}
-                    </p>
-                  )}
-                  {cursor && (
-                    <Button aria-busy={busy} aria-disabled={busy} onClick={() => void more()}>
-                      {busy ? 'Loading conversations…' : 'More conversations'}
-                    </Button>
-                  )}
-                </section>
-              </>
-            )}
-            {filesOpened && (
-              <div hidden={view !== 'files'}>
-                <Suspense fallback={<Spinner />}>
-                  <DirectoryPanel projectId={project.id} openRequest={1} />
-                </Suspense>
-              </div>
-            )}
-            {view === 'tools' && (
-              <Suspense fallback={<Spinner />}>
-                <ProjectSessions projectId={project.id} onOpen={onComputer} />
-                <ProcessPanel workspaceId={project.workspaceId} projectId={project.id} />
-                <p className="muted">
-                  Choose a conversation above to open its terminal, browser or desktop. Each
-                  conversation keeps its own working copy and sessions.
-                </p>
-              </Suspense>
-            )}
-          </div>
+              )}
+            </div>
+          )}
+        </div>
+        {wide && view === 'work' && (
+          <Suspense fallback={null}>
+            <DeskSupport
+              project={project}
+              {...(taskId ? { taskId } : {})}
+              tasks={conversations}
+              onTask={onTask}
+              onProcesses={openProcesses}
+            />
+          </Suspense>
         )}
       </div>
       {settings && (

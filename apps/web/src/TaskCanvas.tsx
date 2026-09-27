@@ -25,6 +25,8 @@ export function TaskOutputs({
   onRemember,
   autoPreview = true,
   compact = true,
+  fitted = false,
+  preferSummary = false,
   afterPreview
 }: {
   presentation: TaskPresentation;
@@ -35,8 +37,13 @@ export function TaskOutputs({
   onRemember?: (result: TaskPresentation['results'][number]) => void;
   autoPreview?: boolean;
   compact?: boolean;
+  fitted?: boolean;
+  preferSummary?: boolean;
   afterPreview?: ReactNode;
 }) {
+  const [selectedSection, setSelectedSection] = useState<'preview' | 'summary' | 'files' | null>(
+    null
+  );
   const [showAll, setShowAll] = useState(false);
   const [opened, setOpened] = useState<{ id: string; url: string } | null>(null);
   const [dismissed, setDismissed] = useState<string | null>(null);
@@ -184,8 +191,34 @@ export function TaskOutputs({
       onError={() => setFrameState('failed')}
     />
   );
+  const sections = [
+    ...(preview || featured ? [{ id: 'preview' as const, label: 'Preview' }] : []),
+    ...(afterPreview ? [{ id: 'summary' as const, label: 'Summary' }] : []),
+    ...(files.length || presentation.sourceBundle
+      ? [{ id: 'files' as const, label: 'Downloads' }]
+      : [])
+  ];
+  const selected =
+    sections.find((section) => section.id === selectedSection)?.id ??
+    (preferSummary && afterPreview ? 'summary' : sections[0]?.id);
   return (
-    <section className="garden-outputs" aria-label="Results and downloads">
+    <section
+      className={`garden-outputs${fitted ? ' is-fitted' : ''}`}
+      aria-label="Results and downloads"
+    >
+      {fitted && sections.length > 1 && (
+        <nav className="desk-output-sections" aria-label="Output views">
+          {sections.map((section) => (
+            <Button
+              key={section.id}
+              aria-pressed={selected === section.id}
+              onClick={() => setSelectedSection(section.id)}
+            >
+              {section.label}
+            </Button>
+          ))}
+        </nav>
+      )}
       <ErrorNotice error={error} />
       {!presentation.results.length &&
         !presentation.delivery?.pendingJobs &&
@@ -204,215 +237,230 @@ export function TaskOutputs({
               ))}
           </div>
         )}
-      {featured && (
-        <article className="garden-output-primary">
-          <header className="garden-output-header">
-            <div>
-              <span className="eyebrow">Made with this work</span>
-              <h2>{featured.name}</h2>
+      <div
+        className="garden-output-section garden-output-visual"
+        hidden={fitted && selected !== 'preview'}
+      >
+        {featured && (
+          <article className="garden-output-primary">
+            <header className="garden-output-header">
+              <div>
+                <span className="eyebrow">Made with this work</span>
+                <h2>{featured.name}</h2>
+              </div>
+              <FileText size={22} />
+            </header>
+            <div className="garden-artifact-view">
+              <Suspense fallback={<Spinner label="Opening your result…" />}>
+                <ResultPreview artifact={featured} />
+              </Suspense>
             </div>
-            <FileText size={22} />
-          </header>
-          <div className="garden-artifact-view">
-            <Suspense fallback={<Spinner label="Opening your result…" />}>
-              <ResultPreview artifact={featured} />
-            </Suspense>
-          </div>
-        </article>
-      )}
-      {previews.length > 1 && (
-        <nav className="garden-output-tabs" aria-label="Task previews">
-          {previews.map((item) => (
-            <Button
-              key={item.id}
-              aria-pressed={preview?.id === item.id}
-              onClick={() => {
-                setSelectedPreview(item.id);
-                setOpened(null);
-              }}
-            >
-              {item.title}
-            </Button>
-          ))}
-        </nav>
-      )}
-      {preview && (
-        <article
-          className={`garden-output-primary ${expanded ? 'expanded' : ''}`}
-          ref={stage}
-          id={`preview-${preview.previewId ?? preview.id}`}
-        >
-          <header className="garden-output-header">
-            <div>
-              <span className="eyebrow">
-                {preview.status === 'ready' ? 'Ready to open' : 'Preview'}
-              </span>
-              <h2>{preview.title}</h2>
-            </div>
-            <Globe size={22} />
-          </header>
-          {opened?.id === preview.id && preview.status === 'ready' ? (
-            <div className="garden-preview-live">
-              {frame}
-              {frameState !== 'loaded' && (
-                <div className="garden-preview-state" role="status">
-                  {frameState === 'failed'
-                    ? 'The embedded app could not load. Try Open app, or retry here.'
-                    : frameState === 'slow'
-                      ? 'The app is taking longer to load. You can open it separately or retry.'
-                      : 'Loading the live app…'}
-                  {(frameState === 'failed' || frameState === 'slow') && (
-                    <Button onClick={() => void open(preview)}>Retry preview</Button>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : captured ? (
-            <figure className="garden-captured-result">
-              <img src={captured.src} alt={`Recorded view of ${preview.title}`} />
-              <figcaption>
-                Recorded view ·{' '}
-                {new Date(captured.createdAt).toLocaleString(undefined, {
-                  dateStyle: 'medium',
-                  timeStyle: 'short'
-                })}
-                <span>Open for the live version</span>
-              </figcaption>
-            </figure>
-          ) : (
-            <div className="garden-preview-state" role="status">
-              {preview.status !== 'ready'
-                ? (preview.detail ?? 'The live app is not available right now.')
-                : dismissed === previewKey
-                  ? 'Embedded preview closed. Open the app or view it here when you are ready.'
-                  : frameState === 'failed'
-                    ? 'The app could not be opened. Use View here to retry.'
-                    : 'Opening the live app…'}
-            </div>
-          )}
-          <div className="garden-output-actions">
-            {preview.status === 'ready' && (
-              <>
-                <Button
-                  className="primary"
-                  busy={busy === preview.id}
-                  onClick={() => void open(preview, true)}
-                >
-                  Open app
-                  <ArrowUpRight size={16} />
-                </Button>
-                <Button busy={busy === preview.id} onClick={() => void copyLink(preview)}>
-                  Copy link
-                </Button>
-                {!opened ? (
-                  <Button busy={busy === preview.id} onClick={() => void open(preview)}>
-                    View here
-                  </Button>
-                ) : (
-                  <>
-                    <Button onClick={() => void toggleExpanded().catch(setError)}>
-                      <Maximize2 size={15} />
-                      {expanded ? 'Exit full screen' : 'Expand'}
-                    </Button>
-                    <Button
-                      aria-label="Close embedded preview"
-                      onClick={() => {
-                        void closeExpanded().catch(setError);
-                        setDismissed(previewKey);
-                        setOpened(null);
-                      }}
-                    >
-                      <X size={16} />
-                    </Button>
-                  </>
-                )}
-              </>
-            )}
-            {files[0]?.downloadUrl && files[0].status !== 'unavailable' && (
-              <a
-                className="button garden-primary-download"
-                href={files[0].downloadUrl}
-                download={files[0].title}
+          </article>
+        )}
+        {previews.length > 1 && (
+          <nav className="garden-output-tabs" aria-label="Task previews">
+            {previews.map((item) => (
+              <Button
+                key={item.id}
+                aria-pressed={preview?.id === item.id}
+                onClick={() => {
+                  setSelectedPreview(item.id);
+                  setOpened(null);
+                }}
               >
-                <Download size={15} />
-                Download {files.length === 1 ? 'source' : 'file'}
-              </a>
-            )}
-            {preview.detail && <p className="muted">{preview.detail}</p>}
-          </div>
-          {sharedLink?.id === preview.id &&
-            (sharedLink.copied ? (
-              <p role="status">Link copied.</p>
-            ) : (
-              <label className="field">
-                Copy this link
-                <input
-                  readOnly
-                  value={sharedLink.url}
-                  onFocus={(event) => event.currentTarget.select()}
-                />
-              </label>
+                {item.title}
+              </Button>
             ))}
-        </article>
-      )}
-      {afterPreview}
-      {presentation.sourceBundle && presentation.results.length > 0 && (
-        <div className="garden-source-bundle">
-          <a className="button" href={presentation.sourceBundle.downloadUrl} download>
-            <Download size={15} /> Download source bundle
-          </a>
-          <small>
-            {presentation.sourceBundle.fileCount == null
-              ? 'Project files'
-              : `${presentation.sourceBundle.fileCount} recorded output files`}{' '}
-            · ZIP
-          </small>
-        </div>
-      )}
-      {files.length > 0 && (
-        <>
-          <ScrollRegion label="Output files">
-            <div className="garden-delivery-list">
-              {(compact && !showAll ? files.slice(0, 3) : files).map((item) => (
-                <article key={item.id} className="garden-delivery">
-                  <FileText size={20} />
-                  <div className="garden-delivery-details">
-                    <strong>{item.title}</strong>
-                    <small>
-                      {item.path?.replace(/^workspace\//, '') ?? item.mimeType ?? 'Artifact'}
-                      {item.sizeBytes !== undefined &&
-                        ` · ${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(item.sizeBytes / 1024)} KB`}
-                    </small>
-                    {item.detail && <small>{item.detail}</small>}
-                  </div>
-                  <div className="garden-delivery-actions">
-                    {onDiscuss && <Button onClick={() => onDiscuss(item)}>Discuss</Button>}
-                    {onRemember && <Button onClick={() => onRemember(item)}>Keep a note</Button>}
-                    {item.artifactId && (
-                      <Button onClick={() => onArtifact(item.artifactId!)}>View</Button>
-                    )}
-                    {item.downloadUrl && item.status !== 'unavailable' && (
-                      <a className="button" href={item.downloadUrl} download={item.title}>
-                        <Download size={15} />
-                        <span>Download</span>
-                      </a>
+          </nav>
+        )}
+        {preview && (
+          <article
+            className={`garden-output-primary ${expanded ? 'expanded' : ''}`}
+            ref={stage}
+            id={`preview-${preview.previewId ?? preview.id}`}
+          >
+            <header className="garden-output-header">
+              <div>
+                <span className="eyebrow">
+                  {preview.status === 'ready' ? 'Ready to open' : 'Preview'}
+                </span>
+                <h2>{preview.title}</h2>
+              </div>
+              <Globe size={22} />
+            </header>
+            {opened?.id === preview.id && preview.status === 'ready' ? (
+              <div className="garden-preview-live">
+                {frame}
+                {frameState !== 'loaded' && (
+                  <div className="garden-preview-state" role="status">
+                    {frameState === 'failed'
+                      ? 'The embedded app could not load. Try Open app, or retry here.'
+                      : frameState === 'slow'
+                        ? 'The app is taking longer to load. You can open it separately or retry.'
+                        : 'Loading the live app…'}
+                    {(frameState === 'failed' || frameState === 'slow') && (
+                      <Button onClick={() => void open(preview)}>Retry preview</Button>
                     )}
                   </div>
-                </article>
-              ))}
+                )}
+              </div>
+            ) : captured ? (
+              <figure className="garden-captured-result">
+                <img src={captured.src} alt={`Recorded view of ${preview.title}`} />
+                <figcaption>
+                  Recorded view ·{' '}
+                  {new Date(captured.createdAt).toLocaleString(undefined, {
+                    dateStyle: 'medium',
+                    timeStyle: 'short'
+                  })}
+                  <span>Open for the live version</span>
+                </figcaption>
+              </figure>
+            ) : (
+              <div className="garden-preview-state" role="status">
+                {preview.status !== 'ready'
+                  ? (preview.detail ?? 'The live app is not available right now.')
+                  : dismissed === previewKey
+                    ? 'Embedded preview closed. Open the app or view it here when you are ready.'
+                    : frameState === 'failed'
+                      ? 'The app could not be opened. Use View here to retry.'
+                      : 'Opening the live app…'}
+              </div>
+            )}
+            <div className="garden-output-actions">
+              {preview.status === 'ready' && (
+                <>
+                  <Button
+                    className="primary"
+                    busy={busy === preview.id}
+                    onClick={() => void open(preview, true)}
+                  >
+                    Open app
+                    <ArrowUpRight size={16} />
+                  </Button>
+                  <Button busy={busy === preview.id} onClick={() => void copyLink(preview)}>
+                    Copy link
+                  </Button>
+                  {!opened ? (
+                    <Button busy={busy === preview.id} onClick={() => void open(preview)}>
+                      View here
+                    </Button>
+                  ) : (
+                    <>
+                      <Button onClick={() => void toggleExpanded().catch(setError)}>
+                        <Maximize2 size={15} />
+                        {expanded ? 'Exit full screen' : 'Expand'}
+                      </Button>
+                      <Button
+                        aria-label="Close embedded preview"
+                        onClick={() => {
+                          void closeExpanded().catch(setError);
+                          setDismissed(previewKey);
+                          setOpened(null);
+                        }}
+                      >
+                        <X size={16} />
+                      </Button>
+                    </>
+                  )}
+                </>
+              )}
+              {files[0]?.downloadUrl && files[0].status !== 'unavailable' && (
+                <a
+                  className="button garden-primary-download"
+                  href={files[0].downloadUrl}
+                  download={files[0].title}
+                >
+                  <Download size={15} />
+                  Download {files.length === 1 ? 'source' : 'file'}
+                </a>
+              )}
+              {preview.detail && <p className="muted">{preview.detail}</p>}
             </div>
-          </ScrollRegion>
-          {compact && files.length > 3 && (
-            <Button
-              className="quiet-button"
-              aria-expanded={showAll}
-              onClick={() => setShowAll((value) => !value)}
-            >
-              {showAll ? 'Show fewer outputs' : `All ${files.length} outputs`}
-            </Button>
-          )}
-        </>
-      )}
+            {sharedLink?.id === preview.id &&
+              (sharedLink.copied ? (
+                <p role="status">Link copied.</p>
+              ) : (
+                <label className="field">
+                  Copy this link
+                  <input
+                    readOnly
+                    value={sharedLink.url}
+                    onFocus={(event) => event.currentTarget.select()}
+                  />
+                </label>
+              ))}
+          </article>
+        )}
+      </div>
+      <div
+        className="garden-output-section garden-output-answer"
+        hidden={fitted && selected !== 'summary'}
+      >
+        {afterPreview}
+      </div>
+      <div
+        className="garden-output-section garden-output-downloads"
+        hidden={fitted && selected !== 'files'}
+      >
+        {presentation.sourceBundle && presentation.results.length > 0 && (
+          <div className="garden-source-bundle">
+            <a className="button" href={presentation.sourceBundle.downloadUrl} download>
+              <Download size={15} /> Download source bundle
+            </a>
+            <small>
+              {presentation.sourceBundle.fileCount == null
+                ? 'Project files'
+                : `${presentation.sourceBundle.fileCount} recorded output files`}{' '}
+              · ZIP
+            </small>
+          </div>
+        )}
+        {files.length > 0 && (
+          <>
+            <ScrollRegion label="Output files">
+              <div className="garden-delivery-list">
+                {(compact && !showAll ? files.slice(0, 3) : files).map((item) => (
+                  <article key={item.id} className="garden-delivery">
+                    <FileText size={20} />
+                    <div className="garden-delivery-details">
+                      <strong>{item.title}</strong>
+                      <small>
+                        {item.path?.replace(/^workspace\//, '') ?? item.mimeType ?? 'Artifact'}
+                        {item.sizeBytes !== undefined &&
+                          ` · ${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(item.sizeBytes / 1024)} KB`}
+                      </small>
+                      {item.detail && <small>{item.detail}</small>}
+                    </div>
+                    <div className="garden-delivery-actions">
+                      {onDiscuss && <Button onClick={() => onDiscuss(item)}>Discuss</Button>}
+                      {onRemember && <Button onClick={() => onRemember(item)}>Keep a note</Button>}
+                      {item.artifactId && (
+                        <Button onClick={() => onArtifact(item.artifactId!)}>View</Button>
+                      )}
+                      {item.downloadUrl && item.status !== 'unavailable' && (
+                        <a className="button" href={item.downloadUrl} download={item.title}>
+                          <Download size={15} />
+                          <span>Download</span>
+                        </a>
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </ScrollRegion>
+            {compact && files.length > 3 && (
+              <Button
+                className="quiet-button"
+                aria-expanded={showAll}
+                onClick={() => setShowAll((value) => !value)}
+              >
+                {showAll ? 'Show fewer outputs' : `All ${files.length} outputs`}
+              </Button>
+            )}
+          </>
+        )}
+      </div>
     </section>
   );
 }

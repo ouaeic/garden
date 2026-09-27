@@ -280,6 +280,7 @@ export async function checkProjectConversations({
     let dialog = page.getByRole('dialog', { name: 'New conversation', exact: true });
     let input = dialog.getByPlaceholder('Describe what you want to do…');
     await input.fill('Review quality without changing the assembly.');
+    await dialog.getByRole('button', { name: 'Prompt settings', exact: true }).click();
     assert.equal(
       await dialog.getByRole('combobox', { name: 'Approvals for this prompt' }).inputValue(),
       'autonomous'
@@ -305,11 +306,19 @@ export async function checkProjectConversations({
     assert.equal(requests[0].securityMode, 'autonomous');
     await page.reload();
     await page.getByRole('heading', { name: 'QC conversation', exact: true }).waitFor();
-    const tabs = page.getByRole('combobox', { name: 'Current conversation', exact: true });
+    const tabs = page.getByRole('combobox', {
+      name: 'Current conversation',
+      exact: true,
+      includeHidden: true
+    });
+    const desktopTabs = page.getByRole('navigation', {
+      name: 'Project conversations',
+      exact: true
+    });
     const initialOrder = ['Open a conversation…', 'Assembly analysis', 'QC conversation'];
     assert.deepEqual(await tabs.locator('option').allTextContents(), initialOrder);
     for (const name of ['Assembly analysis', 'QC conversation']) {
-      await tabs.selectOption({ label: name });
+      await desktopTabs.getByRole('button', { name, exact: true }).click();
       assert.equal(await tabs.locator('option:checked').textContent(), name);
       assert.deepEqual(await tabs.locator('option').allTextContents(), initialOrder);
     }
@@ -437,7 +446,8 @@ export async function checkProjectConversations({
     await tabs.locator('option').nth(50).waitFor({ state: 'attached' });
     const initialReadyMs = performance.now() - began;
     assert.equal(await tabs.locator('option').count(), 51);
-    await tabs.focus();
+    const focusedTab = desktopTabs.getByRole('button').first();
+    await focusedTab.focus();
     await Promise.all([
       page.waitForResponse(
         (response) => new URL(response.url()).pathname === `/v1/projects/${project.id}`
@@ -445,7 +455,7 @@ export async function checkProjectConversations({
       page.clock.runFor(15_100)
     ]);
     assert(
-      await tabs.evaluate((element) => element === document.activeElement),
+      await focusedTab.evaluate((element) => element === document.activeElement),
       'Refreshing progress must not steal conversation focus'
     );
     await page
@@ -493,15 +503,15 @@ export async function checkProjectConversations({
     };
     const olderOption = tabs.locator('option').nth(30);
     const olderName = await olderOption.textContent();
-    await tabs.focus();
-    await tabs.selectOption({ label: olderName });
+    const olderTab = desktopTabs.getByRole('button', { name: olderName, exact: true });
+    await olderTab.click();
     await taskEntered;
     assert.equal(await tabs.locator('option:checked').textContent(), olderName);
     assert.equal(await tabs.locator('option').count(), 101);
     releaseTask();
     delayTask = null;
     await page.getByRole('heading', { name: olderName, exact: true }).waitFor();
-    assert(await tabs.evaluate((el) => document.activeElement === el));
+    assert(await olderTab.evaluate((el) => document.activeElement === el));
     await page
       .getByRole('button', { name: `${project.title} · Project overview`, exact: true })
       .click();
@@ -513,6 +523,7 @@ export async function checkProjectConversations({
     assert.equal(await tabs.locator('option').count(), 101);
     const smallInput = page.getByRole('textbox', { name: 'Find a conversation', exact: true });
     await page.setViewportSize({ width: 360, height: 340 });
+    await page.clock.runFor(50);
     await smallInput.scrollIntoViewIfNeeded();
     await smallInput.fill('Analysis');
     assert(await smallInput.evaluate((el) => document.activeElement === el));
@@ -522,6 +533,7 @@ export async function checkProjectConversations({
     await page.screenshot({ path: resolve(report, 'project-keyboard-compact-viewport.png') });
     await smallInput.fill('');
     await page.setViewportSize({ width: 1440, height: 900 });
+    await page.clock.runFor(50);
     const trigger = page.getByRole('button', { name: 'Project settings', exact: true });
     await trigger.focus();
     await trigger.press('Enter');
@@ -574,6 +586,7 @@ export async function checkProjectConversations({
     );
     for (const width of [1440, 360]) {
       await page.setViewportSize({ width, height: 540 });
+      await page.clock.runFor(50);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
       await page.screenshot({ path: resolve(report, `project-keyboard-${width}.png`) });
     }
@@ -582,6 +595,9 @@ export async function checkProjectConversations({
     console.log(
       'Project conversation browser checks passed: persistent working-area drafts, inherited autonomy, independent creation, stable conversation order across navigation and activity, pinned conversations and restored selection, reloads, responsive names and controls, notes with correction history, and exact result references.'
     );
+  } catch (error) {
+    await page.screenshot({ path: resolve(report, 'conversation-failure.png') });
+    throw error;
   } finally {
     releaseTask?.();
     await page.close();

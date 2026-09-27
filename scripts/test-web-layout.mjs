@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { checkDesk } from './browser-desk.mjs';
 import { checkWorkspaceNavigation } from './browser-workspace.mjs';
 import { checkAppearance } from './browser-appearance.mjs';
 import { checkPermissionModes } from './browser-permissions.mjs';
@@ -244,6 +245,18 @@ const bootstrap = {
 };
 const previewHtml =
   '<!doctype html><title>Playable fixture</title><button onclick="this.textContent=Number(this.textContent)+1">0</button>';
+async function revealPromptSettings(surface) {
+  const settings = surface.getByRole('button', { name: 'Prompt settings', exact: true });
+  await settings.waitFor();
+  if ((await settings.getAttribute('aria-expanded')) === 'false') await settings.click();
+}
+async function openNewProject(page) {
+  await page.getByRole('button', { name: 'Show projects', exact: true }).click();
+  await page
+    .locator('#garden-sidebar')
+    .getByRole('button', { name: 'New project', exact: true })
+    .click();
+}
 const errors = [];
 let draft;
 const modelDrafts = new Map();
@@ -673,6 +686,9 @@ try {
     if (path.startsWith('/__athanor/preview/'))
       return route.fulfill({ contentType: 'text/html', body: previewHtml });
     if (!path.startsWith('/v1/')) return route.continue();
+    if (path === '/v1/tasks' && route.request().method() === 'GET')
+      return json({ tasks: [task], nextCursor: null });
+    if (path === '/v1/shares' || path === '/v1/schedules') return json([]);
     if (path === '/v1/bootstrap')
       return json({ ...bootstrap, models: modelCatalog, drafts: [...modelDrafts.values()] });
     if (path.endsWith('/updates') && path.startsWith('/v1/projects/'))
@@ -998,6 +1014,20 @@ try {
       return json(mediaAssets[0]);
     }
     if (path.endsWith('/files')) return json({ entries: [] });
+    if (/^\/v1\/projects\/[^/]+\/changes$/.test(path))
+      return json([
+        {
+          taskId: task.id,
+          status: 'ready',
+          measurement: {
+            added: 160,
+            removed: 12,
+            changedFiles: 3,
+            unmeasuredFiles: 0,
+            truncated: false
+          }
+        }
+      ]);
     if (await processUi.handle(route, path)) return;
     if (await directoryUi.handle(route, path)) return;
     if (path.endsWith('/computation')) return json({ sessions: [computation] });
@@ -1157,6 +1187,8 @@ try {
     errors.push(`Unspecified UI fixture: ${route.request().method()} ${path}`);
     return route.fulfill({ status: 501, json: { error: { message: 'Unspecified UI fixture' } } });
   });
+  if (!process.env.GARDEN_UI_FOCUS || process.env.GARDEN_UI_FOCUS === 'desk')
+    await checkDesk({ context, origin, task, bootstrap, project, report, directoryUi, processUi });
   if (process.env.GARDEN_UI_FOCUS === 'workspace') {
     await checkWorkspaceNavigation({ context, origin, task, report });
     await checkHumanInterventions({ context, origin, task, report });
@@ -1200,9 +1232,15 @@ try {
     });
   }
   if (
-    !['drafts', 'models', 'appearance', 'workspace', 'files-jobs', 'conversations'].includes(
-      process.env.GARDEN_UI_FOCUS
-    )
+    ![
+      'desk',
+      'drafts',
+      'models',
+      'appearance',
+      'workspace',
+      'files-jobs',
+      'conversations'
+    ].includes(process.env.GARDEN_UI_FOCUS)
   ) {
     if (process.env.GARDEN_UI_FOCUS !== 'journeys') {
       await checkPermissionModes({ context, origin, bootstrap, task, project, workspace, report });
@@ -1432,6 +1470,7 @@ try {
       .getByRole('navigation', { name: 'Project views' })
       .getByRole('button', { name: 'Work', exact: true })
       .click();
+    await revealPromptSettings(page);
     const autonomy = page.getByRole('combobox', { name: 'Approvals for this prompt', exact: true });
     await autonomy.selectOption('autonomous');
     assert.equal(
@@ -1593,7 +1632,7 @@ try {
       'Removing text shrinks the direction editor'
     );
     await page.setViewportSize({ width: 320, height: 600 });
-    await page.getByRole('button', { name: 'Prompt settings', exact: true }).click();
+    await revealPromptSettings(page);
     await page.locator('.garden-prompt-options > summary').click();
     const limit = page.getByRole('spinbutton', {
       name: 'Additional spend limit in USD',
@@ -1758,6 +1797,10 @@ try {
     await page.getByRole('button', { name: 'Hide projects', exact: true }).click();
     recordedReply = 'harbor-cobalt-46';
     await page.reload();
+    await page
+      .getByRole('navigation', { name: 'Output views' })
+      .getByRole('button', { name: 'Summary', exact: true })
+      .click();
     await page.locator('.garden-answer').getByText('harbor-cobalt-46', { exact: true }).waitFor();
     await page
       .getByRole('navigation', { name: 'Project views' })
@@ -2350,7 +2393,8 @@ try {
       ];
       if (samePage) {
         await approvalPage.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-      } else await approvalPage.goto(`${origin}/?task=${task.id}`);
+      } else
+        await approvalPage.goto(`${origin}/?task=${task.id}`, { waitUntil: 'domcontentloaded' });
       await approvalPage
         .locator('.decision-card')
         .getByText(`Check the result. ${index}`, { exact: true })
@@ -2603,9 +2647,15 @@ try {
     approvals = [];
   }
   if (
-    !['drafts', 'appearance', 'workspace', 'files-jobs', 'conversations', 'journeys'].includes(
-      process.env.GARDEN_UI_FOCUS
-    )
+    ![
+      'desk',
+      'drafts',
+      'appearance',
+      'workspace',
+      'files-jobs',
+      'conversations',
+      'journeys'
+    ].includes(process.env.GARDEN_UI_FOCUS)
   ) {
     const revealDefaults = async () => {
       await modelsPage.getByRole('region', { name: 'Main agent', exact: true }).waitFor();
@@ -2626,6 +2676,7 @@ try {
     await modelsPage.locator('.garden-task-composer').waitFor();
     if (await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).isVisible())
       await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).click();
+    await revealPromptSettings(modelsPage);
     await modelsPage.locator('.garden-prompt-options > summary').click();
     await modelsPage
       .getByRole('button', { name: 'Model choices for this direction', exact: true })
@@ -2681,6 +2732,7 @@ try {
 
     if (await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).isVisible())
       await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).click();
+    await revealPromptSettings(modelsPage);
     await modelsPage.getByRole('button', { name: /^Model for this direction:/ }).click();
     const modelSearch = modelsPage.getByRole('combobox', { name: 'Search models', exact: true });
     await modelsPage
@@ -2702,6 +2754,7 @@ try {
         .evaluate((element) => element === document.activeElement),
       'Model selection must restore keyboard focus'
     );
+    await revealPromptSettings(modelsPage);
     await modelsPage.getByRole('button', { name: /^Model for this direction:/ }).click();
     await modelsPage.getByRole('option', { name: 'Fixture reasoning model', exact: true }).click();
     await modelsPage
@@ -2711,10 +2764,9 @@ try {
       })
       .waitFor();
 
-    if (!(await modelsPage.getByRole('button', { name: 'New project', exact: true }).isVisible()))
-      await modelsPage.getByRole('button', { name: 'Show projects', exact: true }).click();
-    await modelsPage.getByRole('button', { name: 'New project', exact: true }).click();
+    await openNewProject(modelsPage);
     const newWork = modelsPage.getByRole('dialog', { name: 'Begin something new', exact: true });
+    await revealPromptSettings(newWork);
     await newWork.locator('.garden-prompt-options > summary').click();
     await newWork
       .getByRole('button', { name: 'Model choices for this direction', exact: true })
@@ -2735,7 +2787,8 @@ try {
       'openrouter/beta/model-79'
     );
     await modelsPage.reload();
-    await modelsPage.getByRole('button', { name: 'New project', exact: true }).click();
+    await openNewProject(modelsPage);
+    await revealPromptSettings(newWork);
     await newWork
       .getByRole('button', { name: 'Model for this direction: Research model 78', exact: true })
       .waitFor();
@@ -3054,15 +3107,20 @@ try {
   }
 
   if (
-    !['appearance', 'workspace', 'files-jobs', 'conversations', 'models', 'journeys'].includes(
-      process.env.GARDEN_UI_FOCUS
-    )
+    ![
+      'desk',
+      'appearance',
+      'workspace',
+      'files-jobs',
+      'conversations',
+      'models',
+      'journeys'
+    ].includes(process.env.GARDEN_UI_FOCUS)
   ) {
     let draftPage = await context.newPage();
     const openDraft = async () => {
       await draftPage.goto(`${origin}/?task=${task.id}`);
-      await draftPage.getByRole('button', { name: 'New project', exact: true }).waitFor();
-      await draftPage.getByRole('button', { name: 'New project', exact: true }).click();
+      await openNewProject(draftPage);
       await draftPage.getByRole('dialog', { name: 'Begin something new', exact: true }).waitFor();
     };
     let draftDialog = draftPage.getByRole('dialog', { name: 'Begin something new', exact: true });
@@ -3123,7 +3181,7 @@ try {
     const committedRevision = draftRevisions.get(draftKey);
     assert.equal(modelDrafts.get(draftKey).body, 'Save committed, acknowledgement lost.');
     await draftPage.reload();
-    await draftPage.getByRole('button', { name: 'New project', exact: true }).click();
+    await openNewProject(draftPage);
     await draftDialog.getByText('Draft synced', { exact: true }).waitFor();
     assert.equal(await draftInput.inputValue(), 'Save committed, acknowledgement lost.');
     assert.equal(
@@ -3156,7 +3214,7 @@ try {
     await draftDialog.getByRole('button', { name: 'Retry send', exact: true }).waitFor();
     assert.equal(taskCreations, beforeOffline + 1);
     await draftPage.reload();
-    await draftPage.getByRole('button', { name: 'New project', exact: true }).click();
+    await openNewProject(draftPage);
     await draftDialog.getByRole('button', { name: 'Retry send', exact: true }).waitFor();
     assert.equal(await draftInput.inputValue(), 'Create this task exactly once.');
     await draftDialog.getByRole('button', { name: 'Retry send', exact: true }).click();
@@ -3171,17 +3229,19 @@ try {
 
   assert.deepEqual(errors, [], 'The browser must not report uncaught errors');
   console.log(
-    process.env.GARDEN_UI_FOCUS === 'conversations'
-      ? 'Project conversations and checked updates passed.'
-      : process.env.GARDEN_UI_FOCUS === 'workspace'
-        ? 'Workspace navigation and human intervention checks passed.'
-        : process.env.GARDEN_UI_FOCUS === 'appearance'
-          ? 'Appearance checks passed: themes, responsive layouts, prompt disclosure, reduced motion, pause persistence and animation layout cost.'
-          : process.env.GARDEN_UI_FOCUS === 'models'
-            ? 'Model and draft browser checks passed: prompt, conversation and settings persistence, responsive controls, connection handling and draft recovery.'
-            : process.env.GARDEN_UI_FOCUS === 'drafts'
-              ? 'Draft browser checks passed: encrypted IndexedDB, close and reopen, offline recovery without auto-send, lost save acknowledgement, conflict choice, and interrupted send receipt replay.'
-              : 'Browser checks passed: encrypted draft recovery, viewport layout, phone focus, effort drafts, playable links, downloads, state-preserving expansion, recorded evidence, mission review, media recovery, analysis sessions, device authorization, dictation consent, model selection persistence, and denial feedback with authentication retry.'
+    process.env.GARDEN_UI_FOCUS === 'desk'
+      ? 'Desk browser checks passed.'
+      : process.env.GARDEN_UI_FOCUS === 'conversations'
+        ? 'Project conversations and checked updates passed.'
+        : process.env.GARDEN_UI_FOCUS === 'workspace'
+          ? 'Workspace navigation and human intervention checks passed.'
+          : process.env.GARDEN_UI_FOCUS === 'appearance'
+            ? 'Appearance checks passed: themes, responsive layouts, prompt disclosure, reduced motion, pause persistence and animation layout cost.'
+            : process.env.GARDEN_UI_FOCUS === 'models'
+              ? 'Model and draft browser checks passed: prompt, conversation and settings persistence, responsive controls, connection handling and draft recovery.'
+              : process.env.GARDEN_UI_FOCUS === 'drafts'
+                ? 'Draft browser checks passed: encrypted IndexedDB, close and reopen, offline recovery without auto-send, lost save acknowledgement, conflict choice, and interrupted send receipt replay.'
+                : 'Browser checks passed: encrypted draft recovery, viewport layout, phone focus, effort drafts, playable links, downloads, state-preserving expansion, recorded evidence, mission review, media recovery, analysis sessions, device authorization, dictation consent, model selection persistence, and denial feedback with authentication retry.'
   );
 } catch (error) {
   console.error(error);

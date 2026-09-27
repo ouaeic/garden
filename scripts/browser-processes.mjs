@@ -289,8 +289,8 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
     assert.equal(fixture.reads, before + 1, 'Refresh process status on the relaxed interval');
     assert.equal(
       fixture.projectReads,
-      projectBefore + 1,
-      'Refresh the project job shortcut on the relaxed interval'
+      projectBefore,
+      'The full process view must not also poll a hidden project shortcut'
     );
     await card.getByText('Command & details', { exact: true }).click();
     await card.getByText('Interactive terminal · 120 × 36.', { exact: false }).waitFor();

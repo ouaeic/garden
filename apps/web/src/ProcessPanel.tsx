@@ -1,7 +1,7 @@
 import ScrollRegion from './ScrollRegion';
 import { WorkflowProgress } from './WorkflowProgress';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { Activity, RefreshCw, Square } from 'lucide-react';
+import { Activity, ArrowUpRight, RefreshCw, Square } from 'lucide-react';
 import type { ComputationSession, ManagedProcess, ProcessList } from '@athanor/contracts';
 import { get, post } from './client';
 import { Button, Dialog, ErrorNotice, Spinner } from './ui';
@@ -23,11 +23,15 @@ const ProjectComputations = lazy(() => import('./ProjectComputations'));
 export default function ProcessPanel({
   workspaceId,
   taskId,
-  projectId
+  projectId,
+  compact = false,
+  onOpen
 }: {
   workspaceId: string;
   taskId?: string;
   projectId?: string;
+  compact?: boolean;
+  onOpen?: () => void;
 }) {
   const endpoint = projectId
     ? `/v1/projects/${projectId}/processes`
@@ -156,13 +160,13 @@ export default function ProcessPanel({
   };
   return (
     <section
-      className="project-processes"
+      className={`project-processes${compact ? ' desk-card desk-processes' : ''}`}
       aria-label={taskId || projectId ? 'Project processes' : 'Computer processes'}
     >
       <header className="process-panel-heading">
         <div>
           <h2>
-            <Activity size={19} aria-hidden="true" /> Jobs{' '}
+            <Activity size={19} aria-hidden="true" /> {compact ? 'Processes' : 'Jobs'}{' '}
             {list && <span className="process-count">{active.length + kernelCount} active</span>}
           </h2>
           <p>
@@ -171,6 +175,11 @@ export default function ProcessPanel({
               : 'Jobs, services and analysis sessions on this computer.'}
           </p>
         </div>
+        {compact && onOpen && (
+          <Button onClick={onOpen} aria-label="Open all project processes">
+            All <ArrowUpRight size={14} />
+          </Button>
+        )}
         <Button aria-label="Refresh processes" busy={loading} onClick={() => void refresh()}>
           <RefreshCw size={15} aria-hidden="true" />
           <span>Refresh</span>
