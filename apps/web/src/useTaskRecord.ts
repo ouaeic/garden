@@ -8,7 +8,6 @@ import { presentationArtifacts } from './task-artifacts';
 interface TaskRecordOptions {
   taskId: string;
   workspaceId: string;
-  finished: boolean;
   onTask: (task: Task) => void;
   onRefresh: () => void;
 }
@@ -20,13 +19,7 @@ const readFailure = (subject: string, cause: unknown): Error => {
     : new Error(message);
 };
 
-export function useTaskRecord({
-  taskId,
-  workspaceId,
-  finished,
-  onTask,
-  onRefresh
-}: TaskRecordOptions) {
+export function useTaskRecord({ taskId, workspaceId, onTask, onRefresh }: TaskRecordOptions) {
   const [events, setEvents] = useState<TaskEvent[]>([]);
   const [plan, setPlan] = useState<TaskPlan | null>(null);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
@@ -209,7 +202,7 @@ export function useTaskRecord({
       clearInterval(timer);
       clearTimeout(refreshTimer);
     };
-  }, [taskId, reloadRecords, finished]);
+  }, [taskId, reloadRecords]);
   return {
     events,
     plan,

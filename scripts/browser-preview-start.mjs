@@ -43,7 +43,7 @@ export async function checkPreviewStart({ context, origin, task, presentation, r
               ...source,
               startPath,
               ...(state === 'starting' || state === 'attention' ? { startState: state } : {}),
-              status: state === 'ready' ? 'ready' : 'unavailable',
+              status: state === 'ready' ? 'ready' : state === 'unknown' ? 'unknown' : 'unavailable',
               detail:
                 state === 'ready'
                   ? undefined
@@ -80,6 +80,23 @@ export async function checkPreviewStart({ context, origin, task, presentation, r
       assert.equal(starts, before + 1);
       await page.screenshot({ path: resolve(report, `preview-restored-${width}.png`) });
     }
+    await card.locator('iframe').evaluate((frame) => {
+      frame.dataset.preserved = 'yes';
+    });
+    for (const next of ['unknown', 'ready']) {
+      state = next;
+      const checked = page.waitForResponse(
+        (response) => new URL(response.url()).pathname === `/v1/tasks/${task.id}/presentation`
+      );
+      await checked;
+      await page.waitForTimeout(100);
+      assert(await card.locator('iframe').isVisible());
+      assert.equal(
+        await card.locator('iframe').getAttribute('data-preserved'),
+        'yes',
+        'Availability uncertainty must preserve the app frame and its state'
+      );
+    }
     state = 'attention';
     await page.reload();
     await card.getByRole('link', { name: 'Open conversation' }).waitFor();
@@ -90,6 +107,14 @@ export async function checkPreviewStart({ context, origin, task, presentation, r
     await card.getByRole('button', { name: 'Start preview', exact: true }).click();
     await page.getByText('This conversation is still working.', { exact: true }).waitFor();
     assert(await card.getByRole('button', { name: 'Start preview', exact: true }).isEnabled());
+  } catch (error) {
+    await page.screenshot({ path: resolve(report, 'preview-failure.png') });
+    console.error({
+      state,
+      text: (await page.locator('body').innerText()).slice(0, 3000),
+      frame: await card.locator('iframe').count()
+    });
+    throw error;
   } finally {
     await page.close();
   }

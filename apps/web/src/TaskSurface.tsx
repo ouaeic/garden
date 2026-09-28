@@ -130,7 +130,6 @@ export default function TaskSurface({
   } = useTaskRecord({
     taskId: task.id,
     workspaceId: workspace.id,
-    finished: isFinished(task),
     onTask,
     onRefresh
   });

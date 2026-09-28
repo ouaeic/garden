@@ -70,6 +70,8 @@ export function TaskOutputs({
   }, [recovery.restoredId]);
   const previews = recovery.previews;
   const preview = previews.find((item) => item.id === selectedPreview) ?? previews[0];
+  const viewablePreview =
+    preview?.status === 'ready' || (preview?.status === 'unknown' && opened?.id === preview.id);
   useEffect(() => {
     if (preview?.startState) setSelectedSection('preview');
   }, [preview?.id, preview?.startState]);
@@ -94,6 +96,10 @@ export function TaskOutputs({
   const previewStatus = preview?.status;
   const previewId = preview?.id;
   useEffect(() => {
+    if (previewStatus === 'unavailable' && opened?.id === previewId) {
+      setOpened(null);
+      return;
+    }
     if (
       (!autoPreview && selectedPreview === null) ||
       !previewKey ||
@@ -102,6 +108,7 @@ export function TaskOutputs({
       dismissed === previewKey
     )
       return;
+    if (opened?.id === previewId) return;
     let active = true;
     setOpened(null);
     setFrameState('loading');
@@ -141,7 +148,8 @@ export function TaskOutputs({
     previewStatus,
     dismissed,
     autoPreview,
-    selectedPreview
+    selectedPreview,
+    opened?.id
   ]);
   useEffect(() => {
     if (!opened || frameState !== 'loading') return;
@@ -149,6 +157,8 @@ export function TaskOutputs({
     return () => clearTimeout(timer);
   }, [opened, frameState]);
   async function resultUrl(result: TaskResult) {
+    if (result.status === 'unknown' && opened?.id === result.id)
+      return previewUrl(opened.url, false);
     const url = result.accessPath
       ? (await post<{ url: string }>(result.accessPath, {})).url
       : result.url;
@@ -309,7 +319,7 @@ export function TaskOutputs({
               </div>
               <Globe size={22} />
             </header>
-            {opened?.id === preview.id && preview.status === 'ready' ? (
+            {opened?.id === preview.id && viewablePreview ? (
               <div className="garden-preview-live">
                 {frame}
                 {frameState !== 'loaded' && (
@@ -371,7 +381,7 @@ export function TaskOutputs({
               </div>
             )}
             <div className="garden-output-actions">
-              {preview.status !== 'ready' &&
+              {!viewablePreview &&
                 preview.startPath &&
                 (preview.startState === 'attention' ? (
                   <a
@@ -396,7 +406,7 @@ export function TaskOutputs({
                     {startingPreview ? 'Starting preview…' : 'Start preview'}
                   </Button>
                 ))}
-              {preview.status === 'ready' && (
+              {viewablePreview && (
                 <>
                   <Button
                     className="primary"
