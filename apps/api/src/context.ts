@@ -482,7 +482,6 @@ export const minutesToClock = (value: number): string =>
 /** The preferred standing brief and supported compatibility names, in precedence order. */
 export const workspaceBriefPath = 'workspace/GARDEN.md';
 export const legacyWorkspaceBriefPaths = [
-  'workspace/GARDEN.md',
   'workspace/OPEN_CLOUD.md',
   'workspace/AGENTS.md'
 ] as const;

@@ -118,8 +118,6 @@ export async function repositoryOverview(
       '--glob',
       'GARDEN.md',
       '--glob',
-      'GARDEN.md',
-      '--glob',
       'OPEN_CLOUD.md',
       '--glob',
       'AGENTS.md',

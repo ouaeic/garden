@@ -32,13 +32,11 @@ describe('garden workspace brief editor', () => {
   afterAll(async () => app.close());
   it('reads the preferred brief, falls back through every supported alias and saves the preferred file', async () => {
     files.set('workspace/GARDEN.md', 'Garden guidance');
-    files.set('workspace/GARDEN.md', 'Specific compatibility');
     files.set('workspace/OPEN_CLOUD.md', 'Cloud compatibility');
     files.set('workspace/AGENTS.md', 'Shared guidance');
     const url = '/v1/workspaces/workspace/brief';
     for (const [file, expected] of [
       ['workspace/GARDEN.md', 'Garden guidance'],
-      ['workspace/GARDEN.md', 'Specific compatibility'],
       ['workspace/OPEN_CLOUD.md', 'Cloud compatibility'],
       ['workspace/AGENTS.md', 'Shared guidance']
     ]) {
@@ -47,7 +45,7 @@ describe('garden workspace brief editor', () => {
       expect(response.json()).toEqual({ markdown: expected, path: 'workspace/GARDEN.md' });
       files.delete(file!);
     }
-    expect(raw.mock.calls.length).toBeGreaterThan(4);
+    expect(raw.mock.calls).toHaveLength(6);
     const saved = await app.inject({
       method: 'PUT',
       url,
@@ -55,6 +53,6 @@ describe('garden workspace brief editor', () => {
     });
     expect(saved.statusCode).toBe(200);
     expect(files.get('workspace/GARDEN.md')).toBe('Owner edited guidance');
-    expect(files.has('workspace/GARDEN.md')).toBe(false);
+    expect([...files.keys()]).toEqual(['workspace/GARDEN.md']);
   });
 });
