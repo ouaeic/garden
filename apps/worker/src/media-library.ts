@@ -1,11 +1,8 @@
-import { runtimeUUID } from '@athanor/core';
+import { runtimeUUID } from '@garden/core';
 
-import { AthanorError, decryptJson, encryptJson, sha256 } from '@athanor/core';
-import {
-  NativeMediaLibraryClient,
-  NativeMediaProviderRejectionError
-} from '@athanor/model-gateway';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import { GardenError, decryptJson, encryptJson, sha256 } from '@garden/core';
+import { NativeMediaLibraryClient, NativeMediaProviderRejectionError } from '@garden/model-gateway';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { InferenceCredential } from './agent-state.js';
 import type { ToolContext } from './tool-dispatch.js';
 import { LibraryControls, mediaArguments } from './media-controls.js';
@@ -23,7 +20,7 @@ export const executeMediaLibrary = async (
 ): Promise<unknown> => {
   const input = LibraryControls.parse(mediaArguments(call.arguments));
   if (!secret.apiKey || secret.mediaRoutes?.video?.apiProtocol !== 'openai')
-    throw new AthanorError(
+    throw new GardenError(
       'media_library_unavailable',
       'Choose a native OpenAI video route before opening its library',
       409
@@ -33,7 +30,7 @@ export const executeMediaLibrary = async (
     input.operation === 'create_character' ||
     input.operation === 'cancel_batch';
   if (writing && !context.consequentialApproved)
-    throw new AthanorError(
+    throw new GardenError(
       'media_library_approval_required',
       'Approve this retained provider asset operation first',
       409
@@ -47,10 +44,10 @@ export const executeMediaLibrary = async (
   if (input.operation === 'cancel_batch') {
     const batch = await context.store.getMediaBatch(context.task.userId, input.batchId);
     if (!batch || batch.workspaceId !== context.task.workspaceId)
-      throw new AthanorError('media_batch_not_found', 'Batch not found in this workspace', 404);
+      throw new GardenError('media_batch_not_found', 'Batch not found in this workspace', 404);
     const saved = await context.store.requestMediaBatchCancel(context.task.userId, batch.id);
     if (!saved)
-      throw new AthanorError(
+      throw new GardenError(
         'media_batch_not_cancellable',
         'Reconcile an uncertain submission before cancelling; delivered batches are already terminal',
         409
@@ -94,7 +91,7 @@ export const executeMediaLibrary = async (
   }
   const path = input.referencePath;
   if (/^[a-z]+:/i.test(path) || path.startsWith('/') || path.split('/').includes('..'))
-    throw new AthanorError(
+    throw new GardenError(
       'media_asset_path_invalid',
       'Choose an MP4 character reference inside this workspace',
       400
@@ -106,7 +103,7 @@ export const executeMediaLibrary = async (
     64 * 1024 * 1024
   );
   if (file.bytes.length < 12 || file.bytes.toString('ascii', 4, 8) !== 'ftyp')
-    throw new AthanorError(
+    throw new GardenError(
       'media_asset_format_invalid',
       'Choose a valid MP4 character reference',
       400
@@ -167,7 +164,7 @@ export const executeMediaLibrary = async (
         mediaAssetAad(id)
       )
     });
-    throw new AthanorError(
+    throw new GardenError(
       refused ? 'media_asset_refused' : 'media_asset_submission_uncertain',
       refused
         ? 'The provider refused the character upload. Its reservation was released.'

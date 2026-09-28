@@ -10,13 +10,13 @@ import {
 } from './snapshots.js';
 
 const temporary: string[] = [];
-const originalReserve = process.env.ATHANOR_SNAPSHOT_RESERVE_BYTES;
+const originalReserve = process.env.GARDEN_SNAPSHOT_RESERVE_BYTES;
 beforeAll(() => {
-  process.env.ATHANOR_SNAPSHOT_RESERVE_BYTES = String(64 * 1024 ** 2);
+  process.env.GARDEN_SNAPSHOT_RESERVE_BYTES = String(64 * 1024 ** 2);
 });
 afterAll(() => {
-  if (originalReserve === undefined) delete process.env.ATHANOR_SNAPSHOT_RESERVE_BYTES;
-  else process.env.ATHANOR_SNAPSHOT_RESERVE_BYTES = originalReserve;
+  if (originalReserve === undefined) delete process.env.GARDEN_SNAPSHOT_RESERVE_BYTES;
+  else process.env.GARDEN_SNAPSHOT_RESERVE_BYTES = originalReserve;
 });
 afterEach(async () => {
   await Promise.all(temporary.splice(0).map((directory) => rm(directory, { recursive: true })));
@@ -31,21 +31,21 @@ describe('native recovery points', () => {
   });
 
   it('creates, restores, and deletes a real bounded archive', async () => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-snapshots-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-snapshots-'));
     temporary.push(workspaceRoot);
     const workspaceId = '018f3dd3-899f-7e3d-8d92-8fdbf65f8301';
     const snapshotId = '018f3dd3-8a2a-7d8b-8d3c-a2f4c8316bed';
     const root = path.join(workspaceRoot, workspaceId);
     await Promise.all(
-      ['workspace', '.athanor/browser', '.athanor/artifacts'].map((relative) =>
+      ['workspace', '.garden/browser', '.garden/artifacts'].map((relative) =>
         mkdir(path.join(root, relative), { recursive: true })
       )
     );
     await writeFile(path.join(root, 'workspace', 'analysis.txt'), 'known good\n');
-    await writeFile(path.join(root, '.athanor', 'browser', 'state.json'), '{"session":1}\n');
+    await writeFile(path.join(root, '.garden', 'browser', 'state.json'), '{"session":1}\n');
 
     const created = await createSnapshot({
-      snapshotExecutable: path.resolve('../../scripts/athanor-snapshot'),
+      snapshotExecutable: path.resolve('../../scripts/garden-snapshot'),
       workspaceRoot,
       root,
       workspaceId,
@@ -56,7 +56,7 @@ describe('native recovery points', () => {
     await writeFile(path.join(root, 'workspace', 'new.txt'), 'remove me\n');
 
     await restoreSnapshot({
-      snapshotExecutable: path.resolve('../../scripts/athanor-snapshot'),
+      snapshotExecutable: path.resolve('../../scripts/garden-snapshot'),
       workspaceRoot,
       root,
       workspaceId,
@@ -69,7 +69,7 @@ describe('native recovery points', () => {
 
     await deleteSnapshot({ workspaceRoot, workspaceId, snapshotId });
     await expect(
-      access(path.join(workspaceRoot, '.athanor-snapshots', workspaceId, `${snapshotId}.tar.gz`))
+      access(path.join(workspaceRoot, '.garden-snapshots', workspaceId, `${snapshotId}.tar.gz`))
     ).rejects.toThrow();
   });
 
@@ -84,18 +84,18 @@ describe('native recovery points', () => {
   });
 
   it('refuses a recovery point when a protected top-level directory is a symlink', async () => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-snapshots-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-snapshots-'));
     temporary.push(workspaceRoot);
     const workspaceId = '018f3dd3-899f-7e3d-8d92-8fdbf65f8301';
     const snapshotId = '018f3dd3-8a2a-7d8b-8d3c-a2f4c8316bed';
     const root = path.join(workspaceRoot, workspaceId);
-    await mkdir(path.join(root, '.athanor', 'browser'), { recursive: true });
-    await mkdir(path.join(root, '.athanor', 'artifacts'), { recursive: true });
+    await mkdir(path.join(root, '.garden', 'browser'), { recursive: true });
+    await mkdir(path.join(root, '.garden', 'artifacts'), { recursive: true });
     await symlink(tmpdir(), path.join(root, 'workspace'));
 
     await expect(
       createSnapshot({
-        snapshotExecutable: path.resolve('../../scripts/athanor-snapshot'),
+        snapshotExecutable: path.resolve('../../scripts/garden-snapshot'),
         workspaceRoot,
         root,
         workspaceId,
@@ -105,13 +105,13 @@ describe('native recovery points', () => {
   });
 
   it('refuses links that would leave the recovered computer state', async () => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-snapshots-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-snapshots-'));
     temporary.push(workspaceRoot);
     const workspaceId = '018f3dd3-899f-7e3d-8d92-8fdbf65f8301';
     const snapshotId = '018f3dd3-8a2a-7d8b-8d3c-a2f4c8316bed';
     const root = path.join(workspaceRoot, workspaceId);
     await Promise.all(
-      ['workspace', '.athanor/browser', '.athanor/artifacts'].map((relative) =>
+      ['workspace', '.garden/browser', '.garden/artifacts'].map((relative) =>
         mkdir(path.join(root, relative), { recursive: true })
       )
     );
@@ -119,7 +119,7 @@ describe('native recovery points', () => {
 
     await expect(
       createSnapshot({
-        snapshotExecutable: path.resolve('../../scripts/athanor-snapshot'),
+        snapshotExecutable: path.resolve('../../scripts/garden-snapshot'),
         workspaceRoot,
         root,
         workspaceId,

@@ -17,7 +17,7 @@ garden-operated relay.
 
 ## First choice: a direct address
 
-Run `sudo athanor doctor`. If it reports a globally routable address and nothing warns that only
+Run `sudo garden doctor`. If it reports a globally routable address and nothing warns that only
 private addresses were found, clients already reach you directly.
 
 Two things to get right:
@@ -30,7 +30,7 @@ Two things to get right:
   no domain at all can still have a green padlock:
 
   ```bash
-  sudo athanor certificate enable --agree-tos --email you@example.com
+  sudo garden certificate enable --agree-tos --email you@example.com
   ```
 
   Address certificates last 160 hours, so the renewal timer matters; `doctor` reports it.
@@ -45,7 +45,7 @@ If your address is public but changes, dynamic DNS gives you a stable name and k
 you. It is free and takes about a minute:
 
 ```bash
-sudo athanor ddns configure
+sudo garden ddns configure
 ```
 
 Create a name at a provider first (duckdns.org and desec.io both work; Cloudflare works if you
@@ -53,7 +53,7 @@ already own a domain there). The command records the credential, publishes your 
 makes the name the public origin, and puts it in the certificate. After that, browser sign-in works
 and clients follow you across address changes.
 
-`athanor-network-watch` republishes on every address change, and `doctor` fails if the record has
+`garden-network-watch` republishes on every address change, and `doctor` fails if the record has
 not been refreshed for two days.
 
 ## Third choice: a relay
@@ -106,7 +106,7 @@ unrelated labels that cannot be linked back to the same computer.
 From the server itself:
 
 ```bash
-sudo athanor relay status
+sudo garden relay status
 ```
 
 `doctor` reports the relay too: whether it is on, whether it is connected, the address, the bytes
@@ -115,7 +115,7 @@ used against the allowance, and whether the operator has revoked you.
 ### Turning it off
 
 ```bash
-sudo athanor relay off
+sudo garden relay off
 ```
 
 or the same switch in Settings. Either one closes the tunnel and removes the relay address from what
@@ -162,7 +162,7 @@ Cannot see:
 
 ## Where the state lives
 
-`/etc/athanor/relay/` holds the identity key, the settings, and the last reported status. It is
-readable only by the control account, it survives updates, and it travels in `sudo athanor backup`
+`/etc/garden/relay/` holds the identity key, the settings, and the last reported status. It is
+readable only by the control account, it survives updates, and it travels in `sudo garden backup`
 with the rest of the configuration. **The identity key is your address.** Losing it changes the
 hostname every paired client holds, exactly as if you had moved house.

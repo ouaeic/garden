@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { FastifyInstance } from 'fastify';
-import { JsonProofRequest, type JsonProof, type JsonProofResult } from '@athanor/contracts';
+import { JsonProofRequest, type JsonProof, type JsonProofResult } from '@garden/contracts';
 import { requireScope } from './auth.js';
 import { assertUserDataPath, readWorkspaceFile, workspacePath } from './files.js';
 

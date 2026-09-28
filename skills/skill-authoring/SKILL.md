@@ -5,10 +5,10 @@ license: AGPL-3.0-or-later
 compatibility: No external binaries required.
 allowed-tools: skill session_search file_read file_write
 metadata:
-  athanor.tier: 'builtin'
-  athanor.version: '2.0.0'
-  athanor.risk: 'workspace'
-  athanor.domain: 'discipline'
+  garden.tier: 'builtin'
+  garden.version: '2.0.0'
+  garden.risk: 'workspace'
+  garden.domain: 'discipline'
 ---
 
 # Skill authoring

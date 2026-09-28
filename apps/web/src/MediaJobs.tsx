@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { MediaJob, MediaCharacterAsset, MediaBatch } from '@athanor/contracts';
+import type { MediaJob, MediaCharacterAsset, MediaBatch } from '@garden/contracts';
 import { Download, Film, RefreshCw } from 'lucide-react';
 import { get, patch, post } from './client';
 import { Button, ErrorNotice } from './ui';

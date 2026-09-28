@@ -3,7 +3,7 @@ import { mkdtemp, realpath, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
-import type { ComputationSession } from '@athanor/contracts';
+import type { ComputationSession } from '@garden/contracts';
 import type * as Execution from './execution.js';
 import type * as Resources from './process-resources.js';
 import type * as Missions from './mission-processes.js';

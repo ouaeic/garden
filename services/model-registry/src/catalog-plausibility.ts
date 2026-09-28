@@ -100,8 +100,8 @@ const percent = (share: number): string => `${Math.round(share * 100)}%`;
  * Null when the answer may be written, or the sentence saying why it may not.
  *
  * The sentence is the whole product of this function. It is what the journal prints, what
- * `athanor doctor` reads back out of the state record, and the only thing that will exist on the
- * box connecting "athanor stopped answering" to "the provider renamed a field" - so it names the
+ * `garden doctor` reads back out of the state record, and the only thing that will exist on the
+ * box connecting "garden stopped answering" to "the provider renamed a field" - so it names the
  * fact, both shares and the sizes, and it says what is still serving. A gate that refuses silently
  * would have swapped one silence for another.
  */

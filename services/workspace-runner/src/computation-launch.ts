@@ -1,7 +1,7 @@
 import { realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { ComputationRequest } from '@athanor/contracts';
+import type { ComputationRequest } from '@garden/contracts';
 import {
   AGENT_HOME,
   assertUserDataPath,

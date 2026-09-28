@@ -13,8 +13,8 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { seedModels } from '@athanor/model-gateway';
-import { ProjectModelPreferences } from '@athanor/contracts';
+import { seedModels } from '@garden/model-gateway';
+import { ProjectModelPreferences } from '@garden/contracts';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { ApiConfig } from '../config.js';
 import { buildServer } from '../server.js';
@@ -176,7 +176,7 @@ const buildHarness = async (options: {
   /** Skip writing the three routable models, for the catalogue-scope test. */
   seedCatalogue?: boolean;
 }): Promise<Harness> => {
-  const directory = await mkdtemp(join(tmpdir(), 'athanor-preference-'));
+  const directory = await mkdtemp(join(tmpdir(), 'garden-preference-'));
   disposers.push(() => rm(directory, { recursive: true, force: true }));
   const feed = options.feed ?? [];
   vi.stubGlobal(
@@ -200,7 +200,7 @@ const buildHarness = async (options: {
     DEPLOYMENT_MODE: 'development',
     MODEL_CATALOG_SCOPE: options.catalogScope,
     CONNECTION_MANIFEST_PATH: join(directory, 'connection.json'),
-    ATHANOR_STATE_PATH: directory,
+    GARDEN_STATE_PATH: directory,
     RELAY_STATE_DIR: join(directory, 'relay'),
     RELAY_LOCAL_HOST: '127.0.0.1',
     RELAY_LOCAL_PORT: 443,
@@ -225,7 +225,7 @@ const buildHarness = async (options: {
     PUBLIC_RUNNER_URL: 'ws://127.0.0.1:4300',
     WORKSPACE_IMAGE_REVISION: 'dev',
     WEBAUTHN_RP_ID: 'localhost',
-    WEBAUTHN_RP_NAME: 'athanor Test',
+    WEBAUTHN_RP_NAME: 'garden Test',
     WEBAUTHN_ORIGIN: 'http://localhost:5173',
     ALLOW_INSECURE_DEV_AUTH: true,
     WORKER_ID: 'preference-test-worker',

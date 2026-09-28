@@ -46,7 +46,7 @@ it('returns a completed receipt after restart without repeating its effect and s
   await expect(
     restarted.run(root, 'agent:one', id, { type: 'click', selector: '#delete' }, perform)
   ).rejects.toThrow('different arguments');
-  const filename = path.join(root, '.athanor/browser-actions/receipts.sqlite');
+  const filename = path.join(root, '.garden/browser-actions/receipts.sqlite');
   expect((await stat(filename)).mode & 0o777).toBe(0o600);
   const stored = await readFile(filename);
   expect(stored.includes(Buffer.from('private-canary'))).toBe(false);
@@ -149,7 +149,7 @@ it('refuses invalid identities and symlink receipt stores before executing', asy
   const perform = vi.fn(async () => ({}));
   await expect(journal.run(root, 'a', '../bad', {}, perform)).rejects.toThrow();
   await journal.read(root, 'a', id);
-  const file = path.join(root, '.athanor/browser-actions/receipts.sqlite');
+  const file = path.join(root, '.garden/browser-actions/receipts.sqlite');
   await rm(file);
   await symlink(path.join(root, 'outside'), file);
   await expect(journal.run(root, 'a', id, {}, perform)).rejects.toThrow('Invalid browser receipt');

@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { capabilityAudience, signCapabilityToken } from '@athanor/core';
+import { capabilityAudience, signCapabilityToken } from '@garden/core';
 import type { RunnerConfig } from './config.js';
 import { ensureWorkspace } from './files.js';
 import { buildServer } from './server.js';
@@ -28,7 +28,7 @@ const runnerConfig = (workspaceRoot: string, secret: string): RunnerConfig =>
     RUNNER_SHARED_SECRET: secret,
     WORKSPACE_ROOT: workspaceRoot,
     TAR_EXECUTABLE: '/usr/bin/tar',
-    SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/athanor-snapshot'),
+    SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/garden-snapshot'),
     BROWSER_USE_DESKTOP_DISPLAY: false,
     BROWSER_CPU_NICE: 0,
     MAX_EXECUTION_SECONDS: 30,
@@ -57,7 +57,7 @@ describe('a capability is only good for the request it names', () => {
   });
 
   const harness = async () => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-audience-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-audience-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const secret = 'runner-audience-test-secret-at-least-32-characters';
     const app = await buildServer(runnerConfig(workspaceRoot, secret));

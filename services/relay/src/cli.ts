@@ -8,7 +8,7 @@ import { Registry } from './registry.js';
 import { RelayServer } from './relay.js';
 import { createSelfSignedCertificate, generateIdentityKeyPair } from './x509.js';
 
-const USAGE = `athanor-relay <command> [options]
+const USAGE = `garden-relay <command> [options]
 
 Commands:
   serve [--no-registration]          run the relay
@@ -20,7 +20,7 @@ Commands:
   dev-cert --host <name> --out <dir> write a self-signed relay certificate for local testing
 
 Options:
-  --config <path>   configuration file (default: $ATHANOR_RELAY_CONFIG or /etc/athanor-relay.json)
+  --config <path>   configuration file (default: $GARDEN_RELAY_CONFIG or /etc/garden-relay.json)
 `;
 
 export interface Args {
@@ -52,7 +52,7 @@ export const parseArgs = (argv: readonly string[]): Args => {
 };
 
 const configPath = (args: Args): string =>
-  args.flags.get('config') ?? process.env.ATHANOR_RELAY_CONFIG ?? '/etc/athanor-relay.json';
+  args.flags.get('config') ?? process.env.GARDEN_RELAY_CONFIG ?? '/etc/garden-relay.json';
 
 const openRegistry = async (config: RelayConfig): Promise<Registry> =>
   Registry.open({

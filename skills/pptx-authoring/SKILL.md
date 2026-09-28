@@ -2,18 +2,18 @@
 name: pptx-authoring
 description: Build or extend an editable PowerPoint deck with python-pptx — layouts from the master, one idea per slide, native charts, speaker notes — and prove every slide renders without overflowing its text boxes. Use when the deliverable is a .pptx, a pitch deck, a slide deck, a board pack or a presentation the owner will edit. Do not use to make an HTML or PDF-only presentation, and never export slides as images into a .pptx.
 license: AGPL-3.0-or-later
-compatibility: Every tool named here is installed on this computer by athanor - python-pptx through /usr/local/lib/athanor/python/bin/python3, athanor-office-convert, and poppler-utils.
+compatibility: Every tool named here is installed on this computer by garden - python-pptx through /usr/local/lib/garden/python/bin/python3, garden-office-convert, and poppler-utils.
 allowed-tools: shell file_read file_write files_list document_read image_read publish_artifact
 metadata:
-  athanor.tier: 'builtin'
-  athanor.version: '2.2.0'
-  athanor.risk: 'workspace'
-  athanor.domain: 'presentations'
+  garden.tier: 'builtin'
+  garden.version: '2.2.0'
+  garden.risk: 'workspace'
+  garden.domain: 'presentations'
 ---
 
 # Presentation authoring
 
-Run every script in this skill with `/usr/local/lib/athanor/python/bin/python3`. It is the one
+Run every script in this skill with `/usr/local/lib/garden/python/bin/python3`. It is the one
 interpreter this computer probes for, the release drill refuses to ship without, and every skill
 here names — a superset of the distribution's own packages, so a procedure written against it keeps
 working when a library moves to the pinned set. Do not reach for a bare `python3`.
@@ -144,7 +144,7 @@ scratch to change three slides; the master, theme and custom layouts will not su
 
 1. Reopen with python-pptx: slide count, and the placeholder text of every slide. Confirm nothing
    is empty that should not be, and that every slide has notes.
-2. `athanor-office-convert deck.pptx proofs/deck.pdf`, then `pdftoppm -jpeg -r 120 proofs/deck.pdf
+2. `garden-office-convert deck.pptx proofs/deck.pdf`, then `pdftoppm -jpeg -r 120 proofs/deck.pdf
 proofs/p`.
 3. The slide count is `expectPages` on the acceptance render clause, declared before the deck was
    built rather than counted afterwards.

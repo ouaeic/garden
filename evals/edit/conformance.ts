@@ -46,7 +46,7 @@
  *
  * It runs no model. Every emission here is one a model plausibly produces - a dropped marker, a
  * unified diff, an anchor counted off a header - but the RATE at which models produce them is not
- * measured anywhere in athanor and is not measured here. This bounds the cost of each failure; it
+ * measured anywhere in garden and is not measured here. This bounds the cost of each failure; it
  * does not weight them.
  */
 import { applyEdit } from '../../apps/worker/src/edit/apply.js';

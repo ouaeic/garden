@@ -65,7 +65,7 @@ export const resolveInside = (root: string, requested = '.'): string => {
   return resolved;
 };
 
-const ARTIFACTS = path.join('.athanor', 'artifacts');
+const ARTIFACTS = path.join('.garden', 'artifacts');
 
 /**
  * The agent's `$HOME`, named once. `ensureWorkspace` below is what creates it and execution.ts's
@@ -87,20 +87,20 @@ const isUserData = (relative: string): boolean =>
 
 /**
  * The container's own directories, which are not the agent's and are never a bare name's meaning.
- * `.athanor` holds the runner's private state - the browser profile among it - `.config` the
+ * `.garden` holds the runner's private state - the browser profile among it - `.config` the
  * guest's settings, and `.home` the agent's `$HOME` (execution.ts `agentHome`), which holds the
  * coding CLIs' OAuth credentials and the `.bashrc` the owner's own terminal sources. `workspace`
  * is left out on purpose: a path already rooted there is user data and is accepted above before
  * this is consulted.
  *
  * `.home` is here for the fold rather than for the resolve. Nothing under the container root has
- * ever been reachable - `isUserData` admits `workspace/` and `.athanor/artifacts` and nothing else,
+ * ever been reachable - `isUserData` admits `workspace/` and `.garden/artifacts` and nothing else,
  * so `.home/.bashrc` could only ever have become `workspace/.home/.bashrc`, an inert file. Naming
  * it says no outright instead, which is the honest answer and is also the answer that stays right
  * if `$HOME` is ever moved back under `workspace/`. It refuses no legitimate work: a real
  * `workspace/.home` is still reachable by writing that prefix, which the branch above accepts.
  */
-const CONTAINER_ONLY = new Set(['.athanor', '.config', AGENT_HOME]);
+const CONTAINER_ONLY = new Set(['.garden', '.config', AGENT_HOME]);
 
 /**
  * Where a path the agent gave means what the agent meant by it.
@@ -114,8 +114,8 @@ const CONTAINER_ONLY = new Set(['.athanor', '.config', AGENT_HOME]);
  * Only a plain one. A path that is absolute, that steps upwards through `..`, or that names one of
  * the container's own directories is resolved and checked exactly as before, and refused if it
  * lands outside the two roots. Folding those back inside would answer an attempt worth seeing with
- * a write worth nothing: an agent reaching for `.athanor/browser/Cookies` should be told no, not
- * quietly handed `workspace/.athanor/browser/Cookies`. This changes which directory a bare name
+ * a write worth nothing: an agent reaching for `.garden/browser/Cookies` should be told no, not
+ * quietly handed `workspace/.garden/browser/Cookies`. This changes which directory a bare name
  * starts from, not what any path is allowed to reach.
  */
 export const assertUserDataPath = (root: string, requested = 'workspace'): string => {
@@ -148,10 +148,10 @@ export const assertUserDataPath = (root: string, requested = 'workspace'): strin
  * live box across six of ten tasks and a shadow tree that had stood for weeks. A bare name is
  * therefore read from `workspace/`, so `probe` and `workspace/probe` are one directory.
  *
- * Unlike the file fold this refuses nothing new and admits nothing new: `.athanor`, the guest's
+ * Unlike the file fold this refuses nothing new and admits nothing new: `.garden`, the guest's
  * `.config` and the agent's home stay where they are, an absolute path resolves as written, and
  * `resolveInside` still refuses anything that steps out of the container. A command may run in
- * `.athanor/artifacts` or in `$HOME`, which a file tool may not write, and that difference is the
+ * `.garden/artifacts` or in `$HOME`, which a file tool may not write, and that difference is the
  * runner's to keep - so this shares the container-only list and not the user-data check.
  *
  * And `.` is the container root, not a bare name. The document reader and the office converter
@@ -196,7 +196,7 @@ const rejectSymlinkComponents = async (
  *
  * The walk above answers the question at the time it runs, and the kernel answers it again when
  * `open` resolves the path — and in between, every directory under `workspace/` is writable by the
- * agent's own account, so a component that passed can become a link into `.athanor`, where the
+ * agent's own account, so a component that passed can become a link into `.garden`, where the
  * browser profile the agent may not read lives. `O_NOFOLLOW` covers only the last component. These
  * two checks cover the rest: the walk again, which refuses a component that is a link now, and the
  * identity comparison, which refuses a descriptor that is not what the path names now. A swap has
@@ -216,7 +216,7 @@ export const assertOpenedInPlace = async (
 
 /**
  * Agent commands run as a different Unix account than the runner, in a group both belong to, so
- * the home and the project tree are group-accessible and everything under `.athanor` is not.
+ * the home and the project tree are group-accessible and everything under `.garden` is not.
  * That single distinction is what keeps the browser profile - the cookie jar for every site the
  * owner has signed into - out of reach of a command, while leaving the agent free to work on its
  * own files. The parent directory carries the set-group-ID bit so the group is inherited by
@@ -278,12 +278,12 @@ export const ensureWorkspace = async (root: string): Promise<void> => {
   // `bash` does not create a missing `$HOME` and neither does `python3 -m venv $HOME/venv`, so a
   // home that appears only once something has already tried to write in it is a home half the
   // toolchain trips over. Shared with the agent account the same way `workspace/` is - both
-  // accounts read and write these files through the group - and unlike `.athanor`, which is the
+  // accounts read and write these files through the group - and unlike `.garden`, which is the
   // runner's alone.
   await mkdir(path.join(root, AGENT_HOME), { recursive: true, mode: SHARED_MODE });
-  await mkdir(path.join(root, '.athanor', 'browser'), { recursive: true, mode: RUNNER_ONLY_MODE });
-  await mkdir(path.join(root, '.athanor', 'desktop'), { recursive: true, mode: RUNNER_ONLY_MODE });
-  await mkdir(path.join(root, '.athanor', 'artifacts'), {
+  await mkdir(path.join(root, '.garden', 'browser'), { recursive: true, mode: RUNNER_ONLY_MODE });
+  await mkdir(path.join(root, '.garden', 'desktop'), { recursive: true, mode: RUNNER_ONLY_MODE });
+  await mkdir(path.join(root, '.garden', 'artifacts'), {
     recursive: true,
     mode: RUNNER_ONLY_MODE
   });
@@ -295,7 +295,7 @@ export const listFiles = async (root: string, requested = '.'): Promise<unknown[
   const entries = await readdir(target, { withFileTypes: true });
   return Promise.all(
     entries
-      .filter((entry) => entry.name !== '.athanor')
+      .filter((entry) => entry.name !== '.garden')
       .map(async (entry) => {
         const entryPath = path.join(target, entry.name);
         const details = await lstat(entryPath);
@@ -311,7 +311,7 @@ export const listFiles = async (root: string, requested = '.'): Promise<unknown[
          */
         const itemCount = entry.isDirectory()
           ? await readdir(entryPath).then(
-              (names) => names.filter((name) => name !== '.athanor').length,
+              (names) => names.filter((name) => name !== '.garden').length,
               () => undefined
             )
           : undefined;
@@ -680,7 +680,7 @@ export const readWorkspaceFileLines = async (
 };
 
 /** Where a file is copied to before the browser is given its name. Runner-owned, 0700. */
-const UPLOAD_STAGING = path.join('.athanor', 'uploads');
+const UPLOAD_STAGING = path.join('.garden', 'uploads');
 
 /**
  * A copy of a workspace file, in a directory only the runner can write, whose absolute path is

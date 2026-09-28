@@ -3,9 +3,9 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promi
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ComputationRequest, ComputationSession } from '@athanor/contracts';
+import type { ComputationRequest, ComputationSession } from '@garden/contracts';
 import type { input } from 'zod';
-import { capabilityAudience, signCapabilityToken } from '@athanor/core';
+import { capabilityAudience, signCapabilityToken } from '@garden/core';
 import type * as Execution from './execution.js';
 
 vi.mock('./execution.js', async (original) => ({
@@ -366,7 +366,7 @@ describe('scientific state owned by the independent controller', () => {
   it('preserves an unreadable journal when controller startup fails', async () => {
     const f = await fixture();
     await f.supervisor.close();
-    const filename = path.join(f.base, '.athanor/computation.json'),
+    const filename = path.join(f.base, '.garden/computation.json'),
       corrupt = '{incomplete';
     await mkdir(path.dirname(filename), { recursive: true });
     await writeFile(filename, corrupt);

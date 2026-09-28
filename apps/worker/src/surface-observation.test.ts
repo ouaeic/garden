@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { decryptJson } from '@athanor/core';
-import type { ModelRelease } from '@athanor/contracts';
-import type { DataStore, TaskRecord } from '@athanor/data';
-import { ModelGateway, OpenAICompatibleAdapter, type ModelToolCall } from '@athanor/model-gateway';
+import { decryptJson } from '@garden/core';
+import type { ModelRelease } from '@garden/contracts';
+import type { DataStore, TaskRecord } from '@garden/data';
+import { ModelGateway, OpenAICompatibleAdapter, type ModelToolCall } from '@garden/model-gateway';
 import type { AgentState } from './agent-state.js';
 import { completionVerification } from './completion.js';
 import { recordToolResult, type ToolRecordingDeps } from './tool-recording.js';

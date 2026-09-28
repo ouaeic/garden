@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { validateTaskReasoning } from './task-reasoning.js';
-import { ContinueTaskRequest, CreateTaskRequest } from '@athanor/contracts';
+import { ContinueTaskRequest, CreateTaskRequest } from '@garden/contracts';
 
 describe('owner effort selection is checked before work is created', () => {
   it('retains a supported selection and accepts Auto with unknown metadata', () => {

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import { describe, expect, it, vi } from 'vitest';
-import { capabilityAudience, signCapabilityToken } from '@athanor/core';
+import { capabilityAudience, signCapabilityToken } from '@garden/core';
 import { authenticateRunnerRequest } from './auth.js';
 import { registerCodeIntelligenceRoutes } from './code-intelligence-routes.js';
 import type { CodeIntelligenceManager } from './code-intelligence.js';

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { DictationOptions } from '@athanor/contracts';
+import type { DictationOptions } from '@garden/contracts';
 import { Mic } from 'lucide-react';
 import { get } from './client';
 import { money } from './model';

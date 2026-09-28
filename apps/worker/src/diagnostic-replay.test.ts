@@ -7,8 +7,8 @@ import {
   type PrivateDiagnosticKind,
   withPrivateDiagnostics,
   type PrivateDiagnosticSink
-} from '@athanor/core';
-import { DIAGNOSTIC_CAPTURE_BYTES } from '@athanor/contracts';
+} from '@garden/core';
+import { DIAGNOSTIC_CAPTURE_BYTES } from '@garden/contracts';
 import { PrivateDecisionReplay } from './diagnostic-replay.js';
 import { approvalRequirement } from './approval-policy.js';
 import { requestDerivationBreach } from './turn-control.js';

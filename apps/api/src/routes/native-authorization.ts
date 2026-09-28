@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { AthanorError, sha256 } from '@athanor/core';
-import { NativeAuthorizationProof, NativeAuthorizationStart } from '@athanor/contracts';
-import { NativeAuthorizationStore } from '@athanor/data';
+import { GardenError, sha256 } from '@garden/core';
+import { NativeAuthorizationProof, NativeAuthorizationStart } from '@garden/contracts';
+import { NativeAuthorizationStore } from '@garden/data';
 import type { RouteContext } from '../http/server-context.js';
 import { requireUser } from '../http/auth-hook.js';
 import { deviceLabel } from '../auth-routes.js';
@@ -21,7 +21,7 @@ export function registerNativeAuthorizationRoutes(context: RouteContext): void {
     const input = NativeAuthorizationStart.parse(request.body);
     const token = request.cookies[sessionCookieName(secure)];
     if (request.apiToken)
-      throw new AthanorError('session_required', 'Use a signed-in device to authorize garden', 403);
+      throw new GardenError('session_required', 'Use a signed-in device to authorize garden', 403);
     const authorization = await authorizations.start({
       ...input,
       serverOrigin,
@@ -48,7 +48,7 @@ export function registerNativeAuthorizationRoutes(context: RouteContext): void {
     const user = requireUser(request.user);
     const token = request.cookies[sessionCookieName(secure)];
     if (!token || request.apiToken)
-      throw new AthanorError('session_required', 'Use your passkey to authorize this device', 403);
+      throw new GardenError('session_required', 'Use your passkey to authorize this device', 403);
     const input = z
       .object({ userCode: z.string().regex(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/), approve: z.boolean() })
       .strict()
@@ -65,7 +65,7 @@ export function registerNativeAuthorizationRoutes(context: RouteContext): void {
     reply.header('Cache-Control', 'no-store');
     checkShareRate(`native-authorization:${request.ip}`);
     if (request.apiToken)
-      throw new AthanorError('device_proof_required', 'Use the requesting garden device', 403);
+      throw new GardenError('device_proof_required', 'Use the requesting garden device', 403);
     const input = NativeAuthorizationProof.parse(request.body);
     const token = request.cookies[sessionCookieName(secure)];
     const result = await authorizations.redeem({
@@ -76,7 +76,7 @@ export function registerNativeAuthorizationRoutes(context: RouteContext): void {
     });
     if (result.status !== 'authorized') return { status: result.status };
     const user = await store.getUserById(result.userId);
-    if (!user) throw new AthanorError('account_unavailable', 'This account is unavailable', 401);
+    if (!user) throw new GardenError('account_unavailable', 'This account is unavailable', 401);
     if (result.token && result.expiresAt)
       setSessionCookie(reply, result.token, secure, result.expiresAt);
     return {

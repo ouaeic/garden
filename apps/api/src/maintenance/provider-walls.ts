@@ -1,5 +1,5 @@
-import { encryptJson, unwrapDataKey, type EncryptedEnvelope } from '@athanor/core';
-import { agentNotificationAad } from '@athanor/data';
+import { encryptJson, unwrapDataKey, type EncryptedEnvelope } from '@garden/core';
+import { agentNotificationAad } from '@garden/data';
 import type { SupportedContext } from '../http/server-context.js';
 import { errorFields } from '../log.js';
 import { taskFailure } from '../task-failure.js';
@@ -82,7 +82,7 @@ export const createProviderWallMaintenance = (context: SupportedContext) => {
    *
    * A retry is a `status` event with no `owner`, which is what folds it into the collapsed log:
    * twenty-four asks over a day are evidence, not twenty-four things to read. The two lines that
-   * are the owner's business - nothing is connected, or athanor has stopped asking - say so, and
+   * are the owner's business - nothing is connected, or garden has stopped asking - say so, and
    * surface.
    */
   const sayWallInLog = async (input: {
@@ -99,7 +99,7 @@ export const createProviderWallMaintenance = (context: SupportedContext) => {
       summary: PROVIDER_WALL_EVENT_SUMMARY,
       payloadCiphertext: encryptJson(
         {
-          __athanorEventVersion: 1,
+          __gardenEventVersion: 1,
           summary: input.summary,
           payload: { ...(input.owner ? { owner: true } : {}), code: input.code }
         },
@@ -199,7 +199,7 @@ export const createProviderWallMaintenance = (context: SupportedContext) => {
           kind: 'warning',
           code,
           owner: true,
-          summary: `Asked your provider ${PROVIDER_WALL_MAX_RETRIES} times over the last day and it is still refusing, so athanor has stopped asking. Reply here to try again.`
+          summary: `Asked your provider ${PROVIDER_WALL_MAX_RETRIES} times over the last day and it is still refusing, so garden has stopped asking. Reply here to try again.`
         });
         log.warn('provider_wall.gave_up', { taskId, code });
         continue;
@@ -216,7 +216,7 @@ export const createProviderWallMaintenance = (context: SupportedContext) => {
         eventSummary: PROVIDER_WALL_EVENT_SUMMARY,
         eventCiphertext: encryptJson(
           {
-            __athanorEventVersion: 1,
+            __gardenEventVersion: 1,
             summary: `Asking your provider again after it refused this work: attempt ${retries + 1} of ${PROVIDER_WALL_MAX_RETRIES}.`,
             payload: { code }
           },
@@ -262,7 +262,7 @@ export const createProviderWallMaintenance = (context: SupportedContext) => {
             eventSummary: PROVIDER_RECONNECTED_EVENT_SUMMARY,
             eventCiphertext: encryptJson(
               {
-                __athanorEventVersion: 1,
+                __gardenEventVersion: 1,
                 summary: 'A provider key was saved, so this work is going again.',
                 payload: { code: 'provider_reconnected' }
               },

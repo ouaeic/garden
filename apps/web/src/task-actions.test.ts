@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Task } from '@athanor/contracts';
+import type { Task } from '@garden/contracts';
 import { createQuestionAnswerSender } from './task-actions.js';
 
 describe('answer delivery', () => {

@@ -21,7 +21,7 @@ import {
   startTurnState,
   validateDelegateReport
 } from './completion.js';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import type { ModelToolCall } from '@garden/model-gateway';
 import { MAX_FINISH_REJECTIONS, MAX_QUESTIONS_PER_TURN } from './turn-bounds.js';
 
 describe('what a new turn keeps and what it drops', () => {
@@ -136,7 +136,7 @@ describe('completion verification', () => {
       {
         name: string;
         success: boolean;
-        /** A call athanor answered rather than ran. Implies `success: false`. */
+        /** A call garden answered rather than ran. Implies `success: false`. */
         skipped?: boolean;
         mutating?: boolean;
         briefOnly?: boolean;
@@ -290,7 +290,7 @@ describe('completion verification', () => {
 
   it('does not let writing the running brief invalidate the evidence already gathered', () => {
     // Observed live: a turn did the work, checked it, cited the check, then recorded the outcome in
-    // workspace/ATHANOR.md - and that write became the new last change, so its own record-keeping
+    // workspace/GARDEN.md - and that write became the new last change, so its own record-keeping
     // invalidated evidence it had already gathered. The way out was to read the brief back, which
     // proves only that a file it just wrote says what it wrote. Bookkeeping is not the work.
     const checked = completionVerification(
@@ -417,7 +417,7 @@ describe('completion verification', () => {
     // The gate read `DECLARATION_TOOLS` while the set that answers this exact question -
     // `AGENT_SPEECH`, which is that set plus `notify` - sat two hundred lines above it, used once.
     // A notice is a sentence the model composed, delivered; it carries nothing back about the
-    // world, and citing one proved only that athanor has a lock screen.
+    // world, and citing one proved only that garden has a lock screen.
     const cited = completionVerification(state({ 'call-1': { name: 'notify', success: true } }), {
       status: 'verified',
       evidence: [{ claim: 'The report is ready', source: 'tool_result', toolCallId: 'call-1' }]
@@ -437,7 +437,7 @@ describe('completion verification', () => {
     );
   });
 
-  it('refuses a citation of a call athanor answered instead of running, and says which it was', () => {
+  it('refuses a citation of a call garden answered instead of running, and says which it was', () => {
     const answered = state({
       'call-1': { name: 'file_read', success: false, skipped: true }
     });
@@ -797,7 +797,7 @@ describe('what the user can see, and what merely says so', () => {
     turnToolResults: results
   });
 
-  it('refuses a user-visible claim pinned to a call athanor answered without running', () => {
+  it('refuses a user-visible claim pinned to a call garden answered without running', () => {
     const checked = completionVerification(
       state({
         'call-1': { name: 'file_write', success: true },
@@ -976,7 +976,7 @@ describe('reading a specialist report against its contract', () => {
 /**
  * A check the harness reports as already passed, for a command that never ran.
  *
- * `acceptanceAlreadyObserved` answers a finish-time check from a run athanor already made, which is
+ * `acceptanceAlreadyObserved` answers a finish-time check from a run garden already made, which is
  * the one path where a check can be reported as passed without anything executing at that moment. So
  * the question worth pinning is whether a `shell` the harness ANSWERED rather than ran can put a
  * fingerprint into `observedCommands` - a duplicate call inside one turn, a payload that would not
@@ -1044,7 +1044,7 @@ describe('a command the harness answered instead of running', () => {
       id: 'check-1',
       label: 'the tests pass',
       passed: true,
-      detail: 'exit 0, from athanor running this same command after the last change',
+      detail: 'exit 0, from garden running this same command after the last change',
       // The command travels with the answer, so the record the owner reads says what was run and
       // not only what the model called it.
       command: 'pytest -q'
@@ -1140,11 +1140,11 @@ describe('a status the harness writes and the model cannot', () => {
  * The matcher behind the one sentence this harness says about a specialist's honesty.
  *
  * `normalisedSpan` decides whether a quoted span is really in the page, and a false negative on the
- * only two citations checked fires "Nothing in this report stood up" - the strongest thing athanor
+ * only two citations checked fires "Nothing in this report stood up" - the strongest thing garden
  * says about a report. Collapse-and-lowercase failed five of six realistic variants of a span that
  * was genuinely copied, because a page is typeset and a model retyping a span from it is not: the
  * publisher's apostrophe is curly, the ligature is one character, the hyphen is soft, the dash is
- * an en dash. Every one of those was athanor calling honest work fabricated.
+ * an en dash. Every one of those was garden calling honest work fabricated.
  *
  * The production matcher receives a complete page and the quoted span, so these cases exercise
  * that boundary rather than reimplementing the comparison in the test.

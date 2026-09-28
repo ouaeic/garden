@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { constants, type BigIntStats } from 'node:fs';
 import { open, type FileHandle } from 'node:fs/promises';
-import { AUDIO_READ_MAX_SECONDS } from '@athanor/contracts';
+import { AUDIO_READ_MAX_SECONDS } from '@garden/contracts';
 import { hostSearchPath } from './execution.js';
 import { resolveExecutable } from './command-policy.js';
 import { assertOpenedInPlace, resolveInside, WorkspaceFileError } from './files.js';
@@ -200,7 +200,7 @@ export const audioWindow = (
  * sending a stereo forty-eight kilohertz phone recording ships several times the bytes for a
  * transcript that cannot differ. Opus is the codec every freely-licensed ffmpeg build carries -
  * which matters, because the distribution table offers `ffmpeg-free` on one of the four families
- * athanor installs on - and Ogg is a container the transcription request already names.
+ * garden installs on - and Ogg is a container the transcription request already names.
  *
  * `-ss` before `-i` seeks the input rather than decoding and discarding everything before the mark,
  * which is the difference between a few seconds and several minutes on an hour-long file. `-vn`

@@ -7,10 +7,10 @@ import { removeCodingMissionFamily } from '../coding-mission-cleanup.js';
  * A group registered before that hook would ship with no check at all.
  */
 
-import { CreateWorkspaceRequest, UpdateSecurityModeRequest } from '@athanor/contracts';
-import type { Workspace } from '@athanor/contracts';
-import { AthanorError } from '@athanor/core';
-import type { UserRecord } from '@athanor/data';
+import { CreateWorkspaceRequest, UpdateSecurityModeRequest } from '@garden/contracts';
+import type { Workspace } from '@garden/contracts';
+import { GardenError } from '@garden/core';
+import type { UserRecord } from '@garden/data';
 import { z } from 'zod';
 import { legacyWorkspaceBriefPaths, workspaceBriefPath, workspaceResponse } from '../context.js';
 import { requireUser } from '../http/auth-hook.js';
@@ -39,7 +39,7 @@ export const registerWorkspaceRoutes = (context: RouteContext): void => {
   app.get<{ Params: { workspaceId: string } }>('/v1/workspaces/:workspaceId', async (request) => {
     const user = requireUser(request.user);
     const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-    if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found', 404);
+    if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found', 404);
     return workspaceResponse(workspace);
   });
 
@@ -58,7 +58,7 @@ export const registerWorkspaceRoutes = (context: RouteContext): void => {
       return idempotent(request, reply, user, async () => {
         const action = z.enum(['hibernate', 'resume']).parse(request.params.action);
         const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-        if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+        if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
         if (action === 'hibernate') await meterWorkspace(workspace);
         await runner.request({
           workspaceId: workspace.id,
@@ -84,7 +84,7 @@ export const registerWorkspaceRoutes = (context: RouteContext): void => {
     async (request) => {
       const user = requireUser(request.user);
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       if (workspace.status === 'running') {
         // The client sends this on mount, so it is part of opening the app. The first heartbeat
         // after a restart waits for the walk because nothing else can tell the owner how much room
@@ -120,9 +120,9 @@ export const registerWorkspaceRoutes = (context: RouteContext): void => {
     input: z.infer<typeof ResizeWorkspaceRequest>
   ): Promise<Workspace> => {
     const workspace = await store.getWorkspace(user.id, workspaceId);
-    if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+    if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
     if (input.storageLimitBytes && input.storageLimitBytes < workspace.storageBytes)
-      throw new AthanorError(
+      throw new GardenError(
         'storage_limit',
         'Remove files until usage is below the smaller storage limit'
       );
@@ -131,7 +131,7 @@ export const registerWorkspaceRoutes = (context: RouteContext): void => {
         .filter((item) => item.id !== workspace.id)
         .reduce((sum, item) => sum + item.storageLimitBytes, 0);
       if (allocatedElsewhere + input.storageLimitBytes > serverLimits.storageBytes) {
-        throw new AthanorError(
+        throw new GardenError(
           'storage_limit',
           'The requested storage exceeds this server’s configured safety limit'
         );
@@ -182,7 +182,7 @@ export const registerWorkspaceRoutes = (context: RouteContext): void => {
       const input = UpdateSecurityModeRequest.parse(request.body);
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
       if (!workspace || workspace.userId !== user.id)
-        throw new AthanorError(
+        throw new GardenError(
           'workspace_owner_required',
           'Only the workspace owner can change its default security mode',
           403
@@ -195,7 +195,7 @@ export const registerWorkspaceRoutes = (context: RouteContext): void => {
           workspace.id,
           input.securityMode
         );
-        if (!updated) throw new AthanorError('workspace_not_found', 'Workspace not found');
+        if (!updated) throw new GardenError('workspace_not_found', 'Workspace not found');
         await recordSecurityEvent(store, {
           userId: user.id,
           kind: 'workspace_security_mode_changed',
@@ -212,7 +212,7 @@ export const registerWorkspaceRoutes = (context: RouteContext): void => {
     async (request) => {
       const user = requireUser(request.user);
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       const readBrief = (path: string) =>
         runner.raw({
           workspaceId: workspace.id,
@@ -229,14 +229,14 @@ export const registerWorkspaceRoutes = (context: RouteContext): void => {
       }
       if (response.status === 404) return { markdown: '', path: workspaceBriefPath };
       if (!response.ok)
-        throw new AthanorError(
+        throw new GardenError(
           'workspace_brief_unavailable',
           `Workspace brief could not be read (${response.status})`,
           502
         );
       const bytes = Buffer.from(await response.arrayBuffer());
       if (bytes.byteLength > 64 * 1024)
-        throw new AthanorError(
+        throw new GardenError(
           'workspace_brief_too_large',
           'Workspace brief exceeds the 64 KB safety limit'
         );
@@ -251,10 +251,10 @@ export const registerWorkspaceRoutes = (context: RouteContext): void => {
       return idempotent(request, reply, user, async () => {
         const input = z.object({ markdown: z.string().max(50_000) }).parse(request.body);
         const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-        if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+        if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
         const content = Buffer.from(input.markdown, 'utf8');
         if (workspace.storageBytes + content.byteLength > workspace.storageLimitBytes)
-          throw new AthanorError('storage_limit', 'Workspace storage limit reached');
+          throw new GardenError('storage_limit', 'Workspace storage limit reached');
         await runner.request({
           workspaceId: workspace.id,
           userId: user.id,
@@ -286,9 +286,9 @@ export const registerWorkspaceRoutes = (context: RouteContext): void => {
       return idempotent(request, reply, user, async () => {
         const input = z.object({ confirmName: z.string() }).parse(request.body);
         const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-        if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+        if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
         if (input.confirmName !== workspace.name)
-          throw new AthanorError(
+          throw new GardenError(
             'confirmation_failed',
             'Type the exact workspace name to delete it'
           );
@@ -298,7 +298,7 @@ export const registerWorkspaceRoutes = (context: RouteContext): void => {
           await Promise.all(workspaceIds.map((id) => store.listTasks(user.id, id)))
         ).flat();
         if (tasks.some((task) => task.parentMissionId))
-          throw new AthanorError(
+          throw new GardenError(
             'coding_mission_scoped',
             'Remove an isolated specialist workspace through its parent task',
             409

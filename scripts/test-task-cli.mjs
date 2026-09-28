@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * What `athanor task` promises a script, proved against a stand-in API rather than a live model.
+ * What `garden task` promises a script, proved against a stand-in API rather than a live model.
  *
  * The subcommand exists because two callers wanted the same three things - an owner who lives in a
- * terminal, and a harness scoring athanor from outside - and none of the three is what curl gives
+ * terminal, and a harness scoring garden from outside - and none of the three is what curl gives
  * you on its own: an exit code that is honest about how the WORK ended, one documented object of
  * data instead of prose to grep, and an approval stop that is visible rather than answered.
  *
@@ -28,13 +28,13 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-const cli = path.resolve('scripts/athanor');
+const cli = path.resolve('scripts/garden');
 // Shaped like the real thing: `auth-hook.ts` accepts /^oc_live_[A-Za-z0-9_-]{40,80}$/ and the
 // command checks the same pattern before it will put the value in a curl configuration file.
 const TOKEN = `oc_live_${'a'.repeat(43)}`;
-// No /etc/athanor to fall back to, so the environment variable is the only token in play and the
+// No /etc/garden to fall back to, so the environment variable is the only token in play and the
 // "no token at all" check below really has none.
-const emptyConfig = mkdtempSync(path.join(tmpdir(), 'athanor-task-cli-'));
+const emptyConfig = mkdtempSync(path.join(tmpdir(), 'garden-task-cli-'));
 
 let checks = 0;
 const failures = [];
@@ -129,7 +129,7 @@ const toolFailureEvent = (message, code) => ({
 const execute = (args, environment, stdin) =>
   new Promise((resolve) => {
     const child = spawn('/bin/sh', [cli, 'task', ...args], {
-      env: { ...process.env, ATHANOR_CONFIG: emptyConfig, ...environment }
+      env: { ...process.env, GARDEN_CONFIG: emptyConfig, ...environment }
     });
     let stdout = '';
     let stderr = '';
@@ -195,11 +195,9 @@ const drive = async (routes, args, options = {}) => {
   const result = await execute(
     args,
     {
-      ATHANOR_API: `http://127.0.0.1:${port}`,
-      ATHANOR_TASK_POLL_SECONDS: '1',
-      ...(options.token === null
-        ? { ATHANOR_TOKEN: '' }
-        : { ATHANOR_TOKEN: options.token ?? TOKEN })
+      GARDEN_API: `http://127.0.0.1:${port}`,
+      GARDEN_TASK_POLL_SECONDS: '1',
+      ...(options.token === null ? { GARDEN_TOKEN: '' } : { GARDEN_TOKEN: options.token ?? TOKEN })
     },
     options.stdin ?? ''
   );
@@ -244,7 +242,7 @@ const finished = await drive(
 
 check('a completed task exits 0', () => assert.equal(finished.code, 0));
 check('the outcome names its contract', () =>
-  assert.equal(finished.outcome.contract, 'athanor.task.outcome/1')
+  assert.equal(finished.outcome.contract, 'garden.task.outcome/1')
 );
 check('a completed task says so', () => {
   assert.equal(finished.outcome.outcome, 'completed');
@@ -291,7 +289,7 @@ check('every call carries the bearer token', () =>
 );
 check('the write carries an idempotency key', () => {
   const post = finished.seen.find((r) => r.method === 'POST');
-  assert.match(post.idempotencyKey ?? '', /^athanor-task-\d+-[0-9a-f]{16}$/);
+  assert.match(post.idempotencyKey ?? '', /^garden-task-\d+-[0-9a-f]{16}$/);
 });
 check('the request is the body the API asks for', () => {
   const post = finished.seen.find((r) => r.method === 'POST');
@@ -471,7 +469,7 @@ check('cancel reports the work, not the request', () => {
   assert.equal(stopped.code, 5);
   assert.equal(stopped.outcome.outcome, 'cancelled');
   const post = stopped.seen.find((r) => r.method === 'POST');
-  assert.equal(post.idempotencyKey, 'athanor-cancel-task-1111');
+  assert.equal(post.idempotencyKey, 'garden-cancel-task-1111');
 });
 
 // --- answering an approval, deliberately ----------------------------------------------------------
@@ -486,7 +484,7 @@ for (const decision of ['approve', 'deny']) {
     assert.equal(answered.outcome.decision, decision);
     const post = answered.seen.find((r) => r.method === 'POST');
     assert.equal(post.path, `/v1/approvals/ap-3333/${decision}`);
-    assert.equal(post.idempotencyKey, `athanor-${decision}-ap-3333`);
+    assert.equal(post.idempotencyKey, `garden-${decision}-ap-3333`);
   });
 }
 
@@ -519,7 +517,7 @@ check('no token stops before anything is sent', () => {
   assert.match(noToken.stderr, /no API token/);
 });
 
-const wrongToken = await drive({}, started, { token: 'sk-not-an-athanor-token' });
+const wrongToken = await drive({}, started, { token: 'sk-not-an-garden-token' });
 check('a token of the wrong shape stops before anything is sent', () => {
   assert.equal(wrongToken.code, 1);
   assert.equal(wrongToken.seen.length, 0);
@@ -574,7 +572,7 @@ check('an answer this cannot read is exit 1, not the code for a cancelled task',
 // Nothing is listening on port 1, which is what an operator gets by pointing this at the wrong one.
 const silent = await execute(
   started,
-  { ATHANOR_API: 'http://127.0.0.1:1', ATHANOR_TOKEN: TOKEN },
+  { GARDEN_API: 'http://127.0.0.1:1', GARDEN_TOKEN: TOKEN },
   ''
 );
 check('a server that does not answer is not a success', () => {
@@ -670,7 +668,7 @@ check('answer sends the reply as the next message on the conversation', () => {
   const post = answered.seen.find((r) => r.method === 'POST');
   assert.equal(post.path, '/v1/tasks/task-1111/messages');
   assert.equal(post.body.prompt, 'Use the dev one');
-  assert.equal(answered.outcome.contract, 'athanor.task.answer/1');
+  assert.equal(answered.outcome.contract, 'garden.task.answer/1');
 });
 
 /*
@@ -771,7 +769,7 @@ const guardDown = await drive(
         sequence: 11,
         kind: 'status',
         summary:
-          'Paused: athanor could not check this against your spending caps, so it stopped rather than spend past them.',
+          'Paused: garden could not check this against your spending caps, so it stopped rather than spend past them.',
         payload: {
           blockedBy: 'spend_guard_unavailable',
           reason: 'connection refused',
@@ -905,7 +903,7 @@ rmSync(emptyConfig, { recursive: true, force: true });
 
 if (failures.length) {
   process.stderr.write(`${failures.map((line) => `  FAIL ${line}`).join('\n')}\n`);
-  process.stderr.write(`athanor task: ${failures.length} of ${checks} checks failed\n`);
+  process.stderr.write(`garden task: ${failures.length} of ${checks} checks failed\n`);
   process.exit(1);
 }
-process.stdout.write(`athanor task: ${checks} checks passed against a stand-in API.\n`);
+process.stdout.write(`garden task: ${checks} checks passed against a stand-in API.\n`);

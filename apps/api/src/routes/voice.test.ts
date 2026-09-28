@@ -4,15 +4,15 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
 import WebSocket from 'ws';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createDatabase, DataStore, migrateDatabase, VoiceStore } from '@athanor/data';
-import { encryptJson, sha256, wrapDataKey } from '@athanor/core';
+import { createDatabase, DataStore, migrateDatabase, VoiceStore } from '@garden/data';
+import { encryptJson, sha256, wrapDataKey } from '@garden/core';
 import type {
   VoiceConnection,
   VoiceModels,
   VoiceSession,
   VoiceWorkProposal
-} from '@athanor/contracts';
-import { encodeVoiceFrame } from '@athanor/model-gateway';
+} from '@garden/contracts';
+import { encodeVoiceFrame } from '@garden/model-gateway';
 import type { RouteContext } from '../http/server-context.js';
 import { registerVoiceRoutes } from './voice.js';
 class Provider extends EventEmitter {
@@ -93,7 +93,7 @@ async function fixture(nativeTransport = false) {
   app.decorateRequest('user', null);
   app.decorateRequest('apiToken', null);
   app.addHook('onRequest', async (request) => {
-    request.user = request.cookies.athanor_session === token ? user : null;
+    request.user = request.cookies.garden_session === token ? user : null;
     request.apiToken = request.headers['x-token'] ? ({} as never) : null;
   });
   app.setErrorHandler((error, _request, reply) => {
@@ -130,7 +130,7 @@ async function fixture(nativeTransport = false) {
     }
   });
   await app.ready();
-  const headers = { cookie: `athanor_session=${token}`, origin: 'https://garden.example' };
+  const headers = { cookie: `garden_session=${token}`, origin: 'https://garden.example' };
   const models = (await app.inject({ url: '/v1/voice/models', headers })).json<VoiceModels>();
   const selection = {
     modelId: models.options[0]!.id,

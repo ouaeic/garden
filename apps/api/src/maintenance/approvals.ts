@@ -7,7 +7,7 @@
  * task somewhere the owner can restart it.
  */
 
-import { encryptJson, unwrapDataKey } from '@athanor/core';
+import { encryptJson, unwrapDataKey } from '@garden/core';
 import type { SupportedContext } from '../http/server-context.js';
 
 export const createApprovalSweep = (context: SupportedContext) => {
@@ -58,7 +58,7 @@ export const createApprovalSweep = (context: SupportedContext) => {
           summary: 'Encrypted approval expiry event',
           payloadCiphertext: encryptJson(
             {
-              __athanorEventVersion: 1,
+              __gardenEventVersion: 1,
               summary:
                 'The approval this task was waiting for expired unanswered, so the task is paused and its reserved credits are back. Resume it to ask again.',
               // Owner-facing by construction: the task is stopped and only their reply starts it.

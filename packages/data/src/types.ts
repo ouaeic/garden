@@ -1,4 +1,4 @@
-import type { EncryptedEnvelope } from '@athanor/core';
+import type { EncryptedEnvelope } from '@garden/core';
 import type {
   AgentNotificationKind,
   ApiTokenScope,
@@ -8,8 +8,8 @@ import type {
   TaskEventKind,
   TaskReasoningEffort,
   TaskScheduleSpec
-} from '@athanor/contracts';
-import type { SecurityMode } from '@athanor/contracts';
+} from '@garden/contracts';
+import type { SecurityMode } from '@garden/contracts';
 
 export interface UserRecord {
   id: string;

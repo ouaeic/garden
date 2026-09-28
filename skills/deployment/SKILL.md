@@ -2,13 +2,13 @@
 name: deployment
 description: Get a built application running and reachable, on this computer or the owner's own host, with the two facts about this machine that decide whether it works — bind 127.0.0.1, and choose deliberately between a process that ends and a service the computer keeps running — stated plainly to the owner along with the rollback command. Use when the owner asks to run, preview, publish or deploy an application. Do not use to publish anything publicly without explicit approval, do not use for third-party paid hosting platforms, and never claim a systemd unit was installed, because the agent account cannot install one.
 license: AGPL-3.0-or-later
-compatibility: Requires the application's own runtime. A service the computer keeps running is supervised by athanor's own workspace runtime and needs no root. systemctl and journalctl exist here but the agent account has no root, so a systemd unit file is written for the owner to install rather than installed here; neither binary is part of the document toolchain and neither is installed by athanor.
+compatibility: Requires the application's own runtime. A service the computer keeps running is supervised by garden's own workspace runtime and needs no root. systemctl and journalctl exist here but the agent account has no root, so a systemd unit file is written for the owner to install rather than installed here; neither binary is part of the document toolchain and neither is installed by garden.
 allowed-tools: shell process publish_preview file_read file_write files_list browser_snapshot browser_action
 metadata:
-  athanor.tier: 'builtin'
-  athanor.version: '2.0.0'
-  athanor.risk: 'external'
-  athanor.domain: 'code'
+  garden.tier: 'builtin'
+  garden.version: '2.0.0'
+  garden.risk: 'external'
+  garden.domain: 'code'
 ---
 
 # Deployment
@@ -41,7 +41,7 @@ restart of the workspace runtime. Nothing brings it back.
 
 `shell background=true service=<name>` is the other primitive and it is the answer whenever the
 owner is being handed a link. The computer keeps it running: no timeout, started again with backoff
-whenever it stops, and still there after a reboot, an update or an `athanor restart`. It stops for
+whenever it stops, and still there after a reboot, an update or an `garden restart`. It stops for
 good on `process action=kill`. Starting one raises an approval card that says exactly this, so the
 owner has agreed to a program that outlives the task before it starts. There are sixteen services
 per computer, and a program that dies immediately five times in a row is treated as misconfigured
@@ -55,8 +55,8 @@ So say which of three things the owner is getting, in words, every time:
 - **A throwaway demonstration** — a plain `background=true` process. Tell them plainly that it runs
   until the computer restarts or the timeout expires, and that asking you again brings it straight
   back.
-- **A systemd unit on a host athanor does not manage** — their action, not yours, and it is a
-  different machine or a deliberate choice to sit outside athanor's supervision. Write the unit file
+- **A systemd unit on a host garden does not manage** — their action, not yours, and it is a
+  different machine or a deliberate choice to sit outside garden's supervision. Write the unit file
   into the workspace with `Restart=on-failure`, a `RestartSec`, an explicit `WorkingDirectory` and an
   `EnvironmentFile` pointing at a root-readable secrets file, then hand them the three commands to
   run as root: `systemctl daemon-reload`, `systemctl enable --now <unit>`, and
@@ -104,7 +104,7 @@ they should look at.
 every time, in every security mode, on a clean turn and on a tainted one. Ask with the specifics:
 what URL, what is exposed, and who will be able to reach it.
 
-Both publish a **port**, not a running program. The link lives in athanor's database; what it
+Both publish a **port**, not a running program. The link lives in garden's database; what it
 proxies to is whatever is still listening. That is why the lifetime above has to be said out loud —
 it is the single most common way a demo is broken by the time the owner opens it.
 

@@ -11,7 +11,7 @@ import {
  * A minimal DER/X.509 v3 builder for self-signed Ed25519 certificates.
  *
  * Two reasons this exists rather than shelling out to `openssl`:
- *  - the relay must be runnable with nothing but a Node runtime, including `athanor-relay dev-cert`
+ *  - the relay must be runnable with nothing but a Node runtime, including `garden-relay dev-cert`
  *    for a local smoke test;
  *  - it pins, in code, the exact certificate shape a box presents as its identity credential, which
  *    is the thing the relay authenticates against.

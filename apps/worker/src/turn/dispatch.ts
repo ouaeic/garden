@@ -36,9 +36,9 @@ import { ZodError } from 'zod';
  * Lifted out of `AgentWorker.run()` unchanged; the three `return`s became `'returned'`, and the
  * approval memo is created here rather than one line above the loop. That is the whole of the edit.
  */
-import type { ModelResponse, ModelToolCall } from '@athanor/model-gateway';
-import type { ModelRelease, WebToolPlan } from '@athanor/contracts';
-import type { DataStore, TaskRecord } from '@athanor/data';
+import type { ModelResponse, ModelToolCall } from '@garden/model-gateway';
+import type { ModelRelease, WebToolPlan } from '@garden/contracts';
+import type { DataStore, TaskRecord } from '@garden/data';
 import type { AgentState, AgentWorkerConfig } from '../agent-state.js';
 import type { AgentApprovalRequirement } from '../approval-state.js';
 import { createApprovalFloorMemo, type ApprovalFloorMemo } from '../approval-floor.js';

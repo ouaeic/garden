@@ -1,0 +1,81 @@
+# One template, four instances, and the thing a reader gets wrong here: %i is not an isolation
+# boundary. Every instance runs as the same user and group, out of the same EnvironmentFile, with the
+# same empty CapabilityBoundingSet and the same ReadWritePaths. An instance separates nothing except
+# which entry point argv[1] selects; what it buys is a restart of its own and a journal of its own,
+# and what it costs is a whole Node runtime.
+#
+# Measured on the build machine, settled, `ps -eo rss`: a bare Node process is 41.2 MB, the notifier
+# 63.7 MB and the registry 57.0 MB. Both services' own logic, plus the push library, imported into a
+# process that already holds the API's module graph, is 1.3 MB. So two of these four instances are
+# 119 MB of duplicated runtime around timer loops that apps/api/src/maintenance already has a home
+# for - and the registry's own doctor note says the rest of it out loud: an active unit "says the
+# process is up and nothing more, and almost all of that process's life is the hour it spends
+# asleep". Folding them is a change to this file, garden.target, scripts/garden-service and
+# scripts/garden at once; the installer refuses a change that moves only some of them.
+[Unit]
+Description=garden %i service
+PartOf=garden.target
+After=network-online.target postgresql.service garden-runner.service
+Wants=network-online.target
+# Pulls the database in rather than only ordering behind it, so a boot that did not already have
+# postgresql enabled still ends with a working box instead of a service that starts and finds
+# nothing to talk to.
+Wants=postgresql.service
+# Wants, not Requires: a wedged runner costs the agent its hands, not the owner their whole
+# interface. Under Requires= a runner that crash-looped into `failed` stopped the API, the worker
+# and everything else with it, turning "tools are unavailable" into an nginx 502 for the product.
+Wants=garden-runner.service
+# The control-plane services are restarted by `garden restart` and by the update path, both of
+# which can restart them several times in quick succession; the default start limit would count
+# those as a flap and refuse to bring them back.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=garden-control
+Group=garden-control
+WorkingDirectory=/opt/garden
+EnvironmentFile=/etc/garden/control.env
+ExecStart=/usr/local/lib/garden/garden-service %i
+# `always`, not `on-failure`: a service that exits cleanly for its own reasons — an unhandled
+# shutdown signal, a library calling exit(0) on a bad config read — is still the whole product being
+# down, and there is nobody sitting at a console to notice. An explicit `systemctl stop`, which is
+# what `garden restart` and the update path use, is not a restart trigger, so this does not fight
+# either of them. One second, because the gap is a user staring at a dead page.
+Restart=always
+RestartSec=1
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+# The same block the runner carries, and here it costs nothing to argue about: this unit runs no
+# agent command, reaches no helper through sudo and creates no namespace of its own. It is a Node
+# process serving loopback ports 4100, 4201 and 4203 - all above 1024 - so it needs no capability
+# at all and the bounding set can be empty rather than merely narrowed. The rest refuse a change of
+# execution domain, the system clock and a realtime scheduling class, none of which a request
+# handler has any business asking for.
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+LockPersonality=true
+ProtectHostname=true
+ProtectClock=true
+RestrictRealtime=true
+ReadWritePaths=/var/lib/garden-control
+# The relay's identity key and settings. Under /etc because it is configuration the owner chose and
+# it has to survive an update and travel in the configuration backup; writable here because the API
+# is what turns the relay on and off. Leading "-" so a server that has not re-run the installer
+# still starts.
+ReadWritePaths=-/etc/garden/relay
+# The control plane serves requests; it does not run agent commands, so a rising process count
+# here is a leak rather than work. Core dumps go the same way as the runner's.
+TasksMax=512
+LimitCORE=0
+
+[Install]
+WantedBy=multi-user.target

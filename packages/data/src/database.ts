@@ -3,7 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import pg from 'pg';
-import { unwrapDataKey } from '@athanor/core';
+import { unwrapDataKey } from '@garden/core';
 import { migrations } from './migrations.js';
 
 export interface QueryResult<T> {
@@ -92,7 +92,7 @@ class PostgresDatabase implements Database {
     // the only thing needed here is to not let the event become an uncaught exception.
     this.#pool.on('error', (error) => {
       process.stderr.write(
-        `[athanor] idle database connection dropped, pool will reconnect: ${
+        `[garden] idle database connection dropped, pool will reconnect: ${
           error instanceof Error ? error.message : String(error)
         }\n`
       );
@@ -396,7 +396,7 @@ export const createDatabase = (config: DatabaseConfig): Database => {
     if (!config.url) throw new Error('DATABASE_URL is required for the postgres driver');
     return new PostgresDatabase(config.url);
   }
-  return new EmbeddedDatabase(config.pglitePath ?? '.athanor/postgres');
+  return new EmbeddedDatabase(config.pglitePath ?? '.garden/postgres');
 };
 
 /**
@@ -423,7 +423,7 @@ export const migrateDatabase = async (database: Database): Promise<void> =>
     const versions = new Set(applied.rows.map((row) => Number(row.version)));
     /**
      * A database that has been through migrations this build has never heard of belongs to a newer
-     * athanor. `athanor update` restores the pre-update dump alongside the pre-update revision, so
+     * garden. `garden update` restores the pre-update dump alongside the pre-update revision, so
      * the pairing is normally kept for us; a checkout moved back by hand is where the two part
      * company. Older code against a newer schema does not fail cleanly - it writes rows that
      * satisfy the constraints it remembers - so the process stops here, while everything is still
@@ -433,7 +433,7 @@ export const migrateDatabase = async (database: Database): Promise<void> =>
     const unknown = [...versions].filter((version) => !declared.has(version)).sort((a, b) => a - b);
     if (unknown.length)
       throw new Error(
-        `This database has been migrated by a newer athanor: it carries schema version ${unknown.at(
+        `This database has been migrated by a newer garden: it carries schema version ${unknown.at(
           -1
         )}, and this build knows ${Math.max(...declared)}. Move back to the newer build, or restore the backup taken before the update.`
       );
@@ -450,7 +450,7 @@ export const migrateDatabase = async (database: Database): Promise<void> =>
   });
 
 /**
- * A dump and the key that opens it are two halves of one backup, and only `athanor restore` keeps
+ * A dump and the key that opens it are two halves of one backup, and only `garden restore` keeps
  * them together. A hand-run `pg_restore` onto a fresh install pairs old ciphertext with the key the
  * installer minted minutes earlier, and nothing about that fails loudly: the key still decodes to
  * 32 bytes, migrations still apply, /healthz still answers. The first sign is the conversation list
@@ -476,7 +476,7 @@ export const assertMasterKeyOpensDatabase = async (
     unwrapDataKey(row.wrapped_key, masterKey, row.workspace_id);
   } catch {
     throw new Error(
-      'This database was encrypted with a different DATA_MASTER_KEY: the key in /etc/athanor/control.env does not open it. Restore the control.env that was taken alongside this database - the installer generates a fresh key whenever it does not find one, and nothing already stored can be read without the original.'
+      'This database was encrypted with a different DATA_MASTER_KEY: the key in /etc/garden/control.env does not open it. Restore the control.env that was taken alongside this database - the installer generates a fresh key whenever it does not find one, and nothing already stored can be read without the original.'
     );
   }
 };

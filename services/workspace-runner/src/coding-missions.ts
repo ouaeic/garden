@@ -17,7 +17,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import type { CodingMissionChange } from '@athanor/contracts';
+import type { CodingMissionChange } from '@garden/contracts';
 import {
   assertOpenedInPlace,
   assertUserDataPath,
@@ -35,7 +35,7 @@ const MAX_FILES = 10_000,
   MAX_DIFF_BYTES = 1_048_576;
 const EXCLUDED = new Set([
   '.git',
-  '.athanor',
+  '.garden',
   '.garden',
   '.home',
   'node_modules',
@@ -322,7 +322,7 @@ export class NativeCodingMissions {
     z.uuid().parse(id);
     return path.join(
       workspacePath(this.root, parent),
-      '.athanor',
+      '.garden',
       'coding-missions',
       id,
       'manifest.json'
@@ -372,7 +372,7 @@ export class NativeCodingMissions {
       try {
         const ref = JSON.parse(
           await readFile(
-            path.join(workspacePath(this.root, workspaceId), '.athanor', 'coding-parent.json'),
+            path.join(workspacePath(this.root, workspaceId), '.garden', 'coding-parent.json'),
             'utf8'
           )
         ) as { parent: string; id: string };
@@ -464,12 +464,12 @@ export class NativeCodingMissions {
       await ensureWorkspace(child);
       await chmod(child, 0o750);
       await this.save(manifest);
-      await jsonWrite(path.join(child, '.athanor', 'coding-parent.json'), {
+      await jsonWrite(path.join(child, '.garden', 'coding-parent.json'), {
         parent: parentWorkspaceId,
         id
       });
       try {
-        const base = path.join(child, '.athanor', 'coding-base');
+        const base = path.join(child, '.garden', 'coding-base');
         await mkdir(base, { mode: 0o700 });
         const snapshot = await scan(parent, source, base);
         manifest.base = snapshot.files;
@@ -556,7 +556,7 @@ export class NativeCodingMissions {
       await readFile(
         path.join(
           workspacePath(this.root, mission.childWorkspaceId),
-          '.athanor',
+          '.garden',
           'coding-parent.json'
         ),
         'utf8'
@@ -628,7 +628,7 @@ export class NativeCodingMissions {
     });
   }
   private journalFile(parent: string) {
-    return path.join(workspacePath(this.root, parent), '.athanor', 'coding-integration.json');
+    return path.join(workspacePath(this.root, parent), '.garden', 'coding-integration.json');
   }
   /** A crash during application rolls back before the first request can observe the workspace. */
   async recover(parent: string): Promise<void> {
@@ -724,10 +724,10 @@ export class NativeCodingMissions {
             return;
           }
           const source = reverse
-            ? path.join(child, '.athanor', 'coding-base', change.path)
+            ? path.join(child, '.garden', 'coding-base', change.path)
             : path.join(child, 'workspace', change.path);
           const sourceRoot = reverse
-            ? path.join(child, '.athanor', 'coding-base')
+            ? path.join(child, '.garden', 'coding-base')
             : path.join(child, 'workspace');
           const sourceHandle = await open(
             source,
@@ -934,7 +934,7 @@ export class NativeCodingMissions {
         omitted = !bounded;
       if (bounded) {
         const original = before
-          ? await readFact(path.join(child, '.athanor'), `coding-base/${file}`, before, 128_000)
+          ? await readFact(path.join(child, '.garden'), `coding-base/${file}`, before, 128_000)
           : Buffer.alloc(0);
         const modified = after
           ? await readFact(child, `workspace/${file}`, after, 128_000)

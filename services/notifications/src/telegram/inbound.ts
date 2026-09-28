@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
-import type { DataStore, NotificationDestinationConfig } from '@athanor/data';
+import type { DataStore, NotificationDestinationConfig } from '@garden/data';
 import type { EndpointHealth } from '../retry.js';
 import { transportFailure } from '../transport.js';
 import type { TelegramClient } from './client.js';
@@ -234,13 +234,13 @@ export const sweepCardOutcomes = async (input: {
           )
         );
         warn(
-          `athanor-notifications: notification.destination_outcome_unwritable destination=${row.destinationId} the card cannot be edited and will not be tried again: ${reason}\n`
+          `garden-notifications: notification.destination_outcome_unwritable destination=${row.destinationId} the card cannot be edited and will not be tried again: ${reason}\n`
         );
         continue;
       }
       input.endpoints.failed(row.destinationId, statusCode, clock(), retryAfterMs);
       warn(
-        `athanor-notifications: notification.destination_outcome_failed destination=${row.destinationId} ${reason}\n`
+        `garden-notifications: notification.destination_outcome_failed destination=${row.destinationId} ${reason}\n`
       );
     }
   }
@@ -304,7 +304,7 @@ const reject = async (
   if (!admitted.record) {
     if (admitted.suppressed === 1)
       warn(
-        `athanor-notifications: notification.destination_inbound_flood destination=${input.destination.id} refusals are arriving faster than they are worth recording; they are still refused, and counted on the next one written\n`
+        `garden-notifications: notification.destination_inbound_flood destination=${input.destination.id} refusals are arriving faster than they are worth recording; they are still refused, and counted on the next one written\n`
       );
     return 'rejected';
   }
@@ -444,7 +444,7 @@ const handleMessage = async (
   const replyTo = message.reply_to_message?.message_id;
   if (replyTo !== undefined && text) return answerQuestion(input, update, message, replyTo, text);
   warn(
-    `athanor-notifications: notification.destination_ignored destination=${destination.id} a message that is neither a pairing nor a reply to a question\n`
+    `garden-notifications: notification.destination_ignored destination=${destination.id} a message that is neither a pairing nor a reply to a question\n`
   );
   return 'ignored';
 };
@@ -463,7 +463,7 @@ const completePairing = async (
   const warn = input.warn ?? ((line: string) => void process.stderr.write(line));
   if (!secret || !message.from) {
     warn(
-      `athanor-notifications: notification.destination_ignored destination=${destination.id} /start without a pairing secret\n`
+      `garden-notifications: notification.destination_ignored destination=${destination.id} /start without a pairing secret\n`
     );
     return 'ignored';
   }
@@ -494,7 +494,7 @@ const completePairing = async (
   await bestEffort(
     client.call('sendMessage', {
       chat_id: message.chat.id,
-      text: 'Paired. This chat now receives notifications from athanor, and approvals can be answered here.',
+      text: 'Paired. This chat now receives notifications from garden, and approvals can be answered here.',
       protect_content: true
     })
   );
@@ -531,7 +531,7 @@ const answerQuestion = async (
   );
   if (!ledger?.taskId) {
     warn(
-      `athanor-notifications: notification.destination_ignored destination=${destination.id} a reply to a message that was not a question\n`
+      `garden-notifications: notification.destination_ignored destination=${destination.id} a reply to a message that was not a question\n`
     );
     return 'ignored';
   }
@@ -539,14 +539,14 @@ const answerQuestion = async (
     return reject(input, 'unpaired_sender', { fromId: message.from?.id ?? null });
   const task = await store.getTask(destination.userId, ledger.taskId).catch(() => null);
   if (!task || task.status !== 'awaiting_user') {
-    await say('That conversation is not waiting for an answer. Open athanor to continue it.');
+    await say('That conversation is not waiting for an answer. Open garden to continue it.');
     return 'ignored';
   }
   if (!destination.config.apiToken) {
     warn(
-      `athanor-notifications: notification.destination_answer_failed destination=${destination.id} paired without an API token; unpair and pair again to answer questions from the phone\n`
+      `garden-notifications: notification.destination_answer_failed destination=${destination.id} paired without an API token; unpair and pair again to answer questions from the phone\n`
     );
-    await say('athanor could not take that answer from here. Open athanor to reply.');
+    await say('garden could not take that answer from here. Open garden to reply.');
     return 'failed';
   }
   const doFetch = input.fetch ?? fetch;
@@ -568,19 +568,19 @@ const answerQuestion = async (
     );
     status = response.status;
     if (response.ok) {
-      await say('Sent to athanor.');
+      await say('Sent to garden.');
       return 'answered';
     }
   } catch (error) {
     warn(
-      `athanor-notifications: notification.destination_answer_failed destination=${destination.id} ${error instanceof Error ? error.message : String(error)}\n`
+      `garden-notifications: notification.destination_answer_failed destination=${destination.id} ${error instanceof Error ? error.message : String(error)}\n`
     );
-    await say('athanor could not take that answer right now. Open athanor to reply.');
+    await say('garden could not take that answer right now. Open garden to reply.');
     return 'failed';
   }
   warn(
-    `athanor-notifications: notification.destination_answer_failed destination=${destination.id} the API answered ${status}\n`
+    `garden-notifications: notification.destination_answer_failed destination=${destination.id} the API answered ${status}\n`
   );
-  await say(`athanor did not take that answer (${status}). Open athanor to reply.`);
+  await say(`garden did not take that answer (${status}). Open garden to reply.`);
   return 'failed';
 };

@@ -1,4 +1,4 @@
-import type { ModelMessage } from '@athanor/model-gateway';
+import type { ModelMessage } from '@garden/model-gateway';
 import { describe, expect, it } from 'vitest';
 import {
   haltReason,

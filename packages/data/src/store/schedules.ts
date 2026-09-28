@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { EncryptedEnvelope } from '@athanor/core';
+import type { EncryptedEnvelope } from '@garden/core';
 import type { Database } from '../database.js';
 import type { TaskRecord, TaskScheduleRecord } from '../types.js';
 import { json, mapTask, mapTaskSchedule, numericOrNull } from './rows.js';

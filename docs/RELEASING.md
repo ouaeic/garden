@@ -76,12 +76,12 @@ Do not reuse or move a release tag.
 The release workflow is fail-closed. Configure these as reviewer-protected repository or environment
 secrets; never place them in source, logs, artifacts, or a developer `.env`:
 
-| Platform | Required protected secrets                                                                                                                   |
-| -------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| macOS    | `ATHANOR_MACOS_CERTIFICATE`, `ATHANOR_MACOS_CERTIFICATE_PASSWORD`, `ATHANOR_APPLE_ID`, `ATHANOR_APPLE_APP_PASSWORD`, `ATHANOR_APPLE_TEAM_ID` |
-| Windows  | `ATHANOR_WINDOWS_CERTIFICATE`, `ATHANOR_WINDOWS_CERTIFICATE_PASSWORD`                                                                        |
-| Android  | `ATHANOR_ANDROID_KEYSTORE_BASE64`, `ATHANOR_ANDROID_KEYSTORE_PASSWORD`, `ATHANOR_ANDROID_KEY_ALIAS`, `ATHANOR_ANDROID_KEY_PASSWORD`          |
-| iOS      | `ATHANOR_IOS_CERTIFICATE`, `ATHANOR_IOS_CERTIFICATE_PASSWORD`, `ATHANOR_IOS_MOBILE_PROVISION`, `ATHANOR_APPLE_TEAM_ID`                       |
+| Platform | Required protected secrets                                                                                                              |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| macOS    | `GARDEN_MACOS_CERTIFICATE`, `GARDEN_MACOS_CERTIFICATE_PASSWORD`, `GARDEN_APPLE_ID`, `GARDEN_APPLE_APP_PASSWORD`, `GARDEN_APPLE_TEAM_ID` |
+| Windows  | `GARDEN_WINDOWS_CERTIFICATE`, `GARDEN_WINDOWS_CERTIFICATE_PASSWORD`                                                                     |
+| Android  | `GARDEN_ANDROID_KEYSTORE_BASE64`, `GARDEN_ANDROID_KEYSTORE_PASSWORD`, `GARDEN_ANDROID_KEY_ALIAS`, `GARDEN_ANDROID_KEY_PASSWORD`         |
+| iOS      | `GARDEN_IOS_CERTIFICATE`, `GARDEN_IOS_CERTIFICATE_PASSWORD`, `GARDEN_IOS_MOBILE_PROVISION`, `GARDEN_APPLE_TEAM_ID`                      |
 
 The macOS certificate must be a Developer ID Application certificate; the Apple password must be an
 app-specific password so Tauri can notarize and staple the direct-download artifacts. The Windows
@@ -112,7 +112,7 @@ the machine can compile.
 | Android | Android SDK and NDK, `ANDROID_HOME` set    | N/A — no Apple toolchain involved       |
 | Windows | the MSVC toolchain, on Windows             | N/A                                     |
 
-`pnpm --filter @athanor/desktop native:build` produces a signed `.app` and a `.dmg` with nothing but
+`pnpm --filter @garden/desktop native:build` produces a signed `.app` and a `.dmg` with nothing but
 the Command Line Tools: the SDKs under `/Library/Developer/CommandLineTools/SDKs` are enough, and
 `build-native.mjs` sets an ad-hoc signing identity when no Apple identity is configured, so a local
 build is launchable without a developer account. Notarisation is skipped and says so.
@@ -137,7 +137,7 @@ of the package that is about to be published.
 | macOS    | `12.0`         | The oldest deployment target Xcode 27 will build, and the oldest the macOS 27 SDK back-deploys a universal binary to. |
 
 The macOS floor is confirmed in a built artifact rather than only in configuration: a local
-`native:build` produces an `athanor.app` whose `Info.plist` carries `LSMinimumSystemVersion 12.0`,
+`native:build` produces an `garden.app` whose `Info.plist` carries `LSMinimumSystemVersion 12.0`,
 ad-hoc signed with the hardened runtime, and `verify-macos-artifact.mjs` accepts it.
 
 macOS was the one that was wrong. No `minimumSystemVersion` was declared at all, so the bundle

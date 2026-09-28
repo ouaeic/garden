@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-# Exercises scripts/athanor-system-packages without root and without a real package manager.
+# Exercises scripts/garden-system-packages without root and without a real package manager.
 #
 # That helper is the one root-privileged path on this computer: the agent asks for a package, the
 # owner approves it, the runner rewrites the command onto a single sudoers rule, and this is what
@@ -41,7 +41,7 @@ mkdir -p "$fake_bin" "$active" "$records" "$state" "$host_bin"
 # An inherited manager is a trap recorder: fixture dispatch must never reach it.
 cat >"$host_bin/apt-get" <<'HOST_MANAGER'
 #!/bin/sh
-printf 'inherited host manager reached\n' >>"$ATHANOR_TEST_RECORDS/calls"
+printf 'inherited host manager reached\n' >>"$GARDEN_TEST_RECORDS/calls"
 exit 97
 HOST_MANAGER
 chmod 0755 "$host_bin/apt-get"
@@ -58,7 +58,7 @@ if command -v dash >/dev/null 2>&1; then helper_shell=$(command -v dash); fi
 cat >"$fake_bin/id" <<'FAKE_ID'
 #!/bin/sh
 if [ "$1" = "-u" ]; then
-  printf '%s\n' "${ATHANOR_TEST_UID:-0}"
+  printf '%s\n' "${GARDEN_TEST_UID:-0}"
   exit 0
 fi
 printf 'unexpected id arguments: %s\n' "$*" >&2
@@ -66,14 +66,14 @@ exit 1
 FAKE_ID
 chmod 0755 "$fake_bin/id"
 
-# One recorder per manager, placed in "$active" one at a time. `athanor_detect_package_manager`
+# One recorder per manager, placed in "$active" one at a time. `garden_detect_package_manager`
 # probes apt-get, dnf5, dnf, zypper, pacman in that order and takes the first it finds, so a
 # directory holding exactly one of them is how a family is chosen here.
 make_manager() {
   rm -f "$active"/*
   cat >"$active/$1" <<'RECORDER'
 #!/bin/sh
-printf '%s %s\n' "${0##*/}" "$*" >>"$ATHANOR_TEST_RECORDS/calls"
+printf '%s %s\n' "${0##*/}" "$*" >>"$GARDEN_TEST_RECORDS/calls"
 RECORDER
   chmod 0755 "$active/$1"
 }
@@ -104,19 +104,19 @@ done
 # The copy under test. Every path the production script hard-codes is rewritten here rather than
 # read from the environment, because the production script reading any of them from the
 # environment would be the defect this file exists to make impossible.
-helper="$test_root/athanor-system-packages"
+helper="$test_root/garden-system-packages"
 sed \
   -e "s|^PATH=/usr/sbin:/usr/bin:/sbin:/bin$|PATH='$active:$fake_bin'|" \
-  -e "s|^host_definitions=/opt/athanor/scripts/athanor-host.sh$|host_definitions='$repository_root/scripts/athanor-host.sh'|" \
-  -e "s|^athanor_state_dir=/var/lib/athanor$|athanor_state_dir='$state'|" \
+  -e "s|^host_definitions=/opt/garden/scripts/garden-host.sh$|host_definitions='$repository_root/scripts/garden-host.sh'|" \
+  -e "s|^garden_state_dir=/var/lib/garden$|garden_state_dir='$state'|" \
   -e "s|/usr/bin/|$coreutils/|g" \
-  "$repository_root/scripts/athanor-system-packages" >"$helper"
+  "$repository_root/scripts/garden-system-packages" >"$helper"
 chmod 0755 "$helper"
 
 # A sed that matched nothing would leave the copy pointed at /opt and /var, where it would either
 # fail for the wrong reason or - as root - do something real. Refuse to run rather than report a
 # pass that measured the wrong file.
-for rewritten in "$active:$fake_bin" "$repository_root/scripts/athanor-host.sh" "$state" "$coreutils/mktemp"; do
+for rewritten in "$active:$fake_bin" "$repository_root/scripts/garden-host.sh" "$state" "$coreutils/mktemp"; do
   grep -q -- "$rewritten" "$helper" || {
     printf 'the fixture could not rewrite %s into its copy of the helper\n' "$rewritten" >&2
     exit 1
@@ -126,7 +126,7 @@ done
 run_helper() {
   rm -f "$records/calls"
   set +e
-  ATHANOR_TEST_RECORDS="$records" "$helper_shell" "$helper" "$@" >"$records/out" 2>"$records/err"
+  GARDEN_TEST_RECORDS="$records" "$helper_shell" "$helper" "$@" >"$records/out" 2>"$records/err"
   helper_status=$?
   set -e
 }
@@ -245,36 +245,36 @@ check 'and reaches no package manager when given one' "$(calls)" ''
 run_helper upgrade
 check 'an operation the helper does not have is refused' "$helper_status" 1
 check_contains 'with the two it does have' "$(cat "$records/err")" \
-  'Usage: athanor-system-packages {update|install PACKAGE...}'
+  'Usage: garden-system-packages {update|install PACKAGE...}'
 
 run_helper
 check 'no operation at all is refused' "$helper_status" 1
 check_contains 'no operation prints the helper usage' "$(cat "$records/err")" \
-  'Usage: athanor-system-packages {update|install PACKAGE...}'
+  'Usage: garden-system-packages {update|install PACKAGE...}'
 check 'no operation invokes no package manager' "$(calls)" ''
 
 # --- the two things that must stop it before it starts ------------------------------------------
 
 printf '\n# refusals before any work\n'
 
-ATHANOR_TEST_UID=1000
-export ATHANOR_TEST_UID
+GARDEN_TEST_UID=1000
+export GARDEN_TEST_UID
 run_helper install nmap
 check 'a caller that is not root is refused' "$helper_status" 1
 check_contains 'and is told which policy it should have come through' "$(cat "$records/err")" \
   'must run through the installed sudo policy'
 check 'and nothing runs' "$(calls)" ''
-unset ATHANOR_TEST_UID
+unset GARDEN_TEST_UID
 
 # The host table is what makes this helper know more than one family. Carrying on without it -
 # falling back to apt, say - is how a Debian assumption survives a repair that removed it.
-missing_table="$test_root/athanor-system-packages.no-table"
-sed -e "s|^host_definitions='$repository_root/scripts/athanor-host.sh'$|host_definitions='$test_root/absent/athanor-host.sh'|" \
+missing_table="$test_root/garden-system-packages.no-table"
+sed -e "s|^host_definitions='$repository_root/scripts/garden-host.sh'$|host_definitions='$test_root/absent/garden-host.sh'|" \
   "$helper" >"$missing_table"
 chmod 0755 "$missing_table"
 rm -f "$records/calls"
 set +e
-ATHANOR_TEST_RECORDS="$records" "$helper_shell" "$missing_table" install nmap >"$records/out" 2>"$records/err"
+GARDEN_TEST_RECORDS="$records" "$helper_shell" "$missing_table" install nmap >"$records/out" 2>"$records/err"
 helper_status=$?
 set -e
 check 'a missing host table stops the install' "$helper_status" 1
@@ -282,8 +282,8 @@ check 'a missing host table stops the install' "$helper_status" 1
 # stopped reading the table at all and merely fell over on the next undefined function - which is
 # the same pass a silent fall-back to apt would earn once someone made that fall-back quiet.
 check_contains 'and says so in its own words' "$(cat "$records/err")" \
-  'athanor-system-packages cannot read'
-check_contains 'and names the file it could not read' "$(cat "$records/err")" 'athanor-host.sh'
+  'garden-system-packages cannot read'
+check_contains 'and names the file it could not read' "$(cat "$records/err")" 'garden-host.sh'
 check 'and installs nothing on a guess' "$(calls)" ''
 
 printf '\n%s checks, %s failures\n' "$checks" "$failures"

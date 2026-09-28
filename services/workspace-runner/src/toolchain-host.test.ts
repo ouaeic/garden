@@ -20,18 +20,18 @@ import {
  * its repositories do not carry - so an agent told what to do could not do it, and would spend a
  * turn finding that out in front of the owner.
  *
- * The table in scripts/athanor-host.sh already holds the per-family names for the installer and
- * for `athanor doctor`. These tests read the real table, as four different hosts, which is the
+ * The table in scripts/garden-host.sh already holds the per-family names for the installer and
+ * for `garden doctor`. These tests read the real table, as four different hosts, which is the
  * only way a machine running one family can check the columns for the other three.
  */
 
 const repositoryRoot = path.join(fileURLToPath(new URL('.', import.meta.url)), '..', '..', '..');
-const realTable = path.join(repositoryRoot, 'scripts', 'athanor-host.sh');
+const realTable = path.join(repositoryRoot, 'scripts', 'garden-host.sh');
 
 let workingDirectory: string;
 
 /**
- * The real table, read as a host of our choosing. Only `athanor_detect_host` is replaced - the
+ * The real table, read as a host of our choosing. Only `garden_detect_host` is replaced - the
  * package rows, the awk that reads them and the dash convention are all the shipped ones, so a row
  * that loses a column fails here rather than on somebody's Fedora box.
  */
@@ -39,7 +39,7 @@ const asHost = async (family: string, manager: string): Promise<string> => {
   const definitions = path.join(workingDirectory, `${family}.sh`);
   await writeFile(
     definitions,
-    `. ${JSON.stringify(realTable)}\nathanor_detect_host() { athanor_family=${family}; athanor_pm=${manager}; return 0; }\n`
+    `. ${JSON.stringify(realTable)}\ngarden_detect_host() { garden_family=${family}; garden_pm=${manager}; return 0; }\n`
   );
   return definitions;
 };
@@ -60,7 +60,7 @@ const capability = (overrides: Partial<ToolchainCapability>): ToolchainCapabilit
 });
 
 beforeAll(async () => {
-  workingDirectory = await mkdtemp(path.join(tmpdir(), 'athanor-host-'));
+  workingDirectory = await mkdtemp(path.join(tmpdir(), 'garden-host-'));
 });
 afterAll(async () => rm(workingDirectory, { recursive: true, force: true }));
 
@@ -107,7 +107,7 @@ describe('reading the host package table', () => {
     // A file that exists but cannot say what this host is - which is what a laptop and a container
     // without an /etc/os-release both look like.
     const silent = path.join(workingDirectory, 'silent.sh');
-    await writeFile(silent, 'athanor_detect_host() { return 1; }\n');
+    await writeFile(silent, 'garden_detect_host() { return 1; }\n');
     expect(await hostPackages(['ffmpeg'], silent)).toBeUndefined();
   });
 });
@@ -157,11 +157,11 @@ describe('the sentence a missing capability is closed with', () => {
   it('keeps the half no package name expresses', async () => {
     const authoring = capability({
       packages: ['python-docx'],
-      beyondPackages: 're-run the athanor installer'
+      beyondPackages: 're-run the garden installer'
     });
     const host = withHost(await hostPackages(['python-docx'], await asHost('rhel', 'dnf')));
     expect(installAdvice(authoring, host)).toBe(
-      'dnf install -y python3-docx; re-run the athanor installer'
+      'dnf install -y python3-docx; re-run the garden installer'
     );
   });
 });

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { AthanorError, type EncryptedEnvelope } from '@athanor/core';
+import { GardenError, type EncryptedEnvelope } from '@garden/core';
 import type { Database } from '../database.js';
 import type { NotificationStore } from './notifications.js';
 import { TASK_EVENT_CHANNEL, type TaskSignals } from './tasks.js';
@@ -59,7 +59,7 @@ export class MediaDeliveryStore {
           messageCiphertext: input.messageCiphertext
         });
       } catch (error) {
-        if (!(error instanceof AthanorError && error.code === 'agent_notification_limit'))
+        if (!(error instanceof GardenError && error.code === 'agent_notification_limit'))
           throw error;
         notificationState = 'suppressed_limit';
       }

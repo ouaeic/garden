@@ -2,9 +2,9 @@
  * What makes an image and what speaks, and what each will cost per unit the owner can picture.
  */
 
-import { MediaModelSelection } from '@athanor/contracts';
+import { MediaModelSelection } from '@garden/contracts';
 import { registerProjectModelRoutes } from './project-models.js';
-import { AthanorError, encryptJson, inferenceCredentialAad } from '@athanor/core';
+import { GardenError, encryptJson, inferenceCredentialAad } from '@garden/core';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 
@@ -30,7 +30,7 @@ export const registerMediaRoutes = (context: RouteContext): void => {
       const input = MediaModelSelection.parse(request.body);
       const connection = (await inferenceConnections(user.id)).values().next().value;
       if (!connection?.record)
-        throw new AthanorError(
+        throw new GardenError(
           'provider_setup_required',
           'Connect a model provider before choosing what it generates with',
           409
@@ -48,7 +48,7 @@ export const registerMediaRoutes = (context: RouteContext): void => {
         )
       });
       if (!saved)
-        throw new AthanorError(
+        throw new GardenError(
           'provider_changed',
           'This connection changed while its models were being verified. Reload and try again.',
           409

@@ -1,5 +1,5 @@
-import { runtimeClearTimer, runtimeNow, runtimeRandom, runtimeSetTimeout } from '@athanor/core';
-import { AthanorError } from '@athanor/core';
+import { runtimeClearTimer, runtimeNow, runtimeRandom, runtimeSetTimeout } from '@garden/core';
+import { GardenError } from '@garden/core';
 
 /**
  * Provider faults an identical later request has a real chance of surviving. Anything else
@@ -124,7 +124,7 @@ export const isProviderWallStatus = (status: number): boolean =>
   status === 408 || status === 429 || (status >= 500 && status < 600);
 
 export const isRetryableError = (error: unknown): boolean => {
-  if (error instanceof AthanorError && RETRYABLE_CODES.has(error.code)) return true;
+  if (error instanceof GardenError && RETRYABLE_CODES.has(error.code)) return true;
   const status = httpStatusOf(error);
   if (status === undefined) return false;
   return isProviderWallStatus(status);
@@ -134,7 +134,7 @@ export const isRetryableError = (error: unknown): boolean => {
  * Codes that name a wall whatever status they arrived with.
  *
  * Two of them are thrown without one at all - `list()` raises `provider_unavailable` with
- * AthanorError's default of 400, and the request deadline raises `model_request_timeout` the same
+ * GardenError's default of 400, and the request deadline raises `model_request_timeout` the same
  * way - so a status-only reading calls the most obvious walls on the box client mistakes.
  */
 const PROVIDER_WALL_CODES = new Set([
@@ -154,7 +154,7 @@ const PROVIDER_WALL_CODES = new Set([
  * ninety-second load-shedding 503 into a dead scheduled run with eighteen steps of work on disk.
  */
 export const isProviderWall = (error: unknown): boolean => {
-  if (error instanceof AthanorError && PROVIDER_WALL_CODES.has(error.code)) return true;
+  if (error instanceof GardenError && PROVIDER_WALL_CODES.has(error.code)) return true;
   const status = httpStatusOf(error);
   return status === undefined ? false : isProviderWallStatus(status);
 };

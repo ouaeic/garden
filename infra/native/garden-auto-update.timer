@@ -1,0 +1,14 @@
+[Unit]
+Description=Weekly garden unattended update
+
+[Timer]
+# Off until the operator runs `garden auto-update on`. The random delay keeps every
+# garden installation from pulling from the same origin at the same minute.
+OnCalendar=weekly
+RandomizedDelaySec=6h
+AccuracySec=1h
+Persistent=true
+Unit=garden-auto-update.service
+
+[Install]
+WantedBy=timers.target

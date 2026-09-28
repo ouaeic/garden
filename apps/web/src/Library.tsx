@@ -1,5 +1,5 @@
 import { useSurfaceLocation } from './surface-location';
-import type { Project, Task, Workspace } from '@athanor/contracts';
+import type { Project, Task, Workspace } from '@garden/contracts';
 import { ResultsLibrary } from './library/Results.js';
 import { MemoryLibrary } from './library/Memory.js';
 import { SkillsLibrary } from './library/Skills.js';

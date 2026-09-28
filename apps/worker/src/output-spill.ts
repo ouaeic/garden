@@ -27,7 +27,7 @@
  * the worker's own state, and the entry dies with the state it belongs to.
  */
 import { createHash } from 'node:crypto';
-import type { TaskRecord } from '@athanor/data';
+import type { TaskRecord } from '@garden/data';
 import type { AgentState } from './agent-state.js';
 import type { AgentRunnerClient } from './runner-client.js';
 import { UNTRUSTED_ENVELOPE_OPENING } from './sanitise.js';
@@ -35,17 +35,17 @@ import { UNTRUSTED_ENVELOPE_OPENING } from './sanitise.js';
 /**
  * Where a result the owner's own computer produced parks its overflow.
  *
- * Under `workspace/` rather than beside it: the runner owns the sibling `.athanor` at a mode the
+ * Under `workspace/` rather than beside it: the runner owns the sibling `.garden` at a mode the
  * agent cannot traverse, and a path the agent cannot read is the same useless recovery as the task
- * event. `publishing.ts` writes `workspace/.athanor/renders/` for the same reason.
+ * event. `publishing.ts` writes `workspace/.garden/renders/` for the same reason.
  */
-export const SPILL_DIRECTORY = 'workspace/.athanor/output';
+export const SPILL_DIRECTORY = 'workspace/.garden/output';
 
 /**
  * And where a result from outside parks its overflow: inside the download quarantine, so that the
  * existing prefix list is what taints a read of it and there is no second list to keep in step.
  */
-export const UNTRUSTED_SPILL_DIRECTORY = 'workspace/downloads/athanor-output';
+export const UNTRUSTED_SPILL_DIRECTORY = 'workspace/downloads/garden-output';
 
 /**
  * The largest result this will park, and the point past which it says nothing at all.
@@ -183,7 +183,7 @@ const SPILL_MARKER = new RegExp(
  * is asked because trust is the only thing that chooses the directory: a result from outside is
  * parked in the quarantine and fenced, a result from the owner's own computer is parked on a clean
  * path and is not. So the two always agree when the harness wrote the marker, and a
- * `.athanor/output` path quoted inside a fenced result is a path the harness did not write for
+ * `.garden/output` path quoted inside a fenced result is a path the harness did not write for
  * that result - it is a string that arrived from outside naming a clean address, which is the
  * laundering channel this whole file was arranged to avoid. Refused, in that one direction.
  *

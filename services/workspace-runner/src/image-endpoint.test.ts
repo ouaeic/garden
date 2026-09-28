@@ -3,7 +3,7 @@ import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { capabilityAudience, signCapabilityToken } from '@athanor/core';
+import { capabilityAudience, signCapabilityToken } from '@garden/core';
 import type { RunnerConfig } from './config.js';
 import { ensureWorkspace } from './files.js';
 import { buildServer } from './server.js';
@@ -34,7 +34,7 @@ const runnerConfig = (workspaceRoot: string, secret: string, converter: string):
   RUNNER_SHARED_SECRET: secret,
   WORKSPACE_ROOT: workspaceRoot,
   TAR_EXECUTABLE: '/usr/bin/tar',
-  SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/athanor-snapshot'),
+  SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/garden-snapshot'),
   BROWSER_USE_DESKTOP_DISPLAY: false,
   BROWSER_CPU_NICE: 0,
   MAX_EXECUTION_SECONDS: 30,
@@ -58,7 +58,7 @@ const runnerConfig = (workspaceRoot: string, secret: string, converter: string):
 
 /** A server with one workspace holding the named files, and a converter that echoes its input. */
 const serve = async (files: Record<string, string>) => {
-  const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-image-'));
+  const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-image-'));
   disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
   const converter = path.join(workspaceRoot, 'magick');
   await writeFile(converter, '#!/bin/sh\nprintf converted-\ncat\n');
@@ -100,7 +100,7 @@ const serve = async (files: Record<string, string>) => {
 
 describe('reading a picture a model can be shown', () => {
   /*
-   * The commonest thing a phone owner attaches. Before this route it was the one file athanor
+   * The commonest thing a phone owner attaches. Before this route it was the one file garden
    * could see and not look at.
    */
   it('converts a phone photograph and says it did', async () => {

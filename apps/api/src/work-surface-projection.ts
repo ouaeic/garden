@@ -6,7 +6,7 @@ import {
   type TaskPlan,
   type TaskResult,
   type WorkSurfaceView
-} from '@athanor/contracts';
+} from '@garden/contracts';
 
 const record = (value: unknown): Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value)

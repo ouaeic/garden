@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
-import type { ModelRelease } from '@athanor/contracts';
-import { encryptJson, generateDataKey, wrapDataKey } from '@athanor/core';
+import type { ModelRelease } from '@garden/contracts';
+import { encryptJson, generateDataKey, wrapDataKey } from '@garden/core';
 import {
   createDatabase,
   DataStore,
   migrateDatabase,
   writeProjectModelPreferences
-} from '@athanor/data';
-import { ModelGateway, type DecisionRequest, type DecisionResponse } from '@athanor/model-gateway';
+} from '@garden/data';
+import { ModelGateway, type DecisionRequest, type DecisionResponse } from '@garden/model-gateway';
 import { resolveDecisionRoute } from './decision-route.js';
 import { executeDecisionTool, runDecisions, type DecisionContext } from './decisions.js';
 import { approvalForCall } from './approval-floor.js';

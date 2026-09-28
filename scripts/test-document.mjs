@@ -6,14 +6,14 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 
-const root = await mkdtemp(path.join(os.tmpdir(), 'athanor-document-'));
+const root = await mkdtemp(path.join(os.tmpdir(), 'garden-document-'));
 // The formats a real person's folders fill up with, kept in their own directory so the counts the
 // first folder asserts stay the counts it was written for.
-const shelf = await mkdtemp(path.join(os.tmpdir(), 'athanor-shelf-'));
+const shelf = await mkdtemp(path.join(os.tmpdir(), 'garden-shelf-'));
 // Scans get a third one, because recognising a page costs seconds and a search that walked the
 // whole shelf would pay them for every fixture above as well.
-const scans = await mkdtemp(path.join(os.tmpdir(), 'athanor-scans-'));
-const executable = path.resolve('scripts/athanor-document');
+const scans = await mkdtemp(path.join(os.tmpdir(), 'garden-scans-'));
+const executable = path.resolve('scripts/garden-document');
 
 const runIn = (cwd, environment, ...args) =>
   spawnSync('/usr/bin/python3', [executable, ...args], {
@@ -323,7 +323,7 @@ const writeScannedPdf = async (rasteriser, source, destination, mixed = false) =
 try {
   await writeFile(
     path.join(root, 'notes.txt'),
-    'Athanor keeps the computer persistent.\n\nBioinformatics results stay on the server.\n'
+    'Garden keeps the computer persistent.\n\nBioinformatics results stay on the server.\n'
   );
   await writeFile(
     path.join(root, 'report.html'),
@@ -615,7 +615,7 @@ try {
     [
       '#!/bin/sh',
       'case "$2" in',
-      '  *.docx) cp "$ATHANOR_STUB_DOCX" "$2" ;;',
+      '  *.docx) cp "$GARDEN_STUB_DOCX" "$2" ;;',
       '  *) exit 1 ;;',
       'esac',
       ''
@@ -625,7 +625,7 @@ try {
   await writeFile(path.join(shelf, 'minutes.doc'), Buffer.from('d0cf11e0a1b11ae1', 'hex'));
   const legacy = runIn(
     shelf,
-    { ATHANOR_OFFICE_CONVERT: converter, ATHANOR_STUB_DOCX: path.join(shelf, 'converted.docx') },
+    { GARDEN_OFFICE_CONVERT: converter, GARDEN_STUB_DOCX: path.join(shelf, 'converted.docx') },
     'read',
     '--path',
     'minutes.doc'
@@ -637,7 +637,7 @@ try {
   // can act on: one of them is a package they can install.
   const unconverted = runIn(
     shelf,
-    { ATHANOR_OFFICE_CONVERT: path.join(shelf, 'no-such-converter') },
+    { GARDEN_OFFICE_CONVERT: path.join(shelf, 'no-such-converter') },
     'read',
     '--path',
     'minutes.doc'
@@ -660,13 +660,13 @@ try {
     return candidate && existsSync(candidate) ? candidate : installed;
   };
   const poppler = {
-    ATHANOR_PDFTOTEXT: process.env.ATHANOR_PDFTOTEXT ?? whereIs('pdftotext', '/usr/bin/pdftotext'),
-    ATHANOR_PDFIMAGES: process.env.ATHANOR_PDFIMAGES ?? whereIs('pdfimages', '/usr/bin/pdfimages'),
-    ATHANOR_PDFINFO: process.env.ATHANOR_PDFINFO ?? whereIs('pdfinfo', '/usr/bin/pdfinfo'),
-    ATHANOR_PDFTOPPM: process.env.ATHANOR_PDFTOPPM ?? whereIs('pdftoppm', '/usr/bin/pdftoppm')
+    GARDEN_PDFTOTEXT: process.env.GARDEN_PDFTOTEXT ?? whereIs('pdftotext', '/usr/bin/pdftotext'),
+    GARDEN_PDFIMAGES: process.env.GARDEN_PDFIMAGES ?? whereIs('pdfimages', '/usr/bin/pdfimages'),
+    GARDEN_PDFINFO: process.env.GARDEN_PDFINFO ?? whereIs('pdfinfo', '/usr/bin/pdfinfo'),
+    GARDEN_PDFTOPPM: process.env.GARDEN_PDFTOPPM ?? whereIs('pdftoppm', '/usr/bin/pdftoppm')
   };
-  const recogniser = process.env.ATHANOR_TESSERACT ?? whereIs('tesseract', '/usr/bin/tesseract');
-  const unrecognised = { ...poppler, ATHANOR_TESSERACT: path.join(scans, 'no-recogniser') };
+  const recogniser = process.env.GARDEN_TESSERACT ?? whereIs('tesseract', '/usr/bin/tesseract');
+  const unrecognised = { ...poppler, GARDEN_TESSERACT: path.join(scans, 'no-recogniser') };
   // One page of a lease with a real text layer. Used twice: as the document that must not be
   // recognised, and as the source the scan below is rendered from and then stripped of its text.
   const leasePage = [
@@ -690,7 +690,7 @@ try {
   if (
     sectionRuns(
       SECTIONS[1],
-      existsSync(poppler.ATHANOR_PDFTOTEXT) && existsSync(poppler.ATHANOR_PDFINFO),
+      existsSync(poppler.GARDEN_PDFTOTEXT) && existsSync(poppler.GARDEN_PDFINFO),
       'poppler-utils'
     )
   ) {
@@ -758,7 +758,7 @@ try {
       stubRasteriser,
       [
         '#!/bin/sh',
-        'echo rendered >> "$ATHANOR_STUB_RENDERED"',
+        'echo rendered >> "$GARDEN_STUB_RENDERED"',
         'for last; do :; done',
         ': > "$last.png"',
         ''
@@ -775,10 +775,10 @@ try {
       scans,
       {
         ...poppler,
-        ATHANOR_PDFIMAGES: path.join(scans, 'no-inspector'),
-        ATHANOR_PDFTOPPM: stubRasteriser,
-        ATHANOR_TESSERACT: stubRecogniser,
-        ATHANOR_STUB_RENDERED: path.join(scans, 'rendered-long-scan')
+        GARDEN_PDFIMAGES: path.join(scans, 'no-inspector'),
+        GARDEN_PDFTOPPM: stubRasteriser,
+        GARDEN_TESSERACT: stubRecogniser,
+        GARDEN_STUB_RENDERED: path.join(scans, 'rendered-long-scan')
       },
       'read',
       '--path',
@@ -804,10 +804,10 @@ try {
       scans,
       {
         ...poppler,
-        ATHANOR_PDFIMAGES: path.join(scans, 'no-inspector'),
-        ATHANOR_PDFTOPPM: stubRasteriser,
-        ATHANOR_TESSERACT: stubRecogniser,
-        ATHANOR_STUB_RENDERED: path.join(scans, 'rendered-half-scan')
+        GARDEN_PDFIMAGES: path.join(scans, 'no-inspector'),
+        GARDEN_PDFTOPPM: stubRasteriser,
+        GARDEN_TESSERACT: stubRecogniser,
+        GARDEN_STUB_RENDERED: path.join(scans, 'rendered-half-scan')
       },
       'search',
       '--path',
@@ -832,10 +832,10 @@ try {
       scans,
       {
         ...poppler,
-        ATHANOR_PDFIMAGES: path.join(scans, 'no-inspector'),
-        ATHANOR_PDFTOPPM: stubRasteriser,
-        ATHANOR_TESSERACT: stubRecogniser,
-        ATHANOR_STUB_RENDERED: path.join(scans, 'rendered-whole-scan')
+        GARDEN_PDFIMAGES: path.join(scans, 'no-inspector'),
+        GARDEN_PDFTOPPM: stubRasteriser,
+        GARDEN_TESSERACT: stubRecogniser,
+        GARDEN_STUB_RENDERED: path.join(scans, 'rendered-whole-scan')
       },
       'search',
       '--path',
@@ -857,10 +857,10 @@ try {
       scans,
       {
         ...poppler,
-        ATHANOR_PDFIMAGES: path.join(scans, 'no-inspector'),
-        ATHANOR_PDFTOPPM: stubRasteriser,
-        ATHANOR_TESSERACT: stubRecogniser,
-        ATHANOR_STUB_RENDERED: marker
+        GARDEN_PDFIMAGES: path.join(scans, 'no-inspector'),
+        GARDEN_PDFTOPPM: stubRasteriser,
+        GARDEN_TESSERACT: stubRecogniser,
+        GARDEN_STUB_RENDERED: marker
       },
       'read',
       '--path',
@@ -881,7 +881,7 @@ try {
     if (
       sectionRuns(
         SECTIONS[2],
-        existsSync(poppler.ATHANOR_PDFTOPPM) && existsSync(recogniser),
+        existsSync(poppler.GARDEN_PDFTOPPM) && existsSync(recogniser),
         'poppler-utils and tesseract-ocr'
       )
     ) {
@@ -889,7 +889,7 @@ try {
       await mkdir(contracts, { recursive: true });
       await writeFile(path.join(scans, 'source-page.pdf'), leasePage);
       await writeScannedPdf(
-        poppler.ATHANOR_PDFTOPPM,
+        poppler.GARDEN_PDFTOPPM,
         path.join(scans, 'source-page.pdf'),
         path.join(contracts, 'lease-scan.pdf')
       );
@@ -904,7 +904,7 @@ try {
       );
       assert.match(beforePayload.note, /no text was extracted/);
 
-      const reading = { ...poppler, ATHANOR_TESSERACT: recogniser };
+      const reading = { ...poppler, GARDEN_TESSERACT: recogniser };
       const after = runIn(contracts, reading, 'read', '--path', 'lease-scan.pdf');
       assert.equal(after.status, 0, after.stderr);
       const afterPayload = JSON.parse(after.stdout);
@@ -920,7 +920,7 @@ try {
       );
 
       await writeScannedPdf(
-        poppler.ATHANOR_PDFTOPPM,
+        poppler.GARDEN_PDFTOPPM,
         path.join(scans, 'source-page.pdf'),
         path.join(contracts, 'mixed.pdf'),
         true

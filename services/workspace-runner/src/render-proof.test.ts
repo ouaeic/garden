@@ -6,7 +6,7 @@ import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { capabilityAudience, signCapabilityToken } from '@athanor/core';
+import { capabilityAudience, signCapabilityToken } from '@garden/core';
 import type { RunnerConfig } from './config.js';
 import { ensureWorkspace } from './files.js';
 import { resolveExecutable } from './command-policy.js';
@@ -257,7 +257,7 @@ describe('measuring a document this computer rendered', () => {
   let root: string;
 
   beforeEach(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'athanor-render-test-'));
+    root = await mkdtemp(path.join(tmpdir(), 'garden-render-test-'));
     await mkdir(path.join(root, 'workspace'), { recursive: true });
   });
   afterEach(async () => {
@@ -427,7 +427,7 @@ const runnerConfig = (workspaceRoot: string, secret: string): RunnerConfig =>
     RUNNER_SHARED_SECRET: secret,
     WORKSPACE_ROOT: workspaceRoot,
     TAR_EXECUTABLE: '/usr/bin/tar',
-    SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/athanor-snapshot'),
+    SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/garden-snapshot'),
     BROWSER_USE_DESKTOP_DISPLAY: false,
     BROWSER_CPU_NICE: 0,
     MAX_EXECUTION_SECONDS: 30,
@@ -475,7 +475,7 @@ describe('the route the acceptance record calls', () => {
    * one - the first entry of `agentSearchPath`, which this route used to resolve against.
    */
   const serve = async (options: { reader?: string; document?: Buffer }) => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-render-route-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-render-route-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const root = path.join(workspaceRoot, WORKSPACE);
     await ensureWorkspace(root);
@@ -484,7 +484,7 @@ describe('the route the acceptance record calls', () => {
       options.document ?? '%PDF-1.4 pretend\n'
     );
     if (options.reader) {
-      const bin = path.join(root, 'workspace', '.athanor', 'tools', 'node_modules', '.bin');
+      const bin = path.join(root, 'workspace', '.garden', 'tools', 'node_modules', '.bin');
       await mkdir(bin, { recursive: true });
       await writeFile(path.join(bin, 'pdftotext'), options.reader);
       await chmod(path.join(bin, 'pdftotext'), 0o755);
@@ -515,7 +515,7 @@ describe('the route the acceptance record calls', () => {
 
   /**
    * The case this used to be, inverted. It planted a page reader in the workspace's own tool bin -
-   * a directory `scripts/athanor-sandbox` grants the agent write on - and the route ran it, on the
+   * a directory `scripts/garden-sandbox` grants the agent write on - and the route ran it, on the
    * owner's document, as the runner's own account. It is kept as the proof that it no longer does.
    *
    * The status is asserted only as "not the measurement", because which refusal arrives depends on
@@ -523,7 +523,7 @@ describe('the route the acceptance record calls', () => {
    * it is written by the decoy itself and by nothing else.
    */
   it('will not run a page reader the agent left on its own search path', async () => {
-    const marker = path.join(await mkdtemp(path.join(tmpdir(), 'athanor-render-marker-')), 'ran');
+    const marker = path.join(await mkdtemp(path.join(tmpdir(), 'garden-render-marker-')), 'ran');
     const call = await serve({
       reader: `#!/bin/sh\n: > ${JSON.stringify(marker)}\ncat <<'PAGES'\n${POPPLER_BBOX}PAGES\n`
     });
@@ -608,17 +608,17 @@ describe('the route the acceptance record calls', () => {
 /**
  * Where the three render tools are looked for, which is not where an agent command looks.
  *
- * pdftotext, pdftoppm and athanor-office-convert are spawned by the runner's own account against
+ * pdftotext, pdftoppm and garden-office-convert are spawned by the runner's own account against
  * the owner's document. Both directories planted here are ones the sandbox grants the agent write
  * on, and one of them used to lead the list this resolved against.
  */
 describe('the tools a render proof spawns', () => {
   const planted = async (): Promise<{ root: string; decoy: string }> => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-render-decoy-'));
-    const decoy = path.join(root, 'workspace', '.athanor', 'tools', 'node_modules', '.bin');
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-render-decoy-'));
+    const decoy = path.join(root, 'workspace', '.garden', 'tools', 'node_modules', '.bin');
     for (const bin of [decoy, path.join(agentHome(root), '.local', 'bin')]) {
       await mkdir(bin, { recursive: true });
-      for (const name of ['pdftotext', 'pdftoppm', 'athanor-office-convert']) {
+      for (const name of ['pdftotext', 'pdftoppm', 'garden-office-convert']) {
         await writeFile(path.join(bin, name), '#!/bin/sh\nexit 0\n');
         await chmod(path.join(bin, name), 0o755);
       }

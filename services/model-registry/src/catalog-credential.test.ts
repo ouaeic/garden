@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { encryptJson, inferenceCredentialAad, type EncryptedEnvelope } from '@athanor/core';
+import { encryptJson, inferenceCredentialAad, type EncryptedEnvelope } from '@garden/core';
 import { catalogCredential, type CredentialSource } from './catalog-credential.js';
 
 const masterKey = randomBytes(32);

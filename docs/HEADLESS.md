@@ -1,13 +1,13 @@
 # Driving garden from a script
 
-`athanor task` is the larger half of garden's headless surface. It starts work, waits for it, and
+`garden task` is the larger half of garden's headless surface. It starts work, waits for it, and
 answers with one JSON object and an exit code that says how the work ended. The one other command
-here is `athanor tool-opens` at the end of this page, which reads back what the box has been doing
+here is `garden tool-opens` at the end of this page, which reads back what the box has been doing
 rather than making it do anything; it is on this page because it wants the same API token and the
 same plumbing, not because it drives a run.
 
 There is a third command on the same plumbing, and it is on its own page because its caller is not a
-script the owner wrote: `athanor acp` speaks Agent Client Protocol on stdin and stdout, so an editor
+script the owner wrote: `garden acp` speaks Agent Client Protocol on stdin and stdout, so an editor
 or a desktop client somebody else wrote can drive this box. It creates the same tasks over the same
 routes with the same token, under the same approval floor. See [ACP](ACP.md) - and read its approval
 section before minting a token for it, because the scope you choose is what decides whether a client
@@ -31,24 +31,24 @@ buys exactly its own scopes until its own expiry, and no path widens either.
 
 This is kept, not fixed. Two reasons:
 
-- A server with no screen is still reached from the owner's own browser. `sudo athanor connect`
+- A server with no screen is still reached from the owner's own browser. `sudo garden connect`
   prints the address to open and a QR code for a phone, a passkey is bound to that hostname, and
-  `sudo athanor doctor` reports a box with no hostname as one where browser sign-in cannot work at
+  `sudo garden doctor` reports a box with no hostname as one where browser sign-in cannot work at
   all. Nothing needs a browser on the box itself, so "the operator only has SSH" is not the same
   claim as "no human can reach a browser pointed at this machine".
 - What is genuinely not served is a first token with no human anywhere, on any device - a machine
   provisioning itself. That case is refused on purpose. A credential a machine can mint for itself
   unattended is a credential anything that reaches the machine can mint.
 
-What was missing was not a way to mint a token but a place to keep one. `athanor task` looks for a
+What was missing was not a way to mint a token but a place to keep one. `garden task` looks for a
 token in two places, in this order:
 
-1. `ATHANOR_TOKEN` in the environment, for a caller on another machine.
-2. `/etc/athanor/api-token`, for the box itself. Create it root-owned and mode `0600`, containing
+1. `GARDEN_TOKEN` in the environment, for a caller on another machine.
+2. `/etc/garden/api-token`, for the box itself. Create it root-owned and mode `0600`, containing
    the token and nothing else. Then the token is not in a shell history, an environment, or a
-   process list, and `sudo athanor task ...` is the ordinary invocation.
+   process list, and `sudo garden task ...` is the ordinary invocation.
 
-Override the file's location with `ATHANOR_TOKEN_FILE` and the server's address with `ATHANOR_API`,
+Override the file's location with `GARDEN_TOKEN_FILE` and the server's address with `GARDEN_API`,
 which defaults to `http://127.0.0.1:4100`.
 
 Nothing in garden creates that file, sets its mode, or checks it. `doctor` does not mention it.
@@ -67,14 +67,14 @@ Two refusals are deliberate and are not worked around here: no scope reaches
 ## The commands
 
 ```bash
-sudo athanor task run --workspace ID (--prompt TEXT | --prompt-file PATH)
-sudo athanor task wait TASK_ID [--timeout SECONDS]
-sudo athanor task show TASK_ID
-sudo athanor task cancel TASK_ID
-sudo athanor task approvals [TASK_ID]
-sudo athanor task approve APPROVAL_ID
-sudo athanor task deny APPROVAL_ID
-sudo athanor task answer TASK_ID (--text TEXT | --text-file PATH)
+sudo garden task run --workspace ID (--prompt TEXT | --prompt-file PATH)
+sudo garden task wait TASK_ID [--timeout SECONDS]
+sudo garden task show TASK_ID
+sudo garden task cancel TASK_ID
+sudo garden task approvals [TASK_ID]
+sudo garden task approve APPROVAL_ID
+sudo garden task deny APPROVAL_ID
+sudo garden task answer TASK_ID (--text TEXT | --text-file PATH)
 ```
 
 `run` also takes `--model ID`, `--privacy-route ROUTE`, `--credits N`, `--spend-usd N`,
@@ -112,11 +112,11 @@ attempts.
 ## The outcome
 
 `run`, `wait`, `show` and `cancel` print one JSON object on standard output. Progress and errors go
-to standard error, so `athanor task run ... > outcome.json` is a complete result.
+to standard error, so `garden task run ... > outcome.json` is a complete result.
 
 ```json
 {
-  "contract": "athanor.task.outcome/1",
+  "contract": "garden.task.outcome/1",
   "outcome": "completed",
   "exitCode": 0,
   "taskId": "…",
@@ -195,8 +195,8 @@ on the answer could not tell those apart.
 | 7    | `running`           | `show` only: the task has not stopped.                             |
 | 64   | -                   | No such subcommand.                                                |
 
-Exit 4 does not stop anything. The task keeps running and keeps spending; `athanor task cancel`
-is how it is stopped, and `athanor task wait` picks the same task back up.
+Exit 4 does not stop anything. The task keeps running and keeps spending; `garden task cancel`
+is how it is stopped, and `garden task wait` picks the same task back up.
 
 Exit 6 is the one worth reading twice. `awaiting_resource` sounds like a wait that clears on its
 own and is not: it is where a provider wall, a disconnected provider or an unreachable model parks
@@ -207,7 +207,7 @@ ending, so they exit 0 or 1 and print what they did.
 
 ## Approvals, and the mode they follow from
 
-**`athanor task` never answers an approval.** A run that reaches one stops, exits 3, and hands back
+**`garden task` never answers an approval.** A run that reaches one stops, exits 3, and hands back
 what was asked as data. There is no `--yes` and there is deliberately no `--security-mode`: how much
 a run stops to ask is the workspace's setting, and a flag on the command that started the work could
 quietly answer questions the owner had asked to be shown. The mode is reported in every outcome
@@ -229,8 +229,8 @@ A task inherits its mode from its workspace when it is created. Change the works
 one call, using a token carrying `workspaces:write`:
 
 ```bash
-curl -fsS -X PATCH "$ATHANOR_API/v1/workspaces/$WORKSPACE/security-mode" \
-  -H "Authorization: Bearer $ATHANOR_TOKEN" \
+curl -fsS -X PATCH "$GARDEN_API/v1/workspaces/$WORKSPACE/security-mode" \
+  -H "Authorization: Bearer $GARDEN_TOKEN" \
   -H 'Content-Type: application/json' \
   -H "Idempotency-Key: mode-$(date +%s)" \
   -d '{"securityMode":"autonomous"}'
@@ -239,19 +239,19 @@ curl -fsS -X PATCH "$ATHANOR_API/v1/workspaces/$WORKSPACE/security-mode" \
 An unattended caller that answers its own questions writes that loop itself:
 
 ```bash
-athanor task run --workspace "$WORKSPACE" --prompt-file brief.txt >outcome.json
+garden task run --workspace "$WORKSPACE" --prompt-file brief.txt >outcome.json
 task=$(jq -r .taskId outcome.json)
 while [ "$(jq -r .outcome outcome.json)" = awaiting_approval ]; do
   for id in $(jq -r '.pendingApprovals[].id' outcome.json); do
-    athanor task approve "$id"
+    garden task approve "$id"
   done
   # The other kind of stop. A card is decided; a question is answered, and a loop that only
   # decides cards spins here for ever against an empty list.
   if [ "$(jq -r '.question.question // empty' outcome.json)" != "" ]; then
     jq -r .question.question outcome.json >&2
-    athanor task answer "$task" --text "use your judgement and say what you assumed"
+    garden task answer "$task" --text "use your judgement and say what you assumed"
   fi
-  athanor task wait "$task" >outcome.json
+  garden task wait "$task" >outcome.json
 done
 exit "$(jq -r .exitCode outcome.json)"
 ```
@@ -263,7 +263,7 @@ down in its own source, where it can be read, counted and disclosed - not folded
 ## What the box has been reaching for
 
 ```bash
-sudo athanor tool-opens [DAYS] [--json]
+sudo garden tool-opens [DAYS] [--json]
 ```
 
 The one command on this page that is not about a run. It reports the share of this box's turns over
@@ -293,8 +293,8 @@ something that is not the owner and is not a clock starting a turn here - and it
 A trigger is attached to a schedule when the schedule is created:
 
 ```bash
-curl -sS -X POST "$ATHANOR_URL/v1/schedules" \
-  -H "authorization: Bearer $ATHANOR_TOKEN" -H 'content-type: application/json' \
+curl -sS -X POST "$GARDEN_URL/v1/schedules" \
+  -H "authorization: Bearer $GARDEN_TOKEN" -H 'content-type: application/json' \
   -H "idempotency-key: $(uuidgen)" \
   -d '{"workspaceId":"…","prompt":"Look at the build that just failed and say what broke it.",
        "spec":{"kind":"weekly","timeZone":"UTC","localTime":"03:00","weekdays":[0]},
@@ -310,8 +310,8 @@ A sender signs each delivery:
 
 ```
 POST https://<your box>/v1/hooks/<triggerUrlPath segment>
-x-athanor-timestamp: <unix seconds>
-x-athanor-signature: v1=<hex HMAC-SHA256 of "v1:<timestamp>:" followed by the exact body bytes,
+x-garden-timestamp: <unix seconds>
+x-garden-signature: v1=<hex HMAC-SHA256 of "v1:<timestamp>:" followed by the exact body bytes,
                           keyed with triggerSecret>
 ```
 
@@ -354,10 +354,10 @@ Two more things a script driving this API should expect:
 - It does not mint tokens, rotate them, or check the permissions on the file it reads one from.
 - It does not create workspaces, upload inputs, or download artefacts. Those are `curl` against
   `/v1/workspaces` and `/v1/workspaces/:id/file`, with `files:read` and `files:write`.
-- It does not stream. `run` polls every two seconds (`ATHANOR_TASK_POLL_SECONDS`). The live
+- It does not stream. `run` polls every two seconds (`GARDEN_TASK_POLL_SECONDS`). The live
   transcript is `GET /v1/tasks/:taskId/events/stream`, which reconnects with `Last-Event-ID`.
 - It does not read the transcript. The outcome carries the ending; `GET /v1/tasks/:taskId/events`
-  carries the whole trajectory, and `athanor task` deliberately does not wrap it.
+  carries the whole trajectory, and `garden task` deliberately does not wrap it.
 - It does not resume. `paused` and `awaiting_resource` are reported, not cleared;
   `POST /v1/tasks/:taskId/resume` is the call.
 - It does not put the computer back. `POST /v1/tasks/:taskId/trajectory` accepts

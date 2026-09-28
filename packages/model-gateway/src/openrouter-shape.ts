@@ -1,7 +1,7 @@
 /**
  * The one place this package looks at OpenRouter's `/models` document before believing any of it.
  *
- * That document comes from a service athanor does not control, and it used to be read through a
+ * That document comes from a service garden does not control, and it used to be read through a
  * bare TypeScript interface - a compile-time description of what the wire was expected to hold,
  * which nothing checked at run time. Measured against the built parser, four reshapes of the
  * document each threw a raw TypeError out of the whole refresh rather than out of one row:
@@ -9,7 +9,7 @@
  * "object is not iterable", `pricing.overrides` as an object gave "((intermediate value) ?? [])
  * .flatMap is not a function", and a single `null` inside `data` gave "Cannot read properties of
  * null (reading 'id')". The degradation was safe - every caller records the failure and leaves the
- * previous catalogue serving - but the owner reads that raw JavaScript sentence in `athanor doctor`,
+ * previous catalogue serving - but the owner reads that raw JavaScript sentence in `garden doctor`,
  * and one provider's field reshape stopped every model in the catalogue from being refreshed for as
  * long as it lasted.
  *

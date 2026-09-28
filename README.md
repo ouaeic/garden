@@ -12,7 +12,7 @@ inference fallback. Model access belongs to the owner: use OpenRouter, Ollama Cl
 OpenAI-compatible endpoint, Codex with a ChatGPT subscription, Claude Code with a Claude
 subscription, or OpenCode with a publisher login it officially supports.
 
-The app and command are named `garden`. Existing `athanor` commands, installation paths,
+The app and command are named `garden`. Existing `garden` commands, installation paths,
 and device identities remain supported, so an update preserves the same computer and access.
 
 ## Install
@@ -20,7 +20,7 @@ and device identities remain supported, so an update preserves the same computer
 On a fresh Debian, Ubuntu, Fedora, RHEL, Rocky, AlmaLinux, Arch or openSUSE computer:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ouaeic/athanor/v0.2.0/install.sh | sudo env ATHANOR_REF=v0.2.0 sh
+curl -fsSL https://raw.githubusercontent.com/ouaeic/garden/v0.2.0/install.sh | sudo env GARDEN_REF=v0.2.0 sh
 ```
 
 The command is pinned to a tag rather than a branch. The install action in the native client goes
@@ -35,15 +35,15 @@ will create a passkey on a page whose certificate it does not trust, and clickin
 does not change that. If a domain already points at the server, ask for both during the install:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ouaeic/athanor/v0.2.0/install.sh | sudo env ATHANOR_REF=v0.2.0 ATHANOR_HOSTNAME=your.domain ATHANOR_ACME_EMAIL=you@example.com sh
+curl -fsSL https://raw.githubusercontent.com/ouaeic/garden/v0.2.0/install.sh | sudo env GARDEN_REF=v0.2.0 GARDEN_HOSTNAME=your.domain GARDEN_ACME_EMAIL=you@example.com sh
 ```
 
-`ATHANOR_ACME_EMAIL` is the contact address the certificate authority is given, and supplying it is
+`GARDEN_ACME_EMAIL` is the contact address the certificate authority is given, and supplying it is
 how the subscriber agreement is accepted — garden will not accept it on the operator’s behalf, so
 without that variable no certificate is requested. Install without them and nothing is lost: the
 installer ends by saying that browser sign-in does not work yet, and prints whichever of
-`sudo athanor set-hostname` and `sudo athanor certificate enable` that server still needs. Both do
-the same job afterwards, and `sudo athanor doctor` keeps saying so until they are done.
+`sudo garden set-hostname` and `sudo garden certificate enable` that server still needs. Both do
+the same job afterwards, and `sudo garden doctor` keeps saying so until they are done.
 
 From a checked-out source tree:
 
@@ -83,8 +83,8 @@ the fragment. The installer also prints a connection ticket for the native clien
 - the expiring first-owner code.
 
 The identity is independent of an IP address. The native client probes saved addresses concurrently,
-pins the server public key, refreshes the address set from `/.well-known/athanor`, retries safe
-requests after an address change, and falls back to `_athanor._tcp.local` discovery on the LAN. A
+pins the server public key, refreshes the address set from `/.well-known/garden`, retries safe
+requests after an address change, and falls back to `_garden._tcp.local` discovery on the LAN. A
 newly discovered address is accepted only after it proves the same pinned identity.
 
 Dynamic addresses work automatically on the same LAN through mDNS and off-site when the host has a
@@ -99,7 +99,7 @@ garden does not silently add a relay, VPN, or tracking directory; see
 
 ### Agent computer
 
-- Native execution as a dedicated unprivileged `athanor` Linux user.
+- Native execution as a dedicated unprivileged `garden` Linux user.
 - Persistent home, files, Chromium profile, installed programs, and publisher CLI logins.
 - Foreground and background commands with timeouts, output bounds, polling, cancellation, and
   explicit network intent.
@@ -199,41 +199,41 @@ chosen provider.
 ## Server commands
 
 ```text
-sudo athanor doctor
-sudo athanor connect
-sudo athanor pairing-code
-sudo athanor start
-sudo athanor stop
-sudo athanor restart
-sudo athanor status
-sudo athanor logs
-sudo athanor backup [directory]
-sudo athanor restore DIRECTORY --yes
-sudo athanor update
-sudo athanor rollback [directory]
-sudo athanor auto-update {status|on|off}
-sudo athanor certificate
-sudo athanor ddns
-sudo athanor set-hostname NAME
-sudo athanor price-ceiling {show|set INPUT OUTPUT|clear}
-sudo athanor spend-cap {show|set DAILY MONTHLY|clear}
-sudo athanor spend-ceiling ...                 # the old name for price-ceiling; still answers
-sudo athanor relay {status|on|off}
-sudo athanor uninstall
+sudo garden doctor
+sudo garden connect
+sudo garden pairing-code
+sudo garden start
+sudo garden stop
+sudo garden restart
+sudo garden status
+sudo garden logs
+sudo garden backup [directory]
+sudo garden restore DIRECTORY --yes
+sudo garden update
+sudo garden rollback [directory]
+sudo garden auto-update {status|on|off}
+sudo garden certificate
+sudo garden ddns
+sudo garden set-hostname NAME
+sudo garden price-ceiling {show|set INPUT OUTPUT|clear}
+sudo garden spend-cap {show|set DAILY MONTHLY|clear}
+sudo garden spend-ceiling ...                 # the old name for price-ceiling; still answers
+sudo garden relay {status|on|off}
+sudo garden uninstall
 ```
 
 `price-ceiling` is the pre-flight half of the spending brake, and it was called `spend-ceiling`
 until the release that added the other half; the old name still answers and tells you the new one.
 It refuses to pick a model priced above the rates you name, which is the half that works while you
-are asleep. Both rates are dollars per million tokens - `sudo athanor price-ceiling set 2 10` means
+are asleep. Both rates are dollars per million tokens - `sudo garden price-ceiling set 2 10` means
 "at most $2 per million in and $10 per million out" - and either may be the word `none`. A model you
 choose by name is never constrained by it: the ceiling governs what garden picks for you, not what
 you pick for yourself.
 
 `spend-cap` is the running half: what a day and a month may cost you in dollars, which is what
-actually halts a task. `sudo athanor spend-cap set 5 100` is "at most $5 a day and $100 a month",
+actually halts a task. `sudo garden spend-cap set 5 100` is "at most $5 a day and $100 a month",
 and either may be `none`. It is the same setting as the caps in Settings, on the command line,
-because an owner setting a headless server up over ssh has no browser open yet. `sudo athanor doctor`
+because an owner setting a headless server up over ssh has no browser open yet. `sudo garden doctor`
 says which caps are in force every time it runs.
 
 `certificate` requests a publicly trusted certificate for the existing server identity key, so the
@@ -248,7 +248,7 @@ and is only for a server no inbound connection can reach. Enrolling with one hap
 because only the running server can redeem an enrollment token. See
 [Operations](docs/OPERATIONS.md) for the full surface.
 
-`uninstall` disables garden but preserves `/home/athanor`, `/etc/athanor`, PostgreSQL data, and
+`uninstall` disables garden but preserves `/home/garden`, `/etc/garden`, PostgreSQL data, and
 backups. See [Deployment](docs/DEPLOYMENT.md) and [Operations](docs/OPERATIONS.md).
 
 Backups contain the database encryption keys, server identity, browser profile, publisher logins,
@@ -305,7 +305,7 @@ pnpm dev
 
 `pnpm dev` starts the web client, the API, the worker and the workspace runner together, and each
 service reads `.env` from the repository root. A development database is not required: with
-`DATABASE_DRIVER=pglite`, which `.env.example` sets, the stack keeps its data in `.athanor/postgres`
+`DATABASE_DRIVER=pglite`, which `.env.example` sets, the stack keeps its data in `.garden/postgres`
 under the repository.
 
 Open `http://localhost:5173` and run the full source verification with:

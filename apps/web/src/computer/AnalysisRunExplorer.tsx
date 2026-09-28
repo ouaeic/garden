@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { AnalysisRunRecord } from '@athanor/contracts/analysis-run';
+import type { AnalysisRunRecord } from '@garden/contracts/analysis-run';
 import AnalysisRunPreview, {
   type AnalysisLocation,
   type ProducerSelection

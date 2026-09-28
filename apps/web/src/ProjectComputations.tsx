@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ComputationSession } from '@athanor/contracts';
+import type { ComputationSession } from '@garden/contracts';
 import { post } from './client';
 import { ErrorNotice } from './ui';
 import { ComputationCard } from './computer/Computation';

@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
+import { createDatabase, DataStore, migrateDatabase } from '@garden/data';
 import {
   encryptJson,
   executeConnectorAction,
   parseAccountConnectorAction,
   type ConnectorTransport
-} from '@athanor/core';
+} from '@garden/core';
 import { withAccountOperation } from './account-operation.js';
 
 describe('worker account operation persistence', () => {

@@ -36,7 +36,7 @@ async function fixture() {
   };
   const mark = () =>
     writeFile(
-      path.join(root, '.athanor/coding-parent.json'),
+      path.join(root, '.garden/coding-parent.json'),
       JSON.stringify({ parent: randomUUID(), id: randomUUID() })
     );
   return { parent, root, sandbox, policy, mark };

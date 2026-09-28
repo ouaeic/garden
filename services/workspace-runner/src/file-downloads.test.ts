@@ -5,7 +5,7 @@ import path from 'node:path';
 import { inflateRawSync } from 'node:zlib';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { signCapabilityToken, capabilityAudience } from '@athanor/core';
+import { signCapabilityToken, capabilityAudience } from '@garden/core';
 import { authenticateRunnerRequest } from './auth.js';
 import { directoryArchive } from './directory-archive.js';
 import { listDirectory } from './directories.js';
@@ -352,7 +352,7 @@ describe('streaming source delivery', () => {
       path.join(workspace, 'workspace/project/a.txt'),
       path.join(workspace, 'workspace/project/link')
     );
-    for (const asked of ['../escape', '.athanor/browser/Cookies', 'project/link', 'project'])
+    for (const asked of ['../escape', '.garden/browser/Cookies', 'project/link', 'project'])
       await expect(openDownloadFile(workspace, asked)).rejects.toThrow();
     await expect(sourceBundle(workspace, ['project/a.txt', 'project/missing'])).rejects.toThrow();
     const app = appFor(),

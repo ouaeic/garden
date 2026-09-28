@@ -7,8 +7,8 @@ import {
   recordPrivateDiagnostic,
   withPrivateDiagnostics,
   wrapDataKey
-} from '@athanor/core';
-import type { DataStore, TaskRecord } from '@athanor/data';
+} from '@garden/core';
+import type { DataStore, TaskRecord } from '@garden/data';
 import { TaskDiagnosticCapture } from './diagnostic-capture.js';
 
 const task = {

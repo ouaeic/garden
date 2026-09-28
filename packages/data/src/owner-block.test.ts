@@ -26,7 +26,7 @@ import {
   userMemoryAad,
   userMemoryKey,
   type EncryptedEnvelope
-} from '@athanor/core';
+} from '@garden/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createDatabase, migrateDatabase, type Database } from './database.js';
 import { migrations } from './migrations.js';

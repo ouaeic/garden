@@ -10,9 +10,9 @@ import {
   TaskApprovalOffer,
   canonicalApprovalScope,
   describeApprovalScope
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { createHmac } from 'node:crypto';
-import { AthanorError, decryptJson, encryptJson, unwrapDataKey } from '@athanor/core';
+import { GardenError, decryptJson, encryptJson, unwrapDataKey } from '@garden/core';
 import { z } from 'zod';
 import { textValue } from '../context.js';
 import { requireUser } from '../http/auth-hook.js';
@@ -96,7 +96,7 @@ export const registerApprovalRoutes = (context: RouteContext): void => {
         ).parse(request.body ?? {});
         const approval = await store.getApproval(request.params.approvalId);
         if (!approval || approval.userId !== user.id)
-          throw new AthanorError(
+          throw new GardenError(
             'approval_unavailable',
             'Approval is missing, resolved, or expired'
           );
@@ -114,7 +114,7 @@ export const registerApprovalRoutes = (context: RouteContext): void => {
         let grant: Parameters<typeof store.resolveApproval>[4];
         if ('scope' in input && input.scope === 'run') {
           if (request.apiToken)
-            throw new AthanorError(
+            throw new GardenError(
               'approval_grant_owner_required',
               'Reusable permissions require the owner’s session',
               403
@@ -128,7 +128,7 @@ export const registerApprovalRoutes = (context: RouteContext): void => {
             !workspace?.wrappedKey ||
             !task.agentStateCiphertext
           )
-            throw new AthanorError(
+            throw new GardenError(
               'approval_grant_unavailable',
               'This action supports approval once only',
               409
@@ -151,7 +151,7 @@ export const registerApprovalRoutes = (context: RouteContext): void => {
             offer.data.turn !== (state.turn ?? 0) ||
             offer.data.securityMode !== task.securityMode
           )
-            throw new AthanorError(
+            throw new GardenError(
               'approval_grant_unavailable',
               'This permission no longer matches the current run',
               409
@@ -173,7 +173,7 @@ export const registerApprovalRoutes = (context: RouteContext): void => {
           const task = await store.getTask(user.id, String(approval.taskId));
           const workspace = task ? await store.getWorkspace(user.id, task.workspaceId) : null;
           if (!task || !workspace?.wrappedKey)
-            throw new AthanorError('approval_unavailable', 'Approval workspace is unavailable');
+            throw new GardenError('approval_unavailable', 'Approval workspace is unavailable');
           const key = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
           correction = {
             promptCiphertext: encryptJson({ prompt: note }, key, `task-message:${task.id}`),
@@ -186,7 +186,7 @@ export const registerApprovalRoutes = (context: RouteContext): void => {
           approval.status === 'pending'
         ) {
           if (request.apiToken)
-            throw new AthanorError(
+            throw new GardenError(
               'session_required',
               'Complete the handoff from a signed-in device',
               403
@@ -194,7 +194,7 @@ export const registerApprovalRoutes = (context: RouteContext): void => {
           const task = await store.getTask(user.id, String(approval.taskId));
           const workspace = task ? await store.getWorkspace(user.id, task.workspaceId) : null;
           if (!task || !workspace?.wrappedKey)
-            throw new AthanorError('approval_unavailable', 'Handoff workspace unavailable', 409);
+            throw new GardenError('approval_unavailable', 'Handoff workspace unavailable', 409);
           const preview = decryptJson<{ tool: string }>(
             approval.previewCiphertext as Parameters<typeof decryptJson>[0],
             unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id)
@@ -211,13 +211,13 @@ export const registerApprovalRoutes = (context: RouteContext): void => {
             path: `/v1/workspaces/${workspace.id}/computer-sessions`
           });
           if (sessions[surface]?.holder === 'secure_input')
-            throw new AthanorError(
+            throw new GardenError(
               'private_input_active',
               'End private input before continuing',
               409
             );
           if (!sessions[surface])
-            throw new AthanorError(
+            throw new GardenError(
               'handoff_unavailable',
               'Open the computer and complete the requested action first',
               409
@@ -244,7 +244,7 @@ export const registerApprovalRoutes = (context: RouteContext): void => {
           ...settlement
         );
         if (!changed)
-          throw new AthanorError(
+          throw new GardenError(
             'approval_unavailable',
             'Approval is missing, resolved, or expired'
           );
@@ -259,7 +259,7 @@ export const registerApprovalRoutes = (context: RouteContext): void => {
       const user = requireUser(request.user);
       const { before } = z.object({ before: z.string().uuid().optional() }).parse(request.query);
       const task = await store.getTask(user.id, request.params.taskId);
-      if (!task) throw new AthanorError('task_not_found', 'Work not found', 404);
+      if (!task) throw new GardenError('task_not_found', 'Work not found', 404);
       const workspace = await store.getWorkspace(user.id, task.workspaceId);
       if (!workspace?.wrappedKey || !task.agentStateCiphertext) return [];
       const key = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
@@ -298,7 +298,7 @@ export const registerApprovalRoutes = (context: RouteContext): void => {
             request.params.grantId
           ))
         )
-          throw new AthanorError('approval_grant_unavailable', 'Permission not found', 404);
+          throw new GardenError('approval_grant_unavailable', 'Permission not found', 404);
         return { ok: true };
       });
     }

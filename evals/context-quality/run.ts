@@ -88,7 +88,7 @@ for (const trajectory of trajectories)
  * `configuration-fidelity` is the shipped constants written back explicitly, so it goes through the
  * whole patch-and-reimport path and must land on the same numbers as `shipped`, which imports the
  * module directly. A rename upstream, a regex that stops matching, a scratch copy that resolves a
- * different `@athanor/model-gateway` - each of those makes every configuration secretly identical,
+ * different `@garden/model-gateway` - each of those makes every configuration secretly identical,
  * and every row in the table below would then agree with every other row, which reads like a
  * finding. This is the only thing standing between that and a confident wrong report.
  */
@@ -256,7 +256,7 @@ const regressions = flag('ci')
 // knows the answer and keeps it.
 for (const regression of regressions) process.stderr.write(`REGRESSION: ${regression}\n`);
 // `rigFailures` counts on every run, not only under `--ci`: a baseline regression is a decision
-// about athanor, but a degenerate control or a frozen probe column means the numbers printed above
+// about garden, but a degenerate control or a frozen probe column means the numbers printed above
 // are not measurements at all, and that is not something a flag should be able to hide.
 const failed =
   fidelityFailures.length + controlFailures.length + rigFailures.length + regressions.length;

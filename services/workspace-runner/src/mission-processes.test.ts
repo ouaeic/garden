@@ -118,7 +118,7 @@ const fixture = async () => {
 it('requires measured process isolation for child missions and preserves ordinary invocation modes', async () => {
   const { root, sandbox } = await fixture();
   await writeFile(
-    path.join(root, '.athanor', 'coding-parent.json'),
+    path.join(root, '.garden', 'coding-parent.json'),
     JSON.stringify({ parent: randomUUID(), id: randomUUID() })
   );
   await expect(
@@ -262,7 +262,7 @@ it('quiesces declared services, persists retirement and refuses new launches whi
     manager.start(root, path.basename(root), 'task', request, 60, false)
   ).rejects.toThrow('scope is closed');
   const registry = JSON.parse(
-    await readFile(path.join(root, '.athanor', 'services.json'), 'utf8')
+    await readFile(path.join(root, '.garden', 'services.json'), 'utf8')
   ) as unknown[];
   expect(registry).toEqual([]);
 });
@@ -284,7 +284,7 @@ it('never restarts durable commands inside a child mission after runner recovery
   );
   await manager.close();
   await writeFile(
-    path.join(root, '.athanor', 'coding-parent.json'),
+    path.join(root, '.garden', 'coding-parent.json'),
     JSON.stringify({ parent: randomUUID(), id: randomUUID() })
   );
   const recovered = new ProcessManager();
@@ -319,12 +319,12 @@ it('refuses quiescence success until retired declarations are durably persisted'
     60,
     false
   );
-  await rm(path.join(root, '.athanor', 'services.json'));
-  await mkdir(path.join(root, '.athanor', 'services.json'));
+  await rm(path.join(root, '.garden', 'services.json'));
+  await mkdir(path.join(root, '.garden', 'services.json'));
   await expect(manager.quiesceWorkspace(path.basename(root))).rejects.toThrow();
-  await rm(path.join(root, '.athanor', 'services.json'), { recursive: true });
+  await rm(path.join(root, '.garden', 'services.json'), { recursive: true });
   await manager.quiesceWorkspace(path.basename(root));
-  expect(JSON.parse(await readFile(path.join(root, '.athanor', 'services.json'), 'utf8'))).toEqual(
+  expect(JSON.parse(await readFile(path.join(root, '.garden', 'services.json'), 'utf8'))).toEqual(
     []
   );
 });

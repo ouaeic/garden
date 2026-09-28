@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { TaskEvent, TaskPresentation, WorkSurfaceView } from '@athanor/contracts';
+import type { TaskEvent, TaskPresentation, WorkSurfaceView } from '@garden/contracts';
 import { currentWork } from './current-work';
 import { WorkDirections } from './WorkDirections';
 import WorkTrace from './WorkTrace';

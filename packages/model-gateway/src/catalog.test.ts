@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { MediaModelOption } from '@athanor/contracts';
+import type { MediaModelOption } from '@garden/contracts';
 import {
   configuredModelCatalog,
   rankMediaModels,
@@ -37,7 +37,7 @@ describe('cloud-only model catalog', () => {
     );
   });
 
-  it('advertises only the modalities athanor can put into a request', () => {
+  it('advertises only the modalities garden can put into a request', () => {
     // The gateway builds exactly one non-text content block, `image_url`, so a reviewed seed that
     // offered audio or video would show the owner a capability nothing on this computer can reach:
     // a screenshot is sent to a vision model, a recording never is.
@@ -45,7 +45,7 @@ describe('cloud-only model catalog', () => {
     expect([...offered].sort()).toEqual(['image', 'text']);
   });
 
-  it('keeps provider model ids separate from stable athanor ids', () => {
+  it('keeps provider model ids separate from stable garden ids', () => {
     expect(seedModels()).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -75,10 +75,10 @@ describe('media model catalogue', () => {
     ...overrides
   });
 
-  it('offers a reviewed route for each modality athanor can actually generate', () => {
+  it('offers a reviewed route for each modality garden can actually generate', () => {
     const offered = seedMediaModels().map((entry) => entry.modality);
     // Video is absent by construction: there is no request shape behind it, and a catalogue entry
-    // would be an offer athanor cannot keep.
+    // would be an offer garden cannot keep.
     expect(offered.sort()).toEqual(['audio', 'image']);
     expect(seedMediaModels().every((entry) => entry.priceSource === 'measured')).toBe(true);
   });
@@ -97,7 +97,7 @@ describe('media model catalogue', () => {
     expect(rankMediaModels(models, 'best')[0]?.id).toBe('dear');
   });
 
-  it('leads Recommended with the route athanor has itself measured', () => {
+  it('leads Recommended with the route garden has itself measured', () => {
     const models = [
       option({ id: 'cheaper', usdPerImage: 0.001 }),
       option({ id: 'reviewed', usdPerImage: 0.014, priceSource: 'measured' })

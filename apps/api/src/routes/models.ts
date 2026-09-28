@@ -7,9 +7,9 @@
  * own single-model provider.
  */
 
-import { modelTaskKinds, priceCeilingFields, rankModels, selectPurposeModel } from '@athanor/core';
-import type { ModelTaskKind } from '@athanor/core';
-import { refreshOpenRouterCatalog, seedModels } from '@athanor/model-gateway';
+import { modelTaskKinds, priceCeilingFields, rankModels, selectPurposeModel } from '@garden/core';
+import type { ModelTaskKind } from '@garden/core';
+import { refreshOpenRouterCatalog, seedModels } from '@garden/model-gateway';
 import { ownerPriceCeiling } from '../context.js';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext, ServerBase } from '../http/server-context.js';

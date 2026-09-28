@@ -1,4 +1,4 @@
-import type { ComputationCell, TaskEvent } from '@athanor/contracts';
+import type { ComputationCell, TaskEvent } from '@garden/contracts';
 
 export interface ComputationHistoryEntry {
   cellId: string;

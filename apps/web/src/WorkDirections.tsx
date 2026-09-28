@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { WorkSurfaceView } from '@athanor/contracts';
+import type { WorkSurfaceView } from '@garden/contracts';
 import { Button } from './ui';
 
 export function WorkDirections({

@@ -1,5 +1,5 @@
 import { taskReasoningEffort } from '../reasoning.js';
-import type { ReasoningEffort } from '@athanor/contracts';
+import type { ReasoningEffort } from '@garden/contracts';
 /**
  * Everything that has to be true, and everything that has to be measured, before a request is sent.
  *
@@ -26,8 +26,8 @@ import type { ReasoningEffort } from '@athanor/contracts';
  *
  * Lifted out of `AgentWorker.run()` unchanged.
  */
-import type { TaskRecord } from '@athanor/data';
-import { AthanorError } from '@athanor/core';
+import type { TaskRecord } from '@garden/data';
+import { GardenError } from '@garden/core';
 import type { AgentState } from '../agent-state.js';
 import {
   compactionTrigger,
@@ -84,7 +84,7 @@ export const prepareStepRequest = async (
   // owner chose, and it is answerable - pick another one - but only if they are told.
   const shortfall = contextShortfall(model.contextTokens, maxOutputTokens, reservedTokens);
   if (shortfall > 0)
-    throw new AthanorError(
+    throw new GardenError(
       'model_context_too_small',
       `${model.displayName} has a ${model.contextTokens.toLocaleString()}-token window, and every request already carries about ${reservedTokens.toLocaleString()} tokens of tools before your first word. It is short by roughly ${shortfall.toLocaleString()} tokens, so this task cannot run on it - choose a model with a larger window.`
     );

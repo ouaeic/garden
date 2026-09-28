@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { TaskEvent, TaskPlan, TaskResult } from '@athanor/contracts';
+import type { TaskEvent, TaskPlan, TaskResult } from '@garden/contracts';
 import { projectWorkSurface } from './work-surface-projection.js';
 
 const event = (sequence: number, kind: TaskEvent['kind'], payload: unknown): TaskEvent => ({

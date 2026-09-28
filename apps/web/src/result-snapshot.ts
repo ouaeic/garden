@@ -1,4 +1,4 @@
-import type { TaskEvent, TaskResult } from '@athanor/contracts';
+import type { TaskEvent, TaskResult } from '@garden/contracts';
 import { data, text } from './model';
 
 /** A preview image must be a raster observed at this registered result, not an arbitrary model URL. */

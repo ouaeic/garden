@@ -28,7 +28,7 @@ const Record = z.object({
 type Preview = z.infer<typeof Record>;
 const hash = (text: string) => createHash('sha256').update(text).digest('hex');
 const locks = new Map<string, Promise<unknown>>();
-const directory = (root: string) => path.join(root, '.athanor', 'code-edits');
+const directory = (root: string) => path.join(root, '.garden', 'code-edits');
 
 async function save(root: string, record: Preview) {
   const target = path.join(directory(root), `${record.id}.json`);

@@ -2,13 +2,13 @@
 name: web-form-filling
 description: Fill a web form correctly — enumerate the live fields, plan values from owner-provided facts, enter them in groups, verify the saved values, then submit within the owner's authorized scope. Use when completing multi-step application, grant or permit portals. Respect runtime approval cards and private-input handoffs; never invent facts or defeat a CAPTCHA.
 license: AGPL-3.0-or-later
-compatibility: Requires the athanor browser runner.
+compatibility: Requires the garden browser runner.
 allowed-tools: browser_snapshot read_elements browser_action document_read file_read files_list image_read
 metadata:
-  athanor.tier: 'builtin'
-  athanor.version: '2.3.1'
-  athanor.risk: 'external'
-  athanor.domain: 'web'
+  garden.tier: 'builtin'
+  garden.version: '2.3.1'
+  garden.risk: 'external'
+  garden.domain: 'web'
 ---
 
 # Web form filling

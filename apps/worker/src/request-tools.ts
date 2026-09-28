@@ -1,5 +1,5 @@
-import type { WorkspaceSurfaces } from '@athanor/contracts';
-import type { AnyConnectorKind } from '@athanor/core';
+import type { WorkspaceSurfaces } from '@garden/contracts';
+import type { AnyConnectorKind } from '@garden/core';
 import { COMPACT_CONTEXT_TOOL } from './context.js';
 import { agentToolsFor } from './tool-catalogue.js';
 

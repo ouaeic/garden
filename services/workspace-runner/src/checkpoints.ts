@@ -29,7 +29,7 @@ const GC_DEBT_THRESHOLD = 8;
 /**
  * What a turn checkpoint covers: the agent's project tree and anything it published.
  *
- * `.athanor/browser` and `.athanor/desktop` are deliberately absent. Those are the Chromium profile
+ * `.garden/browser` and `.garden/desktop` are deliberately absent. Those are the Chromium profile
  * and the live desktop session - the cookie jar for every site the owner has ever signed into - and
  * rolling them back to yesterday morning signs the owner out of all of them. A rewind undoes what
  * the agent did to the work; it is not meant to undo the owner's own logins.
@@ -53,8 +53,8 @@ const GC_DEBT_THRESHOLD = 8;
  * every other delete on the turn free. Anyone widening or narrowing this list is moving that rule
  * too.
  */
-export const CHECKPOINT_CONTENT = ['workspace', '.athanor/artifacts'] as const;
-export const CHECKPOINT_BROWSER_PROFILE = '.athanor/browser';
+export const CHECKPOINT_CONTENT = ['workspace', '.garden/artifacts'] as const;
+export const CHECKPOINT_BROWSER_PROFILE = '.garden/browser';
 
 export type CheckpointMechanism = 'btrfs' | 'zfs' | 'content';
 
@@ -624,7 +624,7 @@ export class WorkspaceCheckpoints {
   #directory(workspaceId: string): string {
     return path.join(
       path.resolve(this.#config.workspaceRoot),
-      '.athanor-checkpoints',
+      '.garden-checkpoints',
       safeId(workspaceId, 'workspace ID')
     );
   }
@@ -688,8 +688,8 @@ export class WorkspaceCheckpoints {
   }
 
   async #probe(root: string): Promise<{ mechanism: CheckpointMechanism; dataset: string | null }> {
-    const probeId = `athanor-probe-${Date.now().toString(36)}`;
-    const directory = path.join(path.dirname(root), '.athanor-checkpoints');
+    const probeId = `garden-probe-${Date.now().toString(36)}`;
+    const directory = path.join(path.dirname(root), '.garden-checkpoints');
     await mkdir(directory, { recursive: true, mode: 0o700 });
     const target = path.join(directory, probeId);
     try {
@@ -787,7 +787,7 @@ export class WorkspaceCheckpoints {
       await this.#run(this.#config.btrfsExecutable, ['subvolume', 'snapshot', '-r', root, target]);
       meta.source = target;
     } else if (resolved.mechanism === 'zfs') {
-      const snapshot = `${resolved.dataset ?? ''}@athanor-${id}`;
+      const snapshot = `${resolved.dataset ?? ''}@garden-${id}`;
       await this.#run(this.#config.zfsExecutable, ['snapshot', snapshot]);
       meta.source = snapshot;
     } else {
@@ -928,7 +928,7 @@ export class WorkspaceCheckpoints {
     const base =
       meta.mechanism === 'btrfs'
         ? (meta.source ?? path.join(directory, meta.id))
-        : path.join(root, '.zfs', 'snapshot', `athanor-${meta.id}`);
+        : path.join(root, '.zfs', 'snapshot', `garden-${meta.id}`);
     return {
       scan: await scanTree(base, this.#roots(), this.#limits('use')),
       content: (relative) => path.join(base, safeRelative(relative))

@@ -130,7 +130,7 @@ describe('native isolated coding work', () => {
     const f = await start();
     await writeFile(path.join(root, f.childWorkspaceId, 'workspace/src/app.ts'), 'specialist');
     const review = await f.missions.review(parent, f.id, 1);
-    const manifestFile = path.join(root, parent, '.athanor/coding-missions', f.id, 'manifest.json');
+    const manifestFile = path.join(root, parent, '.garden/coding-missions', f.id, 'manifest.json');
     const manifest = JSON.parse(await readFile(manifestFile, 'utf8')) as Record<string, unknown>;
     manifest.phase = 'integrating';
     manifest.integration = {
@@ -140,7 +140,7 @@ describe('native isolated coding work', () => {
     };
     await writeFile(manifestFile, JSON.stringify(manifest));
     await writeFile(
-      path.join(root, parent, '.athanor/coding-integration.json'),
+      path.join(root, parent, '.garden/coding-integration.json'),
       JSON.stringify({ id: f.id })
     );
     await writeFile(path.join(root, parent, 'workspace/project/src/app.ts'), 'specialist');
@@ -151,7 +151,7 @@ describe('native isolated coding work', () => {
     ).toContain('= 1');
     expect((await restarted.review(parent, f.id, 1)).canIntegrate).toBe(true);
     await expect(
-      readFile(path.join(root, parent, '.athanor/coding-integration.json'))
+      readFile(path.join(root, parent, '.garden/coding-integration.json'))
     ).rejects.toThrow();
   });
   it('fails closed for absent kernel confinement, links and stale cancelled generations', async () => {
@@ -201,7 +201,7 @@ describe('native isolated coding work', () => {
   it('recovers a rollback that finished before its journal unlink was persisted', async () => {
     const f = await start();
     await writeFile(
-      path.join(root, parent, '.athanor/coding-integration.json'),
+      path.join(root, parent, '.garden/coding-integration.json'),
       JSON.stringify({ id: f.id })
     );
     await new NativeCodingMissions(root, true, execution).recover(parent);
@@ -209,7 +209,7 @@ describe('native isolated coding work', () => {
       await readFile(path.join(root, parent, 'workspace/project/src/app.ts'), 'utf8')
     ).toContain('= 1');
     await expect(
-      readFile(path.join(root, parent, '.athanor/coding-integration.json'))
+      readFile(path.join(root, parent, '.garden/coding-integration.json'))
     ).rejects.toThrow();
   });
   const surface = (workspaceId: string, sub: string, role: string, scopes: string[]) => {

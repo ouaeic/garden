@@ -1,4 +1,4 @@
-import type { ServerToolUse, WebCitation } from '@athanor/contracts';
+import type { ServerToolUse, WebCitation } from '@garden/contracts';
 import { z } from 'zod';
 import type { GenerationCutoff } from './generation-budget.js';
 import { ReasoningEffort, ReasoningOptions } from './reasoning.js';
@@ -48,7 +48,7 @@ export const ModelMessage = z.object({
    *
    * It was a content test - the middle of the marker, searched for in the message body - and a
    * content test cannot tell those apart. The phrase appears in this repository's own test files,
-   * so pasting athanor's source into athanor made a message uncuttable: two windows differing by
+   * so pasting garden's source into garden made a message uncuttable: two windows differing by
    * fifty-nine characters dropped nothing and then dropped thirty-six messages, taking 468,530
    * characters of the owner's corrections with them. Owner-authored text was being trusted as a
    * category when the fact wanted was about its source.
@@ -76,7 +76,7 @@ export type ModelTool = z.infer<typeof ModelTool>;
  * here. Keeping the two in one array would have made "which of these disclose the query to a third
  * party" a matter of inspecting each entry's shape, on the one decision where that must never be a
  * guess. Which tools may travel here is not this package's decision: `resolveWebToolPlan` in
- * @athanor/contracts is the only thing that answers it, and the adapter refuses a request that
+ * @garden/contracts is the only thing that answers it, and the adapter refuses a request that
  * contradicts it.
  */
 export const ModelServerTool = z.object({
@@ -275,7 +275,7 @@ export interface ModelResponse {
     latencyMs: number;
     /**
      * Milliseconds until the model produced its first token, on a streamed turn. Published latency
-     * for these routes is null everywhere it can be observed, so this is the measurement athanor
+     * for these routes is null everywhere it can be observed, so this is the measurement garden
      * can actually make: over the owner's network, from the owner's box, on the owner's prompts.
      * Absent on a non-streamed turn, where there is no first token to time.
      */

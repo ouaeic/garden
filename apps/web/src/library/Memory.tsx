@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { MemoryItemBody, Workspace } from '@athanor/contracts';
+import type { MemoryItemBody, Workspace } from '@garden/contracts';
 import { ApiError, del, get, patch, post, put } from '../client.js';
 import { Button, Dialog, Field } from '../ui.js';
 import {

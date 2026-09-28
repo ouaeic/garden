@@ -5,9 +5,9 @@ const Config = z.object({
   RUNNER_HOST: z.string().default('127.0.0.1'),
   RUNNER_PORT: z.coerce.number().int().positive().default(4300),
   RUNNER_SHARED_SECRET: z.string().min(32),
-  WORKSPACE_ROOT: z.string().default('.athanor/workspaces'),
+  WORKSPACE_ROOT: z.string().default('.garden/workspaces'),
   TAR_EXECUTABLE: z.string().default('/usr/bin/tar'),
-  SNAPSHOT_EXECUTABLE: z.string().default('/usr/local/lib/athanor/athanor-snapshot'),
+  SNAPSHOT_EXECUTABLE: z.string().default('/usr/local/lib/garden/garden-snapshot'),
   GUI_NAMESPACE_HELPER: z.string().optional(),
   BROWSER_EXECUTABLE_PATH: z.string().optional(),
   // On by default: run the browser on the workspace's own X server rather than headless. Headless
@@ -25,7 +25,7 @@ const Config = z.object({
    * pins the machine - measured at about thirteen of sixteen cores, held for as long as the page
    * stayed open. Ten is a weight, not a cap: the browser still gets the whole processor when
    * nothing else wants it, and yields to the agent's own commands when they do, which is the same
-   * argument `athanor-runner.service` makes for its own `CPUWeight`. Zero switches it off.
+   * argument `garden-runner.service` makes for its own `CPUWeight`. Zero switches it off.
    */
   BROWSER_CPU_NICE: z.coerce.number().int().min(0).max(19).default(10),
   DESKTOP_BRIDGE_EXECUTABLE: z.string().optional(),
@@ -47,9 +47,9 @@ const Config = z.object({
   // upper bound for task-scoped interpreter sessions.
   MAX_BACKGROUND_SECONDS: z.coerce.number().int().positive().max(2_147_483).default(86_400),
   // prlimit is part of util-linux, an essential package, so it is present on every stock
-  // Debian and Ubuntu host without anything being installed for athanor's benefit.
+  // Debian and Ubuntu host without anything being installed for garden's benefit.
   RESOURCE_LIMIT_EXECUTABLE: z.string().default('/usr/bin/prlimit'),
-  // A bare name rather than a path, which is the one spelling everything else in athanor uses for
+  // A bare name rather than a path, which is the one spelling everything else in garden uses for
   // this: the installer puts a compatibility command on PATH where the release only packages the
   // older ImageMagick, and the toolchain probe and the skills both name it this way. The package
   // table already installs it for image work, so a photograph the owner wants looked at is
@@ -119,7 +119,7 @@ const Config = z.object({
    * exec line that already drops it to the agent account.
    *
    * Off by default and turned on by the installer from a measurement rather than from a guess:
-   * `athanor-sandbox check` reports `filesystem=landlock` or `filesystem=none`, and
+   * `garden-sandbox check` reports `filesystem=landlock` or `filesystem=none`, and
    * scripts/install-native.sh writes this key from that line. Defaulting it on would have been the
    * braver spelling and the wrong one - a kernel without Landlock, or a util-linux older than 2.41,
    * makes setpriv exit before the command runs, so an upgrade would have turned every command on
@@ -130,7 +130,7 @@ const Config = z.object({
    * there is nowhere to apply it and every command would run exactly as unconfined as before while
    * this key said otherwise.
    *
-   * It also needs WORKSPACE_ROOT to be /home/athanor, which the helper hard-codes and will not take
+   * It also needs WORKSPACE_ROOT to be /home/garden, which the helper hard-codes and will not take
    * from a caller. That is not checked here, because a runner started with a different workspace
    * root is a development configuration where AGENT_SANDBOX_HELPER is unset and this is moot; on a
    * box where it is set, the same installer writes both values.

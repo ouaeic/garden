@@ -18,7 +18,7 @@ import {
   ModelRelease,
   OwnerPreferences,
   resolveWebToolPlan
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import type {
   MediaModalityState,
   MediaSettings,
@@ -26,9 +26,9 @@ import type {
   Workspace,
   CreateWorkspaceRequest,
   MediaModelSelection
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import {
-  AthanorError,
+  GardenError,
   assertSpendAllowed,
   generateDataKey,
   readInferenceConnections,
@@ -39,10 +39,10 @@ import {
   selectModel,
   spendWindowBounds,
   wrapDataKey
-} from '@athanor/core';
-import type { ModelTaskKind, RoutableModel } from '@athanor/core';
-import type { MediaModelOption } from '@athanor/contracts';
-import type { UserRecord, WorkspaceRecord } from '@athanor/data';
+} from '@garden/core';
+import type { ModelTaskKind, RoutableModel } from '@garden/core';
+import type { MediaModelOption } from '@garden/contracts';
+import type { UserRecord, WorkspaceRecord } from '@garden/data';
 import {
   createModelAdapter,
   MediaRouteResolver,
@@ -51,7 +51,7 @@ import {
   planUsageFor,
   resolveVisionInputRoutes,
   seedModels
-} from '@athanor/model-gateway';
+} from '@garden/model-gateway';
 import type { z } from 'zod';
 import { ownerPriceCeiling, workspaceResponse } from '../context.js';
 import type { InferenceSecret } from '../context.js';
@@ -248,7 +248,7 @@ export const createServerSupport = (context: ServerBase) => {
      * makes an unattended run agree with the owner's own screen rather than quietly choosing
      * something else. That door is deliberately exempt from the price ceiling - `rankModels` drops
      * the ceiling for an explicit id, and `selectModel`'s `requestedId` arm can never answer
-     * `blocked` - because the ceiling governs what athanor chooses for the owner, never what the
+     * `blocked` - because the ceiling governs what garden chooses for the owner, never what the
      * owner chooses for themselves. A pin is not that. It is a setting made once on a screen, and
      * it then governs runs the owner is not present for, so on this path the ceiling wins:
      * measured before this line existed, a pin at 30x the input ceiling and 45x the output ceiling
@@ -296,7 +296,7 @@ export const createServerSupport = (context: ServerBase) => {
     const selection =
       pinned?.choice && pinned.ceilingOutcome !== 'requested_over_ceiling' ? pinned : select();
     if (selection.ceilingOutcome === 'blocked')
-      throw new AthanorError(
+      throw new GardenError(
         'price_ceiling_blocked',
         selection.message ?? 'No model can do this work under your price ceiling',
         402
@@ -461,7 +461,7 @@ export const createServerSupport = (context: ServerBase) => {
   ): Promise<Workspace> => {
     const existing = await store.listWorkspaces(user.id);
     if (existing.length >= serverLimits.maxWorkspaces)
-      throw new AthanorError(
+      throw new GardenError(
         'computer_already_exists',
         'This garden installation already has its persistent computer',
         409
@@ -469,7 +469,7 @@ export const createServerSupport = (context: ServerBase) => {
     const remainingStorage =
       serverLimits.storageBytes - existing.reduce((sum, item) => sum + item.storageLimitBytes, 0);
     if (input.storageLimitBytes > remainingStorage)
-      throw new AthanorError(
+      throw new GardenError(
         'storage_limit',
         'The requested cloud storage exceeds your selected allowance'
       );
@@ -585,7 +585,7 @@ export const createServerSupport = (context: ServerBase) => {
    * is on the same route, and the second heading described a conversation that could not be started
    * here. Where a query goes is a fact about the box, so it is reported as one.
    *
-   * The verdict itself is not computed here: `resolveWebToolPlan` in @athanor/contracts is the only
+   * The verdict itself is not computed here: `resolveWebToolPlan` in @garden/contracts is the only
    * place in this repository that decides it, so the sentence on the settings page and the tools
    * that go on the wire cannot come from two different opinions.
    *
@@ -768,7 +768,7 @@ export const createServerSupport = (context: ServerBase) => {
         choice.modelId &&
         (!routes[kind] || routes[kind]?.unavailableReason)
       )
-        throw new AthanorError(
+        throw new GardenError(
           'media_route_unavailable',
           'The selected media route is unavailable. Choose an available model.',
           409
@@ -822,7 +822,7 @@ export const createServerSupport = (context: ServerBase) => {
       [workspaceId, userId, busy ? [...busy] : SETTLED_STATUSES]
     );
     if (result.rows.length > 0)
-      throw new AthanorError(
+      throw new GardenError(
         'workspace_busy',
         options?.refusal ?? 'Pause or finish every agent task before changing recovery points',
         409

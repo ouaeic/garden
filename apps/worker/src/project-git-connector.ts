@@ -1,8 +1,8 @@
-import { runtimeNow } from '@athanor/core';
+import { runtimeNow } from '@garden/core';
 import { createHash } from 'node:crypto';
-import type { GitHubProjectAction } from '@athanor/contracts';
-import type { ConnectorExecutionResult, ConnectorSecret } from '@athanor/core';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import type { GitHubProjectAction } from '@garden/contracts';
+import type { ConnectorExecutionResult, ConnectorSecret } from '@garden/core';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { ToolContext } from './tool-dispatch.js';
 
 export async function executeProjectGitConnector(

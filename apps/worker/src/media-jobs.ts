@@ -1,9 +1,9 @@
-import { runtimeNow, runtimeUUID } from '@athanor/core';
+import { runtimeNow, runtimeUUID } from '@garden/core';
 
 import { setTimeout as sleep } from 'node:timers/promises';
-import { decryptJson, encryptJson, sha256, unwrapDataKey } from '@athanor/core';
-import { agentNotificationAad, type DataStore, type MediaJobRecord } from '@athanor/data';
-import { VideoClient, VideoSubmissionUncertainError } from '@athanor/model-gateway';
+import { decryptJson, encryptJson, sha256, unwrapDataKey } from '@garden/core';
+import { agentNotificationAad, type DataStore, type MediaJobRecord } from '@garden/data';
+import { VideoClient, VideoSubmissionUncertainError } from '@garden/model-gateway';
 import { AgentRunnerClient, withRunnerAbort } from './runner-client.js';
 import { MediaBatchWorker } from './media-batches.js';
 
@@ -24,7 +24,7 @@ function mediaEvent(job: MediaJobRecord, key: Buffer, status: string, artifactId
     summary: 'Encrypted media event',
     payloadCiphertext: encryptJson(
       {
-        __athanorEventVersion: 1,
+        __gardenEventVersion: 1,
         summary: artifactId ? 'Video ready' : `Video ${status.replaceAll('_', ' ')}`,
         payload: {
           mediaJobId: job.id,
@@ -157,7 +157,7 @@ export class MediaJobWorker {
       if (job.status === 'delivering') {
         const output = await client.download(job.providerJobId, signal);
         if (!job.outputPath) throw new Error('The output path is missing');
-        const storageKey = `.athanor/artifacts/media-${job.id}`;
+        const storageKey = `.garden/artifacts/media-${job.id}`;
         await runner.writeBytes(job.workspaceId, job.taskId, job.outputPath, output.bytes);
         await runner.writeBytes(job.workspaceId, job.taskId, storageKey, output.bytes);
         const completed = await store.completeMediaJob({

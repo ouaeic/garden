@@ -189,13 +189,13 @@ export const listeningSocketsOfGroup = async (
 /**
  * The account agent commands run as, or this process's own where there is no second account.
  *
- * The name is fixed rather than configured, for the same reason `scripts/athanor-sandbox` fixes it:
+ * The name is fixed rather than configured, for the same reason `scripts/garden-sandbox` fixes it:
  * the helper's whole property is that a caller gains nothing by lying to it, so neither end reads
  * the account it drops to out of anything a caller can influence. A developer's laptop has no such
  * account and runs agent commands as the runner itself, which is exactly what the fallback says.
  */
 export const agentAccountUid = async (
-  account = 'athanor-agent',
+  account = 'garden-agent',
   passwdPath = '/etc/passwd'
 ): Promise<number> => {
   const own = process.getuid?.() ?? 0;
@@ -212,8 +212,8 @@ export const agentAccountUid = async (
 /**
  * Every port an agent-owned process has open on this computer.
  *
- * NOT the process-group walk above, because that walk cannot run where athanor ships.
- * `infra/native/athanor-runner.service` sets `ProtectProc=invisible`, and agent commands run as a
+ * NOT the process-group walk above, because that walk cannot run where garden ships.
+ * `infra/native/garden-runner.service` sets `ProtectProc=invisible`, and agent commands run as a
  * different account than the runner - measured on a live box: `/proc/<pid>` for the service and for
  * its root `sudo` wrapper were both hidden from the runner's namespace, and `/proc/<pid>/fd` was
  * denied, while `/proc/net/tcp` stayed readable. Attribution by file descriptor is therefore

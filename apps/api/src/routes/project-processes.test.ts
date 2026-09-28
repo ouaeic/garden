@@ -1,5 +1,5 @@
 import Fastify from 'fastify';
-import type { ProcessList } from '@athanor/contracts';
+import type { ProcessList } from '@garden/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { registerProjectProcessRoutes } from './project-processes.js';
 import type { RouteContext } from '../http/server-context.js';

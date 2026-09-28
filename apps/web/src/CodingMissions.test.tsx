@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import type { CodingMissionReview } from '@athanor/contracts';
+import type { CodingMissionReview } from '@garden/contracts';
 import { MissionReviewChanges } from './CodingMissions';
 
 const review: CodingMissionReview = {

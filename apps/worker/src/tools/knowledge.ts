@@ -1,4 +1,4 @@
-import { runtimeDate } from '@athanor/core';
+import { runtimeDate } from '@garden/core';
 import { createHmac } from 'node:crypto';
 import {
   assertMemoryValidity,
@@ -7,14 +7,14 @@ import {
   memoryTemporalStatus,
   userMemoryAad,
   userMemoryKey,
-  AthanorError,
+  GardenError,
   OWNER_MEMORY_MAX_CHARS,
   WORKSPACE_MEMORY_MAX_CHARS,
   OWNER_MEMORY_MAX_ROWS,
   type MemoryDocument,
   type MemoryKind
-} from '@athanor/core';
-import { type ModelToolCall } from '@athanor/model-gateway';
+} from '@garden/core';
+import { type ModelToolCall } from '@garden/model-gateway';
 import {
   boundedKnowledge,
   openedSkillsStillReadable,
@@ -48,7 +48,7 @@ export async function executeKnowledgeTool(
        * accepted; `memory_recall` and the memory pack print `mem.item` ids no tool accepted; and a
        * `finish` cites the `toolCallId` whose raw result the harness stores and nothing could read.
        * A pointer nobody can dereference is the defect, and this is the one call that dereferences
-       * all three - `expand`, in the field's words, over edges athanor already wrote.
+       * all three - `expand`, in the field's words, over edges garden already wrote.
        *
        * It is here rather than in a tool of its own on purpose. A new tool is resident bytes in
        * every request and a second concept for the model to choose between; this is the same
@@ -191,7 +191,7 @@ export async function executeKnowledgeTool(
        * turn in the loop.
        */
       if (target === 'user' && action !== 'list')
-        throw new AthanorError(
+        throw new GardenError(
           'memory_scope_refused',
           'Memory about the owner is loaded into every workspace on this computer and only the owner can write it, in Settings. Use target "workspace" for what you learned here.'
         );
@@ -243,7 +243,7 @@ export async function executeKnowledgeTool(
           .reduce((total, entry) => total + entry.content.length, 0);
         const limit = target === 'user' ? OWNER_MEMORY_MAX_CHARS : WORKSPACE_MEMORY_MAX_CHARS;
         if (targetTotal + content.length > limit)
-          throw new AthanorError(
+          throw new GardenError(
             'memory_full',
             `${target} memory is ${targetTotal}/${limit} characters. Consolidate or remove an entry before adding this one.`
           );
@@ -267,7 +267,7 @@ export async function executeKnowledgeTool(
       }
       const id = textValue(call.arguments.id);
       const existing = records.find((entry) => entry.id === id);
-      if (!existing) throw new AthanorError('memory_not_found', 'Memory entry not found');
+      if (!existing) throw new GardenError('memory_not_found', 'Memory entry not found');
       /*
        * The refusal above reads the argument; this one reads the row.
        *
@@ -278,7 +278,7 @@ export async function executeKnowledgeTool(
        * property of the row.
        */
       if (existing.target === 'user')
-        throw new AthanorError(
+        throw new GardenError(
           'memory_scope_refused',
           'That entry is memory about the owner. Only the owner can change or remove it, in Settings.'
         );
@@ -296,7 +296,7 @@ export async function executeKnowledgeTool(
         // stronger statement about the gate than any test could make.
         const limit = WORKSPACE_MEMORY_MAX_CHARS;
         if (othersTotal + content.length > limit)
-          throw new AthanorError('memory_full', 'Replacement would exceed the memory limit');
+          throw new GardenError('memory_full', 'Replacement would exceed the memory limit');
         const validUntil =
           typeof call.arguments.validUntil === 'string' ? call.arguments.validUntil : undefined;
         const document: MemoryDocument = {
@@ -320,14 +320,14 @@ export async function executeKnowledgeTool(
           maxOwnerRows: OWNER_MEMORY_MAX_ROWS,
           contentCiphertext: encryptJson(document, key, `workspace-memory:${task.workspaceId}`)
         });
-        if (!updated) throw new AthanorError('memory_not_found', 'Memory entry not found');
+        if (!updated) throw new GardenError('memory_not_found', 'Memory entry not found');
         return materialize(updated);
       }
       if (action === 'remove')
         return {
           removed: await context.store.deleteWorkspaceMemory(task.userId, task.workspaceId, id)
         };
-      throw new AthanorError('memory_action_invalid', 'Unknown memory action');
+      throw new GardenError('memory_action_invalid', 'Unknown memory action');
     }
     case 'skill': {
       const action = textValue(call.arguments.action);
@@ -403,7 +403,7 @@ export async function executeKnowledgeTool(
         // brief and tells the model to reopen them, which a stub would then refuse to honour.
         const active = openedSkillsStillReadable(state.messages, state.openedSkills ?? []);
         const builtin = openSkill(library, id, { missingBinaries, active });
-        if (!builtin) throw new AthanorError('skill_not_found', 'Skill not found');
+        if (!builtin) throw new GardenError('skill_not_found', 'Skill not found');
         if (!active.includes(builtin.name)) state.openedSkills = [...active, builtin.name];
         return {
           id: builtin.name,
@@ -421,7 +421,7 @@ export async function executeKnowledgeTool(
       if (action === 'upsert') {
         const document = skillDocument(call.arguments);
         const nameHash = createHmac('sha256', key)
-          .update(`athanor-skill:${document.name}`)
+          .update(`garden-skill:${document.name}`)
           .digest('hex');
         const saved = await context.store.upsertWorkspaceSkill({
           userId: task.userId,
@@ -434,7 +434,7 @@ export async function executeKnowledgeTool(
       if (action === 'remove') {
         const id = textValue(call.arguments.id);
         const found = skills.find((item) => item.id === id || item.name === id);
-        if (!found) throw new AthanorError('skill_not_found', 'Skill not found');
+        if (!found) throw new GardenError('skill_not_found', 'Skill not found');
         return {
           removed: await context.store.deleteWorkspaceSkill(
             task.userId,
@@ -444,7 +444,7 @@ export async function executeKnowledgeTool(
           name: found.name
         };
       }
-      throw new AthanorError('skill_action_invalid', 'Unknown skill action');
+      throw new GardenError('skill_action_invalid', 'Unknown skill action');
     }
     default:
       /*

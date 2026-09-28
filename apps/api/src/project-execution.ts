@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { AthanorError, decryptJson, encryptJson, unwrapDataKey, wrapDataKey } from '@athanor/core';
-import type { TaskEvent } from '@athanor/contracts';
-import type { ProjectExecutionRecord, TaskRecord } from '@athanor/data';
+import { GardenError, decryptJson, encryptJson, unwrapDataKey, wrapDataKey } from '@garden/core';
+import type { TaskEvent } from '@garden/contracts';
+import type { ProjectExecutionRecord, TaskRecord } from '@garden/data';
 import type { SupportedContext } from './http/server-context.js';
 import { TaskEvidenceReader } from './task-evidence.js';
 import { taskSourceFiles } from './task-presentation.js';
@@ -10,7 +10,7 @@ import { taskSourceFiles } from './task-presentation.js';
 type Context = Pick<SupportedContext, 'store' | 'database' | 'masterKey' | 'runner'>;
 type Manifest = { paths: string[]; kind: 'new' | 'legacy' };
 const aad = (taskId: string) => `project-execution:${taskId}`;
-const BRIEFS = ['workspace/ATHANOR.md', 'workspace/AGENTS.md', 'workspace/OPEN_CLOUD.md'];
+const BRIEFS = ['workspace/GARDEN.md', 'workspace/AGENTS.md', 'workspace/OPEN_CLOUD.md'];
 const record = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -65,9 +65,7 @@ export function projectSourcePaths(
       !normalized.startsWith('workspace/') ||
       normalized
         .split('/')
-        .some((part) =>
-          ['.athanor', '.garden', '.home', '.git', 'node_modules', '.venv'].includes(part)
-        )
+        .some((part) => ['.garden', '.home', '.git', 'node_modules', '.venv'].includes(part))
     )
       continue;
     const parts = normalized.split('/');
@@ -80,7 +78,7 @@ export function projectSourcePaths(
     );
   }
   if (selected.size > 128)
-    throw new AthanorError(
+    throw new GardenError(
       'project_sources_limit',
       'This project names too many independent source locations to prepare safely.',
       409
@@ -95,7 +93,7 @@ export async function beginProjectExecution(
   independent = false
 ): Promise<ProjectExecutionRecord | null> {
   const workspace = await context.store.getWorkspace(task.userId, task.workspaceId);
-  if (!workspace?.wrappedKey) throw new AthanorError('workspace_not_found', 'Workspace not found');
+  if (!workspace?.wrappedKey) throw new GardenError('workspace_not_found', 'Workspace not found');
   const prior = await context.store.getProjectExecution(task.userId, task.id);
   if ((workspace.parentWorkspaceId && !independent && !prior) || task.parentMissionId) return null;
   const key = unwrapDataKey(workspace.wrappedKey, context.masterKey, workspace.id);
@@ -177,7 +175,7 @@ export async function completeProjectExecution(
     return current;
   }
   const source = await context.store.getWorkspace(task.userId, execution.sourceWorkspaceId);
-  if (!source?.wrappedKey) throw new AthanorError('workspace_not_found', 'Workspace not found');
+  if (!source?.wrappedKey) throw new GardenError('workspace_not_found', 'Workspace not found');
   const key = unwrapDataKey(source.wrappedKey, context.masterKey, source.id);
   const manifest = decryptJson<Manifest>(execution.sourceManifestCiphertext, key, aad(task.id));
   try {

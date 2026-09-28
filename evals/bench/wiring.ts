@@ -1,11 +1,11 @@
 /**
- * The join, driven: athanor's OWN runner client, over a real socket, against this shim.
+ * The join, driven: garden's OWN runner client, over a real socket, against this shim.
  *
  * THIS FILE EXISTS BECAUSE OF ONE DEFECT SHAPE. The last wave in this programme shipped a repair
  * whose every seam was proved in isolation while the one line joining them was never written. A
  * shim whose routes are each exercised by a hand-written request is exactly that: every part
  * green, nothing joined. `selftest.ts`'s route table sends requests THIS RIG composed, to answers
- * THIS RIG parses. If the shim's answers are shaped for this rig rather than for athanor, every
+ * THIS RIG parses. If the shim's answers are shaped for this rig rather than for garden, every
  * check in that table still passes.
  *
  * So the checks below construct `AgentRunnerClient` from `apps/worker/src/runner-client.ts` - the
@@ -17,7 +17,7 @@
  * does not.
  *
  * WHAT IT STILL DOES NOT PROVE, and this is the honest edge of it: no `AgentWorker` runs here, and
- * no model is called. It proves the wire between athanor's client and this shim. It does not prove
+ * no model is called. It proves the wire between garden's client and this shim. It does not prove
  * a whole turn. That step needs a provider key and is the first paid command in `README.md`.
  */
 import { AgentRunnerClient } from '../../apps/worker/src/runner-client.js';
@@ -52,7 +52,7 @@ export const wiringChecks = async (): Promise<string[]> => {
     const read = await client.readFile(WORKSPACE, TASK, 'workspace/wire.txt');
     if (read !== SAMPLE)
       problems.push(
-        `athanor's own client read back ${JSON.stringify(read.slice(0, 60))} for a file it had just written`
+        `garden's own client read back ${JSON.stringify(read.slice(0, 60))} for a file it had just written`
       );
 
     // The hash the line-addressed editor stales its evidence against. `readFileWithHash` reads
@@ -61,7 +61,7 @@ export const wiringChecks = async (): Promise<string[]> => {
     const hashed = await client.readFileWithHash(WORKSPACE, TASK, 'workspace/wire.txt');
     if (hashed.sha256 === null || hashed.sha256.length !== 64)
       problems.push(
-        `athanor's own client got sha256 ${String(hashed.sha256)} back, so no line-addressed edit could land against this shim`
+        `garden's own client got sha256 ${String(hashed.sha256)} back, so no line-addressed edit could land against this shim`
       );
 
     /*
@@ -83,7 +83,7 @@ export const wiringChecks = async (): Promise<string[]> => {
     });
     if (shown.displayedLines !== 2 || shown.totalLines !== 6)
       problems.push(
-        `a display budget of 2 lines showed ${shown.displayedLines} of ${shown.totalLines} through athanor's own client`
+        `a display budget of 2 lines showed ${shown.displayedLines} of ${shown.totalLines} through garden's own client`
       );
     if (shown.content !== 'alpha\nbravo')
       problems.push(
@@ -113,7 +113,7 @@ export const wiringChecks = async (): Promise<string[]> => {
     );
     if (ran.exitCode !== 0 || ran.stdout !== SAMPLE)
       problems.push(
-        `a command run through athanor's own client saw exit ${String(ran.exitCode)} and ${JSON.stringify(ran.stdout.slice(0, 40))}`
+        `a command run through garden's own client saw exit ${String(ran.exitCode)} and ${JSON.stringify(ran.stdout.slice(0, 40))}`
       );
 
     // The three probes whose failure is silent in production. `#workspaceSurfaces` parses this
@@ -128,7 +128,7 @@ export const wiringChecks = async (): Promise<string[]> => {
     );
     if (surfaces.browser !== 'absent' || surfaces.desktop !== 'absent')
       problems.push(
-        `the shim told athanor's own client browser=${surfaces.browser} desktop=${surfaces.desktop}, so the catalogue gate would not withdraw`
+        `the shim told garden's own client browser=${surfaces.browser} desktop=${surfaces.desktop}, so the catalogue gate would not withdraw`
       );
     const machine = await client.call<{ summary: unknown }>(
       WORKSPACE,
@@ -142,7 +142,7 @@ export const wiringChecks = async (): Promise<string[]> => {
       );
 
     // And a route the shim does not implement, reached through the production client. The client
-    // throws an AthanorError on a non-ok status, which the three call sites in `agent.ts` catch
+    // throws an GardenError on a non-ok status, which the three call sites in `agent.ts` catch
     // into a shrug - so the throw is NOT the guard and this check is about `shim.misses` being
     // set by traffic that came over the wire rather than from this rig's own `handle` call.
     await client
@@ -150,14 +150,14 @@ export const wiringChecks = async (): Promise<string[]> => {
       .catch(() => null);
     if (!shim.misses.includes('POST /v1/workspaces/:workspaceId/browser/print-pdf'))
       problems.push(
-        'a route reached over the socket by athanor own client was not recorded as a miss, so a live run would not be voided'
+        'a route reached over the socket by garden own client was not recorded as a miss, so a live run would not be voided'
       );
     // Every request the production client makes carries a signed capability token. Counted rather
     // than verified: this shim verifies nothing (see its header), and a count of zero would mean
     // the client was not the thing talking to it.
     if (shim.unauthenticated !== 0)
       problems.push(
-        `${shim.unauthenticated} request(s) reached the shim with no Authorization header, so something other than athanor's client is driving it`
+        `${shim.unauthenticated} request(s) reached the shim with no Authorization header, so something other than garden's client is driving it`
       );
   } catch (cause) {
     problems.push(

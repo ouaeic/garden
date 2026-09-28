@@ -36,7 +36,7 @@
  * cheaper than a contract line - it is a contract line paid late, plus a matcher - and the honest
  * response is to promote it back into the contract deliberately. @see ruleFiringCounts.
  */
-import type { ModelMessage } from '@athanor/model-gateway';
+import type { ModelMessage } from '@garden/model-gateway';
 
 /**
  * What one appended correction opens with, and the reason it is a fixed string.
@@ -103,7 +103,7 @@ const OFFICE_DOCUMENT = /\.(?:docx|pptx|xlsx)\b/i;
  * calls away. One wasted correction is cheap, but it is also avoidable by naming the three binaries
  * the proof is made of.
  */
-const RENDER_PROOF_COMMAND = /athanor-office-convert|pdftoppm|libreoffice|soffice/i;
+const RENDER_PROOF_COMMAND = /garden-office-convert|pdftoppm|libreoffice|soffice/i;
 
 /** Everything that puts a page from the outside in front of the model as a page rather than a hit. */
 const PRIMARY_SOURCE_READERS = [
@@ -173,7 +173,7 @@ export const DORMANT_RULES: readonly DormantRule[] = [
           !RENDER_PROOF_COMMAND.test(argumentText(call))
       ),
     correction:
-      'You have produced an Office document. Nothing in its source shows text overflowing its box, a page breaking in the wrong place, or a sheet full of #REF!, and the first thing that will observe those is the user opening the file. Before you publish it: convert it with `athanor-office-convert IN OUT`, render the pages with `pdftoppm`, and look at them with image_read. The render-proof skill carries the full procedure.'
+      'You have produced an Office document. Nothing in its source shows text overflowing its box, a page breaking in the wrong place, or a sheet full of #REF!, and the first thing that will observe those is the user opening the file. Before you publish it: convert it with `garden-office-convert IN OUT`, render the pages with `pdftoppm`, and look at them with image_read. The render-proof skill carries the full procedure.'
   },
   {
     /**

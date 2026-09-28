@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { Duplex } from 'node:stream';
 import { afterAll, afterEach, describe, expect, test, vi } from 'vitest';
-import { PREVIEW_IDLE_EXPIRY_DAYS } from '@athanor/contracts';
+import { PREVIEW_IDLE_EXPIRY_DAYS } from '@garden/contracts';
 import {
   buildConversationNameIndex,
   buildMemoryItemIndex,
@@ -28,10 +28,10 @@ import {
   type ConnectorTransport,
   type EncryptedEnvelope,
   type MailSocketFactory
-} from '@athanor/core';
-import { agentNotificationAad, MAX_APPROVAL_PAGE } from '@athanor/data';
-import { seedModels } from '@athanor/model-gateway';
-import { DatabaseFixtures } from '@athanor/data/test-support/database-fixtures';
+} from '@garden/core';
+import { agentNotificationAad, MAX_APPROVAL_PAGE } from '@garden/data';
+import { seedModels } from '@garden/model-gateway';
+import { DatabaseFixtures } from '@garden/data/test-support/database-fixtures';
 import type { ApiConfig } from './config.js';
 import * as apiContext from './context.js';
 import { createLogger, silentLogger } from './log.js';
@@ -209,13 +209,13 @@ describe('API production boundaries', () => {
       })
     );
 
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const config: ApiConfig = {
       DEPLOYMENT_MODE: 'development',
       MODEL_CATALOG_SCOPE: 'reviewed_open_weight',
       CONNECTION_MANIFEST_PATH: join(directory, 'connection.json'),
-      ATHANOR_STATE_PATH: directory,
+      GARDEN_STATE_PATH: directory,
       RELAY_STATE_DIR: join(directory, 'relay'),
       RELAY_LOCAL_HOST: '127.0.0.1',
       RELAY_LOCAL_PORT: 443,
@@ -240,7 +240,7 @@ describe('API production boundaries', () => {
       PUBLIC_RUNNER_URL: 'ws://127.0.0.1:4300',
       WORKSPACE_IMAGE_REVISION: 'dev',
       WEBAUTHN_RP_ID: 'localhost',
-      WEBAUTHN_RP_NAME: 'athanor Test',
+      WEBAUTHN_RP_NAME: 'garden Test',
       WEBAUTHN_ORIGIN: 'http://localhost:5173',
       ALLOW_INSECURE_DEV_AUTH: true,
       WORKER_ID: 'embedded-test-worker',
@@ -299,13 +299,13 @@ describe('API production boundaries', () => {
             });
           if (path === '/register')
             return connectorResponse({
-              client_id: 'athanor-api-test',
+              client_id: 'garden-api-test',
               client_secret: 'registered-secret',
               token_endpoint_auth_method: 'client_secret_basic',
               redirect_uris: ['http://localhost:5173/v1/connectors/mcp/oauth/callback'],
               grant_types: ['authorization_code', 'refresh_token'],
               response_types: ['code'],
-              client_name: 'athanor'
+              client_name: 'garden'
             });
           if (path === '/token')
             return connectorResponse({
@@ -857,7 +857,7 @@ describe('API production boundaries', () => {
     });
     expect(workspaceExport.statusCode).toBe(200);
     expect(workspaceExport.headers['content-disposition']).toContain(
-      `athanor-workspace-${workspaceId}.tar.gz`
+      `garden-workspace-${workspaceId}.tar.gz`
     );
 
     await database.query(
@@ -1006,7 +1006,7 @@ describe('API production boundaries', () => {
     const previewCookie = (
       Array.isArray(previewCookieHeader) ? previewCookieHeader[0] : previewCookieHeader
     )?.split(';', 1)[0];
-    expect(previewCookie).toContain('athanor-preview-access=');
+    expect(previewCookie).toContain('garden-preview-access=');
     const privatePage = await previewApp.inject({
       method: 'GET',
       url: '/',
@@ -1634,7 +1634,7 @@ const isolatedConfig = (directory: string): ApiConfig => ({
   DEPLOYMENT_MODE: 'development',
   MODEL_CATALOG_SCOPE: 'provider_catalog',
   CONNECTION_MANIFEST_PATH: join(directory, 'connection.json'),
-  ATHANOR_STATE_PATH: directory,
+  GARDEN_STATE_PATH: directory,
   RELAY_STATE_DIR: join(directory, 'relay'),
   RELAY_LOCAL_HOST: '127.0.0.1',
   RELAY_LOCAL_PORT: 443,
@@ -1648,7 +1648,7 @@ const isolatedConfig = (directory: string): ApiConfig => ({
   PREVIEW_GATEWAY_PORT: 4401,
   RESERVED_PREVIEW_PORTS: '4201,4203',
   DATABASE_DRIVER: 'pglite',
-  DATABASE_URL: 'postgres://athanor:unused@127.0.0.1:5432/athanor',
+  DATABASE_URL: 'postgres://garden:unused@127.0.0.1:5432/garden',
   PGLITE_PATH: join(directory, 'database'),
   DATA_MASTER_KEY: Buffer.alloc(32, 9).toString('base64'),
   SESSION_SIGNING_KEY: 'session-secret-with-at-least-32-characters',
@@ -1657,7 +1657,7 @@ const isolatedConfig = (directory: string): ApiConfig => ({
   PUBLIC_RUNNER_URL: 'ws://127.0.0.1:4300',
   WORKSPACE_IMAGE_REVISION: 'dev',
   WEBAUTHN_RP_ID: 'localhost',
-  WEBAUTHN_RP_NAME: 'athanor Test',
+  WEBAUTHN_RP_NAME: 'garden Test',
   WEBAUTHN_ORIGIN: 'http://localhost:5173',
   ALLOW_INSECURE_DEV_AUTH: true,
   WORKER_ID: 'authorization-test-worker',
@@ -1696,7 +1696,7 @@ describe('isolated preview discovery', () => {
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const beforeConfig = {
       ...isolatedConfig(directory),
-      PREVIEW_BASE_URL: 'http://localhost:5173/__athanor/preview'
+      PREVIEW_BASE_URL: 'http://localhost:5173/__garden/preview'
     };
     let server = await buildServer(beforeConfig, { masterKey });
     disposers.push(() => server.app.close());
@@ -1723,7 +1723,7 @@ describe('isolated preview discovery', () => {
       summary: 'Encrypted preview event',
       payloadCiphertext: encryptJson(
         {
-          __athanorEventVersion: 1,
+          __gardenEventVersion: 1,
           summary: 'Private app is available',
           payload: { previewId: historical.id, url: historical.url }
         },
@@ -1732,7 +1732,7 @@ describe('isolated preview discovery', () => {
       )
     });
     await server.app.close();
-    const currentBase = 'https://localhost:8443/__athanor/preview';
+    const currentBase = 'https://localhost:8443/__garden/preview';
     let relayOnline = true;
     const relay = new RelaySupervisor({
       directory: join(directory, 'relay'),
@@ -1772,8 +1772,8 @@ describe('isolated preview discovery', () => {
       headers: { cookie }
     });
     expect(bootstrap.statusCode, bootstrap.body).toBe(200);
-    expect(bootstrap.headers['x-athanor-preview-base-url']).toBe(currentBase);
-    expect(bootstrap.headers['x-athanor-relay-preview-origin']).toBe(
+    expect(bootstrap.headers['x-garden-preview-base-url']).toBe(currentBase);
+    expect(bootstrap.headers['x-garden-relay-preview-origin']).toBe(
       'https://enrolled.relay.example:9443'
     );
     relayOnline = false;
@@ -1783,11 +1783,11 @@ describe('isolated preview discovery', () => {
       headers: { cookie }
     });
     expect(offline.statusCode, offline.body).toBe(200);
-    expect(offline.headers['x-athanor-relay-preview-origin']).toBeUndefined();
+    expect(offline.headers['x-garden-relay-preview-origin']).toBeUndefined();
     const anonymous = await server.app.inject({ method: 'GET', url: '/v1/bootstrap' });
     expect(anonymous.statusCode).toBe(401);
-    expect(anonymous.headers['x-athanor-preview-base-url']).toBeUndefined();
-    expect(anonymous.headers['x-athanor-relay-preview-origin']).toBeUndefined();
+    expect(anonymous.headers['x-garden-preview-base-url']).toBeUndefined();
+    expect(anonymous.headers['x-garden-relay-preview-origin']).toBeUndefined();
 
     const listed = await server.app.inject({
       method: 'GET',
@@ -1883,7 +1883,7 @@ describe('workspace authorization boundaries', () => {
       })
     );
 
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-authz-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-authz-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -1996,7 +1996,7 @@ describe('workspace authorization boundaries', () => {
     });
     expect(ownerDelete.statusCode, ownerDelete.body).toBe(200);
     expect(runnerDeletes).toHaveLength(1);
-    expect(runnerDeletes[0]).toContain('.athanor/artifacts/');
+    expect(runnerDeletes[0]).toContain('.garden/artifacts/');
 
     /*
      * An artifact never decides how the browser treats it.
@@ -2070,7 +2070,7 @@ describe('workspace authorization boundaries', () => {
           })
       )
     );
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-authz-all-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-authz-all-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -2124,7 +2124,7 @@ describe('workspace authorization boundaries', () => {
   }, 30_000);
 
   test('throttles repeated passkey ceremonies from one caller', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-rate-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-rate-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -2201,7 +2201,7 @@ describe('conversation management', () => {
         });
       })
     );
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-tasks-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-tasks-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -2329,7 +2329,7 @@ describe('conversation management', () => {
    */
   test('pins a conversation to the top of the list and files another out of it', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-filing-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-filing-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -2407,7 +2407,7 @@ describe('conversation management', () => {
    */
   test('resumes the conversation list from the cursor the bootstrap carries', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-taskpage-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-taskpage-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -2480,7 +2480,7 @@ describe('conversation management', () => {
    */
   test('tells the client how many runs a schedule has, not how many of them fitted', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-runcount-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-runcount-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -2642,7 +2642,7 @@ describe('memory about the owner', () => {
 
   test('is sealed under a key the workspace does not have, and refuses the other key outright', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-owner-memory-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-owner-memory-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store, database } = await buildServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
@@ -2691,7 +2691,7 @@ describe('memory about the owner', () => {
 
   test('shows the owner the whole tier, refuses the row past the bound, and deletes any row', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-owner-bound-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-owner-bound-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
@@ -2739,7 +2739,7 @@ describe('memory about the owner', () => {
 
   test('moves an entry written under the old promise when the owner next edits it', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-owner-promote-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-owner-promote-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store, database } = await buildServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
@@ -2814,7 +2814,7 @@ describe('memory about the owner', () => {
    */
   test('refuses a credential into the tier that follows the owner, and only a credential', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-owner-secret-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-owner-secret-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database } = await buildServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
@@ -2925,7 +2925,7 @@ describe('memory about the owner', () => {
    */
   test('writes the owner block, seals it away from the workspace, and refuses past its bound', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-owner-block-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-owner-block-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store, database } = await buildServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
@@ -3038,7 +3038,7 @@ describe('memory about the owner', () => {
     'refuses stale owner-block writes after clearing, including recreation=%s',
     async (recreate) => {
       stubProviderFetch();
-      const directory = await mkdtemp(join(tmpdir(), 'athanor-owner-block-clear-'));
+      const directory = await mkdtemp(join(tmpdir(), 'garden-owner-block-clear-'));
       disposers.push(() => rm(directory, { recursive: true, force: true }));
       const { app, database, store } = await buildServer(isolatedConfig(directory), { masterKey });
       disposers.push(() => app.close());
@@ -3117,7 +3117,7 @@ describe('memory about the owner', () => {
    */
   test('refuses a block carrying a direction the owner cannot see', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-owner-block-hidden-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-owner-block-hidden-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database } = await buildServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
@@ -3172,7 +3172,7 @@ describe('memory about the owner', () => {
    */
   test('lets the owner overwrite a block this box can no longer decrypt', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-owner-block-lost-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-owner-block-lost-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database } = await buildServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
@@ -3213,7 +3213,7 @@ describe('memory about the owner', () => {
 describe('unattended recovery', () => {
   test('releases a task whose approval expired unanswered', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-approvals-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-approvals-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store, database, runMaintenance } = await buildServer(isolatedConfig(directory), {
       masterKey
@@ -3318,7 +3318,7 @@ describe('unattended recovery', () => {
    */
   test('says the message a task died holding was never started', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-undelivered-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-undelivered-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store, database, runMaintenance } = await buildServer(isolatedConfig(directory), {
       masterKey
@@ -3384,7 +3384,7 @@ describe('unattended recovery', () => {
 
   test('leaves a task alone while its approval can still be answered', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-approvals-live-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-approvals-live-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store, database, runMaintenance } = await buildServer(isolatedConfig(directory), {
       masterKey
@@ -3427,7 +3427,7 @@ describe('unattended recovery', () => {
      * decision.
      */
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-question-answer-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-question-answer-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store, database } = await buildServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
@@ -3510,7 +3510,7 @@ describe('unattended recovery', () => {
     stubProviderFetch((url) => {
       if (url.endsWith('/resume')) resumed.push(url);
     });
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-schedule-recovery-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-schedule-recovery-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database, runMaintenance } = await buildServer(isolatedConfig(directory), {
       masterKey
@@ -3578,7 +3578,7 @@ describe('unattended recovery', () => {
    */
   test('leaves a task that ran and then hit an unnamed wall where the worker put it', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-schedule-wall-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-schedule-wall-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database, runMaintenance } = await buildServer(isolatedConfig(directory), {
       masterKey
@@ -3648,7 +3648,7 @@ describe('unattended recovery', () => {
    */
   test('retries a provider quota wall on a widening interval and wakes the owner if it stands', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-quota-wall-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-quota-wall-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store, database, runMaintenance } = await buildServer(isolatedConfig(directory), {
       masterKey
@@ -3669,7 +3669,7 @@ describe('unattended recovery', () => {
       summary: 'Encrypted warning event',
       payloadCiphertext: encryptJson(
         {
-          __athanorEventVersion: 1,
+          __gardenEventVersion: 1,
           summary: 'The provider refused the request: no quota left',
           payload: { owner: true, code: 'provider_quota_exhausted' }
         },
@@ -3780,7 +3780,7 @@ describe('unattended recovery', () => {
    */
   test('never probes a wall only the owner can take down, and puts the work back when they do', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-no-provider-wall-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-no-provider-wall-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store, database, runMaintenance } = await buildServer(isolatedConfig(directory), {
       masterKey
@@ -3799,7 +3799,7 @@ describe('unattended recovery', () => {
       summary: 'Encrypted warning event',
       payloadCiphertext: encryptJson(
         {
-          __athanorEventVersion: 1,
+          __gardenEventVersion: 1,
           summary: 'There is no model provider connected',
           payload: { owner: true, code: 'provider_not_connected' }
         },
@@ -3844,7 +3844,7 @@ describe('unattended recovery', () => {
 
   test('dispatches a due schedule and moves it past the run it just served', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-schedule-dispatch-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-schedule-dispatch-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database } = await buildServer(
       { ...isolatedConfig(directory), SCHEDULER_POLL_MS: 1_000 },
@@ -3910,7 +3910,7 @@ describe('unattended recovery', () => {
 
   test('survives a maintenance step that throws, and logs it', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-maintenance-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-maintenance-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const lines: Array<Record<string, unknown>> = [];
     const { app, store, runMaintenance } = await buildServer(isolatedConfig(directory), {
@@ -3939,7 +3939,7 @@ describe('unattended recovery', () => {
    * single key opens a database once both generations are in it.
    */
   test('refuses to serve when the master key does not open this database', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-master-key-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-master-key-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const config = isolatedConfig(directory);
     const original = await buildServer(config, { masterKey });
@@ -3965,7 +3965,7 @@ describe('unattended recovery', () => {
 describe('operator-facing logs', () => {
   test('records the failure the client was told to quote, and no content', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-logs-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-logs-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const lines: Array<Record<string, unknown>> = [];
     const { app, runMaintenance } = await buildDomainServer(isolatedConfig(directory), {
@@ -4015,7 +4015,7 @@ describe('operator-facing logs', () => {
     expect(written).not.toContain(cookie);
     expect(written).not.toContain('test-key');
     // A signed-in session cookie is the single most damaging thing a log could carry.
-    expect(written).not.toContain('athanor_session');
+    expect(written).not.toContain('garden_session');
   }, 30_000);
 });
 
@@ -4092,7 +4092,7 @@ const stubProviderAndRunner = (
 describe('spending caps', () => {
   test('refuses work that would pass the daily cap and reports where it stands', async () => {
     stubProviderAndRunner();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-spend-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-spend-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -4271,7 +4271,7 @@ describe('spending caps', () => {
    */
   test('puts a ceiling in place when the key is saved, and lets the owner decline one', async () => {
     stubProviderAndRunner();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-seeded-caps-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-seeded-caps-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -4351,7 +4351,7 @@ describe('spending caps', () => {
    */
   test('takes a first ceiling, and a first refusal, from a box whose key was saved long ago', async () => {
     stubProviderAndRunner();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-first-answer-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-first-answer-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -4435,7 +4435,7 @@ describe('spending caps', () => {
    */
   test('lets an owner who accepted the suggested ceiling queue a morning of work', async () => {
     stubProviderAndRunner();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-seeded-caps-queue-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-seeded-caps-queue-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store } = await buildDomainServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
@@ -4531,7 +4531,7 @@ describe('spending caps', () => {
       'openai/gpt-oss-120b': { prompt: '0.000002', completion: '0.000006' },
       'z-ai/glm-5.2': { prompt: '0.000075', completion: '0.00015' }
     });
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-price-ceiling-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-price-ceiling-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -4724,7 +4724,7 @@ describe('spending caps', () => {
 describe('capability and preview boundaries', () => {
   test('refuses stream credentials to API tokens and reserved ports to previews', async () => {
     stubProviderAndRunner();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-capability-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-capability-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -4810,7 +4810,7 @@ describe('capability and preview boundaries', () => {
 
 describe('authentication posture', () => {
   test('refuses development sign-in unless the deployment really is development', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-devauth-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-devauth-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     // The flag is set exactly as a stray environment file would leave it.
     const { app } = await buildServer({
@@ -4839,7 +4839,7 @@ describe('authentication posture', () => {
    * settings screen draws had nothing that could redeem it.
    */
   test('opens a passkey ceremony for a minted device grant, and for nothing else', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-enroll-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-enroll-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     // The ticket carries where the box can be reached, so the box has to know that first.
     await writeFile(
@@ -4860,7 +4860,7 @@ describe('authentication posture', () => {
     expect(created.statusCode, created.body).toBe(200);
     const ticket = JSON.parse(
       Buffer.from(
-        created.json<{ uri: string }>().uri.replace(/^(?:garden|athanor):\/\/pair\//, ''),
+        created.json<{ uri: string }>().uri.replace(/^garden:\/\/pair\//, ''),
         'base64url'
       ).toString('utf8')
     ) as { pairingCode: string };
@@ -4943,7 +4943,7 @@ describe('authentication posture', () => {
     disposers.push(async () => {
       timers.mockRestore();
     });
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-diagnostics-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-diagnostics-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -4971,8 +4971,8 @@ describe('authentication posture', () => {
       backupTimer: 'unknown',
       build
     });
-    expect(timers).toHaveBeenCalledWith('athanor-auto-update.timer');
-    expect(timers).toHaveBeenCalledWith('athanor-backup.timer');
+    expect(timers).toHaveBeenCalledWith('garden-auto-update.timer');
+    expect(timers).toHaveBeenCalledWith('garden-backup.timer');
 
     await writeFile(
       join(directory, 'certificate.error'),
@@ -5038,7 +5038,7 @@ describe('authentication posture', () => {
   }, 30_000);
 
   test('throttles account recovery per caller as well as per username', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-recovery-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-recovery-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -5093,7 +5093,7 @@ describe('authentication posture', () => {
    * must always ask still refuses a session that cannot show one.
    */
   test('answers a sensitive action with the ceremony the owner just completed, once', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-stepup-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-stepup-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store, database } = await buildServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -5244,7 +5244,7 @@ describe('the settings and file surfaces the client already calls', () => {
         });
       })
     );
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-surfaces-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-surfaces-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -5472,7 +5472,7 @@ describe('the settings and file surfaces the client already calls', () => {
         });
       })
     );
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-provider-key-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-provider-key-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -5559,7 +5559,7 @@ describe('rewinding the computer, not only the conversation', () => {
         });
       })
     );
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-rewind-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-rewind-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -5777,9 +5777,9 @@ describe('rewinding the computer, not only the conversation', () => {
   }, 30_000);
 });
 
-describe('the standing record of what athanor said', () => {
+describe('the standing record of what garden said', () => {
   test('gives every notice a sentence, including one it can no longer read', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-notices-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-notices-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -5923,7 +5923,7 @@ const mailboxHarness = (refuse?: RegExp) => {
           );
         return server.say(`${tag} OK done\r\n`);
       });
-      imap.say('* OK [CAPABILITY IMAP4rev1 SASL-IR AUTH=PLAIN] athanor test ready\r\n');
+      imap.say('* OK [CAPABILITY IMAP4rev1 SASL-IR AUTH=PLAIN] garden test ready\r\n');
       return imap;
     }
     const smtp = new ScriptedMailServer((command, server) => {
@@ -5973,7 +5973,7 @@ describe('mail and calendar connectors', () => {
     overrides: Parameters<typeof buildServer>[1],
     hostSuffixes = ''
   ) => {
-    const directory = await mkdtemp(join(tmpdir(), `athanor-api-${label}-`));
+    const directory = await mkdtemp(join(tmpdir(), `garden-api-${label}-`));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database } = await buildDomainServer(
       { ...isolatedConfig(directory), CONNECTOR_ALLOWED_HOST_SUFFIXES: hostSuffixes },
@@ -6250,7 +6250,7 @@ describe('mail and calendar connectors', () => {
 
 describe('where web searches are answered', () => {
   /**
-   * The one disclosure athanor cannot get wrong. A search query is routinely the most revealing
+   * The one disclosure garden cannot get wrong. A search query is routinely the most revealing
    * sentence in a conversation, and OpenRouter's zero-retention enforcement is documented as
    * covering inference routing only - "It does not apply to plugins and tools you choose to enable,
    * such as web search". That cuts both ways, and the product used to read only one half of it:
@@ -6311,7 +6311,7 @@ describe('where web searches are answered', () => {
    */
   test('carries the same answer in the bootstrap every client starts from', async () => {
     stubProviderCalls();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-websearch-bootstrap-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-websearch-bootstrap-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -6350,7 +6350,7 @@ describe('where web searches are answered', () => {
    */
   test('still answers searches on the provider when the credential enforces zero retention', async () => {
     stubProviderCalls();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-websearch-cred-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-websearch-cred-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const settings = await providerSettings(isolatedConfig(directory), {
       enforceZeroDataRetention: true
@@ -6365,7 +6365,7 @@ describe('where web searches are answered', () => {
 
   test('lets the deployment take provider search off the box, and says that is what did it', async () => {
     stubProviderCalls();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-websearch-forced-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-websearch-forced-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     // The switch that is about search rather than about retention, and the whole of the way back
     // to the old behaviour - reachable from the environment, with no credential edit and so no
@@ -6383,7 +6383,7 @@ describe('where web searches are answered', () => {
 
   test('answers for a box configured from its environment and never connected by hand', async () => {
     stubProviderCalls();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-websearch-env-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-websearch-env-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     // AI_REQUIRE_ZDR is the shipped default and no longer speaks to this question at all.
     const settings = await providerSettings(isolatedConfig(directory), null);
@@ -6421,7 +6421,7 @@ describe('where web searches are answered', () => {
           })
       )
     );
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-provider-facts-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-provider-facts-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer({
       ...isolatedConfig(directory),
@@ -6481,7 +6481,7 @@ describe('a half-typed message', () => {
           })
       )
     );
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-drafts-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-drafts-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -6619,7 +6619,7 @@ describe('what the computer is running', () => {
         return json({ storageBytes: 4_096, ok: true });
       })
     );
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-processes-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-processes-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -6707,7 +6707,7 @@ describe('what the computer is running', () => {
         });
       })
     );
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-process-stop-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-process-stop-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -6741,7 +6741,7 @@ describe('what the computer is running', () => {
 describe('searching the owner’s own history', () => {
   test('answers from the index the agent uses, one conversation per result', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-search-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-search-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store } = await buildServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
@@ -6891,7 +6891,7 @@ describe('searching the owner’s own history', () => {
 
   test('finds a conversation the owner renamed in March by that name in December', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-search-renamed-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-search-renamed-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store, database } = await buildServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
@@ -6954,7 +6954,7 @@ describe('searching the owner’s own history', () => {
    */
   test('narrows on the first letters of a word in a name, however deep the conversation is', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-search-prefix-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-search-prefix-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store } = await buildServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
@@ -7025,7 +7025,7 @@ describe('searching the owner’s own history', () => {
    */
   test('one conversation this server cannot read costs itself and nothing behind it', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-search-unreadable-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-search-unreadable-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const config = isolatedConfig(directory);
 
@@ -7137,7 +7137,7 @@ describe('searching the owner’s own history', () => {
    */
   test('comes up while the older half of the history is still being indexed', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-search-backfill-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-search-backfill-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const config = isolatedConfig(directory);
 
@@ -7209,7 +7209,7 @@ describe('searching the owner’s own history', () => {
 describe('what the computer wrote down about its owner', () => {
   test('lists the agent’s own memory, and a delete takes the verbatim words with it', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-memory-items-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-memory-items-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store, database } = await buildDomainServer(isolatedConfig(directory), {
       masterKey
@@ -7280,7 +7280,7 @@ describe('what the computer wrote down about its owner', () => {
     });
     /*
      * A drafted fact this turn voted for, and one the turn before it voted for. Two votes are what
-     * makes a draft into something athanor believes, so the deleted turn has to stop casting one -
+     * makes a draft into something garden believes, so the deleted turn has to stop casting one -
      * and the draft it was the whole of has nothing left behind it at all.
      */
     await store.observeMemoryFactCandidate({
@@ -7407,7 +7407,7 @@ describe('what the computer wrote down about its owner', () => {
    */
   test('says which side of the computer wrote each remembered row, not just how far it is trusted', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-memory-origin-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-memory-origin-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store } = await buildDomainServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
@@ -7441,7 +7441,7 @@ describe('what the computer wrote down about its owner', () => {
           ...buildMemoryItemIndex(content, indexKey),
           ...(input.kind === 'fact'
             ? {
-                subjectKey: memorySubjectKey('athanor', indexKey),
+                subjectKey: memorySubjectKey('garden', indexKey),
                 objectKey: memoryObjectKey(input.body, indexKey)
               }
             : {})
@@ -7546,7 +7546,7 @@ describe('what the computer wrote down about its owner', () => {
    */
   test('lists the memory a person has to settle, and verifying one takes it off the list', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-memory-review-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-memory-review-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store, database } = await buildDomainServer(isolatedConfig(directory), {
       masterKey
@@ -7775,7 +7775,7 @@ describe('what the computer wrote down about its owner', () => {
    */
   test('shows a rule a model put forward, whole, and refuses it for good on one press', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-memory-proposals-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-memory-proposals-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store } = await buildDomainServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
@@ -7808,10 +7808,10 @@ describe('what the computer wrote down about its owner', () => {
       'except that a plan is agreed before a large redirection and money is never spent with a ' +
       'third party until you have asked.';
     expect(sentence.length).toBeGreaterThan(200);
-    const observation = { subject: 'athanor', predicate: 'standing_order', object: sentence };
+    const observation = { subject: 'garden', predicate: 'standing_order', object: sentence };
     await store.observeMemoryFactCandidate({
       workspaceId,
-      subjectKey: memorySubjectKey('athanor', indexKey),
+      subjectKey: memorySubjectKey('garden', indexKey),
       predicate: 'standing_order',
       objectKey: memoryObjectKey(sentence, indexKey),
       episodeId: episode.id,
@@ -7870,7 +7870,7 @@ describe('what the computer wrote down about its owner', () => {
     // back into the queue, tonight or on any later night.
     await store.observeMemoryFactCandidate({
       workspaceId,
-      subjectKey: memorySubjectKey('athanor', indexKey),
+      subjectKey: memorySubjectKey('garden', indexKey),
       predicate: 'standing_order',
       objectKey: memoryObjectKey(sentence, indexKey),
       episodeId: episode.id,
@@ -7896,7 +7896,7 @@ describe('what the computer wrote down about its owner', () => {
    */
   test('refuses a screenful of proposed rules on one press, and leaves the one it was not shown', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-memory-group-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-memory-group-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store } = await buildDomainServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
@@ -7923,10 +7923,10 @@ describe('what the computer wrote down about its owner', () => {
       tainted: false
     });
     const propose = async (sentence: string) => {
-      const observation = { subject: 'athanor', predicate: 'standing_order', object: sentence };
+      const observation = { subject: 'garden', predicate: 'standing_order', object: sentence };
       await store.observeMemoryFactCandidate({
         workspaceId,
-        subjectKey: memorySubjectKey('athanor', indexKey),
+        subjectKey: memorySubjectKey('garden', indexKey),
         predicate: 'standing_order',
         objectKey: memoryObjectKey(sentence, indexKey),
         episodeId: episode.id,
@@ -8022,7 +8022,7 @@ describe('what the computer wrote down about its owner', () => {
 describe('reading past the first page', () => {
   test('hands back a timeline window with its cursor, a second page of approvals, and an export longer than one read', async () => {
     stubProviderAndRunner();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-paging-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-paging-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store, database } = await buildDomainServer(isolatedConfig(directory), {
       masterKey
@@ -8232,7 +8232,7 @@ describe('the doors the runner already had', () => {
         });
       })
     );
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-runner-doors-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-runner-doors-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -8361,7 +8361,7 @@ describe('the routes nothing had ever asked', () => {
     // The runner stub that answers the preview port check, which is what stands between a request
     // for a private link and a 400 saying nothing is listening.
     stubProviderAndRunner({}, true);
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-untested-routes-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-untested-routes-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store, database } = await buildDomainServer(isolatedConfig(directory), {
       masterKey
@@ -8497,7 +8497,7 @@ describe('the routes nothing had ever asked', () => {
 describe('editing a standing instruction', () => {
   test('moves a schedule to a new time without losing its instruction, its ceiling or its history', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-schedule-edit-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-schedule-edit-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -8674,7 +8674,7 @@ describe('scheduled dispatch', () => {
    */
   test('dispatches every schedule that is already due on a single poll', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-schedule-drain-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-schedule-drain-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database, runScheduler } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -8776,7 +8776,7 @@ describe('scheduled dispatch', () => {
         });
       })
     );
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-schedule-strand-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-schedule-strand-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store, database, runScheduler } = await buildDomainServer(
       isolatedConfig(directory)
@@ -8844,7 +8844,7 @@ describe('control-plane gates', () => {
    */
   test('answers the public licence route from a single user count', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-legal-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-legal-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -8869,7 +8869,7 @@ describe('control-plane gates', () => {
    */
   test('refuses a repeated cursor on the event stream instead of replaying the conversation', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-stream-cursor-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-stream-cursor-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -8902,7 +8902,7 @@ describe('control-plane gates', () => {
    */
   test('will not take a file write that is not bytes, rather than skipping the storage guard', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-file-guard-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-file-guard-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -8951,7 +8951,7 @@ describe('control-plane gates', () => {
    */
   test('refuses an automation token that asks to put the computer back', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-token-rewind-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-token-rewind-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -9015,7 +9015,7 @@ describe('control-plane gates', () => {
    */
   test('refuses an automation token that asks to stop the run asking', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-token-mode-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-token-mode-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -9086,7 +9086,7 @@ describe('control-plane gates', () => {
    */
   test('refuses an automation token that asks to stop every future run asking', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-token-ws-mode-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-token-ws-mode-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -9146,7 +9146,7 @@ describe('control-plane gates', () => {
   test('bounds and scrubs what a connector says when a recheck fails', async () => {
     stubProviderFetch();
     const failing = { now: false };
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-connector-recheck-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-connector-recheck-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer(
       { ...isolatedConfig(directory), CONNECTOR_ALLOWED_HOST_SUFFIXES: 'example.test' },
@@ -9205,7 +9205,7 @@ describe('control-plane gates', () => {
    */
   test('draws the sidebar without one workspace read per row', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-list-fanout-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-list-fanout-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, store, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -9292,7 +9292,7 @@ describe('control-plane gates', () => {
    */
   test('replays a retried mutation that reuses its key and refuses one that reuses it for something else', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-idempotency-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-idempotency-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -9347,14 +9347,14 @@ describe('control-plane gates', () => {
   });
 
   /**
-   * On a deployment the cookie is `__Host-athanor_session`, and the prefix rules discard a
+   * On a deployment the cookie is `__Host-garden_session`, and the prefix rules discard a
    * `Set-Cookie` that carries the prefix without `Secure` - so the header that was supposed to
    * clear it did nothing at all. `preview-gateway.ts` records what a prefix mismatch cost here once
    * already.
    */
   test('clears the session cookie on account deletion with the attributes it was set with', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-account-delete-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-account-delete-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer({
       ...isolatedConfig(directory),
@@ -9368,7 +9368,7 @@ describe('control-plane gates', () => {
     });
     const setCookie = signIn.headers['set-cookie'];
     const issued = (Array.isArray(setCookie) ? setCookie[0] : setCookie) as string;
-    expect(issued).toContain('__Host-athanor_session=');
+    expect(issued).toContain('__Host-garden_session=');
     const cookie = issued.split(';', 1)[0]!;
 
     const deleted = await app.inject({
@@ -9381,7 +9381,7 @@ describe('control-plane gates', () => {
     expect(deleted.statusCode, deleted.body).toBe(200);
     const cleared = deleted.headers['set-cookie'];
     const header = (Array.isArray(cleared) ? cleared[0] : cleared) as string;
-    expect(header).toContain('__Host-athanor_session=');
+    expect(header).toContain('__Host-garden_session=');
     expect(header).toContain('Secure');
     expect(header).toContain('Path=/');
     expect(header).toContain('SameSite=Lax');
@@ -9483,7 +9483,7 @@ describe('what dictation costs', () => {
         return json({ ok: true, storageBytes: 0 });
       })
     );
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-dictation-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-dictation-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -9633,7 +9633,7 @@ describe('round trips before the first token', () => {
         );
       })
     );
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-roundtrips-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-roundtrips-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -9783,7 +9783,7 @@ describe('the phone transport', () => {
           if (method === 'getMe')
             return json({
               ok: true,
-              result: { id: 1234567, is_bot: true, username: 'athanor_test_bot' }
+              result: { id: 1234567, is_bot: true, username: 'garden_test_bot' }
             });
           if (method === 'sendMessage') return json({ ok: true, result: { message_id: 77 } });
           return json({ ok: false, error_code: 400 }, 400);
@@ -9796,7 +9796,7 @@ describe('the phone transport', () => {
         });
       })
     );
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-phone-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-phone-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database, store } = await buildDomainServer(isolatedConfig(directory));
     disposers.push(() => app.close());
@@ -9833,8 +9833,8 @@ describe('the phone transport', () => {
     });
     expect(created.statusCode, created.body).toBe(201);
     const offer = created.json<{ botUsername: string; pairingUrl: string; expiresAt: string }>();
-    expect(offer.botUsername).toBe('athanor_test_bot');
-    expect(offer.pairingUrl.startsWith('https://t.me/athanor_test_bot?start=')).toBe(true);
+    expect(offer.botUsername).toBe('garden_test_bot');
+    expect(offer.pairingUrl.startsWith('https://t.me/garden_test_bot?start=')).toBe(true);
     const secret = new URL(offer.pairingUrl).searchParams.get('start')!;
     // 32 random bytes, base64url: 43 characters, all of them inside the deep link's alphabet.
     expect(secret).toMatch(/^[A-Za-z0-9_-]{43}$/);
@@ -9866,7 +9866,7 @@ describe('the phone transport', () => {
     expect(listed.json()).toEqual([
       {
         kind: 'telegram',
-        botUsername: 'athanor_test_bot',
+        botUsername: 'garden_test_bot',
         paired: false,
         verifiedAt: null,
         disabledAt: null,
@@ -10039,7 +10039,7 @@ describe('the phone transport', () => {
 describe('a run a spending ceiling stopped', () => {
   test('says so on the task, refuses a resume that would only stop again, and lifts on request', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-spend-pause-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-spend-pause-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database } = await buildDomainServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
@@ -10138,7 +10138,7 @@ describe('a run a spending ceiling stopped', () => {
 
   test('keeps a below-cap conversation paused when the recorded request would exceed its limit', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-paused-estimate-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-paused-estimate-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database, store } = await buildDomainServer(isolatedConfig(directory), {
       masterKey
@@ -10173,7 +10173,7 @@ describe('a run a spending ceiling stopped', () => {
       summary: 'Encrypted status',
       payloadCiphertext: encryptJson(
         {
-          __athanorEventVersion: 1,
+          __gardenEventVersion: 1,
           summary: 'Paused for spending',
           payload: { blockedBy: decision.blockedBy, windows: decision.windows, estimateUsd: 0.01 }
         },
@@ -10216,7 +10216,7 @@ describe('a run a spending ceiling stopped', () => {
 
   test("moves a single run's own ceiling up and never down", async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-task-ceiling-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-task-ceiling-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app } = await buildDomainServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());
@@ -10248,7 +10248,7 @@ describe('a run a spending ceiling stopped', () => {
 describe('an account with more than one provider connected', () => {
   test('keeps both connections and lists both catalogues in one picker', async () => {
     stubProviderFetch();
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-multi-provider-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-multi-provider-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, database } = await buildDomainServer(isolatedConfig(directory), { masterKey });
     disposers.push(() => app.close());

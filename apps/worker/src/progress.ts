@@ -1,5 +1,5 @@
-import { sha256 } from '@athanor/core';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import { sha256 } from '@garden/core';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { AgentState } from './agent-state.js';
 import { asRecord } from './values.js';
 

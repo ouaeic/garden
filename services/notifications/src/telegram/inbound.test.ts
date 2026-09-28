@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import type { DataStore } from '@athanor/data';
+import type { DataStore } from '@garden/data';
 import { EndpointHealth } from '../retry.js';
 import { TransportError } from '../transport.js';
 import type { TelegramClient } from './client.js';
@@ -32,7 +32,7 @@ const destination = (overrides: Partial<DestinationState> = {}): DestinationStat
   id: 'destination-1',
   userId: 'owner',
   senderId: '4242',
-  config: { botToken: '1000:bot-secret', botUsername: 'athanor_bot', apiToken: 'oc_live_phone' },
+  config: { botToken: '1000:bot-secret', botUsername: 'garden_bot', apiToken: 'oc_live_phone' },
   ...overrides
 });
 
@@ -425,7 +425,7 @@ describe('a reply to a question', () => {
     expect(JSON.parse(post!.init.body as string)).toEqual({ prompt: 'Use the savings account' });
     expect(recorded.api).toContainEqual([
       'sendMessage',
-      expect.objectContaining({ text: 'Sent to athanor.' })
+      expect.objectContaining({ text: 'Sent to garden.' })
     ]);
   });
 
@@ -516,7 +516,7 @@ describe('cards decided somewhere else', () => {
             inline_keyboard: [
               [
                 {
-                  text: '❌ Denied in athanor at 12:31',
+                  text: '❌ Denied in garden at 12:31',
                   url: 'https://ai.example.test/?task=task-1'
                 }
               ]

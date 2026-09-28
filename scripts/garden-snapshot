@@ -1,0 +1,280 @@
+#!/usr/bin/python3
+"""Create and restore bounded Garden recovery archives without elevated privileges."""
+
+from __future__ import annotations
+
+import os
+import shutil
+import sys
+import tarfile
+from pathlib import Path, PurePosixPath
+from typing import Iterable, NoReturn
+
+
+CONTENT_ROOTS = ("workspace", ".garden/browser", ".garden/artifacts")
+ARCHIVE_PARENTS = (".garden",)
+MAX_ENTRIES = 2_000_000
+MINIMUM_CONFIGURED_RESERVE_BYTES = 64 * 1024**2
+MAXIMUM_CONFIGURED_RESERVE_BYTES = 1024**4
+
+
+def fail(message: str) -> NoReturn:
+    raise ValueError(message)
+
+
+def reserve_bytes(total_bytes: int) -> int:
+    configured = os.environ.get("GARDEN_SNAPSHOT_RESERVE_BYTES", "")
+    if not configured:
+        return min(20 * 1024**3, max(2 * 1024**3, int(total_bytes * 0.02)))
+    if not configured.isdecimal():
+        fail("GARDEN_SNAPSHOT_RESERVE_BYTES must be a whole number of bytes")
+    reserve = int(configured)
+    if not MINIMUM_CONFIGURED_RESERVE_BYTES <= reserve <= MAXIMUM_CONFIGURED_RESERVE_BYTES:
+        fail(
+            "GARDEN_SNAPSHOT_RESERVE_BYTES must be between "
+            f"{MINIMUM_CONFIGURED_RESERVE_BYTES} and {MAXIMUM_CONFIGURED_RESERVE_BYTES}"
+        )
+    return reserve
+
+
+def normalized_name(raw: str) -> str:
+    if not raw or "\x00" in raw or "\\" in raw:
+        fail("archive contains an invalid path")
+    name = raw.rstrip("/")
+    path = PurePosixPath(name)
+    if path.is_absolute() or ".." in path.parts or not path.parts:
+        fail("archive contains a path outside the recovery root")
+    normalized = path.as_posix()
+    allowed = normalized in ARCHIVE_PARENTS or any(
+        normalized == root or normalized.startswith(f"{root}/") for root in CONTENT_ROOTS
+    )
+    if not allowed:
+        fail(f"archive contains an unexpected path: {normalized}")
+    return normalized
+
+
+def resolved_link(member: tarfile.TarInfo) -> str:
+    target = PurePosixPath(member.linkname)
+    if target.is_absolute():
+        fail("archive contains an absolute link")
+    base = PurePosixPath() if member.islnk() else PurePosixPath(member.name).parent
+    parts: list[str] = []
+    for part in (base / target).parts:
+        if part in ("", "."):
+            continue
+        if part == "..":
+            if not parts:
+                fail("archive contains a link outside the recovery root")
+            parts.pop()
+        else:
+            parts.append(part)
+    if not parts:
+        fail("archive contains an invalid link")
+    return normalized_name(PurePosixPath(*parts).as_posix())
+
+
+def safe_member(member: tarfile.TarInfo) -> tarfile.TarInfo:
+    normalized_name(member.name)
+    if member.issym() or member.islnk():
+        resolved_link(member)
+    elif not (member.isfile() or member.isdir()):
+        fail(f"archive contains an unsupported special entry: {member.name}")
+    return member
+
+
+def validate_archive(archive_path: Path) -> tuple[int, int]:
+    entries = 0
+    expanded_bytes = 0
+    names: set[str] = set()
+    types: dict[str, str] = {}
+    link_paths: set[str] = set()
+    hard_link_targets: dict[str, str] = {}
+    with tarfile.open(archive_path, "r:gz") as archive:
+        for member in archive:
+            name = normalized_name(safe_member(member).name)
+            if name in names:
+                fail(f"archive contains a duplicate path: {name}")
+            names.add(name)
+            types[name] = (
+                "file"
+                if member.isfile()
+                else "directory"
+                if member.isdir()
+                else "symbolic_link"
+                if member.issym()
+                else "hard_link"
+            )
+            if member.issym() or member.islnk():
+                link_paths.add(name)
+            if member.islnk():
+                hard_link_targets[name] = resolved_link(member)
+            entries += 1
+            if entries > MAX_ENTRIES:
+                fail("archive contains too many filesystem entries")
+            if member.isfile():
+                expanded_bytes += member.size
+    if not entries:
+        fail("archive is empty")
+    for required in CONTENT_ROOTS:
+        if types.get(required) != "directory":
+            fail(f"archive is missing {required}")
+    for name in names:
+        parts = PurePosixPath(name).parts
+        for depth in range(1, len(parts)):
+            if PurePosixPath(*parts[:depth]).as_posix() in link_paths:
+                fail("archive contains an entry below a filesystem link")
+    for target in hard_link_targets.values():
+        if types.get(target) != "file":
+            fail("archive contains a hard link without a regular-file target")
+    return entries, expanded_bytes
+
+
+def source_filter(counter: list[int]):
+    def filtered(member: tarfile.TarInfo) -> tarfile.TarInfo:
+        safe_member(member)
+        counter[0] += 1
+        if counter[0] > MAX_ENTRIES:
+            fail("recovery source contains too many filesystem entries")
+        member.mode &= 0o777
+        member.uid = 0
+        member.gid = 0
+        member.uname = ""
+        member.gname = ""
+        return member
+
+    return filtered
+
+
+def create(archive_path: Path, root: Path) -> None:
+    root = root.resolve(strict=True)
+    if not root.is_dir():
+        fail("recovery source is not a directory")
+    for relative in CONTENT_ROOTS:
+        source = root / relative
+        if source.is_symlink() or not source.is_dir():
+            fail(f"recovery source {relative} must be a real directory")
+    archive_path.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
+    counter = [0]
+    with tarfile.open(
+        archive_path,
+        "w:gz",
+        format=tarfile.PAX_FORMAT,
+        dereference=False,
+    ) as archive:
+        for relative in CONTENT_ROOTS:
+            archive.add(
+                root / relative,
+                arcname=relative,
+                recursive=True,
+                filter=source_filter(counter),
+            )
+    validate_archive(archive_path)
+
+
+def extracted_path(destination: Path, member: tarfile.TarInfo) -> Path:
+    return destination.joinpath(*PurePosixPath(normalized_name(member.name)).parts)
+
+
+def copy_regular_file(
+    archive: tarfile.TarFile,
+    member: tarfile.TarInfo,
+    destination: Path,
+) -> None:
+    target = extracted_path(destination, member)
+    target.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
+    source = archive.extractfile(member)
+    if source is None:
+        fail(f"archive file could not be read: {member.name}")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(target, flags, 0o600)
+    try:
+        with source, os.fdopen(descriptor, "wb", closefd=False) as output:
+            shutil.copyfileobj(source, output, length=1024 * 1024)
+            output.flush()
+            os.fsync(output.fileno())
+    finally:
+        os.close(descriptor)
+    target.chmod(member.mode & 0o777)
+    os.utime(target, (member.mtime, member.mtime), follow_symlinks=False)
+
+
+def extract_portably(archive_path: Path, destination: Path) -> None:
+    """Extract without tarfile's version-dependent filter API.
+
+    Directories and regular files are materialized before links, so no archive entry can make a
+    later write traverse a symlink. validate_archive has already rejected link ancestors and
+    hard-link targets that are not regular files.
+    """
+    with tarfile.open(archive_path, "r:gz") as archive:
+        members = list(archive)
+        directories = sorted(
+            (member for member in members if member.isdir()),
+            key=lambda member: len(PurePosixPath(member.name).parts),
+        )
+        for member in directories:
+            extracted_path(destination, member).mkdir(parents=True, mode=0o700, exist_ok=True)
+        for member in members:
+            if member.isfile():
+                copy_regular_file(archive, member, destination)
+        for member in members:
+            if member.islnk():
+                source = destination.joinpath(*PurePosixPath(resolved_link(member)).parts)
+                target = extracted_path(destination, member)
+                target.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
+                os.link(source, target, follow_symlinks=False)
+        for member in members:
+            if member.issym():
+                target = extracted_path(destination, member)
+                target.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
+                os.symlink(member.linkname, target)
+        for member in reversed(directories):
+            target = extracted_path(destination, member)
+            target.chmod(member.mode & 0o777)
+            os.utime(target, (member.mtime, member.mtime), follow_symlinks=False)
+
+
+def extract(archive_path: Path, destination: Path) -> None:
+    _, expanded_bytes = validate_archive(archive_path)
+    destination.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
+    filesystem = shutil.disk_usage(destination.parent)
+    reserve = reserve_bytes(filesystem.total)
+    if filesystem.free - expanded_bytes < reserve:
+        fail("host disk does not have enough headroom to stage this recovery archive")
+    destination.mkdir(mode=0o700, exist_ok=False)
+    extract_portably(archive_path, destination)
+
+
+def path_argument(raw: str, label: str) -> Path:
+    if "\x00" in raw:
+        fail(f"{label} is invalid")
+    return Path(raw).expanduser().absolute()
+
+
+def main(arguments: Iterable[str]) -> int:
+    values = list(arguments)
+    command = values[0] if values else ""
+    if command == "create" and len(values) == 3:
+        create(path_argument(values[1], "archive path"), path_argument(values[2], "source path"))
+    elif command == "validate" and len(values) == 2:
+        entries, expanded_bytes = validate_archive(path_argument(values[1], "archive path"))
+        print(f"entries={entries} expanded_bytes={expanded_bytes}")
+    elif command == "extract" and len(values) == 3:
+        extract(
+            path_argument(values[1], "archive path"),
+            path_argument(values[2], "destination path"),
+        )
+    else:
+        print(
+            "Usage: garden-snapshot {create ARCHIVE ROOT|validate ARCHIVE|extract ARCHIVE DEST}",
+            file=sys.stderr,
+        )
+        return 64
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main(sys.argv[1:]))
+    except (OSError, tarfile.TarError, ValueError) as error:
+        print(f"garden snapshot: {error}", file=sys.stderr)
+        raise SystemExit(1)

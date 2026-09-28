@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AthanorError } from '@athanor/core';
+import { GardenError } from '@garden/core';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 export function registerComputationRoutes({ app, store, runner, idempotent }: RouteContext): void {
@@ -8,7 +8,7 @@ export function registerComputationRoutes({ app, store, runner, idempotent }: Ro
     async (request) => {
       const user = requireUser(request.user);
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       return runner.request({
         workspaceId: workspace.id,
         userId: user.id,
@@ -24,14 +24,14 @@ export function registerComputationRoutes({ app, store, runner, idempotent }: Ro
     async (request, reply) => {
       const user = requireUser(request.user);
       if (request.apiToken)
-        throw new AthanorError(
+        throw new GardenError(
           'session_required',
           'Control computation from a signed-in device',
           403
         );
       return idempotent(request, reply, user, async () => {
         const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-        if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+        if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
         const session = z
           .string()
           .regex(/^kernel-[a-f0-9-]{36}$/)

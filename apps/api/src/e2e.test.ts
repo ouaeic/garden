@@ -6,14 +6,14 @@
  * real database, the real API, the real embedded worker and the real agent loop. Only the provider
  * and the workspace runner are scripted, because those are the two things a test cannot own.
  *
- * The provider script is fixed per test, so a failure here is athanor's behaviour changing rather
+ * The provider script is fixed per test, so a failure here is garden's behaviour changing rather
  * than a model saying something different today.
  */
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { seedModels } from '@athanor/model-gateway';
+import { seedModels } from '@garden/model-gateway';
 import type { ApiConfig } from './config.js';
 import { buildServer } from './server.js';
 
@@ -88,7 +88,7 @@ const start = async (
     taskSpendCapUsd?: number;
   } = {}
 ): Promise<Harness> => {
-  const directory = await mkdtemp(join(tmpdir(), 'athanor-e2e-'));
+  const directory = await mkdtemp(join(tmpdir(), 'garden-e2e-'));
   disposers.push(() => rm(directory, { recursive: true, force: true }));
 
   let served = 0;
@@ -154,7 +154,7 @@ const start = async (
             taskId: expect.any(String) as unknown,
             workspaceId: expect.any(String) as unknown,
             kind: 'new',
-            paths: ['workspace/AGENTS.md', 'workspace/ATHANOR.md', 'workspace/OPEN_CLOUD.md']
+            paths: ['workspace/AGENTS.md', 'workspace/GARDEN.md', 'workspace/OPEN_CLOUD.md']
           });
           return json({
             status: 'ready',
@@ -270,7 +270,7 @@ const start = async (
     DEPLOYMENT_MODE: 'development',
     MODEL_CATALOG_SCOPE: 'reviewed_open_weight',
     CONNECTION_MANIFEST_PATH: join(directory, 'connection.json'),
-    ATHANOR_STATE_PATH: directory,
+    GARDEN_STATE_PATH: directory,
     RELAY_STATE_DIR: join(directory, 'relay'),
     RELAY_LOCAL_HOST: '127.0.0.1',
     RELAY_LOCAL_PORT: 443,
@@ -294,7 +294,7 @@ const start = async (
     PUBLIC_RUNNER_URL: 'ws://127.0.0.1:4300',
     WORKSPACE_IMAGE_REVISION: 'dev',
     WEBAUTHN_RP_ID: 'localhost',
-    WEBAUTHN_RP_NAME: 'athanor Test',
+    WEBAUTHN_RP_NAME: 'garden Test',
     WEBAUTHN_ORIGIN: 'http://localhost:5173',
     ALLOW_INSECURE_DEV_AUTH: true,
     WORKER_ID: 'e2e-worker',

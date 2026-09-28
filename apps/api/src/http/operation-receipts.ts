@@ -3,8 +3,8 @@ import {
   deriveServiceSecret,
   encryptJson,
   type EncryptedEnvelope
-} from '@athanor/core';
-import type { Database } from '@athanor/data';
+} from '@garden/core';
+import type { Database } from '@garden/data';
 
 export interface OperationIdentity {
   userId: string;

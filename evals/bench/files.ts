@@ -75,7 +75,7 @@ dir=$(printf '%s' "$1" | base64 -d 2>/dev/null || printf '%s' "$1" | base64 -D)
 [ -d "$dir" ] || exit 3
 for entry in "$dir"/* "$dir"/.[!.]*; do
   [ -e "$entry" ] || continue
-  case "\${entry##*/}" in .athanor) continue ;; esac
+  case "\${entry##*/}" in .garden) continue ;; esac
   if [ -L "$entry" ]; then kind=symlink
   elif [ -d "$entry" ]; then kind=directory
   else kind=file
@@ -235,11 +235,11 @@ export const createCheckpoint = async (
   const script = `
 set -u
 id=$(printf '%s' "$1" | base64 -d 2>/dev/null || printf '%s' "$1" | base64 -D)
-mkdir -p .athanor-bench/checkpoints
-tar -cf ".athanor-bench/checkpoints/$id.tar" -C workspace . 2>/dev/null || exit 4
+mkdir -p .garden-bench/checkpoints
+tar -cf ".garden-bench/checkpoints/$id.tar" -C workspace . 2>/dev/null || exit 4
 files=$(find workspace -type f 2>/dev/null | wc -l)
 total=$(du -sk workspace 2>/dev/null | head -1 | cut -f1)
-stored=$(du -sk ".athanor-bench/checkpoints/$id.tar" 2>/dev/null | head -1 | cut -f1)
+stored=$(du -sk ".garden-bench/checkpoints/$id.tar" 2>/dev/null | head -1 | cut -f1)
 printf '%s %s %s\\n' "$files" "$total" "$stored"
 `;
   const result = await backend.exec(call(script, [b64(checkpointId)]));
@@ -265,7 +265,7 @@ printf '%s %s %s\\n' "$files" "$total" "$stored"
 
 export const listCheckpoints = async (backend: WorkspaceBackend): Promise<string[]> => {
   const result = await backend.exec(
-    call('ls .athanor-bench/checkpoints 2>/dev/null | sed "s/\\.tar$//"')
+    call('ls .garden-bench/checkpoints 2>/dev/null | sed "s/\\.tar$//"')
   );
   if (result.exitCode !== 0) return [];
   return result.stdout.split('\n').filter((line) => line.trim() !== '');

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AthanorError, verifyCapabilityToken } from '@athanor/core';
+import { GardenError, verifyCapabilityToken } from '@garden/core';
 import { RunnerClient } from './runner-client.js';
 
 const secret = 'runner-secret-with-at-least-32-characters';
@@ -35,7 +35,7 @@ describe('runner capability requests', () => {
           method: 'POST'
         })
       ).rejects.toMatchObject({
-        name: 'AthanorError',
+        name: 'GardenError',
         statusCode: status,
         code: 'runner_request_failed',
         message: 'Project history changed. Review a fresh archive preview.'
@@ -93,8 +93,8 @@ describe('runner capability requests', () => {
         path: '/archive'
       })
       .catch((error: unknown) => error);
-    expect(result).toBeInstanceOf(AthanorError);
-    const error = result as AthanorError;
+    expect(result).toBeInstanceOf(GardenError);
+    const error = result as GardenError;
     expect(error.statusCode).toBe(409);
     expect(error.message).not.toContain(key);
     expect(error.message).toContain('[REDACTED]');

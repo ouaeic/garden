@@ -1,7 +1,7 @@
-import { redactText } from '@athanor/core';
+import { redactText } from '@garden/core';
 
 /**
- * What every athanor process writes to the journal.
+ * What every garden process writes to the journal.
  *
  * Two formats used to share this box. The API wrote one JSON object per line, with an allowlist of
  * field names deciding what may appear; this process wrote English sentences, each of them guarding
@@ -15,7 +15,7 @@ import { redactText } from '@athanor/core';
  * priority prefix, so `journalctl -p err` still finds a real failure.
  *
  * It lives here rather than in the API because the API depends on this package and not the other
- * way round, and the only other thing both import - `@athanor/contracts` - is compiled into the
+ * way round, and the only other thing both import - `@garden/contracts` - is compiled into the
  * browser bundle, where there is no `process` to read a journal stream or a stdout off.
  */
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -47,7 +47,7 @@ const loggableFields = new Set([
   'build',
   /** Which restore point a line is about: the row's own random id, and nothing about its contents. */
   'checkpointId',
-  /** What was thrown, where athanor's own vocabulary has no word for it. */
+  /** What was thrown, where garden's own vocabulary has no word for it. */
   'class',
   'code',
   'concurrency',
@@ -133,7 +133,7 @@ export interface LoggerOptions {
   now?: () => Date;
 }
 
-/** One JSON object per line on stdout, which is what journald stores and `athanor logs` replays. */
+/** One JSON object per line on stdout, which is what journald stores and `garden logs` replays. */
 export const createLogger = (options: LoggerOptions): Logger => {
   const threshold = levelRank[options.level];
   const write = options.write ?? ((line: string) => process.stdout.write(`${line}\n`));

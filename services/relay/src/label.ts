@@ -12,7 +12,7 @@ const ED25519_RAW_LENGTH = 32;
 /** RFC 4648 base32, lowercased. Lowercase because DNS labels are case-insensitive. */
 const BASE32_ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567';
 
-const LABEL_DOMAIN_SEPARATOR = Buffer.from('athanor-relay-label-v1\x00', 'latin1');
+const LABEL_DOMAIN_SEPARATOR = Buffer.from('garden-relay-label-v1\x00', 'latin1');
 
 export const base32Lower = (input: Uint8Array): string => {
   let bits = 0;
@@ -51,7 +51,7 @@ export const spkiHash = (spki: Uint8Array): string =>
   createHash('sha256').update(spki).digest('hex');
 
 /**
- * label = base32-lower-nopad(SHA256("athanor-relay-label-v1\x00" || u8(len(domain)) || domain
+ * label = base32-lower-nopad(SHA256("garden-relay-label-v1\x00" || u8(len(domain)) || domain
  *                                   || raw_ed25519_pubkey))[0:26]
  *
  * The relay always derives this from the SPKI a peer actually presented; a box can never ask for a

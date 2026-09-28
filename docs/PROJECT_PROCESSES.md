@@ -31,7 +31,7 @@ The machine can use all available CPUs. Its existing memory, task-count and stor
 protect the control services; monitoring does not lower those limits. The interface reports the
 configured command memory allowance. Changing a host limit remains an explicit operator action.
 Operators configure the command allowance with `COMMAND_MEMORY_LIMIT_BYTES` and the runner service
-envelope with `MemoryHigh` and `MemoryMax` in `infra/native/athanor-runner.service`. CPU readings use
+envelope with `MemoryHigh` and `MemoryMax` in `infra/native/garden-runner.service`. CPU readings use
 the kernel counters documented in [proc_pid_stat](https://man7.org/linux/man-pages/man5/proc_pid_stat.5.html).
 
 No new credentials, external service, paid dependency or public network listener is introduced.

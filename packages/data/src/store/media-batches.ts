@@ -1,4 +1,4 @@
-import { AthanorError, type EncryptedEnvelope } from '@athanor/core';
+import { GardenError, type EncryptedEnvelope } from '@garden/core';
 import type { Database } from '../database.js';
 import { BillingStore } from './billing.js';
 import { MediaJobStore } from './media-jobs.js';
@@ -92,7 +92,7 @@ export class MediaBatchStore {
           shot.operation !== 'generate'
       )
     )
-      throw new AthanorError(
+      throw new GardenError(
         'media_batch_invalid',
         'Approve a bounded batch of new videos belonging to this task',
         400
@@ -110,7 +110,7 @@ export class MediaBatchStore {
           row.taskId !== input.taskId ||
           row.requestHash !== input.requestHash
         )
-          throw new AthanorError(
+          throw new GardenError(
             'media_batch_conflict',
             'This batch submission key already belongs to another request',
             409

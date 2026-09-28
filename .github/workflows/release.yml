@@ -33,7 +33,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - id: release
         env:
-          ATHANOR_RELEASE_TAG: ${{ github.ref_name }}
+          GARDEN_RELEASE_TAG: ${{ github.ref_name }}
         run: pnpm release:check
       - run: pnpm license:check
       - run: pnpm license:rust
@@ -99,11 +99,11 @@ jobs:
       - name: Require Apple distribution and notarization credentials
         if: runner.os == 'macOS'
         env:
-          APPLE_CERTIFICATE: ${{ secrets.ATHANOR_MACOS_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.ATHANOR_MACOS_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.ATHANOR_APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.ATHANOR_APPLE_APP_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.ATHANOR_APPLE_TEAM_ID }}
+          APPLE_CERTIFICATE: ${{ secrets.GARDEN_MACOS_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.GARDEN_MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.GARDEN_APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.GARDEN_APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.GARDEN_APPLE_TEAM_ID }}
         run: |
           test -n "$APPLE_CERTIFICATE"
           test -n "$APPLE_CERTIFICATE_PASSWORD"
@@ -114,13 +114,13 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         env:
-          WINDOWS_CERTIFICATE: ${{ secrets.ATHANOR_WINDOWS_CERTIFICATE }}
-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.ATHANOR_WINDOWS_CERTIFICATE_PASSWORD }}
+          WINDOWS_CERTIFICATE: ${{ secrets.GARDEN_WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.GARDEN_WINDOWS_CERTIFICATE_PASSWORD }}
         run: |
           if (-not $env:WINDOWS_CERTIFICATE -or -not $env:WINDOWS_CERTIFICATE_PASSWORD) {
             throw "Protected Windows signing credentials are required"
           }
-          $certificatePath = Join-Path $env:RUNNER_TEMP "athanor-release.pfx"
+          $certificatePath = Join-Path $env:RUNNER_TEMP "garden-release.pfx"
           [IO.File]::WriteAllBytes(
             $certificatePath,
             [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
@@ -150,11 +150,11 @@ jobs:
       - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_CERTIFICATE: ${{ secrets.ATHANOR_MACOS_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.ATHANOR_MACOS_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.ATHANOR_APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.ATHANOR_APPLE_APP_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.ATHANOR_APPLE_TEAM_ID }}
+          APPLE_CERTIFICATE: ${{ secrets.GARDEN_MACOS_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.GARDEN_MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.GARDEN_APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.GARDEN_APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.GARDEN_APPLE_TEAM_ID }}
         with:
           projectPath: apps/desktop
           tauriScript: pnpm exec tauri
@@ -251,10 +251,10 @@ jobs:
       - run: pnpm native:configure
       - name: Require protected Android signing credentials
         env:
-          KEYSTORE_BASE64: ${{ secrets.ATHANOR_ANDROID_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.ATHANOR_ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ATHANOR_ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ATHANOR_ANDROID_KEY_PASSWORD }}
+          KEYSTORE_BASE64: ${{ secrets.GARDEN_ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.GARDEN_ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.GARDEN_ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.GARDEN_ANDROID_KEY_PASSWORD }}
         run: |
           test -n "$KEYSTORE_BASE64"
           test -n "$KEYSTORE_PASSWORD"
@@ -262,19 +262,19 @@ jobs:
           test -n "$KEY_PASSWORD"
       - name: Materialize the protected Android keystore
         env:
-          KEYSTORE_BASE64: ${{ secrets.ATHANOR_ANDROID_KEYSTORE_BASE64 }}
-        run: printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "${RUNNER_TEMP}/athanor-release.jks"
+          KEYSTORE_BASE64: ${{ secrets.GARDEN_ANDROID_KEYSTORE_BASE64 }}
+        run: printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "${RUNNER_TEMP}/garden-release.jks"
       - name: Build, sign, and audit Android APK and app bundle
         env:
           CI: true
-          CARGO_TARGET_DIR: ${{ runner.temp }}/athanor-target
-          GRADLE_USER_HOME: ${{ runner.temp }}/athanor-gradle
-          ATHANOR_ANDROID_KEYSTORE: ${{ runner.temp }}/athanor-release.jks
-          ATHANOR_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ATHANOR_ANDROID_KEYSTORE_PASSWORD }}
-          ATHANOR_ANDROID_KEY_ALIAS: ${{ secrets.ATHANOR_ANDROID_KEY_ALIAS }}
-          ATHANOR_ANDROID_KEY_PASSWORD: ${{ secrets.ATHANOR_ANDROID_KEY_PASSWORD }}
-          ATHANOR_ANDROID_REQUIRE_SIGNED: '1'
-        run: pnpm --filter @athanor/desktop android:build --apk --aab --ci
+          CARGO_TARGET_DIR: ${{ runner.temp }}/garden-target
+          GRADLE_USER_HOME: ${{ runner.temp }}/garden-gradle
+          GARDEN_ANDROID_KEYSTORE: ${{ runner.temp }}/garden-release.jks
+          GARDEN_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.GARDEN_ANDROID_KEYSTORE_PASSWORD }}
+          GARDEN_ANDROID_KEY_ALIAS: ${{ secrets.GARDEN_ANDROID_KEY_ALIAS }}
+          GARDEN_ANDROID_KEY_PASSWORD: ${{ secrets.GARDEN_ANDROID_KEY_PASSWORD }}
+          GARDEN_ANDROID_REQUIRE_SIGNED: '1'
+        run: pnpm --filter @garden/desktop android:build --apk --aab --ci
       - name: Attach signed Android artifacts to the draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -310,10 +310,10 @@ jobs:
       - run: pnpm native:configure
       - name: Require protected iOS distribution credentials
         env:
-          IOS_CERTIFICATE: ${{ secrets.ATHANOR_IOS_CERTIFICATE }}
-          IOS_CERTIFICATE_PASSWORD: ${{ secrets.ATHANOR_IOS_CERTIFICATE_PASSWORD }}
-          IOS_MOBILE_PROVISION: ${{ secrets.ATHANOR_IOS_MOBILE_PROVISION }}
-          APPLE_DEVELOPMENT_TEAM: ${{ secrets.ATHANOR_APPLE_TEAM_ID }}
+          IOS_CERTIFICATE: ${{ secrets.GARDEN_IOS_CERTIFICATE }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.GARDEN_IOS_CERTIFICATE_PASSWORD }}
+          IOS_MOBILE_PROVISION: ${{ secrets.GARDEN_IOS_MOBILE_PROVISION }}
+          APPLE_DEVELOPMENT_TEAM: ${{ secrets.GARDEN_APPLE_TEAM_ID }}
         run: |
           test -n "$IOS_CERTIFICATE"
           test -n "$IOS_CERTIFICATE_PASSWORD"
@@ -322,13 +322,13 @@ jobs:
       - name: Build, sign, and audit the iOS App Store package
         env:
           CI: true
-          CARGO_TARGET_DIR: ${{ runner.temp }}/athanor-target
-          IOS_CERTIFICATE: ${{ secrets.ATHANOR_IOS_CERTIFICATE }}
-          IOS_CERTIFICATE_PASSWORD: ${{ secrets.ATHANOR_IOS_CERTIFICATE_PASSWORD }}
-          IOS_MOBILE_PROVISION: ${{ secrets.ATHANOR_IOS_MOBILE_PROVISION }}
-          APPLE_DEVELOPMENT_TEAM: ${{ secrets.ATHANOR_APPLE_TEAM_ID }}
+          CARGO_TARGET_DIR: ${{ runner.temp }}/garden-target
+          IOS_CERTIFICATE: ${{ secrets.GARDEN_IOS_CERTIFICATE }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.GARDEN_IOS_CERTIFICATE_PASSWORD }}
+          IOS_MOBILE_PROVISION: ${{ secrets.GARDEN_IOS_MOBILE_PROVISION }}
+          APPLE_DEVELOPMENT_TEAM: ${{ secrets.GARDEN_APPLE_TEAM_ID }}
         run: >-
-          pnpm --filter @athanor/desktop ios:build
+          pnpm --filter @garden/desktop ios:build
           --target aarch64
           --ci
           --export-method app-store-connect
@@ -357,8 +357,8 @@ jobs:
         run: |
           find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%P\0' |
             sort -z |
-            xargs -0 sha256sum > "${RUNNER_TEMP}/ATHANOR_SHA256SUMS"
-          mv "${RUNNER_TEMP}/ATHANOR_SHA256SUMS" SHA256SUMS
+            xargs -0 sha256sum > "${RUNNER_TEMP}/GARDEN_SHA256SUMS"
+          mv "${RUNNER_TEMP}/GARDEN_SHA256SUMS" SHA256SUMS
       - name: Upload SHA-256 manifest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

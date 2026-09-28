@@ -110,7 +110,7 @@ describe('independent project preparation', () => {
       handles: [{ id: 'analysis', kind: 'job' }]
     });
     await expect(
-      readFile(path.join(workspacePath(f.root, second.workspaceId), '.athanor/project-source.json'))
+      readFile(path.join(workspacePath(f.root, second.workspaceId), '.garden/project-source.json'))
     ).rejects.toThrow();
     expect(
       await readFile(path.join(f.source, 'workspace/unrelated-a/large-result.txt'), 'utf8')
@@ -176,7 +176,7 @@ describe('independent project preparation', () => {
     );
     expect(() => manager.prepare(f.sourceWorkspaceId, f.input)).toThrow('cancelled');
     await expect(
-      readFile(path.join(workspacePath(f.root, f.workspaceId), '.athanor/project-source.json'))
+      readFile(path.join(workspacePath(f.root, f.workspaceId), '.garden/project-source.json'))
     ).rejects.toThrow();
   });
   it('binds replay to the exact source selection instead of accepting a reused target id', async () => {

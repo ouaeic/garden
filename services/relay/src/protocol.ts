@@ -1,12 +1,12 @@
 /**
- * Wire protocol constants and message shapes for athanor-relay v1.
+ * Wire protocol constants and message shapes for garden-relay v1.
  *
  * Everything on the wire is TLS 1.3 + HTTP/2 + NDJSON + one CBOR header, deliberately, so that
  * the relay is swappable for a different implementation without touching the box.
  */
 
 /** ALPN offered by a box on its control connection. Also how :443 is demultiplexed. */
-export const CONTROL_ALPN = 'athanor-relay/1';
+export const CONTROL_ALPN = 'garden-relay/1';
 
 /** Protocol major version carried in `hello`. A box speaking a different one is refused. */
 export const PROTOCOL_VERSION = 1;

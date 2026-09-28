@@ -5,7 +5,7 @@ import {
   responseInputs,
   type ModelMessage,
   type NativeContinuation
-} from '@athanor/model-gateway';
+} from '@garden/model-gateway';
 import { estimatedContextTokens, prepareModelContext } from './context.js';
 
 function conversation(opaque = 'opaque-private-evidence') {

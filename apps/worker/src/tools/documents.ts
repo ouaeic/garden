@@ -1,11 +1,11 @@
-import { runtimeUUID } from '@athanor/core';
+import { runtimeUUID } from '@garden/core';
 import { randomInt } from 'node:crypto';
-import { AthanorError } from '@athanor/core';
+import { GardenError } from '@garden/core';
 import {
   MediaClient,
   MediaProviderRejectionError,
   type ModelToolCall
-} from '@athanor/model-gateway';
+} from '@garden/model-gateway';
 import { type ExecObservation } from '../agent-state.js';
 import { requireMediaGenerationApproval } from '../media-approval.js';
 import { currentRunnerAbortSignal } from '../runner-client.js';
@@ -61,7 +61,7 @@ export async function executeDocumentTool(
         { action: 'read', path, startPage, endPage, maxCharacters }
       );
       if (result.exitCode !== 0)
-        throw new AthanorError(
+        throw new GardenError(
           'document_read_failed',
           result.stderr || 'Document extraction failed'
         );
@@ -77,7 +77,7 @@ export async function executeDocumentTool(
       return transcribeRecording(context, call);
     case 'document_search': {
       const query = textValue(call.arguments.query).trim();
-      if (!query) throw new AthanorError('document_query_empty', 'Document search needs a query');
+      if (!query) throw new GardenError('document_query_empty', 'Document search needs a query');
       const rawAlternatives =
         call.arguments.alternatives === undefined ? [] : call.arguments.alternatives;
       if (
@@ -87,7 +87,7 @@ export async function executeDocumentTool(
           (value) => typeof value !== 'string' || !value.trim() || value.length > 500
         )
       )
-        throw new AthanorError(
+        throw new GardenError(
           'document_alternatives_invalid',
           'Document search accepts up to four nonempty alternatives of 500 characters each'
         );
@@ -111,7 +111,7 @@ export async function executeDocumentTool(
         { action: 'search', path, query, alternatives, maxFiles, fileOffset, maxResults, maxPages }
       );
       if (result.exitCode !== 0)
-        throw new AthanorError('document_search_failed', result.stderr || 'Document search failed');
+        throw new GardenError('document_search_failed', result.stderr || 'Document search failed');
       return JSON.parse(result.stdout) as unknown;
     }
     case 'generate_media': {
@@ -127,7 +127,7 @@ export async function executeDocumentTool(
         (typeof args.action !== 'string' ||
           !['describe', 'status', 'generate', 'library', 'batch'].includes(args.action))
       )
-        throw new AthanorError(
+        throw new GardenError(
           'media_action_invalid',
           'Choose generate, describe, status or library',
           400
@@ -143,7 +143,7 @@ export async function executeDocumentTool(
       if (args.action === 'status') {
         const job = await context.store.getMediaJob(task.userId, textValue(args.jobId));
         if (!job || job.taskId !== task.id)
-          throw new AthanorError('media_job_not_found', 'Video job not found', 404);
+          throw new GardenError('media_job_not_found', 'Video job not found', 404);
         return {
           mediaJobId: job.id,
           operation: job.operation,
@@ -162,13 +162,13 @@ export async function executeDocumentTool(
         return queueVideoGeneration(context, call, secret);
       }
       if (kind !== 'image' && kind !== 'audio')
-        throw new AthanorError('media_kind_invalid', 'Choose image or audio');
+        throw new GardenError('media_kind_invalid', 'Choose image or audio');
       const media = resolvedMediaModel(kind, secret.mediaRoutes);
       const controls = GenerationControls.parse(args);
       const voice = controls.voice ?? media.voice;
       const references = await prepareMediaReferences(context, controls.inputReferences ?? []);
       if (!media.route || media.route.unavailableReason)
-        throw new AthanorError(
+        throw new GardenError(
           'media_route_unavailable',
           'Choose an available route for this modality in Settings',
           409
@@ -179,7 +179,7 @@ export async function executeDocumentTool(
         : undefined;
       const modelId = media.modelId;
       const prompt = textValue(args.prompt).trim();
-      if (!prompt) throw new AthanorError('media_prompt_empty', 'A media prompt is required');
+      if (!prompt) throw new GardenError('media_prompt_empty', 'A media prompt is required');
       const { width, height } =
         kind === 'image'
           ? mediaImageDimensions({
@@ -209,14 +209,14 @@ export async function executeDocumentTool(
           ? args.maxCostUsd
           : null;
       if (quotedUsd === null && explicitLimit === null)
-        throw new AthanorError(
+        throw new GardenError(
           'media_reservation_required',
           'This route has no complete request price. Include options.maxCostUsd in the approval.',
           400
         );
       const estimateUsd = quotedUsd ?? explicitLimit!;
       if (explicitLimit !== null && estimateUsd > explicitLimit)
-        throw new AthanorError(
+        throw new GardenError(
           'media_reservation_exceeded',
           'The media quote exceeds the selected spending reservation',
           402
@@ -234,13 +234,13 @@ export async function executeDocumentTool(
       const extension = controls.outputFormat ?? (kind === 'image' ? 'png' : 'mp3');
       const requested = textValue(args.path).trim().replace(/^\.\//, '');
       if (requested.split('/').includes('..'))
-        throw new AthanorError(
+        throw new GardenError(
           'media_path_invalid',
           'A generated file goes in the workspace; the path may not climb out of it'
         );
       const base = !requested
         ? `workspace/generated/${generation}.${extension}`
-        : requested.startsWith('workspace/') || requested.startsWith('.athanor/')
+        : requested.startsWith('workspace/') || requested.startsWith('.garden/')
           ? requested
           : `workspace/${requested}`;
       const decision = await context.store.spendGuard({
@@ -250,7 +250,7 @@ export async function executeDocumentTool(
         includeOpenCommitments: true
       });
       if (decision.outcome === 'deny')
-        throw new AthanorError(
+        throw new GardenError(
           'spend_cap_reached',
           `${spendHalt(decision)} Nothing was generated and nothing was charged; say so and carry on with the work that costs nothing.`
         );
@@ -306,7 +306,7 @@ export async function executeDocumentTool(
             requireMediaGenerationApproval(context.key, task, context.state, call, latest);
             const claim = await context.store.taskClaim(task.id);
             if (claim?.status !== 'running' || claim.leaseOwner !== context.config.WORKER_ID)
-              throw new AthanorError(
+              throw new GardenError(
                 'media_task_changed',
                 'This worker no longer owns the media request',
                 409
@@ -336,7 +336,7 @@ export async function executeDocumentTool(
           usdPerMillionCharacters: media.usdPerMillionCharacters
         })
         .catch(async (error: unknown) => {
-          if (!reserved && error instanceof AthanorError) throw error;
+          if (!reserved && error instanceof GardenError) throw error;
           if (reserved && !settled && error instanceof MediaProviderRejectionError)
             await context.store.recordUsage({
               ...usage,
@@ -344,7 +344,7 @@ export async function executeDocumentTool(
               state: 'released',
               settleReservation: true
             });
-          throw new AthanorError(
+          throw new GardenError(
             'media_generation_failed',
             error instanceof Error ? error.message : 'Media generation failed'
           );

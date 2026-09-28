@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { SharePreviewResponse } from '@athanor/contracts';
+import type { SharePreviewResponse } from '@garden/contracts';
 import {
   captureShareOptions,
   shareCreationOperation,

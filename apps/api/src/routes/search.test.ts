@@ -8,8 +8,8 @@ import {
   encryptJson,
   memoryIndexKey,
   wrapDataKey
-} from '@athanor/core';
-import { createDatabase, DataStore, migrateDatabase, type TaskRecord } from '@athanor/data';
+} from '@garden/core';
+import { createDatabase, DataStore, migrateDatabase, type TaskRecord } from '@garden/data';
 import type { RouteContext } from '../http/server-context.js';
 import { registerSearchRoutes } from './search.js';
 

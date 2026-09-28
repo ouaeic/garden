@@ -90,7 +90,7 @@ export const RelayConfigSchema = z
     metricsHost: z.string().default('127.0.0.1'),
     tlsCertPath: z.string().min(1),
     tlsKeyPath: z.string().min(1),
-    registryPath: z.string().min(1).default('/var/lib/athanor-relay/registry.json'),
+    registryPath: z.string().min(1).default('/var/lib/garden-relay/registry.json'),
     /** When false, `/v1/enroll` is refused outright even with a valid invite token. */
     registrationEnabled: z.boolean().default(true),
     /**

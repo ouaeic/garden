@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { sha256 } from '@athanor/core';
-import type { DataStore, WorkspacePreviewRecord, WorkspaceRecord } from '@athanor/data';
+import { sha256 } from '@garden/core';
+import type { DataStore, WorkspacePreviewRecord, WorkspaceRecord } from '@garden/data';
 import type { ApiConfig } from './config.js';
 import { buildPreviewGateway } from './preview-gateway.js';
 import { RunnerClient } from './runner-client.js';
@@ -69,11 +69,11 @@ const config = {
   PREVIEW_GATEWAY_PORT: 4400,
   WORKSPACE_RUNNER_URL: 'http://127.0.0.1:4300',
   PUBLIC_RUNNER_URL: 'ws://127.0.0.1:4300',
-  DATABASE_URL: 'postgres://athanor:unused@127.0.0.1:5432/athanor',
+  DATABASE_URL: 'postgres://garden:unused@127.0.0.1:5432/garden',
   RESERVED_PREVIEW_PORTS: '4201,4203'
 } as unknown as ApiConfig;
 
-const upstreamCookies = ['workspace_app_session=opaque; Path=/', '__Host-athanor_session=forged'];
+const upstreamCookies = ['workspace_app_session=opaque; Path=/', '__Host-garden_session=forged'];
 
 const buildGateway = async (
   gatewayConfig: ApiConfig = config
@@ -117,7 +117,7 @@ describe('the cookie that carries a private preview\u2019s access', () => {
   /*
    * A browser silently discards a `__Host-` cookie whose Path is not `/`. This one is scoped to a
    * single preview on purpose, so the prefix and the path could never both hold - and every
-   * private preview athanor published was therefore unopenable: the tokenised link answered with a
+   * private preview garden published was therefore unopenable: the tokenised link answered with a
    * 303 and a Set-Cookie the browser threw away, the redirect arrived carrying nothing, and the
    * owner was told to open the preview from the workspace they had just opened it from. Nothing
    * caught it, because the tests here only ever checked which cookies are stripped on the way out.
@@ -128,7 +128,7 @@ describe('the cookie that carries a private preview\u2019s access', () => {
     // at the root and hides the bug.
     const secureConfig = {
       ...config,
-      PREVIEW_BASE_URL: 'https://app.example.test/__athanor/preview'
+      PREVIEW_BASE_URL: 'https://app.example.test/__garden/preview'
     } as unknown as ApiConfig;
     const runner = new RunnerClient(
       'http://workspace-manager.test',
@@ -139,7 +139,7 @@ describe('the cookie that carries a private preview\u2019s access', () => {
 
     const response = await gateway.inject({
       method: 'GET',
-      url: `/__athanor/preview/${slug}/?access=${accessToken}`,
+      url: `/__garden/preview/${slug}/?access=${accessToken}`,
       headers: { host: 'app.example.test', 'x-forwarded-proto': 'https' }
     });
 
@@ -162,9 +162,9 @@ describe('preview origin isolation', () => {
   const isolated = {
     ...config,
     PUBLIC_APP_URL: 'https://app.example.test',
-    PREVIEW_BASE_URL: 'https://app.example.test:8443/__athanor/preview'
+    PREVIEW_BASE_URL: 'https://app.example.test:8443/__garden/preview'
   };
-  const path = `/__athanor/preview/${slug}/`;
+  const path = `/__garden/preview/${slug}/`;
 
   it('serves a functional isolated origin and confines service workers to its preview', async () => {
     const { gateway } = await buildGateway(isolated);
@@ -175,7 +175,7 @@ describe('preview origin isolation', () => {
       headers: {
         host: 'app.example.test:8443',
         'x-forwarded-proto': 'https',
-        cookie: `__Secure-athanor-preview-access=${accessToken}`
+        cookie: `__Secure-garden-preview-access=${accessToken}`
       }
     });
     expect(response.statusCode).toBe(200);
@@ -203,7 +203,7 @@ describe('preview origin isolation', () => {
   it('keeps the opaque sandbox if explicitly built on the owner origin', async () => {
     const { gateway } = await buildGateway({
       ...isolated,
-      PREVIEW_BASE_URL: 'https://app.example.test/__athanor/preview'
+      PREVIEW_BASE_URL: 'https://app.example.test/__garden/preview'
     });
     disposers.push(() => gateway.close());
     const response = await gateway.inject({
@@ -212,7 +212,7 @@ describe('preview origin isolation', () => {
       headers: {
         host: 'app.example.test',
         'x-forwarded-proto': 'https',
-        cookie: `__Secure-athanor-preview-access=${accessToken}`
+        cookie: `__Secure-garden-preview-access=${accessToken}`
       }
     });
     expect(response.statusCode).toBe(200);
@@ -223,7 +223,7 @@ describe('preview origin isolation', () => {
 });
 
 describe('preview gateway credential isolation', () => {
-  it('never forwards athanor session, preview access or authorization credentials', async () => {
+  it('never forwards garden session, preview access or authorization credentials', async () => {
     const { gateway, forwarded } = await buildGateway();
     disposers.push(() => gateway.close());
 
@@ -234,10 +234,10 @@ describe('preview gateway credential isolation', () => {
         host: previewHost,
         authorization: 'Bearer caller-supplied-token',
         cookie: [
-          '__Host-athanor_session=host-session-secret',
-          'athanor_session=plain-session-secret',
-          `athanor-preview-access=${accessToken}`,
-          '__Host-athanor-preview-access=production-access-secret',
+          '__Host-garden_session=host-session-secret',
+          'garden_session=plain-session-secret',
+          `garden-preview-access=${accessToken}`,
+          '__Host-garden-preview-access=production-access-secret',
           'workspace_app_session=opaque'
         ].join('; ')
       }
@@ -252,7 +252,7 @@ describe('preview gateway credential isolation', () => {
     expect(forwarded().get('authorization')).toMatch(/^Bearer /);
   });
 
-  it('drops the cookie header entirely when only athanor cookies are present', async () => {
+  it('drops the cookie header entirely when only garden cookies are present', async () => {
     const { gateway, forwarded } = await buildGateway();
     disposers.push(() => gateway.close());
 
@@ -261,7 +261,7 @@ describe('preview gateway credential isolation', () => {
       url: '/',
       headers: {
         host: previewHost,
-        cookie: `athanor-preview-access=${accessToken}; __Host-athanor_session=host-session-secret`
+        cookie: `garden-preview-access=${accessToken}; __Host-garden_session=host-session-secret`
       }
     });
 
@@ -276,13 +276,13 @@ describe('preview gateway credential isolation', () => {
     const response = await gateway.inject({
       method: 'GET',
       url: '/',
-      headers: { host: previewHost, cookie: `athanor-preview-access=${accessToken}` }
+      headers: { host: previewHost, cookie: `garden-preview-access=${accessToken}` }
     });
 
     expect(response.statusCode).toBe(200);
     const setCookie = String(response.headers['set-cookie']);
     expect(setCookie).toContain('workspace_app_session=opaque');
-    expect(setCookie).not.toContain('__Host-athanor_session');
+    expect(setCookie).not.toContain('__Host-garden_session');
   });
 
   /**
@@ -296,7 +296,7 @@ describe('preview gateway credential isolation', () => {
       const response = await gateway.inject({
         method: 'GET',
         url: '/',
-        headers: { host: previewHost, cookie: `athanor-preview-access=${accessToken}` }
+        headers: { host: previewHost, cookie: `garden-preview-access=${accessToken}` }
       });
       await gateway.close();
       expect(response.statusCode, `port ${port}`).toBe(404);
@@ -320,7 +320,7 @@ describe('a preview opened while the computer is asleep', () => {
     const response = await gateway.inject({
       method: 'GET',
       url: '/',
-      headers: { host: previewHost, cookie: `athanor-preview-access=${accessToken}` }
+      headers: { host: previewHost, cookie: `garden-preview-access=${accessToken}` }
     });
 
     expect(response.statusCode).toBe(200);
@@ -335,7 +335,7 @@ describe('a preview opened while the computer is asleep', () => {
     const response = await gateway.inject({
       method: 'GET',
       url: '/',
-      headers: { host: previewHost, cookie: `athanor-preview-access=${accessToken}` }
+      headers: { host: previewHost, cookie: `garden-preview-access=${accessToken}` }
     });
 
     expect(response.statusCode).toBe(503);
@@ -361,14 +361,14 @@ describe('independent owner preview access', () => {
         headers: { host: previewHost }
       });
       expect(opened.statusCode).toBe(303);
-      const cookie = opened.cookies.find((entry) => entry.name === 'athanor-preview-access');
+      const cookie = opened.cookies.find((entry) => entry.name === 'garden-preview-access');
       expect(cookie).toBeDefined();
       expect(
         (
           await gateway.inject({
             method: 'GET',
             url: '/',
-            headers: { host: previewHost, cookie: `athanor-preview-access=${cookie!.value}` }
+            headers: { host: previewHost, cookie: `garden-preview-access=${cookie!.value}` }
           })
         ).statusCode
       ).toBe(200);

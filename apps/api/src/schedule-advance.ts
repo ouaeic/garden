@@ -1,5 +1,5 @@
-import type { TaskScheduleSpec } from '@athanor/contracts';
-import { nextScheduleRun } from '@athanor/core';
+import type { TaskScheduleSpec } from '@garden/contracts';
+import { nextScheduleRun } from '@garden/core';
 
 type WallClockSpec = Extract<TaskScheduleSpec, { timeZone: string }>;
 

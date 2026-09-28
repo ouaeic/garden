@@ -134,7 +134,7 @@ export interface WireTool {
 /**
  * The wire, as a function: one request out, one choice and one usage frame back.
  *
- * It is a parameter of `runOne` so the edit axis can carry its calls through athanor's own
+ * It is a parameter of `runOne` so the edit axis can carry its calls through garden's own
  * gateway - the worker's client, retry policy and usage parsing - while the general half keeps
  * the bare fetch it has always used. Both answer in the same shape, so the loop that reads the
  * answer does not know which one it is holding. @see `edit-live.ts`.

@@ -272,7 +272,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "athanor-desktop"
+name = "garden-desktop"
 version = "0.2.0"
 dependencies = [
  "axum",

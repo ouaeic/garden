@@ -3,7 +3,7 @@ import type { BigIntStats } from 'node:fs';
 import type { FileHandle } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
-import type { TableCell, TablePage } from '@athanor/contracts';
+import type { TableCell, TablePage } from '@garden/contracts';
 import { openDownloadFile } from './open-download-file.js';
 import { WorkspaceFileError, assertOpenedInPlace } from './files.js';
 

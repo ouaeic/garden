@@ -52,7 +52,7 @@ if sys.argv[1] == "--status":
     file, parent, asker = sys.argv[2:5]
     relative = os.path.relpath(file, parent)
     parts = relative.split(os.sep)
-    if len(parts) != 3 or parts[:2] != [".athanor", "sandbox"] or not parts[2].endswith(".lease") or not all(c in "0123456789abcdef" for c in parts[2][:-6]) or not parts[2][:-6]:
+    if len(parts) != 3 or parts[:2] != [".garden", "sandbox"] or not parts[2].endswith(".lease") or not all(c in "0123456789abcdef" for c in parts[2][:-6]) or not parts[2][:-6]:
         raise RuntimeError("Invalid mission lease path")
     at = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     for part in parts[:-1]:

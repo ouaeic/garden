@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { ArrowRight, ArrowUpRight, Bell, FolderOpen, Plus } from 'lucide-react';
-import type { Project, Task } from '@athanor/contracts';
+import type { Project, Task } from '@garden/contracts';
 import { hasOngoingWork, needsAttention, shortDate, taskStatusLabel } from './model';
 import LivingBackdrop from './LivingBackdrop';
 import ScrollRegion from './ScrollRegion';

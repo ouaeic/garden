@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
-import { capabilityAudience, signCapabilityToken } from '@athanor/core';
+import { capabilityAudience, signCapabilityToken } from '@garden/core';
 import { authenticateRunnerRequest } from './auth.js';
 import { registerDocumentRoutes } from './document-routes.js';
 import { execute } from './execution.js';
@@ -13,7 +13,7 @@ const workspaceId = '00000000-0000-4000-8000-000000000001';
 const otherWorkspace = '00000000-0000-4000-8000-000000000002';
 const secret = 'document-read-test-secret-at-least-thirty-two';
 const url = `/v1/workspaces/${workspaceId}/documents`;
-const script = path.resolve('../../scripts/athanor-document');
+const script = path.resolve('../../scripts/garden-document');
 
 describe('scoped native document reading', () => {
   it('shares file path conventions, preserves source links and refuses private or escaped files', async () => {
@@ -21,10 +21,10 @@ describe('scoped native document reading', () => {
     const root = path.join(directory, workspaceId);
     await mkdir(path.join(root, 'workspace', 'reports'), { recursive: true });
     await mkdir(path.join(root, '.home'), { recursive: true });
-    await mkdir(path.join(root, '.athanor', 'artifacts'), { recursive: true });
+    await mkdir(path.join(root, '.garden', 'artifacts'), { recursive: true });
     await writeFile(path.join(root, 'workspace', 'reports', 'note.txt'), 'Sparse readable text');
     await writeFile(path.join(root, '.home', 'private.txt'), 'PRIVATE CANARY');
-    await writeFile(path.join(root, '.athanor', 'artifacts', 'report.txt'), 'Published evidence');
+    await writeFile(path.join(root, '.garden', 'artifacts', 'report.txt'), 'Published evidence');
     await symlink(
       path.join(root, '.home', 'private.txt'),
       path.join(root, 'workspace', 'escaped.txt')
@@ -94,7 +94,7 @@ describe('scoped native document reading', () => {
       ).toEqual(
         expect.arrayContaining([expect.objectContaining({ path: 'workspace/reports/note.txt' })])
       );
-      const published = await read('.athanor/artifacts/report.txt');
+      const published = await read('.garden/artifacts/report.txt');
       expect(
         (
           JSON.parse(published.json<Awaited<ReturnType<typeof execute>>>().stdout) as {

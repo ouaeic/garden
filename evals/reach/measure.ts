@@ -222,7 +222,7 @@ export const measureProbe = async (
     clockAnchor: seeded.clockAnchor
   });
   const window: ModelMessage[] = [
-    { role: 'system', content: 'You are athanor.' },
+    { role: 'system', content: 'You are garden.' },
     { role: 'user', content: probe.question }
   ];
   injectMemoryPack(window, pack);
@@ -247,7 +247,7 @@ export const measureProbe = async (
   /* ---- @2: one recall, then one reach into the entry the store ranked first. ---- */
   const recallTask = await openTask(seeded, probe.question);
   const recallState = stateWith([
-    { role: 'system', content: 'You are athanor.' },
+    { role: 'system', content: 'You are garden.' },
     { role: 'user', content: probe.question }
   ]);
   const recallContext = contextFor(seeded, recallTask, recallState);

@@ -1,7 +1,7 @@
 /**
  * The acceptance record: what would prove this job is done, taken from the model and made real.
  *
- * The one mechanism in athanor that cannot be satisfied by the model deciding its own work is good,
+ * The one mechanism in garden that cannot be satisfied by the model deciding its own work is good,
  * and the reason is the red baseline below: before the turn has changed anything, the checks are
  * run *as declared*, and a record where none of them fails is refused. A test that passes before
  * the work is a test of nothing.
@@ -13,8 +13,8 @@
  * Lifted out of `AgentWorker.run()`'s batch loop unchanged; the arm's `continue`s became `return`s,
  * which is the whole of the edit.
  */
-import type { ModelToolCall } from '@athanor/model-gateway';
-import type { TaskRecord, DataStore } from '@athanor/data';
+import type { ModelToolCall } from '@garden/model-gateway';
+import type { TaskRecord, DataStore } from '@garden/data';
 import {
   acceptanceAcceptedResult,
   describeAcceptanceCheck,

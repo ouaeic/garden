@@ -12,7 +12,7 @@
  */
 
 import { z } from 'zod';
-import { AthanorError } from '@athanor/core';
+import { GardenError } from '@garden/core';
 
 /** What a provider's own account endpoint said about the plan. */
 export const PlanUsage = z.object({
@@ -85,7 +85,7 @@ const OpenRouterKey = z.object({
 
 const checkedBody = async (response: Response, who: string): Promise<unknown> => {
   if (!response.ok)
-    throw new AthanorError(
+    throw new GardenError(
       'provider_unavailable',
       `${who} returned ${response.status}`,
       response.status === 401 || response.status === 403 ? 409 : 502

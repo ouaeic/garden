@@ -1,4 +1,4 @@
-import type { ReasoningEffort } from '@athanor/contracts';
+import type { ReasoningEffort } from '@garden/contracts';
 /**
  * The one call in the turn that spends the owner's money, and the four watches around it.
  *
@@ -28,10 +28,10 @@ import type { ReasoningEffort } from '@athanor/contracts';
  * Lifted out of `AgentWorker.run()` unchanged; one `return` became `'halted'`, three `continue`s
  * became `'retry'`, and the fall-through became `'generated'`. That is the whole of the edit.
  */
-import { AthanorError, sha256 } from '@athanor/core';
-import type { ModelRelease } from '@athanor/contracts';
-import type { DataStore, TaskRecord } from '@athanor/data';
-import { interruptedResponseOf, type ModelResponse } from '@athanor/model-gateway';
+import { GardenError, sha256 } from '@garden/core';
+import type { ModelRelease } from '@garden/contracts';
+import type { DataStore, TaskRecord } from '@garden/data';
+import { interruptedResponseOf, type ModelResponse } from '@garden/model-gateway';
 import type { AgentState, AgentWorkerConfig } from '../agent-state.js';
 import type { AgentRunnerClient } from '../runner-client.js';
 import { materializeNativeInputs } from '../native-input.js';
@@ -148,7 +148,7 @@ export const generateModelStep = async (
    * A holder rather than a bare `let` for the reason `firstToken` above is one: the assignment
    * happens inside a callback, which the compiler's flow analysis does not follow.
    */
-  const refusedWindow: { error?: AthanorError } = {};
+  const refusedWindow: { error?: GardenError } = {};
   const interruptedFailure: { error?: Error } = {};
   const looping = new AbortController();
   let streamed = '';
@@ -181,7 +181,7 @@ export const generateModelStep = async (
     reservedTokensOfSent: Math.ceil(JSON.stringify(requestTools).length / 4)
   });
   if (derivationBreach)
-    throw new AthanorError(
+    throw new GardenError(
       'request_not_derivable',
       `This turn stopped before sending a request it could not account for: ${derivationBreach}. Nothing it produced was rolled back - reply to carry on.`
     );
@@ -207,7 +207,7 @@ export const generateModelStep = async (
    * the same window, so the two must agree, and they are pinned against each OTHER rather than
    * against a literal in `generate-session.test.ts`.
    */
-  const sessionId = sha256(`athanor-task:${await turnRoutingTaskId(deps, task, key)}`).slice(0, 64);
+  const sessionId = sha256(`garden-task:${await turnRoutingTaskId(deps, task, key)}`).slice(0, 64);
   const nativeRequest = await materializeNativeInputs(
     deps.runner,
     task,
@@ -268,7 +268,7 @@ export const generateModelStep = async (
        * so a resume cannot hand the same refusal a fresh allowance.
        */
       if (
-        error instanceof AthanorError &&
+        error instanceof GardenError &&
         error.code === 'provider_context_overflow' &&
         (state.contextOverflowRepairs ?? 0) < MAX_CONTEXT_OVERFLOW_REPAIRS
       ) {

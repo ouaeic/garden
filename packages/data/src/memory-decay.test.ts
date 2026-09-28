@@ -29,7 +29,7 @@ import {
   buildMemoryItemIndex,
   memoryIndexKey,
   planMemoryQuery
-} from '@athanor/core';
+} from '@garden/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createDatabase, migrateDatabase, type Database } from './database.js';
 import { DataStore } from './store.js';

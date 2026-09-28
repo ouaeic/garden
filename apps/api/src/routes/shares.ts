@@ -22,9 +22,9 @@ import {
   type ShareBlob,
   type ShareRecord,
   type SharePreviewResponse
-} from '@athanor/contracts';
-import { AthanorError, sha256 } from '@athanor/core';
-import type { TaskShareRecord } from '@athanor/data';
+} from '@garden/contracts';
+import { GardenError, sha256 } from '@garden/core';
+import type { TaskShareRecord } from '@garden/data';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 import {
@@ -212,7 +212,7 @@ export const registerShareRoutes = (context: RouteContext): void => {
 
   const requireSharing = (): void => {
     if (!sharingEnabled())
-      throw new AthanorError('sharing_disabled', 'Sharing is turned off on this server', 403);
+      throw new GardenError('sharing_disabled', 'Sharing is turned off on this server', 403);
   };
 
   /** Mints a link for a built snapshot: seals it, stores the ciphertext, returns the key once. */
@@ -234,7 +234,7 @@ export const registerShareRoutes = (context: RouteContext): void => {
       body.expectedPreviewDigest &&
       body.expectedPreviewDigest !== sharePreviewDigest(built.snapshot)
     )
-      throw new AthanorError(
+      throw new GardenError(
         'preview_changed',
         'This work changed after you reviewed it. Review the snapshot again before creating a link.',
         409
@@ -300,7 +300,7 @@ export const registerShareRoutes = (context: RouteContext): void => {
   app.get<{ Params: { taskId: string } }>('/v1/tasks/:taskId/shares', async (request) => {
     const user = requireUser(request.user);
     const task = await store.getTask(user.id, request.params.taskId);
-    if (!task) throw new AthanorError('task_not_found', 'Task not found', 404);
+    if (!task) throw new GardenError('task_not_found', 'Task not found', 404);
     return (await store.listSharesForTask(user.id, task.id)).map(shareRecord);
   });
 
@@ -313,7 +313,7 @@ export const registerShareRoutes = (context: RouteContext): void => {
     const user = requireUser(request.user);
     return idempotent(request, reply, user, async () => {
       const share = await store.getShareForOwner(user.id, request.params.shareId);
-      if (!share) throw new AthanorError('not_found', 'Share not found', 404);
+      if (!share) throw new GardenError('not_found', 'Share not found', 404);
       const revoked = await store.revokeShare(user.id, share.id);
       if (revoked) log.info('share.revoked', { shareId: share.id, taskId: share.taskId });
       return { revoked };
@@ -324,7 +324,7 @@ export const registerShareRoutes = (context: RouteContext): void => {
     const user = requireUser(request.user);
     return idempotent(request, reply, user, async () => {
       const task = await store.getTask(user.id, request.params.taskId);
-      if (!task) throw new AthanorError('task_not_found', 'Task not found', 404);
+      if (!task) throw new GardenError('task_not_found', 'Task not found', 404);
       const revoked = await store.revokeAllShares(user.id, task.id);
       if (revoked) log.info('share.revoked_all', { taskId: task.id, revoked });
       return { revoked };
@@ -346,7 +346,7 @@ export const registerShareRoutes = (context: RouteContext): void => {
       const body = CreateShareRequest.parse(request.body ?? {});
       return idempotent(request, reply, user, async () => {
         const previous = await store.getShareForOwner(user.id, request.params.shareId);
-        if (!previous) throw new AthanorError('not_found', 'Share not found', 404);
+        if (!previous) throw new GardenError('not_found', 'Share not found', 404);
         const created = await mint(request, user.id, previous.taskId, body, previous.version + 1);
         await store.revokeShare(user.id, previous.id);
         reply.header('cache-control', 'no-store');

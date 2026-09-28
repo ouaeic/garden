@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Artifact, Task, TaskEvent, TaskPlan, TaskPresentation } from '@athanor/contracts';
+import type { Artifact, Task, TaskEvent, TaskPlan, TaskPresentation } from '@garden/contracts';
 import { ApiError, get } from './client';
 import { loadEventPage, subscribeTaskEvents } from './stream';
 import type { EventPage, StreamConnection } from './stream';

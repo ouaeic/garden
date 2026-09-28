@@ -2,7 +2,7 @@
  * The table, the gates, and the committed baseline.
  *
  * The shape is `evals/context-quality/report.ts`'s, deliberately and almost line for line: a
- * provenance pair on every run, a stamp under `$stamp` carrying the athanor and the rig digest that
+ * provenance pair on every run, a stamp under `$stamp` carrying the garden and the rig digest that
  * accepted the numbers, exact gates on integer-derived columns and a band on nothing, and a set of
  * checks that fail SEPARATELY from the baseline because each of them exists for a defect that
  * produces a plausible number rather than an error. Inventing a second reporting shape for a second
@@ -68,7 +68,7 @@ export const rigIdentity = (): Omit<BaselineStamp, 'acceptedAt'> =>
   (stamped ??= { ...buildIdentity(), rig: rigDigest() });
 
 export const identityLabel = (identity: Omit<BaselineStamp, 'acceptedAt'>): string =>
-  `athanor ${identity.version} at ${identity.commit ?? 'an uncommitted tree'}, rig ${identity.rig}`;
+  `garden ${identity.version} at ${identity.commit ?? 'an uncommitted tree'}, rig ${identity.rig}`;
 
 export const stampOf = (baseline: Baseline | undefined): BaselineStamp | null => {
   const row = (baseline as Record<string, unknown> | undefined)?.[BASELINE_STAMP_KEY];
@@ -123,7 +123,7 @@ export const baselineFrom = (measurements: readonly Measurement[]): Baseline => 
  * Every column is a count of lines or of calls. Nothing in this measurement is a function of the
  * clock, of the catalogue, or of anything else that drifts under unrelated work - which is what the
  * two-per-cent band in `evals/report.ts` is calibrated to and why it does not belong here. A row
- * that moves by one line moved because something changed what athanor displays, and that is a
+ * that moves by one line moved because something changed what garden displays, and that is a
  * decision somebody should have to re-accept.
  *
  * One-sided where the direction has a meaning: displaying MORE per landed edit is the regression.
@@ -301,7 +301,7 @@ export const render = (
   );
   if (stamp && (stamp.commit !== identity.commit || stamp.rig !== identity.rig))
     lines.push(
-      'Note: the committed numbers were measured by a different revision of athanor or of this rig. A row that moved may have moved for that reason.'
+      'Note: the committed numbers were measured by a different revision of garden or of this rig. A row that moved may have moved for that reason.'
     );
 
   const trajectories = measurements.filter((row) => row.source === 'trajectory');
@@ -341,7 +341,7 @@ export const render = (
     const patches = corpus.reduce((total, row) => total + row.patchEdits, 0);
     const landed = corpus.reduce((total, row) => total + row.landedEdits, 0);
     lines.push(
-      `  What that figure is about: the largest file any of these ${corpus.length} fixtures puts in a workspace is ${largest.path} at ${largest.lines} lines, and of the ${corpus.reduce((total, row) => total + row.reads, 0)} reads that returned, ${corpus.reduce((total, row) => total + row.windowedReads, 0)} took the windowed path. This corpus cannot reach the display bound and cannot tell a narrow reader from a wide one, so its number is a fact about the corpus and not about athanor on real files. The trajectories above are where this axis is actually measured, and they are the only rows this rig commits a baseline for.`
+      `  What that figure is about: the largest file any of these ${corpus.length} fixtures puts in a workspace is ${largest.path} at ${largest.lines} lines, and of the ${corpus.reduce((total, row) => total + row.reads, 0)} reads that returned, ${corpus.reduce((total, row) => total + row.windowedReads, 0)} took the windowed path. This corpus cannot reach the display bound and cannot tell a narrow reader from a wide one, so its number is a fact about the corpus and not about garden on real files. The trajectories above are where this axis is actually measured, and they are the only rows this rig commits a baseline for.`
     );
     lines.push(
       `  And what the denominator is made of: ${patches} of the ${landed} landed edits are file_patch, ${landed - patches} are whole-file file_write. A denominator of writes describes a corpus that CREATES files; the edit format is priced on one that CHANGES them.`

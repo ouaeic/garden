@@ -1,4 +1,4 @@
-import type { PendingNotificationRecord } from '@athanor/data';
+import type { PendingNotificationRecord } from '@garden/data';
 
 /**
  * What a notification is about, separated from how it is worded and from whether it is sent.

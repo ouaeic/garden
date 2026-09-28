@@ -4,7 +4,7 @@ import type {
   ConnectorAuditEvent,
   ConnectorTestResult,
   StartConnectorOAuthResponse
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { del, get, post } from '../client.js';
 import { Button, Dialog, Field } from '../ui.js';
 import {
@@ -253,7 +253,7 @@ export function ConnectionsLibrary({ onChange }: { onChange: () => void }) {
               if (usingOAuth)
                 popup.current = window.open(
                   'about:blank',
-                  'athanor-connection',
+                  'garden-connection',
                   'popup,width=620,height=720'
                 );
               void action
@@ -555,7 +555,7 @@ export function ConnectionsLibrary({ onChange }: { onChange: () => void }) {
                   onClick={() => {
                     popup.current = window.open(
                       authorization.authorizationUrl,
-                      'athanor-connection',
+                      'garden-connection',
                       'popup,width=620,height=720'
                     );
                   }}

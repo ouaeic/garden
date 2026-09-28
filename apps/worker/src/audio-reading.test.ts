@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/unbound-method -- The runner methods here are spies; assertions never invoke a detached method. */
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { encryptJson } from '@athanor/core';
-import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
+import { encryptJson } from '@garden/core';
+import { createDatabase, DataStore, migrateDatabase } from '@garden/data';
 import { transcribeRecording } from './audio-reading.js';
 import {
   currentTranscriptionCredential,

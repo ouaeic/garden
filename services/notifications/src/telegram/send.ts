@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type { PendingDestinationRow } from '@athanor/data';
+import type { PendingDestinationRow } from '@garden/data';
 import { notificationPayload } from '../payload.js';
 import { TransportError, type Transport } from '../transport.js';
 import { createTelegramClient } from './client.js';

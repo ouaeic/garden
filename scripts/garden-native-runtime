@@ -1,0 +1,288 @@
+#!/bin/sh
+set -eu
+
+garden_root="${GARDEN_ROOT:-/opt/garden}"
+native_prefix="${GARDEN_RUNTIME_PREFIX:-}"
+native_root="$native_prefix/usr/local/lib/garden"
+fail() { printf 'garden native runtime: %s\n' "$1" >&2; exit 1; }
+[ "$(id -u)" -eq 0 ] || fail 'run this command as root'
+
+# Exchanges a link itself, including the first activation over a directory-based environment.
+# The legacy directory and its active name remain reachable throughout the kernel operation.
+activate_link() {
+  python3 -I - "$1" "$2" <<'PYTHON'
+import ctypes, os, sys
+active, target = sys.argv[1:]
+if os.path.isdir(active) and not os.path.islink(active):
+    previous = active + "-before-managed"
+    os.symlink(target, previous)
+    libc = ctypes.CDLL(None, use_errno=True)
+    if sys.platform == "darwin":
+        result = libc.renamex_np(os.fsencode(active), os.fsencode(previous), 2)
+    else:
+        result = libc.renameat2(-100, os.fsencode(active), -100, os.fsencode(previous), 2)
+    if result != 0:
+        error = ctypes.get_errno()
+        os.unlink(previous)
+        raise OSError(error, os.strerror(error))
+else:
+    temporary = active + ".next." + str(os.getpid())
+    os.symlink(target, temporary)
+    try:
+        os.replace(temporary, active)
+    finally:
+        if os.path.lexists(temporary): os.unlink(temporary)
+PYTHON
+}
+
+# A completion receipt is reusable only while every executable path remains installer-owned.
+debugger_cache_safe() {
+  python3 -I - "$1" "$2" <<'PYTHON'
+import os, pathlib, stat, sys
+root = pathlib.Path(sys.argv[1])
+owner = os.geteuid()
+def safe(file):
+    info = file.lstat()
+    return (info.st_uid == owner and not info.st_mode & 0o6022 and
+            (stat.S_ISREG(info.st_mode) or stat.S_ISDIR(info.st_mode)))
+try:
+    if not safe(root) or not root.is_dir():
+        raise ValueError('unsafe debugger cache')
+    for directory, names, files in os.walk(root, followlinks=False):
+        if not all(safe(pathlib.Path(directory) / name) for name in names + files):
+            raise ValueError('unsafe debugger cache entry')
+    if (root / '.garden-complete').read_text().strip() != sys.argv[2]:
+        raise ValueError('incorrect debugger receipt')
+    if not (root / 'src/dapDebugServer.js').is_file():
+        raise ValueError('missing debugger entry point')
+except (OSError, ValueError):
+    sys.exit(1)
+PYTHON
+}
+
+# Replacement is committed only after the pinned staged archive has passed every check.
+replace_debugger_cache() {
+  python3 -I - "$1" "$2" <<'PYTHON'
+import ctypes, os, stat, sys
+staged, target = sys.argv[1:]
+if not os.path.lexists(target):
+    os.rename(staged, target)
+else:
+    if not stat.S_ISDIR(os.lstat(target).st_mode):
+        raise ValueError('the debugger cache must be a real directory')
+    libc = ctypes.CDLL(None, use_errno=True)
+    if sys.platform == 'darwin':
+        result = libc.renamex_np(os.fsencode(staged), os.fsencode(target), 2)
+    else:
+        result = libc.renameat2(-100, os.fsencode(staged), -100, os.fsencode(target), 2)
+    if result != 0:
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error))
+PYTHON
+}
+
+install_tools() (
+  install -d -m 0755 "$native_root"
+  requirements="$garden_root/infra/native/garden-python-requirements.txt"
+  requirement_hash=$(sha256sum "$requirements" | awk '{print $1}')
+  python_abi=$(python3 -I -c 'import sys; print("%s.%s" % sys.version_info[:2])')
+  python_target="$native_root/python-$python_abi-$requirement_hash"
+  python_ready="$python_target/.garden-complete"
+  # A failed download cannot modify the active environment. Completed environments remain cached
+  # at their original paths: a virtual environment's scripts contain absolute interpreter paths.
+  if [ ! -f "$python_ready" ]; then
+    [ "$(readlink "$native_root/python" 2>/dev/null || true)" != "$python_target" ] ||
+      fail 'the active Python environment has no completion receipt; preserve it for recovery'
+    [ ! -L "$python_target" ] || fail 'the Python cache must not be a symlink'
+    rm -rf -- "$python_target"
+    trap 'rm -rf -- "$python_target"' EXIT INT TERM
+    python3 -m venv --system-site-packages "$python_target"
+    "$python_target/bin/python3" -m pip install --quiet --disable-pip-version-check \
+      --require-hashes --no-deps --only-binary=:all: --requirement "$requirements"
+    "$python_target/bin/python3" -I -c \
+      'import debugpy, pypdf, pptx, docx, openpyxl, pandas, matplotlib, PIL; assert debugpy.__version__ == "1.8.21"'
+    chmod -R a+rX "$python_target"
+    printf '%s\n' "$requirement_hash" >"$python_ready"
+    trap - EXIT INT TERM
+  fi
+  [ "$(cat "$python_ready")" = "$requirement_hash" ] || fail 'the Python cache receipt does not match'
+  "$python_target/bin/python3" -I -c \
+    'import debugpy, pypdf, pptx, docx, openpyxl, pandas, matplotlib, PIL; assert debugpy.__version__ == "1.8.21"'
+
+  js_version=1.117.0
+  js_hash=ad8d04ede9d4b75cc290fd5438a65047a06f786d04f604b6112485b36f090772
+  js_target="$native_root/js-debug-$js_version"
+  if ! debugger_cache_safe "$js_target" "$js_hash"; then
+    [ ! -L "$js_target" ] || fail 'the JavaScript debugger cache must not be a symlink'
+    js_stage=$(mktemp -d "$native_root/.debug-install.XXXXXX")
+    trap 'rm -rf -- "$js_stage"' EXIT INT TERM
+    curl -fsSL --retry 3 --max-time 120 \
+      "https://github.com/microsoft/vscode-js-debug/releases/download/v$js_version/js-debug-dap-v$js_version.tar.gz" \
+      -o "$js_stage/adapter.tar.gz"
+    printf '%s  %s\n' "$js_hash" "$js_stage/adapter.tar.gz" | sha256sum --check --status
+    tar --no-same-owner --no-same-permissions -xzf "$js_stage/adapter.tar.gz" -C "$js_stage"
+    [ -f "$js_stage/js-debug/src/dapDebugServer.js" ] || fail 'the native debugger entry point is missing'
+    chmod -R a-s,go-w,a+rX "$js_stage/js-debug"
+    printf '%s\n' "$js_hash" >"$js_stage/js-debug/.garden-complete"
+    chmod 0644 "$js_stage/js-debug/.garden-complete"
+    debugger_cache_safe "$js_stage/js-debug" "$js_hash" || fail 'the staged debugger cache is not safely owned'
+    node --check "$js_stage/js-debug/src/dapDebugServer.js"
+    replace_debugger_cache "$js_stage/js-debug" "$js_target"
+    rm -rf -- "$js_stage"
+    trap - EXIT INT TERM
+  fi
+  debugger_cache_safe "$js_target" "$js_hash" || fail 'the debugger cache ownership or receipt is invalid'
+  node --check "$js_target/src/dapDebugServer.js"
+
+  # Completed environments remain available for offline recovery after activation.
+  activate_link "$native_root/python" "$python_target"
+  activate_link "$native_root/js-debug" "$js_target"
+)
+
+install_policy() (
+  policy_dir="$native_prefix/etc/sudoers.d"
+  install -d -m 0755 "$policy_dir"
+  # Dotted temporary names are ignored by sudo's includedir; validation precedes the atomic rename.
+  policy_stage=$(mktemp "$policy_dir/.garden-policy.XXXXXX")
+  trap 'rm -f -- "$policy_stage"' EXIT INT TERM
+  install -m 0440 "$garden_root/infra/native/garden-packages.sudoers" "$policy_stage"
+  visudo -cf "$policy_stage" >/dev/null
+  mv -f "$policy_stage" "$policy_dir/garden-packages"
+  trap - EXIT INT TERM
+)
+
+verify_language_servers() {
+  node - "$garden_root/services/workspace-runner/package.json" <<'JS'
+const {createRequire}=require('node:module');
+const fs=require('node:fs');
+const path=require('node:path');
+const req=createRequire(process.argv[2]);
+const manifest=req(process.argv[2]);
+for (const [name, entry] of [['typescript-native','bin/tsc'],['pyright','langserver.index.js']]) {
+  const file=req.resolve(name+'/package.json');
+  const installed=req(file);
+  const pinned=manifest.dependencies[name].replace(/^npm:[^@]+@/,'');
+  if (installed.version!==pinned || !fs.statSync(path.join(path.dirname(file),entry)).isFile())
+    throw new Error('The locked native language server is unavailable: '+name);
+}
+JS
+}
+
+configure_preview_origin() {
+  native_config="${GARDEN_CONFIG:-$native_prefix/etc/garden}"
+  python3 -I - "$native_config" "$native_prefix/etc/nginx/snippets" <<'PYTHON'
+import os, pathlib, re, sys, tempfile
+from urllib.parse import urlsplit
+config, snippets = map(pathlib.Path, sys.argv[1:])
+control = config / 'control.env'
+values = dict(line.split('=', 1) for line in control.read_text().splitlines()
+              if '=' in line and not line.startswith('#'))
+def origin(raw):
+    parsed = urlsplit(raw)
+    if (parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password
+            or not re.fullmatch(r'[a-zA-Z0-9.:-]+|\[[a-fA-F0-9:]+\](?::[0-9]+)?', parsed.netloc)
+            or parsed.query or parsed.fragment):
+        raise ValueError('Preview configuration requires a plain HTTPS origin without credentials')
+    port = parsed.port
+    host = '[' + parsed.hostname + ']' if ':' in parsed.hostname else parsed.hostname
+    return 'https://' + host + (':' + str(port) if port and port != 443 else '')
+app = values['PUBLIC_APP_URL']
+app_origin = origin(app)
+preview = values.get('PREVIEW_BASE_URL', '')
+if not preview or (origin(preview) == app_origin
+                   and urlsplit(preview).path.rstrip('/') == '/__garden/preview'):
+    host = urlsplit(app).hostname
+    host = '[' + host + ']' if ':' in host else host
+    preview = 'https://' + host + ':8443/__garden/preview'
+preview_origin = origin(preview)
+if preview_origin == app_origin:
+    raise ValueError('The preview origin must differ from the authenticated application origin')
+def atomic(file, text, mode):
+    file.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix='.' + file.name + '.', dir=file.parent)
+    try:
+        with os.fdopen(fd, 'w') as stream:
+            os.fchmod(stream.fileno(), mode)
+            if file.exists():
+                existing = file.stat()
+                os.fchown(stream.fileno(), existing.st_uid, existing.st_gid)
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, file)
+    finally:
+        if os.path.exists(temporary): os.unlink(temporary)
+def update(file, replacements):
+    lines = file.read_text().splitlines()
+    output = []
+    for line in lines:
+        key = line.split('=', 1)[0]
+        if key in replacements:
+            if replacements[key] is not None:
+                output.append(key + '=' + replacements[key])
+                replacements[key] = None
+        else: output.append(line)
+    output.extend(key + '=' + value for key, value in replacements.items() if value is not None)
+    atomic(file, '\n'.join(output) + '\n', 0o600)
+def reserved(file):
+    current = dict(line.split('=', 1) for line in file.read_text().splitlines() if '=' in line)
+    defaults = '4201,4203' if file == control else '4100,4400,5432,4201,4203'
+    ports = [p for p in current.get('RESERVED_PREVIEW_PORTS', defaults).split(',') if p]
+    return ','.join(dict.fromkeys([*ports, '443', '8443']))
+# Validate both private inputs before replacing either one. An interrupted activation is
+# idempotent; the updater restores its verified configuration backup if activation fails.
+runner = config / 'runner.env'
+runner_ports, control_ports = reserved(runner), reserved(control)
+snippets.mkdir(parents=True, exist_ok=True)
+atomic(snippets / 'garden-preview-origin.conf',
+       'set $garden_preview_origin "' + preview_origin + '";\n', 0o644)
+update(control, {'PREVIEW_BASE_URL': preview, 'RESERVED_PREVIEW_PORTS': control_ports})
+update(runner, {'RESERVED_PREVIEW_PORTS': runner_ports})
+PYTHON
+  if command -v ufw >/dev/null 2>&1 && ufw status | grep -q '^Status: active'; then
+    ufw allow 8443/tcp >/dev/null
+  elif command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+    firewall-cmd --permanent --add-port=8443/tcp >/dev/null
+    firewall-cmd --add-port=8443/tcp >/dev/null
+  fi
+}
+
+remove_tools() {
+  [ ! -L "$native_root" ] || fail 'the native runtime directory must not be a symlink'
+  for cached in "$native_root"/python-* "$native_root"/js-debug-*; do
+    [ -d "$cached" ] && [ ! -L "$cached" ] && [ -f "$cached/.garden-complete" ] || continue
+    cache_name=$(basename "$cached")
+    case "$cache_name" in
+      python-*)
+        printf '%s\n' "$cache_name" | grep -Eq '^python-[0-9]+\.[0-9]+-[a-f0-9]{64}$' || continue
+        [ "$(cat "$cached/.garden-complete")" = "${cache_name##*-}" ] || continue
+        ;;
+      js-debug-*)
+        printf '%s\n' "$cache_name" | grep -Eq '^js-debug-[0-9]+\.[0-9]+\.[0-9]+$' || continue
+        [ "$(cat "$cached/.garden-complete")" = ad8d04ede9d4b75cc290fd5438a65047a06f786d04f604b6112485b36f090772 ] || continue
+        ;;
+    esac
+    for active in "$native_root/python" "$native_root/js-debug"; do
+      [ "$(readlink "$active" 2>/dev/null || true)" != "$cached" ] || rm -f "$active"
+    done
+    rm -rf -- "$cached"
+  done
+}
+
+case "${1:-}" in
+  tools) install_tools ;;
+  remove) remove_tools ;;
+  policy) install_policy ;;
+  language-servers) verify_language_servers ;;
+  preview-origin) configure_preview_origin ;;
+  all)
+    # Validate every dependency before granting the helper's new policy vocabulary.
+    verify_language_servers
+    install_tools
+    [ -r "$native_root/mission-supervisor.py" ] || fail 'the process supervisor is missing'
+    python3 -I -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' "$native_root/mission-supervisor.py"
+    install_policy
+    configure_preview_origin
+    ;;
+  *) fail 'usage: garden-native-runtime tools|policy|language-servers|preview-origin|all|remove' ;;
+esac

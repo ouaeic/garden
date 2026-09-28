@@ -48,7 +48,7 @@ export function registerDocumentRoutes(
       const dataRoot =
         relative === 'workspace' || relative.startsWith('workspace/')
           ? 'workspace'
-          : '.athanor/artifacts';
+          : '.garden/artifacts';
       const readerPath =
         path.relative(resolveInside(root, dataRoot), resolveInside(root, relative)) || '.';
       const args = [body.action, '--path', readerPath];
@@ -91,7 +91,7 @@ export function registerDocumentRoutes(
         const result = await run(
           root,
           {
-            executable: '/usr/local/lib/athanor/athanor-document',
+            executable: '/usr/local/lib/garden/garden-document',
             args,
             cwd: dataRoot,
             timeoutSeconds: 300,

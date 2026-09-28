@@ -50,7 +50,7 @@ export async function checkPermissionModes({
     }
     if (path === `/v1/workspaces/${workspace.id}/snapshots`) return route.fulfill({ json: [] });
     if (path === `/v1/workspaces/${workspace.id}/brief`)
-      return route.fulfill({ json: { markdown: '', path: 'workspace/ATHANOR.md' } });
+      return route.fulfill({ json: { markdown: '', path: 'workspace/GARDEN.md' } });
     return route.fallback();
   });
   try {

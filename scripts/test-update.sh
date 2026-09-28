@@ -12,7 +12,7 @@ seed="$test_root/seed"
 checkout="$test_root/checkout"
 fake_bin="$test_root/bin"
 runtime="$test_root/runtime"
-config="$test_root/etc/athanor"
+config="$test_root/etc/garden"
 state="$test_root/state"
 home="$test_root/home"
 backups="$test_root/backups"
@@ -49,7 +49,7 @@ while True:
         fcntl.flock(int(sys.argv[-1]), fcntl.LOCK_EX | fcntl.LOCK_NB)
         break
     except BlockingIOError:
-        marker = os.environ.get(\"ATHANOR_TEST_LOCK_BLOCKED\")
+        marker = os.environ.get(\"GARDEN_TEST_LOCK_BLOCKED\")
         if marker and wait: pathlib.Path(marker).touch()
         if time.monotonic() >= end: sys.exit(1)
         time.sleep(0.02)
@@ -58,7 +58,7 @@ while True:
 make_fake id '
 if [ "${1:-}" = "-u" ]; then printf "0\n"; else printf "root\n"; fi'
 make_fake systemctl '
-printf "systemctl %s\n" "$*" >>"$ATHANOR_TEST_COMMAND_LOG"'
+printf "systemctl %s\n" "$*" >>"$GARDEN_TEST_COMMAND_LOG"'
 # Stands in for the running server. The readiness gate asks four separate questions, so the
 # fixtures make it answer them the way a broken release would: FAIL_HEALTH is a build that boots
 # and cannot serve, FAIL_MIGRATION is one whose schema never reached the version it expects. Both
@@ -69,30 +69,30 @@ requested=""
 for argument in "$@"; do
   case "$argument" in http*) requested="$argument" ;; esac
 done
-if [ -f "$ATHANOR_TEST_CHECKOUT/FAIL_HEALTH" ]; then exit 22; fi
+if [ -f "$GARDEN_TEST_CHECKOUT/FAIL_HEALTH" ]; then exit 22; fi
 case "$requested" in
   # The worker metrics the backup reads to decide whether anybody is using the computer. Silence
   # means idle, which is what an unattended box normally is.
   */metrics)
-    if [ -f "$ATHANOR_TEST_WORKER_BUSY" ]; then printf "athanor_worker_active 1\n"; fi
+    if [ -f "$GARDEN_TEST_WORKER_BUSY" ]; then printf "garden_worker_active 1\n"; fi
     # A worker that goes busy in the fraction of a second between the unattended run finding it idle
-    # and the update re-checking on the way in. That gap is the only path through update_athanor
+    # and the update re-checking on the way in. That gap is the only path through update_garden
     # that returns without recording an outcome, and a drill cannot produce it with a static marker:
     # this one answers idle the first time it is asked and busy every time after.
-    if [ -f "$ATHANOR_TEST_WORKER_BUSY_LATE" ]; then
-      metrics_asks=$(cat "$ATHANOR_TEST_WORKER_BUSY_LATE" 2>/dev/null || printf 0)
+    if [ -f "$GARDEN_TEST_WORKER_BUSY_LATE" ]; then
+      metrics_asks=$(cat "$GARDEN_TEST_WORKER_BUSY_LATE" 2>/dev/null || printf 0)
       case "$metrics_asks" in ""|*[!0-9]*) metrics_asks=0 ;; esac
       metrics_asks=$((metrics_asks + 1))
-      printf "%s\n" "$metrics_asks" >"$ATHANOR_TEST_WORKER_BUSY_LATE"
-      [ "$metrics_asks" -le 1 ] || printf "athanor_worker_active 1\n"
+      printf "%s\n" "$metrics_asks" >"$GARDEN_TEST_WORKER_BUSY_LATE"
+      [ "$metrics_asks" -le 1 ] || printf "garden_worker_active 1\n"
     fi
     ;;
   */v1/legal) printf "{\"applicationLicense\":\"AGPL-3.0-only\",\"accepted\":false}\n" ;;
   # The runner health document, which is where `doctor` reads the rung the sandbox is actually on
   # rather than the one runner.env asked for. Other cases receive an idle, healthy runner.
   *4300/healthz)
-    if [ -f "$ATHANOR_TEST_RUNNER_HEALTH" ]; then
-      cat "$ATHANOR_TEST_RUNNER_HEALTH"
+    if [ -f "$GARDEN_TEST_RUNNER_HEALTH" ]; then
+      cat "$GARDEN_TEST_RUNNER_HEALTH"
     else
       printf "{\"ok\":true,\"backgroundCommands\":0}\n"
     fi
@@ -152,85 +152,85 @@ exec /usr/bin/shasum -a 256 "$@"'
 make_fake runuser '
 case "$*" in
   *"playwright-core/cli.js install chromium"*)
-    printf "managed browser fetch\n" >>"$ATHANOR_TEST_COMMAND_LOG"
-    [ "${ATHANOR_TEST_BROWSER_FETCH_FAIL:-0}" != 1 ] || exit 44
-    mkdir -p "$ATHANOR_HOME/.cache/ms-playwright/chromium-1234" \
-      "$ATHANOR_HOME/.cache/ms-playwright/chromium_headless_shell-1234"
+    printf "managed browser fetch\n" >>"$GARDEN_TEST_COMMAND_LOG"
+    [ "${GARDEN_TEST_BROWSER_FETCH_FAIL:-0}" != 1 ] || exit 44
+    mkdir -p "$GARDEN_HOME/.cache/ms-playwright/chromium-1234" \
+      "$GARDEN_HOME/.cache/ms-playwright/chromium_headless_shell-1234"
     ;;
-  *"pg_dump"*) cat "$ATHANOR_TEST_DATABASE" ;;
+  *"pg_dump"*) cat "$GARDEN_TEST_DATABASE" ;;
   *"pg_restore"*)
-    [ "${ATHANOR_TEST_RESTORE_FAIL:-0}" != 1 ] || exit 43
-    cat >"$ATHANOR_TEST_DATABASE" ;;
-  *"dropdb"*|*"createdb"*) : >"$ATHANOR_TEST_DATABASE" ;;
+    [ "${GARDEN_TEST_RESTORE_FAIL:-0}" != 1 ] || exit 43
+    cat >"$GARDEN_TEST_DATABASE" ;;
+  *"dropdb"*|*"createdb"*) : >"$GARDEN_TEST_DATABASE" ;;
   *"schema_migrations"*)
-    if [ -f "$ATHANOR_TEST_CHECKOUT/FAIL_MIGRATION" ]; then printf "6\n"; else printf "7\n"; fi
+    if [ -f "$GARDEN_TEST_CHECKOUT/FAIL_MIGRATION" ]; then printf "6\n"; else printf "7\n"; fi
     ;;
   # The sandbox helper, which both boundary arms of `doctor` reach through runuser and sudo. Silent
   # unless a report is in place, which is the box where the helper answers nothing.
-  *athanor-sandbox*)
-    if [ -f "$ATHANOR_TEST_SANDBOX_REPORT" ]; then cat "$ATHANOR_TEST_SANDBOX_REPORT"; fi
+  *garden-sandbox*)
+    if [ -f "$GARDEN_TEST_SANDBOX_REPORT" ]; then cat "$GARDEN_TEST_SANDBOX_REPORT"; fi
     ;;
 esac
 exit 0'
 make_fake pnpm '
-printf "pnpm %s at %s\n" "$*" "$PWD" >>"$ATHANOR_TEST_COMMAND_LOG"
-if [ "$1" = "-r" ] && [ "${2:-}" = "build" ] && { [ -f "$PWD/FAIL_BUILD" ] || [ "${ATHANOR_TEST_REVERSE_BUILD_FAIL:-0}" = 1 ]; }; then
+printf "pnpm %s at %s\n" "$*" "$PWD" >>"$GARDEN_TEST_COMMAND_LOG"
+if [ "$1" = "-r" ] && [ "${2:-}" = "build" ] && { [ -f "$PWD/FAIL_BUILD" ] || [ "${GARDEN_TEST_REVERSE_BUILD_FAIL:-0}" = 1 ]; }; then
   printf "intentional synthetic build failure\n" >&2
   exit 42
 fi'
 make_fake git '
-exec "$ATHANOR_TEST_REAL_GIT" "$@"'
+exec "$GARDEN_TEST_REAL_GIT" "$@"'
 
 # Everything install_runtime_files installs has to exist in the checkout, otherwise the update
 # fails partway through for a reason that has nothing to do with what is being tested.
-cp "$repository_root/scripts/athanor" \
-  "$repository_root/scripts/athanor-package-helper" \
-  "$repository_root/scripts/athanor-sandbox" \
+cp "$repository_root/scripts/garden" \
+  "$repository_root/scripts/garden-package-helper" \
+  "$repository_root/scripts/garden-sandbox" \
   "$repository_root/scripts/mission-supervisor.py" \
   "$repository_root/scripts/reproducible-run.py" \
   "$repository_root/scripts/garden_system.py" \
-  "$repository_root/scripts/athanor-system-packages" \
-  "$repository_root/scripts/athanor-service" \
-  "$repository_root/scripts/athanor-network-refresh" \
-  "$repository_root/scripts/athanor-network-watch" \
-  "$repository_root/scripts/athanor-ddns" \
-  "$repository_root/scripts/athanor-certificate" \
-  "$repository_root/scripts/athanor-document" \
-  "$repository_root/scripts/athanor-office-convert" \
-  "$repository_root/scripts/athanor-pdf-tables" \
-  "$repository_root/scripts/athanor-document-proof" \
-  "$repository_root/scripts/athanor-gui" \
-  "$repository_root/scripts/athanor-gui-broker" \
-  "$repository_root/scripts/athanor-snapshot" \
+  "$repository_root/scripts/garden-system-packages" \
+  "$repository_root/scripts/garden-service" \
+  "$repository_root/scripts/garden-network-refresh" \
+  "$repository_root/scripts/garden-network-watch" \
+  "$repository_root/scripts/garden-ddns" \
+  "$repository_root/scripts/garden-certificate" \
+  "$repository_root/scripts/garden-document" \
+  "$repository_root/scripts/garden-office-convert" \
+  "$repository_root/scripts/garden-pdf-tables" \
+  "$repository_root/scripts/garden-document-proof" \
+  "$repository_root/scripts/garden-gui" \
+  "$repository_root/scripts/garden-gui-broker" \
+  "$repository_root/scripts/garden-snapshot" \
   "$seed/scripts/"
-cat >"$seed/scripts/athanor-native-runtime" <<'NATIVE_FIXTURE'
+cat >"$seed/scripts/garden-native-runtime" <<'NATIVE_FIXTURE'
 #!/bin/sh
 set -eu
-printf 'native activation %s\n' "$*" >>"$ATHANOR_TEST_COMMAND_LOG"
-if [ -f "$ATHANOR_ROOT/FAIL_NATIVE" ]; then exit 29; fi
+printf 'native activation %s\n' "$*" >>"$GARDEN_TEST_COMMAND_LOG"
+if [ -f "$GARDEN_ROOT/FAIL_NATIVE" ]; then exit 29; fi
 NATIVE_FIXTURE
 cp "$repository_root/infra/native/start-desktop-session.sh" \
-  "$repository_root/infra/native/athanor-desktop-bridge.py" \
-  "$repository_root/infra/native/athanor@.service" \
-  "$repository_root/infra/native/athanor-runner.service" \
-  "$repository_root/infra/native/athanor-jobs.service" \
-  "$repository_root/infra/native/athanor-gui.service" \
-  "$repository_root/infra/native/athanor-work.slice" \
-  "$repository_root/infra/native/athanor.target" \
-  "$repository_root/infra/native/athanor-network-refresh.service" \
-  "$repository_root/infra/native/athanor-network-refresh.timer" \
-  "$repository_root/infra/native/athanor-network-refresh.path" \
-  "$repository_root/infra/native/athanor-network-watch.service" \
-  "$repository_root/infra/native/athanor-auto-update.service" \
-  "$repository_root/infra/native/athanor-auto-update.timer" \
-  "$repository_root/infra/native/athanor-auto-update-alert.service" \
-  "$repository_root/infra/native/athanor-certificate-renew.service" \
-  "$repository_root/infra/native/athanor-certificate-renew.timer" \
-  "$repository_root/infra/native/athanor-certificate-alert.service" \
-  "$repository_root/infra/native/athanor-backup.service" \
-  "$repository_root/infra/native/athanor-backup.timer" \
-  "$repository_root/infra/native/athanor-backup-alert.service" \
-  "$repository_root/infra/native/athanor-motd" \
+  "$repository_root/infra/native/garden-desktop-bridge.py" \
+  "$repository_root/infra/native/garden@.service" \
+  "$repository_root/infra/native/garden-runner.service" \
+  "$repository_root/infra/native/garden-jobs.service" \
+  "$repository_root/infra/native/garden-gui.service" \
+  "$repository_root/infra/native/garden-work.slice" \
+  "$repository_root/infra/native/garden.target" \
+  "$repository_root/infra/native/garden-network-refresh.service" \
+  "$repository_root/infra/native/garden-network-refresh.timer" \
+  "$repository_root/infra/native/garden-network-refresh.path" \
+  "$repository_root/infra/native/garden-network-watch.service" \
+  "$repository_root/infra/native/garden-auto-update.service" \
+  "$repository_root/infra/native/garden-auto-update.timer" \
+  "$repository_root/infra/native/garden-auto-update-alert.service" \
+  "$repository_root/infra/native/garden-certificate-renew.service" \
+  "$repository_root/infra/native/garden-certificate-renew.timer" \
+  "$repository_root/infra/native/garden-certificate-alert.service" \
+  "$repository_root/infra/native/garden-backup.service" \
+  "$repository_root/infra/native/garden-backup.timer" \
+  "$repository_root/infra/native/garden-backup-alert.service" \
+  "$repository_root/infra/native/garden-motd" \
   "$repository_root/infra/native/nginx.conf" \
   "$repository_root/infra/native/nginx-security-headers.conf" \
   "$repository_root/infra/native/nginx-app-csp.conf" \
@@ -239,44 +239,41 @@ cp "$repository_root/infra/native/start-desktop-session.sh" \
 # the checkout, so the checkout needs one to read.
 printf 'export const migrations = [\n  {\n    version: 7,\n    name: "fixture",\n    sql: ``\n  }\n];\n' \
   >"$seed/packages/data/src/migrations.ts"
-printf '#!/bin/sh\nexit 0\n' >"$seed/scripts/athanor-network-refresh"
-chmod 0755 "$seed/scripts/athanor-network-refresh"
-printf '#!/bin/sh\nexit 0\n' >"$seed/scripts/athanor-network-watch"
-chmod 0755 "$seed/scripts/athanor-network-watch"
+printf '#!/bin/sh\nexit 0\n' >"$seed/scripts/garden-network-refresh"
+chmod 0755 "$seed/scripts/garden-network-refresh"
+printf '#!/bin/sh\nexit 0\n' >"$seed/scripts/garden-network-watch"
+chmod 0755 "$seed/scripts/garden-network-watch"
 # The last act of install.sh is to exec this. The bootstrap cases below only need to know whether it
 # was reached, and reaching it with an unverified source is the defect they are here for.
-printf '#!/bin/sh\nprintf "the installer ran\\n" >>"$ATHANOR_TEST_COMMAND_LOG"\n' \
+printf '#!/bin/sh\nprintf "the installer ran\\n" >>"$GARDEN_TEST_COMMAND_LOG"\n' \
   >"$seed/scripts/install-native.sh"
 chmod 0755 "$seed/scripts/install-native.sh"
 
 fixture_maintenance_path() {
-  sed 's#^  maintenance_lock_directory=/run/athanor-maintenance$#  maintenance_lock_directory="${ATHANOR_STATE}/maintenance-lock"#' \
-    "$seed/scripts/athanor" >"$seed/scripts/athanor.next"
-  mv "$seed/scripts/athanor.next" "$seed/scripts/athanor"
-  chmod 0755 "$seed/scripts/athanor"
+  sed 's#^  maintenance_lock_directory=/run/garden-maintenance$#  maintenance_lock_directory="${GARDEN_STATE}/maintenance-lock"#' \
+    "$seed/scripts/garden" >"$seed/scripts/garden.next"
+  mv "$seed/scripts/garden.next" "$seed/scripts/garden"
+  chmod 0755 "$seed/scripts/garden"
 }
 fixture_maintenance_path
 # A previous revision's proxy is intentionally distinct from the incoming listener.
 printf '# previous proxy revision\n' >"$seed/infra/native/nginx.conf"
-sed '/^  install -D -m 0755 scripts\/athanor .*\/usr\/local\/bin\/garden/d' "$seed/scripts/athanor" >"$test_root/previous-cli"
-mv "$test_root/previous-cli" "$seed/scripts/athanor"
-chmod 0755 "$seed/scripts/athanor"
 awk '
   /^  install .*scripts\/mission-supervisor.py / { getline; next }
   /^install_runtime_files\(\) \{$/ {
     print
-    print "  printf '\''previous runtime activation\\n'\'' >>\"$ATHANOR_TEST_COMMAND_LOG\""
+    print "  printf '\''previous runtime activation\\n'\'' >>\"$GARDEN_TEST_COMMAND_LOG\""
     next
   }
   { print }
-' "$seed/scripts/athanor" >"$test_root/previous-cli"
-mv "$test_root/previous-cli" "$seed/scripts/athanor"
-chmod 0755 "$seed/scripts/athanor"
+' "$seed/scripts/garden" >"$test_root/previous-cli"
+mv "$test_root/previous-cli" "$seed/scripts/garden"
+chmod 0755 "$seed/scripts/garden"
 rm "$seed/scripts/mission-supervisor.py"
 
 "$real_git" init --bare "$remote" >/dev/null
 "$real_git" -C "$seed" init -b main >/dev/null
-"$real_git" -C "$seed" config user.name "Athanor update drill"
+"$real_git" -C "$seed" config user.name "Garden update drill"
 "$real_git" -C "$seed" config user.email "update-drill@localhost"
 "$real_git" -C "$seed" add .
 "$real_git" -C "$seed" commit -m v1 >/dev/null
@@ -285,10 +282,10 @@ rm "$seed/scripts/mission-supervisor.py"
 "$real_git" --git-dir="$remote" symbolic-ref HEAD refs/heads/main
 "$real_git" clone "$remote" "$checkout" >/dev/null
 
-printf 'postgres://athanor:synthetic-password@127.0.0.1:5432/athanor\n' |
+printf 'postgres://garden:synthetic-password@127.0.0.1:5432/garden\n' |
   sed 's|^|DATABASE_URL=|' >"$config/control.env"
 printf 'runner=true\nISOLATE_AGENT_NETWORK=false\n' >"$config/runner.env"
-printf 'PUBLIC_APP_URL=https://preview-box.example\nPREVIEW_BASE_URL=https://preview-box.example/__athanor/preview\n' >>"$config/control.env"
+printf 'PUBLIC_APP_URL=https://preview-box.example\nPREVIEW_BASE_URL=https://preview-box.example/__garden/preview\n' >>"$config/control.env"
 printf 'data-before-update\n' >"$home/persistent.txt"
 printf 'database-before-update\n' >"$database_file"
 
@@ -355,7 +352,7 @@ printf 'ok  installer assets preserve file identity and install distinct destina
   ' "$installer_source"
   printf 'printf "%%s\\n" "$database_password"\n'
 } >"$test_root/installer-password-reuse.sh"
-reused_password=$(athanor_config="$config" sh "$test_root/installer-password-reuse.sh")
+reused_password=$(garden_config="$config" sh "$test_root/installer-password-reuse.sh")
 if [ "$reused_password" != synthetic-password ]; then
   printf 'the installer did not reuse the password in an existing control.env: %s\n' \
     "$reused_password" >&2
@@ -363,7 +360,7 @@ if [ "$reused_password" != synthetic-password ]; then
 fi
 # And the window between setting the role's password and writing it down is closed rather than
 # merely narrowed: the write happens before the next step that can fail.
-alter_role_line=$(grep -n 'ALTER ROLE athanor WITH LOGIN PASSWORD' "$installer_source" |
+alter_role_line=$(grep -n 'ALTER ROLE garden WITH LOGIN PASSWORD' "$installer_source" |
   sed -n '1s/:.*//p')
 url_write_line=$(grep -n 'set_env_value "\$control_env" DATABASE_URL' "$installer_source" |
   sed -n '1s/:.*//p')
@@ -378,21 +375,21 @@ printf 'ok  the installer reuses an existing database password and writes it bac
 
 # The commit pin, on the box whose state is already unknown.
 #
-# `ATHANOR_EXPECTED_COMMIT` is how the packaged client pins the source it installs, and the fetch,
+# `GARDEN_EXPECTED_COMMIT` is how the packaged client pins the source it installs, and the fetch,
 # the checkout and the whole verification block sat inside `if [ ! -f scripts/install-native.sh ]`.
 # The arrangement that reaches the bootstrap a second time is not "the owner ran it twice" - the
 # client asks a working box for a pairing code instead - it is a partial install, where the source
-# is on disk and the `athanor` CLI never reached PATH. There the pin went unchecked and the
-# installer ran against whatever revision happened to be lying in /opt/athanor.
+# is on disk and the `garden` CLI never reached PATH. There the pin went unchecked and the
+# installer ran against whatever revision happened to be lying in /opt/garden.
 bootstrap_root="$test_root/bootstrap-root"
 "$real_git" clone "$remote" "$bootstrap_root" >/dev/null 2>&1
 run_bootstrap() {
   PATH="$fake_bin:$PATH" \
-    ATHANOR_TEST_COMMAND_LOG="$command_log" \
-    ATHANOR_TEST_REAL_GIT="$real_git" \
-    ATHANOR_ROOT="${2:-$bootstrap_root}" \
-    ATHANOR_REPOSITORY="$remote" \
-    ATHANOR_EXPECTED_COMMIT="$1" \
+    GARDEN_TEST_COMMAND_LOG="$command_log" \
+    GARDEN_TEST_REAL_GIT="$real_git" \
+    GARDEN_ROOT="${2:-$bootstrap_root}" \
+    GARDEN_REPOSITORY="$remote" \
+    GARDEN_EXPECTED_COMMIT="$1" \
     /bin/sh "$repository_root/install.sh"
 }
 : >"$command_log"
@@ -416,7 +413,7 @@ test "$("$real_git" -C "$bootstrap_root" rev-parse HEAD)" = "$published_head"
 # The path that was already covered by the verification, kept covered: a box with nothing on it at
 # all still clones, still lands on the update branch, and still checks the pin.
 make_fake apt-get '
-printf "apt-get %s\n" "$*" >>"$ATHANOR_TEST_COMMAND_LOG"'
+printf "apt-get %s\n" "$*" >>"$GARDEN_TEST_COMMAND_LOG"'
 : >"$command_log"
 first_install_root="$test_root/first-install-root"
 run_bootstrap "$published_head" "$first_install_root" >/dev/null 2>&1
@@ -424,34 +421,34 @@ rm -f "$fake_bin/apt-get"
 grep -q 'apt-get install' "$command_log"
 grep -q 'the installer ran' "$command_log"
 test "$("$real_git" -C "$first_install_root" rev-parse HEAD)" = "$published_head"
-test "$("$real_git" -C "$first_install_root" rev-parse --abbrev-ref HEAD)" = athanor
+test "$("$real_git" -C "$first_install_root" rev-parse --abbrev-ref HEAD)" = garden
 printf 'ok  the bootstrap checks the commit pin on a partial install and on a fresh one\n'
 
-run_athanor() {
+run_garden() {
   PATH="$fake_bin:$PATH" \
-    ATHANOR_TEST_COMMAND_LOG="$command_log" \
-    ATHANOR_TEST_REAL_GIT="$real_git" \
-    ATHANOR_TEST_CHECKOUT="$checkout" \
-    ATHANOR_ROOT="$checkout" \
-    ATHANOR_CONFIG="$config" \
-    ATHANOR_STATE="$state" \
-    ATHANOR_HOME="$home" \
-    ATHANOR_BACKUP_ROOT="$backups" \
-    ATHANOR_BACKUP_KEEP="${ATHANOR_TEST_BACKUP_KEEP:-5}" \
-    ATHANOR_BACKUP_IDLE_WAIT_SECONDS="${ATHANOR_TEST_BACKUP_IDLE_WAIT:-0}" \
-    ATHANOR_TEST_WORKER_BUSY="$worker_busy" \
-    ATHANOR_TEST_WORKER_BUSY_LATE="${ATHANOR_TEST_WORKER_BUSY_LATE:-$test_root/worker-busy-late}" \
-    ATHANOR_TEST_RUNNER_HEALTH="$test_root/runner-health" \
-    ATHANOR_TEST_SANDBOX_REPORT="$test_root/sandbox-report" \
-    ATHANOR_TEST_DATABASE="$database_file" \
-    ATHANOR_TEST_OFF_HOST="$off_host" \
-    ATHANOR_READY_TIMEOUT_SECONDS=3 \
-    ATHANOR_RUNTIME_PREFIX="$runtime" \
-    "${ATHANOR_TEST_CLI:-$checkout/scripts/athanor}" "$@"
+    GARDEN_TEST_COMMAND_LOG="$command_log" \
+    GARDEN_TEST_REAL_GIT="$real_git" \
+    GARDEN_TEST_CHECKOUT="$checkout" \
+    GARDEN_ROOT="$checkout" \
+    GARDEN_CONFIG="$config" \
+    GARDEN_STATE="$state" \
+    GARDEN_HOME="$home" \
+    GARDEN_BACKUP_ROOT="$backups" \
+    GARDEN_BACKUP_KEEP="${GARDEN_TEST_BACKUP_KEEP:-5}" \
+    GARDEN_BACKUP_IDLE_WAIT_SECONDS="${GARDEN_TEST_BACKUP_IDLE_WAIT:-0}" \
+    GARDEN_TEST_WORKER_BUSY="$worker_busy" \
+    GARDEN_TEST_WORKER_BUSY_LATE="${GARDEN_TEST_WORKER_BUSY_LATE:-$test_root/worker-busy-late}" \
+    GARDEN_TEST_RUNNER_HEALTH="$test_root/runner-health" \
+    GARDEN_TEST_SANDBOX_REPORT="$test_root/sandbox-report" \
+    GARDEN_TEST_DATABASE="$database_file" \
+    GARDEN_TEST_OFF_HOST="$off_host" \
+    GARDEN_READY_TIMEOUT_SECONDS=3 \
+    GARDEN_RUNTIME_PREFIX="$runtime" \
+    "${GARDEN_TEST_CLI:-$checkout/scripts/garden}" "$@"
 }
 
 run_update() {
-  run_athanor update
+  run_garden update
 }
 
 publish_fixture() {
@@ -470,22 +467,22 @@ backup_count() {
 # A staged incoming updater must reverse-install the previous source and private configuration
 # even when required activation changed the preview origin and then failed before service start.
 cp "$repository_root/infra/native/nginx.conf" "$seed/infra/native/nginx.conf"
-cp "$repository_root/scripts/athanor" "$seed/scripts/athanor"
+cp "$repository_root/scripts/garden" "$seed/scripts/garden"
 cp "$repository_root/scripts/mission-supervisor.py" "$seed/scripts/mission-supervisor.py"
 fixture_maintenance_path
-cp "$repository_root/scripts/athanor-native-runtime" "$seed/scripts/preview-activation.sh"
-cat >>"$seed/scripts/athanor-native-runtime" <<'PREVIEW_FIXTURE'
-/bin/sh "$ATHANOR_ROOT/scripts/preview-activation.sh" preview-origin
-if [ -f "$ATHANOR_ROOT/FAIL_AFTER_PREVIEW" ]; then exit 31; fi
+cp "$repository_root/scripts/garden-native-runtime" "$seed/scripts/preview-activation.sh"
+cat >>"$seed/scripts/garden-native-runtime" <<'PREVIEW_FIXTURE'
+/bin/sh "$GARDEN_ROOT/scripts/preview-activation.sh" preview-origin
+if [ -f "$GARDEN_ROOT/FAIL_AFTER_PREVIEW" ]; then exit 31; fi
 PREVIEW_FIXTURE
-cp "$seed/scripts/athanor" "$test_root/staged-updater"
+cp "$seed/scripts/garden" "$test_root/staged-updater"
 chmod 0700 "$test_root/staged-updater"
 cp "$config/control.env" "$test_root/before-preview-control"
 cp "$config/runner.env" "$test_root/before-preview-runner"
 previous_preview_revision=$("$real_git" -C "$checkout" rev-parse HEAD)
 : >"$seed/FAIL_AFTER_PREVIEW"
 publish_fixture preview-activation-interrupted
-if preview_failure=$(ATHANOR_TEST_CLI="$test_root/staged-updater" run_update 2>&1); then
+if preview_failure=$(GARDEN_TEST_CLI="$test_root/staged-updater" run_update 2>&1); then
   printf 'an interrupted preview migration was accepted\n' >&2; exit 1
 fi
 grep -q 'failed with exit 31' <<EOF
@@ -502,21 +499,21 @@ cmp "$config/control.env" "$test_root/before-preview-control" || {
 }
 cmp "$config/runner.env" "$test_root/before-preview-runner"
 test "$("$real_git" -C "$checkout" rev-parse HEAD)" = "$previous_preview_revision"
-grep -q '^# previous proxy revision$' "$runtime/etc/nginx/sites-available/athanor" || {
+grep -q '^# previous proxy revision$' "$runtime/etc/nginx/sites-available/garden" || {
   printf 'assertion failed: staged updater did not install the previous proxy source\n' >&2; exit 1;
 }
 rm "$seed/FAIL_AFTER_PREVIEW"
 printf 'ok  staged updater restores configuration and previous runtime after interrupted preview activation\n'
 
-printf '\n# fixture-version=v2\n' >>"$seed/scripts/athanor-service"
+printf '\n# fixture-version=v2\n' >>"$seed/scripts/garden-service"
 # What an installation from before the helper was moved looks like, so the update is asked to
 # remove it rather than merely to install the replacement somewhere else.
 mkdir -p "$runtime/usr/local/bin"
-printf '#!/bin/sh\nexit 0\n' >"$runtime/usr/local/bin/athanor-package-helper"
-chmod 0755 "$runtime/usr/local/bin/athanor-package-helper"
+printf '#!/bin/sh\nexit 0\n' >"$runtime/usr/local/bin/garden-package-helper"
+chmod 0755 "$runtime/usr/local/bin/garden-package-helper"
 # Stands in for the relay identity key an owner who turned the relay on already has.
-mkdir -p "$runtime/etc/athanor/relay"
-printf 'relay-identity\n' >"$runtime/etc/athanor/relay/identity-marker"
+mkdir -p "$runtime/etc/garden/relay"
+printf 'relay-identity\n' >"$runtime/etc/garden/relay/identity-marker"
 mkdir -p "$home/workspace/project/node_modules"
 printf 'regenerable\n' >"$home/workspace/project/node_modules/dependency.js"
 # The managed browser. Roughly 400 MB of already-compressed binaries that gzip cannot help, in a
@@ -529,24 +526,24 @@ expected_revision=$("$real_git" -C "$seed" rev-parse HEAD)
 
 success_output=$(run_update 2>&1) || { printf 'assertion failed: transactional update must install a usable runtime\n%s\n' "$success_output" >&2; exit 1; }
 test "$("$real_git" -C "$checkout" rev-parse HEAD)" = "$expected_revision"
-grep -q 'fixture-version=v2' "$runtime/usr/local/lib/athanor/athanor-service"
+grep -q 'fixture-version=v2' "$runtime/usr/local/lib/garden/garden-service"
 grep -q 'Update complete' <<EOF
 $success_output
 EOF
 test "$(cat "$home/persistent.txt")" = "data-before-update"
-grep -q '^PREVIEW_BASE_URL=https://preview-box.example:8443/__athanor/preview$' "$config/control.env" || {
+grep -q '^PREVIEW_BASE_URL=https://preview-box.example:8443/__garden/preview$' "$config/control.env" || {
   printf 'assertion failed: update did not activate the isolated preview origin\n' >&2; exit 1;
 }
-grep -q 'https://preview-box.example:8443' "$runtime/etc/nginx/snippets/athanor-preview-origin.conf"
+grep -q 'https://preview-box.example:8443' "$runtime/etc/nginx/snippets/garden-preview-origin.conf"
 grep -q '^ISOLATE_AGENT_NETWORK=false$' "$config/runner.env"
 printf 'ok  transactional update success path\n'
 
 # The package helper reaches root with no capability scope and no approval card of its own. On
 # the agent's PATH it was one command name away from a silent root package install, so an update
 # has to both put it out of reach and take away the copy earlier releases left behind.
-test -x "$runtime/usr/local/lib/athanor/athanor-package-helper"
-test ! -e "$runtime/usr/local/bin/athanor-package-helper"
-test -x "$runtime/usr/local/lib/athanor/athanor-sandbox"
+test -x "$runtime/usr/local/lib/garden/garden-package-helper"
+test ! -e "$runtime/usr/local/bin/garden-package-helper"
+test -x "$runtime/usr/local/lib/garden/garden-sandbox"
 printf 'ok  root helpers are installed off the agent PATH\n'
 
 # What the installer places and the update did not. The backup units were one instance of it; these
@@ -555,29 +552,29 @@ printf 'ok  root helpers are installed off the agent PATH\n'
 # been updated the agent was reading this release's instructions and running install day's binary,
 # or on a box older than they are, running nothing. The nginx snippets are included by the site file
 # the update replaces, so the policy and the site that expects it moved apart at every release.
-test -x "$runtime/usr/local/bin/athanor-office-convert"
+test -x "$runtime/usr/local/bin/garden-office-convert"
 test -x "$runtime/usr/local/bin/garden" || { printf 'assertion failed: garden command was not installed\n' >&2; exit 1; }
-cmp -s "$runtime/usr/local/bin/garden" "$runtime/usr/local/bin/athanor"
-test -x "$runtime/usr/local/bin/athanor-pdf-tables"
-test -x "$runtime/usr/local/lib/athanor/athanor-document-proof"
-test -f "$runtime/etc/nginx/snippets/athanor-security-headers.conf"
-test -f "$runtime/etc/nginx/snippets/athanor-app-csp.conf"
+cmp -s "$checkout/scripts/garden" "$runtime/usr/local/bin/garden"
+test -x "$runtime/usr/local/bin/garden-pdf-tables"
+test -x "$runtime/usr/local/lib/garden/garden-document-proof"
+test -f "$runtime/etc/nginx/snippets/garden-security-headers.conf"
+test -f "$runtime/etc/nginx/snippets/garden-app-csp.conf"
 printf 'ok  the update places every runtime file the installer does\n'
 mkdir -p "$runtime/etc/nginx/conf.d"
-printf 'previous conf.d proxy\n' >"$runtime/etc/nginx/conf.d/athanor.conf"
-run_athanor update install-runtime-files >/dev/null 2>&1
-cmp "$checkout/infra/native/nginx.conf" "$runtime/etc/nginx/conf.d/athanor.conf" || {
+printf 'previous conf.d proxy\n' >"$runtime/etc/nginx/conf.d/garden.conf"
+run_garden update install-runtime-files >/dev/null 2>&1
+cmp "$checkout/infra/native/nginx.conf" "$runtime/etc/nginx/conf.d/garden.conf" || {
   printf 'assertion failed: existing conf.d proxy did not receive the new listener\n' >&2; exit 1;
 }
-rm "$runtime/etc/nginx/conf.d/athanor.conf"
+rm "$runtime/etc/nginx/conf.d/garden.conf"
 printf 'ok  runtime activation refreshes the existing conf.d proxy layout\n'
 
 
 # The relay identity key is this server's address on every relay it has enrolled with: replacing it
 # would silently change the hostname every paired client holds. An update has to leave what is in
 # that directory alone, and to provision it on a server installed before the relay existed.
-test "$(cat "$runtime/etc/athanor/relay/identity-marker")" = "relay-identity"
-test -f "$runtime/etc/systemd/system/athanor-network-refresh.path"
+test "$(cat "$runtime/etc/garden/relay/identity-marker")" = "relay-identity"
+test -f "$runtime/etc/systemd/system/garden-network-refresh.path"
 printf 'ok  the relay identity survives an update\n'
 
 # The backup runs with the server stopped, so its contents are outage time. Dependency trees are
@@ -600,7 +597,7 @@ $success_output
 EOF
 printf 'ok  backup excludes regenerable trees and says so\n'
 
-printf '\n# fixture-version=v3\n' >>"$seed/scripts/athanor-service"
+printf '\n# fixture-version=v3\n' >>"$seed/scripts/garden-service"
 : >"$seed/FAIL_BUILD"
 publish_fixture v3-fails
 
@@ -611,7 +608,7 @@ if failure_output=$(run_update 2>&1); then
 fi
 test "$("$real_git" -C "$checkout" rev-parse HEAD)" = "$expected_revision"
 test ! -e "$checkout/FAIL_BUILD"
-grep -q 'fixture-version=v2' "$runtime/usr/local/lib/athanor/athanor-service"
+grep -q 'fixture-version=v2' "$runtime/usr/local/lib/garden/garden-service"
 test "$(cat "$home/persistent.txt")" = "data-before-rollback"
 grep -q 'Rollback completed; the failed update was not activated' <<EOF
 $failure_output
@@ -621,7 +618,7 @@ printf 'ok  failed update restored source, runtime, and user data\n'
 # A release that builds and boots but cannot serve. The old gate polled /healthz, a route that
 # answers from a static literal, so this case reported "Update complete" over a dead product.
 rm -f "$seed/FAIL_BUILD"
-printf '\n# fixture-version=v4\n' >>"$seed/scripts/athanor-service"
+printf '\n# fixture-version=v4\n' >>"$seed/scripts/garden-service"
 : >"$seed/FAIL_HEALTH"
 publish_fixture v4-does-not-serve
 
@@ -630,7 +627,7 @@ if unserving_output=$(run_update 2>&1); then
   exit 1
 fi
 test "$("$real_git" -C "$checkout" rev-parse HEAD)" = "$expected_revision"
-grep -q 'fixture-version=v2' "$runtime/usr/local/lib/athanor/athanor-service"
+grep -q 'fixture-version=v2' "$runtime/usr/local/lib/garden/garden-service"
 grep -q 'this release is not serving' <<EOF
 $unserving_output
 EOF
@@ -641,7 +638,7 @@ printf 'ok  a release that boots but cannot serve is rolled back\n'
 
 # And one whose migrations never reached the version the new code expects.
 rm -f "$seed/FAIL_HEALTH"
-printf '\n# fixture-version=v5\n' >>"$seed/scripts/athanor-service"
+printf '\n# fixture-version=v5\n' >>"$seed/scripts/garden-service"
 : >"$seed/FAIL_MIGRATION"
 publish_fixture v5-schema-behind
 
@@ -669,26 +666,26 @@ EOF
 grep -q 'Rollback completed; the failed update was not activated' <<EOF
 $native_failure
 EOF
-cmp "$checkout/scripts/mission-supervisor.py" "$runtime/usr/local/lib/athanor/mission-supervisor.py"
+cmp "$checkout/scripts/mission-supervisor.py" "$runtime/usr/local/lib/garden/mission-supervisor.py"
 cmp "$checkout/scripts/reproducible-run.py" "$runtime/usr/local/bin/garden-run"
 test -x "$runtime/usr/local/bin/garden-run"
-cmp "$checkout/scripts/garden_system.py" "$runtime/usr/local/lib/athanor/garden_system.py"
+cmp "$checkout/scripts/garden_system.py" "$runtime/usr/local/lib/garden/garden_system.py"
 rm "$seed/FAIL_NATIVE"
 printf 'ok  missing native capabilities roll back before the new release starts\n'
 
 # Four updates have now been taken, each leaving a full copy of the database and every workspace.
 rm -f "$seed/FAIL_MIGRATION"
-printf '\n# fixture-version=v6\n' >>"$seed/scripts/athanor-service"
+printf '\n# fixture-version=v6\n' >>"$seed/scripts/garden-service"
 publish_fixture v6
 before_prune=$(backup_count)
 test "$before_prune" -ge 2
-ATHANOR_TEST_BACKUP_KEEP=2 run_update >/dev/null 2>&1
+GARDEN_TEST_BACKUP_KEEP=2 run_update >/dev/null 2>&1
 test "$(backup_count)" -eq 2
 printf 'ok  superseded backups are pruned to the retention limit\n'
 
 # The operator is told what the outage will cost before the server is taken away, and what it
 # actually cost afterwards.
-printf '\n# fixture-version=v7\n' >>"$seed/scripts/athanor-service"
+printf '\n# fixture-version=v7\n' >>"$seed/scripts/garden-service"
 publish_fixture v7
 outage_output=$(run_update 2>&1)
 grep -q 'stopping the server now' <<EOF
@@ -704,7 +701,7 @@ printf 'ok  the outage is announced beforehand and measured afterwards\n'
 
 # A file added in a release has to land in that release.
 #
-# `athanor update` is /usr/local/bin/athanor, the previous release's copy of the script, and the
+# `garden update` is /usr/local/bin/garden, the previous release's copy of the script, and the
 # running shell goes on executing it after the pull: the tree being installed from was the new one
 # and the list of what to install from it was the old one. So anything a release added reached an
 # existing box a release late, and nothing reported an error, because nothing had gone wrong. The
@@ -712,21 +709,21 @@ printf 'ok  the outage is announced beforehand and measured afterwards\n'
 # interface still describing a daily copy. The fixture is a unit the published revision installs and
 # the revision performing the update has never heard of.
 printf '[Unit]\nDescription=A unit the published release adds\n' \
-  >"$seed/infra/native/athanor-late-addition.service"
+  >"$seed/infra/native/garden-late-addition.service"
 awk '
   { print }
   /^install_runtime_files\(\) \{$/ {
-    print "  install -D -m 0644 infra/native/athanor-late-addition.service \\"
-    print "    \"$(runtime_path /etc/systemd/system/athanor-late-addition.service)\""
+    print "  install -D -m 0644 infra/native/garden-late-addition.service \\"
+    print "    \"$(runtime_path /etc/systemd/system/garden-late-addition.service)\""
   }
-' "$seed/scripts/athanor" >"$test_root/seed-athanor"
-mv "$test_root/seed-athanor" "$seed/scripts/athanor"
-chmod 0755 "$seed/scripts/athanor"
-printf '\n# fixture-version=v8\n' >>"$seed/scripts/athanor-service"
+' "$seed/scripts/garden" >"$test_root/seed-garden"
+mv "$test_root/seed-garden" "$seed/scripts/garden"
+chmod 0755 "$seed/scripts/garden"
+printf '\n# fixture-version=v8\n' >>"$seed/scripts/garden-service"
 publish_fixture v8-adds-a-unit
 run_update >/dev/null 2>&1
-test -f "$runtime/etc/systemd/system/athanor-late-addition.service"
-grep -q 'fixture-version=v8' "$runtime/usr/local/lib/athanor/athanor-service"
+test -f "$runtime/etc/systemd/system/garden-late-addition.service"
+grep -q 'fixture-version=v8' "$runtime/usr/local/lib/garden/garden-service"
 printf 'ok  a file added in a release is installed by that release\n'
 
 # And the phase is asked only of a revision that answers it.
@@ -739,18 +736,18 @@ printf 'ok  a file added in a release is installed by that release\n'
 # backup, ten minutes later. So what the run looks for is the dispatch arm rather than the name,
 # which also appears in prose. The fixture keeps every mention and loses the arm, and answers an
 # unrecognised argument the way releases before this one did: without failing.
-cp "$seed/scripts/athanor" "$test_root/seed-athanor-answering"
+cp "$seed/scripts/garden" "$test_root/seed-garden-answering"
 sed \
   -e 's/^      install-runtime-files)$/      a-phase-under-some-other-name)/' \
-  -e 's|^      \*) fail "usage: athanor update" ;;$|      *) printf "asked for the phase\\n" >>"$ATHANOR_TEST_COMMAND_LOG"; exit 0 ;;|' \
-  "$test_root/seed-athanor-answering" >"$seed/scripts/athanor"
-chmod 0755 "$seed/scripts/athanor"
-grep -q 'install-runtime-files' "$seed/scripts/athanor"
-if grep -q '^ *install-runtime-files)' "$seed/scripts/athanor"; then
+  -e 's|^      \*) fail "usage: garden update" ;;$|      *) printf "asked for the phase\\n" >>"$GARDEN_TEST_COMMAND_LOG"; exit 0 ;;|' \
+  "$test_root/seed-garden-answering" >"$seed/scripts/garden"
+chmod 0755 "$seed/scripts/garden"
+grep -q 'install-runtime-files' "$seed/scripts/garden"
+if grep -q '^ *install-runtime-files)' "$seed/scripts/garden"; then
   printf 'the fixture still answers to the phase, so it tests nothing\n' >&2
   exit 1
 fi
-printf '\n# fixture-version=v9\n' >>"$seed/scripts/athanor-service"
+printf '\n# fixture-version=v9\n' >>"$seed/scripts/garden-service"
 publish_fixture v9-mentions-the-phase-without-answering
 : >"$command_log"
 if run_update >/dev/null 2>&1; then unanswered_update=completed; else unanswered_update=""; fi
@@ -762,7 +759,7 @@ fi
   printf 'the update did not complete against a revision that does not answer the phase\n' >&2
   exit 1
 }
-grep -q 'fixture-version=v9' "$runtime/usr/local/lib/athanor/athanor-service"
+grep -q 'fixture-version=v9' "$runtime/usr/local/lib/garden/garden-service"
 printf 'ok  the install phase is asked only of a revision that answers to it\n'
 
 # And a generation that came from the phase does not start another.
@@ -775,16 +772,16 @@ printf 'ok  the install phase is asked only of a revision that answers to it\n'
 # something else stops it.
 awk '
   /^        install_runtime_files$/ {
-    print "        printf \"phase generation\\\\n\" >>\"$ATHANOR_TEST_COMMAND_LOG\""
-    print "        [ \"$(grep -c \"phase generation\" \"$ATHANOR_TEST_COMMAND_LOG\")\" -lt 4 ] ||"
+    print "        printf \"phase generation\\\\n\" >>\"$GARDEN_TEST_COMMAND_LOG\""
+    print "        [ \"$(grep -c \"phase generation\" \"$GARDEN_TEST_COMMAND_LOG\")\" -lt 4 ] ||"
     print "          fail \"the phase re-entered itself\""
     print "        install_checked_out_runtime_files"
     next
   }
   { print }
-' "$test_root/seed-athanor-answering" >"$seed/scripts/athanor"
-chmod 0755 "$seed/scripts/athanor"
-printf '\n# fixture-version=v10\n' >>"$seed/scripts/athanor-service"
+' "$test_root/seed-garden-answering" >"$seed/scripts/garden"
+chmod 0755 "$seed/scripts/garden"
+printf '\n# fixture-version=v10\n' >>"$seed/scripts/garden-service"
 publish_fixture v10-the-phase-calls-the-wrapper
 : >"$command_log"
 run_update >/dev/null 2>&1 || true
@@ -793,7 +790,7 @@ if [ "$phase_generations" -ne 1 ]; then
   printf 'the install phase ran %s times in one update\n' "$phase_generations" >&2
   exit 1
 fi
-grep -q 'fixture-version=v10' "$runtime/usr/local/lib/athanor/athanor-service"
+grep -q 'fixture-version=v10' "$runtime/usr/local/lib/garden/garden-service"
 printf 'ok  the install phase does not start a second generation of itself\n'
 
 # The daily backup, and whether the box can say anything true about it.
@@ -819,7 +816,7 @@ printf 'ok  a completed backup records when it happened and how big it is\n'
 # and the exit status says nothing happened wrong - so a box that is busy every time the window
 # comes round stands down every night behind an unchanged promise.
 : >"$worker_busy"
-skipped_output=$(run_athanor backup auto run 2>&1)
+skipped_output=$(run_garden backup auto run 2>&1)
 grep -q 'the next window will take the backup' <<EOF
 $skipped_output
 EOF
@@ -835,7 +832,7 @@ rm -f "$worker_busy"
 commands_before_background=$(wc -l <"$command_log" | tr -d ' ')
 for health in '{"ok":true,"backgroundCommands":1}' '{"ok":true}' 'not json' '{"ok":true,"backgroundCommands":false}'; do
   printf '%s\n' "$health" >"$test_root/runner-health"
-  run_athanor backup auto run >/dev/null 2>&1
+  run_garden backup auto run >/dev/null 2>&1
   test "$(status_field outcome)" = skipped
   test "$(status_field reason)" = 'background computation is active or the runner could not confirm it is idle'
 done
@@ -846,7 +843,7 @@ if grep -q 'systemctl stop' "$test_root/background-skipped-commands"; then
   exit 1
 fi
 printf '0\n' >"$test_root/worker-busy-late"
-run_athanor backup auto run >/dev/null 2>&1
+run_garden backup auto run >/dev/null 2>&1
 rm -f "$test_root/worker-busy-late"
 test "$(status_field reason)" = 'a task started while waiting for maintenance'
 printf 'ok  automatic backups recheck active work and preserve background computations\n'
@@ -857,7 +854,7 @@ printf 'ok  automatic backups recheck active work and preserve background comput
 make_fake df '
 printf "Filesystem 1024-blocks Used Available Capacity Mounted on\n"
 printf "/dev/synthetic 1024 1000 24 98%% /\n"'
-if failed_backup_output=$(run_athanor backup auto run 2>&1); then
+if failed_backup_output=$(run_garden backup auto run 2>&1); then
   printf 'a backup that could not fit reported success\n' >&2
   exit 1
 fi
@@ -879,12 +876,12 @@ printf 'ok  a backup that could not be taken is written down with its reason\n'
 # What OnFailure= is for: a run stopped by its own ninety-minute limit never reaches a line that
 # could write anything, so the pessimistic record it left on the way in is the one that stands.
 printf 'at=2026-08-10T03:00:00Z\noutcome=running\nreason=\n' >"$backup_status_file"
-run_athanor backup auto alert >/dev/null 2>&1
+run_garden backup auto alert >/dev/null 2>&1
 test "$(status_field outcome)" = failed
 test "$(status_field reason)" = "the run was stopped before it finished"
 # And it leaves a finished run alone, because it fires after those too.
 printf 'at=2026-08-10T03:00:00Z\noutcome=ok\nreason=\n' >"$backup_status_file"
-run_athanor backup auto alert >/dev/null 2>&1
+run_garden backup auto alert >/dev/null 2>&1
 test "$(status_field outcome)" = ok
 printf 'ok  a run killed before it finished is recorded, and a finished one is left alone\n'
 
@@ -894,13 +891,13 @@ printf 'ok  a run killed before it finished is recorded, and a finished one is l
 # small to hold the archive was discovered with the data already deleted and the copy half unpacked
 # - the exact loss this command exists to undo, caused by the command itself.
 printf 'data-worth-recovering\n' >"$home/persistent.txt"
-run_athanor backup >/dev/null 2>&1
+run_garden backup >/dev/null 2>&1
 recovery_backup=$(
   find "$backups" -mindepth 1 -maxdepth 1 -type d -name '????????T??????Z' | sort -r | sed -n '1p'
 )
 sleep 1
 printf 'data-written-since\n' >"$home/persistent.txt"
-run_athanor backup >/dev/null 2>&1
+run_garden backup >/dev/null 2>&1
 : >"$command_log"
 make_fake df '
 printf "Filesystem 1024-blocks Used Available Capacity Mounted on\n"
@@ -908,7 +905,7 @@ printf "/dev/synthetic 1024 1000 24 98%% /\n"'
 # Retaining one copy while restoring from the older of two: the prune that makes room would
 # otherwise take the very directory being read from, which is how a recovery becomes a loss.
 if refused_restore=$(
-  ATHANOR_TEST_BACKUP_KEEP=1 run_athanor restore "$recovery_backup" --yes 2>&1
+  GARDEN_TEST_BACKUP_KEEP=1 run_garden restore "$recovery_backup" --yes 2>&1
 ); then
   printf 'a restore that could not fit reported success\n' >&2
   exit 1
@@ -928,7 +925,7 @@ test -f "$recovery_backup/SHA256SUMS"
 printf 'ok  a restore that would not fit refuses before it stops or wipes anything\n'
 
 # And it is a check rather than a wall: with room on the disk the same restore puts the data back.
-run_athanor restore "$recovery_backup" --yes >/dev/null 2>&1
+run_garden restore "$recovery_backup" --yes >/dev/null 2>&1
 test "$(cat "$home/persistent.txt")" = "data-worth-recovering"
 printf 'ok  a restore that fits still restores\n'
 
@@ -941,7 +938,7 @@ printf 'ok  a restore that fits still restores\n'
 printf 'row-worth-recovering\n' >"$database_file"
 printf 'files-worth-recovering\n' >"$home/persistent.txt"
 sleep 1
-run_athanor backup >/dev/null 2>&1
+run_garden backup >/dev/null 2>&1
 database_backup=$(
   find "$backups" -mindepth 1 -maxdepth 1 -type d -name '????????T??????Z' | sort -r | sed -n '1p'
 )
@@ -949,7 +946,7 @@ database_backup=$(
 test "$(cat "$database_backup/database.dump")" = "row-worth-recovering"
 printf 'row-written-since\n' >"$database_file"
 printf 'files-written-since\n' >"$home/persistent.txt"
-run_athanor restore "$database_backup" --yes >/dev/null 2>&1
+run_garden restore "$database_backup" --yes >/dev/null 2>&1
 test "$(cat "$database_file")" = "row-worth-recovering"
 test "$(cat "$home/persistent.txt")" = "files-worth-recovering"
 printf 'ok  a restore puts the database back, not only the files\n'
@@ -962,7 +959,7 @@ printf '{"browsers":[{"name":"chromium","revision":"1234"}]}\n' >"$restore_playw
 mkdir -p "$home/.cache/ms-playwright/chromium-1234" \
   "$home/.cache/ms-playwright/chromium_headless_shell-1234"
 : >"$command_log"
-run_athanor restore "$database_backup" --yes >/dev/null 2>&1
+run_garden restore "$database_backup" --yes >/dev/null 2>&1
 grep -q '^managed browser fetch$' "$command_log" || {
   printf 'restore removed the managed browser without fetching its pinned replacement\n' >&2; exit 1;
 }
@@ -972,7 +969,7 @@ test "$(cat "$database_file")" = "row-worth-recovering"
 test "$(cat "$home/persistent.txt")" = "files-worth-recovering"
 printf 'ok  restore repairs the excluded managed browser after recovering data\n'
 
-restore_browser_warning=$(ATHANOR_TEST_BROWSER_FETCH_FAIL=1 run_athanor restore "$database_backup" --yes 2>&1)
+restore_browser_warning=$(GARDEN_TEST_BROWSER_FETCH_FAIL=1 run_garden restore "$database_backup" --yes 2>&1)
 printf '%s\n' "$restore_browser_warning" | grep -q 'could not be fetched; browser jobs will fail'
 printf '%s\n' "$restore_browser_warning" | grep -q 'Restore complete.'
 test "$(cat "$database_file")" = "row-worth-recovering"
@@ -983,12 +980,12 @@ printf 'ok  a failed browser fetch leaves recovered data serving with an explici
 printf 'row-written-since\n' >"$database_file"
 printf 'files-written-since\n' >"$home/persistent.txt"
 : >"$command_log"
-offline_restore=$(run_athanor restore "$database_backup" --yes --keep-stopped 2>&1)
+offline_restore=$(run_garden restore "$database_backup" --yes --keep-stopped 2>&1)
 printf '%s\n' "$offline_restore" | grep -q 'Restore complete. Garden remains stopped'
 test "$(cat "$database_file")" = "row-worth-recovering"
 test "$(cat "$home/persistent.txt")" = "files-worth-recovering"
 test -s "$command_log"
-grep -q '^systemctl stop athanor.target$' "$command_log"
+grep -q '^systemctl stop garden.target$' "$command_log"
 if grep -Eq '^systemctl (start|restart|reload)|^managed browser fetch$|^network-refresh|^system-packages' "$command_log"; then
   printf 'offline restore started a service or attempted runtime/network repair\n' >&2; exit 1
 fi
@@ -996,7 +993,7 @@ printf 'ok  offline restore recovers database and files without starting service
 
 for offline_origin in --new-host --hostname=ai.example.com; do
   : >"$command_log"
-  if run_athanor restore "$database_backup" --yes --keep-stopped "$offline_origin" >/dev/null 2>&1; then
+  if run_garden restore "$database_backup" --yes --keep-stopped "$offline_origin" >/dev/null 2>&1; then
     printf 'offline restore accepted an option that restarts services\n' >&2; exit 1
   fi
   test ! -s "$command_log"
@@ -1006,12 +1003,12 @@ rm -rf "$restore_playwright"
 
 # Moving to a new computer, which was not merely undrilled but mechanically broken.
 #
-# A backup carries /etc/athanor verbatim, which is what has to happen: the data key, the session
+# A backup carries /etc/garden verbatim, which is what has to happen: the data key, the session
 # key and the pinned server identity all come back exactly or the box cannot open its own database.
 # PUBLIC_APP_URL, WEBAUTHN_ORIGIN and WEBAUTHN_RP_ID came back with them, so a restored box served
 # an origin nobody could reach and scoped browser sign-in to an address it no longer had. Nothing
 # failed anywhere; the box simply could not be opened. `rollback` has called
-# athanor-network-refresh since the day it was written and `restore` never did.
+# garden-network-refresh since the day it was written and `restore` never did.
 #
 # The two fixtures are the whole of "what computer is this": the addresses `ip` reports, and what
 # the resolver says the old origin's name points at.
@@ -1019,22 +1016,22 @@ make_fake ip '
 case "$*" in
   *-6*) exit 0 ;;
 esac
-printf "2: eth0    inet %s/24 brd 203.0.113.255 scope global eth0\n" "$ATHANOR_TEST_HOST_ADDRESS"'
+printf "2: eth0    inet %s/24 brd 203.0.113.255 scope global eth0\n" "$GARDEN_TEST_HOST_ADDRESS"'
 make_fake getent '
-if [ "${1:-}" = ahosts ] && [ "${2:-}" = "$ATHANOR_TEST_RESOLVES_TO_HERE" ]; then
-  printf "%s STREAM %s\n" "$ATHANOR_TEST_HOST_ADDRESS" "$2"
+if [ "${1:-}" = ahosts ] && [ "${2:-}" = "$GARDEN_TEST_RESOLVES_TO_HERE" ]; then
+  printf "%s STREAM %s\n" "$GARDEN_TEST_HOST_ADDRESS" "$2"
   exit 0
 fi
 exit 2'
-network_refresh_binary="$runtime/usr/local/lib/athanor/athanor-network-refresh"
-printf '#!/bin/sh\nprintf "network refresh\\n" >>"$ATHANOR_TEST_COMMAND_LOG"\n' \
+network_refresh_binary="$runtime/usr/local/lib/garden/garden-network-refresh"
+printf '#!/bin/sh\nprintf "network refresh\\n" >>"$GARDEN_TEST_COMMAND_LOG"\n' \
   >"$network_refresh_binary"
 chmod 0755 "$network_refresh_binary"
 
 run_new_host() {
-  ATHANOR_TEST_HOST_ADDRESS="${ATHANOR_TEST_HOST_ADDRESS:-203.0.113.9}" \
-    ATHANOR_TEST_RESOLVES_TO_HERE="${ATHANOR_TEST_RESOLVES_TO_HERE:-nothing.invalid}" \
-    run_athanor "$@"
+  GARDEN_TEST_HOST_ADDRESS="${GARDEN_TEST_HOST_ADDRESS:-203.0.113.9}" \
+    GARDEN_TEST_RESOLVES_TO_HERE="${GARDEN_TEST_RESOLVES_TO_HERE:-nothing.invalid}" \
+    run_garden "$@"
 }
 
 # Replaces in place rather than appending, because the script under test replaces in place: a
@@ -1051,12 +1048,12 @@ set_config_value() {
 
 # The old machine's configuration, as a backup taken there carries it.
 set_config_value PUBLIC_APP_URL https://old-box.example
-set_config_value PREVIEW_BASE_URL https://old-box.example/__athanor/preview
+set_config_value PREVIEW_BASE_URL https://old-box.example/__garden/preview
 set_config_value PUBLIC_RUNNER_URL wss://old-box.example/runner
 set_config_value WEBAUTHN_RP_ID old-box.example
 set_config_value WEBAUTHN_ORIGIN https://old-box.example
 sleep 1
-run_athanor backup >/dev/null 2>&1
+run_garden backup >/dev/null 2>&1
 new_host_backup=$(
   find "$backups" -mindepth 1 -maxdepth 1 -type d -name '????????T??????Z' | sort -r | sed -n '1p'
 )
@@ -1080,7 +1077,7 @@ test "$(sed -n 's/^WEBAUTHN_ORIGIN=//p' "$config/control.env" | sed -n '1p')" = 
 test "$(sed -n 's/^WEBAUTHN_RP_ID=//p' "$config/control.env" | sed -n '1p')" = "203.0.113.9"
 test "$(sed -n 's/^PUBLIC_RUNNER_URL=//p' "$config/control.env" | sed -n '1p')" = "wss://203.0.113.9/runner"
 test "$(sed -n 's/^PREVIEW_BASE_URL=//p' "$config/control.env" | sed -n '1p')" = \
-  "https://203.0.113.9:8443/__athanor/preview"
+  "https://203.0.113.9:8443/__garden/preview"
 grep -q 'network refresh' "$command_log"
 # The data still came back; re-deriving the origin is an addition to the restore, not a detour
 # around it.
@@ -1097,12 +1094,12 @@ set_config_value PUBLIC_APP_URL https://ai.example.com
 set_config_value WEBAUTHN_RP_ID ai.example.com
 set_config_value WEBAUTHN_ORIGIN https://ai.example.com
 sleep 1
-run_athanor backup >/dev/null 2>&1
+run_garden backup >/dev/null 2>&1
 followed_backup=$(
   find "$backups" -mindepth 1 -maxdepth 1 -type d -name '????????T??????Z' | sort -r | sed -n '1p'
 )
 kept_name_output=$(
-  ATHANOR_TEST_RESOLVES_TO_HERE=ai.example.com \
+  GARDEN_TEST_RESOLVES_TO_HERE=ai.example.com \
     run_new_host restore "$followed_backup" --yes --new-host 2>&1
 )
 test "$(sed -n 's/^PUBLIC_APP_URL=//p' "$config/control.env" | sed -n '1p')" = "https://ai.example.com"
@@ -1114,7 +1111,7 @@ rm -f "$fake_bin/ip" "$fake_bin/getent"
 
 # An off-host copy, encrypted, on a disk this computer's own failure does not take.
 #
-# Every retained copy lives in /var/backups/athanor, on the same disk as the data it is a copy of,
+# Every retained copy lives in /var/backups/garden, on the same disk as the data it is a copy of,
 # and both docs/OPERATIONS.md and the settings screen advised an off-host copy the product had no
 # way to make. The stand-in for gpg is a real round trip - a marker line naming the recipient, then
 # the plaintext - so what is pinned is that the encrypted file is what lands, that the recipient
@@ -1163,7 +1160,7 @@ exit 0'
 make_fake df '
 for df_argument in "$@"; do
   case "$df_argument" in
-    "$ATHANOR_TEST_OFF_HOST"*)
+    "$GARDEN_TEST_OFF_HOST"*)
       printf "Filesystem 1024-blocks Used Available Capacity Mounted on\n"
       printf "/dev/second-disk 10485760 1024 10484736 1%% /mnt/second\n"
       exit 0
@@ -1176,7 +1173,7 @@ printf -- '-----BEGIN PGP PUBLIC KEY BLOCK-----\nsynthetic\n' >"$recipient_key"
 
 # Configured while somebody is watching, and refused there rather than at three in the morning.
 if same_disk_refusal=$(
-  run_athanor backup destination "$backups" --recipient "$recipient_key" 2>&1
+  run_garden backup destination "$backups" --recipient "$recipient_key" 2>&1
 ); then
   printf 'a destination on the same filesystem as the local copies was accepted\n' >&2
   exit 1
@@ -1186,20 +1183,20 @@ $same_disk_refusal
 EOF
 # And a destination with nobody to open it: the archive carries the data key and the session key,
 # so a copy of it that leaves the machine is a copy of everything this product protects.
-if no_recipient_refusal=$(run_athanor backup destination "$off_host" 2>&1); then
+if no_recipient_refusal=$(run_garden backup destination "$off_host" 2>&1); then
   printf 'an off-host destination was accepted with no encryption recipient\n' >&2
   exit 1
 fi
 grep -q -- '--recipient' <<EOF
 $no_recipient_refusal
 EOF
-run_athanor backup destination "$off_host" --recipient "$recipient_key" >/dev/null 2>&1
+run_garden backup destination "$off_host" --recipient "$recipient_key" >/dev/null 2>&1
 printf 'ok  an off-host destination is refused on the same disk, and refused unencrypted\n'
 
 sleep 1
 printf 'row-for-the-second-disk\n' >"$database_file"
 printf 'files-for-the-second-disk\n' >"$home/persistent.txt"
-off_host_output=$(run_athanor backup 2>&1)
+off_host_output=$(run_garden backup 2>&1)
 off_host_copy=$(
   find "$off_host" -mindepth 1 -maxdepth 1 -type d -name '????????T??????Z' | sort -r | sed -n '1p'
 )
@@ -1234,7 +1231,7 @@ for encrypted_file in "$off_host_copy"/*.gpg; do
 done
 printf 'row-written-after-the-copy\n' >"$database_file"
 printf 'files-written-after-the-copy\n' >"$home/persistent.txt"
-run_athanor restore "$decrypted" --yes >/dev/null 2>&1
+run_garden restore "$decrypted" --yes >/dev/null 2>&1
 test "$(cat "$database_file")" = "row-for-the-second-disk"
 test "$(cat "$home/persistent.txt")" = "files-for-the-second-disk"
 printf 'ok  the encrypted off-host copy decrypts and restores\n'
@@ -1243,7 +1240,7 @@ printf 'ok  the encrypted off-host copy decrypts and restores\n'
 # and calling that a failure sends an owner hunting for a copy that is sitting right there.
 rm -rf -- "$off_host"
 sleep 1
-if ! unreachable_output=$(run_athanor backup 2>&1); then
+if ! unreachable_output=$(run_garden backup 2>&1); then
   printf 'a backup failed because its off-host destination was unmounted\n' >&2
   exit 1
 fi
@@ -1254,7 +1251,7 @@ $unreachable_output
 EOF
 # And `doctor` says which of the two happened rather than reporting a green backup that exists in
 # exactly one place.
-doctor_output=$(run_athanor doctor 2>&1 || true)
+doctor_output=$(run_garden doctor 2>&1 || true)
 grep -q 'copied locally, not yet off-host' <<EOF
 $doctor_output
 EOF
@@ -1267,11 +1264,11 @@ printf 'ok  an unreachable destination fails the copy, not the backup, and docto
 # computer only, one line after `backup destination show` says where they go, and pointing them at
 # the command they had already run.
 : >"$worker_busy"
-run_athanor backup auto run >/dev/null 2>&1
+run_garden backup auto run >/dev/null 2>&1
 rm -f "$worker_busy"
 test "$(status_field outcome)" = skipped
 test -z "$(sed -n 's/^off_host=//p' "$backup_status_file" | sed -n '1p')"
-configured_doctor=$(run_athanor doctor 2>&1 || true)
+configured_doctor=$(run_garden doctor 2>&1 || true)
 if grep -q 'kept on this computer only' <<EOF
 $configured_doctor
 EOF
@@ -1283,30 +1280,30 @@ grep -q 'an off-host destination is named' <<EOF
 $configured_doctor
 EOF
 rm -f "$fake_bin/gpg" "$fake_bin/df"
-run_athanor backup destination off >/dev/null 2>&1
+run_garden backup destination off >/dev/null 2>&1
 # The counter-direction, and the reason the branch cannot simply be deleted: a box that has never
 # named a second place must still be told so, from the same arm and the same empty record.
-unconfigured_doctor=$(run_athanor doctor 2>&1 || true)
+unconfigured_doctor=$(run_garden doctor 2>&1 || true)
 grep -q 'kept on this computer only' <<EOF
 $unconfigured_doctor
 EOF
 printf 'ok  a skipped run does not turn a configured destination into no destination\n'
 
-# `athanor rollback` itself, which had no case of its own.
+# `garden rollback` itself, which had no case of its own.
 #
 # The update's internal rollback is drilled three ways above, but the command an operator types
-# after a release passes every automatic gate and is still wrong went through `restore_athanor`
+# after a release passes every automatic gate and is still wrong went through `restore_garden`
 # without anything watching it do so. That matters here because `restore` grew an argument parser
 # in this change and `rollback` is one of its two callers - a parser that mishandled the positional
 # would have left the command an owner reaches for on their worst day quietly restoring nothing.
 sleep 1
 printf 'row-before-the-rollback\n' >"$database_file"
 printf 'files-before-the-rollback\n' >"$home/persistent.txt"
-run_athanor backup >/dev/null 2>&1
+run_garden backup >/dev/null 2>&1
 printf 'row-after-the-rollback\n' >"$database_file"
 printf 'files-after-the-rollback\n' >"$home/persistent.txt"
 : >"$command_log"
-rollback_output=$(run_athanor rollback 2>&1)
+rollback_output=$(run_garden rollback 2>&1)
 test "$(cat "$database_file")" = "row-before-the-rollback"
 test "$(cat "$home/persistent.txt")" = "files-before-the-rollback"
 grep -q 'Rollback complete' <<EOF
@@ -1314,7 +1311,7 @@ $rollback_output
 EOF
 printf 'ok  rollback with no argument consumes the newest backup and puts both halves back\n'
 
-rollback_stop_line=$(sed -n '/systemctl stop athanor.target/=' "$command_log" | sed -n '1p')
+rollback_stop_line=$(sed -n '/systemctl stop garden.target/=' "$command_log" | sed -n '1p')
 rollback_build_line=$(sed -n '/pnpm -r build/=' "$command_log" | sed -n '1p')
 test -n "$rollback_stop_line" && test -n "$rollback_build_line"
 test "$rollback_stop_line" -lt "$rollback_build_line"
@@ -1323,37 +1320,37 @@ test -n "$rollback_reference"
 cp -R "$rollback_reference" "$test_root/invalid-rollback"
 printf 'corruption\n' >>"$test_root/invalid-rollback/database.dump"
 : >"$command_log"
-if run_athanor rollback "$test_root/invalid-rollback" >/dev/null 2>&1; then
+if run_garden rollback "$test_root/invalid-rollback" >/dev/null 2>&1; then
   printf 'a corrupt rollback archive was accepted\n' >&2; exit 1
 fi
 test ! -s "$command_log"
 : >"$command_log"
-if ATHANOR_TEST_REVERSE_BUILD_FAIL=1 run_athanor rollback "$rollback_reference" >/dev/null 2>&1; then
+if GARDEN_TEST_REVERSE_BUILD_FAIL=1 run_garden rollback "$rollback_reference" >/dev/null 2>&1; then
   printf 'a failed reverse build was accepted\n' >&2; exit 1
 fi
-unset ATHANOR_TEST_REVERSE_BUILD_FAIL
-grep -q 'systemctl stop athanor.target' "$command_log"
-if grep -q 'systemctl start athanor.target' "$command_log"; then
+unset GARDEN_TEST_REVERSE_BUILD_FAIL
+grep -q 'systemctl stop garden.target' "$command_log"
+if grep -q 'systemctl start garden.target' "$command_log"; then
   printf 'a failed reverse build started the server\n' >&2; exit 1
 fi
 test -f "$rollback_reference/SHA256SUMS"
 : >"$command_log"
-if ATHANOR_TEST_RESTORE_FAIL=1 run_athanor restore "$rollback_reference" --yes >/dev/null 2>&1; then
+if GARDEN_TEST_RESTORE_FAIL=1 run_garden restore "$rollback_reference" --yes >/dev/null 2>&1; then
   printf 'a failed data restore was accepted\n' >&2; exit 1
 fi
-unset ATHANOR_TEST_RESTORE_FAIL
-if grep -q 'systemctl start athanor.target' "$command_log"; then
+unset GARDEN_TEST_RESTORE_FAIL
+if grep -q 'systemctl start garden.target' "$command_log"; then
   printf 'a failed data restore started the server\n' >&2; exit 1
 fi
-run_athanor restore "$rollback_reference" --yes >/dev/null 2>&1
+run_garden restore "$rollback_reference" --yes >/dev/null 2>&1
 printf 'ok  rollback validates before stopping, stops before build and keeps failures stopped\n'
 
 # What a release carries besides its code, and whether an update delivers any of it.
 #
-# Measured on the owner's server, updated from f02ca24 to 9bf2bdc with `sudo athanor update`, which
+# Measured on the owner's server, updated from f02ca24 to 9bf2bdc with `sudo garden update`, which
 # printed "Update complete after 1 minutes offline" and exited 0. Four things did not arrive:
-# CONFINE_AGENT_FILESYSTEM was absent from /etc/athanor/runner.env, so the Landlock boundary was
-# present and switched off while `athanor-sandbox check` answered `filesystem=landlock`;
+# CONFINE_AGENT_FILESYSTEM was absent from /etc/garden/runner.env, so the Landlock boundary was
+# present and switched off while `garden-sandbox check` answered `filesystem=landlock`;
 # python3-scipy and statsmodels were in the capability table and not on the disk; no workspace had
 # the `.home` the agent's HOME had moved to; and nothing recorded the run, so `doctor` said "no
 # update run recorded yet" minutes afterwards. The update ran three steps - fetch, install
@@ -1368,16 +1365,16 @@ cat >"$seed/scripts/install-native.sh" <<'RELEASE_INSTALLER'
 set -eu
 case "${1:-}" in
   --release-steps)
-    printf 'the release steps ran\n' >>"$ATHANOR_TEST_COMMAND_LOG"
-    printf 'installed newly-declared-package\n' >>"$ATHANOR_TEST_COMMAND_LOG"
-    printf 'NEWLY_DECLARED_KEY=written-by-the-release\n' >>"$ATHANOR_CONFIG/runner.env"
+    printf 'the release steps ran\n' >>"$GARDEN_TEST_COMMAND_LOG"
+    printf 'installed newly-declared-package\n' >>"$GARDEN_TEST_COMMAND_LOG"
+    printf 'NEWLY_DECLARED_KEY=written-by-the-release\n' >>"$GARDEN_CONFIG/runner.env"
     exit 0
     ;;
 esac
-printf 'the installer ran\n' >>"$ATHANOR_TEST_COMMAND_LOG"
+printf 'the installer ran\n' >>"$GARDEN_TEST_COMMAND_LOG"
 RELEASE_INSTALLER
 chmod 0755 "$seed/scripts/install-native.sh"
-printf '\n# fixture-version=v11\n' >>"$seed/scripts/athanor-service"
+printf '\n# fixture-version=v11\n' >>"$seed/scripts/garden-service"
 publish_fixture v11-carries-release-steps
 run_update >/dev/null 2>&1
 if ! grep -q 'the release steps ran' "$command_log"; then
@@ -1411,27 +1408,27 @@ printf 'ok  an update delivers the packages and settings the new release carries
 
 # And it delivers them to the box that cannot ask for them.
 #
-# `athanor update` is /usr/local/bin/athanor, the PREVIOUS release's copy of this script, so the
-# release that first calls the release steps from `update_athanor` cannot make itself arrive: the
+# `garden update` is /usr/local/bin/garden, the PREVIOUS release's copy of this script, so the
+# release that first calls the release steps from `update_garden` cannot make itself arrive: the
 # shell running that update has never heard of the call. That is exactly the server this lane came
-# from - it runs the copy of `athanor` the last update placed, which knows how to hand the runtime
+# from - it runs the copy of `garden` the last update placed, which knows how to hand the runtime
 # files to the checkout and nothing about the steps beside them. Without a route through the phase,
 # the boundary that shipped switched off stays off for one more release.
 #
-# The fixture is that server: this release's script with the one line in `update_athanor` removed,
+# The fixture is that server: this release's script with the one line in `update_garden` removed,
 # keeping the phase. What it must do is apply the steps anyway, once, from the checkout's own arm.
-predating_updater="$test_root/predating-athanor"
+predating_updater="$test_root/predating-garden"
 # The call is replaced by a no-op rather than deleted, because deleting it would leave the `else` it
 # sits in empty and the fixture would fail to parse instead of standing in for a real server. What a
-# release that predates the call has at that point in `update_athanor` is nothing happening.
+# release that predates the call has at that point in `update_garden` is nothing happening.
 sed 's/^    install_release_carried_steps$/    : "this release had no such call"/' \
-  "$checkout/scripts/athanor" >"$predating_updater"
-if cmp -s "$predating_updater" "$checkout/scripts/athanor"; then
+  "$checkout/scripts/garden" >"$predating_updater"
+if cmp -s "$predating_updater" "$checkout/scripts/garden"; then
   printf 'the fixture changed nothing, so it stands in for no server at all\n' >&2
   exit 1
 fi
 if grep -q '^    install_release_carried_steps$' "$predating_updater"; then
-  printf 'the fixture still calls the release steps from update_athanor\n' >&2
+  printf 'the fixture still calls the release steps from update_garden\n' >&2
   exit 1
 fi
 # And it keeps the one route this case is about: the phase it hands the runtime files to.
@@ -1439,28 +1436,28 @@ grep -q '^      install-runtime-files)' "$predating_updater"
 chmod 0755 "$predating_updater"
 : >"$command_log"
 : >"$config/runner.env"
-printf '\n# fixture-version=v11a\n' >>"$seed/scripts/athanor-service"
+printf '\n# fixture-version=v11a\n' >>"$seed/scripts/garden-service"
 publish_fixture v11a-updated-by-a-script-that-predates-the-call
 PATH="$fake_bin:$PATH" \
-  ATHANOR_TEST_COMMAND_LOG="$command_log" \
-  ATHANOR_TEST_REAL_GIT="$real_git" \
-  ATHANOR_TEST_CHECKOUT="$checkout" \
-  ATHANOR_ROOT="$checkout" \
-  ATHANOR_CONFIG="$config" \
-  ATHANOR_STATE="$state" \
-  ATHANOR_HOME="$home" \
-  ATHANOR_BACKUP_ROOT="$backups" \
-  ATHANOR_BACKUP_KEEP=5 \
-  ATHANOR_BACKUP_IDLE_WAIT_SECONDS=0 \
-  ATHANOR_TEST_WORKER_BUSY="$worker_busy" \
-  ATHANOR_TEST_WORKER_BUSY_LATE="$test_root/worker-busy-late" \
-  ATHANOR_TEST_DATABASE="$database_file" \
-  ATHANOR_TEST_OFF_HOST="$off_host" \
-  ATHANOR_READY_TIMEOUT_SECONDS=3 \
-  ATHANOR_RUNTIME_PREFIX="$runtime" \
+  GARDEN_TEST_COMMAND_LOG="$command_log" \
+  GARDEN_TEST_REAL_GIT="$real_git" \
+  GARDEN_TEST_CHECKOUT="$checkout" \
+  GARDEN_ROOT="$checkout" \
+  GARDEN_CONFIG="$config" \
+  GARDEN_STATE="$state" \
+  GARDEN_HOME="$home" \
+  GARDEN_BACKUP_ROOT="$backups" \
+  GARDEN_BACKUP_KEEP=5 \
+  GARDEN_BACKUP_IDLE_WAIT_SECONDS=0 \
+  GARDEN_TEST_WORKER_BUSY="$worker_busy" \
+  GARDEN_TEST_WORKER_BUSY_LATE="$test_root/worker-busy-late" \
+  GARDEN_TEST_DATABASE="$database_file" \
+  GARDEN_TEST_OFF_HOST="$off_host" \
+  GARDEN_READY_TIMEOUT_SECONDS=3 \
+  GARDEN_RUNTIME_PREFIX="$runtime" \
   /bin/sh "$predating_updater" update >/dev/null 2>&1
 if ! grep -q '^NEWLY_DECLARED_KEY=written-by-the-release$' "$config/runner.env"; then
-  printf 'a box whose athanor predates the call never received what the release carries\n' >&2
+  printf 'a box whose garden predates the call never received what the release carries\n' >&2
   exit 1
 fi
 # Once, not twice: a second package resolution is minutes of the owner's outage for nothing.
@@ -1471,7 +1468,7 @@ if [ "$(grep -c 'the release steps ran' "$command_log")" -ne 1 ]; then
 fi
 # And the marker the two shells talk through is not left behind for the next run to read.
 test ! -e "$state/release-steps-applied"
-printf 'ok  a box whose athanor predates the call still gets what the release carries, once\n'
+printf 'ok  a box whose garden predates the call still gets what the release carries, once\n'
 
 # Every route to a completed update records itself, so `doctor` can answer "when did this box last
 # actually move". `record_update_status` has been drilled as a function in
@@ -1497,17 +1494,17 @@ printf 'ok  a completed update records itself, with the revision it landed on\n'
 cat >"$seed/scripts/install-native.sh" <<'OLD_INSTALLER'
 #!/bin/sh
 set -eu
-printf 'the installer ran\n' >>"$ATHANOR_TEST_COMMAND_LOG"
+printf 'the installer ran\n' >>"$GARDEN_TEST_COMMAND_LOG"
 OLD_INSTALLER
 chmod 0755 "$seed/scripts/install-native.sh"
-printf '\n# fixture-version=v12\n' >>"$seed/scripts/athanor-service"
+printf '\n# fixture-version=v12\n' >>"$seed/scripts/garden-service"
 publish_fixture v12-installer-predates-the-entry-point
 older_installer_output=$(run_update 2>&1)
 if grep -q 'the installer ran' "$command_log"; then
   printf 'a full install was run against a checkout that has no release-steps entry point\n' >&2
   exit 1
 fi
-grep -q 'fixture-version=v12' "$runtime/usr/local/lib/athanor/athanor-service"
+grep -q 'fixture-version=v12' "$runtime/usr/local/lib/garden/garden-service"
 grep -q 'Update complete' <<EOF
 $older_installer_output
 EOF
@@ -1516,18 +1513,18 @@ printf 'ok  the release steps are asked only of an installer that answers to the
 # The unattended run that returns without saying anything.
 #
 # `auto_update_run` writes `running` before it starts, because a run killed by its own start timeout
-# reaches no further line. `update_athanor` then re-checks the worker in the fraction of a second
+# reaches no further line. `update_garden` then re-checks the worker in the fraction of a second
 # the earlier wait cannot cover, and returned through that gate without correcting the record - so a
 # box whose worker happened to pick up a task at that instant was reported by `doctor` as an update
 # that started and never came back, every week, for as long as the pattern lasted. The loudest thing
 # the record can say, for the most ordinary thing that can happen.
-printf '\n# fixture-version=v13\n' >>"$seed/scripts/athanor-service"
+printf '\n# fixture-version=v13\n' >>"$seed/scripts/garden-service"
 publish_fixture v13-a-task-starts-late
 revision_before_stand_down=$("$real_git" -C "$checkout" rev-parse HEAD)
 busy_late="$test_root/worker-busy-late-marker"
 : >"$busy_late"
 stand_down_output=$(
-  ATHANOR_TEST_WORKER_BUSY_LATE="$busy_late" run_athanor auto-update run 2>&1
+  GARDEN_TEST_WORKER_BUSY_LATE="$busy_late" run_garden auto-update run 2>&1
 )
 grep -q 'a task started while the update was preparing' <<EOF
 $stand_down_output
@@ -1547,12 +1544,12 @@ printf 'ok  an update that stands down at the last moment corrects its own recor
 # that what they do lands. This runs the real scripts/install-native.sh, with one line replaced,
 # and asks what `--release-steps` actually does on a box that is already installed.
 #
-# THE ONE LINE. `athanor_detect_host` reads /etc/os-release, which does not exist on the machine
+# THE ONE LINE. `garden_detect_host` reads /etc/os-release, which does not exist on the machine
 # this drill runs on, and the host it reports decides which column of the package table is used. It
 # is replaced with a debian answer; every other line of the installer is the one that ships.
 #
 # WHAT CATCHES AN ENTRY POINT THAT STOPS EXITING before the install body: the run itself. Execution
-# continues into `[ -f "$athanor_root/package.json" ]`, which this rig's root does not have, so the
+# continues into `[ -f "$garden_root/package.json" ]`, which this rig's root does not have, so the
 # run ends non-zero and every case below it goes red - measured by deleting that `exit 0`. On a real
 # box the same fall-through would find a checkout and go on to create accounts, so the exit status
 # is the whole of what this rig can prove there, and it is enough to fail the drill.
@@ -1567,10 +1564,10 @@ release_config="$test_root/release-etc"
 release_home="$test_root/release-home"
 release_bin="$test_root/release-bin"
 mkdir -p "$release_root/scripts" "$release_config" "$release_bin" \
-  "$release_home/signed-in/workspace" "$release_home/signed-in/.athanor" \
+  "$release_home/signed-in/workspace" "$release_home/signed-in/.garden" \
   "$release_home/not-a-workspace" "$release_home/signed-in/workspace/.home"
-cp "$repository_root/scripts/athanor-host.sh" "$release_root/scripts/"
-sed 's#^athanor_detect_host || fail .*#athanor_os_id=debian; athanor_os_version=12; athanor_family=debian; athanor_pm=apt-get; athanor_arch=x86_64#' \
+cp "$repository_root/scripts/garden-host.sh" "$release_root/scripts/"
+sed 's#^garden_detect_host || fail .*#garden_os_id=debian; garden_os_version=12; garden_family=debian; garden_pm=apt-get; garden_arch=x86_64#' \
   "$repository_root/scripts/install-native.sh" >"$release_root/scripts/install-native.sh"
 if cmp -s "$release_root/scripts/install-native.sh" "$repository_root/scripts/install-native.sh"; then
   printf 'the host-detection line this rig replaces is no longer in the installer\n' >&2
@@ -1582,7 +1579,7 @@ chmod 0755 "$release_root/scripts/install-native.sh"
 # there and that must be left exactly where it is.
 printf 'signed-in\n' >"$release_home/signed-in/.codex-auth.json"
 printf 'agent-written\n' >"$release_home/signed-in/workspace/.home/.bashrc"
-printf 'runner-only\n' >"$release_home/signed-in/.athanor/profile"
+printf 'runner-only\n' >"$release_home/signed-in/.garden/profile"
 printf 'left-alone\n' >"$release_home/not-a-workspace/stray-file"
 printf 'runner=true\n' >"$release_config/runner.env"
 
@@ -1610,13 +1607,13 @@ case "$mode" in
 esac
 exec /bin/chmod "$@"'
 release_fake apt-get '
-printf "apt-get %s\n" "$*" >>"$ATHANOR_TEST_COMMAND_LOG"'
+printf "apt-get %s\n" "$*" >>"$GARDEN_TEST_COMMAND_LOG"'
 # The once-only steps, each with a stand-in that says so if it is ever reached. Nothing here is
 # expected to run: reaching any of them on a box that is already serving is the mistake that would
 # regenerate a shared secret two services are holding, or re-issue a rate-limited certificate.
 for one_time_tool in useradd usermod visudo certbot initdb createuser openssl; do
   release_fake "$one_time_tool" '
-printf "one-time tool %s ran\n" "$(basename "$0")" >>"$ATHANOR_TEST_COMMAND_LOG"'
+printf "one-time tool %s ran\n" "$(basename "$0")" >>"$GARDEN_TEST_COMMAND_LOG"'
 done
 # The sandbox helper the measurement runs, reached the way the installer reaches it: through runuser
 # and sudo. The report file is what this drill varies - present and naming a rung, or absent, which
@@ -1631,12 +1628,12 @@ while [ "$#" -gt 0 ]; do
   case "$1" in -n|-E) shift ;; *) break ;; esac
 done
 case "${1:-}" in
-  */athanor-sandbox)
+  */garden-sandbox)
     # The helper is named by absolute path, which this drill cannot create, so the stand-in answers
     # in its place. No report file at all is the box where the helper is not installed: nothing to
     # run, and a non-zero exit, which is what the installer treats as "could not be measured".
-    [ -f "$ATHANOR_TEST_SANDBOX_REPORT" ] || exit 127
-    cat "$ATHANOR_TEST_SANDBOX_REPORT"
+    [ -f "$GARDEN_TEST_SANDBOX_REPORT" ] || exit 127
+    cat "$GARDEN_TEST_SANDBOX_REPORT"
     exit 0
     ;;
 esac
@@ -1646,11 +1643,11 @@ sandbox_report="$test_root/sandbox-report"
 run_release_steps_rig() {
   : >"$command_log"
   PATH="$release_bin:$fake_bin:$PATH" \
-    ATHANOR_TEST_COMMAND_LOG="$command_log" \
-    ATHANOR_TEST_SANDBOX_REPORT="$sandbox_report" \
-    ATHANOR_ROOT="$release_root" \
-    ATHANOR_CONFIG="$release_config" \
-    ATHANOR_WORKSPACE_ROOT="$release_home" \
+    GARDEN_TEST_COMMAND_LOG="$command_log" \
+    GARDEN_TEST_SANDBOX_REPORT="$sandbox_report" \
+    GARDEN_ROOT="$release_root" \
+    GARDEN_CONFIG="$release_config" \
+    GARDEN_WORKSPACE_ROOT="$release_home" \
     /bin/sh "$release_root/scripts/install-native.sh" --release-steps
 }
 
@@ -1658,7 +1655,7 @@ release_setting() {
   sed -n "s/^$1=//p" "$release_config/runner.env" | sed -n '1p'
 }
 
-printf 'user=athanor-agent\nnetwork-isolation=yes\nfilesystem=landlock\n' >"$sandbox_report"
+printf 'user=garden-agent\nnetwork-isolation=yes\nfilesystem=landlock\n' >"$sandbox_report"
 run_release_steps_rig >"$test_root/release-steps.out" 2>&1
 # The packages the owner's box was missing, asked for by the names this family uses. Read from the
 # capability table through the installer rather than restated, so a row added there is covered here
@@ -1667,13 +1664,13 @@ grep -q 'apt-get install.*python3-scipy' "$command_log"
 grep -q 'apt-get install.*python3-statsmodels' "$command_log"
 # The setting that shipped present and off, written from what the helper measured.
 test "$(release_setting CONFINE_AGENT_FILESYSTEM)" = true
-test "$(release_setting AGENT_SANDBOX_HELPER)" = /usr/local/lib/athanor/athanor-sandbox
+test "$(release_setting AGENT_SANDBOX_HELPER)" = /usr/local/lib/garden/garden-sandbox
 # An operator's own value is left alone, which is what set_env_default is for.
 test "$(release_setting MAX_EXECUTION_SECONDS)" = 3600
 # The workspace whose HOME moved: the credential is carried into `.home`, the runner's own directory
 # is not, and the `.home` an intermediate build left inside `workspace/` stays exactly where it is.
 test "$(cat "$release_home/signed-in/.home/.codex-auth.json")" = "signed-in"
-test ! -e "$release_home/signed-in/.home/.athanor"
+test ! -e "$release_home/signed-in/.home/.garden"
 test -d "$release_home/signed-in/workspace"
 test "$(cat "$release_home/signed-in/workspace/.home/.bashrc")" = "agent-written"
 # And a directory under the workspace root that is not a workspace is not treated as one.
@@ -1700,10 +1697,10 @@ printf 'ok  running the release steps again moves nothing and overwrites nothing
 # kernel cannot - and the runner has to be told, or it asks for a ruleset the kernel rejects and
 # every command exits 125. EMPTY is "could not ask", which is not the same statement, and writing
 # `false` for it would take a working boundary off a box during an update because a probe failed.
-printf 'user=athanor-agent\nnetwork-isolation=yes\nfilesystem=none\n' >"$sandbox_report"
+printf 'user=garden-agent\nnetwork-isolation=yes\nfilesystem=none\n' >"$sandbox_report"
 run_release_steps_rig >/dev/null 2>&1
 test "$(release_setting CONFINE_AGENT_FILESYSTEM)" = false
-printf 'user=athanor-agent\nnetwork-isolation=yes\nfilesystem=landlock\n' >"$sandbox_report"
+printf 'user=garden-agent\nnetwork-isolation=yes\nfilesystem=landlock\n' >"$sandbox_report"
 run_release_steps_rig >/dev/null 2>&1
 test "$(release_setting CONFINE_AGENT_FILESYSTEM)" = true
 rm -f "$sandbox_report"
@@ -1725,16 +1722,16 @@ printf 'ok  the filesystem boundary is written from a measurement, and left alon
 # ran the settings step through fourteen consecutive failed writes to its last line and reported
 # success. Each step now re-enters the installer as its own process. This case is the one that goes
 # red if that ever becomes a subshell again: one failure, not fourteen, and a non-zero ending.
-printf 'user=athanor-agent\nfilesystem=landlock\n' >"$sandbox_report"
+printf 'user=garden-agent\nfilesystem=landlock\n' >"$sandbox_report"
 failing_config="$test_root/release-etc-unwritable"
 if failing_step_output=$(
   : >"$command_log"
   PATH="$release_bin:$fake_bin:$PATH" \
-    ATHANOR_TEST_COMMAND_LOG="$command_log" \
-    ATHANOR_TEST_SANDBOX_REPORT="$sandbox_report" \
-    ATHANOR_ROOT="$release_root" \
-    ATHANOR_CONFIG="$failing_config" \
-    ATHANOR_WORKSPACE_ROOT="$release_home" \
+    GARDEN_TEST_COMMAND_LOG="$command_log" \
+    GARDEN_TEST_SANDBOX_REPORT="$sandbox_report" \
+    GARDEN_ROOT="$release_root" \
+    GARDEN_CONFIG="$failing_config" \
+    GARDEN_WORKSPACE_ROOT="$release_home" \
     /bin/sh "$release_root/scripts/install-native.sh" --release-steps 2>&1
 ); then
   printf 'a release step that could not write its settings reported success\n' >&2
@@ -1757,36 +1754,36 @@ printf 'ok  a release step that fails stops at its first failure and does not ta
 
 # What the owner can see about the boundary this branch added, which until now was nothing.
 #
-# `doctor` reported the identity boundary - "agent commands run as athanor-agent, not as the runner"
+# `doctor` reported the identity boundary - "agent commands run as garden-agent, not as the runner"
 # - and said nothing at all about the filesystem. On the server this was measured on, that silence
-# was the whole of the report: `athanor-sandbox check` answered `filesystem=landlock`, the runner's
+# was the whole of the report: `garden-sandbox check` answered `filesystem=landlock`, the runner's
 # /healthz answered `agentFilesystemConfined: false`, and no line anywhere put those two together.
 #
 # READ FROM THE RUNNER AND NOT FROM THE SETTING, because the setting is the thing that was wrong.
 runner_health="$test_root/runner-health"
-doctor_sandbox="$runtime/usr/local/lib/athanor/athanor-sandbox"
+doctor_sandbox="$runtime/usr/local/lib/garden/garden-sandbox"
 printf 'AGENT_SANDBOX_HELPER=%s\n' "$doctor_sandbox" >>"$config/runner.env"
 printf '{"ok":true,"agentSandbox":true,"agentFilesystemConfined":true}\n' >"$runner_health"
-printf 'user=athanor-agent\nnetwork-isolation=yes\nfilesystem=landlock\n' >"$sandbox_report"
-confined_doctor=$(run_athanor doctor 2>&1 || true)
+printf 'user=garden-agent\nnetwork-isolation=yes\nfilesystem=landlock\n' >"$sandbox_report"
+confined_doctor=$(run_garden doctor 2>&1 || true)
 grep -q '^ok  *agent commands are confined to their own workspace as well as their own account' <<EOF
 $confined_doctor
 EOF
 # The box the lead measured: the kernel can, and the runner is not doing it. That is a fault with a
 # repair, and the sentence has to name the repair rather than the symptom.
 printf '{"ok":true,"agentSandbox":true,"agentFilesystemConfined":false}\n' >"$runner_health"
-unconfined_doctor=$(run_athanor doctor 2>&1 || true)
+unconfined_doctor=$(run_garden doctor 2>&1 || true)
 grep -q '^fail  *this kernel can confine agent commands to their own workspace and the runner is not doing it' <<EOF
 $unconfined_doctor
 EOF
-grep -q 'sudo athanor update writes it from what this kernel measures' <<EOF
+grep -q 'sudo garden update writes it from what this kernel measures' <<EOF
 $unconfined_doctor
 EOF
 # And the box that honestly cannot. Failing `doctor` for the life of a machine whose kernel has no
 # Landlock would make it a report nobody finishes reading, and the two boundaries that ARE in force
 # are the thing to say instead.
-printf 'user=athanor-agent\nnetwork-isolation=yes\nfilesystem=none\n' >"$sandbox_report"
-old_kernel_doctor=$(run_athanor doctor 2>&1 || true)
+printf 'user=garden-agent\nnetwork-isolation=yes\nfilesystem=none\n' >"$sandbox_report"
+old_kernel_doctor=$(run_garden doctor 2>&1 || true)
 if grep -q 'this kernel can confine agent commands' <<EOF
 $old_kernel_doctor
 EOF
@@ -1803,26 +1800,26 @@ $old_kernel_doctor
 EOF
 # A runner older than the field says nothing about it, which is not evidence either way.
 rm -f "$runner_health"
-silent_runner_doctor=$(run_athanor doctor 2>&1 || true)
+silent_runner_doctor=$(run_garden doctor 2>&1 || true)
 grep -q '^note  *this runner does not report whether agent commands are confined' <<EOF
 $silent_runner_doctor
 EOF
 printf 'ok  doctor reports the filesystem rung the runner is enforcing, and calls an old kernel a note\n'
 
 # The advice `doctor` gives an owner whose document tooling is incomplete. It read "On Debian and
-# Ubuntu, sudo athanor update reinstalls it" and was false on every family, because an update
+# Ubuntu, sudo garden update reinstalls it" and was false on every family, because an update
 # installed no packages at all; the owner of the measured server followed it and nothing happened.
 make_fake fc-list 'exit 0'
-tooling_doctor=$(run_athanor doctor 2>&1 || true)
+tooling_doctor=$(run_garden doctor 2>&1 || true)
 rm "$fake_bin/fc-list"
-if grep -q 'sudo athanor update reinstalls it' <<EOF
+if grep -q 'sudo garden update reinstalls it' <<EOF
 $tooling_doctor
 EOF
 then
   printf 'doctor still tells the owner to run an update that will not install anything\n' >&2
   exit 1
 fi
-grep -q "sudo athanor update installs every package this host's family has for them" <<EOF
+grep -q "sudo garden update installs every package this host's family has for them" <<EOF
 $tooling_doctor
 EOF
 printf 'ok  the missing-tooling advice names a command that now does what it says\n'
@@ -1834,29 +1831,29 @@ printf 'ok  the missing-tooling advice names a command that now does what it say
 # it, and it went on starting as root every day for ever. On a fully removed box it fails on a
 # target whose unit file is gone and starts its alert companion, every day; on a partly removed one
 # it stops and restarts the whole product and writes a fresh keys-bearing archive into
-# /var/backups/athanor until the disk fills. The nginx site had the same shape on the conf.d
+# /var/backups/garden until the disk fills. The nginx site had the same shape on the conf.d
 # layout - only the sites-enabled path was removed, so on rhel, arch and suse nginx went on serving
 # a deleted application.
 : >"$command_log"
-run_athanor uninstall >/dev/null 2>&1
-if ! grep -q 'systemctl disable --now .*athanor-backup\.timer' "$command_log"; then
+run_garden uninstall >/dev/null 2>&1
+if ! grep -q 'systemctl disable --now .*garden-backup\.timer' "$command_log"; then
   printf 'uninstall left the daily backup timer enabled\n' >&2
   exit 1
 fi
-backup_leftovers=$(find "$runtime" -name 'athanor-backup*' -print)
+backup_leftovers=$(find "$runtime" -name 'garden-backup*' -print)
 if [ -n "$backup_leftovers" ]; then
   printf 'uninstall left the backup units on disk:\n%s\n' "$backup_leftovers" >&2
   exit 1
 fi
 for removed in \
-  /etc/systemd/system/athanor.target \
-  /etc/systemd/system/athanor-runner.service \
-  /etc/systemd/system/athanor-gui.service \
-  /etc/nginx/sites-available/athanor \
-  /etc/nginx/conf.d/athanor.conf \
-  /etc/nginx/snippets/athanor-security-headers.conf \
-  /etc/nginx/snippets/athanor-app-csp.conf \
-  /etc/update-motd.d/99-athanor; do
+  /etc/systemd/system/garden.target \
+  /etc/systemd/system/garden-runner.service \
+  /etc/systemd/system/garden-gui.service \
+  /etc/nginx/sites-available/garden \
+  /etc/nginx/conf.d/garden.conf \
+  /etc/nginx/snippets/garden-security-headers.conf \
+  /etc/nginx/snippets/garden-app-csp.conf \
+  /etc/update-motd.d/99-garden; do
   if [ -e "$runtime$removed" ]; then
     printf 'uninstall left %s behind\n' "$removed" >&2
     exit 1
@@ -1872,13 +1869,13 @@ native_case="$test_root/native-runtime"
 native_source="$native_case/source"
 native_runtime="$native_case/runtime"
 native_bin="$native_case/bin"
-native_lib="$native_runtime/usr/local/lib/athanor"
+native_lib="$native_runtime/usr/local/lib/garden"
 mkdir -p "$native_source/scripts" "$native_source/infra/native" "$native_bin" \
   "$native_source/services/workspace-runner/node_modules" "$native_lib/python/bin" \
   "$native_runtime/etc/sudoers.d"
-cp "$repository_root/scripts/athanor-native-runtime" "$native_source/scripts/"
-cp "$repository_root/infra/native/athanor-python-requirements.txt" \
-  "$repository_root/infra/native/athanor-packages.sudoers" "$native_source/infra/native/"
+cp "$repository_root/scripts/garden-native-runtime" "$native_source/scripts/"
+cp "$repository_root/infra/native/garden-python-requirements.txt" \
+  "$repository_root/infra/native/garden-packages.sudoers" "$native_source/infra/native/"
 cp "$repository_root/scripts/mission-supervisor.py" "$native_lib/"
 cp "$repository_root/services/workspace-runner/package.json" "$native_source/services/workspace-runner/"
 node - "$native_source/services/workspace-runner/package.json" <<'JS'
@@ -1892,9 +1889,9 @@ for (const [name, entry] of [['typescript-native','bin/tsc'],['pyright','langser
 }
 JS
 mkdir -p "$native_case/config"
-printf 'PUBLIC_APP_URL=https://native-box.example\nPREVIEW_BASE_URL=https://native-box.example/__athanor/preview\n' >"$native_case/config/control.env"
+printf 'PUBLIC_APP_URL=https://native-box.example\nPREVIEW_BASE_URL=https://native-box.example/__garden/preview\n' >"$native_case/config/control.env"
 printf 'ISOLATE_AGENT_NETWORK=false\nRESERVED_PREVIEW_PORTS=4100,4400,9999\n' >"$native_case/config/runner.env"
-printf 'old policy\n' >"$native_runtime/etc/sudoers.d/athanor-packages"
+printf 'old policy\n' >"$native_runtime/etc/sudoers.d/garden-packages"
 printf 'original Python\n' >"$native_lib/python/owner-marker"
 native_real_python=$(command -v python3)
 export NATIVE_REAL_PYTHON="$native_real_python" NATIVE_CASE="$native_case"
@@ -1957,21 +1954,21 @@ cat >"$native_bin/visudo" <<'POLICY'
 set -eu
 for argument in "$@"; do policy="$argument"; done
 if [ -f "$NATIVE_CASE/fail-policy" ]; then exit 1; fi
-grep -q '^Cmnd_Alias ATHANOR_MISSION_STATUS = ' "$policy"
-grep -q '^Defaults!ATHANOR_SANDBOX_RUN !use_pty$' "$policy"
+grep -q '^Cmnd_Alias GARDEN_MISSION_STATUS = ' "$policy"
+grep -q '^Defaults!GARDEN_SANDBOX_RUN !use_pty$' "$policy"
 POLICY
 chmod 0755 "$native_bin/"*
 # The installer must normalize archive modes even under a permissive caller umask.
 run_native() (
   umask 000
-  PATH="$native_bin:$fake_bin:$PATH" ATHANOR_ROOT="$native_source" \
-    ATHANOR_RUNTIME_PREFIX="$native_runtime" ATHANOR_CONFIG="$native_case/config" \
-    /bin/sh "$native_source/scripts/athanor-native-runtime" "$@"
+  PATH="$native_bin:$fake_bin:$PATH" GARDEN_ROOT="$native_source" \
+    GARDEN_RUNTIME_PREFIX="$native_runtime" GARDEN_CONFIG="$native_case/config" \
+    /bin/sh "$native_source/scripts/garden-native-runtime" "$@"
 )
 assert_original_native() {
   test ! -L "$native_lib/python"
   test "$(cat "$native_lib/python/owner-marker")" = 'original Python'
-  test "$(cat "$native_runtime/etc/sudoers.d/athanor-packages")" = 'old policy'
+  test "$(cat "$native_runtime/etc/sudoers.d/garden-packages")" = 'old policy'
 }
 : >"$native_case/fail-pip"
 if run_native all >/dev/null 2>&1; then fail_case 'failed Python install was accepted'; fi
@@ -2011,16 +2008,16 @@ test "$(cat "$native_lib/python-before-managed/owner-marker")" = 'original Pytho
 grep -q -- '--require-hashes --no-deps --only-binary=:all:' "$native_case/pip-arguments" ||
   fail_case 'native Python wheels were not hash-verified'
 grep -q '^ad8d04ede9d4b75cc290fd5438a65047a06f786d04f604b6112485b36f090772 ' "$native_case/hash-check"
-grep -q '^Cmnd_Alias ATHANOR_MISSION_STATUS = ' "$native_runtime/etc/sudoers.d/athanor-packages"
-cp "$native_runtime/etc/sudoers.d/athanor-packages" "$native_case/verified-policy"
+grep -q '^Cmnd_Alias GARDEN_MISSION_STATUS = ' "$native_runtime/etc/sudoers.d/garden-packages"
+cp "$native_runtime/etc/sudoers.d/garden-packages" "$native_case/verified-policy"
 : >"$native_case/fail-policy"
 if run_native policy >/dev/null 2>&1; then fail_case 'invalid sudo policy was activated'; fi
-cmp "$native_case/verified-policy" "$native_runtime/etc/sudoers.d/athanor-packages"
+cmp "$native_case/verified-policy" "$native_runtime/etc/sudoers.d/garden-packages"
 rm "$native_case/fail-policy"
 : >"$native_case/fail-pip"
 : >"$native_case/interrupt-download"
 run_native all >/dev/null 2>&1
-grep -q '^PREVIEW_BASE_URL=https://native-box.example:8443/__athanor/preview$' "$native_case/config/control.env"
+grep -q '^PREVIEW_BASE_URL=https://native-box.example:8443/__garden/preview$' "$native_case/config/control.env"
 grep -q '^RESERVED_PREVIEW_PORTS=4100,4400,9999,443,8443$' "$native_case/config/runner.env"
 grep -q '^ISOLATE_AGENT_NETWORK=false$' "$native_case/config/runner.env"
 printf 'ok  native activation verifies pins, retains rollback tools and reuses its cache offline\n'
@@ -2074,20 +2071,20 @@ cp "$native_case/config/control.env" "$native_case/custom-control"
 run_native preview-origin
 cmp "$native_case/config/control.env" "$native_case/custom-control"
 grep -q '^PREVIEW_BASE_URL=https://private-apps.example:9443/custom/preview$' "$native_case/config/control.env"
-grep -Fq 'set $athanor_preview_origin "https://private-apps.example:9443";' "$native_runtime/etc/nginx/snippets/athanor-preview-origin.conf"
+grep -Fq 'set $garden_preview_origin "https://private-apps.example:9443";' "$native_runtime/etc/nginx/snippets/garden-preview-origin.conf"
 grep -q '^RESERVED_PREVIEW_PORTS=5555,443,8443$' "$native_case/config/control.env"
-printf 'PUBLIC_APP_URL=https://[2001:db8::1]\nPREVIEW_BASE_URL=https://[2001:db8::1]/__athanor/preview\n' >"$native_case/config/control.env"
+printf 'PUBLIC_APP_URL=https://[2001:db8::1]\nPREVIEW_BASE_URL=https://[2001:db8::1]/__garden/preview\n' >"$native_case/config/control.env"
 run_native preview-origin
-grep -Fq 'PREVIEW_BASE_URL=https://[2001:db8::1]:8443/__athanor/preview' "$native_case/config/control.env"
+grep -Fq 'PREVIEW_BASE_URL=https://[2001:db8::1]:8443/__garden/preview' "$native_case/config/control.env"
 printf 'PUBLIC_APP_URL=https://native-box.example\nPREVIEW_BASE_URL=https://native-box.example/unsafe-path\n' >"$native_case/config/control.env"
 cp "$native_case/config/control.env" "$native_case/refused-control"
-cp "$native_runtime/etc/nginx/snippets/athanor-preview-origin.conf" "$native_case/refused-snippet"
+cp "$native_runtime/etc/nginx/snippets/garden-preview-origin.conf" "$native_case/refused-snippet"
 if run_native preview-origin >/dev/null 2>&1; then fail_case 'same-origin custom preview configuration was accepted'; fi
 cmp "$native_case/config/control.env" "$native_case/refused-control"
-cmp "$native_runtime/etc/nginx/snippets/athanor-preview-origin.conf" "$native_case/refused-snippet"
+cmp "$native_runtime/etc/nginx/snippets/garden-preview-origin.conf" "$native_case/refused-snippet"
 printf 'PUBLIC_APP_URL=https://native-box.example\n' >"$native_case/config/control.env"
 run_native preview-origin
-grep -q '^PREVIEW_BASE_URL=https://native-box.example:8443/__athanor/preview$' "$native_case/config/control.env"
+grep -q '^PREVIEW_BASE_URL=https://native-box.example:8443/__garden/preview$' "$native_case/config/control.env"
 printf 'ok  preview activation preserves custom origins, refuses unsafe sharing and derives IPv6/fresh origins\n'
 
 for server in typescript-native pyright; do
@@ -2119,24 +2116,24 @@ cat >"$lock_holder" <<'HOLDER'
 #!/bin/sh
 set -eu
 set -- help
-. "$ATHANOR_ROOT/scripts/athanor" >/dev/null
+. "$GARDEN_ROOT/scripts/garden" >/dev/null
 need_root backup
-acquire_maintenance_lock "${ATHANOR_TEST_LOCK_WAIT:-}"
-printf '%s\n' "$$" >"$ATHANOR_TEST_LOCK_PID"
-case "$ATHANOR_TEST_LOCK_MODE" in
+acquire_maintenance_lock "${GARDEN_TEST_LOCK_WAIT:-}"
+printf '%s\n' "$$" >"$GARDEN_TEST_LOCK_PID"
+case "$GARDEN_TEST_LOCK_MODE" in
   hold) exec sleep 30 ;;
   fail) exit 71 ;;
   probe) exit 0 ;;
-  child) /bin/sh "$ATHANOR_ROOT/scripts/athanor" update install-runtime-files ;;
+  child) /bin/sh "$GARDEN_ROOT/scripts/garden" update install-runtime-files ;;
 esac
 HOLDER
 run_lock_holder() {
-  PATH="$fake_bin:$PATH" ATHANOR_ROOT="$checkout" ATHANOR_STATE="$state" \
-    ATHANOR_CONFIG="$config" ATHANOR_RUNTIME_PREFIX="$runtime" \
-    ATHANOR_TEST_COMMAND_LOG="$command_log" ATHANOR_TEST_LOCK_MODE="$1" \
-    ATHANOR_TEST_LOCK_WAIT="${ATHANOR_TEST_LOCK_WAIT:-}" \
-    ATHANOR_TEST_LOCK_BLOCKED="${ATHANOR_TEST_LOCK_BLOCKED:-}" \
-    ATHANOR_TEST_LOCK_PID="$test_root/lock-holder-pid" \
+  PATH="$fake_bin:$PATH" GARDEN_ROOT="$checkout" GARDEN_STATE="$state" \
+    GARDEN_CONFIG="$config" GARDEN_RUNTIME_PREFIX="$runtime" \
+    GARDEN_TEST_COMMAND_LOG="$command_log" GARDEN_TEST_LOCK_MODE="$1" \
+    GARDEN_TEST_LOCK_WAIT="${GARDEN_TEST_LOCK_WAIT:-}" \
+    GARDEN_TEST_LOCK_BLOCKED="${GARDEN_TEST_LOCK_BLOCKED:-}" \
+    GARDEN_TEST_LOCK_PID="$test_root/lock-holder-pid" \
     /bin/sh "$lock_holder"
 }
 rm -f "$test_root/lock-holder-pid"
@@ -2157,20 +2154,20 @@ commands_before_lock=$(wc -l <"$command_log" | tr -d ' ')
 for operation in backup update rollback restore; do
   set -- "$operation"
   [ "$operation" != restore ] || set -- "$operation" "$lock_reference" --yes
-  if lock_refusal=$(maintenance_lock_acquired=1 ATHANOR_MAINTENANCE_LOCKED=1 \
-    run_athanor "$@" 2>&1); then
+  if lock_refusal=$(maintenance_lock_acquired=1 GARDEN_MAINTENANCE_LOCKED=1 \
+    run_garden "$@" 2>&1); then
     kill -TERM "$(cat "$test_root/lock-holder-pid")"
     fail_case "$operation overlapped the active maintenance operation"
   fi
   printf '%s\n' "$lock_refusal" | grep -q 'holds the maintenance lock'
 done
 test "$(wc -l <"$command_log" | tr -d ' ')" = "$commands_before_lock"
-lock_skip=$(run_athanor backup auto run 2>&1)
+lock_skip=$(run_garden backup auto run 2>&1)
 test "$(status_field outcome)" = skipped
 test "$(status_field reason)" = 'another maintenance operation was still running'
 printf '%s\n' "$lock_skip" | grep -q 'maintenance is busy'
 held_pid=$(cat "$test_root/lock-holder-pid")
-ATHANOR_TEST_LOCK_WAIT=3 ATHANOR_TEST_LOCK_BLOCKED="$test_root/lock-blocked" run_lock_holder probe >"$test_root/lock-waiter.log" 2>&1 &
+GARDEN_TEST_LOCK_WAIT=3 GARDEN_TEST_LOCK_BLOCKED="$test_root/lock-blocked" run_lock_holder probe >"$test_root/lock-waiter.log" 2>&1 &
 lock_waiter_job=$!
 lock_wait=0
 while [ ! -e "$test_root/lock-blocked" ] && [ "$lock_wait" -lt 100 ]; do

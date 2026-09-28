@@ -31,12 +31,12 @@ const captureClientHello = (servername: string | null, alpn?: string[]): Promise
 
 describe('parseClientHello', () => {
   it('reads SNI and ALPN from a real ClientHello', async () => {
-    const hello = await captureClientHello('label.relay.example', ['athanor-relay/1']);
+    const hello = await captureClientHello('label.relay.example', ['garden-relay/1']);
     const result = parseClientHello(hello);
     expect(result.status).toBe('ok');
     if (result.status !== 'ok') return;
     expect(result.info.serverName).toBe('label.relay.example');
-    expect(result.info.alpnProtocols).toEqual(['athanor-relay/1']);
+    expect(result.info.alpnProtocols).toEqual(['garden-relay/1']);
   });
 
   it('lowercases the SNI so routing is case insensitive', async () => {

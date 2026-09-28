@@ -261,7 +261,7 @@ describe('durable finite jobs', () => {
 
   it('refuses an unjournalled job before executing any command', async () => {
     const { root, current } = await setup();
-    await mkdir(path.join(root, '.athanor/services.json'), { recursive: true });
+    await mkdir(path.join(root, '.garden/services.json'), { recursive: true });
     await expect(
       start(current, root, "require('node:fs').writeFileSync('must-not-run.txt','wrong')")
     ).rejects.toThrow();
@@ -466,7 +466,7 @@ describe('saved process history beyond the recent list', () => {
     const [record] = await registry.load();
     expect(record).toBeDefined();
     for (let id = 0; id < 66; id++) await registry.put({ ...record!, id: `job-${id}` }, true);
-    const history = path.join(root, '.athanor/process-history');
+    const history = path.join(root, '.garden/process-history');
     await mkdir(history);
     await mkdir(path.join(history, 'invalid-entry'));
     const restored = manager();

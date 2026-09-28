@@ -1,5 +1,5 @@
 {
-  "name": "@athanor/core",
+  "name": "@garden/core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,7 +16,7 @@
     "test": "NODE_OPTIONS=--conditions=development vitest run"
   },
   "dependencies": {
-    "@athanor/contracts": "workspace:*",
+    "@garden/contracts": "workspace:*",
     "@modelcontextprotocol/sdk": "1.30.0",
     "parse5-sax-parser": "8.0.0",
     "zod": "4.4.3"

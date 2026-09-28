@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
 /**
- * The settings more than one athanor process reads, declared once.
+ * The settings more than one garden process reads, declared once.
  *
  * The API, the worker, the media orchestrator and the notifier are separate units on a packaged
- * install, and systemd starts all four from the same /etc/athanor/control.env. A key declared
+ * install, and systemd starts all four from the same /etc/garden/control.env. A key declared
  * twice is therefore a key two units can disagree about: TASK_MAX_STEPS was bounded at 200 in the
  * API and 400 in the worker, so an operator who raised it to 300 got a worker that accepted the
  * number and an API that refused to start, with nothing in either message to say the other half
@@ -27,8 +27,8 @@ export const sharedEnv = {
    * connection string.
    */
   DATABASE_DRIVER: z.enum(['pglite', 'postgres']).default('pglite'),
-  DATABASE_URL: z.string().default('postgres://athanor:athanor@localhost:5432/athanor'),
-  PGLITE_PATH: z.string().default('.athanor/postgres'),
+  DATABASE_URL: z.string().default('postgres://garden:garden@localhost:5432/garden'),
+  PGLITE_PATH: z.string().default('.garden/postgres'),
   /**
    * The key every workspace key is wrapped under. Optional here and required by each process at
    * load, so the failure is one sentence naming the key rather than a schema dump.
@@ -37,7 +37,7 @@ export const sharedEnv = {
     (value) => (value === '' ? undefined : value),
     z.string().min(1).optional()
   ),
-  /** Authenticates every call between an athanor process and the workspace runner. */
+  /** Authenticates every call between an garden process and the workspace runner. */
   RUNNER_SHARED_SECRET: z.preprocess(
     (value) => (value === '' ? undefined : value),
     z.string().min(32).optional()
@@ -82,7 +82,7 @@ export const sharedEnv = {
    * Which models this box will offer at all.
    *
    * `provider_catalog` offers every chat model the owner's provider account can reach, so models
-   * released after this build appear without an athanor update. `reviewed_open_weight` restricts
+   * released after this build appear without an garden update. `reviewed_open_weight` restricts
    * selection to models carrying a current independent weight-licence review and fails closed when
    * one lapses.
    *

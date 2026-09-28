@@ -3,8 +3,8 @@
  * Database-only operations can instead commit the claim, mutation and receipt atomically.
  */
 
-import { AthanorError } from '@athanor/core';
-import type { UserRecord } from '@athanor/data';
+import { GardenError } from '@garden/core';
+import type { UserRecord } from '@garden/data';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { idempotencyRequestHash } from '../context.js';
 import type { ServerBase } from './server-context.js';
@@ -41,7 +41,7 @@ export const createIdempotentOperation = (
     const rawKey = request.headers['idempotency-key'];
     const key = Array.isArray(rawKey) ? rawKey[0] : rawKey;
     if (!key || !/^[A-Za-z0-9_.:-]{8,200}$/.test(key)) {
-      throw new AthanorError(
+      throw new GardenError(
         'idempotency_key_required',
         'A valid Idempotency-Key header is required'
       );
@@ -58,7 +58,7 @@ export const createIdempotentOperation = (
     const execute = async (): Promise<T> => {
       const replayHeader = request.headers['idempotency-replay-only'];
       if (replayHeader !== undefined && replayHeader !== 'true')
-        throw new AthanorError(
+        throw new GardenError(
           'invalid_operation_replay',
           'Idempotency-Replay-Only accepts true or must be omitted.'
         );
@@ -71,14 +71,14 @@ export const createIdempotentOperation = (
           existing.path !== operationPath ||
           existing.requestHash !== requestHash
         ) {
-          throw new AthanorError(
+          throw new GardenError(
             'idempotency_conflict',
             'This key was already used for a different operation'
           );
         }
         if (existing.state === 'completed' && existing.responseStatus !== null) {
           if (!existing.responseCiphertext)
-            throw new AthanorError(
+            throw new GardenError(
               'operation_outcome_unknown',
               'The saved response needs reconciliation before retrying.',
               409
@@ -88,14 +88,14 @@ export const createIdempotentOperation = (
         }
         if (options.reconcile && !replayOnly) work = options.reconcile;
         else
-          throw new AthanorError(
+          throw new GardenError(
             existing.state === 'failed' ? 'operation_outcome_unknown' : 'operation_in_progress',
             'The original request may have taken effect. Check its outcome before trying again.',
             409
           );
       }
       if (replayOnly)
-        throw new AthanorError(
+        throw new GardenError(
           'operation_receipt_unavailable',
           'The previous send has no saved receipt. Check your work before starting a new request.',
           409
@@ -116,7 +116,7 @@ export const createIdempotentOperation = (
             saved.responseStatus === null ||
             !saved.responseCiphertext
           )
-            throw new AthanorError(
+            throw new GardenError(
               'operation_outcome_unknown',
               'The saved response needs reconciliation before retrying.',
               409

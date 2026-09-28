@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import type { ProcessResourceSample } from '@athanor/contracts';
+import type { ProcessResourceSample } from '@garden/contracts';
 import { z } from 'zod';
 import { sandboxedShell, type AgentSandbox } from './sandbox.js';
 

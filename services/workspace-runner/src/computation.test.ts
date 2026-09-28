@@ -5,7 +5,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as ExecutionModule from './execution.js';
 import type * as HostStorageModule from './host-storage.js';
-import type { ComputationSession } from '@athanor/contracts';
+import type { ComputationSession } from '@garden/contracts';
 import { ensureWorkspace } from './files.js';
 
 vi.mock('./execution.js', async (importOriginal) => {
@@ -85,7 +85,7 @@ describe('persistent native computation', () => {
       code: '++n'
     };
     const first = await cell(session, firstRequest.code, firstRequest.cellId);
-    const journalPath = path.join(directory, '.athanor/computation.json');
+    const journalPath = path.join(directory, '.garden/computation.json');
     const initialBytes = (await readFile(journalPath)).length;
     for (let index = 1; index < 270; index++) {
       const result = await cell(session, '++n', `increment-${index}`);
@@ -144,7 +144,7 @@ describe('persistent native computation', () => {
     const request = { action: 'cell', sessionId: session.sessionId, cellId: 'saved', code: '42' };
     const result = await cell(session, request.code, request.cellId);
     await manager.close();
-    const journal = path.join(directory, '.athanor/computation.json');
+    const journal = path.join(directory, '.garden/computation.json');
     const records = JSON.parse(await readFile(journal, 'utf8')) as Array<Record<string, unknown>>;
     expect(records).toHaveLength(1);
     records[0]!.receipts = [
@@ -155,7 +155,7 @@ describe('persistent native computation', () => {
       }
     ];
     await writeFile(journal, JSON.stringify(records));
-    await rm(path.join(directory, '.athanor/computation-receipts'), { recursive: true });
+    await rm(path.join(directory, '.garden/computation-receipts'), { recursive: true });
     manager = new ComputationManager(directory, policy);
     await manager.restore();
     const migratedSessions = JSON.parse(await readFile(journal, 'utf8')) as unknown[];
@@ -176,7 +176,7 @@ describe('persistent native computation', () => {
     await cell(second, '2', 'intact');
     const filename = path.join(
       directory,
-      '.athanor/computation-receipts',
+      '.garden/computation-receipts',
       first.sessionId,
       `${createHash('sha256').update('corrupt').digest('hex')}.json`
     );
@@ -189,7 +189,7 @@ describe('persistent native computation', () => {
     );
     expect(manager.backgroundWork().commands).toBe(0);
     const journal = JSON.parse(
-      await readFile(path.join(directory, '.athanor/computation.json'), 'utf8')
+      await readFile(path.join(directory, '.garden/computation.json'), 'utf8')
     ) as Array<{ view: ComputationSession }>;
     expect(journal).toHaveLength(2);
     expect(journal.every((record) => record.view.state === 'stopped')).toBe(true);
@@ -599,7 +599,7 @@ describe('persistent native computation', () => {
     const session = await start('python');
     await cell(session, 'values=[1,2]', 'once');
     await manager.close();
-    const journal = path.join(directory, '.athanor/computation.json');
+    const journal = path.join(directory, '.garden/computation.json');
     const records = JSON.parse(await readFile(journal, 'utf8')) as Array<{
       view: { state: string; stateRetained: boolean };
     }>;
@@ -645,7 +645,7 @@ describe('saved analysis sessions', () => {
     const original = await cell(first, '42', 'old-cell');
     await manager.act(workspaceId, owner, { action: 'stop', sessionId: first.sessionId });
     await manager.close();
-    const journalPath = path.join(directory, '.athanor/computation.json');
+    const journalPath = path.join(directory, '.garden/computation.json');
     const [record] = JSON.parse(await readFile(journalPath, 'utf8')) as {
       view: ComputationSession;
     }[];
@@ -703,7 +703,7 @@ describe('computation shutdown durability', () => {
     const held = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const ledger = new ComputationLedger(path.join(directory, '.athanor/computation-receipts'));
+    const ledger = new ComputationLedger(path.join(directory, '.garden/computation-receipts'));
     const original = ledger.put.bind(ledger);
     const receipt = vi
       .spyOn(ComputationLedger.prototype, 'put')
@@ -726,7 +726,7 @@ describe('computation shutdown durability', () => {
       release();
       await Promise.all([stopping, closing]);
       expect(closed).toBe(true);
-      const ledger = new ComputationLedger(path.join(directory, '.athanor/computation-receipts'));
+      const ledger = new ComputationLedger(path.join(directory, '.garden/computation-receipts'));
       expect(await ledger.get(session.sessionId, 'final-cell')).toMatchObject({
         state: 'completed',
         cell: { result: { value: 42 } }

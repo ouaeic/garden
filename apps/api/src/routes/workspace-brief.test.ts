@@ -32,13 +32,13 @@ describe('garden workspace brief editor', () => {
   afterAll(async () => app.close());
   it('reads the preferred brief, falls back through every supported alias and saves the preferred file', async () => {
     files.set('workspace/GARDEN.md', 'Garden guidance');
-    files.set('workspace/ATHANOR.md', 'Specific compatibility');
+    files.set('workspace/GARDEN.md', 'Specific compatibility');
     files.set('workspace/OPEN_CLOUD.md', 'Cloud compatibility');
     files.set('workspace/AGENTS.md', 'Shared guidance');
     const url = '/v1/workspaces/workspace/brief';
     for (const [file, expected] of [
       ['workspace/GARDEN.md', 'Garden guidance'],
-      ['workspace/ATHANOR.md', 'Specific compatibility'],
+      ['workspace/GARDEN.md', 'Specific compatibility'],
       ['workspace/OPEN_CLOUD.md', 'Cloud compatibility'],
       ['workspace/AGENTS.md', 'Shared guidance']
     ]) {
@@ -55,6 +55,6 @@ describe('garden workspace brief editor', () => {
     });
     expect(saved.statusCode).toBe(200);
     expect(files.get('workspace/GARDEN.md')).toBe('Owner edited guidance');
-    expect(files.has('workspace/ATHANOR.md')).toBe(false);
+    expect(files.has('workspace/GARDEN.md')).toBe(false);
   });
 });

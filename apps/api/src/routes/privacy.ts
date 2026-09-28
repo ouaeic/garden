@@ -6,12 +6,12 @@
  */
 
 import { Readable } from 'node:stream';
-import { decryptJson, unwrapDataKey } from '@athanor/core';
+import { decryptJson, unwrapDataKey } from '@garden/core';
 import { revealedTaskEvent } from '../context.js';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 import { recordSecurityEvent } from '../security-events.js';
-import { VoiceStore } from '@athanor/data';
+import { VoiceStore } from '@garden/data';
 import { readVoiceDiscussion } from '../voice/context.js';
 
 export const registerPrivacyRoutes = (context: RouteContext): void => {
@@ -177,7 +177,7 @@ export const registerPrivacyRoutes = (context: RouteContext): void => {
     return reply
       .header(
         'content-disposition',
-        `attachment; filename="athanor-export-${new Date().toISOString().slice(0, 10)}.json"`
+        `attachment; filename="garden-export-${new Date().toISOString().slice(0, 10)}.json"`
       )
       .type('application/json; charset=utf-8')
       .send(Readable.from(document()));

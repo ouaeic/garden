@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { AthanorError } from '@athanor/core';
+import { GardenError } from '@garden/core';
 import { type AgentState } from '../agent-state.js';
 import {
   commandInterpreters,
@@ -296,7 +296,7 @@ export const shellReplacements = (args: Record<string, unknown>): ShellReplaceme
  * recorded key is folded with that rule, and a shell target is resolved against the cwd the call
  * named - which the runner reads relative to the container root, not to `workspace/`.
  */
-const CONTAINER_ONLY = new Set(['.athanor', '.config', '.home']);
+const CONTAINER_ONLY = new Set(['.garden', '.config', '.home']);
 
 const foldRecorded = (recorded: string): string | undefined => {
   const normal = path.posix.normalize(recorded.replace(/\\/g, '/'));
@@ -365,7 +365,7 @@ export const refuseShellReplacementOfUnread = (
     if (!hit) continue;
     const unshownFrom = firstUnshownLine(displayedRanges(reader, recorded), atLeast);
     if (unshownFrom === undefined) continue;
-    throw new AthanorError(
+    throw new GardenError(
       'write_unread',
       /*
        * The same two sentences the write arm uses, because it is the same refusal. One outstanding

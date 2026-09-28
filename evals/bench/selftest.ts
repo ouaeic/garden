@@ -213,7 +213,7 @@ const baseRow = (): RowInput => ({
   model: 'm',
   modelRoute: 'r',
   provider: 'p',
-  harness: 'athanor',
+  harness: 'garden',
   harnessVersion: '0.1.1',
   harnessCommit: 'x',
   arm: 'shipped',
@@ -489,7 +489,7 @@ export const selfTest = async (observation: RouteObservation | null): Promise<st
    * arms at all. `shipped` is the arm that is supposed to cost points - a card that fires with
    * nobody at the keyboard parks the task at 0 - so a row labelled `shipped` and actually measured
    * under `autonomous` prints a smaller gap between the arms than exists. That gap is the one
-   * number this artefact is for, and shrinking it flatters athanor, which is the direction a rig
+   * number this artefact is for, and shrinking it flatters garden, which is the direction a rig
    * has no business being blind in.
    *
    * Every arm, driven off `ARM_SECURITY_MODE` itself rather than off three hand-written cases, so
@@ -694,7 +694,7 @@ export const selfTest = async (observation: RouteObservation | null): Promise<st
     ['model', 'model-sentinel'],
     ['model_route', 'model-route-sentinel'],
     ['provider', 'provider-sentinel'],
-    ['harness', 'athanor'],
+    ['harness', 'garden'],
     ['harness_version', 'harness-version-sentinel'],
     ['harness_commit', 'harness-commit-sentinel'],
     ['arm', 'unattended'],
@@ -741,7 +741,7 @@ export const selfTest = async (observation: RouteObservation | null): Promise<st
     ['infra_failures_advisory', '2'],
     ['declared_drops', 'declared-drops-sentinel'],
     ['run_started_at', 'started-at-sentinel'],
-    ['athanor_commit', 'harness-commit-sentinel']
+    ['garden_commit', 'harness-commit-sentinel']
   ];
   /*
    * The map has to reach EVERY column, or a column added later arrives unpinned and this check
@@ -856,7 +856,7 @@ export const selfTest = async (observation: RouteObservation | null): Promise<st
    */
   const mixedBox: RouteObservation = {
     recordedAt: 'now',
-    athanor: 'selftest',
+    garden: 'selftest',
     fixtures: ['constructed'],
     observed: [
       { route: 'POST /v1/workspaces/:workspaceId/browser/snapshot', fixtures: 1 },
@@ -886,7 +886,7 @@ export const selfTest = async (observation: RouteObservation | null): Promise<st
     const coverage = coverageOf(observation);
     if (coverage.missing.length > 0)
       problems.push(
-        `athanor asked for ${coverage.missing.length} route(s) this shim does not implement: ${coverage.missing.join(', ')}`
+        `garden asked for ${coverage.missing.length} route(s) this shim does not implement: ${coverage.missing.join(', ')}`
       );
     // The excuse has to be spendable only where it applies. A `gatedOut` list that grew to cover a
     // route the catalogue gate does not withdraw would be this rig excusing its own gaps, which is
@@ -898,14 +898,14 @@ export const selfTest = async (observation: RouteObservation | null): Promise<st
         );
   }
 
-  /* ----------------------------- the join, driven by athanor's own client over a real socket */
+  /* ----------------------------- the join, driven by garden's own client over a real socket */
   // Every request above was composed by this rig and parsed by this rig. See wiring.ts for why
   // that is not enough on its own.
   problems.push(...(await wiringChecks()));
 
   /* ------------------------------------ the whole join: a turn, a box, a verifier and a score */
   /*
-   * THE CHECK THIS DIRECTORY EXISTED WITHOUT. `wiring.ts` proves the wire between athanor's client
+   * THE CHECK THIS DIRECTORY EXISTED WITHOUT. `wiring.ts` proves the wire between garden's client
    * and this shim; it does not run a turn. Everything else here proves a part. This drives a REAL
    * `AgentWorker` - the same object the worker process runs - against this shim, against a real
    * temporary directory, and lets a command in that directory decide whether the work was done.
@@ -915,7 +915,7 @@ export const selfTest = async (observation: RouteObservation | null): Promise<st
    * only runs when somebody remembers a flag is a check that is not running when it breaks. It
    * costs about 0.4 s of the ~2 s this command takes.
    *
-   * The model is a script, so this says nothing about athanor's ability at anything. It says the
+   * The model is a script, so this says nothing about garden's ability at anything. It says the
    * loop can carry work into a box and that the box can disagree with it.
    */
   const scored = await scoreTask(SUM_TASK, false);
@@ -934,7 +934,7 @@ export const selfTest = async (observation: RouteObservation | null): Promise<st
    * holds 7 instead of 1260. The turn's own acceptance check ran in the box and failed four times
    * (`MAX_ACCEPTANCE_FAILURES`, `apps/worker/src/turn-bounds.ts:360`), the failures were appended
    * to `remainingRisks` by `apps/worker/src/turn/finish.ts:320`, and the status field was left as
-   * the model declared it. So neither of athanor's two top-line signals separates a solved task
+   * the model declared it. So neither of garden's two top-line signals separates a solved task
    * from a knowingly unsolved one, and a benchmark adapter reading either would have scored that
    * run 1. Only the verifier told them apart.
    */

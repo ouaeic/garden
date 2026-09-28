@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { capabilityAudience, signCapabilityToken } from '@athanor/core';
+import { capabilityAudience, signCapabilityToken } from '@garden/core';
 import type { RunnerConfig } from './config.js';
 import { ensureWorkspace } from './files.js';
 import { buildServer } from './server.js';
@@ -36,7 +36,7 @@ const runnerConfig = (workspaceRoot: string, secret: string): RunnerConfig => ({
   RUNNER_SHARED_SECRET: secret,
   WORKSPACE_ROOT: workspaceRoot,
   TAR_EXECUTABLE: '/usr/bin/tar',
-  SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/athanor-snapshot'),
+  SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/garden-snapshot'),
   BROWSER_USE_DESKTOP_DISPLAY: false,
   BROWSER_CPU_NICE: 0,
   MAX_EXECUTION_SECONDS: 30,
@@ -75,11 +75,11 @@ interface ServiceView {
 
 describe('hibernating the computer and waking it again', () => {
   const harness = async () => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-hibernate-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-hibernate-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const secret = 'runner-hibernate-test-secret-at-least-32-chars';
     const app = await buildServer(runnerConfig(workspaceRoot, secret), {
-      // Stated, not measured. Writing `.athanor/services.json` passes the host disk floor, so on
+      // Stated, not measured. Writing `.garden/services.json` passes the host disk floor, so on
       // any machine under two per cent free this test used to answer 507 where it expects 200 -
       // a failure about the build machine wearing the costume of a failure about the code.
       // `checkpoints.test.ts` says the rest of it.
@@ -118,7 +118,7 @@ describe('hibernating the computer and waking it again', () => {
       return listed.json<{ processes: ServiceView[] }>().processes;
     };
     const records = async (): Promise<Array<{ pid?: number; name: string }>> =>
-      JSON.parse(await readFile(path.join(root, '.athanor', 'services.json'), 'utf8')) as Array<{
+      JSON.parse(await readFile(path.join(root, '.garden', 'services.json'), 'utf8')) as Array<{
         pid?: number;
         name: string;
       }>;

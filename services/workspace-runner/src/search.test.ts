@@ -109,7 +109,7 @@ describe('which browser answers a search', () => {
   });
 
   // The failure this whole route exists to end: the owner takes over their own browser, which
-  // athanor tells them to do, and every research task stops until they hand it back.
+  // garden tells them to do, and every research task stops until they hand it back.
   it('still searches while the owner is using the browser themselves', () => {
     expect(plan({ sessionHolder: 'user' })).toEqual(['isolated']);
     expect(plan({ sessionHolder: 'secure_input' })).toEqual(['isolated']);

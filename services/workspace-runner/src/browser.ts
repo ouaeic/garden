@@ -1,7 +1,7 @@
 import type { GuiLease, GuiNamespaceManager } from './gui-namespace.js';
 import type { BrowserActionProgress } from './browser-action-journal.js';
 import { BrowserTabJournal, recoverableTabUrl } from './browser-tab-journal.js';
-import type { BrowserRecovery } from '@athanor/contracts';
+import type { BrowserRecovery } from '@garden/contracts';
 import { signatureControl } from './human-input.js';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
@@ -24,10 +24,10 @@ import type {
   BrowserPrimitiveAction,
   ParallelWebReadResult,
   ResearchReadSource
-} from '@athanor/contracts';
-import type { BrowserTabCleanup, BrowserTabState } from '@athanor/contracts';
+} from '@garden/contracts';
+import type { BrowserTabCleanup, BrowserTabState } from '@garden/contracts';
 import { BrowserTabs, AGENT_TAB_LIMIT, TAB_IDLE_MS, TAB_SWEEP_MS } from './browser-tabs.js';
-import { assertPublicHttpUrl, isPublicHttpUrl, isPublicInternetAddress } from '@athanor/core';
+import { assertPublicHttpUrl, isPublicHttpUrl, isPublicInternetAddress } from '@garden/core';
 import {
   assertUserDataPath,
   clearStagedUploads,
@@ -565,7 +565,7 @@ const settlePage = async (page: Page, loadTimeout: number): Promise<boolean> => 
  * Ref numbers are handed out from a counter that never rewinds, so a number names one control until
  * that control leaves the page.
  *
- * The scan used to clear every `data-athanor-ref` in the whole document and then re-stamp from zero
+ * The scan used to clear every `data-garden-ref` in the whole document and then re-stamp from zero
  * inside whatever scope it had been given. A scoped re-read - which is the cheap loop the
  * form-filling procedure teaches - therefore silently re-pointed every ref the agent was holding:
  * `oc-0-3` had been Submit and became Postcode, and the next click landed on a different control
@@ -660,7 +660,7 @@ const saveDownloadFile = async (
 
 /** The frame ordinal baked into a snapshot ref, used as the first place to look for it. */
 export const refFrameOrdinal = (selector: string): number | null => {
-  const ordinal = /data-athanor-ref="oc-(\d+)-\d+"/.exec(selector)?.[1];
+  const ordinal = /data-garden-ref="oc-(\d+)-\d+"/.exec(selector)?.[1];
   return ordinal === undefined ? null : Number(ordinal);
 };
 
@@ -979,7 +979,7 @@ const scanFrameElements = async (
           let offset = 0;
           const taken = new Set<string>();
           for (const element of visible) {
-            const existing = element.getAttribute('data-athanor-ref') ?? '';
+            const existing = element.getAttribute('data-garden-ref') ?? '';
             if (existing.startsWith(`${prefix}-`) && !taken.has(existing)) {
               taken.add(existing);
               continue;
@@ -987,7 +987,7 @@ const scanFrameElements = async (
             const assigned = `${prefix}-${seed + offset}`;
             offset += 1;
             taken.add(assigned);
-            element.setAttribute('data-athanor-ref', assigned);
+            element.setAttribute('data-garden-ref', assigned);
           }
           const elements = visible.map((element) => {
             const field = element as HTMLInputElement;
@@ -1004,7 +1004,7 @@ const scanFrameElements = async (
             return {
               // Read back rather than recomputed: the element may be carrying a ref from an earlier
               // scan, which is the whole point of not clearing them.
-              ref: element.getAttribute('data-athanor-ref') ?? '',
+              ref: element.getAttribute('data-garden-ref') ?? '',
               tag: element.tagName.toLowerCase(),
               role: element.getAttribute('role'),
               ariaLabel: element.getAttribute('aria-label') ?? '',
@@ -1058,7 +1058,7 @@ const scanFrameElements = async (
                     selected: option.selected
                   }))
                 : null,
-              labelFor: control?.getAttribute('data-athanor-ref') ?? null,
+              labelFor: control?.getAttribute('data-garden-ref') ?? null,
               closedShadowRoot: opaque.has(element)
             };
           });
@@ -1114,10 +1114,10 @@ const scanFrameElements = async (
  * This used to be a second implementation living here, and the two had already drifted apart in
  * both directions: this copy refused unassigned IPv6 that core allowed, and allowed part of
  * 192.0.0.0/16 that core refused. One of them was always going to be the one missing a range, so
- * there is one, in @athanor/core, shared with the connector and mail paths.
+ * there is one, in @garden/core, shared with the connector and mail paths.
  */
 
-/** The wire shape lives in @athanor/contracts, where the worker reads it from too. */
+/** The wire shape lives in @garden/contracts, where the worker reads it from too. */
 export type ResearchReadResult = ResearchReadSource;
 
 /** Below this a page has said nothing, whatever the parse thought of it. */
@@ -1404,7 +1404,7 @@ const DOWNLOAD_TRIGGERING_ACTIONS: BrowserAction['type'][] = [
 
 /**
  * The words that make activating a control consequential - the destructive half of the safety floor
- * three documents promise. ATHANOR_BLUEPRINT.md:104, docs/AGENT_RUNTIME.md:416 and
+ * three documents promise. GARDEN_BLUEPRINT.md:104, docs/AGENT_RUNTIME.md:416 and
  * docs/CAPABILITIES.md:97 all say destructive operations still require confirmation in every mode.
  *
  * The list used to be only the transactional verbs, so it kept that promise for a control named
@@ -2204,7 +2204,7 @@ export class BrowserManager {
     // The profile is where `#start` puts it, derived from the root the session already carries
     // rather than stored twice - two copies of one path is how they come to disagree.
     for (const [, session] of this.#sessions)
-      await this.#dampen(path.join(session.root, '.athanor', 'browser'));
+      await this.#dampen(path.join(session.root, '.garden', 'browser'));
     const retired: string[] = [];
     for (const [workspaceId, session] of this.#sessions) {
       if (
@@ -2248,7 +2248,7 @@ export class BrowserManager {
         recovery.unavailable = true;
       }
     }
-    const profile = path.join(root, '.athanor', 'browser');
+    const profile = path.join(root, '.garden', 'browser');
     // systemd kills the runner's full process group on restart. Chromium can
     // nevertheless leave these exact profile locks behind after a crash.
     await Promise.all(
@@ -2286,14 +2286,14 @@ export class BrowserManager {
             ),
             ...gui?.environment,
             ...(gui
-              ? { ATHANOR_GUI_BROWSER: this.options.executablePath ?? chromium.executablePath() }
+              ? { GARDEN_GUI_BROWSER: this.options.executablePath ?? chromium.executablePath() }
               : {}),
             ...(attempt.headless ? {} : displayEnvironment)
           },
           acceptDownloads: true,
           // Without this Playwright stages downloads in a temp directory it deletes on close,
           // which both loses late arrivals and puts the bytes outside storage accounting.
-          downloadsPath: path.join(root, '.athanor', 'downloads')
+          downloadsPath: path.join(root, '.garden', 'downloads')
         });
         break;
       } catch (cause) {
@@ -2788,7 +2788,7 @@ export class BrowserManager {
         const { ref, ...rest } = scanned;
         elements.push({
           index: elements.length,
-          selector: `[data-athanor-ref="${ref}"]`,
+          selector: `[data-garden-ref="${ref}"]`,
           ...rest
         });
       }
@@ -3116,7 +3116,7 @@ export class BrowserManager {
           guiEnvironment: gui
             ? {
                 ...gui.environment,
-                ATHANOR_GUI_BROWSER: this.options.executablePath ?? driver.executablePath()
+                GARDEN_GUI_BROWSER: this.options.executablePath ?? driver.executablePath()
               }
             : undefined
         });

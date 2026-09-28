@@ -1,4 +1,4 @@
-import type { SurfacePresence, WorkspaceSurfaces } from '@athanor/contracts';
+import type { SurfacePresence, WorkspaceSurfaces } from '@garden/contracts';
 import { resolveExecutable } from './command-policy.js';
 import { agentSearchPath } from './execution.js';
 import { chromiumDriver } from './playwright.js';
@@ -38,7 +38,7 @@ import { chromiumDriver } from './playwright.js';
  * has never downloaded the browser reports a plausible path to a file that does not exist.
  *
  * A throw is the probe failing to get an answer rather than a box that has no browser, so it is
- * `unknown` and the catalogue stays whole. @see surfaceDescribable in `@athanor/contracts`. Two
+ * `unknown` and the catalogue stays whole. @see surfaceDescribable in `@garden/contracts`. Two
  * things throw there and both mean that: the registry refusing to name a browser, and - since the
  * driver is opened on demand, @see chromiumDriver - `playwright-core` not being installable at all.
  *

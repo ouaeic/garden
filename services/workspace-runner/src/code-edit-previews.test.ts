@@ -63,7 +63,7 @@ describe('checked native code edits', () => {
     for (const file of f.paths)
       expect(await readFile(path.join(f.root, file), 'utf8')).toBe('const renamed = 1;\n');
     const persisted = await readFile(
-      path.join(f.root, '.athanor/code-edits', f.id + '.json'),
+      path.join(f.root, '.garden/code-edits', f.id + '.json'),
       'utf8'
     );
     expect(persisted).not.toContain('const renamed');
@@ -87,7 +87,7 @@ describe('checked native code edits', () => {
   });
   it('reconciles a crash after a write from the durable intent', async () => {
     const f = await fixture();
-    const file = path.join(f.root, '.athanor/code-edits', f.id + '.json');
+    const file = path.join(f.root, '.garden/code-edits', f.id + '.json');
     const record = JSON.parse(await readFile(file, 'utf8')) as {
       state: string;
       files: Array<{ status: string }>;

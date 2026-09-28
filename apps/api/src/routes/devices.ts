@@ -7,7 +7,7 @@
  */
 
 import { randomBytes } from 'node:crypto';
-import { sha256 } from '@athanor/core';
+import { sha256 } from '@garden/core';
 import { z } from 'zod';
 import { CONNECTION_TICKET_VERSION, MDNS_PORT, MDNS_SERVICE } from '../context.js';
 import { requireUser } from '../http/auth-hook.js';

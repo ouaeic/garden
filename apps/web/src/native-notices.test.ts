@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Task } from '@athanor/contracts';
+import type { Task } from '@garden/contracts';
 import { createTaskNotifier } from './native-notices.js';
 import { get } from './client.js';
 import {

@@ -117,7 +117,7 @@ export const TaskPresentation = z.object({
    * to read backwards to find out what had been produced or what was still wrong.
    *
    * Absent while the run is going, and absent on a run that ended without a finish - a crash or a
-   * cancellation has no account of itself to give, and inventing one here would be athanor putting
+   * cancellation has no account of itself to give, and inventing one here would be garden putting
    * words in the model's mouth.
    */
   outcome: z
@@ -129,7 +129,7 @@ export const TaskPresentation = z.object({
        *
        * `finish` declares them and they are the model's own unverified strings - a run that has
        * read a hostile page can declare any address it likes, and a card that printed them would
-       * be athanor vouching for a link it never resolved. `results` above is the answer to "what
+       * be garden vouching for a link it never resolved. `results` above is the answer to "what
        * can I open": every entry there is a preview, artifact or file this box actually holds, and
        * the presentation's own test asserts a declared address never reaches the owner.
        */

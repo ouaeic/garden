@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { MEMORY_KINDS, MEMORY_PACK_QUOTAS, memoryIndexKey, planMemoryQuery } from '@athanor/core';
+import { MEMORY_KINDS, MEMORY_PACK_QUOTAS, memoryIndexKey, planMemoryQuery } from '@garden/core';
 import { createDatabase, migrateDatabase, type Database } from './database.js';
 import { DataStore } from './store.js';
 import {
@@ -270,7 +270,7 @@ describe('memory retrieval eval', () => {
   });
 
   it('finds a fact about a named service from the words a person asks it by', () => {
-    // Subject 'athanor-relay' shares no lexeme with 'relay', so before the alias surface this
+    // Subject 'garden-relay' shares no lexeme with 'relay', so before the alias surface this
     // question reached no channel at all.
     const byId = new Map(packRun.probes.map((probe) => [probe.id, probe]));
     expect(byId.get('relay-port-plain')?.missed).toEqual([]);

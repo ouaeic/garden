@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
-import { capabilityAudience, signCapabilityToken } from '@athanor/core';
+import { capabilityAudience, signCapabilityToken } from '@garden/core';
 import type { RunnerConfig } from './config.js';
 import { DesktopManager } from './desktop.js';
 import { ensureWorkspace } from './files.js';
@@ -29,7 +29,7 @@ describe('a preview whose app is not running', () => {
    * pages are HTML for exactly this reason and this one sits a layer below them.
    */
   it('answers the browser with a page rather than with JSON', async () => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-preview-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-preview-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const secret = 'runner-preview-test-secret-at-least-32-characters';
     const config = {
@@ -38,7 +38,7 @@ describe('a preview whose app is not running', () => {
       RUNNER_SHARED_SECRET: secret,
       WORKSPACE_ROOT: workspaceRoot,
       TAR_EXECUTABLE: '/usr/bin/tar',
-      SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/athanor-snapshot'),
+      SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/garden-snapshot'),
       BROWSER_USE_DESKTOP_DISPLAY: false,
       BROWSER_CPU_NICE: 0,
       MAX_EXECUTION_SECONDS: 30,
@@ -96,7 +96,7 @@ describe('workspace export', () => {
   });
 
   it('streams workspace files and artifacts without browser profile data', async () => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-export-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-export-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const secret = 'runner-export-test-secret-at-least-32-characters';
     const config: RunnerConfig = {
@@ -105,7 +105,7 @@ describe('workspace export', () => {
       RUNNER_SHARED_SECRET: secret,
       WORKSPACE_ROOT: workspaceRoot,
       TAR_EXECUTABLE: '/usr/bin/tar',
-      SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/athanor-snapshot'),
+      SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/garden-snapshot'),
       BROWSER_USE_DESKTOP_DISPLAY: false,
       BROWSER_CPU_NICE: 0,
       MAX_EXECUTION_SECONDS: 30,
@@ -132,8 +132,8 @@ describe('workspace export', () => {
     const root = path.join(workspaceRoot, id);
     await ensureWorkspace(root);
     await writeFile(path.join(root, 'workspace', 'report.txt'), 'private report');
-    await writeFile(path.join(root, '.athanor', 'artifacts', 'chart.svg'), '<svg/>');
-    await writeFile(path.join(root, '.athanor', 'browser', 'Cookies'), 'must-not-export');
+    await writeFile(path.join(root, '.garden', 'artifacts', 'chart.svg'), '<svg/>');
+    await writeFile(path.join(root, '.garden', 'browser', 'Cookies'), 'must-not-export');
     const token = signCapabilityToken(
       {
         sub: 'user',
@@ -154,13 +154,13 @@ describe('workspace export', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.headers['content-type']).toContain('application/gzip');
-    expect(response.headers['content-disposition']).toContain(`athanor-workspace-${id}.tar.gz`);
+    expect(response.headers['content-disposition']).toContain(`garden-workspace-${id}.tar.gz`);
     const archive = gunzipSync(response.rawPayload).toString('utf8');
     expect(archive).toContain('workspace/report.txt');
     expect(archive).toContain('private report');
-    expect(archive).toContain('.athanor/artifacts/chart.svg');
+    expect(archive).toContain('.garden/artifacts/chart.svg');
     expect(archive).not.toContain('must-not-export');
-    expect(archive).not.toContain('.athanor/browser');
+    expect(archive).not.toContain('.garden/browser');
 
     const missingToken = signCapabilityToken(
       {
@@ -175,7 +175,7 @@ describe('workspace export', () => {
     );
     const missing = await app.inject({
       method: 'GET',
-      url: `/v1/workspaces/${id}/file?path=workspace%2FATHANOR.md`,
+      url: `/v1/workspaces/${id}/file?path=workspace%2FGARDEN.md`,
       headers: { authorization: `Bearer ${missingToken}` }
     });
     expect(missing.statusCode).toBe(404);
@@ -193,7 +193,7 @@ describe('workspace export', () => {
     // The browser and desktop streams have always done this. Without it here a sixty-second
     // token bought a shell on the box that ran until one side hung up, with nothing able to
     // revoke it in between.
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-terminal-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-terminal-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const secret = 'runner-terminal-test-secret-at-least-32-characters';
     const config: RunnerConfig = {
@@ -202,7 +202,7 @@ describe('workspace export', () => {
       RUNNER_SHARED_SECRET: secret,
       WORKSPACE_ROOT: workspaceRoot,
       TAR_EXECUTABLE: '/usr/bin/tar',
-      SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/athanor-snapshot'),
+      SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/garden-snapshot'),
       BROWSER_USE_DESKTOP_DISPLAY: false,
       BROWSER_CPU_NICE: 0,
       MAX_EXECUTION_SECONDS: 30,
@@ -245,7 +245,7 @@ describe('workspace export', () => {
     );
     const socket = new WebSocket(
       `${address.replace('http://', 'ws://')}/v1/workspaces/${id}/terminal`,
-      ['athanor-capability', token]
+      ['garden-capability', token]
     );
     const closed = await new Promise<{ code: number; reason: string }>((resolve, reject) => {
       socket.once('close', (code, reason) => resolve({ code, reason: reason.toString('utf8') }));
@@ -262,7 +262,7 @@ describe('turn checkpoints over the runner API', () => {
   });
 
   it('creates, previews and restores one, and refuses a token without workspace.manage', async () => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-checkpoint-route-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-checkpoint-route-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const secret = 'runner-checkpoint-test-secret-at-least-32-chars';
     const config: RunnerConfig = {
@@ -271,7 +271,7 @@ describe('turn checkpoints over the runner API', () => {
       RUNNER_SHARED_SECRET: secret,
       WORKSPACE_ROOT: workspaceRoot,
       TAR_EXECUTABLE: '/usr/bin/tar',
-      SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/athanor-snapshot'),
+      SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/garden-snapshot'),
       BROWSER_USE_DESKTOP_DISPLAY: false,
       BROWSER_CPU_NICE: 0,
       MAX_EXECUTION_SECONDS: 30,
@@ -308,7 +308,7 @@ describe('turn checkpoints over the runner API', () => {
     const root = path.join(workspaceRoot, id);
     await ensureWorkspace(root);
     await writeFile(path.join(root, 'workspace', 'notes.md'), 'the good version\n');
-    await writeFile(path.join(root, '.athanor', 'browser', 'Cookies'), 'session=live');
+    await writeFile(path.join(root, '.garden', 'browser', 'Cookies'), 'session=live');
 
     const manage = (nonce: string, method: string, route: string): string =>
       signCapabilityToken(
@@ -335,7 +335,7 @@ describe('turn checkpoints over the runner API', () => {
     expect(created.json()).toMatchObject({ id: checkpointId, mechanism: 'content', pruned: [] });
 
     await writeFile(path.join(root, 'workspace', 'notes.md'), 'the bad version\n');
-    await writeFile(path.join(root, '.athanor', 'browser', 'Cookies'), 'session=signed-in-since');
+    await writeFile(path.join(root, '.garden', 'browser', 'Cookies'), 'session=signed-in-since');
 
     const preview = await app.inject({
       method: 'GET',
@@ -385,7 +385,7 @@ describe('turn checkpoints over the runner API', () => {
       'the good version\n'
     );
     // The sign-in that happened after the checkpoint survives the rewind, which is the point.
-    await expect(readFile(path.join(root, '.athanor', 'browser', 'Cookies'), 'utf8')).resolves.toBe(
+    await expect(readFile(path.join(root, '.garden', 'browser', 'Cookies'), 'utf8')).resolves.toBe(
       'session=signed-in-since'
     );
   });
@@ -403,7 +403,7 @@ describe('file organisation and toolchain routes', () => {
     RUNNER_SHARED_SECRET: secret,
     WORKSPACE_ROOT: workspaceRoot,
     TAR_EXECUTABLE: '/usr/bin/tar',
-    SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/athanor-snapshot'),
+    SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/garden-snapshot'),
     BROWSER_USE_DESKTOP_DISPLAY: false,
     BROWSER_CPU_NICE: 0,
     MAX_EXECUTION_SECONDS: 30,
@@ -426,7 +426,7 @@ describe('file organisation and toolchain routes', () => {
   });
 
   const harness = async () => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-files-route-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-files-route-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const secret = 'runner-files-route-secret-at-least-32-characters';
     const app = await buildServer(runnerConfig(workspaceRoot, secret));
@@ -552,7 +552,7 @@ describe('file organisation and toolchain routes', () => {
       headers: {
         authorization: `Bearer ${token(['files.write'], { method: 'POST', path: `/v1/workspaces/${id}/files/rename` })}`
       },
-      payload: { from: '.athanor/browser/Cookies', to: 'workspace/cookies' }
+      payload: { from: '.garden/browser/Cookies', to: 'workspace/cookies' }
     });
     expect(profile.statusCode).toBe(400);
     const readOnly = await app.inject({
@@ -599,7 +599,7 @@ describe('file organisation and toolchain routes', () => {
       method: 'GET',
       url: `${filesPath}?path=workspace`,
       headers: {
-        authorization: `Bearer ${token(['files.read'], { method: 'GET', path: `${filesPath}?path=.athanor/artifacts` })}`
+        authorization: `Bearer ${token(['files.read'], { method: 'GET', path: `${filesPath}?path=.garden/artifacts` })}`
       }
     });
     expect(differentQuery.statusCode).toBe(200);
@@ -619,8 +619,8 @@ describe('file organisation and toolchain routes', () => {
      */
     const { app, id, root, token } = await harness();
     await writeFile(path.join(root, 'workspace', 'report.md'), 'w'.repeat(1_000));
-    await writeFile(path.join(root, '.athanor', 'artifacts', 'chart.png'), 'a'.repeat(200));
-    await writeFile(path.join(root, '.athanor', 'browser', 'Cookies'), 'b'.repeat(30));
+    await writeFile(path.join(root, '.garden', 'artifacts', 'chart.png'), 'a'.repeat(200));
+    await writeFile(path.join(root, '.garden', 'browser', 'Cookies'), 'b'.repeat(30));
     // Four hundred times the owner's own data, which is the ratio a real toolchain cache arrives in.
     await mkdir(path.join(agentHome(root), '.cargo'), { recursive: true });
     await writeFile(path.join(agentHome(root), '.cargo', 'registry'), 'h'.repeat(500_000));
@@ -663,11 +663,11 @@ describe('file organisation and toolchain routes', () => {
       headers: {
         authorization: `Bearer ${token(['exec'], { method: 'POST', path: `/v1/workspaces/${id}/toolchain/probe` })}`
       },
-      payload: { binaries: ['sh', 'athanor-definitely-absent'] }
+      payload: { binaries: ['sh', 'garden-definitely-absent'] }
     });
     expect(probe.json()).toEqual({
       present: ['sh'],
-      missing: ['athanor-definitely-absent']
+      missing: ['garden-definitely-absent']
     });
   });
 
@@ -693,7 +693,7 @@ describe('file organisation and toolchain routes', () => {
         .statusCode
     ).toBe(403);
     expect((await request('../../escape')).statusCode).toBe(400);
-    expect((await request('.athanor/browser/Cookies')).statusCode).toBe(400);
+    expect((await request('.garden/browser/Cookies')).statusCode).toBe(400);
   });
 
   it('will not prepare a recording for a token that may only read files elsewhere', async () => {
@@ -790,7 +790,7 @@ describe('file organisation and toolchain routes', () => {
    * is precisely the shape of the defect being closed.
    */
   it("holds the second task in a workspace to its own reads and not to the first task's", async () => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-slot-route-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-slot-route-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const secret = 'runner-slot-route-secret-at-least-32-characters';
     /*
@@ -886,7 +886,7 @@ describe('taking the machine over on one surface', () => {
   });
 
   it('refuses the agent the browser once the owner has taken the desktop', async () => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-one-holder-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-one-holder-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const secret = 'runner-one-holder-secret-at-least-32-characters';
     const id = '00000000-0000-4000-8000-0000000000d7';
@@ -911,7 +911,7 @@ describe('taking the machine over on one surface', () => {
       RUNNER_SHARED_SECRET: secret,
       WORKSPACE_ROOT: workspaceRoot,
       TAR_EXECUTABLE: '/usr/bin/tar',
-      SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/athanor-snapshot'),
+      SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/garden-snapshot'),
       // The configuration this defect only exists in: one screen, two surfaces onto it.
       BROWSER_USE_DESKTOP_DISPLAY: true,
       BROWSER_CPU_NICE: 0,
@@ -985,7 +985,7 @@ describe('taking the machine over on one surface', () => {
    * the scope check, before the browser or the disk is touched, on its own and inside a batch.
    */
   it('refuses a screenshot on the action route without the write scope', async () => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-screenshot-scope-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-screenshot-scope-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const secret = 'runner-screenshot-scope-secret-at-least-32-chars';
     const id = '00000000-0000-4000-8000-0000000000d8';
@@ -1001,7 +1001,7 @@ describe('taking the machine over on one surface', () => {
       RUNNER_SHARED_SECRET: secret,
       WORKSPACE_ROOT: workspaceRoot,
       TAR_EXECUTABLE: '/usr/bin/tar',
-      SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/athanor-snapshot'),
+      SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/garden-snapshot'),
       BROWSER_USE_DESKTOP_DISPLAY: false,
       BROWSER_CPU_NICE: 0,
       MAX_EXECUTION_SECONDS: 30,
@@ -1101,7 +1101,7 @@ describe('what the runner says about its own boundaries', () => {
     confine: boolean | undefined,
     helper: string | undefined
   ): Promise<{ app: Awaited<ReturnType<typeof buildServer>>; workspaceRoot: string }> => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-rung-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-rung-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const config = {
       RUNNER_HOST: '127.0.0.1',
@@ -1109,7 +1109,7 @@ describe('what the runner says about its own boundaries', () => {
       RUNNER_SHARED_SECRET: 'runner-rung-test-secret-at-least-32-characters',
       WORKSPACE_ROOT: workspaceRoot,
       TAR_EXECUTABLE: '/usr/bin/tar',
-      SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/athanor-snapshot'),
+      SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/garden-snapshot'),
       BROWSER_USE_DESKTOP_DISPLAY: false,
       BROWSER_CPU_NICE: 0,
       MAX_EXECUTION_SECONDS: 30,
@@ -1138,9 +1138,9 @@ describe('what the runner says about its own boundaries', () => {
   };
 
   const stubHelper = async (): Promise<string> => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-helper-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-helper-'));
     disposers.push(() => rm(root, { recursive: true, force: true }));
-    const helper = path.join(root, 'athanor-sandbox');
+    const helper = path.join(root, 'garden-sandbox');
     await writeFile(helper, '#!/bin/sh\nexit 0\n');
     await chmod(helper, 0o755);
     return helper;
@@ -1171,7 +1171,7 @@ describe('what the runner says about its own boundaries', () => {
    * The other thing this route now answers: what a restart would destroy.
    *
    * The names are checked as exact keys rather than with `toMatchObject` on a shape, because the
-   * only consumer is a `sed` pattern in scripts/athanor and a typo in either spelling is invisible
+   * only consumer is a `sed` pattern in scripts/garden and a typo in either spelling is invisible
    * to the compiler. `backgroundLongestRemainingMs` is null and not 0 on an idle box - the update
    * distinguishes "nothing running" from "running, no deadline", and 0 would read as the latter.
    *
@@ -1247,7 +1247,7 @@ describe('what the runner says about its own boundaries', () => {
     expect((await stat(home)).isDirectory()).toBe(true);
     // WHERE it is, spelled as one equality rather than as a prefix test. `.home` at the container
     // root: outside `workspace/`, which is what keeps a Rust toolchain's 88,021 files out of
-    // CHECKPOINT_CONTENT and out of the workspace storage quota, and outside `.athanor`, which is
+    // CHECKPOINT_CONTENT and out of the workspace storage quota, and outside `.garden`, which is
     // the runner's alone. A prefix test would pass on `workspace/.home` and on `.home/anything`
     // alike; this one fails the moment the location moves in either direction, which is the whole
     // reason it is written this way - the assertion it replaced read the first path segment and
@@ -1285,7 +1285,7 @@ describe('a desktop action posted after the screen moved under it', () => {
   });
 
   it('refuses it until the agent has observed again, over the real routes', async () => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-desktop-stale-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-desktop-stale-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const secret = 'runner-desktop-stale-secret-at-least-32-characters';
     const id = '00000000-0000-4000-8000-0000000000d8';
@@ -1335,7 +1335,7 @@ describe('a desktop action posted after the screen moved under it', () => {
       RUNNER_SHARED_SECRET: secret,
       WORKSPACE_ROOT: workspaceRoot,
       TAR_EXECUTABLE: '/usr/bin/tar',
-      SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/athanor-snapshot'),
+      SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/garden-snapshot'),
       BROWSER_USE_DESKTOP_DISPLAY: false,
       BROWSER_CPU_NICE: 0,
       MAX_EXECUTION_SECONDS: 30,

@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { SpendWindow } from '@athanor/contracts';
-import { decryptJson, unwrapDataKey } from '@athanor/core';
-import type { DataStore, TaskRecord } from '@athanor/data';
+import { SpendWindow } from '@garden/contracts';
+import { decryptJson, unwrapDataKey } from '@garden/core';
+import type { DataStore, TaskRecord } from '@garden/data';
 import { revealedTaskEvent } from './context.js';
 
 const PausedRequest = z.object({

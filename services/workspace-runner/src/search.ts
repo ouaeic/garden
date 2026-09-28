@@ -14,7 +14,7 @@
  * closed that host for the rest of the session, so the first challenge took the whole web
  * capability off the task - and the tool's own advice, carry on elsewhere, had no elsewhere to
  * point at. A search required the agent to be holding the browser, so every research task stopped
- * dead while the owner was using their own Chromium, which athanor actively encourages them to do.
+ * dead while the owner was using their own Chromium, which garden actively encourages them to do.
  * And all three delegated specialists contended on that one session, so one wall took down the lead
  * and every specialist at once.
  *
@@ -65,7 +65,7 @@ export type SearchRoute = 'isolated' | 'session';
  * lose: waiting it out helps when the challenge was about a moment, and does nothing at all when it
  * was about the address, which is the usual case on a server. `searchWallMessage` no longer promises
  * otherwise. The route that does work from a datacenter address is the provider's own search, which
- * `resolveWebToolPlan` in @athanor/contracts hands this box by default.
+ * `resolveWebToolPlan` in @garden/contracts hands this box by default.
  */
 export const SEARCH_WALL_BACKOFF_MS = 60_000;
 

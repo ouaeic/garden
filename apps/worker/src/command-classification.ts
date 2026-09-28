@@ -17,7 +17,7 @@
  */
 import { posix } from 'node:path';
 import { isIP } from 'node:net';
-import { reachOfBindAddress, type NetworkReach } from '@athanor/core';
+import { reachOfBindAddress, type NetworkReach } from '@garden/core';
 import { classifyDestination } from './egress.js';
 import { textValue } from './values.js';
 
@@ -758,7 +758,7 @@ const escapingRedirect = (body: string): boolean => {
 /**
  * A delete written through a language runtime, whoever the receiver happens to be called.
  *
- * This used to require the literal text `fs.`, so `require('fs').rmSync('/home/athanor')` and the
+ * This used to require the literal text `fs.`, so `require('fs').rmSync('/home/garden')` and the
  * same call through any local name went through with no card at all - while `rm -f` on the
  * workspace's own scratch directory stopped the task. The control refused the honest phrasing and
  * missed the evasive one. Matching the method rather than the receiver closes that, and these
@@ -1621,7 +1621,7 @@ export const shellWriteTargets = (args: Record<string, unknown>): string[] | nul
  * The trees the turn's undo point restores, as the path segments they are.
  *
  * `CHECKPOINT_CONTENT` (services/workspace-runner/src/checkpoints.ts) is
- * `['workspace', '.athanor/artifacts']`. It is copied rather than imported because `apps/worker`
+ * `['workspace', '.garden/artifacts']`. It is copied rather than imported because `apps/worker`
  * does not depend on the runner package and must not start to for one array; the copy is pinned to
  * the original by a test in `command-classification.test.ts` that reads the runner's own source, so
  * a third entry appearing there fails here rather than silently narrowing what this file is willing
@@ -1629,7 +1629,7 @@ export const shellWriteTargets = (args: Record<string, unknown>): string[] | nul
  */
 export const CHECKPOINT_CONTENT: readonly (readonly string[])[] = [
   ['workspace'],
-  ['.athanor', 'artifacts']
+  ['.garden', 'artifacts']
 ];
 
 /**
@@ -1646,7 +1646,7 @@ export const CHECKPOINT_CONTENT: readonly (readonly string[])[] = [
  * TWO SPELLINGS OF ONE PLACE. `shell` runs in `workspace/`, so a bare `dist` is `workspace/dist`;
  * and the rest of this repository writes that same file as `workspace/dist`, because the runner
  * folds a bare name into `workspace/` for a file path and for a cwd alike. So a leading
- * `workspace` or `.athanor` segment is read from the
+ * `workspace` or `.garden` segment is read from the
  * workspace root and every other relative path is read from the cwd, which makes the two spellings
  * one answer - the same equivalence `isDurableInstructionPath` already relies on. It is one answer
  * only where the cwd is at or inside a checkpointed tree, which is the ordinary case and the only
@@ -1660,11 +1660,11 @@ export const CHECKPOINT_CONTENT: readonly (readonly string[])[] = [
  *     inside no checkpoint at all. A rule that asked "inside the root" would have freed a delete
  *     of the agent's own shell configuration. @see `AGENT_HOME` below for why `~` cannot be read
  *     as the root itself.
- *   - `workspace` and `.athanor/artifacts` are not inside themselves. Whether a rewind recreates a
+ *   - `workspace` and `.garden/artifacts` are not inside themselves. Whether a rewind recreates a
  *     top-level tree that was removed outright is not something this file can know, so
  *     `rm -rf workspace` keeps its card.
  *   - An absolute path is outside by construction. The workspace root is a real directory whose
- *     name this pure function is never handed, so `/home/athanor/ws-1/workspace/dist` is not
+ *     name this pure function is never handed, so `/home/garden/ws-1/workspace/dist` is not
  *     recognised as the workspace and keeps its card. That is a card the owner did not need, and it
  *     is the direction to be wrong in: the alternative is matching `workspace` anywhere inside an
  *     absolute path, which would free `/home/other/workspace-backup`.
@@ -1709,10 +1709,10 @@ export const CHECKPOINT_CONTENT: readonly (readonly string[])[] = [
  * This function read `~` as the root ITSELF, which was true while `HOME` was `workspaceRoot` and
  * became a live hole the moment it stopped being. Measured through the shipped
  * `approvalRequirement` in autonomous with `~` read as the root: `rm -rf ~/workspace/dist` and
- * `rm -rf ~/.athanor/artifacts/a.png` both raised NO card, because they resolved to
- * `<root>/workspace/dist` and `<root>/.athanor/artifacts/a.png` and answered "inside the
+ * `rm -rf ~/.garden/artifacts/a.png` both raised NO card, because they resolved to
+ * `<root>/workspace/dist` and `<root>/.garden/artifacts/a.png` and answered "inside the
  * checkpoint" - while what they actually delete is `<root>/.home/workspace/dist` and
- * `<root>/.home/.athanor/artifacts/a.png`, which no rewind walks and nothing puts back. Both card
+ * `<root>/.home/.garden/artifacts/a.png`, which no rewind walks and nothing puts back. Both card
  * again with the segment in front. Nothing was freed by adding it: `~/.ssh` and `~/.cargo/registry`
  * were outside the checkpoint under either reading, and `~/../workspace/dist` - which used to climb
  * out of the root and answer null - now resolves to the real `workspace/dist` and is correctly
@@ -1732,7 +1732,7 @@ export const AGENT_HOME: readonly string[] = ['.home'];
  * judged in one directory and performed in another is the hole this whole rule is about.
  */
 export const CONTAINER_ONLY_DIRECTORIES: ReadonlySet<string> = new Set([
-  '.athanor',
+  '.garden',
   '.config',
   ...AGENT_HOME
 ]);
@@ -1759,7 +1759,7 @@ const rootRelative = (spelling: string, base: readonly string[]): string[] | nul
   // `~other` is somebody else's home directory and is not the agent's; only a bare `~` is HOME.
   if (first.startsWith('~') && first !== '~') return null;
   /*
-   * The root-relative reading of `workspace/…` and `.athanor/…` is an EQUIVALENCE, and it holds
+   * The root-relative reading of `workspace/…` and `.garden/…` is an EQUIVALENCE, and it holds
    * only where the two spellings really are one place.
    *
    * A relative path means whatever the working directory is when the command runs, so
@@ -1782,7 +1782,7 @@ const rootRelative = (spelling: string, base: readonly string[]): string[] | nul
   const rooted =
     first === '~'
       ? [...AGENT_HOME, ...written.slice(1)]
-      : (first === 'workspace' || first === '.athanor') && rootRelativeSpellingHolds
+      : (first === 'workspace' || first === '.garden') && rootRelativeSpellingHolds
         ? written
         : [...base, ...written];
   const resolved: string[] = [];
@@ -4093,7 +4093,7 @@ export const DOWNLOAD_QUARANTINE_PREFIXES = [
   // there, and agent.ts saves it here - so the bytes a stranger e-mailed arrived in the workspace
   // wearing the owner's own clothes. The connector read taints the turn that fetched it; a later
   // task reading the file back was judged clean, and on a clean turn the egress budget is not
-  // charged, a write to ATHANOR.md raises no card and a read of any host raises no card.
+  // charged, a write to GARDEN.md raises no card and a read of any host raises no card.
   'workspace/mail/',
   'mail/'
 ];
@@ -4108,7 +4108,7 @@ export const DOWNLOAD_QUARANTINE_PREFIXES = [
  * against the shipped predicate: `workspace/downloads/inbound/a.json` was quarantined and
  * `workspace/./downloads/inbound/a.json` and `workspace//downloads/inbound/a.json` were not, while
  * all three open the same bytes. One inserted character bought a read of a stranger's file on a
- * turn the floor then judged clean - no egress charge, no card on a write to ATHANOR.md, no card on
+ * turn the floor then judged clean - no egress charge, no card on a write to GARDEN.md, no card on
  * a read of any host.
  *
  * `path.posix.normalize` is what the comparison needed and `path.resolve` is not: resolve would
@@ -4577,7 +4577,7 @@ const sshRemoteCommand = (rest: readonly string[]): string[] => {
  * WHAT THE UNDO POINT COVERS, which is the fact this whole section is keyed on.
  *
  * `CHECKPOINT_CONTENT` (services/workspace-runner/src/checkpoints.ts) is `['workspace',
- * '.athanor/artifacts']`. That is the whole of what a rewind restores, and it decides which of the
+ * '.garden/artifacts']`. That is the whole of what a rewind restores, and it decides which of the
  * commands below are worth a card and which are friction. `rm -rf node_modules` lands inside it and
  * cards anyway, from a rule older than the checkpoint; `dropdb production`, `redis-cli flushall`,
  * `docker volume rm pgdata` and `aws s3 rm --recursive` all land outside it and raised NOTHING in

@@ -1,4 +1,4 @@
-import type { Task } from '@athanor/contracts';
+import type { Task } from '@garden/contracts';
 import { nativeNotificationPermission, notifyNative } from './native.js';
 import { get } from './client.js';
 

@@ -1,13 +1,13 @@
 [package]
-name = "athanor-desktop"
+name = "garden-desktop"
 version = "0.2.0"
-description = "Native shell and permission broker for athanor"
-authors = ["athanor contributors"]
+description = "Native shell and permission broker for garden"
+authors = ["garden contributors"]
 license = "AGPL-3.0-only"
 edition = "2021"
 
 [lib]
-name = "athanor_desktop_lib"
+name = "garden_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

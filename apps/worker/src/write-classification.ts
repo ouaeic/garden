@@ -119,7 +119,7 @@ export const isMutatingToolCall = (name: string, args: Record<string, unknown> =
           argument === 'publish'
       );
     // Every other classifier in this file was converted to commandScript and this one was not, so
-    // `bash -lc 'echo … >> workspace/ATHANOR.md'` stopped for the owner's review and the identical
+    // `bash -lc 'echo … >> workspace/GARDEN.md'` stopped for the owner's review and the identical
     // script handed to the same interpreter on stdin raised no card at all - writtenPaths gates on
     // this predicate, so the durable-instruction rule never saw the path. An interpreter with a
     // script is a writer wherever the script was written down.
@@ -208,9 +208,9 @@ export const requiresAcceptanceChecks = (
  *
  * Matched on the tail of the path rather than anchored at its front. `resolveInside` in the runner
  * accepts an absolute path that lands inside the workspace exactly as happily as a relative one, so
- * a front-anchored rule recognised `workspace/ATHANOR.md` and missed
- * `/home/athanor/ws-1/workspace/ATHANOR.md` - the same file, written by the same call. A bare
- * `ATHANOR.md` still counts, because `shell` runs in `workspace` by default and that is where a
+ * a front-anchored rule recognised `workspace/GARDEN.md` and missed
+ * `/home/garden/ws-1/workspace/GARDEN.md` - the same file, written by the same call. A bare
+ * `GARDEN.md` still counts, because `shell` runs in `workspace` by default and that is where a
  * relative redirect lands.
  */
 /**
@@ -218,7 +218,7 @@ export const requiresAcceptanceChecks = (
  *
  * The completion contract demands evidence observed after the last change, which is right for work
  * and wrong for bookkeeping: an agent that finished, cited what it had proved, and then wrote the
- * outcome into workspace/ATHANOR.md had just made a new last change, so its own record-keeping
+ * outcome into workspace/GARDEN.md had just made a new last change, so its own record-keeping
  * invalidated the evidence it had already gathered. It then read the brief back to satisfy the
  * gate, which proves only that a file it just wrote contains what it wrote.
  *
@@ -290,7 +290,7 @@ export const isDurableInstructionPath = (path: string): boolean => {
     .split(/[\\/]+/)
     .filter((segment) => segment && segment !== '.');
   const last = segments.at(-1) ?? '';
-  if (['garden.md', 'athanor.md', 'open_cloud.md', 'agents.md'].includes(last))
+  if (['garden.md', 'open_cloud.md', 'agents.md'].includes(last))
     return segments.length === 1 || segments.at(-2) === 'workspace';
   const skills = segments.indexOf('skills');
   if (skills < 0 || skills === segments.length - 1) return false;
@@ -313,7 +313,7 @@ export const isDurableInstructionPath = (path: string): boolean => {
  * whether or not anything hostile has been read yet.
  *
  * Matched on segments rather than anchored, for the same reason the durable rule is: `~/.bashrc`,
- * `.bashrc`, `../.bashrc` and `/home/athanor/ws-1/.bashrc` are one file written by one call, and a
+ * `.bashrc`, `../.bashrc` and `/home/garden/ws-1/.bashrc` are one file written by one call, and a
  * rule that only recognised one spelling is a rule one spelling away from being no rule.
  *
  * TWO SETS, because the reach of the tool decides whether the write can land on the file at all.
@@ -365,11 +365,11 @@ const XDG_DEFERRED_EXECUTION_DIRECTORIES = new Set(['claude', 'codex', 'opencode
  * a shell, and `~/.bashrc` there is the real one. `file_write`, `file_patch` and `print_pdf`
  * cannot, and the reason is a bound rather than a habit: every path they are given goes through
  * `assertUserDataPath` (services/workspace-runner/src/files.ts), which admits only `workspace/` and
- * `.athanor/artifacts`, refuses anything absolute or stepping up through `..`, and folds a bare
+ * `.garden/artifacts`, refuses anything absolute or stepping up through `..`, and folds a bare
  * name into `workspace/`. `HOME` is `<workspaceRoot>/.home` - at the container root, BESIDE
  * `workspace/` and not inside it (execution.ts `agentHome`, over `AGENT_HOME` in files.ts) - so
  * `file_write('.bashrc')` writes `workspace/.bashrc`, a file no login shell has ever read, and
- * `file_write('../.zshenv')` and `file_write('/home/athanor/ws-1/.bash_profile')` are refused
+ * `file_write('../.zshenv')` and `file_write('/home/garden/ws-1/.bash_profile')` are refused
  * outright before any of this runs.
  *
  * WHAT WOULD BREAK IT is `$HOME` moving back under `workspace/`, which is where the build wave
@@ -440,7 +440,7 @@ export const writtenPaths = (name: string, args: Record<string, unknown>): strin
   if (name === 'browser_action') return screenshotPaths(args);
   // A redirect writes the brief as surely as file_write does, and the whole point of the durable
   // rule is that the file is read back as a system message in every later task - so a rule that
-  // only watched the two file tools was one `bash -lc 'echo ... >> workspace/ATHANOR.md'` away from
+  // only watched the two file tools was one `bash -lc 'echo ... >> workspace/GARDEN.md'` away from
   // being no rule. Gated on the command already being classified as a writer, so `cat` on the same
   // path raises nothing: a card that fires on reading the brief is a card the owner stops reading.
   //

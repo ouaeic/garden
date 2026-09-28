@@ -11,7 +11,7 @@ import {
   Square,
   SlidersHorizontal
 } from 'lucide-react';
-import type { Task, TaskReasoningEffort } from '@athanor/contracts';
+import type { Task, TaskReasoningEffort } from '@garden/contracts';
 import { permissionModeSummary } from './asking-rules';
 import { effortLabel } from './reasoning-options';
 import { isWorking } from './model';

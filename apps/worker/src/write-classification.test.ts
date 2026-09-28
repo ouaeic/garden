@@ -91,9 +91,9 @@ describe('what a call changed', () => {
     // it is the *only* path the call reports - so `writesOnlyDurableInstructions` can finally be
     // true for a shell call, and the completion contract stops treating the agent's own
     // record-keeping as the last change it has to prove.
-    expect(
-      writtenPaths('shell', shell('bash', '-lc', 'echo done >> workspace/ATHANOR.md'))
-    ).toEqual(['workspace/ATHANOR.md']);
+    expect(writtenPaths('shell', shell('bash', '-lc', 'echo done >> workspace/GARDEN.md'))).toEqual(
+      ['workspace/GARDEN.md']
+    );
     // Unresolvable, so every token: `curl` is neither a recognised reader nor a recognised writer,
     // and its `-o` is exactly the write nothing here follows.
     expect(
@@ -190,7 +190,7 @@ describe('signalling is a change to the computer and not a card', () => {
 /*
  * A screenshot is the one browser action that writes a file, and the durable-instruction and
  * deferred-execution rules read `writtenPaths` to see writes at all. Unnamed here, a screenshot to
- * `workspace/ATHANOR.md` on a tainted turn would raise nothing, and `.bashrc` would be judged as a
+ * `workspace/GARDEN.md` on a tainted turn would raise nothing, and `.bashrc` would be judged as a
  * shell's `.bashrc` rather than as a name the runner folds into `workspace/`.
  */
 describe('the picture a browser action writes', () => {

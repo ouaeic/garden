@@ -2,13 +2,13 @@
 name: data-analysis
 description: Clean a messy dataset and analyse it with a saved, re-runnable script that states its assumptions, so the numbers can be reproduced and audited rather than asserted. Use when the request involves a CSV, TSV, parquet file, database extract or pasted table and the deliverable is an answer, a summary statistic, a comparison or a chart. Do not use when the deliverable is a formula workbook the owner will edit, which belongs to xlsx-authoring.
 license: AGPL-3.0-or-later
-compatibility: The managed interpreter is /usr/local/lib/athanor/python/bin/python3. Probe required imports in the selected runtime before starting; other tools can be installed in an isolated environment through the normal execution policy.
+compatibility: The managed interpreter is /usr/local/lib/garden/python/bin/python3. Probe required imports in the selected runtime before starting; other tools can be installed in an isolated environment through the normal execution policy.
 allowed-tools: shell file_read file_write files_list document_read image_read set_acceptance publish_artifact
 metadata:
-  athanor.tier: 'builtin'
-  athanor.version: '2.5.0'
-  athanor.risk: 'workspace'
-  athanor.domain: 'data'
+  garden.tier: 'builtin'
+  garden.version: '2.5.0'
+  garden.risk: 'workspace'
+  garden.domain: 'data'
 ---
 
 # Data analysis

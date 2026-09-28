@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { encryptJson, inferenceCredentialAad } from '@athanor/core';
-import { refreshOpenRouterCatalog } from '@athanor/model-gateway';
+import { encryptJson, inferenceCredentialAad } from '@garden/core';
+import { refreshOpenRouterCatalog } from '@garden/model-gateway';
 import { refreshOnce, type CatalogStore } from './refresh-once.js';
 
 const masterKey = randomBytes(32);
@@ -154,7 +154,7 @@ describe('refreshOnce', () => {
    * used to run on that and report `refreshed`, which left `selectModel` ranking an empty pool with
    * nothing anywhere on the box naming a cause. What has to be true is all three of these at once:
    * the catalogue already here is untouched, the pass says so in a state of its own, and the reason
-   * is carried out where the journal and `athanor doctor` can both put it in front of the owner.
+   * is carried out where the journal and `garden doctor` can both put it in front of the owner.
    */
   it('refuses to replace a good catalogue with an answer that stopped describing models, and says which fact went', async () => {
     const described = Array.from({ length: 40 }, (_unused, index) => ({

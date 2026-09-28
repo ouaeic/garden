@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'garden-shell-2026-09-06';
+const SHELL_CACHE = 'garden-shell-2026-09-28';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 self.addEventListener('install', (event) => {
@@ -16,10 +16,7 @@ self.addEventListener('activate', (event) => {
       const names = await caches.keys();
       await Promise.all(
         names
-          .filter(
-            (name) =>
-              (name.startsWith('athanor') || name.startsWith('garden')) && name !== SHELL_CACHE
-          )
+          .filter((name) => name.startsWith('garden') && name !== SHELL_CACHE)
           .map((name) => caches.delete(name))
       );
       await self.clients.claim();
@@ -35,7 +32,7 @@ self.addEventListener('fetch', (event) => {
     request.method !== 'GET' ||
     url.origin !== self.location.origin ||
     url.pathname.startsWith('/v1/') ||
-    url.pathname.startsWith('/__athanor/')
+    url.pathname.startsWith('/__garden/')
   )
     return;
   if (request.mode === 'navigate') {

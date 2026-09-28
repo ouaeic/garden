@@ -22,13 +22,13 @@ test('release Rust flags remap the user, Cargo, and workspace paths', () => {
   const environment = {
     HOME: '/Users/builder',
     CARGO_HOME: '/Users/builder/custom-cargo',
-    GITHUB_WORKSPACE: '/Users/builder/work/athanor'
+    GITHUB_WORKSPACE: '/Users/builder/work/garden'
   };
   const mappings = releasePathMappings(environment);
   assert.deepEqual(mappings, [
     { source: '/Users/builder', destination: '/build-user' },
     { source: '/Users/builder/custom-cargo', destination: '/cargo' },
-    { source: '/Users/builder/work/athanor', destination: '/workspace' }
+    { source: '/Users/builder/work/garden', destination: '/workspace' }
   ]);
   const configured = withReleaseRustFlags(environment);
   assert.match(configured.CARGO_ENCODED_RUSTFLAGS, /--remap-path-prefix/);
@@ -68,13 +68,13 @@ test('Android release flags preserve caller flags and align LOAD and RELRO witho
 });
 
 test('native artifact audit rejects a build home and accepts remapped output', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'athanor-native-audit-'));
+  const directory = await mkdtemp(join(tmpdir(), 'garden-native-audit-'));
   const release = join(directory, 'release');
-  const executable = join(release, 'athanor-desktop');
+  const executable = join(release, 'garden-desktop');
   const environment = {
     HOME: '/Users/builder',
     CARGO_HOME: '/Users/builder/.cargo',
-    GITHUB_WORKSPACE: '/Users/builder/work/athanor'
+    GITHUB_WORKSPACE: '/Users/builder/work/garden'
   };
   try {
     await mkdir(release);
@@ -102,7 +102,7 @@ function archiveEntry(name, content) {
 
 test('native artifact audit attributes leaked paths to BSD and GNU archive objects', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'garden-native-members-'));
-  const artifact = join(directory, 'release', 'libathanor_desktop_lib.a');
+  const artifact = join(directory, 'release', 'libgarden_desktop_lib.a');
   const name = 'garden-native-compiler.swift.o';
   const payload = Buffer.from(
     '\0DO_NOT_PRINT_OTHER_STRINGS\0DW_AT_comp_dir=/Users/builder/work/project OWNER_PRIVATE_DATA\0'
@@ -149,7 +149,7 @@ test('native artifact audit attributes leaked paths to BSD and GNU archive objec
 
 test('native artifact audit bounds printable diagnostics and still rejects malformed archives', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'garden-native-diagnostic-bound-'));
-  const artifact = join(directory, 'release', 'libathanor_desktop_lib.a');
+  const artifact = join(directory, 'release', 'libgarden_desktop_lib.a');
   try {
     await mkdir(join(directory, 'release'));
     const fragment = '/Users/builder/work/' + 'x'.repeat(400);
@@ -307,7 +307,7 @@ test(
       assert.equal(archives.length, 1);
       const audited = join(directory, `${name}-audit`, 'release');
       await mkdir(audited, { recursive: true });
-      const artifact = join(audited, 'libathanor_desktop_lib.a');
+      const artifact = join(audited, 'libgarden_desktop_lib.a');
       await copyFile(archives[0], artifact);
       return { root: join(directory, `${name}-audit`), bytes: await readFile(artifact) };
     };

@@ -48,7 +48,7 @@ const record = (value: unknown): Record<string, unknown> =>
 export function previewConnectionTicket(raw: string, now = Date.now()): TicketPreview {
   if (new TextEncoder().encode(raw).length > 32 * 1024)
     throw invalidTicket('This connection ticket is too large.');
-  const match = /^(?:garden|athanor):\/\/pair\/([A-Za-z0-9_-]+)$/.exec(raw.trim());
+  const match = /^garden:\/\/pair\/([A-Za-z0-9_-]+)$/.exec(raw.trim());
   if (!match?.[1]) throw invalidTicket();
   let parsed: unknown;
   try {
@@ -70,7 +70,7 @@ export function previewConnectionTicket(raw: string, now = Date.now()): TicketPr
   const discovery = record(ticket.discovery);
   if (
     Object.keys(discovery).some((key) => !['mdnsService', 'mdnsPort'].includes(key)) ||
-    discovery.mdnsService !== '_athanor._tcp.local' ||
+    discovery.mdnsService !== '_garden._tcp.local' ||
     discovery.mdnsPort !== 443
   )
     throw invalidTicket('This ticket has unsupported discovery settings.');
@@ -152,11 +152,11 @@ export function enrollmentCodeFromFragment(fragment: string, origin: string): st
 
 export async function nativeStatus(signal?: AbortSignal): Promise<NativeStatus | null> {
   return isNativeClient()
-    ? get<NativeStatus>('/__athanor/client/status', { signal: signal ?? null })
+    ? get<NativeStatus>('/__garden/client/status', { signal: signal ?? null })
     : null;
 }
 export async function nativeBootstrap(signal?: AbortSignal): Promise<NativeBootstrap> {
-  const result = await get<NativeBootstrap>('/__athanor/client/bootstrap', {
+  const result = await get<NativeBootstrap>('/__garden/client/bootstrap', {
     signal: signal ?? null
   });
   const installerUrl = localInstallerUrl(result.installerUrl);
@@ -172,13 +172,13 @@ export async function pairNative(
   preference: NetworkPreference = 'unknown'
 ): Promise<NativeBootstrap> {
   previewConnectionTicket(ticket);
-  await post('/__athanor/client/pair', { ticket: ticket.trim() });
+  await post('/__garden/client/pair', { ticket: ticket.trim() });
   await setNetworkPreference(preference);
   return nativeBootstrap();
 }
 export const setNetworkPreference = (preference: NetworkPreference): Promise<{ saved: true }> =>
-  post('/__athanor/client/network-preference', { preference });
-export const forgetNative = (): Promise<{ connected: false }> => del('/__athanor/client/profile');
+  post('/__garden/client/network-preference', { preference });
+export const forgetNative = (): Promise<{ connected: false }> => del('/__garden/client/profile');
 
 type NativeBridge = { invoke: <T>(command: string, args?: Record<string, unknown>) => Promise<T> };
 const bridge = (): NativeBridge | null => {

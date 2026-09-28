@@ -157,7 +157,7 @@ const presentation = {
       title: 'Playable maze',
       status: 'ready',
       accessPath: '/v1/previews/fixture/access',
-      url: origin + '/__athanor/preview/fixture/',
+      url: origin + '/__garden/preview/fixture/',
       downloadUrl: null,
       evidenceEventIds: [event.id]
     },
@@ -688,7 +688,7 @@ try {
     const path = url.pathname;
     const json = (body) => route.fulfill({ json: body });
     if (path === '/sw.js') return route.fulfill({ contentType: 'text/javascript', body: '' });
-    if (path.startsWith('/__athanor/preview/'))
+    if (path.startsWith('/__garden/preview/'))
       return route.fulfill({ contentType: 'text/html', body: previewHtml });
     if (!path.startsWith('/v1/')) return route.continue();
     if (path === '/v1/tasks' && route.request().method() === 'GET')
@@ -1753,7 +1753,7 @@ try {
       'Closing the preview must leave expanded mode'
     );
     presentation.results[0].url =
-      isolatedPreviewOrigin + '/__athanor/preview/' + 'a'.repeat(32) + '/';
+      isolatedPreviewOrigin + '/__garden/preview/' + 'a'.repeat(32) + '/';
     await page.getByRole('button', { name: 'View here', exact: true }).click();
     assert.equal(
       (await page.locator('.garden-preview-frame').getAttribute('sandbox')).includes(

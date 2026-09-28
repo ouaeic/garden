@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ModelRelease } from '@athanor/contracts';
-import type { DataStore, TaskRecord } from '@athanor/data';
-import type { ModelAdapter, ModelRequest } from '@athanor/model-gateway';
+import type { ModelRelease } from '@garden/contracts';
+import type { DataStore, TaskRecord } from '@garden/data';
+import type { ModelAdapter, ModelRequest } from '@garden/model-gateway';
 import { codingMissionAdapter } from './coding-mission-gateway.js';
 const model = {
   id: 'test',

@@ -18,7 +18,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { capabilityAudience, signCapabilityToken } from '@athanor/core';
+import { capabilityAudience, signCapabilityToken } from '@garden/core';
 import type { RunnerConfig } from './config.js';
 import { ensureWorkspace } from './files.js';
 import {
@@ -75,7 +75,7 @@ const cgroupTree = async (
     selfUnreadable?: boolean;
   } = {}
 ): Promise<{ root: string; self: string }> => {
-  const base = await mkdtemp(path.join(tmpdir(), 'athanor-cgroup-'));
+  const base = await mkdtemp(path.join(tmpdir(), 'garden-cgroup-'));
   disposers.push(() => rm(base, { recursive: true, force: true }));
   const root = path.join(base, 'cgroup');
   await mkdir(root, { recursive: true });
@@ -108,7 +108,7 @@ describe('what the control group actually allows', () => {
   it('reads a quota, a ceiling and a pinning out of the kernel’s own formats', async () => {
     const { root, self } = await cgroupTree([
       { name: 'system.slice', memoryMax: String(25 * GIB) },
-      { name: 'athanor-runner.service', cpuMax: '200000 100000', cpuSet: '0-3,8' }
+      { name: 'garden-runner.service', cpuMax: '200000 100000', cpuSet: '0-3,8' }
     ]);
     // 200000/100000 is two cores; the pinning offers five; the tighter of the two is the answer.
     await expect(readCgroup({ root, self })).resolves.toEqual({
@@ -129,12 +129,9 @@ describe('what the control group actually allows', () => {
   it('does not mistake a weight for a quota', async () => {
     const { root, self } = await cgroupTree([
       { name: 'system.slice' },
-      { name: 'athanor-runner.service', cpuMax: 'max 100000', memoryMax: String(25 * GIB) }
+      { name: 'garden-runner.service', cpuMax: 'max 100000', memoryMax: String(25 * GIB) }
     ]);
-    await writeFile(
-      path.join(root, 'system.slice', 'athanor-runner.service', 'cpu.weight'),
-      '50\n'
-    );
+    await writeFile(path.join(root, 'system.slice', 'garden-runner.service', 'cpu.weight'), '50\n');
     await expect(readCgroup({ root, self })).resolves.toMatchObject({ cpuCores: null });
   });
 
@@ -142,7 +139,7 @@ describe('what the control group actually allows', () => {
   it('takes the tightest limit down the chain, not the nearest one', async () => {
     const { root, self } = await cgroupTree([
       { name: 'system.slice', cpuMax: '100000 100000', memoryMax: String(4 * GIB) },
-      { name: 'athanor-runner.service', cpuMax: '800000 100000', memoryMax: String(25 * GIB) }
+      { name: 'garden-runner.service', cpuMax: '800000 100000', memoryMax: String(25 * GIB) }
     ]);
     await expect(readCgroup({ root, self })).resolves.toEqual({
       state: 'read',
@@ -153,7 +150,7 @@ describe('what the control group actually allows', () => {
 
   it('says it does not know rather than guessing when the cgroup is not there to read', async () => {
     const { root, self } = await cgroupTree(
-      [{ name: 'system.slice' }, { name: 'athanor-runner.service' }],
+      [{ name: 'system.slice' }, { name: 'garden-runner.service' }],
       { omitLeafDirectory: true }
     );
     await expect(readCgroup({ root, self })).resolves.toEqual({ state: 'unreadable' });
@@ -161,8 +158,8 @@ describe('what the control group actually allows', () => {
 
   /** A v1-only host has the file and no `0::` line, and v1 can carry a quota this never reads. */
   it('treats a hierarchy it cannot speak as unreadable, not as unlimited', async () => {
-    const { root, self } = await cgroupTree([{ name: 'athanor' }], {
-      selfLine: '1:cpu,cpuacct:/athanor\n2:memory:/athanor\n'
+    const { root, self } = await cgroupTree([{ name: 'garden' }], {
+      selfLine: '1:cpu,cpuacct:/garden\n2:memory:/garden\n'
     });
     await expect(readCgroup({ root, self })).resolves.toEqual({ state: 'unreadable' });
   });
@@ -210,7 +207,7 @@ describe('what the control group actually allows', () => {
     const { root, self } = await cgroupTree(
       [
         { name: 'system.slice' },
-        { name: 'athanor.service', cpuMax: '200000 100000', memoryMax: String(2 * GIB) }
+        { name: 'garden.service', cpuMax: '200000 100000', memoryMax: String(2 * GIB) }
       ],
       { unreadable: ['memory.max'] }
     );
@@ -226,7 +223,7 @@ describe('what the control group actually allows', () => {
     const { root, self } = await cgroupTree(
       [
         {
-          name: 'athanor.service',
+          name: 'garden.service',
           cpuMax: '200000 100000',
           memoryMax: String(2 * GIB),
           cpuSet: '0-1'
@@ -243,7 +240,7 @@ describe('what the control group actually allows', () => {
 
   it('treats a proc it cannot read as a control group that binds', async () => {
     const { root, self } = await cgroupTree(
-      [{ name: 'athanor.service', memoryMax: String(2 * GIB) }],
+      [{ name: 'garden.service', memoryMax: String(2 * GIB) }],
       { selfUnreadable: true }
     );
     await expect(readCgroup({ root, self })).resolves.toEqual({ state: 'unreadable' });
@@ -252,7 +249,7 @@ describe('what the control group actually allows', () => {
   /** A byte count that will not parse is the same fact arriving by a different route. */
   it('does not read a ceiling it cannot parse as no ceiling at all', async () => {
     const { root, self } = await cgroupTree([
-      { name: 'athanor.service', cpuMax: '200000 100000', memoryMax: 'not-a-number' }
+      { name: 'garden.service', cpuMax: '200000 100000', memoryMax: 'not-a-number' }
     ]);
     await expect(readCgroup({ root, self })).resolves.toEqual({
       state: 'read',
@@ -506,7 +503,7 @@ describe('the route the worker actually asks', () => {
     RUNNER_SHARED_SECRET: secret,
     WORKSPACE_ROOT: workspaceRoot,
     TAR_EXECUTABLE: '/usr/bin/tar',
-    SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/athanor-snapshot'),
+    SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/garden-snapshot'),
     BROWSER_USE_DESKTOP_DISPLAY: false,
     BROWSER_CPU_NICE: 0,
     MAX_EXECUTION_SECONDS: 30,
@@ -532,7 +529,7 @@ describe('the route the worker actually asks', () => {
   });
 
   const harness = async (options: Parameters<typeof buildServer>[1]) => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-machine-route-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-machine-route-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const secret = 'runner-machine-route-secret-at-least-32-characters';
     const app = await buildServer(runnerConfig(workspaceRoot, secret), options);

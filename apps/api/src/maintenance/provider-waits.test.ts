@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
-import { decryptJson, encryptJson, generateDataKey, wrapDataKey } from '@athanor/core';
+import { createDatabase, DataStore, migrateDatabase } from '@garden/data';
+import { decryptJson, encryptJson, generateDataKey, wrapDataKey } from '@garden/core';
 import type { SupportedContext } from '../http/server-context.js';
 import { createProviderWallMaintenance } from './provider-walls.js';
 

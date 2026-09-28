@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
-import { capabilityAudience, signCapabilityToken } from '@athanor/core';
+import { capabilityAudience, signCapabilityToken } from '@garden/core';
 import type { RunnerConfig } from './config.js';
 import { buildServer, terminalSize, TERMINAL_DEFAULT_SIZE } from './server.js';
 
@@ -13,7 +13,7 @@ const runnerConfig = (workspaceRoot: string, secret: string): RunnerConfig => ({
   RUNNER_SHARED_SECRET: secret,
   WORKSPACE_ROOT: workspaceRoot,
   TAR_EXECUTABLE: '/usr/bin/tar',
-  SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/athanor-snapshot'),
+  SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/garden-snapshot'),
   BROWSER_USE_DESKTOP_DISPLAY: false,
   BROWSER_CPU_NICE: 0,
   MAX_EXECUTION_SECONDS: 30,
@@ -68,7 +68,7 @@ describe('a terminal session and the capability behind it', () => {
   });
 
   it('outlives the token that opened it once it is renewed, at the size the client asked for', async () => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-terminal-life-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-terminal-life-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const secret = 'runner-terminal-life-secret-at-least-32-characters';
     const app = await buildServer(runnerConfig(workspaceRoot, secret));
@@ -91,7 +91,7 @@ describe('a terminal session and the capability behind it', () => {
 
     const socket = new WebSocket(
       `${address.replace('http://', 'ws://')}/v1/workspaces/${id}/terminal`,
-      ['athanor-capability', mint(4, 'terminal-life-open')]
+      ['garden-capability', mint(4, 'terminal-life-open')]
     );
     let output = '';
     let renewedExp = 0;
@@ -149,7 +149,7 @@ describe('a terminal session and the capability behind it', () => {
    * owner had open, for as long as it lived.
    */
   it('spends a renewal frame once, so a captured one cannot re-arm the shell again', async () => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-terminal-replay-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-terminal-replay-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const secret = 'runner-terminal-replay-secret-at-least-32-chars-ok';
     const app = await buildServer(runnerConfig(workspaceRoot, secret));
@@ -171,7 +171,7 @@ describe('a terminal session and the capability behind it', () => {
       );
     const socket = new WebSocket(
       `${address.replace('http://', 'ws://')}/v1/workspaces/${id}/terminal`,
-      ['athanor-capability', mint(60, 'replay-open')]
+      ['garden-capability', mint(60, 'replay-open')]
     );
     let renewals = 0;
     socket.on('message', (raw: Buffer) => {
@@ -197,7 +197,7 @@ describe('a terminal session and the capability behind it', () => {
   }, 30_000);
 
   it('does not renew on a token minted for a different owner', async () => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-terminal-other-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-terminal-other-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const secret = 'runner-terminal-other-secret-at-least-32-characters';
     const app = await buildServer(runnerConfig(workspaceRoot, secret));
@@ -207,7 +207,7 @@ describe('a terminal session and the capability behind it', () => {
     const socket = new WebSocket(
       `${address.replace('http://', 'ws://')}/v1/workspaces/${id}/terminal`,
       [
-        'athanor-capability',
+        'garden-capability',
         signCapabilityToken(
           {
             sub: 'user',

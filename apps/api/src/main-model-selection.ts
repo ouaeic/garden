@@ -1,5 +1,5 @@
-import type { ModelRelease, PrivacyRoute } from '@athanor/contracts';
-import { AthanorError, selectPurposeModel, type OwnerPriceCeiling } from '@athanor/core';
+import type { ModelRelease, PrivacyRoute } from '@garden/contracts';
+import { GardenError, selectPurposeModel, type OwnerPriceCeiling } from '@garden/core';
 
 /** Named choices share the same contract as project model preferences. */
 export function requireMainModel(input: {
@@ -16,7 +16,7 @@ export function requireMainModel(input: {
     ceiling: input.ceiling
   });
   if (!result.model)
-    throw new AthanorError(
+    throw new GardenError(
       'model_unavailable',
       result.reason ?? 'The selected model is unavailable'
     );

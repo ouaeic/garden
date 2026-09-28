@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { decryptJson, encryptJson } from '@athanor/core';
+import { decryptJson, encryptJson } from '@garden/core';
 import type { ToolContext } from './tool-dispatch.js';
 import { applyPresentationTitle } from './presentation-title.js';
 

@@ -1,8 +1,8 @@
 import { workflowDescription } from './workflow.js';
 import { debuggerDescription } from './debugger.js';
-import { ComputationRequest } from '@athanor/contracts';
+import { ComputationRequest } from '@garden/contracts';
 import { z } from 'zod';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { ToolContext } from '../tool-dispatch.js';
 
 export function computationRequest(args: Record<string, unknown>): ComputationRequest {

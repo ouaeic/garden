@@ -17,18 +17,18 @@ afterEach(async () => {
   );
 });
 
-const helperPath = '/usr/local/lib/athanor/athanor-sandbox';
+const helperPath = '/usr/local/lib/garden/garden-sandbox';
 let workspace: string;
 let workingDirectory: string;
 beforeEach(async () => {
-  workspace = await mkdtemp(path.join(tmpdir(), 'athanor-invocation-workspace-'));
+  workspace = await mkdtemp(path.join(tmpdir(), 'garden-invocation-workspace-'));
   temporaryRoots.push(workspace);
   workingDirectory = path.join(workspace, 'workspace');
 });
 
 /** A sandbox whose spec directory is a fresh temporary tree, removed after the test. */
 const sandboxIn = async (confineFilesystem: boolean) => {
-  const root = await mkdtemp(path.join(tmpdir(), 'athanor-sandbox-'));
+  const root = await mkdtemp(path.join(tmpdir(), 'garden-sandbox-'));
   temporaryRoots.push(root);
   return {
     elevate: '/usr/bin/sudo',
@@ -52,7 +52,7 @@ describe('agent sandbox invocation', () => {
     const sandbox = await sandboxIn(false);
     const invocation = await sandboxedInvocation(
       { executable: '/usr/bin/python3', args: ['build.py', '--fast'] },
-      { PATH: '/usr/bin', HOME: '/home/athanor/ws', LANG: 'C.UTF-8' },
+      { PATH: '/usr/bin', HOME: '/home/garden/ws', LANG: 'C.UTF-8' },
       sandbox,
       false,
       workspace,
@@ -76,10 +76,10 @@ describe('agent sandbox invocation', () => {
     // The order the helper reads: the directory to run in, then what `env -i` needs - assignments
     // first, then the executable, then its arguments.
     expect(await specWords(invocation)).toEqual([
-      'athanor-sandbox-spec 2',
+      'garden-sandbox-spec 2',
       workingDirectory,
       'PATH=/usr/bin',
-      'HOME=/home/athanor/ws',
+      'HOME=/home/garden/ws',
       'LANG=C.UTF-8',
       '/usr/bin/python3',
       'build.py',
@@ -110,7 +110,7 @@ describe('agent sandbox invocation', () => {
     expect(argumentText).not.toContain('.home');
     // And they all reached the file, byte for byte, the heredoc's newlines included.
     expect(await specWords(invocation)).toEqual([
-      'athanor-sandbox-spec 2',
+      'garden-sandbox-spec 2',
       workingDirectory,
       'PATH=/usr/bin',
       `HOME=${workspace}/.home`,
@@ -136,7 +136,7 @@ describe('agent sandbox invocation', () => {
       chosen
     );
     expect(invocation.args.join('\n')).not.toContain('acme-lawsuit-discovery');
-    expect((await specWords(invocation)).slice(0, 2)).toEqual(['athanor-sandbox-spec 2', chosen]);
+    expect((await specWords(invocation)).slice(0, 2)).toEqual(['garden-sandbox-spec 2', chosen]);
   });
 
   it('refuses a directory the helper could not enter as written', async () => {
@@ -335,7 +335,7 @@ describe('agent sandbox invocation', () => {
     const sandbox = await sandboxIn(false);
     await expect(
       sandboxedInvocation(
-        { executable: '/home/athanor/a=b/tool', args: [] },
+        { executable: '/home/garden/a=b/tool', args: [] },
         {},
         sandbox,
         false,
@@ -353,27 +353,27 @@ describe('agent sandbox invocation', () => {
     // container is what is going; not under /tmp, which the agent account may write in. The
     // helper has this path hard-coded beside its workspace parent and reads a spec from nowhere
     // else, so the two have to agree.
-    expect(sandboxSpecDirectory('/home/athanor')).toBe('/home/athanor/.athanor/sandbox');
+    expect(sandboxSpecDirectory('/home/garden')).toBe('/home/garden/.garden/sandbox');
   });
 
   it('refuses to start rather than run agent commands as the runner when the helper is missing', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-sandbox-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-sandbox-'));
     temporaryRoots.push(root);
     await expect(
-      resolveAgentSandbox('/usr/local/lib/athanor/absent', path.join(root, 'specs'))
+      resolveAgentSandbox('/usr/local/lib/garden/absent', path.join(root, 'specs'))
     ).rejects.toThrow('will not start');
   });
 
   it('leaves the sandbox unconfigured where there is no second account to drop to', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-sandbox-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-sandbox-'));
     temporaryRoots.push(root);
     await expect(resolveAgentSandbox(undefined, path.join(root, 'specs'))).resolves.toBeUndefined();
   });
 
   it('accepts a helper the runner can execute', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-sandbox-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-sandbox-'));
     temporaryRoots.push(root);
-    const helper = path.join(root, 'athanor-sandbox');
+    const helper = path.join(root, 'garden-sandbox');
     await writeFile(helper, '#!/bin/sh\nexit 0\n');
     await chmod(helper, 0o755);
     const specDirectory = path.join(root, 'specs');
@@ -390,9 +390,9 @@ describe('agent sandbox invocation', () => {
     // an object can lack it but that the one constructor production uses always sets it. Absence
     // means unconfined, and a resolver that forgot to pass this through would be unconfined
     // everywhere while runner.env said otherwise - a silence, not a failure.
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-sandbox-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-sandbox-'));
     temporaryRoots.push(root);
-    const helper = path.join(root, 'athanor-sandbox');
+    const helper = path.join(root, 'garden-sandbox');
     await writeFile(helper, '#!/bin/sh\nexit 0\n');
     await chmod(helper, 0o755);
     const specDirectory = path.join(root, 'specs');
@@ -410,9 +410,9 @@ describe('agent sandbox invocation', () => {
     // runner died holding, or one the helper would not vouch for - and nothing is in flight when
     // the runner starts, so nothing there is still wanted, and the command text it holds should
     // not outlive the process that wrote it.
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-sandbox-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-sandbox-'));
     temporaryRoots.push(root);
-    const helper = path.join(root, 'athanor-sandbox');
+    const helper = path.join(root, 'garden-sandbox');
     await writeFile(helper, '#!/bin/sh\nexit 0\n');
     await chmod(helper, 0o755);
     const stale = await sandboxIn(false);

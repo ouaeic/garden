@@ -1,5 +1,5 @@
-import type { ModelRelease } from '@athanor/contracts';
-import type { TaskRecord } from '@athanor/data';
+import type { ModelRelease } from '@garden/contracts';
+import type { TaskRecord } from '@garden/data';
 import type { AgentState } from '../agent-state.js';
 import type { CompactionOutcome } from '../context.js';
 

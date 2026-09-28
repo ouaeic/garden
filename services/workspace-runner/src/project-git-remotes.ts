@@ -2,7 +2,7 @@ import { constants } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { chmod, copyFile, open, readFile, readdir, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
-import { GitObjectId, ProjectGitRemoteInput, ProjectGitRemoteOperation } from '@athanor/contracts';
+import { GitObjectId, ProjectGitRemoteInput, ProjectGitRemoteOperation } from '@garden/contracts';
 import { z } from 'zod';
 import { withWorkspaceDirectory, workspacePath } from './files.js';
 import { durableJson, syncDirectory } from './project-version-files.js';

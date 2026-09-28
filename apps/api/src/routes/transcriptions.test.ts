@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import type { MediaModelOption } from '@athanor/contracts';
-import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
+import type { MediaModelOption } from '@garden/contracts';
+import { createDatabase, DataStore, migrateDatabase } from '@garden/data';
 import type * as AudioPreparation from '../audio-preparation.js';
 import type { InferenceSecret } from '../context.js';
 import type { RouteContext } from '../http/server-context.js';

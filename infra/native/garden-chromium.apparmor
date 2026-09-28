@@ -1,0 +1,13 @@
+# Ubuntu restricts unprivileged user namespaces under AppArmor. The managed Chromium binaries
+# need that permission to create their required renderer sandbox. Browser startup fails if the
+# host denies it; the runner does not disable sandboxing to recover.
+#
+# Both managed headless-shell names are included because Playwright uses different layouts on
+# x64 and arm64. No other executable gains user-namespace permission through this profile.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile garden-chromium /home/garden/.cache/ms-playwright/**/{chrome,chrome-headless-shell,headless_shell} flags=(unconfined) {
+  userns,
+  include if exists <local/garden-chromium>
+}

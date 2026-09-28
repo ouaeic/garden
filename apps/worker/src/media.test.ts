@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AUDIO_READ_MAX_SECONDS, type MediaModelOption } from '@athanor/contracts';
+import { AUDIO_READ_MAX_SECONDS, type MediaModelOption } from '@garden/contracts';
 import {
   mediaDimension,
   mediaImageDimensions,

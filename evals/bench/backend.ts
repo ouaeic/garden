@@ -24,7 +24,7 @@ import path from 'node:path';
  * @see services/workspace-runner/src/execution.ts:45-90, which is the whole schema. All eight
  * fields are here and none is quietly dropped: `network` and `maxOutputBytes` in particular are
  * fields the research's first draft omitted, and a shim that ignores `network` gives the agent
- * unconditional egress on a box where athanor would have gated it - which is a difference in what
+ * unconditional egress on a box where garden would have gated it - which is a difference in what
  * was measured, not a detail.
  */
 export interface ExecCall {
@@ -58,7 +58,7 @@ export interface WorkspaceBackend {
    * FALSE ON THE LOCAL BACKEND AND IT CANNOT BE OTHERWISE: a child process on this laptop shares
    * the host's network namespace and nothing in this rig can take that away. It is not papered
    * over. `shim.ts` records it and `parity.ts` prints it as a declared drop, so a row measured on
-   * the local backend cannot be read as a row measured under athanor's egress gate.
+   * the local backend cannot be read as a row measured under garden's egress gate.
    */
   readonly isolatesNetwork: boolean;
   /** Absolute path, inside the box, of the workspace root a relative `cwd` resolves against. */
@@ -171,7 +171,7 @@ const runProcess = async (
  * under it rather than a reader's good faith.
  */
 export const localBackend = async (root?: string): Promise<WorkspaceBackend> => {
-  const base = root ?? (await mkdtemp(path.join(tmpdir(), 'athanor-bench-')));
+  const base = root ?? (await mkdtemp(path.join(tmpdir(), 'garden-bench-')));
   const workspaceRoot = path.join(base, 'workspace');
   const owned = root === undefined;
   return {

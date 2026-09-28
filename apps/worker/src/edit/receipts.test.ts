@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DataStore } from '@athanor/data';
+import type { DataStore } from '@garden/data';
 import { recordPatchReceipt, recoverPatchReceipts } from './receipts.js';
 
 describe('durable edit reconciliation', () => {

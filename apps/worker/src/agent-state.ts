@@ -3,8 +3,8 @@ import type {
   TaskMode,
   TaskReasoningEffort,
   WebToolMode
-} from '@athanor/contracts';
-import type { ModelMessage, ModelToolCall } from '@athanor/model-gateway';
+} from '@garden/contracts';
+import type { ModelMessage, ModelToolCall } from '@garden/model-gateway';
 import type { AcceptanceRecord } from './acceptance.js';
 import type { WorkerConfig } from './config.js';
 import type { ArtifactLedger, ContextBrief } from './context.js';
@@ -95,7 +95,7 @@ export interface AgentState {
       name: string;
       success: boolean;
       /**
-       * Whether athanor answered this call itself instead of running it.
+       * Whether garden answered this call itself instead of running it.
        *
        * Implies `success: false`, and every gate that only asks "did this work" is satisfied by
        * that alone. It is recorded separately because two consumers need the distinction: the
@@ -108,9 +108,9 @@ export interface AgentState {
       /** A change nothing can execute, so the write is the only observation there is. */
       proseOnly?: boolean;
       /**
-       * The command athanor ran here and what it exited with, when this was a foreground `shell`.
+       * The command garden ran here and what it exited with, when this was a foreground `shell`.
        *
-       * Kept so an acceptance check naming a command athanor has already run, after the last
+       * Kept so an acceptance check naming a command garden has already run, after the last
        * change, is answered from that run instead of running the build or the suite a second time.
        */
       command?: { fingerprint: string; exitCode: number };

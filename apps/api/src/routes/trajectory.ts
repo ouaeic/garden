@@ -7,22 +7,22 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { TaskTrajectoryRequest } from '@athanor/contracts';
+import { TaskTrajectoryRequest } from '@garden/contracts';
 import type {
   CheckpointRestorePreview,
   PrivacyRoute,
   RewindScope,
   TaskRewindPreview,
   ModelRelease
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import {
-  AthanorError,
+  GardenError,
   decryptJson,
   encryptJson,
   unwrapDataKey,
   ownerMessageContent
-} from '@athanor/core';
-import type { UserRecord, WorkspaceCheckpointRecord } from '@athanor/data';
+} from '@garden/core';
+import type { UserRecord, WorkspaceCheckpointRecord } from '@garden/data';
 import type { z } from 'zod';
 import { checkpointResponse, ownerPriceCeiling } from '../context.js';
 import { requireMainModel } from '../main-model-selection.js';
@@ -53,10 +53,9 @@ export const registerTrajectoryRoutes = (context: RouteContext): void => {
     input: z.infer<typeof TaskTrajectoryRequest>
   ) => {
     const parent = await store.getTask(user.id, parentId);
-    if (!parent) throw new AthanorError('task_not_found', 'Task not found');
+    if (!parent) throw new GardenError('task_not_found', 'Task not found');
     const workspace = await store.getWorkspace(user.id, parent.workspaceId);
-    if (!workspace?.wrappedKey)
-      throw new AthanorError('workspace_not_found', 'Workspace not found');
+    if (!workspace?.wrappedKey) throw new GardenError('workspace_not_found', 'Workspace not found');
     const dataKey = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
     const events = await store.listTaskEvents(parent.id);
     const conversational = events.filter((event) =>
@@ -64,15 +63,15 @@ export const registerTrajectoryRoutes = (context: RouteContext): void => {
     );
     const target = conversational.find((event) => event.id === input.eventId);
     if (!target)
-      throw new AthanorError(
+      throw new GardenError(
         'trajectory_point_not_found',
         'Choose a user or assistant message from this task',
         404
       );
     if (input.operation === 'edit' && target.kind !== 'user_message')
-      throw new AthanorError('trajectory_point_invalid', 'Only a user message can be edited', 409);
+      throw new GardenError('trajectory_point_invalid', 'Only a user message can be edited', 409);
     if (input.operation === 'retry' && target.kind !== 'assistant_message')
-      throw new AthanorError(
+      throw new GardenError(
         'trajectory_point_invalid',
         'Choose an assistant response to retry',
         409
@@ -93,13 +92,13 @@ export const registerTrajectoryRoutes = (context: RouteContext): void => {
         ? await store.getWorkspaceCheckpoint(user.id, input.checkpointId)
         : await store.checkpointForTaskEvent(user.id, parent.id, target.id);
       if (!restoredCheckpoint || restoredCheckpoint.workspaceId !== workspace.id)
-        throw new AthanorError(
+        throw new GardenError(
           'checkpoint_unavailable',
           'The computer cannot be put back to this point: that turn changed nothing, or its undo point has been cleared',
           409
         );
       if (workspace.status !== 'running')
-        throw new AthanorError('workspace_unavailable', 'Workspace is not running');
+        throw new GardenError('workspace_unavailable', 'Workspace is not running');
     }
     /**
      * Restoring is what makes the rewind true, so it happens before anything is written: a failed
@@ -193,7 +192,7 @@ export const registerTrajectoryRoutes = (context: RouteContext): void => {
       if (cached) return cached;
       if (!event.payloadCiphertext) return {};
       if (event.payloadCiphertext.aad !== `task-event:${parent.id}`)
-        throw new AthanorError(
+        throw new GardenError(
           'encrypted_event_context',
           'Task event encryption context is invalid'
         );
@@ -225,7 +224,7 @@ export const registerTrajectoryRoutes = (context: RouteContext): void => {
     let systemMessages: Array<{ role: string; content: string }> = [];
     if (parent.agentStateCiphertext) {
       if (parent.agentStateCiphertext.aad !== `task-state:${parent.id}`)
-        throw new AthanorError('task_context_invalid', 'Task checkpoint context is invalid', 409);
+        throw new GardenError('task_context_invalid', 'Task checkpoint context is invalid', 409);
       const parentState = decryptJson<{
         messages?: Array<Record<string, unknown> & { role: string; content: string }>;
       }>(parent.agentStateCiphertext, dataKey);
@@ -276,7 +275,7 @@ export const registerTrajectoryRoutes = (context: RouteContext): void => {
     const editingInitialPrompt =
       input.operation === 'edit' && copiedEvents.length === 0 && target === conversational[0];
     if (!editingInitialPrompt && systemMessages.length === 0)
-      throw new AthanorError(
+      throw new GardenError(
         'task_context_unavailable',
         'This point is available after the task saves its first conversation checkpoint',
         409
@@ -284,7 +283,7 @@ export const registerTrajectoryRoutes = (context: RouteContext): void => {
 
     const runsImmediately = input.operation !== 'branch';
     if (runsImmediately && workspace.status !== 'running')
-      throw new AthanorError('workspace_unavailable', 'Workspace is not running');
+      throw new GardenError('workspace_unavailable', 'Workspace is not running');
     const maxComputeCredits = runsImmediately ? input.maxComputeCredits : 0;
     let selected: z.infer<typeof ModelRelease> | undefined;
     let reservedCredits = 0;
@@ -317,9 +316,9 @@ export const registerTrajectoryRoutes = (context: RouteContext): void => {
           })
         : catalog.find((model) => model.id === parent.modelId);
       if (!selected || selected.availability !== 'available')
-        throw new AthanorError('model_unavailable', 'The selected model is not available');
+        throw new GardenError('model_unavailable', 'The selected model is not available');
       if (namesModel && selected.privacyRoute !== forkPrivacyRoute)
-        throw new AthanorError(
+        throw new GardenError(
           'model_unavailable',
           'The selected model is not available for this privacy route'
         );
@@ -514,7 +513,7 @@ export const registerTrajectoryRoutes = (context: RouteContext): void => {
        * distinction this refusal turns on does not exist yet at that point in the lifecycle.
        */
       if (request.apiToken && input.rewind !== 'conversation')
-        throw new AthanorError(
+        throw new GardenError(
           'api_token_scope_required',
           // Says the whole thing, because a bearer token meeting this has no other way to find
           // out: which scope is missing is not the point - no scope grants it - and the door that
@@ -541,9 +540,9 @@ export const registerTrajectoryRoutes = (context: RouteContext): void => {
     async (request) => {
       const user = requireUser(request.user);
       const task = await store.getTask(user.id, request.params.taskId);
-      if (!task) throw new AthanorError('task_not_found', 'Task not found');
+      if (!task) throw new GardenError('task_not_found', 'Task not found');
       const workspace = await store.getWorkspace(user.id, task.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       const events = await store.listTaskEvents(task.id);
       const eventId =
         request.query.eventId ??
@@ -551,7 +550,7 @@ export const registerTrajectoryRoutes = (context: RouteContext): void => {
           ?.id;
       const target = events.find((event) => event.id === eventId);
       if (!target)
-        throw new AthanorError(
+        throw new GardenError(
           'trajectory_point_not_found',
           'Choose a user or assistant message from this task',
           404

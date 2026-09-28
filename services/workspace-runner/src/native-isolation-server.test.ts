@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterEach, expect, it, vi } from 'vitest';
-import { capabilityAudience, signCapabilityToken } from '@athanor/core';
+import { capabilityAudience, signCapabilityToken } from '@garden/core';
 import type * as Sandbox from './sandbox.js';
 const measured = vi.hoisted(() => ({ processIsolation: true, networkIsolation: true }));
 vi.mock('./sandbox.js', async (importOriginal) => {
@@ -41,7 +41,7 @@ it.each([
     vi.stubEnv('CONFINE_AGENT_FILESYSTEM', 'true');
     vi.stubEnv('ISOLATE_AGENT_NETWORK', 'false');
     vi.stubEnv('BROWSER_USE_DESKTOP_DISPLAY', 'false');
-    vi.stubEnv('SNAPSHOT_EXECUTABLE', path.resolve('../../scripts/athanor-snapshot'));
+    vi.stubEnv('SNAPSHOT_EXECUTABLE', path.resolve('../../scripts/garden-snapshot'));
     const app = await buildServer(loadConfig());
     cleanups.push(() => app.close());
     const health = await app.inject('/healthz');

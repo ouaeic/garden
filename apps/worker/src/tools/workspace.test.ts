@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { AthanorError } from '@athanor/core';
-import { type ModelToolCall } from '@athanor/model-gateway';
+import { GardenError } from '@garden/core';
+import { type ModelToolCall } from '@garden/model-gateway';
 import { countPostEditPaths, executeWorkspaceTool, forgetPostEditChecks } from './workspace.js';
 import { POST_EDIT_CHECKED_LANGUAGES } from './diagnostics.js';
 import { forgetReads, forgetRefusals, recordRead, toLines } from '../edit/index.js';
@@ -365,7 +365,7 @@ describe('the shapes a patch is allowed to be', () => {
   });
 
   it('refuses a patch with no edit in it', async () => {
-    await expect(patch([{ path: 'workspace/queue.ts' }])).rejects.toThrow(AthanorError);
+    await expect(patch([{ path: 'workspace/queue.ts' }])).rejects.toThrow(GardenError);
     await expect(patch([{ path: 'workspace/queue.ts' }])).rejects.toThrow(
       /requires a path and a non-empty edit/
     );
@@ -681,7 +681,7 @@ describe('reading a file bigger than one result can hold', () => {
 
       await expect(
         run('file_write', { path: 'workspace/acl.json', content: '{}' })
-      ).rejects.toThrow(AthanorError);
+      ).rejects.toThrow(GardenError);
       expect(written.get('workspace/acl.json')).toHaveLength(76_008);
       // And the refusal names a recovery that exists. Reading a range cannot help a file with one
       // line in it, and neither can a line-addressed edit, so it says to use a program.
@@ -757,7 +757,7 @@ describe('what a read that showed part of a file lets you do to the rest of it',
 
     await expect(
       run('file_write', { path: 'workspace/big.ts', content: tall(200) })
-    ).rejects.toThrow(AthanorError);
+    ).rejects.toThrow(GardenError);
     expect(toLines(written.get('workspace/big.ts') ?? '')).toHaveLength(8_332);
   });
 
@@ -796,7 +796,7 @@ describe('what a read that showed part of a file lets you do to the rest of it',
     ]);
 
     await expect(run('file_write', { path: 'workspace/mid.ts', content: 'new' })).rejects.toThrow(
-      AthanorError
+      GardenError
     );
 
     let next = first.nextStartLine as number | undefined;
@@ -1042,7 +1042,7 @@ describe('a file too long to be remembered four windows at a time', () => {
 
     await expect(
       run('file_write', { path: 'workspace/big.ts', content: 'mine now' })
-    ).rejects.toThrow(AthanorError);
+    ).rejects.toThrow(GardenError);
     expect(toLines(written.get('workspace/big.ts') ?? '')).toHaveLength(8_332);
   });
 

@@ -16,7 +16,7 @@ import {
   type FileHandle
 } from 'node:fs/promises';
 import path from 'node:path';
-import type { ProjectFileVersion } from '@athanor/contracts';
+import type { ProjectFileVersion } from '@garden/contracts';
 import { assertUserDataPath, withWorkspaceDirectory } from './files.js';
 import { openDownloadFile } from './file-downloads.js';
 import { assertHostStorageWrite, hostStorage, type HostStorage } from './host-storage.js';
@@ -25,7 +25,7 @@ export type VersionTree = Record<string, ProjectFileVersion>;
 const excluded = (name: string) =>
   [
     '.git',
-    '.athanor',
+    '.garden',
     '.garden',
     '.home',
     'node_modules',

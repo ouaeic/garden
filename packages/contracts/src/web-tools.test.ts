@@ -214,7 +214,7 @@ describe('provider web tools', () => {
   });
 
   it('puts nothing on the wire but the two fields the provider reads', () => {
-    // `supersedes` is athanor's own bookkeeping. A third key here would travel in the tools array
+    // `supersedes` is garden's own bookkeeping. A third key here would travel in the tools array
     // of the search request, where the provider has no field to put it in.
     const tools = serverWebTools(permitting);
     // A plan that offered no provider-side tool at all would satisfy the loop below without a

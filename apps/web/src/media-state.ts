@@ -1,4 +1,4 @@
-import type { MediaModelOption } from '@athanor/contracts';
+import type { MediaModelOption } from '@garden/contracts';
 export const mediaRouteIsRetired = (
   option: Pick<MediaModelOption, 'retirementAt'> | null | undefined,
   now = Date.now()

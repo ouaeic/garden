@@ -42,12 +42,7 @@ function workflowStep(source, name) {
 
 test('release check distinguishes branch refs from explicit and triggered release tags', () => {
   const environment = { ...process.env };
-  for (const key of [
-    'GITHUB_REF_TYPE',
-    'GITHUB_REF_NAME',
-    'GITHUB_OUTPUT',
-    'ATHANOR_RELEASE_TAG'
-  ]) {
+  for (const key of ['GITHUB_REF_TYPE', 'GITHUB_REF_NAME', 'GITHUB_OUTPUT', 'GARDEN_RELEASE_TAG']) {
     delete environment[key];
   }
   const cases = [
@@ -59,14 +54,11 @@ test('release check distinguishes branch refs from explicit and triggered releas
     [{ GITHUB_REF_TYPE: 'tag', GITHUB_REF_NAME: 'v999.0.0' }, false],
     [{ GITHUB_REF_TYPE: 'tag' }, false],
     [
-      { ATHANOR_RELEASE_TAG: `v${version}`, GITHUB_REF_TYPE: 'branch', GITHUB_REF_NAME: 'main' },
+      { GARDEN_RELEASE_TAG: `v${version}`, GITHUB_REF_TYPE: 'branch', GITHUB_REF_NAME: 'main' },
       true
     ],
-    [
-      { ATHANOR_RELEASE_TAG: 'v999.0.0', GITHUB_REF_TYPE: 'branch', GITHUB_REF_NAME: 'main' },
-      false
-    ],
-    [{ ATHANOR_RELEASE_TAG: '' }, false]
+    [{ GARDEN_RELEASE_TAG: 'v999.0.0', GITHUB_REF_TYPE: 'branch', GITHUB_REF_NAME: 'main' }, false],
+    [{ GARDEN_RELEASE_TAG: '' }, false]
   ];
   assert.ok(cases.length > 0);
   for (const [overrides, accepted] of cases) {
@@ -81,8 +73,8 @@ test('release check distinguishes branch refs from explicit and triggered releas
 test('the runner unit shell accepts its real unit and rejects every deliberate invariant violation', (t) => {
   const directory = temporary(t);
   mkdirSync(join(directory, 'infra/native'), { recursive: true });
-  const path = join(directory, 'infra/native/athanor-runner.service');
-  const original = readFileSync(join(root, 'infra/native/athanor-runner.service'), 'utf8');
+  const path = join(directory, 'infra/native/garden-runner.service');
+  const original = readFileSync(join(root, 'infra/native/garden-runner.service'), 'utf8');
   assert.ok(original.length > 0);
   const shell = workflowStep(verify, "The runner unit's deliberate omissions are still omissions");
   const cases = [
@@ -111,7 +103,7 @@ test('the runner unit shell accepts its real unit and rejects every deliberate i
     ],
     [original.replace(/^ProtectHome=tmpfs$/m, 'ProtectHome=true'), 'must hide /home with tmpfs'],
     [original.replace(/^BindPaths=.*$/m, ''), 'without binding the workspace root'],
-    [`${original}\nReadWritePaths=/home/athanor\n`, 'reopens /home']
+    [`${original}\nReadWritePaths=/home/garden\n`, 'reopens /home']
   ];
   assert.ok(cases.length > 0);
   for (const [fixture, diagnostic] of cases) {
@@ -157,10 +149,10 @@ test('certificate confinement refusal reaches the remaining checks under dash an
   assert.equal(matches.length, 1, 'expected the actual certificate drill script');
   let script = matches[0][1];
   for (const [index, original] of [
-    '/etc/athanor',
+    '/etc/garden',
     '/etc/nginx/snippets',
-    '/var/lib/athanor',
-    '/usr/local/lib/athanor'
+    '/var/lib/garden',
+    '/usr/local/lib/garden'
   ].entries()) {
     assert.equal(script.split(original).length, 2, `expected one writable tree: ${original}`);
     const writable = join(directory, `writable-${index}`);
@@ -262,7 +254,7 @@ if (/(?:^|[/\\\\])build-(?:native|mobile)\\.mjs$/.test(process.argv[1] ?? '')) {
               .join(' ')}\n`
         )
         .matchAll(
-          new RegExp(`^\\s*(?:- )?run: (pnpm --filter @athanor/desktop ${script}[^\\n]*)$`, 'gm')
+          new RegExp(`^\\s*(?:- )?run: (pnpm --filter @garden/desktop ${script}[^\\n]*)$`, 'gm')
         )
     ];
     assert.equal(commands.length, 1, `expected one CI ${script} command`);

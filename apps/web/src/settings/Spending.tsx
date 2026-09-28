@@ -1,4 +1,4 @@
-import type { SpendLimits, SpendSummary } from '@athanor/contracts';
+import type { SpendLimits, SpendSummary } from '@garden/contracts';
 import { put } from '../client.js';
 import { Button, Field } from '../ui.js';
 import {

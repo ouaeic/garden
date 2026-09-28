@@ -8,7 +8,7 @@ import type {
   VoiceStartRequest,
   VoiceWorkProposal,
   VoiceReasoningEffort
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { get, post, del } from '../client';
 import { money, statusLabel } from '../model';
 import { Button, Dialog, ErrorNotice, Field, Spinner } from '../ui';

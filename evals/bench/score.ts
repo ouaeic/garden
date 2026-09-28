@@ -3,7 +3,7 @@
  * socket against a real directory, and the box decides whether it was solved.
  *
  * THIS FILE EXISTS BECAUSE EVERYTHING ELSE IN THIS DIRECTORY WAS PROVED IN ISOLATION. The shim
- * answered requests this rig composed. `wiring.ts` went one better and drove athanor's own
+ * answered requests this rig composed. `wiring.ts` went one better and drove garden's own
  * `AgentRunnerClient` over the socket, which is the wire - but no turn ran, no tool dispatched, no
  * approval floor was consulted and no score was ever produced. That is the computed-and-unwired
  * shape this programme has now shipped three times, and this is the line that was never written.
@@ -17,7 +17,7 @@
  *   NOT  - the model. It is a script (`task.ts`), so no provider is called and nothing is billed.
  *
  * So a score of 1.0 below means the loop can carry a scripted solution end to end into a real
- * filesystem and have a command in that filesystem agree. It says NOTHING about athanor's ability
+ * filesystem and have a command in that filesystem agree. It says NOTHING about garden's ability
  * on a benchmark, and a reader who takes it for one has been misled by this file. That is why the
  * row goes to `parity-wire.csv` and never to `parity.csv`, why its `model` column names itself as
  * scripted, and why README.md's paid command is still the first number that would mean anything.
@@ -45,11 +45,11 @@ import { createShim, type Shim } from './shim.js';
 import { fixtureFor, TASKS, VERIFIER_PATH, type WireTask } from './task.js';
 
 /**
- * What this environment does NOT do that athanor does, printed in the row rather than omitted.
+ * What this environment does NOT do that garden does, printed in the row rather than omitted.
  *
  * Restated from `shim.ts` and `backend.ts` because a row read a year from now will not have those
  * files open beside it. Each is a real difference between the box that produced the number and the
- * box athanor ships onto.
+ * box garden ships onto.
  */
 export const LOCAL_DROPS: readonly string[] = [
   'no capability-token verification (the real runner verifies a signed token per request)',
@@ -80,7 +80,7 @@ export interface ScoredTask {
   /**
    * What the turn said about its own evidence, from the completion event.
    *
-   * Beside the verdict and never instead of it. `status` and this are athanor's account of itself;
+   * Beside the verdict and never instead of it. `status` and this are garden's account of itself;
    * `resolved` is the box's. A benchmark adapter that scored on either of these two would be
    * scoring the agent's own report - see this file's header, and the acceptance ceiling in
    * `apps/worker/src/turn-bounds.ts:360`, which ends a turn `completed` after four failed rounds of
@@ -224,7 +224,7 @@ export const rowInputFrom = (facts: RowFacts): RowInput => ({
   model: facts.model,
   modelRoute: facts.modelRoute,
   provider: facts.provider,
-  harness: 'athanor',
+  harness: 'garden',
   harnessVersion: facts.harnessVersion,
   harnessCommit: facts.harnessCommit,
   arm: facts.arm,
@@ -394,7 +394,7 @@ export const scoreTask = async (
         // response's usage frame - attributable to THIS task, which the account's running total
         // is not once two processes share a key. Scripted: no provider was called, so nothing was billed, and
         // zero is a fact about this run and not a cost measurement; the `model` column names the
-        // run as scripted so the cell cannot be read as "athanor solved this for nothing".
+        // run as scripted so the cell cannot be read as "garden solved this for nothing".
         costUsd: live === undefined ? 0 : outcome.providerCostUsd,
         // Live: the provider's own input count, off the same response frames as the cost.
         // Scripted: measured on the wire by `evals/harness.ts` rather than estimated, the whole
@@ -478,7 +478,7 @@ export const scoreRun = async (options: ScoreOptions): Promise<ScoreReport> => {
     );
   const ranIn = scored[0]?.ranIn ?? { name: 'local', isolatesNetwork: false };
   const input = rowInputFrom({
-    benchmark: 'athanor-wire',
+    benchmark: 'garden-wire',
     taskIds: scored.map((one) => one.task.id),
     // The tasks themselves, hashed, so two rows claiming the same task set can be checked rather
     // than believed. Over the prompt, the seed and the verifier argv - everything that decides what
@@ -525,9 +525,9 @@ const here = path.dirname(fileURLToPath(import.meta.url));
  * A separate artefact from `parity.csv`, and the separation is the point.
  *
  * `parity.csv` is the benchmark artefact and it is committed with zero rows, because there is no
- * athanor benchmark score in this repository. A row produced by a scripted model against a local
+ * garden benchmark score in this repository. A row produced by a scripted model against a local
  * shim is not one, and putting it in that file would put a `score_mean` of 1.0 in the artefact a
- * reader goes to for athanor's number. Same columns, same `rowFrom`, same refusals; different file,
+ * reader goes to for garden's number. Same columns, same `rowFrom`, same refusals; different file,
  * and every row in it says `scripted-no-provider` in its model column.
  */
 export const WIRE_CSV = path.join(here, 'parity-wire.csv');
@@ -575,7 +575,7 @@ export const runScore = async (options: {
   }
   options.out(`One row, earned, written to ${WIRE_CSV}.`);
   options.out(
-    '  It is a wire proof and not a benchmark score: the model is a script. See README.md section 5 for the command that produces a number about athanor.'
+    '  It is a wire proof and not a benchmark score: the model is a script. See README.md section 5 for the command that produces a number about garden.'
   );
   return report.scored.every((one) => one.result.resolved === true) ? 0 : 1;
 };

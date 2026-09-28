@@ -19,14 +19,14 @@
  */
 
 import { gzipSync } from 'node:zlib';
-import type { ShareSnapshot, ShareSnapshotEventKind, TaskEventKind } from '@athanor/contracts';
+import type { ShareSnapshot, ShareSnapshotEventKind, TaskEventKind } from '@garden/contracts';
 import {
   SHARE_LIMITS,
   SHARE_TOKEN_PATTERN,
   ShareSnapshotEventKind as SnapshotKind
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import {
-  AthanorError,
+  GardenError,
   decryptJson,
   encryptBytes,
   generateDataKey,
@@ -34,8 +34,8 @@ import {
   sha256,
   unwrapDataKey,
   type EncryptedEnvelope
-} from '@athanor/core';
-import type { TaskRecord, UserRecord, WorkspaceRecord } from '@athanor/data';
+} from '@garden/core';
+import type { TaskRecord, UserRecord, WorkspaceRecord } from '@garden/data';
 import { revealedTaskEvent, textValue } from './context.js';
 import type { RouteContext } from './http/server-context.js';
 
@@ -200,9 +200,9 @@ export const buildShareSnapshot = async (
 }> => {
   const { store, masterKey, runner } = context;
   const task = await store.getTask(user.id, taskId);
-  if (!task) throw new AthanorError('task_not_found', 'Task not found', 404);
+  if (!task) throw new GardenError('task_not_found', 'Task not found', 404);
   const workspace = await store.getWorkspace(user.id, task.workspaceId);
-  if (!workspace?.wrappedKey) throw new AthanorError('workspace_not_found', 'Workspace not found');
+  if (!workspace?.wrappedKey) throw new GardenError('workspace_not_found', 'Workspace not found');
   const dataKey = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
 
   const events: ShareSnapshot['events'] = [];
@@ -228,10 +228,10 @@ export const buildShareSnapshot = async (
     // Ticked by id, so an id that is not this conversation's names nothing here - whatever else it
     // may name on this box.
     if (!artifact || artifact.taskId !== task.id)
-      throw new AthanorError('not_found', 'Artifact not found', 404);
+      throw new GardenError('not_found', 'Artifact not found', 404);
     const sizeBytes = Number(artifact.sizeBytes);
     if (sizeBytes > SHARE_LIMITS.artifactBytes)
-      throw new AthanorError('share_too_large', 'An artifact is too large to share', 413);
+      throw new GardenError('share_too_large', 'An artifact is too large to share', 413);
     const bytes = await runner.request<Buffer>({
       workspaceId: workspace.id,
       userId: user.id,
@@ -240,12 +240,12 @@ export const buildShareSnapshot = async (
       path: `/v1/workspaces/${workspace.id}/file?path=${encodeURIComponent(String(artifact.storageKey))}`
     });
     if (sha256(bytes) !== artifact.sha256)
-      throw new AthanorError('artifact_integrity_failed', 'Artifact integrity check failed');
+      throw new GardenError('artifact_integrity_failed', 'Artifact integrity check failed');
     if (bytes.byteLength > SHARE_LIMITS.artifactBytes)
-      throw new AthanorError('share_too_large', 'An artifact is too large to share', 413);
+      throw new GardenError('share_too_large', 'An artifact is too large to share', 413);
     total += bytes.byteLength;
     if (total > SHARE_LIMITS.totalBytes)
-      throw new AthanorError('share_too_large', 'This link would carry too much', 413);
+      throw new GardenError('share_too_large', 'This link would carry too much', 413);
     const name = decryptJson<{ name: string }>(
       artifact.nameCiphertext as EncryptedEnvelope,
       dataKey,
@@ -273,7 +273,7 @@ export const buildShareSnapshot = async (
   };
   const snapshotBytes = Buffer.byteLength(JSON.stringify(snapshot), 'utf8');
   if (snapshotBytes > SHARE_LIMITS.snapshotBytes || total + snapshotBytes > SHARE_LIMITS.totalBytes)
-    throw new AthanorError('share_too_large', 'This conversation is too long to share', 413);
+    throw new GardenError('share_too_large', 'This conversation is too long to share', 413);
   return { task, workspace, snapshot, artifacts };
 };
 

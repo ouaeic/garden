@@ -1,4 +1,4 @@
-import type { PrivacyRoute } from '@athanor/contracts';
+import type { PrivacyRoute } from '@garden/contracts';
 import { isNativeOpenAIEndpoint, OPENAI_VIDEO_RETIREMENT_AT } from './openai-media-catalog.js';
 import { mediaRecord } from './media-capabilities.js';
 import { readBoundedMediaBody } from './media-output.js';

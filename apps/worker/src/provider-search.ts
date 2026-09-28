@@ -1,11 +1,11 @@
 /**
  * A web search answered by the model provider, returned in the shape the in-house search returns.
  *
- * The route this exists for is the one athanor actually ships on. A search engine challenges
+ * The route this exists for is the one garden actually ships on. A search engine challenges
  * datacenter address ranges as a matter of course, so the workspace's own browser - which is an
- * ordinary client making an ordinary request from wherever athanor is installed - is answered with
+ * ordinary client making an ordinary request from wherever garden is installed - is answered with
  * an anti-bot challenge rather than results, and will be answered the same way next time, because
- * what is being refused is the address. `resolveWebToolPlan` in @athanor/contracts decides that this
+ * what is being refused is the address. `resolveWebToolPlan` in @garden/contracts decides that this
  * box searches on the provider instead. This is the half that then has to do it.
  *
  * The provider's search is not a function tool. It has no `function.name`, so no model can call it
@@ -16,7 +16,7 @@
  * answered from memory with fabricated projects and fabricated addresses.
  *
  * So `web_search` stays a named function tool on both routes and this answers it: one request whose
- * only job is to run that query, built by athanor, carrying the provider's tool and no function
+ * only job is to run that query, built by garden, carrying the provider's tool and no function
  * tools at all. What comes back are the provider's `url_citation` annotations, which are the sources
  * it actually retrieved rather than the model's account of them, and those become the ranked result
  * rows the model already knows how to read.
@@ -27,9 +27,9 @@
  * back thin would make that sentence false at the moment it mattered most.
  */
 
-import type { ServerToolUse, WebCitation } from '@athanor/contracts';
-import { AthanorError } from '@athanor/core';
-import type { ModelMessage } from '@athanor/model-gateway';
+import type { ServerToolUse, WebCitation } from '@garden/contracts';
+import { GardenError } from '@garden/core';
+import type { ModelMessage } from '@garden/model-gateway';
 
 /**
  * One result row, field for field what `services/workspace-runner/src/search.ts` returns for an
@@ -145,7 +145,7 @@ const searchWasRun = (serverToolUse: ServerToolUse | undefined): boolean =>
 export const providerWebSearch = async (input: {
   query: string;
   limit: number;
-  /** What ran the search, for the trail. athanor is not told which engine the provider chose. */
+  /** What ran the search, for the trail. garden is not told which engine the provider chose. */
   engine: string;
   ask: (messages: ModelMessage[]) => Promise<{
     citations?: readonly WebCitation[];
@@ -153,12 +153,12 @@ export const providerWebSearch = async (input: {
   }>;
 }): Promise<WebSearchAnswer> => {
   const query = collapse(input.query).slice(0, QUERY_LIMIT);
-  if (!query) throw new AthanorError('web_search_invalid', 'A web search needs a query');
+  if (!query) throw new GardenError('web_search_invalid', 'A web search needs a query');
   const response = await input.ask(providerSearchMessages(query));
   const results = providerSearchResults(response.citations ?? [], input.limit);
   if (results.length > 0) return { engine: input.engine, query, route: 'provider', results };
   if (!searchWasRun(response.usage.serverToolUse))
-    throw new AthanorError(
+    throw new GardenError(
       'web_search_not_run',
       `The search service did not run a search for "${query}", so nothing was retrieved and this is not evidence that nothing exists. Search again in different words, or use browser_action and browser_snapshot if you already have an address.`
     );

@@ -12,9 +12,9 @@
  * run, with its own acceptance check having run in the box and failed four times. See
  * `evals/bench/selftest.ts` and the note at `evals/bench/score.ts:159`.
  */
-import type { TaskRecord } from '@athanor/data';
-import { decryptJson } from '@athanor/core';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import type { TaskRecord } from '@garden/data';
+import { decryptJson } from '@garden/core';
+import type { ModelToolCall } from '@garden/model-gateway';
 import { describe, expect, it } from 'vitest';
 import type { AcceptanceRecord, AcceptanceResult } from '../acceptance.js';
 import type { AgentState } from '../agent-state.js';
@@ -349,7 +349,7 @@ describe('what the owner reads, in the words they read', () => {
 
     expect(beside(run)).toEqual([ACCEPTANCE_FAILED_CAVEAT]);
     expect(ACCEPTANCE_FAILED_CAVEAT).toBe(
-      'athanor ran the checks this turn declared and they did not pass, so nothing here is verified - read the failures below before relying on it.'
+      'garden ran the checks this turn declared and they did not pass, so nothing here is verified - read the failures below before relying on it.'
     );
   });
 
@@ -358,9 +358,9 @@ describe('what the owner reads, in the words they read', () => {
 
     expect(beside(run)).toEqual([ACCEPTANCE_COULD_NOT_RUN_CAVEAT]);
     expect(ACCEPTANCE_COULD_NOT_RUN_CAVEAT).toBe(
-      'athanor could not run the checks this turn declared, so this result is unchecked - neither proved nor disproved.'
+      'garden could not run the checks this turn declared, so this result is unchecked - neither proved nor disproved.'
     );
-    // The sentence a reader must not be given here: nothing failed, and saying so would be athanor
+    // The sentence a reader must not be given here: nothing failed, and saying so would be garden
     // claiming an observation it never made.
     expect(beside(run)).not.toContain(ACCEPTANCE_FAILED_CAVEAT);
   });
@@ -535,7 +535,7 @@ it('carries the full final answer independently of progress and the short receip
 });
 
 it('uses a completion title without another model call and keeps naming failures separate from the result', async () => {
-  const { encryptJson, decryptJson } = await import('@athanor/core');
+  const { encryptJson, decryptJson } = await import('@garden/core');
   const writes: unknown[] = [],
     completions: unknown[] = [];
   const titledTask = {

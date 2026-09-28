@@ -1,6 +1,6 @@
 import { runtimeValue, runtimeObservations } from './runtime-observations.js';
 import { createHash, createHmac, hkdfSync } from 'node:crypto';
-import { AthanorError } from './errors.js';
+import { GardenError } from './errors.js';
 
 export interface MemoryDocument {
   content: string;
@@ -196,11 +196,11 @@ export const assertMemoryValidity = (document: MemoryDocument): void => {
   const validFrom = instant(document.validFrom);
   const validUntil = instant(document.validUntil);
   if (document.validFrom && validFrom === undefined)
-    throw new AthanorError('memory_validity_invalid', 'Memory start time is invalid');
+    throw new GardenError('memory_validity_invalid', 'Memory start time is invalid');
   if (document.validUntil && validUntil === undefined)
-    throw new AthanorError('memory_validity_invalid', 'Memory expiry time is invalid');
+    throw new GardenError('memory_validity_invalid', 'Memory expiry time is invalid');
   if (validFrom !== undefined && validUntil !== undefined && validUntil <= validFrom)
-    throw new AthanorError(
+    throw new GardenError(
       'memory_validity_invalid',
       'Memory expiry must be later than its start time'
     );
@@ -395,7 +395,7 @@ const encodeToken = (digest: Buffer, chars: number): string => {
  * cannot decrypt anything, and rotating the search surface never touches stored ciphertext.
  */
 export const memoryIndexKey = (dataKey: Uint8Array): Buffer =>
-  Buffer.from(hkdfSync('sha256', dataKey, new Uint8Array(0), 'athanor-memory-index-v1', 32));
+  Buffer.from(hkdfSync('sha256', dataKey, new Uint8Array(0), 'garden-memory-index-v1', 32));
 
 /**
  * The key a fact about the OWNER is sealed under, and the reason the owner tier can leave a
@@ -423,7 +423,7 @@ export const memoryIndexKey = (dataKey: Uint8Array): Buffer =>
  */
 export const userMemoryKey = (masterKey: Uint8Array, userId: string): Buffer =>
   Buffer.from(
-    hkdfSync('sha256', masterKey, Buffer.from(userId, 'utf8'), 'athanor-user-memory-v1', 32)
+    hkdfSync('sha256', masterKey, Buffer.from(userId, 'utf8'), 'garden-user-memory-v1', 32)
   );
 
 /**
@@ -595,10 +595,10 @@ const HAS_LETTER = /\p{L}/u;
 /**
  * The component words of a compound term.
  *
- * The tokenizer deliberately keeps `athanor-relay`, `imap_idle_notify_interval` and
- * `/srv/athanor/var/log` whole, because that is what makes them findable by their exact name. The
+ * The tokenizer deliberately keeps `garden-relay`, `imap_idle_notify_interval` and
+ * `/srv/garden/var/log` whole, because that is what makes them findable by their exact name. The
  * cost is that they share no lexeme with the words a person actually asks by - nobody types
- * `athanor-relay`, they ask what port the relay listens on. This splits a compound into its parts
+ * `garden-relay`, they ask what port the relay listens on. This splits a compound into its parts
  * so both surfaces exist: the exact name in the body field, the parts in a lower-weighted alias
  * field beside it. Parts that the tokenizer already produced from the same text are dropped, so
  * ordinary prose contributes nothing here and pays nothing for it.
@@ -687,7 +687,7 @@ export const memoryObjectKey = (object: string, key: Uint8Array): string =>
 
 /**
  * Keyed handle for where a verbatim row came from - a path, URL or command. Compacted sources
- * leave the lexical index, so this is what still finds "everything I ever ran in /srv/athanor".
+ * leave the lexical index, so this is what still finds "everything I ever ran in /srv/garden".
  */
 export const memoryOriginKey = (locator: string, key: Uint8Array): string =>
   keyedToken('origin', normalizeMemoryTerm(locator), key, KEY_TOKEN_CHARS);
@@ -706,7 +706,7 @@ export interface MemoryItemIndex {
   /**
    * Keyed component words of the entry's compound terms - its subject, object, title and the
    * identifiers in its body. Indexed at a weight below the title, so `relay` reaches a fact whose
-   * subject is `athanor-relay` without outranking an entry that is actually titled "relay".
+   * subject is `garden-relay` without outranking an entry that is actually titled "relay".
    */
   readonly aliasTokens: string;
   readonly bodyTokens: string;
@@ -848,7 +848,7 @@ const MAX_NAME_PREFIX_TOKENS = 128;
  * Every prefix, within the band, of every word a name is findable by.
  *
  * Both surfaces the name already has, because a prefix has to reach whatever the whole word
- * reaches: `athanor-relay` for its exact name, and the `athanor` and `relay` its alias expansion
+ * reaches: `garden-relay` for its exact name, and the `garden` and `relay` its alias expansion
  * produced, so `rel` narrows to it the way `relay` already does.
  *
  * Whole chains first, in the order the words were found, because the bound below cuts the tail off
@@ -906,7 +906,7 @@ export const conversationNamePrefixTokens = (query: string, key: Uint8Array): st
  * that asks for it.
  */
 export const CONVERSATION_NAME_INDEX_STAMP = encodeToken(
-  createHash('sha256').update('athanor-conversation-name-index-v3-sorted-prefixes').digest(),
+  createHash('sha256').update('garden-conversation-name-index-v3-sorted-prefixes').digest(),
   20
 );
 
@@ -1006,7 +1006,7 @@ export const memoryExcerpt = (
   if (text.length <= maxChars) return text;
 
   // The query's own words and the parts of its compound terms, symmetrically with the alias surface
-  // the index matched on: a row admitted because `athanor-relay` contains `relay` has to be
+  // the index matched on: a row admitted because `garden-relay` contains `relay` has to be
   // excerpted at that name, not at the first prose word that happened to agree.
   const wanted = new Set([...memoryLexemes(query), ...memoryAliasLexemes(query)]);
   const hits = locatedLexemes(text).filter(
@@ -1092,8 +1092,8 @@ export const planMemoryQuery = (
   options: { readonly entities?: readonly string[] } = {}
 ): MemoryQueryPlan => {
   // The request's own words and the parts of its compound terms, symmetrically with the alias
-  // surface every indexed row carries: `athanor-relay` in the request reaches an entry that only
-  // says `relay`, and `relay` reaches one that only says `athanor-relay`.
+  // surface every indexed row carries: `garden-relay` in the request reaches an entry that only
+  // says `relay`, and `relay` reaches one that only says `garden-relay`.
   const lexemes = [...memoryLexemes(query), ...memoryAliasLexemes(query)];
   const keyedLexemes = [
     ...new Set(lexemes.map((lexeme) => keyedToken('lex', lexeme, key, LEXEME_TOKEN_CHARS)))
@@ -1538,7 +1538,7 @@ const PACK_SECTIONS: readonly { readonly kind: MemoryKind; readonly heading: str
 const isoInstant = (value: string): string => {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime()))
-    throw new AthanorError('memory_pack_timestamp_invalid', 'Memory pack timestamps must be dates');
+    throw new GardenError('memory_pack_timestamp_invalid', 'Memory pack timestamps must be dates');
   return parsed.toISOString();
 };
 

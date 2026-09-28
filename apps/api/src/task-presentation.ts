@@ -1,6 +1,6 @@
 import { projectWorkSurface } from './work-surface-projection.js';
-import { deliveryFilePath } from '@athanor/contracts';
-export { deliveryFilePath } from '@athanor/contracts';
+import { deliveryFilePath } from '@garden/contracts';
+export { deliveryFilePath } from '@garden/contracts';
 import type {
   Artifact,
   TaskEvent,
@@ -10,7 +10,7 @@ import type {
   TaskResult,
   TaskOutputIntent,
   WorkspacePreview
-} from '@athanor/contracts';
+} from '@garden/contracts';
 
 const record = (value: unknown): Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value)

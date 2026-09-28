@@ -2,13 +2,13 @@
 name: screen-capture
 description: Save what the browser or the desktop is showing as an image file in the workspace - a page for a report, a proof that a form was filled, the screen of a desktop application - and check the file before handing it over. Use whenever the user asks for a screenshot, a capture or a picture of a page or the screen saved to disk. Do not use to read a page or the screen for your own eyes, which browser_snapshot and desktop_observe already do without writing a file, and never search the filesystem for a browser binary to drive by hand.
 license: AGPL-3.0-or-later
-compatibility: The browser half needs the athanor browser runner; the desktop half needs the GUI desktop, whose display owns ffmpeg and xdotool.
+compatibility: The browser half needs the garden browser runner; the desktop half needs the GUI desktop, whose display owns ffmpeg and xdotool.
 allowed-tools: browser_action print_pdf shell desktop_observe image_read
 metadata:
-  athanor.tier: 'builtin'
-  athanor.version: '1.0.0'
-  athanor.risk: 'workspace'
-  athanor.domain: 'web'
+  garden.tier: 'builtin'
+  garden.version: '1.0.0'
+  garden.risk: 'workspace'
+  garden.domain: 'web'
 ---
 
 # Screen capture

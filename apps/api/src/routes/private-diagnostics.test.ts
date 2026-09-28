@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DIAGNOSTIC_CAPTURE_BYTES } from '@athanor/contracts';
+import { DIAGNOSTIC_CAPTURE_BYTES } from '@garden/contracts';
 import {
   diagnosticCipherHash,
   diagnosticRecordAad,
@@ -9,7 +9,7 @@ import {
   encryptJson,
   PrivateDiagnosticReader,
   wrapDataKey
-} from '@athanor/core';
+} from '@garden/core';
 import type { RouteContext } from '../http/server-context.js';
 import { registerPrivateDiagnosticRoutes } from './private-diagnostics.js';
 const apps: FastifyInstance[] = [];

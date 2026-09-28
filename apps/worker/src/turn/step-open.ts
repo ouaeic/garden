@@ -1,5 +1,5 @@
-import type { TaskRecord } from '@athanor/data';
-import { encryptJson } from '@athanor/core';
+import type { TaskRecord } from '@garden/data';
+import { encryptJson } from '@garden/core';
 import type { AgentState } from '../agent-state.js';
 import { refreshArtifactLedger } from '../context.js';
 import { noteStepBudget, stepCeiling, turnWallClockReached, type HandoffDeps } from '../handoff.js';

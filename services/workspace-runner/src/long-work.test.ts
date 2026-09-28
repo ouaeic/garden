@@ -3,7 +3,7 @@ import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { capabilityAudience, signCapabilityToken } from '@athanor/core';
+import { capabilityAudience, signCapabilityToken } from '@garden/core';
 import type { RunnerConfig } from './config.js';
 import { ensureWorkspace } from './files.js';
 import { buildServer } from './server.js';
@@ -32,7 +32,7 @@ const runnerConfig = (workspaceRoot: string, secret: string): RunnerConfig =>
     RUNNER_SHARED_SECRET: secret,
     WORKSPACE_ROOT: workspaceRoot,
     TAR_EXECUTABLE: '/usr/bin/tar',
-    SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/athanor-snapshot'),
+    SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/garden-snapshot'),
     BROWSER_USE_DESKTOP_DISPLAY: false,
     BROWSER_CPU_NICE: 0,
     // Deliberately different from each other, which is the property under test. On the shipped
@@ -63,7 +63,7 @@ describe('a long job is bounded by the path it runs on', () => {
   });
 
   const harness = async () => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-longwork-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-longwork-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const secret = 'runner-longwork-test-secret-at-least-32-characters';
     const app = await buildServer(runnerConfig(workspaceRoot, secret));
@@ -169,7 +169,7 @@ describe('the host-disk floor reaches a command started through the route', () =
   });
 
   it('stops it, and says so on the command own stderr', async () => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-longwork-floor-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-longwork-floor-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const secret = 'runner-longwork-test-secret-at-least-32-characters';
     let reads = 0;
@@ -240,7 +240,7 @@ describe('a background job says when it will be killed', () => {
     overrides: Partial<RunnerConfig> = {},
     nonceTag = 'deadline'
   ) => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-deadline-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-deadline-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const secret = 'runner-longwork-test-secret-at-least-32-characters';
     const app = await buildServer({
@@ -374,7 +374,7 @@ describe('the ceiling an owner configures is the ceiling the box enforces', () =
   });
 
   const harness = async (workspaceId: string, ceilingSeconds: number, nonceTag: string) => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-ceiling-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-ceiling-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const secret = 'runner-longwork-test-secret-at-least-32-characters';
     const app = await buildServer({
@@ -443,18 +443,18 @@ describe('the ceiling an owner configures is the ceiling the box enforces', () =
  * The update gate, driven from where the update actually runs.
  *
  * `ProcessManager.backgroundWork()` was computed and had no caller, so `/healthz` said nothing
- * about running work and both arms of `athanor update` took their "could not tell" branch and went
+ * about running work and both arms of `garden update` took their "could not tell" branch and went
  * ahead - while docs/OPERATIONS.md and docs/AGENT_RUNTIME.md told the owner the stand-down already
  * happened. The route now publishes it, and this is the case that holds the whole chain shut.
  *
  * WHY IT IS WRITTEN THIS WAY. The link between the runner and the update is not a call: it is two
  * field names, `backgroundCommands` and `backgroundLongestRemainingMs`, that a `sed` pattern in
- * scripts/athanor looks for in the response body. No compiler checks that, and a helper-level test
+ * scripts/garden looks for in the response body. No compiler checks that, and a helper-level test
  * - one that calls `backgroundWork()` and asserts on its return - passes identically whether or not
  * the route emits anything, which is the pin this repository has shipped four times and the reason
  * the defect kept coming back. So this test starts a real background job through the real route,
  * takes the real bytes `/healthz` answers, and runs the REAL shell: `runner_background_work`,
- * `background_work_summary` and both gate blocks are cut out of scripts/athanor at test time by
+ * `background_work_summary` and both gate blocks are cut out of scripts/garden at test time by
  * their own first and last lines, never copied here. If the script is edited so those anchors move,
  * the cut throws by name rather than silently testing a stale copy of the shell.
  *
@@ -467,7 +467,7 @@ describe('an update stands down for the background work this runner reports', ()
     while (disposers.length) await disposers.pop()!();
   });
 
-  const scriptPath = path.resolve('../../scripts/athanor');
+  const scriptPath = path.resolve('../../scripts/garden');
 
   /**
    * The `occurrence`-th run of lines from `first` to `last`, inclusive. Both gate blocks begin with
@@ -479,10 +479,10 @@ describe('an update stands down for the background work this runner reports', ()
     for (let seen = 0; seen < occurrence; seen += 1) {
       from = lines.indexOf(first, from + 1);
       if (from === -1)
-        throw new Error(`scripts/athanor no longer has ${occurrence} occurrence(s) of ${first}`);
+        throw new Error(`scripts/garden no longer has ${occurrence} occurrence(s) of ${first}`);
     }
     const to = lines.indexOf(last, from + 1);
-    if (to === -1) throw new Error(`scripts/athanor: no ${last} after ${first}`);
+    if (to === -1) throw new Error(`scripts/garden: no ${last} after ${first}`);
     return lines.slice(from, to + 1).join('\n');
   };
 
@@ -491,7 +491,7 @@ describe('an update stands down for the background work this runner reports', ()
     program: string,
     body: string | null
   ): Promise<{ status: number | null; stdout: string; stderr: string }> => {
-    const dir = await mkdtemp(path.join(tmpdir(), 'athanor-gate-'));
+    const dir = await mkdtemp(path.join(tmpdir(), 'garden-gate-'));
     disposers.push(() => rm(dir, { recursive: true, force: true }));
     const bodyFile = path.join(dir, 'healthz.json');
     if (body !== null) await writeFile(bodyFile, body);
@@ -530,7 +530,7 @@ describe('an update stands down for the background work this runner reports', ()
   };
 
   const harness = async (workspaceId: string, nonceTag: string) => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-gate-runner-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-gate-runner-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const secret = 'runner-longwork-test-secret-at-least-32-characters';
     const app = await buildServer(runnerConfig(workspaceRoot, secret));
@@ -578,7 +578,7 @@ describe('an update stands down for the background work this runner reports', ()
     // 90s of deadline, rounded the way the shell rounds it. The count alone is not what makes an
     // operator wait; this is.
     expect(run.stderr).toContain('the longest has about 2 minutes left');
-    expect(run.stderr).toContain('ATHANOR_UPDATE_OVER_BACKGROUND_WORK=1');
+    expect(run.stderr).toContain('GARDEN_UPDATE_OVER_BACKGROUND_WORK=1');
     // The branch this route existed to close. Reaching it would mean the field never arrived.
     expect(run.stdout).not.toContain('cannot tell');
   });
@@ -605,7 +605,7 @@ describe('an update stands down for the background work this runner reports', ()
   /*
    * The other direction, which is the half that makes the gate a gate rather than a brake. A box
    * with nothing running must update, and so must a box whose only long-lived process is a DECLARED
-   * SERVICE - a service is written down in .athanor/services.json and `resume` brings it back, so
+   * SERVICE - a service is written down in .garden/services.json and `resume` brings it back, so
    * standing down for one would mean a box that runs a dashboard never updates again.
    */
   it('goes ahead with nothing running, and goes ahead for a declared service', async () => {
@@ -629,7 +629,7 @@ describe('an update stands down for the background work this runner reports', ()
   });
 
   /*
-   * A runner OLDER than this change, and a runner that is not answering at all. `athanor update`
+   * A runner OLDER than this change, and a runner that is not answering at all. `garden update`
    * runs the previous release's copy of this script against whatever is on the disk, so the shell
    * always has to cope with a runner that predates the field - and the two absences mean opposite
    * things. A missing field is "could not tell": the update says so out loud and proceeds, because

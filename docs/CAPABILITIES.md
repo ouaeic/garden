@@ -20,7 +20,7 @@ There is no paid tier and no metering of the owner against a plan. The owner hol
 model-provider account and pays it directly. Four ceilings bound a run, and none of them is an
 allowance:
 
-- the **pre-flight price ceiling** (`sudo athanor price-ceiling`), a maximum rate in dollars per
+- the **pre-flight price ceiling** (`sudo garden price-ceiling`), a maximum rate in dollars per
   million tokens that garden will not select a model above. It is the only one that acts before
   any money is spent, and the only one that works while the owner is asleep; a model the owner
   names explicitly is never constrained by it;
@@ -122,7 +122,7 @@ access, and background work measured in hours. What that machine is stocked _wit
 much narrower decision, because every package on it is disk, install time and attack surface on a
 computer the owner uses for other things.
 
-One table carries most of it - `scripts/athanor-host.sh`, a row per capability and a column per
+One table carries most of it - `scripts/garden-host.sh`, a row per capability and a column per
 supported distribution family - and the installer hands that family's whole column to the package
 manager: the office suite and the metric-compatible fonts a document needs to hold its layout,
 poppler, qpdf, ghostscript, tesseract, ImageMagick, graphviz, ffmpeg, and the distribution's own
@@ -131,10 +131,10 @@ arrives with them rather than as a row of its own, and python-docx is a row only
 Hat columns fill, which the installer names out loud before it installs anything on the other two.
 Two mechanisms are deliberately outside that table, because a distribution name is the wrong pin
 for what they carry: the typst release, fetched by `scripts/install-native.sh` at a version and a
-sha256, and the hash-pinned `infra/native/athanor-python-requirements.txt`, which supplies
+sha256, and the hash-pinned `infra/native/garden-python-requirements.txt`, which supplies
 python-pptx and pypdf - one that Ubuntu stopped packaging after 24.04, one whose form-writer API
 changed between two packaged releases. Both land in the one pinned Python at
-`/usr/local/lib/athanor/python`, built with `--system-site-packages` so it is a superset of the
+`/usr/local/lib/garden/python`, built with `--system-site-packages` so it is a superset of the
 packages above rather than a second environment competing with them. Editing the table is therefore
 the right move for an operating-system package and the wrong one for those three.
 
@@ -166,7 +166,7 @@ presence and import success establish availability, while representative workflo
 particular task works. The Parquet capability probes both pandas and pyarrow independently of CSV
 analysis, so a missing Parquet reader does not hide working CSV tools.
 
-`scripts/athanor-document-proof --manifest` lists each representative workflow and the runtime
+`scripts/garden-document-proof --manifest` lists each representative workflow and the runtime
 capabilities it exercises. The runner suite checks that every capability has a workflow and that
 workflow identifiers are unique. Run the proof with the pinned Python and `--require-all --json`
 on the provisioned host; each job reports its measured checks and missing tools. This is a set of

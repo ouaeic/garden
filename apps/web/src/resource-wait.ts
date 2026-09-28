@@ -1,4 +1,4 @@
-import type { Task, TaskEvent } from '@athanor/contracts';
+import type { Task, TaskEvent } from '@garden/contracts';
 import { data, text } from './model';
 
 const reasons = new Map([

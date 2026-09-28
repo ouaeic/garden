@@ -1,4 +1,4 @@
-import { runtimeNow, runtimeUUID } from '@athanor/core';
+import { runtimeNow, runtimeUUID } from '@garden/core';
 /**
  * Parking a turn on an approval card: the card, the calls behind it, and the saved state.
  *
@@ -15,10 +15,10 @@ import { runtimeNow, runtimeUUID } from '@athanor/core';
  * The **state** and decision are written together while releasing the worker lease. No caller
  * can answer the decision before the exact pending call is available to the next worker.
  */
-import { encryptJson } from '@athanor/core';
+import { encryptJson } from '@garden/core';
 
-import type { DataStore, TaskRecord } from '@athanor/data';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import type { DataStore, TaskRecord } from '@garden/data';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { AgentState, AgentWorkerConfig } from '../agent-state.js';
 import { approvalPreviewHash, type AgentApprovalRequirement } from '../approval-state.js';
 import { event } from '../tool-recording.js';

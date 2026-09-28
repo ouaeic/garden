@@ -17,7 +17,7 @@ import { textValue } from '../values.js';
  * names a missing path, that path begins with `workspace/`, and the command was run from a
  * directory the runner reads inside `workspace/`. An ENOENT for any other path stays silent -
  * nothing here knows why `/etc/missing` is missing - and so does a command run from
- * `.athanor/artifacts`, where the sentence would be false.
+ * `.garden/artifacts`, where the sentence would be false.
  *
  * The spelling the note offers is computed against the directory the shell is actually in. From
  * `probe` - which the runner reads as `workspace/probe` - the file `workspace/probe/data.txt` is

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { seedMediaModels, type ModelToolCall } from '@athanor/model-gateway';
-import type { TaskRecord } from '@athanor/data';
+import { seedMediaModels, type ModelToolCall } from '@garden/model-gateway';
+import type { TaskRecord } from '@garden/data';
 import type { AgentState, InferenceCredential } from './agent-state.js';
 import { pinMediaGenerationApproval, requireMediaGenerationApproval } from './media-approval.js';
 

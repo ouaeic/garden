@@ -4,7 +4,7 @@ import type {
   GitHubProjectAction,
   ProjectGitRemoteOperation,
   ProjectRepository
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { get, post } from './client';
 import { Button, Dialog, ErrorNotice, Field } from './ui';
 

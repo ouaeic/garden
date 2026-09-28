@@ -17,7 +17,7 @@ import {
   type ComputationCell,
   type ComputationInput,
   type ComputationSession
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { boundedCollector, prepareInvocation, type InvocationPolicy } from './execution.js';
 import {
   assertUserDataPath,
@@ -118,7 +118,7 @@ export class ComputationManager {
   ) {
     this.#resources = new ProcessResources(processScanner('/proc', policy.sandbox), now);
     this.#ledger = new ComputationLedger(
-      path.join(workspaceRoot, '.athanor', 'computation-receipts')
+      path.join(workspaceRoot, '.garden', 'computation-receipts')
     );
     this.#timer = setInterval(() => {
       void this.#sweep();
@@ -126,7 +126,7 @@ export class ComputationManager {
     this.#timer.unref();
   }
   get #journal() {
-    return path.join(this.workspaceRoot, '.athanor', 'computation.json');
+    return path.join(this.workspaceRoot, '.garden', 'computation.json');
   }
   async restore(): Promise<void> {
     try {
@@ -380,7 +380,7 @@ export class ComputationManager {
     let history = this.#history.get(workspaceId);
     if (!history) {
       history = new TerminalHistory(
-        path.join(this.workspaceRoot, '.athanor', 'computation-history', workspaceId),
+        path.join(this.workspaceRoot, '.garden', 'computation-history', workspaceId),
         ComputationSessionSchema.refine(
           (view) => !active(view.state) && !view.stateRetained,
           'Only ended analysis sessions can enter saved history'

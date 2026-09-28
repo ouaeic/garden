@@ -2,11 +2,11 @@
  * The route vocabulary this rig speaks, and the hard failure that stops a missing one from
  * looking like a bad model.
  *
- * WHY THIS FILE EXISTS AT ALL. athanor's loop reaches its workspace through exactly one client
+ * WHY THIS FILE EXISTS AT ALL. garden's loop reaches its workspace through exactly one client
  * (`apps/worker/src/runner-client.ts`, constructed at `apps/worker/src/agent.ts:291` from the one
  * global `WORKSPACE_RUNNER_URL`). Point that URL at a shim and the whole loop runs against a
  * benchmark container with no change to the core. The failure that route buys, and which this file
- * is built to make impossible, is that a shim missing a route athanor needs DOES NOT THROW. Three
+ * is built to make impossible, is that a shim missing a route garden needs DOES NOT THROW. Three
  * production sites swallow the miss by design:
  *
  *   apps/worker/src/agent.ts:1301  `#toolchainSummary`  `.catch(() => null)` - the runtime block
@@ -222,7 +222,7 @@ export const isAbsent = (route: string): boolean =>
 /** The observed-route artefact, as `routes.json` holds it. */
 export interface RouteObservation {
   readonly recordedAt: string;
-  readonly athanor: string;
+  readonly garden: string;
   /** Every fixture the sweep ran, by id, so a later sweep can be compared against the same set. */
   readonly fixtures: readonly string[];
   /** Route, and how many of those fixtures reached it at least once. */

@@ -1,4 +1,4 @@
-import { runtimeValue } from '@athanor/core';
+import { runtimeValue } from '@garden/core';
 import { workflowApproval } from './workflow-approval.js';
 import { projectUpdateApproval } from './project-updates.js';
 import { useTaskApproval } from './approval-grants.js';
@@ -17,9 +17,9 @@ import { prepareNativeInputApproval } from './native-input.js';
  */
 import { createHmac } from 'node:crypto';
 import { ZodError } from 'zod';
-import { AthanorError, unwrapDataKey } from '@athanor/core';
-import type { DataStore, TaskRecord } from '@athanor/data';
-import { isNativeOpenAIEndpoint, type ModelToolCall } from '@athanor/model-gateway';
+import { GardenError, unwrapDataKey } from '@garden/core';
+import type { DataStore, TaskRecord } from '@garden/data';
+import { isNativeOpenAIEndpoint, type ModelToolCall } from '@garden/model-gateway';
 import type { AgentState, InferenceCredential } from './agent-state.js';
 import type { AgentApprovalRequirement } from './approval-state.js';
 import type { DestinationContext } from './egress.js';
@@ -112,7 +112,7 @@ export const existingSkillFor = async (
     if (!workspace?.wrappedKey) return undefined;
     const key = unwrapDataKey(workspace.wrappedKey, deps.masterKey, workspace.id);
     const nameHash = runtimeValue(`skill.binding:${name}`, () =>
-      createHmac('sha256', key).update(`athanor-skill:${name}`).digest('hex')
+      createHmac('sha256', key).update(`garden-skill:${name}`).digest('hex')
     );
     const saved = (await deps.store.listWorkspaceSkills(task.userId, task.workspaceId)).find(
       (skill) => skill.nameHash === nameHash
@@ -281,7 +281,7 @@ export const approvalForCall = async (
   if (generation?.credential && state) {
     const workspace = await deps.store.getWorkspaceById(task.workspaceId);
     if (!workspace?.wrappedKey)
-      throw new AthanorError('media_route_unavailable', 'Media workspace is unavailable', 409);
+      throw new GardenError('media_route_unavailable', 'Media workspace is unavailable', 409);
     pinMediaGenerationApproval(
       unwrapDataKey(workspace.wrappedKey, deps.masterKey, workspace.id),
       task,
@@ -325,14 +325,14 @@ export const approvalForCall = async (
   });
   if (declared && transcription?.credential) {
     if (!state)
-      throw new AthanorError(
+      throw new GardenError(
         'transcription_approval_required',
         'Recording approval needs durable task state',
         409
       );
     const workspace = await deps.store.getWorkspaceById(task.workspaceId);
     if (!workspace?.wrappedKey)
-      throw new AthanorError(
+      throw new GardenError(
         'transcription_approval_required',
         'Recording workspace is unavailable',
         409

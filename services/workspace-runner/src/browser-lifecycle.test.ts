@@ -48,7 +48,7 @@ const contexts: Context[] = [];
 const managers: BrowserManager[] = [];
 const workspace = 'browser-lifecycle';
 const setup = async (options: Partial<ConstructorParameters<typeof BrowserManager>[0]> = {}) => {
-  const root = await mkdtemp(path.join(tmpdir(), 'athanor-browser-lifecycle-'));
+  const root = await mkdtemp(path.join(tmpdir(), 'garden-browser-lifecycle-'));
   roots.push(root);
   const manager = new BrowserManager({ maxFileBytes: 1_000_000, ...options });
   managers.push(manager);
@@ -71,7 +71,7 @@ describe('persistent browser ownership', () => {
   it('keeps the project boundary through every launch attempt and releases it after close', async () => {
     const stop = vi.fn(async () => undefined);
     const start = vi.fn(async () => ({
-      environment: { ATHANOR_GUI_ROOT: '/project', HOME: '/private/gui' },
+      environment: { GARDEN_GUI_ROOT: '/project', HOME: '/private/gui' },
       stop
     }));
     const gui = new GuiNamespaceManager('/trusted/gui', start);
@@ -83,8 +83,8 @@ describe('persistent browser ownership', () => {
         executablePath: '/trusted/gui',
         chromiumSandbox: true,
         env: expect.objectContaining({
-          ATHANOR_GUI_ROOT: '/project',
-          ATHANOR_GUI_BROWSER: '/usr/bin/chromium',
+          GARDEN_GUI_ROOT: '/project',
+          GARDEN_GUI_BROWSER: '/usr/bin/chromium',
           HOME: '/private/gui'
         }) as unknown
       })
@@ -146,8 +146,8 @@ describe('persistent browser ownership', () => {
 
   it('excludes private-input state and reports unavailable recovery without blocking current work', async () => {
     const { manager, root } = await setup({ recoverySecret: 'test-recovery-key' });
-    await mkdir(path.join(root, '.athanor/browser-tabs'), { recursive: true });
-    await writeFile(path.join(root, '.athanor/browser-tabs/state.json'), 'invalid encrypted state');
+    await mkdir(path.join(root, '.garden/browser-tabs'), { recursive: true });
+    await writeFile(path.join(root, '.garden/browser-tabs/state.json'), 'invalid encrypted state');
     const session = await manager.ensure(workspace, root);
     expect((await manager.snapshot(workspace, root, 'agent')).recovery?.unavailable).toBe(true);
     await session.control.transfer('secure_input');
@@ -156,7 +156,7 @@ describe('persistent browser ownership', () => {
     expect(await manager.snapshot(workspace, root, 'user')).not.toHaveProperty('recovery');
     await manager.close(workspace);
     expect(
-      await readFile(path.join(root, '.athanor/browser-tabs/state.json'), 'utf8')
+      await readFile(path.join(root, '.garden/browser-tabs/state.json'), 'utf8')
     ).not.toContain('PRIVATE_CANARY');
   });
 
@@ -476,7 +476,7 @@ describe('download event receipts', () => {
   it('refuses a download directory symlink without creating anything outside the workspace', async () => {
     const { manager, root } = await setup();
     await mkdir(path.join(root, 'workspace'));
-    const outside = await mkdtemp(path.join(tmpdir(), 'athanor-download-outside-'));
+    const outside = await mkdtemp(path.join(tmpdir(), 'garden-download-outside-'));
     roots.push(outside);
     await symlink(outside, path.join(root, 'workspace', 'downloads'));
     const session = await manager.ensure(workspace, root);
@@ -509,7 +509,7 @@ describe('download event receipts', () => {
   it('does not follow a dangling symlink at the downloaded filename', async () => {
     const { manager, root } = await setup();
     await mkdir(path.join(root, 'workspace'));
-    const outside = await mkdtemp(path.join(tmpdir(), 'athanor-download-outside-'));
+    const outside = await mkdtemp(path.join(tmpdir(), 'garden-download-outside-'));
     roots.push(outside);
     const session = await manager.ensure(workspace, root);
     const directory = path.join(root, session.downloadsDirectory);

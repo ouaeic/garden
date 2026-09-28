@@ -1,4 +1,4 @@
-import { runtimeDate, runtimeNow } from '@athanor/core';
+import { runtimeDate, runtimeNow } from '@garden/core';
 /**
  * What a finished turn deposits in the tiered store: the episode, and the cautions the harness
  * earned by watching an acceptance command fail.
@@ -15,8 +15,8 @@ import {
   memorySubjectKey,
   redactText,
   type MemoryDeadEndCheck
-} from '@athanor/core';
-import type { DataStore, TaskRecord } from '@athanor/data';
+} from '@garden/core';
+import type { DataStore, TaskRecord } from '@garden/data';
 import type { AcceptanceCommandCheck } from './acceptance.js';
 import type { AgentState } from './agent-state.js';
 import type { CompletionVerification } from './completion.js';
@@ -97,7 +97,7 @@ export const captureMemory = async (
        * `completion.ts` makes the agent cite the `toolCallId` of the call that justifies each
        * claim, and `tool-recording.ts` writes that call's raw untruncated result to the timeline.
        * Both ends of the edge existed; the line above mapped the evidence to `item.claim` and the
-       * id went no further. So athanor computed, on every verified turn, exactly the pointer into
+       * id went no further. So garden computed, on every verified turn, exactly the pointer into
        * the eighty per cent of a trajectory that is tool output - the part that is not re-derivable
        * and is worth keeping - and threw it away at the memory boundary.
        *

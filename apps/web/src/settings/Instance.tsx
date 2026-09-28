@@ -33,7 +33,7 @@ export function InstanceSettings() {
   const diagnostics = useResource<Diagnostics>('/v1/instance/diagnostics');
   const relay = useResource<Record<string, unknown>>('/v1/relay');
   const legal = useResource<Legal>('/v1/legal');
-  const native = useResource<NativeStatus>(isNativeClient() ? '/__athanor/client/status' : null);
+  const native = useResource<NativeStatus>(isNativeClient() ? '/__garden/client/status' : null);
   const [installerUrl, setInstallerUrl] = useState<string | null>(null);
   useEffect(() => {
     if (!isNativeClient()) return;

@@ -1,8 +1,8 @@
-import { runtimeUUID } from '@athanor/core';
+import { runtimeUUID } from '@garden/core';
 
-import { AthanorError, decryptJson, encryptJson, sha256 } from '@athanor/core';
-import type { ModelToolCall, VideoGenerationRequest } from '@athanor/model-gateway';
-import { VideoClient } from '@athanor/model-gateway';
+import { GardenError, decryptJson, encryptJson, sha256 } from '@garden/core';
+import type { ModelToolCall, VideoGenerationRequest } from '@garden/model-gateway';
+import { VideoClient } from '@garden/model-gateway';
 import type { InferenceCredential } from './agent-state.js';
 import { VideoToolInput, mediaArguments } from './media-controls.js';
 import { mediaQuoteUsd, resolvedMediaModel } from './media.js';
@@ -18,7 +18,7 @@ export const prepareMediaReferences = async (
   let bytes = 0;
   for (const path of paths) {
     if (/^[a-z]+:/i.test(path) || path.startsWith('/') || path.split('/').includes('..'))
-      throw new AthanorError(
+      throw new GardenError(
         'media_reference_invalid',
         'Choose image references inside this workspace',
         400
@@ -28,14 +28,14 @@ export const prepareMediaReferences = async (
       !['image/png', 'image/jpeg', 'image/webp'].includes(image.mimeType) ||
       image.base64.length > Math.ceil((16 * 1024 * 1024) / 3) * 4
     )
-      throw new AthanorError(
+      throw new GardenError(
         'media_reference_invalid',
         'Choose a bounded PNG, JPEG or WebP reference',
         400
       );
     bytes += Buffer.byteLength(image.base64, 'base64');
     if (bytes > 64 * 1024 * 1024)
-      throw new AthanorError(
+      throw new GardenError(
         'media_reference_invalid',
         'The references exceed the total byte limit',
         400
@@ -50,7 +50,7 @@ export const prepareVideoGeneration = async (
   secret: InferenceCredential
 ) => {
   if (!context.consequentialApproved)
-    throw new AthanorError(
+    throw new GardenError(
       'media_retention_approval_required',
       'This video job needs its own approval for temporary provider retention',
       409
@@ -59,19 +59,19 @@ export const prepareVideoGeneration = async (
   const media = resolvedMediaModel('video', secret.mediaRoutes),
     route = media.route;
   if (!route || route.modality !== 'video' || !route.providerModelId || route.unavailableReason)
-    throw new AthanorError(
+    throw new GardenError(
       'media_route_unavailable',
       'Choose a video model in Settings before generating a clip',
       409
     );
   if (input.modelId !== route.id && input.modelId !== route.providerModelId)
-    throw new AthanorError(
+    throw new GardenError(
       'media_route_changed',
       'The selected video model changed. Describe the route and request approval again.',
       409
     );
   if (!secret.apiKey)
-    throw new AthanorError(
+    throw new GardenError(
       'provider_setup_required',
       'Connect a provider credential before generating a clip',
       409
@@ -82,7 +82,7 @@ export const prepareVideoGeneration = async (
   let extensionCount = 0;
   if (operation !== 'generate') {
     if (!input.sourceJobId || route.apiProtocol !== 'openai')
-      throw new AthanorError(
+      throw new GardenError(
         'media_source_invalid',
         'Choose a completed native video as the source',
         400
@@ -95,7 +95,7 @@ export const prepareVideoGeneration = async (
       !source.providerJobId ||
       !source.durationSeconds
     )
-      throw new AthanorError(
+      throw new GardenError(
         'media_source_invalid',
         'Choose a completed video in this workspace',
         409
@@ -111,7 +111,7 @@ export const prepareVideoGeneration = async (
       sha256(original.provider.apiKey) !== sha256(secret.apiKey) ||
       original.input.model !== route.providerModelId
     )
-      throw new AthanorError(
+      throw new GardenError(
         'media_source_provider_changed',
         'Video edits and extensions must use the original provider account and model',
         409
@@ -126,13 +126,13 @@ export const prepareVideoGeneration = async (
       input.seed !== undefined ||
       input.characterAssetIds?.length
     )
-      throw new AthanorError(
+      throw new GardenError(
         'media_source_controls_invalid',
         'Keep the source size; edits and extensions accept only the source, prompt and duration',
         400
       );
     if (operation === 'edit' && input.duration !== source.durationSeconds)
-      throw new AthanorError(
+      throw new GardenError(
         'media_source_duration_invalid',
         'An edit keeps the full source duration',
         400
@@ -145,14 +145,14 @@ export const prepareVideoGeneration = async (
       durationSeconds > 120 ||
       extensionCount > 6
     )
-      throw new AthanorError(
+      throw new GardenError(
         'media_extension_limit',
         'A clip permits at most six extensions and one hundred twenty total seconds',
         400
       );
     sourceProviderId = source.providerJobId;
   } else if (input.sourceJobId)
-    throw new AthanorError(
+    throw new GardenError(
       'media_source_invalid',
       'Use edit or extend when choosing a source video',
       400
@@ -167,13 +167,13 @@ export const prepareVideoGeneration = async (
   });
   const reservationUsd = quoteUsd ?? input.maxCostUsd;
   if (reservationUsd === undefined || reservationUsd <= 0)
-    throw new AthanorError(
+    throw new GardenError(
       'media_reservation_required',
       'This route needs a positive spending reservation shown in its approval',
       400
     );
   if (quoteUsd !== null && input.maxCostUsd !== undefined && quoteUsd > input.maxCostUsd)
-    throw new AthanorError(
+    throw new GardenError(
       'media_reservation_exceeded',
       'The provider quote exceeds the requested video spending limit',
       402
@@ -186,7 +186,7 @@ export const prepareVideoGeneration = async (
     named.split('/').includes('..') ||
     !named.endsWith('.mp4')
   )
-    throw new AthanorError(
+    throw new GardenError(
       'media_path_invalid',
       'Choose an MP4 destination inside this workspace',
       400
@@ -196,7 +196,7 @@ export const prepareVideoGeneration = async (
   const characters: Array<{ id: string }> = [];
   for (const assetId of input.characterAssetIds ?? []) {
     if (operation !== 'generate' || route.apiProtocol !== 'openai')
-      throw new AthanorError(
+      throw new GardenError(
         'media_character_route_invalid',
         'Characters require a new native video generation',
         400
@@ -209,7 +209,7 @@ export const prepareVideoGeneration = async (
       asset.status !== 'completed' ||
       !asset.resultCiphertext
     )
-      throw new AthanorError(
+      throw new GardenError(
         'media_character_unavailable',
         'Choose a completed character asset from this workspace and provider account',
         409
@@ -220,7 +220,7 @@ export const prepareVideoGeneration = async (
       mediaAssetAad(asset.id)
     );
     if (!input.prompt.includes(character.name))
-      throw new AthanorError(
+      throw new GardenError(
         'media_character_name_missing',
         'Mention each selected character name verbatim in the video prompt',
         400

@@ -1,6 +1,6 @@
 import { DeviceDraftSettings } from './DeviceDrafts.js';
 import { useState } from 'react';
-import type { ApiToken, ApiTokenScope } from '@athanor/contracts';
+import type { ApiToken, ApiTokenScope } from '@garden/contracts';
 import { del, post } from '../client.js';
 import { addPasskey } from '../auth.js';
 import { revokeDeviceSession, signOutThisDevice } from './session-actions.js';

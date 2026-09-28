@@ -1,5 +1,5 @@
 #!/bin/sh
-# What `sudo athanor doctor` says about whether a notification can reach anybody.
+# What `sudo garden doctor` says about whether a notification can reach anybody.
 #
 # The check under test reads the notification service's health port, and the defect it exists for
 # was measured on a live box: `push_subscriptions` held zero rows, `notification_deliveries` had
@@ -23,7 +23,7 @@ test_root=$(mktemp -d)
 trap 'rm -rf -- "$test_root"' EXIT INT TERM
 
 fake_bin="$test_root/bin"
-config="$test_root/etc/athanor"
+config="$test_root/etc/garden"
 state="$test_root/state"
 control_state="$test_root/control-state"
 mkdir -p "$fake_bin" "$config" "$state" "$control_state" "$test_root/home"
@@ -77,12 +77,12 @@ mkdir -p "$fixtures"
 run_doctor() {
   PATH="$fake_bin:$PATH" \
     FIXTURES="$fixtures" \
-    ATHANOR_ROOT="$repository_root" \
-    ATHANOR_CONFIG="$config" \
-    ATHANOR_STATE="$state" \
-    ATHANOR_CONTROL_STATE="$control_state" \
-    ATHANOR_HOME="$test_root/home" \
-    sh "$repository_root/scripts/athanor" doctor 2>/dev/null || true
+    GARDEN_ROOT="$repository_root" \
+    GARDEN_CONFIG="$config" \
+    GARDEN_STATE="$state" \
+    GARDEN_CONTROL_STATE="$control_state" \
+    GARDEN_HOME="$test_root/home" \
+    sh "$repository_root/scripts/garden" doctor 2>/dev/null || true
 }
 
 # The lines this drill is about, so a failure prints what the owner would have read.

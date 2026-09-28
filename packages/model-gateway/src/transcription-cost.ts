@@ -1,4 +1,4 @@
-import type { MediaModelOption } from '@athanor/contracts';
+import type { MediaModelOption } from '@garden/contracts';
 
 /** Published native model limits bound one unchunked transcription request. */
 const nativeLimits: Readonly<Record<string, { context: number; output: number; seconds: number }>> =

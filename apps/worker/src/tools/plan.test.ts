@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { decryptJson, encryptJson } from '@athanor/core';
-import type { TaskPlanRecord } from '@athanor/data';
+import { decryptJson, encryptJson } from '@garden/core';
+import type { TaskPlanRecord } from '@garden/data';
 import type { ToolContext } from '../tool-dispatch.js';
 import { executePlanTool } from './plan.js';
 

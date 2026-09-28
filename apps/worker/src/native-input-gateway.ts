@@ -1,7 +1,7 @@
-import { AthanorError, pricesAtPromptSize, readRoutingMetadata } from '@athanor/core';
-import type { ModelRelease } from '@athanor/contracts';
-import type { DataStore, TaskRecord } from '@athanor/data';
-import { nativeInputBlocks, type ModelAdapter, type ModelRequest } from '@athanor/model-gateway';
+import { GardenError, pricesAtPromptSize, readRoutingMetadata } from '@garden/core';
+import type { ModelRelease } from '@garden/contracts';
+import type { DataStore, TaskRecord } from '@garden/data';
+import { nativeInputBlocks, type ModelAdapter, type ModelRequest } from '@garden/model-gateway';
 import { estimatedInferenceCostUsd, usageCredit } from './billing.js';
 
 export const nativeInputBound = (
@@ -13,7 +13,7 @@ export const nativeInputBound = (
     model.provider === 'openrouter' &&
     ['openrouter/auto', 'openrouter/free', 'openrouter/bodybuilder'].includes(model.providerModelId)
   )
-    throw new AthanorError(
+    throw new GardenError(
       'native_input_pricing_unknown',
       'Choose a fixed, priced model for native recordings',
       400
@@ -25,7 +25,7 @@ export const nativeInputBound = (
   );
   const rates = [...prices, model.inputUsdPerMillionTokens, model.outputUsdPerMillionTokens];
   if (rates.some((price) => typeof price !== 'number' || !Number.isFinite(price) || price < 0))
-    throw new AthanorError(
+    throw new GardenError(
       'native_input_pricing_unknown',
       'The selected model has no complete native input price. Choose a route with published modality pricing before sending this recording.',
       400
@@ -51,7 +51,7 @@ export const nativeInputBound = (
     (model.contextTokens * maxInputRate * 1.25 + maxTokens * outputRate) / 1_000_000
   );
   if (!Number.isFinite(usd))
-    throw new AthanorError(
+    throw new GardenError(
       'native_input_pricing_unknown',
       'Native input reservation could not be priced',
       400
@@ -82,14 +82,14 @@ export const nativeInputAdapter = (
     const parts = request.messages.flatMap((message) => message.nativeInputs ?? []);
     if (!parts.length) return adapter.chat(request);
     if (request.model !== model.providerModelId)
-      throw new AthanorError(
+      throw new GardenError(
         'native_input_route_changed',
         'The native request no longer targets its selected model',
         409
       );
     nativeInputBlocks(parts, adapter.provider, model.modalities);
     if (request.signal?.aborted)
-      throw new AthanorError(
+      throw new GardenError(
         'native_input_cancelled',
         'The recording request was cancelled before submission',
         409
@@ -104,7 +104,7 @@ export const nativeInputAdapter = (
       (task.privacyRoute === 'provider_zdr' &&
         (current.privacyRoute !== 'provider_zdr' || current.zeroDataRetentionAvailable === false))
     )
-      throw new AthanorError(
+      throw new GardenError(
         'native_input_route_changed',
         'Native input routing changed; refresh the task before sending this recording',
         409
@@ -113,14 +113,14 @@ export const nativeInputAdapter = (
       request.nativeInputCredentialBinding !== credentialBinding ||
       (await currentBinding()) !== credentialBinding
     )
-      throw new AthanorError(
+      throw new GardenError(
         'native_input_route_changed',
         'The provider credential changed; read the recording again with the current account',
         409
       );
     const claim = await store.taskClaim(task.id);
     if (claim?.status !== 'running' || claim.leaseOwner !== workerId)
-      throw new AthanorError(
+      throw new GardenError(
         'native_input_cancelled',
         'This worker no longer owns the recording request',
         409
@@ -145,7 +145,7 @@ export const nativeInputAdapter = (
       liveBound.credits !== bound.credits ||
       current.contextTokens !== model.contextTokens
     )
-      throw new AthanorError(
+      throw new GardenError(
         'native_input_route_changed',
         'The native input price or context allowance changed; refresh this task',
         409
@@ -155,7 +155,7 @@ export const nativeInputAdapter = (
       !Number.isFinite(request.nativeInputApprovedCostUsd) ||
       bound.usd > request.nativeInputApprovedCostUsd
     )
-      throw new AthanorError(
+      throw new GardenError(
         'native_input_approved_cost_exceeded',
         'The native request exceeds its approved price',
         409
@@ -164,7 +164,7 @@ export const nativeInputAdapter = (
       request.nativeInputCreditLimit === undefined ||
       bound.credits > request.nativeInputCreditLimit
     )
-      throw new AthanorError(
+      throw new GardenError(
         'native_input_credit_limit',
         'The conservative native input bound exceeds the task’s remaining compute allowance',
         402
@@ -177,7 +177,7 @@ export const nativeInputAdapter = (
     };
     if (task.hasCodingFamily) return adapter.chat(prepared);
     if (!request.nativeInputRequestId)
-      throw new AthanorError(
+      throw new GardenError(
         'native_input_identity_missing',
         'A native request requires its durable source identity',
         400

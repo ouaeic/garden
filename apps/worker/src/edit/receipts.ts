@@ -1,5 +1,5 @@
-import { decryptJson, encryptJson } from '@athanor/core';
-import type { DataStore } from '@athanor/data';
+import { decryptJson, encryptJson } from '@garden/core';
+import type { DataStore } from '@garden/data';
 
 export interface PatchReceipt {
   path: string;
@@ -23,7 +23,7 @@ export async function recordPatchReceipt(
     summary: 'Encrypted edit receipt',
     payloadCiphertext: encryptJson(
       {
-        __athanorEventVersion: 1,
+        __gardenEventVersion: 1,
         summary: receipt.status === 'applied' ? 'File edit applied' : 'File edit receipt',
         payload: { patchReceipt: { toolCallId, ...receipt } }
       },

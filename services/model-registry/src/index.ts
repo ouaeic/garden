@@ -1,20 +1,20 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { z } from 'zod';
-import { sharedEnv } from '@athanor/contracts/env';
-import { decodeMasterKey } from '@athanor/core';
-import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
+import { sharedEnv } from '@garden/contracts/env';
+import { decodeMasterKey } from '@garden/core';
+import { createDatabase, DataStore, migrateDatabase } from '@garden/data';
 import { epochSeconds, readCatalogRecord, writeCatalogRecord } from './catalog-state.js';
 import { catalogueFrozenLine, refreshFailureReason, refreshLogLine } from './refresh-log.js';
 import { refreshOnce } from './refresh-once.js';
 
 /*
- * Every key more than one athanor unit reads is taken from `sharedEnv` rather than restated here.
+ * Every key more than one garden unit reads is taken from `sharedEnv` rather than restated here.
  *
  * It used to restate eight of them, and three had drifted: this schema defaulted DATABASE_DRIVER to
  * `postgres` where every other unit defaults to `pglite`, trimmed whitespace out of DATA_MASTER_KEY
  * where no other unit does, and accepted a third AI_PROVIDER - `ollama-cloud` - that the API and the
  * worker both refuse to start on. All four units are started by systemd from the same
- * /etc/athanor/control.env, so that last one is a file on which this loop runs and the box does
+ * /etc/garden/control.env, so that last one is a file on which this loop runs and the box does
  * not. None of it was ever compared, because `packages/contracts/src/env.test.ts` walked
  * `src/config.ts` and this unit's schema is inline in `src/index.ts`; that walk has been widened.
  *
@@ -63,12 +63,12 @@ const Config = z.object({
   AI_BASE_URL: sharedEnv.AI_BASE_URL,
   AI_DEFAULT_MODEL: sharedEnv.AI_DEFAULT_MODEL,
   /**
-   * Where each pass writes down what it did, for `athanor doctor` to read. The default is inside
-   * /var/lib/athanor-control because that is the one directory `athanor@.service` may write to.
+   * Where each pass writes down what it did, for `garden doctor` to read. The default is inside
+   * /var/lib/garden-control because that is the one directory `garden@.service` may write to.
    * `doctor` reads the same variable out of control.env, so an operator who moves the file moves
    * both halves at once.
    */
-  MODEL_CATALOG_STATE_PATH: z.string().default('/var/lib/athanor-control/model-catalog.state')
+  MODEL_CATALOG_STATE_PATH: z.string().default('/var/lib/garden-control/model-catalog.state')
 });
 const config = Config.parse(process.env);
 const database = createDatabase({
@@ -129,7 +129,7 @@ while (running) {
   // The journal is the whole of the observation this box has: one owner, no alerting, and this
   // service has no endpoint to ask. Silence would make a catalogue that stopped changing
   // indistinguishable from a provider that shipped nothing, so the first failure and the recovery
-  // are both said once, in `athanor logs registry` - and so is the state where there is nothing to
+  // are both said once, in `garden logs registry` - and so is the state where there is nothing to
   // refresh from at all, which used to be the one silence nobody could tell from health.
   const line = refreshLogLine({
     previousFailures: consecutiveFailures,
@@ -169,9 +169,9 @@ while (running) {
     // failure here is a `doctor` check that reports a stale catalogue for ever after.
     if (!stateWriteSaid) {
       process.stderr.write(
-        `athanor model registry: the refresh record could not be written to ` +
+        `garden model registry: the refresh record could not be written to ` +
           `${config.MODEL_CATALOG_STATE_PATH} (${refreshFailureReason(error)}), so ` +
-          `sudo athanor doctor cannot tell a current catalogue from one that stopped refreshing.\n`
+          `sudo garden doctor cannot tell a current catalogue from one that stopped refreshing.\n`
       );
       stateWriteSaid = true;
     }

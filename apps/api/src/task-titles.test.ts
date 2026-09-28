@@ -6,14 +6,14 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import {
-  AthanorError,
+  GardenError,
   buildConversationNameIndex,
   decryptJson,
   encryptJson,
   memoryIndexKey,
   wrapDataKey
-} from '@athanor/core';
-import { createDatabase, DataStore, migrateDatabase, type Database } from '@athanor/data';
+} from '@garden/core';
+import { createDatabase, DataStore, migrateDatabase, type Database } from '@garden/data';
 import { createLogger } from './log.js';
 import {
   cleanGeneratedTitle,
@@ -246,7 +246,7 @@ describe('the titler', () => {
     const { database, store } = await boxWithAnsweredTask();
     try {
       const complete = vi.fn<TaskTitlerDeps['complete']>(async () => {
-        throw new AthanorError('provider_unavailable', 'the provider did not answer');
+        throw new GardenError('provider_unavailable', 'the provider did not answer');
       });
       const state = freshState();
       const deps: TaskTitlerDeps = { store, masterKey, log, complete };
@@ -448,7 +448,7 @@ it('reads title choices from owner, project and conversation settings in that or
   const complete = vi.fn<TaskTitlerDeps['complete']>(async () => ({ skipped: true }));
   try {
     const { writeProjectModelPreferences, writeConversationModelPreferences } =
-      await import('@athanor/data');
+      await import('@garden/data');
     await store.mergeUserPreferences(user.id, { modelPurposes: { title: pin('owner-title') } });
     await titleTasksOnce({ store, masterKey, log, complete }, freshState());
     expect(complete.mock.lastCall?.[0].choice).toEqual(pin('owner-title'));

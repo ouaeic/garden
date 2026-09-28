@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { type AccountApi, accountResourceId } from './account-api.js';
-import { AthanorError } from './errors.js';
+import { GardenError } from './errors.js';
 
 const pageInput = z.object({
   limit: z.number().int().min(1).max(200).default(50),
@@ -29,7 +29,7 @@ function page(
 ) {
   const values = rows.parse(result[field] ?? (api.secret.provider === 'google' ? [] : undefined));
   if (values.length > limit)
-    throw new AthanorError(
+    throw new GardenError(
       'calendar_page_invalid',
       'The account provider exceeded the requested page size.'
     );

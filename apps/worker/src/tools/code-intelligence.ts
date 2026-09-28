@@ -1,6 +1,6 @@
-import { CodeIntelligenceRequest } from '@athanor/contracts';
+import { CodeIntelligenceRequest } from '@garden/contracts';
 import { z } from 'zod';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { ToolContext } from '../tool-dispatch.js';
 import { recordArtifactWrite } from '../context.js';
 

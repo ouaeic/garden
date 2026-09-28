@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
-import { observedObject, withPrivateDiagnostics, withRuntimeObservations } from '@athanor/core';
-import type { DataStore, TaskRecord } from '@athanor/data';
+import { observedObject, withPrivateDiagnostics, withRuntimeObservations } from '@garden/core';
+import type { DataStore, TaskRecord } from '@garden/data';
 import { AgentWorker } from './agent.js';
 import type { AgentWorkerConfig } from './agent-state.js';
 import { silentLogger } from './log.js';
@@ -73,7 +73,7 @@ export async function replayRuntime(segment: RuntimeSegment) {
 }
 
 import { z } from 'zod';
-import { PrivateDiagnosticReader } from '@athanor/core';
+import { PrivateDiagnosticReader } from '@garden/core';
 const observation = z
   .object({
     type: z.enum(['value', 'call', 'return', 'callback', 'timer', 'fire', 'clear']),

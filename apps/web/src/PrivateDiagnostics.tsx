@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { DiagnosticCaptureStatus } from '@athanor/contracts';
+import type { DiagnosticCaptureStatus } from '@garden/contracts';
 import { post, request } from './client';
 import { bytes } from './model';
 import { Button, ErrorNotice } from './ui';

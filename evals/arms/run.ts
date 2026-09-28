@@ -126,7 +126,7 @@ if (flag('edit')) {
    * by paying for them - the same change was worth a fraction of a point of accuracy and 61% of
    * the output tokens. So the weak tier is where a correctness risk shows and the strong tier is
    * where the saving does, and a run on one of them settles neither. `AI_DEFAULT_MODEL` is what an
-   * installation actually points athanor at, which is the honest strong tier; `--strong` overrides
+   * installation actually points garden at, which is the honest strong tier; `--strong` overrides
    * it. Neither is invented, and where there is no second tier this refuses to spend rather than
    * printing half a decision.
    */
@@ -187,7 +187,7 @@ if (flag('edit')) {
         process.stdout.write(
           `\n  ONE TIER, by request: ${weak}. The rule needs both; this run informs and does not settle.\n`
         );
-      // Through athanor's own gateway - the worker's client, retry policy and usage parsing - so
+      // Through garden's own gateway - the worker's client, retry policy and usage parsing - so
       // the row carries the same request the worker would have sent. @see `edit-live.ts`.
       const transport = gatewayTransport(process.env);
       const rows = await runEditLive(

@@ -7,9 +7,9 @@
  */
 
 import { randomBytes } from 'node:crypto';
-import { CreateApiTokenRequest, OwnerPreferences } from '@athanor/contracts';
-import { AthanorError, hashRecoveryCode, sha256 } from '@athanor/core';
-import type { ApiTokenRecord } from '@athanor/data';
+import { CreateApiTokenRequest, OwnerPreferences } from '@garden/contracts';
+import { GardenError, hashRecoveryCode, sha256 } from '@garden/core';
+import type { ApiTokenRecord } from '@garden/data';
 import { z } from 'zod';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
@@ -82,7 +82,7 @@ export const registerAccountRoutes = (context: RouteContext): void => {
     await requireRecentStepUp(request, user);
     const recoveryCode = randomBytes(18).toString('base64url');
     const replaced = await store.setRecoveryHash(user.id, await hashRecoveryCode(recoveryCode));
-    if (!replaced) throw new AthanorError('user_not_found', 'Account not found', 404);
+    if (!replaced) throw new GardenError('user_not_found', 'Account not found', 404);
     await recordSecurityEvent(store, {
       userId: user.id,
       kind: 'recovery_code_reissued',
@@ -113,7 +113,7 @@ export const registerAccountRoutes = (context: RouteContext): void => {
       });
     } catch (cause) {
       if (cause instanceof Error && cause.message === 'api_token_limit')
-        throw new AthanorError(
+        throw new GardenError(
           'api_token_limit',
           'Revoke an existing API token before creating another',
           409
@@ -201,7 +201,7 @@ export const registerAccountRoutes = (context: RouteContext): void => {
     return idempotent(request, reply, user, async () => {
       const input = z.object({ confirmUsername: z.string() }).parse(request.body);
       if (input.confirmUsername.toLowerCase() !== user.username.toLowerCase())
-        throw new AthanorError(
+        throw new GardenError(
           'confirmation_failed',
           'Type the exact username to delete the account'
         );
@@ -235,7 +235,7 @@ export const registerAccountRoutes = (context: RouteContext): void => {
       await store.deleteUser(user.id);
       /**
        * The same attributes the cookie was set with, because a `Set-Cookie` is only a deletion if
-       * the browser accepts it. On a deployment the name is `__Host-athanor_session`, and the
+       * the browser accepts it. On a deployment the name is `__Host-garden_session`, and the
        * `__Host-` prefix rules require `Secure` and `Path=/` with no `Domain` - without `Secure`
        * the whole header is discarded and the cookie stays where it is. `preview-gateway.ts`
        * records what a prefix mismatch cost this project once already.

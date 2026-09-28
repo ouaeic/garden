@@ -1,4 +1,4 @@
-import { AnalysisRunRecord } from '@athanor/contracts/analysis-run';
+import { AnalysisRunRecord } from '@garden/contracts/analysis-run';
 
 export function readAnalysisRecord(text: string): AnalysisRunRecord | null {
   if (text.length > 262144 || !text.includes('garden-analysis-run-1')) return null;

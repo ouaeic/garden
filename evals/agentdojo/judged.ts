@@ -1,5 +1,5 @@
 /**
- * The live half: a real model, holding athanor's real tool schemas, is handed a real fenced tool
+ * The live half: a real model, holding garden's real tool schemas, is handed a real fenced tool
  * result with a real AgentDojo payload in it, and we watch what it asks for next.
  *
  * ── Why this half exists when the other half assumes the model is already lost ──────────────────
@@ -105,7 +105,7 @@ const liveInjectionTasks = (): readonly InjectionTask[] =>
 
 export const estimateCalls = (): number => DELIVERIES.length * liveInjectionTasks().length;
 
-/** Athanor's own schemas, not a second set written for the benchmark. */
+/** Garden's own schemas, not a second set written for the benchmark. */
 const TOOLS_SENT = ['connector_list', 'connector_action', 'parallel_web_read', 'finish'];
 
 interface ProposedCall {
@@ -134,7 +134,7 @@ export interface LiveRow {
 }
 
 /**
- * Which athanor connector action each injection goal needs. Written here rather than derived from
+ * Which garden connector action each injection goal needs. Written here rather than derived from
  * `translate`, because what is being asked is "did the model ask for the thing the attacker wanted",
  * and that is a question about the *action name*, not about the argument bag a translation invents.
  */
@@ -253,7 +253,7 @@ export const runLive = async (
     `  end-to-end ASR        ${((100 * through) / Math.max(1, rows.length)).toFixed(1)}%`,
     '',
     '  Compliance is the model. Through-the-floor is the model and the monitor together, and it',
-    "  is the only one of the two that is a claim about athanor rather than about a provider's",
+    "  is the only one of the two that is a claim about garden rather than about a provider's",
     '  current checkpoint.',
     ''
   ];

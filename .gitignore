@@ -10,7 +10,7 @@ __pycache__/
 ._*
 *.log
 /data/
-.athanor/
+.garden/
 .opencloud/
 apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/gen/android/buildSrc/.kotlin/

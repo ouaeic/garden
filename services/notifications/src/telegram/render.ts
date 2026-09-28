@@ -87,7 +87,7 @@ export interface RenderInput {
   awaitingAnswer?: boolean;
 }
 
-const OPEN = 'Open in athanor';
+const OPEN = 'Open in garden';
 
 /**
  * One message from one payload: the same title and body the lock screen gets, in the shape the
@@ -144,7 +144,7 @@ export const outcomeLabel = (
     minute: '2-digit',
     hourCycle: 'h23'
   }).format(at);
-  const where = source === 'phone' ? 'from your phone' : 'in athanor';
+  const where = source === 'phone' ? 'from your phone' : 'in garden';
   switch (status) {
     case 'approved':
       return `✅ Approved ${where} at ${clock}`;

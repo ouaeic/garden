@@ -11,7 +11,7 @@ export interface DataMasterKeyConfig {
  * old one wrote.
  */
 export const DATA_MASTER_KEY_REQUIRED =
-  'DATA_MASTER_KEY is required: it lives in /etc/athanor/control.env, which the installer writes on a first install. Recover the original if you have one - a key that did not encrypt this database cannot read it back.';
+  'DATA_MASTER_KEY is required: it lives in /etc/garden/control.env, which the installer writes on a first install. Recover the original if you have one - a key that did not encrypt this database cannot read it back.';
 
 const decodeMasterKey = (value: string): Buffer => {
   if (/^[0-9a-f]{64}$/i.test(value)) return Buffer.from(value, 'hex');
@@ -36,7 +36,7 @@ export const deriveServiceSecret = (
     hkdfSync(
       'sha256',
       masterKey,
-      Buffer.from('athanor-service-secrets:v1', 'utf8'),
+      Buffer.from('garden-service-secrets:v1', 'utf8'),
       Buffer.from(purpose, 'utf8'),
       32
     )

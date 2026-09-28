@@ -7,25 +7,25 @@
  * a key and no ceiling is a box that can spend a month's allowance overnight.
  */
 
-import { MediaModelSelection } from '@athanor/contracts';
+import { MediaModelSelection } from '@garden/contracts';
 import {
-  AthanorError,
+  GardenError,
   assertTimeZone,
   decryptJson,
   encryptJson,
   inferenceCredentialAad,
   inferenceConnectionProvider,
   environmentInferenceSecret
-} from '@athanor/core';
+} from '@garden/core';
 import {
   createModelAdapter,
   configuredModelCatalog,
   refreshOpenRouterCatalog,
   seedModels,
   verifyOpenRouterKey
-} from '@athanor/model-gateway';
+} from '@garden/model-gateway';
 import { z } from 'zod';
-import { DataStore } from '@athanor/data';
+import { DataStore } from '@garden/data';
 import type { InferenceSecret } from '../context.js';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
@@ -135,7 +135,7 @@ export const registerProviderRoutes = (context: RouteContext): void => {
         .parse(request.body);
       const connectionId = input.connectionId ?? input.provider;
       if (inferenceConnectionProvider(connectionId) !== input.provider)
-        throw new AthanorError(
+        throw new GardenError(
           'provider_connection_invalid',
           'Choose a connection for this provider',
           422
@@ -158,20 +158,20 @@ export const registerProviderRoutes = (context: RouteContext): void => {
           ? environment.apiKey
           : undefined);
       if (!input.apiKey?.trim() && existingSecret?.apiKey && !sameEndpoint(existingSecret))
-        throw new AthanorError(
+        throw new GardenError(
           'provider_key_required',
           'Enter the key issued for this endpoint. A saved key cannot be sent to a different endpoint.',
           422
         );
       if (['openrouter', 'ollama-cloud'].includes(input.provider) && !apiKey)
-        throw new AthanorError(
+        throw new GardenError(
           'provider_key_required',
           `${input.provider === 'openrouter' ? 'OpenRouter' : 'Ollama Cloud'} requires an API key`,
           422
         );
       const url = new URL(baseUrl);
       if (url.username || url.password || url.search || url.hash)
-        throw new AthanorError(
+        throw new GardenError(
           'provider_url_invalid',
           'Provider URLs cannot contain credentials, query parameters, or fragments'
         );
@@ -184,7 +184,7 @@ export const registerProviderRoutes = (context: RouteContext): void => {
           /^192\.168\./.test(url.hostname) ||
           /^172\.(?:1[6-9]|2\d|3[01])\./.test(url.hostname));
       if (url.protocol !== 'https:' && !(config.ALLOW_INSECURE_PROVIDER_URLS && privateHttp))
-        throw new AthanorError(
+        throw new GardenError(
           'provider_url_insecure',
           'Use HTTPS, or explicitly allow private HTTP provider URLs on this server'
         );
@@ -239,9 +239,9 @@ export const registerProviderRoutes = (context: RouteContext): void => {
          * anything else that fails is reported as unreachable rather than as verified.
          */
         const described = await adapter.describe(AbortSignal.timeout(15_000)).catch((error) => {
-          const status = error instanceof AthanorError ? /\b(\d{3})$/.exec(error.message)?.[1] : '';
+          const status = error instanceof GardenError ? /\b(\d{3})$/.exec(error.message)?.[1] : '';
           if (status === '401' || status === '403')
-            throw new AthanorError(
+            throw new GardenError(
               'provider_key_rejected',
               'The provider did not accept this key. Paste it again whole — a trailing space or a missing character is enough — and check it has not been revoked.',
               422
@@ -249,7 +249,7 @@ export const registerProviderRoutes = (context: RouteContext): void => {
           throw error;
         });
         if (input.modelId && !described.some((model) => model.id === input.modelId))
-          throw new AthanorError(
+          throw new GardenError(
             'provider_model_not_found',
             `The endpoint did not list model ${input.modelId}`,
             422
@@ -258,7 +258,7 @@ export const registerProviderRoutes = (context: RouteContext): void => {
           ? described.filter((model) => model.id === input.modelId)
           : described;
         if (!catalogue.length)
-          throw new AthanorError(
+          throw new GardenError(
             'provider_model_not_found',
             'The endpoint listed no models for this key',
             422

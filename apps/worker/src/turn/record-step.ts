@@ -19,8 +19,8 @@
  *
  * Lifted out of `AgentWorker.run()` unchanged.
  */
-import type { DataStore, TaskRecord } from '@athanor/data';
-import type { ModelResponse } from '@athanor/model-gateway';
+import type { DataStore, TaskRecord } from '@garden/data';
+import type { ModelResponse } from '@garden/model-gateway';
 import type { AgentState } from '../agent-state.js';
 import { rememberOrigin } from '../egress.js';
 import { providerWebProvenance } from '../provenance.js';

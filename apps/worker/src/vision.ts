@@ -1,4 +1,4 @@
-import { runtimeNow } from '@athanor/core';
+import { runtimeNow } from '@garden/core';
 /**
  * Who looks at a picture the lead model cannot see, and what the registry rows that decision is
  * taken against cost to read.
@@ -8,10 +8,10 @@ import { runtimeNow } from '@athanor/core';
  * inside a method whose other job is bookkeeping, and every one of the four defects the ranking
  * carried was invisible because its failure path is a system notice rather than an error.
  */
-import { preferIncumbent, rankModels, requestForWork, selectModel, sha256 } from '@athanor/core';
-import type { ModelRelease, PrivacyRoute } from '@athanor/contracts';
-import type { DataStore, TaskRecord } from '@athanor/data';
-import { isProviderWall, type ModelGateway, type ModelToolCall } from '@athanor/model-gateway';
+import { preferIncumbent, rankModels, requestForWork, selectModel, sha256 } from '@garden/core';
+import type { ModelRelease, PrivacyRoute } from '@garden/contracts';
+import type { DataStore, TaskRecord } from '@garden/data';
+import { isProviderWall, type ModelGateway, type ModelToolCall } from '@garden/model-gateway';
 import type { AgentState } from './agent-state.js';
 import { estimatedInferenceCostUsd, usageCredit } from './billing.js';
 import { routeTo, usableCapabilities } from './routing.js';
@@ -328,7 +328,7 @@ export const routeImageObservation = async (
             temperature: 0.1,
             maxTokens: 4_096,
             reasoningEffort: 'medium',
-            sessionId: sha256(`athanor-task:${task.id}:vision`).slice(0, 64),
+            sessionId: sha256(`garden-task:${task.id}:vision`).slice(0, 64),
             signal
           })
         )

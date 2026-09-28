@@ -1,8 +1,8 @@
-import { OPENAI_VIDEO_RETIREMENT_AT } from '@athanor/model-gateway';
+import { OPENAI_VIDEO_RETIREMENT_AT } from '@garden/model-gateway';
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { decryptJson, encryptJson } from '@athanor/core';
-import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
+import { decryptJson, encryptJson } from '@garden/core';
+import { createDatabase, DataStore, migrateDatabase } from '@garden/data';
 import { executeMediaLibrary, mediaAssetAad } from './media-library.js';
 import { queueVideoGeneration } from './media-generation.js';
 import { mediaJobAad, type StoredVideoRequest } from './media-job-domain.js';

@@ -42,14 +42,14 @@ const FAST_POLICY: ServicePolicy = {
 const HEALTHY_POLICY: ServicePolicy = { ...FAST_POLICY, healthyAfterMs: 20 };
 
 const workspace = async (): Promise<string> => {
-  const root = await mkdtemp(path.join(tmpdir(), 'athanor-service-'));
+  const root = await mkdtemp(path.join(tmpdir(), 'garden-service-'));
   roots.push(root);
   await mkdir(path.join(root, 'workspace'), { recursive: true });
-  await mkdir(path.join(root, '.athanor'), { recursive: true });
+  await mkdir(path.join(root, '.garden'), { recursive: true });
   return root;
 };
 
-const registryFile = (root: string): string => path.join(root, '.athanor', 'services.json');
+const registryFile = (root: string): string => path.join(root, '.garden', 'services.json');
 
 const readRecords = async (root: string): Promise<Record<string, unknown>[]> => {
   const contents = await readFile(registryFile(root), 'utf8');
@@ -168,7 +168,7 @@ describe('service registry', () => {
       service: 'runner',
       event: 'services.record_write_failed',
       detail:
-        'could not record services in .athanor/services.json - services will not survive a restart',
+        'could not record services in .garden/services.json - services will not survive a restart',
       // Whose services these were. The sentence names the file relative to a workspace it does not
       // name, so without this the owner of a box with several workspaces is told that some
       // services somewhere will not come back.
@@ -178,11 +178,11 @@ describe('service registry', () => {
   });
 
   it('lists only real workspaces beside the snapshot and checkpoint directories', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-service-root-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-service-root-'));
     roots.push(root);
     await mkdir(path.join(root, 'workspace-1'));
-    await mkdir(path.join(root, '.athanor-snapshots'));
-    await mkdir(path.join(root, '.athanor-checkpoints'));
+    await mkdir(path.join(root, '.garden-snapshots'));
+    await mkdir(path.join(root, '.garden-checkpoints'));
     await writeFile(path.join(root, 'stray-file'), '');
     expect(await workspaceDirectories(root)).toEqual(['workspace-1']);
     expect(await workspaceDirectories(path.join(root, 'not-here'))).toEqual([]);
@@ -537,11 +537,11 @@ describe('a service the computer keeps running', () => {
     'finds every workspace on the box at boot without being told which ones have services',
     async () => {
       // What the runner actually does on startup: it is handed a workspace root and nothing else.
-      const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-service-boot-'));
+      const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-service-boot-'));
       roots.push(workspaceRoot);
       const root = path.join(workspaceRoot, 'workspace-1');
       await mkdir(path.join(root, 'workspace'), { recursive: true });
-      await mkdir(path.join(workspaceRoot, '.athanor-snapshots'), { recursive: true });
+      await mkdir(path.join(workspaceRoot, '.garden-snapshots'), { recursive: true });
       const manager = new ProcessManager(50, HEALTHY_POLICY);
       await manager.start(
         root,

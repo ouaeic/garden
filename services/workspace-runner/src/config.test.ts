@@ -10,7 +10,7 @@ afterEach(() => {
 
 const baseEnvironment = () => {
   process.env.RUNNER_SHARED_SECRET = 'runner-secret-of-at-least-thirty-two-characters';
-  process.env.WORKSPACE_ROOT = '/home/athanor';
+  process.env.WORKSPACE_ROOT = '/home/garden';
 };
 
 describe('runner configuration', () => {
@@ -36,7 +36,7 @@ describe('runner configuration', () => {
   it('isolates the network when the privileged helper is configured', () => {
     baseEnvironment();
     process.env.ISOLATE_AGENT_NETWORK = 'true';
-    process.env.AGENT_SANDBOX_HELPER = '/usr/local/lib/athanor/athanor-sandbox';
+    process.env.AGENT_SANDBOX_HELPER = '/usr/local/lib/garden/garden-sandbox';
     expect(loadConfig().ISOLATE_AGENT_NETWORK).toBe(true);
   });
 
@@ -53,7 +53,7 @@ describe('runner configuration', () => {
   it('confines the filesystem when the privileged helper is configured', () => {
     baseEnvironment();
     process.env.CONFINE_AGENT_FILESYSTEM = 'true';
-    process.env.AGENT_SANDBOX_HELPER = '/usr/local/lib/athanor/athanor-sandbox';
+    process.env.AGENT_SANDBOX_HELPER = '/usr/local/lib/garden/garden-sandbox';
     expect(loadConfig().CONFINE_AGENT_FILESYSTEM).toBe(true);
   });
 
@@ -62,11 +62,11 @@ describe('runner configuration', () => {
     // box whose installer has not yet looked has not answered no, and it must start unconfined
     // rather than fail to parse or claim a boundary nobody measured.
     baseEnvironment();
-    process.env.AGENT_SANDBOX_HELPER = '/usr/local/lib/athanor/athanor-sandbox';
+    process.env.AGENT_SANDBOX_HELPER = '/usr/local/lib/garden/garden-sandbox';
     expect(loadConfig().CONFINE_AGENT_FILESYSTEM).toBeUndefined();
   });
 
-  it('reads the ports athanor already serves on so a preview cannot publish them', () => {
+  it('reads the ports garden already serves on so a preview cannot publish them', () => {
     baseEnvironment();
     process.env.RESERVED_PREVIEW_PORTS = '4100, 4400,5432, ,not-a-port';
     expect(loadConfig().RESERVED_PREVIEW_PORTS).toEqual([4100, 4400, 5432]);

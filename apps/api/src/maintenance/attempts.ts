@@ -6,7 +6,7 @@
  * no process left to write anything - so the only record of six deaths is a number in a column.
  */
 
-import { encryptJson, unwrapDataKey } from '@athanor/core';
+import { encryptJson, unwrapDataKey } from '@garden/core';
 import type { SupportedContext } from '../http/server-context.js';
 
 export const createAttemptLimitSweep = (context: SupportedContext) => {
@@ -46,11 +46,11 @@ export const createAttemptLimitSweep = (context: SupportedContext) => {
         summary: 'Encrypted attempt limit event',
         payloadCiphertext: encryptJson(
           {
-            __athanorEventVersion: 1,
+            __gardenEventVersion: 1,
             // Same shape as the approval-expiry line above it, deliberately: what happened, what
-            // athanor did about it, what starts it again. The advice to try "in smaller pieces"
+            // garden did about it, what starts it again. The advice to try "in smaller pieces"
             // was cut - nothing here knows that size was the problem.
-            summary: `Started ${task.attempt} times and never finished, so athanor has stopped retrying it and its reserved credits are back.${undelivered} Reply here to try again.`,
+            summary: `Started ${task.attempt} times and never finished, so garden has stopped retrying it and its reserved credits are back.${undelivered} Reply here to try again.`,
             // Owner-facing: the work is not there, and nothing else in the timeline says why - the
             // worker died before it could write a word.
             payload: {

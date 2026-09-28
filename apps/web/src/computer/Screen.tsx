@@ -4,7 +4,7 @@ import type {
   BrowserTabState,
   BrowserTabCleanup,
   BrowserRecovery
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { Maximize2, Minimize2, Pin, X } from 'lucide-react';
 import { remotePoint } from './screen-geometry';
 import { useExpandedView } from '../use-expanded-view';
@@ -208,7 +208,7 @@ export default function Screen({
         );
         if (!active) return;
         const ws = new WebSocket(socketAddress(value.runnerUrl, `${base}/stream`), [
-          'athanor-capability',
+          'garden-capability',
           value.token
         ]);
         socket.current = ws;

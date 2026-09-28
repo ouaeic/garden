@@ -1,6 +1,6 @@
 import { registerProjectGitRoutes } from './project-git.js';
 import { downloadSignal, sendDownload } from '../download-response.js';
-import { AthanorError } from '@athanor/core';
+import { GardenError } from '@garden/core';
 import {
   ProjectUpdateAction,
   ProjectRepositoryInput,
@@ -13,7 +13,7 @@ import {
   ProjectPurgeSelection,
   ProjectRetentionApply,
   ProjectRetentionSelection
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { z } from 'zod';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
@@ -23,7 +23,7 @@ export function registerProjectUpdateRoutes(context: RouteContext) {
   const bound = new Map<string, number>();
   const owned = async (userId: string, projectId: string) => {
     const project = await store.getProject(userId, projectId);
-    if (!project) throw new AthanorError('project_not_found', 'Project not found', 404);
+    if (!project) throw new GardenError('project_not_found', 'Project not found', 404);
     if ((bound.get(projectId) ?? 0) < Date.now() - 60_000) {
       let before: string | undefined;
       do {
@@ -349,7 +349,7 @@ export function registerProjectUpdateRoutes(context: RouteContext) {
     if (taskId) {
       const task = await store.getTask(userId, taskId);
       if (!task || task.projectId !== projectId || task.parentMissionId)
-        throw new AthanorError(
+        throw new GardenError(
           'conversation_not_found',
           'Conversation not found in this project',
           404

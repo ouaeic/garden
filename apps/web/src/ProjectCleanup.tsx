@@ -4,7 +4,7 @@ import type {
   ProjectPurgeResult,
   ProjectPurgeSelection,
   ProjectRevision
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { post } from './client';
 import { bytes } from './model';
 import { Button, Dialog, ErrorNotice, Spinner } from './ui';

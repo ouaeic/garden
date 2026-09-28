@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
-import type { ManagedProcess, ProjectProcessHistory } from '@athanor/contracts';
+import type { ManagedProcess, ProjectProcessHistory } from '@garden/contracts';
 import type { RouteContext } from '../http/server-context.js';
 import { registerProcessHistoryRoutes } from './process-history.js';
 const key = (id: number, owner: string) =>

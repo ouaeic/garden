@@ -3,7 +3,7 @@ import { apiBaseUrl, loadConfig, masterKeyBytes } from './config.js';
 
 const base = {
   DATABASE_DRIVER: 'postgres',
-  DATABASE_URL: 'postgres://athanor:athanor@localhost:5432/athanor'
+  DATABASE_URL: 'postgres://garden:garden@localhost:5432/garden'
 };
 
 const key = (bytes: number): string => Buffer.alloc(bytes, 7).toString('base64');

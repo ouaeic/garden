@@ -1,7 +1,7 @@
-import { runtimeDate } from '@athanor/core';
-import { TaskScheduleSpec } from '@athanor/contracts';
-import { decryptJson, encryptJson, nextScheduleRun, AthanorError } from '@athanor/core';
-import { type ModelToolCall } from '@athanor/model-gateway';
+import { runtimeDate } from '@garden/core';
+import { TaskScheduleSpec } from '@garden/contracts';
+import { decryptJson, encryptJson, nextScheduleRun, GardenError } from '@garden/core';
+import { type ModelToolCall } from '@garden/model-gateway';
 import { boundedKnowledge, textValue } from '../values.js';
 import { type ToolContext } from '../tool-dispatch.js';
 import { clampNumber } from './numbers.js';
@@ -55,7 +55,7 @@ export async function executeSchedulingTool(
         const spec = TaskScheduleSpec.parse(call.arguments.spec);
         const nextRunAt = nextScheduleRun(spec);
         if (!nextRunAt)
-          throw new AthanorError('schedule_in_past', 'A one-time schedule must be in the future');
+          throw new GardenError('schedule_in_past', 'A one-time schedule must be in the future');
         const maxSchedules = 1_000;
         const created = await context.store.createTaskSchedule({
           userId: task.userId,
@@ -109,7 +109,7 @@ export async function executeSchedulingTool(
       const existing = records.find(
         (record) => record.id === id && record.workspaceId === task.workspaceId
       );
-      if (!existing) throw new AthanorError('schedule_not_found', 'Schedule not found');
+      if (!existing) throw new GardenError('schedule_not_found', 'Schedule not found');
       if (action === 'update') {
         const currentTitle =
           existing.titleCiphertext.aad === `task-title:${task.workspaceId}`
@@ -125,7 +125,7 @@ export async function executeSchedulingTool(
           call.arguments.spec !== undefined ||
           call.arguments.maxComputeCredits !== undefined;
         if (!hasChange)
-          throw new AthanorError(
+          throw new GardenError(
             'schedule_update_empty',
             'Provide a new title, instruction, timing, or compute limit'
           );
@@ -137,7 +137,7 @@ export async function executeSchedulingTool(
             : TaskScheduleSpec.parse(call.arguments.spec);
         const nextRunAt = existing.enabled ? nextScheduleRun(spec) : null;
         if (existing.enabled && !nextRunAt)
-          throw new AthanorError(
+          throw new GardenError(
             'schedule_in_past',
             'An enabled one-time schedule must be in the future'
           );
@@ -170,7 +170,7 @@ export async function executeSchedulingTool(
           maxSpendUsd: existing.maxSpendUsd,
           nextRunAt
         });
-        if (!updated) throw new AthanorError('schedule_not_found', 'Schedule not found');
+        if (!updated) throw new GardenError('schedule_not_found', 'Schedule not found');
         return materialize(updated);
       }
       if (action === 'run') {
@@ -187,7 +187,7 @@ export async function executeSchedulingTool(
          * now is owed a reason it can act on and repeat to the owner.
          */
         if (await context.store.taskScheduleRunInFlight(existing.id))
-          throw new AthanorError(
+          throw new GardenError(
             'previous_run_active',
             'This schedule already has a run that has not finished; open that conversation and let it finish or cancel it, then run this again'
           );
@@ -197,13 +197,13 @@ export async function executeSchedulingTool(
           true,
           runtimeDate()
         );
-        if (!updated) throw new AthanorError('schedule_not_found', 'Schedule not found');
+        if (!updated) throw new GardenError('schedule_not_found', 'Schedule not found');
         return { ...materialize(updated), queuedNow: true };
       }
       if (action === 'pause' || action === 'resume') {
         const nextRunAt = action === 'resume' ? nextScheduleRun(existing.spec) : null;
         if (action === 'resume' && !nextRunAt)
-          throw new AthanorError(
+          throw new GardenError(
             'schedule_finished',
             'This one-time schedule has passed; create a new schedule instead'
           );
@@ -213,7 +213,7 @@ export async function executeSchedulingTool(
           action === 'resume',
           nextRunAt
         );
-        if (!updated) throw new AthanorError('schedule_not_found', 'Schedule not found');
+        if (!updated) throw new GardenError('schedule_not_found', 'Schedule not found');
         return materialize(updated);
       }
       if (action === 'remove')
@@ -221,7 +221,7 @@ export async function executeSchedulingTool(
           removed: await context.store.deleteTaskSchedule(task.userId, existing.id),
           id: existing.id
         };
-      throw new AthanorError('schedule_action_invalid', 'Unknown schedule action');
+      throw new GardenError('schedule_action_invalid', 'Unknown schedule action');
     }
     default:
       /*

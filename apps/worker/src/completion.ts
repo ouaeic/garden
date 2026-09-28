@@ -8,12 +8,12 @@
  *
  * `startTurnState` is here because it is the other half of the same question: what a new turn is
  * allowed to inherit from the last one is exactly what the completion check will later be entitled
- * to count as evidence. `apps/api` imports it through `@athanor/worker` to seed a resumed turn.
+ * to count as evidence. `apps/api` imports it through `@garden/worker` to seed a resumed turn.
  *
  * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
-import { ownerMessageContent, type OwnerMessage } from '@athanor/core';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import { ownerMessageContent, type OwnerMessage } from '@garden/core';
+import type { ModelToolCall } from '@garden/model-gateway';
 import {
   acceptanceObservation,
   acceptancePassedEvidence,
@@ -43,7 +43,7 @@ import { asRecord, textValue } from './values.js';
 export const MODEL_DECLARED_VERIFICATION_STATUSES = ['verified', 'not_applicable'] as const;
 
 /**
- * What athanor is willing to say about a completion.
+ * What garden is willing to say about a completion.
  *
  * The first two are the model's own word for it. The second two are the harness's, computed in
  * `turn/finish.ts` from what the declared acceptance checks actually did, and reachable no other
@@ -290,7 +290,7 @@ export const ACCEPTANCE_MARKER = 'ACTIVE ACCEPTANCE CHECKS';
  * `DECLARATION_TOOLS`, with a comment saying the reason was that widening it "changes a shipped
  * gate and has a price the fixtures in `evals/` would move" - a price, not a reason. The gate it
  * left open was a real one: `file_write` then `notify` then a finish citing the notify passed
- * `completionVerification` on the strength of athanor having delivered a sentence the model wrote.
+ * `completionVerification` on the strength of garden having delivered a sentence the model wrote.
  * Every "cite something that read the outcome back" refusal in this file was one `notify` call away
  * from being satisfied.
  */
@@ -305,7 +305,7 @@ const AGENT_SPEECH = new Set([...DECLARATION_TOOLS, 'notify']);
  *
  * The one worth explaining is the last. `finish` already lets a turn that used no tools complete
  * conversationally, and the completion nag already bounds a turn that keeps replying without acting
- * - both are athanor deciding what to do about a turn that did nothing. A question asked before the
+ * - both are garden deciding what to do about a turn that did nothing. A question asked before the
  * turn has observed anything is the same shape from the front: the computer exists to go and look,
  * and the choice between "which of these two files" and "I read both and they differ like this,
  * which do you want" is the whole difference between a machine and a form. So the first act of a
@@ -401,7 +401,7 @@ export const completionReference = (state: AgentState, id: string): string => {
 };
 
 /**
- * What athanor observed by running this call, when the call was a command it can be held to later.
+ * What garden observed by running this call, when the call was a command it can be held to later.
  *
  * Only a foreground `shell` with no stdin: a background start reports a session rather than an exit
  * code, and a command fed input is not the command an acceptance check can name, since the check
@@ -437,7 +437,7 @@ export const shellObservation = (
  *
  * One reading of "after the last change", shared by the two places that need it: the completion
  * contract, which asks whether the cited result can show the change worked, and the acceptance run,
- * which asks whether a command athanor already executed still speaks for the computer as it stands.
+ * which asks whether a command garden already executed still speaks for the computer as it stands.
  * They were the same question written twice, and two copies of this rule would drift.
  */
 export const evidenceFloor = (
@@ -445,7 +445,7 @@ export const evidenceFloor = (
 ): { order: string[]; lastMutation: number; floor: number; observedItsOwnChange: boolean } => {
   const order = Object.keys(state.turnToolResults ?? {});
   // Writing the running brief is bookkeeping, not the work being proved. An agent that finished,
-  // cited what it had observed and then recorded the outcome in workspace/ATHANOR.md had made a new
+  // cited what it had observed and then recorded the outcome in workspace/GARDEN.md had made a new
   // last change, so its own record-keeping invalidated evidence it had already gathered - and the
   // way out was to read the brief back, which proves only that a file it just wrote says what it
   // wrote. It stays `mutating` everywhere else; it is only not the change the evidence is about.
@@ -478,7 +478,7 @@ export const evidenceFloor = (
    * model turns after its answer was already on screen.
    *
    * A generation is the third case. `generate_media` does not ask the workspace to make a file;
-   * athanor makes it, and the result carries the paths it wrote and the provider's own charge.
+   * garden makes it, and the result carries the paths it wrote and the provider's own charge.
    * Speech has no reader at all in the catalogue, so a turn that recorded a clip had no citable
    * observation to make: measured on `media-one-generation-is-not-re-rolled`, it spent two model
    * calls being refused before finishing on the same evidence anyway. Whether the picture is any
@@ -500,10 +500,10 @@ export const evidenceFloor = (
 };
 
 /**
- * Every command athanor itself ran this turn that still speaks for the computer as it stands.
+ * Every command garden itself ran this turn that still speaks for the computer as it stands.
  *
  * Keyed by what the command was, so an acceptance check naming one of them is answered by the run
- * athanor already made rather than by a second one. Anything before the floor is dropped: the
+ * garden already made rather than by a second one. Anything before the floor is dropped: the
  * computer changed after it, so what it saw is no longer what is there.
  */
 export const observedCommands = (
@@ -633,7 +633,7 @@ export const completionVerification = (
        * `user_visible_result` is the one item that may stand on a claim alone - "the user can see
        * the answer in the reply" cites no call because no call produced it - and it was written as
        * a bare `continue`, so an item of this source skipped every check in this loop including
-       * the ones about the call it did cite. A finish could therefore name a call athanor answered
+       * the ones about the call it did cite. A finish could therefore name a call garden answered
        * without running, or one the computer failed, and have it rendered beside the tick as
        * something the user can see. That is §4.5 #73's shape exactly: evidence that was claimed
        * and never produced, counted as satisfied.
@@ -650,7 +650,7 @@ export const completionVerification = (
           ok: false,
           reason: `Verification cites ${item.toolCallId} as something the user can see, but that ${cited.name} ${
             cited.skipped
-              ? 'never ran - athanor answered it without starting it'
+              ? 'never ran - garden answered it without starting it'
               : 'did not complete successfully this turn'
           }, so it produced nothing to see. Cite the call that did produce it, or describe what the user can see without citing a call.`
         };
@@ -664,12 +664,12 @@ export const completionVerification = (
     const result = state.turnToolResults?.[item.toolCallId];
     // Said apart from the failure below, because they are different facts about the world and the
     // way out of them is different: a call that failed was attempted and the computer answered, a
-    // call athanor answered itself was never attempted at all. Told it "did not complete
+    // call garden answered itself was never attempted at all. Told it "did not complete
     // successfully", a model re-cites a neighbour; told nothing ran, it runs the call.
     if (result?.skipped)
       return {
         ok: false,
-        reason: `Verification cites ${item.toolCallId}, but that ${result.name} never ran - athanor answered it without starting it. Run it, then cite the result.`
+        reason: `Verification cites ${item.toolCallId}, but that ${result.name} never ran - garden answered it without starting it. Run it, then cite the result.`
       };
     if (!result?.success)
       return {
@@ -917,7 +917,7 @@ export interface DelegateReport {
  * The same report weighed against the contract the specialist was given, with the reasons it missed.
  *
  * §4.5 #78 is a declared output schema the child is told up front, validated by the parent, with
- * exactly one bounded correction retry. athanor had the first half and not the second: the shape is
+ * exactly one bounded correction retry. garden had the first half and not the second: the shape is
  * in the specialist's system prompt, `parseDelegateReport` below judged it, and the caller then did
  * nothing at all with the verdict - the comment there said so outright. A report that arrived as
  * prose was adopted by the lead exactly as a report that met the contract was, and nothing anywhere

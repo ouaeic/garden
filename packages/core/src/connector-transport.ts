@@ -2,7 +2,7 @@ import { lookup as resolveDns } from 'node:dns/promises';
 import { request as httpsRequest } from 'node:https';
 import type { ClientRequest, IncomingMessage } from 'node:http';
 import type { LookupFunction } from 'node:net';
-import { AthanorError } from './errors.js';
+import { GardenError } from './errors.js';
 import { hostMatchesSuffix, isPublicInternetAddress } from './network-scope.js';
 
 export interface ConnectorRequestInput {
@@ -41,7 +41,7 @@ export const assertConnectorUrl = (url: URL, allowedHostSuffixes: string[]): voi
     (url.port && url.port !== '443') ||
     !hostMatchesSuffix(url.hostname.toLowerCase(), allowedHostSuffixes)
   ) {
-    throw new AthanorError(
+    throw new GardenError(
       'connector_url_not_allowed',
       'Connector endpoints must use an approved, credential-free HTTPS host on port 443'
     );
@@ -54,9 +54,9 @@ export const secureConnectorRequest: ConnectorTransport = async (input) => {
   const body = input.body ? Buffer.from(input.body) : undefined;
   const maxRequestBytes = input.maxRequestBytes ?? 1_000_000;
   if (!Number.isSafeInteger(maxRequestBytes) || maxRequestBytes < 1 || maxRequestBytes > 40_000_000)
-    throw new AthanorError('connector_request_invalid', 'Invalid connector transfer bounds');
+    throw new GardenError('connector_request_invalid', 'Invalid connector transfer bounds');
   if (body && body.byteLength > maxRequestBytes)
-    throw new AthanorError(
+    throw new GardenError(
       'connector_request_too_large',
       'Connector request exceeds its transfer limit'
     );
@@ -69,7 +69,7 @@ export const secureConnectorRequest: ConnectorTransport = async (input) => {
     !Number.isSafeInteger(maxResponseBytes) ||
     maxResponseBytes < 1
   )
-    throw new AthanorError('connector_request_invalid', 'Invalid connector transfer bounds');
+    throw new GardenError('connector_request_invalid', 'Invalid connector transfer bounds');
   const started = Date.now();
   return new Promise<ConnectorRequestResult>((resolve, reject) => {
     let request: ClientRequest | undefined;
@@ -88,13 +88,13 @@ export const secureConnectorRequest: ConnectorTransport = async (input) => {
       reject(
         error instanceof Error
           ? error
-          : new AthanorError('connector_request_failed', 'Connector request failed')
+          : new GardenError('connector_request_failed', 'Connector request failed')
       );
     };
     const abort = () =>
-      fail(new AthanorError('connector_aborted', 'Connector request was cancelled'));
+      fail(new GardenError('connector_aborted', 'Connector request was cancelled'));
     const deadline = setTimeout(
-      () => fail(new AthanorError('connector_timeout', 'Connector request timed out')),
+      () => fail(new GardenError('connector_timeout', 'Connector request timed out')),
       timeoutMs
     );
     input.signal?.addEventListener('abort', abort, { once: true });
@@ -107,7 +107,7 @@ export const secureConnectorRequest: ConnectorTransport = async (input) => {
       // DNS lookup itself cannot be cancelled; its late result must never start a request.
       if (settled) return;
       if (!addresses.length || addresses.some((entry) => !isPublicConnectorAddress(entry.address)))
-        throw new AthanorError(
+        throw new GardenError(
           'connector_address_not_allowed',
           'Connector host did not resolve exclusively to public internet addresses'
         );
@@ -143,7 +143,7 @@ export const secureConnectorRequest: ConnectorTransport = async (input) => {
             size += chunk.byteLength;
             if (size > maxResponseBytes) {
               fail(
-                new AthanorError(
+                new GardenError(
                   'connector_response_too_large',
                   `Connector response exceeds ${maxResponseBytes} bytes`
                 )
@@ -155,7 +155,7 @@ export const secureConnectorRequest: ConnectorTransport = async (input) => {
           incoming.on('error', fail);
           incoming.on('aborted', () =>
             fail(
-              new AthanorError(
+              new GardenError(
                 'connector_response_incomplete',
                 'Connector response ended before completion'
               )
@@ -165,7 +165,7 @@ export const secureConnectorRequest: ConnectorTransport = async (input) => {
             if (settled) return;
             if (!incoming.complete) {
               fail(
-                new AthanorError(
+                new GardenError(
                   'connector_response_incomplete',
                   'Connector response ended before completion'
                 )
@@ -175,7 +175,7 @@ export const secureConnectorRequest: ConnectorTransport = async (input) => {
             const status = incoming.statusCode ?? 502;
             if (status >= 300 && status < 400) {
               fail(
-                new AthanorError(
+                new GardenError(
                   'connector_redirect_blocked',
                   'Connector redirects are blocked to prevent credential forwarding'
                 )

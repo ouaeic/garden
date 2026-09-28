@@ -1,7 +1,7 @@
 /**
  * The line-addressed edit format: how a file is shown, and how two versions of a line are compared.
  *
- * athanor's editor used to be oldText/newText with an exactly-once guard. That guard is what made
+ * garden's editor used to be oldText/newText with an exactly-once guard. That guard is what made
  * it safe and also what made it expensive: to change one line inside a function that says
  * `return null;` eleven times, the model had to quote enough surrounding text to be unique and then
  * quote all of it back with one word different. The cost of an edit was set by how repetitive the

@@ -1,4 +1,4 @@
-import { AthanorError } from '@athanor/core';
+import { GardenError } from '@garden/core';
 import { seedMediaModels } from './catalog.js';
 import { imageCapabilities } from './image-dimensions.js';
 import { readBoundedMediaBody } from './media-output.js';
@@ -56,7 +56,7 @@ export const refreshOpenRouterMediaCatalog = async (
     result.status === 'fulfilled' ? result.value : undefined
   );
   if (!bodies.slice(0, 4).some((body) => rowsOf(body).length))
-    throw new AthanorError(
+    throw new GardenError(
       'provider_catalog_empty',
       'The provider listed no media models, so the catalogue was left as it was',
       502

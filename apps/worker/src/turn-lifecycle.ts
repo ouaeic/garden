@@ -1,4 +1,4 @@
-import { runtimeClearTimer, runtimeSetInterval, runtimeSetTimeout } from '@athanor/core';
+import { runtimeClearTimer, runtimeSetInterval, runtimeSetTimeout } from '@garden/core';
 /**
  * Holding a task, and letting go of it.
  *
@@ -13,8 +13,8 @@ import { runtimeClearTimer, runtimeSetInterval, runtimeSetTimeout } from '@athan
  *
  * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
-import { AthanorError } from '@athanor/core';
-import type { ModelMessage } from '@athanor/model-gateway';
+import { GardenError } from '@garden/core';
+import type { ModelMessage } from '@garden/model-gateway';
 
 /**
  * A single shell or coding_agent call may legitimately run for an hour, so the lease is refreshed
@@ -98,7 +98,7 @@ export const withRequestDeadline = async <T>(
   const controller = new AbortController();
   const timer = runtimeSetTimeout(() => {
     controller.abort(
-      new AthanorError(
+      new GardenError(
         'model_request_timeout',
         `The model provider did not respond within ${Math.round(milliseconds / 1000)} seconds`
       )

@@ -3,7 +3,7 @@
  * Drives real work through the whole stack against a real model.
  *
  * The release drill proves the runner: the toolchain is there, a document builds, a browser
- * navigates. The unit and end-to-end suites prove athanor's own behaviour against a scripted
+ * navigates. The unit and end-to-end suites prove garden's own behaviour against a scripted
  * provider. Neither answers the only question an owner actually cares about - give it a job in
  * plain English and does the thing arrive.
  *
@@ -18,7 +18,7 @@
  * It cannot be pointed at a deployed box, and that is not an oversight to fix here: it builds the
  * server it drives and signs in through `POST /v1/auth/dev` at line 158, which is refused unless
  * ALLOW_INSECURE_DEV_AUTH is on AND DEPLOYMENT_MODE is development. The over-the-wire equivalent of
- * `runJob` below is `athanor task run` in `scripts/athanor`: the same routes, a bearer token, an
+ * `runJob` below is `garden task run` in `scripts/garden`: the same routes, a bearer token, an
  * honest exit code and one documented JSON object, from anywhere that can reach the server. See
  * docs/HEADLESS.md. It does not replace this file - what this one has and that one cannot is a real
  * model, a real runner and a score taken from the artefact rather than from the agent's claim.
@@ -48,13 +48,13 @@ if (!apiKey) {
 }
 const runnerSecret = process.env.RUNNER_SHARED_SECRET ?? '';
 if (!runnerSecret) {
-  console.error('live-drill: set RUNNER_SHARED_SECRET (from /etc/athanor/runner.env)');
+  console.error('live-drill: set RUNNER_SHARED_SECRET (from /etc/garden/runner.env)');
   process.exit(64);
 }
 
 const only = process.argv.slice(2).filter((value) => !value.startsWith('-'));
 /*
- * Which model to hold every job to, when the point is to test athanor rather than to let its router
+ * Which model to hold every job to, when the point is to test garden rather than to let its router
  * shop. A credit-limited account wants one known-cheap model and no surprises, and without this the
  * drill picked whatever ranked best for each job - which is the right default for judging the
  * router and the wrong one for judging the loop on somebody's last few dollars.
@@ -62,9 +62,9 @@ const only = process.argv.slice(2).filter((value) => !value.startsWith('-'));
  * The route follows: a model is only offered on the privacy route its provider actually supports,
  * so pinning a model without letting the route follow it just makes the task unroutable.
  */
-const pinnedModel = process.env.ATHANOR_DRILL_MODEL ?? '';
-const pinnedRoute = process.env.ATHANOR_DRILL_ROUTE ?? '';
-const directory = await mkdtemp(join(tmpdir(), 'athanor-live-'));
+const pinnedModel = process.env.GARDEN_DRILL_MODEL ?? '';
+const pinnedRoute = process.env.GARDEN_DRILL_ROUTE ?? '';
+const directory = await mkdtemp(join(tmpdir(), 'garden-live-'));
 
 const config = {
   DEPLOYMENT_MODE: 'development',
@@ -93,7 +93,7 @@ const config = {
   PUBLIC_RUNNER_URL: 'ws://127.0.0.1:4300',
   WORKSPACE_IMAGE_REVISION: 'dev',
   WEBAUTHN_RP_ID: 'localhost',
-  WEBAUTHN_RP_NAME: 'athanor live drill',
+  WEBAUTHN_RP_NAME: 'garden live drill',
   WEBAUTHN_ORIGIN: 'http://localhost:5173',
   ALLOW_INSECURE_DEV_AUTH: true,
   WORKER_ID: 'live-drill',
@@ -160,12 +160,12 @@ try {
         .slice(0, 5)
         .map((model) => model.id);
       throw new Error(
-        `ATHANOR_DRILL_MODEL=${pinnedModel} is not in this account's catalogue.${near.length ? ` Did you mean: ${near.join(', ')}` : ''}`
+        `GARDEN_DRILL_MODEL=${pinnedModel} is not in this account's catalogue.${near.length ? ` Did you mean: ${near.join(', ')}` : ''}`
       );
     }
     ok(
       'pinned model',
-      `${match.id} on the ${pinnedRoute || 'provider_zdr'} route${match.privacyRoute === (pinnedRoute || 'provider_zdr') ? '' : ` - note this model is offered on ${match.privacyRoute}, so set ATHANOR_DRILL_ROUTE=${match.privacyRoute}`}`
+      `${match.id} on the ${pinnedRoute || 'provider_zdr'} route${match.privacyRoute === (pinnedRoute || 'provider_zdr') ? '' : ` - note this model is offered on ${match.privacyRoute}, so set GARDEN_DRILL_ROUTE=${match.privacyRoute}`}`
     );
   }
 
@@ -332,7 +332,7 @@ const runJob = async (job) => {
 
 /**
  * Jobs are written the way an owner would write them - no tool names, no file paths, no format
- * hints - because the point is whether athanor turns an ordinary sentence into the right work.
+ * hints - because the point is whether garden turns an ordinary sentence into the right work.
  * Each one is checked on what it left behind.
  */
 /** Only what this job left behind: the jobs share a workspace, so an earlier one's file must
@@ -422,7 +422,7 @@ const JOBS = [
         ? ((await readWorkspaceFile(tests[0].path))?.toString('utf8') ?? '')
         : '';
       // The API deliberately exposes no way to run a command, so the proof that the tests pass is
-      // the harness's own: an acceptance check is a command athanor ran and watched exit zero, and
+      // the harness's own: an acceptance check is a command garden ran and watched exit zero, and
       // the completion carries what it observed. That is a stronger signal than anything this
       // script could assert by reading the file, because the agent cannot write it.
       const events = await app

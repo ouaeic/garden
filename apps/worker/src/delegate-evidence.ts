@@ -1,5 +1,5 @@
-import type { ModelRelease, ParallelWebReadResult } from '@athanor/contracts';
-import type { TaskRecord } from '@athanor/data';
+import type { ModelRelease, ParallelWebReadResult } from '@garden/contracts';
+import type { TaskRecord } from '@garden/data';
 import type { AgentState } from './agent-state.js';
 import {
   quotedSpanMatchesSource,

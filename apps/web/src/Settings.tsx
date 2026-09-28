@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSurfaceLocation } from './surface-location';
 import { ConnectionsLibrary } from './library/Connections';
-import type { Workspace } from '@athanor/contracts';
+import type { Workspace } from '@garden/contracts';
 import { ProviderSettings } from './settings/Providers.js';
 import { SpendingSettings } from './settings/Spending.js';
 import { ComputerSettings } from './settings/Computer.js';

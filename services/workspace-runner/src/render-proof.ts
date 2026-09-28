@@ -361,7 +361,7 @@ export const findRenderTools = async (root: string): Promise<RenderTools> => {
   const [pdftotext, pdftoppm, officeConvert] = await Promise.all([
     resolveExecutable('pdftotext', hostSearchPath, root),
     resolveExecutable('pdftoppm', hostSearchPath, root),
-    resolveExecutable('athanor-office-convert', hostSearchPath, root)
+    resolveExecutable('garden-office-convert', hostSearchPath, root)
   ]);
   return { pdftotext, pdftoppm, officeConvert };
 };
@@ -511,7 +511,7 @@ export const proveRender = async (
       'apt-get install -y libreoffice-writer libreoffice-impress libreoffice-calc'
     );
   const source = await readWorkspaceFile(root, request.path, maxSourceBytes);
-  const scratch = await mkdtemp(path.join(tmpdir(), 'athanor-render-proof-'));
+  const scratch = await mkdtemp(path.join(tmpdir(), 'garden-render-proof-'));
   try {
     const sourcePath = path.join(scratch, `source${extension}`);
     await writeFile(sourcePath, source.content, { mode: 0o600 });

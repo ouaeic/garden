@@ -10,7 +10,7 @@
 
 import { createHmac } from 'node:crypto';
 import {
-  AthanorError,
+  GardenError,
   assertMemoryValidity,
   decryptBytes,
   decryptJson,
@@ -23,16 +23,16 @@ import {
   OWNER_MEMORY_MAX_CHARS,
   OWNER_MEMORY_MAX_ROWS,
   WORKSPACE_MEMORY_MAX_CHARS
-} from '@athanor/core';
-import type { MemoryDocument } from '@athanor/core';
-import { OWNER_BLOCK_MAX_BYTES } from '@athanor/data';
-import type { MemoryItemBody } from '@athanor/contracts';
+} from '@garden/core';
+import type { MemoryDocument } from '@garden/core';
+import { OWNER_BLOCK_MAX_BYTES } from '@garden/data';
+import type { MemoryItemBody } from '@garden/contracts';
 import type {
   MemoryFactCandidateRecord,
   MemoryItemRecord,
   OwnerBlockRecord,
   WorkspaceMemoryRecord
-} from '@athanor/data';
+} from '@garden/data';
 import { z } from 'zod';
 import { UNREADABLE_MEMORY_ITEM } from '../context.js';
 import { requireUser } from '../http/auth-hook.js';
@@ -179,7 +179,7 @@ const OwnerBlockText = z
  * It is a byte none of the three parts can contain, which is what a joining character has to be.
  */
 const SEPARATOR = '\u0000';
-const PROPOSAL_HANDLE_CONTEXT = 'athanor-memory-proposal';
+const PROPOSAL_HANDLE_CONTEXT = 'garden-memory-proposal';
 
 /** Which side of this computer put a row into memory. Three answers, because there are three. */
 export type MemoryItemOrigin = 'stated' | 'proposed' | 'watched';
@@ -360,7 +360,7 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
     const limit = input.target === 'user' ? OWNER_MEMORY_MAX_CHARS : WORKSPACE_MEMORY_MAX_CHARS;
     const spent = spentCharacters(records, open, input.target);
     if (spent + input.content.length > limit)
-      throw new AthanorError(
+      throw new GardenError(
         'memory_full',
         `${input.target} memory is ${spent}/${limit} characters. Consolidate or remove an entry first.`
       );
@@ -378,7 +378,7 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
         contentCiphertext: encryptJson(document, ownerKey, userMemoryAad(user.id))
       });
       if (!created)
-        throw new AthanorError(
+        throw new GardenError(
           'memory_full',
           `Memory about you holds ${OWNER_MEMORY_MAX_ROWS} entries and all ${OWNER_MEMORY_MAX_ROWS} are in use. Remove one you no longer stand behind before adding another.`
         );
@@ -424,12 +424,12 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
     );
     const records = await store.listWorkspaceMemories(user.id, request.params.workspaceId);
     const existing = records.find((record) => record.id === request.params.memoryId);
-    if (!existing) throw new AthanorError('memory_not_found', 'Memory entry not found', 404);
+    if (!existing) throw new GardenError('memory_not_found', 'Memory entry not found', 404);
     const existingDocument = open(existing);
     const limit = existing.target === 'user' ? OWNER_MEMORY_MAX_CHARS : WORKSPACE_MEMORY_MAX_CHARS;
     const spent = spentCharacters(records, open, existing.target, existing.id);
     if (spent + input.content.length > limit)
-      throw new AthanorError('memory_full', 'Replacement would exceed the memory limit');
+      throw new GardenError('memory_full', 'Replacement would exceed the memory limit');
     const updatedDocument: MemoryDocument = {
       content: input.content,
       source: 'owner',
@@ -458,7 +458,7 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
     if (keyScope === 'user' && existing.keyScope !== 'user') {
       const held = await store.countOwnerMemories(user.id);
       if (held >= OWNER_MEMORY_MAX_ROWS)
-        throw new AthanorError(
+        throw new GardenError(
           'memory_full',
           `Memory about you already holds ${OWNER_MEMORY_MAX_ROWS} entries. Remove one you no longer stand behind before moving this one across.`
         );
@@ -478,7 +478,7 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
               `workspace-memory:${request.params.workspaceId}`
             )
     });
-    if (!updated) throw new AthanorError('memory_not_found', 'Memory entry not found', 404);
+    if (!updated) throw new GardenError('memory_not_found', 'Memory entry not found', 404);
     return memoryResponse(updated, updatedDocument);
   });
 
@@ -571,7 +571,7 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
         .parse(request.body);
       const bytes = Buffer.byteLength(input.text, 'utf8');
       if (bytes > OWNER_BLOCK_MAX_BYTES)
-        throw new AthanorError(
+        throw new GardenError(
           'owner_block_full',
           `Your block holds ${OWNER_BLOCK_MAX_BYTES} bytes and this is ${bytes}. Shorten it - nothing here is dropped to make room.`
         );
@@ -583,7 +583,7 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
         expectedVersion: input.expectedVersion
       });
       if (!written)
-        throw new AthanorError(
+        throw new GardenError(
           'owner_block_conflict',
           'Your block changed somewhere else since this screen loaded. Reload it before saving.',
           409
@@ -640,7 +640,7 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
       const workspaceId = request.params.workspaceId;
       const { key } = await workspaceKnowledgeKey(user.id, workspaceId);
       const record = await store.getMemoryItem(workspaceId, request.params.itemId);
-      if (!record) throw new AthanorError('memory_item_not_found', 'Memory item not found', 404);
+      if (!record) throw new GardenError('memory_item_not_found', 'Memory item not found', 404);
       try {
         const document = decryptJson<{ title?: string | null; body: string }>(
           record.documentCiphertext,
@@ -945,7 +945,7 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
          * the handles that resolved to nothing were rows already gone before the press landed.
          */
         if (dismissed === 0)
-          throw new AthanorError('memory_proposal_not_found', 'Proposal not found', 404);
+          throw new GardenError('memory_proposal_not_found', 'Proposal not found', 404);
         return { dismissed };
       });
     }
@@ -966,7 +966,7 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
       return idempotent(request, reply, user, async () => {
         await workspaceKnowledgeKey(user.id, request.params.workspaceId);
         if (!(await store.verifyMemoryProcedure(request.params.workspaceId, request.params.itemId)))
-          throw new AthanorError('memory_item_not_found', 'Memory item not found', 404);
+          throw new GardenError('memory_item_not_found', 'Memory item not found', 404);
         return { verified: true };
       });
     }
@@ -988,7 +988,7 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
       return idempotent(request, reply, user, async () => {
         await workspaceKnowledgeKey(user.id, request.params.workspaceId);
         if (!(await store.retractMemoryItem(request.params.workspaceId, request.params.itemId)))
-          throw new AthanorError(
+          throw new GardenError(
             'memory_item_not_found',
             'Memory item not found, or already retracted',
             404
@@ -1032,7 +1032,7 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
     const user = requireUser(request.user);
     const input = SkillDocumentInput.parse(request.body);
     const { key } = await workspaceKnowledgeKey(user.id, request.params.workspaceId);
-    const nameHash = createHmac('sha256', key).update(`athanor-skill:${input.name}`).digest('hex');
+    const nameHash = createHmac('sha256', key).update(`garden-skill:${input.name}`).digest('hex');
     const saved = await store.upsertWorkspaceSkill({
       userId: user.id,
       workspaceId: request.params.workspaceId,
@@ -1078,7 +1078,7 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
       ...(input.pinned === undefined ? {} : { pinned: input.pinned }),
       ...(input.enabled === undefined ? {} : { enabled: input.enabled })
     });
-    if (!updated) throw new AthanorError('skill_not_found', 'Skill not found', 404);
+    if (!updated) throw new GardenError('skill_not_found', 'Skill not found', 404);
     return {
       id: updated.id,
       version: updated.version,

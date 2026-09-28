@@ -6,7 +6,7 @@ import { agentHome } from './execution.js';
 import { ProcessManager } from './processes.js';
 
 /**
- * Stands in for athanor-sandbox: consumes `run <network mode> <filesystem mode> <root> --spec
+ * Stands in for garden-sandbox: consumes `run <network mode> <filesystem mode> <root> --spec
  * <path>` the way the real helper does, reads the directory, the environment and the command out
  * of the spec file - the header word, the directory, then NUL-terminated words - unlinks it,
  * enters the directory, and execs as `env -i` does.
@@ -74,7 +74,7 @@ const settledStatus = async (
 
 /*
  * Retried, because `close()` is synchronous and the service records behind it are not: a supervisor
- * can still be writing `.athanor/services.json` while the tree is being removed, and the removal
+ * can still be writing `.garden/services.json` while the tree is being removed, and the removal
  * fails ENOTEMPTY on a file that appeared mid-walk. services.test.ts met this first and answers it
  * the same way.
  */
@@ -90,7 +90,7 @@ describe('background process manager', () => {
   it(
     'keeps a long command observable without blocking the agent turn',
     async () => {
-      const root = await mkdtemp(path.join(tmpdir(), 'athanor-process-'));
+      const root = await mkdtemp(path.join(tmpdir(), 'garden-process-'));
       roots.push(root);
       await mkdir(path.join(root, 'workspace'));
       const manager = new ProcessManager();
@@ -124,7 +124,7 @@ describe('background process manager', () => {
       // The direct child exits immediately and a grandchild writes to the inherited pipe afterwards.
       // A session that flipped to `completed` on the child's exit would hand the agent an empty log
       // and call it the whole output, which is the one thing a background job's result is read from.
-      const root = await mkdtemp(path.join(tmpdir(), 'athanor-process-'));
+      const root = await mkdtemp(path.join(tmpdir(), 'garden-process-'));
       roots.push(root);
       await mkdir(path.join(root, 'workspace'));
       const manager = new ProcessManager(UNREACHABLE_FLUSH_GRACE_MS);
@@ -156,7 +156,7 @@ describe('background process manager', () => {
       // session would stay `running` for as long as that process lived and the agent would poll a
       // job that had already finished. Truncating the log is the price of that bound, and this is
       // where it is stated: the grandchild's write lands far outside a grace it cannot reach.
-      const root = await mkdtemp(path.join(tmpdir(), 'athanor-process-'));
+      const root = await mkdtemp(path.join(tmpdir(), 'garden-process-'));
       roots.push(root);
       await mkdir(path.join(root, 'workspace'));
       const manager = new ProcessManager(50);
@@ -185,7 +185,7 @@ describe('background process manager', () => {
     async () => {
       // No 'exit' is ever emitted for a spawn that failed, so a session waiting for one sat at
       // `running` until its own timeout killed a process that had never existed.
-      const root = await mkdtemp(path.join(tmpdir(), 'athanor-process-'));
+      const root = await mkdtemp(path.join(tmpdir(), 'garden-process-'));
       roots.push(root);
       await mkdir(path.join(root, 'workspace'));
       const manager = new ProcessManager();
@@ -208,7 +208,7 @@ describe('background process manager', () => {
     async () => {
       // A long-running background session is the easier way to exhaust the box, not the harder one:
       // nothing is waiting on it, so it has hours rather than minutes to do the damage.
-      const root = await mkdtemp(path.join(tmpdir(), 'athanor-process-'));
+      const root = await mkdtemp(path.join(tmpdir(), 'garden-process-'));
       roots.push(root);
       await mkdir(path.join(root, 'workspace'));
       const limiter = path.join(root, 'limiter');
@@ -256,7 +256,7 @@ describe('background process manager', () => {
       // is on its journal line beside the arguments. A session started in
       // `workspace/acme-lawsuit-discovery` must not put that name there; the helper enters the
       // directory from the spec instead, and the command still runs where it asked to.
-      const root = await mkdtemp(path.join(tmpdir(), 'athanor-process-'));
+      const root = await mkdtemp(path.join(tmpdir(), 'garden-process-'));
       roots.push(root);
       const chosen = path.join(root, 'workspace', 'acme-lawsuit-discovery');
       await mkdir(chosen, { recursive: true });
@@ -308,7 +308,7 @@ describe('background process manager', () => {
        * compute their invocation in one place: a unification that quietly dropped the sandbox from
        * this side would otherwise have passed every test in the package.
        */
-      const root = await mkdtemp(path.join(tmpdir(), 'athanor-process-'));
+      const root = await mkdtemp(path.join(tmpdir(), 'garden-process-'));
       roots.push(root);
       await mkdir(path.join(root, 'workspace'));
       // Stands in for sudo: records what it was asked to run, then runs it.
@@ -319,7 +319,7 @@ describe('background process manager', () => {
         `#!/bin/sh\nif [ "$3" = run ]; then printf '%s\\n' "$*" >"${record}"; fi\nshift\nexec "$@"\n`
       );
       await chmod(elevate, 0o700);
-      // Stands in for athanor-sandbox: drops its own four leading arguments the way the real helper
+      // Stands in for garden-sandbox: drops its own four leading arguments the way the real helper
       // consumes `run <network mode> <filesystem mode> <root>`, then applies the environment and
       // execs, as `env -i` does.
       const helper = path.join(root, 'sandbox');
@@ -352,7 +352,7 @@ describe('background process manager', () => {
       // workspace root - the value this wave moved away from - all 21 tests in this file stayed
       // green. `.home` at the container root, written out, is what actually pins the move: outside
       // `workspace/`, so a Rust toolchain's 88,021 files are not walked by every checkpoint, and
-      // outside `.athanor`, which is the runner's alone.
+      // outside `.garden`, which is the runner's alone.
       expect(path.relative(root, finished.stdout ?? '')).toBe('.home');
       await manager.close();
     },
@@ -366,7 +366,7 @@ describe('background process manager', () => {
       // coding agent is a background session rather than a foreground command - so an allow-list
       // that dropped them here left the owner believing a policy was in force that the process
       // never saw.
-      const root = await mkdtemp(path.join(tmpdir(), 'athanor-process-'));
+      const root = await mkdtemp(path.join(tmpdir(), 'garden-process-'));
       roots.push(root);
       await mkdir(path.join(root, 'workspace'));
       const manager = new ProcessManager();
@@ -396,7 +396,7 @@ describe('background process manager', () => {
   );
 
   it('refuses an environment variable it will not pass on rather than dropping it', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-process-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-process-'));
     roots.push(root);
     await mkdir(path.join(root, 'workspace'));
     const manager = new ProcessManager();
@@ -422,7 +422,7 @@ describe('background process manager', () => {
    * panel could never say what the machine was doing. The workspace filter still holds.
    */
   it('shows the whole workspace to the person who owns it, whichever task started it', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-process-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-process-'));
     roots.push(root);
     await mkdir(path.join(root, 'workspace'));
     const manager = new ProcessManager();
@@ -484,10 +484,10 @@ describe('background process manager', () => {
   it(
     "a cancelled task's background sessions are stopped and its declared services are not",
     async () => {
-      const root = await mkdtemp(path.join(tmpdir(), 'athanor-process-'));
+      const root = await mkdtemp(path.join(tmpdir(), 'garden-process-'));
       roots.push(root);
       await mkdir(path.join(root, 'workspace'));
-      await mkdir(path.join(root, '.athanor'), { recursive: true });
+      await mkdir(path.join(root, '.garden'), { recursive: true });
       const manager = new ProcessManager();
       const sleeping = { executable: '/bin/sh', args: ['-c', 'sleep 30'], timeoutSeconds: 30 };
       const scraper = await manager.start(root, 'workspace-1', 'task-1', sleeping, 30, false);
@@ -538,7 +538,7 @@ describe('background process manager', () => {
    * the same split those two make.
    */
   it('refuses to let one task stop the background work of another', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-process-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-process-'));
     roots.push(root);
     await mkdir(path.join(root, 'workspace'));
     const manager = new ProcessManager();
@@ -559,7 +559,7 @@ describe('background process manager', () => {
   });
 
   it('does not allow background privilege or package operations in host-native mode', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-process-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-process-'));
     roots.push(root);
     await mkdir(path.join(root, 'workspace'));
     const manager = new ProcessManager();
@@ -609,7 +609,7 @@ describe('background process manager', () => {
      * Both spellings, because a wrapper hides the executable in its arguments; and the service
      * spelling too, because a service is the one background job that never stops on its own.
      */
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-process-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-process-'));
     roots.push(root);
     await mkdir(path.join(root, 'workspace'));
     const packageHelper = path.join(root, 'package-helper');
@@ -654,7 +654,7 @@ describe('the host disk floor on the background path', () => {
   it(
     'stops a background session that is consuming the last of the host disk',
     async () => {
-      const root = await mkdtemp(path.join(tmpdir(), 'athanor-process-'));
+      const root = await mkdtemp(path.join(tmpdir(), 'garden-process-'));
       roots.push(root);
       await mkdir(path.join(root, 'workspace'));
       const manager = new ProcessManager();
@@ -684,7 +684,7 @@ describe('the host disk floor on the background path', () => {
    * move it away from 'running' before they kill, and all three of them kill with SIGKILL.
    */
   it('says so when a background session is killed outright', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-process-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-process-'));
     roots.push(root);
     await mkdir(path.join(root, 'workspace'));
     const manager = new ProcessManager();
@@ -722,7 +722,7 @@ describe('the host disk floor on the background path', () => {
     message: string,
     confineFilesystem: boolean
   ): Promise<string> => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-process-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-process-'));
     roots.push(root);
     await mkdir(path.join(root, 'workspace'));
     const elevate = path.join(root, 'elevate');
@@ -768,14 +768,14 @@ describe('the host disk floor on the background path', () => {
       // temporary root here lives under `/var`, which the ruleset grants for reading - so a
       // root-derived path would be silenced by the read list and would pin nothing.
       const stderr = await deniedInBackground(
-        'cat: /home/athanor/00000000-0000-4000-8000-00000000000a/workspace/notes.md: Permission denied',
+        'cat: /home/garden/00000000-0000-4000-8000-00000000000a/workspace/notes.md: Permission denied',
         true
       );
       expect(stderr).toContain('the sandbox on this computer probably refused that');
       // Which path, because a job that touched several files needs to know which one of them met
       // the boundary.
       expect(stderr).toContain(
-        '/home/athanor/00000000-0000-4000-8000-00000000000a/workspace/notes.md'
+        '/home/garden/00000000-0000-4000-8000-00000000000a/workspace/notes.md'
       );
       // The command's own message survives ahead of it: the note is added to the log, not put in
       // place of it.
@@ -797,7 +797,7 @@ describe('the host disk floor on the background path', () => {
       // plain fabrication.
       expect(
         await deniedInBackground(
-          'cat: /home/athanor/00000000-0000-4000-8000-00000000000a/workspace/notes.md: Permission denied',
+          'cat: /home/garden/00000000-0000-4000-8000-00000000000a/workspace/notes.md: Permission denied',
           false
         )
       ).not.toContain('the sandbox on this computer');
@@ -806,7 +806,7 @@ describe('the host disk floor on the background path', () => {
   );
 
   it('leaves a background session on a healthy disk alone', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-process-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-process-'));
     roots.push(root);
     await mkdir(path.join(root, 'workspace'));
     const manager = new ProcessManager();
@@ -835,10 +835,10 @@ describe('the host disk floor on the background path', () => {
   it(
     'does not put a service straight back into the disk it just filled',
     async () => {
-      const root = await mkdtemp(path.join(tmpdir(), 'athanor-process-'));
+      const root = await mkdtemp(path.join(tmpdir(), 'garden-process-'));
       roots.push(root);
       await mkdir(path.join(root, 'workspace'));
-      await mkdir(path.join(root, '.athanor'), { recursive: true });
+      await mkdir(path.join(root, '.garden'), { recursive: true });
       const manager = new ProcessManager(undefined, {
         baseDelayMs: 10,
         ceilingDelayMs: 40,
@@ -880,7 +880,7 @@ describe('the host disk floor on the background path', () => {
  */
 describe('watching a long background job', () => {
   const managerRoot = async (): Promise<string> => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-longwork-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-longwork-'));
     roots.push(root);
     await mkdir(path.join(root, 'workspace'));
     return root;
@@ -1052,7 +1052,7 @@ describe('watching a long background job', () => {
 /**
  * What this computer would destroy by restarting, counted where it is known.
  *
- * `athanor update` stops athanor.target for its backup and rebuild, which SIGTERMs the runner and
+ * `garden update` stops garden.target for its backup and rebuild, which SIGTERMs the runner and
  * takes every background session with it. A declared service comes back - its record is on disk and
  * `resume` relaunches it - and an ordinary background command does not: nothing anywhere records
  * it, so a twenty-hour alignment dies and the next poll of its id answers "Background process not
@@ -1068,7 +1068,7 @@ describe('what a restart would destroy', () => {
   it(
     'counts a background command and not a service, with how long the longest has left',
     async () => {
-      const root = await mkdtemp(path.join(tmpdir(), 'athanor-restart-cost-'));
+      const root = await mkdtemp(path.join(tmpdir(), 'garden-restart-cost-'));
       roots.push(root);
       await mkdir(path.join(root, 'workspace'));
       const manager = new ProcessManager();
@@ -1132,11 +1132,11 @@ describe('what a restart would destroy', () => {
  * Measured on a live box: a service was left listening on a public port. The next turn was asked
  * to stop it, listed the processes, was handed an empty array because `list` filtered on the
  * declaring task, and reported that nothing was running. The service was in the owner's own panel
- * and in `.athanor/services.json` the whole time, and the runner brings it back across reboots.
+ * and in `.garden/services.json` the whole time, and the runner brings it back across reboots.
  */
 describe('reaching a service the declaring task has finished with', () => {
   const startService = async (manager: ProcessManager, owner: string, name: string) => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-service-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-service-'));
     roots.push(root);
     await mkdir(path.join(root, 'workspace'));
     return {
@@ -1221,7 +1221,7 @@ describe('reaching a service the declaring task has finished with', () => {
     "still hides another task's ordinary background command entirely",
     async () => {
       const manager = new ProcessManager();
-      const root = await mkdtemp(path.join(tmpdir(), 'athanor-service-'));
+      const root = await mkdtemp(path.join(tmpdir(), 'garden-service-'));
       roots.push(root);
       await mkdir(path.join(root, 'workspace'));
       const ephemeral = await manager.start(
@@ -1253,7 +1253,7 @@ describe('reaching a service the declaring task has finished with', () => {
  */
 describe('saying that a service is reachable from outside this computer', () => {
   const startService = async (manager: ProcessManager, name: string) => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-listen-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-listen-'));
     roots.push(root);
     await mkdir(path.join(root, 'workspace'));
     return manager.start(
@@ -1321,7 +1321,7 @@ describe('saying that a service is reachable from outside this computer', () => 
   it(
     'observes a service that came back with the runner, not only one just declared',
     async () => {
-      const root = await mkdtemp(path.join(tmpdir(), 'athanor-resume-'));
+      const root = await mkdtemp(path.join(tmpdir(), 'garden-resume-'));
       roots.push(root);
       await mkdir(path.join(root, 'workspace'));
       const first = new ProcessManager(undefined, undefined, 20, async () => []);

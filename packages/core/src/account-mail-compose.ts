@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import type { ConnectorScope } from '@athanor/contracts';
+import type { ConnectorScope } from '@garden/contracts';
 import { type AccountApi, accountResourceId } from './account-api.js';
 import type { AccountOperation } from './account-operation.js';
-import { AthanorError } from './errors.js';
+import { GardenError } from './errors.js';
 import { composeMessage } from './mime.js';
 import { attachAccountMailFiles } from './account-mail-upload.js';
 
@@ -95,7 +95,7 @@ export const mailUncertain = (operationId: string) => ({
 });
 const property = 'String {8b67d872-679e-46d5-a742-6e30f513f61a} Name GardenOperation';
 const missing = (error: unknown) =>
-  error instanceof AthanorError && error.code === 'connector_resource_not_found';
+  error instanceof GardenError && error.code === 'connector_resource_not_found';
 const address = (entry: z.infer<typeof person>) => ({
   emailAddress: { address: entry.address, ...(entry.name ? { name: entry.name } : {}) }
 });
@@ -109,7 +109,7 @@ async function reply(api: AccountApi, id?: string) {
       })
     );
     if (source.id !== id || typeof source.internetMessageId !== 'string')
-      throw new AthanorError('mail_reply_invalid', 'The original message identity is unavailable.');
+      throw new GardenError('mail_reply_invalid', 'The original message identity is unavailable.');
     return {
       inReplyTo: header(2048).parse(source.internetMessageId),
       subject: z.string().parse(source.subject ?? '')
@@ -119,7 +119,7 @@ async function reply(api: AccountApi, id?: string) {
     api.url('gmail', `messages/${encodeURIComponent(id)}`, { format: 'metadata' })
   );
   if (source.id !== id)
-    throw new AthanorError('mail_reply_invalid', 'The provider returned a different message.');
+    throw new GardenError('mail_reply_invalid', 'The provider returned a different message.');
   const headers = rows(object.parse(source.payload).headers);
   const find = (name: string) =>
     headers.find((row) => String(row.name).toLowerCase() === name)?.value;
@@ -161,19 +161,19 @@ export async function composeAccountMail(
     state &&
     (state.operationId !== operation.id || state.digest !== digest || state.mode !== mode)
   )
-    throw new AthanorError(
+    throw new GardenError(
       'connector_operation_mismatch',
       'The saved mail operation belongs to different content or an account.'
     );
   if (operation.completed) {
     if (!state)
-      throw new AthanorError(
+      throw new GardenError(
         'connector_operation_mismatch',
         'The mail receipt has no matching intent.'
       );
     const receipt = Receipt.parse(operation.result);
     if (receipt.operationId !== operation.id)
-      throw new AthanorError(
+      throw new GardenError(
         'connector_operation_mismatch',
         'The saved mail receipt belongs to another operation.'
       );
@@ -201,7 +201,7 @@ export async function composeAccountMail(
   };
   const rejected = async (error: unknown, phase: 'prepared' | 'attachments' = 'prepared') => {
     if (
-      error instanceof AthanorError &&
+      error instanceof GardenError &&
       [400, 401, 403, 404, 413, 422, 429].includes(Number(error.details?.statusCode))
     ) {
       await checkpoint(
@@ -362,7 +362,7 @@ export async function composeAccountMail(
     return mailUncertain(operation.id);
   }
   if (!state)
-    throw new AthanorError('mail_intent_missing', 'The saved mail operation is unavailable.');
+    throw new GardenError('mail_intent_missing', 'The saved mail operation is unavailable.');
   const attached = await attachAccountMailFiles(api, input.attachments, state, checkpoint);
   if (!attached) return mailUncertain(operation.id);
   if (mode === 'draft') return finish(state.draftId!, state.draftId);
@@ -389,7 +389,7 @@ export async function composeAccountMail(
     !sameRecipients(draft.ccRecipients, input.cc) ||
     !sameRecipients(draft.bccRecipients, input.bcc)
   )
-    throw new AthanorError(
+    throw new GardenError(
       'mail_draft_changed',
       'The provider draft differs from the requested message. Inspect it before sending.'
     );

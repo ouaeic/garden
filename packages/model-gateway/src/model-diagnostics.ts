@@ -1,4 +1,4 @@
-import { AthanorError } from '@athanor/core';
+import { GardenError } from '@garden/core';
 import { ModelRequest, type ModelResponse } from './protocol.js';
 
 /** Connection objects, callbacks and abort signals never enter a private request projection. */
@@ -54,8 +54,8 @@ export const diagnosticModelResponse = (response: ModelResponse) => ({
   }
 });
 export const diagnosticModelError = (error: unknown) => ({
-  code: error instanceof AthanorError ? error.code : 'provider_failure',
-  ...(error instanceof AthanorError && typeof error.details?.status === 'number'
+  code: error instanceof GardenError ? error.code : 'provider_failure',
+  ...(error instanceof GardenError && typeof error.details?.status === 'number'
     ? { status: error.details.status }
     : {})
 });

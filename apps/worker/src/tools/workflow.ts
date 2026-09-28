@@ -1,6 +1,6 @@
-import { WorkflowRequest } from '@athanor/contracts';
+import { WorkflowRequest } from '@garden/contracts';
 import { z } from 'zod';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { ToolContext } from '../tool-dispatch.js';
 
 export const workflowRequest = (args: Record<string, unknown>): WorkflowRequest =>

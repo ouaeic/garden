@@ -7,9 +7,9 @@ import {
   withRuntimeObservations,
   type PrivateDiagnosticKind,
   type PrivateDiagnosticSink
-} from '@athanor/core';
-import { DIAGNOSTIC_RECORD_BYTES } from '@athanor/contracts';
-import type { DataStore, TaskRecord } from '@athanor/data';
+} from '@garden/core';
+import { DIAGNOSTIC_RECORD_BYTES } from '@garden/contracts';
+import type { DataStore, TaskRecord } from '@garden/data';
 import { buildIdentity } from './build-identity.js';
 import { RuntimeCodec, replayConfig } from './runtime-codec.js';
 import { RuntimeRecorder } from './runtime-tape.js';

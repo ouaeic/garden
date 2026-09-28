@@ -62,7 +62,7 @@ interface Reading {
  * resolves to the same realpath the shipped modules reach and the cache key matches.
  */
 const reading = async (body: string, environment: NodeJS.ProcessEnv = {}): Promise<Reading> => {
-  const at = path.join(await directory('athanor-residency-'), 'probe.mts');
+  const at = path.join(await directory('garden-residency-'), 'probe.mts');
   await writeFile(
     at,
     `import { createRequire } from 'node:module';
@@ -104,7 +104,7 @@ describe('the weight of a runner that has not been asked for a browser', () => {
     // The configured-executable branch returns before the driver is asked for. On a box that sets
     // BROWSER_EXECUTABLE_PATH this is the whole per-turn probe, so such a box never loads
     // Playwright until it launches one.
-    const root = await directory('athanor-residency-root-');
+    const root = await directory('garden-residency-root-');
     const chrome = path.join(root, 'chrome');
     await writeFile(chrome, '#!/bin/sh\nexit 0\n');
     await chmod(chrome, 0o755);
@@ -128,8 +128,8 @@ describe('the weight of a runner that has been asked for a browser', () => {
      * that needs the package, and requires both that it became resident and that it produced the
      * verdict the registry produces - pointed at an empty browsers directory, `absent`.
      */
-    const root = await directory('athanor-residency-root-');
-    const empty = await directory('athanor-residency-browsers-');
+    const root = await directory('garden-residency-root-');
+    const empty = await directory('garden-residency-browsers-');
     expect(
       await reading(
         `const { browserPresence } = await import(${src('surfaces.ts')});

@@ -47,7 +47,7 @@ const GIB = 1024 ** 3;
  * box it could not. On the 31.34 GiB box seven tenths is 21.94 GiB: 6.27 GiB more than the old
  * half, and 3.13 GiB clear of the throttle below and the kill above alike.
  *
- * What would change it: either percentage moving in `infra/native/athanor-runner.service`. Those
+ * What would change it: either percentage moving in `infra/native/garden-runner.service`. Those
  * two numbers and this fraction are one decision, and `scripts/check-repository.mjs` compares them
  * rather than trusting this paragraph to be re-read.
  */

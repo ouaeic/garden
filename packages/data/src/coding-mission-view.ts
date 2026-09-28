@@ -1,5 +1,5 @@
-import { CodingMission, CodingMissionStart, type CodingMissionState } from '@athanor/contracts';
-import { decryptJson } from '@athanor/core';
+import { CodingMission, CodingMissionStart, type CodingMissionState } from '@garden/contracts';
+import { decryptJson } from '@garden/core';
 import type { CodingMissionRecord } from './store/coding-missions.js';
 
 export const codingMissionView = (record: CodingMissionRecord, key: Uint8Array): CodingMission => {

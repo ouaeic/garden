@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pin } from 'lucide-react';
-import type { PinnedProjectVersions, ProjectRevision } from '@athanor/contracts';
+import type { PinnedProjectVersions, ProjectRevision } from '@garden/contracts';
 import { get, post, put } from './client';
 import { Button, Dialog, ErrorNotice, Field, Spinner } from './ui';
 import ProjectStorage from './ProjectStorage';

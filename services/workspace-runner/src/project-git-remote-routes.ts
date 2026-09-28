@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { ProjectGitRemoteInput } from '@athanor/contracts';
+import { ProjectGitRemoteInput } from '@garden/contracts';
 import { requireScope } from './auth.js';
 import type { ProjectUpdatesManager } from './project-updates.js';
 

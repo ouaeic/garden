@@ -1,6 +1,6 @@
 /** Bounded recovery for responses that contain no tool calls. */
-import type { ModelResponse } from '@athanor/model-gateway';
-import type { TaskRecord } from '@athanor/data';
+import type { ModelResponse } from '@garden/model-gateway';
+import type { TaskRecord } from '@garden/data';
 import type { AgentState } from '../agent-state.js';
 import { event } from '../tool-recording.js';
 import { MAX_COMPLETION_NAGS, MAX_TRUNCATED_CONTINUATIONS } from '../turn-bounds.js';
@@ -113,7 +113,7 @@ export const resolveAnswerHolds = async (
         key,
         state,
         assistantText.slice(0, 400) || `Answered after ${state.step} steps without calling finish.`,
-        `The agent answered ${nags} times without calling finish, so athanor never checked this against the request. Read the answer before relying on it, or reply to carry on.`
+        `The agent answered ${nags} times without calling finish, so garden never checked this against the request. Read the answer before relying on it, or reply to carry on.`
       );
       return 'completed';
     }

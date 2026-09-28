@@ -1,5 +1,5 @@
-import { AthanorError } from '@athanor/core';
-import type { ModelMessage, ModelToolCall } from '@athanor/model-gateway';
+import { GardenError } from '@garden/core';
+import type { ModelMessage, ModelToolCall } from '@garden/model-gateway';
 import { describe, expect, it } from 'vitest';
 import {
   BOOKKEEPING_TOOLS,
@@ -59,7 +59,7 @@ describe('a failure that keeps happening', () => {
     arguments: { patches: [{ path, oldText, newText: 'return rows or []' }] }
   });
   const conflict = (): unknown =>
-    new AthanorError('patch_conflict', 'oldText appears 0 times in workspace/importer.py');
+    new GardenError('patch_conflict', 'oldText appears 0 times in workspace/importer.py');
   const threw = (call: Call, error: unknown): { call: string; failure: string } => ({
     call: failingCallKey(call),
     failure: repeatedFailureKey(call, error)
@@ -88,7 +88,7 @@ describe('a failure that keeps happening', () => {
     ]);
     // The wording of the error moves and the failure does not: the same conflict reported with a
     // different line number, a different byte count or a different request id is the same refusal.
-    const noisy = new AthanorError('patch_conflict', 'oldText appears 0 times, request 4f9c2a1b8e');
+    const noisy = new GardenError('patch_conflict', 'oldText appears 0 times, request 4f9c2a1b8e');
     expect(Object.values(counted(call, noisy, 1, counted(call, conflict(), 2)))).toEqual([3]);
   });
 
@@ -102,7 +102,7 @@ describe('a failure that keeps happening', () => {
      * a path out, and the next call is the one that finds it. Nothing here may reach even the first
      * pushback, let alone the stop.
      */
-    const missing = new AthanorError('not_found', 'File not found');
+    const missing = new GardenError('not_found', 'File not found');
     let counts: Record<string, number> = {};
     for (const path of ['.eslintrc', '.eslintrc.json', 'config/eslint.json', 'eslint.config.js'])
       counts = repeatedFailuresAfter(counts, threw(patch('module.exports', path), missing));
@@ -156,7 +156,7 @@ describe('a failure that keeps happening', () => {
     const secret = patch('const apiToken = "the owner private value";');
     const key = repeatedFailureKey(
       secret,
-      new AthanorError('patch_conflict', 'the owner private value')
+      new GardenError('patch_conflict', 'the owner private value')
     );
     expect(key.startsWith('file_patch:')).toBe(true);
     expect(key).not.toContain('owner');
@@ -183,8 +183,8 @@ describe('a failure that keeps happening', () => {
     expect(counts[repeatedFailureKey(patch('hunk 39'), conflict())]).toBe(1);
   });
 
-  it('reads a plain error by its shape and an athanor error by its code', () => {
-    expect(failureSignature(new AthanorError('patch_conflict', 'anything at all'))).toBe(
+  it('reads a plain error by its shape and an garden error by its code', () => {
+    expect(failureSignature(new GardenError('patch_conflict', 'anything at all'))).toBe(
       'patch_conflict'
     );
     expect(failureSignature(new Error('Workspace tool failed (503): upstream 8f2c91ab0d'))).toBe(

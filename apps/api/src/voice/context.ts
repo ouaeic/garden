@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { AthanorError, decryptJson, encryptJson, unwrapDataKey } from '@athanor/core';
-import type { VoiceStore } from '@athanor/data';
+import { GardenError, decryptJson, encryptJson, unwrapDataKey } from '@garden/core';
+import type { VoiceStore } from '@garden/data';
 import type { RouteContext } from '../http/server-context.js';
 import { revealedTaskEvent } from '../context.js';
 
@@ -97,7 +97,7 @@ async function taskKey(context: RouteContext, userId: string, taskId: string) {
   const task = await context.store.getTask(userId, taskId);
   const workspace = task ? await context.store.getWorkspace(userId, task.workspaceId) : null;
   if (!task || !workspace?.wrappedKey)
-    throw new AthanorError('voice_context_unavailable', 'This conversation is unavailable.', 404);
+    throw new GardenError('voice_context_unavailable', 'This conversation is unavailable.', 404);
   return { task, key: unwrapDataKey(workspace.wrappedKey, context.masterKey, workspace.id) };
 }
 export async function readVoiceDiscussion(

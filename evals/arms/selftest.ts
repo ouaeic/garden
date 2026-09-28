@@ -10,7 +10,7 @@
  *
  *   - the one-difference rule is the entire claim to honesty and it lives in a `throw` nobody
  *     reaches on a good day, so a deliberately bad arm is pushed through it here;
- *   - `core` reads athanor's own core set out of source, and a pattern that has gone stale would
+ *   - `core` reads garden's own core set out of source, and a pattern that has gone stale would
  *     make that arm a set of names this file invented while every byte count stayed plausible;
  *   - the contract cut removes a section by string surgery, and surgery that took one byte too
  *     many or landed on the wrong heading is invisible in a byte count that only ever goes down;
@@ -137,12 +137,12 @@ expect(
   settingsFor(ROOT_ARM).tools === 'full' &&
     settingsFor(ROOT_ARM).skills === 'index' &&
     settingsFor(ROOT_ARM).contract === 'full',
-  'the root arm is what athanor ships today'
+  'the root arm is what garden ships today'
 );
 for (const arm of ARMS)
   expect(arm.ships.length > 20, `arm ${arm.id} has no pre-registered rule for shipping it`);
 
-/* ----------------------------------------------- the core set is athanor's, not this file's copy */
+/* ----------------------------------------------- the core set is garden's, not this file's copy */
 
 const core = coreToolNamesFromSource();
 const catalogue = fullCatalogue().map((tool) => tool.name);
@@ -155,11 +155,11 @@ for (const name of core)
 for (const name of FLOOR_TOOL_NAMES)
   expect(
     catalogue.includes(name),
-    `the calibration arm names "${name}", which athanor does not define`
+    `the calibration arm names "${name}", which garden does not define`
   );
 expect(
   toolsFor(settingsFor('core')).length === core.length + 1,
-  'the core arm must send exactly athanor own core set plus compact_context'
+  'the core arm must send exactly garden own core set plus compact_context'
 );
 expect(
   toolsFor(settingsFor('floor')).length === FLOOR_TOOL_NAMES.length,
@@ -572,11 +572,11 @@ expect(
 const shippedEditTool = fullCatalogue().find((tool) => tool.name === EDIT_TOOL);
 expect(
   shippedEditTool !== undefined,
-  `athanor no longer ships a tool called ${EDIT_TOOL}; this axis is measuring an editor that is not there`
+  `garden no longer ships a tool called ${EDIT_TOOL}; this axis is measuring an editor that is not there`
 );
 expect(
   shippedEditTool !== undefined && dialectOf(shippedEditTool) === settingsFor(ROOT_ARM).edit,
-  `the root arm claims to hold the "${settingsFor(ROOT_ARM).edit}" editor and the catalogue ships the "${shippedEditTool ? dialectOf(shippedEditTool) : 'missing'}" one; every arm in the table would be sending an editor athanor does not, while every byte count stayed plausible`
+  `the root arm claims to hold the "${settingsFor(ROOT_ARM).edit}" editor and the catalogue ships the "${shippedEditTool ? dialectOf(shippedEditTool) : 'missing'}" one; every arm in the table would be sending an editor garden does not, while every byte count stayed plausible`
 );
 expect(
   settingsFor(EDIT_ARM).edit !== settingsFor(ROOT_ARM).edit &&

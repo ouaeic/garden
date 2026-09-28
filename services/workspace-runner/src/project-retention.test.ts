@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it } from 'vitest';
 import Fastify from 'fastify';
-import { capabilityAudience, signCapabilityToken } from '@athanor/core';
+import { capabilityAudience, signCapabilityToken } from '@garden/core';
 import { authenticateRunnerRequest } from './auth.js';
 import { registerProjectUpdateRoutes } from './project-update-routes.js';
 import { ensureWorkspace } from './files.js';

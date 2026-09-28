@@ -6,8 +6,8 @@ import {
   diagnosticRecordAad,
   encryptJson,
   DIAGNOSTIC_EMPTY_HASH
-} from '@athanor/core';
-import { DIAGNOSTIC_CAPTURE_BYTES, DIAGNOSTIC_RECORD_BYTES } from '@athanor/contracts';
+} from '@garden/core';
+import { DIAGNOSTIC_CAPTURE_BYTES, DIAGNOSTIC_RECORD_BYTES } from '@garden/contracts';
 import { DatabaseFixtures, type DatabaseFixture } from '../test-support/database-fixtures.js';
 import { DataStore } from '../store.js';
 

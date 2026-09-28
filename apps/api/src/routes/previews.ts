@@ -6,9 +6,9 @@
  */
 
 import { randomBytes } from 'node:crypto';
-import { CreateWorkspacePreviewRequest, PublishWorkspacePreviewRequest } from '@athanor/contracts';
-import { AthanorError, assertPublishablePort, sha256 } from '@athanor/core';
-import type { WorkspacePreviewRecord } from '@athanor/data';
+import { CreateWorkspacePreviewRequest, PublishWorkspacePreviewRequest } from '@garden/contracts';
+import { GardenError, assertPublishablePort, sha256 } from '@garden/core';
+import type { WorkspacePreviewRecord } from '@garden/data';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 import { serverLimits } from '../plans.js';
@@ -31,7 +31,7 @@ export const registerPreviewRoutes = (context: RouteContext): void => {
     async (request) => {
       const user = requireUser(request.user);
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       return (await store.listWorkspacePreviews(user.id, workspace.id)).map((preview) =>
         workspacePreviewResponse(preview)
       );
@@ -46,7 +46,7 @@ export const registerPreviewRoutes = (context: RouteContext): void => {
         const input = CreateWorkspacePreviewRequest.parse(request.body);
         assertPublishablePort(input.port, reservedPreviewPortSet);
         let workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-        if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+        if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
         if (workspace.status === 'hibernated') {
           await runner.request({
             workspaceId: workspace.id,
@@ -62,7 +62,7 @@ export const registerPreviewRoutes = (context: RouteContext): void => {
           workspace = (await store.getWorkspace(user.id, workspace.id))!;
         }
         if (workspace.status !== 'running')
-          throw new AthanorError(
+          throw new GardenError(
             'workspace_unavailable',
             'The computer must be running before exposing a preview'
           );
@@ -74,7 +74,7 @@ export const registerPreviewRoutes = (context: RouteContext): void => {
           path: `/v1/workspaces/${workspace.id}/preview-check/${input.port}`
         });
         if (!check.available)
-          throw new AthanorError(
+          throw new GardenError(
             'preview_port_unavailable',
             `Nothing is listening on port ${input.port} of this computer`
           );
@@ -93,7 +93,7 @@ export const registerPreviewRoutes = (context: RouteContext): void => {
           });
         } catch (error) {
           if (error instanceof Error && error.message === 'preview_limit')
-            throw new AthanorError(
+            throw new GardenError(
               'preview_limit',
               `This server runs up to ${serverLimits.maxPreviews} previews at once`
             );
@@ -117,7 +117,7 @@ export const registerPreviewRoutes = (context: RouteContext): void => {
           preview.status !== 'active' ||
           (preview.expiresAt !== null && new Date(preview.expiresAt).getTime() <= Date.now())
         )
-          throw new AthanorError('preview_unavailable', 'Preview is expired or revoked', 404);
+          throw new GardenError('preview_unavailable', 'Preview is expired or revoked', 404);
         return workspacePreviewResponse(preview, issuePreviewAccess(preview, masterKey));
       });
     }
@@ -135,7 +135,7 @@ export const registerPreviewRoutes = (context: RouteContext): void => {
           sha256(accessToken)
         );
         if (!preview)
-          throw new AthanorError('preview_unavailable', 'Preview is expired or revoked', 404);
+          throw new GardenError('preview_unavailable', 'Preview is expired or revoked', 404);
         return workspacePreviewResponse(preview, accessToken);
       });
     }
@@ -149,7 +149,7 @@ export const registerPreviewRoutes = (context: RouteContext): void => {
       return idempotent(request, reply, user, async () => {
         PublishWorkspacePreviewRequest.parse(request.body);
         const existing = await store.getWorkspacePreview(user.id, request.params.previewId);
-        if (!existing) throw new AthanorError('preview_not_found', 'Preview not found', 404);
+        if (!existing) throw new GardenError('preview_not_found', 'Preview not found', 404);
         const accessToken = randomBytes(32).toString('base64url');
         const preview = await store.publishWorkspacePreview(
           user.id,
@@ -157,7 +157,7 @@ export const registerPreviewRoutes = (context: RouteContext): void => {
           'public',
           sha256(accessToken)
         );
-        if (!preview) throw new AthanorError('preview_not_found', 'Preview not found', 404);
+        if (!preview) throw new GardenError('preview_not_found', 'Preview not found', 404);
         await recordSecurityEvent(store, {
           userId: user.id,
           kind: 'preview_publish',
@@ -193,7 +193,7 @@ export const registerPreviewRoutes = (context: RouteContext): void => {
           'private',
           sha256(accessToken)
         );
-        if (!preview) throw new AthanorError('preview_not_found', 'Preview not found', 404);
+        if (!preview) throw new GardenError('preview_not_found', 'Preview not found', 404);
         return workspacePreviewResponse(preview, accessToken);
       });
     }

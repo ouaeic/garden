@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { UNKNOWN_SURFACES } from '@athanor/contracts';
+import { UNKNOWN_SURFACES } from '@garden/contracts';
 import { agentToolsFor } from './tool-catalogue.js';
 import { enableToolGroups, rememberToolGroup, TOOL_GROUPS } from './tool-groups.js';
 import { COMPACT_CONTEXT_TOOL } from './context.js';

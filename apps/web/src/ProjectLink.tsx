@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import type { Task } from '@athanor/contracts';
+import type { Task } from '@garden/contracts';
 import { taskStatusLabel } from './model';
 
 export function ProjectLink({

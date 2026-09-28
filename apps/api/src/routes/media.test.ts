@@ -1,8 +1,8 @@
 import Fastify from 'fastify';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { MediaSettings } from '@athanor/contracts';
-import { decryptJson, encryptJson, inferenceCredentialAad } from '@athanor/core';
-import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
+import { MediaSettings } from '@garden/contracts';
+import { decryptJson, encryptJson, inferenceCredentialAad } from '@garden/core';
+import { createDatabase, DataStore, migrateDatabase } from '@garden/data';
 import type { InferenceSecret } from '../context.js';
 import type { RouteContext, ServerBase } from '../http/server-context.js';
 import { createServerSupport } from './support.js';

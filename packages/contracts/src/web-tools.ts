@@ -3,14 +3,14 @@ import { z } from 'zod';
 /**
  * Where a web search and a web fetch are actually performed, and what that discloses.
  *
- * athanor can answer a search two ways. In house means the workspace's own browser on the owner's
+ * garden can answer a search two ways. In house means the workspace's own browser on the owner's
  * own machine: nothing leaves the box but the request the engine would have received from a person
  * sitting at it. On the provider means the model provider runs the search itself and hands the
  * model structured results with citations - faster, cheaper, and reachable from an address a search
  * engine will not serve directly.
  *
  * That last clause is why this file reads the way it does now. The in-house route is a browser
- * making an ordinary request from wherever athanor is installed, and athanor is built to be
+ * making an ordinary request from wherever garden is installed, and garden is built to be
  * installed on a server. Search engines challenge datacenter address ranges as a matter of course,
  * so on the deployment this product is designed for the in-house route does not degrade, it fails:
  * the engine answers with an anti-bot challenge instead of results, and it will answer the same way
@@ -26,7 +26,7 @@ import { z } from 'zod';
  * anything a conversation ever chose. The flag ships on. The result was that the shipped default
  * bought a promise about inference by spending the entire web, on every box, without saying so.
  *
- * The promise it was spending that on was never athanor's to make. Zero-data-retention enforcement
+ * The promise it was spending that on was never garden's to make. Zero-data-retention enforcement
  * is documented as covering inference routing only: "It does not apply to plugins and tools you
  * choose to enable, such as web search." A search query is frequently the most revealing sentence
  * in a conversation - more revealing than the answer - and it falls outside that guarantee whichever
@@ -76,7 +76,7 @@ import { z } from 'zod';
  * So the catalogue is the same on both routes, and the mode decides only who answers a call. The
  * model calls `web_search` under one name, with one description, wherever it is running; in house
  * that call is answered by the workspace's own browser, and on the provider's route it is answered
- * by a request athanor builds for the tool below and nothing else. The provider tool is an
+ * by a request garden builds for the tool below and nothing else. The provider tool is an
  * implementation of a capability now, rather than a substitute for the name of one.
  */
 
@@ -123,7 +123,7 @@ export interface WebToolRoute {
 }
 
 /**
- * The only two sentences athanor says about this.
+ * The only two sentences garden says about this.
  *
  * Deliberately not a per-search confirmation: a prompt on every search makes the tool unusable, and
  * an owner who has to answer the same question thirty times stops reading it by the fourth. This is
@@ -186,7 +186,7 @@ export interface ServerWebTool {
 /**
  * Ceilings, pinned rather than left null.
  *
- * These bound one request, and the request they bound is now the one athanor builds to answer a
+ * These bound one request, and the request they bound is now the one garden builds to answer a
  * single `web_search` call rather than the agent's own step. That is what moved the use ceiling from
  * eight to two: eight was sized against a whole turn's research loop, where the runaway was the
  * expensive failure, and this request has one query to run. Two rather than one so that a provider
@@ -200,7 +200,7 @@ export const SERVER_WEB_SEARCH_MAX_USES = 2;
 export const SERVER_WEB_SEARCH_MAX_RESULTS = 10;
 
 /**
- * Every provider-side tool athanor sends, each carried beside the in-house tool whose calls it
+ * Every provider-side tool garden sends, each carried beside the in-house tool whose calls it
  * answers.
  *
  * The pairing lives in the same structure as the tool rather than in a list beside it because the
@@ -209,7 +209,7 @@ export const SERVER_WEB_SEARCH_MAX_RESULTS = 10;
  * the model a function tool of that name, because such a request would be asking the provider to
  * search while telling the model to search for itself, and the answer would depend on which of the
  * two the model happened to reach for. `duplicatedWebCapabilities` below is what enforces it on the
- * way out. Only the tool half is ever serialised - `supersedes` is athanor's own bookkeeping and has
+ * way out. Only the tool half is ever serialised - `supersedes` is garden's own bookkeeping and has
  * no business on the wire.
  *
  * The provider's `web_fetch` used to stand here beside its search, and it is deliberately gone. It
@@ -292,7 +292,7 @@ export const duplicatedWebCapabilities = (
 };
 
 /**
- * The provider-side tools athanor deliberately does not send, recorded here because this is the
+ * The provider-side tools garden deliberately does not send, recorded here because this is the
  * file somebody reaches for when they notice how short the list above is.
  *
  * `openrouter:web_fetch`: dropped, and the argument is above `PROVIDER_WEB_TOOLS` because it is the
@@ -301,16 +301,16 @@ export const duplicatedWebCapabilities = (
  *
  * `openrouter:shell`, code execution and hosted interpreters: refused. They run in network-isolated
  * containers that cannot install a package at runtime and cannot see the owner's files, against a
- * persistent Linux computer that can do both. The argument is set out in full above athanor's own
+ * persistent Linux computer that can do both. The argument is set out in full above garden's own
  * exec route, in services/workspace-runner/src/execution.ts.
  *
  * `openrouter:apply_patch` and `openrouter:image_generation`: refused for the same reason in
- * smaller. athanor's `file_patch` edits real files with conflict detection, and `generate_media`
+ * smaller. garden's `file_patch` edits real files with conflict detection, and `generate_media`
  * prices a request against the owner's spend limit before anything is spent, which the provider
  * tool has no equivalent of.
  *
  * `openrouter:subagent`: refused. It accepts only provider server tools and rejects function tools
- * outright, so a subagent could not read the workspace - which is the entire point of athanor's own
+ * outright, so a subagent could not read the workspace - which is the entire point of garden's own
  * specialists.
  *
  * `openrouter:fusion`: held, not refused. A panel of models with an analyst is a real capability,
@@ -320,7 +320,7 @@ export const duplicatedWebCapabilities = (
  *
  * `openrouter:advisor`: wanted, and not yet built. Consulting a stronger model mid-generation on
  * one genuinely hard decision is the highest quality-per-token lever available and the one thing
- * athanor cannot do at all today - a cheap lead model that meets a hard question can currently only
+ * garden cannot do at all today - a cheap lead model that meets a hard question can currently only
  * answer it badly or have the owner restart the task. It belongs on this same gate when it lands,
  * because a server tool is a server tool: zero retention does not cover it either.
  */
@@ -338,7 +338,7 @@ const CITATION_EXCERPT_LIMIT = 4_000;
  * OpenRouter puts it in `content` on a `url_citation`; the vendors whose native citations arrive
  * through that route call it `cited_text`. Reading only one of those names is how the grounding
  * evidence gets silently dropped on every citation from the other, so all of them are read, in
- * athanor's own order: an excerpt a caller has already normalised wins over either raw field.
+ * garden's own order: an excerpt a caller has already normalised wins over either raw field.
  */
 const citationPassage = (row: Record<string, unknown>): string | undefined => {
   for (const key of ['excerpt', 'content', 'cited_text']) {

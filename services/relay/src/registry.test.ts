@@ -26,7 +26,7 @@ const options = (overrides: Partial<RegistryOptions> = {}): RegistryOptions => (
 });
 
 beforeEach(async () => {
-  directory = await mkdtemp(join(tmpdir(), 'athanor-relay-registry-'));
+  directory = await mkdtemp(join(tmpdir(), 'garden-relay-registry-'));
 });
 
 afterEach(async () => {

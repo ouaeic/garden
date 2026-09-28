@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { TaskRecord } from '@athanor/data';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import type { TaskRecord } from '@garden/data';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { AgentRunnerClient } from './runner-client.js';
 import { processInputApproval } from './process-input-approval.js';
 import { callDestinations } from './command-classification.js';

@@ -132,7 +132,7 @@ export class BoxHarness {
         t: 'hello',
         proto: PROTOCOL_VERSION,
         role: 'primary',
-        agent: 'athanor-relay-harness/1',
+        agent: 'garden-relay-harness/1',
         caps: this.options.caps ?? ['http1', 'h2', PREVIEW_HTTPS_CAPABILITY]
       })}\n`
     );

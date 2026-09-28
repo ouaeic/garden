@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import type { ConnectorScope } from '@athanor/contracts';
+import type { ConnectorScope } from '@garden/contracts';
 import { type AccountApi, accountResourceId } from './account-api.js';
 import type { AccountOperation } from './account-operation.js';
-import { AthanorError } from './errors.js';
+import { GardenError } from './errors.js';
 
 const timeZone = z
   .string()
@@ -117,7 +117,7 @@ export async function createAccountCalendarEvent(
   if (operation.completed) {
     const result = Created.parse(operation.result);
     if (result.operationId !== operation.id)
-      throw new AthanorError(
+      throw new GardenError(
         'connector_operation_context',
         'The calendar receipt belongs to another operation.'
       );
@@ -139,7 +139,7 @@ export async function createAccountCalendarEvent(
       ? null
       : Recovery.parse(operation.recovery);
   if (saved && saved.operationId !== operation.id)
-    throw new AthanorError(
+    throw new GardenError(
       'connector_operation_context',
       'The calendar checkpoint belongs to another operation.'
     );
@@ -149,7 +149,7 @@ export async function createAccountCalendarEvent(
   ): Promise<AccountCalendarCreation> => {
     eventRecord.parse(event);
     if (google && event.id !== eventId)
-      throw new AthanorError(
+      throw new GardenError(
         'connector_response_invalid',
         'The calendar returned a different event identity.'
       );
@@ -200,7 +200,7 @@ export async function createAccountCalendarEvent(
         return uncertain(operation.id);
       return await finish(event, true);
     } catch (error) {
-      if (error instanceof AthanorError && error.code === 'connector_resource_not_found')
+      if (error instanceof GardenError && error.code === 'connector_resource_not_found')
         return uncertain(operation.id);
       throw error;
     }
@@ -261,7 +261,7 @@ export async function createAccountCalendarEvent(
     const event = await api.json(collection, { method: 'POST', body });
     return await finish(event, false);
   } catch (error) {
-    const status = error instanceof AthanorError ? error.details?.statusCode : undefined;
+    const status = error instanceof GardenError ? error.details?.statusCode : undefined;
     // A definitive rejection is retryable; a transport loss or server failure can hide a commit.
     if (
       typeof status === 'number' &&

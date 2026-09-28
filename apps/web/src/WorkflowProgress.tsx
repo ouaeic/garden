@@ -1,4 +1,4 @@
-import type { WorkflowRun } from '@athanor/contracts';
+import type { WorkflowRun } from '@garden/contracts';
 import { processDuration, processMemory } from './process-display';
 
 export function WorkflowProgress({ run }: { run: WorkflowRun }) {

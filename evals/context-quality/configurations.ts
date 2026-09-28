@@ -309,14 +309,14 @@ export const CONFIGURATIONS: readonly ContextConfiguration[] = [
      * `transcriptLine` now renders a condensed message from `content`, `toolCalls` AND `reasoning`.
      * Before it did, the agent's working out was discarded BEFORE any model was asked to
      * summarise, while `compactionRequest` instructed that summariser to preserve "decisions taken
-     * and the reason for them, including approaches that were tried and rejected" and athanor's own
+     * and the reason for them, including approaches that were tried and rejected" and garden's own
      * preamble told the model to put exactly that material in the reasoning channel: "Working out -
      * options weighed, what to try next, talking yourself through it - goes in the reasoning
      * channel, or nowhere." The harness was hiding the answer and then asking for it.
      *
-     * That is the athanor-shaped reading of Terminus 2's summarise-interrogate-answer pass. Their
+     * That is the garden-shaped reading of Terminus 2's summarise-interrogate-answer pass. Their
      * third agent is given the full history and can therefore reach what their summariser dropped;
-     * athanor's summariser cannot be given a third agent's advantage by asking it better questions,
+     * garden's summariser cannot be given a third agent's advantage by asking it better questions,
      * because the advantage is access rather than attention. One line of source bought the access.
      *
      * The row is inverted rather than deleted, for the reason `owner-unbounded` and `anchorless`
@@ -354,7 +354,7 @@ export const CONFIGURATIONS: readonly ContextConfiguration[] = [
      */
     id: 'reasoning-dropped',
     label: "transcriptLine drops the agent's reasoning (the tree before that line)",
-    why: 'The shipped compaction transcript carries the channel athanor tells the model to reason in. This row is that line taken back out, so what it costs is re-measured rather than remembered; it cannot show what it buys.',
+    why: 'The shipped compaction transcript carries the channel garden tells the model to reason in. This row is that line taken back out, so what it costs is re-measured rather than remembered; it cannot show what it buys.',
     constants: {},
     edits: [
       {
@@ -417,7 +417,7 @@ export const degenerateConfigurations = (): readonly string[] =>
  * Every specifier `context.ts` imports at runtime, and where each one really lives.
  *
  * A variant lives outside the workspace, so neither kind of specifier reaches its target from
- * there: package resolution does not find `@athanor/*`, and a relative path resolves against the
+ * there: package resolution does not find `@garden/*`, and a relative path resolves against the
  * scratch directory, which holds one file. Both are rewritten to the file they would have resolved
  * to under the `development` condition this rig already runs with, and a rewritten module then
  * resolves its OWN imports from its real directory, so only what `context.ts` names belongs here.
@@ -427,15 +427,15 @@ export const degenerateConfigurations = (): readonly string[] =>
  * cannot be loaded three configurations later.
  */
 const SPECIFIERS: ReadonlyArray<readonly [string, string]> = [
-  ['@athanor/model-gateway', 'packages/model-gateway/src/index.ts'],
-  ['@athanor/data', 'packages/data/src/index.ts'],
+  ['@garden/model-gateway', 'packages/model-gateway/src/index.ts'],
+  ['@garden/data', 'packages/data/src/index.ts'],
   ['./output-spill.js', 'apps/worker/src/output-spill.ts'],
-  ['@athanor/contracts/permission-policy', 'packages/contracts/src/permission-policy.ts']
+  ['@garden/contracts/permission-policy', 'packages/contracts/src/permission-policy.ts']
 ];
 
 let scratch: string | undefined;
 const scratchDirectory = (): string => {
-  scratch ??= mkdtempSync(path.join(tmpdir(), 'athanor-context-quality-'));
+  scratch ??= mkdtempSync(path.join(tmpdir(), 'garden-context-quality-'));
   // Outside the repository, so nothing here can be committed by accident, and the copy needs its
   // own module declaration because the directory it lands in has no package.json above it.
   writeFileSync(path.join(scratch, 'package.json'), '{"type":"module"}\n');

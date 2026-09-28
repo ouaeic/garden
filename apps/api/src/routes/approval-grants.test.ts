@@ -1,9 +1,9 @@
 import { createHmac, randomUUID } from 'node:crypto';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
-import { AthanorError, decryptJson, encryptJson, wrapDataKey } from '@athanor/core';
-import { canonicalApprovalScope, type TaskApprovalOffer } from '@athanor/contracts';
+import { createDatabase, DataStore, migrateDatabase } from '@garden/data';
+import { GardenError, decryptJson, encryptJson, wrapDataKey } from '@garden/core';
+import { canonicalApprovalScope, type TaskApprovalOffer } from '@garden/contracts';
 import { ZodError } from 'zod';
 import { registerApprovalRoutes } from './approvals.js';
 import { createIdempotentOperation } from '../http/idempotency.js';
@@ -79,7 +79,7 @@ async function fixture() {
   });
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof ZodError) return reply.code(400).send({ code: 'validation_error' });
-    if (error instanceof AthanorError)
+    if (error instanceof GardenError)
       return reply.code(error.statusCode).send({ code: error.code });
     throw error;
   });

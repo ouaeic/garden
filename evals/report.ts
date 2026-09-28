@@ -27,7 +27,7 @@ import {
  * of.
  *
  * What it buys is the question a baseline diff could never answer. "435 model calls became 441" is
- * unreadable a year later without knowing which athanor and which rig produced each half; with this
+ * unreadable a year later without knowing which garden and which rig produced each half; with this
  * both are a `git checkout` away. `harness` is the digest of the three files that decide every
  * number in this file, so a baseline accepted under a different digest was accepted by a different
  * instrument - reported as a note, never as a failure, because adding a fixture legitimately moves
@@ -517,7 +517,7 @@ export const render = (results: readonly Result[], baseline: Baseline): string =
   );
   if (stamp && (stamp.commit !== identity.commit || stamp.harness !== identity.harness))
     lines.push(
-      'Note: the committed numbers were measured by a different revision of athanor or of this rig. A row that moved may have moved for that reason.'
+      'Note: the committed numbers were measured by a different revision of garden or of this rig. A row that moved may have moved for that reason.'
     );
 
   const leadCharacters = results.reduce(
@@ -613,13 +613,13 @@ export const render = (results: readonly Result[], baseline: Baseline): string =
    * Where the money went, in the one line an owner reads.
    *
    * Printed on every run rather than behind a flag, because the fact this sentence states is the
-   * reason the column above was rebuilt: on this athanor the tool catalogue is the largest term in
+   * reason the column above was rebuilt: on this garden the tool catalogue is the largest term in
    * the bill, it is resident on every request whether or not the turn could use it, and until this
    * wave the number beside `tokens` could not see one byte of it. A share that falls is the whole
    * object of the residency work; a share that rises is a tool somebody added without saying so.
    */
   lines.push(
-    `Of those, ${catalogue} tokens (${((catalogue / Math.max(1, tokens)) * 100).toFixed(1)}%) were the tool catalogue, with a largest resident catalogue of ${resident} bytes. athanor's own window estimate, which is what the compaction trigger is compared against and which counts none of the catalogue, saw ${windows}.`
+    `Of those, ${catalogue} tokens (${((catalogue / Math.max(1, tokens)) * 100).toFixed(1)}%) were the tool catalogue, with a largest resident catalogue of ${resident} bytes. garden's own window estimate, which is what the compaction trigger is compared against and which counts none of the catalogue, saw ${windows}.`
   );
   // Averaged over the turns that had a previous request to repeat, because a one-call turn has no
   // opinion about caching and averaging its nought in would make the suite look worse the more

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ModelRelease } from '@athanor/contracts';
-import type { ModelResponse, ModelRequest } from '@athanor/model-gateway';
+import type { ModelRelease } from '@garden/contracts';
+import type { ModelResponse, ModelRequest } from '@garden/model-gateway';
 import type { ToolContext } from './tool-dispatch.js';
 import { parseClaimReview, reviewClaims, type ClaimSource } from './claim-review.js';
 

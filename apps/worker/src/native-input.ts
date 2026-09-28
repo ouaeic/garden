@@ -1,15 +1,15 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { AthanorError } from '@athanor/core';
-import { ModelRelease } from '@athanor/contracts';
+import { GardenError } from '@garden/core';
+import { ModelRelease } from '@garden/contracts';
 import {
   NATIVE_INPUT_MAX_BYTES,
   NATIVE_INPUT_MAX_PARTS,
   nativeInputMime,
   type ModelMessage,
   type ModelRequest
-} from '@athanor/model-gateway';
-import type { TaskRecord } from '@athanor/data';
+} from '@garden/model-gateway';
+import type { TaskRecord } from '@garden/data';
 import type { AgentState, InferenceCredential } from './agent-state.js';
 import type { AgentRunnerClient } from './runner-client.js';
 import type { ToolContext } from './tool-dispatch.js';
@@ -52,7 +52,7 @@ export const nativeCredentialBinding = (secret: InferenceCredential, privacyRout
     secret.provider === 'openrouter' &&
     !secret.enforceZeroDataRetention
   )
-    throw new AthanorError(
+    throw new GardenError(
       'native_input_privacy_conflict',
       'Enable provider zero retention before sending this recording on a private route',
       409
@@ -92,7 +92,7 @@ const inspectNativeInput = async (
     };
   const kind = options.kind;
   if (!kind)
-    throw new AthanorError(
+    throw new GardenError(
       'native_input_kind_required',
       'Choose audio or video for native reading',
       400
@@ -102,7 +102,7 @@ const inspectNativeInput = async (
     call.arguments.endSeconds !== undefined ||
     call.arguments.maxCharacters !== undefined
   )
-    throw new AthanorError(
+    throw new GardenError(
       'native_input_window_unsupported',
       'Native reading sends a whole file. Create an explicit local clip before reading a time range.',
       400
@@ -112,10 +112,10 @@ const inspectNativeInput = async (
     !path ||
     path.startsWith('/') ||
     path.includes('\\') ||
-    path.split('/').some((part) => ['..', '.athanor', '.garden'].includes(part)) ||
+    path.split('/').some((part) => ['..', '.garden'].includes(part)) ||
     path.includes('\0')
   )
-    throw new AthanorError(
+    throw new GardenError(
       'native_input_path_invalid',
       'Choose a recording inside this workspace',
       400
@@ -127,7 +127,7 @@ const inspectNativeInput = async (
     !model.modalities.includes(kind) ||
     (kind === 'video' && model.provider !== 'openrouter')
   )
-    throw new AthanorError(
+    throw new GardenError(
       'native_input_unsupported',
       'The selected model does not support this native recording modality',
       400
@@ -163,14 +163,14 @@ export const prepareNativeInputApproval = async (
   call: { id: string; arguments: Record<string, unknown> }
 ) => {
   if (!state)
-    throw new AthanorError(
+    throw new GardenError(
       'native_input_approval_required',
       'A durable recording approval requires task state',
       409
     );
   const inspected = await inspectNativeInput({ ...deps, task, state }, call);
   if (!inspected.reference)
-    throw new AthanorError(
+    throw new GardenError(
       'native_input_kind_required',
       'Choose a native recording to approve',
       400
@@ -200,21 +200,21 @@ export const stageNativeInput = async (
   const options = NativeReadOptions.parse(call.arguments.options);
   if (options.action === 'describe') return inspectNativeInput(context, call);
   if (!context.consequentialApproved)
-    throw new AthanorError(
+    throw new GardenError(
       'native_input_approval_required',
       'Approve sending the native recording before it is staged',
       409
     );
   const approved = context.state.nativeInputApprovals?.[call.id];
   if (!approved)
-    throw new AthanorError(
+    throw new GardenError(
       'native_input_approval_required',
       'Inspect and approve this recording before sending it',
       409
     );
   const inspected = await inspectNativeInput(context, call);
   if (!inspected.reference)
-    throw new AthanorError(
+    throw new GardenError(
       'native_input_approval_required',
       'The recording approval no longer matches',
       409
@@ -227,13 +227,13 @@ export const stageNativeInput = async (
       ([key, value]) => currentIdentity[key as keyof typeof currentIdentity] !== value
     )
   )
-    throw new AthanorError(
+    throw new GardenError(
       'native_input_approval_changed',
       'The recording or provider route changed since approval. Inspect and approve the current source again.',
       409
     );
   if (currentCost > approvedCost)
-    throw new AthanorError(
+    throw new GardenError(
       'native_input_approved_cost_exceeded',
       'The recording request now exceeds its approved price. Inspect and approve the current quote again.',
       409
@@ -246,7 +246,7 @@ export const stageNativeInput = async (
     held.length >= NATIVE_INPUT_MAX_PARTS ||
     held.reduce((sum, entry) => sum + entry.bytes, reference.bytes) > NATIVE_INPUT_MAX_BYTES
   )
-    throw new AthanorError(
+    throw new GardenError(
       'native_input_too_large',
       'The staged native recordings exceed the combined next-request limit',
       413
@@ -287,7 +287,7 @@ export const materializeNativeInputs = async (
     .max(NATIVE_INPUT_MAX_PARTS)
     .parse(state.pendingNativeInputs);
   if (refs.reduce((sum, ref) => sum + ref.bytes, 0) > NATIVE_INPUT_MAX_BYTES)
-    throw new AthanorError(
+    throw new GardenError(
       'native_input_too_large',
       'The staged recordings exceed the next-request byte limit',
       413
@@ -302,7 +302,7 @@ export const materializeNativeInputs = async (
         ref.credentialBinding !== refs[0]!.credentialBinding
     )
   )
-    throw new AthanorError(
+    throw new GardenError(
       'native_input_route_changed',
       'The model, provider account, or privacy route changed. Read the recording again under the current route.',
       409
@@ -313,7 +313,7 @@ export const materializeNativeInputs = async (
   );
   const approvedCost = Math.max(...refs.map((ref) => ref.maxCostUsd));
   if (bound.usd > approvedCost)
-    throw new AthanorError(
+    throw new GardenError(
       'native_input_approved_cost_exceeded',
       'The native request exceeds its approved price',
       409
@@ -322,7 +322,7 @@ export const materializeNativeInputs = async (
   for (const ref of refs) {
     const data = await runner.readBytes(task.workspaceId, task.id, ref.path, ref.bytes);
     if (data.bytes.length !== ref.bytes || digest(data.bytes) !== ref.sha256)
-      throw new AthanorError(
+      throw new GardenError(
         'native_input_source_changed',
         'A staged recording changed. Read its current bytes before sending it.',
         409

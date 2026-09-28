@@ -4,13 +4,13 @@
  * A corpus that only contains the case a format is good at proves nothing, so this one is built
  * from the shapes an editing turn actually contains, including the two shapes where the shipped
  * `file_patch` should win outright: a short unique edit, where quoting three lines is cheaper than
- * a header and a tag, and a rename, which `file_patch` cannot express at all and athanor does with
+ * a header and a tag, and a rename, which `file_patch` cannot express at all and garden does with
  * a shell `mv` that costs almost nothing.
  *
  * An edit is declared once, as a change to lines, and each format's encoding is DERIVED from it by
  * `encode.ts`. Nothing here is written in either dialect. That matters more than any other decision
  * in this directory: a corpus where the author hand-writes both sides is a corpus where the author
- * decides the winner, and every previous argument about athanor's weight has been settled that way.
+ * decides the winner, and every previous argument about garden's weight has been settled that way.
  *
  * The files are invented but they are not toys - the repetition in `queue.ts` and the duplicated
  * stanzas in `services.yml` are the exact structures that make a uniqueness-guarded search cost
@@ -128,7 +128,7 @@ const SERVICES = `version: '3.9'
 
 services:
   api:
-    image: athanor/api:latest
+    image: garden/api:latest
     restart: unless-stopped
     environment:
       - NODE_ENV=production
@@ -139,7 +139,7 @@ services:
       timeout: 5s
       retries: 3
   worker:
-    image: athanor/worker:latest
+    image: garden/worker:latest
     restart: unless-stopped
     environment:
       - NODE_ENV=production
@@ -150,7 +150,7 @@ services:
       timeout: 5s
       retries: 3
   runner:
-    image: athanor/runner:latest
+    image: garden/runner:latest
     restart: unless-stopped
     environment:
       - NODE_ENV=production

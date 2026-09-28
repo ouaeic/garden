@@ -1,7 +1,7 @@
 import { Readable } from 'node:stream';
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
 import type { FastifyReply } from 'fastify';
-import { AthanorError } from '@athanor/core';
+import { GardenError } from '@garden/core';
 
 /** Closing a browser download cancels both the HTTP body and the runner's file stream. */
 export const downloadSignal = (reply: FastifyReply): AbortSignal => {
@@ -34,7 +34,7 @@ export const sendDownload = (reply: FastifyReply, response: Response) => {
   if (!response.body) {
     if (response.status === 416 || response.headers.get('content-length') === '0')
       return reply.send();
-    throw new AthanorError('download_unavailable', 'The download stream is unavailable');
+    throw new GardenError('download_unavailable', 'The download stream is unavailable');
   }
   return reply.send(Readable.fromWeb(response.body as unknown as NodeReadableStream));
 };

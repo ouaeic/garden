@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { AthanorError } from '@athanor/core';
-import type { EncryptedEnvelope } from '@athanor/core';
-import type { MediaJobStatus } from '@athanor/contracts';
+import { GardenError } from '@garden/core';
+import type { EncryptedEnvelope } from '@garden/core';
+import type { MediaJobStatus } from '@garden/contracts';
 import type { Database } from '../database.js';
 import type { BillingStore } from './billing.js';
 import { iso, json, optionalText } from './rows.js';
@@ -99,7 +99,7 @@ export class MediaJobStore {
     outputPath: string;
   }): Promise<MediaJobRecord> {
     if (input.privacyRoute !== 'external' || input.retentionApproved !== true)
-      throw new AthanorError(
+      throw new GardenError(
         'media_retention_approval_required',
         'Approve provider retention for this video job before submission',
         409
@@ -109,7 +109,7 @@ export class MediaJobStore {
       input.reservationUsd <= 0 ||
       input.reservationUsd > 10_000
     )
-      throw new AthanorError(
+      throw new GardenError(
         'media_reservation_invalid',
         'Choose a bounded positive video reservation',
         400
@@ -126,7 +126,7 @@ export class MediaJobStore {
           job.taskId !== input.taskId ||
           job.requestHash !== input.requestHash
         )
-          throw new AthanorError(
+          throw new GardenError(
             'media_request_conflict',
             'This submission key belongs to a different request',
             409
@@ -137,7 +137,7 @@ export class MediaJobStore {
         'SELECT id FROM tasks WHERE id=$1 AND user_id=$2 AND workspace_id=$3',
         [input.taskId, input.userId, input.workspaceId]
       );
-      if (!task.rows.length) throw new AthanorError('not_found', 'Task not found', 404);
+      if (!task.rows.length) throw new GardenError('not_found', 'Task not found', 404);
       if ((input.operation ?? 'generate') !== 'generate') {
         const source = input.sourceJobId
           ? await tx.query(
@@ -152,7 +152,7 @@ export class MediaJobStore {
           original.model_id !== input.modelId ||
           !original.provider_job_id
         )
-          throw new AthanorError(
+          throw new GardenError(
             'media_source_invalid',
             'Choose a completed video from this workspace and provider model',
             409
@@ -169,13 +169,13 @@ export class MediaJobStore {
             (input.durationSeconds <= Number(original.duration_seconds) ||
               input.durationSeconds > Number(original.duration_seconds) + 20))
         )
-          throw new AthanorError(
+          throw new GardenError(
             'media_lineage_invalid',
             'The requested video exceeds its source duration or extension limits',
             400
           );
       } else if (input.sourceJobId || input.extensionCount)
-        throw new AthanorError(
+        throw new GardenError(
           'media_lineage_invalid',
           'A new generation cannot claim an existing source lineage',
           400
@@ -187,7 +187,7 @@ export class MediaJobStore {
         includeOpenCommitments: true
       });
       if (decision.outcome === 'deny')
-        throw new AthanorError(
+        throw new GardenError(
           'spend_cap_reached',
           'The video reservation exceeds the remaining spend allowance',
           402

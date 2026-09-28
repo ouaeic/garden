@@ -65,7 +65,7 @@ export async function saveComputationArtifacts(
         data.readUInt32BE(20) === 0)
     )
       throw Error('Invalid or oversized computation PNG');
-    const relative = `.athanor/artifacts/computation-${randomUUID()}.${png ? 'png' : 'svg'}`;
+    const relative = `.garden/artifacts/computation-${randomUUID()}.${png ? 'png' : 'svg'}`;
     await createWorkspaceFile(root, relative, data, 2 * 1024 * 1024);
     artifacts.push({
       path: relative,

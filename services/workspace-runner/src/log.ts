@@ -1,19 +1,19 @@
-import { redactText } from '@athanor/core';
+import { redactText } from '@garden/core';
 
 /**
  * The runner's end of the one journal format, held here rather than imported.
  *
- * `createLogger` is in `@athanor/worker`, and the reason it is there is that the API depends on
+ * `createLogger` is in `@garden/worker`, and the reason it is there is that the API depends on
  * that package while nothing depends on the API. The runner has no such edge to ride. It depends
- * on `@athanor/contracts` and `@athanor/core`, and `@athanor/core` is compiled into the web bundle
+ * on `@garden/contracts` and `@garden/core`, and `@garden/core` is compiled into the web bundle
  * behind a hard size gate, where there is no stdout to write a journal line to.
  *
- * Each way of closing that gap costs more than this file does. Depending on `@athanor/worker`
+ * Each way of closing that gap costs more than this file does. Depending on `@garden/worker`
  * would put the database layer and the model gateway - that package's own dependencies - into the
  * module graph of the one process on this box that executes whatever the agent was told to
  * execute, and it inverts the deployment order: the worker calls the runner over HTTP, so an
  * import the other way makes the runner unstartable until the worker is built. A subpath on
- * `@athanor/core` would put `process` and a stdout write one accidental import away from the web
+ * `@garden/core` would put `process` and a stdout write one accidental import away from the web
  * build, and "no bundler will ever follow this" is a promise no one here can keep. A package of
  * its own would only be canonical if the API and the worker moved onto it too, which is a change
  * to two files this cannot make; until they do it is this file with a build step attached.
@@ -42,7 +42,7 @@ const events = {
   'process.history_write_failed':
     'a terminal process receipt could not be saved; retained records have not been evicted',
   'services.record_write_failed':
-    'could not record services in .athanor/services.json - services will not survive a restart',
+    'could not record services in .garden/services.json - services will not survive a restart',
   'command.limits_unavailable':
     'the resource limiter is missing, so commands run without memory, file-size and process limits. Install util-linux to restore them.',
   'browser.cleanup_failed': 'the project browser namespace could not be released',
@@ -102,7 +102,7 @@ const loggableEntries = (fields: LogFields): Record<string, string | number | bo
 
 /**
  * systemd reads a leading `<N>` off a line and files it at that priority, which is the difference
- * between `journalctl -p warning -u athanor-runner` finding a browser that lost its sandbox and it
+ * between `journalctl -p warning -u garden-runner` finding a browser that lost its sandbox and it
  * answering that nothing has ever gone wrong here. JOURNAL_STREAM is set by systemd itself, and
  * only when this process's output goes to the journal, so a runner started in a terminal writes
  * plain JSON and journald is the only reader that ever sees the marker.
@@ -126,7 +126,7 @@ export interface LoggerOptions {
   now?: () => Date;
 }
 
-/** One JSON object per line on stdout, which is what journald stores and `athanor logs` replays. */
+/** One JSON object per line on stdout, which is what journald stores and `garden logs` replays. */
 export const createLogger = (options: LoggerOptions = {}): Logger => {
   const write = options.write ?? ((line: string) => process.stdout.write(`${line}\n`));
   const now = options.now ?? (() => new Date());

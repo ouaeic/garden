@@ -1,4 +1,4 @@
-import { AthanorError } from '@athanor/core';
+import { GardenError } from '@garden/core';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_MAX_RETRY_AFTER_MS,
@@ -22,10 +22,10 @@ const policy = (overrides: Partial<RetryPolicy> = {}): RetryPolicy => ({
 
 describe('retry classification', () => {
   it('retries transient provider faults and leaves permanent ones alone', () => {
-    expect(isRetryableError(new AthanorError('provider_unavailable', 'down', 503))).toBe(true);
-    expect(isRetryableError(new AthanorError('provider_quota_exhausted', 'slow down'))).toBe(true);
-    expect(isRetryableError(new AthanorError('provider_request_failed', 'bad prompt'))).toBe(false);
-    expect(isRetryableError(new AthanorError('provider_not_configured', 'missing', 404))).toBe(
+    expect(isRetryableError(new GardenError('provider_unavailable', 'down', 503))).toBe(true);
+    expect(isRetryableError(new GardenError('provider_quota_exhausted', 'slow down'))).toBe(true);
+    expect(isRetryableError(new GardenError('provider_request_failed', 'bad prompt'))).toBe(false);
+    expect(isRetryableError(new GardenError('provider_not_configured', 'missing', 404))).toBe(
       false
     );
     expect(isRetryableError(new Error('socket hang up'))).toBe(false);
@@ -45,7 +45,7 @@ describe('retry classification', () => {
 describe('retry-after hints', () => {
   it('reads a hint from error details, a seconds header or an HTTP date header', () => {
     expect(
-      retryAfterMsOf(new AthanorError('provider_quota_exhausted', 'wait', 429, { retryAfter: 7 }))
+      retryAfterMsOf(new GardenError('provider_quota_exhausted', 'wait', 429, { retryAfter: 7 }))
     ).toBe(7000);
     expect(
       retryAfterMsOf(
@@ -78,9 +78,9 @@ describe('backoffDelayMs', () => {
   });
 
   it('raises the wait to a provider hint without exceeding the ceiling', () => {
-    const error = new AthanorError('provider_quota_exhausted', 'wait', 429, { retryAfter: 5 });
+    const error = new GardenError('provider_quota_exhausted', 'wait', 429, { retryAfter: 5 });
     expect(backoffDelayMs(policy(), 1, error)).toBe(5000);
-    const longHint = new AthanorError('provider_quota_exhausted', 'wait', 429, {
+    const longHint = new GardenError('provider_quota_exhausted', 'wait', 429, {
       retryAfter: 600
     });
     expect(backoffDelayMs(policy(), 1, longHint)).toBe(120_000);
@@ -90,8 +90,8 @@ describe('backoffDelayMs', () => {
     // The two ceilings bound different things. A provider asking for sixty seconds and being asked
     // again at twenty spends the whole attempt budget inside its own window and never reaches the
     // moment it said it would serve the key; a wait this side guessed at must still not park a task.
-    const named = (seconds: number): AthanorError =>
-      new AthanorError('provider_quota_exhausted', 'wait', 429, { retryAfter: seconds });
+    const named = (seconds: number): GardenError =>
+      new GardenError('provider_quota_exhausted', 'wait', 429, { retryAfter: seconds });
     expect(backoffDelayMs(policy(), 1, named(60))).toBe(60_000);
     expect(backoffDelayMs(policy(), 1, named(119))).toBe(119_000);
     expect(backoffDelayMs(policy(), 1, named(3_600))).toBe(DEFAULT_MAX_RETRY_AFTER_MS);
@@ -122,7 +122,7 @@ describe('withRetry', () => {
       withRetry(
         async () => {
           attempts += 1;
-          throw new AthanorError('provider_unavailable', 'upstream down', 503);
+          throw new GardenError('provider_unavailable', 'upstream down', 503);
         },
         {
           policy: policy({
@@ -145,7 +145,7 @@ describe('withRetry', () => {
       withRetry(
         async () => {
           attempts += 1;
-          throw new AthanorError('provider_unavailable', 'stream cut', 503);
+          throw new GardenError('provider_unavailable', 'stream cut', 503);
         },
         { policy: policy(), hasStreamed: () => true }
       )
@@ -161,7 +161,7 @@ describe('withRetry', () => {
         async () => {
           attempts += 1;
           controller.abort();
-          throw new AthanorError('provider_unavailable', 'cancelled mid-flight', 503);
+          throw new GardenError('provider_unavailable', 'cancelled mid-flight', 503);
         },
         { policy: policy(), hasStreamed: () => false, signal: controller.signal }
       )
@@ -186,12 +186,12 @@ describe('withRetry', () => {
 
 describe('provider status classification', () => {
   it('retries a 5xx, which is the status the adapter actually produces for an upstream fault', () => {
-    // The adapter used to construct this error without a status, so it inherited AthanorError's
+    // The adapter used to construct this error without a status, so it inherited GardenError's
     // default of 400 and a three-hour task died on one upstream blip.
     for (const status of [500, 502, 503, 504]) {
       expect(
         isRetryableError(
-          new AthanorError(
+          new GardenError(
             'provider_request_failed',
             `openrouter request failed (${status})`,
             status
@@ -202,7 +202,7 @@ describe('provider status classification', () => {
   });
 
   it('still refuses to retry a genuine client-side rejection', () => {
-    expect(isRetryableError(new AthanorError('provider_request_failed', 'bad prompt', 400))).toBe(
+    expect(isRetryableError(new GardenError('provider_request_failed', 'bad prompt', 400))).toBe(
       false
     );
   });
@@ -210,7 +210,7 @@ describe('provider status classification', () => {
   it('honours a Retry-After carried on the error details', () => {
     expect(
       retryAfterMsOf(
-        new AthanorError('provider_quota_exhausted', 'rate limited', 429, { retryAfter: '30' })
+        new GardenError('provider_quota_exhausted', 'rate limited', 429, { retryAfter: '30' })
       )
     ).toBe(30_000);
   });
@@ -225,7 +225,7 @@ describe('whether waiting is any use', () => {
   it('calls every status the provider turns work away with a wall', () => {
     for (const status of [408, 429, 500, 502, 503, 504, 529])
       expect(
-        isProviderWall(new AthanorError('provider_request_failed', `refused (${status})`, status))
+        isProviderWall(new GardenError('provider_request_failed', `refused (${status})`, status))
       ).toBe(true);
   });
 
@@ -234,20 +234,20 @@ describe('whether waiting is any use', () => {
     // often they are asked. Parking a task behind one of them is parking it behind nothing.
     for (const status of [400, 401, 403, 404, 413, 422])
       expect(
-        isProviderWall(new AthanorError('provider_request_failed', `refused (${status})`, status))
+        isProviderWall(new GardenError('provider_request_failed', `refused (${status})`, status))
       ).toBe(false);
   });
 
   it('reads the codes that are thrown without a status of their own', () => {
-    // `list()` raises this one with AthanorError's default of 400, and the request deadline raises
+    // `list()` raises this one with GardenError's default of 400, and the request deadline raises
     // `model_request_timeout` the same way. A status-only reading calls both client mistakes.
-    expect(isProviderWall(new AthanorError('provider_unavailable', 'could not be reached'))).toBe(
+    expect(isProviderWall(new GardenError('provider_unavailable', 'could not be reached'))).toBe(
       true
     );
-    expect(isProviderWall(new AthanorError('model_request_timeout', 'no answer in 900s'))).toBe(
+    expect(isProviderWall(new GardenError('model_request_timeout', 'no answer in 900s'))).toBe(
       true
     );
-    expect(isProviderWall(new AthanorError('provider_not_connected', 'add a provider', 503))).toBe(
+    expect(isProviderWall(new GardenError('provider_not_connected', 'add a provider', 503))).toBe(
       true
     );
     expect(isProviderWall(new Error('socket hang up'))).toBe(false);

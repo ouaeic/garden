@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PREVIEW_HTTPS_PORT } from '@athanor/relay';
+import { PREVIEW_HTTPS_PORT } from '@garden/relay';
 
 /**
  * Relay settings for one box.
@@ -67,7 +67,7 @@ export const disabledRelayConfig = (): RelayClientConfig => RelayClientConfigSch
  * The pin is part of "configured" and not an optional extra, because the dial deliberately carries
  * no CA check: the box authenticates the relay by the key it pinned at enrollment and by nothing
  * else. A settings file with a host and a label but no pin - one written by a build that predates
- * pinning, hand-edited through the `jq` path in `scripts/athanor`, or produced by any future writer
+ * pinning, hand-edited through the `jq` path in `scripts/garden`, or produced by any future writer
  * that forgets the field - parses cleanly and would otherwise dial, present the private key that is
  * this box's address, and accept whatever certificate answered for the name.
  */

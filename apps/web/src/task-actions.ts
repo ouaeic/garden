@@ -1,4 +1,4 @@
-import type { Task } from '@athanor/contracts';
+import type { Task } from '@garden/contracts';
 import { post } from './client.js';
 
 export function createQuestionAnswerSender(

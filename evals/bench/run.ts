@@ -14,7 +14,7 @@
  * paid path refuses to start without a key and without every bound named on the command line.
  *
  * Not part of `pnpm check`, like every other rig in `evals/`. It exits non-zero on a self-test
- * failure or on a route athanor asks for that the shim does not implement, so it is usable in CI
+ * failure or on a route garden asks for that the shim does not implement, so it is usable in CI
  * on its own schedule.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -80,7 +80,7 @@ if (flag('observe')) {
     process.stderr.write(`No fixture matches "${filter ?? ''}".\n`);
     process.exit(2);
   }
-  out(`Sweeping ${selection.length} fixture(s) for the routes athanor asks a workspace for.`);
+  out(`Sweeping ${selection.length} fixture(s) for the routes garden asks a workspace for.`);
   let done = 0;
   const observation = await observe(selection, () => {
     done += 1;
@@ -101,7 +101,7 @@ if (flag('observe')) {
    * ZERO is the floor rather than some fraction of 15, deliberately. A smaller observation is a
    * legitimate outcome: the observed set is a FLOOR of what these fixtures happen to drive, and a
    * fixture retired or a tool that stops calling a route moves it down honestly. Nothing about
-   * athanor moves it to zero while the loop still reaches a workspace, so zero is the only count
+   * garden moves it to zero while the loop still reaches a workspace, so zero is the only count
    * that can only mean the instrument.
    */
   if (observation.observed.length === 0) {
@@ -158,7 +158,7 @@ if (flag('routes')) {
     process.exit(2);
   }
   const coverage = coverageOf(observation);
-  out(`Observed ${observation.recordedAt} on ${observation.athanor}`);
+  out(`Observed ${observation.recordedAt} on ${observation.garden}`);
   out(`${observation.fixtures.length} fixtures, ${observation.observed.length} distinct routes.`);
   out('');
   for (const row of observation.observed)
@@ -278,7 +278,7 @@ if (flag('assemble')) {
 /*
  * The join, driven to a score. Still offline, still free: the model is a script and no provider is
  * reached. See `score.ts` for what that does and does not prove, and README.md section 5 for the
- * command that produces a number about athanor rather than about the wire.
+ * command that produces a number about garden rather than about the wire.
  */
 if (flag('score')) {
   process.exit(

@@ -1,7 +1,7 @@
 import type * as childProcess from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DesktopAction } from '@athanor/contracts';
+import { DesktopAction } from '@garden/contracts';
 import { DisplayEncoder, DisplayMessageType, type DisplayGeometry } from './desktop-stream.js';
 import {
   DesktopManager,
@@ -237,7 +237,7 @@ interface Harness {
  */
 class PerformManager extends DesktopManager {
   constructor(private readonly fake: Session) {
-    super('/usr/libexec/athanor-desktop-bridge.py', '/usr/libexec/start-desktop-session.sh');
+    super('/usr/libexec/garden-desktop-bridge.py', '/usr/libexec/start-desktop-session.sh');
   }
 
   override async ensure(): Promise<Session> {
@@ -642,7 +642,7 @@ describe('what the desktop refuses', () => {
     expect(result).toEqual({ result: { ok: true, action: 'invoke', nodeId: '0/2/5' } });
     // No `--serve`, and the request arrived on the child's stdin instead.
     expect(processes.argumentsFor('/usr/bin/python3')).toEqual([
-      ['/usr/libexec/athanor-desktop-bridge.py']
+      ['/usr/libexec/garden-desktop-bridge.py']
     ]);
     expect(processes.operations()).toEqual(['act']);
   });

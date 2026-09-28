@@ -2,13 +2,13 @@
 name: pdf-assembly
 description: Merge, split, rotate, stamp, watermark, compress, redact and encrypt PDFs deterministically, and fill AcroForm fields through a validated plan before flattening. Use when an existing PDF must be reshaped or a PDF form must be completed. Do not use to author a PDF from scratch, to read one, or to submit a form on a website.
 license: AGPL-3.0-or-later
-compatibility: qpdf, poppler-utils, ghostscript, ImageMagick and pypdf through /usr/local/lib/athanor/python/bin/python3 are installed on every supported host. img2pdf is absent from openSUSE only; check it is there before rasterising, because it is what rebuilds a page without recompressing it.
+compatibility: qpdf, poppler-utils, ghostscript, ImageMagick and pypdf through /usr/local/lib/garden/python/bin/python3 are installed on every supported host. img2pdf is absent from openSUSE only; check it is there before rasterising, because it is what rebuilds a page without recompressing it.
 allowed-tools: shell file_read file_write files_list document_read image_read publish_artifact
 metadata:
-  athanor.tier: 'builtin'
-  athanor.version: '2.1.0'
-  athanor.risk: 'workspace'
-  athanor.domain: 'pdf'
+  garden.tier: 'builtin'
+  garden.version: '2.1.0'
+  garden.risk: 'workspace'
+  garden.domain: 'pdf'
 ---
 
 # PDF assembly and forms
@@ -71,7 +71,7 @@ Plan, validate, fill, then flatten. Never write values straight in.
 
 1. **Enumerate** the fields as they actually exist:
    ```python
-   # /usr/local/lib/athanor/python/bin/python3 enumerate_fields.py
+   # /usr/local/lib/garden/python/bin/python3 enumerate_fields.py
    from pypdf import PdfReader
    fields = PdfReader('form.pdf').get_fields() or {}
    for name, f in fields.items():

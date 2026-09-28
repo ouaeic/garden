@@ -1,9 +1,9 @@
 import path from 'node:path';
 import { z } from 'zod';
-import { CodingMissionChange, CodingMissionStart } from '@athanor/contracts';
-import { AthanorError, decryptJson, unwrapDataKey } from '@athanor/core';
-import type { TaskRecord } from '@athanor/data';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import { CodingMissionChange, CodingMissionStart } from '@garden/contracts';
+import { GardenError, decryptJson, unwrapDataKey } from '@garden/core';
+import type { TaskRecord } from '@garden/data';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { ApprovalFloorDeps } from './approval-floor.js';
 import type { AgentState } from './agent-state.js';
 import { approvalRequirement, type ApprovalContext } from './approval-policy.js';
@@ -24,7 +24,7 @@ export async function codingMissionApproval(
     .parse(call.arguments.options);
   const seen = state?.codingMissionReviews?.[input.missionId];
   if (seen?.digest !== input.digest || seen.generation !== input.generation)
-    throw new AthanorError(
+    throw new GardenError(
       'coding_review_required',
       'Inspect the exact coding mission review in this parent context first',
       409
@@ -37,7 +37,7 @@ export async function codingMissionApproval(
     mission.generation !== input.generation ||
     mission.childStatus !== 'completed'
   )
-    throw new AthanorError(
+    throw new GardenError(
       'coding_review_changed',
       'The mission review no longer describes completed work in this parent task',
       409
@@ -70,7 +70,7 @@ export async function codingMissionApproval(
     !review.canIntegrate ||
     review.changes.some((c) => c.binary || c.diffOmitted)
   )
-    throw new AthanorError(
+    throw new GardenError(
       'coding_review_changed',
       'The source changed after inspection; review it again',
       409

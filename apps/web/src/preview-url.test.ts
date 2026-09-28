@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 const origin = 'https://garden.test';
-const path = '/__athanor/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/index.html?access=fixture#game';
+const path = '/__garden/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/index.html?access=fixture#game';
 const fixture = async (location = 'http://localhost:41000', marker = '1', advertised = origin) => {
   vi.resetModules();
   vi.stubGlobal('window', { location: new URL(location) });
@@ -9,8 +9,8 @@ const fixture = async (location = 'http://localhost:41000', marker = '1', advert
       {},
       {
         headers: {
-          'x-athanor-native-client': marker,
-          'x-athanor-server-origin': advertised
+          'x-garden-native-client': marker,
+          'x-garden-server-origin': advertised
         }
       }
     )
@@ -34,7 +34,7 @@ describe('native preview origin authority', () => {
     const distinct = [
       origin + ':8443' + path,
       'https://garden.test.evil' + path,
-      origin + '/__athanor/preview/other/',
+      origin + '/__garden/preview/other/',
       origin + '/v1/bootstrap'
     ];
     expect(distinct.length).toBeGreaterThan(0);
@@ -65,7 +65,7 @@ describe('native preview origin authority', () => {
     const client = await fixture();
     expect(client.nativeServerOrigin()).toBe(origin);
     vi.stubGlobal('fetch', async () =>
-      Response.json({}, { headers: { 'x-athanor-native-client': '1' } })
+      Response.json({}, { headers: { 'x-garden-native-client': '1' } })
     );
     await client.get('/v1/bootstrap');
     expect(client.nativeServerOrigin()).toBeNull();
@@ -80,10 +80,10 @@ it('maps the configured native preview onto its own verified loopback origin', a
       {},
       {
         headers: {
-          'x-athanor-native-client': '1',
-          'x-athanor-server-origin': origin,
-          'x-athanor-preview-origin': origin + ':8443',
-          'x-athanor-preview-local-origin': 'http://localhost:41001'
+          'x-garden-native-client': '1',
+          'x-garden-server-origin': origin,
+          'x-garden-preview-origin': origin + ':8443',
+          'x-garden-preview-local-origin': 'http://localhost:41001'
         }
       }
     )
@@ -104,10 +104,10 @@ it('maps the configured native preview onto its own verified loopback origin', a
       {},
       {
         headers: {
-          'x-athanor-native-client': '1',
-          'x-athanor-server-origin': origin,
-          'x-athanor-preview-origin': origin + ':8443',
-          'x-athanor-preview-local-origin': 'http://localhost:41000'
+          'x-garden-native-client': '1',
+          'x-garden-server-origin': origin,
+          'x-garden-preview-origin': origin + ':8443',
+          'x-garden-preview-local-origin': 'http://localhost:41000'
         }
       }
     )

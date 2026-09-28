@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createDatabase } from '@athanor/data';
-import { encryptJson } from '@athanor/core';
+import { createDatabase } from '@garden/data';
+import { encryptJson } from '@garden/core';
 import {
   AVAILABILITY_TTL_MS,
   PRESENTATION_EVENT_LIMIT,

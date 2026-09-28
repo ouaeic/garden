@@ -73,7 +73,7 @@ interface Harness {
 }
 
 const buildHarness = async (): Promise<Harness> => {
-  const directory = await mkdtemp(join(tmpdir(), 'athanor-schedule-overlap-'));
+  const directory = await mkdtemp(join(tmpdir(), 'garden-schedule-overlap-'));
   disposers.push(() => rm(directory, { recursive: true, force: true }));
   vi.stubGlobal(
     'fetch',
@@ -90,7 +90,7 @@ const buildHarness = async (): Promise<Harness> => {
     DEPLOYMENT_MODE: 'development',
     MODEL_CATALOG_SCOPE: 'reviewed_open_weight',
     CONNECTION_MANIFEST_PATH: join(directory, 'connection.json'),
-    ATHANOR_STATE_PATH: directory,
+    GARDEN_STATE_PATH: directory,
     RELAY_STATE_DIR: join(directory, 'relay'),
     RELAY_LOCAL_HOST: '127.0.0.1',
     RELAY_LOCAL_PORT: 443,
@@ -115,7 +115,7 @@ const buildHarness = async (): Promise<Harness> => {
     PUBLIC_RUNNER_URL: 'ws://127.0.0.1:4300',
     WORKSPACE_IMAGE_REVISION: 'dev',
     WEBAUTHN_RP_ID: 'localhost',
-    WEBAUTHN_RP_NAME: 'athanor Test',
+    WEBAUTHN_RP_NAME: 'garden Test',
     WEBAUTHN_ORIGIN: 'http://localhost:5173',
     ALLOW_INSECURE_DEV_AUTH: true,
     WORKER_ID: 'schedule-overlap-worker',

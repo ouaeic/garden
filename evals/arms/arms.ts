@@ -3,7 +3,7 @@
  *
  * ── Why this file is a tree and not a list ──────────────────────────────────────────────────────
  *
- * Every previous argument about athanor's resident weight - the catalogue is too big, the skill
+ * Every previous argument about garden's resident weight - the catalogue is too big, the skill
  * index is dead, `## Doing the work well` is method that should not be carried - was settled by
  * reading source and forming a view. None of them was measured, because measuring them means
  * running two configurations against the same work and there was no way to state "the same work"
@@ -43,7 +43,7 @@ import { readFileSync } from 'node:fs';
  * in the live half.
  */
 export interface ArmSettings {
-  /** Which slice of athanor's own catalogue reaches the wire. */
+  /** Which slice of garden's own catalogue reaches the wire. */
   readonly tools: 'full' | 'core' | 'floor';
   /** Whether the curated knowledge block's skill index is in the window at all. */
   readonly skills: 'index' | 'none';
@@ -182,7 +182,7 @@ export const PRE_REGISTRATION = [
 /* ------------------------------------------------------------------ resolution, enforced in code */
 
 /**
- * The root arm: what athanor sends today, and `edit` tracks the working tree rather than a wish.
+ * The root arm: what garden sends today, and `edit` tracks the working tree rather than a wish.
  *
  * It said `patch` when this file was written, because that is what shipped. The line-addressed
  * dialect then landed, and leaving the constant alone would have made every arm in this table -
@@ -248,7 +248,7 @@ export const armById = (id: string): Arm => {
 
 /**
  * `coreToolNames` is module-private inside `tool-catalogue.ts`, and copying the twenty names here
- * would make this rig's `core` arm quietly stop being athanor's core set the first time somebody
+ * would make this rig's `core` arm quietly stop being garden's core set the first time somebody
  * moves a tool between the two halves - while every number in the table stayed plausible.
  *
  * So it is read out of the source, the way `evals/fixtures.ts` reads the dispatch tables it must
@@ -261,7 +261,7 @@ export const coreToolNamesFromSource = (
   const block = /const coreToolNames = new Set\(\[([\s\S]*?)\]\);/.exec(source);
   if (!block?.[1])
     throw new Error(
-      'coreToolNames could not be read from tool-catalogue.ts; the `core` arm is not athanor’s core set and this rig must not pretend otherwise'
+      'coreToolNames could not be read from tool-catalogue.ts; the `core` arm is not garden’s core set and this rig must not pretend otherwise'
     );
   const names = [...block[1].matchAll(/^\s*'([a-z_]+)'/gm)].map((match) => match[1] as string);
   if (names.length < 10)
@@ -271,7 +271,7 @@ export const coreToolNamesFromSource = (
 
 /**
  * The calibration arm's five, written out because they are a deliberate hand reduction rather than
- * a slice of anything athanor defines: one way to run something, one to read, two to write, one to
+ * a slice of anything garden defines: one way to run something, one to read, two to write, one to
  * stop. It is the smallest set on which a general agent has ever been shown to do real work, and
  * its only job here is to be obviously worse. If it is not obviously worse, the instrument is not
  * measuring what it claims to.

@@ -15,7 +15,7 @@ afterEach(async () => {
 });
 
 const temporaryDirectory = async (): Promise<string> => {
-  const directory = await mkdtemp(join(tmpdir(), 'athanor-relay-client-'));
+  const directory = await mkdtemp(join(tmpdir(), 'garden-relay-client-'));
   cleanups.push(() => rm(directory, { recursive: true, force: true }));
   return directory;
 };
@@ -46,7 +46,7 @@ describe('relay is off unless it is deliberately turned on', () => {
 
   it('treats an enrollment with no pinned relay key as off, because there is nothing to trust', () => {
     // A settings file written by a build that predates pinning, or hand-edited by the `jq` path in
-    // `scripts/athanor`, parses cleanly with a host, a label and a null pin. Dialling on that means
+    // `scripts/garden`, parses cleanly with a host, a label and a null pin. Dialling on that means
     // presenting the private key that is this box's address to whoever now answers for the name.
     expect(
       relayIsUsable(

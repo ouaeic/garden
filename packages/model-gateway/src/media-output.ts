@@ -1,7 +1,7 @@
 import { lookup } from 'node:dns/promises';
 import { request } from 'node:https';
 import { isIP } from 'node:net';
-import { isPublicHttpUrl, isPublicInternetAddress } from '@athanor/core';
+import { isPublicHttpUrl, isPublicInternetAddress } from '@garden/core';
 
 export const MAX_MEDIA_OUTPUT_BYTES = 64 * 1024 * 1024;
 export const MAX_MEDIA_JSON_BYTES = 96 * 1024 * 1024;

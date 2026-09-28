@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { WorkflowRequest } from '@athanor/contracts';
+import { WorkflowRequest } from '@garden/contracts';
 import { z } from 'zod';
 import { requireScope } from './auth.js';
 import type { WorkflowManager } from './workflows.js';

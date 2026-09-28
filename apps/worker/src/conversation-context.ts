@@ -1,8 +1,8 @@
 import { projectRequest } from './project-updates.js';
-import type { ProjectUpdates } from '@athanor/contracts';
-import { ConversationSource } from '@athanor/contracts';
-import { decryptJson, unwrapDataKey } from '@athanor/core';
-import { projectResponse, type TaskRecord } from '@athanor/data';
+import type { ProjectUpdates } from '@garden/contracts';
+import { ConversationSource } from '@garden/contracts';
+import { decryptJson, unwrapDataKey } from '@garden/core';
+import { projectResponse, type TaskRecord } from '@garden/data';
 import type { WindowDeps } from './window.js';
 
 const excerpt = (text: string, limit: number) =>

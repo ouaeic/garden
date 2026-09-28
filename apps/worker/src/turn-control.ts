@@ -15,12 +15,12 @@ import {
   recordPrivateDiagnostic,
   ownerMessageContent,
   type OwnerMessage,
-  AthanorError,
+  GardenError,
   decryptJson,
   encryptJson
-} from '@athanor/core';
-import type { DataStore, TaskRecord } from '@athanor/data';
-import type { ModelMessage, ModelTool } from '@athanor/model-gateway';
+} from '@garden/core';
+import type { DataStore, TaskRecord } from '@garden/data';
+import type { ModelMessage, ModelTool } from '@garden/model-gateway';
 import type { AgentState, AgentWorkerConfig } from './agent-state.js';
 import type { Logger } from './log.js';
 import type { AgentRunnerClient } from './runner-client.js';
@@ -92,7 +92,7 @@ export const drainCorrection = async (
   });
   if (!consumed) {
     if (queued.approvalId)
-      throw new AthanorError(
+      throw new GardenError(
         'approval_correction_conflict',
         'The task changed before its denial correction could be saved'
       );
@@ -260,7 +260,7 @@ export const honorUserControl = async (
  * them was found by a human reading two files against each other, because nothing in the product
  * ever re-derives what it is about to do from what it has recorded.
  *
- * The model request is the largest such control in athanor: it is the whole of what the model sees,
+ * The model request is the largest such control in garden: it is the whole of what the model sees,
  * it is assembled from four independent inputs at three different points in the loop, and a
  * divergence in it is silent - the provider answers a wrong window exactly as readily as a right
  * one, and the answer looks like an ordinary reply. So it is re-derived immediately before the send

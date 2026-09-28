@@ -19,7 +19,7 @@ const record = (over: Partial<CatalogRefreshRecord> = {}): CatalogRefreshRecord 
   ...over
 });
 
-const scratch = () => mkdtemp(join(tmpdir(), 'athanor-catalog-state-'));
+const scratch = () => mkdtemp(join(tmpdir(), 'garden-catalog-state-'));
 
 describe('the catalogue refresh record', () => {
   it('round-trips through a directory it has to create itself, because nothing else makes one', async () => {

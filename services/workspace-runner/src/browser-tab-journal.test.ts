@@ -29,13 +29,13 @@ describe('encrypted browser tab recovery', () => {
       tabs: [tab],
       omitted: 0
     });
-    const filename = path.join(one, '.athanor/browser-tabs/state.json');
+    const filename = path.join(one, '.garden/browser-tabs/state.json');
     const raw = await readFile(filename, 'utf8');
     expect(raw).not.toContain(tab.title);
     expect(raw).not.toContain(tab.url);
     expect((await stat(filename)).mode & 0o777).toBe(0o600);
     await store.save(two, []);
-    await copyFile(filename, path.join(two, '.athanor/browser-tabs/state.json'));
+    await copyFile(filename, path.join(two, '.garden/browser-tabs/state.json'));
     await expect(store.read(two)).rejects.toThrow();
   });
   it('serializes updates and reports bounded history rather than silently dropping tabs', async () => {

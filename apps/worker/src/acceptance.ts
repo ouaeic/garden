@@ -27,7 +27,7 @@ import {
   isDestructiveScript
 } from './command-classification.js';
 import { textValue } from './values.js';
-import { JsonProof } from '@athanor/contracts';
+import { JsonProof } from '@garden/contracts';
 
 /** A command the harness runs itself, with the arguments fixed before the work started. */
 export interface AcceptanceCommandCheck {
@@ -133,7 +133,7 @@ export interface AcceptanceResult {
  *
  * Both are still failures for the purpose of refusing a finish, and nothing here changes that: a
  * job whose proof cannot be run is not a proven job. The distinction is for what the completion
- * then *says*, where "your test failed" and "athanor never got to run your test" are different
+ * then *says*, where "your test failed" and "garden never got to run your test" are different
  * things to tell an owner.
  *
  * Read off `detail`, because that is the only place the difference exists. Adding a field to
@@ -339,7 +339,7 @@ const expandedBeforeItRan = (executable: string, args: readonly string[]): boole
 /**
  * A check that no state of this computer can fail, refused at the moment it is declared.
  *
- * The red baseline in `declareAcceptance` is the only thing in athanor that ever falsifies a check -
+ * The red baseline in `declareAcceptance` is the only thing in garden that ever falsifies a check -
  * it runs the record against the job before the work and refuses one where nothing fails - and it
  * is asked only `if (!state.mutated)`. The hold that demands a record at all fires on
  * `state.mutatedBeyondProse`. So on the ordinary coding turn, where the model writes the code and is
@@ -645,7 +645,7 @@ export const parseAcceptanceChecks = (
 };
 
 /**
- * The identity of a command, so "has athanor already run exactly this?" is a lookup.
+ * The identity of a command, so "has garden already run exactly this?" is a lookup.
  *
  * Executable, arguments and working directory and nothing else: two calls that differ in any of
  * them are different commands, and the whole value of this is that a match means a match.
@@ -667,7 +667,7 @@ export const commandFingerprint = (input: {
  * The acceptance record exists because a model asserting its own correctness proves nothing and an
  * external check does. That argument is about who ran the command, not about how many times: when
  * the model checks its own work through `shell` - which is how most of them check anything - the
- * process athanor started is the same process, with the same arguments, in the same directory, on a
+ * process garden started is the same process, with the same arguments, in the same directory, on a
  * computer nothing has changed since. Running it a second time at finish observes the identical
  * fact and charges the owner a second build or a second test suite for it.
  *
@@ -691,7 +691,7 @@ export const acceptanceAlreadyObserved = (
     id: check.id,
     label: check.label,
     passed: true,
-    detail: `exit ${exitCode}, from athanor running this same command after the last change`,
+    detail: `exit ${exitCode}, from garden running this same command after the last change`,
     command: acceptanceCommandText(check)
   };
 };

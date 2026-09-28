@@ -24,8 +24,8 @@ import {
   type SharePreviewResponse,
   type ShareSnapshot,
   type TaskEventKind
-} from '@athanor/contracts';
-import { encryptJson, sha256, unwrapDataKey, type EncryptedEnvelope } from '@athanor/core';
+} from '@garden/contracts';
+import { encryptJson, sha256, unwrapDataKey, type EncryptedEnvelope } from '@garden/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ApiConfig } from '../config.js';
 import { SHARE_REQUESTS_PER_MINUTE } from '../context.js';
@@ -62,7 +62,7 @@ interface Harness {
 }
 
 const buildHarness = async (overrides: Partial<ApiConfig> = {}): Promise<Harness> => {
-  const directory = await mkdtemp(join(tmpdir(), 'athanor-shares-'));
+  const directory = await mkdtemp(join(tmpdir(), 'garden-shares-'));
   disposers.push(() => rm(directory, { recursive: true, force: true }));
   artifactBytes.clear();
   vi.stubGlobal(
@@ -90,7 +90,7 @@ const buildHarness = async (overrides: Partial<ApiConfig> = {}): Promise<Harness
     DEPLOYMENT_MODE: 'development',
     MODEL_CATALOG_SCOPE: 'reviewed_open_weight',
     CONNECTION_MANIFEST_PATH: join(directory, 'connection.json'),
-    ATHANOR_STATE_PATH: directory,
+    GARDEN_STATE_PATH: directory,
     RELAY_STATE_DIR: join(directory, 'relay'),
     RELAY_LOCAL_HOST: '127.0.0.1',
     RELAY_LOCAL_PORT: 443,
@@ -115,7 +115,7 @@ const buildHarness = async (overrides: Partial<ApiConfig> = {}): Promise<Harness
     PUBLIC_RUNNER_URL: 'ws://127.0.0.1:4300',
     WORKSPACE_IMAGE_REVISION: 'dev',
     WEBAUTHN_RP_ID: 'localhost',
-    WEBAUTHN_RP_NAME: 'athanor Test',
+    WEBAUTHN_RP_NAME: 'garden Test',
     WEBAUTHN_ORIGIN: 'http://localhost:5173',
     ALLOW_INSECURE_DEV_AUTH: true,
     WORKER_ID: 'shares-test-worker',
@@ -203,7 +203,7 @@ const buildHarness = async (overrides: Partial<ApiConfig> = {}): Promise<Harness
         kind,
         summary: `Encrypted ${kind.replaceAll('_', ' ')} event`,
         payloadCiphertext: encryptJson(
-          { __athanorEventVersion: 1, summary, payload },
+          { __gardenEventVersion: 1, summary, payload },
           owner.key,
           `task-event:${taskId}`
         )
@@ -211,7 +211,7 @@ const buildHarness = async (overrides: Partial<ApiConfig> = {}): Promise<Harness
     },
     artifact: async (taskId, name, mimeType, bytes) => {
       artifacts += 1;
-      const storageKey = `.athanor/artifacts/${artifacts}-${name}`;
+      const storageKey = `.garden/artifacts/${artifacts}-${name}`;
       artifactBytes.set(storageKey, bytes);
       const row = await store.createArtifact({
         userId: owner.userId,
@@ -330,7 +330,7 @@ const seedConversation = async (harness: Harness, taskId: string) => {
     }
   );
   await harness.event(taskId, 'preview', 'Preview published', {
-    url: 'https://box.example/__athanor/preview/abc?access=PREVIEW-TOKEN-MARKER'
+    url: 'https://box.example/__garden/preview/abc?access=PREVIEW-TOKEN-MARKER'
   });
   await harness.event(taskId, 'assistant_message', 'Revenue rose 4%', {
     markdown: 'Revenue rose **4%** quarter on quarter.'
@@ -641,7 +641,7 @@ describe('the public side of a share link', () => {
       const withCookie = await harness.app.inject({
         method: 'GET',
         url: path,
-        headers: { cookie: `athanor_session=${sessionToken}` }
+        headers: { cookie: `garden_session=${sessionToken}` }
       });
       expect(withCookie.headers['set-cookie'], path).toBeUndefined();
       expect(withCookie.statusCode, path).toBe(anonymous.statusCode);
@@ -691,7 +691,7 @@ describe('the public side of a share link', () => {
 
 describe('the viewer the page loads', () => {
   it('serves the built script and stylesheet under a digest the page names', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-share-viewer-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-share-viewer-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     await writeFile(join(directory, 'share.js'), 'console.log("viewer")');
     await writeFile(join(directory, 'share.css'), 'main{color:red}');
@@ -727,7 +727,7 @@ describe('the viewer the page loads', () => {
   });
 
   it('still serves the page when the viewer is not built, and says so in the asset version', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-share-noviewer-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-share-noviewer-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const harness = await buildHarness({ SHARE_VIEWER_DIR: directory });
     const taskId = await harness.task();
@@ -1005,7 +1005,7 @@ describe("the owner's side", () => {
       mimeType: 'text/plain',
       sizeBytes: 1,
       sha256: sha256('x'),
-      storageKey: '.athanor/artifacts/x'
+      storageKey: '.garden/artifacts/x'
     });
     const crossed = await createShare(harness, ownTask, {
       artifactIds: [String(foreignArtifact.id)]

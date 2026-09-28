@@ -3,7 +3,7 @@ set -eu
 
 workspace_root="${1:?workspace root is required}"
 display_number="${2:?display number is required}"
-state_dir="$workspace_root/.athanor/desktop"
+state_dir="$workspace_root/.garden/desktop"
 environment_file="$state_dir/environment"
 
 for desktop_binary in /usr/bin/Xvfb /usr/bin/xdpyinfo /usr/bin/dbus-run-session /usr/bin/xauth; do
@@ -28,13 +28,13 @@ valid_resolution() {
 # the runner resizes down to follow whoever is watching. 3840x2160 is a 33 MB lazily faulted
 # mapping; the 15360x8640 seen in other projects is half a gigabyte of virtual address space
 # for no benefit.
-: "${ATHANOR_MAX_RES:=3840x2160}"
-: "${ATHANOR_BOOT_RES:=1280x800}"
-: "${ATHANOR_KEYBOARD_LAYOUT:=us}"
-valid_resolution "$ATHANOR_MAX_RES" || ATHANOR_MAX_RES=3840x2160
-valid_resolution "$ATHANOR_BOOT_RES" || ATHANOR_BOOT_RES=1280x800
-case "$ATHANOR_KEYBOARD_LAYOUT" in
-*[!a-z0-9,_-]*) ATHANOR_KEYBOARD_LAYOUT=us ;;
+: "${GARDEN_MAX_RES:=3840x2160}"
+: "${GARDEN_BOOT_RES:=1280x800}"
+: "${GARDEN_KEYBOARD_LAYOUT:=us}"
+valid_resolution "$GARDEN_MAX_RES" || GARDEN_MAX_RES=3840x2160
+valid_resolution "$GARDEN_BOOT_RES" || GARDEN_BOOT_RES=1280x800
+case "$GARDEN_KEYBOARD_LAYOUT" in
+*[!a-z0-9,_-]*) GARDEN_KEYBOARD_LAYOUT=us ;;
 esac
 
 # X11 and D-Bus sockets belong on a tmpfs. A workspace directory is the last resort: it may be
@@ -46,7 +46,7 @@ elif [ -w "/run/user/$(id -u)" ]; then
   runtime_parent="/run/user/$(id -u)"
 fi
 if [ -n "$runtime_parent" ]; then
-  runtime_dir="$runtime_parent/athanor-desktop-$display_number"
+  runtime_dir="$runtime_parent/garden-desktop-$display_number"
 else
   runtime_dir="$state_dir/run"
 fi
@@ -74,7 +74,7 @@ printf 'add %s MIT-MAGIC-COOKIE-1 %s\n' "$DISPLAY" "$authority_cookie" | /usr/bi
 unset authority_cookie
 mv -f "$authority_file" "$XAUTHORITY"
 export XDG_RUNTIME_DIR="$runtime_dir"
-export ATHANOR_MAX_RES ATHANOR_BOOT_RES ATHANOR_KEYBOARD_LAYOUT
+export GARDEN_MAX_RES GARDEN_BOOT_RES GARDEN_KEYBOARD_LAYOUT
 export NO_AT_BRIDGE=0
 export GTK_MODULES="gail:atk-bridge"
 export QT_ACCESSIBILITY=1
@@ -98,7 +98,7 @@ exec /usr/bin/dbus-run-session -- /bin/sh -c '
   # DAMAGE and XFIXES back the capture and cursor paths, MIT-SHM keeps a full-screen fetch a
   # single memcpy, and RANDR is how the display follows the client viewport.
   /usr/bin/Xvfb "$DISPLAY" -auth "$XAUTHORITY" \
-    -screen 0 "${ATHANOR_MAX_RES}x24" \
+    -screen 0 "${GARDEN_MAX_RES}x24" \
     +extension RANDR +extension DAMAGE +extension XFIXES +extension MIT-SHM \
     +extension Composite \
     -dpi 96 -nolisten tcp -nolisten local -noreset &
@@ -128,22 +128,22 @@ exec /usr/bin/dbus-run-session -- /bin/sh -c '
   }
   # Printable keys are injected as keycodes and resolved by the server layout, so dead keys,
   # AltGr and non-US layouts only work if this matches the human at the other end.
-  /usr/bin/setxkbmap -display "$DISPLAY" "$ATHANOR_KEYBOARD_LAYOUT" >/dev/null 2>&1 || true
+  /usr/bin/setxkbmap -display "$DISPLAY" "$GARDEN_KEYBOARD_LAYOUT" >/dev/null 2>&1 || true
   # A null sink, not because anything streams audio yet, but because GUI applications that
   # cannot open any audio device log continuously and some of them stall on startup.
   if command -v pulseaudio >/dev/null 2>&1; then
     if pulseaudio --start --exit-idle-time=-1 >/dev/null 2>&1; then
       audio_started=true
-      pactl load-module module-null-sink sink_name=athanor >/dev/null 2>&1 || true
+      pactl load-module module-null-sink sink_name=garden >/dev/null 2>&1 || true
     fi
   fi
   /usr/libexec/at-spi-bus-launcher --launch-immediately >/dev/null 2>&1 &
   atspi_pid=$!
   /usr/bin/openbox-session >/dev/null 2>&1 &
   openbox_pid=$!
-  printf "DISPLAY=%s\nXAUTHORITY=%s\nDBUS_SESSION_BUS_ADDRESS=%s\nXDG_RUNTIME_DIR=%s\nATHANOR_MAX_RES=%s\nATHANOR_BOOT_RES=%s\nATHANOR_KEYBOARD_LAYOUT=%s\n" \
+  printf "DISPLAY=%s\nXAUTHORITY=%s\nDBUS_SESSION_BUS_ADDRESS=%s\nXDG_RUNTIME_DIR=%s\nGARDEN_MAX_RES=%s\nGARDEN_BOOT_RES=%s\nGARDEN_KEYBOARD_LAYOUT=%s\n" \
     "$DISPLAY" "$XAUTHORITY" "$DBUS_SESSION_BUS_ADDRESS" "$XDG_RUNTIME_DIR" \
-    "$ATHANOR_MAX_RES" "$ATHANOR_BOOT_RES" "$ATHANOR_KEYBOARD_LAYOUT" > "$1"
+    "$GARDEN_MAX_RES" "$GARDEN_BOOT_RES" "$GARDEN_KEYBOARD_LAYOUT" > "$1"
   chmod 0600 "$1"
   wait "$xvfb_pid"
-' athanor-desktop-session "$environment_file"
+' garden-desktop-session "$environment_file"

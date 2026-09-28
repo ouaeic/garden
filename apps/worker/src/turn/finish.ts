@@ -1,9 +1,9 @@
 import { waitForQuestion } from '../questions.js';
 /** Validate completion evidence, plan coverage, acceptance and delivery before ending the turn. */
-import type { ModelToolCall } from '@athanor/model-gateway';
-import type { TaskRecord } from '@athanor/data';
-import { deliveryFilePath, mediaDeliveryState } from '@athanor/contracts';
-import type { MemoryDeadEndCheck } from '@athanor/core';
+import type { ModelToolCall } from '@garden/model-gateway';
+import type { TaskRecord } from '@garden/data';
+import { deliveryFilePath, mediaDeliveryState } from '@garden/contracts';
+import type { MemoryDeadEndCheck } from '@garden/core';
 import {
   acceptanceFailureMessage,
   acceptanceObservation,
@@ -21,7 +21,7 @@ import {
   observedCommands,
   type CompletionVerification
 } from '../completion.js';
-import type { DataStore } from '@athanor/data';
+import type { DataStore } from '@garden/data';
 import { event } from '../tool-recording.js';
 import {
   ACCEPTANCE_COULD_NOT_RUN_CAVEAT,
@@ -106,7 +106,7 @@ export const handleFinishCall = async (
    *
    * So the completion stands and the doubt travels with it: the turn finishes, and what
    * could not be established is carried into `remainingRisks`, where the completion card
-   * already shows it. The owner sees what was made and is told plainly that athanor could
+   * already shows it. The owner sees what was made and is told plainly that garden could
    * not prove it.
    */
   // Later plan, acceptance and delivery holds share this budget across persisted retries.
@@ -173,7 +173,7 @@ export const handleFinishCall = async (
     });
     return 'held';
   }
-  // Nothing in athanor ever ran a check that could fail on the work itself. A finish cited a
+  // Nothing in garden ever ran a check that could fail on the work itself. A finish cited a
   // successful call ordered after the last change, which any read of the file just written
   // satisfies. If this turn changed something, it has to say what would prove it - once.
   //
@@ -217,7 +217,7 @@ export const handleFinishCall = async (
    * An unverifiable finish still completes, and says so in the one sentence the owner can
    * do something with.
    *
-   * It used to carry `checked.reason` and the attempt count: "athanor could not confirm
+   * It used to carry `checked.reason` and the attempt count: "garden could not confirm
    * this completion after 3 attempts: Every cited result predates file_write (call-2)...
    * Cite call-2 itself if its output shows the outcome". That is the harness talking to the
    * model, printed at somebody who cannot cite anything, in the place that should say what
@@ -230,7 +230,7 @@ export const handleFinishCall = async (
         status: 'unverified',
         evidence: [],
         remainingRisks: [
-          'athanor could not tie this result to anything it did, so check it before relying on it.'
+          'garden could not tie this result to anything it did, so check it before relying on it.'
         ]
       };
   let acceptanceEvidence: string[] = [];
@@ -276,7 +276,7 @@ export const handleFinishCall = async (
    * honest report of a turn that ran no checks.
    */
   if (state.acceptance && state.mode !== 'plan') {
-    // Carrying what athanor has already run, so a check naming a command it executed
+    // Carrying what garden has already run, so a check naming a command it executed
     // itself after the last change is answered by that run rather than by a second build.
     const results = await deps.runAcceptanceChecks(
       task,
@@ -410,7 +410,7 @@ export const handleFinishCall = async (
      *
      * Both of these sentences are about a tick that is worth less than it looks, and neither of
      * them is true when there is no tick. Reaching this line with failures means the branch above
-     * has just run: the status is downgraded and the completion already carries athanor's own
+     * has just run: the status is downgraded and the completion already carries garden's own
      * sentence saying the checks did not pass. Written beside that, "These checks were already
      * passing before this job started, so passing them says nothing about it" describes a passing
      * run that did not happen, and "they show nothing broke" says the opposite of the four

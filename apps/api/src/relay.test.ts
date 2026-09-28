@@ -2,7 +2,7 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import type { RelayStatus } from '@athanor/relay-client';
+import type { RelayStatus } from '@garden/relay-client';
 import type { ApiConfig } from './config.js';
 import { silentLogger } from './log.js';
 import {
@@ -145,7 +145,7 @@ const supervisorOn = (
 
 describe('a box ships with no relay', () => {
   test('makes no connection and advertises no relay address until it is told to', async () => {
-    const directory = await temporaryDirectory('athanor-relay-off-');
+    const directory = await temporaryDirectory('garden-relay-off-');
     const links: FakeLink[] = [];
     const relay = supervisorOn(directory, links);
     await relay.start();
@@ -159,7 +159,7 @@ describe('a box ships with no relay', () => {
   });
 
   test('reads a torn or hand-edited settings file as off rather than as a live relay', async () => {
-    const directory = await temporaryDirectory('athanor-relay-torn-');
+    const directory = await temporaryDirectory('garden-relay-torn-');
     await writeFile(join(directory, 'settings.json'), '{"enabled": true, "host": ');
     const links: FakeLink[] = [];
     const relay = supervisorOn(directory, links);
@@ -169,9 +169,9 @@ describe('a box ships with no relay', () => {
   });
 
   test('will not dial an enrollment that carries no pinned relay key', async () => {
-    const directory = await temporaryDirectory('athanor-relay-unpinned-');
+    const directory = await temporaryDirectory('garden-relay-unpinned-');
     // Exactly what a settings file written before pinning existed, or edited by hand through the
-    // `jq` path in `scripts/athanor`, parses to: enabled, addressable, and trusting nobody.
+    // `jq` path in `scripts/garden`, parses to: enabled, addressable, and trusting nobody.
     await writeFile(
       join(directory, 'settings.json'),
       JSON.stringify({ enabled: true, host: 'relay.example.com', label: 'abc' })
@@ -235,7 +235,7 @@ describe('turning the relay on', () => {
   );
 
   test('records the label and the pinned relay key, and dials', async () => {
-    const directory = await temporaryDirectory('athanor-relay-on-');
+    const directory = await temporaryDirectory('garden-relay-on-');
     const links: FakeLink[] = [];
     const relay = supervisorOn(directory, links);
     await relay.start();
@@ -260,7 +260,7 @@ describe('turning the relay on', () => {
   });
 
   test('comes back on after a restart without being told again', async () => {
-    const directory = await temporaryDirectory('athanor-relay-restart-');
+    const directory = await temporaryDirectory('garden-relay-restart-');
     const first = supervisorOn(directory, []);
     await first.start();
     await first.enroll({ host: 'relay.example.com', token: 'arly1_token' });
@@ -275,7 +275,7 @@ describe('turning the relay on', () => {
   });
 
   test('writes the live state where a root shell can read it', async () => {
-    const directory = await temporaryDirectory('athanor-relay-status-');
+    const directory = await temporaryDirectory('garden-relay-status-');
     const relay = supervisorOn(directory, []);
     await relay.start();
     await relay.enroll({ host: 'relay.example.com', token: 'arly1_token' });
@@ -283,7 +283,7 @@ describe('turning the relay on', () => {
       state: string;
       hostname: string;
     };
-    // `athanor doctor` has no session and still has to be able to say what the relay is doing.
+    // `garden doctor` has no session and still has to be able to say what the relay is doing.
     expect(status.state).toBe('online');
     expect(status.hostname).toBe('label-for-relay.example.com.relay.example.com');
   });
@@ -291,7 +291,7 @@ describe('turning the relay on', () => {
 
 describe('turning the relay off', () => {
   test('closes the connection and stops advertising the address', async () => {
-    const directory = await temporaryDirectory('athanor-relay-off-again-');
+    const directory = await temporaryDirectory('garden-relay-off-again-');
     const links: FakeLink[] = [];
     const relay = supervisorOn(directory, links);
     await relay.start();
@@ -316,7 +316,7 @@ describe('turning the relay off', () => {
   });
 
   test('applies two changes one at a time rather than leaving a connection adrift', async () => {
-    const directory = await temporaryDirectory('athanor-relay-race-');
+    const directory = await temporaryDirectory('garden-relay-race-');
     const links: FakeLink[] = [];
     const relay = supervisorOn(directory, links);
     await relay.start();
@@ -332,7 +332,7 @@ describe('turning the relay off', () => {
   });
 
   test('a revoked enrollment stops being advertised, on disk as well as in memory', async () => {
-    const directory = await temporaryDirectory('athanor-relay-revoked-');
+    const directory = await temporaryDirectory('garden-relay-revoked-');
     const links: FakeLink[] = [];
     const relay = supervisorOn(directory, links);
     await relay.start();
@@ -349,7 +349,7 @@ describe('turning the relay off', () => {
       'https://203.0.113.9'
     ]);
 
-    // `athanor-network-refresh` reads the settings file and nothing else, so a revocation that
+    // `garden-network-refresh` reads the settings file and nothing else, so a revocation that
     // lived only in memory would leave the address in the connection manifest anyway.
     expect((await readRelaySettings(directory)).revokedAt).not.toBeNull();
     // And it survives a restart: the status file has not been read yet at that point, so without
@@ -358,14 +358,14 @@ describe('turning the relay off', () => {
     await restarted.start();
     expect(restarted.publicHostname()).toBeNull();
 
-    // `athanor doctor` still has to be able to say revoked rather than "off, and that is fine",
+    // `garden doctor` still has to be able to say revoked rather than "off, and that is fine",
     // and that branch is only reached while the settings say the relay is switched on.
     expect(restarted.report().enabled).toBe(true);
     expect(restarted.report().label).toBe('label-for-relay.example.com');
   });
 
   test('enrolling again with a fresh token clears the revocation', async () => {
-    const directory = await temporaryDirectory('athanor-relay-reenroll-');
+    const directory = await temporaryDirectory('garden-relay-reenroll-');
     const links: FakeLink[] = [];
     const relay = supervisorOn(directory, links);
     await relay.start();
@@ -381,7 +381,7 @@ describe('turning the relay off', () => {
   });
 
   test('forgetting the relay clears the host, the label and the pin', async () => {
-    const directory = await temporaryDirectory('athanor-relay-forget-');
+    const directory = await temporaryDirectory('garden-relay-forget-');
     const relay = supervisorOn(directory, []);
     await relay.start();
     await relay.enroll({ host: 'relay.example.com', token: 'arly1_token' });
@@ -439,7 +439,7 @@ const testConfig = (directory: string): ApiConfig => ({
   DEPLOYMENT_MODE: 'development',
   MODEL_CATALOG_SCOPE: 'provider_catalog',
   CONNECTION_MANIFEST_PATH: join(directory, 'connection.json'),
-  ATHANOR_STATE_PATH: directory,
+  GARDEN_STATE_PATH: directory,
   RELAY_STATE_DIR: join(directory, 'relay'),
   RELAY_LOCAL_HOST: '127.0.0.1',
   RELAY_LOCAL_PORT: 8443,
@@ -462,7 +462,7 @@ const testConfig = (directory: string): ApiConfig => ({
   PUBLIC_RUNNER_URL: 'ws://127.0.0.1:4300',
   WORKSPACE_IMAGE_REVISION: 'dev',
   WEBAUTHN_RP_ID: 'localhost',
-  WEBAUTHN_RP_NAME: 'athanor Test',
+  WEBAUTHN_RP_NAME: 'garden Test',
   WEBAUTHN_ORIGIN: 'http://localhost:5173',
   ALLOW_INSECURE_DEV_AUTH: true,
   WORKER_ID: 'relay-test-worker',
@@ -488,7 +488,7 @@ const testConfig = (directory: string): ApiConfig => ({
 
 describe('the relay routes an owner uses', () => {
   test('enroll, appear in a device ticket, then disappear when switched off', async () => {
-    const directory = await temporaryDirectory('athanor-relay-api-');
+    const directory = await temporaryDirectory('garden-relay-api-');
     await writeFile(
       join(directory, 'connection.json'),
       JSON.stringify({ endpoints: ['https://203.0.113.9'], identity: 'sha256/box' })
@@ -538,7 +538,7 @@ describe('the relay routes an owner uses', () => {
     });
     const decode = (uri: string): Record<string, unknown> =>
       JSON.parse(
-        Buffer.from(uri.replace(/^(?:garden|athanor):\/\/pair\//, ''), 'base64url').toString('utf8')
+        Buffer.from(uri.replace(/^garden:\/\/pair\//, ''), 'base64url').toString('utf8')
       ) as Record<string, unknown>;
     const ticket = decode(ticketOn.json<{ uri: string }>().uri);
     expect(ticket.endpoints).toEqual([
@@ -561,7 +561,7 @@ describe('the relay routes an owner uses', () => {
     ]);
     expect(ticket.version).toBe(2);
     expect(ticket.identity).toBe('sha256/box');
-    expect(ticket.discovery).toEqual({ mdnsService: '_athanor._tcp.local', mdnsPort: 443 });
+    expect(ticket.discovery).toEqual({ mdnsService: '_garden._tcp.local', mdnsPort: 443 });
     // Between 20 and 128 characters of base64url, which is the code the client will accept.
     expect(ticket.pairingCode).toMatch(/^[A-Za-z0-9_-]{20,128}$/);
     // Whole seconds since the epoch, and still in the future, so the client can say "expired"

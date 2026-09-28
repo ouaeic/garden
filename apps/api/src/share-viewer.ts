@@ -18,9 +18,9 @@
 
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { sha256 } from '@athanor/core';
+import { sha256 } from '@garden/core';
 
-export const SHARE_PAGE_TITLE = 'A shared athanor conversation';
+export const SHARE_PAGE_TITLE = 'A shared garden conversation';
 
 /**
  * Sent with the viewer page. Listed as pairs so the tests can assert every one of them by name

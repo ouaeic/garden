@@ -1733,7 +1733,7 @@ describe('forcedGitPush and isScheduledExecutionPath', () => {
     for (const path of [
       '/etc/cron.d/job',
       '/etc/cron.daily/backup',
-      '/var/spool/cron/crontabs/athanor',
+      '/var/spool/cron/crontabs/garden',
       '/etc/systemd/system/tracker.service',
       '~/.config/systemd/user/tracker.service',
       '/etc/profile.d/path.sh',
@@ -1795,7 +1795,7 @@ describe('what a rewind puts back', () => {
       './server.log',
       'workspace/tmp.log',
       'workspace/downloads/*.dmg',
-      '.athanor/artifacts/report.pdf',
+      '.garden/artifacts/report.pdf',
       "'workspace/quoted path'",
       // Through HOME and back out of it. This is `<root>/workspace/tracker/target` however far
       // round the houses the spelling goes, and it is the counter-direction for the `~` segment:
@@ -1814,10 +1814,10 @@ describe('what a rewind puts back', () => {
       '~/.bashrc',
       // These two were asserted RECOVERABLE here while `~` was read as the workspace root, which
       // was true only while HOME was the root. They are `<root>/.home/workspace/tracker/target` and
-      // `<root>/.home/.athanor/artifacts/report.pdf`: directories the agent can create under its own
+      // `<root>/.home/.garden/artifacts/report.pdf`: directories the agent can create under its own
       // HOME, wearing the two prefixes that mean "recoverable", inside nothing a rewind walks.
       '~/workspace/tracker/target',
-      '~/.athanor/artifacts/report.pdf',
+      '~/.garden/artifacts/report.pdf',
       // Climbing out of `workspace/`, and out of the root altogether.
       '../secrets',
       '../../etc/nginx',
@@ -1829,7 +1829,7 @@ describe('what a rewind puts back', () => {
       // The checkpoint roots are not inside themselves.
       'workspace',
       '~/workspace',
-      '.athanor/artifacts',
+      '.garden/artifacts',
       // Somebody else's home, and an expansion this cannot see.
       '~root/.ssh',
       '$HOME/.ssh',
@@ -1852,8 +1852,8 @@ describe('what a rewind puts back', () => {
     expect(insideCheckpointContent('.ssh', '.')).toBe(false);
     expect(insideCheckpointContent('dist', '.')).toBe(false);
     expect(insideCheckpointContent('.ssh', '')).toBe(false);
-    expect(insideCheckpointContent('x', '.athanor')).toBe(false);
-    expect(insideCheckpointContent('x', '.athanor/artifacts')).toBe(true);
+    expect(insideCheckpointContent('x', '.garden')).toBe(false);
+    expect(insideCheckpointContent('x', '.garden/artifacts')).toBe(true);
     expect(insideCheckpointContent('x', '~')).toBe(false);
     expect(insideCheckpointContent('x', '/etc')).toBe(false);
   });
@@ -1904,7 +1904,7 @@ describe('what a rewind puts back', () => {
   /*
    * The `~` hole again, in the other argument.
    *
-   * `workspace/…` and `.athanor/…` are read from the workspace root because from a cwd inside a
+   * `workspace/…` and `.garden/…` are read from the workspace root because from a cwd inside a
    * checkpointed tree the two readings are both recoverable and the divergence cannot change the
    * answer. From a cwd that is NOT, the root-relative reading answers about a different place
    * entirely: `cwd: '.home'` with `workspace/dist` removes `<root>/.home/workspace/dist`, a
@@ -1915,10 +1915,10 @@ describe('what a rewind puts back', () => {
    */
   it('reads the root-relative spelling only from a cwd where it means the same place', () => {
     expect(insideCheckpointContent('workspace/dist', '.home')).toBe(false);
-    expect(insideCheckpointContent('.athanor/artifacts/report.pdf', '.home')).toBe(false);
+    expect(insideCheckpointContent('.garden/artifacts/report.pdf', '.home')).toBe(false);
     expect(insideCheckpointContent('workspace/dist', '.home/tools')).toBe(false);
-    // `.athanor` alone is not `.athanor/artifacts`, and only the second is checkpointed.
-    expect(insideCheckpointContent('workspace/dist', '.athanor')).toBe(false);
+    // `.garden` alone is not `.garden/artifacts`, and only the second is checkpointed.
+    expect(insideCheckpointContent('workspace/dist', '.garden')).toBe(false);
     // The counter-direction, and it is documentation rather than a pin: from the container root
     // the two readings ARE one path, and from inside a checkpointed tree the literal reading lands
     // inside that same tree, so these answer true however the condition above is mutated. Nothing
@@ -1928,8 +1928,8 @@ describe('what a rewind puts back', () => {
     expect(insideCheckpointContent('workspace/dist', '')).toBe(true);
     expect(insideCheckpointContent('workspace/dist', 'workspace')).toBe(true);
     expect(insideCheckpointContent('workspace/dist', 'workspace/tracker')).toBe(true);
-    expect(insideCheckpointContent('.athanor/artifacts/a.png', 'workspace')).toBe(true);
-    expect(insideCheckpointContent('workspace/dist', '.athanor/artifacts')).toBe(true);
+    expect(insideCheckpointContent('.garden/artifacts/a.png', 'workspace')).toBe(true);
+    expect(insideCheckpointContent('workspace/dist', '.garden/artifacts')).toBe(true);
   });
 
   /*
@@ -1957,14 +1957,14 @@ describe('what a rewind puts back', () => {
    *
    * It was the root, and this file read `~` as the root because of it. When HOME moved to
    * `<workspaceRoot>/.home`, that reading became a hole rather than an approximation: `~/workspace`
-   * and `~/.athanor/artifacts` are the two prefixes that answer "recoverable", and read against the
+   * and `~/.garden/artifacts` are the two prefixes that answer "recoverable", and read against the
    * root they answered it for a directory the checkpoint has never walked. Measured through
    * `approvalRequirement` in autonomous before the segment was added: `rm -rf ~/workspace/dist` and
-   * `rm -rf ~/.athanor/artifacts/a.png` were FREE.
+   * `rm -rf ~/.garden/artifacts/a.png` were FREE.
    */
   it('reads ~ as the agent HOME rather than as the workspace root', () => {
     expect(insideCheckpointContent('~/workspace/dist')).toBe(false);
-    expect(insideCheckpointContent('~/.athanor/artifacts/a.png')).toBe(false);
+    expect(insideCheckpointContent('~/.garden/artifacts/a.png')).toBe(false);
     // Unmoved by the change, and named so a later reader can see the segment costs nothing here:
     // these were outside the checkpoint under either reading of `~`.
     expect(insideCheckpointContent('~/.ssh')).toBe(false);
@@ -2197,7 +2197,7 @@ describe('which git subcommands change the tree', () => {
  * answers where a delete lands; this answers whether what lands there comes back.
  */
 describe('what the checkpoint walked past', () => {
-  const weights = ['workspace/models/llama.gguf', '.athanor/artifacts/recording.mov'];
+  const weights = ['workspace/models/llama.gguf', '.garden/artifacts/recording.mov'];
 
   it('reaches an uncovered file through the directories above it', () => {
     for (const [target, cwd] of [
@@ -2206,8 +2206,8 @@ describe('what the checkpoint walked past', () => {
       ['llama.gguf', 'workspace/models'],
       ['workspace/models', 'workspace'],
       ['workspace', 'workspace'],
-      ['.athanor/artifacts/recording.mov', 'workspace'],
-      ['.athanor/artifacts', 'workspace']
+      ['.garden/artifacts/recording.mov', 'workspace'],
+      ['.garden/artifacts', 'workspace']
     ] as const)
       expect(removesUncoveredFile(target, cwd, weights), `${target} from ${cwd}`).toBe(true);
   });
@@ -2383,7 +2383,7 @@ describe('a command carried into another box', () => {
  * Measured against the shipped predicate before the repair: the plain spelling was quarantined and
  * `workspace/./downloads/...` and `workspace//downloads/...` were not, while all three open the
  * same bytes. The consequence of landing on the clean side is not abstract - it is no egress
- * charge, no card on a write to ATHANOR.md and no card on a read of any host, for a turn that has
+ * charge, no card on a write to GARDEN.md and no card on a read of any host, for a turn that has
  * read content somebody else wrote.
  */
 describe('the paths the quarantine rule treats as downloaded', () => {

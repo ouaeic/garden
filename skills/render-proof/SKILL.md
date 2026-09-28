@@ -2,13 +2,13 @@
 name: render-proof
 description: Prove that a generated .docx, .pptx, .xlsx or PDF actually looks right: declare the render acceptance check the harness measures for itself, validate the file's structure, render every page to an image, scan for placeholder text, missing fonts and content that never arrived, then look at the pages for the faults no measurement catches. Use before building any visual deliverable and again before showing it to the owner. Do not use for plain text, Markdown, JSON or source code, which have no rendered form.
 license: AGPL-3.0-or-later
-compatibility: Every tool named here is installed on this computer by athanor - athanor-office-convert, typst, poppler-utils, qpdf, and the interpreter at /usr/local/lib/athanor/python/bin/python3.
+compatibility: Every tool named here is installed on this computer by garden - garden-office-convert, typst, poppler-utils, qpdf, and the interpreter at /usr/local/lib/garden/python/bin/python3.
 allowed-tools: shell file_read files_list document_read image_read set_acceptance publish_artifact
 metadata:
-  athanor.tier: 'builtin'
-  athanor.version: '2.3.0'
-  athanor.risk: 'workspace'
-  athanor.domain: 'output-quality'
+  garden.tier: 'builtin'
+  garden.version: '2.3.0'
+  garden.risk: 'workspace'
+  garden.domain: 'output-quality'
 ---
 
 # Render proof
@@ -20,10 +20,10 @@ through it before the owner sees it.
 
 Two names are used throughout and there is no alternative to either:
 
-- **`athanor-office-convert IN OUT`** converts a Word, PowerPoint or Excel file. The target format
+- **`garden-office-convert IN OUT`** converts a Word, PowerPoint or Excel file. The target format
   comes from the output extension. It exits non-zero when the bytes are not there, which bare
   LibreOffice does not.
-- **`/usr/local/lib/athanor/python/bin/python3`** is the Python that has python-pptx, python-docx,
+- **`/usr/local/lib/garden/python/bin/python3`** is the Python that has python-pptx, python-docx,
   openpyxl, pandas, matplotlib, Pillow and pypdf. Plain `python3` does not have pypdf. Write the
   path out in full every time.
 
@@ -53,12 +53,12 @@ that drew it was on the page — and that is what check 1 of stage 3 is for.
 
 ## Stage 1 — structural validation
 
-| Artifact          | Command                                                                                                                                                                 | Failure                        |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| PDF               | `qpdf --check out.pdf`                                                                                                                                                  | any error line, or exit 2      |
-| .docx/.pptx/.xlsx | `/usr/local/lib/athanor/python/bin/python3 -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1]); print(z.testzip(), '[Content_Types].xml' in z.namelist())" out.docx` | non-`None` testzip, or `False` |
-| .xlsx             | reopen with `openpyxl.load_workbook(path)` and with `load_workbook(path, data_only=True)`                                                                               | either raises                  |
-| Typst source      | `typst compile in.typ out.pdf`                                                                                                                                          | non-zero exit, or any warning  |
+| Artifact          | Command                                                                                                                                                                | Failure                        |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| PDF               | `qpdf --check out.pdf`                                                                                                                                                 | any error line, or exit 2      |
+| .docx/.pptx/.xlsx | `/usr/local/lib/garden/python/bin/python3 -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1]); print(z.testzip(), '[Content_Types].xml' in z.namelist())" out.docx` | non-`None` testzip, or `False` |
+| .xlsx             | reopen with `openpyxl.load_workbook(path)` and with `load_workbook(path, data_only=True)`                                                                              | either raises                  |
+| Typst source      | `typst compile in.typ out.pdf`                                                                                                                                         | non-zero exit, or any warning  |
 
 A convergence warning from Typst means the layout never stabilised. Treat it as a failure, not a
 warning: the page you get is not the page the source describes.
@@ -68,7 +68,7 @@ warning: the page you get is not the page the source describes.
 Everything goes down one path: to a PDF first, then to JPEGs.
 
 ```
-athanor-office-convert out.docx proofs/out.pdf     # .docx, .pptx and .xlsx all go this way
+garden-office-convert out.docx proofs/out.pdf     # .docx, .pptx and .xlsx all go this way
 typst compile report.typ proofs/out.pdf            # Typst source
 pdftoppm -jpeg -r 120 proofs/out.pdf proofs/p
 ```

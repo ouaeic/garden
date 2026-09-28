@@ -1,5 +1,5 @@
 /**
- * The edit axis on athanor's own wire: a transport built from the worker's gateway.
+ * The edit axis on garden's own wire: a transport built from the worker's gateway.
  *
  * `live.ts` posts to one route with a bare `fetch`, which is right for the general half - it is
  * measuring what an arm carries, and the client is not the thing under test. The edit axis is
@@ -103,7 +103,7 @@ export const gatewayTransport = (env: Environment = process.env): Transport => {
       provider: providerName,
       privacyRoute: credential.enforceZeroDataRetention ? 'provider_zdr' : 'external',
       appUrl: 'http://localhost:5173',
-      appTitle: 'athanor',
+      appTitle: 'garden',
       enforceZeroDataRetention: credential.enforceZeroDataRetention,
       fetch: globalThis.fetch
     })

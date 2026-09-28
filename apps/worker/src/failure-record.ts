@@ -1,5 +1,5 @@
-import { AthanorError, redactText } from '@athanor/core';
-import { TASK_MAX_ATTEMPTS } from '@athanor/data';
+import { GardenError, redactText } from '@garden/core';
+import { TASK_MAX_ATTEMPTS } from '@garden/data';
 import type { LogFields, LogLevel } from './log.js';
 
 /** How many stacks are remembered before the set is emptied and one of them may repeat. */
@@ -13,11 +13,11 @@ const MACHINE_WORD = /^[A-Za-z0-9_.-]{1,64}$/;
 
 /**
  * The identity of a failure without its wording: a driver's SQLSTATE or a system errno where the
- * thrown value carries one, otherwise the class that was thrown. Null for an AthanorError, whose
+ * thrown value carries one, otherwise the class that was thrown. Null for an GardenError, whose
  * code already says what it is.
  */
 const failureClass = (error: unknown): string | null => {
-  if (error instanceof AthanorError) return null;
+  if (error instanceof GardenError) return null;
   const carried = (error as { code?: unknown } | null)?.code;
   if (typeof carried === 'string' && MACHINE_WORD.test(carried)) return carried;
   // `name` is a class name in every error anyone writes, but it is an ordinary writable property
@@ -29,7 +29,7 @@ const failureClass = (error: unknown): string | null => {
 /**
  * The code, if it is one.
  *
- * An AthanorError's code is athanor's own vocabulary everywhere it is written by hand - but not
+ * An GardenError's code is garden's own vocabulary everywhere it is written by hand - but not
  * everywhere it is constructed. `runnerFailure` in runner-client.ts mints one from the `code` field
  * of whatever JSON the workspace runner answered with, and that is a value off a wire rather than
  * out of this repository: unbounded, free to carry a newline that would split this record in two,
@@ -37,7 +37,7 @@ const failureClass = (error: unknown): string | null => {
  * on the line, and where it does not fit the line still says a task failed and how far it got.
  */
 const failureCode = (error: unknown): string => {
-  if (!(error instanceof AthanorError)) return 'agent_failed';
+  if (!(error instanceof GardenError)) return 'agent_failed';
   return MACHINE_WORD.test(error.code) ? error.code : 'agent_failed';
 };
 
@@ -69,7 +69,7 @@ const failureStack = (error: unknown): string => {
 };
 
 /**
- * The identity of a failure that is not a task's, in the same words a failed task uses: athanor's
+ * The identity of a failure that is not a task's, in the same words a failed task uses: garden's
  * own code where it has one, otherwise the driver's SQLSTATE, the system errno or the class that
  * was thrown - and the frames, which name code locations and never what flowed through them.
  */
@@ -77,7 +77,7 @@ export const failureFields = (error: unknown): LogFields => {
   const kind = failureClass(error);
   const stack = kind ? failureStack(error) : '';
   return {
-    code: error instanceof AthanorError ? failureCode(error) : (kind ?? 'unknown'),
+    code: error instanceof GardenError ? failureCode(error) : (kind ?? 'unknown'),
     ...(stack ? { frames: stack } : {})
   };
 };
@@ -106,8 +106,8 @@ export interface TaskFailureLog {
  * offending value back, a filesystem error names the file, a provider echoes the prompt.
  *
  * The stack is the exception: frames name code locations and never the data that flowed through
- * them. They are recorded only where the failure came from the machine rather than from athanor's
- * own judgement - an AthanorError says what it is in one word and needs no frames - and only the
+ * them. They are recorded only where the failure came from the machine rather than from garden's
+ * own judgement - an GardenError says what it is in one word and needs no frames - and only the
  * first time this process records that particular stack, so a task handed out six times leaves six
  * records and one trace. `framesRepeated` is how the five other records say where it went.
  *

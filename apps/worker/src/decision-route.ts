@@ -1,5 +1,5 @@
-import type { ModelRelease } from '@athanor/contracts';
-import { sha256 } from '@athanor/core';
+import type { ModelRelease } from '@garden/contracts';
+import { sha256 } from '@garden/core';
 import { resolveTaskPurposeModel } from './purpose-model.js';
 import type { ToolContext } from './tool-dispatch.js';
 

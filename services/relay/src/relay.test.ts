@@ -39,7 +39,7 @@ const startRelay = async (
   overrides: Record<string, unknown> = {},
   logger: Logger = silentLogger
 ): Promise<Harness> => {
-  const directory = await mkdtemp(join(tmpdir(), 'athanor-relay-'));
+  const directory = await mkdtemp(join(tmpdir(), 'garden-relay-'));
   const { privateKey } = generateIdentityKeyPair();
   const certificate = createSelfSignedCertificate({
     privateKey,
@@ -111,7 +111,7 @@ const makeBox = (): Box => {
   const label = deriveLabel(RELAY_DOMAIN, raw);
   const certificate = createSelfSignedCertificate({
     privateKey,
-    commonName: 'athanor',
+    commonName: 'garden',
     // One key pair for every path, so the client rule is always "pin the SPKI, not the certificate".
     dnsNames: [`${label}.${RELAY_DOMAIN}`]
   });
@@ -514,7 +514,7 @@ describe('identity proof', () => {
     const relay = await startRelay();
     const box = makeBox();
 
-    // What `athanor-relay invite` does: a separate process opens the same registry file, appends an
+    // What `garden-relay invite` does: a separate process opens the same registry file, appends an
     // invite and closes. The running relay has never seen it.
     const cli = await Registry.open({
       path: relay.config.registryPath,

@@ -1,5 +1,5 @@
-import type { DirectionContext } from '@athanor/contracts';
-import type { AnalysisRunRecord } from '@athanor/contracts/analysis-run';
+import type { DirectionContext } from '@garden/contracts';
+import type { AnalysisRunRecord } from '@garden/contracts/analysis-run';
 import { readAnalysisRecord } from './analysis-record';
 import { readWorkspaceFile } from './workspace-file';
 

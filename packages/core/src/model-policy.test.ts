@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ModelRelease } from '@athanor/contracts';
+import type { ModelRelease } from '@garden/contracts';
 import {
   UNMEASURED_QUALITY_PRIOR,
   blendWeights,

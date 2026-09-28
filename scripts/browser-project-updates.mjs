@@ -80,7 +80,7 @@ export function projectUpdateFixture(project, tasks) {
         state: 'ready',
         parentRevision: fixture.head?.id ?? null,
         candidateDigest: 'a'.repeat(64),
-        path: `/home/athanor/.project-store/${project.id}/public/candidates/${id}/workspace`,
+        path: `/home/garden/.project-store/${project.id}/public/candidates/${id}/workspace`,
         changes: [
           {
             path: 'analysis.py',

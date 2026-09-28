@@ -47,7 +47,7 @@ import {
   type ProcessHistoryRecord
 } from './services.js';
 import { agentAccountUid, agentListeningSockets, listeningSocketsOfGroup } from './listeners.js';
-import { reachOfBindAddress } from '@athanor/core';
+import { reachOfBindAddress } from '@garden/core';
 import { awaitChildExit, DEFAULT_FLUSH_GRACE_MS } from './subprocess.js';
 
 const BackgroundRequest = z
@@ -1184,7 +1184,7 @@ export class ProcessManager {
     const sweep = () => {
       void (async () => {
         /*
-         * TWO READERS, because neither works in both places athanor runs.
+         * TWO READERS, because neither works in both places garden runs.
          *
          * The per-service walk needs `/proc/<pid>/fd`, which is exactly what the shipped
          * `ProtectProc=invisible` takes away from the runner - measured on a live box, where the
@@ -1259,7 +1259,7 @@ export class ProcessManager {
     const where = reachable.map((socket) => `${socket.address}:${socket.port}`).join(', ');
     noteOnStderr(
       session,
-      `athanor: "${supervised.record.name}" is listening on ${where}, which is not this computer only - anyone who can reach this computer on that port can reach what it serves. If it was meant to be private, bind 127.0.0.1 and use publish_preview, which proxies to loopback.`
+      `garden: "${supervised.record.name}" is listening on ${where}, which is not this computer only - anyone who can reach this computer on that port can reach what it serves. If it was meant to be private, bind 127.0.0.1 and use publish_preview, which proxies to loopback.`
     );
   }
 
@@ -1371,7 +1371,7 @@ export class ProcessManager {
    * - **Host rebooted**: the records are on disk and the pids are meaningless. Every recorded pid
    *   is either dead or a stranger's, `reclaimOrphan` leaves strangers alone, and each service is
    *   started fresh.
-   * - **Workspace deleted**: the tree, and the record inside `.athanor` with it, is gone before
+   * - **Workspace deleted**: the tree, and the record inside `.garden` with it, is gone before
    *   this ever runs.
    */
   async resume(
@@ -1485,19 +1485,19 @@ export class ProcessManager {
   /**
    * How much unfinished background work stopping this runner would destroy, across every workspace.
    *
-   * WHAT IT IS FOR. `athanor update` - by hand, and weekly at a randomised hour, which on the
-   * production box measured as 03:34 UTC next Monday - stops athanor.target for the backup and the
+   * WHAT IT IS FOR. `garden update` - by hand, and weekly at a randomised hour, which on the
+   * production box measured as 03:34 UTC next Monday - stops garden.target for the backup and the
    * rebuild. That SIGTERMs this runner, `close()` stops every session, and a session that is not a
    * declared service has no record anywhere on disk: it does not come back, and the next poll of
    * its id answers "Background process not found" rather than anything about an update. A
    * twenty-hour alignment started by an agent is simply gone, at three in the morning, with nobody
-   * awake. The gate that is supposed to prevent this reads `athanor_worker_active` from the
+   * awake. The gate that is supposed to prevent this reads `garden_worker_active` from the
    * worker's /metrics, which counts TURNS in flight; a background job outlives the turn that
    * started it by design, so the gate is structurally blind to exactly the work this box exists
    * for. This process is the only one on the machine that knows, which is why the answer lives
    * here.
    *
-   * A SERVICE IS NOT COUNTED, deliberately. Its record is in `.athanor/services.json`, `resume`
+   * A SERVICE IS NOT COUNTED, deliberately. Its record is in `.garden/services.json`, `resume`
    * puts it back when the runner comes up, and `hibernate.test.ts` holds that pair. Counting it
    * would stand the weekly update down for the one kind of work a restart does not harm, and a box
    * that stands down every week is a box that quietly stops receiving fixes.
@@ -1506,12 +1506,12 @@ export class ProcessManager {
    * hours left" is the sentence that makes an operator wait, where a bare count is not.
    *
    * ITS ONE CALLER IS `/healthz` in server.ts, which publishes this as `backgroundCommands` and
-   * `backgroundLongestRemainingMs`; `runner_background_work` in scripts/athanor greps that body for
+   * `backgroundLongestRemainingMs`; `runner_background_work` in scripts/garden greps that body for
    * those two literals, and both update arms stand down on a positive count. Nothing else calls it.
    * Those field names are therefore part of this method's contract even though no compiler checks
    * them: rename one and the update silently goes back to saying it could not tell and proceeding.
    * The end-to-end case in long-work.test.ts is what holds that shut - it runs the real shell
-   * functions, cut out of scripts/athanor at test time, against the real body of the real route.
+   * functions, cut out of scripts/garden at test time, against the real body of the real route.
    */
   backgroundWork(): { commands: number; longestRemainingMs: number | null } {
     let commands = 0;
@@ -1539,7 +1539,7 @@ export class ProcessManager {
    *
    * Measured: a service was left listening on a public port, and the next turn asked to stop it
    * listed the processes, got an empty array, and reported that nothing was running. The service
-   * was in `.athanor/services.json` and in the owner's own panel the whole time. A thing the
+   * was in `.garden/services.json` and in the owner's own panel the whole time. A thing the
    * product will restart across reboots, that no agent can name, cannot be turned off by asking.
    */
   taskWriters(workspaceId: string, owner: string): Array<{ id: string; kind: string }> {

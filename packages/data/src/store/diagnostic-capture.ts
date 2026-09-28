@@ -1,16 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import {
-  AthanorError,
+  GardenError,
   diagnosticCipherHash,
   diagnosticRecordAad,
   type EncryptedEnvelope
-} from '@athanor/core';
+} from '@garden/core';
 import {
   DIAGNOSTIC_CAPTURE_BYTES,
   DIAGNOSTIC_RECORD_BYTES,
   DiagnosticCaptureReason,
   DiagnosticCaptureStatus
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import type { Database } from '../database.js';
 import { iso, json } from './rows.js';
 
@@ -68,12 +68,12 @@ export class DiagnosticCaptureStore {
           userId
         ])
       ).rows[0];
-      if (!task) throw new AthanorError('task_not_found', 'Conversation not found', 404);
+      if (!task) throw new GardenError('task_not_found', 'Conversation not found', 404);
       const row = (
         await db.query('SELECT * FROM diagnostic_captures WHERE task_id=$1 FOR UPDATE', [taskId])
       ).rows[0];
       if (row && row.id !== id)
-        throw new AthanorError(
+        throw new GardenError(
           'diagnostic_changed',
           'The recording changed. Refresh before continuing.',
           409
@@ -84,7 +84,7 @@ export class DiagnosticCaptureStore {
       }
       if (!row) {
         if (action !== 'start')
-          throw new AthanorError('diagnostic_not_found', 'Recording not found', 404);
+          throw new GardenError('diagnostic_not_found', 'Recording not found', 404);
         const inserted = await db.query(
           `INSERT INTO diagnostic_captures(id,user_id,task_id,workspace_id,epoch) VALUES($1,$2,$3,$4,$5) RETURNING *`,
           [id, userId, taskId, task.workspace_id, randomUUID()]
@@ -92,13 +92,13 @@ export class DiagnosticCaptureStore {
         return record(inserted.rows[0]!).status;
       }
       if (row.workspace_id !== task.workspace_id)
-        throw new AthanorError(
+        throw new GardenError(
           'diagnostic_workspace_changed',
           'The working area changed. Download and delete this recording before starting another.',
           409
         );
       if (action === 'start' && row.state === 'failed')
-        throw new AthanorError(
+        throw new GardenError(
           'diagnostic_incomplete',
           'Download and delete the incomplete recording before starting another.',
           409

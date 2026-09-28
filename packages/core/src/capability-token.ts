@@ -146,6 +146,6 @@ export const deriveCapabilityNonce = (parentNonce: string, secret: string): stri
   if (!parentNonce) throw new Error('Parent capability nonce is required');
   if (secret.length < 32) throw new Error('Runner shared secret must be at least 32 characters');
   return createHmac('sha256', secret)
-    .update(`athanor-derived-capability:${parentNonce}`)
+    .update(`garden-derived-capability:${parentNonce}`)
     .digest('base64url');
 };

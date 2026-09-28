@@ -138,7 +138,7 @@ upload`, `docker buildx build --push`, `vercel --prod`, `kubectl apply`, `gh rel
   which walked past the whole rule until the gate pass. Each must card in every mode. Measured
   at `89185c6`, before the rule existed, every row raised nothing in balanced or autonomous while
   `rm -rf node_modules`, which a rewind restores, stopped the turn in all three. What decides the
-  table is `CHECKPOINT_CONTENT` — `workspace` and `.athanor/artifacts` — which none of these is
+  table is `CHECKPOINT_CONTENT` — `workspace` and `.garden/artifacts` — which none of these is
   inside. The third class is the twenty-six rows that pin the location test the destructive
   rule gained this wave; they are described under **FREE_WORKSPACE_DELETES** below, because neither half
   of that pair means anything without the other.
@@ -173,10 +173,10 @@ crontab /etc/passwd` — a shape this table had none of, and every one of the fi
   balanced and autonomous, until this pair. `HOME` is `<workspaceRoot>/.home` — beside `workspace/`, not inside it — so a rule
   that asked "inside the root" rather than "strictly inside the checkpointed trees" would free every
   one of them while every count in the table fell and the run read like a win. The last two rows are
-  the other half of that: `rm -rf ~/workspace/dist` and `rm -rf ~/.athanor/artifacts/report.pdf`
+  the other half of that: `rm -rf ~/workspace/dist` and `rm -rf ~/.garden/artifacts/report.pdf`
   wear the two prefixes that mean "recoverable" and land under HOME, where nothing walks them, and
   they were measured free until `~` stopped being read as the workspace root. The two after those
-  are the same two places reached by the other argument: `workspace/…` and `.athanor/…` were read
+  are the same two places reached by the other argument: `workspace/…` and `.garden/…` were read
   from the workspace root whatever the `cwd` said, so `rm -rf workspace/dist` with `cwd: '.home'`
   was measured free after the `~` fix and removes `<root>/.home/workspace/dist`. `resolveInside`
   accepts any path inside the container root for a `cwd`, so that is a call the model may simply
@@ -252,7 +252,7 @@ extensiveness in this product. A change that starts charging for it should fail 
 
 ## Accepting a change
 
-A number that moves here is a decision about how often athanor interrupts its owner. Read the
+A number that moves here is a decision about how often garden interrupts its owner. Read the
 `--detail` output, decide the new number is the one you want, and `--accept` in the same commit that
 moved it with the figure in the message. The guard and provenance failures are not decisions and
 must never be accepted: fix the floor, or delete the guard with the rule it guards.

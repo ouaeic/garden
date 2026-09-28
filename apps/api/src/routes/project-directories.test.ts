@@ -1,6 +1,6 @@
 import Fastify from 'fastify';
 import { describe, expect, it, vi } from 'vitest';
-import type { ProjectDirectory } from '@athanor/contracts';
+import type { ProjectDirectory } from '@garden/contracts';
 import type { RouteContext } from '../http/server-context.js';
 import { registerProjectDirectoryRoutes } from './project-directories.js';
 

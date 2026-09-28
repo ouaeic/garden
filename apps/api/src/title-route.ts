@@ -1,10 +1,10 @@
-import type { PrivacyRoute, PurposeModelChoice } from '@athanor/contracts';
+import type { PrivacyRoute, PurposeModelChoice } from '@garden/contracts';
 import {
   isModelEligible,
   selectPurposeModel,
   type RoutableModel,
   type ModelRequest
-} from '@athanor/core';
+} from '@garden/core';
 
 export const TITLE_MAX_COST_USD = 0.005;
 export const TITLE_OUTPUT_TOKENS = 256;

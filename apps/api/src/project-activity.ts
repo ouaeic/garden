@@ -1,6 +1,6 @@
-import { decryptJson, unwrapDataKey, type EncryptedEnvelope } from '@athanor/core';
+import { decryptJson, unwrapDataKey, type EncryptedEnvelope } from '@garden/core';
 import { z } from 'zod';
-import type { Task } from '@athanor/contracts';
+import type { Task } from '@garden/contracts';
 import type { RouteContext } from './http/server-context.js';
 import { revealedTaskEvent } from './context.js';
 

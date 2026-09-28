@@ -37,7 +37,7 @@
  * nothing moves, because a ceiling read against `Date.now()` would be re-decided on every turn and
  * would rewrite the block whose header says "frozen for this run".
  */
-import { encryptBytes, encryptJson, ownerBlockAad, userMemoryKey } from '@athanor/core';
+import { encryptBytes, encryptJson, ownerBlockAad, userMemoryKey } from '@garden/core';
 import type {
   DataStore,
   MemoryCandidateRecord,
@@ -46,7 +46,7 @@ import type {
   TaskPlanRecord,
   TaskRecord,
   WorkspaceMemoryRecord
-} from '@athanor/data';
+} from '@garden/data';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentState, AgentWorkerConfig } from './agent-state.js';
 import { BASE_PROMPT_MARKER, OWNER_BLOCK_MARKER } from './context.js';

@@ -1,5 +1,5 @@
-import type { MediaModelOption, MediaModelSelection } from '@athanor/contracts';
-import { sha256 } from '@athanor/core';
+import type { MediaModelOption, MediaModelSelection } from '@garden/contracts';
+import { sha256 } from '@garden/core';
 import { resolveMediaModel, seedMediaModels } from './catalog.js';
 import { describeOpenRouterImageModel, refreshOpenRouterMediaCatalog } from './media-catalog.js';
 import { quoteMediaPrice } from './media-capabilities.js';

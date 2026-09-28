@@ -1,7 +1,7 @@
-import { runtimeDate, runtimeUUID } from '@athanor/core';
+import { runtimeDate, runtimeUUID } from '@garden/core';
 
 import {
-  AthanorError,
+  GardenError,
   buildMemoryItemIndex,
   type MemoryItemContent,
   buildMemorySourceIndex,
@@ -34,21 +34,21 @@ import {
   type MemoryPackEntry,
   type MemoryStatus,
   type MemoryTrust
-} from '@athanor/core';
+} from '@garden/core';
 import type {
   DataStore,
   MemoryCandidateRecord,
   MemoryCitedCallRecord,
   MemoryPackRecord,
   MemoryUseOutcome
-} from '@athanor/data';
-import type { ModelMessage } from '@athanor/model-gateway';
+} from '@garden/data';
+import type { ModelMessage } from '@garden/model-gateway';
 import { preambleInsertIndex } from './context.js';
 
 /* ------------------------------------------------------------------------ *
  * Encryption contexts
  *
- * Every ciphertext in athanor is bound to the kind of row it belongs to, exactly like
+ * Every ciphertext in garden is bound to the kind of row it belongs to, exactly like
  * `task-plan:`, `workspace-memory:` and `task-state:`. Binding the tier as well as the workspace
  * means a body lifted out of one memory table cannot be replayed into another, and a row that
  * arrives with the wrong context is dropped rather than decrypted.
@@ -89,7 +89,7 @@ export const MEMORY_PACK_MARKER = 'RECALLED MEMORY PACK';
  * fifteen remembered sentences underneath it.
  *
  * The verification sentence is the other half, §4.7 #114: an entry is a claim with an age, and the
- * horizon at which athanor itself stops believing a remembered procedure is `staleDays` in
+ * horizon at which garden itself stops believing a remembered procedure is `staleDays` in
  * `listStaleMemoryProcedures`. Naming the same number here rather than a rounder one keeps the
  * prose and the review queue one policy with one spelling - the finding this repository has
  * already paid for twice, most recently in the approval floor.
@@ -428,12 +428,12 @@ const clamp = (value: number | undefined, fallback: number, low: number, high: n
  */
 export const recallMemory = async (input: MemoryRecallInput): Promise<MemoryRecallResult> => {
   const query = input.query.trim();
-  if (!query) throw new AthanorError('memory_recall_query_empty', 'Recall needs something to ask');
+  if (!query) throw new GardenError('memory_recall_query_empty', 'Recall needs something to ask');
   if (input.asOf && Number.isNaN(new Date(input.asOf).getTime()))
-    throw new AthanorError('memory_recall_as_of_invalid', 'Recall as_of must be a date');
+    throw new GardenError('memory_recall_as_of_invalid', 'Recall as_of must be a date');
   const kinds = [...new Set(input.kinds ?? [])].filter((kind) => MEMORY_KINDS.includes(kind));
   if (input.kinds && kinds.length === 0)
-    throw new AthanorError(
+    throw new GardenError(
       'memory_recall_kinds_invalid',
       `Recall kinds must be drawn from ${MEMORY_KINDS.join(', ')}`
     );
@@ -671,7 +671,7 @@ export const searchMemorySessions = async (
 ): Promise<MemorySessionSearchResult> => {
   const query = input.query.trim();
   if (!query)
-    throw new AthanorError(
+    throw new GardenError(
       'session_search_query_empty',
       'A search needs something to look for, or an id to reach into a result already returned.'
     );
@@ -995,8 +995,8 @@ const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
  * this an oracle for which UUIDs exist in the owner's store, which is a strictly worse thing to
  * hand out than the material itself.
  */
-const reachRefused = (): AthanorError =>
-  new AthanorError(
+const reachRefused = (): GardenError =>
+  new GardenError(
     'session_search_reach_unknown',
     'Reach only an id this conversation was given: a result id from session_search, or a memory id from memory_recall or the memory pack. Search first, then reach into a result.'
   );
@@ -1029,7 +1029,7 @@ export const reachMemoryEvidence = async (
   input: MemoryReachInput
 ): Promise<MemoryReach | UntrustedMemoryReach> => {
   if (input.spent >= MEMORY_REACH_MAX_PER_TURN)
-    throw new AthanorError(
+    throw new GardenError(
       'session_search_reach_exhausted',
       `This turn has already reached into ${MEMORY_REACH_MAX_PER_TURN} stored results, which is the limit for one turn. Work with what came back, or search for what is still missing.`
     );
@@ -1779,7 +1779,7 @@ const QUALIFICATION_CONDITIONAL_HEAD =
  * opener - a condition included.
  */
 const DISCRETION_GRANT = [
-  String.raw`\b(?:you|athanor|the agent|agents?)(?:'re|\s+(?:are|is))\s+(?:free|allowed|permitted|welcome|cleared|authori[sz]ed|entitled)\b`,
+  String.raw`\b(?:you|garden|the agent|agents?)(?:'re|\s+(?:are|is))\s+(?:free|allowed|permitted|welcome|cleared|authori[sz]ed|entitled)\b`,
   String.raw`\bwithout\s+(?:asking|approval|confirmation|confirming|checking|permission|a card|prompting|waiting)\b`,
   String.raw`\b(?:feel free|go ahead|freely|at (?:your|its) (?:own )?discretion|as you see fit|on your own(?: authority)?|approve (?:your|its) own|self-approv\p{L}*|auto-approv\p{L}*|blanket approval|standing approval|pre-?approved|fair game|free (?:rein|reign|hand)|carte blanche)\b`,
   String.raw`\b(?:no need to|(?:don't|do not|needn't|need not|never)\s+(?:have to\s+|need to\s+|bother to\s+)?)(?:ask|confirm|check|wait|raise|prompt)\b`,
@@ -1809,7 +1809,7 @@ const DISCRETION_GRANT = [
  * never touch /etc" as a permission.
  */
 const CONTRAST_GRANT = [
-  String.raw`\b(?:you|athanor|the agent|agents?)\s+(?:may|might|can|could)\b(?!'t\b|\s+(?:not|never|no longer)\b)`,
+  String.raw`\b(?:you|garden|the agent|agents?)\s+(?:may|might|can|could)\b(?!'t\b|\s+(?:not|never|no longer)\b)`,
   String.raw`\bmay\b(?!\s+(?:not|never|no longer)\b)`,
   String.raw`\b(?:can|could)\s+be\s+(?!(?:undone|restored|recovered|reverted|recreated|regenerated|rebuilt|reproduced|replayed|redone|reversed|rolled back|lost)\b)\p{L}+(?:ed|en|t)\b`,
   String.raw`\b(?:have|has|with)\s+my\s+(?:permission|blessing|approval|consent)\b`,
@@ -2517,7 +2517,7 @@ export const observedStandingOrders = (text: string): MemoryFactObservation[] =>
     // Addressed to this computer rather than about the owner, and that is not a nicety: the pack
     // caps facts at four per subject, so filing these under `owner` would mean a workspace with
     // four standing orders could never recall the owner's shell again.
-    found.push({ subject: 'athanor', predicate: 'standing_order', object });
+    found.push({ subject: 'garden', predicate: 'standing_order', object });
   }
   return found.slice(0, MEMORY_MAX_FACT_OBSERVATIONS);
 };
@@ -2921,7 +2921,7 @@ export const recordTurnEpisode = async (input: {
           if (standing && !promoted) return null;
           const content: MemoryItemContent = promoted
             ? // The owner's sentence and nothing else. Rendering it the way the line below renders
-              // an extracted triple would produce "athanor standing order Never run git stash." -
+              // an extracted triple would produce "garden standing order Never run git stash." -
               // a sentence the owner did not write, in a tier whose whole claim is that they did.
               {
                 title: 'Standing instruction',

@@ -8,7 +8,7 @@
  * failure mode of a wrong answer - a meeting an hour out - is worse than the failure mode of an
  * unsupported property.
  */
-import { AthanorError } from './errors.js';
+import { GardenError } from './errors.js';
 
 export interface IcalProperty {
   name: string;
@@ -333,7 +333,7 @@ export interface CalendarEvent {
   status: string | null;
   organizer: { name: string | null; address: string } | null;
   attendees: CalendarAttendee[];
-  /** The RRULE as written. athanor reads recurrence back but never composes one. */
+  /** The RRULE as written. garden reads recurrence back but never composes one. */
   recurrenceRule: string | null;
   sequence: number;
   lastModified: string | null;
@@ -415,7 +415,7 @@ export interface EventDraft {
 
 const assertNoBreaks = (value: string, field: string): string => {
   if (/[\r\n]/.test(value) || value.includes(String.fromCharCode(0)))
-    throw new AthanorError(
+    throw new GardenError(
       'calendar_value_invalid',
       `The ${field} value contains a line break and cannot be written`
     );
@@ -432,7 +432,7 @@ export const buildEventComponent = (draft: EventDraft): IcalComponent => {
   const moment = (value: string, field: string): IcalProperty => {
     if (draft.allDay) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(value))
-        throw new AthanorError(
+        throw new GardenError(
           'calendar_value_invalid',
           `An all-day event needs ${field} as YYYY-MM-DD`
         );
@@ -444,7 +444,7 @@ export const buildEventComponent = (draft: EventDraft): IcalComponent => {
     }
     const parsed = Date.parse(value);
     if (!Number.isFinite(parsed))
-      throw new AthanorError('calendar_value_invalid', `${field} is not a valid date and time`);
+      throw new GardenError('calendar_value_invalid', `${field} is not a valid date and time`);
     return { name: field, parameters: new Map(), value: icalUtcStamp(new Date(parsed)) };
   };
   const properties: IcalProperty[] = [
@@ -484,7 +484,7 @@ export const buildEventComponent = (draft: EventDraft): IcalComponent => {
     name: 'VCALENDAR',
     properties: [
       { name: 'VERSION', parameters: new Map(), value: '2.0' },
-      { name: 'PRODID', parameters: new Map(), value: '-//athanor//calendar//EN' },
+      { name: 'PRODID', parameters: new Map(), value: '-//garden//calendar//EN' },
       { name: 'CALSCALE', parameters: new Map(), value: 'GREGORIAN' }
     ],
     components: [{ name: 'VEVENT', properties, components: [] }]

@@ -1,4 +1,4 @@
-import type { ReasoningOptions, TaskReasoningEffort } from '@athanor/contracts';
+import type { ReasoningOptions, TaskReasoningEffort } from '@garden/contracts';
 
 const levels: TaskReasoningEffort[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 

@@ -5,7 +5,7 @@ import { realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
-import { CodeIntelligenceRequest } from '@athanor/contracts';
+import { CodeIntelligenceRequest } from '@garden/contracts';
 import { applyCodeEditPreview, saveCodeEditPreview } from './code-edit-previews.js';
 import { prepareInvocation, type InvocationPolicy } from './execution.js';
 import { assertUserDataPath, resolveInside } from './files.js';

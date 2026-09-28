@@ -14,7 +14,7 @@
  *
  * `transcriptLine` in `context.ts` - the transcript handed to the summarising model - CARRIES it.
  * It used not to, and that was the defect: the summariser is asked for "decisions taken and the
- * reason for them, including approaches that were tried and rejected", while athanor's own preamble
+ * reason for them, including approaches that were tried and rejected", while garden's own preamble
  * tells the model that "Working out - options weighed, what to try next, talking yourself through
  * it - goes in the reasoning channel, or nowhere". A transcript built from content and tool calls
  * alone withheld the one channel the harness had asked the model to put the answer in, and then
@@ -35,10 +35,10 @@
  * rig can price this and cannot score it, and it says so of itself.
  */
 import { describe, expect, it } from 'vitest';
-import { generateDataKey } from '@athanor/core';
-import type { ModelRelease } from '@athanor/contracts';
-import type { TaskRecord } from '@athanor/data';
-import type { ModelMessage } from '@athanor/model-gateway';
+import { generateDataKey } from '@garden/core';
+import type { ModelRelease } from '@garden/contracts';
+import type { TaskRecord } from '@garden/data';
+import type { ModelMessage } from '@garden/model-gateway';
 import type { AgentState } from './agent-state.js';
 import { compactTurnContext, type CompactionDeps } from './compaction.js';
 
@@ -77,7 +77,7 @@ const filler = (label: string, characters: number): string =>
  */
 const windowPastTheTrigger = (): ModelMessage[] => {
   const messages: ModelMessage[] = [
-    { role: 'system', content: `You are athanor. ${filler('preamble', 600)}` },
+    { role: 'system', content: `You are garden. ${filler('preamble', 600)}` },
     { role: 'user', content: `${GOAL}. ${filler('goal', 400)}` }
   ];
   for (let step = 0; step < 26; step += 1) {

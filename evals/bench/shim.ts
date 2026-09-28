@@ -1,5 +1,5 @@
 /**
- * athanor's runner protocol in, box commands out.
+ * garden's runner protocol in, box commands out.
  *
  * Point `WORKSPACE_RUNNER_URL` at this server and the whole loop - catalogue, approval floor,
  * compaction, tools - runs against whatever `WorkspaceBackend` it was given, with no change to

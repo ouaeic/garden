@@ -1,0 +1,608 @@
+#!/bin/sh
+set -eu
+
+# Runs one agent command as the dedicated `garden-agent` account instead of as the runner's own
+# account. Changing user identity needs privilege the runner deliberately does not have, so it
+# asks for it here, through a sudoers rule only the runner's account may use.
+#
+# The helper only ever hands back *less* privilege than its caller already has: a different
+# unprivileged user, no route to a higher one, optionally no network, and optionally a Landlock
+# ruleset that admits one workspace and nothing else under /home. That is why it is safe for it to
+# run a command it did not write - there is nothing a caller could gain by lying to it that it did
+# not already have. The property has to be kept on every path the caller names, not only the
+# command: the file a `run` request arrives in is read and removed by this helper as root, so a
+# caller free to name that file could have root remove any file on the box. `spec_parent` below
+# and the reader's ownership checks are what keep the property true for the file too.
+
+agent_user="garden-agent"
+
+# Where a confinable workspace root has to live, hard-coded for the same reason the account name is.
+# The helper's whole property is that a caller gains nothing by lying to it, and a caller free to
+# name its own root could pass `/` and be handed write access to the box. `WORKSPACE_ROOT` in the
+# runner's environment is set to this same path by scripts/install-native.sh; if the two ever
+# disagree, `confine` refuses every command rather than confining the wrong tree.
+workspace_parent="/home/garden"
+
+# Where a `run` request's spec file has to be, hard-coded for the same reason again. This helper
+# removes the file it is handed, as root, and it once did so for any path at all: measured with a
+# harness copy, `run network open - --spec /etc/sudoers.d/garden-packages` was refused for its
+# header and the policy file was gone, and a refusal on the mode words removed whatever path stood
+# after `--spec` before anything was read - a root-level delete of any file on the box, for a
+# caller whose own account could not perform it. So a spec is `$spec_parent/<hex>.spec` and
+# nothing else: the directory the runner keeps its own private state in and creates owner-only
+# (sandbox.ts `sandboxSpecDirectory`), where removing a file removes what the caller could remove
+# anyway. `spec_path_shape` refuses every other path before a single byte is read or removed, and
+# the reader checks the file's owner against the account sudo says asked.
+spec_parent="$workspace_parent/.garden/sandbox"
+mission_supervisor="/usr/local/lib/garden/mission-supervisor.py"
+
+# The file a `run` request's command and environment arrive in, once it has been named and its
+# path has passed `spec_path_shape` - nothing else is ever assigned here. Removed on every refusal
+# below that: the runner has handed the file over by the time it calls, and a refusal that left it
+# lying on disk would keep the command text around for exactly as long as nothing came to collect
+# it.
+spec=""
+
+fail() {
+  printf 'garden-sandbox: %s\n' "$1" >&2
+  # Only a path the shape check accepted, and only while no component the caller's account owns
+  # has become a link: `.garden` and `sandbox` are the caller's directories, and either pointed
+  # elsewhere would make this a removal from wherever it pointed.
+  if [ -n "$spec" ] && [ ! -L "$workspace_parent/.garden" ] && [ ! -L "$spec_parent" ] &&
+    [ ! -L "$spec" ]; then
+    rm -f -- "$spec"
+  fi
+  # Distinct from the exit statuses a real command produces, so a sandbox failure is not read as
+  # the command itself having failed.
+  exit 125
+}
+
+[ "$(id -u)" -eq 0 ] || fail "this helper runs through the installed sudo policy"
+[ -x /usr/bin/setpriv ] || fail "/usr/bin/setpriv is missing; install util-linux"
+
+agent_uid=$(id -u "$agent_user" 2>/dev/null) || fail "the $agent_user account does not exist"
+agent_gid=$(id -g "$agent_user" 2>/dev/null) || fail "the $agent_user account has no group"
+
+# Group-writable, nothing for anyone else. The runner shares a group with the agent account so
+# each can read and change the other's workspace files; the browser profile and the rest of
+# .garden stay owner-only, which is what keeps the cookie jar out of the agent's reach.
+umask 0007
+
+# The three Landlock verb lists, spelled the way setpriv(1) spells them. Measured against util-linux
+# 2.41.3 on the owner's box, whose `setpriv --help` lists exactly these fifteen rule verbs.
+#
+# READ is read plus execute, which is what a command needs to run the programs the box installs and
+# read their configuration. It grants nothing that lets a command change any of it.
+#
+# WRITE is every verb this setpriv knows, `refer` included. Without `refer` a rename is refused even
+# when both sides are inside the same granted hierarchy, which breaks every editor, compiler and
+# package manager that writes a temporary file and moves it into place - `mv` inside the workspace
+# was measured to fail without it.
+#
+# DEVICE is the trap this list exists to avoid. A ruleset with no write grant on /dev kills
+# `echo x > /dev/null` outright and turns every `2>/dev/null` redirect into a shell error: measured
+# on the owner's box, where with /dev ungranted the redirect case printed
+# `/bin/sh: 1: cannot create /dev/null: Permission denied` before running anything. `truncate` is
+# deliberately absent from it - the kernel does not apply that check to a character device, and
+# `echo x > /dev/null` was measured to work without it.
+landlock_read="execute,read-file,read-dir"
+landlock_write="execute,write-file,read-file,read-dir,remove-dir,remove-file,make-char,make-dir,make-reg,make-sock,make-fifo,make-block,make-sym,refer,truncate"
+landlock_device="write-file,read-file,make-char,make-dir,make-reg,make-sock,make-fifo,make-block,make-sym"
+
+# Empty means no filesystem boundary at all, which is what `open` asks for and what the owner's
+# interactive shell always gets.
+landlock_arguments=""
+
+# The shape files.ts:28 requires of a workspace id: 8-4-4-4-12 hexadecimal digits, with the version
+# nibble 1-8 and the variant nibble one of 8, 9, a or b. Spelled as shell globs because /bin/sh has
+# no regular expressions, and without an external command because the helper deliberately reaches
+# for nothing it does not already need. The leading glob pins every length and separator position at
+# once; the hexadecimal checks are what `?` cannot say.
+workspace_id_shape() {
+  case "$1" in
+    ????????-????-????-????-????????????) ;;
+    *) return 1 ;;
+  esac
+  shape_rest="${1#*-}"
+  shape_a="${1%%-*}"
+  shape_b="${shape_rest%%-*}"
+  shape_rest="${shape_rest#*-}"
+  shape_c="${shape_rest%%-*}"
+  shape_rest="${shape_rest#*-}"
+  shape_d="${shape_rest%%-*}"
+  shape_e="${shape_rest#*-}"
+  for shape_segment in "$shape_a" "$shape_b" "$shape_c" "$shape_d" "$shape_e"; do
+    case "$shape_segment" in
+      *[!0-9A-Fa-f]*) return 1 ;;
+    esac
+  done
+  case "$shape_c" in
+    [1-8]*) ;;
+    *) return 1 ;;
+  esac
+  case "$shape_d" in
+    [89AaBb]*) ;;
+    *) return 1 ;;
+  esac
+}
+
+# `$spec_parent/<hex>.spec` with no further slash, and nothing but hexadecimal digits before the
+# suffix: the name the runner gives a spec - twelve random bytes as twenty-four digits - and nothing
+# a caller could steer anywhere else. `case` globs match `/`, which is why the first pattern is
+# what refuses a subdirectory. Refused before the file is opened, read or removed.
+spec_path_shape() {
+  case "$1" in
+    "$spec_parent"/*/*) return 1 ;;
+    "$spec_parent"/*.spec) ;;
+    *) return 1 ;;
+  esac
+  spec_name="${1##*/}"
+  spec_name="${spec_name%.spec}"
+  case "$spec_name" in
+    "" | *[!0-9a-f]*) return 1 ;;
+  esac
+}
+
+# A root is confinable only if it is a direct child of $workspace_parent, is named like a workspace,
+# and both it and the `workspace` directory inside it exist as real directories.
+#
+# Four separate questions, asked so that each one can be watched failing on its own: the last
+# component is a workspace id, the path starts at the workspace parent, it stops one level below it,
+# and neither it nor its `workspace` is a symbolic link. Deriving the id from the path instead of
+# from the prefix is what keeps them separable - `/somewhere/else/<a real id>` is refused by the
+# second question alone, and a guard no input can distinguish from its neighbour is a guard nobody
+# can watch fail. `case` globs match `/`, unlike pathname expansion, which is why the two-star
+# pattern says "deeper than one level" and why `${1##*/}` on a trailing slash yields nothing and is
+# refused by the first.
+#
+# NO PATH THIS GRANTS MAY BE A SYMBOLIC LINK, and this is the check with teeth. setpriv opens each
+# rule path and follows links, so a `workspace` replaced by a link to `/` would be a rule granting
+# write to the whole disk - and the workspace root is mode 2770 with the agent account's own group,
+# which means the agent can perform that replacement. `.home` is checked for the same reason and
+# only since it became a write grant of its own: it is the agent's `$HOME` (execution.ts
+# `agentHome`), it sits at the container root beside `workspace`, and a link there would buy exactly
+# as much as a link at `workspace`. A `.home` that does not exist at all is a different case and is
+# not refused here - `confine_to` skips a missing directory, which grants less.
+#
+# What this does NOT close is the race: the check and setpriv's open are two operations, and a
+# command already running in the workspace can swap either entry between them. Closing it needs the
+# workspace root itself to stop being agent-writable - now possible, since with `$HOME` at
+# `$ROOT/.home` the agent creates nothing directly in `$ROOT` any more, but it is a mode change in
+# the runner and in the installer's workspace loop rather than anything this helper can do.
+confinable_root() {
+  workspace_id_shape "${1##*/}" || return 1
+  case "$1" in
+    "$workspace_parent"/*/*) return 1 ;;
+    "$workspace_parent"/*) ;;
+    *) return 1 ;;
+  esac
+  if [ -L "$1" ] || [ -L "$1/workspace" ] || [ -L "$1/.home" ]; then return 1; fi
+  [ -d "$1" ] || return 1
+  [ -d "$1/workspace" ] || return 1
+}
+
+# Builds the ruleset for one workspace.
+#
+# /home is granted nowhere, and that single omission is the whole boundary. Every workspace on this
+# box is mode 2770 with the agent account's primary group, so before this a command run for one task
+# could read and rewrite every other task's files; and $ROOT/.garden - the checkpoints, the browser
+# profile's parent, the artifacts - sat one level above the only granted directory, reachable and
+# renameable. Neither is reachable now: Landlock does not restrict directory traversal, so a command
+# still reaches its own $ROOT/workspace through a $ROOT it may not read, list, write or rename.
+#
+# THE TWO GRANTS INSIDE $ROOT ARE NAMED ONE BY ONE, and $ROOT itself is never named. $ROOT/.home is
+# the agent's $HOME (execution.ts `agentHome`) and has to be written - it is where pip, cargo, npm
+# and the coding CLIs keep their caches and their sign-in state, and a boundary that refuses `pip
+# install` is an outage rather than a boundary. It is not under workspace/ because workspace/ is
+# what the turn checkpoint walks and hashes, and a Rust toolchain alone is 88,021 files against a
+# 250,000-file ceiling. Granting $ROOT instead would be one rule rather than two and would hand the
+# command $ROOT/.garden with it, which is the second of the two things this boundary exists to
+# stop; scripts/test-sandbox.sh asserts that neither $ROOT nor $ROOT/.garden is ever a rule path.
+#
+# /run is in the read list and is not in the design this implements, because the design would have
+# taken DNS away from every command. On Ubuntu /etc/resolv.conf is a symbolic link to
+# /run/systemd/resolve/stub-resolv.conf, so a ruleset without /run makes the resolver unreadable:
+# measured on the owner's box, `curl https://example.com` failed with "Could not resolve host" and
+# `cat /etc/resolv.conf` with "Permission denied", and both were fixed by this one line.
+#
+# A directory that is not there is skipped rather than refused. /lib64 and /srv do not exist on every
+# distribution this installs on, and setpriv exits before running anything when a rule names a path
+# it cannot open - so refusing would turn a missing directory into a box where no command runs. A
+# skip can only ever grant less, which is the safe direction for it to be wrong in.
+#
+# The read half is its own function because `check` probes with exactly it, and a probe that grants
+# less than the shipped ruleset does can fail for want of a rule on a host whose kernel is perfectly
+# capable - see the `check` branch below for the one that did.
+add_read_rules() {
+  for confine_directory in /usr /bin /lib /lib64 /sbin /opt /etc /var /srv /run /proc /sys; do
+    [ -d "$confine_directory" ] || continue
+    landlock_arguments="$landlock_arguments --landlock-rule path-beneath:$landlock_read:$confine_directory"
+  done
+}
+
+confine_to() {
+  confine_root="$1"
+  landlock_arguments="--landlock-access fs"
+  add_read_rules
+  # $ROOT/workspace first, and its absence is already refused by `confinable_root`: a ruleset that
+  # silently omitted it would leave the command with a confinement and nowhere to work. $ROOT/.home
+  # is skipped when absent instead, because a workspace made before the runner started creating it
+  # still has to run - the command loses its $HOME writes, which is less than losing every command.
+  for confine_directory in "$confine_root/workspace" "$confine_root/.home" /tmp /var/tmp /dev/shm; do
+    [ -d "$confine_directory" ] || continue
+    landlock_arguments="$landlock_arguments --landlock-rule path-beneath:$landlock_write:$confine_directory"
+  done
+  if [ -d /dev ]; then
+    landlock_arguments="$landlock_arguments --landlock-rule path-beneath:$landlock_device:/dev"
+  fi
+}
+
+# --no-new-privs is what actually stops a command reaching a higher account. It is inherited by
+# every descendant and cannot be removed, so a set-user-ID binary - sudo, su, pkexec, or a
+# symbolic link to one under any name - confers nothing, no matter which interpreter spelled the
+# command. The kernel clears every capability on the transition away from root, so the command
+# starts with none. It is also Landlock's precondition: a ruleset may only be applied by a process
+# that has already given up the ability to gain privilege.
+#
+# $landlock_arguments is split on whitespace on purpose. Every word in it is a fixed literal from
+# the three verb lists above or a path under $workspace_parent whose last component has already been
+# checked to be a workspace id, so there is no whitespace and no glob character in it for the split
+# to get wrong. It is carried in a variable rather than in "$@" because the command itself already
+# occupies the positional parameters, and /bin/sh has no second array.
+#
+# Reached by the owner's `shell` arm, whose command stands on the argument list. The `run` arm
+# builds the same chain inside its reader, from a file - see `spec_loader` below for why.
+run_as_agent() {
+  # shellcheck disable=SC2086
+  exec /usr/bin/setpriv \
+    --reuid "$agent_uid" --regid "$agent_gid" --clear-groups --no-new-privs \
+    $landlock_arguments \
+    -- /usr/bin/env -i "$@"
+}
+
+# How a `run` request's command reaches the agent account, and why it is not simply "$@".
+#
+# This helper runs under sudo, and sudo writes every argument of every privileged invocation to the
+# system journal - persistent, root-owned, outside the workspace and outside every checkpoint. The
+# policy that admits this helper cannot say otherwise: the sudo the box ships knows no directive
+# that would keep the command line out of the log, and a sudoers file naming one is refused whole
+# (scripts/install-native.sh). With the command on the argument list, that journal held every
+# heredoc body, every filename and everything typed at a terminal, on a box whose privacy document
+# says its own logs hold none of those. So the argument list carries the modes, the root and a
+# path, and the command with its environment comes through a file the runner wrote for this one
+# invocation, readable by the runner and root and nobody else. The journal then records that a
+# command ran, in which modes and in which workspace, and not what it was.
+#
+# The file is read by /usr/bin/python3 rather than by this shell, because the shell cannot do it: a
+# variable cannot hold a NUL, `read` strips the newline it stops at, and command substitution strips
+# every trailing one - so an argument ending in a newline, which a heredoc body always does, would
+# arrive short. Python reads bytes and hands them to execv as bytes, and scripts/test-sandbox.sh
+# drives an argument that ends in two newlines through it and compares the far side byte for byte.
+# The reader unlinks the file before it execs, so the command itself can never find it.
+#
+# What the file holds: a header naming this format, then every word NUL-terminated - the directory
+# the command runs in first, then the environment's NAME=VALUE words, then the executable and its
+# arguments, which is exactly the list `env -i` was given when it stood on the argument list. The
+# header is what tells a runner and a helper that are out of step apart from a file that merely has
+# a command in it. The directory is in the file rather than being where sudo is started because
+# sudo writes the directory it was started from to the journal beside the arguments, and the
+# directory an agent chooses for a command is a name used inside the task; the runner starts sudo
+# from the container root and the reader enters the real directory here, after that line is
+# written. The directory persists across setpriv and unshare, so nothing else has to know it.
+#
+# WHAT THE READER CHECKS BEFORE IT REMOVES ANYTHING, because it removes as root. The path has
+# already passed `spec_path_shape`; the reader then walks the two components under
+# $workspace_parent without following a link, since both belong to the caller's account and either
+# could be pointed at a directory root must not remove from; opens the file itself without
+# following a link; and refuses one not owned by the account sudo says asked, or with a second
+# name, or without the header. Only then is it unlinked - by name in the directory it was opened
+# from - and only then read as a command. A file refused on any of those is left exactly where it
+# was, and the harness asserts that on each.
+#
+# The chain past the reader is the one `run_as_agent` builds for the owner's shell: setpriv drops
+# to the agent account with no route back and applies the ruleset, `env -i` installs exactly the
+# environment given. Network isolation wraps the same chain in a namespace, with loopback brought
+# up inside it: without it a command cannot even reach a port its own subprocess is listening on,
+# which breaks ordinary local tooling for no security benefit. The shell text is fixed and the
+# command arrives through "$@", so nothing from the caller is ever interpreted.
+spec_loader='
+import fcntl, json, os, re, stat, sys
+network, process_tree, supervisor, spec, parent, asker, setpriv, unshare, uid, gid, root = sys.argv[1:12]
+landlock = sys.argv[12:]
+
+def fail(message):
+    sys.stderr.write("garden-sandbox: %s\n" % message)
+    sys.exit(125)
+
+directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+if not spec.startswith(parent + "/"):
+    fail("the spec file is not under the workspace parent")
+components = spec[len(parent) + 1:].split("/")
+name = components.pop()
+try:
+    at = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    for component in components:
+        below = os.open(component, directory_flags, dir_fd=at)
+        os.close(at)
+        at = below
+    fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=at)
+except OSError as error:
+    fail("the spec file could not be opened: %s" % error.strerror)
+info = os.fstat(fd)
+if not stat.S_ISREG(info.st_mode):
+    fail("the spec path is not a regular file")
+if info.st_uid != int(asker):
+    fail("the spec file is not owned by the account that asked for this command")
+if info.st_nlink != 1:
+    fail("the spec file has more than one name")
+with os.fdopen(fd, "rb") as handle:
+    data = handle.read()
+header = b"garden-sandbox-spec 2\0"
+if not data.startswith(header) or not data.endswith(b"\0"):
+    fail("the spec file is not in the form this helper reads")
+lease_fd = None
+reference_locks = []
+project_references = []
+if process_tree == "mission":
+    lease_name = name[:-5] + ".lease"
+    lease_fd = os.open(lease_name, os.O_RDWR | os.O_NOFOLLOW, dir_fd=at)
+    lease_info = os.fstat(lease_fd)
+    if not stat.S_ISREG(lease_info.st_mode) or lease_info.st_uid != int(asker) or lease_info.st_nlink != 1:
+        fail("invalid mission process lease")
+    os.set_inheritable(lease_fd, True)
+    gate_fd = os.open(name[:-5] + ".gate", os.O_RDONLY | os.O_NOFOLLOW, dir_fd=at)
+    gate_info = os.fstat(gate_fd)
+    if not stat.S_ISREG(gate_info.st_mode) or gate_info.st_uid != int(asker) or gate_info.st_nlink != 1:
+        fail("invalid mission process gate")
+    os.set_inheritable(gate_fd, True)
+os.unlink(name, dir_fd=at)
+os.close(at)
+words = data[len(header):-1].split(b"\0")
+cwd = words.pop(0)
+if not cwd.startswith(b"/"):
+    fail("the working directory must be an absolute path")
+if not words or all(b"=" in word for word in words):
+    fail("no command was given")
+try:
+    os.chdir(cwd)
+except OSError as error:
+    fail("the working directory could not be entered: %s" % error.strerror)
+# The control plane writes membership; command output cannot extend this read-only grant.
+held = []
+if landlock:
+    try:
+        target = os.open(root, directory_flags)
+        metadata = os.open(".garden", directory_flags, dir_fd=target)
+        os.close(target)
+        meta_info = os.fstat(metadata)
+        if meta_info.st_uid != int(asker) or meta_info.st_mode & 0o022:
+            fail("project input metadata is not protected")
+        try:
+            inputs = os.open("project-inputs.json", os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=metadata)
+        except FileNotFoundError:
+            inputs = None
+        os.close(metadata)
+        if inputs is not None:
+            info = os.fstat(inputs)
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != int(asker) or info.st_nlink != 1 or info.st_mode & 0o077 or info.st_size > 262144:
+                fail("invalid project input membership")
+            with os.fdopen(inputs, "r") as handle:
+                membership = json.load(handle)
+            sources = membership.get("sources")
+            if not isinstance(sources, list) or len(sources) > 4096:
+                fail("invalid project input list")
+            parent_fd = os.open(parent, directory_flags)
+            for source in sources:
+                if not isinstance(source, str) or not re.fullmatch(r"[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}", source):
+                    fail("invalid project input identity")
+                try:
+                    source_fd = os.open(source, directory_flags, dir_fd=parent_fd)
+                    try:
+                        input_fd = os.open("workspace", directory_flags, dir_fd=source_fd)
+                    finally:
+                        os.close(source_fd)
+                except FileNotFoundError:
+                    continue
+                os.set_inheritable(input_fd, True)
+                held.append(input_fd)
+                landlock += ["--landlock-rule", "path-beneath:execute,read-file,read-dir:/proc/self/fd/%d" % input_fd]
+            projects = membership.get("projects", [])
+            if not isinstance(projects, list) or len(projects) > 64:
+                fail("invalid project version list")
+            if projects:
+                store_fd = os.open(".project-store", directory_flags, dir_fd=parent_fd)
+                try:
+                    for project in projects:
+                        if not isinstance(project, str) or not re.fullmatch(r"[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}", project):
+                            fail("invalid project version identity")
+                        project_fd = os.open(project, directory_flags, dir_fd=store_fd)
+                        try:
+                            input_fd = os.open("public", directory_flags, dir_fd=project_fd)
+                        finally:
+                            os.close(project_fd)
+                        info = os.fstat(input_fd)
+                        if info.st_uid != int(asker) or info.st_mode & 0o022:
+                            fail("project versions are not protected")
+                        if process_tree == "mission":
+                            # A distinct open file description keeps the execution grant from
+                            # unlocking the supervisor lifetime protection through an inherited fd.
+                            lock_fd = os.open(".", directory_flags, dir_fd=input_fd)
+                            try:
+                                fcntl.flock(lock_fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+                            except BlockingIOError:
+                                fail("project history maintenance is in progress; retry shortly")
+                            os.set_inheritable(lock_fd, True)
+                            reference_locks.append(lock_fd)
+                            project_references.append({"projectId": project, "device": str(info.st_dev), "inode": str(info.st_ino)})
+                        os.set_inheritable(input_fd, True)
+                        held.append(input_fd)
+                        landlock += ["--landlock-rule", "path-beneath:execute,read-file,read-dir:/proc/self/fd/%d" % input_fd]
+                finally:
+                    os.close(store_fd)
+            os.close(parent_fd)
+    except FileNotFoundError:
+        pass
+    except (OSError, ValueError, TypeError, AttributeError):
+        fail("project inputs could not be verified")
+chain = [setpriv, "--reuid", uid, "--regid", gid, "--clear-groups", "--no-new-privs"]
+chain += landlock + ["--", "/usr/bin/env", "-i"] + words
+if network == "isolated":
+    isolate = "ip link set lo up 2>/dev/null || true\nexec \"$@\""
+    chain = [unshare, "--net", "--", "/bin/sh", "-c", isolate, "garden-sandbox"] + chain
+if process_tree == "mission":
+    os.lseek(lease_fd, 0, os.SEEK_SET)
+    record = json.loads(os.read(lease_fd, 8192))
+    record["projectInputs"] = project_references
+    record["projectInputLockProtocol"] = 1
+    data = json.dumps(record, separators=(",", ":")).encode()
+    if len(data) > 8192:
+        fail("project input lifetime record exceeds its storage bound")
+    os.lseek(lease_fd, 0, os.SEEK_SET)
+    os.write(lease_fd, data)
+    os.ftruncate(lease_fd, len(data))
+    os.fsync(lease_fd)
+    descriptors = {"inputs": held, "locks": reference_locks}
+    chain = ["/usr/bin/python3", "-I", "-S", supervisor, str(lease_fd), str(gate_fd), json.dumps(descriptors), unshare] + chain
+os.execv(chain[0], chain)
+'
+
+mode="${1:-}"
+shift || true
+
+case "$mode" in
+  run)
+    network="${1:-}"
+    shift || true
+    confinement="${1:-}"
+    shift || true
+    # Present in the grammar even under `open`, where it is ignored, so that the word order is one
+    # fact rather than two: a caller that forgets the root is refused for a missing spec instead of
+    # having its first environment assignment read as a mode.
+    root="${1:-}"
+    shift || true
+    # The spec path is the last word, and it is the only one after the root. Anything more is a
+    # caller spelling the command on the argument list, which is the one thing this arm must never
+    # run: refusing it is what keeps a stale caller from putting file contents back in the journal.
+    [ "${1:-}" = "--spec" ] ||
+      fail "the command is read from a spec file: run NETWORK FILESYSTEM ROOT --spec PATH"
+    spec_argument="${2:-}"
+    [ -n "$spec_argument" ] || fail "no spec path was given"
+    [ "$#" -eq 2 ] || fail "nothing may follow the spec path; the command and its environment belong in the file"
+    # Who is asking, before the file is looked at. sudo names the account in SUDO_UID, and the
+    # reader refuses a spec that account does not own - so a file root or anyone else left at the
+    # right path, under the right name, is neither read nor removed. A helper run by root directly
+    # has no asker to check against and is refused for it, with the file left where it is.
+    asker_uid="${SUDO_UID:-}"
+    case "$asker_uid" in
+      "" | *[!0-9]*) fail "SUDO_UID does not name the account that asked; this helper runs through the installed sudo policy" ;;
+    esac
+    # Then the shape, and `spec` assigned only past it, so that no refusal below can remove a file
+    # at a path the caller chose.
+    spec_path_shape "$spec_argument" ||
+      fail "the spec file must be $spec_parent/<hex>.spec, the one place the runner writes one"
+    spec="$spec_argument"
+    [ -f "$spec" ] || fail "the spec file $spec does not exist"
+    case "$confinement" in
+      confine | mission)
+        confinable_root "$root" ||
+          fail "a confined command needs an existing workspace directly under $workspace_parent"
+        confine_to "$root"
+        ;;
+      open)
+        landlock_arguments=""
+        ;;
+      *)
+        fail "the filesystem mode must be confine, mission or open"
+        ;;
+    esac
+    case "$network" in
+      network | isolated) ;;
+      *) fail "the network mode must be network or isolated" ;;
+    esac
+    [ -x /usr/bin/python3 ] || fail "/usr/bin/python3 is missing, and it is what reads the spec file"
+    # -I ignores every PYTHON* variable and the current directory, -S skips site-packages: the
+    # reader takes nothing from the environment sudo left it or from anything installed on the box.
+    # $landlock_arguments is split on whitespace on purpose, for the reason run_as_agent gives.
+    # shellcheck disable=SC2086
+    exec /usr/bin/python3 -I -S -c "$spec_loader" "$network" "$confinement" "$mission_supervisor" "$spec" "$workspace_parent" \
+      "$asker_uid" /usr/bin/setpriv /usr/bin/unshare "$agent_uid" "$agent_gid" "$root" $landlock_arguments
+    ;;
+  shell)
+    # The owner's interactive terminal. Separated from `run` only so the sudoers policy can give
+    # this one a pseudo-terminal: without one the shell has no controlling terminal of its own
+    # and loses job control, which is the difference between a usable terminal and a broken one.
+    #
+    # Never confined, and this is not an oversight. This mode is the owner sitting at their own
+    # computer, and a filesystem boundary here would stop them reading their own files from their
+    # own terminal - which is ease of use destroyed for no boundary gained, since the owner already
+    # reaches every one of those files through the file browser.
+    [ "$#" -gt 0 ] || fail "no command was given"
+    run_as_agent "$@"
+    ;;
+  mission-status)
+    [ "$#" -eq 1 ] || fail "mission-status requires one lease path"
+    exec /usr/bin/python3 -I -S "$mission_supervisor" --status "$1" "$workspace_parent" "$SUDO_UID"
+    ;;
+  check)
+    # The installer runs this and refuses to finish if the answer is wrong, so that a box can
+    # never come up believing it sandboxes agent commands when it does not.
+    printf 'user=%s\n' "$(
+      /usr/bin/setpriv --reuid "$agent_uid" --regid "$agent_gid" --clear-groups --no-new-privs \
+        -- /usr/bin/id -un
+    )"
+    # `/bin/sh -c :` rather than `/bin/true`, here and in the filesystem probe below, and it is the
+    # same argument in both places: POSIX pins a shell at /bin/sh and pins nothing at /bin/true.
+    # `true` is a coreutils binary whose location is exactly the merged/non-merged question the
+    # filesystem probe already got wrong once - on a host that puts it at /usr/bin/true with no /bin
+    # symlink, or on a macOS-shaped box where /bin has no `true` at all, a probe spelled /bin/true
+    # reports a rung this box does not deserve. Nothing about either probe needs a smaller program
+    # than a shell that exits.
+    if /usr/bin/unshare --net -- /bin/sh -c : >/dev/null 2>&1; then
+      printf 'network-isolation=yes\n'
+    else
+      printf 'network-isolation=no\n'
+    fi
+    if [ -r "$mission_supervisor" ] && /usr/bin/unshare --mount --pid --fork --kill-child --mount-proc -- /bin/sh -c '[ "$$" -eq 1 ]' >/dev/null 2>&1; then
+      printf 'process-isolation=yes\n'
+      /usr/bin/python3 -I -S "$mission_supervisor" --features
+    else
+      printf 'process-isolation=no\n'
+      printf 'retained-process-trees=no\n'
+    fi
+    # The filesystem rung, reported rather than assumed. The installer reads this line and writes
+    # CONFINE_AGENT_FILESYSTEM from it, so a kernel or a util-linux that cannot do this is told to
+    # stop asking rather than left failing every command - and an operator can read the same line.
+    #
+    # Two answers and not three. /usr/bin/bwrap is present on a stock Ubuntu and would be a second
+    # way to draw this boundary, but nothing in this helper uses it, and a line naming a
+    # confinement no code performs is exactly the lie the whole ladder exists to prevent. It
+    # becomes a third answer on the day something here actually runs it.
+    #
+    # The probe carries the same read rules a confined command gets, and this is the point of it.
+    # It used to grant /usr alone and then exec a program under /bin, which resolves inside that one
+    # hierarchy only where /bin is a symbolic link into it. On the owner's box it is (`/bin ->
+    # usr/bin`, `/lib -> usr/lib`, `/lib64 -> usr/lib64`), so the probe passed and said nothing about
+    # a host where /bin is a real directory - and on that host it failed for want of a rule rather
+    # than for want of Landlock, the installer took the `*)` arm, warned about the kernel, and wrote
+    # CONFINE_AGENT_FILESYSTEM=false on a box that could have enforced it. A silent downgrade
+    # reported as a kernel limitation. install-native.sh installs on several host families, so that
+    # host is not hypothetical, and the helper's own comment above already says /lib64 and /srv are
+    # not universal. Probing with the shipped list also means the probe fails if the list itself is
+    # ever wrong, which is the failure worth learning about at install time.
+    #
+    # scripts/test-sandbox.sh stands a non-merged host up for this: its setpriv recorder decides
+    # rule coverage by literal path prefix, which is what a real /bin costs, and it asserts the
+    # OUTCOME of both this probe and a copy of the old /usr-only one.
+    landlock_arguments="--landlock-access fs"
+    add_read_rules
+    # shellcheck disable=SC2086
+    if /usr/bin/setpriv --no-new-privs $landlock_arguments -- /bin/sh -c : >/dev/null 2>&1; then
+      printf 'filesystem=landlock\n'
+    else
+      printf 'filesystem=none\n'
+    fi
+    ;;
+  *)
+    fail "usage: garden-sandbox {run network|isolated confine|mission|open ROOT --spec PATH|shell [VAR=VALUE...] COMMAND [ARG...]|check}"
+    ;;
+esac

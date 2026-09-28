@@ -5,8 +5,8 @@
  * use", and the question is asked of the database rather than of a list held in this process.
  */
 
-import { AthanorError } from '@athanor/core';
-import type { DataStore } from '@athanor/data';
+import { GardenError } from '@garden/core';
+import type { DataStore } from '@garden/data';
 import { z } from 'zod';
 import { workspaceResponse } from '../context.js';
 import { requireUser } from '../http/auth-hook.js';
@@ -29,7 +29,7 @@ export const registerSnapshotRoutes = (context: RouteContext): void => {
     async (request) => {
       const user = requireUser(request.user);
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       return store.listWorkspaceSnapshots(user.id, workspace.id);
     }
   );
@@ -42,9 +42,9 @@ export const registerSnapshotRoutes = (context: RouteContext): void => {
       return idempotent(request, reply, user, async () => {
         const input = z.object({ name: z.string().trim().min(1).max(80) }).parse(request.body);
         const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-        if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+        if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
         if (!['running', 'hibernated'].includes(workspace.status)) {
-          throw new AthanorError(
+          throw new GardenError(
             'workspace_unavailable',
             'Recovery points can only be created for a running or hibernated workspace',
             409
@@ -52,7 +52,7 @@ export const registerSnapshotRoutes = (context: RouteContext): void => {
         }
         const snapshots = await store.listWorkspaceSnapshots(user.id, workspace.id);
         if (snapshots.length >= serverLimits.maxSnapshots) {
-          throw new AthanorError(
+          throw new GardenError(
             'snapshot_limit',
             `This server keeps up to ${serverLimits.maxSnapshots} recovery points`,
             409
@@ -114,16 +114,15 @@ export const registerSnapshotRoutes = (context: RouteContext): void => {
       await requireRecentStepUp(request, user);
       return idempotent(request, reply, user, async () => {
         const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-        if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+        if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
         const snapshot = await store.getWorkspaceSnapshot(
           user.id,
           workspace.id,
           request.params.snapshotId
         );
-        if (!snapshot)
-          throw new AthanorError('snapshot_not_found', 'Recovery point not found', 404);
+        if (!snapshot) throw new GardenError('snapshot_not_found', 'Recovery point not found', 404);
         if (snapshot.status === 'creating' || snapshot.status === 'deleting') {
-          throw new AthanorError('snapshot_busy', 'This recovery point is still changing', 409);
+          throw new GardenError('snapshot_busy', 'This recovery point is still changing', 409);
         }
         await store.setWorkspaceSnapshotStatus(String(snapshot.id), 'deleting');
         const snapshotId = String(snapshot.id);
@@ -161,16 +160,16 @@ export const registerSnapshotRoutes = (context: RouteContext): void => {
     return idempotent(request, reply, user, async () => {
       const input = z.object({ confirmName: z.string() }).parse(request.body);
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       if (input.confirmName !== workspace.name) {
-        throw new AthanorError(
+        throw new GardenError(
           'confirmation_mismatch',
           'Enter the exact computer name to restore this recovery point',
           400
         );
       }
       if (!['running', 'hibernated'].includes(workspace.status)) {
-        throw new AthanorError(
+        throw new GardenError(
           'workspace_unavailable',
           'A restore cannot start while another computer operation is active',
           409
@@ -182,7 +181,7 @@ export const registerSnapshotRoutes = (context: RouteContext): void => {
         request.params.snapshotId
       );
       if (!target || target.status !== 'ready') {
-        throw new AthanorError(
+        throw new GardenError(
           'snapshot_unavailable',
           'Only a ready recovery point can be restored',
           409
@@ -190,7 +189,7 @@ export const registerSnapshotRoutes = (context: RouteContext): void => {
       }
       const snapshots = await store.listWorkspaceSnapshots(user.id, workspace.id);
       if (snapshots.length >= serverLimits.maxSnapshots) {
-        throw new AthanorError(
+        throw new GardenError(
           'snapshot_limit',
           'Delete a recovery point first; restore creates an additional safety point',
           409

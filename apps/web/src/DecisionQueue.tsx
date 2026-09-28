@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { ShieldCheck, ArrowUpRight } from 'lucide-react';
-import type { Task } from '@athanor/contracts';
+import type { Task } from '@garden/contracts';
 import type { Decision } from './model';
 import { data, text, date } from './model';
 import { post, ApiError } from './client';

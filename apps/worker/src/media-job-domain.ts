@@ -1,4 +1,4 @@
-import type { VideoGenerationRequest } from '@athanor/model-gateway';
+import type { VideoGenerationRequest } from '@garden/model-gateway';
 
 export interface StoredVideoRequest {
   provider: { baseUrl: string; apiKey: string; apiProtocol: 'openrouter' | 'openai' };

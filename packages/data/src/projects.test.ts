@@ -6,7 +6,7 @@ import {
   memoryIndexKey,
   planMemoryQuery,
   wrapDataKey
-} from '@athanor/core';
+} from '@garden/core';
 import { createDatabase, migrateDatabase } from './database.js';
 import { DataStore } from './store.js';
 import { projectResponse } from './projects.js';

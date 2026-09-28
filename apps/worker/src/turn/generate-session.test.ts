@@ -22,11 +22,11 @@
  * chose. The gateway is made to throw once it has captured the body, so each case ends at the send
  * and never reaches billing.
  */
-import { UNKNOWN_SURFACES } from '@athanor/contracts';
-import type { ModelRelease } from '@athanor/contracts';
-import { encryptJson, sha256 } from '@athanor/core';
-import type { DataStore, TaskRecord } from '@athanor/data';
-import type { ModelGateway, ModelTool } from '@athanor/model-gateway';
+import { UNKNOWN_SURFACES } from '@garden/contracts';
+import type { ModelRelease } from '@garden/contracts';
+import { encryptJson, sha256 } from '@garden/core';
+import type { DataStore, TaskRecord } from '@garden/data';
+import type { ModelGateway, ModelTool } from '@garden/model-gateway';
 import { describe, expect, it } from 'vitest';
 import type { AgentState, AgentWorkerConfig } from '../agent-state.js';
 import { COMPACT_CONTEXT_TOOL, prepareModelContext } from '../context.js';
@@ -109,7 +109,7 @@ const reservedTokens = Math.ceil(JSON.stringify(requestTools).length / 4);
 const openingState = (): AgentState =>
   ({
     messages: [
-      { role: 'system', content: 'ATHANOR RUNTIME CONTEXT (dynamic)' },
+      { role: 'system', content: 'GARDEN RUNTIME CONTEXT (dynamic)' },
       { role: 'user', content: 'fix the importer' }
     ],
     step: 0,
@@ -235,7 +235,7 @@ describe('the session key a request carries', () => {
       sessionIdSent(task({ id: forkId, parentTaskId: rootId, forkKind: 'retry' }))
     ).resolves.toBe(parent);
     // The key is the hash and not the id: nothing about which conversation this is leaves the box.
-    expect(parent).toBe(sha256(`athanor-task:${rootId}`).slice(0, 64));
+    expect(parent).toBe(sha256(`garden-task:${rootId}`).slice(0, 64));
     expect(parent).not.toContain(rootId);
   });
 

@@ -10,7 +10,7 @@
  * ── THE CGROUP IS THE ANSWER, NOT THE HARDWARE ────────────────────────────────────────────────
  *
  * Every number here is what this process may actually have, which on this box is never what the
- * hardware has. `infra/native/athanor-runner.service` draws a control group around the runner and
+ * hardware has. `infra/native/garden-runner.service` draws a control group around the runner and
  * every command it starts: `MemoryMax=80%` is a hard ceiling the kernel kills at, `MemoryHigh=60%`
  * throttles below it, and `commandLimits` puts a per-process RLIMIT_DATA at seven tenths of the
  * box inside both. A report built from `os.totalmem()` and `os.availableParallelism()` would say
@@ -55,7 +55,7 @@ import { hostStorage, hostStorageFloorBytes, type HostStorage } from './host-sto
 
 const GIB = 1024 ** 3;
 
-/** Where the unified cgroup v2 hierarchy is mounted on every distribution athanor supports. */
+/** Where the unified cgroup v2 hierarchy is mounted on every distribution garden supports. */
 export const CGROUP_ROOT = '/sys/fs/cgroup';
 /** The only file that says which cgroup this process is actually in. */
 export const CGROUP_SELF = '/proc/self/cgroup';

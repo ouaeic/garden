@@ -92,7 +92,7 @@ describe('command resource limits', () => {
   });
 
   /*
-   * Seven tenths, not half: `MemoryMax=80%` in infra/native/athanor-runner.service is what really
+   * Seven tenths, not half: `MemoryMax=80%` in infra/native/garden-runner.service is what really
    * stops one command from taking the memory PostgreSQL needs, because it counts the runner and
    * every command it started together. RLIMIT_DATA is per process and cannot make that promise at
    * all - sixty-four children of `parallel -j 64` get sixty-four allowances of it - so at half the
@@ -141,7 +141,7 @@ describe('command resource limits', () => {
   });
 
   it('reports a missing limiter instead of throwing', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-limiter-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-limiter-'));
     temporaryRoots.push(root);
     expect(await resolveCommandLimiter(path.join(root, 'prlimit'))).toBeUndefined();
 

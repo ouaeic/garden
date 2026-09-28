@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { AthanorError, type EncryptedEnvelope } from '@athanor/core';
+import { GardenError, type EncryptedEnvelope } from '@garden/core';
 import type { Database } from '../database.js';
 import { json, iso } from './rows.js';
 
@@ -60,7 +60,7 @@ export class ConnectorOperationStore {
       !/^[a-f0-9]{64}$/.test(intentKey) ||
       !/^[a-z_]{1,80}$/.test(identity.action)
     )
-      throw new AthanorError(
+      throw new GardenError(
         'connector_operation_invalid',
         'Invalid connected-service operation identity.'
       );
@@ -120,14 +120,14 @@ export class ConnectorOperationStore {
             ).rows[0];
         }
         if (!existing)
-          throw new AthanorError('connector_not_found', 'The account or task is unavailable.');
+          throw new GardenError('connector_not_found', 'The account or task is unavailable.');
         const operation = record(existing);
         if (
           operation.action !== identity.action ||
           operation.taskId !== identity.taskId ||
           existing.intent_key !== intentKey
         )
-          throw new AthanorError(
+          throw new GardenError(
             'connector_operation_conflict',
             'The operation key belongs to different work.'
           );
@@ -140,7 +140,7 @@ export class ConnectorOperationStore {
           owned
         );
         if (request.rows[0]?.operation_id !== operation.id)
-          throw new AthanorError(
+          throw new GardenError(
             'connector_operation_conflict',
             'The operation key belongs to different work.'
           );
@@ -148,9 +148,9 @@ export class ConnectorOperationStore {
         let active = true;
         const save = async (field: 'recovery' | 'result', envelope: EncryptedEnvelope) => {
           if (!active || connection.signal.aborted)
-            throw new AthanorError('connector_operation_lost', 'The operation lock was released.');
+            throw new GardenError('connector_operation_lost', 'The operation lock was released.');
           if (complete)
-            throw new AthanorError(
+            throw new GardenError(
               'connector_operation_completed',
               'The operation already has a final receipt.'
             );
@@ -158,7 +158,7 @@ export class ConnectorOperationStore {
             envelope.aad !== connectorOperationAad(operation, field) ||
             Buffer.byteLength(JSON.stringify(envelope)) > 100_000
           )
-            throw new AthanorError(
+            throw new GardenError(
               'connector_operation_context',
               'The operation receipt has the wrong context or exceeds its size limit.'
             );
@@ -172,7 +172,7 @@ export class ConnectorOperationStore {
             JSON.stringify(envelope)
           ]);
           if (changed.rowCount !== 1)
-            throw new AthanorError(
+            throw new GardenError(
               'connector_operation_lost',
               'The operation receipt could not be saved.'
             );

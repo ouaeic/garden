@@ -96,7 +96,7 @@ describe('icalendar reading', () => {
 describe('icalendar writing', () => {
   it('writes a timed event as a UTC instant and reads it back unchanged', () => {
     const component = buildEventComponent({
-      uid: 'new-1@athanor',
+      uid: 'new-1@garden',
       summary: 'Design review; with the team',
       description: 'Bring:\nthe deck',
       location: 'Room 4',
@@ -124,7 +124,7 @@ describe('icalendar writing', () => {
   it('writes an all-day event as a date and refuses a mismatched pair', () => {
     const text = serializeIcalendar(
       buildEventComponent({
-        uid: 'new-2@athanor',
+        uid: 'new-2@garden',
         summary: 'Leave',
         start: '2026-07-14',
         end: '2026-07-16',
@@ -134,7 +134,7 @@ describe('icalendar writing', () => {
     expect(text).toContain('DTSTART;VALUE=DATE:20260714');
     expect(() =>
       buildEventComponent({
-        uid: 'new-3@athanor',
+        uid: 'new-3@garden',
         summary: 'Leave',
         start: '2026-07-14T09:00:00Z',
         end: '2026-07-14T10:00:00Z',
@@ -143,7 +143,7 @@ describe('icalendar writing', () => {
     ).toThrow('YYYY-MM-DD');
     expect(() =>
       buildEventComponent({
-        uid: 'new-4@athanor',
+        uid: 'new-4@garden',
         summary: 'Leave',
         start: 'whenever',
         end: 'later',
@@ -156,7 +156,7 @@ describe('icalendar writing', () => {
     const summary = 'A'.repeat(300);
     const text = serializeIcalendar(
       buildEventComponent({
-        uid: 'new-5@athanor',
+        uid: 'new-5@garden',
         summary,
         start: '2026-07-14T09:00:00Z',
         end: '2026-07-14T10:00:00Z',

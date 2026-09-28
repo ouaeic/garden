@@ -1,12 +1,12 @@
-import { AthanorError } from '@athanor/core';
+import { GardenError } from '@garden/core';
 
 /**
  * The API's end of the one journal format.
  *
  * The logger itself, and with it the allowlist that decides what a line may name, is in
- * `@athanor/worker`: the API depends on that package, nothing depends on the API, and the only
+ * `@garden/worker`: the API depends on that package, nothing depends on the API, and the only
  * other thing every process imports is compiled into the browser bundle where there is no stdout
- * to write to. What stays here is what needs athanor's own error vocabulary, which lives a layer
+ * to write to. What stays here is what needs garden's own error vocabulary, which lives a layer
  * above the logger.
  */
 export {
@@ -19,8 +19,8 @@ export {
   type LogLevel,
   type LogThreshold,
   type LogValue
-} from '@athanor/worker';
-import type { LogFields, Logger } from '@athanor/worker';
+} from '@garden/worker';
+import type { LogFields, Logger } from '@garden/worker';
 
 /**
  * A stack trace names code locations, never the data that flowed through them, so the frames are
@@ -55,7 +55,7 @@ const errorFrames = (error: unknown): string | undefined => {
  * One word, or nothing.
  *
  * Every candidate for `code` on this line is a string somebody else chose. Two of them are not
- * athanor's to trust however much they look like it: an AthanorError's code is this repository's
+ * garden's to trust however much they look like it: an GardenError's code is this repository's
  * own vocabulary where it is written by hand, but `runnerFailure` mints one from the `code` field
  * of whatever JSON the workspace runner answered with, and `name` is an ordinary writable property
  * that a library is free to put a sentence in. Both arrive off a wire, unbounded, free to carry
@@ -68,13 +68,13 @@ const errorFrames = (error: unknown): string | undefined => {
 const MACHINE_WORD = /^[A-Za-z0-9_.-]{1,64}$/;
 
 /**
- * The identity of a failure without its wording: an Athanor code where one exists, otherwise a
+ * The identity of a failure without its wording: an Garden code where one exists, otherwise a
  * driver's SQLSTATE or a system errno, otherwise the class name.
  */
 export const errorFields = (error: unknown): LogFields => {
   const carried = (error as { code?: unknown } | null)?.code;
   const code =
-    error instanceof AthanorError
+    error instanceof GardenError
       ? MACHINE_WORD.test(error.code)
         ? error.code
         : 'api_failed'

@@ -21,9 +21,9 @@
  * exactly one test. The self-scoping route sits beside it as the control, still green either way.
  */
 
-import type { ApiTokenScope } from '@athanor/contracts';
-import { AthanorError, sha256 } from '@athanor/core';
-import type { ApiTokenRecord, UserRecord } from '@athanor/data';
+import type { ApiTokenScope } from '@garden/contracts';
+import { GardenError, sha256 } from '@garden/core';
+import type { ApiTokenRecord, UserRecord } from '@garden/data';
 import type { FastifyRequest } from 'fastify';
 import { hasRecentStepUp, sessionCookieName, sessionUser } from '../session.js';
 import type { ServerBase } from './server-context.js';
@@ -158,7 +158,7 @@ const missingRecordLabel: Record<string, string> = {
 };
 
 export const requireUser = (user: UserRecord | null): UserRecord => {
-  if (!user) throw new AthanorError('authentication_required', 'Sign in to continue');
+  if (!user) throw new GardenError('authentication_required', 'Sign in to continue');
   return user;
 };
 
@@ -277,7 +277,7 @@ export const createStepUpGuard = (context: ServerBase): StepUpGuard => {
   const { store, secure } = context;
   const requireRecentStepUp = async (request: FastifyRequest, user: UserRecord): Promise<void> => {
     if (!(await hasRecentStepUp(store, user.id, request.cookies[sessionCookieName(secure)]))) {
-      throw new AthanorError(
+      throw new GardenError(
         'step_up_required',
         'Confirm this sensitive action with your passkey',
         403
@@ -327,12 +327,12 @@ export const registerAuthHooks = (context: ServerBase): void => {
       request.apiToken = null;
     }
     if (!publicPaths.has(path) && !request.user) {
-      throw new AthanorError('authentication_required', 'Sign in to continue');
+      throw new GardenError('authentication_required', 'Sign in to continue');
     }
     if (request.apiToken) {
       const scope = requiredApiTokenScope(request.method, path);
       if (!scope || !request.apiToken.scopes.includes(scope))
-        throw new AthanorError(
+        throw new GardenError(
           'api_token_scope_required',
           scope
             ? `This API token requires the ${scope} scope`
@@ -343,7 +343,7 @@ export const registerAuthHooks = (context: ServerBase): void => {
     if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
       const origin = request.headers.origin;
       if (origin && origin !== config.PUBLIC_APP_URL)
-        throw new AthanorError('invalid_origin', 'Request origin is not allowed');
+        throw new GardenError('invalid_origin', 'Request origin is not allowed');
     }
   });
   /**
@@ -360,7 +360,7 @@ export const registerAuthHooks = (context: ServerBase): void => {
     for (const [name, value] of Object.entries(parameters)) {
       if (!name.endsWith('Id') || typeof value !== 'string') continue;
       if (uuidPattern.test(value)) continue;
-      throw new AthanorError(
+      throw new GardenError(
         missingRecordCode[name] ?? 'not_found',
         `${missingRecordLabel[name] ?? 'The record'} was not found`,
         404
@@ -385,11 +385,11 @@ export const registerAuthHooks = (context: ServerBase): void => {
        * owner's own workspace" are the same question with one answer.
        */
       if (!(await store.workspaceBelongsToUser(user.id, parameters.workspaceId)))
-        throw new AthanorError('workspace_not_found', 'Workspace not found', 404);
+        throw new GardenError('workspace_not_found', 'Workspace not found', 404);
     }
     if (parameters.taskId && route === '/v1/tasks/:taskId/:action' && request.method === 'POST') {
       if (!(await store.getTask(user.id, parameters.taskId)))
-        throw new AthanorError('task_not_found', 'Task not found', 404);
+        throw new GardenError('task_not_found', 'Task not found', 404);
     }
   });
 };

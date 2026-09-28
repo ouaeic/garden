@@ -1,4 +1,4 @@
-import type { TaskScheduleSpec } from '@athanor/contracts';
+import type { TaskScheduleSpec } from '@garden/contracts';
 
 const weekdayNumbers: Record<string, number> = {
   Sun: 0,

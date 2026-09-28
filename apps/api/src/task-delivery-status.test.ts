@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
-import { createDatabase } from '@athanor/data';
+import { createDatabase } from '@garden/data';
 import { withTaskDeliveryStatus } from './task-delivery-status.js';
 
 describe('batched task delivery summaries', () => {

@@ -1,5 +1,5 @@
-import { CONVERSATION_NAME_INDEX_STAMP } from '@athanor/core';
-import type { ConversationNameIndex, EncryptedEnvelope } from '@athanor/core';
+import { CONVERSATION_NAME_INDEX_STAMP } from '@garden/core';
+import type { ConversationNameIndex, EncryptedEnvelope } from '@garden/core';
 import type { Database } from '../database.js';
 import type { TaskRecord } from '../types.js';
 import { encryptedText, json, mapTask } from './rows.js';
@@ -20,7 +20,7 @@ import { MAX_TASK_PAGE } from './tasks.js';
 const SPEND_RETENTION_INTERVAL = `INTERVAL '400 days'`;
 
 /**
- * The passes nobody asks for: the backfills that carry rows an older athanor wrote up to the shape
+ * The passes nobody asks for: the backfills that carry rows an older garden wrote up to the shape
  * this one reads, the nightly sweep that bounds every table that would otherwise grow for ever, and
  * the account export that reads all of them at once.
  *
@@ -99,7 +99,7 @@ export class MaintenanceStore {
       // statement, and the day anything names a prepared statement here the fifth execution
       // silently goes back to reading the whole table. Interpolating costs nothing and does not
       // depend on it - and it is what `taskNameTsv` already does with this same value: it comes
-      // from `@athanor/core`, it is a fixed hash over a fixed alphabet, and no caller supplies it.
+      // from `@garden/core`, it is a fixed hash over a fixed alphabet, and no caller supplies it.
       `SELECT id, workspace_id, title, prompt_ciphertext FROM tasks
        WHERE name_tsv IS NULL OR NOT (name_tsv @@ '${CONVERSATION_NAME_INDEX_STAMP}'::tsquery)
        ORDER BY created_at, id LIMIT $1`,

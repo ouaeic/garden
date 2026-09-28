@@ -1,12 +1,12 @@
-import { SaveDraftRequest } from '@athanor/contracts';
+import { SaveDraftRequest } from '@garden/contracts';
 import {
-  AthanorError,
+  GardenError,
   decryptJson,
   deriveServiceSecret,
   encryptJson,
   sha256,
   unwrapDataKey
-} from '@athanor/core';
+} from '@garden/core';
 import { createHmac } from 'node:crypto';
 import type { z } from 'zod';
 import { requireUser } from '../http/auth-hook.js';
@@ -20,11 +20,11 @@ export const registerDraftRoutes = (context: RouteContext): void => {
   const workspaceFor = async (userId: string, input: z.infer<typeof DraftScope>) => {
     const workspace = await store.getWorkspace(userId, input.workspaceId);
     if (!workspace?.wrappedKey)
-      throw new AthanorError('workspace_not_found', 'Workspace not found', 404);
+      throw new GardenError('workspace_not_found', 'Workspace not found', 404);
     if (input.taskId) {
       const task = await store.getTask(userId, input.taskId);
       if (!task || task.workspaceId !== workspace.id)
-        throw new AthanorError(
+        throw new GardenError(
           'task_not_found',
           'This conversation is not in the selected workspace',
           404
@@ -37,7 +37,7 @@ export const registerDraftRoutes = (context: RouteContext): void => {
     const token = request.cookies[sessionCookieName(secure)];
     const sessionId = token ? await store.getSessionPublicId(user.id, sha256(token)) : null;
     if (!sessionId)
-      throw new AthanorError('authentication_required', 'A signed-in device is required', 401);
+      throw new GardenError('authentication_required', 'A signed-in device is required', 401);
     const secret = Buffer.from(deriveServiceSecret(masterKey, 'device-drafts'), 'base64url');
     const key = createHmac('sha256', secret)
       .update(JSON.stringify([user.id, sessionId]))
@@ -100,7 +100,7 @@ export const registerDraftRoutes = (context: RouteContext): void => {
               : null
         });
         if (!receipt)
-          throw new AthanorError(
+          throw new GardenError(
             'draft_conflict',
             'A newer draft was saved on another device. Choose which version to keep.',
             409

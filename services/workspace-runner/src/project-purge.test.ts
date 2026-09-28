@@ -20,7 +20,7 @@ import { purgeCapacity, purgeFilesystem, PurgeManifest } from './project-purge-f
 import { ensureWorkspace } from './files.js';
 import { acquireProjectReference } from './project-reference-lock.js';
 import Fastify from 'fastify';
-import { capabilityAudience, signCapabilityToken } from '@athanor/core';
+import { capabilityAudience, signCapabilityToken } from '@garden/core';
 import { authenticateRunnerRequest } from './auth.js';
 import { registerProjectUpdateRoutes } from './project-update-routes.js';
 

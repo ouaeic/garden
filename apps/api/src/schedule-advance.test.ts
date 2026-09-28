@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import type { TaskScheduleSpec } from '@athanor/contracts';
-import { nextScheduleRun } from '@athanor/core';
+import type { TaskScheduleSpec } from '@garden/contracts';
+import { nextScheduleRun } from '@garden/core';
 import { advanceScheduleRun } from './schedule-advance.js';
 
 const newYork = 'America/New_York';

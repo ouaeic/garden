@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import type { NativeAuthorization } from '@athanor/contracts';
+import type { NativeAuthorization } from '@garden/contracts';
 import {
   authorizationSnapshot,
   browserAuthorizationLocation,

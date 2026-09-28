@@ -1,4 +1,4 @@
-import type { ImageDimensions, MediaCapabilities } from '@athanor/contracts';
+import type { ImageDimensions, MediaCapabilities } from '@garden/contracts';
 
 // Model-specific geometry is documented at https://docs.byteplus.com/api/docs/ModelArk/1824121.
 const dimensionsFor = (model: string): ImageDimensions | undefined =>

@@ -118,7 +118,7 @@ export async function repositoryOverview(
       '--glob',
       'GARDEN.md',
       '--glob',
-      'ATHANOR.md',
+      'GARDEN.md',
       '--glob',
       'OPEN_CLOUD.md',
       '--glob',

@@ -10,7 +10,7 @@
 import { describe, expect, it } from 'vitest';
 import { dampenBrowserCpu, type BrowserCpuDeps } from './browser-cpu.js';
 
-const PROFILE = '/home/athanor/ws-1/.athanor/browser';
+const PROFILE = '/home/garden/ws-1/.garden/browser';
 
 const fakeProc = (
   processes: Record<number, { cmd: string; nice?: number }>,
@@ -51,7 +51,7 @@ describe('pushing a browser down the scheduler', () => {
   it('leaves another workspace`s browser and unrelated processes alone', async () => {
     const { deps, moved } = fakeProc({
       10: { cmd: `chrome --user-data-dir=${PROFILE}` },
-      20: { cmd: 'chrome --user-data-dir=/home/athanor/ws-2/.athanor/browser' },
+      20: { cmd: 'chrome --user-data-dir=/home/garden/ws-2/.garden/browser' },
       30: { cmd: 'postgres: writer process' }
     });
     expect(await dampenBrowserCpu(deps, PROFILE, 10)).toBe(1);

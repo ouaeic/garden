@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { wrapDataKey } from '@athanor/core';
-import type { DataStore, TaskRecord } from '@athanor/data';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import { wrapDataKey } from '@garden/core';
+import type { DataStore, TaskRecord } from '@garden/data';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { AgentState } from './agent-state.js';
 import type { DestinationContext } from './egress.js';
 import {

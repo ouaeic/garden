@@ -44,7 +44,7 @@ describe('where a tainted turn may send a request', () => {
 
   /*
    * The owner asked for a page to be built and served. It raised ten approval cards and every one
-   * of them was athanor talking to itself - four to its own web server on loopback, three to its
+   * of them was garden talking to itself - four to its own web server on loopback, three to its
    * own preview URL on its own domain. Nothing left the machine in any of them. Cards like that are
    * worse than no card, because they are what teaches someone to approve without reading.
    */
@@ -69,7 +69,7 @@ describe('where a tainted turn may send a request', () => {
    * The other half of the same repair, and the half that was wrong for six waves.
    *
    * `http://192.168.1.10/thing` and `http://box.local/page` sat in the list above, under a comment
-   * about athanor talking to itself, and neither of them is athanor talking to itself: one is the
+   * about garden talking to itself, and neither of them is garden talking to itself: one is the
    * owner's NAS and the other is whatever answers mDNS on their LAN. The reason they were there is
    * that the predicate underneath answered one question - "is this out on the internet" - and the
    * whole estate shares its answer with loopback. Driven on the shipped floor at cd7033f, nine such
@@ -144,7 +144,7 @@ describe('where a tainted turn may send a request', () => {
 
   it('does not ask about this installation reading its own published preview', () => {
     const verdict = classifyDestination(
-      'https://vps-5099.example-host.one/__athanor/preview/5f4e5aece4af2436e54eabe2',
+      'https://vps-5099.example-host.one/__garden/preview/5f4e5aece4af2436e54eabe2',
       context({ selfOrigins: ['vps-5099.example-host.one'] })
     );
     expect(verdict.sink).toBe(false);

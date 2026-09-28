@@ -12,7 +12,7 @@ import type {
   DesktopAction,
   DesktopHolder,
   DesktopLaunchRequest
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import {
   DISPLAY_PROTOCOL,
   DisplayEncoder,
@@ -102,14 +102,14 @@ export interface DesktopSnapshot {
 }
 
 /**
- * The AT-SPI state names this file matches on, in the spelling `athanor-desktop-bridge.py` emits.
+ * The AT-SPI state names this file matches on, in the spelling `garden-desktop-bridge.py` emits.
  *
  * Written down because both of them had been wrong, in the same way, for the life of the file: the
  * selection ranked on `'disabled'` and the classifier looked for `'read-only'`, and AT-SPI has
  * neither string. The vocabulary is `ATSPI_STATE_*` with the prefix removed and lowercased, so
  * `ATSPI_STATE_SENSITIVE` is `sensitive` and `ATSPI_STATE_READ_ONLY` is `read_only` - one word,
  * underscore, no hyphen. `state_name` in the bridge is the function that produces them and
- * `athanor-desktop-bridge.test.py` is what pins it; a name invented here rather than read from
+ * `garden-desktop-bridge.test.py` is what pins it; a name invented here rather than read from
  * there is a predicate that silently never fires, which is exactly what happened twice.
  */
 export const DESKTOP_STATE = {
@@ -202,7 +202,7 @@ export interface DesktopStreamState {
 
 export interface DesktopSubscriber {
   state: (state: DesktopStreamState) => void;
-  /** Receives ready-framed `athanor.display.v1` binary messages; forward them verbatim. */
+  /** Receives ready-framed `garden.display.v1` binary messages; forward them verbatim. */
   frame: (frame: Buffer, state: DesktopStreamState) => void;
   /**
    * Send-buffer depth of the client transport. The WebSocket route should pass
@@ -801,8 +801,8 @@ const parseGeometry = (value: string | undefined, fallback: DisplayGeometry): Di
  * Measured on the box. A turn was asked to use the desktop, tried `gedit`, then `xterm`, then
  * `mousepad`, got nothing from any of them and reported the desktop dead. It was not dead: X11,
  * xdotool, wmctrl and xrandr are all provisioned, and the desktop was serving. What the host has
- * no GUI application at all - the capability table in `scripts/athanor-host.sh` provisions the
- * desktop's plumbing and no programs to run in it - except the one athanor manages itself.
+ * no GUI application at all - the capability table in `scripts/garden-host.sh` provisions the
+ * desktop's plumbing and no programs to run in it - except the one garden manages itself.
  *
  * So the refusal names it. A browser is the surface most desktop work wants anyway, and it is the
  * only program this computer can promise is present, because it is the one it installs. Guessing
@@ -1018,7 +1018,7 @@ export class DesktopManager {
     let gui: GuiLease | undefined;
     try {
       gui = await this.gui?.acquire(root);
-      const envFile = path.join(root, '.athanor', 'desktop', 'environment');
+      const envFile = path.join(root, '.garden', 'desktop', 'environment');
       await rm(envFile, { force: true });
       const process = spawn(this.sessionExecutable!, [root, display], {
         cwd: root,
@@ -1094,7 +1094,7 @@ export class DesktopManager {
           this.#syncEncoder(session);
         }
       });
-      const boot = parseGeometry(values.ATHANOR_BOOT_RES, DEFAULT_BOOT_GEOMETRY);
+      const boot = parseGeometry(values.GARDEN_BOOT_RES, DEFAULT_BOOT_GEOMETRY);
       const env: NodeJS.ProcessEnv = {
         ...processEnv(root),
         ...gui?.environment,
@@ -1120,7 +1120,7 @@ export class DesktopManager {
         lastAction: '',
         geometry: boot,
         bootGeometry: boot,
-        ceiling: parseGeometry(values.ATHANOR_MAX_RES, DEFAULT_CEILING),
+        ceiling: parseGeometry(values.GARDEN_MAX_RES, DEFAULT_CEILING),
         outputName: 'screen',
         currentMode: null,
         codec: 'avc1',
@@ -1208,7 +1208,7 @@ export class DesktopManager {
     session.outputName = state.output;
     session.ceiling = state.maximum;
     session.geometry = state.current;
-    session.currentMode = state.athanorModes[0] ?? null;
+    session.currentMode = state.gardenModes[0] ?? null;
     if (
       state.current.width !== session.bootGeometry.width ||
       state.current.height !== session.bootGeometry.height
@@ -1460,7 +1460,7 @@ export class DesktopManager {
         nodes: [],
         nodesOmitted: 0,
         screenshotBase64: '',
-        message: 'This Linux host does not have the Athanor GUI dependencies configured.'
+        message: 'This Linux host does not have the Garden GUI dependencies configured.'
       };
     const session = await this.ensure(workspaceId, root);
     const holder = session.control.holder;

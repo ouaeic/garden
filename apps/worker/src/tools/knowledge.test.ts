@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type ModelToolCall } from '@athanor/model-gateway';
+import { type ModelToolCall } from '@garden/model-gateway';
 import { executeKnowledgeTool } from './knowledge.js';
 import { type ToolContext } from '../tool-dispatch.js';
 

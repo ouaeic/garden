@@ -13,16 +13,16 @@ import {
   type VoiceModels,
   type VoiceSession,
   type VoiceWorkProposal
-} from '@athanor/contracts';
-import { AthanorError, decryptJson, encryptJson, sha256, userMemoryKey } from '@athanor/core';
-import { VoiceStore, type VoiceProposalRecord, type UserRecord } from '@athanor/data';
+} from '@garden/contracts';
+import { GardenError, decryptJson, encryptJson, sha256, userMemoryKey } from '@garden/core';
+import { VoiceStore, type VoiceProposalRecord, type UserRecord } from '@garden/data';
 import {
   discoverRealtimeModels,
   isNativeOpenAIEndpoint,
   REALTIME_PRICE_CHECKED_AT,
   realtimeReservationUsd,
   type RealtimeModelMetadata
-} from '@athanor/model-gateway';
+} from '@garden/model-gateway';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 import { SESSION_LIFETIME_SECONDS, sessionCookieName } from '../session.js';
@@ -51,7 +51,7 @@ const configAad = (id: string) => `voice-configuration:${id}`;
 const connectionAad = (id: string) => `voice-connection:${id}`;
 const proposalAad = (id: string) => `voice-proposal:${id}`;
 const unavailable = () =>
-  new AthanorError('voice_session_unavailable', 'This voice session is unavailable', 404);
+  new GardenError('voice_session_unavailable', 'This voice session is unavailable', 404);
 const active = new Set(['preparing', 'connecting', 'listening', 'responding', 'stopping']);
 export interface VoiceRouteOptions {
   providerFactory?: (url: string, options: WebSocket.ClientOptions) => WebSocket;
@@ -70,7 +70,7 @@ export async function registerVoiceRoutes(
     const user = requireUser(request.user),
       cookie = request.cookies?.[sessionCookieName(context.secure)];
     if (request.apiToken || !cookie)
-      throw new AthanorError(
+      throw new GardenError(
         'voice_owner_required',
         'Start live voice from a signed-in browser',
         403
@@ -84,7 +84,7 @@ export async function registerVoiceRoutes(
       !isNativeOpenAIEndpoint(secret.baseUrl) ||
       !secret.apiKey
     )
-      throw new AthanorError(
+      throw new GardenError(
         'voice_connection_unavailable',
         'Live voice needs a direct OpenAI API credential in Settings',
         409
@@ -151,7 +151,7 @@ export async function registerVoiceRoutes(
       return {
         options: [],
         reason:
-          error instanceof AthanorError
+          error instanceof GardenError
             ? error.message
             : 'Live voice model discovery could not be verified. Try again after checking the provider connection.'
       };
@@ -201,7 +201,7 @@ export async function registerVoiceRoutes(
           active.has(session.status)
         )
       )
-        throw new AthanorError(
+        throw new GardenError(
           'voice_still_active',
           'End live voice before clearing its saved discussion.',
           409
@@ -213,7 +213,7 @@ export async function registerVoiceRoutes(
   app.post<{ Params: { taskId: string } }>('/v1/tasks/:taskId/voice-sessions', async (request) => {
     const { user, authHash } = owner(request),
       selection = VoiceStartRequest.parse(request.body);
-    if (closing) throw new AthanorError('voice_server_stopping', 'The server is restarting', 503);
+    if (closing) throw new GardenError('voice_server_stopping', 'The server is restarting', 503);
     const requestKey = z
       .string()
       .regex(/^[A-Za-z0-9_.:-]{8,200}$/)
@@ -243,7 +243,7 @@ export async function registerVoiceRoutes(
     const c = await connectionFor(user.id),
       model = c.models.find((m) => `openai/${m.modelId}` === selection.modelId);
     if (c.routeProof !== selection.expectedRouteProof || !model)
-      throw new AthanorError(
+      throw new GardenError(
         'voice_selection_changed',
         'Review the current live voice model and provider connection before starting',
         409
@@ -251,13 +251,13 @@ export async function registerVoiceRoutes(
     if (
       selection.privacyRoute !== (c.secret.enforceZeroDataRetention ? 'provider_zdr' : 'external')
     )
-      throw new AthanorError(
+      throw new GardenError(
         'voice_privacy_changed',
         'Confirm the advertised provider retention route before starting live voice',
         409
       );
     if (selection.maxSpendUsd < realtimeReservationUsd(model))
-      throw new AthanorError(
+      throw new GardenError(
         'voice_reservation_required',
         'The selected voice allowance cannot reserve a bounded response',
         402
@@ -376,7 +376,7 @@ export async function registerVoiceRoutes(
           if (row.status === (action === 'confirm' ? 'confirmed' : 'rejected'))
             return publicProposal(row);
           if (row.status !== 'pending' || Date.parse(row.expiresAt) <= Date.now())
-            throw new AthanorError(
+            throw new GardenError(
               'voice_proposal_expired',
               'This voice proposal is no longer awaiting review',
               409
@@ -421,7 +421,7 @@ export async function registerVoiceRoutes(
         record = await read(user.id, request.params.sessionId),
         input = VoiceReceiptReconciliation.parse(request.body);
       if (active.has(record.session.status) || record.session.cleanupPending)
-        throw new AthanorError(
+        throw new GardenError(
           'voice_still_active',
           'End the voice session before reconciling a provider invoice',
           409
@@ -474,7 +474,7 @@ export async function registerVoiceRoutes(
       if (!controller?.reconnectable && !configuration.selection.shareTaskContext)
         throw unavailable();
       if (controller && !controller.reconnectable && !controller.closed)
-        throw new AthanorError(
+        throw new GardenError(
           'voice_recovery_wait',
           'Voice is releasing its previous connection.',
           503
@@ -677,7 +677,7 @@ export async function registerVoiceRoutes(
               .catch(() => {});
           socket.resume();
           if (
-            error instanceof AthanorError &&
+            error instanceof GardenError &&
             ['voice_budget_unavailable', 'voice_reservation_required'].includes(error.code) &&
             socket.readyState === WebSocket.OPEN
           ) {

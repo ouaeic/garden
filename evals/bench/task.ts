@@ -12,7 +12,7 @@
  * it exercises everything between the model and the box that a paid run would: the turn loop, the
  * tool catalogue, the approval floor, the acceptance hold, the runner protocol, the shim, and a
  * real filesystem. What it does NOT exercise is the model - no provider is called, nothing is
- * billed, and the score below says nothing whatever about how good athanor is at anything. It says
+ * billed, and the score below says nothing whatever about how good garden is at anything. It says
  * the wire carries work end to end. That distinction is why `--score` writes `parity-wire.csv` and
  * not `parity.csv`; see README.md.
  *
@@ -20,7 +20,7 @@
  * (`PUSHBACK_MARKERS`, published from `apps/worker/src/turn-bounds.ts`), not against a step number,
  * for the reason `evals/harness.ts`'s header gives: a fixed list of replies cannot tell "the loop
  * held the finish and the model complied" from "the next reply happened to be next". A script that
- * reads what athanor just said can, and the step count it produces is then the measured price of
+ * reads what garden just said can, and the step count it produces is then the measured price of
  * the holds rather than an arrangement of this file.
  */
 import type { Fixture, LiveProvider, ModelScript, ScriptContext } from '../harness.js';
@@ -93,14 +93,14 @@ export const EXPECTED_TOTAL = NUMBERS.reduce((total, value) => total + value, 0)
  * `shell` sends `executable` and `args` to the runner as separate fields and the shim spawns them
  * with the environment the call carried, which for a tool call is empty - so a script that reached
  * for `awk` would be measuring whether the box's shell has a compiled-in default PATH rather than
- * whether athanor's loop can drive a box. `read`, arithmetic expansion and `echo` are shell
+ * whether garden's loop can drive a box. `read`, arithmetic expansion and `echo` are shell
  * builtins everywhere this can run. An absolute `executable` for the same reason.
  */
 const SUM_SCRIPT =
   'total=0; while read -r n; do total=$((total + n)); done < input.txt; echo "$total" > total.txt';
 
 /**
- * Whether athanor's LAST word carries one of the loop's own pushback markers.
+ * Whether garden's LAST word carries one of the loop's own pushback markers.
  *
  * The last one and not the window, and the difference cost this script four steps on its first
  * run. A hold's message stays in the window for the rest of the turn, so a script that asked
@@ -108,7 +108,7 @@ const SUM_SCRIPT =
  * byte-identical arguments. The loop's stationary watch caught it and said so
  * ("NOTHING HAS CHANGED FOR 3 STEPS. Every one of them made the same call - set_acceptance - with
  * byte-identical arguments"), which is the mechanism working; the script was the thing that was
- * wrong. `lastMessage` steps over the runtime block, so it is what athanor just said and nothing
+ * wrong. `lastMessage` steps over the runtime block, so it is what garden just said and nothing
  * else. @see evals/harness.ts's ScriptContext.
  */
 const said = (context: ScriptContext, marker: string): boolean =>

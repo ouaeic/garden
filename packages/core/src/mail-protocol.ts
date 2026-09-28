@@ -1,7 +1,7 @@
 /**
  * IMAP and SMTP submission, spoken directly.
  *
- * The decision behind this file: athanor talks to the owner's own mail server over open protocols
+ * The decision behind this file: garden talks to the owner's own mail server over open protocols
  * rather than through a provider's HTTP API, and it does so without adding a dependency. IMAP is a
  * line protocol with literals and SMTP submission is a line protocol with multi-line replies; the
  * subset needed to list, search, read, append and send is small enough to read in one sitting, and
@@ -16,7 +16,7 @@
 import { connect as tlsConnect } from 'node:tls';
 import { lookup as resolveDns } from 'node:dns/promises';
 import type { Duplex } from 'node:stream';
-import { AthanorError } from './errors.js';
+import { GardenError } from './errors.js';
 import { decodeEncodedWords, type MimeAddress } from './mime.js';
 import { isPublicInternetAddress } from './network-scope.js';
 
@@ -40,7 +40,7 @@ export interface CalendarAccountSecret {
   version: 1;
   username: string;
   password: string;
-  /** The address other people invite the owner by; how athanor finds them among an event's attendees. */
+  /** The address other people invite the owner by; how garden finds them among an event's attendees. */
   address: string;
 }
 
@@ -56,7 +56,7 @@ const DEFAULT_TIMEOUT_MS = 30_000;
  * arrives clears the timer and arms a fresh one, so a server that answers one byte every
  * twenty-nine seconds is never late by that measure and the session runs forever - holding a
  * worker slot open while the lease keeps renewing, which is the shape of the stall that ate a
- * turn. Five minutes is far longer than any mailbox operation athanor performs (the largest
+ * turn. Five minutes is far longer than any mailbox operation garden performs (the largest
  * fetch it will ask for is 25 MB) and far shorter than the fifteen-minute model-request deadline
  * it sits underneath, so a session that trips this is stuck rather than slow.
  */
@@ -70,7 +70,7 @@ const DEFAULT_DEADLINE_MS = 5 * 60 * 1000;
 export const secureMailSocket: MailSocketFactory = async (endpoint, timeoutMs) => {
   const addresses = await resolveDns(endpoint.host, { all: true, verbatim: true });
   if (!addresses.length || addresses.some((entry) => !isPublicInternetAddress(entry.address)))
-    throw new AthanorError(
+    throw new GardenError(
       'mail_address_not_allowed',
       'The mail host did not resolve exclusively to public internet addresses'
     );
@@ -90,7 +90,7 @@ export const secureMailSocket: MailSocketFactory = async (endpoint, timeoutMs) =
       }
     );
     socket.setTimeout(timeoutMs, () =>
-      socket.destroy(new AthanorError('mail_timeout', 'The mail server did not answer in time'))
+      socket.destroy(new GardenError('mail_timeout', 'The mail server did not answer in time'))
     );
     socket.once('error', reject);
   });
@@ -123,10 +123,7 @@ class ByteChannel {
       this.#read += chunk.byteLength;
       if (this.#read > this.maxBytes)
         this.#fail(
-          new AthanorError(
-            'mail_response_too_large',
-            'The mail server sent more than was asked for'
-          )
+          new GardenError('mail_response_too_large', 'The mail server sent more than was asked for')
         );
       this.#wake();
     });
@@ -152,10 +149,10 @@ class ByteChannel {
     notify?.();
   }
 
-  #expired(): AthanorError {
+  #expired(): GardenError {
     this.#notify = null;
     this.stream.destroy();
-    return new AthanorError(
+    return new GardenError(
       'mail_timeout',
       // Deliberately the same code as the per-read timeout: both mean "the server did not finish",
       // both are answered by checking the host and port, and the owner-facing copy that routes on
@@ -168,7 +165,7 @@ class ByteChannel {
     const pending = this.#failure;
     if (pending) throw pending;
     if (this.#ended)
-      throw new AthanorError('mail_connection_closed', 'The mail server closed the connection');
+      throw new GardenError('mail_connection_closed', 'The mail server closed the connection');
     // Checked before waiting rather than only inside the timer, because the drip case never
     // reaches a timer expiry: the wait always ends in data, and it is the accumulation of waits
     // that has to be refused.
@@ -199,7 +196,7 @@ class ByteChannel {
           }
           this.#notify = null;
           this.stream.destroy();
-          reject(new AthanorError('mail_timeout', 'The mail server did not answer in time'));
+          reject(new GardenError('mail_timeout', 'The mail server did not answer in time'));
         },
         Math.min(this.timeoutMs, remaining)
       );
@@ -252,7 +249,7 @@ class ByteChannel {
           .toString('binary')
           .replace(/\r?\n$/, '');
       if (this.#length > 200_000)
-        throw new AthanorError('mail_response_invalid', 'The mail server sent an unbounded line');
+        throw new GardenError('mail_response_invalid', 'The mail server sent an unbounded line');
       await this.#waitForData();
     }
   }
@@ -456,7 +453,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const imapDate = (iso: string): string => {
   const parsed = new Date(iso);
   if (!Number.isFinite(parsed.getTime()))
-    throw new AthanorError('mail_search_invalid', `"${iso}" is not a date`);
+    throw new GardenError('mail_search_invalid', `"${iso}" is not a date`);
   return `${parsed.getUTCDate()}-${MONTHS[parsed.getUTCMonth()]!}-${parsed.getUTCFullYear()}`;
 };
 
@@ -497,7 +494,7 @@ export class ImapSession {
     const greeting = await channel.readLine();
     if (!/^\* (OK|PREAUTH)/i.test(greeting)) {
       channel.destroy();
-      throw new AthanorError('mail_greeting_invalid', 'The IMAP server refused the connection');
+      throw new GardenError('mail_greeting_invalid', 'The IMAP server refused the connection');
     }
     const session = new ImapSession(channel, new Set());
     for (const entry of (/\[CAPABILITY ([^\]]*)\]/i.exec(greeting)?.[1] ?? '').split(' '))
@@ -551,7 +548,7 @@ export class ImapSession {
       const line = await this.#readLogicalLine();
       if (line.text.startsWith('+')) return;
       if (line.text.startsWith(`${tag} `))
-        throw new AthanorError(
+        throw new GardenError(
           'mail_command_failed',
           `The IMAP server refused the command: ${line.text.slice(tag.length + 1, tag.length + 301)}`
         );
@@ -571,7 +568,7 @@ export class ImapSession {
       }
       const status = line.text.slice(tag.length + 1);
       if (!/^OK\b/i.test(status))
-        throw new AthanorError(
+        throw new GardenError(
           'mail_command_failed',
           `The IMAP server refused the command: ${status.slice(0, 300)}`
         );
@@ -580,7 +577,7 @@ export class ImapSession {
   }
 
   /**
-   * Every value that came from outside athanor - a search term, a mailbox name, a password, a
+   * Every value that came from outside garden - a search term, a mailbox name, a password, a
    * whole draft - is sent as a literal rather than interpolated into the command line. A literal
    * carries its own length, so there is no quoting to get wrong and no way for a newline in an
    * argument to become a second IMAP command.
@@ -631,9 +628,9 @@ export class ImapSession {
       return;
     }
     if (this.capabilities.has('LOGINDISABLED'))
-      throw new AthanorError(
+      throw new GardenError(
         'mail_authentication_unsupported',
-        'The IMAP server offers no password authentication athanor can use'
+        'The IMAP server offers no password authentication garden can use'
       );
     await this.#execute([
       'LOGIN ',
@@ -795,7 +792,7 @@ export class ImapSession {
       const size = Number(asText(fields.get('RFC822.SIZE') ?? null)) || raw.byteLength;
       return { raw, size, truncated: size > raw.byteLength };
     }
-    throw new AthanorError('mail_message_not_found', `Message ${uid} is not in ${mailbox}`);
+    throw new GardenError('mail_message_not_found', `Message ${uid} is not in ${mailbox}`);
   }
 
   async storeFlags(mailbox: string, uids: number[], add: boolean, flags: string[]): Promise<void> {
@@ -858,7 +855,7 @@ export class SmtpSession {
     const greeting = await SmtpSession.#reply(channel);
     if (greeting.code !== 220) {
       channel.destroy();
-      throw new AthanorError('mail_greeting_invalid', 'The SMTP server refused the connection');
+      throw new GardenError('mail_greeting_invalid', 'The SMTP server refused the connection');
     }
     const hello = await SmtpSession.#command(channel, `EHLO ${options.clientDomain}`, [250]);
     const session = new SmtpSession(channel, hello.lines.slice(1));
@@ -878,9 +875,9 @@ export class SmtpSession {
       lines.push(line.slice(4));
       if (/^\d{3} /.test(line)) return { code: Number(line.slice(0, 3)), lines };
       if (!/^\d{3}-/.test(line))
-        throw new AthanorError('mail_response_invalid', 'The SMTP server sent an unreadable reply');
+        throw new GardenError('mail_response_invalid', 'The SMTP server sent an unreadable reply');
       if (lines.length > 100)
-        throw new AthanorError('mail_response_invalid', 'The SMTP server sent an unbounded reply');
+        throw new GardenError('mail_response_invalid', 'The SMTP server sent an unbounded reply');
     }
   }
 
@@ -892,7 +889,7 @@ export class SmtpSession {
     channel.write(`${command}\r\n`);
     const reply = await SmtpSession.#reply(channel);
     if (!expected.includes(reply.code))
-      throw new AthanorError(
+      throw new GardenError(
         'mail_send_failed',
         `The SMTP server answered ${reply.code}: ${(reply.lines[0] ?? '').slice(0, 300)}`
       );
@@ -907,9 +904,9 @@ export class SmtpSession {
       return;
     }
     if (!/LOGIN/i.test(advertised))
-      throw new AthanorError(
+      throw new GardenError(
         'mail_authentication_unsupported',
-        'The SMTP server offers no password authentication athanor can use'
+        'The SMTP server offers no password authentication garden can use'
       );
     await SmtpSession.#command(this.channel, 'AUTH LOGIN', [334]);
     await SmtpSession.#command(
@@ -944,7 +941,7 @@ export class SmtpSession {
     this.channel.write(Buffer.from(`${body}${body.endsWith('\r\n') ? '' : '\r\n'}.\r\n`, 'binary'));
     const reply = await SmtpSession.#reply(this.channel);
     if (reply.code !== 250)
-      throw new AthanorError(
+      throw new GardenError(
         'mail_send_failed',
         `The SMTP server refused the message with ${reply.code}: ${(reply.lines[0] ?? '').slice(0, 300)}`
       );

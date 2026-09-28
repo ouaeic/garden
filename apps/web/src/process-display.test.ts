@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ManagedProcess } from '@athanor/contracts';
+import type { ManagedProcess } from '@garden/contracts';
 import { processActive, processDuration, processElapsed, processMemory } from './process-display';
 const process: ManagedProcess = {
   sessionId: 'job-1',

@@ -3,7 +3,7 @@ import type {
   ModelPurpose,
   PurposeModelChoice,
   PrivacyRoute
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import {
   priceCeilingFields,
   selectModel,

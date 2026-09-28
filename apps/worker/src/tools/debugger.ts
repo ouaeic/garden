@@ -1,6 +1,6 @@
-import { DebuggerRequest } from '@athanor/contracts';
+import { DebuggerRequest } from '@garden/contracts';
 import { z } from 'zod';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { ToolContext } from '../tool-dispatch.js';
 export function debuggerRequest(args: Record<string, unknown>): DebuggerRequest {
   return DebuggerRequest.parse({

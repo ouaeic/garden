@@ -1,7 +1,7 @@
 import { projectMemorySourceSearchSql } from './sql/memory.js';
 import { randomUUID } from 'node:crypto';
 import {
-  AthanorError,
+  GardenError,
   MEMORY_PACK_BUDGET_TOKENS,
   MEMORY_FUZZY_SIMILARITY_THRESHOLD,
   MEMORY_PACK_DEFAULT_QUOTA,
@@ -18,7 +18,7 @@ import {
   isMemoryToken,
   memoryPredicate,
   resolveMemoryContradiction
-} from '@athanor/core';
+} from '@garden/core';
 import type {
   EncryptedEnvelope,
   MemoryItemIndex,
@@ -27,7 +27,7 @@ import type {
   MemoryQueryPlan,
   MemoryStatus,
   MemoryTrust
-} from '@athanor/core';
+} from '@garden/core';
 import type { Database } from '../database.js';
 import {
   iso,
@@ -264,7 +264,7 @@ export type MemoryLinkRelation =
  * Two active facts about one subject that the store cannot tell apart on its own.
  *
  * Produced by `listMemoryContradictionCandidates` and consumed by the resolution policy in
- * `@athanor/core`, which is deterministic *given a verdict* - so this carries everything the
+ * `@garden/core`, which is deterministic *given a verdict* - so this carries everything the
  * policy needs (trust and observation time) plus the sealed documents, because the only thing that
  * can supply the verdict is something holding the key.
  */
@@ -946,12 +946,12 @@ export class MemoryStore {
   ): Promise<{ item: MemoryItemRecord; supersededIds: string[] }> {
     const definition = memoryPredicate(input.predicate);
     if (!definition)
-      throw new AthanorError(
+      throw new GardenError(
         'memory_predicate_unknown',
         `Unknown memory predicate "${input.predicate}"`
       );
     if (!input.index.subjectKey)
-      throw new AthanorError('memory_fact_subject_missing', 'A fact needs a subject');
+      throw new GardenError('memory_fact_subject_missing', 'A fact needs a subject');
 
     /*
      * The shipped definition, pushed into the registry before anything is written against it.
@@ -977,7 +977,7 @@ export class MemoryStore {
     // Asked of the registry by name rather than off the definition in hand, so that "what makes a
     // predicate functional" has exactly one spelling. `definition` came from the same registry a
     // few lines up, so the answer cannot differ; what changes is that the deterministic half of
-    // contradiction resolution and the predicate helper `@athanor/core` exports are now the same
+    // contradiction resolution and the predicate helper `@garden/core` exports are now the same
     // test, and a future edit to one of them cannot leave the other behind.
     if (isFunctionalMemoryPredicate(input.predicate)) {
       const retired = await transaction.query<{ id: string }>(
@@ -1011,7 +1011,7 @@ export class MemoryStore {
    * moment at which one has been recorded and the other has not.
    *
    * `passed` wins inside the turn as well as across turns. A command can reach both lists at once -
-   * two checks naming the same command, one answered by a run athanor already watched succeed and
+   * two checks naming the same command, one answered by a run garden already watched succeed and
    * one it ran again - and the pass is the later evidence, so nothing is written for it.
    *
    * The subject is the command alone, exactly as a passing run keys it, so a command that fails in
@@ -1137,7 +1137,7 @@ export class MemoryStore {
    * The words, not only the pointer.
    *
    * This selected `source_id`, `span` and `occurred_at` and had no caller anywhere outside the
-   * store's own delegate - which is the whole defect it was: athanor can name the exact character
+   * store's own delegate - which is the whole defect it was: garden can name the exact character
    * range of the exact stored turn that justifies a remembered fact, and handed back a reference
    * nothing could dereference. `body_ciphertext` is what makes the edge readable, and it comes back
    * sealed like every other body in this tier: the store cannot open it, and the span is returned
@@ -1357,7 +1357,7 @@ export class MemoryStore {
       [input.workspaceId, input.subjectKey, input.predicate, input.objectKey]
     );
     if (!standing.rows[0])
-      throw new AthanorError(
+      throw new GardenError(
         'memory_candidate_missing',
         'A fact candidate could not be observed or read back'
       );
@@ -1768,7 +1768,7 @@ export class MemoryStore {
         prepared.index.subjectKey !== candidate.subjectKey ||
         prepared.index.objectKey !== candidate.objectKey
       )
-        throw new AthanorError(
+        throw new GardenError(
           'memory_promotion_mismatch',
           'A promoted fact must carry the subject and object of the candidate it came from'
         );
@@ -2436,7 +2436,7 @@ export class MemoryStore {
     );
     if (inserted.rows[0]) return mapMemoryPack(inserted.rows[0]);
     const existing = await this.getMemoryPack(input.taskId);
-    if (!existing) throw new AthanorError('memory_pack_missing', 'Memory pack could not be stored');
+    if (!existing) throw new GardenError('memory_pack_missing', 'Memory pack could not be stored');
     return existing;
   }
 
@@ -2879,7 +2879,7 @@ export class MemoryStore {
   /**
    * The nightly half of §4.3 that had never been built, reduced to the part that needs no model.
    *
-   * `resolveMemoryContradiction` in `@athanor/core` is the resolution table - deterministic given a
+   * `resolveMemoryContradiction` in `@garden/core` is the resolution table - deterministic given a
    * verdict, so the only thing anyone ever has to supply is the verdict - and it had no production
    * caller at all: real code, with a real reader, that nothing in the product could reach. The
    * missing piece was never the table. It was an answer to "do these two disagree", and for one
@@ -3046,7 +3046,7 @@ export class MemoryStore {
        * `mem.fact_candidate` until two separate turns have observed it, holding a sealed draft and
        * the ids of the turns that vouched for it. Nothing reads that table on recall, so it is not
        * the lie the bundle above was - but leaving this turn's vote in it means a line the owner
-       * deleted can still be half of what makes athanor believe something later, from a record they
+       * deleted can still be half of what makes garden believe something later, from a record they
        * were told was gone. A draft with no turn left behind it is not a draft.
        *
        * Two statements, in this order, and the order is the whole of it. The sole-witness drafts go
@@ -3158,13 +3158,13 @@ export class MemoryStore {
     taskId?: never;
   }): Promise<OwnerBlockRecord | null> {
     if (input.workspaceId !== undefined || input.taskId !== undefined)
-      throw new AthanorError(
+      throw new GardenError(
         'owner_block_refused',
         'The owner block is written by the owner in Settings, not from inside a task.'
       );
     const bytes = ownerBlockBytes(input.ciphertext);
     if (bytes > OWNER_BLOCK_MAX_BYTES)
-      throw new AthanorError(
+      throw new GardenError(
         'owner_block_full',
         `Your block holds ${OWNER_BLOCK_MAX_BYTES} bytes and this is ${bytes}. Shorten it; nothing here is dropped to make room.`
       );

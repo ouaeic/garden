@@ -1,8 +1,8 @@
-import { runtimeNow } from '@athanor/core';
-import { resolveArtifactReference } from '@athanor/contracts/artifact-reference';
-import { deliveryFilePath, TaskOutputIntents, type TaskOutputIntent } from '@athanor/contracts';
-import { decryptJson } from '@athanor/core';
-import type { DataStore, TaskRecord } from '@athanor/data';
+import { runtimeNow } from '@garden/core';
+import { resolveArtifactReference } from '@garden/contracts/artifact-reference';
+import { deliveryFilePath, TaskOutputIntents, type TaskOutputIntent } from '@garden/contracts';
+import { decryptJson } from '@garden/core';
+import type { DataStore, TaskRecord } from '@garden/data';
 import type { AgentState, AgentWorkerConfig } from './agent-state.js';
 import { withRunnerAbort, type AgentRunnerClient } from './runner-client.js';
 import { asRecord, previewUrl } from './values.js';
@@ -106,7 +106,7 @@ export const resolveDelivery = async (
       .flatMap((item) => {
         if (!item.payloadCiphertext) return [];
         const body = asRecord(decryptJson(item.payloadCiphertext, key, `task-event:${task.id}`));
-        const payload = body?.__athanorEventVersion === 1 ? asRecord(body.payload) : body;
+        const payload = body?.__gardenEventVersion === 1 ? asRecord(body.payload) : body;
         return typeof payload?.previewId === 'string' ? [payload.previewId] : [];
       })
   );

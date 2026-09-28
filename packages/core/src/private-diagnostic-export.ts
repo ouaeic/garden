@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { DiagnosticCaptureStatus } from '@athanor/contracts';
+import { DiagnosticCaptureStatus } from '@garden/contracts';
 import { DIAGNOSTIC_EMPTY_HASH, PrivateDiagnosticBody } from './private-diagnostics.js';
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/);

@@ -22,7 +22,7 @@
  * lesson is narrower than "keep it honest": a shape this one gets wrong fails loudly only where the
  * loop has nothing to fall back on.
  *
- * The one difference that matters: the model here is a function of what athanor just said, not a
+ * The one difference that matters: the model here is a function of what garden just said, not a
  * fixed list of replies. Every hold in the loop works by pushing a message back and asking again,
  * so a fixed list cannot tell "the model complied on the second attempt" from "the second reply
  * happened to be next". A script that reads the pushback can, and the step count it produces is
@@ -83,7 +83,7 @@ import { builtinSkillLibrary } from '../apps/worker/src/skills.js';
  * Where this rig tells the model the built-in procedures live.
  *
  * `DEFAULT_SKILL_ROOT` is derived from `import.meta.url`, so on this machine a skill the turn opens
- * arrives in the window as `Skill directory: /Users/somebody/some folder/athanor/skills/<name>` -
+ * arrives in the window as `Skill directory: /Users/somebody/some folder/garden/skills/<name>` -
  * and `promptTokens` counts every byte of that request, carried through every later step of the turn.
  * Two things follow, and only one of them is small. The small one: the committed baseline is a
  * function of where the repository happens to sit, so a CI checkout and a laptop cannot compare
@@ -101,7 +101,7 @@ import { builtinSkillLibrary } from '../apps/worker/src/skills.js';
  * the checkout root. That is the guard, not this: a normalisation nobody checks is a normalisation
  * that stops covering the next place a path escapes into a prompt.
  */
-const NORMALISED_SKILL_ROOT = '/athanor/skills';
+const NORMALISED_SKILL_ROOT = '/garden/skills';
 
 /** The checkout this file was loaded from, which is the string that must never reach a request. */
 const CHECKOUT_ROOT = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '');
@@ -118,7 +118,7 @@ const CHECKOUT_ROOT = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$
 /* ------------------------------------------------------------- what produced a number, exactly */
 
 /**
- * Which athanor, and which rig, a row was measured by.
+ * Which garden, and which rig, a row was measured by.
  *
  * A trajectory is a log until somebody can re-run it and get the same numbers, and until this
  * existed nothing in the output of `pnpm eval` said what it was the output *of*. A baseline diff a
@@ -172,7 +172,7 @@ export const runIdentity = (): RunIdentity =>
   (stampedIdentity ??= { ...buildIdentity(), harness: harnessDigest() });
 
 export const identityLabel = (identity: RunIdentity): string =>
-  `athanor ${identity.version} at ${identity.commit ?? 'an uncommitted tree'}, rig ${identity.harness}`;
+  `garden ${identity.version} at ${identity.commit ?? 'an uncommitted tree'}, rig ${identity.harness}`;
 
 const masterKey = Buffer.alloc(32, 5);
 const runnerSecret = 'r'.repeat(48);
@@ -250,7 +250,7 @@ export interface ScriptContext {
    */
   readonly step: number;
   /**
-   * The last thing athanor said to the model, which is how every hold in the loop talks back. The
+   * The last thing garden said to the model, which is how every hold in the loop talks back. The
    * runtime block is stepped over: it sits at the end of every window and its clock changes.
    */
   readonly lastMessage: string;
@@ -293,7 +293,7 @@ export interface ScriptContext {
   readonly vision: boolean;
 }
 
-/** A model, as a function of what athanor just said to it. */
+/** A model, as a function of what garden just said to it. */
 export type ModelScript = (context: ScriptContext) => ModelTurn;
 
 /** Where a live run's provider is, and which model it names on the wire. @see `Fixture.live`. */
@@ -331,7 +331,7 @@ const bodyOf = (init?: RequestInit): Record<string, unknown> => {
  *
  * A message the context layer marked as a cache breakpoint is sent as a content array carrying a
  * `cache_control` block rather than as a bare string, so reading `content` as a string alone makes
- * exactly the messages athanor considers most important read as empty.
+ * exactly the messages garden considers most important read as empty.
  */
 const contentOf = (message: { content?: unknown }): string => {
   if (typeof message.content === 'string') return message.content;
@@ -353,7 +353,7 @@ const commonPrefix = (left: string, right: string): number => {
  * One request as the provider reads it, which is not the order the JSON body happens to be in.
  *
  * A prefix cache is over tokens, and the tool definitions are tokenised ahead of the conversation
- * whatever position the request object puts them in - so comparing the raw bodies scores athanor
+ * whatever position the request object puts them in - so comparing the raw bodies scores garden
  * against the one part of the prompt that never changes, and reports about 23% for a turn whose
  * real repeated run is nearer 90%. The catalogue goes first here for the same reason it goes first
  * there: it is the head of what any provider could hand back.
@@ -365,7 +365,7 @@ const promptBytes = (body: Record<string, unknown>): string =>
  * What the provider says the request cost it, counted from the request.
  *
  * Four characters to the token, which is the same rough conversion the window is estimated with on
- * the other side - so this is a plausible provider count rather than a copy of athanor's own
+ * the other side - so this is a plausible provider count rather than a copy of garden's own
  * number, and the two are allowed to disagree by whatever the two roundings differ by. The
  * catalogue is included because a provider bills the whole request, which is precisely the term
  * that was missing from the estimate the loop falls back on when nobody sends one.
@@ -511,7 +511,7 @@ const framesFor = (turn: ModelTurn, promptTokens: number): string[] => {
    * back at 34,405. One frame, and a mechanism goes from never firing to firing.
    *
    * `prompt_tokens` counts the serialised request, catalogue included, at four characters to the
-   * token. That is deliberately the whole body rather than a copy of athanor's own estimate: a
+   * token. That is deliberately the whole body rather than a copy of garden's own estimate: a
    * provider bills the JSON it receives, the estimate on the other side counts message content and
    * cannot see the envelope, and the gap between the two is exactly the thing `agent.ts:4108` says
    * this replacement exists to correct.
@@ -698,7 +698,7 @@ export interface RunnerStub {
    *
    * On the runner stub rather than beside the model script because it is the same kind of thing as
    * an exit code: a fact about the world outside the loop that a fixture declares once. The model
-   * script is a function of what athanor said, and a 500 is not something athanor said.
+   * script is a function of what garden said, and a 500 is not something garden said.
    *
    * This is what the retry wall has needed since it was written. `5xx` and `408/429` are walls the
    * loop is meant to sit behind and come back from, `4xx` is a wall it must not retry, and until
@@ -918,7 +918,7 @@ interface RunnerState {
    * `unstubbed` above is the complement of this list against what the stub answers, and the
    * complement is not the same evidence. A benchmark shim built from `unstubbed` alone would
    * implement nothing, because the stub already answers everything these fixtures reach - and a
-   * shim that is missing a route athanor needs does not throw: the tool returns the failure branch,
+   * shim that is missing a route garden needs does not throw: the tool returns the failure branch,
    * the turn works around it, and the task scores 0 with no error anywhere. That is the exact
    * defect shape `evals/bench` exists to make impossible, so the set of routes the loop ACTUALLY
    * requests has to be recorded rather than inferred from a route list somebody read.
@@ -960,7 +960,7 @@ const routeName = (url: string, init?: RequestInit): string => {
  * shipped a bound for. The 800-line display cap and the 18,000-byte one in `workspace.ts` cannot be
  * approached by a one-line answer. The line numbers a `file_patch` addresses were numbers of the
  * envelope, so no line-addressed edit could land against a fixture file. And any count of what a
- * read PUT IN FRONT OF THE MODEL was a count of this stub rather than of athanor.
+ * read PUT IN FRONT OF THE MODEL was a count of this stub rather than of garden.
  */
 const fileText = (content: string): Response =>
   new Response(content, { headers: { 'content-type': 'text/plain; charset=utf-8' } });
@@ -1446,7 +1446,7 @@ export interface Expectation {
    */
   readonly delegatedCalls?: number;
   /**
-   * Every tool athanor actually started, in order. `finish` and `set_acceptance` never appear: the
+   * Every tool garden actually started, in order. `finish` and `set_acceptance` never appear: the
    * loop answers those itself, ahead of the line that records a tool as started.
    */
   readonly tools?: readonly string[];
@@ -1575,7 +1575,7 @@ export interface Expectation {
   /**
    * Exactly which of the procedures this turn opened the brief names as no longer in the window.
    *
-   * The whole list, not a floor: naming one that is still open would be athanor telling the model
+   * The whole list, not a floor: naming one that is still open would be garden telling the model
    * to re-read something it is already holding, which costs a step and a window for nothing.
    */
   readonly skillsNamedInBrief?: readonly string[];
@@ -2102,13 +2102,13 @@ export interface LandedEdit {
  * The read side of a turn, as arithmetic rather than as an impression.
  *
  * DISPLAYED LINES PER LANDED EDIT is the number the whole edit-format economic case turns on and
- * the one athanor measured nowhere. The line dialect buys output characters per edit and pays for
+ * the one garden measured nowhere. The line dialect buys output characters per edit and pays for
  * them in input: the numbering is charged on every request after a read for as long as the file
  * stays in the window, so `evals/arms/price.ts` can only close its break-even by ASSUMING how many
  * edits a turn lands per read. This is that assumption, measured.
  *
  * Read from the event stream and not from the window: `tool_result` carries the result the tool
- * returned, before the context layer decides how much of it to keep, so this counts what athanor
+ * returned, before the context layer decides how much of it to keep, so this counts what garden
  * chose to display and not what survived a later squeeze. Both are worth knowing and they are
  * different questions; `evals/context-quality` owns the second one.
  *
@@ -2245,7 +2245,7 @@ export interface RunOutcome {
   /**
    * What the provider was handed, in tokens, summed over every request it answered.
    *
-   * The whole body: catalogue, envelope and messages. This used to be athanor's own estimate of the
+   * The whole body: catalogue, envelope and messages. This used to be garden's own estimate of the
    * messages alone, which excluded `body.tools` - so on a product whose catalogue is four fifths of
    * the fixed floor, the headline column of the suite that guards against cost regressions could
    * not see the largest cost term at all. Emptying the catalogue moved it by 0.0%.
@@ -2270,7 +2270,7 @@ export interface RunOutcome {
    */
   readonly residentCatalogueBytes: number;
   /**
-   * The prompt athanor thought it had built, by its own estimate, summed over every cost event.
+   * The prompt garden thought it had built, by its own estimate, summed over every cost event.
    *
    * The number this suite reported as `promptTokens` until the wave that noticed the two halves of
    * the rig disagreed. Kept, because the difference between it and `promptTokens` is exactly what
@@ -3466,7 +3466,7 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
    * estimate is.
    *
    * This rig priced a run for its whole life from `context.estimatedInputTokens`, which is the
-   * context layer's estimate of the MESSAGES. `body.tools` is not in it, and on this athanor the
+   * context layer's estimate of the MESSAGES. `body.tools` is not in it, and on this garden the
    * catalogue is about 12,300 tokens of every single request - so the largest cost term in the
    * product was invisible to the instrument that exists to notice when a cost term moves, and
    * deleting the catalogue outright moved the headline column by 0.0%. Every efficiency claim
@@ -3834,7 +3834,7 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
       {
         WORKER_ID,
         DATABASE_DRIVER: 'pglite',
-        DATABASE_URL: 'postgres://localhost/athanor',
+        DATABASE_URL: 'postgres://localhost/garden',
         PGLITE_PATH: ':memory:',
         DATA_MASTER_KEY: masterKey.toString('base64'),
         RUNNER_SHARED_SECRET: 'x'.repeat(48),
@@ -4079,7 +4079,7 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
    * It used to hold the last step alone, which is a log: it says where the turn ended and nothing
    * about how it got there, so the two questions this suite exists to answer - which step first
    * differed, and what did the model see when it decided - could be asked of it and not answered.
-   * `requests` is now every provider call in order, and `identity` names the athanor and the rig
+   * `requests` is now every provider call in order, and `identity` names the garden and the rig
    * that produced them. Those two together are what makes a run reproducible by somebody who was
    * not at this machine: check the revision out, hold the fixture beside it, send the same bytes.
    */

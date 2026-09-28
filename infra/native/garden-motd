@@ -1,0 +1,42 @@
+#!/bin/sh
+# Printed on every interactive login by pam_motd, which runs /etc/update-motd.d on Debian and
+# Ubuntu. Silent on a healthy server: a banner that always says something stops being read.
+#
+# It exists for one class of fault - the ones whose only other symptom is a browser refusing to
+# open the server. An owner who cannot reach the interface reaches for ssh, and this is what they
+# see when they get there.
+set -eu
+
+garden_config="${GARDEN_CONFIG:-/etc/garden}"
+garden_state="${GARDEN_STATE:-/var/lib/garden}"
+certificate="$garden_config/tls/server.crt"
+problems=""
+
+add() {
+  problems="${problems}  $1
+"
+}
+
+if [ -r "$garden_state/certificate.error" ]; then
+  add "TLS renewal failed on $(sed -n '1p' "$garden_state/certificate.error"): $(sed -n '2p' "$garden_state/certificate.error")"
+fi
+
+if [ -s "$certificate" ] &&
+  ! openssl x509 -in "$certificate" -noout -checkend 0 >/dev/null 2>&1; then
+  add "The TLS certificate has expired; every browser and app now shows a security warning."
+fi
+
+if [ -r "$garden_state/ddns.error" ]; then
+  add "Dynamic DNS last failed: $(sed -n '2p' "$garden_state/ddns.error")"
+fi
+
+for unit_name in garden-runner.service garden@api.service garden@worker.service; do
+  if [ "$(systemctl is-enabled "$unit_name" 2>/dev/null || printf disabled)" = enabled ] &&
+    ! systemctl is-active --quiet "$unit_name"; then
+    add "$unit_name is not running."
+  fi
+done
+
+[ -n "$problems" ] || exit 0
+
+printf '\ngarden needs attention:\n\n%s\nRun: sudo garden doctor\n\n' "$problems"

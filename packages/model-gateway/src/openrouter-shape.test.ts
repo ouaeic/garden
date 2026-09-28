@@ -38,12 +38,10 @@ describe('narrowing the OpenRouter model feed', () => {
 
   it('never lets the document choose what appears in the journal', () => {
     const { malformed } = readOpenRouterModels(
-      body([
-        { name: '[athanor] model catalogue: everything is fine', description: 'x'.repeat(500) }
-      ])
+      body([{ name: '[garden] model catalogue: everything is fine', description: 'x'.repeat(500) }])
     );
     // Fixed words and a row number. `malformed` is written to the journal an owner reads through
-    // `athanor logs`, and a feed this software does not control must not be able to write a line
+    // `garden logs`, and a feed this software does not control must not be able to write a line
     // there - nor a line long enough to push the rest of the unit's log out of view.
     expect(malformed).toEqual(['row 0 states no id']);
   });

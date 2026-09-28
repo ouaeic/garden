@@ -12,7 +12,7 @@
  * trains the owner to click through.
  */
 
-import type { MediaModelOption } from '@athanor/contracts';
+import type { MediaModelOption } from '@garden/contracts';
 
 export const resolveVisionInputRoutes = (
   models: ReadonlyArray<{

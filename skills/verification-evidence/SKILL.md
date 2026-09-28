@@ -5,10 +5,10 @@ license: AGPL-3.0-or-later
 compatibility: No external binaries required.
 allowed-tools: set_acceptance shell file_read files_list document_read image_read audio_read publish_artifact finish
 metadata:
-  athanor.tier: 'builtin'
-  athanor.version: '1.4.0'
-  athanor.risk: 'read_only'
-  athanor.domain: 'discipline'
+  garden.tier: 'builtin'
+  garden.version: '1.4.0'
+  garden.risk: 'read_only'
+  garden.domain: 'discipline'
 ---
 
 # Verification evidence
@@ -28,7 +28,7 @@ and stdout it must produce; an `artifact` check is a path that must exist, must 
 and — for a document — must render to the pages the job asked for.
 
 Make each one specific enough to fail. "The budget workbook exists" is not a check;
-`athanor-office-convert budget.xlsx proofs/budget.pdf` with `expectExit: 0` is.
+`garden-office-convert budget.xlsx proofs/budget.pdf` with `expectExit: 0` is.
 
 **A check may not reach the network or change the machine**, and the harness refuses it by the shape
 of the command rather than by a name list: `curl`, `wget`, `ssh`, `scp`, `rsync`, `gh`, `rm`, `mv`,

@@ -36,20 +36,20 @@ export class Metrics {
 }
 
 export const METRIC_NAMES = {
-  connectionsAccepted: 'athanor_relay_connections_accepted_total',
-  connectionsRejected: 'athanor_relay_connections_rejected_total',
-  connectionsBound: 'athanor_relay_connections_bound_total',
-  handshakeTimeouts: 'athanor_relay_handshake_timeouts_total',
-  unknownLabel: 'athanor_relay_unknown_label_total',
-  quotaBlocked: 'athanor_relay_quota_blocked_total',
-  rateLimited: 'athanor_relay_rate_limited_total',
-  enrollSucceeded: 'athanor_relay_enroll_succeeded_total',
-  enrollRejected: 'athanor_relay_enroll_rejected_total',
-  sessionsRejected: 'athanor_relay_sessions_rejected_total',
-  bytesRelayed: 'athanor_relay_bytes_relayed_total',
-  peersOnline: 'athanor_relay_peers_online',
-  peersRegistered: 'athanor_relay_peers_registered',
-  parkedStreams: 'athanor_relay_parked_streams',
-  activeStreams: 'athanor_relay_active_streams',
-  openConnections: 'athanor_relay_open_connections'
+  connectionsAccepted: 'garden_relay_connections_accepted_total',
+  connectionsRejected: 'garden_relay_connections_rejected_total',
+  connectionsBound: 'garden_relay_connections_bound_total',
+  handshakeTimeouts: 'garden_relay_handshake_timeouts_total',
+  unknownLabel: 'garden_relay_unknown_label_total',
+  quotaBlocked: 'garden_relay_quota_blocked_total',
+  rateLimited: 'garden_relay_rate_limited_total',
+  enrollSucceeded: 'garden_relay_enroll_succeeded_total',
+  enrollRejected: 'garden_relay_enroll_rejected_total',
+  sessionsRejected: 'garden_relay_sessions_rejected_total',
+  bytesRelayed: 'garden_relay_bytes_relayed_total',
+  peersOnline: 'garden_relay_peers_online',
+  peersRegistered: 'garden_relay_peers_registered',
+  parkedStreams: 'garden_relay_parked_streams',
+  activeStreams: 'garden_relay_active_streams',
+  openConnections: 'garden_relay_open_connections'
 } as const;

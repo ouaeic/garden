@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { decryptJson, generateDataKey } from '@athanor/core';
-import type { DataStore, TaskRecord } from '@athanor/data';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import { decryptJson, generateDataKey } from '@garden/core';
+import type { DataStore, TaskRecord } from '@garden/data';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { AgentState } from './agent-state.js';
 import {
   sanitiseUntrusted,

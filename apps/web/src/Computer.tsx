@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import type { Task, Workspace } from '@athanor/contracts';
+import type { Task, Workspace } from '@garden/contracts';
 const Files = lazy(() =>
   import('./computer/Files.js').then((module) => ({ default: module.Files }))
 );

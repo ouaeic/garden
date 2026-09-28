@@ -13,8 +13,8 @@ import {
   DesktopAction,
   DesktopHolder,
   DesktopLaunchRequest
-} from '@athanor/contracts';
-import { AthanorError, MAX_CAPABILITY_TTL_SECONDS } from '@athanor/core';
+} from '@garden/contracts';
+import { GardenError, MAX_CAPABILITY_TTL_SECONDS } from '@garden/core';
 import { z } from 'zod';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
@@ -29,14 +29,14 @@ export const registerRunnerProxyRoutes = (context: RouteContext): void => {
     async (request, reply) => {
       const user = requireUser(request.user);
       if (request.apiToken)
-        throw new AthanorError(
+        throw new GardenError(
           'session_required',
           'Manage browser tabs from a signed-in device',
           403
         );
       return idempotent(request, reply, user, async () => {
         const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-        if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+        if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
         const tab = z
           .string()
           .regex(/^tab-[1-9]\d*$/)
@@ -61,7 +61,7 @@ export const registerRunnerProxyRoutes = (context: RouteContext): void => {
     async (request) => {
       const user = requireUser(request.user);
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       return runner.request({
         workspaceId: workspace.id,
         userId: user.id,
@@ -81,7 +81,7 @@ export const registerRunnerProxyRoutes = (context: RouteContext): void => {
       const user = requireUser(request.user);
       return idempotent(request, reply, user, async () => {
         const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-        if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+        if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
         const action = BrowserAction.parse(request.body);
         return runner.request({
           workspaceId: workspace.id,
@@ -104,7 +104,7 @@ export const registerRunnerProxyRoutes = (context: RouteContext): void => {
     const user = requireUser(request.user);
     return idempotent(request, reply, user, async () => {
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       return runner.request({
         workspaceId: workspace.id,
         userId: user.id,
@@ -123,7 +123,7 @@ export const registerRunnerProxyRoutes = (context: RouteContext): void => {
     async (request) => {
       const user = requireUser(request.user);
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       return {
         runnerUrl: config.PUBLIC_RUNNER_URL,
         /*
@@ -163,7 +163,7 @@ export const registerRunnerProxyRoutes = (context: RouteContext): void => {
     async (request) => {
       const user = requireUser(request.user);
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       return {
         runnerUrl: config.PUBLIC_RUNNER_URL,
         /*
@@ -195,7 +195,7 @@ export const registerRunnerProxyRoutes = (context: RouteContext): void => {
     async (request) => {
       const user = requireUser(request.user);
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       return runner.request({
         workspaceId: workspace.id,
         userId: user.id,
@@ -215,7 +215,7 @@ export const registerRunnerProxyRoutes = (context: RouteContext): void => {
       const user = requireUser(request.user);
       return idempotent(request, reply, user, async () => {
         const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-        if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+        if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
         return runner.request({
           workspaceId: workspace.id,
           userId: user.id,
@@ -236,7 +236,7 @@ export const registerRunnerProxyRoutes = (context: RouteContext): void => {
       const user = requireUser(request.user);
       return idempotent(request, reply, user, async () => {
         const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-        if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+        if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
         return runner.request({
           workspaceId: workspace.id,
           userId: user.id,
@@ -258,7 +258,7 @@ export const registerRunnerProxyRoutes = (context: RouteContext): void => {
     const user = requireUser(request.user);
     return idempotent(request, reply, user, async () => {
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       return runner.request({
         workspaceId: workspace.id,
         userId: user.id,
@@ -277,7 +277,7 @@ export const registerRunnerProxyRoutes = (context: RouteContext): void => {
     async (request) => {
       const user = requireUser(request.user);
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       return {
         runnerUrl: config.PUBLIC_RUNNER_URL,
         /* The same three, for the desktop surface. See `browser-token` above. */
@@ -318,7 +318,7 @@ export const registerRunnerProxyRoutes = (context: RouteContext): void => {
     async (request) => {
       const user = requireUser(request.user);
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       // `agentListeners` and the two fields beside it are the ports an agent-owned process holds
       // open on the box, which the runner measures rather than infers - a service can be reachable
       // from the internet with every other field on the row looking exactly like a private one.
@@ -359,13 +359,13 @@ export const registerRunnerProxyRoutes = (context: RouteContext): void => {
     async (request) => {
       const user = requireUser(request.user);
       if (request.apiToken)
-        throw new AthanorError(
+        throw new GardenError(
           'session_required',
           'Resume finite jobs from a signed-in device',
           403
         );
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       const session = z
         .string()
         .regex(/^job_[0-9a-f-]+$/)
@@ -389,7 +389,7 @@ export const registerRunnerProxyRoutes = (context: RouteContext): void => {
     async (request) => {
       const user = requireUser(request.user);
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       /*
        * Read it, or stop it. The action was hard-coded to `kill` here, so the runner's `log` arm -
        * which returns the output buffered since the last read, and is the only way to see what a

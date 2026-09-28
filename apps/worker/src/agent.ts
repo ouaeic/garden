@@ -4,20 +4,20 @@ import {
   runtimeSetInterval,
   runtimeSleep,
   runtimeUUID
-} from '@athanor/core';
+} from '@garden/core';
 import {
   withPrivateDiagnostics,
   observedObject,
   runtimeObservations,
   runtimeCall,
   runtimeValue
-} from '@athanor/core';
+} from '@garden/core';
 import { TaskDiagnosticCapture } from './diagnostic-capture.js';
 import { askUser, parkBrowserHandoff, saveQuestion } from './questions.js';
-import { BrowserActionReceipt } from '@athanor/contracts';
+import { BrowserActionReceipt } from '@garden/contracts';
 import { browserActionRequestId } from './browser-action-receipts.js';
 import { codingMissionAdapter } from './coding-mission-gateway.js';
-import type { ReasoningEffort } from '@athanor/contracts';
+import type { ReasoningEffort } from '@garden/contracts';
 
 import {
   MAX_AGENT_NOTIFICATIONS_PER_TASK,
@@ -27,26 +27,26 @@ import {
   type SpendDecision,
   type TaskPlanStep,
   type WebToolPlan
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import {
   type OwnerMessage,
   decryptJson,
   encryptJson,
   readInferenceConnections,
   modelConnectionId,
-  AthanorError,
+  GardenError,
   selectModel,
   sha256,
   unwrapDataKey,
   type MemoryDeadEndCheck
-} from '@athanor/core';
+} from '@garden/core';
 import {
   agentNotificationAad,
   TASK_MAX_ATTEMPTS,
   readTaskModelPreferences,
   mergeProjectModelChoices
-} from '@athanor/data';
-import type { DataStore, TaskRecord, WorkspaceRecord } from '@athanor/data';
+} from '@garden/data';
+import type { DataStore, TaskRecord, WorkspaceRecord } from '@garden/data';
 import {
   fetchGenerationThroughput,
   isProviderWall,
@@ -56,7 +56,7 @@ import {
   OpenRouterDecisionAdapter,
   type ModelResponse,
   type ModelToolCall
-} from '@athanor/model-gateway';
+} from '@garden/model-gateway';
 import {
   type AcceptanceCommandCheck,
   type AcceptanceRecord,
@@ -185,7 +185,7 @@ const PARKABLE_PROVIDER_WALLS = new Set([
 /**
  * What something outside `apps/worker/src` reaches for, and nothing else.
  *
- * `@athanor/worker`'s package `exports` map names one entry - this file - so a name another
+ * `@garden/worker`'s package `exports` map names one entry - this file - so a name another
  * package needs has to be re-exported here or it cannot be imported at all. That is the whole
  * justification for this block, and it is the only one.
  *
@@ -534,7 +534,7 @@ export class AgentWorker {
     const id = modelConnectionId(model, connections.keys());
     const secret = id ? connections.get(id) : undefined;
     if (!secret)
-      throw new AthanorError(
+      throw new GardenError(
         'provider_model_mismatch',
         'The selected model has no available connection. Check its provider in Settings.',
         409
@@ -554,7 +554,7 @@ export class AgentWorker {
       : connections.keys().next().value;
     const secret = id ? connections.get(id) : undefined;
     if (!secret)
-      throw new AthanorError(
+      throw new GardenError(
         // The name three things already listen for. `provider_setup_required` was thrown here and
         // recognised nowhere: the API's wall table, the title sweep's cooldown and this worker's own
         // `waiting` test all key on `provider_not_connected`, so the missing-credential wall was
@@ -732,11 +732,11 @@ export class AgentWorker {
         'warning',
         'This turn has no undo point for the computer',
         {
-          // The code first, where there is one to read. An `AthanorError` carries it as a field
+          // The code first, where there is one to read. An `GardenError` carries it as a field
           // already; everything else has it flattened into the message and is dug back out there.
           ...(ownerFixableCheckpointFailure(
             message,
-            error instanceof AthanorError ? { code: error.code } : undefined
+            error instanceof GardenError ? { code: error.code } : undefined
           )
             ? { owner: true }
             : {}),
@@ -936,7 +936,7 @@ export class AgentWorker {
         cumulativeCredits: state.credits,
         usage: response.usage,
         metadata: response.metadata,
-        // Which athanor priced this. A cost line is the most-compared number the product emits - a
+        // Which garden priced this. A cost line is the most-compared number the product emits - a
         // baseline read back a year later, a regression argued from two transcripts - and until now
         // nothing on it said which build produced it, so two figures that disagree could not be told
         // apart from two builds that disagree. `buildIdentity()` is derived once from the checkout and
@@ -1009,7 +1009,7 @@ export class AgentWorker {
         task,
         key,
         'status',
-        'Paused: athanor could not check this against your spending caps, so it stopped rather than spend past them.',
+        'Paused: garden could not check this against your spending caps, so it stopped rather than spend past them.',
         { blockedBy: 'spend_guard_unavailable', reason, estimateUsd }
       );
       await this.store.updateTask({
@@ -1164,7 +1164,7 @@ export class AgentWorker {
       !this.config.OPENROUTER_API_KEY &&
       !(this.config.AI_PROVIDER === 'openai-compatible' && this.config.AI_DEFAULT_MODEL)
     )
-      throw new AthanorError(
+      throw new GardenError(
         // The name three things already listen for. `provider_setup_required` was thrown here and
         // recognised nowhere: the API's wall table, the title sweep's cooldown and this worker's own
         // `waiting` test all key on `provider_not_connected`, so the missing-credential wall was
@@ -1479,7 +1479,7 @@ export class AgentWorker {
     const catalog = (await this.store.listModels()) as unknown as ModelRelease[];
     const model = catalog.find((entry) => entry.id === task.modelId);
     if (!model)
-      throw new AthanorError(
+      throw new GardenError(
         'model_unavailable',
         `Model ${task.modelId} is no longer in the registry`
       );
@@ -1504,7 +1504,7 @@ export class AgentWorker {
                 reasoningEffort: 'low',
                 // Distinct per call, so two searches in one turn are two requests to the provider
                 // rather than one request it believes it has already answered.
-                sessionId: sha256(`athanor-task:${task.id}:search:${call.id}`).slice(0, 64),
+                sessionId: sha256(`garden-task:${task.id}:search:${call.id}`).slice(0, 64),
                 signal
               }),
             WEB_SEARCH_REQUEST_TIMEOUT_MS
@@ -1810,7 +1810,7 @@ export class AgentWorker {
             agentStateCiphertext: encryptJson(state, key, `task-state:${task.id}`)
           });
         if (queued.promptCiphertext.aad !== `task-message:${task.id}`)
-          throw new AthanorError(
+          throw new GardenError(
             'queued_message_context',
             'Queued message encryption context is invalid'
           );
@@ -2309,7 +2309,7 @@ export class AgentWorker {
   async #rerouteAroundWall(
     task: TaskRecord,
     workspace: WorkspaceRecord,
-    error: AthanorError
+    error: GardenError
   ): Promise<boolean> {
     try {
       const key = unwrapDataKey(workspace.wrappedKey!, this.#masterKey, workspace.id);
@@ -2432,7 +2432,7 @@ export class AgentWorker {
     if (
       task.hasCodingFamily &&
       !task.parentMissionId &&
-      error instanceof AthanorError &&
+      error instanceof GardenError &&
       ['coding_family_budget', 'coding_family_spend'].includes(error.code) &&
       workspace?.wrappedKey
     ) {
@@ -2490,7 +2490,7 @@ export class AgentWorker {
      * through to the parking below and behaves exactly as it did before.
      */
     if (
-      error instanceof AthanorError &&
+      error instanceof GardenError &&
       isProviderWall(error) &&
       PARKABLE_PROVIDER_WALLS.has(error.code) &&
       workspace?.wrappedKey &&
@@ -2503,7 +2503,7 @@ export class AgentWorker {
     // named here and missing from the API's own table parks the work for ever with nothing left to
     // wake it, which is strictly worse than failing, because failing at least tells the owner.
     const waiting =
-      error instanceof AthanorError &&
+      error instanceof GardenError &&
       isProviderWall(error) &&
       PARKABLE_PROVIDER_WALLS.has(error.code);
     let turn = 0;
@@ -2544,11 +2544,11 @@ export class AgentWorker {
         this.store,
         task,
         key,
-        error instanceof AthanorError && error.code.includes('provider') ? 'warning' : 'error',
+        error instanceof GardenError && error.code.includes('provider') ? 'warning' : 'error',
         message.slice(0, 500),
         // The task stopped and did not do what was asked. Whatever else is folded away, the reason
         // the work is not there has to be in the conversation.
-        { owner: true, code: error instanceof AthanorError ? error.code : 'agent_failed' }
+        { owner: true, code: error instanceof GardenError ? error.code : 'agent_failed' }
       );
     }
     /*
@@ -2659,7 +2659,7 @@ export class AgentWorker {
         task,
         key,
         'warning',
-        `Your message was not started, and athanor is not going to start it on its own.${exhausted}${markdown ? ` What you sent was: "${markdown.slice(0, 240)}"` : ''} Send it again to try.`,
+        `Your message was not started, and garden is not going to start it on its own.${exhausted}${markdown ? ` What you sent was: "${markdown.slice(0, 240)}"` : ''} Send it again to try.`,
         {
           owner: true,
           code: 'queued_message_undelivered',

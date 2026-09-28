@@ -6,7 +6,7 @@ import { sharedEnv } from './env.js';
 /**
  * The audit that makes `sharedEnv` mean something.
  *
- * Every athanor unit parses its environment with its own zod schema, and on a packaged install all
+ * Every garden unit parses its environment with its own zod schema, and on a packaged install all
  * of them are started from the same control.env. Two schemas that disagree about one key is a box
  * that half starts: the operator raises TASK_MAX_STEPS, the worker accepts the number, the API
  * refuses to boot, and nothing in either message mentions the other. This walks the config schemas
@@ -109,13 +109,13 @@ const recordedDivergences: Array<{ file: string; key: string; because: string }>
     file: 'services/notifications/src/config.ts',
     key: 'DATABASE_DRIVER',
     because:
-      'The notifier only ever runs from a control.env that sets this, and has no development shape that would use the embedded database, so it defaults to the packaged install driver. It also cannot import this declaration: it does not depend on @athanor/contracts, and adding the dependency rewrites the lockfile.'
+      'The notifier only ever runs from a control.env that sets this, and has no development shape that would use the embedded database, so it defaults to the packaged install driver. It also cannot import this declaration: it does not depend on @garden/contracts, and adding the dependency rewrites the lockfile.'
   },
   {
     file: 'services/notifications/src/config.ts',
     key: 'DATA_MASTER_KEY',
     because:
-      'Optional in both, and stricter here on purpose: the notifier decodes the key itself rather than handing it to @athanor/data, so a value that is not exactly 32 bytes of base64 does not fail somewhere legible - it decodes to the wrong length and every push silently reads "Untitled conversation", which is the defect this key was wired to end. Refusing at load is the only place that failure has a sentence. It cannot import the shared declaration for the same reason DATABASE_DRIVER and PUSH_VAPID_PUBLIC_KEY above cannot: services/notifications does not depend on @athanor/contracts, and adding the dependency rewrites the lockfile.'
+      'Optional in both, and stricter here on purpose: the notifier decodes the key itself rather than handing it to @garden/data, so a value that is not exactly 32 bytes of base64 does not fail somewhere legible - it decodes to the wrong length and every push silently reads "Untitled conversation", which is the defect this key was wired to end. Refusing at load is the only place that failure has a sentence. It cannot import the shared declaration for the same reason DATABASE_DRIVER and PUSH_VAPID_PUBLIC_KEY above cannot: services/notifications does not depend on @garden/contracts, and adding the dependency rewrites the lockfile.'
   },
   {
     file: 'services/notifications/src/config.ts',

@@ -1,6 +1,6 @@
 import { interruptedResponseOf } from './interrupted-response.js';
-import { resolveWebToolPlan } from '@athanor/contracts';
-import { AthanorError } from '@athanor/core';
+import { resolveWebToolPlan } from '@garden/contracts';
+import { GardenError } from '@garden/core';
 import { describe, expect, it, vi } from 'vitest';
 import { HUGE_REQUEST_TOKENS } from './generation-budget.js';
 import { ModelGateway } from './gateway.js';
@@ -364,16 +364,16 @@ describe('OpenAICompatibleAdapter', () => {
       })
       .catch((error: unknown) => error);
 
-    expect(failure).toBeInstanceOf(AthanorError);
-    expect((failure as AthanorError).code).toBe('provider_context_overflow');
-    expect((failure as AthanorError).statusCode).toBe(413);
+    expect(failure).toBeInstanceOf(GardenError);
+    expect((failure as GardenError).code).toBe('provider_context_overflow');
+    expect((failure as GardenError).statusCode).toBe(413);
     // The whole point of this ceiling is that it is a different quantity from the one the token
     // arithmetic bounds, so a refusal that talked about tokens would send the repair to the wrong
     // number.
-    expect((failure as AthanorError).message).toMatch(/bytes/);
-    expect((failure as AthanorError).message).not.toMatch(/token/i);
-    expect((failure as AthanorError).details).toMatchObject({ maxRequestBytes: 10_000 });
-    expect(Number((failure as AthanorError).details?.requestBytes)).toBeGreaterThan(40_000);
+    expect((failure as GardenError).message).toMatch(/bytes/);
+    expect((failure as GardenError).message).not.toMatch(/token/i);
+    expect((failure as GardenError).details).toMatchObject({ maxRequestBytes: 10_000 });
+    expect(Number((failure as GardenError).details?.requestBytes)).toBeGreaterThan(40_000);
     // Refused here, so nothing was put on the wire and nothing was billed.
     expect(capture.calls).toBe(0);
   });
@@ -388,7 +388,7 @@ describe('OpenAICompatibleAdapter', () => {
         temperature: 0.2
       })
       .catch((error: unknown) => error);
-    expect((failure as AthanorError).code).toBe('provider_context_overflow');
+    expect((failure as GardenError).code).toBe('provider_context_overflow');
     expect(capture.calls).toBe(0);
 
     await byteCeilingAdapter(capture).chat({
@@ -448,10 +448,10 @@ describe('OpenAICompatibleAdapter', () => {
       (error: unknown) => error
     );
 
-    expect(failure).toBeInstanceOf(AthanorError);
-    expect((failure as AthanorError).code).toBe('provider_quota_exhausted');
-    expect((failure as AthanorError).statusCode).toBe(429);
-    expect((failure as AthanorError).message).toContain('rate limited mid-stream');
+    expect(failure).toBeInstanceOf(GardenError);
+    expect((failure as GardenError).code).toBe('provider_quota_exhausted');
+    expect((failure as GardenError).statusCode).toBe(429);
+    expect((failure as GardenError).message).toContain('rate limited mid-stream');
     expect(retryAfterMsOf(failure)).toBe(120_000);
     expect(interruptedResponseOf(failure)).toMatchObject({
       text: 'Working on ',
@@ -554,8 +554,8 @@ describe('OpenAICompatibleAdapter', () => {
     // away, and the name it leaves under is the one the layers above park a task behind; the old
     // name was retried inside the step and then failed the whole task, which is the opposite
     // outcome to the same outage arriving as a dropped socket.
-    expect((failure as AthanorError).code).toBe('provider_unavailable');
-    expect((failure as AthanorError).statusCode).toBe(502);
+    expect((failure as GardenError).code).toBe('provider_unavailable');
+    expect((failure as GardenError).statusCode).toBe(502);
     expect(isRetryableError(failure)).toBe(true);
     expect(isProviderWall(failure)).toBe(true);
   });
@@ -601,9 +601,9 @@ describe('OpenAICompatibleAdapter', () => {
       (error: unknown) => error
     );
 
-    expect((failure as AthanorError).code).toBe('provider_unavailable');
-    expect((failure as AthanorError).statusCode).toBe(503);
-    expect((failure as AthanorError).message).toContain('UND_ERR_SOCKET');
+    expect((failure as GardenError).code).toBe('provider_unavailable');
+    expect((failure as GardenError).statusCode).toBe(503);
+    expect((failure as GardenError).message).toContain('UND_ERR_SOCKET');
     expect(isRetryableError(failure)).toBe(true);
     expect(deltas).toEqual(['Half an ']);
     expect(interruptedResponseOf(failure)).toMatchObject({
@@ -719,8 +719,8 @@ describe('OpenAICompatibleAdapter', () => {
       deltas
     ).catch((error: unknown) => error);
 
-    expect((failure as AthanorError).code).toBe('provider_stream_stalled');
-    expect((failure as AthanorError).statusCode).toBe(504);
+    expect((failure as GardenError).code).toBe('provider_stream_stalled');
+    expect((failure as GardenError).statusCode).toBe(504);
     expect(isRetryableError(failure)).toBe(true);
     expect(deltas).toEqual([]);
   });
@@ -803,9 +803,9 @@ describe('OpenAICompatibleAdapter', () => {
       []
     ).catch((error: unknown) => error);
 
-    expect(failure).toBeInstanceOf(AthanorError);
-    expect((failure as AthanorError).message).toContain('no instances available');
-    expect((failure as AthanorError).statusCode).toBe(503);
+    expect(failure).toBeInstanceOf(GardenError);
+    expect((failure as GardenError).message).toContain('no instances available');
+    expect((failure as GardenError).statusCode).toBe(503);
     expect(isRetryableError(failure)).toBe(true);
   });
 
@@ -820,8 +820,8 @@ describe('OpenAICompatibleAdapter', () => {
       (error: unknown) => error
     );
 
-    expect((failure as AthanorError).code).toBe('provider_stream_unparsed');
-    expect((failure as AthanorError).statusCode).toBe(502);
+    expect((failure as GardenError).code).toBe('provider_stream_unparsed');
+    expect((failure as GardenError).statusCode).toBe(502);
   });
 
   it('refuses a stream whose only frame was the end-of-stream marker', async () => {
@@ -830,8 +830,8 @@ describe('OpenAICompatibleAdapter', () => {
       []
     ).catch((error: unknown) => error);
 
-    expect((failure as AthanorError).code).toBe('provider_stream_unparsed');
-    expect((failure as AthanorError).statusCode).toBe(502);
+    expect((failure as GardenError).code).toBe('provider_stream_unparsed');
+    expect((failure as GardenError).statusCode).toBe(502);
   });
 
   /*
@@ -1347,7 +1347,7 @@ describe('OpenAICompatibleAdapter', () => {
     await cachingAdapter(capture).chat({
       model: 'z-ai/glm-5.2',
       messages: [{ role: 'user', content: 'Query: what changed in the rules this week?' }],
-      // Empty, because this is the request athanor builds to spend one provider search and nothing
+      // Empty, because this is the request garden builds to spend one provider search and nothing
       // else. A function tool here would be a second answerer for the same question.
       tools: [],
       serverTools: providerSearchPlan.serverTools,
@@ -1442,8 +1442,8 @@ describe('OpenAICompatibleAdapter', () => {
       })
       .catch((error: unknown) => error);
 
-    expect((failure as AthanorError).code).toBe('web_tool_catalogue_conflict');
-    expect((failure as AthanorError).message).toContain('web_search');
+    expect((failure as GardenError).code).toBe('web_tool_catalogue_conflict');
+    expect((failure as GardenError).message).toContain('web_search');
     expect(request).not.toHaveBeenCalled();
   });
 
@@ -1758,7 +1758,7 @@ describe('OpenAICompatibleAdapter', () => {
         })
         .catch((error: unknown) => error);
 
-      expect((failure as AthanorError).code).toBe('provider_stream_stalled');
+      expect((failure as GardenError).code).toBe('provider_stream_stalled');
       // A wall rather than a client mistake, so the layers above wait rather than fail the task.
       expect(isProviderWall(failure)).toBe(true);
     });
@@ -1779,7 +1779,7 @@ describe('OpenAICompatibleAdapter', () => {
       const result = (await streamRequest(
         streamingAdapter(body, { generationTimeoutMs: 30_000, generationMaxChars: 5_000_000 }),
         deltas
-      ).catch((error: unknown) => error)) as AthanorError;
+      ).catch((error: unknown) => error)) as GardenError;
 
       // Nothing was generated, so it is the provider fault it is rather than a partial answer.
       expect(result.code).toBe('provider_stream_stalled');
@@ -1802,7 +1802,7 @@ describe('OpenAICompatibleAdapter', () => {
       const result = (await streamRequest(
         streamingAdapter(body, { generationTimeoutMs: 30_000, generationMaxChars: 200 }),
         deltas
-      ).catch((error: unknown) => error)) as AthanorError;
+      ).catch((error: unknown) => error)) as GardenError;
 
       expect(result.code).toBe('provider_stream_stalled');
       // 200 characters of answer allowed, sixteen times that in envelope: a few hundred frames.
@@ -1864,7 +1864,7 @@ describe('OpenAICompatibleAdapter', () => {
         })) as typeof fetch
     });
 
-  const refusal = async (adapter: OpenAICompatibleAdapter): Promise<AthanorError> =>
+  const refusal = async (adapter: OpenAICompatibleAdapter): Promise<GardenError> =>
     (await adapter
       .chat({
         model: 'z-ai/glm-5.2',
@@ -1872,7 +1872,7 @@ describe('OpenAICompatibleAdapter', () => {
         tools: [],
         temperature: 0.2
       })
-      .catch((error: unknown) => error)) as AthanorError;
+      .catch((error: unknown) => error)) as GardenError;
 
   it('names a window the route will not take, and the sizes it named', async () => {
     const failure = await refusal(
@@ -2201,7 +2201,7 @@ describe('OpenAICompatibleAdapter', () => {
         })
         .catch((error: unknown) => error);
 
-      expect(failure).toBeInstanceOf(AthanorError);
+      expect(failure).toBeInstanceOf(GardenError);
       expect(reasoningDeltas.join('')).toBe('deliberating hard');
       // Nothing at all reached the text channel, so `attempts` is the reasoning watch on its own.
       expect(textDeltas).toBe(0);

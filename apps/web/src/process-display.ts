@@ -1,4 +1,4 @@
-import type { ManagedProcess } from '@athanor/contracts';
+import type { ManagedProcess } from '@garden/contracts';
 
 export const processState = (process: ManagedProcess): string =>
   process.job?.state ?? process.service?.state ?? process.status;

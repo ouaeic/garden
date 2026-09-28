@@ -1,0 +1,1620 @@
+#!/usr/bin/python3
+"""Bounded, dependency-light extraction and search for user-owned documents."""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import datetime
+import email
+import email.policy
+import html
+import json
+import math
+import os
+import posixpath
+import re
+import struct
+import subprocess
+import sys
+import tempfile
+import time
+import xml.etree.ElementTree as ET
+import zipfile
+from collections import Counter
+from html.parser import HTMLParser
+from pathlib import Path
+from typing import Iterable, NamedTuple
+from urllib.parse import unquote
+
+
+# What a folder of one person's documents actually holds. The formats missing from this set used to
+# be missing from every answer as well - not ranked low, absent - so a 2009 Word file, a bank's
+# .xls, a forwarded email and an e-book were invisible to a search that had walked straight past
+# them. Nothing in this set is refused for its format any more: the last one that was - an Outlook
+# .msg - turned out to want a reader rather than a package. A file that still cannot be read is
+# refused as that file, with a reason, which is a thing the owner can act on. Silence is not.
+SUPPORTED = {
+    ".csv",
+    ".doc",
+    ".docx",
+    ".eml",
+    ".epub",
+    ".html",
+    ".htm",
+    ".json",
+    ".md",
+    ".msg",
+    ".odp",
+    ".ods",
+    ".odt",
+    ".pdf",
+    ".ppt",
+    ".pptx",
+    ".rtf",
+    ".svg",
+    ".tsv",
+    ".txt",
+    ".xls",
+    ".xlsx",
+    ".xml",
+    ".yaml",
+    ".yml",
+}
+MAX_SOURCE_BYTES = 250 * 1024 * 1024
+MAX_ARCHIVE_MEMBER_BYTES = 64 * 1024 * 1024
+TOKEN = re.compile(r"[\w-]{2,}", re.UNICODE)
+
+# The one interpreter this computer guarantees has the document libraries. The distribution's
+# python3 usually has openpyxl as well, so this is the second thing tried and not the first.
+GARDEN_PYTHON = "/usr/local/lib/garden/python/bin/python3"
+
+# The vetted converter, and what each pre-2007 Office format is turned into before it is read.
+# LibreOffice is already installed for the conversions the document skills prescribe, so reading a
+# .doc costs this computer nothing it was not already carrying, and the file it writes goes through
+# the extractor that was here already rather than through a second reader nobody proved.
+OFFICE_CONVERT = "/usr/local/bin/garden-office-convert"
+LEGACY_OFFICE = {".doc": ".docx", ".xls": ".xlsx", ".ppt": ".pptx"}
+LEGACY_TIMEOUT_SECONDS = 90
+
+# LibreOffice costs seconds per file where every other reader here costs milliseconds. One `read`
+# of one file the owner asked for is worth that. A search over four hundred of them is not - at
+# three seconds each it would spend twenty minutes and be killed long before it answered - so a
+# search converts until this much of its time is gone and then names the rest as unread, which is
+# the honest end of the trade rather than a search that never returns.
+LEGACY_SEARCH_BUDGET_SECONDS = 60.0
+
+# An e-book is a whole book, and a search reads every chunk of everything it opens. Past this the
+# rest of the book is named rather than read; a `read` clips at 200,000 characters anyway.
+MAX_BOOK_CHARACTERS = 400_000
+
+# Sparse text is a reason to inspect for image content, never evidence of an unreadable page.
+MIN_PDF_CHARACTERS_PER_PAGE = 16
+
+# What reads a PDF, and what reads the pictures in one once they are known to be pictures. All
+# four have been on this computer all along - poppler for the first two, and the installer carries
+# tesseract with its English data - and until now nothing here called the last two, so a folder of
+# scanned contracts was told truthfully that it could not be read and left at that. Truthfully is
+# not the same as read.
+PDF_TEXT_READER = "/usr/bin/pdftotext"
+PDF_PAGE_COUNTER = "/usr/bin/pdfinfo"
+PAGE_RASTERISER = "/usr/bin/pdftoppm"
+OCR_ENGINE = "/usr/bin/tesseract"
+
+# 300 dpi is where scanned body text stops losing characters; above it a page costs more seconds
+# without giving up more words, and grey is what the recogniser thresholds the page down to anyway.
+OCR_DPI = 300
+
+# One page renders in about a second and is recognised in a few, so this is the number at which a
+# page has stopped rather than slowed. It is deliberately small compared with the budgets below:
+# the seconds are counted after a page finishes, so a page that hangs runs on past whatever is left
+# and the whole reading has to still come back inside the time its caller allows.
+OCR_PAGE_TIMEOUT_SECONDS = 45
+
+# Pages, not characters, is the bound that matters here, because each one is a rasterising and a
+# recognition rather than a slice of something already in memory. A reading that stops at this
+# says which pages it did not reach, in the same words the e-book above uses.
+MAX_OCR_PAGES = 20
+
+# Recognition is slower than every other reader here by a factor of a hundred - seconds a page
+# against milliseconds a file - so it takes the same trade LibreOffice takes above, out of a pot of
+# its own. Kept apart from that one deliberately: a folder holding a stack of .doc files and a
+# stack of scans must not spend one format's seconds on the other and then report the second stack
+# as unread. A `read` of a file the owner named affords more than a search across a folder does.
+#
+# Both sit under the seconds the caller allows this whole process, with room left for the page that
+# is still being recognised when the seconds run out - `document_read` and `document_search` in the
+# agent each name a timeout, and a budget larger than one of those is not a budget at all. It would
+# be a reading killed part-way with nothing to show for it, where the entire point of counting the
+# seconds here is to stop on a page boundary and say which pages were not reached. Twenty dense
+# pages at the seconds a page really costs is what these numbers are sized against; a reading that
+# wants more asks for the next range, which is what the sentence it comes back with says.
+OCR_SEARCH_BUDGET_SECONDS = 90.0
+OCR_READ_BUDGET_SECONDS = 180.0
+
+# Said once, at the top of what recognition produced. Text lifted off a picture of a page is not
+# the same evidence as text the document carried, and a figure read off a scan is wrong in ways a
+# copied figure cannot be, so the agent holding it is told which of the two it has.
+OCR_NOTE = (
+    "[Read by OCR: this PDF carries no text of its own, so the words below were recognised from "
+    "pictures of its pages. Recognition misreads characters, and digits worst of all, so check a "
+    "figure against the page before repeating it and say that a quotation came from OCR.]"
+)
+
+# Naming every populated cell is what makes a figure citable, and it is also what makes a large
+# sheet unreadable, so a reading stops at a bounded number of cells and says where it stopped.
+# The workbook total is set against the 200,000-character ceiling a read is clipped to anyway.
+MAX_SHEET_CELLS = 4_000
+MAX_WORKBOOK_CELLS = 12_000
+CURRENCY_SIGNS = "$£€¥₹₽"
+
+
+class TextHTMLParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.parts: list[str] = []
+        self.hidden = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        del attrs
+        if tag in {"script", "style", "noscript"}:
+            self.hidden += 1
+        elif tag in {"p", "br", "div", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6"}:
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in {"script", "style", "noscript"}:
+            self.hidden = max(0, self.hidden - 1)
+        elif tag in {"p", "div", "li", "tr"}:
+            self.parts.append("\n")
+
+    def handle_data(self, data: str) -> None:
+        if not self.hidden:
+            self.parts.append(data)
+
+
+def safe_target(raw: str, *, directory_ok: bool = False) -> Path:
+    root = Path.cwd().resolve()
+    requested = Path(raw)
+    target = (root / requested).resolve() if not requested.is_absolute() else requested.resolve()
+    try:
+        target.relative_to(root)
+    except ValueError as error:
+        raise ValueError("Document path must stay inside the current workspace") from error
+    if directory_ok and target.is_dir():
+        return target
+    if not target.is_file():
+        raise ValueError("Document path is not a regular file")
+    if target.stat().st_size > MAX_SOURCE_BYTES:
+        raise ValueError("Document exceeds the 250 MB extraction limit")
+    return target
+
+
+def normalized(text: str) -> str:
+    text = text.replace("\x00", "")
+    text = re.sub(r"\r\n?", "\n", text)
+    text = re.sub(r"[ \t]+\n", "\n", text)
+    text = re.sub(r"\n{4,}", "\n\n\n", text)
+    return text.strip()
+
+
+def html_text(source: str) -> str:
+    """Markup to prose. Shared by a web page, a chapter of an e-book and an HTML-only email."""
+    parser = TextHTMLParser()
+    parser.feed(source)
+    return normalized(html.unescape(" ".join(parser.parts)))
+
+
+def bounded_member(archive: zipfile.ZipFile, name: str) -> bytes:
+    info = archive.getinfo(name)
+    if info.file_size > MAX_ARCHIVE_MEMBER_BYTES:
+        raise ValueError(f"Archive member is too large: {name}")
+    with archive.open(info) as member:
+        return member.read(MAX_ARCHIVE_MEMBER_BYTES + 1)
+
+
+def xml_text(data: bytes, paragraph_tags: set[str] | None = None) -> str:
+    paragraph_tags = paragraph_tags or {"p", "tr", "row"}
+    root = ET.fromstring(data)
+    parts: list[str] = []
+    for element in root.iter():
+        local = element.tag.rsplit("}", 1)[-1]
+        if local in {"t", "text", "tab"} and element.text:
+            parts.append(element.text)
+        if local in paragraph_tags:
+            parts.append("\n")
+    return normalized(" ".join(parts).replace(" \n ", "\n"))
+
+
+def extract_docx(target: Path) -> str:
+    with zipfile.ZipFile(target) as archive:
+        return xml_text(bounded_member(archive, "word/document.xml"))
+
+
+def natural_key(name: str) -> list[object]:
+    return [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", name)]
+
+
+def extract_pptx(target: Path) -> str:
+    with zipfile.ZipFile(target) as archive:
+        names = sorted(
+            (
+                name
+                for name in archive.namelist()
+                if re.fullmatch(r"ppt/slides/slide\d+\.xml", name)
+            ),
+            key=natural_key,
+        )
+        return normalized(
+            "\n\n".join(
+                f"[Slide {index}]\n{xml_text(bounded_member(archive, name))}"
+                for index, name in enumerate(names, 1)
+            )
+        )
+
+
+def openpyxl_module():
+    """The workbook reader, or None when the running interpreter does not have it."""
+    try:
+        import openpyxl
+    except ImportError:
+        return None
+    return openpyxl
+
+
+def number_text(value: float, number_format: str) -> str:
+    """Render a number the way its format renders it: percentage, currency, decimal places.
+
+    Only the first section of the format is read. The sections after it describe negative, zero
+    and text values, and reading them would buy a minus sign the number already carries.
+    """
+    code = (number_format or "General").split(";")[0]
+    marks = "".join(
+        part for group in re.findall(r'"([^"]*)"|\[\$([^\]]*)\]', code) for part in group
+    )
+    symbol = "".join(mark for mark in marks if mark in CURRENCY_SIGNS)
+    skeleton = re.sub(r'"[^"]*"|\[[^\]]*\]|\\.|_.|\*.', "", code)
+    if "%" in skeleton:
+        value *= 100
+    places = re.search(r"\.([0#?]+)", skeleton)
+    grouping = "," if re.search(r"[#0],[#0]", skeleton) else ""
+    whole = int(value) if isinstance(value, int) or float(value).is_integer() else None
+    if places:
+        text = format(float(value), f"{grouping}.{len(places.group(1))}f")
+    elif whole is not None and abs(whole) < 2**53:
+        # An invoice number, an account number or an order reference is a whole number the sheet
+        # holds exactly, and eleven significant figures would round it into 4.4770090012e+11 and
+        # lose the digits that make it citable. Past 2**53 the workbook itself no longer holds
+        # every digit, so there is nothing left to preserve and the general form is the honest one.
+        text = format(whole, f"{grouping}d")
+    else:
+        text = format(value, f"{grouping}.11g")
+    sign = ""
+    if text.startswith("-"):
+        sign, text = "-", text[1:]
+    return f"{sign}{symbol}{text}%" if "%" in skeleton else f"{sign}{symbol}{text}"
+
+
+def moment_text(value: object, number_format: str) -> str:
+    """ISO 8601, rather than the sheet's own date mask.
+
+    The defect being fixed is a date arriving as 45292. Reproducing the mask would trade it for
+    01/02/2024, which is two different days depending on who is reading.
+    """
+    code = re.sub(r'"[^"]*"|\[[^\]]*\]|\\.', "", number_format or "").lower()
+    if isinstance(value, datetime.time):
+        return value.strftime("%H:%M:%S" if value.second else "%H:%M")
+    timed = "h" in code or "s" in code
+    if isinstance(value, datetime.datetime) and (timed or value.time() != datetime.time()):
+        return value.strftime("%Y-%m-%d %H:%M")
+    return value.strftime("%Y-%m-%d")
+
+
+def cell_text(value: object, number_format: str) -> str:
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if isinstance(value, (datetime.datetime, datetime.date, datetime.time)):
+        return moment_text(value, number_format)
+    if isinstance(value, datetime.timedelta):
+        return str(value)
+    if isinstance(value, (int, float)):
+        return number_text(value, number_format)
+    # A cell's own line breaks and tabs would read as new rows and new cells further along.
+    return re.sub(r"\s+", " ", str(value)).strip()
+
+
+def plural(count: int, noun: str) -> str:
+    return f"{count:,} {noun}" if count == 1 else f"{count:,} {noun}s"
+
+
+def formula_string(value: object) -> str | None:
+    if not isinstance(value, str):
+        value = getattr(value, "text", None)  # an array formula carries its source here
+    if isinstance(value, str) and value.startswith("="):
+        return re.sub(r"\s+", " ", value).strip()
+    return None
+
+
+def sheet_lines(value_sheet, formula_sheet, limit: int) -> tuple[list[str], int, int, str]:
+    """One line per row, one `B14: value` per populated cell, until the cell limit is spent.
+
+    The two sheets are the same XML read twice, once for cached values and once for formulas, so
+    their rows arrive in step. A formula is only ever attached to a value cell of the same
+    coordinate, which means a misalignment would lose a formula rather than misreport one.
+    """
+    lines: list[str] = []
+    written = 0
+    uncached = 0
+    stopped = ""
+    for value_row, formula_row in zip(value_sheet.iter_rows(), formula_sheet.iter_rows()):
+        formula_at: dict[str, str] = {}
+        for cell in formula_row:
+            # A gap in a row arrives as a cell with no coordinate at all, and holds nothing.
+            coordinate = getattr(cell, "coordinate", None)
+            source = formula_string(cell.value)
+            if coordinate and source is not None:
+                formula_at[coordinate] = source
+        cells: list[str] = []
+        for cell in value_row:
+            coordinate = getattr(cell, "coordinate", None)
+            if not coordinate:
+                continue
+            formula = formula_at.get(coordinate)
+            if cell.value is None and formula is None:
+                continue
+            if written >= limit:
+                stopped = coordinate
+                break
+            if cell.value is None:
+                uncached += 1
+                text = formula
+            else:
+                text = cell_text(cell.value, cell.number_format)
+            if not text:
+                continue
+            cells.append(f"{coordinate}: {text}")
+            written += 1
+        if cells:
+            lines.append("\t".join(cells))
+        if stopped:
+            break
+    return lines or ["(no populated cells)"], written, uncached, stopped
+
+
+def workbook_lines(values, formulas, name: str) -> list[str]:
+    body: list[str] = []
+    budget = MAX_WORKBOOK_CELLS
+    uncached = 0
+    sheets = values.worksheets
+    for index, sheet in enumerate(sheets, 1):
+        if budget <= 0:
+            skipped = sheets[index - 1 :]
+            titles = ", ".join(later.title for later in skipped)
+            body.append(
+                f"[Not read: {plural(len(skipped), 'further sheet')} ({titles}). "
+                f"The {MAX_WORKBOOK_CELLS:,} cell limit for one workbook was reached.]"
+            )
+            break
+        lines, written, missing, stopped = sheet_lines(
+            sheet, formulas[sheet.title], min(MAX_SHEET_CELLS, budget)
+        )
+        body.append(f"[Sheet {index}: {sheet.title}]")
+        body.extend(lines)
+        if stopped:
+            body.append(
+                f"[Truncated: {plural(written, 'cell')} read from {sheet.title}, stopping at "
+                f"{stopped}. The rest of the sheet was not read.]"
+            )
+        budget -= written
+        uncached += missing
+    if uncached:
+        stem = Path(name).stem
+        body.insert(
+            0,
+            "[This workbook has not been recalculated since it was written. Where a formula has "
+            f"no cached result the formula itself appears below, in {plural(uncached, 'cell')}: "
+            f"`garden-office-convert {name} {stem}.recalc.xlsx` computes the values.]",
+        )
+    return body
+
+
+def workbook_text(target: Path, openpyxl) -> str:
+    """Read-only twice over: one workbook for cached values, one for the formulas behind them."""
+    values = openpyxl.load_workbook(target, read_only=True, data_only=True)
+    formulas = openpyxl.load_workbook(target, read_only=True, data_only=False)
+    try:
+        return normalized("\n".join(workbook_lines(values, formulas, target.name)))
+    finally:
+        values.close()
+        formulas.close()
+
+
+def delegated_workbook_text(target: Path) -> str | None:
+    """Ask the pinned interpreter to read the workbook when this one cannot."""
+    if not os.access(GARDEN_PYTHON, os.X_OK):
+        return None
+    try:
+        result = subprocess.run(
+            [GARDEN_PYTHON, str(Path(__file__).resolve()), "workbook", "--path", str(target)],
+            check=False,
+            capture_output=True,
+            timeout=90,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    try:
+        payload = json.loads(result.stdout.decode("utf-8", "replace"))
+    except ValueError:
+        return None
+    text = payload.get("text")
+    return text if isinstance(text, str) else None
+
+
+# What the reader below cannot do, said once in the text it produces. A workbook that quietly
+# came back as serial numbers and blank totals is worse than one that says why it did.
+SHEET_XML_NOTE = (
+    "[Read from the sheet XML because openpyxl is not installed here: the sheets below are "
+    "unnamed and in file order rather than tab order, dates and percentages appear as the raw "
+    "numbers underneath them, and a formula cell with no cached value is blank.]"
+)
+
+
+def extract_xlsx(target: Path) -> tuple[str, str]:
+    """A workbook read as a spreadsheet, plus the name of the reader that managed it."""
+    openpyxl = openpyxl_module()
+    if openpyxl is not None:
+        return workbook_text(target, openpyxl), "openpyxl"
+    delegated = delegated_workbook_text(target)
+    if delegated is not None:
+        return delegated, "openpyxl"
+    return f"{SHEET_XML_NOTE}\n{sheet_xml_text(target)}", "sheet XML"
+
+
+def sheet_xml_text(target: Path) -> str:
+    with zipfile.ZipFile(target) as archive:
+        shared: list[str] = []
+        if "xl/sharedStrings.xml" in archive.namelist():
+            root = ET.fromstring(bounded_member(archive, "xl/sharedStrings.xml"))
+            for item in root:
+                shared.append(
+                    "".join(
+                        node.text or "" for node in item.iter() if node.tag.rsplit("}", 1)[-1] == "t"
+                    )
+                )
+        sheets = sorted(
+            (
+                name
+                for name in archive.namelist()
+                if re.fullmatch(r"xl/worksheets/sheet\d+\.xml", name)
+            ),
+            key=natural_key,
+        )
+        parts: list[str] = []
+        for sheet_index, name in enumerate(sheets, 1):
+            parts.append(f"[Sheet {sheet_index}]")
+            root = ET.fromstring(bounded_member(archive, name))
+            for row in (node for node in root.iter() if node.tag.rsplit("}", 1)[-1] == "row"):
+                cells: list[str] = []
+                for cell in (
+                    node for node in row if node.tag.rsplit("}", 1)[-1] == "c"
+                ):
+                    kind = cell.attrib.get("t")
+                    value = next(
+                        (
+                            node.text or ""
+                            for node in cell.iter()
+                            if node.tag.rsplit("}", 1)[-1] in {"v", "t"}
+                        ),
+                        "",
+                    )
+                    if kind == "s" and value.isdigit() and int(value) < len(shared):
+                        value = shared[int(value)]
+                    cells.append(value)
+                parts.append("\t".join(cells))
+        return normalized("\n".join(parts))
+
+
+def extract_open_document(target: Path) -> str:
+    with zipfile.ZipFile(target) as archive:
+        return xml_text(bounded_member(archive, "content.xml"))
+
+
+class ConversionBudget:
+    """Seconds of one slow reader that one reading may spend, and what is left of them."""
+
+    def __init__(self, seconds: float) -> None:
+        self.remaining = seconds
+
+    def spend(self, seconds: float) -> None:
+        self.remaining -= seconds
+
+
+class Budgets(NamedTuple):
+    """The two slow readers on this computer, each with its own seconds.
+
+    Converting and recognising are both worth minutes of one file the owner named and seconds of a
+    folder walked past looking for a phrase, which is the difference between the pots a `read`
+    hands out and the pots a `search` does.
+    """
+
+    office: ConversionBudget
+    ocr: ConversionBudget
+
+
+def read_budgets() -> Budgets:
+    """What one file the owner asked for by name may cost.
+
+    LibreOffice is unbounded here, as it always has been: the per-file timeout is the only ceiling
+    a single conversion ever had. Recognition is not, because a two-hundred-page scan would be an
+    hour, and the page ceiling and these seconds are what make it a reading rather than a wait.
+    """
+    return Budgets(ConversionBudget(math.inf), ConversionBudget(OCR_READ_BUDGET_SECONDS))
+
+
+def search_budgets() -> Budgets:
+    """What a walk over a whole folder may spend before it owes the owner an answer."""
+    return Budgets(
+        ConversionBudget(LEGACY_SEARCH_BUDGET_SECONDS), ConversionBudget(OCR_SEARCH_BUDGET_SECONDS)
+    )
+
+
+def installed(default: str, override: str) -> str | None:
+    """A tool this reader runs, named absolutely rather than looked up on the search path.
+
+    The path an agent command runs with includes directories the agent itself can write to, and
+    reading a document is the one place that must not execute something out of one of them. Every
+    override exists for the same two reasons: the test drives stubs through them, and a developer
+    whose machine keeps poppler somewhere other than where a provisioned computer does can still
+    run the whole proof rather than skipping the half of it that touches a PDF.
+    """
+    candidate = os.environ.get(override) or default
+    return candidate if os.access(candidate, os.X_OK) else None
+
+
+def extract_legacy_office(target: Path, budget: ConversionBudget) -> str:
+    """A pre-2007 Word, Excel or PowerPoint file, through the converter the skills already use.
+
+    These are binary formats with no reader in the standard library, and the bytes decoded as text
+    are the mojibake this refuses to return. The modern file is a temporary that never touches the
+    owner's folder, and it is read by the extractor that was already here.
+    """
+    modern = LEGACY_OFFICE[target.suffix.lower()]
+    converter = installed(OFFICE_CONVERT, "GARDEN_OFFICE_CONVERT")
+    if converter is None:
+        raise ValueError(
+            f"a {target.suffix.lower()} file is read by converting it first, and "
+            "garden-office-convert is not on this computer, so this one cannot be read as text. "
+            "apt-get install -y libreoffice-writer libreoffice-impress libreoffice-calc, then "
+            "re-run the garden installer, is what opens it"
+        )
+    if budget.remaining <= 0:
+        raise ValueError(
+            "not converted: this search had already spent the time it allows LibreOffice by the "
+            "time it reached this file. Reading this one file with document_read converts it"
+        )
+    with tempfile.TemporaryDirectory(prefix="garden-legacy-") as scratch:
+        converted = Path(scratch) / f"converted{modern}"
+        started = time.monotonic()
+        try:
+            result = subprocess.run(
+                [converter, str(target), str(converted)],
+                check=False,
+                capture_output=True,
+                timeout=LEGACY_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired:
+            raise ValueError(
+                f"LibreOffice did not finish reading this {target.suffix.lower()} file within "
+                f"{LEGACY_TIMEOUT_SECONDS}s, so nothing was read from it"
+            ) from None
+        finally:
+            budget.spend(time.monotonic() - started)
+        if result.returncode != 0 or not converted.is_file():
+            detail = normalized(result.stderr.decode("utf-8", "replace")).splitlines()
+            raise ValueError(
+                detail[-1] if detail else f"LibreOffice could not read {target.name}"
+            )
+        if modern == ".docx":
+            return extract_docx(converted)
+        if modern == ".pptx":
+            return extract_pptx(converted)
+        return extract_xlsx(converted)[0]
+
+
+def extract_eml(target: Path) -> str:
+    """A saved email, read as the message it is: who it is from and about, then what it says.
+
+    The standard library is the whole reader. It decodes the quoted-printable and base64 bodies and
+    the encoded-word headers a forwarded message is full of - which is exactly what the raw bytes
+    would otherwise have turned into on the way to the answer.
+    """
+    message = email.message_from_bytes(target.read_bytes(), policy=email.policy.default)
+    lines: list[str] = []
+    for field in ("From", "To", "Cc", "Date", "Subject"):
+        value = message.get(field)
+        if value:
+            # A long recipient list is folded across lines in the file and is one fact here.
+            folded = re.sub(r"\s+", " ", str(value)).strip()
+            lines.append(f"{field}: {folded}")
+    # This parser accepts anything: hand it a zip, or a page of random bytes, and it returns a
+    # message with no headers whose body is the whole file decoded with replacements. That is the
+    # same mojibake .msg is refused for, so it is refused here for the same reason - a file with
+    # not one header of the five above was never an email, whatever it is called.
+    if not lines:
+        raise ValueError(
+            "this file is named as an email but carries none of the headers one has, so whatever "
+            "it is, it is not a message this computer can read"
+        )
+    body = message.get_body(preferencelist=("plain", "html"))
+    if body is not None:
+        try:
+            content = body.get_content()
+        except (LookupError, ValueError) as error:
+            # A charset this computer has no codec for. Headers alone are still worth returning -
+            # who it is from and what it is about is most of why a search found it - and saying
+            # which part is missing beats a message that half-decodes into symbols.
+            content = f"[The body of this message is in an encoding this computer cannot read: {error}]"
+        lines.append("")
+        lines.append(html_text(content) if body.get_content_subtype() == "html" else str(content))
+    # Named, never opened. An attachment is a document in its own right, and the owner reads it by
+    # saving it out; listing it here is what tells them it is in there at all.
+    attached = [
+        part.get_filename()
+        for part in message.iter_attachments()
+        if part.get_filename()
+    ]
+    if attached:
+        lines.append("")
+        lines.append(f"[{plural(len(attached), 'attachment')}: {', '.join(attached)}]")
+    return normalized("\n".join(lines))
+
+
+# A compound file is a filesystem inside a file: a header, two allocation tables and a directory
+# of named streams, all fixed-width. An Outlook .msg is one of those, with each field of the
+# message in a stream named after the property it holds.
+#
+# This format was refused by name here for a long time, on the grounds that nothing on the computer
+# decoded it and no package would. The second half of that is still true - the pinned Python
+# environment holds pypdf and python-pptx and nothing else, the installer's package table names no
+# reader for this, and apt runs with --no-install-recommends, so nothing arrives on the side
+# either. The first half was never true. The container is documented and fixed-width, `struct` is
+# the whole of what reads it, and a forwarded Outlook mail is an ordinary thing to have in a folder.
+CFB_SIGNATURE = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+FREE_SECTOR = 0xFFFFFFFF
+END_OF_CHAIN = 0xFFFFFFFE
+ROOT_STORAGE = 5
+STORAGE = 1
+STREAM = 2
+
+
+class DirectoryEntry(NamedTuple):
+    name: str
+    kind: int
+    left: int
+    right: int
+    child: int
+    start: int
+    size: int
+
+
+class CompoundFile:
+    """The streams inside a compound file, read by name.
+
+    A reader and nothing else: it walks the two allocation tables and the directory, and where it
+    cannot account for what it finds it says so rather than guessing. Every walk below is bounded by
+    the sector count the file's own length allows, because a chain that points back at itself is
+    how a format like this turns a document reader into a computer that never answers.
+    """
+
+    def __init__(self, data: bytes) -> None:
+        if len(data) < 512 or data[:8] != CFB_SIGNATURE:
+            raise ValueError("it does not begin like a compound file")
+        self.data = data
+        sector_shift, mini_shift = struct.unpack_from("<HH", data, 30)
+        self.sector_size = 1 << sector_shift
+        self.mini_size = 1 << mini_shift
+        if self.sector_size not in {512, 4096} or self.mini_size != 64:
+            raise ValueError("its sectors are not a size a compound file has")
+        fat_count, directory_start = struct.unpack_from("<II", data, 44)
+        (self.mini_cutoff,) = struct.unpack_from("<I", data, 56)
+        mini_fat_start, _, difat_start, difat_count = struct.unpack_from("<IIII", data, 60)
+        self.sectors = max(0, (len(data) - self.sector_size) // self.sector_size)
+        self.fat = self._allocation_table(fat_count, difat_start, difat_count)
+        self.mini_fat = self._entries(self._sectors_of(mini_fat_start))
+        self.directory = self._directory(directory_start)
+        # Entry zero is the root storage by definition, and it carries two jobs: it is the top of
+        # the directory tree, and its own stream is where every stream too small for a sector lives.
+        self.root = self.directory[0]
+        self.mini_stream = self._sectors_of(self.root.start, self.root.size)
+
+    def _sector(self, number: int) -> bytes:
+        if number < 0 or number >= self.sectors:
+            raise ValueError("a sector chain points outside the file")
+        start = (number + 1) * self.sector_size
+        return self.data[start : start + self.sector_size]
+
+    @staticmethod
+    def _entries(raw: bytes) -> list[int]:
+        return list(struct.unpack_from(f"<{len(raw) // 4}I", raw, 0))
+
+    def _allocation_table(self, count: int, difat_start: int, difat_count: int) -> list[int]:
+        """Which sector follows which, assembled from the list of sectors that says so.
+
+        The first hundred and nine of those are in the header; a file large enough to need more
+        keeps the rest in a chain of its own, each link ending in the number of the next.
+        """
+        numbers = self._entries(self.data[76:512])
+        sector = difat_start
+        for _ in range(min(difat_count, self.sectors)):
+            if sector >= self.sectors:
+                break
+            block = self._entries(self._sector(sector))
+            numbers.extend(block[:-1])
+            sector = block[-1]
+        raw = b"".join(self._sector(number) for number in numbers[:count] if number < self.sectors)
+        return self._entries(raw)
+
+    def _chain(self, start: int, table: list[int]) -> Iterable[int]:
+        seen: set[int] = set()
+        sector = start
+        while sector < len(table) and sector not in {FREE_SECTOR, END_OF_CHAIN}:
+            if sector in seen:
+                raise ValueError("a sector chain in this file loops")
+            seen.add(sector)
+            yield sector
+            sector = table[sector]
+
+    def _sectors_of(self, start: int, size: int | None = None) -> bytes:
+        raw = b"".join(self._sector(number) for number in self._chain(start, self.fat))
+        return raw if size is None else raw[:size]
+
+    def _directory(self, start: int) -> list[DirectoryEntry]:
+        raw = self._sectors_of(start)
+        entries: list[DirectoryEntry] = []
+        for at in range(0, len(raw) - 127, 128):
+            length, kind = struct.unpack_from("<HB", raw, at + 64)
+            # The length counts the terminating null as two of its bytes, and a corrupt one is
+            # clamped rather than trusted, because it indexes straight into the file.
+            name = raw[at : at + max(0, min(64, length - 2))].decode("utf-16-le", "replace")
+            left, right, child = struct.unpack_from("<III", raw, at + 68)
+            sector, size = struct.unpack_from("<IQ", raw, at + 116)
+            entries.append(DirectoryEntry(name, kind, left, right, child, sector, size))
+        if not entries or entries[0].kind != ROOT_STORAGE:
+            raise ValueError("its directory does not begin with a root storage")
+        return entries
+
+    def contents(self, storage: DirectoryEntry) -> dict[str, DirectoryEntry]:
+        """What is directly inside one storage, by name.
+
+        The children of a storage are held as a tree rather than a list, so this is a walk: the
+        storage names one child, and that child's left and right are its siblings rather than its
+        own contents. Order is the tree's own and carries nothing, which is why the answer is a
+        mapping and the caller asks for what it wants by name.
+        """
+        found: dict[str, DirectoryEntry] = {}
+        pending = [storage.child]
+        seen: set[int] = set()
+        while pending:
+            index = pending.pop()
+            if index >= len(self.directory) or index in seen:
+                continue
+            seen.add(index)
+            entry = self.directory[index]
+            if entry.kind in {STORAGE, STREAM}:
+                found[entry.name] = entry
+            pending.extend((entry.left, entry.right))
+        return found
+
+    def stream(self, entry: DirectoryEntry) -> bytes:
+        """One stream's bytes, from the mini stream when it is small and the file when it is not."""
+        size = min(entry.size, MAX_ARCHIVE_MEMBER_BYTES)
+        if size >= self.mini_cutoff:
+            return self._sectors_of(entry.start, size)
+        parts: list[bytes] = []
+        for number in self._chain(entry.start, self.mini_fat):
+            at = number * self.mini_size
+            parts.append(self.mini_stream[at : at + self.mini_size])
+        return b"".join(parts)[:size]
+
+
+# The properties a message is made of, named by the tag Outlook stores each one under. Read in this
+# order because it is the order a person reads a message in, which is the order extract_eml puts a
+# saved .eml in as well - the two formats are the same message and they come back looking alike.
+MSG_SENDER_NAME = "0C1A"
+MSG_SENDER_ADDRESS = "0C1F"
+MSG_SENDER_SMTP = "5D01"
+MSG_DISPLAY_TO = "0E04"
+MSG_DISPLAY_CC = "0E03"
+MSG_SUBJECT = "0037"
+MSG_HEADERS = "007D"
+MSG_BODY = "1000"
+MSG_BODY_HTML = "1013"
+MSG_ATTACHMENT_NAME = "3707"
+MSG_ATTACHMENT_SHORT_NAME = "3704"
+
+
+def msg_text(message: CompoundFile, streams: dict[str, DirectoryEntry], tag: str) -> str | None:
+    """One property as text, in whichever of the two string types it happens to be stored as.
+
+    The eight-bit form carries the code page it was written in somewhere else entirely, and the
+    overwhelming majority of those are the Windows Latin one. UTF-8 is tried first because a modern
+    producer writes it and it fails loudly on anything else, where the fallback fails silently.
+    """
+    entry = streams.get(f"__substg1.0_{tag}001F")
+    if entry is not None:
+        return message.stream(entry).decode("utf-16-le", "replace").strip() or None
+    entry = streams.get(f"__substg1.0_{tag}001E")
+    if entry is None:
+        return None
+    raw = message.stream(entry)
+    try:
+        return raw.decode("utf-8").strip() or None
+    except UnicodeDecodeError:
+        return raw.decode("cp1252", "replace").strip() or None
+
+
+def msg_attachments(message: CompoundFile, streams: dict[str, DirectoryEntry]) -> list[str]:
+    """Named, never opened - the same trade a saved .eml gets, and for the same reason."""
+    names: list[str] = []
+    for name, entry in sorted(streams.items()):
+        if entry.kind != STORAGE or not name.startswith("__attach_version1.0"):
+            continue
+        inside = message.contents(entry)
+        filename = msg_text(message, inside, MSG_ATTACHMENT_NAME) or msg_text(
+            message, inside, MSG_ATTACHMENT_SHORT_NAME
+        )
+        if filename:
+            names.append(filename)
+    return names
+
+
+def extract_msg(target: Path) -> str:
+    """A saved Outlook message, read as the message it is rather than refused for being binary.
+
+    What comes back is shaped exactly like a saved .eml: who it is from and about, then what it
+    says, then what was attached. The two are the same message and an answer should not be able to
+    tell the owner which client happened to save it.
+
+    Strict on purpose, in both directions. A file that is not a compound file at all, or one whose
+    streams hold none of the properties a message has, is refused with the sentence the owner can
+    act on - because handing back a plausible-looking half of a message is the failure this format
+    was refused by name to avoid, and being able to read one is no reason to start doing that.
+    """
+    try:
+        message = CompoundFile(target.read_bytes())
+        streams = message.contents(message.root)
+    except (ValueError, struct.error, IndexError) as error:
+        raise ValueError(
+            f"this file is named as an Outlook message but is not one that can be opened here: "
+            f"{error}. Saving the message again as .eml from the mail client, or forwarding it, is "
+            "what makes it readable"
+        ) from None
+    sender = msg_text(message, streams, MSG_SENDER_NAME)
+    address = msg_text(message, streams, MSG_SENDER_ADDRESS) or msg_text(
+        message, streams, MSG_SENDER_SMTP
+    )
+    headers = msg_text(message, streams, MSG_HEADERS)
+    # A message that was sent carries the headers it was sent with, and the date is one of them,
+    # parsed by the same standard-library reader a saved .eml goes through. A draft carries no such
+    # stream and has no send date to report, so it is given none rather than the day it was saved.
+    posted = email.message_from_string(headers, policy=email.policy.default) if headers else None
+    sent = posted.get("Date") if posted is not None else None
+    fields = [
+        ("From", f"{sender} <{address}>" if sender and address else sender or address),
+        ("To", msg_text(message, streams, MSG_DISPLAY_TO)),
+        ("Cc", msg_text(message, streams, MSG_DISPLAY_CC)),
+        ("Date", sent),
+        ("Subject", msg_text(message, streams, MSG_SUBJECT)),
+    ]
+    lines: list[str] = []
+    for name, value in fields:
+        if not value:
+            continue
+        # A long recipient list is folded across lines in the file and is one fact here.
+        folded = re.sub(r"\s+", " ", str(value)).strip()
+        lines.append(f"{name}: {folded}")
+    body = msg_text(message, streams, MSG_BODY)
+    if body is None:
+        html_body = msg_text(message, streams, MSG_BODY_HTML)
+        body = html_text(html_body) if html_body else None
+    if not lines and not body:
+        raise ValueError(
+            "this file is a compound file but holds none of the properties a message has, so "
+            "whatever it is, it is not a message this computer can read"
+        )
+    if body is None:
+        # The remaining case is a body kept only as formatted text, which is a compressed stream in
+        # a format of its own. Saying so is worth more than returning the headers and letting the
+        # message look like one that said nothing.
+        body = (
+            "[The body of this message is stored only as formatted text, which this reader does "
+            "not decode. The fields above are what it could read; opening the message and saving "
+            "it as .eml, or forwarding it, brings the body with it.]"
+        )
+    attached = msg_attachments(message, streams)
+    lines.extend(["", body])
+    if attached:
+        lines.extend(["", f"[{plural(len(attached), 'attachment')}: {', '.join(attached)}]"])
+    return normalized("\n".join(lines))
+
+
+def epub_documents(archive: zipfile.ZipFile) -> list[str]:
+    """The chapters of a book in the order the book declares, or file order when it declares none.
+
+    Reading order matters more here than in any other format: an e-book's files are routinely named
+    part0034.xhtml in the order they were converted, so file order alone puts the copyright notice
+    in the middle of chapter nine and reports page positions that are not the book's.
+    """
+    names = set(archive.namelist())
+    try:
+        container = ET.fromstring(bounded_member(archive, "META-INF/container.xml"))
+        package_name = next(
+            element.attrib["full-path"]
+            for element in container.iter()
+            if element.tag.rsplit("}", 1)[-1] == "rootfile" and "full-path" in element.attrib
+        )
+        package = ET.fromstring(bounded_member(archive, package_name))
+    except (KeyError, ValueError, StopIteration, ET.ParseError):
+        package = None
+    if package is not None:
+        base = posixpath.dirname(package_name)
+        manifest = {
+            element.attrib["id"]: element.attrib["href"]
+            for element in package.iter()
+            if element.tag.rsplit("}", 1)[-1] == "item"
+            and "id" in element.attrib
+            and "href" in element.attrib
+        }
+        ordered: list[str] = []
+        for element in package.iter():
+            if element.tag.rsplit("}", 1)[-1] != "itemref":
+                continue
+            href = manifest.get(element.attrib.get("idref", ""))
+            if not href:
+                continue
+            # An href is a URL: a chapter file with a space in its name arrives percent-encoded, and
+            # it is relative to the package document rather than to the root of the archive.
+            member = posixpath.normpath(posixpath.join(base, unquote(href.split("#", 1)[0])))
+            if member in names and member not in ordered:
+                ordered.append(member)
+        if ordered:
+            return ordered
+    return sorted(
+        (name for name in names if name.lower().endswith((".xhtml", ".html", ".htm"))),
+        key=natural_key,
+    )
+
+
+def extract_epub(target: Path) -> str:
+    with zipfile.ZipFile(target) as archive:
+        members = epub_documents(archive)
+        parts: list[str] = []
+        written = 0
+        for index, name in enumerate(members):
+            if written >= MAX_BOOK_CHARACTERS:
+                parts.append(
+                    f"[Not read: {plural(len(members) - index, 'further section')}. The "
+                    f"{MAX_BOOK_CHARACTERS:,} character limit for one book was reached.]"
+                )
+                break
+            section = html_text(bounded_member(archive, name).decode("utf-8", "replace"))
+            if not section:
+                continue
+            parts.append(section)
+            written += len(section)
+        return normalized("\n\n".join(parts))
+
+
+def extract_pdf(target: Path, start_page: int, end_page: int) -> tuple[str, int | None]:
+    reader = installed(PDF_TEXT_READER, "GARDEN_PDFTOTEXT")
+    counter = installed(PDF_PAGE_COUNTER, "GARDEN_PDFINFO")
+    if reader is None or counter is None:
+        raise ValueError(
+            "poppler is what reads a PDF on this computer and it is not installed here, so this "
+            "file cannot be read as text at all. apt-get install -y poppler-utils is what opens it"
+        )
+    pages: int | None = None
+    info = subprocess.run(
+        [counter, str(target)],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    for line in info.stdout.splitlines():
+        if line.startswith("Pages:"):
+            try:
+                pages = int(line.split(":", 1)[1].strip())
+            except ValueError:
+                pass
+    command = [
+        reader,
+        "-f",
+        str(start_page),
+        "-l",
+        str(end_page),
+        "-layout",
+        str(target),
+        "-",
+    ]
+    result = subprocess.run(command, check=False, capture_output=True, timeout=90)
+    if result.returncode != 0:
+        raise ValueError(
+            normalized(result.stderr.decode("utf-8", "replace")) or "PDF extraction failed"
+        )
+    page_text = result.stdout.decode("utf-8", "replace").split("\f")
+    if page_text and not page_text[-1].strip():
+        page_text.pop()
+    count = min(pages, end_page) - start_page + 1 if pages else len(page_text)
+    page_text += [""] * max(0, count - len(page_text))
+    return "\f".join(normalized(page) for page in page_text[:count]), pages
+
+
+class Extraction(NamedTuple):
+    text: str
+    pages: int | None = None
+    extractor: str | None = None
+    # How many pages this reading actually covered, which is what decides whether the characters
+    # that came back are a document or the absence of one. Zero for everything that has no pages.
+    pages_read: int = 0
+    # What recognition did not get to, on the occasions it did not get to all of it - a scan no
+    # recogniser could be run on at all, or one this reading stopped part of the way through. Read
+    # by `unread_reason` for the first and by the search for the second, because both owe the owner
+    # the difference between a document that says nothing and a document nothing here finished.
+    ocr_gap: str | None = None
+    ocr_pages: tuple[int, ...] = ()
+
+
+def pdf_ocr_pages(target: Path, plain: Extraction, start: int, end: int) -> list[int]:
+    """Recognise sparse pages with images, including scans within an otherwise textual PDF."""
+    page_text = plain.text.split("\f")
+    sparse = [
+        start + i
+        for i in range(plain.pages_read)
+        if len(page_text[i].strip() if i < len(page_text) else "")
+        < MIN_PDF_CHARACTERS_PER_PAGE
+    ]
+    if not sparse:
+        return []
+    inspector = installed("/usr/bin/pdfimages", "GARDEN_PDFIMAGES")
+    if inspector is None:
+        return sparse
+    try:
+        result = subprocess.run(
+            [inspector, "-f", str(start), "-l", str(end), "-list", str(target)],
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        if result.returncode != 0:
+            return sparse
+        image_pages = {
+            int(line.split()[0])
+            for line in result.stdout.splitlines()
+            if line.split() and line.split()[0].isdigit()
+        }
+        return [page for page in sparse if page in image_pages or not (page_text[page - start].strip() if page - start < len(page_text) else "")]
+    except (OSError, subprocess.SubprocessError):
+        return sparse
+
+
+def last_line(stream: bytes) -> str:
+    """The last thing a tool said before it gave up, which is the part worth repeating."""
+    said = normalized(stream.decode("utf-8", "replace")).splitlines()
+    return said[-1] if said else ""
+
+
+def recognise_page(engine: str, rasteriser: str, target: Path, page: int, scratch: Path) -> str:
+    """One page of a scan, rendered to a picture and read off it.
+
+    The picture goes with the page rather than with the document: a 300 dpi page is a megabyte, and
+    twenty of them held at once to read them one at a time would be a megabyte nineteen times over.
+    """
+    image = scratch / f"page-{page}"
+    rendered = subprocess.run(
+        [
+            rasteriser,
+            "-r",
+            str(OCR_DPI),
+            "-gray",
+            "-png",
+            "-singlefile",
+            "-f",
+            str(page),
+            "-l",
+            str(page),
+            str(target),
+            str(image),
+        ],
+        check=False,
+        capture_output=True,
+        timeout=OCR_PAGE_TIMEOUT_SECONDS,
+    )
+    picture = image.with_suffix(".png")
+    if rendered.returncode != 0 or not picture.is_file():
+        raise ValueError(last_line(rendered.stderr) or f"page {page} could not be rendered")
+    try:
+        recognised = subprocess.run(
+            [engine, str(picture), "-", "--dpi", str(OCR_DPI), "-l", "eng"],
+            check=False,
+            capture_output=True,
+            timeout=OCR_PAGE_TIMEOUT_SECONDS,
+        )
+    finally:
+        picture.unlink(missing_ok=True)
+    if recognised.returncode != 0:
+        raise ValueError(last_line(recognised.stderr) or f"page {page} could not be recognised")
+    # One picture is one page, so the recogniser's own page break carries no information here and
+    # would read as a page of its own to everything downstream that counts them.
+    return recognised.stdout.decode("utf-8", "replace").replace("\f", "").strip()
+
+
+def recognised_pdf(
+    plain: Extraction,
+    target: Path,
+    start_page: int,
+    candidates: list[int],
+    budget: ConversionBudget,
+) -> Extraction:
+    """Keep exact text on readable pages; OCR only the sparse image pages within this reading."""
+    engine = installed(OCR_ENGINE, "GARDEN_TESSERACT")
+    rasteriser = installed(PAGE_RASTERISER, "GARDEN_PDFTOPPM")
+    if engine is None or rasteriser is None:
+        return plain._replace(
+            ocr_gap="image pages could not be recognised: install tesseract-ocr "
+            "and poppler-utils to read them"
+        )
+    pages = plain.text.split("\f")
+    pages += [""] * max(0, plain.pages_read - len(pages))
+    recognised = 0
+    changed_pages: list[int] = []
+    failure: str | None = None
+    with tempfile.TemporaryDirectory(prefix="garden-ocr-") as scratch:
+        for page in candidates[:MAX_OCR_PAGES]:
+            if budget.remaining <= 0:
+                failure = "the seconds this reading allows OCR were spent"
+                break
+            started = time.monotonic()
+            try:
+                text = recognise_page(engine, rasteriser, target, page, Path(scratch))
+                index = page - start_page
+                if len(text.strip()) > len(pages[index].strip()):
+                    pages[index] = text
+                    changed_pages.append(page)
+                recognised += 1
+            except (ValueError, OSError, subprocess.SubprocessError) as error:
+                failure = (
+                    f"OCR stopped on page {page}: {str(error) or type(error).__name__}"
+                )
+                break
+            finally:
+                budget.spend(time.monotonic() - started)
+    remaining = len(candidates) - recognised
+    gap = None
+    if remaining:
+        why = (
+            failure or f"one reading recognises at most {plural(MAX_OCR_PAGES, 'page')}"
+        )
+        gap = f"{plural(remaining, 'image page')} were not recognised, because {why}"
+    body = "\f".join(pages)
+    return Extraction(
+        body, plain.pages, "OCR" if changed_pages else plain.extractor, plain.pages_read, gap, tuple(changed_pages)
+    )
+
+
+def extract_text(
+    target: Path,
+    start_page: int = 1,
+    end_page: int = 20,
+    budgets: Budgets | None = None,
+) -> Extraction:
+    suffix = target.suffix.lower()
+    budgets = budgets or read_budgets()
+    if suffix == ".pdf":
+        text, pages = extract_pdf(target, start_page, end_page)
+        plain = Extraction(
+            text, pages, None, max(1, min(pages or end_page, end_page) - start_page + 1)
+        )
+        candidates = pdf_ocr_pages(target, plain, start_page, end_page)
+        if not candidates:
+            return plain
+        return recognised_pdf(plain, target, start_page, candidates, budgets.ocr)
+    if suffix == ".docx":
+        return Extraction(extract_docx(target))
+    if suffix == ".pptx":
+        return Extraction(extract_pptx(target))
+    if suffix == ".xlsx":
+        text, extractor = extract_xlsx(target)
+        return Extraction(text, None, extractor)
+    if suffix in LEGACY_OFFICE:
+        return Extraction(
+            extract_legacy_office(target, budgets.office), None, "LibreOffice"
+        )
+    if suffix == ".epub":
+        return Extraction(extract_epub(target))
+    if suffix == ".eml":
+        return Extraction(extract_eml(target))
+    if suffix == ".msg":
+        return Extraction(extract_msg(target), None, "compound file")
+    if suffix in {".odt", ".ods", ".odp"}:
+        return Extraction(extract_open_document(target))
+    data = target.read_bytes()
+    text = data.decode("utf-8", "replace")
+    if suffix in {".html", ".htm"}:
+        return Extraction(html_text(text))
+    if suffix in {".xml", ".svg"}:
+        try:
+            return Extraction(xml_text(data, {"p", "text", "g"}))
+        except ET.ParseError:
+            pass
+    if suffix in {".csv", ".tsv"}:
+        dialect = "excel-tab" if suffix == ".tsv" else "excel"
+        rows = csv.reader(text.splitlines(), dialect=dialect)
+        return Extraction(normalized("\n".join("\t".join(row) for row in rows)))
+    if suffix == ".rtf":
+        text = re.sub(r"\\'[0-9a-fA-F]{2}", " ", text)
+        text = re.sub(r"\\[a-zA-Z]+-?\d* ?", " ", text)
+        text = text.replace("{", " ").replace("}", " ")
+    return Extraction(normalized(text))
+
+
+def unread_reason(extraction: Extraction, suffix: str) -> str | None:
+    """Sparse but valid text remains readable and searchable; missing OCR is partial coverage."""
+    if extraction.text.strip():
+        return None
+    if suffix == ".pdf":
+        return "no text was extracted from these PDF pages" + (
+            f"; {extraction.ocr_gap}"
+            if extraction.ocr_gap
+            else "; they may be blank, pictures, or text that the installed readers could not recognise"
+        )
+    return "no text at all came out of this file"
+
+
+def chunks(text: str, size: int = 2_400) -> Iterable[str]:
+    paragraphs = [part.strip() for part in re.split(r"\n\s*\n", text) if part.strip()]
+    current = ""
+    for paragraph in paragraphs:
+        if current and len(current) + len(paragraph) + 2 > size:
+            yield current
+            current = ""
+        current = f"{current}\n\n{paragraph}".strip()
+        while len(current) > size * 2:
+            yield current[:size]
+            current = current[size:]
+    if current:
+        yield current
+
+
+def located_chunks(text: str, suffix: str) -> Iterable[tuple[str, int | None]]:
+    if suffix == ".pdf":
+        for page, page_text in enumerate(text.split("\f"), 1):
+            for chunk in chunks(page_text):
+                yield chunk, page
+        return
+    for chunk in chunks(text):
+        yield chunk, None
+
+
+def bm25_score(
+    query: str,
+    text: str,
+    name: str,
+    counts: Counter[str],
+    token_count: int,
+    document_frequency: Counter[str],
+    corpus_size: int,
+    average_length: float,
+) -> float:
+    terms = list(dict.fromkeys(term.lower() for term in TOKEN.findall(query)))
+    if not terms:
+        return 0
+    k1 = 1.5
+    b = 0.75
+    normalized_length = token_count / max(1.0, average_length)
+    score = 0.0
+    for term in terms:
+        frequency = counts[term]
+        if not frequency:
+            continue
+        inverse_frequency = math.log(
+            1
+            + (corpus_size - document_frequency[term] + 0.5)
+            / (document_frequency[term] + 0.5)
+        )
+        score += inverse_frequency * (
+            frequency * (k1 + 1)
+            / (frequency + k1 * (1 - b + b * normalized_length))
+        )
+    haystack = text.lower()
+    phrase = query.strip().lower()
+    if phrase and phrase in haystack:
+        score += 4
+    lowered_name = name.lower()
+    score += 1.5 * sum(1 for term in terms if term in lowered_name)
+    coverage = sum(1 for term in terms if counts[term]) / len(terms)
+    return score + coverage * 2
+
+
+def read_command(args: argparse.Namespace) -> dict[str, object]:
+    target = safe_target(args.path)
+    suffix = target.suffix.lower()
+    extraction = extract_text(target, args.start_page, args.end_page)
+    total = len(extraction.text)
+    clipped = extraction.text[: args.max_chars]
+    reason = unread_reason(extraction, suffix)
+    return {
+        "path": os.path.relpath(target, Path.cwd()),
+        "format": suffix.lstrip(".") or "text",
+        "text": clipped,
+        "characters": total,
+        "truncated": total > len(clipped),
+        "extractor": extraction.extractor,
+        "pages": extraction.pages,
+        "pageRange": (
+            {"start": args.start_page, "end": args.end_page}
+            if suffix == ".pdf"
+            else None
+        ),
+        **(
+            {
+                "note": f"This document could not be read as text: {reason}. Do not assume it is empty."
+            }
+            if reason
+            else {
+                "note": f"Partial reading: {extraction.ocr_gap}. Extracted text remains searchable."
+            }
+            if extraction.ocr_gap
+            else {}
+        ),
+        **({"recognitionNote": OCR_NOTE, "recognisedPages": list(extraction.ocr_pages)} if extraction.extractor == "OCR" else {}),
+    }
+
+
+def candidate_files(root: Path, max_files: int) -> Iterable[Path]:
+    ignored = {".git", ".garden", "node_modules", "dist", "build", ".venv", "__pycache__"}
+    seen = 0
+    for directory, names, files in os.walk(root):
+        names[:] = sorted(
+            name for name in names if name not in ignored and not name.startswith(".")
+        )
+        for name in sorted(files):
+            target = Path(directory) / name
+            if target.suffix.lower() not in SUPPORTED or target.is_symlink():
+                continue
+            try:
+                if target.stat().st_size > MAX_SOURCE_BYTES:
+                    continue
+            except OSError:
+                continue
+            yield target
+            seen += 1
+            if seen >= max_files:
+                return
+
+
+def search_command(args: argparse.Namespace) -> dict[str, object]:
+    if len(args.alternative) > 4 or any(
+        not value.strip() or len(value) > 500 for value in args.alternative
+    ):
+        raise ValueError("Search accepts up to four nonempty alternatives of 500 characters each")
+    queries = list(
+        dict.fromkeys([args.query.strip(), *(value.strip() for value in args.alternative)])
+    )
+    if any(not TOKEN.findall(value) for value in queries):
+        raise ValueError("Each search query must contain at least one word")
+    query_terms = list(
+        dict.fromkeys(term.lower() for value in queries for term in TOKEN.findall(value))
+    )
+    root = safe_target(args.path, directory_ok=True)
+    from itertools import islice
+
+    candidates_walk = iter([root]) if root.is_file() else candidate_files(
+        root, args.file_offset + args.max_files + 1
+    )
+    page = list(islice(candidates_walk, args.file_offset, args.file_offset + args.max_files + 1))
+    has_more = len(page) > args.max_files
+    files = page[:args.max_files]
+    candidates: list[tuple[Path, str, int | None, Counter[str], int]] = []
+    document_frequency: Counter[str] = Counter()
+    corpus_size = 0
+    corpus_tokens = 0
+    failures = 0
+    unread: list[dict[str, str]] = []
+    # Scans this walk started reading and did not finish. Their pages that were recognised are in
+    # the results like anything else; what is owed here is the pages that were not.
+    partial: list[dict[str, str]] = []
+    # Which reader produced a file's text, for the files where that is not simply the file itself.
+    # An excerpt recognised off a picture and an excerpt copied out of a document look identical on
+    # the way to the owner, and they are not worth the same.
+    readers: dict[Path, str] = {}
+    recognised_pages: dict[Path, tuple[int, ...]] = {}
+    budgets = search_budgets()
+    for target in files:
+        relative = os.path.relpath(target, Path.cwd())
+        try:
+            extraction = extract_text(target, 1, args.max_pages, budgets)
+        except Exception as error:
+            # Deliberately every exception rather than the named five. A search runs over whatever
+            # the owner happens to have on disk, and the extractors reach into third-party parsers
+            # that raise their own types - openpyxl alone raises several outside that tuple. One
+            # unreadable file among four hundred must be counted and skipped, never the reason the
+            # owner's search returns nothing at all. The count is reported as `filesSkipped`, and
+            # the file is named in `unread` so the answer can say which one and why.
+            failures += 1
+            unread.append({"path": relative, "reason": str(error) or type(error).__name__})
+            continue
+        reason = unread_reason(extraction, target.suffix.lower())
+        if reason:
+            unread.append({"path": relative, "reason": reason})
+        # Read, but not all of it. Kept apart from `unread` because these files did match on what
+        # was recognised and saying they could not be read would be its own false sentence.
+        elif extraction.ocr_gap:
+            partial.append({"path": relative, "reason": extraction.ocr_gap})
+        if extraction.extractor:
+            readers[target] = extraction.extractor
+            recognised_pages[target] = extraction.ocr_pages
+        for chunk, page in located_chunks(extraction.text, target.suffix.lower()):
+            counts = Counter(term.lower() for term in TOKEN.findall(chunk))
+            token_count = sum(counts.values())
+            corpus_size += 1
+            corpus_tokens += token_count
+            present = {term for term in query_terms if counts[term]}
+            document_frequency.update(present)
+            if present or any(term in target.name.lower() for term in query_terms):
+                candidates.append((target, chunk, page, counts, token_count))
+    average_length = corpus_tokens / max(1, corpus_size)
+    ranked = []
+    for target, chunk, page, counts, token_count in candidates:
+        scores = [
+            (
+                query,
+                bm25_score(
+                    query, chunk, target.name, counts, token_count,
+                    document_frequency, corpus_size, average_length,
+                ),
+            )
+            for query in queries
+        ]
+        # A passage earns its strongest individual match; repeating variants buys no extra rank.
+        matched = [query for query, score in scores if score > 0]
+        ranked.append((max(score for _, score in scores), target, chunk, page, matched))
+    ranked.sort(key=lambda item: (-item[0], str(item[1]), item[3] or 0))
+    results: list[dict[str, object]] = []
+    per_file: Counter[str] = Counter()
+    for score, target, excerpt, page, matched in ranked:
+        relative = os.path.relpath(target, Path.cwd())
+        if per_file[relative] >= 3:
+            continue
+        result: dict[str, object] = {
+            "path": relative,
+            "score": round(score, 3),
+            "excerpt": excerpt[: args.excerpt_chars],
+        }
+        if len(queries) > 1:
+            result["matchedQueries"] = matched
+        if page is not None:
+            result["page"] = page
+        if target in readers and (readers[target] != "OCR" or page in recognised_pages[target]):
+            result["extractor"] = readers[target]
+        results.append(result)
+        per_file[relative] += 1
+        if len(results) >= args.max_results:
+            break
+    # The sentences that have to travel with these results rather than be worked out from them.
+    notes: list[str] = []
+    if has_more:
+        notes.append(
+            f"This search reached its limit of {args.max_files} files and is incomplete. "
+            f"Continue with fileOffset={args.file_offset + len(files)} and the same queries/path, "
+            "or narrow the folder. No matches on this page does not mean no matches in the folder. "
+            "Pages scan the current file list; restart from zero if files change during the search."
+        )
+    if unread:
+        notes.append(
+            f"{plural(len(unread), 'document')} of {len(files)} could not be read as text, so "
+            "nothing in them could have matched whatever they contain; `unread` says which and "
+            "why. Say that alongside these results - never report a search as finding nothing "
+            "without it."
+        )
+    if partial:
+        notes.append(
+            f"{plural(len(partial), 'scan')} of {len(files)} was read only as far as this search "
+            "got through it, so a phrase on a page it never reached could not have matched; "
+            "`partiallyRead` says which and how much was left. Say that alongside these results, "
+            "and read one of those files with document_read to recognise the rest of it."
+        )
+    if any(reader == "OCR" for reader in readers.values()):
+        notes.append(
+            "A result marked `extractor: OCR` was recognised from a picture of a page rather than "
+            "carried as text by the document. Say so when quoting one, and check any figure in it "
+            "against the page, because recognition misreads digits."
+        )
+    return {
+        "query": args.query,
+        **({"queries": queries} if len(queries) > 1 else {}),
+        "path": os.path.relpath(root, Path.cwd()),
+        "filesConsidered": len(files),
+        "coverage": {
+            "fileOffset": args.file_offset,
+            "fileLimit": args.max_files,
+            "hasMore": has_more,
+            "nextFileOffset": args.file_offset + len(files) if has_more else None,
+        },
+        "filesSkipped": failures,
+        "filesUnread": len(unread),
+        # Named individually, up to a point: a folder where nothing at all could be read would
+        # otherwise return a list longer than the results it is explaining. The count above is the
+        # whole truth either way.
+        "unread": unread[:25],
+        # Bounded for the same reason `unread` is, and only present when there is one: a search that
+        # finished every scan it opened should not carry an empty list saying so.
+        **({} if not partial else {"partiallyRead": partial[:25]}),
+        "results": results,
+        **({} if not notes else {"note": " ".join(notes)}),
+        "method": "private source-linked BM25 retrieval; ask follow-up searches with synonyms when wording may differ",
+    }
+
+
+def parser() -> argparse.ArgumentParser:
+    result = argparse.ArgumentParser(prog="garden-document")
+    subparsers = result.add_subparsers(dest="command", required=True)
+    read = subparsers.add_parser("read")
+    read.add_argument("--path", required=True)
+    read.add_argument("--start-page", type=int, default=1)
+    read.add_argument("--end-page", type=int, default=20)
+    read.add_argument("--max-chars", type=int, default=80_000)
+    search = subparsers.add_parser("search")
+    search.add_argument("--path", default=".")
+    search.add_argument("--query", required=True)
+    search.add_argument("--alternative", action="append", default=[])
+    search.add_argument("--max-files", type=int, default=500)
+    search.add_argument("--file-offset", type=int, default=0)
+    search.add_argument("--max-results", type=int, default=12)
+    search.add_argument("--max-pages", type=int, default=500)
+    search.add_argument("--excerpt-chars", type=int, default=2_400)
+    workbook = subparsers.add_parser(
+        "workbook",
+        help="Read one .xlsx with openpyxl. `read` calls this on the pinned interpreter when its own lacks the library.",
+    )
+    workbook.add_argument("--path", required=True)
+    return result
+
+
+def main() -> int:
+    args = parser().parse_args()
+    try:
+        if args.command == "read":
+            if args.start_page < 1 or args.end_page < args.start_page or args.end_page > 10_000:
+                raise ValueError("Invalid page range")
+            args.max_chars = min(200_000, max(1_000, args.max_chars))
+            payload = read_command(args)
+        elif args.command == "workbook":
+            openpyxl = openpyxl_module()
+            if openpyxl is None:
+                raise ValueError("openpyxl is not available to this interpreter")
+            payload = {"text": workbook_text(safe_target(args.path), openpyxl)}
+        else:
+            args.max_files = min(2_000, max(1, args.max_files))
+            if args.file_offset < 0 or args.file_offset > 1_000_000:
+                raise ValueError("File offset must be between 0 and 1000000")
+            args.max_results = min(50, max(1, args.max_results))
+            args.max_pages = min(10_000, max(1, args.max_pages))
+            args.excerpt_chars = min(8_000, max(300, args.excerpt_chars))
+            payload = search_command(args)
+        json.dump(payload, sys.stdout, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return 0
+    except Exception as error:
+        # Same reasoning as the per-file guard above, for the same reason: the caller is the agent,
+        # and a JSON error it can read and report is worth more than a traceback on stderr that it
+        # cannot. KeyboardInterrupt and SystemExit are not Exceptions and still pass straight out.
+        json.dump({"error": str(error)}, sys.stderr, ensure_ascii=False)
+        sys.stderr.write("\n")
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

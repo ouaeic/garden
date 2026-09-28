@@ -18,7 +18,7 @@ afterEach(async () => {
 });
 
 const workspace = async (): Promise<string> => {
-  const root = await mkdtemp(path.join(tmpdir(), 'athanor-surfaces-'));
+  const root = await mkdtemp(path.join(tmpdir(), 'garden-surfaces-'));
   roots.push(root);
   return root;
 };

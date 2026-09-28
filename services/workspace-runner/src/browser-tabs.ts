@@ -1,4 +1,4 @@
-import type { BrowserTabState } from '@athanor/contracts';
+import type { BrowserTabState } from '@garden/contracts';
 
 export const TAB_IDLE_MS = 30 * 60 * 1000;
 export const AGENT_TAB_LIMIT = 24;

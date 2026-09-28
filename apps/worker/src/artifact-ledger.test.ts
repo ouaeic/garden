@@ -19,7 +19,7 @@
  * still names the file.
  */
 import { describe, expect, it } from 'vitest';
-import type { ModelMessage, ModelToolCall } from '@athanor/model-gateway';
+import type { ModelMessage, ModelToolCall } from '@garden/model-gateway';
 import {
   ARTIFACT_LEDGER_MARKER,
   artifactLedgerBlock,
@@ -510,7 +510,7 @@ describe('the bound on how large the block can get', () => {
 
 describe('the block is re-rendered rather than appended', () => {
   const window = (): ModelMessage[] => [
-    { role: 'system', content: 'ATHANOR OPERATING CONTRACT' },
+    { role: 'system', content: 'GARDEN OPERATING CONTRACT' },
     { role: 'user', content: 'move the importer' }
   ];
   const entry = (path: string, step: number) => ({
@@ -539,7 +539,7 @@ describe('the block is re-rendered rather than appended', () => {
     const ledger = recordArtifactWrite(undefined, entry('workspace/a.ts', 1));
     refreshArtifactLedger(messages, ledger);
     messages.push({ role: 'assistant', content: 'and then four more steps happened' });
-    messages.push({ role: 'system', content: 'ATHANOR RUNTIME CONTEXT (dynamic)' });
+    messages.push({ role: 'system', content: 'GARDEN RUNTIME CONTEXT (dynamic)' });
     refreshArtifactLedger(messages, ledger);
 
     expect(messages.at(-1)?.content.startsWith(ARTIFACT_LEDGER_MARKER)).toBe(true);
@@ -577,7 +577,7 @@ describe('the block is re-rendered rather than appended', () => {
 describe('a compaction that eats the prose leaves the block standing', () => {
   const trajectory = (): ModelMessage[] => {
     const messages: ModelMessage[] = [
-      { role: 'system', content: 'ATHANOR OPERATING CONTRACT' },
+      { role: 'system', content: 'GARDEN OPERATING CONTRACT' },
       { role: 'user', content: 'move every service off the direct database role' }
     ];
     for (let step = 0; step < 24; step += 1) {
@@ -643,7 +643,7 @@ describe('a compaction that eats the prose leaves the block standing', () => {
         step: 2
       })
     );
-    messages.push({ role: 'system', content: 'ATHANOR RUNTIME CONTEXT (dynamic)' });
+    messages.push({ role: 'system', content: 'GARDEN RUNTIME CONTEXT (dynamic)' });
     const blockAt = messages.findIndex((message) =>
       message.content.startsWith(ARTIFACT_LEDGER_MARKER)
     );
@@ -667,9 +667,9 @@ describe('every step opens with the block re-rendered at the tail', () => {
     const { openStep } = await import('./turn/step-open.js');
     const runtime = (): void => {
       for (let index = state.messages.length - 1; index >= 0; index -= 1)
-        if (state.messages[index]?.content.startsWith('ATHANOR RUNTIME CONTEXT'))
+        if (state.messages[index]?.content.startsWith('GARDEN RUNTIME CONTEXT'))
           state.messages.splice(index, 1);
-      state.messages.push({ role: 'system', content: 'ATHANOR RUNTIME CONTEXT (dynamic)' });
+      state.messages.push({ role: 'system', content: 'GARDEN RUNTIME CONTEXT (dynamic)' });
     };
     const outcome = await openStep(
       {
@@ -693,7 +693,7 @@ describe('every step opens with the block re-rendered at the tail', () => {
 
   it('publishes the row a step wrote into the window the next step is given', async () => {
     const state = {
-      messages: [{ role: 'system', content: 'ATHANOR OPERATING CONTRACT' }],
+      messages: [{ role: 'system', content: 'GARDEN OPERATING CONTRACT' }],
       step: 1,
       credits: 0,
       artifactLedger: recordArtifactWrite(undefined, {
@@ -713,7 +713,7 @@ describe('every step opens with the block re-rendered at the tail', () => {
 
   it('brings the block back to the tail after a step buried it under its own results', async () => {
     const state = {
-      messages: [{ role: 'system', content: 'ATHANOR OPERATING CONTRACT' }],
+      messages: [{ role: 'system', content: 'GARDEN OPERATING CONTRACT' }],
       step: 1,
       credits: 0,
       artifactLedger: recordArtifactWrite(undefined, {
@@ -743,12 +743,12 @@ describe('every step opens with the block re-rendered at the tail', () => {
     // Second from the tail, behind the runtime block and nothing else, which is what keeps it
     // inside `MIN_PROTECTED_TAIL_MESSAGES` for the rest of the turn.
     expect(state.messages.at(-2)?.content.startsWith(ARTIFACT_LEDGER_MARKER)).toBe(true);
-    expect(state.messages.at(-1)?.content.startsWith('ATHANOR RUNTIME CONTEXT')).toBe(true);
+    expect(state.messages.at(-1)?.content.startsWith('GARDEN RUNTIME CONTEXT')).toBe(true);
   });
 
   it('carries no block on a turn that has written nothing', async () => {
     const state = {
-      messages: [{ role: 'system', content: 'ATHANOR OPERATING CONTRACT' }],
+      messages: [{ role: 'system', content: 'GARDEN OPERATING CONTRACT' }],
       step: 1,
       credits: 0
     } as unknown as AgentState;

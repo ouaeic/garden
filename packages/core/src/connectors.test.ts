@@ -234,13 +234,13 @@ describe('connector security boundary', () => {
       if (path === '/register') {
         registrations += 1;
         return response({
-          client_id: 'athanor-test',
+          client_id: 'garden-test',
           client_secret: 'registered-secret',
           token_endpoint_auth_method: 'client_secret_basic',
           redirect_uris: ['https://app.example.test/v1/connectors/mcp/oauth/callback'],
           grant_types: ['authorization_code', 'refresh_token'],
           response_types: ['code'],
-          client_name: 'athanor'
+          client_name: 'garden'
         });
       }
       if (path === '/token') {

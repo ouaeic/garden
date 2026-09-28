@@ -1,12 +1,12 @@
-import { OwnerPreferences, type ModelRelease } from '@athanor/contracts';
+import { OwnerPreferences, type ModelRelease } from '@garden/contracts';
 import {
   DEFAULT_ROUTING_POLICY,
   providerPreferences,
   shouldMeasureCeiling,
   type ProviderPreferences,
   type RoutingPolicy
-} from '@athanor/core';
-import type { DataStore } from '@athanor/data';
+} from '@garden/core';
+import type { DataStore } from '@garden/data';
 
 /**
  * The owner's rule for choosing between the companies serving one model.

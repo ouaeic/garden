@@ -115,7 +115,7 @@ mod tests {
                     "{command} unavailable on {target:?}"
                 );
                 for value in [
-                    "http://localhost:41001/__athanor/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/",
+                    "http://localhost:41001/__garden/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/",
                     "https://outside.test/",
                     "http://localhost:5173/",
                     "http://localhost.evil.test:41000/",

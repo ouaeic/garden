@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+
+refresh="${GARDEN_NETWORK_REFRESH:-/usr/local/lib/garden/garden-network-refresh}"
+
+"$refresh"
+
+# iproute2's netlink monitor works with systemd-networkd, NetworkManager, ifupdown,
+# cloud-init, and manual address changes. A short delay lets multi-event interface
+# updates settle; the refresh command hashes the effective state before reloading TLS.
+ip monitor address route link | while IFS= read -r _event; do
+  sleep 2
+  "$refresh" || true
+done

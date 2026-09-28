@@ -1,5 +1,5 @@
-import { ReasoningEffort, type ReasoningOptions } from '@athanor/contracts';
-export { ReasoningEffort, ReasoningOptions } from '@athanor/contracts';
+import { ReasoningEffort, type ReasoningOptions } from '@garden/contracts';
+export { ReasoningEffort, ReasoningOptions } from '@garden/contracts';
 
 /** A missing list hides selection; null means the gateway accepts its complete vocabulary. */
 export const readReasoningOptions = (value: unknown): ReasoningOptions | null => {

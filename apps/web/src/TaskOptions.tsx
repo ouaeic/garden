@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Task } from '@athanor/contracts';
+import type { Task } from '@garden/contracts';
 import { patch } from './client';
 import { money } from './model';
 import { Button, ErrorNotice, Field } from './ui';

@@ -13,7 +13,7 @@ Offline, no key, no network, no model. Three consecutive `--ci` runs produce byt
 **Displayed lines per landed edit.** Rows of file text a `file_read` rendered into a tool result,
 divided by the edits that reached disk in the same turn.
 
-It is the number the whole edit-format economic case turns on and athanor measured nowhere. The
+It is the number the whole edit-format economic case turns on and garden measured nowhere. The
 line dialect buys output characters per edit and pays for them in input: the numbering is charged on
 every request after a read for as long as that file stays in the window. `evals/arms/price.ts`
 computes the break-even as a number of **edits per turn** and has to assume how many lines a turn
@@ -28,7 +28,7 @@ Nothing measured that. This does.
 | a turn with no edit | **no quotient.** Counted in its own column, never `Infinity`, never 0     |
 | the patch echo      | its own column, beside the numerator and never inside it                  |
 
-It is read off the `tool_result` event stream, so it counts what athanor **chose to display**, not
+It is read off the `tool_result` event stream, so it counts what garden **chose to display**, not
 what survived a later squeeze. That second question is `evals/context-quality`'s and measuring it
 here would silently answer a different one.
 

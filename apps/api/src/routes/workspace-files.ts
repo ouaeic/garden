@@ -9,8 +9,8 @@
 
 import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
-import { AthanorError, decryptJson, encryptJson, sha256, unwrapDataKey } from '@athanor/core';
-import type { WorkspaceRecord } from '@athanor/data';
+import { GardenError, decryptJson, encryptJson, sha256, unwrapDataKey } from '@garden/core';
+import type { WorkspaceRecord } from '@garden/data';
 import { z } from 'zod';
 import { FILE_WINDOW_HEADERS } from '../context.js';
 import { downloadSignal, sendDownload } from '../download-response.js';
@@ -29,7 +29,7 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
     async (request) => {
       const user = requireUser(request.user);
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       const path = encodeURIComponent(request.query.path ?? 'workspace');
       return runner.request({
         workspaceId: workspace.id,
@@ -47,7 +47,7 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
       const user = requireUser(request.user);
       await requireRecentStepUp(request, user);
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       const response = await runner.raw({
         workspaceId: workspace.id,
         userId: user.id,
@@ -56,7 +56,7 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
         path: `/v1/workspaces/${workspace.id}/export`
       });
       if (!response.body)
-        throw new AthanorError('workspace_export_failed', 'Workspace export stream is unavailable');
+        throw new GardenError('workspace_export_failed', 'Workspace export stream is unavailable');
       await recordSecurityEvent(store, {
         userId: user.id,
         kind: 'workspace_export',
@@ -68,7 +68,7 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
         .header('cache-control', 'private, no-store')
         .header(
           'content-disposition',
-          `attachment; filename="athanor-workspace-${workspace.id}.tar.gz"`
+          `attachment; filename="garden-workspace-${workspace.id}.tar.gz"`
         )
         .send(Readable.fromWeb(response.body as unknown as NodeReadableStream));
     }
@@ -80,7 +80,7 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
   }>('/v1/workspaces/:workspaceId/download', async (request, reply) => {
     const user = requireUser(request.user);
     const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-    if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+    if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
     const path = z.string().min(1).max(4096).parse(request.query.path);
     const headers: Record<string, string> = {};
     for (const name of ['range', 'if-range'] as const) {
@@ -106,7 +106,7 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
   }>('/v1/workspaces/:workspaceId/file', async (request, reply) => {
     const user = requireUser(request.user);
     const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-    if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+    if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
     /*
      * A window, and the numbers describing it.
      *
@@ -132,8 +132,7 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
       const value = response.headers.get(header);
       if (value !== null) reply.header(header, value);
     }
-    if (!response.body)
-      throw new AthanorError('file_unavailable', 'The file stream is unavailable');
+    if (!response.body) throw new GardenError('file_unavailable', 'The file stream is unavailable');
     return reply
       .type('application/octet-stream')
       .send(Readable.fromWeb(response.body as unknown as NodeReadableStream));
@@ -147,7 +146,7 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
     const user = requireUser(request.user);
     return idempotent(request, reply, user, async () => {
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       /**
        * The body is a `Buffer` only for `application/octet-stream`, which is the one content type
        * this file registers a raw parser for. Anything else - `application/json` most obviously -
@@ -158,9 +157,9 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
        * check that exists to stop the disk filling cannot be stepped around by a header.
        */
       if (!Buffer.isBuffer(request.body))
-        throw new AthanorError('invalid_request', 'Send the file as application/octet-stream', 415);
+        throw new GardenError('invalid_request', 'Send the file as application/octet-stream', 415);
       if (workspace.storageBytes + request.body.byteLength > workspace.storageLimitBytes)
-        throw new AthanorError('storage_limit', 'Workspace storage limit reached');
+        throw new GardenError('storage_limit', 'Workspace storage limit reached');
       /*
        * The caller's claim about what it is replacing, checked by the runner under the write's own
        * descriptor. Two people editing the same file - or the owner saving a file the agent is
@@ -192,7 +191,7 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
           request.query.expectSha256 !== undefined || request.query.createOnly === 'true'
       });
       if (response.status === 409)
-        throw new AthanorError(
+        throw new GardenError(
           request.query.createOnly === 'true' ? 'file_exists' : 'file_changed',
           request.query.createOnly === 'true'
             ? 'A file with this name already exists. Choose another name.'
@@ -232,7 +231,7 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
       const user = requireUser(request.user);
       return idempotent(request, reply, user, async () => {
         const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-        if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+        if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
         await runner.request({
           workspaceId: workspace.id,
           userId: user.id,
@@ -257,7 +256,7 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
           .object({ from: z.string().min(1).max(1024), to: z.string().min(1).max(1024) })
           .parse(request.body);
         const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-        if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+        if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
         return runner.request<{ path: string }>({
           workspaceId: workspace.id,
           userId: user.id,
@@ -279,7 +278,7 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
       return idempotent(request, reply, user, async () => {
         const input = z.object({ path: z.string().min(1).max(1024) }).parse(request.body);
         const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-        if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+        if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
         return runner.request<{ path: string }>({
           workspaceId: workspace.id,
           userId: user.id,
@@ -310,9 +309,9 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
         .parse(request.body);
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
       if (!workspace?.wrappedKey)
-        throw new AthanorError('workspace_not_found', 'Workspace not found');
+        throw new GardenError('workspace_not_found', 'Workspace not found');
       if (input.taskId && !(await store.getTask(user.id, input.taskId)))
-        throw new AthanorError('task_not_found', 'Task not found');
+        throw new GardenError('task_not_found', 'Task not found');
       const content = await runner.request<Buffer>({
         workspaceId: workspace.id,
         userId: user.id,
@@ -321,8 +320,8 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
         path: `/v1/workspaces/${workspace.id}/file?path=${encodeURIComponent(input.path)}`
       });
       if (workspace.storageBytes + content.byteLength > workspace.storageLimitBytes)
-        throw new AthanorError('storage_limit', 'Artifact version would exceed workspace storage');
-      const storageKey = `.athanor/artifacts/${randomUUID()}`;
+        throw new GardenError('storage_limit', 'Artifact version would exceed workspace storage');
+      const storageKey = `.garden/artifacts/${randomUUID()}`;
       const digest = sha256(content);
       await runner.request({
         workspaceId: workspace.id,
@@ -375,7 +374,7 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
       const user = requireUser(request.user);
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
       if (!workspace?.wrappedKey)
-        throw new AthanorError('workspace_not_found', 'Workspace not found');
+        throw new GardenError('workspace_not_found', 'Workspace not found');
       const key = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
       return (await store.listArtifacts(user.id, workspace.id)).map((artifact) => ({
         id: artifact.id,
@@ -400,10 +399,10 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
     async (request, reply) => {
       const user = requireUser(request.user);
       const artifact = await store.getArtifact(user.id, request.params.artifactId);
-      if (!artifact) throw new AthanorError('not_found', 'Artifact not found');
+      if (!artifact) throw new GardenError('not_found', 'Artifact not found');
       const workspace = await store.getWorkspace(user.id, String(artifact.workspaceId));
       if (!workspace?.wrappedKey)
-        throw new AthanorError('workspace_not_found', 'Workspace not found');
+        throw new GardenError('workspace_not_found', 'Workspace not found');
       const response = await runner.raw({
         workspaceId: workspace.id,
         userId: user.id,
@@ -424,11 +423,11 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
       });
       if (response.status === 409) {
         await response.body?.cancel();
-        throw new AthanorError('artifact_integrity_failed', 'Artifact integrity check failed');
+        throw new GardenError('artifact_integrity_failed', 'Artifact integrity check failed');
       }
       if (!response.ok) return sendDownload(reply, response);
       if (!response.body)
-        throw new AthanorError('file_unavailable', 'The artifact stream is unavailable');
+        throw new GardenError('file_unavailable', 'The artifact stream is unavailable');
       for (const header of [
         'content-length',
         'content-range',
@@ -498,9 +497,9 @@ export const registerWorkspaceFileRoutes = (context: RouteContext): void => {
       const user = requireUser(request.user);
       return idempotent(request, reply, user, async () => {
         const artifact = await store.getArtifact(user.id, request.params.artifactId);
-        if (!artifact) throw new AthanorError('not_found', 'Artifact not found');
+        if (!artifact) throw new GardenError('not_found', 'Artifact not found');
         const workspace = await store.getWorkspace(user.id, String(artifact.workspaceId));
-        if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+        if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
         await runner.request({
           workspaceId: workspace.id,
           userId: user.id,

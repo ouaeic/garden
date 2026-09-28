@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
-import { decryptJson, encryptJson } from '@athanor/core';
-import type { ModelRelease, WebToolPlan } from '@athanor/contracts';
+import { createDatabase, DataStore, migrateDatabase } from '@garden/data';
+import { decryptJson, encryptJson } from '@garden/core';
+import type { ModelRelease, WebToolPlan } from '@garden/contracts';
 import type { AgentState } from './agent-state.js';
 import { drainCorrection } from './turn-control.js';
 import { resumeParkedTurn, type TurnResumeDeps } from './turn/resume.js';

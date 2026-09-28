@@ -8,13 +8,13 @@ import {
 
 function validInfo() {
   return {
-    CFBundleIdentifier: 'org.athanor.ai',
+    CFBundleIdentifier: 'org.garden.ai',
     CFBundleName: 'garden',
     CFBundleShortVersionString: '0.1.0',
     CFBundleVersion: '1',
-    CFBundleExecutable: 'athanor',
+    CFBundleExecutable: 'garden',
     MinimumOSVersion: '15.0',
-    CFBundleURLTypes: [{ CFBundleURLSchemes: ['garden', 'athanor'] }],
+    CFBundleURLTypes: [{ CFBundleURLSchemes: ['garden'] }],
     NSAppTransportSecurity: {
       NSExceptionDomains: {
         localhost: {
@@ -23,7 +23,7 @@ function validInfo() {
         }
       }
     },
-    NSBonjourServices: ['_athanor._tcp'],
+    NSBonjourServices: ['_garden._tcp'],
     NSCameraUsageDescription: 'Used only when the person attaches a camera photo.',
     NSLocalNetworkUsageDescription: 'Used only to rediscover the paired remote computer.',
     NSMicrophoneUsageDescription: 'Used only when the person records a voice note.',
@@ -32,7 +32,7 @@ function validInfo() {
 }
 
 test('accepts only safe IPA archive paths', () => {
-  assert.equal(isSafeArchivePath('Payload/athanor.app/Info.plist'), true);
+  assert.equal(isSafeArchivePath('Payload/garden.app/Info.plist'), true);
   assert.equal(isSafeArchivePath('../escape'), false);
   assert.equal(isSafeArchivePath('/absolute'), false);
   assert.equal(isSafeArchivePath('C:\\escape'), false);

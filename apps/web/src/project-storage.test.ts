@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { ProjectStorageUsage } from '@athanor/contracts';
+import type { ProjectStorageUsage } from '@garden/contracts';
 import { expect, it } from 'vitest';
 import { ProjectStorageDetails } from './ProjectStorage';
 

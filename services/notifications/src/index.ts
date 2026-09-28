@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
+import { createDatabase, DataStore, migrateDatabase } from '@garden/data';
 import webpush from 'web-push';
 import {
   apiBaseUrl,
@@ -42,9 +42,9 @@ if (!masterKey) {
   // missing line in control.env - and a paired phone receives nothing, because the bot token that
   // reaches it is sealed under the same key.
   process.stdout.write(
-    'athanor notifications: no DATA_MASTER_KEY is configured, so notifications cannot name the ' +
+    'garden notifications: no DATA_MASTER_KEY is configured, so notifications cannot name the ' +
       'conversation they are about and will be titled "Untitled conversation", and a paired phone ' +
-      'cannot be sent to or read from. Set DATA_MASTER_KEY in /etc/athanor/control.env to the ' +
+      'cannot be sent to or read from. Set DATA_MASTER_KEY in /etc/garden/control.env to the ' +
       'same value the API and worker use.\n'
   );
 }
@@ -59,9 +59,9 @@ if (pushEnabled) {
   // Stay up and report the reason. Exiting would crash-loop under systemd and make an optional
   // feature look like a broken installation; the health endpoint says plainly that it is off.
   process.stdout.write(
-    'athanor notifications: no Web Push signing keys are configured, so delivery to browsers is ' +
+    'garden notifications: no Web Push signing keys are configured, so delivery to browsers is ' +
       'disabled. Run the installer, or set PUSH_VAPID_SUBJECT, PUSH_VAPID_PUBLIC_KEY and ' +
-      'PUSH_VAPID_PRIVATE_KEY in /etc/athanor/control.env to enable it.\n'
+      'PUSH_VAPID_PRIVATE_KEY in /etc/garden/control.env to enable it.\n'
   );
 }
 const endpoints = new EndpointHealth();
@@ -166,31 +166,31 @@ const health = createServer((request, response) => {
   if (request.url === '/metrics') {
     response.setHeader('content-type', 'text/plain; version=0.0.4');
     response.end(
-      `athanor_notifications_delivered_total ${notifier.totals.delivered}\n` +
-        `athanor_notifications_failed_total ${notifier.totals.failed}\n` +
-        `athanor_notifications_suppressed_total ${notifier.totals.suppressed}\n` +
-        `athanor_notifications_endpoints_retired_total ${notifier.totals.retired}\n` +
-        `athanor_notifications_endpoints_failing ${endpoints.failingCount}\n` +
-        `athanor_notifications_deferred ${notifier.totals.deferred}\n` +
+      `garden_notifications_delivered_total ${notifier.totals.delivered}\n` +
+        `garden_notifications_failed_total ${notifier.totals.failed}\n` +
+        `garden_notifications_suppressed_total ${notifier.totals.suppressed}\n` +
+        `garden_notifications_endpoints_retired_total ${notifier.totals.retired}\n` +
+        `garden_notifications_endpoints_failing ${endpoints.failingCount}\n` +
+        `garden_notifications_deferred ${notifier.totals.deferred}\n` +
         // Told apart from `deferred` deliberately: a deferral is a device that will not take a
         // push right now, a hold is the owner being at the keyboard or asleep. A rising
         // `suppressed_total` beside a flat `held` is the service dropping notifications on
         // purpose; beside a standing `held` it is the same few items waiting for a person.
-        `athanor_notifications_held ${notifier.totals.held}\n` +
-        `athanor_notifications_unsendable ${notifier.totals.unsendable}\n` +
+        `garden_notifications_held ${notifier.totals.held}\n` +
+        `garden_notifications_unsendable ${notifier.totals.unsendable}\n` +
         // The phone transport's share of the two totals above, so a phone that has gone quiet is
         // not hidden behind a browser that has not.
-        `athanor_notifications_destination_delivered_total ${destinationTotals.delivered}\n` +
-        `athanor_notifications_destination_failed_total ${destinationTotals.failed}\n` +
-        `athanor_notifications_inbound_total ${inbound.total}\n` +
-        `athanor_notifications_inbound_rejected_total ${inbound.rejected}\n` +
-        `athanor_notifications_inbound_poll_age_seconds ${
+        `garden_notifications_destination_delivered_total ${destinationTotals.delivered}\n` +
+        `garden_notifications_destination_failed_total ${destinationTotals.failed}\n` +
+        `garden_notifications_inbound_total ${inbound.total}\n` +
+        `garden_notifications_inbound_rejected_total ${inbound.rejected}\n` +
+        `garden_notifications_inbound_poll_age_seconds ${
           destinations.pollAgeMs === null ? -1 : Math.round(destinations.pollAgeMs / 1000)
         }\n`
     );
     return;
   }
-  // `deliveryEnabled` is read by `athanor doctor`, which reports a service that is answering but
+  // `deliveryEnabled` is read by `garden doctor`, which reports a service that is answering but
   // has nothing to send with as a warning rather than as health. `endpointsFailing` is the same
   // idea one step further in: keys are configured, the service is sending, and a device is not
   // receiving. The one thing that cannot report a broken push is a push, so it is reported here,

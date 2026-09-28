@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import SavedProcessHistory from './SavedProcessHistory';
 import { ComputationCard } from './computer/Computation';
-import type { ComputationSession } from '@athanor/contracts';
+import type { ComputationSession } from '@garden/contracts';
 
 describe('saved process history presentation', () => {
   it('distinguishes saved history from recent runs and explains legacy coverage', () => {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CircleDollarSign } from 'lucide-react';
-import type { SpendWindow, Task, TaskSpendBlock } from '@athanor/contracts';
+import type { SpendWindow, Task, TaskSpendBlock } from '@garden/contracts';
 import { get, post, put, ApiError } from './client';
 import { stepUp } from './auth';
 import { Button, ErrorNotice, Field, Spinner } from './ui';

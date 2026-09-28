@@ -1,13 +1,13 @@
 # Operations
 
-The `athanor` command is the supported operator surface.
+The `garden` command is the supported operator surface.
 
 ## Routine
 
 ```bash
-sudo athanor doctor
-sudo athanor status
-sudo athanor logs
+sudo garden doctor
+sudo garden status
+sudo garden logs
 ```
 
 `doctor` checks root-only configuration, service state (including push delivery), API and PostgreSQL
@@ -19,14 +19,14 @@ headroom.
 Lines are prefixed `ok`, `note`, `warn`, or `fail`. Only `fail` makes the command exit non-zero.
 
 It also reports both boundaries an agent command runs inside, which used to be one. The account
-boundary - "agent commands run as athanor-agent, not as the runner" - was reported and the
+boundary - "agent commands run as garden-agent, not as the runner" - was reported and the
 filesystem boundary was not, which is how a server came to answer `filesystem=landlock` from
-`athanor-sandbox check` and `agentFilesystemConfined: false` from the runner at the same moment with
+`garden-sandbox check` and `agentFilesystemConfined: false` from the runner at the same moment with
 nothing saying so. The filesystem line is read from the runner's own health endpoint rather than
 from `CONFINE_AGENT_FILESYSTEM`, because the setting is what goes wrong, and it reads three ways:
 
 - `ok` - the runner is confining commands to their own workspace.
-- `fail` - this kernel can and the runner is not; `sudo athanor update` writes the setting from what
+- `fail` - this kernel can and the runner is not; `sudo garden update` writes the setting from what
   the kernel measures.
 - `note` - this kernel or util-linux has no Landlock, so the account and network boundaries are the
   ones in force. That is a machine whose owner can do nothing about it, and it is not a failure.
@@ -42,7 +42,7 @@ attempt failed, the recorded reason is repeated as a `note`.
 Browser sign-in is checked from `WEBAUTHN_RP_ID`. A WebAuthn Relying Party ID must be a registrable
 domain name and the specification does not allow an address literal, so a server whose origin is a
 bare IPv4 or IPv6 address gets two `warn` lines: that browser sign-in cannot work, and the shortest
-way to fix it (`sudo athanor ddns configure`, or `sudo athanor set-hostname NAME` when dynamic DNS
+way to fix it (`sudo garden ddns configure`, or `sudo garden set-hostname NAME` when dynamic DNS
 already publishes a name that is not yet the origin). This is a warning rather than a failure
 because such a server is fully usable from the native clients; only the browser and the installable
 app are out of reach.
@@ -57,7 +57,7 @@ The relay gets a line of its own. `note relay: off, and that is fine` is the shi
 right one for most servers, which are reached directly; it is a note rather than a warning because
 nothing is missing. When the relay is on, `doctor` reports the address, the connection state, the
 bytes used against the operator's allowance, and a `fail` if the operator revoked this server.
-`sudo athanor relay {status|on|off}` is the operator surface; enrolling needs a hostname and a
+`sudo garden relay {status|on|off}` is the operator surface; enrolling needs a hostname and a
 single-use token and happens in Settings, because only the running server can redeem one. See
 [relay.md](relay.md).
 
@@ -85,13 +85,13 @@ cannot be tested from the host itself.
 
 ## Services
 
-`athanor-runner.service` runs the agent computer as the `athanor` user, and the commands that agent
-asks for run as `athanor-agent`, a third account with less privilege than the runner's own. The
+`garden-runner.service` runs the agent computer as the `garden` user, and the commands that agent
+asks for run as `garden-agent`, a third account with less privilege than the runner's own. The
 install refuses to finish if that drop does not take effect, because a box that believes it confines
-agent commands and does not is worse than one that never claimed to. `athanor@api`, `@worker`,
-`@registry`, and `@notifications` run the private services as `athanor-control`, all bound to
-loopback and reached through Nginx. `athanor@notifications` delivers Web Push and runs the phone
-transport; its VAPID key pair is generated once at install into `/etc/athanor/control.env` and
+agent commands and does not is worse than one that never claimed to. `garden@api`, `@worker`,
+`@registry`, and `@notifications` run the private services as `garden-control`, all bound to
+loopback and reached through Nginx. `garden@notifications` delivers Web Push and runs the phone
+transport; its VAPID key pair is generated once at install into `/etc/garden/control.env` and
 reused on every later run, because regenerating it would invalidate every browser subscription. Its health port is 4203, fixed in code
 rather than configurable, and `doctor` fails if that port is missing or reachable from anywhere but
 loopback.
@@ -99,15 +99,15 @@ loopback.
 ## Network refresh
 
 ```bash
-systemctl status athanor-network-refresh.timer
-sudo /usr/local/lib/athanor/athanor-network-refresh
-curl -k https://127.0.0.1/.well-known/athanor
+systemctl status garden-network-refresh.timer
+sudo /usr/local/lib/garden/garden-network-refresh
+curl -k https://127.0.0.1/.well-known/garden
 ```
 
 The timer refreshes endpoint metadata and certificate SANs when addresses change while retaining the
 same private identity key. It never rewrites a hostname and never contacts a relay: it reads
-`/etc/athanor/relay/settings.json` and, only while the relay is switched on, appends the relay
-address to the endpoint list after every direct one. `athanor-network-refresh.path` watches that
+`/etc/garden/relay/settings.json` and, only while the relay is switched on, appends the relay
+address to the endpoint list after every direct one. `garden-network-refresh.path` watches that
 file, so switching the relay off drops the address immediately rather than at the next timer
 firing. It rebuilds the
 self-signed certificate in its final month, and it leaves a certificate issued by a public
@@ -121,17 +121,17 @@ server reached only by an IP address cannot register or use a passkey in a brows
 TLS is. Dynamic DNS is how a server without a domain gets one.
 
 ```bash
-sudo athanor ddns configure
-sudo athanor ddns configure --provider duckdns --hostname my-athanor.duckdns.org
-sudo athanor ddns status
-sudo athanor ddns test
-sudo athanor ddns disable
+sudo garden ddns configure
+sudo garden ddns configure --provider duckdns --hostname my-garden.duckdns.org
+sudo garden ddns status
+sudo garden ddns test
+sudo garden ddns disable
 ```
 
 With no arguments on a terminal, `configure` asks which provider to use, then for the hostname, then
 for the token with the input hidden. With `--provider`/`--hostname` it is non-interactive and reads
-the token from standard input. Automation may instead set `ATHANOR_DDNS_PROVIDER`,
-`ATHANOR_DDNS_HOSTNAME`, `ATHANOR_DDNS_ZONE_ID`, and `ATHANOR_DDNS_TOKEN`; the installer passes the
+the token from standard input. Automation may instead set `GARDEN_DDNS_PROVIDER`,
+`GARDEN_DDNS_HOSTNAME`, `GARDEN_DDNS_ZONE_ID`, and `GARDEN_DDNS_TOKEN`; the installer passes the
 same variables straight through.
 
 | Provider   | Name you get       | Notes                                                           |
@@ -148,13 +148,13 @@ server identity. A record is only rewritten when its name matches exactly, so an
 the same type in the same zone is never overwritten.
 
 Credentials never reach an argument list or a log. The token is read from the terminal, a pipe, or
-the environment; it is stored in `/etc/athanor/control.env` at mode 0600; it is written there through
+the environment; it is stored in `/etc/garden/control.env` at mode 0600; it is written there through
 awk's environment rather than `awk -v`, because a process argument list is world-readable through
 `/proc`; it is passed to the provider through a curl configuration on standard input; and curl's own
 diagnostics are filtered so a DuckDNS URL cannot print its token into the journal.
 
 `configure` publishes immediately, waits up to a minute for the name to resolve, and then makes it
-the public origin by running `athanor set-hostname` — which is the step that moves `PUBLIC_APP_URL`,
+the public origin by running `garden set-hostname` — which is the step that moves `PUBLIC_APP_URL`,
 `PREVIEW_BASE_URL`, `PUBLIC_RUNNER_URL`, `WEBAUTHN_ORIGIN`, and `WEBAUTHN_RP_ID` onto the name and
 therefore the step that turns browser sign-in on. Pass `--keep-origin` to publish the record and leave the origin alone, which is what a
 server behind a separate reverse proxy wants.
@@ -167,7 +167,7 @@ nothing here would otherwise notice for up to a day. Thirty minutes is still far
 these providers ask for, and the state file keeps a busy netlink host from publishing per event.
 
 The configured hostname is carried into the connection manifest endpoints and the certificate SANs.
-A provider that cannot be reached is reported on stderr, recorded in `/var/lib/athanor/ddns.error`
+A provider that cannot be reached is reported on stderr, recorded in `/var/lib/garden/ddns.error`
 for `ddns status` and `doctor` to show, and does not stop the endpoint and certificate refresh.
 
 Address handling follows what each provider actually does:
@@ -190,10 +190,10 @@ whether the answer already includes this computer's address or is still cached.
 ## Price ceiling
 
 ```bash
-sudo athanor price-ceiling show
-sudo athanor price-ceiling set 2 10
-sudo athanor price-ceiling set none 10
-sudo athanor price-ceiling clear
+sudo garden price-ceiling show
+sudo garden price-ceiling set 2 10
+sudo garden price-ceiling set none 10
+sudo garden price-ceiling clear
 ```
 
 `spend-ceiling` was the old name for this and still answers, printing the new one. It is not the
@@ -223,8 +223,8 @@ to be.
 A daily backup is enabled by the installer and needs no attention:
 
 ```bash
-sudo athanor backup auto status
-sudo athanor backup auto off
+sudo garden backup auto status
+sudo garden backup auto off
 ```
 
 It runs at a randomised hour and waits a few minutes for the worker to go idle before starting,
@@ -234,15 +234,15 @@ down and leaves the next window to take the copy. `doctor` reports the age of th
 To take one immediately, or to write it somewhere specific:
 
 ```bash
-sudo athanor backup
-sudo athanor backup /mnt/encrypted-backups/athanor-2026-07-30
+sudo garden backup
+sudo garden backup /mnt/encrypted-backups/garden-2026-07-30
 ```
 
 Mutating garden services pause under a restart trap. A backup contains:
 
 - `database.dump`;
-- `workspaces.tar.gz` for `/home/athanor`;
-- `configuration.tar.gz` for `/etc/athanor`;
+- `workspaces.tar.gz` for `/home/garden`;
+- `configuration.tar.gz` for `/etc/garden`;
 - `packages.txt` for additional operating-system packages installed through garden; and
 - `SHA256SUMS`.
 
@@ -253,19 +253,19 @@ packages from the host's own configured repositories.
 
 ### An off-host copy
 
-Everything above lands in `/var/backups/athanor`, on the same disk as the data it is a copy of. That
+Everything above lands in `/var/backups/garden`, on the same disk as the data it is a copy of. That
 survives a mistake and it does not survive the disk, which is the commonest way a one-box server is
 lost outright. Name a second place, on a disk this one failing does not take:
 
 ```bash
-sudo athanor backup destination /mnt/backup-disk --recipient /root/backup-key.pub
-sudo athanor backup destination show
-sudo athanor backup destination off
+sudo garden backup destination /mnt/backup-disk --recipient /root/backup-key.pub
+sudo garden backup destination show
+sudo garden backup destination off
 ```
 
 Every backup is then encrypted to that recipient with `gpg` and copied there, after the services are
 back, so the copy costs no downtime. A copy that fails does not fail the backup: the verified local
-copy is complete either way, and `sudo athanor doctor` says which of the two happened rather than
+copy is complete either way, and `sudo garden doctor` says which of the two happened rather than
 reporting a green backup that exists in exactly one place.
 
 The recipient is not optional. `configuration.tar.gz` carries this server's data key and session
@@ -278,16 +278,16 @@ The destination is a path this computer can already write to: a removable disk, 
 mounted. It does not speak ssh, rsync, S3 or any provider's API, and that is a decision rather than a
 gap - a credential on this box that can write to the destination can also delete what is already
 there, so a server that is broken into loses every copy at once. If that trade is wrong for you,
-`sudo athanor backup /path` has always written a copy wherever you say, and `cron` and `rsync` are
+`sudo garden backup /path` has always written a copy wherever you say, and `cron` and `rsync` are
 yours to point at it.
 
-A destination on the same filesystem as `/var/backups/athanor` is refused when it is configured,
+A destination on the same filesystem as `/var/backups/garden` is refused when it is configured,
 rather than discovered to have been pointless after a disk failure.
 
 ## Restore
 
 ```bash
-sudo athanor restore /path/to/backup --yes
+sudo garden restore /path/to/backup --yes
 ```
 
 Restore accepts only the fixed backup filenames, verifies strict checksums and archive paths,
@@ -298,7 +298,7 @@ manifest and certificate names. It is destructive by design: make a separate bac
 For a recovery rehearsal on an isolated machine, use:
 
 ```bash
-sudo athanor restore /path/to/backup --yes --keep-stopped
+sudo garden restore /path/to/backup --yes --keep-stopped
 ```
 
 This restores the database, files and keys while leaving Garden stopped. It skips runtime repair,
@@ -315,7 +315,7 @@ then restore the decrypted directory:
 ```bash
 cd /mnt/backup-disk/20260901T030000Z
 for encrypted in *.gpg; do gpg --decrypt --output "${encrypted%.gpg}" "$encrypted"; done
-sudo athanor restore . --yes
+sudo garden restore . --yes
 ```
 
 `SHA256SUMS.encrypted` beside them lists the checksums of the encrypted files, so you can confirm the
@@ -347,14 +347,14 @@ requests retain their status and a redacted explanation. Unknown upstream respon
 
 ## Moving to a new computer
 
-The backup carries `/etc/athanor` verbatim, which is what has to happen: the data key, the session
+The backup carries `/etc/garden` verbatim, which is what has to happen: the data key, the session
 signing key and the pinned server identity all come back exactly, or the restored server cannot open
 its own database and no paired client trusts it. `PUBLIC_APP_URL`, `WEBAUTHN_ORIGIN` and
 `WEBAUTHN_RP_ID` come back with them - and on a different computer those three name the old one. Tell
 the restore that the computer has changed:
 
 ```bash
-sudo athanor restore /path/to/backup --yes --new-host
+sudo garden restore /path/to/backup --yes --new-host
 ```
 
 Without a name of its own, that re-derives the origin from the address the new machine actually has,
@@ -365,28 +365,28 @@ replaced by an address, because replacing it would throw away every browser pass
 With a name that does not point here yet, or a new one:
 
 ```bash
-sudo athanor restore /path/to/backup --yes --hostname ai.example.com
+sudo garden restore /path/to/backup --yes --hostname ai.example.com
 ```
 
 The whole move, on a machine that has just been built:
 
 1. Run the one-command installer on the new machine - the exact line is in `docs/DEPLOYMENT.md`
    under "One-command installation" - so it has PostgreSQL, Nginx, the units and the checkout.
-   Passing `ATHANOR_HOSTNAME` here is wasted: step 3 replaces the whole of `/etc/athanor` with the
+   Passing `GARDEN_HOSTNAME` here is wasted: step 3 replaces the whole of `/etc/garden` with the
    backup's copy, so the name has to be set after the restore rather than before it.
 2. Copy the backup directory onto it, decrypting it first if it came from an off-host copy.
-3. `sudo athanor restore /path/to/backup --yes --new-host` - add `--hostname NAME` if this machine
+3. `sudo garden restore /path/to/backup --yes --new-host` - add `--hostname NAME` if this machine
    should answer to a domain.
-4. `sudo athanor connect` for a ticket and QR carrying the new addresses. Paired clients hold the old
+4. `sudo garden connect` for a ticket and QR carrying the new addresses. Paired clients hold the old
    ones; the server identity survived in the backup, so they still trust this server and their
    passkeys still work.
 5. A passkey made in a browser is bound to the origin it was made on. If the origin changed, add
    those again from a client that still signs in.
-6. `sudo athanor doctor`.
+6. `sudo garden doctor`.
 
 Restore also reinstalls the managed browser revision excluded from the backup. If that download
 fails, the restored data remains available and the command reports that browser work cannot run.
-`sudo athanor update` retries the download; `sudo athanor doctor` checks the installed revision.
+`sudo garden update` retries the download; `sudo garden doctor` checks the installed revision.
 
 Nothing in step 3 is fatal after the data is back: a name that does not resolve yet from a machine
 plugged in ten minutes ago prints what to run and leaves the restored server serving.
@@ -394,7 +394,7 @@ plugged in ten minutes ago prints what to run and leaves the restored server ser
 ## Update
 
 ```bash
-sudo athanor update
+sudo garden update
 ```
 
 Backup, update, restore and rollback share a root-owned kernel lock. A competing maintenance
@@ -410,7 +410,7 @@ browser, GUI, and one model call pass.
 
 ### What an update carries besides code
 
-Between the build and the restart, `athanor update` runs `scripts/install-native.sh --release-steps`
+Between the build and the restart, `garden update` runs `scripts/install-native.sh --release-steps`
 from the revision it has just pulled. That covers the three things a release carries that are not
 compiled:
 
@@ -418,8 +418,8 @@ compiled:
   release that adds one installs it on an existing box rather than only on a fresh one.
 - **Workspace layout.** The permissions the agent account needs, and the move of the agent's HOME
   into `<workspace>/.home`, which is what keeps a signed-in coding CLI signed in across an upgrade.
-- **Runner settings.** Every key in `/etc/athanor/runner.env` except the generated shared secret,
-  including `CONFINE_AGENT_FILESYSTEM`, which is written from what `athanor-sandbox check` measures
+- **Runner settings.** Every key in `/etc/garden/runner.env` except the generated shared secret,
+  including `CONFINE_AGENT_FILESYSTEM`, which is written from what `garden-sandbox check` measures
   on this kernel rather than from a preference.
 
 Until this existed an update ran the three build steps and nothing else an install does, so those
@@ -433,7 +433,7 @@ checks the process supervisor, and validates the shared sudo policy before its a
 A missing dependency or failed integrity check prevents activation and rolls the update back.
 Incomplete downloads never replace active tools. Completed environments remain available for
 offline native-tool recovery, including the initial environment at
-`/usr/local/lib/athanor/python-before-managed` when the installation began with a directory there.
+`/usr/local/lib/garden/python-before-managed` when the installation began with a directory there.
 
 Accounts, generated secrets, certificates and the database cluster are not recreated. Node itself is
 also not upgraded by this phase. Failure of an optional operating-system package step is reported;
@@ -443,9 +443,9 @@ has started and may have run migrations; failures before that point leave the da
 Use the exact backup path printed by the update to revert an activated release:
 
 ```bash
-sudo athanor auto-update off
-sudo athanor rollback /path/to/the/pre-update-backup
-sudo athanor doctor
+sudo garden auto-update off
+sudo garden rollback /path/to/the/pre-update-backup
+sudo garden doctor
 ```
 
 Rollback validates the backup and recorded Git commit before stopping services, then restores both
@@ -462,13 +462,13 @@ initial Python environment and unrelated operator directories.
 ## Unattended updates
 
 ```bash
-sudo athanor auto-update status
-sudo athanor auto-update on
-sudo athanor auto-update off
+sudo garden auto-update status
+sudo garden auto-update on
+sudo garden auto-update off
 ```
 
-Off by default. `on` enables `athanor-auto-update.timer`, which runs weekly at a randomised time and
-catches up after downtime. Each run is the same transactional `athanor update` described above,
+Off by default. `on` enables `garden-auto-update.timer`, which runs weekly at a randomised time and
+catches up after downtime. Each run is the same transactional `garden update` described above,
 including the backup and the automatic rollback.
 
 The run stops early and changes nothing when the timer is disabled, when the checkout is already at
@@ -491,7 +491,7 @@ commands. Recovery depends on how the work was declared:
 
 Both manual and unattended updates check unfinished background work as well as active tasks.
 Manual updates refuse and name the running work; unattended updates defer to their next window.
-`ATHANOR_UPDATE_OVER_BACKGROUND_WORK=1` is an explicit operator override. A runner too old to report
+`GARDEN_UPDATE_OVER_BACKGROUND_WORK=1` is an explicit operator override. A runner too old to report
 background work produces a warning because the updater cannot establish that the workspace is idle.
 
 For recoverable finite work, use `shell(background=true, job=...)` and declare a
@@ -506,13 +506,13 @@ choice survives updates.
 ## Uninstall
 
 ```bash
-sudo athanor uninstall
+sudo garden uninstall
 ```
 
 Uninstall disables garden services, the network watcher, the unattended-update timer, the
-certificate renewal timer, and its Nginx site, and removes the `/etc/sudoers.d/athanor-packages` rule that let the agent account install
-system packages as root, the Avahi advertisement at `/etc/avahi/services/athanor.service`, and the
-`magick` compatibility command if the installer had to supply one. It preserves `/home/athanor`, `/etc/athanor`, PostgreSQL data,
+certificate renewal timer, and its Nginx site, and removes the `/etc/sudoers.d/garden-packages` rule that let the agent account install
+system packages as root, the Avahi advertisement at `/etc/avahi/services/garden.service`, and the
+`magick` compatibility command if the installer had to supply one. It preserves `/home/garden`, `/etc/garden`, PostgreSQL data,
 and backups. Removal of preserved data is a separate, explicit operator action.
 
 ## Schedules that stop running
@@ -564,7 +564,7 @@ starts a turn on this box. `docs/HEADLESS.md` has the request shape. Operational
   quarantine, so an agent reading one is treated as having read untrusted content. **Nothing prunes
   that directory.** A busy trigger grows the workspace over time; it is ordinary workspace storage
   and is deleted like any other file.
-- `journalctl -u athanor@api | grep schedule.trigger_delivery` reports every delivery and its
+- `journalctl -u garden@api | grep schedule.trigger_delivery` reports every delivery and its
   outcome - `accepted`, `duplicate`, `rate_limited`, `too_many_pending` or `not_armed`. It records
   no payload and no signature. The size of the backlog is not in the journal; it is in the `429`
   the sender is answered with, which says how many deliveries are unread and how many bytes they
@@ -620,10 +620,10 @@ message to reply to, and both are acted on from the phone. Operationally:
   revoke for you. A new token and a new pairing link replace the phone; the old sender has no
   standing with the new bot.
 - **Network:** long polling needs outbound HTTPS to the bot API and nothing inbound - no public
-  URL, no open port, no certificate. `TELEGRAM_API_BASE_URL` in `/etc/athanor/control.env` has one
+  URL, no open port, no certificate. `TELEGRAM_API_BASE_URL` in `/etc/garden/control.env` has one
   real value and exists so a test can point the service at a stub. One poller runs per bot token;
   running the service twice against one database would make the two steal each other's updates.
-- **Journal:** `journalctl -u athanor@notifications | grep notification.destination_` -
+- **Journal:** `journalctl -u garden@notifications | grep notification.destination_` -
   `_delivery_failing` when the bot API refuses a send (retried with a growing wait, capped at half
   an hour, never retired), `_outcome_failed` when it refuses the edit that writes a decision onto
   a card (the same wait, shared with sends, so a failing bot API never holds the push sweep
@@ -633,9 +633,9 @@ message to reply to, and both are acted on from the phone. Operationally:
   `_inbound_failed` when one update could not be handled, `_answer_failed` when the task route
   refused a reply, and `_ignored` for a message that was neither a pairing nor a reply. No line
   carries the token.
-- **Doctor:** `sudo athanor doctor` reads `destinations.telegram` off the health port and says
+- **Doctor:** `sudo garden doctor` reads `destinations.telegram` off the health port and says
   "phone notification transport" when a paired phone is being polled, or warns when it is paired
-  and not. `/metrics` on 4203 adds `athanor_notifications_destination_delivered_total`,
+  and not. `/metrics` on 4203 adds `garden_notifications_destination_delivered_total`,
   `_destination_failed_total`, `_inbound_total`, `_inbound_rejected_total` and
   `_inbound_poll_age_seconds`.
 
@@ -657,7 +657,7 @@ An owner can hand out a read-only link to one conversation. Operationally:
   public lookup refuses a revoked row in its own statement, so the effect is immediate.
 - Closed and expired rows are swept a month after they closed; the artifact bytes of a revoked
   link go at once. Deleting a conversation deletes its links.
-- `journalctl -u athanor@api | grep 'share\.'` reports `share.created`, `share.revoked` and
+- `journalctl -u garden@api | grep 'share\.'` reports `share.created`, `share.revoked` and
   `share.revoked_all` with row ids and sizes. It records no content, no link, and nothing about
   readers; a read is a count and a time on the row, and that is all the server knows about it.
 - The viewer page is built with the web app (`apps/web/dist/share/`) and served by the API from
@@ -673,7 +673,7 @@ An owner can hand out a read-only link to one conversation. Operationally:
 
 ## Incident priorities
 
-1. Stop access with the firewall or `sudo athanor stop`.
+1. Stop access with the firewall or `sudo garden stop`.
 2. Preserve existing logs without enabling content collection.
 3. Snapshot affected storage only when policy permits.
 4. Rotate model, connector, session, publisher, runner, and host credentials according to scope.
@@ -682,14 +682,14 @@ An owner can hand out a read-only link to one conversation. Operationally:
 
 ## Common failures
 
-- **API unavailable:** inspect `journalctl -u athanor@api` and PostgreSQL.
-- **Runner unavailable:** inspect `athanor-runner`; history should remain readable.
+- **API unavailable:** inspect `journalctl -u garden@api` and PostgreSQL.
+- **Runner unavailable:** inspect `garden-runner`; history should remain readable.
 - **GUI unavailable:** verify Xvfb, Openbox, D-Bus, AT-SPI, and screenshot paths.
 - **Codex/Claude unauthenticated:** use Terminal and the publisher status/login command.
 - **Provider setup required:** save a key/model in Settings.
 - **Preview unavailable:** verify the user process, loopback port, preview state, path base, and HTTPS 8443 firewall/router forwarding. The isolated preview listener must reject garden API and runner paths; `garden doctor` checks the local listener.
 - **Passkey origin mismatch:** restore the original public origin; do not repeatedly rewrite it.
-- **Push notifications missing:** run `sudo athanor doctor`, which distinguishes a service that is
+- **Push notifications missing:** run `sudo garden doctor`, which distinguishes a service that is
   not answering from one that is running with no Web Push signing keys, and both from one that is
   sending with nobody enrolled to receive: the health port reports `endpointsTotal` and
   `destinationsPaired` beside `endpointsFailing`, and `doctor` warns "no device or phone is
@@ -697,8 +697,8 @@ An owner can hand out a read-only link to one conversation. Operationally:
   at least one exists and none is refusing, and reports a count the service could not make as
   unknown rather than as zero. A missing key pair does not
   stop the unit — it disables delivery and says so, because a crash-looping unit hides its own
-  reason. Confirm the `PUSH_VAPID_*` values in `/etc/athanor/control.env` and inspect
-  `journalctl -u athanor@notifications`. This covers browsers and installed web apps only: the
+  reason. Confirm the `PUSH_VAPID_*` values in `/etc/garden/control.env` and inspect
+  `journalctl -u garden@notifications`. This covers browsers and installed web apps only: the
   packaged desktop and mobile clients hold no push subscription and raise notices through the
   operating system themselves, so a phone that is quiet while a browser is not is a client-side
   permission rather than a server fault.
@@ -718,21 +718,21 @@ An owner can hand out a read-only link to one conversation. Operationally:
   target there is no candidate. All of it leaves the standing record intact: what the agent
   raised is in Settings and in each conversation. A box that is down is reported by neither,
   because the notifier that would say so is on it.
-- **A paired phone gone quiet:** `sudo athanor doctor` reports "a phone is paired for
+- **A paired phone gone quiet:** `sudo garden doctor` reports "a phone is paired for
   notifications but the service is not reading from it" when the health port says `paired` and
   not `polling`. The one cause is `DATA_MASTER_KEY`: the bot token is sealed under it, and a
   service holding a different key - or none - can neither send with it nor poll for taps. Then
-  `journalctl -u athanor@notifications | grep notification.destination_` for the line that names
+  `journalctl -u garden@notifications | grep notification.destination_` for the line that names
   the destination and the refusal.
-- **Changed address:** inspect `/.well-known/athanor`, timer state, mDNS, provider DNS, and firewall.
-- **Dynamic DNS stale:** run `sudo athanor ddns status`, which prints the last recorded provider
-  error, then `sudo athanor ddns test` to force a publish and see the provider's answer.
+- **Changed address:** inspect `/.well-known/garden`, timer state, mDNS, provider DNS, and firewall.
+- **Dynamic DNS stale:** run `sudo garden ddns status`, which prints the last recorded provider
+  error, then `sudo garden ddns test` to force a publish and see the provider's answer.
 - **Browser sign-in impossible:** `doctor` warns when the origin is an IP address. Run
-  `sudo athanor ddns configure`, or `sudo athanor set-hostname NAME` when a name is already
+  `sudo garden ddns configure`, or `sudo garden set-hostname NAME` when a name is already
   published. Native clients are unaffected either way.
-- **Certificate missing a new name:** `sudo athanor certificate status` prints
+- **Certificate missing a new name:** `sudo garden certificate status` prints
   `Configured names:` and names anything the served certificate does not cover. The renewal timer
-  reissues within six hours; `sudo athanor certificate issue` does it now.
+  reissues within six hours; `sudo garden certificate issue` does it now.
 - **Low disk:** stop long jobs, back up, expand/mount storage, and restart.
 
 Native scientific interpreters use the independent execution controller when its socket is configured.

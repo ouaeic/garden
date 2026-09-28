@@ -1,5 +1,5 @@
-import type { TaskRecord } from '@athanor/data';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import type { TaskRecord } from '@garden/data';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { AgentState } from '../agent-state.js';
 import type { AgentApprovalRequirement } from '../approval-state.js';
 

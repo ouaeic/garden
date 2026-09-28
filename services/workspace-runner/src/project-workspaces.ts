@@ -1,5 +1,5 @@
 import { constants, type Stats } from 'node:fs';
-import { MAX_CAPABILITY_TTL_SECONDS } from '@athanor/core';
+import { MAX_CAPABILITY_TTL_SECONDS } from '@garden/core';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, open, opendir, readFile, rename, rm, lstat } from 'node:fs/promises';
 import path from 'node:path';
@@ -25,7 +25,7 @@ const Request = z
   })
   .strict();
 const EXCLUDED = new Set([
-  '.athanor',
+  '.garden',
   '.garden',
   '.home',
   '.git',
@@ -111,13 +111,13 @@ export class ProjectWorkspaces {
     const target = workspacePath(this.root, workspaceId);
     try {
       const file = await open(
-        path.join(target, '.athanor', 'project-inputs.json'),
+        path.join(target, '.garden', 'project-inputs.json'),
         constants.O_RDONLY | constants.O_NOFOLLOW
       );
       try {
         await assertOpenedInPlace(
           target,
-          path.join(target, '.athanor', 'project-inputs.json'),
+          path.join(target, '.garden', 'project-inputs.json'),
           file
         );
         const info = await file.stat();
@@ -169,7 +169,7 @@ export class ProjectWorkspaces {
         await directory.close();
       }
     }
-    const metadata = path.join(target, '.athanor');
+    const metadata = path.join(target, '.garden');
     const directory = await open(
       metadata,
       constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW
@@ -235,7 +235,7 @@ export class ProjectWorkspaces {
     const requestHash = digest({ sourceWorkspaceId, ...input });
     const source = workspacePath(this.root, sourceWorkspaceId),
       target = workspacePath(this.root, input.workspaceId);
-    const marker = path.join(target, '.athanor', 'project-source.json');
+    const marker = path.join(target, '.garden', 'project-source.json');
     try {
       const prior = JSON.parse(await readFile(marker, 'utf8')) as ProjectWorkspaceReceipt;
       if (
@@ -435,7 +435,7 @@ export class ProjectWorkspaces {
           { ino: stat.ino, dev: stat.dev, mtimeMs: stat.mtimeMs, ctimeMs: stat.ctimeMs }
         ])
       );
-      const output = await open(path.join(staging, '.athanor', 'project-source.json'), 'wx', 0o600);
+      const output = await open(path.join(staging, '.garden', 'project-source.json'), 'wx', 0o600);
       try {
         await output.writeFile(JSON.stringify(receipt));
         await output.sync();

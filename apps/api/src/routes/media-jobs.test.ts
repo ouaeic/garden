@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { MediaJob, MediaCharacterAsset, MediaBatch } from '@athanor/contracts';
-import { encryptJson, sha256, wrapDataKey } from '@athanor/core';
-import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
+import { MediaJob, MediaCharacterAsset, MediaBatch } from '@garden/contracts';
+import { encryptJson, sha256, wrapDataKey } from '@garden/core';
+import { createDatabase, DataStore, migrateDatabase } from '@garden/data';
 import type { RouteContext } from '../http/server-context.js';
 import { registerMediaJobRoutes } from './media-jobs.js';
 

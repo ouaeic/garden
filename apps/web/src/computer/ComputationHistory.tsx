@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { ComputationSession } from '@athanor/contracts';
+import type { ComputationSession } from '@garden/contracts';
 import { loadEventPage } from '../stream';
 import { Button, ErrorNotice } from '../ui';
 import { computationHistory, type ComputationHistoryEntry } from './computation-history';

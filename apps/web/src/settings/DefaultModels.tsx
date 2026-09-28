@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { ProjectModelChoices, ProjectModelPreferences } from '@athanor/contracts';
+import type { ProjectModelChoices, ProjectModelPreferences } from '@garden/contracts';
 import { put } from '../client.js';
 import { Button } from '../ui.js';
 import { ActionFeedback, ResourceState, useAction, useResource } from '../management.js';

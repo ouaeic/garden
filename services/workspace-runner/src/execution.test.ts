@@ -23,7 +23,7 @@ import {
 } from './execution.js';
 
 /**
- * Stands in for athanor-sandbox: consumes `run <network mode> <filesystem mode> <root> --spec
+ * Stands in for garden-sandbox: consumes `run <network mode> <filesystem mode> <root> --spec
  * <path>` the way the real helper does, reads the directory, the environment and the command out
  * of the spec file - the header word, the directory, then NUL-terminated words - unlinks it,
  * enters the directory, and execs as `env -i` does.
@@ -48,7 +48,7 @@ afterEach(async () => {
 });
 
 const workspaceRoot = async (): Promise<string> => {
-  const root = await mkdtemp(path.join(tmpdir(), 'athanor-execution-'));
+  const root = await mkdtemp(path.join(tmpdir(), 'garden-execution-'));
   temporaryRoots.push(root);
   await mkdir(path.join(root, 'workspace'));
   return root;
@@ -169,7 +169,7 @@ describe('bounded execution output', () => {
         execute(root, attempt, {
           maximumSeconds: 30,
           allowSystemPackages: true,
-          systemPackageHelper: '/usr/local/sbin/athanor-system-packages'
+          systemPackageHelper: '/usr/local/sbin/garden-system-packages'
         })
       ).rejects.toThrow('Host-native package management supports approved update and install only');
   });
@@ -203,7 +203,7 @@ describe('bounded execution output', () => {
         {
           maximumSeconds: 30,
           allowSystemPackages: true,
-          systemPackageHelper: '/usr/local/sbin/athanor-system-packages'
+          systemPackageHelper: '/usr/local/sbin/garden-system-packages'
         }
       )
     ).rejects.toThrow('Host-native package management supports approved update and install only');
@@ -260,7 +260,7 @@ describe('bounded execution output', () => {
         {
           maximumSeconds: 30,
           allowSystemPackages: true,
-          systemPackageHelper: '/usr/local/sbin/athanor-system-packages'
+          systemPackageHelper: '/usr/local/sbin/garden-system-packages'
         }
       )
     ).rejects.toThrow('Package names may not contain');
@@ -311,10 +311,10 @@ describe("what the agent's own search path reaches", () => {
    */
   it('runs a tool installed into $HOME/.local/bin or $HOME/bin by its bare name', async () => {
     const root = await workspaceRoot();
-    await installUnderHome(root, '.local/bin', 'athanor-user-installed');
-    await installUnderHome(root, 'bin', 'athanor-home-installed');
+    await installUnderHome(root, '.local/bin', 'garden-user-installed');
+    await installUnderHome(root, 'bin', 'garden-home-installed');
 
-    for (const name of ['athanor-user-installed', 'athanor-home-installed']) {
+    for (const name of ['garden-user-installed', 'garden-home-installed']) {
       const result = await execute(root, { executable: name, args: [] }, { maximumSeconds: 30 });
       expect(result.exitCode, `${name} did not run`).toBe(0);
       expect(result.stdout).toBe(name);
@@ -327,10 +327,10 @@ describe("what the agent's own search path reaches", () => {
    * workspace's own node_modules/.bin stays first because it was first before this.
    */
   it('puts both home directories ahead of the system ones and behind the workspace tools', () => {
-    const root = '/srv/athanor/workspaces/one';
+    const root = '/srv/garden/workspaces/one';
     const entries = agentSearchPath(root).split(path.delimiter);
     expect(entries[0]).toBe(
-      path.join(root, 'workspace', '.athanor', 'tools', 'node_modules', '.bin')
+      path.join(root, 'workspace', '.garden', 'tools', 'node_modules', '.bin')
     );
     expect(entries.indexOf(path.join(agentHome(root), '.local', 'bin'))).toBe(1);
     expect(entries.indexOf(path.join(agentHome(root), 'bin'))).toBe(2);
@@ -340,13 +340,13 @@ describe("what the agent's own search path reaches", () => {
 
   /*
    * The split, stated as the difference between the two lists rather than as a copy of one of them.
-   * Every entry `agentSearchPath` has that this does not is a directory `scripts/athanor-sandbox`
+   * Every entry `agentSearchPath` has that this does not is a directory `scripts/garden-sandbox`
    * grants the agent write on, and every entry they share is a system one. That is the whole claim
    * the helpers in audio.ts, render-proof.ts and toolchain.ts now rest on, so it is asserted as a
    * set difference: a fourth agent-writable entry added to that list later fails here.
    */
   it('leaves every directory the agent can write off the list the runner spawns from', () => {
-    const root = '/srv/athanor/workspaces/one';
+    const root = '/srv/garden/workspaces/one';
     const host = hostSearchPath.split(path.delimiter);
     expect(host).toEqual([
       '/usr/local/sbin',
@@ -361,7 +361,7 @@ describe("what the agent's own search path reaches", () => {
         .split(path.delimiter)
         .filter((entry) => !host.includes(entry))
     ).toEqual([
-      path.join(root, 'workspace', '.athanor', 'tools', 'node_modules', '.bin'),
+      path.join(root, 'workspace', '.garden', 'tools', 'node_modules', '.bin'),
       path.join(agentHome(root), '.local', 'bin'),
       path.join(agentHome(root), 'bin')
     ]);
@@ -380,16 +380,16 @@ describe("what the agent's own search path reaches", () => {
    */
   it('still runs what the agent installed under $HOME, and hides it from the runner', async () => {
     const root = await workspaceRoot();
-    await installUnderHome(root, '.local/bin', 'athanor-user-installed');
+    await installUnderHome(root, '.local/bin', 'garden-user-installed');
 
     const result = await execute(
       root,
-      { executable: 'athanor-user-installed', args: [] },
+      { executable: 'garden-user-installed', args: [] },
       { maximumSeconds: 30 }
     );
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toBe('athanor-user-installed');
-    expect(await resolveExecutable('athanor-user-installed', hostSearchPath, root)).toBe(undefined);
+    expect(result.stdout).toBe('garden-user-installed');
+    expect(await resolveExecutable('garden-user-installed', hostSearchPath, root)).toBe(undefined);
   });
 });
 
@@ -413,7 +413,7 @@ describe('agent sandbox', () => {
     const record = path.join(root, 'elevated');
     const elevate = await recordingElevator(root, record);
     const helper = path.join(root, 'sandbox');
-    // Stands in for athanor-sandbox: drops its own four leading arguments the way the real helper
+    // Stands in for garden-sandbox: drops its own four leading arguments the way the real helper
     // consumes `run <network mode> <filesystem mode> <root>`, then applies the environment and
     // execs, as `env -i` does.
     await writeFile(helper, SANDBOX_STAND_IN);
@@ -562,28 +562,28 @@ describe('agent sandbox', () => {
 
   it('says a refusal came from the sandbox when the path it names is outside the grant', async () => {
     const { stderr } = await sandboxedRun(
-      'cat: /home/athanor/00000000-0000-4000-8000-00000000000a/workspace/notes.md: Permission denied',
+      'cat: /home/garden/00000000-0000-4000-8000-00000000000a/workspace/notes.md: Permission denied',
       true
     );
     expect(stderr).toContain('the sandbox on this computer probably refused that');
     // The path is quoted back, because a command that touched several files needs to know which
     // one, and the sentence is otherwise indistinguishable from a general note about the box.
     expect(stderr).toContain(
-      '/home/athanor/00000000-0000-4000-8000-00000000000a/workspace/notes.md'
+      '/home/garden/00000000-0000-4000-8000-00000000000a/workspace/notes.md'
     );
     // The command's own message survives ahead of it: the note is added to the stream, not put in
     // place of it.
     expect(stderr).toContain('Permission denied');
 
     // The other load-bearing true case, and the reason the grant list may not simply grow until
-    // everything is silent: `.athanor` is the checkpoints and the browser profile's parent, it sits
+    // everything is silent: `.garden` is the checkpoints and the browser profile's parent, it sits
     // at the container root beside the two directories that ARE granted, and a command that meets
     // it has met the boundary rather than a mode bit. Written as an installed-host path rather than
     // built from this test's root, because a temporary root here lives under `/var`, which the
     // ruleset grants for reading - so a root-derived path would be silenced by the read list and
     // would pin nothing.
     const own = await sandboxedRun(
-      'tar: /home/athanor/00000000-0000-4000-8000-00000000000a/.athanor/checkpoints: Cannot open: Permission denied',
+      'tar: /home/garden/00000000-0000-4000-8000-00000000000a/.garden/checkpoints: Cannot open: Permission denied',
       true
     );
     expect(own.stderr).toContain('the sandbox on this computer probably refused that');
@@ -626,7 +626,7 @@ describe('agent sandbox', () => {
     // `ProcessManager.start` went red. A silence test whose message is silent for a second reason
     // is a silence test about the second reason.
     const unconfined = await sandboxedRun(
-      'cat: /home/athanor/00000000-0000-4000-8000-00000000000a/workspace/notes.md: Permission denied',
+      'cat: /home/garden/00000000-0000-4000-8000-00000000000a/workspace/notes.md: Permission denied',
       false
     );
     expect(unconfined.stderr).not.toContain('the sandbox on this computer');
@@ -765,7 +765,7 @@ describe('agent sandbox', () => {
  * list in their own right. So on both hosts this suite runs on, a root-derived path is silenced by
  * the SYSTEM half of the list no matter what the workspace half says. Measured rather than
  * supposed: deleting both workspace-derived entries left all 152 tests in this package green,
- * while on the installed host - root `/home/athanor/<id>`, `/home` granted nowhere - their absence
+ * while on the installed host - root `/home/garden/<id>`, `/home` granted nowhere - their absence
  * would put the sentence on every ordinary mode bit inside a task's own `workspace/`, which is the
  * exact lie the grant list was widened to stop telling.
  *
@@ -782,7 +782,7 @@ describe('agent sandbox', () => {
  * to cover the path.
  */
 describe('the workspace half of the confinement grant list', () => {
-  const installedRoot = '/home/athanor/00000000-0000-4000-8000-00000000000a';
+  const installedRoot = '/home/garden/00000000-0000-4000-8000-00000000000a';
   const denialOf = (file: string) => ({
     stderr: () => `cat: ${file}: Permission denied`,
     exitCode: 1,
@@ -795,10 +795,10 @@ describe('the workspace half of the confinement grant list', () => {
 
   it('speaks for the container root that holds the undo point', () => {
     expect(noteFor(`${installedRoot}/notes.md`)).toContain('the sandbox on this computer');
-    expect(noteFor(`${installedRoot}/.athanor/checkpoints/turn-4`)).toContain(
+    expect(noteFor(`${installedRoot}/.garden/checkpoints/turn-4`)).toContain(
       'the sandbox on this computer'
     );
-    expect(noteFor('/home/athanor/00000000-0000-4000-8000-00000000000b/workspace/x')).toContain(
+    expect(noteFor('/home/garden/00000000-0000-4000-8000-00000000000b/workspace/x')).toContain(
       'the sandbox on this computer'
     );
   });
@@ -1196,7 +1196,7 @@ describe('what execution does not consult', () => {
  * would name one file to the file tools and two directories to the shell. Measured on a live box:
  * six of ten tasks spent a third of their tool calls on exactly that, and a shadow
  * `workspace/workspace/` tree had stood for weeks. So both spellings land in one directory, while
- * `.athanor`, the agent's own home and every absolute path resolve as written and the escape
+ * `.garden`, the agent's own home and every absolute path resolve as written and the escape
  * refusal stands.
  */
 describe('the directory a command runs in', () => {
@@ -1221,12 +1221,12 @@ describe('the directory a command runs in', () => {
 
   it('leaves the container-only directories and the default where they were', async () => {
     const root = await workspaceRoot();
-    await mkdir(path.join(root, '.athanor', 'artifacts'), { recursive: true });
+    await mkdir(path.join(root, '.garden', 'artifacts'), { recursive: true });
     for (const [cwd, expected] of [
       ['workspace', ['workspace']],
       ['.', []],
       ['./', []],
-      ['.athanor/artifacts', ['.athanor', 'artifacts']],
+      ['.garden/artifacts', ['.garden', 'artifacts']],
       [path.join(root, 'workspace'), ['workspace']]
     ] as const) {
       const result = await execute(root, { ...printCwd, cwd }, { maximumSeconds: 30 });

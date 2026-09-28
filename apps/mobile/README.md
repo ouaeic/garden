@@ -1,4 +1,4 @@
-# athanor mobile
+# garden mobile
 
 The Tauri 2 project in `apps/desktop/src-tauri` is the single audited native shell for macOS,
 Windows, Linux, iOS, and Android. Mobile builds intentionally reuse the responsive server UI instead
@@ -10,8 +10,8 @@ follows its current endpoints, proxies HTTP/SSE/WebSockets, and keeps remote ser
 native IPC boundary.
 
 Run `pnpm native:configure` to verify that generic-client boundary before packaging. Initialize
-platform projects with `pnpm --filter @athanor/desktop ios:init` and
-`pnpm --filter @athanor/desktop android:init`, then use the corresponding `ios:build` or
+platform projects with `pnpm --filter @garden/desktop ios:init` and
+`pnpm --filter @garden/desktop android:init`, then use the corresponding `ios:build` or
 `android:build` script. iOS requires full Xcode and a signing team. Android requires Android
 Studio/SDK, NDK, Java, and signing configuration. Generated native platform directories may be
 produced in a release workstation or CI because they include environment- and signing-specific

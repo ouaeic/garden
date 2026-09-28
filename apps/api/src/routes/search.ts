@@ -6,8 +6,8 @@ import {
   memoryIndexKey,
   planMemoryQuery,
   unwrapDataKey
-} from '@athanor/core';
-import { searchOwnerHistory, type TaskRecord } from '@athanor/data';
+} from '@garden/core';
+import { searchOwnerHistory, type TaskRecord } from '@garden/data';
 import { z } from 'zod';
 import { SEARCH_EXCERPT_CHARS } from '../context.js';
 import { requireUser } from '../http/auth-hook.js';

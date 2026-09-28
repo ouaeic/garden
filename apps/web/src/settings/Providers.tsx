@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { MediaSettings, ModelRelease, OwnerPreferences } from '@athanor/contracts';
+import type { MediaSettings, ModelRelease, OwnerPreferences } from '@garden/contracts';
 import { del, put } from '../client.js';
 import { Button, Field } from '../ui.js';
 import {

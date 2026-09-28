@@ -4,7 +4,7 @@
 `status`, `verification`, `askedOwner`, `commandsRun`, `minCachePrefix`, `compactions`,
 `minBriefSections`, `ownerMessageIntact`, `minToolResultFloor`, `holds`, `untrusted` and `replies`.
 Every one of those is a count. None of them is an answer, and structurally none of them can be —
-the model in that rig is a function of what athanor just said, so a change that cuts the model's
+the model in that rig is a function of what garden just said, so a change that cuts the model's
 recent window by 75% produces the identical scripted reply and reports 49/49.
 
 That makes every change to `apps/worker/src/context.ts` unfalsifiable by the suite that guards it.
@@ -12,7 +12,7 @@ That makes every change to `apps/worker/src/context.ts` unfalsifiable by the sui
 thing it needed four tool results ago.
 
 This directory measures the other axis. It takes a long-running trajectory, compresses its earlier
-portion through athanor's own production path — `compactContext`, the squeeze, the floor,
+portion through garden's own production path — `compactContext`, the squeeze, the floor,
 `prepareModelContext`, `markCacheBreakpoints` — at a named configuration, and then asks questions
 that can only be answered from the part that was compressed.
 
@@ -39,7 +39,7 @@ no key, no network and no model: the half of this that can gate is the half that
 consecutive `--ci` runs produce byte-identical output, which is the property the baseline check
 depends on and is worth re-establishing after any change here.
 
-Every run opens with two provenance lines: which athanor and which rig are running, and which
+Every run opens with two provenance lines: which garden and which rig are running, and which
 accepted the committed numbers. `--accept` writes that pair into `baseline.json` under `$stamp` —
 the version and short revision from `buildIdentity()`, the same pair the box reports to its owner,
 plus a digest of the six source files here that decide every number printed. The digest moves on any
@@ -124,7 +124,7 @@ including this one, which is what makes it the control it is described as below.
 The published work this design follows grades those 0–5 with a judge blinded to which method
 produced the answer, and reports artifact tracking as the worst of the four — 2.45/5 even for the
 winning method, with the stated conclusion that it "may need dedicated state tracking beyond
-summarization". That is the conclusion athanor took: the `ARTIFACTS WRITTEN` block is dedicated
+summarization". That is the conclusion garden took: the `ARTIFACTS WRITTEN` block is dedicated
 state tracking, it is fed from where a write lands rather than from a summary, and the artifact
 column reads 5.00 on every trajectory with it and 2.50 without — see "where the artifact loss
 actually is" below for both numbers and what each mechanism is doing.
@@ -418,7 +418,7 @@ tripling of anything, and the cost is not what decides it. Three things do.
 `transcriptLine` used to render each condensed message from `content` and `toolCalls` alone, so the
 agent's working out was discarded **before** a summarising model was called — while the summariser
 was instructed to preserve "decisions taken and the reason for them, including approaches that were
-tried and rejected", and athanor's own preamble told the model to put exactly that material where
+tried and rejected", and garden's own preamble told the model to put exactly that material where
 the summariser would not see it: "Working out - options weighed, what to try next, talking yourself
 through it - goes in the reasoning channel, or nowhere." The harness was hiding the answer and then
 asking for it.
@@ -426,7 +426,7 @@ asking for it.
 Terminus 2's third agent is given the **full history**, so its advantage over its own summariser is
 access, not attention. Ported faithfully here it would carry reasoning; ported as three calls over
 the same `plan.transcript`, it would carry nothing new. The sharper statement of the research's
-insight, on athanor's terms, is that a summariser cannot summarise what it was never shown — and the
+insight, on garden's terms, is that a summariser cannot summarise what it was never shown — and the
 cheap answer to that is one line, not two more agents.
 
 `transcriptLine` now appends ` [reasoned: ...]`, bounded by the same per-message limit as the

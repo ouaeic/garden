@@ -1,0 +1,15 @@
+[Unit]
+Description=Record a failed garden certificate renewal
+# Started by OnFailure= on the renewal unit, never on its own. `no` is systemd's default and said
+# the opposite of the line above it: it let `systemctl start garden-certificate-alert` file an
+# error about a renewal that never failed. `yes` refuses only an explicit start request; activation
+# as another unit's dependency, which is what OnFailure= is, is unaffected.
+RefuseManualStart=yes
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/garden/garden-certificate alert-failed
+# The journal is the one place a failure is already being written, so it is written at the level
+# that shows up in `journalctl -p err` rather than buried among informational lines.
+SyslogIdentifier=garden-certificate
+SyslogLevel=err

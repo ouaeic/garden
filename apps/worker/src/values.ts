@@ -1,4 +1,4 @@
-import { runtimeUUID } from '@athanor/core';
+import { runtimeUUID } from '@garden/core';
 /**
  * Reading a value out of something a model wrote.
  *
@@ -15,9 +15,9 @@ import { runtimeUUID } from '@athanor/core';
  * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
 
-import type { TaskPlanStep } from '@athanor/contracts';
-import { AthanorError } from '@athanor/core';
-import type { ModelMessage } from '@athanor/model-gateway';
+import type { TaskPlanStep } from '@garden/contracts';
+import { GardenError } from '@garden/core';
+import type { ModelMessage } from '@garden/model-gateway';
 import { UNICODE_TAG_CHARACTERS } from './sanitise.js';
 import { SKILL_BODY_HEADINGS } from './skills.js';
 
@@ -117,9 +117,9 @@ export const countOccurrences = (source: string, value: string): number => {
  */
 export const boundedKnowledge = (value: unknown, maximum = 4_000): string => {
   const content = textValue(value).normalize('NFKC').replace(UNICODE_TAG_CHARACTERS, '').trim();
-  if (!content) throw new AthanorError('knowledge_empty', 'Knowledge content cannot be empty');
+  if (!content) throw new GardenError('knowledge_empty', 'Knowledge content cannot be empty');
   if (content.length > maximum)
-    throw new AthanorError(
+    throw new GardenError(
       'knowledge_too_large',
       `Knowledge content must be ${maximum.toLocaleString()} characters or less`
     );
@@ -130,7 +130,7 @@ export const boundedKnowledge = (value: unknown, maximum = 4_000): string => {
     }) ||
     /[\u200B-\u200F\u202A-\u202E\u2060\u2066-\u2069\uFEFF]/u.test(content)
   )
-    throw new AthanorError(
+    throw new GardenError(
       'knowledge_unsafe_text',
       'Knowledge cannot contain hidden control or bidirectional text'
     );
@@ -139,7 +139,7 @@ export const boundedKnowledge = (value: unknown, maximum = 4_000): string => {
       content
     )
   )
-    throw new AthanorError(
+    throw new GardenError(
       'knowledge_secret_detected',
       'Keep credentials out of memory and skills; use a scoped connected service instead'
     );
@@ -149,7 +149,7 @@ export const boundedKnowledge = (value: unknown, maximum = 4_000): string => {
 const skillName = (value: unknown): string => {
   const name = textValue(value).trim().toLowerCase();
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) || name.length > 64)
-    throw new AthanorError(
+    throw new GardenError(
       'skill_name_invalid',
       'Skill names use lowercase words separated by hyphens and are at most 64 characters'
     );
@@ -166,7 +166,7 @@ export const skillDocument = (
     (heading) => !new RegExp(`^#{1,3}\\s+${heading}\\s*$`, 'im').test(content)
   );
   if (missing.length)
-    throw new AthanorError('skill_structure_invalid', `Skill is missing: ${missing.join(', ')}`);
+    throw new GardenError('skill_structure_invalid', `Skill is missing: ${missing.join(', ')}`);
   return { name, description, content };
 };
 

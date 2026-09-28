@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { signatureControl } from './human-input.js';
 import { classifyBrowserAction, combineBatchPreflight } from './browser.js';
-import { OwnerStroke } from '@athanor/contracts';
+import { OwnerStroke } from '@garden/contracts';
 
 it('hands personal signatures to the owner without interrupting ordinary account navigation', () => {
   const signatures = [

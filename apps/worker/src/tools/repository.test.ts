@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { AthanorError } from '@athanor/core';
-import { type ModelToolCall } from '@athanor/model-gateway';
+import { GardenError } from '@garden/core';
+import { type ModelToolCall } from '@garden/model-gateway';
 import {
   declaredSymbol,
   executeRepositoryTool,
@@ -143,7 +143,7 @@ describe('what a code search answers with', () => {
     });
     const error = await search({ query: 'e' }, spread(101, 1)).catch((raised: unknown) => raised);
 
-    expect(error).toBeInstanceOf(AthanorError);
+    expect(error).toBeInstanceOf(GardenError);
     expect((error as Error).message).toContain('101 files match');
     expect((error as Error).message).toMatch(/narrow your search/);
     expect((error as Error).message).toMatch(/path or glob/);
@@ -282,7 +282,7 @@ describe('what an overview stands for when it cannot show everything', () => {
  * `nginxConf` and `MODEL_ID` - four fixtures out of four - and spends 103 of its 300 rows on test
  * files, 116 on names nothing outside their own file can reach, and 47 of its 197 measurable rows
  * on names referenced from nowhere else at all. Counting how often the repository imports a name
- * puts `AthanorError`, `DataStore`, `TaskRecord` and `AgentState` in those first four places and
+ * puts `GardenError`, `DataStore`, `TaskRecord` and `AgentState` in those first four places and
  * takes the test-file rows to 53 and the unreachable ones to 59.
  *
  * The graph was measured and declined. Against a held-out half of this corpus that the ranking
@@ -304,12 +304,12 @@ describe('which symbols an overview leads with', () => {
     ...Array.from({ length: 400 }, (_, index) =>
       declares(`apps/a${String(index).padStart(3, '0')}.ts`, 1, `local${index}`)
     ),
-    declares('services/relay/protocol.ts', 12, 'AthanorError')
+    declares('services/relay/protocol.ts', 12, 'GardenError')
   ];
 
   it('leads with the name the repository imports most, not with the file that sorts first', () => {
     const lines = wideTree();
-    const sweep = Array.from({ length: 50 }, () => importsFrom(['AthanorError'], './x.js')).join(
+    const sweep = Array.from({ length: 50 }, () => importsFrom(['GardenError'], './x.js')).join(
       '\n'
     );
 
@@ -318,7 +318,7 @@ describe('which symbols an overview leads with', () => {
     // 50 others depend on.
     expect(spreadAcrossFiles(lines, 300)[0]).toBe(declares('apps/a000.ts', 1, 'local0'));
     expect(rankByReference(lines, sweep, 300)[0]).toBe(
-      declares('services/relay/protocol.ts', 12, 'AthanorError')
+      declares('services/relay/protocol.ts', 12, 'GardenError')
     );
   });
 
@@ -404,7 +404,7 @@ describe('which symbols an overview leads with', () => {
       'packages/contracts/src/index.ts:522:export type Task = z.infer<typeof Task>;'
     ];
 
-    expect(rankByReference(lines, importsFrom(['Task'], '@athanor/contracts'), 300)[0]).toBe(
+    expect(rankByReference(lines, importsFrom(['Task'], '@garden/contracts'), 300)[0]).toBe(
       'packages/contracts/src/index.ts:484:export const Task = z.object({'
     );
   });
@@ -414,23 +414,23 @@ describe('which symbols an overview leads with', () => {
      * `const from = (` really is a declaration in `evals/read/measure.ts`, and `const type = (` in
      * `services/workspace-runner/src/render-proof.test.ts`. Every import statement in the
      * repository contains both words, so a scanner that took them for names put two local test
-     * helpers at the top of the overview, ahead of `AthanorError`.
+     * helpers at the top of the overview, ahead of `GardenError`.
      */
     const lines = [
       declares('evals/read/measure.ts', 79, 'from', false),
       declares('evals/render-proof.test.ts', 241, 'type', false),
-      declares('packages/core/errors.ts', 1, 'AthanorError')
+      declares('packages/core/errors.ts', 1, 'GardenError')
     ];
     // Twenty-four statements, every one of them containing `from` and `type` and only twelve of
-    // them containing `AthanorError`. Counted as names those two words win two to one, and both
+    // them containing `GardenError`. Counted as names those two words win two to one, and both
     // sort ahead of `packages/` so they would take the tie as well.
     const sweep = [
-      ...Array.from({ length: 12 }, () => `import type { AthanorError } from './errors.js';`),
+      ...Array.from({ length: 12 }, () => `import type { GardenError } from './errors.js';`),
       ...Array.from({ length: 12 }, () => `import type { unrelated } from './other.js';`)
     ].join('\n');
 
     expect(rankByReference(lines, sweep, 300)[0]).toBe(
-      declares('packages/core/errors.ts', 1, 'AthanorError')
+      declares('packages/core/errors.ts', 1, 'GardenError')
     );
   });
 
@@ -439,13 +439,13 @@ describe('which symbols an overview leads with', () => {
     // opening line carries no `from '...'` to match. Measured on this repository, the flag leaves
     // the ranking 2,113 names to order and a line-based sweep leaves it 1,163.
     const lines = [
-      declares('packages/core/errors.ts', 1, 'AthanorError'),
+      declares('packages/core/errors.ts', 1, 'GardenError'),
       declares('apps/a.ts', 1, 'quiet')
     ];
-    const sweep = ['import {', '  AthanorError,', '  other', "} from '@athanor/core';"].join('\n');
+    const sweep = ['import {', '  GardenError,', '  other', "} from '@garden/core';"].join('\n');
 
     expect(rankByReference(lines, sweep, 300)[0]).toBe(
-      declares('packages/core/errors.ts', 1, 'AthanorError')
+      declares('packages/core/errors.ts', 1, 'GardenError')
     );
   });
 
@@ -643,7 +643,7 @@ describe('which symbols an overview leads with', () => {
     ['rust', ['use std::collections::HashMap;', 'use crate::store::{Record, Store};']],
     ['ruby', ["require 'json'", "require_relative 'store'"]],
     ['c', ['#include <stdlib.h>', '#include "registry.h"']],
-    ['csharp', ['using System.Collections.Generic;', 'using Athanor.Server;']]
+    ['csharp', ['using System.Collections.Generic;', 'using Garden.Server;']]
   ])(
     'reads no reference at all out of %s, so its overview is the proportional one',
     (_, source) => {
@@ -984,7 +984,7 @@ describe('which languages an overview can see', () => {
     {
       extension: 'rb',
       seen: [
-        ['module Athanor', 'Athanor'],
+        ['module Garden', 'Garden'],
         ['class Registry', 'Registry'],
         ['def self.mount(port)', 'mount']
       ],
@@ -993,7 +993,7 @@ describe('which languages an overview can see', () => {
     {
       extension: 'php',
       seen: [
-        ['namespace Athanor\\Server;', 'Athanor'],
+        ['namespace Garden\\Server;', 'Garden'],
         ['class Registry', 'Registry'],
         ['interface Resolver', 'Resolver'],
         ['trait Loggable', 'Loggable'],
@@ -1004,7 +1004,7 @@ describe('which languages an overview can see', () => {
     {
       extension: 'cs',
       seen: [
-        ['namespace Athanor.Server;', 'Athanor'],
+        ['namespace Garden.Server;', 'Garden'],
         ['public class Registry', 'Registry'],
         ['public interface IResolver', 'IResolver'],
         ['public struct Route', 'Route'],
@@ -1015,7 +1015,7 @@ describe('which languages an overview can see', () => {
     {
       extension: 'cpp',
       seen: [
-        ['namespace athanor {', 'athanor'],
+        ['namespace garden {', 'garden'],
         ['class Registry {', 'Registry'],
         ['struct Route {', 'Route'],
         ['enum class Level {', 'Level']
@@ -1027,7 +1027,7 @@ describe('which languages an overview can see', () => {
     {
       extension: 'hpp',
       seen: [
-        ['namespace athanor {', 'athanor'],
+        ['namespace garden {', 'garden'],
         ['class Registry;', 'Registry'],
         ['struct Route {', 'Route']
       ],
@@ -1501,10 +1501,10 @@ describe('a repository read answering the same thing twice', () => {
         { length: 400 },
         (_, index) => `apps/a${String(index).padStart(3, '0')}.ts:1:export const local${index} = 1;`
       ),
-      'services/relay/protocol.ts:12:export const AthanorError = 1;'
+      'services/relay/protocol.ts:12:export const GardenError = 1;'
     ]);
     const imports = ripgrepImportsLike(
-      Array.from({ length: 50 }, () => "import { AthanorError } from '@athanor/core';")
+      Array.from({ length: 50 }, () => "import { GardenError } from '@garden/core';")
     );
     const [first, second] = await twice(
       'repo_overview',
@@ -1516,7 +1516,7 @@ describe('a repository read answering the same thing twice', () => {
     );
 
     expect((first as { importantSymbols: string[] }).importantSymbols[0]).toBe(
-      'services/relay/protocol.ts:12:export const AthanorError = 1;'
+      'services/relay/protocol.ts:12:export const GardenError = 1;'
     );
     expect(first).toEqual(second);
   });
@@ -1554,13 +1554,10 @@ describe('a repository read answering the same thing twice', () => {
      */
     const symbols = ripgrepLike([
       'apps/a.ts:1:export const quiet = 1;',
-      'packages/core/errors.ts:1:export const AthanorError = 1;'
+      'packages/core/errors.ts:1:export const GardenError = 1;'
     ]);
     const imports = ripgrepImportsLike(
-      Array.from(
-        { length: 30 },
-        () => "import {\n  AthanorError,\n  other\n} from '@athanor/core';"
-      )
+      Array.from({ length: 30 }, () => "import {\n  GardenError,\n  other\n} from '@garden/core';")
     );
     const [first, second] = await twice(
       'repo_overview',
@@ -1572,7 +1569,7 @@ describe('a repository read answering the same thing twice', () => {
     );
 
     expect((first as { importantSymbols: string[] }).importantSymbols[0]).toBe(
-      'packages/core/errors.ts:1:export const AthanorError = 1;'
+      'packages/core/errors.ts:1:export const GardenError = 1;'
     );
     expect(first).toEqual(second);
   });

@@ -13,16 +13,16 @@ import {
   TaskScheduleTrigger,
   UpdateTaskScheduleRequest,
   type TaskSchedule
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import {
-  AthanorError,
+  GardenError,
   assertTimeZone,
   decryptJson,
   encryptJson,
   inferModelTask,
   unwrapDataKey
-} from '@athanor/core';
-import type { TaskScheduleRecord } from '@athanor/data';
+} from '@garden/core';
+import type { TaskScheduleRecord } from '@garden/data';
 import { z } from 'zod';
 import { ownerPriceCeiling } from '../context.js';
 import { requireMainModel } from '../main-model-selection.js';
@@ -185,7 +185,7 @@ export const registerScheduleRoutes = (context: RouteContext): void => {
         try {
           assertTimeZone(input.spec.timeZone);
         } catch {
-          throw new AthanorError('invalid_time_zone', 'Choose a valid IANA time zone');
+          throw new GardenError('invalid_time_zone', 'Choose a valid IANA time zone');
         }
       }
       // No occurrence has been served yet, so there is no repeat to guard against - but a first
@@ -200,22 +200,22 @@ export const registerScheduleRoutes = (context: RouteContext): void => {
        * rather than silently rewritten, because which timing a schedule has is the owner's.
        */
       if (input.trigger && input.spec.kind === 'once')
-        throw new AthanorError(
+        throw new GardenError(
           'trigger_needs_repeating_schedule',
           'A one-time schedule stops after its single run, so it cannot carry an inbound trigger; give it a repeating timing instead'
         );
       const nextRunAt = advanceScheduleRun(input.spec, null);
       if (!nextRunAt)
-        throw new AthanorError('schedule_in_past', 'The one-time schedule must be in the future');
+        throw new GardenError('schedule_in_past', 'The one-time schedule must be in the future');
       const workspace = await store.getWorkspace(user.id, input.workspaceId);
       if (!workspace?.wrappedKey)
-        throw new AthanorError('workspace_not_found', 'Workspace not found');
+        throw new GardenError('workspace_not_found', 'Workspace not found');
       if (['failed', 'deleting'].includes(workspace.status))
-        throw new AthanorError('workspace_unavailable', 'Workspace is unavailable');
+        throw new GardenError('workspace_unavailable', 'Workspace is unavailable');
       const spendCeilingUsd = await resolveSpendCeiling(user.id, input.maxSpendUsd);
       await assertSpendCeilingAllowed({ userId: user.id, ceilingUsd: spendCeilingUsd });
       if ((await store.countTaskSchedules(user.id)) >= serverLimits.maxSchedules) {
-        throw new AthanorError(
+        throw new GardenError(
           'schedule_limit',
           `This server supports up to ${serverLimits.maxSchedules} scheduled tasks`
         );
@@ -239,7 +239,7 @@ export const registerScheduleRoutes = (context: RouteContext): void => {
         selected.availability !== 'available' ||
         selected.privacyRoute !== input.privacyRoute
       ) {
-        throw new AthanorError(
+        throw new GardenError(
           'model_unavailable',
           'The selected cloud model is unavailable for this privacy route'
         );
@@ -302,7 +302,7 @@ export const registerScheduleRoutes = (context: RouteContext): void => {
         });
       } catch (error) {
         if (error instanceof Error && error.message === 'schedule_limit') {
-          throw new AthanorError(
+          throw new GardenError(
             'schedule_limit',
             `This server supports up to ${serverLimits.maxSchedules} scheduled tasks`
           );
@@ -354,10 +354,10 @@ export const registerScheduleRoutes = (context: RouteContext): void => {
       return idempotent(request, reply, user, async () => {
         const input = UpdateTaskScheduleRequest.parse(request.body ?? {});
         const schedule = await store.getTaskSchedule(user.id, request.params.scheduleId);
-        if (!schedule) throw new AthanorError('schedule_not_found', 'Schedule not found');
+        if (!schedule) throw new GardenError('schedule_not_found', 'Schedule not found');
         const workspace = await store.getWorkspace(user.id, schedule.workspaceId);
         if (!workspace?.wrappedKey)
-          throw new AthanorError('workspace_not_found', 'Workspace not found');
+          throw new GardenError('workspace_not_found', 'Workspace not found');
         /*
          * Declared and refused rather than accepted and dropped. `updateTaskSchedule` does not write
          * `model_id` or `privacy_route`, and zod strips a key it does not declare - so a client
@@ -370,7 +370,7 @@ export const registerScheduleRoutes = (context: RouteContext): void => {
           (input.modelId !== undefined && input.modelId !== schedule.modelId) ||
           (input.privacyRoute !== undefined && input.privacyRoute !== schedule.privacyRoute)
         )
-          throw new AthanorError(
+          throw new GardenError(
             'schedule_model_immutable',
             'A schedule keeps the model and privacy route it was created with; create a new schedule to change them',
             409
@@ -382,7 +382,7 @@ export const registerScheduleRoutes = (context: RouteContext): void => {
           input.maxComputeCredits === undefined &&
           input.maxSpendUsd === undefined
         )
-          throw new AthanorError(
+          throw new GardenError(
             'schedule_update_empty',
             'Provide a new title, instruction, timing, compute limit or spending ceiling'
           );
@@ -390,7 +390,7 @@ export const registerScheduleRoutes = (context: RouteContext): void => {
           try {
             assertTimeZone(input.spec.timeZone);
           } catch {
-            throw new AthanorError('invalid_time_zone', 'Choose a valid IANA time zone');
+            throw new GardenError('invalid_time_zone', 'Choose a valid IANA time zone');
           }
         }
         const trigger = await triggerOf(user.id, schedule.id);
@@ -404,7 +404,7 @@ export const registerScheduleRoutes = (context: RouteContext): void => {
          * correct, and only covers one of the ways in.
          */
         if (input.spec?.kind === 'once' && trigger)
-          throw new AthanorError(
+          throw new GardenError(
             'trigger_needs_repeating_schedule',
             'A one-time schedule stops after its single run, so it cannot carry an inbound trigger; delete the trigger by deleting the schedule, or keep a repeating timing'
           );
@@ -424,14 +424,14 @@ export const registerScheduleRoutes = (context: RouteContext): void => {
               ? advanceScheduleRun(spec, null)
               : null;
         if (input.spec !== undefined && schedule.enabled && !nextRunAt)
-          throw new AthanorError(
+          throw new GardenError(
             'schedule_in_past',
             'An enabled one-time schedule must be in the future'
           );
         const title = input.title ?? (await scheduleTitle(schedule, workspace));
         const prompt = input.prompt ?? schedulePrompt(schedule, workspace);
         if (!prompt)
-          throw new AthanorError(
+          throw new GardenError(
             'encrypted_prompt_context',
             'This server cannot read the instruction on this schedule; send a new one with this edit'
           );
@@ -443,7 +443,7 @@ export const registerScheduleRoutes = (context: RouteContext): void => {
           maxSpendUsd: input.maxSpendUsd === undefined ? schedule.maxSpendUsd : input.maxSpendUsd,
           nextRunAt
         });
-        if (!updated) throw new AthanorError('schedule_not_found', 'Schedule not found');
+        if (!updated) throw new GardenError('schedule_not_found', 'Schedule not found');
         return withTrigger(await privateScheduleResponse(updated, workspace), trigger);
       });
     }
@@ -456,7 +456,7 @@ export const registerScheduleRoutes = (context: RouteContext): void => {
       return idempotent(request, reply, user, async () => {
         const action = z.enum(['pause', 'resume', 'run']).parse(request.params.action);
         const schedule = await store.getTaskSchedule(user.id, request.params.scheduleId);
-        if (!schedule) throw new AthanorError('schedule_not_found', 'Schedule not found');
+        if (!schedule) throw new GardenError('schedule_not_found', 'Schedule not found');
         const nextRunAt =
           action === 'run'
             ? new Date()
@@ -464,7 +464,7 @@ export const registerScheduleRoutes = (context: RouteContext): void => {
               ? advanceScheduleRun(schedule.spec, null)
               : null;
         if (action === 'resume' && !nextRunAt) {
-          throw new AthanorError(
+          throw new GardenError(
             'schedule_finished',
             'This one-time schedule has already passed; create a new schedule instead',
             409
@@ -498,7 +498,7 @@ export const registerScheduleRoutes = (context: RouteContext): void => {
         if (action === 'run') {
           const inFlight = await store.taskScheduleRunInFlight(schedule.id);
           if (inFlight)
-            throw new AthanorError(
+            throw new GardenError(
               'previous_run_active',
               'This schedule already has a run that has not finished; open that conversation and let it finish or cancel it, then run this again',
               409
@@ -510,7 +510,7 @@ export const registerScheduleRoutes = (context: RouteContext): void => {
           action !== 'pause',
           nextRunAt
         );
-        if (!updated) throw new AthanorError('schedule_not_found', 'Schedule not found');
+        if (!updated) throw new GardenError('schedule_not_found', 'Schedule not found');
         return withTrigger(
           await privateScheduleResponse(updated),
           await triggerOf(user.id, schedule.id)
@@ -568,7 +568,7 @@ export const registerScheduleRoutes = (context: RouteContext): void => {
          * at a megabyte; this is the bound that is actually argued.
          */
         if (body.byteLength > MAX_DELIVERY_BYTES)
-          throw new AthanorError(
+          throw new GardenError(
             'hook_payload_too_large',
             `An inbound delivery is at most ${MAX_DELIVERY_BYTES} bytes`,
             413
@@ -580,19 +580,18 @@ export const registerScheduleRoutes = (context: RouteContext): void => {
          */
         const token = request.params.token;
         if (!/^[A-Za-z0-9_-]{43}$/.test(token))
-          throw new AthanorError('hook_not_found', 'No trigger matches this address', 404);
+          throw new GardenError('hook_not_found', 'No trigger matches this address', 404);
         const found = await store.taskScheduleByTriggerPath(token);
-        if (!found)
-          throw new AthanorError('hook_not_found', 'No trigger matches this address', 404);
+        if (!found) throw new GardenError('hook_not_found', 'No trigger matches this address', 404);
         const workspace = await store.getWorkspaceById(found.workspaceId);
         if (!workspace?.wrappedKey)
-          throw new AthanorError('hook_not_found', 'No trigger matches this address', 404);
+          throw new GardenError('hook_not_found', 'No trigger matches this address', 404);
 
-        const timestamp = Number(request.headers['x-athanor-timestamp']);
-        const presented = String(request.headers['x-athanor-signature'] ?? '');
+        const timestamp = Number(request.headers['x-garden-timestamp']);
+        const presented = String(request.headers['x-garden-signature'] ?? '');
         const skew = Math.abs(Math.floor(Date.now() / 1000) - timestamp);
         if (!Number.isFinite(timestamp) || skew > SIGNATURE_WINDOW_SECONDS)
-          throw new AthanorError(
+          throw new GardenError(
             'hook_timestamp_outside_window',
             `Sign each delivery with a current timestamp; this one is outside the ${SIGNATURE_WINDOW_SECONDS} second window`,
             401
@@ -616,7 +615,7 @@ export const registerScheduleRoutes = (context: RouteContext): void => {
           'hex'
         );
         if (offered.length !== expected.length || !timingSafeEqual(offered, expected))
-          throw new AthanorError(
+          throw new GardenError(
             'hook_signature_invalid',
             'The signature does not match this delivery',
             401
@@ -650,7 +649,7 @@ export const registerScheduleRoutes = (context: RouteContext): void => {
           code: recorded.outcome
         });
         if (recorded.outcome === 'rate_limited' || recorded.outcome === 'too_many_pending')
-          throw new AthanorError(
+          throw new GardenError(
             recorded.outcome === 'rate_limited'
               ? 'hook_rate_limited'
               : 'hook_deliveries_not_kept_up',

@@ -2,13 +2,13 @@
 name: citation-discipline
 description: Attach a resolvable source and a verbatim quoted span to every factual claim, then re-fetch each source before delivery and confirm the quote still supports the claim. Use whenever research, a briefing, a vendor or market comparison, or any answer the owner might act on carries facts, numbers, dates or attributed statements. Do not use for the owner's own data, for arithmetic derived in the answer itself, or for clearly labelled opinion.
 license: AGPL-3.0-or-later
-compatibility: Requires the athanor browser runner for re-fetching; no other binaries.
+compatibility: Requires the garden browser runner for re-fetching; no other binaries.
 allowed-tools: parallel_web_read web_search browser_snapshot browser_action document_read document_search file_write
 metadata:
-  athanor.tier: 'builtin'
-  athanor.version: '1.1.0'
-  athanor.risk: 'read_only'
-  athanor.domain: 'research'
+  garden.tier: 'builtin'
+  garden.version: '1.1.0'
+  garden.risk: 'read_only'
+  garden.domain: 'research'
 ---
 
 # Citation discipline

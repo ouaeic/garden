@@ -3,7 +3,7 @@ import type {
   MediaModelOption,
   MediaParameter,
   MediaPriceLine
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { readBoundedMediaBody } from './media-output.js';
 import { mediaRecord } from './media-capabilities.js';
 import type { MediaCatalogOptions } from './media-catalog.js';

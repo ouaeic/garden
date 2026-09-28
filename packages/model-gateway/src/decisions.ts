@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AthanorError } from '@athanor/core';
+import { GardenError } from '@garden/core';
 
 const identifier = z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/);
 const instructions = z.string().min(1).max(6000);
@@ -121,7 +121,7 @@ export class OpenRouterDecisionAdapter implements DecisionAdapter {
       base.search ||
       base.hash
     )
-      throw new AthanorError(
+      throw new GardenError(
         'decision_route_unavailable',
         'This connection does not offer the Decisions API.',
         409
@@ -153,7 +153,7 @@ export class OpenRouterDecisionAdapter implements DecisionAdapter {
     });
     if (!response.ok) {
       await response.body?.cancel();
-      throw new AthanorError(
+      throw new GardenError(
         'decision_provider_error',
         `Decision inference returned HTTP ${response.status}.`,
         response.status

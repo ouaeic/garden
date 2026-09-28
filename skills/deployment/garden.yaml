@@ -1,0 +1,40 @@
+id: deployment
+version: 2.0.0
+catalog_line: 'Run an app here: bind 127.0.0.1, prove it with curl, then keep it up as a named service.'
+
+lineage:
+  origin: builtin
+  approved_by: null
+  approved_at: null
+
+requires:
+  tools:
+    [
+      shell,
+      process,
+      publish_preview,
+      file_read,
+      file_write,
+      browser_snapshot,
+      browser_action,
+      files_list
+    ]
+  # Neither is in the document toolchain and neither is installed by garden: they belong to this
+  # skill's own subject matter, and document-toolchain.test.ts exempts them by name for that reason.
+  binaries: [systemctl, journalctl]
+
+capability:
+  fs.read: ['$WORKSPACE/**']
+  fs.write: ['$WORKSPACE/**']
+  net.hosts: []
+  exec: [systemctl, journalctl, curl]
+  connectors: []
+  spend: none
+
+verify:
+  - run: 'test -s workspace/deploy/health-response.txt'
+    assert: 'the health response body captured during the work is on disk and not empty - set_acceptance refuses curl, wget and ssh outright, so the check is on what the request returned rather than on making the request again'
+  - check: 'The health check was made twice from shell, sixty seconds apart, so a crash loop cannot pass.'
+  - check: 'The rollback command is written down and was validated before the switch.'
+  - check: 'Public publishing, if any, was explicitly approved by the owner.'
+  - check: 'The report says whether the app is a named service or a process that ends, and no systemd unit was described as installed unless the owner installed it.'

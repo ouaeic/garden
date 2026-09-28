@@ -1,8 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { z } from 'zod';
-import type { ConnectorScope } from '@athanor/contracts';
+import type { ConnectorScope } from '@garden/contracts';
 import type { ConnectorTransport } from './connectors.js';
-import { AthanorError } from './errors.js';
+import { GardenError } from './errors.js';
 
 export const AccountProvider = z.enum(['google', 'microsoft']);
 export type AccountProvider = z.infer<typeof AccountProvider>;
@@ -72,12 +72,12 @@ export function accountOAuthScopes(
   capabilities: readonly ConnectorScope[]
 ): string[] {
   if (!capabilities.length)
-    throw new AthanorError('connector_scope_invalid', 'Choose mail or calendar capabilities.');
+    throw new GardenError('connector_scope_invalid', 'Choose mail or calendar capabilities.');
   const allowed: Readonly<Record<string, string>> = routes[provider].scopes;
   const selected = capabilities.map((scope) => {
     const result = allowed[scope];
     if (!result)
-      throw new AthanorError(
+      throw new GardenError(
         'connector_scope_invalid',
         'This account only supports mail and calendar capabilities.'
       );
@@ -105,7 +105,7 @@ export function beginAccountOAuth(input: {
         ['localhost', '127.0.0.1', '[::1]'].includes(redirect.hostname)
       ))
   )
-    throw new AthanorError(
+    throw new GardenError(
       'connector_redirect_invalid',
       'Use the Garden HTTPS callback or a loopback development callback.'
     );
@@ -142,7 +142,7 @@ function responseObject(bytes: Buffer): Record<string, unknown> {
   } catch {
     /* Provider bodies may contain credentials; never include them in an error. */
   }
-  throw new AthanorError(
+  throw new GardenError(
     'connector_oauth_response_invalid',
     'The account provider returned an unreadable authorization response.'
   );
@@ -184,7 +184,7 @@ async function exchange(
     } catch {
       /* Preserve a bounded status-only error. */
     }
-    throw new AthanorError(
+    throw new GardenError(
       code === 'invalid_grant' ? 'connector_reauthorization_required' : 'connector_oauth_failed',
       code === 'invalid_grant'
         ? 'Account authorization expired or was revoked. Connect this account again.'
@@ -203,14 +203,14 @@ async function exchange(
     })
     .safeParse(result);
   if (!parsed.success)
-    throw new AthanorError(
+    throw new GardenError(
       'connector_oauth_response_invalid',
       'The account provider omitted required token information.'
     );
   const value = parsed.data;
   const refreshToken = value.refresh_token ?? secret.tokens?.refreshToken;
   if (!refreshToken)
-    throw new AthanorError(
+    throw new GardenError(
       'connector_reauthorization_required',
       'The provider did not grant offline access. Connect again and grant the requested access.'
     );
@@ -221,7 +221,7 @@ async function exchange(
     (scope) => scope !== 'offline_access' && !granted.has(canonicalScope(secret.provider, scope))
   );
   if (missing.length)
-    throw new AthanorError(
+    throw new GardenError(
       'connector_scope_denied',
       'The provider did not grant every selected capability. Reconnect with fewer capabilities or grant the requested access.'
     );
@@ -246,7 +246,7 @@ export async function completeAccountOAuth(input: {
 }): Promise<AccountOAuth> {
   const secret = AccountOAuth.parse(input.secret);
   if (!secret.pending || input.state !== secret.pending.state)
-    throw new AthanorError(
+    throw new GardenError(
       'connector_oauth_state_invalid',
       'This authorization response does not match the connection attempt.'
     );
@@ -282,7 +282,7 @@ export async function verifyAccountOAuthIdentity(
     maxResponseBytes: 65536
   });
   if (response.status !== 200)
-    throw new AthanorError(
+    throw new GardenError(
       'connector_identity_unavailable',
       'The provider could not confirm which account was connected.'
     );
@@ -292,18 +292,18 @@ export async function verifyAccountOAuthIdentity(
       ? { id: identity.sub, address: identity.email }
       : { id: identity.id, address: identity.mail || identity.userPrincipalName };
   if (connected.provider === 'google' && identity.email_verified !== true)
-    throw new AthanorError(
+    throw new GardenError(
       'connector_identity_unavailable',
       'The provider did not confirm a verified account email address.'
     );
   const verified = AccountOAuth.safeParse({ ...connected, account });
   if (!verified.success)
-    throw new AthanorError(
+    throw new GardenError(
       'connector_identity_unavailable',
       'The provider returned an incomplete account identity.'
     );
   if (connected.account && connected.account.id !== verified.data.account!.id)
-    throw new AthanorError(
+    throw new GardenError(
       'connector_identity_changed',
       'The provider returned a different account. Connect it explicitly.'
     );
@@ -318,7 +318,7 @@ export async function refreshAccountOAuth(
 ): Promise<AccountOAuth> {
   const current = AccountOAuth.parse(secret);
   if (current.pending || !current.tokens || !current.account)
-    throw new AthanorError(
+    throw new GardenError(
       'connector_reauthorization_required',
       'Connect this account before using it.'
     );

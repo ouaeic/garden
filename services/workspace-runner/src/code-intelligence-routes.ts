@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { CodeIntelligenceRequest } from '@athanor/contracts';
+import { CodeIntelligenceRequest } from '@garden/contracts';
 import { requireScope } from './auth.js';
 import { workspacePath } from './files.js';
 import type { CodeIntelligenceManager } from './code-intelligence.js';

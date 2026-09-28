@@ -2,7 +2,7 @@ import ScrollRegion from './ScrollRegion';
 import { WorkflowProgress } from './WorkflowProgress';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Activity, ArrowUpRight, RefreshCw, Square } from 'lucide-react';
-import type { ComputationSession, ManagedProcess, ProcessList } from '@athanor/contracts';
+import type { ComputationSession, ManagedProcess, ProcessList } from '@garden/contracts';
 import { get, post } from './client';
 import { Button, Dialog, ErrorNotice, Spinner } from './ui';
 import { useVisibleClock } from './visible-clock';

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AthanorError } from '@athanor/core';
+import { GardenError } from '@garden/core';
 
 export const NATIVE_INPUT_MAX_BYTES = 8 * 1024 * 1024;
 export const NATIVE_INPUT_MAX_PARTS = 4;
@@ -46,7 +46,7 @@ export const nativeInputMime = (
     )
       return 'video/webm';
   }
-  throw new AthanorError(
+  throw new GardenError(
     'native_input_format_unsupported',
     'Native reading accepts WAV/MP3 audio or MP4/WebM video with matching file bytes. Convert other formats explicitly first.',
     400
@@ -64,7 +64,7 @@ export const nativeInputBlocks = (
   modalities: readonly string[] | undefined
 ): NativeInputBlock[] => {
   if (parts.length > NATIVE_INPUT_MAX_PARTS)
-    throw new AthanorError(
+    throw new GardenError(
       'native_input_too_large',
       'Too many native media parts for one request',
       413
@@ -73,27 +73,27 @@ export const nativeInputBlocks = (
   return parts.map((raw) => {
     const part = NativeInputPart.parse(raw);
     if (!modalities?.includes(part.kind) || (part.kind === 'video' && provider !== 'openrouter'))
-      throw new AthanorError(
+      throw new GardenError(
         'native_input_unsupported',
         'The selected model and provider protocol do not declare this native input modality',
         400
       );
     const decoded = Buffer.from(part.data, 'base64');
     if (decoded.toString('base64') !== part.data)
-      throw new AthanorError(
+      throw new GardenError(
         'native_input_invalid',
         'Native input must contain canonical base64 file bytes',
         400
       );
     bytes += decoded.byteLength;
     if (bytes > NATIVE_INPUT_MAX_BYTES)
-      throw new AthanorError(
+      throw new GardenError(
         'native_input_too_large',
         'Native media exceeds the combined request byte limit',
         413
       );
     if (nativeInputMime(decoded, part.kind) !== part.mimeType)
-      throw new AthanorError(
+      throw new GardenError(
         'native_input_invalid',
         'Native input MIME does not match its bytes',
         400

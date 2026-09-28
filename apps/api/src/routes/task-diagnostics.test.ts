@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { DiagnosticRecord, DiagnosticReplay, encryptJson, wrapDataKey } from '@athanor/core';
+import { DiagnosticRecord, DiagnosticReplay, encryptJson, wrapDataKey } from '@garden/core';
 import type { RouteContext } from '../http/server-context.js';
 import { registerTaskDiagnosticRoutes } from './task-diagnostics.js';
 
@@ -48,7 +48,7 @@ function setup({
     createdAt: '2026-09-17T00:00:00.000Z',
     summary: canary,
     payloadCiphertext: encryptJson(
-      { __athanorEventVersion: 1, summary: canary, payload: { private: canary } },
+      { __gardenEventVersion: 1, summary: canary, payload: { private: canary } },
       key,
       `task-event:${taskId}`
     )
@@ -128,7 +128,7 @@ describe('authenticated diagnostic download', () => {
     rows[0]!.kind = 'tool_result';
     rows[0]!.payloadCiphertext = encryptJson(
       {
-        __athanorEventVersion: 1,
+        __gardenEventVersion: 1,
         summary: canary,
         payload: { toolCallId: 'call', result: { exitCode: 7, stderr: canary } }
       },

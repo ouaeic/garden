@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createDatabase, migrateDatabase, DataStore, type Database } from '@athanor/data';
-import { encryptJson, buildMemoryItemIndex, memoryIndexKey, planMemoryQuery } from '@athanor/core';
+import { createDatabase, migrateDatabase, DataStore, type Database } from '@garden/data';
+import { encryptJson, buildMemoryItemIndex, memoryIndexKey, planMemoryQuery } from '@garden/core';
 import { memoryItemAad, memoryPackEntries, recallMemory } from './memory-runtime.js';
 const databases: Database[] = [];
 afterEach(async () => {

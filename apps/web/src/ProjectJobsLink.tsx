@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { ProcessList } from '@athanor/contracts';
+import type { ProcessList } from '@garden/contracts';
 import { get } from './client';
 import { processActive } from './process-display';
 import { Button } from './ui';

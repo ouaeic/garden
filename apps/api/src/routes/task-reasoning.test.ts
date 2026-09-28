@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
-import { decryptJson, encryptJson, wrapDataKey } from '@athanor/core';
+import { decryptJson, encryptJson, wrapDataKey } from '@garden/core';
 import type { RouteContext } from '../http/server-context.js';
 import { registerTaskRoutes } from './tasks.js';
 

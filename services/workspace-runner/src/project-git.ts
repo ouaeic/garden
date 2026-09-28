@@ -12,7 +12,7 @@ import {
   type ProjectFileVersion,
   type ProjectRepository,
   type ProjectRepositoryHistory
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import {
   type ProjectVersionFiles,
   durableJson,

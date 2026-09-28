@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TaskPresentation, type TaskEvent, type WorkspacePreview } from '@athanor/contracts';
+import { TaskPresentation, type TaskEvent, type WorkspacePreview } from '@garden/contracts';
 import {
   buildTaskPresentation,
   deliveryFilePath,
@@ -32,7 +32,7 @@ const preview: WorkspacePreview = {
   port: 8080,
   visibility: 'private',
   status: 'active',
-  url: 'https://garden.test/__athanor/preview/real/',
+  url: 'https://garden.test/__garden/preview/real/',
   expiresAt: null,
   lastAccessedAt: null,
   createdAt: now,
@@ -803,7 +803,7 @@ describe('the account a milestone gives of itself', () => {
 describe('how a finished run says it went', () => {
   const completion = {
     summary: 'Rebuilt the importer and re-ran the March batch against it.',
-    deliverables: ['reports/march.csv', 'https://garden.test/__athanor/preview/real/'],
+    deliverables: ['reports/march.csv', 'https://garden.test/__garden/preview/real/'],
     verification: {
       status: 'verified',
       evidence: [
@@ -834,7 +834,7 @@ describe('how a finished run says it went', () => {
   /**
    * A finish declares its own deliverables, and they are the model's unverified strings: a run that
    * has read a hostile page can declare any address it likes. Printing them on the card would be
-   * athanor vouching for a link it never resolved, so the card names none of them and `results` -
+   * garden vouching for a link it never resolved, so the card names none of them and `results` -
    * which this box resolved itself - is the answer to what can be opened.
    */
   it('never prints an address the model declared for itself', () => {

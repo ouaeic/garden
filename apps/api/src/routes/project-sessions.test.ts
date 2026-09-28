@@ -1,4 +1,4 @@
-import type { ProjectSessions } from '@athanor/contracts';
+import type { ProjectSessions } from '@garden/contracts';
 import Fastify from 'fastify';
 import { expect, it, vi } from 'vitest';
 import { registerProjectSessionRoutes } from './project-sessions.js';

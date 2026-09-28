@@ -1,6 +1,6 @@
-import type { ModelRelease, TaskReasoningEffort } from '@athanor/contracts';
-import { AthanorError } from '@athanor/core';
-import { assertReasoningEffort } from '@athanor/model-gateway';
+import type { ModelRelease, TaskReasoningEffort } from '@garden/contracts';
+import { GardenError } from '@garden/core';
+import { assertReasoningEffort } from '@garden/model-gateway';
 
 /** Validate an owner choice before creating work or reserving its spend. */
 export const validateTaskReasoning = (
@@ -9,14 +9,14 @@ export const validateTaskReasoning = (
 ): TaskReasoningEffort => {
   if (preference === 'auto') return preference;
   if (model.reasoning?.supportedEfforts === undefined)
-    throw new AthanorError(
+    throw new GardenError(
       'reasoning_options_unknown',
       'This model does not advertise selectable reasoning effort. Choose Auto.'
     );
   try {
     assertReasoningEffort(preference, model.reasoning);
   } catch (error) {
-    throw new AthanorError(
+    throw new GardenError(
       'reasoning_effort_unsupported',
       error instanceof Error ? error.message : 'Unsupported reasoning effort'
     );

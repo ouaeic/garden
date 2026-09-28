@@ -1,4 +1,4 @@
-import { AthanorError } from '@athanor/core';
+import { GardenError } from '@garden/core';
 
 /**
  * How fast the company that served one request actually was, in the aggregator's own numbers.
@@ -58,7 +58,7 @@ export const fetchGenerationThroughput = async (options: {
   } catch (error) {
     // Never a reason a turn fails: this runs after the answer the owner is waiting for has already
     // been delivered, and its only purpose is to make the next turn's routing better informed.
-    if (error instanceof AthanorError) return null;
+    if (error instanceof GardenError) return null;
     return null;
   }
 };

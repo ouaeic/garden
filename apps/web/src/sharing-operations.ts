@@ -1,4 +1,4 @@
-import type { CreateShareRequest, SharePreviewResponse } from '@athanor/contracts';
+import type { CreateShareRequest, SharePreviewResponse } from '@garden/contracts';
 
 export interface ReviewedShare {
   options: CreateShareRequest;

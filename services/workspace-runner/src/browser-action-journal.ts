@@ -1,9 +1,9 @@
-import { BrowserActionReceipt } from '@athanor/contracts';
+import { BrowserActionReceipt } from '@garden/contracts';
 import { createHmac } from 'node:crypto';
 import { chmod, lstat, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { decryptJson, encryptJson, type EncryptedEnvelope } from '@athanor/core';
+import { decryptJson, encryptJson, type EncryptedEnvelope } from '@garden/core';
 import { z } from 'zod';
 
 const Identity = z.string().regex(/^[a-f0-9]{64}$/);
@@ -18,7 +18,7 @@ export class BrowserActionJournal {
   constructor(private readonly secret: string) {}
 
   async #open(root: string) {
-    const directory = path.join(root, '.athanor', 'browser-actions');
+    const directory = path.join(root, '.garden', 'browser-actions');
     await mkdir(directory, { recursive: true, mode: 0o700 });
     if (!(await lstat(directory)).isDirectory())
       throw new Error('Invalid browser receipt directory');

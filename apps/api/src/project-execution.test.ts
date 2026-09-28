@@ -2,8 +2,8 @@ import { projectActivity } from './project-activity.js';
 import type { RouteContext } from './http/server-context.js';
 import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createDatabase, migrateDatabase, DataStore, type Database } from '@athanor/data';
-import { encryptJson, decryptJson, unwrapDataKey, wrapDataKey } from '@athanor/core';
+import { createDatabase, migrateDatabase, DataStore, type Database } from '@garden/data';
+import { encryptJson, decryptJson, unwrapDataKey, wrapDataKey } from '@garden/core';
 import { RunnerClient } from './runner-client.js';
 import {
   beginProjectExecution,
@@ -71,7 +71,7 @@ describe('project preparation API operation', () => {
   it('keeps explicitly attached files exact and derives only recorded project directories', () => {
     expect(projectSourcePaths([], ['workspace/uploads/selected.wav'])).toEqual([
       'workspace/AGENTS.md',
-      'workspace/ATHANOR.md',
+      'workspace/GARDEN.md',
       'workspace/OPEN_CLOUD.md',
       'workspace/uploads/selected.wav'
     ]);
@@ -98,7 +98,7 @@ describe('project preparation API operation', () => {
     ]);
     expect(paths).toEqual([
       'workspace/AGENTS.md',
-      'workspace/ATHANOR.md',
+      'workspace/GARDEN.md',
       'workspace/OPEN_CLOUD.md',
       'workspace/analysis/input.csv',
       'workspace/uploads/photo.png'
@@ -215,7 +215,7 @@ it('projects recorded progress for the visible owned conversations without impor
     kind: 'notice',
     summary: 'Protected event',
     payloadCiphertext: encryptJson(
-      { __athanorEventVersion: 1, summary: 'Cohort checks are running', payload: {} },
+      { __gardenEventVersion: 1, summary: 'Cohort checks are running', payload: {} },
       f.key,
       `task-event:${f.task.id}`
     )
@@ -251,7 +251,7 @@ it('keeps interrupted and unverified endings in project summaries without applyi
     summary: 'Protected ending',
     payloadCiphertext: encryptJson(
       {
-        __athanorEventVersion: 1,
+        __gardenEventVersion: 1,
         summary: 'Stopped before checks',
         payload: { interrupted: true, verification: { status: 'unverified' } }
       },

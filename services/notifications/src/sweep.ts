@@ -1,4 +1,4 @@
-import type { DataStore } from '@athanor/data';
+import type { DataStore } from '@garden/data';
 import { notificationSubject, ownerPresent, ownerSettings, type PendingRow } from './context.js';
 import type { OwnerNotificationSettings } from './model.js';
 import { deliveryDecision } from './policy.js';
@@ -42,8 +42,8 @@ export interface SweepInput {
    *
    * A full batch is a hundred serial sends, each with a ten-second ceiling, so a pass that meets a
    * push service which accepts the connection and then says nothing can run for minutes - longer
-   * than the thirty seconds `athanor@.service` gives a stop before it sends SIGKILL. Two things
-   * follow, and only the second is a defect: every `athanor restart` and every update pays that
+   * than the thirty seconds `garden@.service` gives a stop before it sends SIGKILL. Two things
+   * follow, and only the second is a defect: every `garden restart` and every update pays that
    * thirty seconds, and the kill can land in the gap between a push that was sent and the ledger
    * row recording it was sent, so the owner gets that notification a second time on the next start.
    * Checking here - at an item boundary, never inside one - closes both without abandoning work.
@@ -192,7 +192,7 @@ export const runSweep = async (input: SweepInput): Promise<SweepResult> => {
       if (!warnedOnce.has(item.id)) {
         warnedOnce.add(item.id);
         warn(
-          `athanor-notifications: notification.destination_unreadable destination=${item.id} its configuration does not open under DATA_MASTER_KEY; nothing is sent to it. Unpair and pair again in Settings\n`
+          `garden-notifications: notification.destination_unreadable destination=${item.id} its configuration does not open under DATA_MASTER_KEY; nothing is sent to it. Unpair and pair again in Settings\n`
         );
       }
       continue;
@@ -280,7 +280,7 @@ export const runSweep = async (input: SweepInput): Promise<SweepResult> => {
           })
         );
         warn(
-          `athanor-notifications: ${host} has refused every notification for ${Math.round(RETRY_HORIZON_MS / 3_600_000)}h${status}; that device has been retired and will not be tried again. Turn notifications on again on the device to restore it\n`
+          `garden-notifications: ${host} has refused every notification for ${Math.round(RETRY_HORIZON_MS / 3_600_000)}h${status}; that device has been retired and will not be tried again. Turn notifications on again on the device to restore it\n`
         );
         continue;
       }
@@ -314,8 +314,8 @@ export const runSweep = async (input: SweepInput): Promise<SweepResult> => {
         const wait = Math.max(1, Math.round((outcome.state.retryAt - clock().getTime()) / 60_000));
         warn(
           item.transport === 'push'
-            ? `athanor-notifications: ${host} refused a notification${status}; nothing is lost and it will be tried again in ${wait} min, backing off to ${Math.round(RETRY_HORIZON_MS / 3_600_000)}h before that device is retired\n`
-            : `athanor-notifications: notification.destination_delivery_failing destination=${item.id} ${host} refused a message${status}; nothing is lost and it will be tried again in ${wait} min, backing off to ${Math.round(backoffMs(Number.MAX_SAFE_INTEGER) / 60_000)} min between attempts\n`
+            ? `garden-notifications: ${host} refused a notification${status}; nothing is lost and it will be tried again in ${wait} min, backing off to ${Math.round(RETRY_HORIZON_MS / 3_600_000)}h before that device is retired\n`
+            : `garden-notifications: notification.destination_delivery_failing destination=${item.id} ${host} refused a message${status}; nothing is lost and it will be tried again in ${wait} min, backing off to ${Math.round(backoffMs(Number.MAX_SAFE_INTEGER) / 60_000)} min between attempts\n`
         );
       }
     }

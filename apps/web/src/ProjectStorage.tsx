@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ProjectStorageUsage } from '@athanor/contracts';
+import type { ProjectStorageUsage } from '@garden/contracts';
 import { get } from './client';
 import { Button, ErrorNotice, Spinner } from './ui';
 import './project-storage.css';

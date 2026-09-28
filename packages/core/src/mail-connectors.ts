@@ -24,7 +24,7 @@ import {
   type CalDavContext
 } from './caldav.js';
 import type { ConnectorDefinition, ConnectorSecret, ConnectorTransport } from './connectors.js';
-import { AthanorError } from './errors.js';
+import { GardenError } from './errors.js';
 import {
   buildEventComponent,
   eventFromComponent,
@@ -67,11 +67,11 @@ export const mailConnectorCatalog: ConnectorDefinition[] = [
     dataAccess:
       'Only the mailboxes and messages a task names are read; the task permission mode governs sending.',
     tokenLocation:
-      'The username and app password are encrypted in the athanor secret store and never placed in a model prompt.',
+      'The username and app password are encrypted in the garden secret store and never placed in a model prompt.',
     providerLogging:
       'The mail provider keeps its own copy of every message and its own connection logs, exactly as it does for any other mail client.',
     requirements:
-      'You need a mailbox whose provider still allows a mail client: an IMAP host on port 993, an SMTP submission host on port 465, your address, a username and an app password. An account that can only be signed into with Google or Microsoft OAuth will not connect, and athanor will not ask you for your main account password.',
+      'You need a mailbox whose provider still allows a mail client: an IMAP host on port 993, an SMTP submission host on port 465, your address, a username and an app password. An account that can only be signed into with Google or Microsoft OAuth will not connect, and garden will not ask you for your main account password.',
     scopes: [
       { id: 'mail:mailbox.read', label: 'Read and search mail', sideEffect: 'read' },
       { id: 'mail:message.write', label: 'Save drafts and mark messages', sideEffect: 'write' },
@@ -85,10 +85,10 @@ export const mailConnectorCatalog: ConnectorDefinition[] = [
       'Read a date range and create, change or answer events on a calendar server that speaks CalDAV.',
     dataAccess: 'Only the calendars and date ranges a task names are read or changed.',
     tokenLocation:
-      'The username and app password are encrypted in the athanor secret store and never placed in a model prompt.',
+      'The username and app password are encrypted in the garden secret store and never placed in a model prompt.',
     providerLogging: 'The calendar provider keeps its own copy of every event and its own logs.',
     requirements:
-      'You need the CalDAV URL your calendar server publishes - for example https://cloud.example.com/remote.php/dav/ - plus a username, an app password, and the address other people invite you by. Paste the full URL rather than the bare host: athanor does not follow redirects with your password attached.',
+      'You need the CalDAV URL your calendar server publishes - for example https://cloud.example.com/remote.php/dav/ - plus a username, an app password, and the address other people invite you by. Paste the full URL rather than the bare host: garden does not follow redirects with your password attached.',
     scopes: [
       {
         id: 'calendar:calendars.read',
@@ -285,7 +285,7 @@ const assertMailHostAllowed = (host: string, allowedHostSuffixes: string[]): str
   // install may talk to at all: when it is set it binds every mail host, and when it is empty the
   // owner's own choice stands.
   if (allowedHostSuffixes.length && !hostMatchesSuffix(host, allowedHostSuffixes))
-    throw new AthanorError(
+    throw new GardenError(
       'connector_url_not_allowed',
       `This deployment does not allow mail on ${host}`
     );
@@ -297,7 +297,7 @@ export const parseImapEndpoint = (baseUrl: string, allowedHostSuffixes: string[]
   try {
     url = new URL(baseUrl);
   } catch {
-    throw new AthanorError('connector_url_not_allowed', 'The mailbox address is not a URL');
+    throw new GardenError('connector_url_not_allowed', 'The mailbox address is not a URL');
   }
   if (
     url.protocol !== 'imaps:' ||
@@ -306,27 +306,27 @@ export const parseImapEndpoint = (baseUrl: string, allowedHostSuffixes: string[]
     url.hash ||
     url.pathname.length > 1
   )
-    throw new AthanorError(
+    throw new GardenError(
       'connector_url_not_allowed',
       'A mailbox address looks like imaps://mail.example.com:993 and carries no credentials'
     );
   const port = Number(url.port || '993');
   if (!Number.isInteger(port) || port < 1 || port > 65_535)
-    throw new AthanorError('connector_url_not_allowed', 'The mailbox port is not a port number');
+    throw new GardenError('connector_url_not_allowed', 'The mailbox port is not a port number');
   return { host: assertMailHostAllowed(url.hostname.toLowerCase(), allowedHostSuffixes), port };
 };
 
 const mailSecret = (secret: ConnectorSecret) => {
   const account = secret.mail;
   if (!account?.username || !account.password || !account.fromAddress)
-    throw new AthanorError('connector_secret_invalid', 'The mailbox credentials are missing');
+    throw new GardenError('connector_secret_invalid', 'The mailbox credentials are missing');
   return account;
 };
 
 const calendarSecret = (secret: ConnectorSecret) => {
   const account = secret.calendar;
   if (!account?.username || !account.password)
-    throw new AthanorError('connector_secret_invalid', 'The calendar credentials are missing');
+    throw new GardenError('connector_secret_invalid', 'The calendar credentials are missing');
   return account;
 };
 
@@ -390,7 +390,7 @@ const decodeAttachments = (
     const content = Buffer.from(attachment.contentBase64, 'base64');
     total += content.byteLength;
     if (total > 10_000_000)
-      throw new AthanorError(
+      throw new GardenError(
         'mail_attachments_too_large',
         'Attachments on one message may total at most 10 MB'
       );
@@ -435,7 +435,7 @@ const deliver = async (
     (address) => address.address
   );
   if (!recipients.length)
-    throw new AthanorError('mail_recipients_missing', 'A message needs at least one recipient');
+    throw new GardenError('mail_recipients_missing', 'A message needs at least one recipient');
   const smtp = await SmtpSession.open({
     endpoint: {
       host: assertMailHostAllowed(account.smtpHost.toLowerCase(), input.allowedHostSuffixes),
@@ -563,7 +563,7 @@ const executeMailAction = async (input: MailExecutionInput): Promise<MailExecuti
         const fetched = await session.fetchMessage(action.mailbox, action.uid, action.maxBytes);
         const part = extractPart(fetched.raw, action.partId);
         if (!part)
-          throw new AthanorError(
+          throw new GardenError(
             'mail_attachment_not_found',
             `Part ${action.partId} is not in message ${action.uid}`
           );
@@ -579,7 +579,7 @@ const executeMailAction = async (input: MailExecutionInput): Promise<MailExecuti
     case 'mail_mark':
       return withImap(input, async (session) => {
         if (action.seen === undefined && action.flagged === undefined)
-          throw new AthanorError(
+          throw new GardenError(
             'mail_mark_empty',
             'Say which of seen or flagged to change, and to what'
           );
@@ -648,7 +648,7 @@ const executeMailAction = async (input: MailExecutionInput): Promise<MailExecuti
         );
         const replyTargets = original.replyTo.length ? original.replyTo : original.from;
         if (!replyTargets.length)
-          throw new AthanorError(
+          throw new GardenError(
             'mail_reply_impossible',
             'The original message carries no address to reply to'
           );
@@ -676,7 +676,7 @@ const executeMailAction = async (input: MailExecutionInput): Promise<MailExecuti
         return { sent: true, repliedToUid: action.uid, ...delivered };
       });
     default:
-      throw new AthanorError('connector_action_invalid', 'Unsupported mailbox action');
+      throw new GardenError('connector_action_invalid', 'Unsupported mailbox action');
   }
 };
 
@@ -764,7 +764,7 @@ const rewrittenMoment = (
 ): IcalProperty => {
   if (allDay) {
     if (!/^\d{4}-\d{2}-\d{2}/.test(value))
-      throw new AthanorError(
+      throw new GardenError(
         'calendar_value_invalid',
         `An all-day event needs ${name} as YYYY-MM-DD`
       );
@@ -776,7 +776,7 @@ const rewrittenMoment = (
   }
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed))
-    throw new AthanorError('calendar_value_invalid', `${name} is not a valid date and time`);
+    throw new GardenError('calendar_value_invalid', `${name} is not a valid date and time`);
   const instant = new Date(parsed);
   const timeZone =
     previous?.parameters.get('VALUE') === 'DATE'
@@ -798,11 +798,11 @@ const loadEvent = async (
   const calendar = parseIcalendar(fetched.calendarData)[0];
   const event = calendar ? findEventComponent(calendar) : undefined;
   if (!calendar || !event)
-    throw new AthanorError('calendar_event_not_found', 'That address does not hold an event');
+    throw new GardenError('calendar_event_not_found', 'That address does not hold an event');
   if (!fetched.etag)
-    throw new AthanorError(
+    throw new GardenError(
       'calendar_etag_missing',
-      'The calendar server did not version this event, so athanor cannot change it safely'
+      'The calendar server did not version this event, so garden cannot change it safely'
     );
   return { url, etag: fetched.etag, calendar, event };
 };
@@ -866,7 +866,7 @@ const executeCalendarAction = async (input: MailExecutionInput): Promise<MailExe
       );
     }
     case 'calendar_create_event': {
-      const uid = `${crypto.randomUUID()}@athanor`;
+      const uid = `${crypto.randomUUID()}@garden`;
       const account = calendarSecret(input.secret);
       const calendar = buildEventComponent({
         uid,
@@ -898,7 +898,7 @@ const executeCalendarAction = async (input: MailExecutionInput): Promise<MailExe
           ...(action.attendees.length
             ? {
                 invitationNote:
-                  'Attendees were written onto the event. Whether they receive an invitation depends on your calendar server doing the scheduling; athanor does not send one itself.'
+                  'Attendees were written onto the event. Whether they receive an invitation depends on your calendar server doing the scheduling; garden does not send one itself.'
               }
             : {})
         },
@@ -936,9 +936,9 @@ const executeCalendarAction = async (input: MailExecutionInput): Promise<MailExe
       if (action.start !== undefined || action.allDay !== undefined) {
         const start = action.start ?? existing.start?.value;
         if (start === undefined)
-          throw new AthanorError(
+          throw new GardenError(
             'calendar_value_invalid',
-            'That event has no start, so athanor cannot move it'
+            'That event has no start, so garden cannot move it'
           );
         setProperty(
           loaded.event,
@@ -1013,9 +1013,9 @@ const executeCalendarAction = async (input: MailExecutionInput): Promise<MailExe
     case 'calendar_respond_invitation': {
       const account = calendarSecret(input.secret);
       if (!account.address)
-        throw new AthanorError(
+        throw new GardenError(
           'connector_secret_invalid',
-          'This calendar connector has no address, so athanor cannot tell which attendee is you'
+          'This calendar connector has no address, so garden cannot tell which attendee is you'
         );
       const loaded = await loadEvent(context, action.eventUrl);
       const mine = loaded.event.properties.find(
@@ -1027,7 +1027,7 @@ const executeCalendarAction = async (input: MailExecutionInput): Promise<MailExe
             .toLowerCase() === account.address.toLowerCase()
       );
       if (!mine)
-        throw new AthanorError(
+        throw new GardenError(
           'calendar_attendee_not_found',
           `${account.address} is not an attendee of that event`
         );
@@ -1051,13 +1051,13 @@ const executeCalendarAction = async (input: MailExecutionInput): Promise<MailExe
           etag: written.etag,
           replyDeliveredByServer: 'unknown',
           replyNote:
-            'Your answer is recorded on the event. The organiser is told only if your calendar server does scheduling on your behalf; athanor does not email a reply.'
+            'Your answer is recorded on the event. The organiser is told only if your calendar server does scheduling on your behalf; garden does not email a reply.'
         },
         written.statusCode
       );
     }
     default:
-      throw new AthanorError('connector_action_invalid', 'Unsupported calendar action');
+      throw new GardenError('connector_action_invalid', 'Unsupported calendar action');
   }
 };
 
@@ -1113,7 +1113,7 @@ export const verifyMailConnector = async (input: {
   });
   const calendars = await discoverCalendars(context);
   if (!calendars.length)
-    throw new AthanorError(
+    throw new GardenError(
       'calendar_none_found',
       'That address answered, but no calendars were found on it'
     );

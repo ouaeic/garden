@@ -7,7 +7,7 @@ import type {
   Project,
   Task,
   TaskPresentation
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { get, patch } from './client';
 import {
   money,

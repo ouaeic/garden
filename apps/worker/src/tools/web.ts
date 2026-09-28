@@ -1,6 +1,6 @@
 import { browserActionRequestId } from '../browser-action-receipts.js';
-import { type ParallelWebReadResult } from '@athanor/contracts';
-import { type ModelToolCall } from '@athanor/model-gateway';
+import { type ParallelWebReadResult } from '@garden/contracts';
+import { type ModelToolCall } from '@garden/model-gateway';
 import { textValue } from '../values.js';
 import { perPartOutputChars } from '../context.js';
 import { surfaceActionRequest } from '../tools.js';

@@ -71,7 +71,7 @@ const APP_ENTRY = /[\\/]index\.html$/;
  * index.html it could not run.
  */
 const eagerBundleGraph = (): Plugin => ({
-  name: 'athanor-eager-bundle-graph',
+  name: 'garden-eager-bundle-graph',
   apply: 'build',
   generateBundle(_options, bundle) {
     const byFileName = new Map(Object.values(bundle).map((item) => [item.fileName, item]));

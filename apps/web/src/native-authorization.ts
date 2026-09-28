@@ -2,7 +2,7 @@ import type {
   NativeAuthorization,
   NativeAuthorizationProof,
   NativeAuthorizationPurpose
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { post, waitForRetry } from './client';
 import { nativeCapabilities, openAuthorizationBrowser } from './native';
 import type { AuthResult } from './auth';

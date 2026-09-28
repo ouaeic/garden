@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import type { ShareSnapshot } from '@athanor/contracts';
+import type { ShareSnapshot } from '@garden/contracts';
 import { loadShare, loadShareArtifact } from './share-crypto.js';
 import type { OpenedShare } from './share-crypto.js';
 import { shareArtifactDocument } from './share-html.js';

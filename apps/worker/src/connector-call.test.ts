@@ -166,7 +166,7 @@ describe('reaching a connected service', () => {
         writeFile: async () => undefined,
         execute: async (actionInput) => {
           sent.push(actionInput);
-          return { sent: true, messageId: '<1@athanor>' };
+          return { sent: true, messageId: '<1@garden>' };
         }
       });
 
@@ -178,7 +178,7 @@ describe('reaching a connected service', () => {
         }
       ]);
       // A sent message is the agent's own words, so it is not relabelled as somebody else's.
-      expect(result).toEqual({ sent: true, messageId: '<1@athanor>' });
+      expect(result).toEqual({ sent: true, messageId: '<1@garden>' });
     }
   );
 

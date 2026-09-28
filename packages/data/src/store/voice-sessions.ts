@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { AthanorError, type EncryptedEnvelope } from '@athanor/core';
-import type { VoicePendingReceipt, VoiceSession, VoiceWorkProposal } from '@athanor/contracts';
+import { GardenError, type EncryptedEnvelope } from '@garden/core';
+import type { VoicePendingReceipt, VoiceSession, VoiceWorkProposal } from '@garden/contracts';
 import type { Database } from '../database.js';
 import { BillingStore } from './billing.js';
 import { iso, json, optionalText } from './rows.js';
@@ -58,7 +58,7 @@ const proposal = (row: Record<string, unknown>): VoiceProposalRecord => ({
   messageId: optionalText(row.message_id)
 });
 const unavailable = () =>
-  new AthanorError('voice_session_unavailable', 'This voice session is no longer available', 409);
+  new GardenError('voice_session_unavailable', 'This voice session is no longer available', 409);
 const active = ['preparing', 'connecting', 'listening', 'responding', 'stopping'];
 export class VoiceStore {
   constructor(readonly database: Database) {}
@@ -110,7 +110,7 @@ export class VoiceStore {
     if (!Number.isFinite(minimumReservationUsd) || minimumReservationUsd <= 0)
       throw new Error('Invalid voice admission bound');
     if (session.maxSpendUsd < minimumReservationUsd)
-      throw new AthanorError(
+      throw new GardenError(
         'voice_reservation_required',
         `Live voice needs $${minimumReservationUsd.toFixed(4)} of held capacity for one bounded response. Review the session allowance before starting; this is not an actual charge.`,
         402
@@ -140,7 +140,7 @@ export class VoiceStore {
           decision.blockedBy === 'task'
             ? 'task and its related work'
             : `${decision.blockedBy ?? 'account'} account window`;
-      throw new AthanorError(
+      throw new GardenError(
         'voice_budget_unavailable',
         `Voice needs $${minimumReservationUsd.toFixed(4)} of held capacity for one response; $${availableUsd.toFixed(4)} is available for the ${scope}. Capacity is not an actual charge. Choose a cheaper model, reconcile held charges, or review the budget.`,
         402,
@@ -170,7 +170,7 @@ export class VoiceStore {
       ).rows[0];
       if (existing) {
         if (existing.request_hash !== input.requestHash || existing.auth_hash !== input.authHash)
-          throw new AthanorError(
+          throw new GardenError(
             'voice_request_conflict',
             'This voice request belongs to a different selection or browser session',
             409
@@ -199,7 +199,7 @@ export class VoiceStore {
           )
         ).rows.length
       )
-        throw new AthanorError(
+        throw new GardenError(
           'voice_already_active',
           'End the current voice session before starting another',
           409
@@ -211,7 +211,7 @@ export class VoiceStore {
         )
       ).rows[0];
       if (Number(held?.n) >= 100)
-        throw new AthanorError(
+        throw new GardenError(
           'voice_receipt_limit',
           'Reconcile held voice charges before starting another session',
           409
@@ -253,7 +253,7 @@ export class VoiceStore {
     ).rows[0];
     if (!row) return null;
     if (row.request_hash !== requestHash || row.auth_hash !== authHash)
-      throw new AthanorError(
+      throw new GardenError(
         'voice_request_conflict',
         'This voice request belongs to a different selection or browser session',
         409
@@ -403,7 +403,7 @@ export class VoiceStore {
         ].includes(session.errorCode ?? '');
       if (!stale && !lost) {
         if (['connecting', 'listening', 'responding'].includes(session.status))
-          throw new AthanorError(
+          throw new GardenError(
             'voice_recovery_wait',
             'Waiting for the previous voice connection to release its lease.',
             503
@@ -424,7 +424,7 @@ export class VoiceStore {
         session.settledUsd + session.pendingUsd + input.minimumReservationUsd >
         session.maxSpendUsd
       )
-        throw new AthanorError(
+        throw new GardenError(
           'voice_budget_unavailable',
           'Unconfirmed usage remains held. Review the session allowance before continuing.',
           402
@@ -501,7 +501,7 @@ export class VoiceStore {
       if (!row) throw unavailable();
       const session = map(row).session;
       if (Number(row.pending_usd) + Number(row.settled_usd) + costUsd > session.maxSpendUsd + 1e-10)
-        throw new AthanorError(
+        throw new GardenError(
           'voice_spend_cap_reached',
           'This voice session has reached its spending limit',
           402
@@ -675,7 +675,7 @@ export class VoiceStore {
         ])
       ).rows[0];
       if (Number(count?.n) >= 20)
-        throw new AthanorError(
+        throw new GardenError(
           'voice_proposal_limit',
           'Review existing voice proposals before proposing more work',
           409
@@ -732,7 +732,7 @@ export class VoiceStore {
       [id, userId, digest, status, messageId]
     );
     if (result.rowCount !== 1)
-      throw new AthanorError(
+      throw new GardenError(
         'voice_proposal_changed',
         'This voice proposal is no longer awaiting confirmation',
         409

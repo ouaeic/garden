@@ -14,8 +14,8 @@
  * connection, so a caller can only get a wrong answer out of these by handing them a wrong row.
  */
 
-import { TaskEventKind } from '@athanor/contracts';
-import type { EncryptedEnvelope, MemoryKind, MemoryStatus, MemoryTrust } from '@athanor/core';
+import { TaskEventKind } from '@garden/contracts';
+import type { EncryptedEnvelope, MemoryKind, MemoryStatus, MemoryTrust } from '@garden/core';
 import type {
   ApiTokenRecord,
   ConnectorAuditRecord,

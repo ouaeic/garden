@@ -3,7 +3,7 @@ import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import {
   resolveArtifactReference,
   type ArtifactReference
-} from '@athanor/contracts/artifact-reference';
+} from '@garden/contracts/artifact-reference';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';

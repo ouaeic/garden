@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { TaskRecord } from '@athanor/data';
+import type { TaskRecord } from '@garden/data';
 import type { AgentState } from './agent-state.js';
 import {
   declareAcceptance,

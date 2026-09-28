@@ -41,7 +41,7 @@ class Child extends EventEmitter {
   }
 }
 
-const sessionExecutable = '/nonexistent/athanor-test-desktop';
+const sessionExecutable = '/nonexistent/garden-test-desktop';
 const starts: Array<{ root: string; display: string; child: Child }> = [];
 const spawned: Array<{ executable: string; args: readonly string[]; child: Child }> = [];
 const bridgeRequests: string[] = [];
@@ -84,12 +84,12 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   return {
     ...actual,
     rm: (file: string, ...args: unknown[]) => {
-      if (file.endsWith('/.athanor/desktop/environment')) return Promise.resolve();
+      if (file.endsWith('/.garden/desktop/environment')) return Promise.resolve();
       return Reflect.apply(actual.rm, actual, [file, ...args]) as unknown;
     },
     readFile: (file: string, ...args: unknown[]) => {
-      if (file.endsWith('/.athanor/desktop/environment'))
-        return readEnvironment(file.slice(0, -'/.athanor/desktop/environment'.length));
+      if (file.endsWith('/.garden/desktop/environment'))
+        return readEnvironment(file.slice(0, -'/.garden/desktop/environment'.length));
       return Reflect.apply(actual.readFile, actual, [file, ...args]) as unknown;
     }
   };
@@ -99,7 +99,7 @@ const roots: string[] = [];
 const managers: DesktopManager[] = [];
 const workspace = 'desktop-lifecycle';
 const setup = async () => {
-  const root = await mkdtemp(path.join(tmpdir(), 'athanor-desktop-lifecycle-'));
+  const root = await mkdtemp(path.join(tmpdir(), 'garden-desktop-lifecycle-'));
   roots.push(root);
   const manager = new DesktopManager('/nonexistent/bridge', sessionExecutable);
   managers.push(manager);
@@ -177,7 +177,7 @@ describe('desktop session ownership', () => {
       const unsubscribe = await manager.subscribeStream(workspace, root, subscriber);
       if (ending === 'close') await manager.close(workspace);
       else starts[0]!.child.finish();
-      const otherRoot = await mkdtemp(path.join(tmpdir(), 'athanor-desktop-lifecycle-'));
+      const otherRoot = await mkdtemp(path.join(tmpdir(), 'garden-desktop-lifecycle-'));
       roots.push(otherRoot);
       const other = await manager.ensure('other-workspace', otherRoot);
       expect(other.env.DISPLAY).toBe(session.env.DISPLAY);
@@ -244,7 +244,7 @@ describe('desktop session ownership', () => {
 
   it('reserves different displays for different workspaces starting concurrently', async () => {
     const { manager, root } = await setup();
-    const otherRoot = await mkdtemp(path.join(tmpdir(), 'athanor-desktop-lifecycle-'));
+    const otherRoot = await mkdtemp(path.join(tmpdir(), 'garden-desktop-lifecycle-'));
     roots.push(otherRoot);
     const [first, second] = await Promise.all([
       manager.ensure(workspace, root),
@@ -359,7 +359,7 @@ describe('desktop session ownership', () => {
       Promise.resolve(
         environment([...starts].reverse().find((entry) => entry.root === workspaceRoot)!.display)
       );
-    const otherRoot = await mkdtemp(path.join(tmpdir(), 'athanor-desktop-lifecycle-'));
+    const otherRoot = await mkdtemp(path.join(tmpdir(), 'garden-desktop-lifecycle-'));
     roots.push(otherRoot);
     const other = await manager.ensure('other-workspace', otherRoot);
     expect(other.env.DISPLAY).not.toBe(`:${starts[0]!.display}`);

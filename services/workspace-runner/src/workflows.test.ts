@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { WorkflowRequest, type WorkflowRun } from '@athanor/contracts';
+import { WorkflowRequest, type WorkflowRun } from '@garden/contracts';
 import { WorkflowManager } from './workflows.js';
 import { WorkflowStore } from './workflow-store.js';
 import { ensureWorkspace } from './files.js';
@@ -95,7 +95,7 @@ describe('durable workflow ownership and launch contracts', () => {
     await expect(
       manager.act(f.workspaceId, f.owner, { ...request, name: 'changed' }, 'call-1')
     ).rejects.toThrow('different arguments');
-    const storeFile = await readFile(path.join(f.root, '.athanor/workflows/runs.sqlite'));
+    const storeFile = await readFile(path.join(f.root, '.garden/workflows/runs.sqlite'));
     expect(storeFile.includes(Buffer.from('private-donor'))).toBe(false);
     expect(storeFile.includes(Buffer.from(request.name))).toBe(false);
     const parameters = await readFile(
@@ -148,7 +148,7 @@ describe('durable workflow ownership and launch contracts', () => {
     expect(f.start).toHaveBeenCalledTimes(1);
     await writeFile(path.join(f.base, 'outside.nf'), 'workflow{}');
     await symlink(path.join(f.base, 'outside.nf'), path.join(f.root, 'workspace/escape.nf'));
-    for (const script of ['../outside.nf', '.athanor/secret', 'escape.nf'])
+    for (const script of ['../outside.nf', '.garden/secret', 'escape.nf'])
       await expect(
         manager.act(f.workspaceId, f.owner, { ...request, script }, `bad-${script}`)
       ).rejects.toThrow();

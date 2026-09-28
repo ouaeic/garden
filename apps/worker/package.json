@@ -1,5 +1,5 @@
 {
-  "name": "@athanor/worker",
+  "name": "@garden/worker",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -28,10 +28,10 @@
     "test": "NODE_OPTIONS=--conditions=development vitest run"
   },
   "dependencies": {
-    "@athanor/contracts": "workspace:*",
-    "@athanor/core": "workspace:*",
-    "@athanor/data": "workspace:*",
-    "@athanor/model-gateway": "workspace:*",
+    "@garden/contracts": "workspace:*",
+    "@garden/core": "workspace:*",
+    "@garden/data": "workspace:*",
+    "@garden/model-gateway": "workspace:*",
     "zod": "4.4.3"
   }
 }

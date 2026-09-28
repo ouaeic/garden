@@ -1,5 +1,5 @@
-import type { SubagentLane } from '@athanor/contracts';
-import type { DataStore, TaskRecord } from '@athanor/data';
+import type { SubagentLane } from '@garden/contracts';
+import type { DataStore, TaskRecord } from '@garden/data';
 import { event } from './tool-recording.js';
 
 /**

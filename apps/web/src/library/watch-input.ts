@@ -1,4 +1,4 @@
-import type { TaskScheduleSpec } from '@athanor/contracts';
+import type { TaskScheduleSpec } from '@garden/contracts';
 import { fieldValue, numberOrNull } from '../management.js';
 
 export function watchInput(

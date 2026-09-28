@@ -14,25 +14,25 @@ val tauriProperties = Properties().apply {
 }
 
 val releaseSigningValues = mapOf(
-    "ATHANOR_ANDROID_KEYSTORE" to System.getenv("ATHANOR_ANDROID_KEYSTORE"),
-    "ATHANOR_ANDROID_KEYSTORE_PASSWORD" to System.getenv("ATHANOR_ANDROID_KEYSTORE_PASSWORD"),
-    "ATHANOR_ANDROID_KEY_ALIAS" to System.getenv("ATHANOR_ANDROID_KEY_ALIAS"),
-    "ATHANOR_ANDROID_KEY_PASSWORD" to System.getenv("ATHANOR_ANDROID_KEY_PASSWORD")
+    "GARDEN_ANDROID_KEYSTORE" to System.getenv("GARDEN_ANDROID_KEYSTORE"),
+    "GARDEN_ANDROID_KEYSTORE_PASSWORD" to System.getenv("GARDEN_ANDROID_KEYSTORE_PASSWORD"),
+    "GARDEN_ANDROID_KEY_ALIAS" to System.getenv("GARDEN_ANDROID_KEY_ALIAS"),
+    "GARDEN_ANDROID_KEY_PASSWORD" to System.getenv("GARDEN_ANDROID_KEY_PASSWORD")
 )
 val hasAnyReleaseSigningValue = releaseSigningValues.values.any { !it.isNullOrBlank() }
 val hasCompleteReleaseSigning = releaseSigningValues.values.all { !it.isNullOrBlank() }
 if (hasAnyReleaseSigningValue && !hasCompleteReleaseSigning) {
     throw GradleException(
-        "Android release signing is partially configured; provide all ATHANOR_ANDROID_* signing values"
+        "Android release signing is partially configured; provide all GARDEN_ANDROID_* signing values"
     )
 }
 
 android {
     compileSdk = 36
-    namespace = "org.athanor.ai"
+    namespace = "org.garden.ai"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
-        applicationId = "org.athanor.ai"
+        applicationId = "org.garden.ai"
         minSdk = 26
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
@@ -41,11 +41,11 @@ android {
     signingConfigs {
         if (hasCompleteReleaseSigning) {
             create("release") {
-                storeFile = file(releaseSigningValues.getValue("ATHANOR_ANDROID_KEYSTORE")!!)
+                storeFile = file(releaseSigningValues.getValue("GARDEN_ANDROID_KEYSTORE")!!)
                 storePassword =
-                    releaseSigningValues.getValue("ATHANOR_ANDROID_KEYSTORE_PASSWORD")!!
-                keyAlias = releaseSigningValues.getValue("ATHANOR_ANDROID_KEY_ALIAS")!!
-                keyPassword = releaseSigningValues.getValue("ATHANOR_ANDROID_KEY_PASSWORD")!!
+                    releaseSigningValues.getValue("GARDEN_ANDROID_KEYSTORE_PASSWORD")!!
+                keyAlias = releaseSigningValues.getValue("GARDEN_ANDROID_KEY_ALIAS")!!
+                keyPassword = releaseSigningValues.getValue("GARDEN_ANDROID_KEY_PASSWORD")!!
             }
         }
     }
@@ -104,7 +104,7 @@ dependencies {
 val patchTauriDocumentStartInjection by tasks.registering {
     doLast {
         val generatedWebView = file(
-            "src/main/java/org/athanor/ai/generated/RustWebView.kt"
+            "src/main/java/org/garden/ai/generated/RustWebView.kt"
         )
         val source = generatedWebView.readText()
         val upstream =

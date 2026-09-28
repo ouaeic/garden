@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { BrowserAction } from '@athanor/contracts';
+import { BrowserAction } from '@garden/contracts';
 import {
   BotWallLedger,
   BrowserManager,
@@ -32,8 +32,8 @@ const PAGE_URL = 'https://93.184.216.34/checkout';
 const OTHER_URL = 'https://93.184.216.34/receipt';
 const LOOPBACK_URL = 'http://127.0.0.1:8080/admin';
 /** Frame ordinal 0, so `resolveBrowserTarget` looks in the page's own frame first. */
-const REF = '[data-athanor-ref="oc-0-3"]';
-const SUBMIT_REF = '[data-athanor-ref="oc-0-9"]';
+const REF = '[data-garden-ref="oc-0-3"]';
+const SUBMIT_REF = '[data-garden-ref="oc-0-9"]';
 const WORKSPACE_ROOT = '/nonexistent';
 
 /**
@@ -740,7 +740,7 @@ describe('every browser action, performed', () => {
     expect(result.elements).toEqual([
       expect.objectContaining({
         index: 0,
-        selector: '[data-athanor-ref="oc-0-1"]',
+        selector: '[data-garden-ref="oc-0-1"]',
         name: 'Full name'
       })
     ]);
@@ -831,7 +831,7 @@ describe('every browser action, performed', () => {
 describe('uploading a workspace file', () => {
   const roots: string[] = [];
   const workspace = async (): Promise<string> => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-upload-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-upload-'));
     roots.push(root);
     await mkdir(path.join(root, 'workspace'), { recursive: true });
     await writeFile(path.join(root, 'workspace', 'invoice.pdf'), 'invoice bytes');
@@ -902,7 +902,7 @@ describe('uploading a workspace file', () => {
 describe('saving a screenshot to the workspace', () => {
   const roots: string[] = [];
   const workspace = async (): Promise<string> => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-screenshot-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-screenshot-'));
     roots.push(root);
     await mkdir(path.join(root, 'workspace'), { recursive: true });
     return root;
@@ -955,7 +955,7 @@ describe('saving a screenshot to the workspace', () => {
       act(harness, { type: 'screenshot', path: '../../etc/cron.d/job.png' }, 'agent', false, root)
     ).rejects.toThrow('escapes workspace');
     await expect(
-      act(harness, { type: 'screenshot', path: '.athanor/browser/state.png' }, 'agent', false, root)
+      act(harness, { type: 'screenshot', path: '.garden/browser/state.png' }, 'agent', false, root)
     ).rejects.toThrow('Only workspace files');
     expect(harness.trace).toEqual([]);
   });

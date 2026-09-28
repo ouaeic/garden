@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { encryptJson, sha256, wrapDataKey } from '@athanor/core';
-import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
-import { TaskPresentation } from '@athanor/contracts';
+import { encryptJson, sha256, wrapDataKey } from '@garden/core';
+import { createDatabase, DataStore, migrateDatabase } from '@garden/data';
+import { TaskPresentation } from '@garden/contracts';
 import { AVAILABILITY_TTL_MS } from '../task-evidence.js';
 import type { RouteContext } from '../http/server-context.js';
 import { registerTaskPresentationRoutes } from './task-presentation.js';
@@ -100,7 +100,7 @@ describe('authenticated task presentation from stored execution evidence', () =>
         port: p.port,
         visibility: p.visibility,
         status: p.status,
-        url: `https://garden.test/__athanor/preview/${p.slug}/`,
+        url: `https://garden.test/__garden/preview/${p.slug}/`,
         expiresAt: p.expiresAt,
         lastAccessedAt: p.lastAccessedAt,
         createdAt: p.createdAt,
@@ -125,7 +125,7 @@ describe('authenticated task presentation from stored execution evidence', () =>
     expect(body.results).toHaveLength(2);
     expect(body.results[0]).toMatchObject({
       previewId,
-      url: 'https://garden.test/__athanor/preview/0123456789abcdef0123456789abcdef/',
+      url: 'https://garden.test/__garden/preview/0123456789abcdef0123456789abcdef/',
       accessPath: `/v1/previews/${previewId}/access`
     });
     expect(body.results[1]).toMatchObject({

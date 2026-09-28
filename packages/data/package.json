@@ -1,5 +1,5 @@
 {
-  "name": "@athanor/data",
+  "name": "@garden/data",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -20,8 +20,8 @@
     "test": "NODE_OPTIONS=--conditions=development vitest run"
   },
   "dependencies": {
-    "@athanor/contracts": "workspace:*",
-    "@athanor/core": "workspace:*",
+    "@garden/contracts": "workspace:*",
+    "@garden/core": "workspace:*",
     "@electric-sql/pglite": "0.5.4",
     "pg": "8.23.0"
   },

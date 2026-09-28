@@ -1,4 +1,4 @@
-import type { TaskEvent } from '@athanor/contracts';
+import type { TaskEvent } from '@garden/contracts';
 import { ApiError, apiUrl, get, responseError } from './client.js';
 
 export interface EventPage {

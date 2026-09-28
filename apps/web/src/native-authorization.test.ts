@@ -4,7 +4,7 @@ import {
   nativeAuthorizationMessage,
   type NativeAuthorizationProof,
   type NativeAuthorizationStart
-} from '@athanor/contracts';
+} from '@garden/contracts';
 const mocks = vi.hoisted(() => ({ post: vi.fn(), open: vi.fn(), wait: vi.fn() }));
 vi.mock('./client', () => ({ post: mocks.post, waitForRetry: mocks.wait }));
 vi.mock('./native', () => ({

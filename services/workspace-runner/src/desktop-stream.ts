@@ -1,4 +1,4 @@
-import type { DesktopHolder } from '@athanor/contracts';
+import type { DesktopHolder } from '@garden/contracts';
 
 /**
  * Display transport for the private Linux desktop.
@@ -34,7 +34,7 @@ export interface DisplayStreamFrame extends DisplayFrame {
 
 /** Binary wire protocol spoken over the desktop WebSocket. JSON payloads travel inside
  *  binary frames so the client has exactly one parse path. */
-export const DISPLAY_PROTOCOL = 'athanor.display.v1';
+export const DISPLAY_PROTOCOL = 'garden.display.v1';
 
 export const DisplayMessageType = {
   videoConfig: 0x02,
@@ -396,24 +396,24 @@ export interface RandrState {
   output: string;
   current: DisplayGeometry;
   maximum: DisplayGeometry;
-  athanorModes: string[];
+  gardenModes: string[];
 }
 
-export const ATHANOR_MODE_PREFIX = 'athanor-';
+export const GARDEN_MODE_PREFIX = 'garden-';
 
 export const displayModeName = (geometry: DisplayGeometry): string =>
-  `${ATHANOR_MODE_PREFIX}${geometry.width}x${geometry.height}`;
+  `${GARDEN_MODE_PREFIX}${geometry.width}x${geometry.height}`;
 
 export const parseRandrState = (output: string): RandrState | null => {
   const screen = /current\s+(\d+)\s*x\s*(\d+),\s*maximum\s+(\d+)\s*x\s*(\d+)/.exec(output);
   const connected = /^(\S+)\s+connected/m.exec(output);
   if (!screen || !connected) return null;
-  const modes = [...output.matchAll(/^\s+(athanor-\d+x\d+)\s/gm)].map((match) => match[1] ?? '');
+  const modes = [...output.matchAll(/^\s+(garden-\d+x\d+)\s/gm)].map((match) => match[1] ?? '');
   return {
     output: connected[1] ?? 'screen',
     current: { width: Number(screen[1]), height: Number(screen[2]) },
     maximum: { width: Number(screen[3]), height: Number(screen[4]) },
-    athanorModes: modes.filter(Boolean)
+    gardenModes: modes.filter(Boolean)
   };
 };
 

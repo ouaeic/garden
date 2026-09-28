@@ -1,4 +1,4 @@
-import type { TaskRecord } from '@athanor/data';
+import type { TaskRecord } from '@garden/data';
 import type { AcceptanceCheck } from './acceptance.js';
 import type { AgentRunnerClient } from './runner-client.js';
 

@@ -259,7 +259,7 @@ const OUTPUT_LIMIT_CAPPED =
  *
  * Every block it fills sits in the preamble, ahead of the whole trajectory and under both cache
  * breakpoints, and until this fixture existed not one of them was filled on any row here. The pool
- * was empty, the skill list was empty and there was no `workspace/ATHANOR.md` anywhere in the rig -
+ * was empty, the skill list was empty and there was no `workspace/GARDEN.md` anywhere in the rig -
  * so four separate repairs to the order and the freezing of those blocks could each have been
  * reverted, one at a time, without a single committed number moving.
  */
@@ -650,7 +650,7 @@ export const fixtures: readonly Fixture[] = [
     runner: {
       files: {
         ...workspaceFiles,
-        'workspace/ATHANOR.md':
+        'workspace/GARDEN.md':
           '# Brochure work\n\nRates are agreed per term. Anything sent to a client goes past Dan first.\n'
       }
     },
@@ -873,7 +873,7 @@ export const fixtures: readonly Fixture[] = [
     id: 'files-code-declares-acceptance-first',
     shape: 'files',
     request: 'Fix workspace/importer.py so it reads all three columns.',
-    why: 'The same job done in the order the contract asks for. Five model calls, no hold, and two commands: the harness watched the check fail before the work, and the run that shows it passing afterwards is the one the model asked athanor for. The third command used to be a fourth - the suite ran once more at finish, with nothing changed in between, and charged the owner a second suite for the same answer. The step this row and its pair both gained is the read a line-addressed edit rests on, and it is the honest price of the change: the write it replaced named no lines and needed no evidence, because it was handing back the bytes it had never looked at.',
+    why: 'The same job done in the order the contract asks for. Five model calls, no hold, and two commands: the harness watched the check fail before the work, and the run that shows it passing afterwards is the one the model asked garden for. The third command used to be a fourth - the suite ran once more at finish, with nothing changed in between, and charged the owner a second suite for the same answer. The step this row and its pair both gained is the read a line-addressed edit rests on, and it is the honest price of the change: the write it replaced named no lines and needed no evidence, because it was handing back the bytes it had never looked at.',
     runner: { files: workspaceFiles, exec: [1, 0, 0] },
     model: sequence(
       {
@@ -2892,7 +2892,7 @@ export const fixtures: readonly Fixture[] = [
     shape: 'files',
     request:
       'Write a script that renames the scans in workspace/scans by date, and run it on them.',
-    why: 'The shape half the owner’s work takes: write a helper, run it, and the run is the proof. The command the model declares as its acceptance check is the command athanor itself has already run, after the last change, and watched exit zero - so the second execution buys no evidence and costs whatever the script costs.',
+    why: 'The shape half the owner’s work takes: write a helper, run it, and the run is the proof. The command the model declares as its acceptance check is the command garden itself has already run, after the last change, and watched exit zero - so the second execution buys no evidence and costs whatever the script costs.',
     runner: { files: workspaceFiles, exec: [0] },
     model: sequence(
       {
@@ -3130,7 +3130,7 @@ export const fixtures: readonly Fixture[] = [
     id: 'small-reasoning-between-commands-is-not-called-a-stall',
     shape: 'small',
     request: 'Work out why the importer drops rows and tell me, without changing anything.',
-    why: 'The hardest case the idle guard has to survive, and the one that decides where it counts from. A careful turn reads something, thinks about it across two steps of prose, checks the same file once more and then searches - and only one of those steps ever asked for a tool and got nothing. The count must come from that one step, not from the two that asked for nothing at all: those are the completion nag’s, it bounds them, and it ends a turn by completing rather than by stopping. Counting both told this turn "NOTHING HAS RUN FOR 3 STEPS" when one step had, which is athanor stating something untrue about the owner’s work in order to interrupt it.',
+    why: 'The hardest case the idle guard has to survive, and the one that decides where it counts from. A careful turn reads something, thinks about it across two steps of prose, checks the same file once more and then searches - and only one of those steps ever asked for a tool and got nothing. The count must come from that one step, not from the two that asked for nothing at all: those are the completion nag’s, it bounds them, and it ends a turn by completing rather than by stopping. Counting both told this turn "NOTHING HAS RUN FOR 3 STEPS" when one step had, which is garden stating something untrue about the owner’s work in order to interrupt it.',
     runner: { files: workspaceFiles },
     model: ({ index, lastMessage }) => {
       // The trap: reaching here means the guard fired on a turn that was thinking between commands.
@@ -3381,7 +3381,7 @@ export const fixtures: readonly Fixture[] = [
         'workspace/importer.py': 'def load(rows):\n    return [row for row in rows if any(row)]\n'
       },
       // Two runs of the suite, one failing and one passing, and neither of them counted anywhere.
-      // The third run the acceptance check would have needed is answered from the run athanor had
+      // The third run the acceptance check would have needed is answered from the run garden had
       // already watched, which is a saving this fixture inherits rather than one it is about.
       commandsRun: 2,
       // Nothing was held. Nine steps of a job going wrong three times and then right, at the price

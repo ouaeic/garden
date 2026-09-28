@@ -1,7 +1,7 @@
 /**
  * The half that costs nothing and is exact, and the reason it is run first.
  *
- * Everything in this file is arithmetic over bytes athanor itself produces. It needs no key, no
+ * Everything in this file is arithmetic over bytes garden itself produces. It needs no key, no
  * network and no model, it is deterministic to the byte, and it is therefore the half that can
  * gate on every commit - the same split `evals/context-quality` and `evals/agentdojo` both
  * settled on, for the same reason: the half of a rig that can run always is the half that is still
@@ -15,7 +15,7 @@
  * improve, and the token premium does not.
  *
  * It CANNOT say whether an arm completes the work. Nothing offline can: a scripted model is a
- * function of what athanor just said, so a smaller catalogue produces a byte-identical reply and
+ * function of what garden just said, so a smaller catalogue produces a byte-identical reply and
  * the rig would report a perfect tie for every arm and call it a finding. Saying so plainly is
  * most of the value of this file, because a tie that means "the instrument is blind here" and a
  * tie that means "the candidate is free" print identically.

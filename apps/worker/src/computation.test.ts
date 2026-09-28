@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { TaskRecord } from '@athanor/data';
+import type { TaskRecord } from '@garden/data';
 import type { AgentRunnerClient } from './runner-client.js';
 import { computationApproval } from './computation-approval.js';
 import * as ApprovalPolicy from './approval-policy.js';

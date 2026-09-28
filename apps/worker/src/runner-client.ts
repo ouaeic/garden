@@ -1,8 +1,8 @@
-import { runtimeClearTimer, runtimeSetTimeout, runtimeUUID } from '@athanor/core';
+import { runtimeClearTimer, runtimeSetTimeout, runtimeUUID } from '@garden/core';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { readBoundedMediaBody } from '@athanor/model-gateway';
-import { AthanorError, capabilityAudience, signCapabilityToken } from '@athanor/core';
+import { readBoundedMediaBody } from '@garden/model-gateway';
+import { GardenError, capabilityAudience, signCapabilityToken } from '@garden/core';
 
 /**
  * Carries the cancellation signal for whatever tool call is currently in flight.
@@ -91,7 +91,7 @@ const runnerFailure = async (response: Response): Promise<Error> => {
   if (!code || !message)
     return new Error(`Workspace tool failed (${response.status}): ${body.slice(0, 500)}`);
   const wall = asRecord(failure?.botWall);
-  return new AthanorError(code, message, response.status, wall ? { botWall: wall } : undefined);
+  return new GardenError(code, message, response.status, wall ? { botWall: wall } : undefined);
 };
 
 const pause = (milliseconds: number, signal?: AbortSignal | null): Promise<void> =>
@@ -109,23 +109,23 @@ const pause = (milliseconds: number, signal?: AbortSignal | null): Promise<void>
     signal?.addEventListener('abort', done, { once: true });
   });
 
-const unreachable = (error: unknown, timeoutMs: number): AthanorError => {
+const unreachable = (error: unknown, timeoutMs: number): GardenError => {
   if (isTimeout(error))
-    return new AthanorError(
+    return new GardenError(
       'workspace_runner_timeout',
       `The workspace service on this computer accepted this call but produced no answer within ${Math.round(timeoutMs / 60_000)} minutes, so it was abandoned. It may still be running: check the current state before repeating it.`,
       504
     );
   const code = transportCode(error);
   if (code && NEVER_SENT.has(code))
-    return new AthanorError(
+    return new GardenError(
       'workspace_runner_unreachable',
-      `The workspace service on this computer is not accepting connections (${code}), so nothing from this call ran. It normally returns within a few seconds - try again. If it keeps failing, the athanor-runner service on the server needs attention and no tool can run until it is back.`,
+      `The workspace service on this computer is not accepting connections (${code}), so nothing from this call ran. It normally returns within a few seconds - try again. If it keeps failing, the garden-runner service on the server needs attention and no tool can run until it is back.`,
       503
     );
-  return new AthanorError(
+  return new GardenError(
     'workspace_runner_interrupted',
-    `The connection to the workspace service on this computer broke while this call was in flight (${code ?? 'connection lost'}), so it may have partly run. Establish the current state before repeating it. If this keeps happening, the athanor-runner service on the server needs attention.`,
+    `The connection to the workspace service on this computer broke while this call was in flight (${code ?? 'connection lost'}), so it may have partly run. Establish the current state before repeating it. If this keeps happening, the garden-runner service on the server needs attention.`,
     503
   );
 };
@@ -297,7 +297,7 @@ export class AgentRunnerClient {
      * runner's `{error:{code,message}}` envelope into a sentence - so the machine-readable code was
      * on the wire, thrown away here, and then dug back out of the sentence by
      * `agent.ts`'s `checkpointRefusalCode` with a JSON parse over a prefix. `runnerFailure` returns
-     * an `AthanorError` carrying the code as a field, which is what decides whether a lost undo
+     * an `GardenError` carrying the code as a field, which is what decides whether a lost undo
      * point is raised to the owner or filed quietly, and `checkpointRefusalCode` stays as the
      * fallback for a runner one release behind this worker.
      */
@@ -590,7 +590,7 @@ export class AgentRunnerClient {
     maxBytes?: number
   ): Promise<{ mimeType: string; bytes: Buffer }> {
     if (maxBytes !== undefined && (!Number.isSafeInteger(maxBytes) || maxBytes <= 0))
-      throw new AthanorError('file_size_limit_invalid', 'Choose a positive file byte limit', 400);
+      throw new GardenError('file_size_limit_invalid', 'Choose a positive file byte limit', 400);
     const token = signCapabilityToken(
       {
         sub: this.subjectFor(taskId),
@@ -616,7 +616,7 @@ export class AgentRunnerClient {
     if (maxBytes === undefined) bytes = Buffer.from(await response.arrayBuffer());
     else {
       const tooLarge = () =>
-        new AthanorError(
+        new GardenError(
           'file_too_large',
           'The workspace file exceeds this operation’s byte limit',
           413
@@ -626,7 +626,7 @@ export class AgentRunnerClient {
         throw tooLarge();
       }
       if (!response.body)
-        throw new AthanorError('file_empty', 'The workspace file has no bytes', 400);
+        throw new GardenError('file_empty', 'The workspace file has no bytes', 400);
       const reader = response.body.getReader();
       const chunks: Uint8Array[] = [];
       let size = 0;
@@ -696,7 +696,7 @@ export class AgentRunnerClient {
       !Number.isSafeInteger(raw.sourceBytes) ||
       raw.sourceBytes <= 0
     )
-      throw new AthanorError(
+      throw new GardenError(
         'audio_source_receipt_invalid',
         'The runner returned no valid recording source receipt',
         502
@@ -777,7 +777,7 @@ export class AgentRunnerClient {
         sourceBytes <= 0)
     ) {
       await response.body?.cancel();
-      throw new AthanorError(
+      throw new GardenError(
         'audio_source_receipt_invalid',
         'The prepared recording does not match its approved source',
         409

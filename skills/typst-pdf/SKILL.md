@@ -1,14 +1,14 @@
 ---
 name: typst-pdf
-description: Typeset a precise PDF — report, letter, invoice, CV, paper, certificate — from a Typst source with real typography, page numbering and optional PDF/A conformance, then prove it renders. Use when the deliverable is a PDF authored from scratch and layout matters. Do not use to convert an existing .docx or .pptx to PDF, which goes through athanor-office-convert, and do not reach for LaTeX, which is not installed here and is not the answer to any of these.
+description: Typeset a precise PDF — report, letter, invoice, CV, paper, certificate — from a Typst source with real typography, page numbering and optional PDF/A conformance, then prove it renders. Use when the deliverable is a PDF authored from scratch and layout matters. Do not use to convert an existing .docx or .pptx to PDF, which goes through garden-office-convert, and do not reach for LaTeX, which is not installed here and is not the answer to any of these.
 license: AGPL-3.0-or-later
-compatibility: Every tool named here is installed on this computer by athanor - typst 0.15.1, poppler-utils and qpdf.
+compatibility: Every tool named here is installed on this computer by garden - typst 0.15.1, poppler-utils and qpdf.
 allowed-tools: shell file_read file_write files_list image_read publish_artifact
 metadata:
-  athanor.tier: 'builtin'
-  athanor.version: '2.3.0'
-  athanor.risk: 'workspace'
-  athanor.domain: 'documents'
+  garden.tier: 'builtin'
+  garden.version: '2.3.0'
+  garden.risk: 'workspace'
+  garden.domain: 'documents'
 ---
 
 # Authored PDFs with Typst

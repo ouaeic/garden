@@ -110,7 +110,7 @@ export interface OwnerTurn {
   /**
    * The assistant's closing message, which is what `recordTurnEpisode` stores as `summary`.
    *
-   * The closing one and not all of them: athanor's summary is the finish's own account of the turn,
+   * The closing one and not all of them: garden's summary is the finish's own account of the turn,
    * not a transcript of everything it said on the way. Every assistant message still goes into the
    * forbidden vocabulary through `said`, so the exclusion is computed over more text than the store
    * will ever index. Wider exclusion, narrower index - both in the direction that cannot flatter.

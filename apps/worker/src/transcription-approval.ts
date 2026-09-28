@@ -1,13 +1,13 @@
-import { runtimeValue } from '@athanor/core';
+import { runtimeValue } from '@garden/core';
 import { createHmac } from 'node:crypto';
-import { AthanorError } from '@athanor/core';
+import { GardenError } from '@garden/core';
 import {
   isNativeOpenAIEndpoint,
   isOpenRouterEndpoint,
   refreshOpenRouterTranscriptionModel,
   type ModelToolCall
-} from '@athanor/model-gateway';
-import type { TaskRecord } from '@athanor/data';
+} from '@garden/model-gateway';
+import type { TaskRecord } from '@garden/data';
 import type { AgentState, InferenceCredential } from './agent-state.js';
 import type { AgentRunnerClient } from './runner-client.js';
 import { resolvedTranscriptionRoute } from './media.js';
@@ -56,7 +56,7 @@ export const transcriptionPrivacy = (
         secret.enforceZeroDataRetention === true
     )
   )
-    throw new AthanorError(
+    throw new GardenError(
       'transcription_external_consent_required',
       'This transcription endpoint has no verified private route. Set options.privacyRoute="external" to request approval for this recording only, or choose a verified native private transcription route. Task and credential privacy remain unchanged.',
       409
@@ -128,7 +128,7 @@ export const pinTranscriptionApproval = async (
     !Number.isSafeInteger(source.sourceBytes) ||
     source.sourceBytes <= 0
   )
-    throw new AthanorError(
+    throw new GardenError(
       'transcription_source_unverified',
       'The runner could not identify the recording for approval',
       409
@@ -153,7 +153,7 @@ export const requireTranscriptionApproval = (
     !proof ||
     proof.binding !== transcriptionBinding(input.key, input.task, input.state, call, secret)
   )
-    throw new AthanorError(
+    throw new GardenError(
       'transcription_approval_changed',
       'The recording approval no longer matches its task, route, credential, price or options. Request a new approval before sending it.',
       409

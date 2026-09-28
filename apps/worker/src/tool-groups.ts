@@ -1,4 +1,4 @@
-import type { ModelTool } from '@athanor/model-gateway';
+import type { ModelTool } from '@garden/model-gateway';
 import { z } from 'zod';
 
 export const TOOL_GROUPS = {

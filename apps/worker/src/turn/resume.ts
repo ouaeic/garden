@@ -1,4 +1,4 @@
-import { runtimeDate } from '@athanor/core';
+import { runtimeDate } from '@garden/core';
 /**
  * What a turn has to settle before it can take another step: everything the last one left behind.
  *
@@ -16,10 +16,10 @@ import { runtimeDate } from '@athanor/core';
  * Lifted out of `AgentWorker.run()` unchanged: two hundred and eighteen lines that ran once, before
  * the loop, and had nothing to do with the loop.
  */
-import { ownerMessageContent, type OwnerMessage, decryptJson, encryptJson } from '@athanor/core';
-import type { BrowserActionReceipt, ModelRelease, WebToolPlan } from '@athanor/contracts';
-import type { TaskRecord } from '@athanor/data';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import { ownerMessageContent, type OwnerMessage, decryptJson, encryptJson } from '@garden/core';
+import type { BrowserActionReceipt, ModelRelease, WebToolPlan } from '@garden/contracts';
+import type { TaskRecord } from '@garden/data';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { AgentState } from '../agent-state.js';
 import { approvalArgumentsMatch, approvalOutcome } from '../approval-state.js';
 import { event, type ToolRecordingDeps } from '../tool-recording.js';

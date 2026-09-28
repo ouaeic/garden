@@ -1,8 +1,8 @@
 import { spawn } from 'node:child_process';
 import { constants } from 'node:fs';
 import { access } from 'node:fs/promises';
-import { DICTATION_MAX_BYTES, DICTATION_MAX_SECONDS } from '@athanor/contracts';
-import { AthanorError } from '@athanor/core';
+import { DICTATION_MAX_BYTES, DICTATION_MAX_SECONDS } from '@garden/contracts';
+import { GardenError } from '@garden/core';
 import type { TranscriptionFormat } from './context.js';
 
 const DEMUXERS: Record<TranscriptionFormat, string> = {
@@ -41,10 +41,10 @@ export const decodeDictationBase64 = (data: string): Buffer => {
     data.length % 4 !== 0 ||
     /[^A-Za-z0-9+/=]/.test(data)
   )
-    throw new AthanorError('dictation_audio_invalid', 'Choose a bounded audio recording', 400);
+    throw new GardenError('dictation_audio_invalid', 'Choose a bounded audio recording', 400);
   const bytes = Buffer.from(data, 'base64');
   if (!bytes.length || bytes.length > DICTATION_MAX_BYTES || bytes.toString('base64') !== data)
-    throw new AthanorError(
+    throw new GardenError(
       'dictation_audio_invalid',
       'The audio recording is malformed or too large',
       400
@@ -60,7 +60,7 @@ export const prepareDictationAudio = async (
 ): Promise<{ bytes: Buffer; seconds: number; format: 'wav' }> => {
   const executable = await dictationDecoder();
   if (!executable)
-    throw new AthanorError(
+    throw new GardenError(
       'dictation_decoder_unavailable',
       'This installation needs its native media tools before it can read recordings',
       503
@@ -114,11 +114,11 @@ export const prepareDictationAudio = async (
       child.kill('SIGKILL');
     };
     const abort = () =>
-      stop(new AthanorError('dictation_cancelled', 'The recording was cancelled', 499));
+      stop(new GardenError('dictation_cancelled', 'The recording was cancelled', 499));
     const timer = setTimeout(
       () =>
         stop(
-          new AthanorError(
+          new GardenError(
             'dictation_decode_timeout',
             'The recording could not be prepared in time',
             422
@@ -133,7 +133,7 @@ export const prepareDictationAudio = async (
       size += chunk.length;
       if (size > MAX_PCM_BYTES)
         stop(
-          new AthanorError(
+          new GardenError(
             'dictation_duration_limit',
             'Dictate a message of no more than five minutes',
             413
@@ -153,7 +153,7 @@ export const prepareDictationAudio = async (
       if (failure) reject(failure);
       else if (code !== 0 || !size || size % 2 !== 0)
         reject(
-          new AthanorError(
+          new GardenError(
             'dictation_audio_invalid',
             'The recording contains no readable audio',
             422
@@ -161,7 +161,7 @@ export const prepareDictationAudio = async (
         );
       else if (size > DICTATION_MAX_SECONDS * SAMPLE_RATE * 2)
         reject(
-          new AthanorError(
+          new GardenError(
             'dictation_duration_limit',
             'Dictate a message of no more than five minutes',
             413

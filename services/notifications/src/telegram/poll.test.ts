@@ -1,6 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
-import type { DataStore, NotificationDestinationRecord } from '@athanor/data';
+import type { DataStore, NotificationDestinationRecord } from '@garden/data';
 import { backoffMs } from '../retry.js';
 import type { TelegramClient } from './client.js';
 import type { TelegramUpdate } from './inbound.js';
@@ -68,7 +68,7 @@ const harness = (
       id: 'destination-1',
       userId: 'owner',
       senderId: '4242',
-      config: { botToken: '1000:bot-secret', botUsername: 'athanor_bot' }
+      config: { botToken: '1000:bot-secret', botUsername: 'garden_bot' }
     },
     lastUpdateId: options.lastUpdateId ?? null,
     timeoutS: 50,
@@ -150,8 +150,8 @@ const destination = (
   id: 'destination-1',
   userId: 'owner',
   kind: 'telegram',
-  config: { botToken: '1000:bot-secret', botUsername: 'athanor_bot' },
-  botUsername: 'athanor_bot',
+  config: { botToken: '1000:bot-secret', botUsername: 'garden_bot' },
+  botUsername: 'garden_bot',
   senderId: '4242',
   pairingHash: null,
   pairingExpiresAt: null,

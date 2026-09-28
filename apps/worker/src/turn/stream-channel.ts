@@ -4,10 +4,10 @@ import {
   runtimeSetInterval,
   runtimeSetTimeout,
   runtimeUUID
-} from '@athanor/core';
+} from '@garden/core';
 /** Stream writes stay ordered and stop when the worker loses ownership. */
 
-import type { DataStore, TaskRecord } from '@athanor/data';
+import type { DataStore, TaskRecord } from '@garden/data';
 import type { AgentState } from '../agent-state.js';
 import {
   REASONING_FLUSH_INTERVAL_MS,

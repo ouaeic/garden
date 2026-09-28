@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import type { TaskEvent } from '@athanor/contracts';
+import type { TaskEvent } from '@garden/contracts';
 import SubagentLanes from './SubagentLanes';
 
 describe('research evidence status', () => {

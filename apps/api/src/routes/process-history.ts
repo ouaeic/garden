@@ -1,13 +1,13 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { AthanorError } from '@athanor/core';
+import { GardenError } from '@garden/core';
 import {
   ProcessHistoryQuery,
   type ComputationSession,
   type HistoryPage,
   type ManagedProcess,
   type ProjectProcessHistory
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 
@@ -33,7 +33,7 @@ export function registerProcessHistoryRoutes({ app, store, runner }: RouteContex
         const scopes = new Map<string, Set<string> | null>();
         if (kind === 'workspace') {
           if (!(await store.getWorkspace(user.id, id)))
-            throw new AthanorError('workspace_not_found', 'Workspace not found', 404);
+            throw new GardenError('workspace_not_found', 'Workspace not found', 404);
           scopes.set(id, null);
         } else {
           const members = await store.projectExecutionMembers(user.id, id, kind);
@@ -42,7 +42,7 @@ export function registerProcessHistoryRoutes({ app, store, runner }: RouteContex
               ? !(await store.getProject(user.id, id))
               : !members.some((member) => member.taskId === id)
           )
-            throw new AthanorError('task_not_found', 'Project not found', 404);
+            throw new GardenError('task_not_found', 'Project not found', 404);
           for (const member of members) {
             const owners = scopes.get(member.workspaceId) ?? new Set<string>();
             owners.add(member.taskId);
@@ -69,7 +69,7 @@ export function registerProcessHistoryRoutes({ app, store, runner }: RouteContex
               JSON.parse(Buffer.from(query.cursor, 'base64url').toString('utf8'))
             );
           } catch {
-            throw new AthanorError(
+            throw new GardenError(
               'history_cursor_invalid',
               'This history link is invalid. Refresh saved history.',
               400
@@ -77,7 +77,7 @@ export function registerProcessHistoryRoutes({ app, store, runner }: RouteContex
           }
         }
         if (cursor && cursor.scope !== scope)
-          throw new AthanorError(
+          throw new GardenError(
             'history_scope_changed',
             'Project membership changed. Refresh saved history.',
             409
@@ -114,7 +114,7 @@ export function registerProcessHistoryRoutes({ app, store, runner }: RouteContex
                 }
               );
               if (!Array.isArray(result.entries) || result.entries.length > PAGE + 1)
-                throw new AthanorError(
+                throw new GardenError(
                   'history_unavailable',
                   'Saved history could not be read completely. Try again.',
                   503
@@ -128,7 +128,7 @@ export function registerProcessHistoryRoutes({ app, store, runner }: RouteContex
                   !owner ||
                   (owners && !owners.has(owner))
                 )
-                  throw new AthanorError(
+                  throw new GardenError(
                     'history_scope_invalid',
                     'Saved history scope could not be verified',
                     503

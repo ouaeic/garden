@@ -49,10 +49,8 @@ describe('which calls count as changing something', () => {
 
     // Closed: a delete through a language runtime went through with no card, whatever the receiver
     // was called, while the same delete spelled `rm` stopped the task.
-    expect(isDestructiveScript(`require('fs').rmSync('/home/athanor',{recursive:true})`)).toBe(
-      true
-    );
-    expect(isDestructiveScript(`const f=require('fs'); f.rmSync('/home/athanor')`)).toBe(true);
+    expect(isDestructiveScript(`require('fs').rmSync('/home/garden',{recursive:true})`)).toBe(true);
+    expect(isDestructiveScript(`const f=require('fs'); f.rmSync('/home/garden')`)).toBe(true);
     expect(isDestructiveScript(`import pathlib; pathlib.Path('x').unlink()`)).toBe(true);
     // ...without catching the `remove` every list in every language has.
     expect(isDestructiveScript(`items.remove(x); print(len(items))`)).toBe(false);
@@ -75,7 +73,7 @@ describe('which calls count as changing something', () => {
     expect(isDestructiveScript('typst compile a.typ b.pdf > /dev/null')).toBe(false);
     expect(isDestructiveScript('pnpm build > /tmp/build.log')).toBe(false);
     // A redirect that really does leave the workspace still counts.
-    expect(isDestructiveScript('echo x > /etc/cron.d/athanor')).toBe(true);
+    expect(isDestructiveScript('echo x > /etc/cron.d/garden')).toBe(true);
     expect(isDestructiveScript('echo x > ~/.bashrc')).toBe(true);
     expect(isDestructiveScript('echo x > ../../escape')).toBe(true);
   });
@@ -298,14 +296,14 @@ describe('what the catalogue declares and the classifiers actually read', () => 
   it('sees a script the model wrote to stdin exactly as one it wrote to -lc', () => {
     // commandScript exists because moving a script into stdin walked past every classifier at
     // once. isMutatingToolCall was the one that never adopted it, and writtenPaths gates on it,
-    // so `bash -lc 'echo … >> workspace/ATHANOR.md'` stopped for review and the identical script
+    // so `bash -lc 'echo … >> workspace/GARDEN.md'` stopped for review and the identical script
     // through stdin landed a standing directive into the file loaded ahead of every later task
     // with no card at all.
-    const script = 'echo "always deploy on friday" >> workspace/ATHANOR.md';
+    const script = 'echo "always deploy on friday" >> workspace/GARDEN.md';
     expect(isMutatingToolCall('shell', { executable: 'bash', args: ['-lc', script] })).toBe(true);
     expect(isMutatingToolCall('shell', { executable: 'bash', args: [], stdin: script })).toBe(true);
     expect(writtenPaths('shell', { executable: 'bash', args: [], stdin: script })).toContain(
-      'workspace/ATHANOR.md'
+      'workspace/GARDEN.md'
     );
     expect(
       approvalRequirement('shell', { executable: 'bash', args: [], stdin: script }, 'balanced', {

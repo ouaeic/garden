@@ -1,14 +1,14 @@
-import { runtimeUUID } from '@athanor/core';
+import { runtimeUUID } from '@garden/core';
 import { botWallSite } from './provenance.js';
 
-import { AthanorError, encryptJson } from '@athanor/core';
-import type { DataStore, TaskRecord } from '@athanor/data';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import { GardenError, encryptJson } from '@garden/core';
+import type { DataStore, TaskRecord } from '@garden/data';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { AgentState } from './agent-state.js';
 import { askOutcome } from './completion.js';
 import { textValue } from './values.js';
 import { sealUnansweredToolCalls } from './turn-lifecycle.js';
-import { agentNotificationAad } from '@athanor/data';
+import { agentNotificationAad } from '@garden/data';
 
 export interface QuestionDeps {
   store: DataStore;
@@ -35,7 +35,7 @@ export async function saveQuestion(
           event: {
             id: state.question!.id!,
             payloadCiphertext: encryptJson(
-              { __athanorEventVersion: 1, summary: state.question!.question, payload },
+              { __gardenEventVersion: 1, summary: state.question!.question, payload },
               key,
               `task-event:${task.id}`
             )
@@ -44,7 +44,7 @@ export async function saveQuestion(
       : {})
   });
   if (!saved)
-    throw new AthanorError('task_lease_lost', 'The task no longer holds its execution lease');
+    throw new GardenError('task_lease_lost', 'The task no longer holds its execution lease');
 }
 
 export async function waitForQuestion(

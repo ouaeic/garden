@@ -58,22 +58,22 @@ importers:
 
   apps/api:
     dependencies:
-      '@athanor/contracts':
+      '@garden/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@athanor/core':
+      '@garden/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@athanor/data':
+      '@garden/data':
         specifier: workspace:*
         version: link:../../packages/data
-      '@athanor/model-gateway':
+      '@garden/model-gateway':
         specifier: workspace:*
         version: link:../../packages/model-gateway
-      '@athanor/relay-client':
+      '@garden/relay-client':
         specifier: workspace:*
         version: link:../../packages/relay-client
-      '@athanor/worker':
+      '@garden/worker':
         specifier: workspace:*
         version: link:../worker
       '@fastify/cookie':
@@ -113,7 +113,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@athanor/contracts':
+      '@garden/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
       '@simplewebauthn/browser':
@@ -183,16 +183,16 @@ importers:
 
   apps/worker:
     dependencies:
-      '@athanor/contracts':
+      '@garden/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@athanor/core':
+      '@garden/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@athanor/data':
+      '@garden/data':
         specifier: workspace:*
         version: link:../../packages/data
-      '@athanor/model-gateway':
+      '@garden/model-gateway':
         specifier: workspace:*
         version: link:../../packages/model-gateway
       zod:
@@ -207,7 +207,7 @@ importers:
 
   packages/core:
     dependencies:
-      '@athanor/contracts':
+      '@garden/contracts':
         specifier: workspace:*
         version: link:../contracts
       '@modelcontextprotocol/sdk':
@@ -222,10 +222,10 @@ importers:
 
   packages/data:
     dependencies:
-      '@athanor/contracts':
+      '@garden/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@athanor/core':
+      '@garden/core':
         specifier: workspace:*
         version: link:../core
       '@electric-sql/pglite':
@@ -241,10 +241,10 @@ importers:
 
   packages/model-gateway:
     dependencies:
-      '@athanor/contracts':
+      '@garden/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@athanor/core':
+      '@garden/core':
         specifier: workspace:*
         version: link:../core
       image-dimensions:
@@ -263,7 +263,7 @@ importers:
 
   packages/relay-client:
     dependencies:
-      '@athanor/relay':
+      '@garden/relay':
         specifier: workspace:*
         version: link:../../services/relay
       zod:
@@ -276,16 +276,16 @@ importers:
 
   services/model-registry:
     dependencies:
-      '@athanor/contracts':
+      '@garden/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@athanor/core':
+      '@garden/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@athanor/data':
+      '@garden/data':
         specifier: workspace:*
         version: link:../../packages/data
-      '@athanor/model-gateway':
+      '@garden/model-gateway':
         specifier: workspace:*
         version: link:../../packages/model-gateway
       zod:
@@ -294,7 +294,7 @@ importers:
 
   services/notifications:
     dependencies:
-      '@athanor/data':
+      '@garden/data':
         specifier: workspace:*
         version: link:../../packages/data
       web-push:
@@ -316,10 +316,10 @@ importers:
 
   services/workspace-runner:
     dependencies:
-      '@athanor/contracts':
+      '@garden/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@athanor/core':
+      '@garden/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@davisvaughan/tree-sitter-r':

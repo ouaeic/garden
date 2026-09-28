@@ -92,7 +92,7 @@ function requestedAndroidAbis(argumentsForPlatform) {
 
 if (platform === 'android') {
   const options = {
-    allowUnsigned: environment.ATHANOR_ANDROID_REQUIRE_SIGNED !== '1',
+    allowUnsigned: environment.GARDEN_ANDROID_REQUIRE_SIGNED !== '1',
     expectedAbis: requestedAndroidAbis(platformArguments),
     environment
   };

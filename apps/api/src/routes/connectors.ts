@@ -8,14 +8,14 @@ import { registerAccountConnectorRoutes } from './account-connectors.js';
  */
 
 import { randomBytes, randomUUID } from 'node:crypto';
-import { CreateConnectorRequest, StartMcpOAuthRequest } from '@athanor/contracts';
+import { CreateConnectorRequest, StartMcpOAuthRequest } from '@garden/contracts';
 import type {
   Connector,
   ConnectorTestResult,
   StartConnectorOAuthResponse
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import {
-  AthanorError,
+  GardenError,
   authorizeAccountConnector,
   isAccountConnectorKind,
   secureConnectorRequest,
@@ -29,8 +29,8 @@ import {
   redactText,
   sha256,
   verifyConnector
-} from '@athanor/core';
-import type { ConnectorSecret } from '@athanor/core';
+} from '@garden/core';
+import type { ConnectorSecret } from '@garden/core';
 import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { requireUser } from '../http/auth-hook.js';
@@ -66,10 +66,10 @@ export const registerConnectorRoutes = (context: RouteContext): void => {
     requested: Connector['scopes']
   ): Connector['scopes'] => {
     const definition = connectorCatalog.find((entry) => entry.kind === kind);
-    if (!definition) throw new AthanorError('connector_kind_invalid', 'Connector is unavailable');
+    if (!definition) throw new GardenError('connector_kind_invalid', 'Connector is unavailable');
     const allowedScopes = new Set(definition.scopes.map((scope) => scope.id));
     if (requested.some((scope) => !allowedScopes.has(scope)))
-      throw new AthanorError(
+      throw new GardenError(
         'connector_scope_invalid',
         'One or more capabilities do not belong to this connector'
       );
@@ -81,7 +81,7 @@ export const registerConnectorRoutes = (context: RouteContext): void => {
     ok: boolean,
     message: string,
     statusCode = ok ? 200 : 400,
-    source = 'athanor-mcp-oauth'
+    source = 'garden-mcp-oauth'
   ) => {
     const appUrl = new URL(config.PUBLIC_APP_URL);
     const targetOrigin = appUrl.origin;
@@ -105,7 +105,7 @@ export const registerConnectorRoutes = (context: RouteContext): void => {
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>${title}</title>
 <style>html{color-scheme:dark}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#08090b;color:#eef0f4;font:16px system-ui,sans-serif}.card{max-width:32rem;margin:2rem;padding:2rem;border:1px solid #5d626d;border-radius:1rem;background:#101217}h1{font-size:1.25rem}p{color:#c6c9d0;line-height:1.5}a{color:#fff}</style>
-<main class="card"><h1>${title}</h1><p>${safeMessage}</p><a href="${home}">Return to athanor</a></main>
+<main class="card"><h1>${title}</h1><p>${safeMessage}</p><a href="${home}">Return to garden</a></main>
 <script>if(window.opener){window.opener.postMessage(${event},${origin});setTimeout(()=>window.close(),500)}</script>
 </html>`);
   };
@@ -123,7 +123,7 @@ export const registerConnectorRoutes = (context: RouteContext): void => {
     ).toString();
     return reply.header('cache-control', 'public, max-age=3600').send({
       client_id: clientId,
-      client_name: 'athanor',
+      client_name: 'garden',
       client_uri: config.PUBLIC_APP_URL,
       redirect_uris: [redirectUrl],
       grant_types: ['authorization_code', 'refresh_token'],
@@ -197,7 +197,7 @@ export const registerConnectorRoutes = (context: RouteContext): void => {
       const state = z.string().min(20).max(2048).parse(request.query.state);
       const attempt = await store.consumeConnectorOAuthAttempt(sha256(state));
       if (!attempt)
-        throw new AthanorError(
+        throw new GardenError(
           'connector_oauth_attempt_invalid',
           'This authorization link is invalid or has expired',
           400
@@ -210,13 +210,13 @@ export const registerConnectorRoutes = (context: RouteContext): void => {
         );
       const authorizationCode = z.string().min(1).max(8192).parse(request.query.code);
       if (attempt.secretCiphertext.aad !== `connector-oauth:${attempt.id}`)
-        throw new AthanorError(
+        throw new GardenError(
           'connector_oauth_secret_context',
           'The authorization secret context is invalid'
         );
       const secret = decryptJson<ConnectorSecret>(attempt.secretCiphertext, masterKey);
       if (secret.mcpOAuth?.state !== state)
-        throw new AthanorError(
+        throw new GardenError(
           'connector_oauth_state_invalid',
           'The authorization state does not match'
         );
@@ -261,7 +261,7 @@ export const registerConnectorRoutes = (context: RouteContext): void => {
     } catch (error) {
       request.log.warn(
         {
-          code: error instanceof AthanorError ? error.code : 'connector_oauth_callback_failed'
+          code: error instanceof GardenError ? error.code : 'connector_oauth_callback_failed'
         },
         'MCP OAuth callback failed'
       );
@@ -343,8 +343,8 @@ export const registerConnectorRoutes = (context: RouteContext): void => {
           ...(overrides.mailSocketFactory ? { mailSocketFactory: overrides.mailSocketFactory } : {})
         });
       } catch (error) {
-        if (error instanceof AthanorError) throw error;
-        throw new AthanorError(
+        if (error instanceof GardenError) throw error;
+        throw new GardenError(
           'connector_connection_failed',
           error instanceof Error ? error.message : 'Connector could not be verified',
           400
@@ -392,9 +392,9 @@ export const registerConnectorRoutes = (context: RouteContext): void => {
     async (request) => {
       const user = requireUser(request.user);
       const connector = await store.getConnector(user.id, request.params.connectorId);
-      if (!connector) throw new AthanorError('connector_not_found', 'Connector not found', 404);
+      if (!connector) throw new GardenError('connector_not_found', 'Connector not found', 404);
       if (connector.secretCiphertext.aad !== `connector:${user.id}:${connector.id}`)
-        throw new AthanorError(
+        throw new GardenError(
           'connector_secret_context',
           'Connector secret encryption context is invalid'
         );
@@ -421,7 +421,7 @@ export const registerConnectorRoutes = (context: RouteContext): void => {
               encryptJson(updated, masterKey, `connector:${user.id}:${connector.id}`)
             );
             if (!saved)
-              throw new AthanorError(
+              throw new GardenError(
                 'connector_secret_update_failed',
                 'The refreshed connector authorization could not be saved'
               );
@@ -457,7 +457,7 @@ export const registerConnectorRoutes = (context: RouteContext): void => {
          */
         const failureMessage = (message: string): string => redactText(message).slice(0, 200);
         const failure =
-          error instanceof AthanorError
+          error instanceof GardenError
             ? { code: error.code, message: failureMessage(error.message) }
             : {
                 code: 'connector_connection_failed',
@@ -491,7 +491,7 @@ export const registerConnectorRoutes = (context: RouteContext): void => {
       await requireRecentStepUp(request, user);
       return idempotent(request, reply, user, async () => {
         const connector = await store.getConnector(user.id, request.params.connectorId);
-        if (!connector) throw new AthanorError('connector_not_found', 'Connector not found', 404);
+        if (!connector) throw new GardenError('connector_not_found', 'Connector not found', 404);
         const revoked = await store.revokeConnector(user.id, connector.id);
         if (revoked)
           await store.recordConnectorAudit({

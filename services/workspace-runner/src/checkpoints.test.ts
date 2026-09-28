@@ -60,10 +60,10 @@ afterEach(async () => {
 const WORKSPACE_ID = '018f3dd3-899f-7e3d-8d92-8fdbf65f8301';
 
 const workspace = async (): Promise<{ workspaceRoot: string; root: string }> => {
-  const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-checkpoints-'));
+  const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-checkpoints-'));
   temporary.push(workspaceRoot);
   const root = path.join(workspaceRoot, WORKSPACE_ID);
-  for (const relative of ['workspace', '.athanor/artifacts', '.athanor/browser'])
+  for (const relative of ['workspace', '.garden/artifacts', '.garden/browser'])
     await mkdir(path.join(root, relative), { recursive: true });
   return { workspaceRoot, root };
 };
@@ -114,7 +114,7 @@ const config = (
 
 const storeSize = async (workspaceRoot: string): Promise<number> => {
   let total = 0;
-  const pending = [path.join(workspaceRoot, '.athanor-checkpoints', WORKSPACE_ID, 'blobs')];
+  const pending = [path.join(workspaceRoot, '.garden-checkpoints', WORKSPACE_ID, 'blobs')];
   while (pending.length) {
     const current = pending.pop()!;
     const entries = await readdir(current, { withFileTypes: true }).catch(() => []);
@@ -134,7 +134,7 @@ const manifestFiles = async (
 ): Promise<Array<[string, number, number, number, string]>> => {
   const raw = gunzipSync(
     await readFile(
-      path.join(workspaceRoot, '.athanor-checkpoints', WORKSPACE_ID, `${id}.manifest.json.gz`)
+      path.join(workspaceRoot, '.garden-checkpoints', WORKSPACE_ID, `${id}.manifest.json.gz`)
     )
   );
   return (
@@ -145,11 +145,11 @@ const manifestFiles = async (
 };
 
 const blobPath = (workspaceRoot: string, hash: string): string =>
-  path.join(workspaceRoot, '.athanor-checkpoints', WORKSPACE_ID, 'blobs', hash.slice(0, 2), hash);
+  path.join(workspaceRoot, '.garden-checkpoints', WORKSPACE_ID, 'blobs', hash.slice(0, 2), hash);
 
 const blobCount = async (workspaceRoot: string): Promise<number> => {
   let count = 0;
-  const blobs = path.join(workspaceRoot, '.athanor-checkpoints', WORKSPACE_ID, 'blobs');
+  const blobs = path.join(workspaceRoot, '.garden-checkpoints', WORKSPACE_ID, 'blobs');
   for (const shard of await readdir(blobs).catch(() => []))
     count += (await readdir(path.join(blobs, shard))).length;
   return count;
@@ -200,12 +200,12 @@ describe('turn checkpoints', () => {
   it('leaves the browser profile alone, so a rewind does not sign the owner out', async () => {
     const { workspaceRoot, root } = await workspace();
     const checkpoints = new WorkspaceCheckpoints(config(workspaceRoot));
-    await writeFile(path.join(root, '.athanor', 'browser', 'Cookies'), 'session=before\n');
+    await writeFile(path.join(root, '.garden', 'browser', 'Cookies'), 'session=before\n');
     await writeFile(path.join(root, 'workspace', 'note.txt'), 'before\n');
     const created = await checkpoints.create(WORKSPACE_ID, root, { checkpointId: randomUUID() });
 
-    await writeFile(path.join(root, '.athanor', 'browser', 'Cookies'), 'session=after-login\n');
-    await writeFile(path.join(root, '.athanor', 'browser', 'Login Data'), 'signed in\n');
+    await writeFile(path.join(root, '.garden', 'browser', 'Cookies'), 'session=after-login\n');
+    await writeFile(path.join(root, '.garden', 'browser', 'Login Data'), 'signed in\n');
     await writeFile(path.join(root, 'workspace', 'note.txt'), 'after\n');
 
     const preview = await checkpoints.preview(WORKSPACE_ID, root, created.id);
@@ -214,11 +214,11 @@ describe('turn checkpoints', () => {
     ]);
 
     await checkpoints.restore(WORKSPACE_ID, root, created.id);
-    await expect(readFile(path.join(root, '.athanor', 'browser', 'Cookies'), 'utf8')).resolves.toBe(
+    await expect(readFile(path.join(root, '.garden', 'browser', 'Cookies'), 'utf8')).resolves.toBe(
       'session=after-login\n'
     );
     await expect(
-      readFile(path.join(root, '.athanor', 'browser', 'Login Data'), 'utf8')
+      readFile(path.join(root, '.garden', 'browser', 'Login Data'), 'utf8')
     ).resolves.toBe('signed in\n');
     await expect(readFile(path.join(root, 'workspace', 'note.txt'), 'utf8')).resolves.toBe(
       'before\n'
@@ -230,12 +230,12 @@ describe('turn checkpoints', () => {
     const checkpoints = new WorkspaceCheckpoints(
       config(workspaceRoot, { includeBrowserProfile: true })
     );
-    await writeFile(path.join(root, '.athanor', 'browser', 'Cookies'), 'session=before\n');
+    await writeFile(path.join(root, '.garden', 'browser', 'Cookies'), 'session=before\n');
     const created = await checkpoints.create(WORKSPACE_ID, root, { checkpointId: randomUUID() });
-    await writeFile(path.join(root, '.athanor', 'browser', 'Cookies'), 'session=after\n');
+    await writeFile(path.join(root, '.garden', 'browser', 'Cookies'), 'session=after\n');
 
     const preview = await checkpoints.preview(WORKSPACE_ID, root, created.id);
-    expect(preview.modified.map((change) => change.path)).toEqual(['.athanor/browser/Cookies']);
+    expect(preview.modified.map((change) => change.path)).toEqual(['.garden/browser/Cookies']);
   });
 
   it('costs no bytes for an unchanged turn and stores one copy of repeated content', async () => {
@@ -483,7 +483,7 @@ describe('turn checkpoints', () => {
     // unreferenced blobs costs disk. Deleting referenced ones costs them the undo.
     const { workspaceRoot, root } = await workspace();
     const checkpoints = new WorkspaceCheckpoints(config(workspaceRoot, { retainTurns: 2 }));
-    const directory = path.join(workspaceRoot, '.athanor-checkpoints', WORKSPACE_ID);
+    const directory = path.join(workspaceRoot, '.garden-checkpoints', WORKSPACE_ID);
     const ids: string[] = [];
     for (let turn = 0; turn < 10; turn += 1) {
       await writeFile(path.join(root, 'workspace', 'draft.md'), `revision ${turn}\n`);
@@ -514,7 +514,7 @@ describe('turn checkpoints', () => {
     const checkpoints = new WorkspaceCheckpoints(
       config(workspaceRoot, { retainTurns: 2, retainDailyDays: 30 })
     );
-    const directory = path.join(workspaceRoot, '.athanor-checkpoints', WORKSPACE_ID);
+    const directory = path.join(workspaceRoot, '.garden-checkpoints', WORKSPACE_ID);
     const made: string[] = [];
     const day = 24 * 60 * 60 * 1000;
     for (let index = 0; index < 8; index += 1) {
@@ -563,7 +563,7 @@ describe('turn checkpoints', () => {
       run
     );
     await writeFile(path.join(root, 'workspace', 'note.txt'), 'before\n');
-    await writeFile(path.join(root, '.athanor', 'browser', 'Cookies'), 'session=before\n');
+    await writeFile(path.join(root, '.garden', 'browser', 'Cookies'), 'session=before\n');
 
     const created = await checkpoints.create(WORKSPACE_ID, root, { checkpointId: randomUUID() });
     // Read off the checkpoint that was taken rather than off a probe run for its own sake: this is
@@ -574,7 +574,7 @@ describe('turn checkpoints', () => {
     expect(calls.some((call) => call.includes('snapshot') && call.includes('-r'))).toBe(true);
 
     await writeFile(path.join(root, 'workspace', 'note.txt'), 'after\n');
-    await writeFile(path.join(root, '.athanor', 'browser', 'Cookies'), 'session=after\n');
+    await writeFile(path.join(root, '.garden', 'browser', 'Cookies'), 'session=after\n');
     const preview = await checkpoints.preview(WORKSPACE_ID, root, created.id);
     // The snapshot holds the profile too; the exclusion still keeps it out of the rewind.
     expect(preview.modified.map((change) => change.path)).toEqual(['workspace/note.txt']);
@@ -583,7 +583,7 @@ describe('turn checkpoints', () => {
     await expect(readFile(path.join(root, 'workspace', 'note.txt'), 'utf8')).resolves.toBe(
       'before\n'
     );
-    await expect(readFile(path.join(root, '.athanor', 'browser', 'Cookies'), 'utf8')).resolves.toBe(
+    await expect(readFile(path.join(root, '.garden', 'browser', 'Cookies'), 'utf8')).resolves.toBe(
       'session=after\n'
     );
   });
@@ -614,7 +614,7 @@ describe('turn checkpoints', () => {
     const { workspaceRoot, root } = await workspace();
     const higher: CheckpointRunner = async (executable, args) => {
       if (executable !== '/usr/sbin/zfs') throw new Error('not installed');
-      if (args[0] === 'list') return `tank/athanor\t${workspaceRoot}\n`;
+      if (args[0] === 'list') return `tank/garden\t${workspaceRoot}\n`;
       throw new Error('unexpected');
     };
     expect(
@@ -628,7 +628,7 @@ describe('turn checkpoints', () => {
 
     const exact: CheckpointRunner = async (executable, args) => {
       if (executable !== '/usr/sbin/zfs') throw new Error('not installed');
-      if (args[0] === 'list') return `tank/athanor/workspace\t${root}\n`;
+      if (args[0] === 'list') return `tank/garden/workspace\t${root}\n`;
       if (args[0] === 'snapshot' || args[0] === 'destroy') return '';
       throw new Error('unexpected');
     };
@@ -653,7 +653,7 @@ describe('turn checkpoints', () => {
     const created = await checkpoints.create(WORKSPACE_ID, root, { checkpointId: randomUUID() });
     const manifest = path.join(
       workspaceRoot,
-      '.athanor-checkpoints',
+      '.garden-checkpoints',
       WORKSPACE_ID,
       `${created.id}.manifest.json.gz`
     );
@@ -774,7 +774,7 @@ describe('turn checkpoints', () => {
     await checkpoints.deleteAll(WORKSPACE_ID);
     expect(await checkpoints.list(WORKSPACE_ID)).toEqual([]);
     await expect(
-      stat(path.join(workspaceRoot, '.athanor-checkpoints', WORKSPACE_ID))
+      stat(path.join(workspaceRoot, '.garden-checkpoints', WORKSPACE_ID))
     ).rejects.toThrow();
   });
 });

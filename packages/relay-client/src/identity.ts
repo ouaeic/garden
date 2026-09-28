@@ -7,7 +7,7 @@ import {
   generateIdentityKeyPair,
   publicKeySpkiDer,
   rawEd25519FromSpki
-} from '@athanor/relay';
+} from '@garden/relay';
 
 /**
  * The box's relay identity.
@@ -92,8 +92,8 @@ export const loadOrCreateIdentity = async (directory: string): Promise<RelayIden
   // it cannot be the label, because the label is not known until a relay domain is chosen.
   const certificate = createSelfSignedCertificate({
     privateKey: pair.privateKey,
-    commonName: 'athanor-box',
-    dnsNames: ['athanor-box']
+    commonName: 'garden-box',
+    dnsNames: ['garden-box']
   });
 
   await mkdir(dirname(keyPath), { recursive: true, mode: 0o700 });

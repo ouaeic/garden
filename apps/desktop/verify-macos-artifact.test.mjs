@@ -4,13 +4,13 @@ import { assertNoMacSensitiveContent, validateMacInfo } from './verify-macos-art
 
 function validInfo() {
   return {
-    CFBundleIdentifier: 'org.athanor.ai',
+    CFBundleIdentifier: 'org.garden.ai',
     CFBundleName: 'garden',
     CFBundleShortVersionString: '0.1.0',
     CFBundleVersion: '1',
-    CFBundleExecutable: 'athanor-desktop',
+    CFBundleExecutable: 'garden-desktop',
     LSMinimumSystemVersion: '12.0',
-    CFBundleURLTypes: [{ CFBundleURLSchemes: ['garden', 'athanor'] }],
+    CFBundleURLTypes: [{ CFBundleURLSchemes: ['garden'] }],
     NSAppTransportSecurity: {
       NSExceptionDomains: {
         localhost: {
@@ -19,7 +19,7 @@ function validInfo() {
         }
       }
     },
-    NSBonjourServices: ['_athanor._tcp'],
+    NSBonjourServices: ['_garden._tcp'],
     NSCameraUsageDescription: 'Used only when the person attaches a camera photo.',
     NSLocalNetworkUsageDescription: 'Used only to rediscover the paired remote computer.',
     NSMicrophoneUsageDescription: 'Used only when the person records a voice note.',

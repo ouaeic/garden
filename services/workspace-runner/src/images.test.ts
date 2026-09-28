@@ -35,7 +35,7 @@ const refusalFrom = async (call: Promise<unknown>): Promise<WorkspaceFileError> 
 
 /** A stand-in for the host's converter, so what this file asserts does not need ImageMagick. */
 const stubConverter = async (body: string): Promise<string> => {
-  const directory = await mkdtemp(path.join(tmpdir(), 'athanor-convert-'));
+  const directory = await mkdtemp(path.join(tmpdir(), 'garden-convert-'));
   scripts.push(directory);
   const script = path.join(directory, 'magick');
   await writeFile(script, `#!/bin/sh\n${body}\n`);
@@ -116,7 +116,7 @@ describe('the conversion a photograph gets', () => {
 
   /*
    * A drawing is line art, and JPEG's ringing eats the thin strokes and small text that are the
-   * whole of what a diagram says. The renderer is athanor's own rather than the delegate, because
+   * whole of what a diagram says. The renderer is garden's own rather than the delegate, because
    * the delegate resolves external references and a downloaded SVG could point one at this network.
    */
   it('rasterises a drawing to PNG with a renderer that fetches nothing', () => {

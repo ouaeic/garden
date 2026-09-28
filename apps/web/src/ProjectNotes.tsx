@@ -1,6 +1,6 @@
 import ScrollRegion from './ScrollRegion';
 import { useEffect, useState } from 'react';
-import type { ConversationSource, ProjectNote } from '@athanor/contracts';
+import type { ConversationSource, ProjectNote } from '@garden/contracts';
 import { get, post, request } from './client';
 import { Button, Dialog, ErrorNotice, Field, Spinner } from './ui';
 

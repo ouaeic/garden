@@ -1,11 +1,11 @@
-import { OwnerPreferences, type ModelRelease } from '@athanor/contracts';
-import { AthanorError, encryptJson, selectPurposeModel } from '@athanor/core';
+import { OwnerPreferences, type ModelRelease } from '@garden/contracts';
+import { GardenError, encryptJson, selectPurposeModel } from '@garden/core';
 import {
   readTaskModelPreferences,
   resolvePurposeChoice,
   type DataStore,
   type TaskRecord
-} from '@athanor/data';
+} from '@garden/data';
 import type { AgentState } from './agent-state.js';
 
 type PurposeContext = {
@@ -24,7 +24,7 @@ async function preferences(
     context.store.getUserById(task.userId),
     context.store.effectiveSpendLimits(task.userId)
   ]);
-  if (!user) throw new AthanorError('owner_not_found', 'Project owner is unavailable');
+  if (!user) throw new GardenError('owner_not_found', 'Project owner is unavailable');
   const owner = OwnerPreferences.parse(user.preferences);
   return {
     project,
@@ -50,7 +50,7 @@ export async function resolveTaskPurposeModel(
 ): Promise<ModelRelease> {
   const { project, global, limits, decisionsEnabled } = await preferences(context, task);
   if (purpose === 'decisions' && !decisionsEnabled)
-    throw new AthanorError(
+    throw new GardenError(
       'decision_models_disabled',
       'Decision models are turned off in Settings.',
       409
@@ -74,7 +74,7 @@ export async function resolveTaskPurposeModel(
     privacyRoute: task.privacyRoute === 'provider_zdr' ? 'provider_zdr' : 'external',
     ceiling: limits
   });
-  if (!result.model) throw new AthanorError('purpose_model_unavailable', result.reason!, 409);
+  if (!result.model) throw new GardenError('purpose_model_unavailable', result.reason!, 409);
   return result.model;
 }
 
@@ -118,7 +118,7 @@ export async function applyProjectMainModel(
     privacyRoute: task.privacyRoute === 'provider_zdr' ? 'provider_zdr' : 'external',
     ceiling: limits
   });
-  if (!result.model) throw new AthanorError('purpose_model_unavailable', result.reason!, 409);
+  if (!result.model) throw new GardenError('purpose_model_unavailable', result.reason!, 409);
   const effort = result.model.id === task.modelId ? (task.reasoningEffort ?? 'auto') : 'auto';
   const nextState = { ...state, mainModelPreference: fingerprint, ownerReasoningEffort: effort };
   await context.store.applyProjectMainModel({

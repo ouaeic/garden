@@ -23,10 +23,10 @@ import {
   UpdateSecurityModeRequest,
   UpdateTaskPlanRequest,
   UpdateTaskRequest
-} from '@athanor/contracts';
-import type { TaskPage, TaskPlanStep } from '@athanor/contracts';
+} from '@garden/contracts';
+import type { TaskPage, TaskPlanStep } from '@garden/contracts';
 import {
-  AthanorError,
+  GardenError,
   encryptJson,
   inferModelTask,
   modelFit,
@@ -34,9 +34,9 @@ import {
   selectPurposeModel,
   spendHalt,
   unwrapDataKey
-} from '@athanor/core';
-import type { RoutableModel } from '@athanor/core';
-import { writeProjectModelPreferences, readProjectModelPreferences } from '@athanor/data';
+} from '@garden/core';
+import type { RoutableModel } from '@garden/core';
+import { writeProjectModelPreferences, readProjectModelPreferences } from '@garden/data';
 import { ownerPriceCeiling, resumableTaskStatuses } from '../context.js';
 import { withTaskDeliveryStatus } from '../task-delivery-status.js';
 import { requireUser } from '../http/auth-hook.js';
@@ -200,9 +200,9 @@ export const registerTaskRoutes = (context: RouteContext): void => {
       const input = CreateTaskRequest.parse(request.body);
       const project = input.projectId ? await store.getProject(user.id, input.projectId) : null;
       if (input.projectId && !project)
-        throw new AthanorError('project_not_found', 'Project not found', 404);
+        throw new GardenError('project_not_found', 'Project not found', 404);
       if (project && input.workspaceId !== project.workspaceId)
-        throw new AthanorError(
+        throw new GardenError(
           'project_workspace_changed',
           'Reload this project before starting a conversation.',
           409
@@ -210,7 +210,7 @@ export const registerTaskRoutes = (context: RouteContext): void => {
       if (input.source) {
         const source = await store.getTask(user.id, input.source.taskId);
         if (!project || source?.projectId !== project.id)
-          throw new AthanorError(
+          throw new GardenError(
             'project_source_unavailable',
             'The selected context is not in this project.',
             404
@@ -224,7 +224,7 @@ export const registerTaskRoutes = (context: RouteContext): void => {
             ])
           ).rows.length
         )
-          throw new AthanorError(
+          throw new GardenError(
             'project_source_unavailable',
             'The selected message is unavailable.',
             404
@@ -263,12 +263,12 @@ export const registerTaskRoutes = (context: RouteContext): void => {
               ceiling: ownerPriceCeiling(await store.effectiveSpendLimits(user.id))
             });
             if (!resolved.model)
-              throw new AthanorError(
+              throw new GardenError(
                 'model_unavailable',
                 resolved.reason ?? 'No model is available for this project'
               );
             if (input.modelId && input.modelId !== resolved.model.id)
-              throw new AthanorError(
+              throw new GardenError(
                 'model_choice_conflict',
                 'The prompt and project must choose the same main model'
               );
@@ -285,9 +285,9 @@ export const registerTaskRoutes = (context: RouteContext): void => {
       );
       const workspace = (await workspaceRead)();
       if (!workspace?.wrappedKey)
-        throw new AthanorError('workspace_not_found', 'Workspace not found');
+        throw new GardenError('workspace_not_found', 'Workspace not found');
       if (workspace.status !== 'running')
-        throw new AthanorError('workspace_unavailable', 'Workspace is not running');
+        throw new GardenError('workspace_unavailable', 'Workspace is not running');
       const spendCeilingUsd = (await guarded)();
       const { catalog, chosen } = (await routed)();
       const selected = chosen?.model;
@@ -296,7 +296,7 @@ export const registerTaskRoutes = (context: RouteContext): void => {
         selected.availability !== 'available' ||
         selected.privacyRoute !== input.privacyRoute
       ) {
-        throw new AthanorError(
+        throw new GardenError(
           'model_unavailable',
           'The selected model is not available for this privacy route'
         );
@@ -356,7 +356,7 @@ export const registerTaskRoutes = (context: RouteContext): void => {
               nameIndexFor(title, input.prompt, dataKey)
             )
           : created;
-        if (!titled) throw new AthanorError('task_unavailable', 'The task could not be named', 409);
+        if (!titled) throw new GardenError('task_unavailable', 'The task could not be named', 409);
         if (!project && input.modelChoices && Object.keys(input.modelChoices).length)
           await writeProjectModelPreferences(store, masterKey, titled, {
             expectedRevision: 0,
@@ -508,7 +508,7 @@ export const registerTaskRoutes = (context: RouteContext): void => {
   app.get<{ Params: { taskId: string } }>('/v1/tasks/:taskId', async (request) => {
     const user = requireUser(request.user);
     const task = await store.getTask(user.id, request.params.taskId);
-    if (!task) throw new AthanorError('task_not_found', 'Task not found');
+    if (!task) throw new GardenError('task_not_found', 'Task not found');
     return privateTaskResponse((await withTaskDeliveryStatus(database, user.id, [task]))[0]!);
   });
 
@@ -521,17 +521,17 @@ export const registerTaskRoutes = (context: RouteContext): void => {
       async () => {
         const input = UpdateTaskRequest.parse(request.body ?? {});
         const task = await store.getTask(user.id, request.params.taskId);
-        if (!task) throw new AthanorError('task_not_found', 'Task not found');
+        if (!task) throw new GardenError('task_not_found', 'Task not found');
         const workspace = await store.getWorkspace(user.id, task.workspaceId);
         if (!workspace?.wrappedKey)
-          throw new AthanorError('workspace_not_found', 'Workspace not found');
+          throw new GardenError('workspace_not_found', 'Workspace not found');
         let current = task;
         if (input.pinned !== undefined || input.archived !== undefined) {
           const filed = await store.updateTaskFiling(user.id, task.id, {
             ...(input.pinned === undefined ? {} : { pinned: input.pinned }),
             ...(input.archived === undefined ? {} : { archived: input.archived })
           });
-          if (!filed) throw new AthanorError('task_not_found', 'Task not found');
+          if (!filed) throw new GardenError('task_not_found', 'Task not found');
           current = filed;
         }
         if (input.title === undefined) return privateTaskResponse(current, workspace);
@@ -544,7 +544,7 @@ export const registerTaskRoutes = (context: RouteContext): void => {
           // half-rewritten, so the opening is re-tokenized from the task's own ciphertext.
           nameIndexFor(input.title, openPrompt(task, key), key)
         );
-        if (!renamed) throw new AthanorError('task_not_found', 'Task not found');
+        if (!renamed) throw new GardenError('task_not_found', 'Task not found');
         return privateTaskResponse(renamed, workspace);
       },
       { databaseOnly: true }
@@ -555,11 +555,11 @@ export const registerTaskRoutes = (context: RouteContext): void => {
     const user = requireUser(request.user);
     return idempotent(request, reply, user, async () => {
       const task = await store.getTask(user.id, request.params.taskId);
-      if (!task) throw new AthanorError('task_not_found', 'Task not found');
+      if (!task) throw new GardenError('task_not_found', 'Task not found');
       if (['queued', 'planning', 'running'].includes(task.status))
-        throw new AthanorError('task_active', 'Stop this task before deleting it', 409);
+        throw new GardenError('task_active', 'Stop this task before deleting it', 409);
       if (task.parentMissionId)
-        throw new AthanorError(
+        throw new GardenError(
           'coding_mission_scoped',
           'Remove isolated specialist work through its parent task',
           409
@@ -575,10 +575,9 @@ export const registerTaskRoutes = (context: RouteContext): void => {
   app.get<{ Params: { taskId: string } }>('/v1/tasks/:taskId/plan', async (request) => {
     const user = requireUser(request.user);
     const task = await store.getTask(user.id, request.params.taskId);
-    if (!task) throw new AthanorError('task_not_found', 'Task not found');
+    if (!task) throw new GardenError('task_not_found', 'Task not found');
     const workspace = await store.getWorkspace(user.id, task.workspaceId);
-    if (!workspace?.wrappedKey)
-      throw new AthanorError('workspace_not_found', 'Workspace not found');
+    if (!workspace?.wrappedKey) throw new GardenError('workspace_not_found', 'Workspace not found');
     const plan = await store.getLatestTaskPlan(task.id);
     return plan ? privateTaskPlanResponse(plan, workspace) : null;
   });
@@ -586,10 +585,9 @@ export const registerTaskRoutes = (context: RouteContext): void => {
   app.get<{ Params: { taskId: string } }>('/v1/tasks/:taskId/plans', async (request) => {
     const user = requireUser(request.user);
     const task = await store.getTask(user.id, request.params.taskId);
-    if (!task) throw new AthanorError('task_not_found', 'Task not found');
+    if (!task) throw new GardenError('task_not_found', 'Task not found');
     const workspace = await store.getWorkspace(user.id, task.workspaceId);
-    if (!workspace?.wrappedKey)
-      throw new AthanorError('workspace_not_found', 'Workspace not found');
+    if (!workspace?.wrappedKey) throw new GardenError('workspace_not_found', 'Workspace not found');
     return Promise.all(
       (await store.listTaskPlans(task.id)).map((plan) => privateTaskPlanResponse(plan, workspace))
     );
@@ -598,16 +596,15 @@ export const registerTaskRoutes = (context: RouteContext): void => {
   app.post<{ Params: { taskId: string } }>('/v1/tasks/:taskId/plan', async (request) => {
     const user = requireUser(request.user);
     const task = await store.getTask(user.id, request.params.taskId);
-    if (!task) throw new AthanorError('task_not_found', 'Task not found');
+    if (!task) throw new GardenError('task_not_found', 'Task not found');
     if (['completed', 'failed', 'cancelled'].includes(task.status))
-      throw new AthanorError(
+      throw new GardenError(
         'invalid_task_state',
         'A finished task plan is immutable; branch by starting a new task',
         409
       );
     const workspace = await store.getWorkspace(user.id, task.workspaceId);
-    if (!workspace?.wrappedKey)
-      throw new AthanorError('workspace_not_found', 'Workspace not found');
+    if (!workspace?.wrappedKey) throw new GardenError('workspace_not_found', 'Workspace not found');
     const input = UpdateTaskPlanRequest.parse(request.body);
     const previousPlan =
       input.outputs === undefined ? await store.getLatestTaskPlan(task.id) : null;
@@ -668,7 +665,7 @@ export const registerTaskRoutes = (context: RouteContext): void => {
       });
     } catch (cause) {
       if (cause instanceof Error && cause.message === 'plan_version_conflict')
-        throw new AthanorError(
+        throw new GardenError(
           'plan_version_conflict',
           'The plan changed on another device; reload before saving',
           409
@@ -681,7 +678,7 @@ export const registerTaskRoutes = (context: RouteContext): void => {
       summary: 'Encrypted user plan event',
       payloadCiphertext: encryptJson(
         {
-          __athanorEventVersion: 1,
+          __gardenEventVersion: 1,
           summary: `Plan updated to version ${created.version}`,
           payload: {
             planId: created.id,
@@ -702,7 +699,7 @@ export const registerTaskRoutes = (context: RouteContext): void => {
   app.get<{ Params: { taskId: string } }>('/v1/tasks/:taskId/spend-block', async (request) => {
     const user = requireUser(request.user);
     const task = await store.getTask(user.id, request.params.taskId);
-    if (!task) throw new AthanorError('task_not_found', 'Task not found');
+    if (!task) throw new GardenError('task_not_found', 'Task not found');
     const { decision, estimateSource } = await taskResumeSpend(store, task, masterKey);
     /*
      * The same test the caps route uses to decide a loosening needs a passkey: an epoch `updatedAt`
@@ -743,7 +740,7 @@ export const registerTaskRoutes = (context: RouteContext): void => {
         async () => {
           const input = RaiseTaskSpendCeilingRequest.parse(request.body);
           const task = await store.getTask(user.id, request.params.taskId);
-          if (!task) throw new AthanorError('task_not_found', 'Task not found');
+          if (!task) throw new GardenError('task_not_found', 'Task not found');
           await store.raiseTaskSpendCeiling(user.id, task.id, input.maxSpendUsd);
           return privateTaskResponse((await store.getTask(user.id, task.id))!);
         },
@@ -763,16 +760,16 @@ export const registerTaskRoutes = (context: RouteContext): void => {
         async () => {
           const action = request.params.action;
           if (!['pause', 'resume', 'cancel'].includes(action))
-            throw new AthanorError('invalid_action', 'Unsupported task action');
+            throw new GardenError('invalid_action', 'Unsupported task action');
           const task = await store.getTask(user.id, request.params.taskId);
-          if (!task) throw new AthanorError('task_not_found', 'Task not found');
+          if (!task) throw new GardenError('task_not_found', 'Task not found');
           if (['completed', 'failed', 'cancelled'].includes(task.status))
-            throw new AthanorError('invalid_task_state', 'A finished task cannot be changed', 409);
+            throw new GardenError('invalid_task_state', 'A finished task cannot be changed', 409);
           if (
             action === 'resume' &&
             !(resumableTaskStatuses as readonly string[]).includes(task.status)
           )
-            throw new AthanorError(
+            throw new GardenError(
               'invalid_task_state',
               'Only paused or resource-waiting tasks can be resumed',
               409
@@ -785,7 +782,7 @@ export const registerTaskRoutes = (context: RouteContext): void => {
             if (action === 'resume') {
               const { decision: verdict } = await taskResumeSpend(store, task, masterKey);
               if (verdict.outcome === 'deny')
-                throw new AthanorError('spend_cap_reached', spendHalt(verdict));
+                throw new GardenError('spend_cap_reached', spendHalt(verdict));
               await ensureProjectExecution(context, task);
             }
             await store.setTaskStatusForUser(user.id, task.id, status);
@@ -804,9 +801,9 @@ export const registerTaskRoutes = (context: RouteContext): void => {
       const user = requireUser(request.user);
       const input = UpdateSecurityModeRequest.parse(request.body);
       const task = await store.getTask(user.id, request.params.taskId);
-      if (!task) throw new AthanorError('task_not_found', 'Task not found');
+      if (!task) throw new GardenError('task_not_found', 'Task not found');
       if (task.userId !== user.id)
-        throw new AthanorError(
+        throw new GardenError(
           'task_owner_required',
           'Only the task owner can change its security mode',
           403
@@ -825,7 +822,7 @@ export const registerTaskRoutes = (context: RouteContext): void => {
        */
       return idempotent(request, reply, user, async () => {
         const updated = await store.updateTaskSecurityMode(user.id, task.id, input.securityMode);
-        if (!updated) throw new AthanorError('task_not_found', 'Task not found');
+        if (!updated) throw new GardenError('task_not_found', 'Task not found');
         const workspace = await store.getWorkspace(user.id, task.workspaceId);
         if (workspace?.wrappedKey) {
           const key = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);

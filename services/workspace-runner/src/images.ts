@@ -28,8 +28,8 @@ export const IMAGE_CONTENT_TYPES: Readonly<Record<string, string>> = {
 /**
  * What a model will actually accept as the picture part of a request.
  *
- * This is the second of the two limits that get confused here. The first is what athanor can read
- * off a disk, which is the table above and is wide. This one is narrow and is not athanor's to
+ * This is the second of the two limits that get confused here. The first is what garden can read
+ * off a disk, which is the table above and is wide. This one is narrow and is not garden's to
  * widen: the gateway sends one `image_url` data URL, and no route behind it takes HEIC, TIFF, BMP,
  * AVIF or SVG. A format outside this set has to be converted before the request is built, because
  * passing it through only moves the refusal to a provider whose error will not say which file.
@@ -42,7 +42,7 @@ export const MODEL_IMAGE_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * How each format athanor can read is re-encoded on its way out, and by which reader.
+ * How each format garden can read is re-encoded on its way out, and by which reader.
  *
  * The coder is named rather than inferred. ImageMagick will otherwise choose one by looking at the
  * bytes, and some of the coders it can choose that way execute what they read; a picture that

@@ -1,4 +1,4 @@
-import { GitObjectId, ProjectGitRemoteInput } from '@athanor/contracts';
+import { GitObjectId, ProjectGitRemoteInput } from '@garden/contracts';
 import { projectGitCommand, projectGitIsAncestor } from './project-git-command.js';
 
 export interface GitRemoteTransport {

@@ -12,7 +12,7 @@
  * intact, because the headers are what the owner is triaging on.
  */
 import { randomUUID } from 'node:crypto';
-import { AthanorError } from './errors.js';
+import { GardenError } from './errors.js';
 import { htmlToText } from './mail-html.js';
 export { htmlToText } from './mail-html.js';
 
@@ -43,7 +43,7 @@ export interface ParsedMessage {
   listUnsubscribe: string | null;
   text: string;
   textTruncated: boolean;
-  /** True when the only body athanor could recover came out of an HTML part. */
+  /** True when the only body garden could recover came out of an HTML part. */
   textFromHtml: boolean;
   attachments: MimeAttachment[];
 }
@@ -517,7 +517,7 @@ export interface OutgoingMessage {
  */
 const assertHeaderSafe = (value: string, field: string): string => {
   if (/[\r\n]/.test(value) || value.includes('\0'))
-    throw new AthanorError(
+    throw new GardenError(
       'mail_header_invalid',
       `The ${field} value contains a line break and cannot be sent`
     );
@@ -544,7 +544,7 @@ const encodeWord = (value: string): string => {
 const formatAddress = (address: MimeAddress): string => {
   const mailbox = assertHeaderSafe(address.address.trim(), 'address');
   if (!/^[^\s@<>,;]+@[^\s@<>,;]+$/.test(mailbox))
-    throw new AthanorError('mail_address_invalid', `"${mailbox}" is not a usable email address`);
+    throw new GardenError('mail_address_invalid', `"${mailbox}" is not a usable email address`);
   if (!address.name) return mailbox;
   const name = assertHeaderSafe(address.name.trim(), 'name');
   if (/[^\u0020-\u007e]/.test(name)) return `${encodeWord(name)} <${mailbox}>`;
@@ -601,7 +601,7 @@ export const composeMessage = (message: OutgoingMessage): { raw: Buffer; message
   const domain = message.from.address.split('@')[1] ?? 'localhost';
   const messageId = message.messageId ?? `<${randomUUID()}@${domain}>`;
   if (!/^<[^<>\s@]+@[^<>\s@]+>$/.test(messageId))
-    throw new AthanorError('mail_message_id_invalid', 'Invalid message identity.');
+    throw new GardenError('mail_message_id_invalid', 'Invalid message identity.');
   const headers: string[] = [
     `From: ${formatAddress(message.from)}`,
     `To: ${message.to.map(formatAddress).join(', ')}`,
@@ -615,7 +615,7 @@ export const composeMessage = (message: OutgoingMessage): { raw: Buffer; message
     'MIME-Version: 1.0'
   ];
   if (!message.to.length && !message.cc.length && !message.bcc.length)
-    throw new AthanorError('mail_recipients_missing', 'A message needs at least one recipient');
+    throw new GardenError('mail_recipients_missing', 'A message needs at least one recipient');
   if (message.inReplyTo)
     headers.push(`In-Reply-To: ${assertHeaderSafe(message.inReplyTo, 'In-Reply-To')}`);
   if (message.references?.length)
@@ -631,7 +631,7 @@ export const composeMessage = (message: OutgoingMessage): { raw: Buffer; message
       messageId
     };
   }
-  const boundary = `athanor-${randomUUID()}`;
+  const boundary = `garden-${randomUUID()}`;
   headers.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
   const sections = [
     `--${boundary}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${base64Lines(body)}`,

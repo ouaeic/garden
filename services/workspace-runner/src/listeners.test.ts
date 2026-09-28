@@ -10,7 +10,7 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { reachOfBindAddress } from '@athanor/core';
+import { reachOfBindAddress } from '@garden/core';
 import {
   agentAccountUid,
   agentListeningSockets,
@@ -97,7 +97,7 @@ describe('parseListeningSockets', () => {
 describe('socketInode', () => {
   it('takes the inode out of a socket link and refuses every other kind of fd', () => {
     expect(socketInode('socket:[84021]')).toBe('84021');
-    expect(socketInode('/home/athanor/workspace/notes.md')).toBeNull();
+    expect(socketInode('/home/garden/workspace/notes.md')).toBeNull();
     expect(socketInode('pipe:[84021]')).toBeNull();
     expect(socketInode('anon_inode:[eventpoll]')).toBeNull();
   });
@@ -145,7 +145,7 @@ describe('listeningSocketsOfGroup', () => {
     tcp: readonly string[],
     tcp6: readonly string[] = []
   ): Promise<string> => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-proc-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-proc-'));
     roots.push(root);
     await mkdir(path.join(root, 'net'), { recursive: true });
     await writeFile(path.join(root, 'net', 'tcp'), [HEADER, ...tcp].join('\n'));
@@ -221,9 +221,9 @@ describe('listeningSocketsOfGroup', () => {
    * nowhere". This asserts the read fails quietly rather than throwing into a listing.
    */
   it('answers empty rather than throwing when there is no proc to read', async () => {
-    expect(
-      await listeningSocketsOfGroup(4242, path.join(tmpdir(), 'athanor-no-proc-here'))
-    ).toEqual([]);
+    expect(await listeningSocketsOfGroup(4242, path.join(tmpdir(), 'garden-no-proc-here'))).toEqual(
+      []
+    );
   });
 
   it('ignores a connection that is not in LISTEN', async () => {
@@ -256,7 +256,7 @@ describe('agentListeningSockets', () => {
     `   0: ${local} 00000000:0000 ${state} 00000000:00000000 00:00000000 00000000     ${uid}        0 ${inode} 1 0 100 0 0 10 0`;
 
   const buildNet = async (tcp: readonly string[], tcp6: readonly string[] = []) => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-net-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-net-'));
     roots.push(root);
     await mkdir(path.join(root, 'net'), { recursive: true });
     await writeFile(path.join(root, 'net', 'tcp'), [HEADER2, ...tcp].join('\n'));
@@ -289,7 +289,7 @@ describe('agentListeningSockets', () => {
   });
 
   it('answers empty rather than throwing where there is no proc', async () => {
-    expect(await agentListeningSockets(997, path.join(tmpdir(), 'athanor-absent'))).toEqual([]);
+    expect(await agentListeningSockets(997, path.join(tmpdir(), 'garden-absent'))).toEqual([]);
   });
 });
 
@@ -300,7 +300,7 @@ describe('agentAccountUid', () => {
   });
 
   const passwd = async (text: string) => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-passwd-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-passwd-'));
     roots.push(root);
     const file = path.join(root, 'passwd');
     await writeFile(file, text);
@@ -311,11 +311,11 @@ describe('agentAccountUid', () => {
     const file = await passwd(
       [
         'root:x:0:0:root:/root:/bin/bash',
-        'athanor-agent:x:997:986::/nonexistent:/usr/sbin/nologin',
-        'athanor:x:1001:1001::/home/athanor:/bin/sh'
+        'garden-agent:x:997:986::/nonexistent:/usr/sbin/nologin',
+        'garden:x:1001:1001::/home/garden:/bin/sh'
       ].join('\n')
     );
-    expect(await agentAccountUid('athanor-agent', file)).toBe(997);
+    expect(await agentAccountUid('garden-agent', file)).toBe(997);
   });
 
   /*
@@ -325,8 +325,8 @@ describe('agentAccountUid', () => {
    */
   it('falls back to this process where there is no such account', async () => {
     const file = await passwd('root:x:0:0:root:/root:/bin/bash');
-    expect(await agentAccountUid('athanor-agent', file)).toBe(process.getuid?.() ?? 0);
-    expect(await agentAccountUid('athanor-agent', '/nonexistent/passwd')).toBe(
+    expect(await agentAccountUid('garden-agent', file)).toBe(process.getuid?.() ?? 0);
+    expect(await agentAccountUid('garden-agent', '/nonexistent/passwd')).toBe(
       process.getuid?.() ?? 0
     );
   });

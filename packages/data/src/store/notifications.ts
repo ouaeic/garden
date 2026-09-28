@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { AthanorError, decryptJson, encryptJson, unwrapDataKey } from '@athanor/core';
-import type { EncryptedEnvelope } from '@athanor/core';
-import { MAX_AGENT_NOTIFICATIONS_PER_TASK } from '@athanor/contracts';
-import type { NotificationKind } from '@athanor/contracts';
+import { GardenError, decryptJson, encryptJson, unwrapDataKey } from '@garden/core';
+import type { EncryptedEnvelope } from '@garden/core';
+import { MAX_AGENT_NOTIFICATIONS_PER_TASK } from '@garden/contracts';
+import type { NotificationKind } from '@garden/contracts';
 import type { Database } from '../database.js';
 import type {
   AgentNotificationRecord,
@@ -285,7 +285,7 @@ export class NotificationStore {
         [input.taskId, input.userId]
       );
       if (Number(existing.rows[0]?.count ?? 0) >= MAX_AGENT_NOTIFICATIONS_PER_TASK)
-        throw new AthanorError(
+        throw new GardenError(
           'agent_notification_limit',
           `This conversation has already sent its ${MAX_AGENT_NOTIFICATIONS_PER_TASK} notifications`
         );
@@ -302,7 +302,7 @@ export class NotificationStore {
         ]
       );
       const row = result.rows[0];
-      if (!row) throw new AthanorError('task_not_found', 'Conversation not found', 404);
+      if (!row) throw new GardenError('task_not_found', 'Conversation not found', 404);
       return {
         id: String(row.id),
         userId: String(row.user_id),

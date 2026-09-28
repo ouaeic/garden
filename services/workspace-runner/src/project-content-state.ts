@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ProjectContentKind } from '@athanor/contracts';
+import type { ProjectContentKind } from '@garden/contracts';
 import { WorkspaceFileError } from './files.js';
 import type { ProjectHistoryMetadata } from './project-history-metadata.js';
 

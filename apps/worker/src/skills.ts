@@ -580,7 +580,7 @@ const firstSentence = (description: string): string => {
  * own roots (see `ownerSkillRoots`) - and never inside any workspace. `file_read` is answered by the runner, a separate service whose `WORKSPACE_ROOT` is
  * a different tree entirely, and every one of its file routes goes through
  * `assertUserDataPath` (`services/workspace-runner/src/files.ts`), which admits `workspace/` and
- * `.athanor/artifacts/` and refuses everything else by design. Wiring `OpenedSkill.allowlist` into
+ * `.garden/artifacts/` and refuses everything else by design. Wiring `OpenedSkill.allowlist` into
  * that layer as a read-only exemption would mean teaching the file boundary a second root, sending
  * it across the worker/runner API on every read, and doing it on the one function whose entire job
  * is to say no - to make a handful of shipped scripts readable that the model does not need to
@@ -606,7 +606,7 @@ const loadOne = (
    * The origin this root confers, when the root is the answer rather than the file.
    *
    * Everything below reads the skill's own declaration, which is right for a library that ships
-   * inside athanor and wrong for one the owner points at: `capabilityCeilingViolations` gives
+   * inside garden and wrong for one the owner points at: `capabilityCeilingViolations` gives
    * `builtin` an unrestricted net grant, `spend: metered`, and writes outside the workspace, and
    * the declaration it reads is a line in the skill's own sidecar. A directory that can be dropped
    * into a watched folder could therefore write itself the ceiling by declaring it. Where the
@@ -668,7 +668,7 @@ const loadOne = (
 
   let sidecar: Record<string, YamlValue> = {};
   try {
-    sidecar = parseSkillYaml(readFileSync(join(directory, 'athanor.yaml'), 'utf8'));
+    sidecar = parseSkillYaml(readFileSync(join(directory, 'garden.yaml'), 'utf8'));
   } catch (error) {
     if (error instanceof SkillFormatError) {
       diagnostics.push({
@@ -683,7 +683,7 @@ const loadOne = (
       skill: name,
       level: 'warn',
       code: 'sidecar_missing',
-      message: 'athanor.yaml is absent; the skill loads with an empty capability grant'
+      message: 'garden.yaml is absent; the skill loads with an empty capability grant'
     });
   }
 
@@ -692,7 +692,7 @@ const loadOne = (
     forcedOrigin ??
     ((): SkillOrigin => {
       const declared = text(
-        mapping(sidecar.lineage ?? null).origin ?? metadata['athanor.tier'] ?? null
+        mapping(sidecar.lineage ?? null).origin ?? metadata['garden.tier'] ?? null
       );
       return declared === 'learned' || declared === 'owner' ? declared : 'builtin';
     })();
@@ -739,10 +739,10 @@ const loadOne = (
     catalogLine,
     body: front.body,
     directory,
-    version: text(sidecar.version ?? metadata['athanor.version'] ?? null, '1.0.0'),
+    version: text(sidecar.version ?? metadata['garden.version'] ?? null, '1.0.0'),
     origin,
-    risk: text(metadata['athanor.risk'] ?? null, 'workspace'),
-    domain: text(metadata['athanor.domain'] ?? null, 'general'),
+    risk: text(metadata['garden.risk'] ?? null, 'workspace'),
+    domain: text(metadata['garden.domain'] ?? null, 'general'),
     allowedTools: stringList(front.data['allowed-tools'] ?? null),
     requiredTools: stringList(requires.tools ?? null),
     requiredBinaries: stringList(requires.binaries ?? null),
@@ -796,13 +796,13 @@ export const loadSkillLibrary = (
  * `SkillOrigin` has declared an `owner` variant since the library was written and no on-disk skill
  * could ever reach it: `DEFAULT_SKILL_ROOT` was the only root anything loaded, and the only other
  * way in - `skill(action=upsert)` - writes a database row rather than a folder. So the ceiling in
- * `capabilityCeilingViolations` that exists specifically for skills athanor did not ship had
+ * `capabilityCeilingViolations` that exists specifically for skills garden did not ship had
  * nothing to apply to, and an owner with a folder of procedures had nowhere to put it.
  *
  * A directory rather than a marketplace, deliberately. The format this loader already reads is the
  * one the open corpus is written in - a folder with a `SKILL.md` carrying `name` and `description`
- * in front matter - and everything athanor asks for beyond that is a warning, not a refusal: the
- * `athanor.yaml` sidecar is optional and its absence loads the skill with an empty capability
+ * in front matter - and everything garden asks for beyond that is a warning, not a refusal: the
+ * `garden.yaml` sidecar is optional and its absence loads the skill with an empty capability
  * grant, which `skills/README.md` records as the whole point of keeping it a sidecar. So this is
  * the entire cost of reading other people's skills: a place to point at.
  *
@@ -882,12 +882,12 @@ let cached: SkillLibrary | null = null;
 let cachedBuiltin: SkillLibrary | null = null;
 
 /**
- * Only what athanor ships, which is what `isBuiltinSkillName` is asking about.
+ * Only what garden ships, which is what `isBuiltinSkillName` is asking about.
  *
  * Kept apart from the resident catalogue below on purpose. The card an upsert raises says "Review
  * owner override of built-in skill X" and promises the built-in survives untouched, and neither
  * sentence is true of a folder the owner pointed at - that one is theirs, and a workspace skill
- * taking its name is an ordinary replacement, not an override of something athanor guarantees.
+ * taking its name is an ordinary replacement, not an override of something garden guarantees.
  */
 const builtinOnlySkillLibrary = (): SkillLibrary => {
   cachedBuiltin ??= loadSkillLibrary();
@@ -947,7 +947,7 @@ export const skillCatalogBlock = (library: SkillLibrary): string => {
    * for every task on every installation to describe a folder almost none of them have.
    */
   const heading = library.skills.some((skill) => skill.origin === 'owner')
-    ? 'Skills on this computer, athanor’s own and your own (index only; open one before doing the work it covers)'
+    ? 'Skills on this computer, garden’s own and your own (index only; open one before doing the work it covers)'
     : 'Built-in skills (index only; open one before doing the work it covers)';
   return `${heading}:\n${lines.join('\n')}`;
 };
@@ -1047,13 +1047,13 @@ export const scanSkillBodyForSecrets = (body: string): string[] =>
 /**
  * An absolute path that names one run's machine state rather than anything durable.
  *
- * The exempt prefixes are the ones athanor itself installs and every vetted procedure names -
- * the pinned interpreter under /usr/local/lib/athanor and the wrapper commands in /usr/local/bin -
+ * The exempt prefixes are the ones garden itself installs and every vetted procedure names -
+ * the pinned interpreter under /usr/local/lib/garden and the wrapper commands in /usr/local/bin -
  * plus the two scratch roots. Flagging those would put a warning on the single most common correct
  * line in a skill, and a warning that fires on the correct case is one the reviewer stops reading.
  */
 const ABSOLUTE_PATH =
-  /(^|\s)\/(?!tmp\/|var\/lib\/athanor\/|usr\/local\/bin\/|usr\/local\/lib\/athanor\/)[A-Za-z0-9._-]+\/[^\s`'")]*/g;
+  /(^|\s)\/(?!tmp\/|var\/lib\/garden\/|usr\/local\/bin\/|usr\/local\/lib\/garden\/)[A-Za-z0-9._-]+\/[^\s`'")]*/g;
 
 export const scanSkillBodyForPaths = (body: string): string[] => [
   ...new Set((body.match(ABSOLUTE_PATH) ?? []).map((match) => match.trim()))

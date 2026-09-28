@@ -1,4 +1,4 @@
-import { runtimeNow } from '@athanor/core';
+import { runtimeNow } from '@garden/core';
 /**
  * The bound on a patch sent again byte for byte after it was refused.
  *

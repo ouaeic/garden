@@ -36,28 +36,28 @@ use tokio_tungstenite::{
 mod preview_proxy;
 
 const RETRYABLE_BODY_LIMIT: usize = 16 * 1024 * 1024;
-const SERVER_SESSION_COOKIE: &str = "__Host-athanor_session";
-const LOCAL_SESSION_COOKIE: &str = "athanor_native_session";
+const SERVER_SESSION_COOKIE: &str = "__Host-garden_session";
+const LOCAL_SESSION_COOKIE: &str = "garden_native_session";
 /*
  * What this program is, on the request side of the gateway.
  *
- * The shell already stamped `x-athanor-native-client` on every *response* so the page could learn
+ * The shell already stamped `x-garden-native-client` on every *response* so the page could learn
  * it was talking through the gateway, and stamped nothing on the way out - so the box saw a plain
  * WKWebView/WebView2/WebKitGTK User-Agent and labelled the owner's desktop app "Safari on macOS",
  * byte-identical to their real Safari in the Devices list that is also the revoke-a-session
  * control. The platform is a build fact, not a runtime one, so it is a constant.
  */
 #[cfg(target_os = "macos")]
-const CLIENT_IDENTITY: &str = concat!("athanor-macos/", env!("CARGO_PKG_VERSION"));
+const CLIENT_IDENTITY: &str = concat!("garden-macos/", env!("CARGO_PKG_VERSION"));
 #[cfg(target_os = "windows")]
-const CLIENT_IDENTITY: &str = concat!("athanor-windows/", env!("CARGO_PKG_VERSION"));
+const CLIENT_IDENTITY: &str = concat!("garden-windows/", env!("CARGO_PKG_VERSION"));
 #[cfg(target_os = "linux")]
-const CLIENT_IDENTITY: &str = concat!("athanor-linux/", env!("CARGO_PKG_VERSION"));
+const CLIENT_IDENTITY: &str = concat!("garden-linux/", env!("CARGO_PKG_VERSION"));
 #[cfg(target_os = "ios")]
-const CLIENT_IDENTITY: &str = concat!("athanor-ios/", env!("CARGO_PKG_VERSION"));
+const CLIENT_IDENTITY: &str = concat!("garden-ios/", env!("CARGO_PKG_VERSION"));
 #[cfg(target_os = "android")]
-const CLIENT_IDENTITY: &str = concat!("athanor-android/", env!("CARGO_PKG_VERSION"));
-const CLIENT_HEADER: &str = "x-athanor-client";
+const CLIENT_IDENTITY: &str = concat!("garden-android/", env!("CARGO_PKG_VERSION"));
+const CLIENT_HEADER: &str = "x-garden-client";
 
 #[derive(Clone)]
 struct ActiveServer {
@@ -414,14 +414,14 @@ pub async fn start(state: Arc<ClientState>) -> Result<String, String> {
     *state.local_origin.write().await = origin.clone();
     preview_proxy::start(state.clone()).await?;
     let router = Router::new()
-        .route("/__athanor/client/status", get(client_status))
-        .route("/__athanor/client/pair", post(pair))
+        .route("/__garden/client/status", get(client_status))
+        .route("/__garden/client/pair", post(pair))
         .route(
-            "/__athanor/client/network-preference",
+            "/__garden/client/network-preference",
             post(save_network_preference),
         )
-        .route("/__athanor/client/profile", delete(forget_server))
-        .route("/__athanor/client/bootstrap", get(bootstrap))
+        .route("/__garden/client/profile", delete(forget_server))
+        .route("/__garden/client/bootstrap", get(bootstrap))
         .fallback(proxy)
         .with_state(state)
         .layer(middleware::from_fn_with_state(
@@ -490,8 +490,8 @@ fn is_foreign_origin(headers: &HeaderMap, expected: &str) -> bool {
  * an attacker's own hostname at 127.0.0.1, after which the page's fetches to `http://their-name:PORT/`
  * are same-origin from the browser's point of view: no `Origin` header is sent, no CORS check runs,
  * and the response body is readable. The session cookie does not travel (it is scoped to the host
- * `localhost`), so the proxied API stays unauthenticated - but `/__athanor/client/status` and
- * `/__athanor/client/bootstrap` need no session, and between them they hand out the box's public
+ * `localhost`), so the proxied API stays unauthenticated - but `/__garden/client/status` and
+ * `/__garden/client/bootstrap` need no session, and between them they hand out the box's public
  * endpoints and the first-owner pairing code. The port stopped being a secret when it was fixed and
  * written to disk so that local storage would survive a restart.
  *
@@ -877,7 +877,7 @@ fn canonical_origin(active: &ActiveServer) -> &str {
 }
 
 fn is_preview_path(path: &str) -> bool {
-    let Some(remainder) = path.strip_prefix("/__athanor/preview/") else {
+    let Some(remainder) = path.strip_prefix("/__garden/preview/") else {
         return false;
     };
     let slug = remainder.split('/').next().unwrap_or("");
@@ -989,19 +989,19 @@ fn upstream_response(
     let mut builder = Response::builder().status(status);
     if let Some(headers) = builder.headers_mut() {
         headers.insert(
-            HeaderName::from_static("x-athanor-native-client"),
+            HeaderName::from_static("x-garden-native-client"),
             HeaderValue::from_static("1"),
         );
         if let Ok(origin) = HeaderValue::from_str(canonical_origin(active)) {
-            headers.insert(HeaderName::from_static("x-athanor-server-origin"), origin);
+            headers.insert(HeaderName::from_static("x-garden-server-origin"), origin);
         }
         if let Some(preview) = preview {
             headers.insert(
-                HeaderName::from_static("x-athanor-preview-origin"),
+                HeaderName::from_static("x-garden-preview-origin"),
                 HeaderValue::from_str(&preview.remote.origin().ascii_serialization()).unwrap(),
             );
             headers.insert(
-                HeaderName::from_static("x-athanor-preview-local-origin"),
+                HeaderName::from_static("x-garden-preview-local-origin"),
                 HeaderValue::from_str(&preview.local).unwrap(),
             );
         }
@@ -1009,10 +1009,10 @@ fn upstream_response(
             if !is_hop_by_hop(name) && name != CONTENT_LENGTH {
                 if matches!(
                     name.as_str(),
-                    "x-athanor-native-client"
-                        | "x-athanor-server-origin"
-                        | "x-athanor-preview-origin"
-                        | "x-athanor-preview-local-origin"
+                    "x-garden-native-client"
+                        | "x-garden-server-origin"
+                        | "x-garden-preview-origin"
+                        | "x-garden-preview-local-origin"
                 ) {
                     continue;
                 }
@@ -1286,9 +1286,9 @@ async fn websocket_proxy(
         .unwrap_or_default();
     let upgrade = if offered
         .split(',')
-        .any(|value| value.trim() == "athanor-capability")
+        .any(|value| value.trim() == "garden-capability")
     {
-        upgrade.protocols(["athanor-capability"])
+        upgrade.protocols(["garden-capability"])
     } else {
         upgrade
     };
@@ -1511,7 +1511,7 @@ fn offline_page(
   button.addEventListener('click', async () => {{
     button.disabled = true; ticket.removeAttribute('aria-invalid'); error.textContent = 'Verifying server identity…';
     try {{
-      const response = await fetch('/__athanor/client/pair', {{
+      const response = await fetch('/__garden/client/pair', {{
         method: 'POST', headers: {{'content-type':'application/json'}},
         body: JSON.stringify({{ticket: ticket.value.trim()}})
       }});
@@ -1526,7 +1526,7 @@ fn offline_page(
   document.querySelectorAll('[data-network]').forEach((choice) => {{
     choice.addEventListener('click', async () => {{
       const preference = choice.dataset.network;
-      const response = await fetch('/__athanor/client/network-preference', {{
+      const response = await fetch('/__garden/client/network-preference', {{
         method: 'POST',
         headers: {{'content-type': 'application/json'}},
         body: JSON.stringify({{preference}})
@@ -1552,8 +1552,8 @@ mod tests {
         let mut headers = HeaderMap::new();
         for cookie in [
             "unrelated=opaque",
-            "__Host-athanor_session_extra=opaque",
-            "__Host-athanor_session=; HttpOnly",
+            "__Host-garden_session_extra=opaque",
+            "__Host-garden_session=; HttpOnly",
         ] {
             headers.insert(SET_COOKIE, HeaderValue::from_str(cookie).unwrap());
             assert!(!issued_server_session(
@@ -1564,7 +1564,7 @@ mod tests {
         }
         headers.insert(
             SET_COOKIE,
-            HeaderValue::from_static("__Host-athanor_session=opaque; Secure; HttpOnly"),
+            HeaderValue::from_static("__Host-garden_session=opaque; Secure; HttpOnly"),
         );
         assert!(issued_server_session(
             "/v1/auth/native/redeem",
@@ -1634,7 +1634,7 @@ mod tests {
         input.insert(ORIGIN, HeaderValue::from_static("http://localhost:41000"));
         input.insert(
             COOKIE,
-            HeaderValue::from_static("theme=dark; athanor_native_session=private-value"),
+            HeaderValue::from_static("theme=dark; garden_native_session=private-value"),
         );
         let result = forwarded_headers(&input, "https://ai.example.test");
         assert!(!result.contains_key(axum::http::header::CONNECTION));
@@ -1645,7 +1645,7 @@ mod tests {
         );
         assert_eq!(
             result.get(COOKIE).unwrap(),
-            &HeaderValue::from_static("theme=dark; __Host-athanor_session=private-value")
+            &HeaderValue::from_static("theme=dark; __Host-garden_session=private-value")
         );
     }
 
@@ -1659,12 +1659,12 @@ mod tests {
         input.insert(ORIGIN, HeaderValue::from_static("http://localhost:41000"));
         input.insert(
             HeaderName::from_static(CLIENT_HEADER),
-            HeaderValue::from_static("athanor-macos/999.999.999"),
+            HeaderValue::from_static("garden-macos/999.999.999"),
         );
         let result = forwarded_headers(&input, "https://ai.example.test");
         let stamped = result.get(CLIENT_HEADER).unwrap().to_str().unwrap();
         assert_eq!(stamped, CLIENT_IDENTITY);
-        assert!(stamped.starts_with("athanor-"));
+        assert!(stamped.starts_with("garden-"));
         assert!(stamped.ends_with(concat!("/", env!("CARGO_PKG_VERSION"))));
         // Insert, not append: a page that stamped its own value must not reach the box with two.
         assert_eq!(result.get_all(CLIENT_HEADER).iter().count(), 1);
@@ -1726,11 +1726,11 @@ mod tests {
     fn translates_the_secure_server_session_for_the_loopback_origin() {
         assert_eq!(
             local_set_cookie(
-                "__Host-athanor_session=private-value; Path=/; HttpOnly; Secure; SameSite=Lax"
+                "__Host-garden_session=private-value; Path=/; HttpOnly; Secure; SameSite=Lax"
             )
             .unwrap(),
             HeaderValue::from_static(
-                "athanor_native_session=private-value; Path=/; HttpOnly; SameSite=Lax"
+                "garden_native_session=private-value; Path=/; HttpOnly; SameSite=Lax"
             )
         );
         assert!(local_set_cookie("unrelated=value; Secure").is_none());
@@ -1757,7 +1757,7 @@ mod tests {
     fn native_preview_browser_open_is_scoped_and_preserves_signed_url() {
         let owner = "https://garden.test";
         let preview = "https://garden.test:8443";
-        let path = "/__athanor/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/";
+        let path = "/__garden/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/";
         let raw = format!("{preview}{path}?access=fixture%2Fsigned%3D&next=%2Findex.html#scene");
         assert_eq!(
             checked_preview_browser_url(&raw, owner, Some(preview)).unwrap(),
@@ -1829,16 +1829,16 @@ mod tests {
             reqwest::Response::from(axum::http::Response::builder()
             .header("content-security-policy", sandbox)
             .header("content-security-policy", "frame-ancestors https://example.test")
-            .header("x-athanor-native-client", "forged")
-            .header("x-athanor-server-origin", "https://outside.test")
-            .header("location", "https://example.test:8443/__athanor/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/")
+            .header("x-garden-native-client", "forged")
+            .header("x-garden-server-origin", "https://outside.test")
+            .header("location", "https://example.test:8443/__garden/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/")
             .body("preview bytes").unwrap())
         };
         let result = upstream_response(
             upstream(),
             &active,
             "http://localhost:41000",
-            "/__athanor/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/index.html",
+            "/__garden/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/index.html",
             None,
             "http://localhost:41001",
         );
@@ -1852,19 +1852,19 @@ mod tests {
         assert_eq!(
             result
                 .headers()
-                .get_all("x-athanor-native-client")
+                .get_all("x-garden-native-client")
                 .iter()
                 .count(),
             1
         );
-        assert_eq!(result.headers()["x-athanor-native-client"], "1");
+        assert_eq!(result.headers()["x-garden-native-client"], "1");
         assert_eq!(
-            result.headers()["x-athanor-server-origin"],
+            result.headers()["x-garden-server-origin"],
             "https://example.test"
         );
         assert_eq!(
             result.headers()[LOCATION],
-            "https://example.test:8443/__athanor/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/"
+            "https://example.test:8443/__garden/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/"
         );
         assert_eq!(
             to_bytes(result.into_body(), 1024).await.unwrap().as_ref(),
@@ -1872,8 +1872,8 @@ mod tests {
         );
         let denied_paths = [
             "/v1/share",
-            "/__athanor/preview/other/",
-            "/__athanor/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-extra/",
+            "/__garden/preview/other/",
+            "/__garden/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-extra/",
         ];
         assert!(!denied_paths.is_empty());
         for path in denied_paths {
@@ -1959,7 +1959,7 @@ mod tests {
     #[tokio::test]
     async fn loads_pending_pairing_only_from_the_explicit_cache_path() {
         let directory =
-            std::env::temp_dir().join(format!("athanor-pairing-cache-{}", uuid::Uuid::new_v4()));
+            std::env::temp_dir().join(format!("garden-pairing-cache-{}", uuid::Uuid::new_v4()));
         let data_directory = directory.join("data");
         let cache_directory = directory.join("cache");
         let profile_path = data_directory.join("server-profile.json");
@@ -1995,7 +1995,7 @@ mod tests {
             ),
             endpoints: vec!["https://example.test".into()],
             discovery: Discovery {
-                mdns_service: "_athanor._tcp.local".into(),
+                mdns_service: "_garden._tcp.local".into(),
                 mdns_port: 443,
             },
             last_endpoint: None,
@@ -2012,7 +2012,7 @@ mod tests {
     #[tokio::test]
     async fn forgetting_a_server_removes_the_profile_and_the_pairing_code_it_came_with() {
         let directory =
-            std::env::temp_dir().join(format!("athanor-forget-{}", uuid::Uuid::new_v4()));
+            std::env::temp_dir().join(format!("garden-forget-{}", uuid::Uuid::new_v4()));
         let profile_path = directory.join("server-profile.json");
         let pending_path = directory.join("pending-pairing.json");
         save_profile(&profile_path, &test_profile()).unwrap();
@@ -2043,7 +2043,7 @@ mod tests {
     #[tokio::test]
     async fn the_status_route_reports_why_the_connection_is_down() {
         let directory =
-            std::env::temp_dir().join(format!("athanor-status-{}", uuid::Uuid::new_v4()));
+            std::env::temp_dir().join(format!("garden-status-{}", uuid::Uuid::new_v4()));
         let profile_path = directory.join("server-profile.json");
         save_profile(&profile_path, &test_profile()).unwrap();
         let state =
@@ -2078,7 +2078,7 @@ mod tests {
     #[tokio::test]
     async fn the_running_gateway_answers_only_its_own_name_and_its_own_origin() {
         let directory =
-            std::env::temp_dir().join(format!("athanor-gateway-guard-{}", uuid::Uuid::new_v4()));
+            std::env::temp_dir().join(format!("garden-gateway-guard-{}", uuid::Uuid::new_v4()));
         let profile_path = directory.join("server-profile.json");
         save_profile(&profile_path, &test_profile()).unwrap();
         let state =
@@ -2088,7 +2088,7 @@ mod tests {
         let client = reqwest::Client::new();
 
         let allowed = client
-            .get(format!("{origin}/__athanor/client/status"))
+            .get(format!("{origin}/__garden/client/status"))
             .send()
             .await
             .unwrap();
@@ -2096,7 +2096,7 @@ mod tests {
 
         // DNS rebinding: the page's own hostname, resolved to 127.0.0.1 by the attacker's DNS.
         let rebound = client
-            .get(format!("{origin}/__athanor/client/bootstrap"))
+            .get(format!("{origin}/__garden/client/bootstrap"))
             .header(HOST, format!("rebound.attacker.test:{port}"))
             .send()
             .await
@@ -2119,7 +2119,7 @@ mod tests {
 
     #[tokio::test]
     async fn proxies_the_live_pinned_server_when_explicitly_requested() {
-        let Ok(path) = std::env::var("ATHANOR_LIVE_MANIFEST") else {
+        let Ok(path) = std::env::var("GARDEN_LIVE_MANIFEST") else {
             return;
         };
         #[derive(Deserialize)]
@@ -2131,7 +2131,7 @@ mod tests {
         }
         let manifest: LiveManifest = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
         let directory =
-            std::env::temp_dir().join(format!("athanor-live-proxy-{}", uuid::Uuid::new_v4()));
+            std::env::temp_dir().join(format!("garden-live-proxy-{}", uuid::Uuid::new_v4()));
         let profile_path = directory.join("server-profile.json");
         save_profile(
             &profile_path,
@@ -2157,7 +2157,7 @@ mod tests {
         assert_eq!(
             response
                 .headers()
-                .get("x-athanor-native-client")
+                .get("x-garden-native-client")
                 .and_then(|value| value.to_str().ok()),
             Some("1")
         );

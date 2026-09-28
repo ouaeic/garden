@@ -62,7 +62,7 @@ export function assertNoIosSensitiveContent(label, bytes) {
 }
 
 export function validateIosInfo(info, expectedVersion) {
-  invariant(info.CFBundleIdentifier === 'org.athanor.ai', 'iOS bundle identifier changed');
+  invariant(info.CFBundleIdentifier === 'org.garden.ai', 'iOS bundle identifier changed');
   invariant(info.CFBundleName === 'garden', 'iOS bundle name changed');
   invariant(
     info.CFBundleShortVersionString === expectedVersion,
@@ -78,7 +78,7 @@ export function validateIosInfo(info, expectedVersion) {
   );
   const schemes = (info.CFBundleURLTypes ?? []).flatMap((entry) => entry.CFBundleURLSchemes ?? []);
   invariant(
-    schemes.length === 2 && schemes.includes('garden') && schemes.includes('athanor'),
+    schemes.length === 1 && schemes.includes('garden'),
     'iOS pairing deep-link boundary changed'
   );
   const transport = info.NSAppTransportSecurity ?? {};
@@ -91,7 +91,7 @@ export function validateIosInfo(info, expectedVersion) {
     'iOS transport policy must permit insecure HTTP only for exact localhost'
   );
   invariant(
-    JSON.stringify(info.NSBonjourServices) === JSON.stringify(['_athanor._tcp']),
+    JSON.stringify(info.NSBonjourServices) === JSON.stringify(['_garden._tcp']),
     'iOS Bonjour discovery boundary changed'
   );
   for (const key of [
@@ -145,7 +145,7 @@ export async function verifyIosIpa(ipaPath) {
   const infoEntries = entries.filter((entry) => /^Payload\/[^/]+\.app\/Info\.plist$/.test(entry));
   invariant(infoEntries.length === 1, 'iOS package must contain exactly one application');
 
-  const extractionDirectory = await mkdtemp(join(tmpdir(), 'athanor-ios-audit-'));
+  const extractionDirectory = await mkdtemp(join(tmpdir(), 'garden-ios-audit-'));
   try {
     await command('unzip', ['-q', resolvedIpa, '-d', extractionDirectory]);
     await assertContainedSymlinks(extractionDirectory);
@@ -188,8 +188,8 @@ export async function verifyIosIpa(ipaPath) {
     );
     invariant(
       entitlementsText.includes('application-identifier') &&
-        entitlementsText.includes('.org.athanor.ai'),
-      'iOS release signing identity does not cover org.athanor.ai'
+        entitlementsText.includes('.org.garden.ai'),
+      'iOS release signing identity does not cover org.garden.ai'
     );
 
     const provisionPath = join(applicationDirectory, 'embedded.mobileprovision');
@@ -211,10 +211,9 @@ export async function verifyIosIpa(ipaPath) {
       'iOS release provisioning profile is expired'
     );
     invariant(
-      String(provision.Entitlements?.['application-identifier'] ?? '').endsWith(
-        '.org.athanor.ai'
-      ) && provision.Entitlements?.['get-task-allow'] !== true,
-      'iOS provisioning profile does not securely cover org.athanor.ai'
+      String(provision.Entitlements?.['application-identifier'] ?? '').endsWith('.org.garden.ai') &&
+        provision.Entitlements?.['get-task-allow'] !== true,
+      'iOS provisioning profile does not securely cover org.garden.ai'
     );
 
     assertNoIosSensitiveContent('iOS application executable', await readFile(executable));

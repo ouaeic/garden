@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { decryptJson, generateDataKey } from '@athanor/core';
-import type { TaskRecord } from '@athanor/data';
+import { decryptJson, generateDataKey } from '@garden/core';
+import type { TaskRecord } from '@garden/data';
 import type { AgentState } from './agent-state.js';
-import type { ModelRelease } from '@athanor/contracts';
-import type { ModelGateway } from '@athanor/model-gateway';
+import type { ModelRelease } from '@garden/contracts';
+import type { ModelGateway } from '@garden/model-gateway';
 import {
   handOffAtStepLimit,
   renewStepBudget,
@@ -214,7 +214,7 @@ describe('the effort the closing call thinks at', () => {
       turn: 0,
       credits: 40,
       messages: [
-        { role: 'system', content: 'ATHANOR RUNTIME CONTEXT (dynamic)' },
+        { role: 'system', content: 'GARDEN RUNTIME CONTEXT (dynamic)' },
         { role: 'user', content: 'fix the importer' },
         {
           role: 'assistant',

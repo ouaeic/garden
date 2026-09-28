@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ModelRelease } from '@athanor/contracts';
+import type { ModelRelease } from '@garden/contracts';
 import { Button, Field } from '../ui.js';
 import { money } from '../model.js';
 

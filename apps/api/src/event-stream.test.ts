@@ -9,7 +9,7 @@
  * connection the server ends underneath itself - exists only in the socket's lifecycle.
  *
  * The provider is scripted with a deliberate 300 ms first byte so the latency numbers below are
- * athanor's own overhead and not the model's.
+ * garden's own overhead and not the model's.
  *
  * Two shapes of fixture live here. The short one answers in a sentence and produces four delta
  * frames, which is enough to time a first paint and nothing else: a four-frame stream is over
@@ -23,7 +23,7 @@ import net from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { seedModels } from '@athanor/model-gateway';
+import { seedModels } from '@garden/model-gateway';
 import type { ApiConfig } from './config.js';
 import { buildServer } from './server.js';
 
@@ -136,7 +136,7 @@ const start = async (
     deltaChars?: number;
   } = {}
 ): Promise<LatencyHarness> => {
-  const directory = await mkdtemp(join(tmpdir(), 'athanor-latency-'));
+  const directory = await mkdtemp(join(tmpdir(), 'garden-latency-'));
   disposers.push(() => rm(directory, { recursive: true, force: true }));
   const runnerCalls: string[] = [];
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -168,7 +168,7 @@ const start = async (
             taskId: expect.any(String) as unknown,
             workspaceId: expect.any(String) as unknown,
             kind: 'new',
-            paths: ['workspace/AGENTS.md', 'workspace/ATHANOR.md', 'workspace/OPEN_CLOUD.md']
+            paths: ['workspace/AGENTS.md', 'workspace/GARDEN.md', 'workspace/OPEN_CLOUD.md']
           });
           return json({
             status: 'ready',
@@ -288,7 +288,7 @@ const start = async (
     DEPLOYMENT_MODE: 'development',
     MODEL_CATALOG_SCOPE: 'reviewed_open_weight',
     CONNECTION_MANIFEST_PATH: join(directory, 'connection.json'),
-    ATHANOR_STATE_PATH: directory,
+    GARDEN_STATE_PATH: directory,
     RELAY_STATE_DIR: join(directory, 'relay'),
     RELAY_LOCAL_HOST: '127.0.0.1',
     RELAY_LOCAL_PORT: 443,
@@ -312,7 +312,7 @@ const start = async (
     PUBLIC_RUNNER_URL: 'ws://127.0.0.1:4300',
     WORKSPACE_IMAGE_REVISION: 'dev',
     WEBAUTHN_RP_ID: 'localhost',
-    WEBAUTHN_RP_NAME: 'athanor Test',
+    WEBAUTHN_RP_NAME: 'garden Test',
     WEBAUTHN_ORIGIN: 'http://localhost:5173',
     ALLOW_INSECURE_DEV_AUTH: true,
     WORKER_ID: 'latency-worker',

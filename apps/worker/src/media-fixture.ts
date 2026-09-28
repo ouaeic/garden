@@ -1,4 +1,4 @@
-import { seedMediaModels, type MediaRouteResolver } from '@athanor/model-gateway';
+import { seedMediaModels, type MediaRouteResolver } from '@garden/model-gateway';
 import type { InferenceCredential } from './agent-state.js';
 
 /** Explicit provider metadata for offline loop tests; discovery has its own HTTP contract tests. */

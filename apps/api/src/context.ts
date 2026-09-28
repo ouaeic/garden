@@ -1,4 +1,4 @@
-import type { ModelRelease } from '@athanor/contracts';
+import type { ModelRelease } from '@garden/contracts';
 /**
  * The API server's context: everything a route needs that is not the route.
  *
@@ -45,9 +45,9 @@ import type {
   Workspace,
   WorkspaceCheckpoint,
   WorkspacePreview
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import {
-  AthanorError,
+  GardenError,
   buildConversationNameIndex,
   decryptJson,
   deriveServiceSecret,
@@ -60,7 +60,7 @@ import {
   type ConnectorTransport,
   type MailSocketFactory,
   type OwnerPriceCeiling
-} from '@athanor/core';
+} from '@garden/core';
 import {
   assertMasterKeyOpensDatabase,
   createDatabase,
@@ -73,8 +73,8 @@ import {
   type WorkspaceCheckpointRecord,
   type WorkspacePreviewRecord,
   type WorkspaceRecord
-} from '@athanor/data';
-import { connectorHostAllowance } from '@athanor/worker';
+} from '@garden/data';
+import { connectorHostAllowance } from '@garden/worker';
 import type { ApiConfig } from './config.js';
 import { createLogger, errorFields, type Logger } from './log.js';
 import { buildPreviewGateway } from './preview-gateway.js';
@@ -193,7 +193,7 @@ export const revealedTaskEvent = (
   if (
     encryptedPayload &&
     typeof encryptedPayload === 'object' &&
-    (encryptedPayload as { __athanorEventVersion?: unknown }).__athanorEventVersion === 1
+    (encryptedPayload as { __gardenEventVersion?: unknown }).__gardenEventVersion === 1
   ) {
     const content = encryptedPayload as { summary?: unknown; payload?: unknown };
     return {
@@ -310,8 +310,8 @@ export interface ConnectionManifest {
  * A client refuses a ticket whose version it does not recognise and one carrying a field it has
  * never heard of, which is what makes this a number rather than a preference: an installer and a
  * server that print different tickets produce a device that cannot be added. The installer writes
- * the same three values - `scripts/athanor` where it prints the first-device ticket, and
- * `scripts/athanor-network-refresh` where it writes the manifest this reads.
+ * the same three values - `scripts/garden` where it prints the first-device ticket, and
+ * `scripts/garden-network-refresh` where it writes the manifest this reads.
  */
 /**
  * The provider connection one account's model calls go through, as it is sealed in the database.
@@ -361,7 +361,7 @@ export interface InferenceSecret {
 }
 
 export const CONNECTION_TICKET_VERSION = 2;
-export const MDNS_SERVICE = '_athanor._tcp.local';
+export const MDNS_SERVICE = '_garden._tcp.local';
 export const MDNS_PORT = 443;
 
 /**
@@ -386,9 +386,9 @@ const readConnectionManifest = async (path: string): Promise<ConnectionManifest>
         : {})
     };
   } catch {
-    throw new AthanorError(
+    throw new GardenError(
       'connection_manifest_unavailable',
-      'The server connection details are not available yet; run sudo athanor connect on the server',
+      'The server connection details are not available yet; run sudo garden connect on the server',
       503
     );
   }
@@ -473,7 +473,7 @@ const shareRateLimitWindowMs = 60_000;
  */
 export const clockToMinutes = (value: string): number => {
   const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
-  if (!match) throw new AthanorError('invalid_quiet_hours', 'Quiet hours need a time like 22:00');
+  if (!match) throw new GardenError('invalid_quiet_hours', 'Quiet hours need a time like 22:00');
   return Number(match[1]) * 60 + Number(match[2]);
 };
 export const minutesToClock = (value: number): string =>
@@ -482,7 +482,7 @@ export const minutesToClock = (value: number): string =>
 /** The preferred standing brief and supported compatibility names, in precedence order. */
 export const workspaceBriefPath = 'workspace/GARDEN.md';
 export const legacyWorkspaceBriefPaths = [
-  'workspace/ATHANOR.md',
+  'workspace/GARDEN.md',
   'workspace/OPEN_CLOUD.md',
   'workspace/AGENTS.md'
 ] as const;
@@ -561,7 +561,7 @@ export const readBackupStatus = async (
  * The Updates row had the mirror-image fault: static copy telling an owner who enabled weekly
  * updates a year ago to go and enable them.
  *
- * `systemctl is-enabled`, which is what `athanor check` already asks, with the same three
+ * `systemctl is-enabled`, which is what `garden check` already asks, with the same three
  * answers. `unknown` is the honest one for a box that is not systemd-managed - a development
  * checkout, a container - and for a `systemctl` that does not answer inside the budget: the
  * screen says it cannot tell rather than reporting `off` and sending the owner to switch on a
@@ -635,7 +635,7 @@ export const createApiContext = async (config: ApiConfig, overrides: ApiOverride
    *
    * A connector verified against one list and then executed against another is a connector that
    * connects and then fails the first time it is asked to do anything, so both processes read the
-   * single rule in @athanor/worker: the deployment list plus the connector's own hostname, except
+   * single rule in @garden/worker: the deployment list plus the connector's own hostname, except
    * for mail and calendar, where the deployment list stands alone because a mailbox's submission
    * host is routinely a different name from the one it is read on.
    */
@@ -643,7 +643,7 @@ export const createApiContext = async (config: ApiConfig, overrides: ApiOverride
     connectorHostAllowance(config.CONNECTOR_ALLOWED_HOST_SUFFIXES, { kind, baseUrl });
   /**
    * Publishing a preview points the internet at a loopback port of the agent computer, and every
-   * athanor service is on loopback: the API, this preview gateway, the runner, PostgreSQL and the
+   * garden service is on loopback: the API, this preview gateway, the runner, PostgreSQL and the
    * sibling health endpoints. Refusing our own ports is what keeps "publish my demo on 3000" from
    * becoming "publish the database on 5432".
    */
@@ -705,13 +705,13 @@ export const createApiContext = async (config: ApiConfig, overrides: ApiOverride
           for (const [candidate, attempt] of attempts) {
             if (attempt.resetAt <= now) attempts.delete(candidate);
           }
-          if (attempts.size >= 10_000) throw new AthanorError(code, busy, 429);
+          if (attempts.size >= 10_000) throw new GardenError(code, busy, 429);
         }
         attempts.set(key, { count: 1, resetAt: now + windowMs });
         return;
       }
       current.count += 1;
-      if (current.count > limit) throw new AthanorError(code, exhausted, 429);
+      if (current.count > limit) throw new GardenError(code, exhausted, 429);
     };
   };
   const checkAuthRate = rateLimiter(
@@ -804,7 +804,7 @@ export const createApiContext = async (config: ApiConfig, overrides: ApiOverride
     const workspace = knownWorkspace ?? (await store.getWorkspaceById(task.workspaceId));
     if (!workspace?.wrappedKey) return 'Private task';
     if (task.titleCiphertext.aad !== `task-title:${workspace.id}`) {
-      throw new AthanorError('encrypted_title_context', 'Task title encryption context is invalid');
+      throw new GardenError('encrypted_title_context', 'Task title encryption context is invalid');
     }
     const key = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
     return decryptJson<{ title: string }>(task.titleCiphertext, key).title;
@@ -835,10 +835,9 @@ export const createApiContext = async (config: ApiConfig, overrides: ApiOverride
     knownWorkspace?: WorkspaceRecord
   ): Promise<string> => {
     const workspace = knownWorkspace ?? (await store.getWorkspaceById(schedule.workspaceId));
-    if (!workspace?.wrappedKey)
-      throw new AthanorError('workspace_not_found', 'Workspace not found');
+    if (!workspace?.wrappedKey) throw new GardenError('workspace_not_found', 'Workspace not found');
     if (schedule.titleCiphertext.aad !== `task-title:${workspace.id}`) {
-      throw new AthanorError(
+      throw new GardenError(
         'encrypted_title_context',
         'Schedule title encryption context is invalid'
       );
@@ -875,7 +874,7 @@ export const createApiContext = async (config: ApiConfig, overrides: ApiOverride
     // `serverLimits.maxSchedules` puts at a thousand, and two lookups per row is the shape the
     // sidebar spent a release paying for.
     const workspace = knownWorkspace ?? (await store.getWorkspaceById(schedule.workspaceId));
-    if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+    if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
     return scheduleResponseFields(schedule, workspace);
   };
 
@@ -906,7 +905,7 @@ export const createApiContext = async (config: ApiConfig, overrides: ApiOverride
     workspace: WorkspaceRecord
   ): Promise<TaskPlan> => {
     if (plan.stepsCiphertext.aad !== `task-plan:${plan.taskId}`)
-      throw new AthanorError('encrypted_plan_context', 'Task plan encryption context is invalid');
+      throw new GardenError('encrypted_plan_context', 'Task plan encryption context is invalid');
     const key = unwrapDataKey(workspace.wrappedKey!, masterKey, workspace.id);
     const content = decryptJson<{
       steps: TaskPlanStep[];
@@ -963,7 +962,7 @@ export const createApiContext = async (config: ApiConfig, overrides: ApiOverride
     // Always the slug. A preview used to be able to report a custom domain as its address once a
     // TXT record verified, but nothing ever routed such a host here: there is one nginx server
     // block, it matches any name, and only the preview path regex reaches the gateway - so the
-    // owner was handed a link that answered with a certificate warning and then with athanor's own
+    // owner was handed a link that answered with a certificate warning and then with garden's own
     // sign-in page. The feature is gone rather than half-present; the columns behind it are left in
     // place for now so a rollback to the previous release still reads its own rows.
     const url = new URL(workspacePreviewUrl(preview.slug));
@@ -1010,7 +1009,7 @@ export const createApiContext = async (config: ApiConfig, overrides: ApiOverride
   ): Promise<{ workspace: WorkspaceRecord; key: Buffer }> => {
     const workspace = await store.getWorkspace(userId, workspaceId);
     if (!workspace?.wrappedKey)
-      throw new AthanorError('workspace_not_found', 'Workspace not found', 404);
+      throw new GardenError('workspace_not_found', 'Workspace not found', 404);
     return {
       workspace,
       key: unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id)

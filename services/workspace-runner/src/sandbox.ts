@@ -86,7 +86,7 @@ export const probeMissionProcessIsolation = async (sandbox: AgentSandbox): Promi
 
 export const isCodingMissionWorkspace = async (root: string): Promise<boolean> => {
   try {
-    const marker = await lstat(path.join(root, '.athanor', 'coding-parent.json'));
+    const marker = await lstat(path.join(root, '.garden', 'coding-parent.json'));
     if (!marker.isFile() || marker.isSymbolicLink())
       throw new Error('Invalid private coding mission marker');
     return true;
@@ -105,7 +105,7 @@ const SUDO_EXECUTABLE = '/usr/bin/sudo';
  * thing going away; it is created 0700 by the runner, so the agent account - which shares a group
  * with the runner and would read a 0770 directory - cannot open it even on a box with no Landlock;
  * and under Landlock its whole parent is granted nowhere. /tmp would have had to defend the file
- * against the account that owns every other file there, and a workspace's `.athanor` is not there
+ * against the account that owns every other file there, and a workspace's `.garden` is not there
  * when the command is the one that deletes the workspace.
  *
  * The helper has this same path hard-coded beside its workspace parent and reads a spec from
@@ -114,7 +114,7 @@ const SUDO_EXECUTABLE = '/usr/bin/sudo';
  * the shape the helper accepts - hexadecimal digits and `.spec`, no further path.
  */
 export const sandboxSpecDirectory = (workspaceRoot: string): string =>
-  path.resolve(workspaceRoot, '.athanor', 'sandbox');
+  path.resolve(workspaceRoot, '.garden', 'sandbox');
 
 const SPEC_DIRECTORY_MODE = 0o700;
 const SPEC_FILE_MODE = 0o600;
@@ -124,7 +124,7 @@ const SPEC_FILE_MODE = 0o600;
  * that merely has a command in it - a runner and a helper out of step, or a stray file. The number
  * is the layout: it moved when the working directory became the word after the header.
  */
-const SPEC_HEADER = 'athanor-sandbox-spec 2';
+const SPEC_HEADER = 'garden-sandbox-spec 2';
 
 /**
  * The environment is handed over in the spec file because sudo resets it, and reconstructing it

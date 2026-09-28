@@ -5,15 +5,15 @@ import {
   buildMemoryItemIndex,
   buildMemorySourceIndex,
   planMemoryQuery
-} from '@athanor/core';
-import { MEMORY_FUZZY_SIMILARITY_THRESHOLD } from '@athanor/core';
+} from '@garden/core';
+import { MEMORY_FUZZY_SIMILARITY_THRESHOLD } from '@garden/core';
 import type {
   EncryptedEnvelope,
   MemoryKind,
   MemoryPackQuota,
   MemoryQueryPlan,
   MemoryTrust
-} from '@athanor/core';
+} from '@garden/core';
 import type { Database } from './database.js';
 import type { DataStore, RecallMemoryInput } from './store.js';
 
@@ -140,8 +140,8 @@ export const MEMORY_EVAL_ITEMS: readonly MemoryEvalItem[] = [
     ref: 'relay-port',
     kind: 'fact',
     title: 'relay listen address',
-    body: 'athanor-relay binds 0.0.0.0:8443 behind the SNI proxy. Nothing else may hold that port.',
-    subject: 'athanor-relay',
+    body: 'garden-relay binds 0.0.0.0:8443 behind the SNI proxy. Nothing else may hold that port.',
+    subject: 'garden-relay',
     object: '0.0.0.0:8443',
     predicate: 'runs_on',
     daysAgo: 40,
@@ -176,9 +176,9 @@ export const MEMORY_EVAL_ITEMS: readonly MemoryEvalItem[] = [
     ref: 'backup-location',
     kind: 'fact',
     title: 'backup destination',
-    body: 'Backups are written to /srv/athanor/var/backup and mirrored to the encrypted volume.',
+    body: 'Backups are written to /srv/garden/var/backup and mirrored to the encrypted volume.',
     subject: 'backups',
-    object: '/srv/athanor/var/backup',
+    object: '/srv/garden/var/backup',
     predicate: 'located_at',
     daysAgo: 75,
     uses: [9, 31, 68],
@@ -246,9 +246,9 @@ export const MEMORY_EVAL_ITEMS: readonly MemoryEvalItem[] = [
   {
     ref: 'deploy-procedure',
     kind: 'procedure',
-    title: 'Deploy athanor',
-    tags: ['deploy', 'athanor'],
-    body: 'pnpm build, then systemctl restart athanor.target. Watch journalctl -u athanor.target for the ready line before calling it done.',
+    title: 'Deploy garden',
+    tags: ['deploy', 'garden'],
+    body: 'pnpm build, then systemctl restart garden.target. Watch journalctl -u garden.target for the ready line before calling it done.',
     daysAgo: 20,
     uses: [1, 3, 8, 14, 19],
     citedUses: 2
@@ -268,7 +268,7 @@ export const MEMORY_EVAL_ITEMS: readonly MemoryEvalItem[] = [
     kind: 'procedure',
     title: 'Take a database snapshot',
     tags: ['backup', 'postgres'],
-    body: 'pg_dump -Fc athanor > /srv/athanor/var/backup/athanor.dump and check the file size before trusting it.',
+    body: 'pg_dump -Fc garden > /srv/garden/var/backup/garden.dump and check the file size before trusting it.',
     daysAgo: 28,
     uses: [7, 21, 44],
     citedUses: 1
@@ -286,7 +286,7 @@ export const MEMORY_EVAL_ITEMS: readonly MemoryEvalItem[] = [
     ref: 'relay-not-enabled',
     kind: 'episode',
     title: 'The relay did not come back after a reboot',
-    body: 'After the computer rebooted, athanor-relay stayed down because its unit had never been enabled. systemctl enable --now athanor-relay fixed it for good.',
+    body: 'After the computer rebooted, garden-relay stayed down because its unit had never been enabled. systemctl enable --now garden-relay fixed it for good.',
     daysAgo: 18,
     uses: [4, 15, 29],
     citedUses: 1
@@ -343,9 +343,9 @@ export const MEMORY_EVAL_ITEMS: readonly MemoryEvalItem[] = [
     ref: 'workspace-root',
     kind: 'fact',
     title: 'working root',
-    body: 'Everything the agent owns lives under /srv/athanor and nothing outside it is written without asking.',
+    body: 'Everything the agent owns lives under /srv/garden and nothing outside it is written without asking.',
     subject: 'workspace',
-    object: '/srv/athanor',
+    object: '/srv/garden',
     predicate: 'located_at',
     pin: true,
     daysAgo: 160,
@@ -482,9 +482,9 @@ export const MEMORY_EVAL_ITEMS: readonly MemoryEvalItem[] = [
     ref: 'wal-location',
     kind: 'fact',
     title: 'write-ahead log archive',
-    body: 'The write-ahead log is archived to /srv/athanor/var/backup/wal, which is pruned on its own schedule.',
+    body: 'The write-ahead log is archived to /srv/garden/var/backup/wal, which is pruned on its own schedule.',
     subject: 'wal archive',
-    object: '/srv/athanor/var/backup/wal',
+    object: '/srv/garden/var/backup/wal',
     predicate: 'located_at',
     daysAgo: 74,
     uses: [21, 56],
@@ -494,9 +494,9 @@ export const MEMORY_EVAL_ITEMS: readonly MemoryEvalItem[] = [
     ref: 'log-location',
     kind: 'fact',
     title: 'log directory',
-    body: 'Service logs are written under /srv/athanor/var/log; journald keeps the systemd side.',
+    body: 'Service logs are written under /srv/garden/var/log; journald keeps the systemd side.',
     subject: 'logs',
-    object: '/srv/athanor/var/log',
+    object: '/srv/garden/var/log',
     predicate: 'located_at',
     daysAgo: 66,
     uses: [17, 36, 64],
@@ -506,9 +506,9 @@ export const MEMORY_EVAL_ITEMS: readonly MemoryEvalItem[] = [
     ref: 'config-location',
     kind: 'fact',
     title: 'configuration directory',
-    body: 'Configuration lives in /srv/athanor/etc and is the only tree edited by hand.',
+    body: 'Configuration lives in /srv/garden/etc and is the only tree edited by hand.',
     subject: 'configuration',
-    object: '/srv/athanor/etc',
+    object: '/srv/garden/etc',
     predicate: 'located_at',
     daysAgo: 100
   },
@@ -516,9 +516,9 @@ export const MEMORY_EVAL_ITEMS: readonly MemoryEvalItem[] = [
     ref: 'skills-location',
     kind: 'fact',
     title: 'skills directory',
-    body: 'Vetted skills live in /srv/athanor/skills and are read at the start of a task.',
+    body: 'Vetted skills live in /srv/garden/skills and are read at the start of a task.',
     subject: 'skills',
-    object: '/srv/athanor/skills',
+    object: '/srv/garden/skills',
     predicate: 'located_at',
     daysAgo: 55
   },
@@ -624,7 +624,7 @@ export const MEMORY_EVAL_ITEMS: readonly MemoryEvalItem[] = [
     kind: 'procedure',
     title: 'Restore the database from a snapshot',
     tags: ['restore', 'postgres', 'backup'],
-    body: 'systemctl stop athanor.target, then pg_restore -c -d athanor the dump, then start the target again. Never restore into a running system.',
+    body: 'systemctl stop garden.target, then pg_restore -c -d garden the dump, then start the target again. Never restore into a running system.',
     daysAgo: 26,
     uses: [12, 40],
     citedUses: 1
@@ -633,8 +633,8 @@ export const MEMORY_EVAL_ITEMS: readonly MemoryEvalItem[] = [
     ref: 'rollback-procedure',
     kind: 'procedure',
     title: 'Roll back a deploy',
-    tags: ['rollback', 'deploy', 'athanor'],
-    body: 'git checkout the previous tag, pnpm build, systemctl restart athanor.target. The database migration is forward-only, so check it is compatible first.',
+    tags: ['rollback', 'deploy', 'garden'],
+    body: 'git checkout the previous tag, pnpm build, systemctl restart garden.target. The database migration is forward-only, so check it is compatible first.',
     daysAgo: 24,
     uses: [15, 46],
     citedUses: 1
@@ -660,7 +660,7 @@ export const MEMORY_EVAL_ITEMS: readonly MemoryEvalItem[] = [
     kind: 'procedure',
     title: 'Restart the mail connector',
     tags: ['mail', 'connector'],
-    body: 'systemctl restart athanor-mail, then watch for the IDLE line in the log before believing it reconnected.',
+    body: 'systemctl restart garden-mail, then watch for the IDLE line in the log before believing it reconnected.',
     daysAgo: 29
   },
 
@@ -744,14 +744,14 @@ export const MEMORY_EVAL_SOURCES: readonly MemoryEvalSource[] = [
     ref: 'relay-turn-agent',
     conversation: 'relay-reboot',
     role: 'assistant',
-    body: 'athanor-relay was never enabled at boot, so a restart left it stopped. I ran systemctl enable --now athanor-relay and it is listening on 0.0.0.0:8443 again.',
+    body: 'garden-relay was never enabled at boot, so a restart left it stopped. I ran systemctl enable --now garden-relay and it is listening on 0.0.0.0:8443 again.',
     daysAgo: 18
   },
   {
     ref: 'relay-turn-tool',
     conversation: 'relay-reboot',
     role: 'tool',
-    body: '$ systemctl status athanor-relay\n  Loaded: loaded (/etc/systemd/system/athanor-relay.service; enabled)\n  Active: active (running)\n  Listening on 0.0.0.0:8443',
+    body: '$ systemctl status garden-relay\n  Loaded: loaded (/etc/systemd/system/garden-relay.service; enabled)\n  Active: active (running)\n  Listening on 0.0.0.0:8443',
     daysAgo: 18
   },
   {
@@ -786,7 +786,7 @@ export const MEMORY_EVAL_SOURCES: readonly MemoryEvalSource[] = [
     ref: 'snapshot-turn-tool',
     conversation: 'db-snapshot',
     role: 'tool',
-    body: '$ pg_dump -Fc athanor > /srv/athanor/var/backup/athanor.dump\n$ ls -l /srv/athanor/var/backup\n-rw------- 1 athanor athanor 41M athanor.dump',
+    body: '$ pg_dump -Fc garden > /srv/garden/var/backup/garden.dump\n$ ls -l /srv/garden/var/backup\n-rw------- 1 garden garden 41M garden.dump',
     daysAgo: 28
   },
 
@@ -873,7 +873,7 @@ export const MEMORY_EVAL_SOURCES: readonly MemoryEvalSource[] = [
     ref: 'oom-turn-tool',
     conversation: 'build-killed',
     role: 'tool',
-    body: '$ journalctl -k | tail -3\nOut of memory: Killed process 41122 (node) total-vm:9182364kB\n$ systemctl show athanor-worker -p MemoryMax\nMemoryMax=infinity',
+    body: '$ journalctl -k | tail -3\nOut of memory: Killed process 41122 (node) total-vm:9182364kB\n$ systemctl show garden-worker -p MemoryMax\nMemoryMax=infinity',
     daysAgo: 58
   },
   {
@@ -915,7 +915,7 @@ export const MEMORY_EVAL_PROBES: readonly MemoryEvalProbe[] = [
   {
     id: 'relay-by-exact-name',
     type: 'single_session_fact',
-    question: 'what do we know about athanor-relay',
+    question: 'what do we know about garden-relay',
     gold: ['relay-port']
   },
   {
@@ -939,7 +939,7 @@ export const MEMORY_EVAL_PROBES: readonly MemoryEvalProbe[] = [
   {
     id: 'backup-directory-by-path',
     type: 'single_session_fact',
-    question: 'what is in /srv/athanor/var/backup',
+    question: 'what is in /srv/garden/var/backup',
     gold: ['backup-location', 'snapshot-procedure']
   },
   {
@@ -983,13 +983,13 @@ export const MEMORY_EVAL_PROBES: readonly MemoryEvalProbe[] = [
   {
     id: 'deploy-how',
     type: 'multi_session',
-    question: 'how do I deploy athanor',
+    question: 'how do I deploy garden',
     gold: ['deploy-procedure']
   },
   {
     id: 'deploy-restart-unit',
     type: 'multi_session',
-    question: 'restart athanor.target after a deploy',
+    question: 'restart garden.target after a deploy',
     gold: ['deploy-procedure']
   },
   {
@@ -1807,7 +1807,7 @@ export const seedMemoryEvalPadding = async (input: {
  * fails in someone else's branch.
  */
 const evalRowId = (ref: string): string => {
-  const digest = createHash('sha256').update(`athanor-memory-eval ${ref}`).digest('hex');
+  const digest = createHash('sha256').update(`garden-memory-eval ${ref}`).digest('hex');
   return [
     digest.slice(0, 8),
     digest.slice(8, 12),

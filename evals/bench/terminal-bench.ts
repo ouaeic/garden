@@ -390,7 +390,7 @@ const verifierArgs = (): readonly string[] => [
  * A placeholder that answered with prose would let a whole scored run complete, score 0 on every
  * task, and read exactly like an agent that found 241 tasks hard. This throws on the first call
  * instead, so the missing provider is the error and not the result. `harness.ts:291` -
- * "a model, as a function of what athanor just said to it" - is the seam a real provider goes
+ * "a model, as a function of what garden just said to it" - is the seam a real provider goes
  * through, and `TerminalBenchOptions.model` is where it goes in.
  */
 const defaultModel =

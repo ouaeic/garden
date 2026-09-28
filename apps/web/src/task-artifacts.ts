@@ -1,4 +1,4 @@
-import type { Artifact, TaskPresentation } from '@athanor/contracts';
+import type { Artifact, TaskPresentation } from '@garden/contracts';
 
 /** Registry metadata keeps inherited immutable results viewable after a project moves workspace. */
 export function presentationArtifacts(

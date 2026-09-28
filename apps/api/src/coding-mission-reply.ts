@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { AthanorError, decryptJson, encryptJson, unwrapDataKey } from '@athanor/core';
-import type { TaskRecord } from '@athanor/data';
+import { GardenError, decryptJson, encryptJson, unwrapDataKey } from '@garden/core';
+import type { TaskRecord } from '@garden/data';
 import type { RouteContext } from './http/server-context.js';
 
 /** A clarification resumes the same bounded mission; it never creates a new spending allocation. */
@@ -19,17 +19,17 @@ export async function replyToCodingMission(
     !task.agentStateCiphertext ||
     (await context.store.hasPendingApproval(task.userId, task.id))
   )
-    throw new AthanorError(
+    throw new GardenError(
       'coding_mission_scoped',
       'Send new work to the parent task; a specialist accepts replies only to its pending question',
       409
     );
   const workspace = await context.store.getWorkspace(task.userId, task.workspaceId);
   if (!workspace?.wrappedKey)
-    throw new AthanorError('workspace_not_found', 'Workspace not found', 404);
+    throw new GardenError('workspace_not_found', 'Workspace not found', 404);
   const key = unwrapDataKey(workspace.wrappedKey, context.masterKey, workspace.id);
   if (task.agentStateCiphertext.aad !== `task-state:${task.id}`)
-    throw new AthanorError(
+    throw new GardenError(
       'task_context_unavailable',
       'The specialist checkpoint is unavailable',
       409
@@ -44,7 +44,7 @@ export async function replyToCodingMission(
     typeof state.question !== 'object' ||
     state.pending
   )
-    throw new AthanorError(
+    throw new GardenError(
       'task_context_unavailable',
       'The specialist checkpoint is unavailable',
       409
@@ -61,7 +61,7 @@ export async function replyToCodingMission(
     messageCiphertext: encryptJson({ markdown: prompt }, key, `task-event:${task.id}`)
   });
   if (!saved)
-    throw new AthanorError(
+    throw new GardenError(
       'coding_mission_scoped',
       'This specialist no longer has that pending question; refresh its current state',
       409

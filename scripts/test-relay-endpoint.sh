@@ -12,7 +12,7 @@ test_root=$(mktemp -d)
 trap 'rm -rf -- "$test_root"' EXIT INT TERM
 
 fake_bin="$test_root/bin"
-config="$test_root/etc/athanor"
+config="$test_root/etc/garden"
 state="$test_root/state"
 mkdir -p "$fake_bin" "$config/tls" "$config/relay" "$state"
 
@@ -43,10 +43,10 @@ chmod 0600 "$config/tls/server.key"
 
 run_refresh() {
   PATH="$fake_bin:$PATH" \
-    ATHANOR_CONFIG="$config" \
-    ATHANOR_STATE="$state" \
-    ATHANOR_DDNS="$test_root/absent-ddns" \
-    /bin/sh "$repository_root/scripts/athanor-network-refresh" >/dev/null
+    GARDEN_CONFIG="$config" \
+    GARDEN_STATE="$state" \
+    GARDEN_DDNS="$test_root/absent-ddns" \
+    /bin/sh "$repository_root/scripts/garden-network-refresh" >/dev/null
 }
 
 endpoints() {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { DictationReceipt, VoicePendingReceipt, VoiceSession } from '@athanor/contracts';
+import type { DictationReceipt, VoicePendingReceipt, VoiceSession } from '@garden/contracts';
 import { get, post } from './client';
 import { money, date } from './model';
 import { Button, ErrorNotice, Field } from './ui';

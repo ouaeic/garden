@@ -1,6 +1,6 @@
 import ScrollRegion from './ScrollRegion';
 import { useEffect, useState } from 'react';
-import type { ProjectSessions as Sessions } from '@athanor/contracts';
+import type { ProjectSessions as Sessions } from '@garden/contracts';
 import { get } from './client';
 import { Button, ErrorNotice, Spinner } from './ui';
 

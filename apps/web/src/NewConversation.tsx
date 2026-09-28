@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import type { ConversationSource, Project, Task, Workspace } from '@athanor/contracts';
+import type { ConversationSource, Project, Task, Workspace } from '@garden/contracts';
 import { get } from './client';
 import type { Bootstrap, Draft } from './model';
 import { Dialog, ErrorNotice, Spinner } from './ui';

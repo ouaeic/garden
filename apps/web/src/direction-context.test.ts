@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DirectionContext } from '@athanor/contracts';
+import { DirectionContext } from '@garden/contracts';
 import { directionPrompt } from './direction-context';
 
 const selected = {

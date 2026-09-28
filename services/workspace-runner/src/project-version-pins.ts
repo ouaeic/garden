@@ -2,7 +2,7 @@ import { constants } from 'node:fs';
 import { open, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
-import { PinnedProjectVersionCursor, type ProjectVersionPin } from '@athanor/contracts';
+import { PinnedProjectVersionCursor, type ProjectVersionPin } from '@garden/contracts';
 import { durableJson, syncDirectory } from './project-version-files.js';
 
 const StoredPin = z

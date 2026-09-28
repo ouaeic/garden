@@ -6,10 +6,10 @@ import { releasePathMappings } from './release-build-env.mjs';
 const desktopDirectory = resolve(fileURLToPath(new URL('.', import.meta.url)));
 
 const nativeArtifactKinds = new Map([
-  ['athanor-desktop', 'desktop'],
-  ['athanor-desktop.exe', 'desktop'],
-  ['libathanor_desktop_lib.so', 'android'],
-  ['libathanor_desktop_lib.a', 'ios']
+  ['garden-desktop', 'desktop'],
+  ['garden-desktop.exe', 'desktop'],
+  ['libgarden_desktop_lib.so', 'android'],
+  ['libgarden_desktop_lib.a', 'ios']
 ]);
 
 function printable(value, limit = 200) {

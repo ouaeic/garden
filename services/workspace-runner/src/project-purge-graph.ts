@@ -1,4 +1,4 @@
-import { ProjectRepositoryOperation } from '@athanor/contracts';
+import { ProjectRepositoryOperation } from '@garden/contracts';
 import { lstat } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
@@ -7,7 +7,7 @@ import type {
   ProjectFileVersion,
   ProjectPurgePreview,
   ProjectPurgeSelection
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import {
   type ProjectHistoryMetadata,
   HistoryDigest,
@@ -270,7 +270,7 @@ export async function projectPurgeGraph(
       if (check.id === registry.workspaceId || Object.values(registry.members).includes(check.id))
         throw Error('A check directory overlaps a working area.');
       const marker = await metadata.read(
-        path.join(metadata.root, check.id, '.athanor/project-check.json'),
+        path.join(metadata.root, check.id, '.garden/project-check.json'),
         z.object({
           projectId: z.uuid(),
           updateId: z.uuid(),

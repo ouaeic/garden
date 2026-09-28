@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type * as Execution from './execution.js';
 import type * as MissionProcesses from './mission-processes.js';
 import type { ChildProcess } from 'node:child_process';
-import { DebugSessionSchema } from '@athanor/contracts';
+import { DebugSessionSchema } from '@garden/contracts';
 import { ensureWorkspace } from './files.js';
 vi.mock('./execution.js', async (importOriginal) => ({
   ...(await importOriginal<typeof Execution>()),

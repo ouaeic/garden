@@ -90,7 +90,7 @@ export interface MediaRequest {
    * Sent only when the caller supplies one. This used to be a constant, and the constant belonged
    * to one specific speech model - so the moment the model became the owner's choice, every other
    * speech route would have been asked for a voice from a different model's list. A route whose
-   * voices athanor does not know is asked without one, and the provider's own answer says what it
+   * voices garden does not know is asked without one, and the provider's own answer says what it
    * needs, which is better than this side inventing a name for it.
    */
   voice?: string;
@@ -117,7 +117,7 @@ export interface MediaRequest {
    * What the caller believes this route costs, used only when the provider does not say.
    *
    * Both are per the unit the modality is billed in and both may be absent. Every response path
-   * below prefers the provider's own figure; these exist so that a route athanor has measured
+   * below prefers the provider's own figure; these exist so that a route garden has measured
    * still prices its own generations rather than borrowing the price of whatever model happened to
    * be compiled in.
    */

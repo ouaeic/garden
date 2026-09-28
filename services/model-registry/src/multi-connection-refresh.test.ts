@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { encryptJson, inferenceCredentialAad } from '@athanor/core';
+import { encryptJson, inferenceCredentialAad } from '@garden/core';
 import { catalogCredentials } from './catalog-credential.js';
 import { refreshOnce, type CatalogStore } from './refresh-once.js';
 

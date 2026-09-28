@@ -1,6 +1,6 @@
 import { registerPrivateDiagnosticRoutes } from './private-diagnostics.js';
 import { Readable } from 'node:stream';
-import { AthanorError, createDiagnosticProjector, decryptJson, unwrapDataKey } from '@athanor/core';
+import { GardenError, createDiagnosticProjector, decryptJson, unwrapDataKey } from '@garden/core';
 import { revealedTaskEvent } from '../context.js';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
@@ -13,10 +13,10 @@ export function registerTaskDiagnosticRoutes(context: RouteContext): void {
     async (request, reply) => {
       const user = requireUser(request.user);
       const task = await store.getTask(user.id, request.params.taskId);
-      if (!task) throw new AthanorError('task_not_found', 'Conversation not found', 404);
+      if (!task) throw new GardenError('task_not_found', 'Conversation not found', 404);
       const workspace = await store.getWorkspace(user.id, task.workspaceId);
       if (!workspace?.wrappedKey)
-        throw new AthanorError('workspace_not_found', 'Workspace not found', 404);
+        throw new GardenError('workspace_not_found', 'Workspace not found', 404);
       const key = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
       const projector = createDiagnosticProjector();
       // Fix the event boundary before streaming so active work cannot make this download endless.

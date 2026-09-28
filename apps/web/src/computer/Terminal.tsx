@@ -101,7 +101,7 @@ export default function Terminal({
         if (!active) return;
         const ws = new WebSocket(
           socketAddress(value.runnerUrl, `/v1/workspaces/${workspaceId}/terminal`),
-          ['athanor-capability', value.token]
+          ['garden-capability', value.token]
         );
         socket.current = ws;
         ws.onopen = () => {

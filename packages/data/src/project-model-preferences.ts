@@ -1,15 +1,11 @@
+import { ProjectModelChoices, type ModelPurpose, type PurposeModelChoice } from '@garden/contracts';
 import {
-  ProjectModelChoices,
-  type ModelPurpose,
-  type PurposeModelChoice
-} from '@athanor/contracts';
-import {
-  AthanorError,
+  GardenError,
   decryptJson,
   encryptJson,
   unwrapDataKey,
   type EncryptedEnvelope
-} from '@athanor/core';
+} from '@garden/core';
 import type { Database } from './database.js';
 import { json } from './store/rows.js';
 
@@ -38,7 +34,7 @@ export class ProjectModelPreferenceStore {
       [input.taskId, input.userId, JSON.stringify(input.choicesCiphertext), input.expectedRevision]
     );
     if (!result.rows.length)
-      throw new AthanorError(
+      throw new GardenError(
         'conversation_preferences_changed',
         'Conversation choices changed; reload and try again',
         409
@@ -68,7 +64,7 @@ export class ProjectModelPreferenceStore {
       ]
     );
     if (!result.rows.length)
-      throw new AthanorError(
+      throw new GardenError(
         'task_changed',
         'The project changed before its model setting could be applied',
         409
@@ -87,7 +83,7 @@ export class ProjectModelPreferenceStore {
     );
     const row = result.rows[0];
     if (typeof row?.wrapped_key !== 'string')
-      throw new AthanorError('project_not_found', 'Project not found', 404);
+      throw new GardenError('project_not_found', 'Project not found', 404);
     return {
       projectTaskId: String(row.id),
       workspaceId: String(row.workspace_id),
@@ -107,7 +103,7 @@ export class ProjectModelPreferenceStore {
       await tx.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [input.userId]);
       const root = await tx.query(lineage, [input.taskId, input.userId]);
       if (root.rows[0]?.id !== input.projectTaskId)
-        throw new AthanorError('project_changed', 'Project changed; reload its model choices', 409);
+        throw new GardenError('project_changed', 'Project changed; reload its model choices', 409);
       await tx.query('SELECT id FROM projects WHERE id=$1 AND user_id=$2 FOR UPDATE', [
         input.projectTaskId,
         input.userId
@@ -128,7 +124,7 @@ export class ProjectModelPreferenceStore {
               ]
             );
       if (!result.rows.length)
-        throw new AthanorError(
+        throw new GardenError(
           'project_preferences_changed',
           'Model choices changed on another device; reload and try again',
           409

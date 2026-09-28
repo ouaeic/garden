@@ -8,7 +8,7 @@
  * columns are deliberately ordered cost-first so the gain is read against something.
  *
  * The committed baseline is a tripwire, not a specification. A change that moves a number here is
- * a decision about what athanor's agent can still remember, and the intended way to make it is to
+ * a decision about what garden's agent can still remember, and the intended way to make it is to
  * re-accept the baseline in the commit that moves it, with the new figure quoted in the message.
  */
 import { createHash } from 'node:crypto';
@@ -22,7 +22,7 @@ import { PROBE_KINDS } from './probes.js';
 /* ------------------------------------------------------------- what produced a number, exactly */
 
 /**
- * Which athanor, and which rig, a committed row was measured by.
+ * Which garden, and which rig, a committed row was measured by.
  *
  * The twin of the block in `evals/report.ts`, and deliberately a twin rather than a shared import:
  * `evals/harness.ts` rewrites the built-in skill library at module load, so importing anything from
@@ -74,7 +74,7 @@ export const rigIdentity = (): Omit<BaselineStamp, 'acceptedAt'> =>
   (stamped ??= { ...buildIdentity(), rig: rigDigest() });
 
 export const identityLabel = (identity: Omit<BaselineStamp, 'acceptedAt'>): string =>
-  `athanor ${identity.version} at ${identity.commit ?? 'an uncommitted tree'}, rig ${identity.rig}`;
+  `garden ${identity.version} at ${identity.commit ?? 'an uncommitted tree'}, rig ${identity.rig}`;
 
 /**
  * The stamp out of a parsed baseline, or null.
@@ -241,7 +241,7 @@ export const render = (
   );
   if (stamp && (stamp.commit !== identity.commit || stamp.rig !== identity.rig))
     lines.push(
-      'Note: the committed numbers were measured by a different revision of athanor or of this rig. A row that moved may have moved for that reason.'
+      'Note: the committed numbers were measured by a different revision of garden or of this rig. A row that moved may have moved for that reason.'
     );
 
   const byTrajectory = new Map<string, Measurement[]>();

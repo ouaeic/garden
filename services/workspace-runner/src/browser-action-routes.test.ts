@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
 import { expect, it, vi } from 'vitest';
-import { capabilityAudience, signCapabilityToken } from '@athanor/core';
+import { capabilityAudience, signCapabilityToken } from '@garden/core';
 import { authenticateRunnerRequest } from './auth.js';
 import { registerBrowserActionRoutes } from './browser-action-routes.js';
 import type { BrowserManager } from './browser.js';

@@ -38,7 +38,7 @@ export type { MediaJobRecord } from './store/media-jobs.js';
 
 /**
  * Re-exported for one release. `MEMORY_SOURCE_SEARCH_PER_TASK` moved to `store/sql/memory.ts`
- * with the statement whose cap it is, and `@athanor/data` publishes this file wholesale - so
+ * with the statement whose cap it is, and `@garden/data` publishes this file wholesale - so
  * without this line the package would silently stop exporting a name it has always exported. It can
  * go once nothing outside this package reaches for it through the barrel.
  */
@@ -47,10 +47,10 @@ export { MEMORY_SOURCE_SEARCH_PER_TASK } from './store/sql/memory.js';
 /**
  * Re-exported for the same reason and on the same terms. `MAX_APPROVAL_PAGE`,
  * `agentNotificationAad` and `StoredNotificationSettings` moved in Wave 6.3 to the domain files
- * whose statements they belong to, and `@athanor/data` publishes this file wholesale - so without
+ * whose statements they belong to, and `@garden/data` publishes this file wholesale - so without
  * these lines the package would silently stop exporting three names it has always exported, and
  * `apps/api` and `apps/worker` would stop compiling. They can go once every importer names
- * `@athanor/data`'s new modules directly.
+ * `@garden/data`'s new modules directly.
  */
 export { MAX_APPROVAL_PAGE } from './store/connectors.js';
 export {
@@ -62,7 +62,7 @@ export type { StoredNotificationSettings } from './store/notifications.js';
 
 /**
  * Re-exported on the same terms as the block above. The five domains Wave 7.3 lifted took their
- * own constants and record shapes with them, and `@athanor/data` publishes this file wholesale, so
+ * own constants and record shapes with them, and `@garden/data` publishes this file wholesale, so
  * these lines are what keeps the package exporting the names it has always exported. They can go
  * once every importer names the new modules directly.
  */
@@ -417,7 +417,7 @@ export class DataStore {
   // statement; every one of them is one hop to the file that owns the table.
   //
   // Each name below still resolves on `DataStore`, because every caller in this repository and
-  // every consumer of the `@athanor/data` barrel reaches the store through this one object. What
+  // every consumer of the `@garden/data` barrel reaches the store through this one object. What
   // moved is the SQL, not the surface.
   //
   // The signatures are deliberately not restated. Forwarding `Parameters<IdentityStore['...']>`
@@ -437,7 +437,7 @@ export class DataStore {
   // deleting the forward before it does is a silent barrel regression rather than a shrink. The
   // three re-export blocks above are the same rule in the other direction - they go together, and
   // only once every importer names `store/tasks.js`, `store/memory.js`, `store/connectors.js` and
-  // `store/notifications.js` instead of the `@athanor/data` barrel.
+  // `store/notifications.js` instead of the `@garden/data` barrel.
   // ---------------------------------------------------------------------------------------------
 
   createUser(...args: Parameters<IdentityStore['createUser']>) {

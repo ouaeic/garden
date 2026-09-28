@@ -1,6 +1,6 @@
 import { performance } from 'node:perf_hooks';
-import { AthanorError } from '@athanor/core';
-import { webCitationsFrom } from '@athanor/contracts';
+import { GardenError } from '@garden/core';
+import { webCitationsFrom } from '@garden/contracts';
 import { z } from 'zod';
 import type { ModelRequest, ModelResponse, ModelToolCall } from './protocol.js';
 import {
@@ -45,7 +45,7 @@ export function responseFault(
   status: number,
   body: unknown,
   retryAfter?: string | null
-): AthanorError {
+): GardenError {
   const value = record(body);
   const error = record(value?.error) ?? value;
   const message =
@@ -53,7 +53,7 @@ export function responseFault(
       ? error.message.slice(0, 400)
       : 'The provider could not complete the request';
   const context = error?.code === 'context_length_exceeded';
-  return new AthanorError(
+  return new GardenError(
     context
       ? 'provider_context_overflow'
       : status === 429

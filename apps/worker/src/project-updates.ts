@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import { ProjectUpdateAction, type ProjectUpdate } from '@athanor/contracts';
-import type { ModelToolCall } from '@athanor/model-gateway';
-import type { TaskRecord } from '@athanor/data';
+import { ProjectUpdateAction, type ProjectUpdate } from '@garden/contracts';
+import type { ModelToolCall } from '@garden/model-gateway';
+import type { TaskRecord } from '@garden/data';
 import type { AgentRunnerClient } from './runner-client.js';
 import type { ToolContext } from './tool-dispatch.js';
 import { approvalRequirement, type ApprovalContext } from './approval-policy.js';

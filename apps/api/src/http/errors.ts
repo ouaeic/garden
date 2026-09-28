@@ -3,12 +3,12 @@
  *
  * Kept whole and kept alone: the requestId the client is told to quote is minted here and it is
  * the same string that reaches the log, so the two cannot drift apart. Everything that leaves
- * goes through `redactText` on the way out, because some AthanorError messages are built from an
+ * goes through `redactText` on the way out, because some GardenError messages are built from an
  * upstream response.
  */
 
 import { randomUUID } from 'node:crypto';
-import { AthanorError, redactText } from '@athanor/core';
+import { GardenError, redactText } from '@garden/core';
 import { z } from 'zod';
 import { errorFields } from '../log.js';
 import type { ServerBase } from './server-context.js';
@@ -17,7 +17,7 @@ export const registerErrorHandler = (context: ServerBase): void => {
   const { log, app, requestStarted } = context;
   app.setErrorHandler((error, request, reply) => {
     const requestId = String(request.id ?? randomUUID());
-    const known = error instanceof AthanorError;
+    const known = error instanceof GardenError;
     const invalid = error instanceof z.ZodError;
     const status = invalid
       ? 400
@@ -66,7 +66,7 @@ export const registerErrorHandler = (context: ServerBase): void => {
         message: invalid
           ? `One or more request fields are missing or invalid${invalidFields ? `: ${invalidFields}` : ''}`
           : known
-            ? // An AthanorError message is written to be read by the owner, but some are built from
+            ? // An GardenError message is written to be read by the owner, but some are built from
               // an upstream response, so the last thing before it leaves the process scrubs it.
               redactText(error.message)
             : 'The request could not be completed',

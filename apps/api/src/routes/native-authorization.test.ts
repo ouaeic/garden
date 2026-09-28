@@ -2,9 +2,9 @@ import { createHash, generateKeyPairSync, randomBytes, sign } from 'node:crypto'
 import cookie from '@fastify/cookie';
 import Fastify from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { nativeAuthorizationMessage, type NativeAuthorization } from '@athanor/contracts';
-import { sha256 } from '@athanor/core';
-import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
+import { nativeAuthorizationMessage, type NativeAuthorization } from '@garden/contracts';
+import { sha256 } from '@garden/core';
+import { createDatabase, DataStore, migrateDatabase } from '@garden/data';
 import { registerAuthHooks } from '../http/auth-hook.js';
 import { registerErrorHandler } from '../http/errors.js';
 import { registerAuthRoutes } from '../auth-routes.js';
@@ -94,7 +94,7 @@ describe('native authorization HTTP boundary', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/auth/native/start',
-      headers: { origin, 'x-athanor-client': 'athanor-android/0.1.1' },
+      headers: { origin, 'x-garden-client': 'garden-android/0.1.1' },
       payload
     });
     const authorization = response.json<NativeAuthorization & { verificationUri: string }>();

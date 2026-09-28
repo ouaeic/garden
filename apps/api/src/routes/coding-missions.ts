@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { CodingMissionChange, type CodingMissionReview } from '@athanor/contracts';
-import { AthanorError, unwrapDataKey } from '@athanor/core';
-import { codingMissionView } from '@athanor/data';
+import { CodingMissionChange, type CodingMissionReview } from '@garden/contracts';
+import { GardenError, unwrapDataKey } from '@garden/core';
+import { codingMissionView } from '@garden/data';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 
@@ -19,19 +19,19 @@ export const registerCodingMissionRoutes = (context: RouteContext): void => {
   const { app, store, runner, masterKey, idempotent } = context;
   const held = async (userId: string, id: string) => {
     const mission = await store.getCodingMission(userId, id);
-    if (!mission) throw new AthanorError('coding_mission_missing', 'Coding mission not found', 404);
+    if (!mission) throw new GardenError('coding_mission_missing', 'Coding mission not found', 404);
     const workspace = await store.getWorkspace(userId, mission.parentWorkspaceId);
     if (!workspace?.wrappedKey)
-      throw new AthanorError('workspace_not_found', 'Parent workspace not found', 404);
+      throw new GardenError('workspace_not_found', 'Parent workspace not found', 404);
     return { mission, key: unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id) };
   };
   app.get<{ Params: { taskId: string } }>('/v1/tasks/:taskId/coding-missions', async (request) => {
     const user = requireUser(request.user),
       task = await store.getTask(user.id, request.params.taskId);
-    if (!task) throw new AthanorError('task_not_found', 'Task not found', 404);
+    if (!task) throw new GardenError('task_not_found', 'Task not found', 404);
     const workspace = await store.getWorkspace(user.id, task.workspaceId);
     if (!workspace?.wrappedKey)
-      throw new AthanorError('workspace_not_found', 'Workspace not found', 404);
+      throw new GardenError('workspace_not_found', 'Workspace not found', 404);
     const key = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
     return {
       missions: (await store.listCodingMissions(user.id, task.id)).map((m) =>

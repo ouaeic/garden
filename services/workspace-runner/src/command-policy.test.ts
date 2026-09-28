@@ -143,28 +143,28 @@ describe('package names in shell data', () => {
 });
 
 describe('privileged helper detection', () => {
-  it('refuses a command that names one of athanor own root helpers', () => {
+  it('refuses a command that names one of garden own root helpers', () => {
     const helpers = [
-      '/usr/local/lib/athanor/athanor-package-helper',
-      '/usr/local/lib/athanor/athanor-sandbox'
+      '/usr/local/lib/garden/garden-package-helper',
+      '/usr/local/lib/garden/garden-sandbox'
     ];
     expect(
       privilegedHelperInvocation(
-        { executable: '/usr/local/lib/athanor/athanor-package-helper', args: ['install', 'nmap'] },
+        { executable: '/usr/local/lib/garden/garden-package-helper', args: ['install', 'nmap'] },
         helpers
       )
-    ).toBe('athanor-package-helper');
+    ).toBe('garden-package-helper');
     expect(
       privilegedHelperInvocation(
-        { executable: 'sh', args: ['-c', 'athanor-sandbox run network id'] },
+        { executable: 'sh', args: ['-c', 'garden-sandbox run network id'] },
         helpers
       )
-    ).toBe('athanor-sandbox');
+    ).toBe('garden-sandbox');
     expect(privilegedHelperInvocation({ executable: 'git', args: ['status'] }, helpers)).toBe(
       undefined
     );
     expect(
-      privilegedHelperInvocation({ executable: 'athanor-sandbox', args: [] }, [undefined])
+      privilegedHelperInvocation({ executable: 'garden-sandbox', args: [] }, [undefined])
     ).toBeUndefined();
   });
 });
@@ -173,7 +173,7 @@ describe('executable resolution', () => {
   it('follows a symbolic link so a renamed escalation binary is still recognised', async () => {
     // `ln -s /usr/bin/sudo ./s` presents a basename of `s` to a check that only reads the string
     // it was handed, which is all the argument analysis used to see.
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-policy-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-policy-'));
     temporaryRoots.push(root);
     const target = path.join(root, 'sudo');
     await writeFile(target, '#!/bin/sh\nexit 0\n');
@@ -188,7 +188,7 @@ describe('executable resolution', () => {
   });
 
   it('finds a bare command name on the search path the command will run with', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-policy-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-policy-'));
     temporaryRoots.push(root);
     const tool = path.join(root, 'workspace-tool');
     await writeFile(tool, '#!/bin/sh\nexit 0\n');

@@ -1,6 +1,6 @@
 import ScrollRegion from './ScrollRegion';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ProjectProcessHistory, ManagedProcess, ComputationSession } from '@athanor/contracts';
+import type { ProjectProcessHistory, ManagedProcess, ComputationSession } from '@garden/contracts';
 import { ApiError, get, post } from './client';
 import { Button, ErrorNotice } from './ui';
 import { processDuration, processName, processState } from './process-display';

@@ -1,6 +1,6 @@
 import { withTaskApproval } from './approval-grants.js';
 /** Command effects, including destructive operations, publishing and network access. */
-import { type SecurityMode } from '@athanor/contracts';
+import { type SecurityMode } from '@garden/contracts';
 import { textValue } from './values.js';
 import {
   commandInterpreters,
@@ -186,7 +186,7 @@ export const shellApprovalRequirement = (
     if (relocation)
       return {
         action: `Move data out of reach with ${executable}`,
-        preview: `Run ${[executable, ...commandArgs].join(' ')}. This empties the place it moves from, and that place is outside the turn's undo point - which covers workspace/ and .athanor/artifacts and nothing else - so rewinding this turn does not put it back. Nothing has to be deleted for this computer to lose the agent's own keys or its shell configuration this way.`
+        preview: `Run ${[executable, ...commandArgs].join(' ')}. This empties the place it moves from, and that place is outside the turn's undo point - which covers workspace/ and .garden/artifacts and nothing else - so rewinding this turn does not put it back. Nothing has to be deleted for this computer to lose the agent's own keys or its shell configuration this way.`
       };
     return {
       action: `Run ${executable}`,
@@ -261,9 +261,9 @@ export const shellApprovalRequirement = (
               : `Install work that outlives this turn with ${destruction.operation}`,
         preview:
           destruction.kind === 'store'
-            ? `Run ${invocation}. What this removes is not in the workspace - a database, a cache, a bucket or a container volume all live outside it - so rewinding this turn does not put it back. The turn's undo point covers workspace/ and .athanor/artifacts and nothing else.`
+            ? `Run ${invocation}. What this removes is not in the workspace - a database, a cache, a bucket or a container volume all live outside it - so rewinding this turn does not put it back. The turn's undo point covers workspace/ and .garden/artifacts and nothing else.`
             : destruction.kind === 'carried'
-              ? `Run ${invocation}. This carries the command into another container or pod and runs it there. The turn's undo point covers workspace/ and .athanor/artifacts on this computer and nothing on the other side of that boundary, so rewinding this turn leaves whatever it did there done.`
+              ? `Run ${invocation}. This carries the command into another container or pod and runs it there. The turn's undo point covers workspace/ and .garden/artifacts on this computer and nothing on the other side of that boundary, so rewinding this turn leaves whatever it did there done.`
               : `Run ${invocation}. This installs something that runs after this task and every card in it is over, under a process no approval here governs, and it is not inside the turn's undo point either - rewinding this turn leaves it running.`
       };
     const publishing =

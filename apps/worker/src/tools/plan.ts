@@ -3,9 +3,9 @@ import {
   type TaskOutputIntent,
   type TaskPlanStep,
   type WorkSurfaceReport
-} from '@athanor/contracts';
-import { decryptJson, encryptJson, AthanorError } from '@athanor/core';
-import { type ModelToolCall } from '@athanor/model-gateway';
+} from '@garden/contracts';
+import { decryptJson, encryptJson, GardenError } from '@garden/core';
+import { type ModelToolCall } from '@garden/model-gateway';
 import { event } from '../tool-recording.js';
 import { planStepsFromArguments, textValue } from '../values.js';
 import { type ToolContext } from '../tool-dispatch.js';
@@ -40,7 +40,7 @@ export async function executePlanTool(context: ToolContext, call: ModelToolCall)
       ).at(-1);
       const directionEventId = latestDirection?.id;
       if (call.arguments.presentation !== undefined && !directionEventId)
-        throw new AthanorError(
+        throw new GardenError(
           'presentation_direction_missing',
           'The current owner direction is unavailable; reload the task before reporting.'
         );
@@ -72,7 +72,7 @@ export async function executePlanTool(context: ToolContext, call: ModelToolCall)
          * whose title arrived under another key or as an empty string, so a model told only
          * "needs at least one step" sends the same thing again. Seen twice in one run.
          */
-        throw new AthanorError(
+        throw new GardenError(
           'invalid_plan',
           'A plan needs at least one step with a title. Send steps as ["Read the brief", …] or [{"title":"Read the brief","status":"in_progress"}, …]; a step with no title is dropped. To retire a step, keep its title and set its status to skipped rather than removing it.'
         );

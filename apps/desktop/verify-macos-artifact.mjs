@@ -51,7 +51,7 @@ export function assertNoMacSensitiveContent(label, bytes) {
 }
 
 export function validateMacInfo(info, expectedVersion) {
-  invariant(info.CFBundleIdentifier === 'org.athanor.ai', 'macOS bundle identifier changed');
+  invariant(info.CFBundleIdentifier === 'org.garden.ai', 'macOS bundle identifier changed');
   invariant(info.CFBundleName === 'garden', 'macOS bundle name changed');
   invariant(
     info.CFBundleShortVersionString === expectedVersion,
@@ -71,7 +71,7 @@ export function validateMacInfo(info, expectedVersion) {
   );
   const schemes = (info.CFBundleURLTypes ?? []).flatMap((entry) => entry.CFBundleURLSchemes ?? []);
   invariant(
-    schemes.length === 2 && schemes.includes('garden') && schemes.includes('athanor'),
+    schemes.length === 1 && schemes.includes('garden'),
     'macOS pairing deep-link boundary changed'
   );
   const transport = info.NSAppTransportSecurity ?? {};
@@ -84,7 +84,7 @@ export function validateMacInfo(info, expectedVersion) {
     'macOS transport policy must permit insecure HTTP only for exact localhost'
   );
   invariant(
-    JSON.stringify(info.NSBonjourServices) === JSON.stringify(['_athanor._tcp']),
+    JSON.stringify(info.NSBonjourServices) === JSON.stringify(['_garden._tcp']),
     'macOS Bonjour discovery boundary changed'
   );
   for (const key of [

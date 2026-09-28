@@ -11,8 +11,8 @@
  * the statements it issues, and the parameter positions each one assumes are named in its comment.
  */
 
-import { CONVERSATION_NAME_INDEX_STAMP } from '@athanor/core';
-import type { ConversationNameIndex } from '@athanor/core';
+import { CONVERSATION_NAME_INDEX_STAMP } from '@garden/core';
+import type { ConversationNameIndex } from '@garden/core';
 
 /**
  * Statuses in which a task is about to spend the rest of its ceiling, which is what a start-time

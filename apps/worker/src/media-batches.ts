@@ -1,7 +1,7 @@
-import { runtimeUUID } from '@athanor/core';
+import { runtimeUUID } from '@garden/core';
 
-import { AthanorError, decryptJson, encryptJson, sha256, unwrapDataKey } from '@athanor/core';
-import type { DataStore, MediaBatchRecord } from '@athanor/data';
+import { GardenError, decryptJson, encryptJson, sha256, unwrapDataKey } from '@garden/core';
+import type { DataStore, MediaBatchRecord } from '@garden/data';
 import {
   isNativeOpenAIEndpoint,
   NativeMediaLibraryClient,
@@ -10,8 +10,8 @@ import {
   readVideoGenerationJob,
   mediaRecord,
   MAX_NATIVE_VIDEO_BATCH_BYTES
-} from '@athanor/model-gateway';
-import type { ModelToolCall } from '@athanor/model-gateway';
+} from '@garden/model-gateway';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { InferenceCredential } from './agent-state.js';
 import type { ToolContext } from './tool-dispatch.js';
 import { VideoBatchControls, mediaArguments } from './media-controls.js';
@@ -45,7 +45,7 @@ const nativeBatchJsonl = (request: StoredVideoBatch): string => {
     )
     .join('\n');
   if (Buffer.byteLength(jsonl) > MAX_NATIVE_VIDEO_BATCH_BYTES)
-    throw new AthanorError(
+    throw new GardenError(
       'media_batch_too_large',
       'The combined prompts and image references exceed this batch upload limit; divide the shot list into smaller batches',
       413
@@ -58,7 +58,7 @@ export const queueVideoBatch = async (
   secret: InferenceCredential
 ) => {
   if (!context.consequentialApproved)
-    throw new AthanorError(
+    throw new GardenError(
       'media_batch_approval_required',
       'Approve this batch and its temporary provider retention first',
       409
@@ -69,7 +69,7 @@ export const queueVideoBatch = async (
     !isNativeOpenAIEndpoint(secret.baseUrl) ||
     secret.mediaRoutes?.video?.apiProtocol !== 'openai'
   )
-    throw new AthanorError(
+    throw new GardenError(
       'media_batch_route_invalid',
       'Choose a native video route for batch rendering',
       409
@@ -107,7 +107,7 @@ export const queueVideoBatch = async (
   }
   const total = prepared.reduce((sum, item) => sum + item.intent.reservationUsd, 0);
   if (input.maxCostUsd !== undefined && total > input.maxCostUsd)
-    throw new AthanorError(
+    throw new GardenError(
       'media_batch_limit',
       'The batch quote exceeds its approved spending limit',
       402

@@ -3,7 +3,7 @@
  * The gate over the parts of this repository that TypeScript never compiles and vitest never runs.
  *
  * Three classes of thing used to be able to rot silently. A shell or Python script that ships to an
- * owner's box - `athanor-ddns` refreshing a hostname from a systemd timer, `athanor-certificate`
+ * owner's box - `garden-ddns` refreshing a hostname from a systemd timer, `garden-certificate`
  * renewing TLS - is never parsed by anything in a normal build, so a syntax error in one reaches an
  * installation and fails at three in the morning rather than in CI. The skill library is read by the
  * model rather than by a compiler, so a malformed sidecar or a description that never says when the
@@ -122,7 +122,7 @@ if (shellcheck.error?.code === 'ENOENT') {
 /**
  * The one shipped script whose behaviour is checked here rather than only its syntax.
  *
- * `athanor-system-packages` is the single root-privileged path on an owner's box: the agent asks
+ * `garden-system-packages` is the single root-privileged path on an owner's box: the agent asks
  * for a package, the owner approves it, the runner rewrites the command onto one sudoers rule, and
  * that script runs on the other side as root. Its package-name filter is a security control and
  * its dispatch decides whether an approved install reaches a package manager this host has. Both
@@ -135,7 +135,7 @@ if (shellcheck.error?.code === 'ENOENT') {
  * second and works on a developer's laptop.
  */
 // Native package compilation and reconstruction run here alongside the recorder's file checks.
-for (const drill of ['scripts/test-gui-entry.py', 'infra/native/athanor-desktop-bridge.test.py']) {
+for (const drill of ['scripts/test-gui-entry.py', 'infra/native/garden-desktop-bridge.test.py']) {
   const result = spawnSync('python3', [drill], {
     cwd: repositoryRoot,
     encoding: 'utf8',
@@ -195,7 +195,7 @@ if (systemPackages.status !== 0)
 else say(`Root package helper: ${(systemPackages.stdout.match(/^ok /gm) ?? []).length} checks.`);
 
 /**
- * And the second one, for the same reason. `athanor task` is how a script drives athanor, so its
+ * And the second one, for the same reason. `garden task` is how a script drives garden, so its
  * exit codes are a contract rather than a convenience: the caller's whole reason for existing is
  * that a wrapper which returns 0 while the work died has bitten this repository twice, and one
  * shared non-zero for every kind of ending is the same defect a step along.
@@ -214,14 +214,14 @@ const taskCli = spawnSync(process.execPath, ['scripts/test-task-cli.mjs'], {
 });
 if (taskCli.status !== 0)
   fail(
-    `athanor task does not keep its contract:\n${[taskCli.stdout, taskCli.stderr].join('\n').trim()}`
+    `garden task does not keep its contract:\n${[taskCli.stdout, taskCli.stderr].join('\n').trim()}`
   );
 else say(taskCli.stdout.trim());
 
 /**
  * And the third, for a contract with somebody else's code on the other end of it.
  *
- * `athanor acp` speaks Agent Client Protocol, which means the callers that matter are clients this
+ * `garden acp` speaks Agent Client Protocol, which means the callers that matter are clients this
  * repository did not write and cannot test against. That makes two things load-bearing at once: the
  * wire shapes, because a client is a stranger and will not be forgiving, and the approval floor,
  * because ACP hands a client a permission call and a mode setter and either one could quietly
@@ -241,7 +241,7 @@ const acpBridge = spawnSync(process.execPath, ['scripts/acp/test-acp-bridge.mjs'
 });
 if (acpBridge.status !== 0)
   fail(
-    `athanor acp does not keep its contract:\n${[acpBridge.stdout, acpBridge.stderr].join('\n').trim()}`
+    `garden acp does not keep its contract:\n${[acpBridge.stdout, acpBridge.stderr].join('\n').trim()}`
   );
 else say(acpBridge.stdout.trim());
 
@@ -260,7 +260,7 @@ say(
 
 // --- the skill library ------------------------------------------------------------------------
 
-const skills = spawnSync('/bin/sh', ['scripts/athanor-skill-check', 'skills'], {
+const skills = spawnSync('/bin/sh', ['scripts/garden-skill-check', 'skills'], {
   cwd: repositoryRoot,
   encoding: 'utf8'
 });
@@ -271,7 +271,7 @@ say(`Skill library: ${(skills.stdout || '').trim() || 'checked'}`);
 // --- the ImageMagick 6 compatibility command ----------------------------------------------------
 
 /**
- * The one place in athanor that knows ImageMagick has two spellings, exercised against stand-ins
+ * The one place in garden that knows ImageMagick has two spellings, exercised against stand-ins
  * for the ImageMagick 6 binaries. If this dispatched wrongly, `magick identify x.png` would become
  * `convert identify x.png` on every Debian 12 and Ubuntu 24.04 box and the failure would surface
  * inside a skill, in front of the owner.
@@ -279,12 +279,12 @@ say(`Skill library: ${(skills.stdout || '').trim() || 'checked'}`);
 if (existsSync('/usr/bin/magick')) {
   say('  this host has ImageMagick 7, so the compatibility command was not exercised');
 } else {
-  const stubs = mkdtempSync(path.join(tmpdir(), 'athanor-magick-'));
+  const stubs = mkdtempSync(path.join(tmpdir(), 'garden-magick-'));
   for (const tool of ['convert', 'identify']) {
     writeFileSync(path.join(stubs, tool), `#!/bin/sh\nprintf '${tool} %s' "$*"\n`, { mode: 0o755 });
   }
   const dispatch = (args) =>
-    spawnSync('/bin/sh', ['scripts/athanor-magick', ...args], {
+    spawnSync('/bin/sh', ['scripts/garden-magick', ...args], {
       cwd: repositoryRoot,
       encoding: 'utf8',
       env: { PATH: `${stubs}:/usr/bin:/bin` }
@@ -298,7 +298,7 @@ if (existsSync('/usr/bin/magick')) {
   for (const [args, expected] of expectations) {
     const actual = dispatch(args);
     if (actual !== expected)
-      fail(`scripts/athanor-magick turned \`magick ${args.join(' ')}\` into \`${actual}\``);
+      fail(`scripts/garden-magick turned \`magick ${args.join(' ')}\` into \`${actual}\``);
   }
   rmSync(stubs, { recursive: true, force: true });
   say(`ImageMagick compatibility: ${expectations.length} dispatches match ImageMagick 7.`);
@@ -544,7 +544,7 @@ say(
  * - the unit writes percentages and the source writes a fraction of whatever the host reports.
  */
 {
-  const unit = read('infra/native/athanor-runner.service');
+  const unit = read('infra/native/garden-runner.service');
   const percentage = (key) => Number(new RegExp(`^${key}=(\\d+)%$`, 'm').exec(unit)?.[1]);
   const high = percentage('MemoryHigh');
   const max = percentage('MemoryMax');
@@ -555,17 +555,17 @@ say(
     );
   if (!Number.isFinite(high) || !Number.isFinite(max))
     fail(
-      'infra/native/athanor-runner.service no longer states MemoryHigh and MemoryMax as percentages, so the per-command memory ceiling cannot be compared against them'
+      'infra/native/garden-runner.service no longer states MemoryHigh and MemoryMax as percentages, so the per-command memory ceiling cannot be compared against them'
     );
   else if (!fraction)
     fail(
-      'services/workspace-runner/src/limits.ts no longer spells defaultMemoryLimitBytes as a fraction of the host, so it cannot be compared against the cgroup in infra/native/athanor-runner.service'
+      'services/workspace-runner/src/limits.ts no longer spells defaultMemoryLimitBytes as a fraction of the host, so it cannot be compared against the cgroup in infra/native/garden-runner.service'
     );
   else {
     const percent = (Number(fraction[1]) / Number(fraction[2])) * 100;
     if (percent <= high || percent >= max)
       fail(
-        `the per-command memory ceiling in services/workspace-runner/src/limits.ts is ${percent}% of the host, which is not strictly between MemoryHigh=${high}% and MemoryMax=${max}% in infra/native/athanor-runner.service. At or below the throttle it refuses a large single job the cgroup was written to allow; at or above the kill it can never fire, and every single-process memory death becomes a SIGKILL with nothing on either stream`
+        `the per-command memory ceiling in services/workspace-runner/src/limits.ts is ${percent}% of the host, which is not strictly between MemoryHigh=${high}% and MemoryMax=${max}% in infra/native/garden-runner.service. At or below the throttle it refuses a large single job the cgroup was written to allow; at or above the kill it can never fire, and every single-process memory death becomes a SIGKILL with nothing on either stream`
       );
     else
       say(
@@ -673,17 +673,17 @@ if (NAMED_PRODUCTS) {
  * The host table has to name every family in every row, and cover what the install actually needs.
  *
  * The same package names lived in three places before this - the installer, the runner's toolchain
- * probe and `athanor doctor` - and widening past Debian would have made it twelve. One table is only
+ * probe and `garden doctor` - and widening past Debian would have made it twelve. One table is only
  * an improvement while it stays complete, and a row that quietly loses a column is a host that
  * installs and then cannot make a document.
  */
-const hostTable = read('scripts/athanor-host.sh')
+const hostTable = read('scripts/garden-host.sh')
   .split('\n')
   .slice(
-    read('scripts/athanor-host.sh')
+    read('scripts/garden-host.sh')
       .split('\n')
       .findIndex((line) => line.startsWith('capability\t')),
-    read('scripts/athanor-host.sh')
+    read('scripts/garden-host.sh')
       .split('\n')
       .findIndex((line) => line === 'TABLE')
   )
@@ -718,7 +718,7 @@ say(`Host packages: ${tableRows.length} capabilities across ${families.join(', '
 
 /*
  * There are two ways a box reaches a new release - `install.sh` on top of an existing tree, and
- * `athanor update` from the auto-update timer - and both run with no terminal attached. Two things
+ * `garden update` from the auto-update timer - and both run with no terminal attached. Two things
  * have to be true on each, and both were once true on only one: a release that removes a workspace
  * package makes pnpm want to rebuild the modules directory and stop to ask, which with nothing to
  * answer it aborts the upgrade; and systemd stops wanting a withdrawn unit without ever stopping
@@ -728,7 +728,7 @@ say(`Host packages: ${tableRows.length} capabilities across ${families.join(', '
  */
 const upgradePaths = [
   { file: 'scripts/install-native.sh', name: 'the installer' },
-  { file: 'scripts/athanor', name: '`athanor update`' }
+  { file: 'scripts/garden', name: '`garden update`' }
 ];
 for (const { file, name } of upgradePaths) {
   const source = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
@@ -756,9 +756,7 @@ say(`Upgrade paths: ${upgradePaths.length} carry the non-interactive and withdra
  */
 const declaredVersion = JSON.parse(read('package.json')).version;
 const installUi = read('apps/web/src/ServerInstall.tsx');
-const pinnedRefs = [
-  ...installUi.matchAll(/\/(?:v)?(\d+\.\d+\.\d+)\/|ATHANOR_REF=v(\d+\.\d+\.\d+)/g)
-]
+const pinnedRefs = [...installUi.matchAll(/\/(?:v)?(\d+\.\d+\.\d+)\/|GARDEN_REF=v(\d+\.\d+\.\d+)/g)]
   .map((match) => match[1] ?? match[2])
   .filter(Boolean);
 if (!pinnedRefs.length) fail('apps/web/src/ServerInstall.tsx pins no revision for the installer');
@@ -796,10 +794,10 @@ else say(`Node version: engines and the installer both require ${installerNodeMa
  *
  * Documentation drift is the failure this repository keeps having: a command is added and the list
  * an owner reads is not, so the one thing that would have helped them is the one thing they cannot
- * find. `athanor rollback` shipped and went unmentioned. Both sides are discovered here rather than
+ * find. `garden rollback` shipped and went unmentioned. Both sides are discovered here rather than
  * listed, so the next command is covered by existing.
  */
-const dispatch = read('scripts/athanor');
+const dispatch = read('scripts/garden');
 const dispatchStart = dispatch.indexOf('case "$command_name" in');
 const dispatchBlock = dispatchStart === -1 ? '' : dispatch.slice(dispatchStart);
 const dispatchArms = new Set(
@@ -812,7 +810,7 @@ for (const internal of ['help', 'install']) shippedCommands.delete(internal);
  * The README plus the pages beside it, rather than the README alone.
  *
  * The rule being kept is "no command ships undocumented", and any page an owner reads answers it.
- * What forced the widening: `athanor task` is not a host operation like the rest of this dispatch -
+ * What forced the widening: `garden task` is not a host operation like the rest of this dispatch -
  * it drives work over HTTP with an API token and belongs on a page about doing that, not in the
  * list of things typed to keep the box alive. Insisting on the README would have put it in the
  * wrong place or left it undocumented, which is what a gate that names a location instead of an
@@ -835,19 +833,19 @@ const ownerFacingPages = [
 ];
 const documented = new Set(
   ownerFacingPages
-    .flatMap((relativePath) => [...read(relativePath).matchAll(/^sudo athanor ([a-z][a-z-]*)/gm)])
+    .flatMap((relativePath) => [...read(relativePath).matchAll(/^sudo garden ([a-z][a-z-]*)/gm)])
     .map((match) => match[1])
 );
 const undocumented = [...shippedCommands].filter((name) => !documented.has(name)).sort();
 const imaginary = [...documented].filter((name) => !shippedCommands.has(name)).sort();
-if (!shippedCommands.size) fail('scripts/athanor no longer has a recognisable command dispatch');
+if (!shippedCommands.size) fail('scripts/garden no longer has a recognisable command dispatch');
 else if (undocumented.length)
   fail(
-    `scripts/athanor answers to ${undocumented.join(', ')}, which the README and the pages in docs/ never mention`
+    `scripts/garden answers to ${undocumented.join(', ')}, which the README and the pages in docs/ never mention`
   );
 else if (imaginary.length)
   fail(
-    `the README or a page in docs/ documents ${imaginary.join(', ')}, which scripts/athanor does not answer to`
+    `the README or a page in docs/ documents ${imaginary.join(', ')}, which scripts/garden does not answer to`
   );
 else
   say(
@@ -886,21 +884,21 @@ for (const relativePath of documents) {
   read(relativePath)
     .split('\n')
     .forEach((line, index) => {
-      for (const match of line.matchAll(/sudo athanor ([a-z][a-z-]*)/g)) {
+      for (const match of line.matchAll(/sudo garden ([a-z][a-z-]*)/g)) {
         const name = match[1];
-        const where = `${relativePath}:${index + 1} says "sudo athanor ${name}"`;
+        const where = `${relativePath}:${index + 1} says "sudo garden ${name}"`;
         instructions += 1;
         if (!dispatchArms.has(name)) invented.push(where);
         else if (!usageOffered.has(name) && !line.includes('old name')) retired.push(where);
       }
     });
 }
-if (!usageOffered.size) fail('scripts/athanor no longer prints a usage line naming its commands');
+if (!usageOffered.size) fail('scripts/garden no longer prints a usage line naming its commands');
 else if (invented.length)
-  fail(`${invented.join('; ')}, which scripts/athanor does not answer to at all`);
+  fail(`${invented.join('; ')}, which scripts/garden does not answer to at all`);
 else if (retired.length)
   fail(
-    `${retired.join('; ')}, a name scripts/athanor still answers to but no longer offers; teach the name in its usage line, or mark the line as the old name`
+    `${retired.join('; ')}, a name scripts/garden still answers to but no longer offers; teach the name in its usage line, or mark the line as the old name`
   );
 else
   say(
@@ -931,35 +929,35 @@ else say(`API token scopes: all ${enforcedScopes.length} enforced scopes are sel
  *
  * The installer and `install_runtime_files` keep the same list twice, by hand and by nothing else,
  * and the second copy fell behind without a single test noticing: a server that had only ever been
- * updated had no athanor-backup.timer, so nothing was ever going to take the backup the interface
+ * updated had no garden-backup.timer, so nothing was ever going to take the backup the interface
  * described. The comparison below is the one nobody was running. It is one-directional - the update
  * may place more, as it does for the relay directory - and the exceptions are named rather than
  * inferred, because "the update does not place this" has to be a decision somebody made.
  */
 // The source contract pairs the fresh installer and required update activation with the same
 // migration. The executable proxy drill owns HTTP behavior; the update drill owns rollback.
-const nativePreviewRuntime = read('scripts/athanor-native-runtime');
+const nativePreviewRuntime = read('scripts/garden-native-runtime');
 const nativeInstaller = read('scripts/install-native.sh');
 const previewSite = read('infra/native/nginx.conf');
 const previewCsp = read('infra/native/nginx-app-csp.conf');
 const previewActivation = nativeInstaller.indexOf(
-  '"$athanor_root/scripts/athanor-native-runtime" preview-origin'
+  '"$garden_root/scripts/garden-native-runtime" preview-origin'
 );
 const previewNginxCheck = nativeInstaller.indexOf('\nnginx -t\n');
 if (
   previewActivation < 0 ||
   previewNginxCheck < previewActivation ||
   !/install_policy\s+configure_preview_origin/.test(nativePreviewRuntime) ||
-  !nativePreviewRuntime.includes("atomic(snippets / 'athanor-preview-origin.conf'")
+  !nativePreviewRuntime.includes("atomic(snippets / 'garden-preview-origin.conf'")
 )
   fail(
     'Preview deployment must generate isolated origin configuration during fresh install and required update activation before nginx starts.'
   );
 if (
   !previewSite.includes('listen 8443 ssl;') ||
-  !previewSite.includes('return 308 $athanor_preview_origin$request_uri;') ||
+  !previewSite.includes('return 308 $garden_preview_origin$request_uri;') ||
   !previewSite.includes('proxy_set_header Host $http_host;') ||
-  !previewCsp.includes("frame-src 'self' $athanor_preview_origin;")
+  !previewCsp.includes("frame-src 'self' $garden_preview_origin;")
 )
   fail(
     'Preview deployment must preserve redirect paths, forwarded origin and the exact configured frame origin.'
@@ -975,20 +973,20 @@ for (const line of installerSource.split('\n')) {
   const direct = line.match(/^\s*install\s+-m\s+(?:\S+\s+|-[og]\s+\S+\s+)+(\/\S+)\s*$/);
   if (direct) installerPlaces.add(direct[1]);
 }
-const updateSource = read('scripts/athanor');
+const updateSource = read('scripts/garden');
 const listStart = updateSource.indexOf('install_runtime_files() {');
 const listBlock =
   listStart === -1 ? '' : updateSource.slice(listStart, updateSource.indexOf('\n}\n', listStart));
 const updatePlaces = new Set([...listBlock.matchAll(/runtime_path (\/\S+?)\)/g)].map((m) => m[1]));
 // Placed by an install and deliberately not by an update. The listen snippet is chosen from two
-// assets by the host's nginx version; the HSTS snippet belongs to `athanor certificate enable` and
+// assets by the host's nginx version; the HSTS snippet belongs to `garden certificate enable` and
 // an update that rewrote it would switch HSTS off on a box with a real certificate; the AppArmor
 // profile needs apparmor_parser and a host that has it; the ImageMagick shim exists only where the
 // host has ImageMagick 6; typst is a downloaded release binary rather than a file in this checkout.
 const installOnly = new Set([
-  '/etc/nginx/snippets/athanor-https-listen.conf',
-  '/etc/nginx/snippets/athanor-hsts.conf',
-  '/etc/apparmor.d/athanor-chromium',
+  '/etc/nginx/snippets/garden-https-listen.conf',
+  '/etc/nginx/snippets/garden-hsts.conf',
+  '/etc/apparmor.d/garden-chromium',
   '/usr/local/bin/magick',
   '/usr/local/bin/typst'
 ]);
@@ -1019,12 +1017,12 @@ else
  * And every runner setting a fresh install writes is one an update writes too.
  *
  * The same defect as the runtime files, one directory over and worse: CONFINE_AGENT_FILESYSTEM was
- * written into /etc/athanor/runner.env by the installer and by nothing else, so the Landlock
- * boundary this branch built reached the owner's server present and switched OFF - `athanor-sandbox
+ * written into /etc/garden/runner.env by the installer and by nothing else, so the Landlock
+ * boundary this branch built reached the owner's server present and switched OFF - `garden-sandbox
  * check` answering `filesystem=landlock` while the runner answered `agentFilesystemConfined:
  * false`, after an update that printed "Update complete" and exited 0.
  *
- * `athanor update` now runs `scripts/install-native.sh --release-steps`, which runs the settings
+ * `garden update` now runs `scripts/install-native.sh --release-steps`, which runs the settings
  * step from the incoming release rather than from a second list. THIS IS THE GATE THAT KEEPS IT
  * THAT WAY: a key written outside `release_step_runner_settings` is a key an update does not carry,
  * and adding one fails here rather than being noticed on somebody's box a release later.
@@ -1040,7 +1038,7 @@ const runnerSettingsBlock =
   runnerSettingsStart === -1 ? '' : installerSource.slice(runnerSettingsStart, runnerSettingsEnd);
 // Every call to the three env writers, whatever file it names, because a gate that only recognises
 // one spelling of the target is a gate one token defeats. Measured on this tree: with the pattern
-// written as `"$runner_env"` alone, adding `set_env_value "$athanor_config/runner.env" NEW_KEY x`
+// written as `"$runner_env"` alone, adding `set_env_value "$garden_config/runner.env" NEW_KEY x`
 // outside the step passed this check with the same reassuring line, and NEW_KEY would have reached
 // a fresh install and no existing box - the exact defect this gate is here to refuse. So the target
 // is read rather than assumed, and an unrecognised one fails below rather than being skipped.
@@ -1102,7 +1100,7 @@ else if (releaseStepsDefined.length < 3)
   );
 else if (releaseStepsUnlisted.length)
   fail(
-    `scripts/install-native.sh defines ${releaseStepsUnlisted.join(', ')} but release_steps does not name it, so sudo athanor update would never run it; add it to that list or give it a name that is not release_step_*`
+    `scripts/install-native.sh defines ${releaseStepsUnlisted.join(', ')} but release_steps does not name it, so sudo garden update would never run it; add it to that list or give it a name that is not release_step_*`
   );
 else if (unrecognisedEnvTargets.length)
   fail(
@@ -1110,7 +1108,7 @@ else if (unrecognisedEnvTargets.length)
   );
 else if (runnerKeysNeverUpdated.length)
   fail(
-    `scripts/install-native.sh writes ${runnerKeysNeverUpdated.join(', ')} into runner.env outside release_step_runner_settings, so sudo athanor update would never write it; move it into that step or name it install-only there and here`
+    `scripts/install-native.sh writes ${runnerKeysNeverUpdated.join(', ')} into runner.env outside release_step_runner_settings, so sudo garden update would never write it; move it into that step or name it install-only there and here`
   );
 else if (staleRunnerKeyException.length)
   fail(

@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import type { SecurityMode, Workspace, WorkspaceSnapshot } from '@athanor/contracts';
+import type { SecurityMode, Workspace, WorkspaceSnapshot } from '@garden/contracts';
 import { permissionModeSummary } from '../asking-rules.js';
 import { del, patch, post, put } from '../client.js';
 import { Button, Field } from '../ui.js';

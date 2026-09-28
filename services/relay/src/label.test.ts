@@ -43,7 +43,7 @@ describe('deriveLabel', () => {
   it('follows the documented construction exactly', () => {
     const domain = Buffer.from('relay.example', 'utf8');
     const expected = createHash('sha256')
-      .update(Buffer.from('athanor-relay-label-v1\x00', 'latin1'))
+      .update(Buffer.from('garden-relay-label-v1\x00', 'latin1'))
       .update(Buffer.from([domain.length]))
       .update(domain)
       .update(key(9))

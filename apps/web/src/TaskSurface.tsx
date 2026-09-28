@@ -27,7 +27,7 @@ import type {
   Workspace,
   ConversationSource,
   DirectionContext
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import type { Bootstrap, Decision, Draft } from './model';
 import {
   activeQuestion,

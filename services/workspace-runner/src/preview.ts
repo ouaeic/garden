@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { connect } from 'node:net';
-import { assertPublishablePort } from '@athanor/core';
+import { assertPublishablePort } from '@garden/core';
 
 const PreviewPort = z.coerce.number().int().min(1024).max(65_535);
 
 /**
  * Publishing a preview points the public internet at a loopback port, so the question is not
- * whether the port is the runner's own but whether athanor is already serving something private
+ * whether the port is the runner's own but whether garden is already serving something private
  * there. The reserved set is every port this installation binds - the API, the preview gateway,
  * the database, the service health endpoints - which the runner is told rather than guesses,
  * because they are all configurable. The gateway ahead of it applies the same set, so a preview

@@ -60,7 +60,7 @@ Errors explain the next action:
 - expand storage/host disk;
 - restart the runner;
 - change a retention route;
-- inspect logs or run `athanor doctor`.
+- inspect logs or run `garden doctor`.
 
 Old subscription, upgrade, allowance, checkout, and cloud-provisioning wording is not part of the
 self-hosted interface.

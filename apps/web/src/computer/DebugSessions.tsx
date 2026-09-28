@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import type { DebugSession } from '@athanor/contracts';
+import type { DebugSession } from '@garden/contracts';
 import { get, post } from '../client';
 import { message } from './format';
 const SourceInspector = lazy(() => import('./SourceInspector'));

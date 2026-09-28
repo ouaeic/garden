@@ -4,7 +4,7 @@ import { assertPublishablePort, reservedPreviewPorts } from './preview-ports.js'
 describe('reserved preview ports', () => {
   const reserved = reservedPreviewPorts({
     ports: [4100, 4400, undefined],
-    urls: ['http://127.0.0.1:4300', 'postgres://athanor:pw@127.0.0.1:5432/athanor', ''],
+    urls: ['http://127.0.0.1:4300', 'postgres://garden:pw@127.0.0.1:5432/garden', ''],
     additional: '4201, 4202,4203,not-a-port,'
   });
 
@@ -14,7 +14,7 @@ describe('reserved preview ports', () => {
     ]);
   });
 
-  it('refuses to publish a port belonging to athanor itself', () => {
+  it('refuses to publish a port belonging to garden itself', () => {
     for (const port of [4100, 4300, 4400, 5432])
       expect(() => assertPublishablePort(port, reserved)).toThrow(
         `Port ${port} belongs to this server's own services`

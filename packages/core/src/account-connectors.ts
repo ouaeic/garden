@@ -22,7 +22,7 @@ import {
   listAccountAttachments
 } from './account-mail.js';
 import { listAccountCalendars, readAccountCalendarRange } from './account-calendar.js';
-import { AthanorError } from './errors.js';
+import { GardenError } from './errors.js';
 import { decryptJson, encryptJson, type EncryptedEnvelope } from './crypto.js';
 
 export const isAccountConnectorKind = (kind: string): kind is AccountProvider =>
@@ -164,14 +164,14 @@ export async function authorizeAccountConnector(
 ) {
   const aad = `connector:${connector.userId}:${connector.id}`;
   if (!isAccountConnectorKind(connector.kind) || connector.secretCiphertext.aad !== aad)
-    throw new AthanorError(
+    throw new GardenError(
       'connector_secret_context',
       'The account authorization does not match this connection.'
     );
   const stored = decryptJson<{ accountOAuth: unknown }>(connector.secretCiphertext, masterKey);
   const current = AccountOAuth.parse(stored.accountOAuth);
   if (current.provider !== connector.kind)
-    throw new AthanorError('connector_secret_context', 'The account provider does not match.');
+    throw new GardenError('connector_secret_context', 'The account provider does not match.');
   const refreshed = await refreshAccountOAuth(current, transport);
   const secret = { accountOAuth: refreshed };
   return {
@@ -189,7 +189,7 @@ export async function executeAccountConnector(
   const action = actionInput.parse(input.action);
   const definition = accountConnectorActions[action.action];
   if (!input.scopes.includes(definition.scope))
-    throw new AthanorError(
+    throw new GardenError(
       'connector_scope_denied',
       `Connector has not granted ${definition.scope}`
     );
@@ -202,7 +202,7 @@ export async function executeAccountConnector(
     api.secret.provider !== input.kind ||
     input.baseUrl !== accountConnectorBase(api.secret.provider)
   )
-    throw new AthanorError(
+    throw new GardenError(
       'connector_secret_context',
       'The account does not match this connection.'
     );
@@ -211,7 +211,7 @@ export async function executeAccountConnector(
     case 'account_mail_draft':
     case 'account_mail_send':
       if (!input.operation)
-        throw new AthanorError(
+        throw new GardenError(
           'connector_operation_required',
           'Mail changes need a durable operation receipt.'
         );
@@ -248,7 +248,7 @@ export async function executeAccountConnector(
     case 'account_calendar_update':
     case 'account_calendar_delete':
       if (!input.operation)
-        throw new AthanorError(
+        throw new GardenError(
           'connector_operation_required',
           'Calendar changes need a durable operation receipt.'
         );
@@ -263,7 +263,7 @@ export async function executeAccountConnector(
       break;
     case 'account_calendar_create':
       if (!input.operation)
-        throw new AthanorError(
+        throw new GardenError(
           'connector_operation_required',
           'Calendar changes need a durable operation receipt.'
         );

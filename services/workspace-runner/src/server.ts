@@ -1,6 +1,6 @@
 import { CAPTURE_GIT_HISTORY } from './project-git-capture.js';
 import { GuiNamespaceManager } from './gui-namespace.js';
-import { ProcessHistoryQuery } from '@athanor/contracts';
+import { ProcessHistoryQuery } from '@garden/contracts';
 import { RepositoryMapper, registerRepositoryMapRoute } from './repository-map.js';
 import { registerRepositoryGitRoute } from './repository-git.js';
 import { WorkflowManager } from './workflows.js';
@@ -8,7 +8,7 @@ import { registerWorkflowRoutes } from './workflow-routes.js';
 import { registerDocumentRoutes } from './document-routes.js';
 import { registerBrowserActionRoutes } from './browser-action-routes.js';
 import { connectProcessSupervisor, type ProcessService } from './process-supervisor.js';
-import { OwnerStroke } from '@athanor/contracts';
+import { OwnerStroke } from '@garden/contracts';
 import { ProjectUpdatesManager } from './project-updates.js';
 import { registerProjectUpdateRoutes } from './project-update-routes.js';
 import { DebuggerManager } from './debugger.js';
@@ -43,14 +43,14 @@ import {
   DesktopHolder,
   DesktopLaunchRequest,
   WebFetchRequest
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import {
   deriveCapabilityNonce,
   reachOfBindAddress,
   reservedPreviewPorts,
   verifyCapabilityToken,
   type CapabilityTokenClaims
-} from '@athanor/core';
+} from '@garden/core';
 import { inspectAudioSource, prepareAudio } from './audio.js';
 import { authenticateRunnerRequest, requireScope } from './auth.js';
 import { BotWallError, BrowserManager, type BrowserStreamState } from './browser.js';
@@ -259,7 +259,7 @@ const contentTypeFor = (requestedPath: string): string =>
 /**
  * The two things a desktop viewer says about itself, rather than about the machine.
  *
- * They live here rather than in `@athanor/contracts` because nothing but this socket sends them:
+ * They live here rather than in `@garden/contracts` because nothing but this socket sends them:
  * they are the client half of a transport negotiation, not part of the tool surface the model or
  * the control plane sees. `DisplayViewport`'s own shape is `desktop-stream.ts:341`; this is that
  * shape with the bounds a stranger's message needs.
@@ -522,16 +522,14 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
     guards
   );
   if (resumed > 0)
-    console.info(
-      `athanor runner: resumed ${resumed} service(s) this computer was keeping running.`
-    );
+    console.info(`garden runner: resumed ${resumed} service(s) this computer was keeping running.`);
 
   /*
    * Snapshots and checkpoints stop long-running commands so nothing writes into the tree while it
    * is being rewritten, and services are commands. Without putting them back, "make a recovery
    * point" would silently take the owner's dashboard down for good - which is the same broken
    * promise as the hour-long timeout, arriving by a different route. The record survives a rewind
-   * on purpose: it lives in `.athanor/services.json`, outside both `CHECKPOINT_CONTENT` and the
+   * on purpose: it lives in `.garden/services.json`, outside both `CHECKPOINT_CONTENT` and the
    * snapshot archive, so restoring yesterday's files cannot un-declare today's service.
    */
   const restoreServices = async (root: string, workspaceId: string): Promise<void> => {
@@ -620,7 +618,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
    * WHAT IT COSTS, said plainly: a per-workspace storage limit does not bound what a task writes
    * into its `$HOME`. An agent that fills the disk through `~/.cache` is stopped by the host-disk
    * floor - which counts every byte on the filesystem and is what actually protects the box - and
-   * not by this number. `.athanor/browser` IS counted and is also a machine-written cache the owner
+   * not by this number. `.garden/browser` IS counted and is also a machine-written cache the owner
    * cannot browse, which is the inconsistency in this list; it stays counted because a browser
    * profile is bounded at tens of megabytes and does not move the walk.
    *
@@ -631,7 +629,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
   const storageUsage = async (root: string): Promise<number> =>
     (
       await Promise.all(
-        ['workspace', '.athanor/artifacts', '.athanor/browser'].map((relative) =>
+        ['workspace', '.garden/artifacts', '.garden/browser'].map((relative) =>
           workspaceUsage(path.join(root, relative))
         )
       )
@@ -657,7 +655,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       agentNetworkIsolated: config.ISOLATE_AGENT_NETWORK,
       // The rung this box is actually on, not the one its configuration asked for: with no helper
       // there is nothing to apply a ruleset with, and the setting alone would be a claim rather
-      // than a fact. `athanor-sandbox check` is where the claim was measured, at install time.
+      // than a fact. `garden-sandbox check` is where the claim was measured, at install time.
       agentFilesystemConfined: Boolean(sandbox?.confineFilesystem),
       // Update and backup admission distinguish independently retained work from work this runner
       // would interrupt. The shell consumes these literal field names; long-work.test.ts verifies
@@ -779,7 +777,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
 
   /**
    * Deleting a workspace takes both accounts, because the tree is split between them on purpose.
-   * The runner owns `.athanor` at a mode the agent cannot traverse, which is what keeps an agent
+   * The runner owns `.garden` at a mode the agent cannot traverse, which is what keeps an agent
    * away from its own checkpoints; the agent in turn owns whatever its programs left under its
    * home, some of it at modes the runner cannot traverse. `~/.cache` is the everyday case - GLib
    * creates it with an explicit 0700, so neither a umask nor a pre-created parent changes it, and
@@ -826,7 +824,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       await desktop.close(request.params.workspaceId);
       await gui?.closeRoot(workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId));
       // `forget` because the workspace is going: a service must not be restarted into a tree that
-      // no longer exists, and the record itself goes with the `.athanor` directory below.
+      // no longer exists, and the record itself goes with the `.garden` directory below.
       await computations.stopWorkspace(request.params.workspaceId);
       await debuggers.stopWorkspace(
         workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId)
@@ -1108,7 +1106,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
        * the internet and every field here would look identical to one reachable only by this box.
        *
        * Box-level and named for it. Where `/proc/<pid>` is hidden from the runner, which is how
-       * athanor ships, the uid on a socket is the only attribution available, so this says that an
+       * garden ships, the uid on a socket is the only attribution available, so this says that an
        * agent-owned process holds the port and not which one. Omitted entirely when nothing could
        * be read, because an empty list would claim the machine has nothing open.
        */
@@ -1317,7 +1315,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
           '--directory',
           root,
           'workspace',
-          '.athanor/artifacts'
+          '.garden/artifacts'
         ],
         { stdio: ['ignore', 'pipe', 'ignore'], shell: false }
       );
@@ -1333,7 +1331,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
         .header('cache-control', 'private, no-store')
         .header(
           'content-disposition',
-          `attachment; filename="athanor-workspace-${request.params.workspaceId}.tar.gz"`
+          `attachment; filename="garden-workspace-${request.params.workspaceId}.tar.gz"`
         )
         .send(archive.stdout);
     }
@@ -1834,7 +1832,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
         .status(502)
         .type('text/html; charset=utf-8')
         .send(
-          `<!doctype html><title>Nothing is listening</title><h1>Nothing is listening</h1><p>The app on port ${port} is not answering. It may have stopped, or never started - ask athanor to start it again.</p>`
+          `<!doctype html><title>Nothing is listening</title><h1>Nothing is listening</h1><p>The app on port ${port} is not answering. It may have stopped, or never started - ask garden to start it again.</p>`
         );
     }
     reply.status(response.status);
@@ -1890,7 +1888,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       request.headers['sec-websocket-protocol']
         ?.split(',')
         .map((value) => value.trim())
-        .filter((value) => value && value !== 'athanor-capability') ?? [];
+        .filter((value) => value && value !== 'garden-capability') ?? [];
     const headers = previewRequestHeaders(request.headers);
     const upstream = protocols.length
       ? new WebSocket(target, protocols, { headers })
@@ -2328,7 +2326,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
             canDecodeVideo = DesktopHello.parse(message).canDecodeVideo;
             await desktop.refreshStream(workspaceId, root);
           } else if (message.type === 'viewport') {
-            // The display has been stuck at ATHANOR_BOOT_RES since it was written: `resize` had
+            // The display has been stuck at GARDEN_BOOT_RES since it was written: `resize` had
             // exactly one caller, `subscribeStream`'s optional viewport, which no route ever set.
             // A pane that is not 1280x800 was therefore either letterboxed or scaled, and a human
             // being asked to click accurately on a scaled image is the one case the geometry code

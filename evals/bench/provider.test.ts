@@ -9,7 +9,7 @@
  *
  * WHAT IS REAL IN THESE TESTS. `ModelGateway` and `OpenAICompatibleAdapter` are, and that is why
  * the usage assertions below mean something: the numbers are not read out of a fixture object,
- * they are parsed by athanor's own adapter out of frames shaped like a route's - including
+ * they are parsed by garden's own adapter out of frames shaped like a route's - including
  * `prompt_tokens_details.cached_tokens`, which is the spelling `readCacheUsage` looks for first.
  * The harness is stubbed, because `runFixture` is 500 lines of machinery this file is not about.
  *
@@ -98,7 +98,7 @@ const answer = (usage: WireUsage): Response =>
     sse({ choices: [], usage })
   ]);
 
-/** The request body athanor's own adapter puts on the wire, in miniature. */
+/** The request body garden's own adapter puts on the wire, in miniature. */
 const requestBody = (): string =>
   JSON.stringify({
     model: 'openrouter/some-release',
@@ -466,7 +466,7 @@ describe('the whole seam, against the real runFixture', () => {
    * So this one runs the REAL `runFixture` - the real `AgentWorker`, the real context layer, the
    * real tool catalogue - with `driver.script` as its model and the driver attached, and asserts
    * on what reached the wire. The single most important assertion is the catalogue: the request
-   * this driver sends is decoded from the one athanor's own adapter assembled, so `finish` and
+   * this driver sends is decoded from the one garden's own adapter assembled, so `finish` and
    * `shell` appearing in the outgoing body is the proof that the window survived capture, decode
    * and re-encode. A driver composing a request from `ScriptContext` could not put them there,
    * because a `ScriptContext` has never carried them.
@@ -474,7 +474,7 @@ describe('the whole seam, against the real runFixture', () => {
    * The model answers in prose and calls nothing, so the turn is short and this test is about the
    * seam rather than about a solution. Nothing is billed: the wire is the stub above.
    */
-  it('carries athanor own window out and the model answer back', async () => {
+  it('carries garden own window out and the model answer back', async () => {
     const sent: string[] = [];
     const wireFetch = ((input: string | URL | Request, init?: RequestInit): Promise<Response> => {
       sent.push(typeof init?.body === 'string' ? init.body : '');
@@ -524,7 +524,7 @@ describe('the whole seam, against the real runFixture', () => {
     expect(first.tools?.map((tool) => tool.function?.name)).toContain('finish');
     expect(first.tools?.map((tool) => tool.function?.name)).toContain('shell');
     // Roles too, which `ScriptContext` also drops: a window with no system preamble is a different
-    // prompt from the one athanor priced.
+    // prompt from the one garden priced.
     expect(first.messages?.map((message) => message.role)).toContain('system');
     expect(first.messages?.map((message) => message.role)).toContain('user');
   });

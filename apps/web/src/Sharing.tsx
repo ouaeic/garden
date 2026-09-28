@@ -7,7 +7,7 @@ import type {
   ShareRecord,
   SharePreviewResponse,
   Task
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { ApiError, del, get, post } from './client';
 import { stepUp } from './auth';
 import { date } from './model';

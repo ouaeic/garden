@@ -1,7 +1,7 @@
 /**
  * What the catalogue actually weighs on the box this shim describes - measured, not argued.
  *
- * THE COUNTER-ARGUMENT THIS FILE ANSWERS WITH A NUMBER. athanor is not a benchmark scaffold. It
+ * THE COUNTER-ARGUMENT THIS FILE ANSWERS WITH A NUMBER. garden is not a benchmark scaffold. It
  * ships a tool catalogue where a purpose-built coding scaffold ships one tool or none, and the
  * charge is that it pays a tax per model call for connectors, media, desktop and memory that a
  * coding task will never touch. The research put that tax at 12,508 tokens per call and 39.9% of

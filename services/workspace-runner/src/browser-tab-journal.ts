@@ -3,8 +3,8 @@ import { constants } from 'node:fs';
 import { chmod, lstat, mkdir, open, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
-import { BrowserRecoveredTab } from '@athanor/contracts';
-import { decryptJson, encryptJson, isPublicHttpUrl, type EncryptedEnvelope } from '@athanor/core';
+import { BrowserRecoveredTab } from '@garden/contracts';
+import { decryptJson, encryptJson, isPublicHttpUrl, type EncryptedEnvelope } from '@garden/core';
 
 export type RecoverableBrowserTab = z.infer<typeof BrowserRecoveredTab>;
 const State = z.object({
@@ -33,7 +33,7 @@ export class BrowserTabJournal {
       .digest();
   }
   #path(root: string) {
-    return path.join(root, '.athanor', 'browser-tabs', 'state.json');
+    return path.join(root, '.garden', 'browser-tabs', 'state.json');
   }
   async read(root: string): Promise<{ tabs: RecoverableBrowserTab[]; omitted: number }> {
     await this.#writes.get(root);

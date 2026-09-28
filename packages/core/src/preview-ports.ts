@@ -1,8 +1,8 @@
-import { AthanorError } from './errors.js';
+import { GardenError } from './errors.js';
 
 /**
  * A preview publishes a loopback port of the agent computer to the internet, so the set of ports it
- * may not choose is exactly the set athanor itself listens on. Expressing that as "everything of
+ * may not choose is exactly the set garden itself listens on. Expressing that as "everything of
  * ours" rather than "the runner" is the difference between a demo server and a route to the API,
  * the preview gateway or PostgreSQL - none of which were ever meant to face the internet, and all
  * of which are reachable on loopback from inside the machine.
@@ -10,7 +10,7 @@ import { AthanorError } from './errors.js';
 export interface ReservedPortSources {
   /** Ports this service knows from its own configuration. */
   ports?: readonly (number | undefined | null)[];
-  /** URLs whose port belongs to another athanor service, e.g. the runner or the database. */
+  /** URLs whose port belongs to another garden service, e.g. the runner or the database. */
   urls?: readonly (string | undefined | null)[];
   /**
    * Ports of services this process has no configuration for - the sibling health endpoints the
@@ -57,7 +57,7 @@ export const reservedPreviewPorts = (sources: ReservedPortSources): Set<number> 
  */
 export const assertPublishablePort = (port: number, reserved: ReadonlySet<number>): void => {
   if (reserved.has(port))
-    throw new AthanorError(
+    throw new GardenError(
       'preview_port_reserved',
       `Port ${port} belongs to this server's own services and cannot be published`,
       422

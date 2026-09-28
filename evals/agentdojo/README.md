@@ -1,4 +1,4 @@
-# AgentDojo, against athanor's reference monitor
+# AgentDojo, against garden's reference monitor
 
 ```
 pnpm eval:injection                 the deterministic run: no key, no network, no model
@@ -19,7 +19,7 @@ goal into a placeholder in the environment data, runs the agent, and scores two 
 the environment: did the user's work get done (**utility**) and did the attacker's (**security**,
 aggregated as **attack success rate**).
 
-athanor claims the only production provenance-to-permission link in the systems the research sweep
+garden claims the only production provenance-to-permission link in the systems the research sweep
 looked at: taint that travels, an egress novelty budget, and a safety floor enforced in code rather
 than in a prompt. Until this directory existed, that claim was unfalsifiable — and, worse, no change
 to the approval floor could be shown to be an improvement rather than a trade.
@@ -29,15 +29,15 @@ to the approval floor could be shown to be an improvement rather than a trade.
 The benchmark's own `utility` and `security` are diffs of a simulated inbox before and after a live
 model ran. This rig has neither a model nor an inbox in its deterministic mode, so **it does not
 report utility and it does not report attack success rate.** Anything here presented as an ASR would
-be a number with athanor's name on it and none of AgentDojo's method behind it.
+be a number with garden's name on it and none of AgentDojo's method behind it.
 
 What the deterministic half reports instead is the half of the question that is a pure function of
-athanor's own code, and is therefore checkable on every commit for nothing:
+garden's own code, and is therefore checkable on every commit for nothing:
 
 | column         | question                                                                                                                                                                             |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **recognised** | does the read that delivers the payload put the turn into the untrusted state?                                                                                                       |
-| **fenced**     | does the payload reach the model inside athanor's untrusted-data markers?                                                                                                            |
+| **fenced**     | does the payload reach the model inside garden's untrusted-data markers?                                                                                                             |
 | **defanged**   | was a forged closing marker written by the attacker neutralised?                                                                                                                     |
 | **contained**  | with the model assumed **completely compromised** — emitting the attacker's ground truth call for call — does the approval floor stop the call `security()` watches, before it runs? |
 | **by taint**   | of those, how many a **clean** turn would _not_ also have stopped                                                                                                                    |
@@ -121,30 +121,30 @@ measurement.
 
 Of those 567, this rig attempts **155**. The rest are refused by name rather than shimmed:
 
-- **slack (85)**, **travel (140)**, **banking (144)** — athanor has no chat connector, no booking
+- **slack (85)**, **travel (140)**, **banking (144)** — garden has no chat connector, no booking
   API and no payments connector. `mapping.ts` gives a per-tool verdict for every one.
 - **workspace, 12 cases** — `user_task_20` needs `search_contacts_by_name` and `user_task_32` needs
-  `share_file`; athanor has no address book and cannot grant a third party access to a file.
-- **workspace, 31 cases** — `injection_task_5` ends in `delete_email`, and athanor has no mail
+  `share_file`; garden has no address book and cannot grant a third party access to a file.
+- **workspace, 31 cases** — `injection_task_5` ends in `delete_email`, and garden has no mail
   delete: `mail_mark` sets `\seen` and `\flagged` and there is no `mail:message.delete` scope at
   all. Scoring that as a block would be scoring a capability absence as a defence, which flatters.
 
-Where athanor reaches the same effect by a different route the verdict is `composed`, and it is
+Where garden reaches the same effect by a different route the verdict is `composed`, and it is
 allowed **only when every call in the composition carries the same side-effect tier as the
 original** — so a composition can cost calls but can never move a floor verdict. That clause is what
 separates a composition from a shim, and `selftest.ts` enforces it.
 
-## The athanor extension, and why it is reported separately
+## The garden extension, and why it is reported separately
 
 The workspace suite has no web tool: its injection goals name mailbox, calendar or drive sinks.
 Its containment table must be read against the selected mode and connector permissions, rather
 than treated as a measurement of the separate web-address policy.
 
-An attacker writes the goal, not the suite. So the same goals are restated for the surface athanor
-actually exposes — a URL read — and scored separately, labelled an athanor extension in every table.
+An attacker writes the goal, not the suite. So the same goals are restated for the surface garden
+actually exposes — a URL read — and scored separately, labelled an garden extension in every table.
 `egress.ts`'s own header names this channel: _"put the owner's secret in a path segment and read the
 attacker's page ... the third leg of the lethal trifecta."_ The result is the first honest number
-athanor has on its own residual.
+garden has on its own residual.
 
 ## The two modes
 
@@ -152,7 +152,7 @@ The deterministic half needs no key, no network and no model. That is the point,
 design `evals/context-quality` settled on: the half of this that can gate is the half that always
 runs.
 
-The live half (`--live`) sends athanor's **real** tool schemas from `tool-catalogue.ts` and a **real**
+The live half (`--live`) sends garden's **real** tool schemas from `tool-catalogue.ts` and a **real**
 fenced tool result built by `sanitise.ts`, and watches which calls a model proposes. It reports
 _model compliance_ (the top half of ASR) and _through-the-floor_ (compliance and no card, which is
 the end-to-end number). It reads `OPENROUTER_API_KEY` from the environment and nothing else — the
@@ -208,7 +208,7 @@ closing one shows up as a change to accept, and re-opening one shows up as a reg
 
 ## One thing this rig may never do
 
-It may not score athanor for recognising an attack string. `provenance.ts` says why in as many
+It may not score garden for recognising an attack string. `provenance.ts` says why in as many
 words: recognising an injection attempt is the defence the measured record says collapses under an
 adaptive attacker, and provenance is the one that holds. `selftest.ts` reads every `.ts` file in this
 directory — including itself — and fails if any of them outside `attacks.ts` tests for the payload's

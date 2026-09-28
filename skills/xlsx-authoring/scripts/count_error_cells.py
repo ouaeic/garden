@@ -1,7 +1,7 @@
-#!/usr/local/lib/athanor/python/bin/python3
+#!/usr/local/lib/garden/python/bin/python3
 """Count Excel error cells in a recalculated workbook and report them as JSON.
 
-Run this against the copy produced by ``athanor-office-convert model.xlsx
+Run this against the copy produced by ``garden-office-convert model.xlsx
 model.recalc.xlsx``, not against the workbook
 openpyxl just wrote: openpyxl stores formula strings without cached results, so a freshly written
 workbook has no values to check and would always report zero.

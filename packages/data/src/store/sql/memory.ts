@@ -301,7 +301,7 @@ deduped AS (
 -- sixty rows of tokens to seat four, and every other subject was charged for the difference.
 --
 -- Measured on PGlite, one workspace, four "owner" facts - three sharing a word with the request,
--- one reachable only because the request names its subject - and N pinned "athanor" standing
+-- one reachable only because the request names its subject - and N pinned "garden" standing
 -- orders, asking "which shell does the owner use" (before -> after). Swept at every N from 0 to
 -- 70, not sampled: the erosion begins at 37, where the thirty-seventh pin takes the last rung the
 -- four facts were sharing, and it is total by 40.
@@ -530,7 +530,7 @@ ORDER BY n.rn`;
  * the end is a block nobody spots a wrong line in, which is the failure this number is chosen
  * against rather than storage.
  *
- * It is stated here rather than in `@athanor/core` because the statement below and the CHECK in
+ * It is stated here rather than in `@garden/core` because the statement below and the CHECK in
  * migration 73 are the two places it is enforced, and a bound that lives a package away from both
  * of them is a bound that can drift from the thing enforcing it. `owner-block.test.ts` holds the
  * three copies - this constant, the migration, and the route's message - to one number.

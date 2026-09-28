@@ -3,7 +3,7 @@ import { setSurfaceLocation, useSurfaceLocation } from './surface-location';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import { Download, Folder, FolderOpen, File, RefreshCw } from 'lucide-react';
-import type { DirectoryEntry, DirectoryPage, ProjectDirectory } from '@athanor/contracts';
+import type { DirectoryEntry, DirectoryPage, ProjectDirectory } from '@garden/contracts';
 import { get, post, request as writeRequest, isNativeClient } from './client';
 import { requireDownloadSupport } from './download-support';
 import { Button, Dialog, ErrorNotice, Field, Spinner } from './ui';

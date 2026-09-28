@@ -1,4 +1,4 @@
-import { isMemoryToken, type EncryptedEnvelope, type MemoryQueryPlan } from '@athanor/core';
+import { isMemoryToken, type EncryptedEnvelope, type MemoryQueryPlan } from '@garden/core';
 import type { Database } from './database.js';
 import { encryptedText, iso, json } from './store/rows.js';
 import type { TaskNameHit } from './store/tasks.js';

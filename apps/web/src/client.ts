@@ -109,7 +109,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     }
     const local = typeof window === 'undefined' ? undefined : window.location;
     if (
-      response.headers.get('x-athanor-native-client') === '1' &&
+      response.headers.get('x-garden-native-client') === '1' &&
       local?.protocol === 'http:' &&
       local.hostname === 'localhost'
     ) {
@@ -117,7 +117,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       nativeServer = null;
       nativePreview = null;
       try {
-        const value = response.headers.get('x-athanor-server-origin') ?? '';
+        const value = response.headers.get('x-garden-server-origin') ?? '';
         const origin = new URL(value);
         if (
           origin.protocol === 'https:' &&
@@ -126,8 +126,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
           !origin.password
         )
           nativeServer = value;
-        const remoteValue = response.headers.get('x-athanor-preview-origin') ?? '';
-        const localValue = response.headers.get('x-athanor-preview-local-origin') ?? '';
+        const remoteValue = response.headers.get('x-garden-preview-origin') ?? '';
+        const localValue = response.headers.get('x-garden-preview-local-origin') ?? '';
         const remotePreview = new URL(remoteValue);
         const localPreview = new URL(localValue);
         if (

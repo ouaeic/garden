@@ -25,7 +25,7 @@ import {
 
 const scratch: string[] = [];
 const fresh = (): string => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'athanor-results-'));
+  const dir = mkdtempSync(path.join(tmpdir(), 'garden-results-'));
   scratch.push(dir);
   return dir;
 };
@@ -65,7 +65,7 @@ const recordOf = (
   taskId,
   startedAt: `2026-09-03T00:0${String(runIndex)}:00.000Z`,
   identity: { model: 'openrouter/m', modelRoute: 'm', provider: 'openrouter' },
-  athanor: { version: '0.1.1', commit: 'abc1234' },
+  garden: { version: '0.1.1', commit: 'abc1234' },
   securityMode: arm === 'shipped' ? 'balanced' : 'autonomous',
   autoAnswered: 0,
   autoApproveCapReached: false,
@@ -203,14 +203,14 @@ describe('assembling a row', () => {
       dir,
       'shipped',
       1,
-      recordOf('shipped', 1, 'alpha', true, { athanor: { version: '0.1.1', commit: 'fff9999' } }),
+      recordOf('shipped', 1, 'alpha', true, { garden: { version: '0.1.1', commit: 'fff9999' } }),
       []
     );
     const { out } = quiet();
     expect(
       assembleRow({ dir, arm: 'shipped', runs: 2, taskIds: ['alpha'], out, sameBuild: () => false })
         .refusal
-    ).toMatch(/2 different athanor commits/);
+    ).toMatch(/2 different garden commits/);
     const other = fresh();
     writeTaskRecord(other, 'shipped', 0, recordOf('shipped', 0, 'alpha', true), []);
     writeTaskRecord(
@@ -239,7 +239,7 @@ describe('assembling a row', () => {
       dir,
       'shipped',
       1,
-      recordOf('shipped', 1, 'alpha', true, { athanor: { version: '0.1.1', commit: 'fff9999' } }),
+      recordOf('shipped', 1, 'alpha', true, { garden: { version: '0.1.1', commit: 'fff9999' } }),
       []
     );
     const shared = quiet();
@@ -252,7 +252,7 @@ describe('assembling a row', () => {
       out: shared.out
     });
     expect(assembled.refusal).toBeNull();
-    expect(assembled.row?.[COLUMNS.indexOf('athanor_commit')]).toBe('fff9999');
+    expect(assembled.row?.[COLUMNS.indexOf('garden_commit')]).toBe('fff9999');
     expect(shared.lines.some((line) => line.includes('byte-identical'))).toBe(true);
     const refused = assembleRow({
       dir,
@@ -262,7 +262,7 @@ describe('assembling a row', () => {
       sameBuild: () => false,
       out: quiet().out
     });
-    expect(refused.refusal).toMatch(/2 different athanor commits/);
+    expect(refused.refusal).toMatch(/2 different garden commits/);
   });
 
   it('passes rowFrom for unattended with cards auto-answered, and is refused for shipped', () => {
@@ -350,7 +350,7 @@ describe('the CSV, kept', () => {
     benchmark: 'terminal-bench',
     task_set_sha: 'abcd',
     model: 'openrouter/m',
-    athanor_commit: 'abc1234',
+    garden_commit: 'abc1234',
     n_runs: '3'
   };
 
@@ -375,7 +375,7 @@ describe('the CSV, kept', () => {
     // A different build is another row, not a replacement.
     const other = upsertRow(
       csv,
-      rowFor({ ...key, athanor_commit: 'def5678', arm: 'shipped', score_mean: '0.4' })
+      rowFor({ ...key, garden_commit: 'def5678', arm: 'shipped', score_mean: '0.4' })
     );
     expect(other).toEqual({ replaced: false, rows: 4 });
     const rows = readCsvRows(csv);

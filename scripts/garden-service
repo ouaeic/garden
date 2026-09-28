@@ -1,0 +1,25 @@
+#!/bin/sh
+set -eu
+
+root_dir="${GARDEN_ROOT:-/opt/garden}"
+node="${GARDEN_NODE:-/usr/bin/node}"
+
+# One arm per instance of garden@.service, plus the runner. The list is the one in garden.target
+# and in the installer's `systemctl enable`, and it must stay that list: an arm naming a directory
+# that is not in this repository - `media`, which pointed at services/media-orchestrator - is not a
+# spare capability, it is a unit that would be enabled once and then crash-loop on a missing file.
+case "${1:-}" in
+  api) entry="apps/api/dist/index.js" ;;
+  worker) entry="apps/worker/dist/index.js" ;;
+  registry) entry="services/model-registry/dist/index.js" ;;
+  notifications) entry="services/notifications/dist/index.js" ;;
+  jobs) entry="services/workspace-runner/dist/jobs.js" ;;
+  runner) entry="services/workspace-runner/dist/index.js" ;;
+  *)
+    echo "Usage: garden-service {api|worker|registry|notifications|runner|jobs}" >&2
+    exit 1
+    ;;
+esac
+
+cd "$root_dir"
+exec "$node" "$entry"

@@ -1,5 +1,5 @@
-import { decryptJson, type EncryptedEnvelope } from '@athanor/core';
-import type { DataStore } from '@athanor/data';
+import { decryptJson, type EncryptedEnvelope } from '@garden/core';
+import type { DataStore } from '@garden/data';
 
 export async function taskFailure(
   store: DataStore,

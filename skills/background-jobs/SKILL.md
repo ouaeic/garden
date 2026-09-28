@@ -5,10 +5,10 @@ license: AGPL-3.0-or-later
 compatibility: No external binaries required beyond the job's own toolchain.
 allowed-tools: shell process schedule notify file_read file_write files_list set_plan set_acceptance publish_artifact
 metadata:
-  athanor.tier: 'builtin'
-  athanor.version: '1.5.0'
-  athanor.risk: 'workspace'
-  athanor.domain: 'long-running'
+  garden.tier: 'builtin'
+  garden.version: '1.5.0'
+  garden.risk: 'workspace'
+  garden.domain: 'long-running'
 ---
 
 # Long-running and background work

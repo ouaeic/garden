@@ -78,7 +78,7 @@ export const modelLicenseManifest = new Map(
  * stays MIT, and a revision that was Apache-2.0 does not stop being Apache-2.0 because ninety days
  * passed. The manifest carried a `reviewExpiresAt` and the suite asserted against it, so a checkout
  * nobody had touched went red on a calendar date - and in `reviewed_open_weight` scope that turns a
- * working catalogue into an unselectable one on an unattended server. athanor is installed from a
+ * working catalogue into an unselectable one on an unattended server. garden is installed from a
  * tag and left to run; a build that breaks on a date its owner did not choose is a defect, not a
  * safeguard.
  *

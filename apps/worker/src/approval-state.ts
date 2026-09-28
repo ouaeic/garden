@@ -1,4 +1,4 @@
-import { runtimeNow, runtimeValue } from '@athanor/core';
+import { runtimeNow, runtimeValue } from '@garden/core';
 /**
  * Matching an owner's answer to the thing they were asked about.
  *
@@ -10,7 +10,7 @@ import { runtimeNow, runtimeValue } from '@athanor/core';
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { canonicalJson, textValue } from './values.js';
-import type { TaskApprovalScope } from '@athanor/contracts';
+import type { TaskApprovalScope } from '@garden/contracts';
 
 export interface AgentApprovalRequirement {
   destinations?: string[];

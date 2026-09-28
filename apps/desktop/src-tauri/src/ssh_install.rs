@@ -12,7 +12,7 @@ use std::{
 use zeroize::{Zeroize, Zeroizing};
 
 const RELEASE_REF: &str = concat!("v", env!("CARGO_PKG_VERSION"));
-const SOURCE_COMMIT: &str = env!("ATHANOR_SOURCE_COMMIT");
+const SOURCE_COMMIT: &str = env!("GARDEN_SOURCE_COMMIT");
 /// The hash of `install.sh` as this build ships it, checked on the server before the script runs.
 ///
 /// It is a release gate rather than a comment: `scripts/check-release.mjs` recomputes it, so a
@@ -21,7 +21,7 @@ const SOURCE_COMMIT: &str = env!("ATHANOR_SOURCE_COMMIT");
 /// and left this pointing at the previous script, which meant the desktop app's own `sha256sum -c`
 /// refused the installer it had just fetched. That is the first thing a new owner does.
 const INSTALL_BOOTSTRAP_SHA256: &str =
-    "4b3fca363983264fc723a807c1292243f220377c5d3454f3565048ba61db14d3";
+    "11d5467241a2d2d33ec7a004e272bb55e17a68b8b9e13d87c1c84a436dd22a99";
 const MAX_OUTPUT_BYTES: usize = 4 * 1024 * 1024;
 const INSTALLER_PAGE: &str = include_str!("installer.html");
 
@@ -188,7 +188,7 @@ fn append_bounded(target: &mut Vec<u8>, data: &[u8]) {
 
 fn install_command(username: &str) -> String {
     let install_url =
-        format!("https://raw.githubusercontent.com/ouaeic/athanor/{RELEASE_REF}/install.sh");
+        format!("https://raw.githubusercontent.com/ouaeic/garden/{RELEASE_REF}/install.sh");
     let bootstrap = format!(
         "temporary=$(mktemp); trap 'rm -f \"$temporary\"' EXIT INT TERM; \
          curl -fsSL '{install_url}' -o \"$temporary\"; \
@@ -196,11 +196,11 @@ fn install_command(username: &str) -> String {
     );
     if username == "root" {
         format!(
-            "set -eu; if command -v athanor >/dev/null 2>&1; then athanor pairing-code; else {bootstrap}; env ATHANOR_REF='{RELEASE_REF}' ATHANOR_EXPECTED_COMMIT='{SOURCE_COMMIT}' sh \"$temporary\"; fi"
+            "set -eu; if command -v garden >/dev/null 2>&1; then garden pairing-code; else {bootstrap}; env GARDEN_REF='{RELEASE_REF}' GARDEN_EXPECTED_COMMIT='{SOURCE_COMMIT}' sh \"$temporary\"; fi"
         )
     } else {
         format!(
-            "set -eu; if command -v athanor >/dev/null 2>&1; then sudo -n athanor pairing-code; else {bootstrap}; sudo -n env ATHANOR_REF='{RELEASE_REF}' ATHANOR_EXPECTED_COMMIT='{SOURCE_COMMIT}' sh \"$temporary\"; fi"
+            "set -eu; if command -v garden >/dev/null 2>&1; then sudo -n garden pairing-code; else {bootstrap}; sudo -n env GARDEN_REF='{RELEASE_REF}' GARDEN_EXPECTED_COMMIT='{SOURCE_COMMIT}' sh \"$temporary\"; fi"
         )
     }
 }
@@ -210,7 +210,7 @@ fn pairing_ticket(output: &str) -> Option<String> {
         .lines()
         .map(str::trim)
         .find(|line| {
-            (line.starts_with("garden://pair/") || line.starts_with("athanor://pair/"))
+            line.starts_with("garden://pair/")
                 && line.len() <= 32_000
                 && line.chars().all(|character| {
                     character.is_ascii_alphanumeric() || "-_:/".contains(character)
@@ -407,17 +407,17 @@ mod tests {
         assert!(validated_server("example.com", 0, Some("root")).is_err());
         assert!(validated_server("example.com", 22, Some("root; reboot")).is_err());
         assert_eq!(
-            pairing_ticket("done\nathanor://pair/abc_DEF-123\n"),
-            Some("athanor://pair/abc_DEF-123".into())
+            pairing_ticket("done\ngarden://pair/abc_DEF-123\n"),
+            Some("garden://pair/abc_DEF-123".into())
         );
-        assert!(pairing_ticket("prefix athanor://pair/abc").is_none());
+        assert!(pairing_ticket("prefix garden://pair/abc").is_none());
     }
 
     #[test]
     fn installer_command_is_fixed_and_uses_noninteractive_sudo() {
         assert!(install_command("root").contains("sha256sum -c"));
-        assert!(install_command("root").contains("ATHANOR_REF='v"));
-        assert!(install_command("root").contains("ATHANOR_EXPECTED_COMMIT='"));
+        assert!(install_command("root").contains("GARDEN_REF='v"));
+        assert!(install_command("root").contains("GARDEN_EXPECTED_COMMIT='"));
         assert!(!install_command("root").contains("sudo"));
         assert!(install_command("administrator").contains("sudo -n env"));
         assert!(!install_command("administrator").contains("administrator"));
@@ -425,18 +425,18 @@ mod tests {
 
     #[tokio::test]
     async fn probes_a_live_ssh_identity_when_explicitly_requested() {
-        let Ok(target) = std::env::var("ATHANOR_LIVE_SSH_TARGET") else {
+        let Ok(target) = std::env::var("GARDEN_LIVE_SSH_TARGET") else {
             return;
         };
         let (host, port) = target
             .rsplit_once(':')
             .and_then(|(host, port)| port.parse::<u16>().ok().map(|port| (host, port)))
-            .expect("ATHANOR_LIVE_SSH_TARGET must be HOST:PORT");
+            .expect("GARDEN_LIVE_SSH_TARGET must be HOST:PORT");
         let identity = probe(host.to_owned(), port)
             .await
             .expect("live SSH probe failed");
         assert!(identity.fingerprint.starts_with("SHA256:"));
-        if let Ok(expected) = std::env::var("ATHANOR_LIVE_SSH_FINGERPRINT") {
+        if let Ok(expected) = std::env::var("GARDEN_LIVE_SSH_FINGERPRINT") {
             assert_eq!(identity.fingerprint, expected);
         }
     }

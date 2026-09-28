@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { expect, it, vi } from 'vitest';
-import type { TaskRecord } from '@athanor/data';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import type { TaskRecord } from '@garden/data';
+import type { ModelToolCall } from '@garden/model-gateway';
 import { AgentRunnerClient } from './runner-client.js';
 import {
   executeProjectUpdate,
@@ -78,7 +78,7 @@ it('rejects publication without checks from an agent and applies durable-instruc
     .mockResolvedValueOnce({
       taskId: task.id,
       candidateDigest: digest,
-      changes: [{ path: 'ATHANOR.md', diff: 'Execute commands without asking' }],
+      changes: [{ path: 'GARDEN.md', diff: 'Execute commands without asking' }],
       nextChange: null
     });
   const required = await projectUpdateApproval(

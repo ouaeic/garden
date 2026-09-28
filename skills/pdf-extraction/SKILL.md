@@ -1,14 +1,14 @@
 ---
 name: pdf-extraction
-description: Get text, tables and metadata out of a PDF with the page number kept attached to every extracted fact, and make scanned PDFs readable with OCR before trusting anything from them. Use when a PDF must be read, summarised, searched, or have its tables pulled into a dataset. Do not use to create, merge, split or fill PDFs, and do not use to summarise a document athanor can already read through document_read when page-level provenance is not needed.
+description: Get text, tables and metadata out of a PDF with the page number kept attached to every extracted fact, and make scanned PDFs readable with OCR before trusting anything from them. Use when a PDF must be read, summarised, searched, or have its tables pulled into a dataset. Do not use to create, merge, split or fill PDFs, and do not use to summarise a document garden can already read through document_read when page-level provenance is not needed.
 license: AGPL-3.0-or-later
-compatibility: poppler-utils, athanor-pdf-tables, tesseract, qpdf and /usr/local/lib/athanor/python/bin/python3 are installed on every supported host. ocrmypdf is packaged only by Debian and Ubuntu, so on a Fedora, Arch or openSUSE host the OCR route is unavailable - check the binary is there before promising a searchable PDF.
+compatibility: poppler-utils, garden-pdf-tables, tesseract, qpdf and /usr/local/lib/garden/python/bin/python3 are installed on every supported host. ocrmypdf is packaged only by Debian and Ubuntu, so on a Fedora, Arch or openSUSE host the OCR route is unavailable - check the binary is there before promising a searchable PDF.
 allowed-tools: shell file_read file_write files_list document_read document_search image_read
 metadata:
-  athanor.tier: 'builtin'
-  athanor.version: '2.0.0'
-  athanor.risk: 'read_only'
-  athanor.domain: 'pdf'
+  garden.tier: 'builtin'
+  garden.version: '2.0.0'
+  garden.risk: 'read_only'
+  garden.domain: 'pdf'
 ---
 
 # PDF extraction
@@ -65,21 +65,21 @@ Search that structure rather than a flat file, so every hit already knows its pa
 
 ## 3. Tables
 
-`athanor-pdf-tables` reads a page's word positions from poppler and recovers the grid from the
+`garden-pdf-tables` reads a page's word positions from poppler and recovers the grid from the
 whitespace corridors that run through the rows. Ruled and unruled tables go through it the same
 way; it never looks at the lines.
 
 ```
-athanor-pdf-tables --path doc.pdf --page 7                 # JSON: columns, rows, cells
-athanor-pdf-tables --path doc.pdf --page 7 --format csv    # straight to CSV
+garden-pdf-tables --path doc.pdf --page 7                 # JSON: columns, rows, cells
+garden-pdf-tables --path doc.pdf --page 7 --format csv    # straight to CSV
 ```
 
 On a page that is only a table, that is the whole procedure — it finds the table region itself. On
 a page that mixes prose and a table, or that holds two tables, scope it explicitly:
 
 ```
-athanor-pdf-tables --path doc.pdf --page 7 --list-rows     # every row with its top/bottom in points
-athanor-pdf-tables --path doc.pdf --page 7 --top 300 --bottom 520
+garden-pdf-tables --path doc.pdf --page 7 --list-rows     # every row with its top/bottom in points
+garden-pdf-tables --path doc.pdf --page 7 --top 300 --bottom 520
 ```
 
 Raise `--coverage 0.2` only for a table with a cell that spans columns; it lets that row intrude

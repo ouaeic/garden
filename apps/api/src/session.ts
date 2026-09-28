@@ -1,10 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import type { FastifyReply } from 'fastify';
-import { sha256 } from '@athanor/core';
-import type { DataStore, UserRecord } from '@athanor/data';
+import { sha256 } from '@garden/core';
+import type { DataStore, UserRecord } from '@garden/data';
 
-export const SESSION_COOKIE = 'athanor_session';
-export const HOST_SESSION_COOKIE = '__Host-athanor_session';
+export const SESSION_COOKIE = 'garden_session';
+export const HOST_SESSION_COOKIE = '__Host-garden_session';
 export const sessionCookieName = (secure: boolean): string =>
   secure ? HOST_SESSION_COOKIE : SESSION_COOKIE;
 

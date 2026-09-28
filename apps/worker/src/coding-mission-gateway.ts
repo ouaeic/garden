@@ -1,9 +1,9 @@
-import type { ModelRelease } from '@athanor/contracts';
-import type { DataStore, TaskRecord } from '@athanor/data';
-import type { ModelAdapter } from '@athanor/model-gateway';
+import type { ModelRelease } from '@garden/contracts';
+import type { DataStore, TaskRecord } from '@garden/data';
+import type { ModelAdapter } from '@garden/model-gateway';
 import { usageCredit, estimatedInferenceCostUsd } from './billing.js';
 import { nativeInputBound } from './native-input-gateway.js';
-import { AthanorError } from '@athanor/core';
+import { GardenError } from '@garden/core';
 
 /** Ordinary tasks bypass this path; a family reserves each provider attempt before it is sent. */
 export const codingMissionAdapter = (
@@ -28,7 +28,7 @@ export const codingMissionAdapter = (
     );
     const nativeBound = nativeKinds.length ? nativeInputBound(model, nativeKinds, maxTokens) : null;
     if (nativeBound && !request.nativeInputRequestId)
-      throw new AthanorError(
+      throw new GardenError(
         'native_input_identity_missing',
         'A native request requires its durable source identity',
         400

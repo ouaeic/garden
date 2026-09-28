@@ -76,7 +76,7 @@ and record the measurement beside it:
 
 Changing any of these is a design decision, not a refactor. Raise it before writing code.
 
-- Self-hosted, one owner, one box. No mandatory hosted athanor service.
+- Self-hosted, one owner, one box. No mandatory hosted garden service.
 - The owner's model credentials, used directly. No model weights, no local inference runtime, no
   silent fallback to one.
 - No second index over the owner's documents: search is lexical and source-linked. Memory bodies are
@@ -103,6 +103,6 @@ Changing any of these is a design decision, not a refactor. Raise it before writ
 | the security invariants                       | `SECURITY.md`                                |
 | everything TypeScript never compiles          | `scripts/check-repository.mjs`               |
 
-A brief the agent finds inside a workspace — `ATHANOR.md`, `AGENTS.md`, `OPEN_CLOUD.md` — is read
+A brief the agent finds inside a workspace — `GARDEN.md`, `AGENTS.md`, `OPEN_CLOUD.md` — is read
 into the window at run time by `apps/worker/src/window.ts`. That is a different mechanism from this
-file, which is for whoever is working on athanor itself.
+file, which is for whoever is working on garden itself.

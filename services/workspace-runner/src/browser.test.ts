@@ -50,7 +50,7 @@ describe('browser action policy', () => {
   it('requires broker-side approval for actual form submission targets', () => {
     expect(
       classifyBrowserAction(
-        { type: 'click', selector: '[data-athanor-ref="oc-4"]' },
+        { type: 'click', selector: '[data-garden-ref="oc-4"]' },
         {
           tag: 'button',
           type: 'submit',
@@ -85,7 +85,7 @@ describe('browser action policy', () => {
   it('allows ordinary navigation targets without approval', () => {
     expect(
       classifyBrowserAction(
-        { type: 'click', selector: '[data-athanor-ref="oc-1"]' },
+        { type: 'click', selector: '[data-garden-ref="oc-1"]' },
         ordinaryElement
       )
     ).toMatchObject({ consequential: false, sensitiveInput: false });
@@ -302,7 +302,7 @@ describe('browser snapshot shape', () => {
       botWall: null,
       elements: Array.from({ length: 50 }, (_, index) => ({
         index,
-        selector: `[data-athanor-ref="oc-${index}"]`,
+        selector: `[data-garden-ref="oc-${index}"]`,
         tag: 'button',
         role: null,
         name: `Control number ${index}`,
@@ -340,8 +340,8 @@ describe('browser snapshot shape', () => {
     // Every control must still be reachable after truncation: the whole point of putting `text`
     // last is that a wordy page can only cost the agent page text, never the ability to act.
     expect(delivered).toContain('"url":"https://shop.example.invalid/cart"');
-    expect(delivered).toContain('[data-athanor-ref=\\"oc-0\\"]');
-    expect(delivered).toContain('[data-athanor-ref=\\"oc-49\\"]');
+    expect(delivered).toContain('[data-garden-ref=\\"oc-0\\"]');
+    expect(delivered).toContain('[data-garden-ref=\\"oc-49\\"]');
     expect(delivered.length).toBeLessThanOrEqual(24_000);
   });
 
@@ -434,11 +434,11 @@ describe('download naming', () => {
 
 describe('frame-qualified element refs', () => {
   it('reads the frame a snapshot ref was scanned from', () => {
-    expect(refFrameOrdinal('[data-athanor-ref="oc-0-12"]')).toBe(0);
-    expect(refFrameOrdinal('[data-athanor-ref="oc-3-1"]')).toBe(3);
+    expect(refFrameOrdinal('[data-garden-ref="oc-0-12"]')).toBe(0);
+    expect(refFrameOrdinal('[data-garden-ref="oc-3-1"]')).toBe(3);
     // A hand-written selector carries no frame, and must not be read as frame 0 by accident.
     expect(refFrameOrdinal('#checkout-button')).toBeNull();
-    expect(refFrameOrdinal('[data-athanor-ref="oc-7"]')).toBeNull();
+    expect(refFrameOrdinal('[data-garden-ref="oc-7"]')).toBeNull();
   });
 
   /**
@@ -458,22 +458,22 @@ describe('frame-qualified element refs', () => {
 
   it('takes the one element a ref names', async () => {
     const page = {
-      frames: () => [frameWith({}), frameWith({ '[data-athanor-ref="oc-1-4"]': 1 })],
+      frames: () => [frameWith({}), frameWith({ '[data-garden-ref="oc-1-4"]': 1 })],
       locator: () => ({ first: () => 'main-frame-fallback' })
     } as never;
-    const found = await resolveBrowserTarget(page, '[data-athanor-ref="oc-1-4"]');
+    const found = await resolveBrowserTarget(page, '[data-garden-ref="oc-1-4"]');
     expect((found as unknown as { __selector: string }).__selector).toBe(
-      '[data-athanor-ref="oc-1-4"]'
+      '[data-garden-ref="oc-1-4"]'
     );
   });
 
   it('refuses a ref that now matches two elements rather than choosing one', async () => {
     // Acting on `.first()` here is a coin toss taken on the owner's behalf.
     const page = {
-      frames: () => [frameWith({ '[data-athanor-ref="oc-0-2"]': 2 })],
+      frames: () => [frameWith({ '[data-garden-ref="oc-0-2"]': 2 })],
       locator: () => ({ first: () => 'fallback' })
     } as never;
-    await expect(resolveBrowserTarget(page, '[data-athanor-ref="oc-0-2"]')).rejects.toThrow(
+    await expect(resolveBrowserTarget(page, '[data-garden-ref="oc-0-2"]')).rejects.toThrow(
       /no longer names one control/
     );
   });
@@ -483,7 +483,7 @@ describe('frame-qualified element refs', () => {
       frames: () => [frameWith({})],
       locator: () => ({ first: () => 'fallback' })
     } as never;
-    await expect(resolveBrowserTarget(page, '[data-athanor-ref="oc-0-9"]')).rejects.toThrow(
+    await expect(resolveBrowserTarget(page, '[data-garden-ref="oc-0-9"]')).rejects.toThrow(
       /no longer on the page/
     );
   });
@@ -546,7 +546,7 @@ describe('tab identity', () => {
 });
 
 describe('parallel research URL policy', () => {
-  // What each address means is decided once, in @athanor/core, and tested there. What matters here
+  // What each address means is decided once, in @garden/core, and tested there. What matters here
   // is that this route asks - and asks before it launches anything, so a local address is refused
   // rather than merely failing to load.
   it('refuses a source that is not on the public web, before opening a browser', async () => {
@@ -1208,7 +1208,7 @@ describe('browser launch realism', () => {
       browserLaunchEnvironment(
         {
           PATH: '/usr/bin',
-          HOME: '/home/athanor',
+          HOME: '/home/garden',
           DISPLAY: ':1',
           RUNNER_TOKEN: 'private',
           DATA_MASTER_KEY: 'private',
@@ -1220,7 +1220,7 @@ describe('browser launch realism', () => {
       )
     ).toEqual({
       PATH: '/usr/bin',
-      HOME: '/home/athanor',
+      HOME: '/home/garden',
       DISPLAY: ':9',
       XDG_RUNTIME_DIR: '/run/garden-display',
       ACCESSIBILITY_ENABLED: '1'
@@ -1406,7 +1406,7 @@ describe('search route', () => {
 
   /**
    * The defect this route was rebuilt for. A search used to run in the session browser, which meant
-   * it required the agent to be holding it: while the owner used their own Chromium - which athanor
+   * it required the agent to be holding it: while the owner used their own Chromium - which garden
    * tells them they may do at any time - every search failed with "browser control is held by user"
    * and every research task stopped. Nothing here goes near that browser.
    */
@@ -1467,7 +1467,7 @@ describe('search route', () => {
   /**
    * The sentence used to end with a prognosis it had no way to make: searching would be available
    * again in about a minute, so search again shortly. That was the backoff timer read out as if it
-   * were a forecast. On the deployment athanor is built for it was worse than vague - a server's
+   * were a forecast. On the deployment garden is built for it was worse than vague - a server's
    * address is what most engines are refusing, so the next attempt meets the same challenge and the
    * one after that, and every retry the sentence invited cost the owner a turn and a bill to be
    * refused again. The agent acts on this sentence, so it now says only what is known.

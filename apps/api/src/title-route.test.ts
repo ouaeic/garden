@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { encryptJson, inferenceCredentialAad, type RoutableModel } from '@athanor/core';
-import { seedModels } from '@athanor/model-gateway';
+import { encryptJson, inferenceCredentialAad, type RoutableModel } from '@garden/core';
+import { seedModels } from '@garden/model-gateway';
 import type { ServerBase } from './http/server-context.js';
 import { createServerSupport } from './routes/support.js';
 import { selectTitleRoute, TITLE_MAX_COST_USD, TITLE_OUTPUT_TOKENS } from './title-route.js';

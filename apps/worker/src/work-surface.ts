@@ -4,8 +4,8 @@ import {
   workSurfaceReferences,
   workEvidenceValue,
   type WorkSurfaceReport
-} from '@athanor/contracts';
-import { AthanorError, decryptJson } from '@athanor/core';
+} from '@garden/contracts';
+import { GardenError, decryptJson } from '@garden/core';
 import type { ToolContext } from './tool-dispatch.js';
 
 const record = (value: unknown): Record<string, unknown> =>
@@ -14,7 +14,7 @@ const record = (value: unknown): Record<string, unknown> =>
     : {};
 const payload = (value: unknown): Record<string, unknown> => {
   const envelope = record(value);
-  return envelope.__athanorEventVersion === 1 ? record(envelope.payload) : envelope;
+  return envelope.__gardenEventVersion === 1 ? record(envelope.payload) : envelope;
 };
 export function describeWorkSurface() {
   return {
@@ -31,7 +31,7 @@ export async function validateWorkSurface(
 ): Promise<WorkSurfaceReport> {
   const parsed = WorkSurfaceInput.safeParse(input);
   if (!parsed.success)
-    throw new AthanorError(
+    throw new GardenError(
       'invalid_presentation',
       parsed.error.issues
         .map((issue) => `${issue.path.join('.') || 'presentation'}: ${issue.message}`)
@@ -44,7 +44,7 @@ export async function validateWorkSurface(
       references.map((ref) => {
         const eventId = context.state.turnToolResults?.[ref.toolCallId]?.eventId;
         if (!eventId)
-          throw new AthanorError(
+          throw new GardenError(
             'presentation_evidence_missing',
             `No recorded result for ${ref.toolCallId} in this turn. Use an actual completed tool call.`
           );
@@ -70,7 +70,7 @@ export async function validateWorkSurface(
   }
   for (const reference of references) {
     if (workEvidenceValue(results.get(reference.toolCallId), reference.pointer) === undefined)
-      throw new AthanorError(
+      throw new GardenError(
         'presentation_evidence_missing',
         `The recorded result ${reference.toolCallId}${reference.pointer} is unavailable or too large. Select a valid value from a bounded tool result.`
       );
@@ -80,7 +80,7 @@ export async function validateWorkSurface(
       for (const point of block.points) {
         const value = workEvidenceValue(results.get(point.value.toolCallId), point.value.pointer);
         if (typeof value !== 'number' || !Number.isFinite(value))
-          throw new AthanorError(
+          throw new GardenError(
             'presentation_chart_value',
             `Chart point ${point.label} must select a finite numeric result.`
           );
@@ -89,7 +89,7 @@ export async function validateWorkSurface(
       if (block.result.kind === 'artifact') {
         const artifact = await context.store.getArtifact(context.task.userId, block.result.id);
         if (!artifact || artifact.taskId !== context.task.id)
-          throw new AthanorError(
+          throw new GardenError(
             'presentation_result_scope',
             'The artifact must belong to this task.'
           );
@@ -103,7 +103,7 @@ export async function validateWorkSurface(
             execution.workspaceId !== context.task.workspaceId ||
             execution.sourceWorkspaceId !== artifact.workspaceId
           )
-            throw new AthanorError(
+            throw new GardenError(
               'presentation_result_scope',
               'The artifact must belong to this task or its recorded source workspace.'
             );
@@ -122,7 +122,7 @@ export async function validateWorkSurface(
               ).previewId === block.result.id
           )
         )
-          throw new AthanorError(
+          throw new GardenError(
             'presentation_result_scope',
             'The preview must have been published by this task.'
           );

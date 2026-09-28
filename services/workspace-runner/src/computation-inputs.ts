@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
 import { open } from 'node:fs/promises';
 import path from 'node:path';
-import type { ComputationInput } from '@athanor/contracts';
+import type { ComputationInput } from '@garden/contracts';
 import { assertOpenedInPlace, assertUserDataPath } from './files.js';
 
 const FILE_BYTES = 16 * 1024 * 1024;

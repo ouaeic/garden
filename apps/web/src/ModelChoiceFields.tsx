@@ -3,7 +3,7 @@ import type {
   ProjectModelChoices,
   ProjectModelPreferences,
   PurposeModelChoice
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import ModelPicker from './ModelPicker.js';
 import { Field } from './ui.js';
 import './model-choices.css';

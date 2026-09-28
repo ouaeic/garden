@@ -129,7 +129,7 @@ describe('the note a workspace/-prefixed miss earns', () => {
       ],
       // The same spelling, run from a directory that is not inside workspace/.
       [
-        { executable: 'ls', args: ['workspace/x'], cwd: '.athanor/artifacts' },
+        { executable: 'ls', args: ['workspace/x'], cwd: '.garden/artifacts' },
         "ls: cannot access 'workspace/x': No such file or directory\n"
       ],
       // A command that failed for another reason entirely.

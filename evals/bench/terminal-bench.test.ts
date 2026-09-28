@@ -104,7 +104,7 @@ const withInstruction = (block: readonly string[]): Parts => ({
 });
 
 beforeAll(() => {
-  root = mkdtempSync(path.join(tmpdir(), 'athanor-tb-loader-'));
+  root = mkdtempSync(path.join(tmpdir(), 'garden-tb-loader-'));
 });
 afterAll(() => {
   rmSync(root, { recursive: true, force: true });
@@ -389,7 +389,7 @@ describe('the working directory', () => {
 describe('a suite', () => {
   let suiteRoot = '';
   beforeAll(() => {
-    suiteRoot = mkdtempSync(path.join(tmpdir(), 'athanor-tb-suite-'));
+    suiteRoot = mkdtempSync(path.join(tmpdir(), 'garden-tb-suite-'));
     const previous = root;
     root = suiteRoot;
     write('good-one', WELL_FORMED);

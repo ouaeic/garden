@@ -1,11 +1,11 @@
-import { AUDIO_READ_MAX_SECONDS, type MediaModelOption } from '@athanor/contracts';
+import { AUDIO_READ_MAX_SECONDS, type MediaModelOption } from '@garden/contracts';
 import {
   managedMediaModels,
   nativeTranscriptionBound,
   quoteMediaPrice,
   resolveImageDimensions,
   type TranscriptionBound
-} from '@athanor/model-gateway';
+} from '@garden/model-gateway';
 
 /**
  * What generated media costs, decided here rather than by the model.
@@ -51,7 +51,7 @@ export interface ResolvedMediaModel {
   voice: string | undefined;
   /**
    * Whether the price above came from anywhere at all. False means the provider published no cost
-   * for this route and athanor has never measured it, which is the state the approval floor below
+   * for this route and garden has never measured it, which is the state the approval floor below
    * treats as "always ask" - see `mediaEstimateUsd`'s callers.
    */
   priceKnown: boolean;
@@ -278,4 +278,4 @@ export const mediaEstimateUsd = (input: MediaEstimateInput): number => mediaQuot
  * The cumulative media-spend threshold, which now lives in the contracts package because the
  * Settings screen that chooses the model has to state the same number this card enforces.
  */
-export { MEDIA_APPROVAL_USD } from '@athanor/contracts';
+export { MEDIA_APPROVAL_USD } from '@garden/contracts';

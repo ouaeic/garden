@@ -12,7 +12,7 @@
  *
  * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
-import { AthanorError, isMailConnectorKind, sha256, type AnyConnectorKind } from '@athanor/core';
+import { GardenError, isMailConnectorKind, sha256, type AnyConnectorKind } from '@garden/core';
 import { labelledConnectorResult } from './provenance.js';
 import { asRecord, textValue } from './values.js';
 
@@ -141,12 +141,12 @@ export const performConnectorAction = async (input: {
   // Dropping the ones it could not read would send the message without them, which is the worst
   // available outcome: the recipient gets a covering letter promising a CV that is not there.
   if (MAIL_COMPOSING_ACTIONS.has(input.action) && named !== paths.length)
-    throw new AthanorError(
+    throw new GardenError(
       'mail_attachment_path_required',
       'Attachments are workspace file paths, as strings - write the file first and name its path.'
     );
   if (paths.length > 10)
-    throw new AthanorError(
+    throw new GardenError(
       'mail_attachments_too_many',
       'A message may carry at most 10 attachments. Send the rest as a private preview link.'
     );
@@ -159,7 +159,7 @@ export const performConnectorAction = async (input: {
     // mailbox is opened and a credential is used, and so the refusal names the files the model
     // chose rather than arriving as a protocol-level size error.
     if (total > MAX_OUTGOING_ATTACHMENT_BYTES)
-      throw new AthanorError(
+      throw new GardenError(
         'mail_attachments_too_large',
         `Attachments on one message may total at most 10 MB, and ${paths.join(', ')} exceed it. Send the large ones as a private preview link instead.`
       );
@@ -179,7 +179,7 @@ export const performConnectorAction = async (input: {
   const content = asRecord(asRecord(labelled)?.content);
   const encoded = content?.contentBase64;
   if (typeof encoded !== 'string')
-    throw new AthanorError(
+    throw new GardenError(
       'mail_content_invalid',
       'The mailbox omitted the requested attachment bytes.'
     );

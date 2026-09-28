@@ -1,8 +1,8 @@
-import { runtimeUUID } from '@athanor/core';
+import { runtimeUUID } from '@garden/core';
 import { randomBytes } from 'node:crypto';
-import { publishesPublicly } from '@athanor/contracts';
-import { encryptJson, sha256, AthanorError } from '@athanor/core';
-import { type ModelToolCall } from '@athanor/model-gateway';
+import { publishesPublicly } from '@garden/contracts';
+import { encryptJson, sha256, GardenError } from '@garden/core';
+import { type ModelToolCall } from '@garden/model-gateway';
 import { type ExecObservation } from '../agent-state.js';
 import { event } from '../tool-recording.js';
 import { previewUrl, textValue } from '../values.js';
@@ -30,13 +30,13 @@ import { clampNumber, finiteNumber } from './numbers.js';
 const previewPort = (value: unknown): number => {
   const named = finiteNumber(value);
   if (named === null)
-    throw new AthanorError(
+    throw new GardenError(
       'preview_port_invalid',
       'A port is a whole number between 1024 and 65535. Name the port the app is actually listening on.'
     );
   const port = clampNumber(named, { min: 1024, max: 65_535, fallback: 1024, integer: true });
   if (port === 4300)
-    throw new AthanorError(
+    throw new GardenError(
       'preview_port_reserved',
       'Port 4300 is reserved by the workspace runtime'
     );
@@ -80,7 +80,7 @@ export async function executePublishingTool(
         requestedMime
       );
       const mimeType = (!scriptableMime && requestedMime) || source.mimeType;
-      const storageKey = `.athanor/artifacts/${runtimeUUID()}`;
+      const storageKey = `.garden/artifacts/${runtimeUUID()}`;
       await context.runner.writeBytes(task.workspaceId, task.id, storageKey, source.bytes);
       const artifact = await context.store.createArtifact({
         userId: task.userId,
@@ -104,7 +104,7 @@ export async function executePublishingTool(
         | undefined;
       const extension = sourcePath.split('.').at(-1)?.toLowerCase() ?? '';
       if (['pptx', 'docx', 'xlsx', 'odp', 'odt', 'ods'].includes(extension)) {
-        const previewPath = `workspace/.athanor/renders/${runtimeUUID()}.pdf`;
+        const previewPath = `workspace/.garden/renders/${runtimeUUID()}.pdf`;
         try {
           // The same wrapper every vetted procedure names, rather than bare LibreOffice. It
           // writes the file where it is told instead of choosing a name from the input stem, it
@@ -118,7 +118,7 @@ export async function executePublishingTool(
             'exec',
             `${root}/exec`,
             {
-              executable: 'athanor-office-convert',
+              executable: 'garden-office-convert',
               args: [sourcePath, previewPath],
               cwd: '.',
               timeoutSeconds: 200
@@ -131,7 +131,7 @@ export async function executePublishingTool(
             task.id,
             previewPath
           );
-          const previewStorageKey = `.athanor/artifacts/${runtimeUUID()}`;
+          const previewStorageKey = `.garden/artifacts/${runtimeUUID()}`;
           await context.runner.writeBytes(
             task.workspaceId,
             task.id,
@@ -215,7 +215,7 @@ export async function executePublishingTool(
         `${root}/preview-check/${port}`
       );
       if (!check.available)
-        throw new AthanorError(
+        throw new GardenError(
           'preview_port_unavailable',
           `No service is listening on port ${port} of this computer. Bind the app to 127.0.0.1 and try again.`
         );
@@ -232,7 +232,7 @@ export async function executePublishingTool(
           entryPath.startsWith('//') ||
           entryPath.split(/[/\\]/).includes('..'))
       )
-        throw new AthanorError(
+        throw new GardenError(
           'preview_path_invalid',
           'A preview path is a path inside the served port, not a URL, and it may not climb out of it'
         );
@@ -268,7 +268,7 @@ export async function executePublishingTool(
         sha256(accessToken)
       );
       if (!published)
-        throw new AthanorError('preview_publish_failed', 'Public deployment could not be saved');
+        throw new GardenError('preview_publish_failed', 'Public deployment could not be saved');
       const deployment = {
         previewId: published.id,
         label,

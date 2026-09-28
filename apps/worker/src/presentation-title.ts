@@ -1,10 +1,5 @@
-import { TASK_TITLE_MAX_LENGTH } from '@athanor/contracts';
-import {
-  buildConversationNameIndex,
-  decryptJson,
-  encryptJson,
-  memoryIndexKey
-} from '@athanor/core';
+import { TASK_TITLE_MAX_LENGTH } from '@garden/contracts';
+import { buildConversationNameIndex, decryptJson, encryptJson, memoryIndexKey } from '@garden/core';
 import type { ToolContext } from './tool-dispatch.js';
 
 /** Reuses a headline already written by the agent, preserving an owner's explicit name in SQL. */

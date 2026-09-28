@@ -5,8 +5,8 @@
  * all - that is the owner deciding how much of their own money the agent may spend.
  */
 
-import { UpdateSpendLimitsRequest } from '@athanor/contracts';
-import { AthanorError, decryptJson, storageThreshold, unwrapDataKey } from '@athanor/core';
+import { UpdateSpendLimitsRequest } from '@garden/contracts';
+import { GardenError, decryptJson, storageThreshold, unwrapDataKey } from '@garden/core';
 import { ownerPriceCeiling, revealedTaskEvent } from '../context.js';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
@@ -50,7 +50,7 @@ import { currentPeriod, serverLimits } from '../plans.js';
  * THE DOCUMENT CITED ABOVE IS NOT IN THE REPOSITORY. `.gitignore` excludes `docs/design/`, so
  * `git ls-files docs/design/` returns nothing and a clone has no §3.2, §10.5 or §4.1 to check any
  * of this against - while this file, `usage-tool-opens.test.ts`, `store.test.ts`,
- * `store/sql/tasks.ts`, `apps/worker/src/tool-catalogue.test.ts`, `scripts/athanor` and
+ * `store/sql/tasks.ts`, `apps/worker/src/tool-catalogue.test.ts`, `scripts/garden` and
  * `docs/HEADLESS.md` all cite it by path. That is why 9.2%, 59.8% and the shorthand are restated
  * here in full rather than referred to: the restatement is the only copy a reader of the shipped
  * tree gets, and the assertions named above are the only thing that keeps it true.
@@ -404,7 +404,7 @@ export const registerUsageRoutes = (context: RouteContext): void => {
         });
       } catch (error) {
         if (error instanceof Error && error.message.startsWith('Unknown IANA time zone'))
-          throw new AthanorError('invalid_time_zone', 'Choose a valid IANA time zone');
+          throw new GardenError('invalid_time_zone', 'Choose a valid IANA time zone');
         throw error;
       }
       return store.effectiveSpendLimits(user.id);

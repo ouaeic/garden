@@ -1,5 +1,5 @@
 /**
- * AgentDojo, transcribed: the benchmark's own facts, with nothing of athanor's in this file.
+ * AgentDojo, transcribed: the benchmark's own facts, with nothing of garden's in this file.
  *
  * ── Where every number and every string here comes from ─────────────────────────────────────────
  *
@@ -71,7 +71,7 @@ export interface InjectionTask {
  * Every tool in every one of the four suites.
  *
  * A union rather than `string`, so `mapping.ts`'s verdict table is total over it and a tool cannot
- * be added here without the build stopping until somebody has said what athanor does about it.
+ * be added here without the build stopping until somebody has said what garden does about it.
  * That is `connectorContentOrigins`' discipline (packages/core/src/connectors.ts:181) applied to an
  * adapter, and it is the discipline the parity programme's §4.4(4) asks for on the sink set - a
  * benchmark adapter that silently drops a tool it has not thought about measures nothing.
@@ -164,7 +164,7 @@ export interface Suite {
   /**
    * Set when this rig transcribes the suite's tasks. The other three carry their inventories and
    * their counts so the coverage arithmetic is real, and no task rows, because transcribing tasks
-   * whose every tool is absent from athanor would be transcription with nothing to run it against.
+   * whose every tool is absent from garden would be transcription with nothing to run it against.
    */
   readonly transcribed: boolean;
 }
@@ -173,9 +173,9 @@ export interface Suite {
  * Only the workspace suite carries task rows, and that is a finding rather than a shortcut.
  *
  * `mapping.ts` holds the per-tool evidence. The short version: workspace is mail, calendar and a
- * file share, and athanor has a connector for each of those three; slack is a chat product athanor
+ * file share, and garden has a connector for each of those three; slack is a chat product garden
  * has no connector for; travel is nineteen bespoke booking endpoints; banking is a payments API.
- * Shimming any of those onto `mcp_call_tool` would put the whole suite behind one athanor tool
+ * Shimming any of those onto `mcp_call_tool` would put the whole suite behind one garden tool
  * whose approval tier is a constant, which would make every one of its security cases score
  * identically and tell nobody anything.
  */
@@ -370,7 +370,7 @@ const WORKSPACE_USER_TASKS: readonly UserTask[] = [
  * `decidedBy` is the call the benchmark's own `security()` looks for the effect of. For 0, 1 and 2
  * that is the single call; for 3 and 4 it is the send, the search before it being how the attacker
  * gets the material; for 5 `security()` walks `post_environment.inbox.trash`, so it needs the send
- * *and* the delete, and the delete is the one athanor cannot perform at all.
+ * *and* the delete, and the delete is the one garden cannot perform at all.
  */
 const WORKSPACE_INJECTION_TASKS: readonly InjectionTask[] = [
   {

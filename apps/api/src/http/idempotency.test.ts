@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { generateDataKey } from '@athanor/core';
-import { createDatabase, DataStore, migrateDatabase, type UserRecord } from '@athanor/data';
+import { generateDataKey } from '@garden/core';
+import { createDatabase, DataStore, migrateDatabase, type UserRecord } from '@garden/data';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { createIdempotentOperation } from './idempotency.js';
 import { operationReceipts, sealLegacyOperationResponses } from './operation-receipts.js';

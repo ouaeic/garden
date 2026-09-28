@@ -16,14 +16,14 @@ export interface ToolchainCapability {
   pythonModules: readonly string[];
   fonts: readonly string[];
   /**
-   * Capability keys in the host package table (`scripts/athanor-host.sh`), resolved to the names
+   * Capability keys in the host package table (`scripts/garden-host.sh`), resolved to the names
    * this host's own distribution uses at report time.
    *
    * They were command lines - `apt-get install -y imagemagick graphviz python3-pil` - which is one
    * of the four families this computer installs on. On the other three the one sentence telling an
    * agent how to close a gap named a binary the host has never had, and named packages under
    * spellings its repositories do not carry. The table is where those names already live, for the
-   * installer and for `athanor doctor`; naming a capability rather than a package is what lets
+   * installer and for `garden doctor`; naming a capability rather than a package is what lets
    * this report read the same list they do.
    */
   packages?: readonly string[];
@@ -51,33 +51,33 @@ export interface HostPackages {
 /**
  * The one Python the document skills name. It is a virtual environment created with
  * --system-site-packages, so it sees both the distribution's python-docx, openpyxl, pandas,
- * matplotlib and Pillow and the versions athanor pins itself. Probing through it rather
+ * matplotlib and Pillow and the versions garden pins itself. Probing through it rather
  * than through `python3` is what makes "is pypdf importable" the same question the agent will ask.
  */
-export const ATHANOR_PYTHON = '/usr/local/lib/athanor/python/bin/python3';
+export const GARDEN_PYTHON = '/usr/local/lib/garden/python/bin/python3';
 
 export const DOCUMENT_TOOLCHAIN: readonly ToolchainCapability[] = [
   {
     id: 'office-authoring',
     purpose: 'Write .docx, .pptx and .xlsx as real Office files rather than hand-rolled XML',
-    binaries: [ATHANOR_PYTHON],
+    binaries: [GARDEN_PYTHON],
     pythonModules: ['pptx', 'docx', 'openpyxl'],
     fonts: [],
     packages: ['python-docx', 'python-openpyxl'],
     // python-pptx is not the distribution's any more: Ubuntu packaged it up to 24.04 and stopped,
-    // so it is pinned in infra/native/athanor-python-requirements.txt and installed into the one
+    // so it is pinned in infra/native/garden-python-requirements.txt and installed into the one
     // interpreter above. Naming the reinstall rather than a package line that would not work.
     beyondPackages:
-      're-run the athanor installer to restore the pinned Python environment, which is where python-pptx comes from',
+      're-run the garden installer to restore the pinned Python environment, which is where python-pptx comes from',
     install:
-      "install this host's python-docx and python-openpyxl packages, then re-run the athanor installer to restore the pinned Python environment"
+      "install this host's python-docx and python-openpyxl packages, then re-run the garden installer to restore the pinned Python environment"
   },
   {
     id: 'office-conversion',
     purpose:
       'Turn an Office file into a PDF, or recalculate a workbook, through one command that fails when the bytes are not there instead of exiting 0',
     binaries: [
-      'athanor-office-convert',
+      'garden-office-convert',
       'soffice',
       'pdftoppm',
       'pdffonts',
@@ -122,11 +122,11 @@ export const DOCUMENT_TOOLCHAIN: readonly ToolchainCapability[] = [
   {
     id: 'pdf-forms',
     purpose: 'Enumerate and fill the fields of a PDF form, which is the one PDF job qpdf cannot do',
-    binaries: [ATHANOR_PYTHON],
+    binaries: [GARDEN_PYTHON],
     pythonModules: ['pypdf'],
     fonts: [],
     install:
-      'reinstall the pinned document Python environment, which scripts/install-native.sh creates from infra/native/athanor-python-requirements.txt'
+      'reinstall the pinned document Python environment, which scripts/install-native.sh creates from infra/native/garden-python-requirements.txt'
   },
   {
     id: 'pdf-extraction',
@@ -140,7 +140,7 @@ export const DOCUMENT_TOOLCHAIN: readonly ToolchainCapability[] = [
       'pdftotext',
       'pdfinfo',
       'pdftoppm',
-      'athanor-pdf-tables',
+      'garden-pdf-tables',
       'ocrmypdf',
       'tesseract',
       'gs'
@@ -164,7 +164,7 @@ export const DOCUMENT_TOOLCHAIN: readonly ToolchainCapability[] = [
   {
     id: 'data-analysis',
     purpose: 'Read, reshape and chart spreadsheet and CSV data',
-    binaries: [ATHANOR_PYTHON],
+    binaries: [GARDEN_PYTHON],
     // numpy is not a fourth package: pandas and matplotlib both depend on it, so it is on every box
     // that has either. It is named because procedures import it directly, and a capability list
     // that leaves out what the work actually calls is the list that sends an agent guessing.
@@ -176,7 +176,7 @@ export const DOCUMENT_TOOLCHAIN: readonly ToolchainCapability[] = [
   {
     id: 'parquet-data',
     purpose: 'Read and write typed Parquet tables with pandas',
-    binaries: [ATHANOR_PYTHON],
+    binaries: [GARDEN_PYTHON],
     pythonModules: ['pandas', 'pyarrow'],
     fonts: [],
     packages: ['python-pandas', 'python-pyarrow'],
@@ -204,7 +204,7 @@ export const DOCUMENT_TOOLCHAIN: readonly ToolchainCapability[] = [
     id: 'statistics',
     purpose:
       'Answer a question about data with a stated confidence rather than arithmetic done in a model’s head - a confidence interval, a significance test, a regression, a seasonal decomposition or a forecast',
-    binaries: [ATHANOR_PYTHON],
+    binaries: [GARDEN_PYTHON],
     pythonModules: ['scipy', 'statsmodels'],
     fonts: [],
     packages: ['python-scipy', 'python-statsmodels'],
@@ -213,7 +213,7 @@ export const DOCUMENT_TOOLCHAIN: readonly ToolchainCapability[] = [
   {
     id: 'image-work',
     purpose: 'Crop, resize, composite and convert images, and render diagrams',
-    binaries: [ATHANOR_PYTHON, 'magick', 'dot'],
+    binaries: [GARDEN_PYTHON, 'magick', 'dot'],
     pythonModules: ['PIL'],
     fonts: [],
     packages: ['imagemagick', 'graphviz', 'python-pillow'],
@@ -426,7 +426,7 @@ export const probePythonModules = async (
 ): Promise<Set<string>> => {
   const wanted = [...new Set(modules)];
   if (!wanted.length) return new Set();
-  const python = await resolveExecutable(ATHANOR_PYTHON, agentSearchPath(root), root);
+  const python = await resolveExecutable(GARDEN_PYTHON, agentSearchPath(root), root);
   if (!python) return new Set();
   const output = await runProbe(python, ['-c', IMPORT_PROBE, ...wanted]);
   return output === null ? new Set() : parseImportableModules(output, wanted);
@@ -434,12 +434,10 @@ export const probePythonModules = async (
 
 /**
  * The one file that knows what a capability is called on this distribution, and the same one the
- * installer sources and `athanor-system-packages` dispatches through. Reached by a path relative
+ * installer sources and `garden-system-packages` dispatches through. Reached by a path relative
  * to this module, which lands on the checkout root from `src/` and from `dist/` alike.
  */
-const HOST_DEFINITIONS = fileURLToPath(
-  new URL('../../../scripts/athanor-host.sh', import.meta.url)
-);
+const HOST_DEFINITIONS = fileURLToPath(new URL('../../../scripts/garden-host.sh', import.meta.url));
 
 /**
  * Asked of the host table itself rather than reimplemented here.
@@ -451,10 +449,10 @@ const HOST_DEFINITIONS = fileURLToPath(
  */
 const HOST_PACKAGE_PROBE = `. "$1" >/dev/null 2>&1 || exit 1
 shift
-athanor_detect_host >/dev/null 2>&1 || exit 1
-printf 'manager\t%s\n' "$athanor_pm"
+garden_detect_host >/dev/null 2>&1 || exit 1
+printf 'manager\t%s\n' "$garden_pm"
 for capability in "$@"; do
-  printf '%s\t%s\n' "$capability" "$(athanor_package_for "$capability" "$athanor_family")"
+  printf '%s\t%s\n' "$capability" "$(garden_package_for "$capability" "$garden_family")"
 done
 `;
 
@@ -477,7 +475,7 @@ export const hostPackages = async (
   const output = await runProbe('/bin/sh', [
     '-c',
     HOST_PACKAGE_PROBE,
-    'athanor-host',
+    'garden-host',
     definitions,
     ...wanted
   ]);

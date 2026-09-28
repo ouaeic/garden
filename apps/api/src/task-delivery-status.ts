@@ -1,5 +1,5 @@
-import { PENDING_MEDIA_DELIVERY } from '@athanor/contracts';
-import { taskDeliveryCountsSql, type Database } from '@athanor/data';
+import { PENDING_MEDIA_DELIVERY } from '@garden/contracts';
+import { taskDeliveryCountsSql, type Database } from '@garden/data';
 
 /** One aggregate over a page's task IDs keeps delivery state out of per-row title reads. */
 export const withTaskDeliveryStatus = async <T extends { id: string }>(

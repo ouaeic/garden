@@ -5,7 +5,7 @@
  * WHY A CSV AND NOT A SCORE. A leaderboard row conflates the model, the harness and the budget,
  * and the field's own convention hides the third: `max_steps` in a Python file, a summarisation
  * threshold as a kwarg default, `--permission-mode=bypassPermissions` hard-coded in an adapter.
- * athanor's differentiating artefact is not its rank. It is that its row says what it was run
+ * garden's differentiating artefact is not its rank. It is that its row says what it was run
  * with, including the parts that cost it points.
  *
  * THE THREE DISCIPLINES THIS FILE ENFORCES RATHER THAN DOCUMENTS:
@@ -18,7 +18,7 @@
  *      were auto-answered and the arm is not `unattended` is refused as fabricated, because that
  *      is a number produced by a configuration the row does not name.
  *
- * WHAT IS NOT HERE. There is no reference-harness row yet, and there is no athanor row either -
+ * WHAT IS NOT HERE. There is no reference-harness row yet, and there is no garden row either -
  * both cost money and this lane may not spend it. What exists is the shape, the aggregation and
  * the refusals, all exercisable at zero cost. `README.md` carries the command that fills it in.
  */
@@ -61,7 +61,7 @@ export type Arm = 'shipped' | 'autonomous' | 'unattended';
  * `balanced` stops for what the computer cannot take back and a card that fires with nobody at the
  * keyboard parks the task at 0 - so a row labelled `shipped` and measured under `autonomous` prints
  * a smaller gap between the arms than exists. The gap between `shipped` and `unattended` is the one
- * number this artefact exists to publish, and shrinking it flatters athanor.
+ * number this artefact exists to publish, and shrinking it flatters garden.
  *
  * A map rather than three conditions, so an arm added to the ladder has to declare its mode here or
  * fail to compile, rather than silently arriving with no guard on it.
@@ -150,9 +150,9 @@ export interface RowInput {
   readonly verifierEnv: 'separate' | 'same';
   readonly networkMode: string;
   /**
-   * What this row's environment does NOT do that athanor does. Printed, not omitted.
+   * What this row's environment does NOT do that garden does. Printed, not omitted.
    *
-   * This is the difference between athanor's row and athanor, and it is the sentence that has to
+   * This is the difference between garden's row and garden, and it is the sentence that has to
    * travel with the number for the number to mean anything.
    */
   readonly declaredDrops: readonly string[];
@@ -262,7 +262,7 @@ export const COLUMNS: readonly string[] = [
   'infra_failures_advisory',
   'declared_drops',
   'run_started_at',
-  'athanor_commit'
+  'garden_commit'
 ];
 
 const cell = (value: string | number | null): string => {

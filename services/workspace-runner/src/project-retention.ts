@@ -1,4 +1,4 @@
-import { ProjectRepositoryOperation } from '@athanor/contracts';
+import { ProjectRepositoryOperation } from '@garden/contracts';
 import { createHash } from 'node:crypto';
 import { lstat, opendir } from 'node:fs/promises';
 import path from 'node:path';
@@ -9,7 +9,7 @@ import {
   type ProjectRetentionPreview,
   type ProjectRetentionResult,
   type ProjectVersionArchive
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { withWorkspaceDirectory, WorkspaceFileError } from './files.js';
 import { acquireDirectoryReference, withProjectReference } from './project-reference-lock.js';
 import {

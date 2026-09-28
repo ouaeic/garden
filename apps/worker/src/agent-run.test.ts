@@ -4,26 +4,26 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { DIAGNOSTIC_CAPTURE_BYTES } from '@athanor/contracts';
+import { DIAGNOSTIC_CAPTURE_BYTES } from '@garden/contracts';
 import { CapturedRuntimeReplay, replayRuntime, type RuntimeSegment } from './runtime-replay.js';
 import {
   diagnosticPlainHash,
   diagnosticCipherHash,
   DIAGNOSTIC_EMPTY_HASH,
   type PrivateDiagnosticBody
-} from '@athanor/core';
+} from '@garden/core';
 import type { AgentState } from './agent-state.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  AthanorError,
+  GardenError,
   connectorActions,
   decryptJson,
   encryptJson,
   generateDataKey,
   wrapDataKey
-} from '@athanor/core';
-import type { DataStore, TaskEventRecord, TaskRecord, WorkspaceRecord } from '@athanor/data';
-import type { ModelRelease } from '@athanor/contracts';
+} from '@garden/core';
+import type { DataStore, TaskEventRecord, TaskRecord, WorkspaceRecord } from '@garden/data';
+import type { ModelRelease } from '@garden/contracts';
 import { MIN_TOKEN_BYTES } from './egress.js';
 import { AgentWorker } from './agent.js';
 import { approvalPreviewHash } from './approval-state.js';
@@ -113,7 +113,7 @@ const config = (
 ): Omit<WorkerConfig, 'WORKER_HEALTH_PORT' | 'WORKER_HEALTH_HOST'> => ({
   WORKER_ID: 'worker-test',
   DATABASE_DRIVER: 'pglite',
-  DATABASE_URL: 'postgres://localhost/athanor',
+  DATABASE_URL: 'postgres://localhost/garden',
   PGLITE_PATH: ':memory:',
   DATA_MASTER_KEY: masterKey.toString('base64'),
   RUNNER_SHARED_SECRET: 'x'.repeat(48),
@@ -2320,7 +2320,7 @@ describe('asking memory a question mid-task', () => {
 /**
  * Where this run's searches go, and what the model is therefore holding.
  *
- * The decision belongs to `resolveWebToolPlan` in @athanor/contracts and to nothing else, so these
+ * The decision belongs to `resolveWebToolPlan` in @garden/contracts and to nothing else, so these
  * exercise the wiring rather than the verdict: that the worker asks once per run, offers the model
  * the same tools whichever answer it got, spends the provider's search only when the model calls
  * `web_search`, and never lets a mid-run credential edit move a task onto a route the owner was not
@@ -2649,7 +2649,7 @@ describe('the web route a run is pinned to', () => {
       .map((message) => message.content)
       .at(-1) ?? '';
 
-  /** A provider response to the search request athanor builds, with the sources it retrieved. */
+  /** A provider response to the search request garden builds, with the sources it retrieved. */
   const searched = (
     citations: Array<{ url: string; title?: string; content?: string }>,
     requests = 1
@@ -3244,7 +3244,7 @@ describe('finding things on the internet', () => {
     const log: FetchLog = { calls: [], modelRequests: [], runnerRequests: [] };
     installFetch(
       [
-        toolFrame('call-s', 'web_search', { query: 'athanor board pack template', limit: 40 }),
+        toolFrame('call-s', 'web_search', { query: 'garden board pack template', limit: 40 }),
         textFrame('Found them.')
       ],
       log
@@ -3259,7 +3259,7 @@ describe('finding things on the internet', () => {
     // rather than sending a request that would come back as a validation error.
     expect(
       log.runnerRequests?.find((request) => request.url.includes('/browser/search'))?.body
-    ).toEqual({ query: 'athanor board pack template', limit: 10 });
+    ).toEqual({ query: 'garden board pack template', limit: 10 });
   });
 
   it('reads twelve pages at a twelfth of the window each, so all twelve come back', async () => {
@@ -3734,10 +3734,10 @@ describe('the review copy that goes out beside an editable file', () => {
     // at the same moment. The wrapper is the answer to all three, and it is the only route the
     // built-in procedures name - the worker was the one caller still going around it.
     const { conversions } = await publish(() => observation(0));
-    const conversion = conversions.find((call) => call.executable === 'athanor-office-convert');
-    expect(conversion, 'the review copy did not go through athanor-office-convert').toBeDefined();
+    const conversion = conversions.find((call) => call.executable === 'garden-office-convert');
+    expect(conversion, 'the review copy did not go through garden-office-convert').toBeDefined();
     expect(conversion?.args?.[0]).toBe('workspace/board-pack.docx');
-    expect(conversion?.args?.[1]).toMatch(/^workspace\/\.athanor\/renders\/.+\.pdf$/);
+    expect(conversion?.args?.[1]).toMatch(/^workspace\/\.garden\/renders\/.+\.pdf$/);
     expect(conversions.some((call) => call.executable === 'libreoffice')).toBe(false);
   });
 
@@ -4084,7 +4084,7 @@ describe('spending the owner’s money on generated media', () => {
   });
 
   it('refuses a path that climbs out of the workspace before the provider is called', async () => {
-    const probe = await generate({ arguments: { path: '../../etc/athanor/control.env' } });
+    const probe = await generate({ arguments: { path: '../../etc/garden/control.env' } });
     expect(probe.generated).toHaveLength(0);
     expect(probe.billed).toHaveLength(0);
     expect(probe.messages.find((message) => message.toolCallId === 'call-m')?.content).toContain(
@@ -4927,7 +4927,7 @@ describe('what would prove the job is done', () => {
     expect(probe.deadEnds.flatMap((entry) => entry.wrote)).toEqual([]);
   });
 
-  it('keeps the order athanor did its own steps in out of the completion', async () => {
+  it('keeps the order garden did its own steps in out of the completion', async () => {
     const task = makeTask(acceptanceState());
     const probe = probeStore(() => task);
     const log: FetchLog = { calls: [], modelRequests: [] };
@@ -5414,7 +5414,7 @@ describe('how full the window is believed to be', () => {
    *
    * The default stub answers anything with `/file` in it with a 404, which a `files_list` URL
    * matches - so every step of these runs used to be a tool call that threw, sixty times over. That
-   * is now a turn athanor stops on its own, and rightly: a call that fails byte-identically is the
+   * is now a turn garden stops on its own, and rightly: a call that fails byte-identically is the
    * one shape the loop has no other bound for. These tests are about which number the compaction
    * trigger believes, so the workspace they run against has to work.
    */
@@ -6782,7 +6782,7 @@ describe('the prompt prefix a follow-up turn re-sends', () => {
      * The brief is a plain workspace file and any turn may write it - the agent keeping its own
      * journal is the commonest writer of all. It used to be spliced in as the FIRST preamble block,
      * ahead of the reviewed knowledge block and the memory pack, so one appended line to
-     * `workspace/ATHANOR.md` moved the divergence point to the second message of the prompt and
+     * `workspace/GARDEN.md` moved the divergence point to the second message of the prompt and
      * re-billed everything behind it at the write premium on the next turn. Those other two blocks
      * are frozen for the life of the task by design; the brief is the one preamble block that is
      * not, which is exactly why it belongs behind them.
@@ -6792,7 +6792,7 @@ describe('the prompt prefix a follow-up turn re-sends', () => {
     const probe = probeStore(() => task);
     probe.recallPack(['memory-item-1']);
     const route = (url: string): Response | undefined =>
-      readPath(url) === 'workspace/ATHANOR.md' ? jsonResponse({ content: briefBody }) : undefined;
+      readPath(url) === 'workspace/GARDEN.md' ? jsonResponse({ content: briefBody }) : undefined;
 
     const first: FetchLog = { calls: [], modelRequests: [] };
     installFetch([textFrame('Tidied.')], first, { route });
@@ -7079,7 +7079,7 @@ describe('the warnings that are the owner’s business', () => {
 
     await new AgentWorker(probe.store, config(), masterKey, runnerSecret, journal.logger).fail(
       task,
-      new AthanorError('model_timeout', 'The model provider did not respond within 900 seconds'),
+      new GardenError('model_timeout', 'The model provider did not respond within 900 seconds'),
       903_000
     );
 
@@ -7107,7 +7107,7 @@ describe('the warnings that are the owner’s business', () => {
     const journal = journalled();
 
     await new AgentWorker(probe.store, config(), masterKey, runnerSecret, journal.logger)
-      .fail(task, new AthanorError('workspace_unreachable', 'The workspace could not be reached'))
+      .fail(task, new GardenError('workspace_unreachable', 'The workspace could not be reached'))
       .catch(() => undefined);
 
     expect(journal.lines[0]).toContain('workspace_unreachable');
@@ -7160,7 +7160,7 @@ describe('a correction the turn it was sent to did not survive', () => {
 
     await new AgentWorker(probe.store, config(), masterKey, runnerSecret, silentLogger).fail(
       task,
-      new AthanorError('model_timeout', 'The model provider did not respond within 900 seconds')
+      new GardenError('model_timeout', 'The model provider did not respond within 900 seconds')
     );
 
     expect(requeued).toEqual({ id: taskId, workerId: 'worker-test' });
@@ -7190,12 +7190,12 @@ describe('a correction the turn it was sent to did not survive', () => {
 
     await new AgentWorker(probe.store, config(), masterKey, runnerSecret, silentLogger).fail(
       task,
-      new AthanorError('model_timeout', 'The model provider did not respond within 900 seconds')
+      new GardenError('model_timeout', 'The model provider did not respond within 900 seconds')
     );
 
     expect(probe.checkpoints).toMatchObject([{ status: 'failed', clearLease: true }]);
     expect(ownerLines(probe)[1]).toBe(
-      'Your message was not started, and athanor is not going to start it on its own. This conversation was started 6 times without finishing. What you sent was: "No, leave the invoices alone" Send it again to try.'
+      'Your message was not started, and garden is not going to start it on its own. This conversation was started 6 times without finishing. What you sent was: "No, leave the invoices alone" Send it again to try.'
     );
     // Their words in the payload as well as the sentence, so sending it again need not mean
     // typing it again.
@@ -7227,7 +7227,7 @@ describe('a correction the turn it was sent to did not survive', () => {
 
     await new AgentWorker(probe.store, config(), masterKey, runnerSecret, silentLogger).fail(
       task,
-      new AthanorError('provider_quota_exhausted', 'The provider is out of quota')
+      new GardenError('provider_quota_exhausted', 'The provider is out of quota')
     );
 
     expect(asked).toBe(0);
@@ -8255,17 +8255,17 @@ describe('a generation the repetition watch stopped', () => {
 /**
  * The five gates that decide whether a turn has been anywhere, and what stopping means.
  *
- * Every one of them was a control wired to something slightly wrong: a call athanor answered
+ * Every one of them was a control wired to something slightly wrong: a call garden answered
  * itself recorded as a call the computer answered, a call that never ran holding the key that
  * refuses the re-issue, a broker's "this is harmless" arriving as a card, Stop reaching every tool
  * except the one the owner was asked about, and a notice the model composed standing in as proof
  * that the work is done. None of the five had a test on either side of it.
  */
-describe('what athanor answered itself, and what the computer answered', () => {
+describe('what garden answered itself, and what the computer answered', () => {
   const readRoute = (path: string, content: string) => (url: string) =>
     url.includes('/file?') && readPath(url) === path ? jsonResponse({ content }) : undefined;
 
-  it('refuses a finish that cites a call athanor answered without running it', async () => {
+  it('refuses a finish that cites a call garden answered without running it', async () => {
     // The exact shape from the incident: a read is answered by the harness - here as an exact
     // repeat, in the field usually as arguments cut off at the output ceiling - and the same reply
     // finishes on it. Nothing ran, and the turn used to complete `status:'verified'` on it.
@@ -9137,7 +9137,7 @@ describe('a tool call that was cut off mid-argument', () => {
 });
 
 /**
- * Which athanor priced this.
+ * Which garden priced this.
  *
  * A cost line is the most-compared number the product emits - a baseline read back a year later, a
  * regression argued from two transcripts - and until now nothing on it said which build produced it,
@@ -9211,7 +9211,7 @@ describe('dormant rules on a real turn', () => {
     const correction = messagesOf(log.modelRequests[1]).find((m) =>
       m.content.startsWith('HARNESS CORRECTION [office-render-proof]')
     );
-    expect(correction?.content).toContain('athanor-office-convert');
+    expect(correction?.content).toContain('garden-office-convert');
   });
 
   it('sends a request with no rule byte in it when nothing fired', async () => {
@@ -9288,13 +9288,13 @@ describe('the contract the run actually sends', () => {
     // The pinned interpreter path is the single most expensive fact in the gated span and the one
     // that does most damage when it is wrong: it sends the model at a binary that is not there, and
     // it finds out one failed shell call at a time in front of the owner.
-    expect(contract).not.toContain('/usr/local/lib/athanor/python/bin/python3');
+    expect(contract).not.toContain('/usr/local/lib/garden/python/bin/python3');
     expect(contract).toContain('The managed document toolchain is unavailable');
   });
 
   it('is smaller on a barer box than on a provisioned one', async () => {
     const bare = contractOf(await turn(NO_TOOLCHAIN));
-    const provisioned = contractOf(await turn('python3 3.12, typst 0.12, athanor-office-convert.'));
+    const provisioned = contractOf(await turn('python3 3.12, typst 0.12, garden-office-convert.'));
     // The whole claim of a conditional contract in one assertion: two boxes, two sizes. Before the
     // gate was wired these two were the same string, and the saving was a number in a report.
     expect(bare.length).toBeLessThan(provisioned.length);
@@ -9366,7 +9366,7 @@ describe('the machine the run tells the model it is on', () => {
     const lines = block.split('\n');
     const machine = lines.findIndex((line) => line.startsWith('- Machine: '));
     expect(machine).toBeGreaterThan(-1);
-    expect(lines[machine + 1] ?? '').toContain('df -h /home/athanor');
+    expect(lines[machine + 1] ?? '').toContain('df -h /home/garden');
   });
 
   /**
@@ -9387,7 +9387,7 @@ describe('the machine the run tells the model it is on', () => {
     const block = runtimeBlockOf(await turn(null));
     expect(block).not.toContain('- Machine:');
     // And the rest of the block is untouched, which is what makes an unanswerable probe free.
-    expect(block).toContain('- Check real capacity with `df -h /home/athanor`');
+    expect(block).toContain('- Check real capacity with `df -h /home/garden`');
   });
 
   /**
@@ -9697,7 +9697,7 @@ describe('a task walled on one provider while another is connected', () => {
     });
     await new AgentWorker(probe.store, config(), masterKey, runnerSecret, silentLogger).fail(
       task,
-      new AthanorError('provider_quota_exhausted', 'The provider is out of quota')
+      new GardenError('provider_quota_exhausted', 'The provider is out of quota')
     );
     return { probe, moves };
   };
@@ -9762,7 +9762,7 @@ describe('a task walled on one provider while another is connected', () => {
     });
     await new AgentWorker(probe.store, config(), masterKey, runnerSecret, silentLogger).fail(
       task,
-      new AthanorError('provider_quota_exhausted', 'The provider is out of quota')
+      new GardenError('provider_quota_exhausted', 'The provider is out of quota')
     );
     expect(probe.checkpoints).toMatchObject([{ status: 'awaiting_resource' }]);
   });
@@ -10077,7 +10077,7 @@ describe('real runtime replay', () => {
         runnerSecret
       );
       if (scenario === 'failure handling')
-        await worker.fail(task, new AthanorError('provider_unavailable', 'Provider offline'), 100);
+        await worker.fail(task, new GardenError('provider_unavailable', 'Provider offline'), 100);
       else
         await worker.run(task).catch((error) => {
           if (scenario !== 'interrupted stream') throw error;

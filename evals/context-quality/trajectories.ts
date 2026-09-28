@@ -44,7 +44,7 @@ import type { Probe } from './probes.js';
  * the same 24,000 characters. Whether that costs recall is this rig's question and nothing else
  * here could ask it.
  *
- * Three shapes, chosen with `ATHANOR_CONTEXT_READ_SHAPE`, defaulting to the one the committed
+ * Three shapes, chosen with `GARDEN_CONTEXT_READ_SHAPE`, defaulting to the one the committed
  * baseline was accepted under:
  *
  *   raw       one unbroken run of text, as this fixture has always built it
@@ -74,23 +74,23 @@ const DEFAULT_READ_WIDTH = 80;
 /**
  * The read shape this process is measuring, read once.
  *
- * Spelled `shape` or `shape:width` - `numbered:43` is athanor's own mean source line, `numbered:130`
+ * Spelled `shape` or `shape:width` - `numbered:43` is garden's own mean source line, `numbered:130`
  * is about a log line, and the default 80 sits between them. Width matters more than anything else
  * in this experiment: the surcharge is a fixed few bytes per LINE, so it is 9% of a 43-character
  * source line and 3% of a 130-character log line, and a report that quoted one number without its
  * line width would be quoting an accident of the corpus.
  */
 const readShape = (): { readonly shape: ReadShape; readonly width: number } => {
-  const raw = process.env.ATHANOR_CONTEXT_READ_SHAPE?.trim();
+  const raw = process.env.GARDEN_CONTEXT_READ_SHAPE?.trim();
   if (!raw) return { shape: 'raw', width: DEFAULT_READ_WIDTH };
   const [name, width] = raw.split(':');
   if (name !== 'raw' && name !== 'lines' && name !== 'numbered')
     throw new Error(
-      `ATHANOR_CONTEXT_READ_SHAPE=${raw}: expected raw, lines or numbered, optionally :width`
+      `GARDEN_CONTEXT_READ_SHAPE=${raw}: expected raw, lines or numbered, optionally :width`
     );
   const parsed = width === undefined ? DEFAULT_READ_WIDTH : Number(width);
   if (!Number.isInteger(parsed) || parsed < 8)
-    throw new Error(`ATHANOR_CONTEXT_READ_SHAPE=${raw}: width must be an integer of at least 8`);
+    throw new Error(`GARDEN_CONTEXT_READ_SHAPE=${raw}: width must be an integer of at least 8`);
   return { shape: name, width: parsed };
 };
 
@@ -242,7 +242,7 @@ const PLANTS: ReadonlyMap<number, Plant> = new Map<number, Plant>([
  * boundary is counted from the tail.
  *
  * It is also the answer to a question this rig would otherwise get wrong. The published probe work
- * says artifact tracking "may need dedicated state tracking beyond summarization". Athanor already
+ * says artifact tracking "may need dedicated state tracking beyond summarization". Garden already
  * has exactly that for the plan - a durable, re-rendered, model-visible block that no compaction
  * and no truncation reaches - and has nothing of the kind for the set of files it has written.
  */
@@ -278,7 +278,7 @@ export const isPlanStep = (step: number): boolean => PLAN_STEPS.has(step);
  * The same two numbers the step's tool result already carries - `{"ok":true,"path":…,"bytesWritten":…}`
  * - which is the point rather than a convenience: in production the ledger row is built from the
  * workspace's own answer to the write, so a rig that invented its own figures would be measuring a
- * block athanor does not render. `measure.ts` folds these through `recordArtifactWrite` at the end
+ * block garden does not render. `measure.ts` folds these through `recordArtifactWrite` at the end
  * of the step, so the row appears in the window one step later, exactly as `openStep` publishes it.
  */
 export const writeAt = (step: number): { readonly path: string; readonly bytes: number } | null => {
@@ -306,7 +306,7 @@ const CORRECTION_SPAN = 'the pooled connection ceiling is now 64 and applies aro
  * A correction the owner types in the middle of a running task.
  *
  * Nothing else in this fixture is a mid-task `user` message, and that is the gap it fills. Every
- * other probe asks about something athanor produced, so every one of them is answered by a
+ * other probe asks about something garden produced, so every one of them is answered by a
  * mechanism that treats the material as recoverable tool output or as discardable reasoning. What
  * the owner types has neither property: no tool call brings it back, nothing re-pushes it, and a
  * window that loses it leaves the agent working to an instruction that was withdrawn.
@@ -505,7 +505,7 @@ export const PROBES: readonly Probe[] = [
      * The plan as the agent narrated it in prose at step 7. Prose is not state: nothing re-pushes
      * it, a compaction condenses it like any other turn, and what survives is whatever the
      * summariser chose to keep. Read against `continuation-plan-block` directly below, which is
-     * the same question asked of the mechanism athanor actually maintains for this.
+     * the same question asked of the mechanism garden actually maintains for this.
      */
     id: 'continuation-plan-order',
     kind: 'continuation',
@@ -592,7 +592,7 @@ export const PROBES: readonly Probe[] = [
   },
   {
     /**
-     * The same question asked of the mechanism athanor now maintains for it, and the pair to
+     * The same question asked of the mechanism garden now maintains for it, and the pair to
      * `artifact-files-touched` in exactly the way `continuation-plan-block` is the pair to
      * `continuation-plan-order`.
      *

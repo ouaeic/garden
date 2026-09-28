@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { decryptJson, encryptJson } from '@athanor/core';
-import { createDatabase, migrateDatabase, DataStore, type Database } from '@athanor/data';
+import { decryptJson, encryptJson } from '@garden/core';
+import { createDatabase, migrateDatabase, DataStore, type Database } from '@garden/data';
 import type { AgentState } from '../agent-state.js';
 import { approvalPreviewHash } from '../approval-state.js';
 import { parkForApproval } from './approval-park.js';

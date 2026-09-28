@@ -9,9 +9,9 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { INBOUND_QUARANTINE_DIRECTORY } from '@athanor/contracts';
-import { decryptJson, encryptJson, unwrapDataKey, type EncryptedEnvelope } from '@athanor/core';
-import type { WorkspaceRecord } from '@athanor/data';
+import { INBOUND_QUARANTINE_DIRECTORY } from '@garden/contracts';
+import { decryptJson, encryptJson, unwrapDataKey, type EncryptedEnvelope } from '@garden/core';
+import type { WorkspaceRecord } from '@garden/data';
 import type { SupportedContext } from '../http/server-context.js';
 import { errorFields } from '../log.js';
 import { MAX_PENDING_DELIVERIES } from '../routes/schedules.js';
@@ -207,7 +207,7 @@ export const createScheduleDispatch = (context: SupportedContext) => {
         summary: 'Encrypted schedule status event',
         payloadCiphertext: encryptJson(
           {
-            __athanorEventVersion: 1,
+            __gardenEventVersion: 1,
             summary: 'Scheduled run queued',
             payload: { scheduleId }
           },
@@ -235,7 +235,7 @@ export const createScheduleDispatch = (context: SupportedContext) => {
         summary: 'Encrypted schedule error event',
         payloadCiphertext: encryptJson(
           {
-            __athanorEventVersion: 1,
+            __gardenEventVersion: 1,
             summary: scheduleErrorMessage('workspace_unavailable'),
             // `owner` is what keeps a warning or an error out on the page rather than folded into
             // the collapsed work log with the machinery the agent recovered from. A scheduled run
@@ -320,7 +320,7 @@ export const createScheduleDispatch = (context: SupportedContext) => {
           {
             id: String(delivery.id),
             // A `jsonb` column arrives parsed from one driver and as text from another; the store's
-            // own `json` helper does exactly this and is not exported past `@athanor/data`.
+            // own `json` helper does exactly this and is not exported past `@garden/data`.
             bodyCiphertext: (typeof delivery.body_ciphertext === 'string'
               ? JSON.parse(delivery.body_ciphertext)
               : delivery.body_ciphertext) as EncryptedEnvelope
@@ -417,7 +417,7 @@ export const createScheduleDispatch = (context: SupportedContext) => {
           summary: 'Encrypted schedule error event',
           payloadCiphertext: encryptJson(
             {
-              __athanorEventVersion: 1,
+              __gardenEventVersion: 1,
               summary: `This run has been open for more than a day, so its schedule skipped every occurrence since and has now been paused. Finish or cancel this conversation, then turn the schedule back on.`,
               payload: {
                 owner: true,
@@ -531,7 +531,7 @@ export const createScheduleDispatch = (context: SupportedContext) => {
         : undefined;
     const preparingEventCiphertext = encryptJson(
       {
-        __athanorEventVersion: 1,
+        __gardenEventVersion: 1,
         summary: 'Scheduled run is starting the computer',
         payload: { scheduleId: schedule.id, scheduledFor: schedule.nextRunAt }
       },
@@ -540,7 +540,7 @@ export const createScheduleDispatch = (context: SupportedContext) => {
     );
     const failureEventCiphertext = encryptJson(
       {
-        __athanorEventVersion: 1,
+        __gardenEventVersion: 1,
         summary: 'Scheduled run could not start',
         payload: { owner: true, scheduleId: schedule.id }
       },
@@ -575,7 +575,7 @@ export const createScheduleDispatch = (context: SupportedContext) => {
         summary: 'Encrypted schedule error event',
         payloadCiphertext: encryptJson(
           {
-            __athanorEventVersion: 1,
+            __gardenEventVersion: 1,
             summary: scheduleErrorMessage(materialized.errorCode ?? 'schedule_failed'),
             payload: { owner: true, code: materialized.errorCode, scheduleId: schedule.id }
           },
@@ -621,7 +621,7 @@ export const createScheduleDispatch = (context: SupportedContext) => {
           summary: 'Encrypted schedule error event',
           payloadCiphertext: encryptJson(
             {
-              __athanorEventVersion: 1,
+              __gardenEventVersion: 1,
               summary: `${schedule.modelId} is no longer available, so this scheduled task has been paused after ${MODEL_UNAVAILABLE_PAUSE_AFTER} runs that could not start. Choose another model and turn it back on.`,
               payload: {
                 owner: true,

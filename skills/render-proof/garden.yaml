@@ -1,0 +1,50 @@
+id: render-proof
+version: 2.3.0
+catalog_line: 'Render a document, deck, workbook or PDF to page images and prove it looks right.'
+
+lineage:
+  origin: builtin
+  approved_by: null
+  approved_at: null
+
+requires:
+  tools: [shell, file_read, files_list, image_read, set_acceptance, publish_artifact, document_read]
+  binaries:
+    [
+      garden-office-convert,
+      pdftoppm,
+      pdffonts,
+      pdftotext,
+      pdfinfo,
+      pdfimages,
+      qpdf,
+      typst,
+      /usr/local/lib/garden/python/bin/python3
+    ]
+
+capability:
+  fs.read: ['$WORKSPACE/**']
+  fs.write: ['$WORKSPACE/proofs/**', '$TMP/**']
+  net.hosts: []
+  exec:
+    [
+      garden-office-convert,
+      typst,
+      pdftoppm,
+      pdftotext,
+      pdffonts,
+      pdfinfo,
+      pdfimages,
+      qpdf,
+      /usr/local/lib/garden/python/bin/python3
+    ]
+  connectors: []
+  spend: none
+
+verify:
+  - check: 'The deliverable has an acceptance check with a render clause, declared before it was built.'
+  - run: 'qpdf --check proofs/out.pdf'
+    assert: 'exit status 0'
+  - run: 'pdffonts proofs/out.pdf'
+    assert: 'no font row reports emb=no'
+  - check: 'Every rendered page was graded against the rubric and the images are attached.'

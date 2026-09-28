@@ -9,8 +9,8 @@
  * spelling right every time. The reference implementation the format was measured from ships a
  * hand-maintained deny-list of four models that miscount anchors or drop the tag header - which is
  * a statement that emission failure is a real, per-model, routing-level fact rather than an
- * implementation bug somebody could fix. athanor runs on whatever model the owner points it at, so
- * athanor cannot route around it.
+ * implementation bug somebody could fix. garden runs on whatever model the owner points it at, so
+ * garden cannot route around it.
  *
  * The ruling named the gate: one arm whose single difference is the edit tool, over the same
  * sample, reporting edit-success and mean output tokens on the same row. This is that arm.
@@ -819,7 +819,7 @@ export class EditWorld implements Oracle {
     }
     const grep = /^grep\s+(?:-\w+\s+)*['"]?([^'"]+?)['"]?(\s+\S+)?$/.exec(trimmed);
     if (grep) return this.grep(grep[1] as string).join('\n');
-    return `athanor-eval: this rig's shell understands ls, cat, grep, find and mv over the workspace, and was given: ${trimmed}`;
+    return `garden-eval: this rig's shell understands ls, cat, grep, find and mv over the workspace, and was given: ${trimmed}`;
   }
 
   answer(name: string, args: Record<string, unknown>): OracleResult {
@@ -860,7 +860,7 @@ export class EditWorld implements Oracle {
         return ok('This rig has no network. Work from what is on the computer.');
       default:
         return ok(
-          `athanor-eval: ${name} is not modelled by this rig. Reach the same fact another way, or finish with what you have.`
+          `garden-eval: ${name} is not modelled by this rig. Reach the same fact another way, or finish with what you have.`
         );
     }
   }

@@ -12,14 +12,14 @@ import {
 
 test('parses the release identity and ABI boundary from aapt badging', () => {
   assert.deepEqual(
-    parseBadging(`package: name='org.athanor.ai' versionCode='1000' versionName='0.1.0'
+    parseBadging(`package: name='org.garden.ai' versionCode='1000' versionName='0.1.0'
 minSdkVersion:'26'
 targetSdkVersion:'36'
 uses-permission: name='android.permission.INTERNET'
 native-code: 'arm64-v8a' 'x86_64'
 `),
     {
-      packageName: 'org.athanor.ai',
+      packageName: 'org.garden.ai',
       versionCode: '1000',
       versionName: '0.1.0',
       minSdk: '26',
@@ -83,10 +83,10 @@ test('rejects missing, malformed or page-straddling RELRO protection even with a
 });
 
 test('requires 16 KiB ELF pages only for Android 64-bit ABIs', () => {
-  assert.equal(minimumElfPageAlignment('lib/arm64-v8a/libathanor.so'), 0x4000);
-  assert.equal(minimumElfPageAlignment('lib/x86_64/libathanor.so'), 0x4000);
-  assert.equal(minimumElfPageAlignment('lib/armeabi-v7a/libathanor.so'), 0x1000);
-  assert.equal(minimumElfPageAlignment('lib/x86/libathanor.so'), 0x1000);
+  assert.equal(minimumElfPageAlignment('lib/arm64-v8a/libgarden.so'), 0x4000);
+  assert.equal(minimumElfPageAlignment('lib/x86_64/libgarden.so'), 0x4000);
+  assert.equal(minimumElfPageAlignment('lib/armeabi-v7a/libgarden.so'), 0x1000);
+  assert.equal(minimumElfPageAlignment('lib/x86/libgarden.so'), 0x1000);
 });
 
 test('distinguishes private-key parser constants from embedded private-key material', () => {

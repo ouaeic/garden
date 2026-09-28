@@ -25,7 +25,7 @@
  * owner is owed is the reason, and it goes where they already read reasons - the caveat on the
  * completion, beside the work.
  */
-import type { DataStore, TaskRecord } from '@athanor/data';
+import type { DataStore, TaskRecord } from '@garden/data';
 import type { AgentState } from '../agent-state.js';
 import type { CompletionVerification } from '../completion.js';
 import {
@@ -73,7 +73,7 @@ export interface StepOutcome {
 /**
  * Ends the turn, honestly, and says why where the owner reads reasons.
  *
- * The summary is athanor's own sentence rather than the model's last paragraph: these breaks only
+ * The summary is garden's own sentence rather than the model's last paragraph: these breaks only
  * fire on a step that asked for a tool, so whatever it wrote is prose written alongside a call -
  * the deliberation that caused the break. `completeTurn` publishes the summary as the reply when
  * the turn never spoke, so taking it from the model would put the spiral's last paragraph at the
@@ -139,7 +139,7 @@ export const enforceStepBounds = async (
       headline: 'Stopped a turn that had stopped moving',
       payload: { steps: idle },
       summary: `Stopped after ${idle} steps that asked for tools and started none.`,
-      risk: `athanor stopped this turn: ${idle} steps running asked for tools and started none, so the work was not moving. Reply to carry on, or say which way you want it decided.`
+      risk: `garden stopped this turn: ${idle} steps running asked for tools and started none, so the work was not moving. Reply to carry on, or say which way you want it decided.`
     });
     return true;
   }
@@ -169,7 +169,7 @@ export const enforceStepBounds = async (
       headline: 'Stopped a turn that was retrying a failure',
       payload: { tool: repeated.tool, attempts: repeated.count },
       summary: `Stopped after ${repeated.count} identical ${repeated.tool} calls that all failed the same way.`,
-      risk: `athanor stopped this turn: ${repeated.tool} was called ${repeated.count} times with the same arguments and failed the same way every time, so nothing it did in between was changing the outcome. Reply to carry on, or say which way you want it decided.`
+      risk: `garden stopped this turn: ${repeated.tool} was called ${repeated.count} times with the same arguments and failed the same way every time, so nothing it did in between was changing the outcome. Reply to carry on, or say which way you want it decided.`
     });
     return true;
   }
@@ -215,7 +215,7 @@ export const enforceStepBounds = async (
         signature: stationary.signature
       },
       summary: `Stopped after ${stationary.steps} steps that all made the same ${stationary.tools.join(', ')} call.`,
-      risk: `athanor stopped this turn: ${stationary.steps} steps running made the identical ${stationary.tools.join(', ')} call, so the work had stopped moving. Reply to carry on, or say which way you want it decided.`
+      risk: `garden stopped this turn: ${stationary.steps} steps running made the identical ${stationary.tools.join(', ')} call, so the work had stopped moving. Reply to carry on, or say which way you want it decided.`
     });
     return true;
   }

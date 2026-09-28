@@ -24,7 +24,7 @@ import {
   generateIdentityKeyPair,
   parseRelayConfig,
   silentLogger
-} from '@athanor/relay';
+} from '@garden/relay';
 import {
   RelayClientConfigSchema,
   RelayConnection,
@@ -212,7 +212,7 @@ if (!httpReply.includes(`box-http ${challengePath}`)) {
 }
 console.log('ok: a plaintext :80 request reached the box HTTP listener through the relay');
 
-// A box going away is the ordinary case - `systemctl restart athanor@api` does it - and the relay
+// A box going away is the ordinary case - `systemctl restart garden@api` does it - and the relay
 // has to survive it for every other peer. Draining parked streams from inside nghttp2's own receive
 // callback used to wedge the event loop right here: one restart pegged a core, climbed past a
 // gigabyte resident in seconds, and took the relay down for everyone. The check is whether the

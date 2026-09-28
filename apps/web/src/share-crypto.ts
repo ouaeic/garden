@@ -1,4 +1,4 @@
-import type { ShareBlob, ShareSnapshot } from '@athanor/contracts';
+import type { ShareBlob, ShareSnapshot } from '@garden/contracts';
 
 export const SHARE_BOUNDS = {
   snapshotBytes: 8 * 1024 * 1024,

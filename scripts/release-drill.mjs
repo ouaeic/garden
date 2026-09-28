@@ -12,8 +12,8 @@ if (!secret || secret.length < 32) {
 }
 
 const runnerUrl = process.env.WORKSPACE_RUNNER_URL ?? 'http://127.0.0.1:4300';
-const workspaceId = process.env.ATHANOR_DRILL_WORKSPACE ?? randomUUID();
-const subject = 'athanor-release-drill';
+const workspaceId = process.env.GARDEN_DRILL_WORKSPACE ?? randomUUID();
+const subject = 'garden-release-drill';
 
 const token = (scopes, method, path) =>
   signCapabilityToken(
@@ -92,7 +92,7 @@ try {
       })
     ).value;
 
-  const packageName = process.env.ATHANOR_DRILL_PACKAGE;
+  const packageName = process.env.GARDEN_DRILL_PACKAGE;
   if (packageName) {
     check(/^[a-z0-9][a-z0-9+.-]*$/i.test(packageName), 'package drill input is a package name');
     const installed = await exec('apt-get', ['install', '-y', packageName], {
@@ -108,11 +108,11 @@ try {
   // a box missing python-pptx does not fail here - it fails in front of the owner, three shell
   // calls into a job they asked for. Kept as one list so a skill cannot quietly grow a requirement
   // the drill does not assert.
-  const ATHANOR_PYTHON = '/usr/local/lib/athanor/python/bin/python3';
+  const GARDEN_PYTHON = '/usr/local/lib/garden/python/bin/python3';
   const REQUIRED_BINARIES = [
     'garden-run',
-    'athanor-office-convert',
-    'athanor-pdf-tables',
+    'garden-office-convert',
+    'garden-pdf-tables',
     'dot',
     'ffmpeg',
     'ffprobe',
@@ -166,17 +166,17 @@ try {
     '-lc',
     [
       'set -eu',
-      // athanor-agent, not athanor: an agent command runs as its own account, separate from the one
+      // garden-agent, not garden: an agent command runs as its own account, separate from the one
       // the runner itself runs as. This asserted the runner's account until the sandbox landed, and
       // then kept passing on nothing - `set -eu` makes a failed test exit silently, so the whole
       // toolchain check reported "exit=1" with neither stream to say why.
-      'test "$(id -un)" = "athanor-agent"',
-      `test -x ${ATHANOR_PYTHON}`,
+      'test "$(id -un)" = "garden-agent"',
+      `test -x ${GARDEN_PYTHON}`,
       `for binary in ${REQUIRED_BINARIES.join(' ')}; do command -v "$binary" >/dev/null || { echo "missing binary: $binary" >&2; exit 1; }; done`,
-      `for module in ${REQUIRED_MODULES.join(' ')}; do ${ATHANOR_PYTHON} -c "import $module" 2>/dev/null || { echo "missing python module: $module" >&2; exit 1; }; done`,
+      `for module in ${REQUIRED_MODULES.join(' ')}; do ${GARDEN_PYTHON} -c "import $module" 2>/dev/null || { echo "missing python module: $module" >&2; exit 1; }; done`,
       `for font in ${REQUIRED_FONTS.map((font) => `'${font}'`).join(' ')}; do fc-list | grep -qi "$font" || { echo "missing font: $font" >&2; exit 1; }; done`,
       "printf 'durable-agent-computer\\n' > release-drill-state.txt",
-      `printf 'user=%s python=%s libreoffice=%s typst=%s\\n' "$(id -un)" "$(${ATHANOR_PYTHON} --version 2>&1)" "$(libreoffice --version | head -n 1)" "$(typst --version)"`
+      `printf 'user=%s python=%s libreoffice=%s typst=%s\\n' "$(id -un)" "$(${GARDEN_PYTHON} --version 2>&1)" "$(libreoffice --version | head -n 1)" "$(typst --version)"`
     ].join('; ')
   ]);
   check(
@@ -193,9 +193,9 @@ try {
   // render - and --require-all makes a job that cannot run for want of a tool a failure rather than
   // a note, because on this machine everything is meant to be there.
   const documents = await exec(
-    ATHANOR_PYTHON,
+    GARDEN_PYTHON,
     [
-      '/usr/local/lib/athanor/athanor-document-proof',
+      '/usr/local/lib/garden/garden-document-proof',
       '--json',
       '--require-all',
       '--workdir',
@@ -223,7 +223,7 @@ try {
       : [documents.stdout.trim(), documents.stderr.trim()].filter(Boolean).join(' | ').slice(0, 600)
   );
 
-  const fileBody = Buffer.from('# Athanor release drill\n\nfile round-trip is healthy\n');
+  const fileBody = Buffer.from('# Garden release drill\n\nfile round-trip is healthy\n');
   const written = await request(`${root}/file?path=workspace/release-drill.md`, {
     method: 'PUT',
     scopes: ['files.write'],
@@ -446,7 +446,7 @@ print('unauthorized X11 connections refused:', len(sockets))
     storageBytes: usage.value.storageBytes
   });
 } finally {
-  if (workspaceCreated && process.env.ATHANOR_DRILL_KEEP !== 'true') {
+  if (workspaceCreated && process.env.GARDEN_DRILL_KEEP !== 'true') {
     await request(root, { method: 'DELETE', scopes: ['workspace.manage'] });
     check(true, 'release-drill workspace cleanup');
   }

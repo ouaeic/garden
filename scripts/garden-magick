@@ -1,0 +1,31 @@
+#!/bin/sh
+# garden ImageMagick 6 compatibility command.
+#
+# ImageMagick 7 folds every tool into one `magick` command. ImageMagick 6 - which is what the
+# `imagemagick` package is on Debian 12 and on Ubuntu 22.04 and 24.04, the releases most owners
+# install on - has no such binary at all: it provides convert, identify, mogrify and the rest as
+# separate commands. garden names one binary everywhere it matters (the runner's image-work
+# capability probe, `garden doctor`, the release drill and the skill library all say `magick`), and
+# this is the single place that difference is written down instead of every one of them carrying an
+# "or convert" branch the agent would have to reason about mid-job.
+#
+# scripts/install-native.sh installs this as /usr/local/bin/magick only on a host whose ImageMagick
+# has no `magick` of its own.
+set -eu
+
+# A real ImageMagick 7 wins the moment the host has one, so a distribution upgrade retires this
+# without anybody having to remember it is here.
+if [ -x /usr/bin/magick ]; then
+  exec /usr/bin/magick "$@"
+fi
+
+# `magick TOOL ...` is ImageMagick 7's spelling of the legacy tools, and under ImageMagick 6 each of
+# those is its own command. Everything else is the conversion pipeline, which is `convert`.
+case "${1:-}" in
+  animate | compare | composite | conjure | convert | display | identify | import | mogrify | montage | stream)
+    tool=$1
+    shift
+    exec "$tool" "$@"
+    ;;
+esac
+exec convert "$@"

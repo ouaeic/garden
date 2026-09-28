@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { verifyCapabilityToken, wrapDataKey } from '@athanor/core';
-import type { ModelRelease } from '@athanor/contracts';
-import type { DataStore, TaskRecord } from '@athanor/data';
+import { verifyCapabilityToken, wrapDataKey } from '@garden/core';
+import type { ModelRelease } from '@garden/contracts';
+import type { DataStore, TaskRecord } from '@garden/data';
 import {
   retainInterruptedResponse,
   type ModelResponse,
   type ModelToolCall
-} from '@athanor/model-gateway';
+} from '@garden/model-gateway';
 import type { AgentState } from './agent-state.js';
 import { executeDelegateTool } from './delegate.js';
 import { AgentRunnerClient } from './runner-client.js';
@@ -156,7 +156,7 @@ const runMission = async (
   const state = {
     turnNoveltyBytes: 0,
     messages: options.leadMessages ?? [
-      { role: 'system', content: 'ATHANOR OPERATING CONTRACT\nlead contract' },
+      { role: 'system', content: 'GARDEN OPERATING CONTRACT\nlead contract' },
       { role: 'user', content: 'read the notes' }
     ],
     ...(options.taint ? { taint: options.taint } : {}),
@@ -329,7 +329,7 @@ describe('direct review of the lead’s claims', () => {
       runner: { readFile },
       usage,
       leadMessages: [
-        { role: 'system', content: 'ATHANOR OPERATING CONTRACT\nPRIVATE_UNRELATED_CANARY' }
+        { role: 'system', content: 'GARDEN OPERATING CONTRACT\nPRIVATE_UNRELATED_CANARY' }
       ]
     });
     expect(result.calls).toBe(1);
@@ -940,7 +940,7 @@ describe("the owner's block inside a specialist's window", () => {
 
   const leadWindow = (...extra: Array<{ role: string; content: string }>) =>
     [
-      { role: 'system', content: 'ATHANOR OPERATING CONTRACT\nlead contract' },
+      { role: 'system', content: 'GARDEN OPERATING CONTRACT\nlead contract' },
       ...extra,
       { role: 'user', content: 'read the notes' }
     ] as unknown as AgentState['messages'];

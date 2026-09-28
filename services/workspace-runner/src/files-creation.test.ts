@@ -31,8 +31,8 @@ describe.skipIf(process.platform !== 'linux')('creation under a held workspace d
   let outside: string;
   let parent: string;
   beforeEach(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'athanor-creation-root-'));
-    outside = await mkdtemp(path.join(tmpdir(), 'athanor-creation-outside-'));
+    root = await mkdtemp(path.join(tmpdir(), 'garden-creation-root-'));
+    outside = await mkdtemp(path.join(tmpdir(), 'garden-creation-outside-'));
     parent = path.join(root, 'workspace', 'exports');
     await mkdir(parent, { recursive: true });
   });

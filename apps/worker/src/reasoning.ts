@@ -2,9 +2,9 @@ import {
   ReasoningEffort,
   type ReasoningOptions,
   type TaskReasoningEffort
-} from '@athanor/contracts';
-import { assertReasoningEffort } from '@athanor/model-gateway';
-import { AthanorError } from '@athanor/core';
+} from '@garden/contracts';
+import { assertReasoningEffort } from '@garden/model-gateway';
+import { GardenError } from '@garden/core';
 
 /** Owner settings are stable; automatic settings stay inside the model's advertised vocabulary. */
 export const taskReasoningEffort = (
@@ -14,7 +14,7 @@ export const taskReasoningEffort = (
 ): ReasoningEffort | undefined => {
   if (preference && preference !== 'auto') {
     if (options?.supportedEfforts === undefined)
-      throw new AthanorError(
+      throw new GardenError(
         'reasoning_options_unknown',
         'The selected model no longer advertises reasoning controls. Choose Auto or a supported model.'
       );

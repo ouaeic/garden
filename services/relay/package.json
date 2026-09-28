@@ -1,5 +1,5 @@
 {
-  "name": "@athanor/relay",
+  "name": "@garden/relay",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     }
   },
   "bin": {
-    "athanor-relay": "./dist/cli.js"
+    "garden-relay": "./dist/cli.js"
   },
   "scripts": {
     "dev": "NODE_OPTIONS=--conditions=development tsx watch src/cli.ts serve",

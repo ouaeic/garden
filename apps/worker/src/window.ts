@@ -1,5 +1,5 @@
-import { runtimeValue } from '@athanor/core';
-import { runtimeDate, runtimeUUID } from '@athanor/core';
+import { runtimeValue } from '@garden/core';
+import { runtimeDate, runtimeUUID } from '@garden/core';
 import { conversationContext } from './conversation-context.js';
 /**
  * The window itself: what goes in front of the trajectory, what is refreshed at the tail on every
@@ -16,11 +16,11 @@ import { conversationContext } from './conversation-context.js';
  * carried across byte for byte.
  */
 import { createHash } from 'node:crypto';
-import type { TaskPlanStep, WebToolPlan } from '@athanor/contracts';
+import type { TaskPlanStep, WebToolPlan } from '@garden/contracts';
 import {
   ownerMessageContent,
   type OwnerMessage,
-  AthanorError,
+  GardenError,
   decryptBytes,
   decryptJson,
   encryptJson,
@@ -32,9 +32,9 @@ import {
   userMemoryAad,
   userMemoryKey,
   type MemoryDocument
-} from '@athanor/core';
-import type { DataStore, TaskRecord, WorkspaceRecord } from '@athanor/data';
-import type { ModelMessage } from '@athanor/model-gateway';
+} from '@garden/core';
+import type { DataStore, TaskRecord, WorkspaceRecord } from '@garden/data';
+import type { ModelMessage } from '@garden/model-gateway';
 import type { AgentState, AgentWorkerConfig } from './agent-state.js';
 import {
   CONDENSED_HISTORY_MARKER,
@@ -410,7 +410,7 @@ export const assemblePreamble = async (deps: WindowDeps, input: PreambleInput): 
   // the same provenance as a tool read, including on a resumed task.
   let brief = '';
   let briefPath = '';
-  for (const name of ['GARDEN.md', 'ATHANOR.md', 'OPEN_CLOUD.md', 'AGENTS.md']) {
+  for (const name of ['GARDEN.md', 'OPEN_CLOUD.md', 'AGENTS.md']) {
     try {
       briefPath = `workspace/${name}`;
       brief = await deps.runner.readFile(task.workspaceId, task.id, briefPath);
@@ -855,7 +855,7 @@ export const refreshActivePlan = async (
   }
   if (!plan || plan.version === state.planVersion) return false;
   if (plan.stepsCiphertext.aad !== `task-plan:${task.id}`)
-    throw new AthanorError('encrypted_plan_context', 'Task plan encryption context is invalid');
+    throw new GardenError('encrypted_plan_context', 'Task plan encryption context is invalid');
   const content = decryptJson<{ steps: TaskPlanStep[]; branchName?: string }>(
     plan.stepsCiphertext,
     key

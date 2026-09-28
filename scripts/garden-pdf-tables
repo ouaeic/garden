@@ -1,0 +1,345 @@
+#!/usr/bin/python3
+"""The one way a table comes out of a PDF on this computer.
+
+Poppler already knows where every word sits on the page - `pdftotext -bbox-layout` reports a
+bounding box per word. A table is then a geometric fact rather than a guess: the columns are the
+vertical corridors of whitespace that survive across the rows, and the rows are words that share a
+baseline band. Working from the boxes keeps the page number attached to every cell and needs
+nothing beyond poppler, which is the same engine `document_read` already uses, so there is no
+second extraction stack whose answers can disagree with the first.
+
+Ruled and unruled tables are handled identically, because the rules are never consulted.
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import io
+import json
+import os
+import subprocess
+import sys
+import xml.etree.ElementTree as ET
+from pathlib import Path
+from statistics import median
+from typing import NamedTuple
+
+XHTML = "{http://www.w3.org/1999/xhtml}"
+PDFTOTEXT = "/usr/bin/pdftotext"
+
+
+class Word(NamedTuple):
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    text: str
+
+
+def safe_target(raw: str) -> Path:
+    """Same containment rule as garden-document: nothing outside the workspace is readable."""
+    root = Path.cwd().resolve()
+    requested = Path(raw)
+    target = (root / requested).resolve() if not requested.is_absolute() else requested.resolve()
+    try:
+        target.relative_to(root)
+    except ValueError as error:
+        raise ValueError("PDF path must stay inside the current workspace") from error
+    if not target.is_file():
+        raise ValueError("PDF path is not a regular file")
+    return target
+
+
+def pdftotext() -> str:
+    """Poppler, named absolutely, exactly as garden-document names it.
+
+    This fell back to shutil.which("pdftotext"), which is the search-path execution the sibling
+    reader forbids in as many words in its own installed() helper - and this script is the one an agent
+    reaches by name through shell, with the agent's own writable PATH. A workspace that dropped a
+    file called pdftotext somewhere on that path had this script run it, on a page of the owner's
+    own document, for as long as poppler was missing from /usr/bin.
+
+    The override is the same variable name garden-document uses for the same binary, so a
+    developer whose machine keeps poppler elsewhere sets one thing and both readers find it, and
+    the executable bit is checked rather than the file bit: a path that exists and cannot be run
+    is not an installation.
+    """
+    candidate = os.environ.get("GARDEN_PDFTOTEXT") or PDFTOTEXT
+    if os.access(candidate, os.X_OK):
+        return candidate
+    raise ValueError(
+        "poppler-utils is not installed, so PDF word positions cannot be read. "
+        "Install it with: apt-get install -y poppler-utils"
+    )
+
+
+def page_words(target: Path, page: int) -> tuple[list[Word], float, float]:
+    result = subprocess.run(
+        [pdftotext(), "-bbox-layout", "-f", str(page), "-l", str(page), str(target), "-"],
+        check=False,
+        capture_output=True,
+        timeout=120,
+    )
+    if result.returncode != 0:
+        raise ValueError(
+            (result.stderr.decode("utf-8", "replace").strip() or "pdftotext failed").splitlines()[
+                -1
+            ]
+        )
+    root = ET.fromstring(result.stdout.decode("utf-8", "replace"))
+    element = root.find(f".//{XHTML}page")
+    if element is None:
+        raise ValueError(f"Page {page} does not exist in this PDF")
+    words = [
+        Word(
+            float(node.get("xMin", 0)),
+            float(node.get("yMin", 0)),
+            float(node.get("xMax", 0)),
+            float(node.get("yMax", 0)),
+            (node.text or "").strip(),
+        )
+        for node in element.iter(f"{XHTML}word")
+        if (node.text or "").strip()
+    ]
+    return words, float(element.get("width", 0)), float(element.get("height", 0))
+
+
+def group_rows(words: list[Word]) -> list[list[Word]]:
+    """Words share a row when their vertical bands overlap; that is what a reader's eye uses."""
+    if not words:
+        return []
+    tolerance = median(word.y1 - word.y0 for word in words) * 0.6
+    rows: list[list[Word]] = []
+    current: list[Word] = []
+    anchor = 0.0
+    for word in sorted(words, key=lambda item: ((item.y0 + item.y1) / 2, item.x0)):
+        centre = (word.y0 + word.y1) / 2
+        if current and centre - anchor > tolerance:
+            rows.append(sorted(current, key=lambda item: item.x0))
+            current = []
+        if not current:
+            anchor = centre
+        current.append(word)
+    if current:
+        rows.append(sorted(current, key=lambda item: item.x0))
+    return rows
+
+
+def corridors(
+    rows: list[list[Word]], width: float, minimum_gap: float, coverage: float
+) -> list[tuple[float, float]]:
+    """Whitespace that runs top to bottom through the rows is where a column boundary is.
+
+    Coverage is counted per row rather than per word so that one long title line cannot close a
+    corridor that every data row leaves open - which is what a table with a caption looks like.
+    """
+    if not rows or width <= 0:
+        return []
+    step = 1.0
+    columns_count = int(width / step) + 1
+    hits = [0] * columns_count
+    for row in rows:
+        touched = set()
+        for word in row:
+            start = max(0, int(word.x0 / step))
+            end = min(columns_count - 1, int(word.x1 / step))
+            touched.update(range(start, end + 1))
+        for index in touched:
+            hits[index] += 1
+    limit = max(1, len(rows) * coverage)
+    gaps: list[tuple[float, float]] = []
+    run_start: int | None = None
+    for index in range(columns_count):
+        empty = hits[index] < limit
+        if empty and run_start is None:
+            run_start = index
+        elif not empty and run_start is not None:
+            if (index - run_start) * step >= minimum_gap:
+                gaps.append((run_start * step, index * step))
+            run_start = None
+    if run_start is not None and (columns_count - run_start) * step >= minimum_gap:
+        gaps.append((run_start * step, columns_count * step))
+    # The leading and trailing margins are not column boundaries, they are the page.
+    interior = [gap for gap in gaps if gap[0] > 0 and gap[1] < columns_count * step]
+    bounds: list[tuple[float, float]] = []
+    previous = 0.0
+    for gap in interior:
+        bounds.append((previous, gap[0]))
+        previous = gap[1]
+    bounds.append((previous, width))
+    return bounds
+
+
+def assign(row: list[Word], columns: list[tuple[float, float]]) -> list[str]:
+    cells: list[list[str]] = [[] for _ in columns]
+    for word in row:
+        centre = (word.x0 + word.x1) / 2
+        index = next(
+            (
+                position
+                for position, (start, end) in enumerate(columns)
+                if start <= centre < end
+            ),
+            len(columns) - 1,
+        )
+        cells[index].append(word.text)
+    return [" ".join(cell) for cell in cells]
+
+
+def table_region(
+    rows: list[list[Word]],
+    width: float,
+    minimum_gap: float,
+    coverage: float,
+    min_columns: int,
+) -> tuple[int, int, list[tuple[float, float]]]:
+    """The longest run of consecutive rows that share a column grid, which is what a table is.
+
+    A page of prose has no corridor that survives every line, so no window qualifies and nothing
+    is returned; a page whose table sits under a paragraph returns the table alone. Longest wins
+    over widest so that a two-column table is not preferred to the whole five-column one because
+    two of its rows happen to leave a wider corridor.
+    """
+    best: tuple[int, int, int, int, list[tuple[float, float]]] | None = None
+    for start in range(len(rows)):
+        for end in range(len(rows), start + 1, -1):
+            if best and end - start < best[0]:
+                break
+            window = rows[start:end]
+            columns = corridors(window, width, minimum_gap, coverage)
+            if len(columns) < min_columns:
+                continue
+            if any(
+                sum(1 for cell in assign(row, columns) if cell) < min_columns for row in window
+            ):
+                continue
+            candidate = (end - start, len(columns), -start, start, columns)
+            if best is None or candidate[:3] > best[:3]:
+                best = candidate
+            break
+    if best is None:
+        return 0, 0, []
+    return best[3], best[3] + best[0], best[4]
+
+
+def extract(arguments: argparse.Namespace) -> dict[str, object]:
+    target = safe_target(arguments.path)
+    words, width, height = page_words(target, arguments.page)
+    if arguments.top is not None:
+        words = [word for word in words if word.y1 >= arguments.top]
+    if arguments.bottom is not None:
+        words = [word for word in words if word.y0 <= arguments.bottom]
+    rows = group_rows(words)
+    if arguments.list_rows:
+        return {
+            "path": str(target.relative_to(Path.cwd().resolve())),
+            "page": arguments.page,
+            "width": round(width, 2),
+            "height": round(height, 2),
+            "rows": [
+                {
+                    "top": round(min(word.y0 for word in row), 2),
+                    "bottom": round(max(word.y1 for word in row), 2),
+                    "text": " ".join(word.text for word in row),
+                }
+                for row in rows
+            ],
+        }
+    # An explicit vertical range is the caller telling us where the table is, so it is taken as
+    # given; without one the region is found from the geometry.
+    if arguments.top is not None or arguments.bottom is not None:
+        columns = corridors(rows, width, arguments.gap, arguments.coverage)
+        scoped = rows
+    else:
+        first, last, columns = table_region(
+            rows, width, arguments.gap, arguments.coverage, arguments.min_columns
+        )
+        scoped = rows[first:last]
+    kept = [
+        (row, cells)
+        for row, cells in ((row, assign(row, columns)) for row in scoped)
+        if sum(1 for cell in cells if cell) >= arguments.min_columns
+    ]
+    widths = {len([cell for cell in cells if cell]) for _row, cells in kept}
+    return {
+        "path": str(target.relative_to(Path.cwd().resolve())),
+        "page": arguments.page,
+        "width": round(width, 2),
+        "height": round(height, 2),
+        "columns": [[round(start, 2), round(end, 2)] for start, end in columns],
+        "rows": [
+            {"top": round(min(word.y0 for word in row), 2), "cells": cells}
+            for row, cells in kept
+        ],
+        # Reported rather than enforced: a row with fewer filled cells than the header is usually
+        # a wrapped line or a merged cell, and the caller has to decide which before using it.
+        "ragged": len(widths) > 1,
+    }
+
+
+def as_csv(payload: dict[str, object]) -> str:
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    for row in payload.get("rows", []):  # type: ignore[union-attr]
+        writer.writerow(row["cells"])
+    return buffer.getvalue()
+
+
+def parser() -> argparse.ArgumentParser:
+    result = argparse.ArgumentParser(
+        prog="garden-pdf-tables",
+        description=(
+            "Read one page of a PDF as a table, from the word positions poppler reports. Run "
+            "--list-rows first on a page that mixes prose and a table, then re-run with --top "
+            "and --bottom set to the table's own vertical extent."
+        ),
+    )
+    result.add_argument("--path", required=True)
+    result.add_argument("--page", type=int, default=1)
+    result.add_argument("--top", type=float, help="ignore words above this y, in PDF points")
+    result.add_argument("--bottom", type=float, help="ignore words below this y, in PDF points")
+    result.add_argument(
+        "--gap",
+        type=float,
+        default=4.0,
+        help="narrowest whitespace corridor that counts as a column boundary, in points",
+    )
+    result.add_argument(
+        "--coverage",
+        type=float,
+        default=0.0,
+        help=(
+            "fraction of the rows allowed to intrude into a column corridor; raise it only for a "
+            "table with a cell that spans columns"
+        ),
+    )
+    result.add_argument("--min-columns", type=int, default=2)
+    result.add_argument("--list-rows", action="store_true")
+    result.add_argument("--format", choices=["json", "csv"], default="json")
+    return result
+
+
+def main() -> int:
+    arguments = parser().parse_args()
+    try:
+        if arguments.page < 1 or arguments.page > 10_000:
+            raise ValueError("Page must be between 1 and 10000")
+        arguments.gap = min(72.0, max(1.0, arguments.gap))
+        arguments.coverage = min(1.0, max(0.0, arguments.coverage))
+        arguments.min_columns = max(1, arguments.min_columns)
+        payload = extract(arguments)
+        if arguments.format == "csv" and not arguments.list_rows:
+            sys.stdout.write(as_csv(payload))
+        else:
+            json.dump(payload, sys.stdout, ensure_ascii=False)
+            sys.stdout.write("\n")
+        return 0
+    except (OSError, ValueError, ET.ParseError, subprocess.TimeoutExpired) as error:
+        json.dump({"error": str(error)}, sys.stderr, ensure_ascii=False)
+        sys.stderr.write("\n")
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

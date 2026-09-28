@@ -105,7 +105,7 @@ describe('the journal this process writes', () => {
 
   /**
    * Without the prefix every one of these sits at the default priority, and
-   * `journalctl -p warning -u athanor-runner` - the first thing anybody runs on a box that is
+   * `journalctl -p warning -u garden-runner` - the first thing anybody runs on a box that is
    * misbehaving - answers that the runner has never had anything to report.
    */
   it('marks the priority for journald, and only when journald is reading', () => {

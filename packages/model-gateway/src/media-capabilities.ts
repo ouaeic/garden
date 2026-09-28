@@ -3,8 +3,8 @@ import type {
   MediaModelOption,
   MediaParameter,
   MediaPriceLine
-} from '@athanor/contracts';
-export type { MediaCapabilities, MediaParameter, MediaPriceLine } from '@athanor/contracts';
+} from '@garden/contracts';
+export type { MediaCapabilities, MediaParameter, MediaPriceLine } from '@garden/contracts';
 export type CatalogMediaModel = MediaModelOption;
 export const mediaRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);

@@ -1,5 +1,5 @@
 {
-  "name": "@athanor/relay-client",
+  "name": "@garden/relay-client",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -18,7 +18,7 @@
     "test": "NODE_OPTIONS=--conditions=development vitest run && NODE_OPTIONS=--conditions=development tsx scripts/relay-roundtrip.mts && NODE_OPTIONS=--conditions=development tsx scripts/relay-bind-refusal.mts"
   },
   "dependencies": {
-    "@athanor/relay": "workspace:*",
+    "@garden/relay": "workspace:*",
     "zod": "4.4.3"
   },
   "devDependencies": {

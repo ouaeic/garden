@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, realpath, rm, symlink, writeFile, readFile, stat } from
 import path from 'node:path';
 import os from 'node:os';
 import { afterEach, expect, it } from 'vitest';
-import { ComputationRequest } from '@athanor/contracts';
+import { ComputationRequest } from '@garden/contracts';
 import { computationLaunch } from './computation-launch.js';
 const roots: string[] = [];
 afterEach(async () => {

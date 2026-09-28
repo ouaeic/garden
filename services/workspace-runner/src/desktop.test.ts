@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
-import { capabilityAudience, signCapabilityToken } from '@athanor/core';
+import { capabilityAudience, signCapabilityToken } from '@garden/core';
 import type { RunnerConfig } from './config.js';
 import type { DisplayViewport } from './desktop-stream.js';
 import { chromiumDriver } from './playwright.js';
@@ -40,7 +40,7 @@ import {
  * screen the agent is looking at is described by neither.
  *
  * The vocabulary is `ATSPI_STATE_*` with the prefix removed and lowercased, which is what
- * `athanor-desktop-bridge.py` emits and what `athanor-desktop-bridge.test.py` pins. Note the two
+ * `garden-desktop-bridge.py` emits and what `garden-desktop-bridge.test.py` pins. Note the two
  * that matter here: a control the user can operate is `sensitive`, and one they cannot simply
  * lacks it - there is no `disabled`; and a field that refuses input is `read_only`, one word with
  * an underscore, because the C name is `ATSPI_STATE_READ_ONLY`.
@@ -93,7 +93,7 @@ const runnerConfig = (workspaceRoot: string, secret: string): RunnerConfig => ({
   RUNNER_SHARED_SECRET: secret,
   WORKSPACE_ROOT: workspaceRoot,
   TAR_EXECUTABLE: '/usr/bin/tar',
-  SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/athanor-snapshot'),
+  SNAPSHOT_EXECUTABLE: path.resolve('../../scripts/garden-snapshot'),
   BROWSER_USE_DESKTOP_DISPLAY: false,
   BROWSER_CPU_NICE: 0,
   MAX_EXECUTION_SECONDS: 30,
@@ -127,7 +127,7 @@ const runnerConfig = (workspaceRoot: string, secret: string): RunnerConfig => ({
  */
 describe('the accessibility bridge, in the language it is written in', () => {
   const interpreter = '/usr/bin/python3';
-  const suite = path.resolve('../../infra/native/athanor-desktop-bridge.test.py');
+  const suite = path.resolve('../../infra/native/garden-desktop-bridge.test.py');
 
   it.runIf(existsSync(interpreter))('passes its own suite', () => {
     const result = spawnSync(interpreter, [suite], { encoding: 'utf8' });
@@ -367,7 +367,7 @@ describe('desktop action policy', () => {
   });
 
   /**
-   * The destructive half of the floor ATHANOR_BLUEPRINT.md:104, docs/AGENT_RUNTIME.md:416 and
+   * The destructive half of the floor GARDEN_BLUEPRINT.md:104, docs/AGENT_RUNTIME.md:416 and
    * docs/CAPABILITIES.md:97 all promise. Until ATH-001 was repaired, `#approvalForCall` turned every
    * verdict here into an approval row, so a benign answer for a control named "Erase" cost nothing
    * and nobody could see that this list only ever knew the transactional verbs. It costs something
@@ -581,23 +581,23 @@ describe('desktop session lifecycle', () => {
   const withSession = async (
     body: (manager: DesktopManager, root: string) => Promise<void>
   ): Promise<void> => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-desktop-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-desktop-'));
     const script = path.join(root, 'session.sh');
     await writeFile(
       script,
       [
         '#!/bin/sh',
         'set -eu',
-        'mkdir -p "$1/.athanor/desktop"',
+        'mkdir -p "$1/.garden/desktop"',
         'printf "DISPLAY=:99\\nXAUTHORITY=/nonexistent/authority\\nDBUS_SESSION_BUS_ADDRESS=unix:path=/dev/null\\n' +
-          'XDG_RUNTIME_DIR=%s\\nATHANOR_BOOT_RES=1600x1000\\nATHANOR_MAX_RES=3840x2160\\n"' +
-          ' "$1" > "$1/.athanor/desktop/environment"',
+          'XDG_RUNTIME_DIR=%s\\nGARDEN_BOOT_RES=1600x1000\\nGARDEN_MAX_RES=3840x2160\\n"' +
+          ' "$1" > "$1/.garden/desktop/environment"',
         'exec sleep 30'
       ].join('\n'),
       { mode: 0o755 }
     );
     const manager = new DesktopManager('/nonexistent/bridge.py', script, [
-      '/usr/local/lib/athanor/athanor-package-helper'
+      '/usr/local/lib/garden/garden-package-helper'
     ]);
     try {
       await body(manager, root);
@@ -649,7 +649,7 @@ describe('desktop session lifecycle', () => {
         { executable: '/usr/bin/sudo', args: ['id'] },
         { executable: 'pkexec', args: ['id'] },
         { executable: '/usr/bin/apt-get', args: ['install', '-y', 'openssh-server'] },
-        { executable: '/usr/local/lib/athanor/athanor-package-helper', args: ['install', 'nmap'] }
+        { executable: '/usr/local/lib/garden/garden-package-helper', args: ['install', 'nmap'] }
       ];
       for (const request of refused)
         await expect(
@@ -679,7 +679,7 @@ describe('desktop session lifecycle', () => {
     await withSession(async (manager, root) => {
       await expect(
         manager.launch('workspace', root, {
-          executable: '/usr/bin/athanor-no-such-desktop-program',
+          executable: '/usr/bin/garden-no-such-desktop-program',
           args: [],
           cwd: 'workspace',
           env: {}
@@ -693,7 +693,7 @@ describe('desktop session lifecycle', () => {
   /*
    * And says what IS here, because the turn that found this tried three editors and concluded the
    * screen was broken. The capability table provisions the desktop's plumbing - X11, xdotool,
-   * wmctrl, xrandr - and no programs to run in it, except the browser athanor installs itself.
+   * wmctrl, xrandr - and no programs to run in it, except the browser garden installs itself.
    */
   it('names the browser it manages when the program asked for is absent', async () => {
     /*
@@ -709,7 +709,7 @@ describe('desktop session lifecycle', () => {
     await withSession(async (manager, root) => {
       const refusal = await manager
         .launch('workspace', root, {
-          executable: '/usr/bin/athanor-no-such-desktop-program',
+          executable: '/usr/bin/garden-no-such-desktop-program',
           args: [],
           cwd: 'workspace',
           env: {}
@@ -771,7 +771,7 @@ describe('the desktop stream socket', () => {
   const SECRET = 'runner-desktop-stream-secret-at-least-32-chars';
 
   const openStream = async (): Promise<{ socket: WebSocket; desktop: RecordingDesktop }> => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'athanor-desktop-stream-'));
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-desktop-stream-'));
     disposers.push(() => rm(workspaceRoot, { recursive: true, force: true }));
     const desktop = new RecordingDesktop();
     const app = await buildServer(runnerConfig(workspaceRoot, SECRET), {
@@ -800,7 +800,7 @@ describe('the desktop stream socket', () => {
     );
     const socket = new WebSocket(
       `${address.replace('http://', 'ws://')}/v1/workspaces/${WORKSPACE}/desktop/stream`,
-      ['athanor-capability', token]
+      ['garden-capability', token]
     );
     disposers.push(async () => socket.close());
     await new Promise<void>((resolve, reject) => {

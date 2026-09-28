@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AthanorError } from './errors.js';
+import { GardenError } from './errors.js';
 import {
   assertSpendAllowed,
   evaluateSpendCaps,
@@ -114,11 +114,11 @@ describe('assertSpendAllowed', () => {
       assertSpendAllowed(decision);
       expect.unreachable('the denial should have thrown');
     } catch (error) {
-      expect(error).toBeInstanceOf(AthanorError);
-      const athanor = error as AthanorError;
-      expect(athanor.code).toBe('spend_cap_reached');
-      expect(athanor.statusCode).toBe(402);
-      expect(athanor.details?.blockedBy).toBe('daily');
+      expect(error).toBeInstanceOf(GardenError);
+      const garden = error as GardenError;
+      expect(garden.code).toBe('spend_cap_reached');
+      expect(garden.statusCode).toBe(402);
+      expect(garden.details?.blockedBy).toBe('daily');
     }
   });
 });

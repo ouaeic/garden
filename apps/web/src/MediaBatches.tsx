@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { MediaBatch } from '@athanor/contracts';
+import type { MediaBatch } from '@garden/contracts';
 import { Film, RefreshCw, Square } from 'lucide-react';
 import { patch, post } from './client';
 import { Button, ErrorNotice } from './ui';

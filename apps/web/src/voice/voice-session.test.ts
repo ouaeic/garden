@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import type { VoiceConnection, VoiceSession, VoiceStartRequest } from '@athanor/contracts';
+import type { VoiceConnection, VoiceSession, VoiceStartRequest } from '@garden/contracts';
 import {
   createVoiceSessionController,
   type VoiceCallbacks,

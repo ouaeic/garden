@@ -23,7 +23,7 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { encryptJson, unwrapDataKey } from '@athanor/core';
+import { encryptJson, unwrapDataKey } from '@garden/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ApiConfig } from '../config.js';
 import { buildServer } from '../server.js';
@@ -57,7 +57,7 @@ interface Harness {
 }
 
 const buildHarness = async (): Promise<Harness> => {
-  const directory = await mkdtemp(join(tmpdir(), 'athanor-tool-opens-'));
+  const directory = await mkdtemp(join(tmpdir(), 'garden-tool-opens-'));
   disposers.push(() => rm(directory, { recursive: true, force: true }));
   // Everything this server would reach for over the network is the workspace runner and the model
   // feed, and this suite reads neither. Nothing here calls a provider or spends anything.
@@ -75,7 +75,7 @@ const buildHarness = async (): Promise<Harness> => {
     DEPLOYMENT_MODE: 'development',
     MODEL_CATALOG_SCOPE: 'reviewed_open_weight',
     CONNECTION_MANIFEST_PATH: join(directory, 'connection.json'),
-    ATHANOR_STATE_PATH: directory,
+    GARDEN_STATE_PATH: directory,
     RELAY_STATE_DIR: join(directory, 'relay'),
     RELAY_LOCAL_HOST: '127.0.0.1',
     RELAY_LOCAL_PORT: 443,
@@ -100,7 +100,7 @@ const buildHarness = async (): Promise<Harness> => {
     PUBLIC_RUNNER_URL: 'ws://127.0.0.1:4300',
     WORKSPACE_IMAGE_REVISION: 'dev',
     WEBAUTHN_RP_ID: 'localhost',
-    WEBAUTHN_RP_NAME: 'athanor Test',
+    WEBAUTHN_RP_NAME: 'garden Test',
     WEBAUTHN_ORIGIN: 'http://localhost:5173',
     ALLOW_INSECURE_DEV_AUTH: true,
     WORKER_ID: 'tool-opens-test-worker',
@@ -181,7 +181,7 @@ const buildHarness = async (): Promise<Harness> => {
             kind: 'user_message',
             summary: 'Encrypted user message event',
             payloadCiphertext: encryptJson(
-              { __athanorEventVersion: 1, summary: 'and now this', payload: {} },
+              { __gardenEventVersion: 1, summary: 'and now this', payload: {} },
               key,
               `task-event:${task.id}`
             )
@@ -197,7 +197,7 @@ const buildHarness = async (): Promise<Harness> => {
           summary: 'Encrypted tool started event',
           payloadCiphertext: encryptJson(
             {
-              __athanorEventVersion: 1,
+              __gardenEventVersion: 1,
               summary: `Running ${call}`,
               payload: { toolCallId: `call-${call}`, tool: call, arguments: {} }
             },

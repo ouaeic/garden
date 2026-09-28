@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { beforeAll, afterAll, describe, expect, it } from 'vitest';
-import { encryptJson, decryptJson } from '@athanor/core';
+import { encryptJson, decryptJson } from '@garden/core';
 import { createDatabase, migrateDatabase } from './database.js';
 import { migrations } from './migrations.js';
 import { DataStore, connectorOperationAad, type ConnectorOperationIdentity } from './store.js';

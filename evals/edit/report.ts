@@ -52,7 +52,7 @@ export const renderQuestions = (): string =>
     '  3. A wrong file is never scored as a round trip. It is scored `X`, or `X-echo` where the',
     '     tool result displays the damaged lines on the same turn.',
     '  4. THIS RIG RUNS NO MODEL. It bounds the cost of each failure; it does not weight them,',
-    '     because nothing in athanor measures how often a model makes each mistake.',
+    '     because nothing in garden measures how often a model makes each mistake.',
     ''
   ].join('\n');
 

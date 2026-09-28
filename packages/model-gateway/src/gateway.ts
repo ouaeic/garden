@@ -1,6 +1,6 @@
-import { runtimeUUID } from '@athanor/core';
+import { runtimeUUID } from '@garden/core';
 
-import { AthanorError, privateDiagnostics, recordPrivateDiagnostic } from '@athanor/core';
+import { GardenError, privateDiagnostics, recordPrivateDiagnostic } from '@garden/core';
 import {
   DiagnosticModelRequest,
   diagnosticModelResponse,
@@ -43,7 +43,7 @@ export class ModelGateway {
   async decide(provider: string, request: DecisionRequest): Promise<DecisionResponse> {
     const adapter = this.#decisions.get(provider);
     if (!adapter)
-      throw new AthanorError(
+      throw new GardenError(
         'decision_route_unavailable',
         'The selected connection does not offer decision inference.',
         409
@@ -114,7 +114,7 @@ export class ModelGateway {
   ): Promise<ModelResponse> {
     const adapter = this.#adapters.get(provider);
     if (!adapter)
-      throw new AthanorError('provider_not_configured', `Provider ${provider} is not configured`);
+      throw new GardenError('provider_not_configured', `Provider ${provider} is not configured`);
     // A long-running task must not die on one transient upstream fault, but replaying a request
     // whose output the owner has already seen would duplicate it, so streaming is watched here
     // rather than trusted to the adapter.

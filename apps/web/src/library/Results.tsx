@@ -1,6 +1,6 @@
 import ScrollRegion from '../ScrollRegion';
 import { useEffect, useRef, useState } from 'react';
-import type { Artifact, Project, ShareRecord, Task, TaskPage, Workspace } from '@athanor/contracts';
+import type { Artifact, Project, ShareRecord, Task, TaskPage, Workspace } from '@garden/contracts';
 import { del, get, patch } from '../client.js';
 import { Button, Dialog, Field } from '../ui.js';
 import {

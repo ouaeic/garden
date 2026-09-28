@@ -1,5 +1,5 @@
 /** Undefined continues the floor; null preserves an explicit read-only decision. */
-import { AUDIO_READ_MAX_SECONDS } from '@athanor/contracts';
+import { AUDIO_READ_MAX_SECONDS } from '@garden/contracts';
 import { mediaQuoteUsd, transcriptionEstimateUsd, MEDIA_APPROVAL_USD } from './media.js';
 import { textValue } from './values.js';
 import { mediaArguments, TranscriptionControls } from './media-controls.js';

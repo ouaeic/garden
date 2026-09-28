@@ -1,5 +1,5 @@
 /**
- * The route-fidelity observation: what athanor's loop actually asks a workspace for.
+ * The route-fidelity observation: what garden's loop actually asks a workspace for.
  *
  * This is the deliverable the rest of the rig rests on. Before it, the set of routes a benchmark
  * shim must implement was a list somebody read off `services/workspace-runner/src/server.ts` and
@@ -104,7 +104,7 @@ export const observe = async (
   const observedPaths = new Set(observed.map((row) => row.route.split(' ')[1] ?? ''));
   return {
     recordedAt: new Date().toISOString(),
-    athanor: identityLabel(runIdentity()),
+    garden: identityLabel(runIdentity()),
     // Read off the harness rather than assumed: its `/surfaces` stub answers with
     // both surfaces AVAILABLE, and the comment there says why - that is the box this rig models.
     // It has to travel with the observation, because a box with both surfaces reaches seven routes

@@ -17,7 +17,7 @@
   </dict>
   <key>NSBonjourServices</key>
   <array>
-    <string>_athanor._tcp</string>
+    <string>_garden._tcp</string>
   </array>
   <key>NSCameraUsageDescription</key>
   <string>garden uses the camera only when you choose to attach a photo to a task on your remote computer.</string>

@@ -1,16 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import {
   assertTimeZone,
-  AthanorError,
+  GardenError,
   evaluateSpendCaps,
   localDayKey,
   readRoutingMetadata,
   roundUsd,
   spendWindowBounds
-} from '@athanor/core';
-import type { EncryptedEnvelope, SpendWindowInput } from '@athanor/core';
-import { DEFAULT_SPEND_WARN_PERCENT } from '@athanor/contracts';
-import type { SpendBucket, SpendDecision, SpendLimits, SpendSummary } from '@athanor/contracts';
+} from '@garden/core';
+import type { EncryptedEnvelope, SpendWindowInput } from '@garden/core';
+import { DEFAULT_SPEND_WARN_PERCENT } from '@garden/contracts';
+import type { SpendBucket, SpendDecision, SpendLimits, SpendSummary } from '@garden/contracts';
 import type { Database } from '../database.js';
 import type { SpendAlertRecord, SpendLimitsRecord } from '../types.js';
 import { iso, json, mapSpendLimits, numericOrNull, optionalText } from './rows.js';
@@ -65,7 +65,7 @@ export const DEFAULT_MONTHLY_CAP_USD = 100;
  * only case this speaks for - `monthly_cap_usd` is NULL for both, and the row's absence is the only
  * thing in the schema that tells them apart.
  *
- * ⚠ Which leaves one writer it cannot see: `athanor price-ceiling set` - renamed from
+ * ⚠ Which leaves one writer it cannot see: `garden price-ceiling set` - renamed from
  * `spend-ceiling`, which is the name to grep for in anything written before the rename - inserts
  * into `spend_limits` in raw SQL to store the two price ceilings, and any row at all takes this
  * function out of the conversation for that owner.
@@ -73,7 +73,7 @@ export const DEFAULT_MONTHLY_CAP_USD = 100;
  * It used to write that row with every money cap NULL, which took this default off a box whose
  * owner only wanted to cap the price per million tokens. It no longer does: its INSERT arm writes
  * `monthly_cap_usd` with the constant above - read out of this file by `default_monthly_cap` in
- * scripts/athanor, so the two cannot come to disagree - and its UPDATE arm leaves an answer already
+ * scripts/garden, so the two cannot come to disagree - and its UPDATE arm leaves an answer already
  * there alone. `daily_cap_usd` and `default_task_cap_usd` stay NULL on that row, which is what both
  * of them mean anyway.
  *
@@ -377,7 +377,7 @@ export class BillingStore {
           )
         ).rows[0];
         if (!call || input.kind !== 'model_inference' || input.state !== 'settled')
-          throw new AthanorError(
+          throw new GardenError(
             'coding_usage_invalid',
             'The coding usage receipt does not belong to this task',
             409
@@ -408,7 +408,7 @@ export class BillingStore {
         !Number.isFinite(input.costUsd) ||
         Number(input.costUsd) < 0
       )
-        throw new AthanorError(
+        throw new GardenError(
           'media_reservation_invalid',
           'Choose a valid provider spend reservation',
           400
@@ -420,7 +420,7 @@ export class BillingStore {
           input.idempotencyKey
         ]);
         if (existing.rows.length)
-          throw new AthanorError(
+          throw new GardenError(
             'media_submission_exists',
             'This media submission already has a reservation; do not submit it again',
             409
@@ -432,7 +432,7 @@ export class BillingStore {
           includeOpenCommitments: true
         });
         if (decision.outcome === 'deny')
-          throw new AthanorError(
+          throw new GardenError(
             'spend_cap_reached',
             'The media reservation exceeds the remaining spending allowance',
             402
@@ -451,7 +451,7 @@ export class BillingStore {
         !Number.isFinite(input.credits) ||
         input.credits < 0
       )
-        throw new AthanorError(
+        throw new GardenError(
           'media_cost_invalid',
           'A media settlement requires a valid cost',
           400
@@ -472,7 +472,7 @@ export class BillingStore {
         ]
       );
       if (updated.rowCount !== 1)
-        throw new AthanorError(
+        throw new GardenError(
           'media_reservation_missing',
           'The media reservation could not be settled',
           409
@@ -518,7 +518,7 @@ export class BillingStore {
         (value) => Number.isFinite(value) && value >= 0
       )
     )
-      throw new AthanorError(
+      throw new GardenError(
         'native_input_usage_invalid',
         'Native input usage must contain finite nonnegative amounts',
         400
@@ -529,7 +529,7 @@ export class BillingStore {
       [input.userId, input.idempotencyKey, input.costUsd, input.credits, input.quantity]
     );
     if (result.rowCount !== 1)
-      throw new AthanorError(
+      throw new GardenError(
         'native_input_usage_missing',
         'The native input reservation could not be settled',
         409

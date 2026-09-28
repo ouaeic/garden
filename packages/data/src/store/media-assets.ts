@@ -1,4 +1,4 @@
-import { AthanorError, type EncryptedEnvelope } from '@athanor/core';
+import { GardenError, type EncryptedEnvelope } from '@garden/core';
 import type { Database } from '../database.js';
 import { BillingStore } from './billing.js';
 import { iso, json } from './rows.js';
@@ -50,7 +50,7 @@ export class MediaAssetStore {
       input.reservationUsd <= 0 ||
       input.reservationUsd > 10_000
     )
-      throw new AthanorError(
+      throw new GardenError(
         'media_asset_approval_required',
         'Approve temporary provider retention and a positive asset reservation',
         409
@@ -61,13 +61,13 @@ export class MediaAssetStore {
         'SELECT id FROM tasks WHERE id=$1 AND user_id=$2 AND workspace_id=$3',
         [input.taskId, input.userId, input.workspaceId]
       );
-      if (!task.rows.length) throw new AthanorError('task_not_found', 'Task not found', 404);
+      if (!task.rows.length) throw new GardenError('task_not_found', 'Task not found', 404);
       const previous = await tx.query(
         "SELECT id FROM provider_media_assets WHERE request_key=$1 OR (user_id=$2 AND task_id=$3 AND request_hash=$4 AND status IN ('submitting','submission_uncertain'))",
         [input.requestKey, input.userId, input.taskId, input.requestHash]
       );
       if (previous.rows.length)
-        throw new AthanorError(
+        throw new GardenError(
           'media_asset_submission_exists',
           'This asset upload already has a submission intent; reconcile it instead of uploading again',
           409
@@ -137,7 +137,7 @@ export class MediaAssetStore {
     costUsd: number;
   }): Promise<MediaAssetRecord | null> {
     if (!Number.isFinite(input.costUsd) || input.costUsd < 0 || input.costUsd > 10_000)
-      throw new AthanorError('media_cost_invalid', 'Choose a valid provider invoice cost', 400);
+      throw new GardenError('media_cost_invalid', 'Choose a valid provider invoice cost', 400);
     return this.database.transaction(async (tx) => {
       const changed = await tx.query(
         "UPDATE provider_media_assets SET status='completed',cost_usd=$3,result_ciphertext=$4::jsonb,updated_at=NOW() WHERE id=$1 AND user_id=$2 AND status IN ('completed','submission_uncertain','submitting') AND cost_usd IS NULL RETURNING *",

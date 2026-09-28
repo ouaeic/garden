@@ -1,4 +1,4 @@
-# The athanor built-in skill library
+# The garden built-in skill library
 
 Every directory here is one skill: a procedure over capability the agent already has. Nothing in
 this library adds a tool, and nothing is ever installed from a registry or a marketplace.
@@ -8,7 +8,7 @@ this library adds a tool, and nothing is ever installed from a registry or a mar
 ```
 skills/<name>/
 ├── SKILL.md        # agentskills.io-conformant front matter + the body the model reads on demand
-├── athanor.yaml    # athanor-only sidecar: capability, verification, lineage
+├── garden.yaml    # garden-only sidecar: capability, verification, lineage
 ├── scripts/        # executable, non-interactive helpers that print JSON to stdout
 ├── references/     # loaded on demand, one level deep only
 └── assets/         # templates and house styles
@@ -16,16 +16,16 @@ skills/<name>/
 
 `SKILL.md` front matter carries **only** specification fields — `name`, `description`, `license`,
 `compatibility`, `allowed-tools`, and a `metadata` map whose values are all flat strings. The
-specification defines `metadata` as a map of string keys to string _values_, so athanor's structured
-declarations live in the `athanor.yaml` sidecar, which other clients ignore.
+specification defines `metadata` as a map of string keys to string _values_, so garden's structured
+declarations live in the `garden.yaml` sidecar, which other clients ignore.
 
-Exactly four metadata keys are used: `athanor.tier`, `athanor.version`, `athanor.risk`,
-`athanor.domain`.
+Exactly four metadata keys are used: `garden.tier`, `garden.version`, `garden.risk`,
+`garden.domain`.
 
 ## What a skill declares it uses
 
 `allowed-tools` in the front matter and `requires.tools` in the sidecar are the same set said twice,
-once in the specification's vocabulary and once in athanor's. They must match: `requires.tools` is
+once in the specification's vocabulary and once in garden's. They must match: `requires.tools` is
 what `openSkill` sends the model as `<skill_grants>`, and a tool the procedure uses but the sidecar
 omits is a step the grants line disowns. A loader test holds them together and checks both against
 the real tool catalogue, so a renamed tool cannot leave a skill pointing at nothing.
@@ -45,7 +45,7 @@ easiest to make here.** Nothing at run time consults `fs.read`, `fs.write`, `net
 `connectors`: what actually bounds a skill is the same approval policy, command policy and account
 separation that bound the agent before the skill was opened, and the only part of the sidecar the
 model is shown is `requires.tools`, rendered as an advisory `<skill_grants>` line. Narrowing these
-fields therefore buys a reviewer's understanding, not a refusal. `scripts/athanor-skill-check`
+fields therefore buys a reviewer's understanding, not a refusal. `scripts/garden-skill-check`
 enforces the two ceilings that are worth enforcing — a non-builtin skill may not claim
 `net.hosts: ['*']` or `spend: metered` — and it does so as a repository lint, which is what it has
 always been.
@@ -58,7 +58,7 @@ the lint exists for a library that lives in a repository, which is this one.
 The sidecar carries nothing else. `schema:`, `lineage.parent` and a `budget:` block of tuned-looking
 millisecond values were all removed in Wave 8 after grepping both directions and finding no reader:
 the body budget is a constant in the loader (`SKILL_BUDGET`, 500 lines / 5,000 tokens / 20 catalog
-words) and in `athanor-skill-check`, not a per-skill number, and a per-skill activation timeout was
+words) and in `garden-skill-check`, not a per-skill number, and a per-skill activation timeout was
 never implemented. A tuned-looking constant is the most convincing thing a dead control can leave
 behind, which is exactly why the loader's own header records having removed the last one.
 
@@ -66,7 +66,7 @@ behind, which is exactly why the loader's own header records having removed the 
 
 Two levels, because full descriptions for the whole library would sit in every prompt:
 
-1. **Catalog line** — `catalog_line` in `athanor.yaml`, at most 20 words, always resident.
+1. **Catalog line** — `catalog_line` in `garden.yaml`, at most 20 words, always resident.
 2. **Body** — the whole of `SKILL.md` below the front matter, injected only when the skill is
    opened.
 
@@ -132,11 +132,11 @@ introduced quietly.
 Three names carry that rule for document work, and a skill uses them rather than the tools
 underneath:
 
-| Name                                        | What it is                                                                                                                            |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `/usr/local/lib/athanor/python/bin/python3` | The one Python. It has python-pptx, python-docx, openpyxl, pandas, matplotlib, Pillow and the pinned pypdf. Plain `python3` does not. |
-| `athanor-office-convert IN OUT`             | The one way an Office file becomes a PDF or a workbook is recalculated. Exits non-zero when the bytes are not there.                  |
-| `athanor-pdf-tables --path F --page N`      | The one way a table comes out of a PDF.                                                                                               |
+| Name                                       | What it is                                                                                                                            |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `/usr/local/lib/garden/python/bin/python3` | The one Python. It has python-pptx, python-docx, openpyxl, pandas, matplotlib, Pillow and the pinned pypdf. Plain `python3` does not. |
+| `garden-office-convert IN OUT`             | The one way an Office file becomes a PDF or a workbook is recalculated. Exits non-zero when the bytes are not there.                  |
+| `garden-pdf-tables --path F --page N`      | The one way a table comes out of a PDF.                                                                                               |
 
 Anything a new skill names in `requires.binaries` must already be in
 `services/workspace-runner/src/toolchain.ts`, installed by `scripts/install-native.sh`, and
@@ -148,7 +148,7 @@ dependency the box does not have — which is exactly how this library drifted a
 once already.
 
 A second test, `apps/worker/src/skills.test.ts`, holds the same declarations against
-`scripts/athanor-host.sh` — the one table that says what each of the four supported distribution
+`scripts/garden-host.sh` — the one table that says what each of the four supported distribution
 families installs — **column by column**. A `-` in any family's column is an invisible degradation
 rather than a missing feature: the skill still loads, still names the command, and fails on that
 family only. Where a family genuinely has no package the degradation is recorded in that test by
@@ -157,7 +157,7 @@ name and asserted exactly, so a gap can shrink by intent and can never grow by a
 ## Checking the library
 
 ```
-scripts/athanor-skill-check                          # structural lint over every skill directory
-pnpm --filter @athanor/worker -s test                # loader and library invariants
-pnpm --filter @athanor/workspace-runner -s test      # toolchain chain, and documents built and measured
+scripts/garden-skill-check                          # structural lint over every skill directory
+pnpm --filter @garden/worker -s test                # loader and library invariants
+pnpm --filter @garden/workspace-runner -s test      # toolchain chain, and documents built and measured
 ```

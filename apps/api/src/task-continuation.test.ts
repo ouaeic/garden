@@ -2,9 +2,9 @@ import Fastify from 'fastify';
 import { registerQuestionRoutes } from './routes/questions.js';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
-import { decryptJson, encryptJson, wrapDataKey } from '@athanor/core';
-import type { TaskRecord } from '@athanor/data';
+import { createDatabase, DataStore, migrateDatabase } from '@garden/data';
+import { decryptJson, encryptJson, wrapDataKey } from '@garden/core';
+import type { TaskRecord } from '@garden/data';
 import type { RouteContext } from './http/server-context.js';
 import {
   continueTaskOperation,

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ModelResponse } from '@athanor/model-gateway';
-import type { DataStore } from '@athanor/data';
+import type { ModelResponse } from '@garden/model-gateway';
+import type { DataStore } from '@garden/data';
 import { delegateBudget, recordModelStepUsage } from './billing.js';
 
 it('records distinct provider generations at a resumed step while replaying one receipt idempotently', async () => {

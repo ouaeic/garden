@@ -1,10 +1,10 @@
-import type { ModelRelease } from '@athanor/contracts';
+import type { ModelRelease } from '@garden/contracts';
 import { reconcileCodingMission } from './coding-mission-loop.js';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { CodingMissionStart } from '@athanor/contracts';
-import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
-import { encryptJson, generateDataKey, wrapDataKey } from '@athanor/core';
+import { CodingMissionStart } from '@garden/contracts';
+import { createDatabase, DataStore, migrateDatabase } from '@garden/data';
+import { encryptJson, generateDataKey, wrapDataKey } from '@garden/core';
 import {
   executeCodingMission,
   parkCodingMissionWait,

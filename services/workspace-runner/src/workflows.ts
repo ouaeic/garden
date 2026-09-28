@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { WorkflowRequest, type WorkflowRun } from '@athanor/contracts';
+import { WorkflowRequest, type WorkflowRun } from '@garden/contracts';
 import {
   assertUserDataPath,
   createWorkspaceFile,

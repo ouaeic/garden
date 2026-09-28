@@ -3,9 +3,9 @@
 use super::*;
 use url::Url;
 
-const REMOTE_COOKIE: &str = "__Secure-athanor-preview-access";
-const LOCAL_COOKIE: &str = "athanor_native_preview_access";
-const BASE_PATH: &str = "/__athanor/preview";
+const REMOTE_COOKIE: &str = "__Secure-garden-preview-access";
+const LOCAL_COOKIE: &str = "garden_native_preview_access";
+const BASE_PATH: &str = "/__garden/preview";
 
 #[derive(Default)]
 pub(super) struct PreviewState {
@@ -98,12 +98,12 @@ pub(super) async fn observe(
     let owner = canonical_origin(active);
     let target = response
         .headers()
-        .get("x-athanor-preview-base-url")
+        .get("x-garden-preview-base-url")
         .and_then(|value| value.to_str().ok())
         .and_then(|value| checked_target(value, owner));
     let relay = response
         .headers()
-        .get("x-athanor-relay-preview-origin")
+        .get("x-garden-relay-preview-origin")
         .and_then(|value| value.to_str().ok())
         .and_then(checked_relay);
     *state.preview.target.write().await = target.map(|remote| Target {
@@ -206,7 +206,7 @@ fn transport_url(active: &ActiveServer, connection: &Connection, canonical: &Url
 fn owner_cookie(name: &str) -> bool {
     matches!(
         name,
-        LOCAL_SESSION_COOKIE | SERVER_SESSION_COOKIE | "athanor_session"
+        LOCAL_SESSION_COOKIE | SERVER_SESSION_COOKIE | "garden_session"
     )
 }
 
@@ -218,7 +218,7 @@ fn request_headers(input: &HeaderMap, remote: &Url) -> HeaderMap {
                 name.as_str(),
                 "host" | "content-length" | "authorization" | "cookie" | "origin" | "referer"
             )
-            || name.as_str().starts_with("x-athanor-")
+            || name.as_str().starts_with("x-garden-")
             || name.as_str().starts_with("x-forwarded-")
             || name.as_str() == "forwarded"
         {
@@ -320,7 +320,7 @@ fn response(
         for (name, value) in upstream.headers() {
             if is_hop_by_hop(name)
                 || name == CONTENT_LENGTH
-                || name.as_str().starts_with("x-athanor-")
+                || name.as_str().starts_with("x-garden-")
             {
                 continue;
             }
@@ -482,8 +482,8 @@ async fn websocket(
 mod tests {
     use super::*;
     const OWNER: &str = "https://garden.test";
-    const PREVIEW: &str = "https://garden.test:8443/__athanor/preview";
-    const SLUG_PATH: &str = "/__athanor/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/";
+    const PREVIEW: &str = "https://garden.test:8443/__garden/preview";
+    const SLUG_PATH: &str = "/__garden/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/";
     fn connection_fixture() -> Connection {
         Connection {
             remote: Url::parse(PREVIEW).unwrap(),
@@ -551,7 +551,7 @@ mod tests {
         let headers = request_headers(&HeaderMap::new(), &canonical);
         assert_eq!(headers.get(HOST).unwrap(), "garden.test:8443");
         let distinct = Url::parse(
-            "https://apps.test:8443/__athanor/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/",
+            "https://apps.test:8443/__garden/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/",
         )
         .unwrap();
         assert_eq!(
@@ -571,7 +571,7 @@ mod tests {
             profile,
         };
         let canonical = Url::parse(
-            "https://garden.test:9443/__athanor/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/",
+            "https://garden.test:9443/__garden/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/",
         )
         .unwrap();
         let mut connection = connection_fixture();
@@ -621,8 +621,8 @@ mod tests {
         assert!(checked_target(PREVIEW, OWNER).is_some());
         let denied = [
             OWNER.to_owned() + BASE_PATH,
-            "http://garden.test:8443/__athanor/preview".into(),
-            "https://user@garden.test:8443/__athanor/preview".into(),
+            "http://garden.test:8443/__garden/preview".into(),
+            "https://user@garden.test:8443/__garden/preview".into(),
             format!("{PREVIEW}?target=other"),
             format!("{PREVIEW}#part"),
             "https://garden.test:8443/v1".into(),
@@ -641,11 +641,11 @@ mod tests {
         let denied_paths = [
             "/v1/bootstrap",
             "/",
-            "/__athanor/runner/",
-            "/__athanor/preview/invalid/",
+            "/__garden/runner/",
+            "/__garden/preview/invalid/",
             "//evil.test/path",
-            "/__athanor/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/../../v1/bootstrap",
-            "/__athanor/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/%2e%2e/%2e%2e/v1/bootstrap",
+            "/__garden/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/../../v1/bootstrap",
+            "/__garden/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/%2e%2e/%2e%2e/v1/bootstrap",
         ];
         assert!(!denied_paths.is_empty());
         for value in denied_paths {
@@ -662,34 +662,34 @@ mod tests {
     #[test]
     fn native_preview_never_transports_owner_credentials() {
         let mut input = HeaderMap::new();
-        input.insert(COOKIE, HeaderValue::from_static("athanor_native_session=owner; __Host-athanor_session=other; athanor_session=dev; athanor_native_preview_access=grant; theme=dark"));
+        input.insert(COOKIE, HeaderValue::from_static("garden_native_session=owner; __Host-garden_session=other; garden_session=dev; garden_native_preview_access=grant; theme=dark"));
         input.append(
             COOKIE,
-            HeaderValue::from_static("__Secure-athanor-preview-access=spoof; colour=green"),
+            HeaderValue::from_static("__Secure-garden-preview-access=spoof; colour=green"),
         );
         input.insert("authorization", HeaderValue::from_static("Bearer owner"));
-        input.insert("x-athanor-client", HeaderValue::from_static("forged"));
+        input.insert("x-garden-client", HeaderValue::from_static("forged"));
         input.insert("x-forwarded-host", HeaderValue::from_static("garden.test"));
         input.insert(ORIGIN, HeaderValue::from_static("http://localhost:41001"));
         let headers = request_headers(&input, &Url::parse(PREVIEW).unwrap());
         assert_eq!(
             headers.get(COOKIE).unwrap(),
-            "__Secure-athanor-preview-access=grant; theme=dark; colour=green"
+            "__Secure-garden-preview-access=grant; theme=dark; colour=green"
         );
         assert!(!headers.contains_key("authorization"));
-        assert!(!headers.contains_key("x-athanor-client"));
+        assert!(!headers.contains_key("x-garden-client"));
         assert!(!headers.contains_key("x-forwarded-host"));
         assert_eq!(headers.get(ORIGIN).unwrap(), "https://garden.test:8443");
         for name in [
             LOCAL_SESSION_COOKIE,
             SERVER_SESSION_COOKIE,
-            "athanor_session",
+            "garden_session",
             LOCAL_COOKIE,
         ] {
             assert!(response_cookie(&format!("{name}=changed; Path=/; HttpOnly")).is_none());
         }
-        assert_eq!(response_cookie("__Secure-athanor-preview-access=grant; Path=/__athanor/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; Secure; HttpOnly; SameSite=Lax; Domain=garden.test").unwrap(),
-            "athanor_native_preview_access=grant; Path=/__athanor/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; HttpOnly; SameSite=Lax");
+        assert_eq!(response_cookie("__Secure-garden-preview-access=grant; Path=/__garden/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; Secure; HttpOnly; SameSite=Lax; Domain=garden.test").unwrap(),
+            "garden_native_preview_access=grant; Path=/__garden/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; HttpOnly; SameSite=Lax");
     }
 
     #[test]
@@ -717,9 +717,9 @@ mod tests {
             reqwest::Response::from(
                 axum::http::Response::builder()
                     .status(status)
-                    .header("x-athanor-preview-base-url", PREVIEW)
+                    .header("x-garden-preview-base-url", PREVIEW)
                     .header(
-                        "x-athanor-relay-preview-origin",
+                        "x-garden-relay-preview-origin",
                         "https://box.relay.test:18443",
                     )
                     .body("metadata")
@@ -788,9 +788,9 @@ mod tests {
         let upstream = reqwest::Response::from(axum::http::Response::builder()
             .header("content-security-policy", format!("frame-ancestors {OWNER}; object-src 'none'"))
             .header("content-security-policy", "script-src 'self'; base-uri 'self'")
-            .header("set-cookie", "__Secure-athanor-preview-access=grant; Path=/__athanor/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; HttpOnly; Secure; SameSite=Lax")
-            .header("set-cookie", "athanor_native_session=poison; Path=/")
-            .header("x-athanor-native-client", "1")
+            .header("set-cookie", "__Secure-garden-preview-access=grant; Path=/__garden/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; HttpOnly; Secure; SameSite=Lax")
+            .header("set-cookie", "garden_native_session=poison; Path=/")
+            .header("x-garden-native-client", "1")
             .header("location", format!("https://garden.test:8443{SLUG_PATH}"))
             .body("module and asset bytes").unwrap());
         let response = response(upstream, &connection, OWNER, "http://localhost:41000");
@@ -808,7 +808,7 @@ mod tests {
             ]
         );
         assert_eq!(response.headers().get_all(SET_COOKIE).iter().count(), 1);
-        assert!(!response.headers().contains_key("x-athanor-native-client"));
+        assert!(!response.headers().contains_key("x-garden-native-client"));
         assert_eq!(
             response.headers().get(LOCATION).unwrap(),
             format!("http://localhost:41001{SLUG_PATH}").as_str()

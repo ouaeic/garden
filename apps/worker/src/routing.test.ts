@@ -1,6 +1,6 @@
-import type { MediaModelOption, ModelRelease } from '@athanor/contracts';
-import type { RoutingMetadata } from '@athanor/core';
-import type { ModelRequest } from '@athanor/model-gateway';
+import type { MediaModelOption, ModelRelease } from '@garden/contracts';
+import type { RoutingMetadata } from '@garden/core';
+import type { ModelRequest } from '@garden/model-gateway';
 import { describe, expect, it } from 'vitest';
 import {
   compactionEventSummary,

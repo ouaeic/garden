@@ -8,7 +8,7 @@
  * 99.4% idle with the published preview still serving, because a preview is an HTTP port and does
  * not need a browser at all.
  *
- * **Niceness rather than a quota, deliberately.** `athanor-runner.service` already argues this in
+ * **Niceness rather than a quota, deliberately.** `garden-runner.service` already argues this in
  * its own unit file - "a quota would slow legitimate work even on an idle machine, while a weight
  * gives the agent the whole processor when nothing else wants it" - and that reasoning holds here.
  * What it does not do on its own is help, because the browser lives *inside* the runner's cgroup:
@@ -18,7 +18,7 @@
  *
  * A cgroup would be the tidier instrument and is not available: cgroup v2 refuses to let a cgroup
  * hold processes once a controller is enabled for its children, so putting the browser in
- * `athanor-runner.service/browser` means moving the runner itself into a sibling first - a fight
+ * `garden-runner.service/browser` means moving the runner itself into a sibling first - a fight
  * with systemd over a tree it owns, for a bound `setPriority` already gives.
  *
  * Everything here is best-effort and silent on failure. A browser that could not be niced is a

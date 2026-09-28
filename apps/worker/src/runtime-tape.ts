@@ -3,7 +3,7 @@ import {
   withRuntimeObservations,
   type RuntimeObservations,
   type PrivateDiagnosticSink
-} from '@athanor/core';
+} from '@garden/core';
 import type { RuntimeCodec } from './runtime-codec.js';
 
 export type RuntimeEvent = {

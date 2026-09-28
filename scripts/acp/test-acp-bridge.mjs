@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 /**
- * What `athanor acp` promises an ACP client, driven end to end against stand-ins for both halves.
+ * What `garden acp` promises an ACP client, driven end to end against stand-ins for both halves.
  *
  * A protocol implementation nobody has driven is the shape this programme keeps catching: something
  * computed, shipped, and never wired to a caller. So this does not unit-test the mapper. It spawns
- * the REAL `scripts/athanor acp` arm as a subprocess, speaks the CLIENT half of ACP down its stdin
+ * the REAL `scripts/garden acp` arm as a subprocess, speaks the CLIENT half of ACP down its stdin
  * and reads the agent half off its stdout, and answers its HTTP calls from a stand-in API on a
  * loopback port that returns the shapes `apps/api` actually returns.
  *
  * Two stand-ins, because the bridge sits between them and every defect worth catching is a
  * disagreement between the two. The precedent is `scripts/test-task-cli.mjs`, which does the same
- * for `athanor task` and says the same thing about what it cannot prove: this is a stand-in, so it
+ * for `garden task` and says the same thing about what it cannot prove: this is a stand-in, so it
  * stays green if the API changes shape underneath it. `scripts/live-drill.mjs` is the other half,
  * and it costs money.
  *
@@ -29,7 +29,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const cli = path.join(repositoryRoot, 'scripts', 'athanor');
+const cli = path.join(repositoryRoot, 'scripts', 'garden');
 // Shaped like the real thing: `auth-hook.ts` accepts /^oc_live_[A-Za-z0-9_-]{40,80}$/, and the
 // bridge checks the same pattern before it will put the value in an Authorization header.
 const TOKEN = `oc_live_${'a'.repeat(43)}`;
@@ -67,7 +67,7 @@ const event = (sequence, kind, payload, summary = '') => ({
 });
 
 /**
- * A stand-in athanor API.
+ * A stand-in garden API.
  *
  * `script` is a list of what each successive GET /v1/tasks/:id should answer, so a test can walk a
  * task from running to whatever ending it is about. `events` is keyed by the `after` cursor, which
@@ -123,11 +123,11 @@ const startClient = (api, extraArguments = [], environment = {}) => {
       cwd: repositoryRoot,
       env: {
         ...process.env,
-        ATHANOR_API: api.base,
-        ATHANOR_TOKEN: TOKEN,
-        // No /etc/athanor to fall back to, so a case that clears ATHANOR_TOKEN really has none.
-        ATHANOR_TOKEN_FILE: path.join(repositoryRoot, 'scripts', 'acp', 'no-such-token'),
-        ATHANOR_ACP_POLL_SECONDS: '0.05',
+        GARDEN_API: api.base,
+        GARDEN_TOKEN: TOKEN,
+        // No /etc/garden to fall back to, so a case that clears GARDEN_TOKEN really has none.
+        GARDEN_TOKEN_FILE: path.join(repositoryRoot, 'scripts', 'acp', 'no-such-token'),
+        GARDEN_ACP_POLL_SECONDS: '0.05',
         ...environment
       },
       stdio: ['pipe', 'pipe', 'pipe']
@@ -258,7 +258,7 @@ const openSession = async (client) => {
     assert.equal(ready.result.agentCapabilities.promptCapabilities.audio, false);
   });
   check('session/new returns a session id', () => {
-    assert.match(opened.result.sessionId, /^athanor-acp-/);
+    assert.match(opened.result.sessionId, /^garden-acp-/);
   });
   /*
    * The floor, stated as a shape rather than as a promise: a client cannot set a mode it was never
@@ -328,8 +328,8 @@ const openSession = async (client) => {
   check('a finished turn stops with end_turn', () => {
     assert.equal(turn.result.stopReason, 'end_turn');
   });
-  check('the turn reports which athanor task ran it', () => {
-    assert.equal(turn.result._meta.athanor.taskId, 'task-1111');
+  check('the turn reports which garden task ran it', () => {
+    assert.equal(turn.result._meta.garden.taskId, 'task-1111');
   });
   check('the streamed answer arrives once, not twice', () => {
     const text = streamedText(client.notifications);
@@ -449,7 +449,7 @@ const openSession = async (client) => {
   check('a cancelled turn stops with cancelled, as the specification requires', () => {
     assert.equal(answered.result.stopReason, 'cancelled');
   });
-  check('session/cancel actually cancelled the athanor task', () => {
+  check('session/cancel actually cancelled the garden task', () => {
     assert.ok(
       api.requests.some((entry) => entry.path === '/v1/tasks/task-1111/cancel'),
       'nothing cancelled the task'
@@ -514,7 +514,7 @@ const openSession = async (client) => {
     assert.equal(turn.result.stopReason, 'refusal');
   });
   check('the parked turn says it is parked, in a field and in words', () => {
-    assert.equal(turn.result._meta.athanor.parked, 'awaiting_approval');
+    assert.equal(turn.result._meta.garden.parked, 'awaiting_approval');
     assert.match(streamedText(client.notifications), /parked rather than finished/);
     assert.match(streamedText(client.notifications), /install ripgrep/);
   });
@@ -560,7 +560,7 @@ const openSession = async (client) => {
   });
   /*
    * THE CRUX, as an assertion. ACP's PermissionOptionKind has four values and this offers two.
-   * `allow_always` is the one that matters: athanor has nowhere to keep a standing decision -
+   * `allow_always` is the one that matters: garden has nowhere to keep a standing decision -
    * `POST /v1/approvals/:id/:decision` resolves one approval and consults no rule table - so a
    * client handed `allow_always` would reasonably stop asking its user, and from that moment a
    * toggle in somebody's editor is answering every card instead of the owner.
@@ -573,7 +573,7 @@ const openSession = async (client) => {
   client.reply(asked.id, { outcome: { outcome: 'selected', optionId: 'approve' } });
   const answered = await turn;
 
-  check('the client decision reaches athanor own approval route', () => {
+  check('the client decision reaches garden own approval route', () => {
     const decided = api.requests.find((entry) => entry.path === '/v1/approvals/ap-1/approve');
     assert.ok(decided, 'the approval was never answered against the API');
     assert.equal(decided.method, 'POST');
@@ -724,7 +724,7 @@ const openSession = async (client) => {
 
 {
   const api = await startApi({ route: () => ({ body: {} }) });
-  const client = startClient(api, [], { ATHANOR_TOKEN: '' });
+  const client = startClient(api, [], { GARDEN_TOKEN: '' });
   await openSession(client);
   const session = (await client.request('session/new', { cwd: '/x', mcpServers: [] })).result
     .sessionId;
@@ -736,7 +736,7 @@ const openSession = async (client) => {
   check('a prompt with no token is refused with authentication required', () => {
     assert.ok(turn.error);
     assert.equal(turn.error.code, -32000);
-    assert.match(turn.error.message, /ATHANOR_TOKEN/);
+    assert.match(turn.error.message, /GARDEN_TOKEN/);
   });
   check('a turn with no token never reached the API', () => {
     assert.deepEqual(api.requests, []);
@@ -770,14 +770,14 @@ const openSession = async (client) => {
 
   check('a watch that ran out does not report end_turn', () => {
     assert.equal(turn.result.stopReason, 'refusal');
-    assert.equal(turn.result._meta.athanor.parked, 'still_running');
+    assert.equal(turn.result._meta.garden.parked, 'still_running');
   });
   check('it says the task is still running and still spending', () => {
-    assert.equal(turn.result._meta.athanor.stillSpending, true);
+    assert.equal(turn.result._meta.garden.stillSpending, true);
     assert.match(streamedText(client.notifications), /STILL RUNNING AND STILL SPENDING/);
   });
   check('it names the command that stops it', () => {
-    assert.match(streamedText(client.notifications), /athanor task cancel task-1111/);
+    assert.match(streamedText(client.notifications), /garden task cancel task-1111/);
   });
 
   await client.close();
@@ -943,7 +943,7 @@ const openSession = async (client) => {
 
 if (failures.length) {
   for (const failure of failures) process.stderr.write(`  ${failure}\n`);
-  process.stderr.write(`athanor acp: ${failures.length} of ${checks} checks failed\n`);
+  process.stderr.write(`garden acp: ${failures.length} of ${checks} checks failed\n`);
   process.exit(1);
 }
 process.stdout.write(

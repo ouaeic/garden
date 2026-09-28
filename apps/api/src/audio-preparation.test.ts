@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import type * as ChildProcess from 'node:child_process';
 import { promisify } from 'node:util';
 import { describe, expect, it, vi } from 'vitest';
-import { DICTATION_MAX_BYTES } from '@athanor/contracts';
+import { DICTATION_MAX_BYTES } from '@garden/contracts';
 import {
   decodeDictationBase64,
   dictationDecoder,

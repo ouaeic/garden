@@ -1,0 +1,49 @@
+id: pdf-assembly
+version: 2.1.0
+catalog_line: 'Merge, split, stamp, redact and encrypt PDFs, and fill AcroForm fields safely.'
+
+lineage:
+  origin: builtin
+  approved_by: null
+  approved_at: null
+
+requires:
+  tools: [shell, file_read, file_write, files_list, image_read, publish_artifact, document_read]
+  binaries:
+    [
+      qpdf,
+      pdfinfo,
+      pdftoppm,
+      pdftotext,
+      gs,
+      img2pdf,
+      magick,
+      /usr/local/lib/garden/python/bin/python3
+    ]
+
+capability:
+  fs.read: ['$WORKSPACE/**']
+  fs.write: ['$WORKSPACE/**', '$TMP/**']
+  net.hosts: []
+  exec:
+    [
+      qpdf,
+      pdfinfo,
+      pdftotext,
+      pdftoppm,
+      gs,
+      img2pdf,
+      magick,
+      typst,
+      /usr/local/lib/garden/python/bin/python3
+    ]
+  connectors: []
+  spend: none
+
+verify:
+  - run: 'qpdf --check out.pdf'
+    assert: 'exits 0 with no error lines'
+  - run: 'pdfinfo out.pdf'
+    assert: 'page count equals the intended arithmetic'
+  - check: 'Filled field values read back identical to the plan and are visible in the rendered page.'
+  - check: 'For redaction, the removed string is absent from pdftotext output.'

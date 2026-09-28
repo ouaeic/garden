@@ -1,9 +1,5 @@
 import type { FastifyRequest } from 'fastify';
-import {
-  requireCapability,
-  verifyCapabilityToken,
-  type CapabilityTokenClaims
-} from '@athanor/core';
+import { requireCapability, verifyCapabilityToken, type CapabilityTokenClaims } from '@garden/core';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -31,7 +27,7 @@ export const authenticateRunnerRequest = (secret: string) => {
     const header = request.headers.authorization;
     const protocols =
       request.headers['sec-websocket-protocol']?.split(',').map((value) => value.trim()) ?? [];
-    const protocolToken = protocols[0] === 'athanor-capability' ? protocols[1] : undefined;
+    const protocolToken = protocols[0] === 'garden-capability' ? protocols[1] : undefined;
     const token = header?.startsWith('Bearer ') ? header.slice('Bearer '.length) : protocolToken;
     if (!token) throw new Error('Missing runner capability token');
     // The audience is the method and path the token was minted for. Passing it here is what makes

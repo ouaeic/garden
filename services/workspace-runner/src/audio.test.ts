@@ -14,7 +14,7 @@ afterEach(async () => {
 });
 
 const toolsBin = (root: string): string =>
-  path.join(root, 'workspace', '.athanor', 'tools', 'node_modules', '.bin');
+  path.join(root, 'workspace', '.garden', 'tools', 'node_modules', '.bin');
 
 /**
  * A workspace with the host's own ffmpeg linked into a directory the test names explicitly.
@@ -28,7 +28,7 @@ const toolsBin = (root: string): string =>
  * against is asserted below, by planting decoys and watching them not run.
  */
 const workspaceWithFfmpeg = async (): Promise<string | null> => {
-  const root = await mkdtemp(path.join(tmpdir(), 'athanor-audio-'));
+  const root = await mkdtemp(path.join(tmpdir(), 'garden-audio-'));
   roots.push(root);
   await mkdir(path.join(root, 'workspace'), { recursive: true });
   const bin = toolsBin(root);
@@ -147,7 +147,7 @@ describe('preparing a recording the owner has', () => {
     // the reading path uses, so what is asserted is a real file rather than a fixture's idea of one.
     const source = path.join(root, 'workspace', 'memo.m4a');
     const made = spawnSync(
-      path.join(root, 'workspace', '.athanor', 'tools', 'node_modules', '.bin', 'ffmpeg'),
+      path.join(root, 'workspace', '.garden', 'tools', 'node_modules', '.bin', 'ffmpeg'),
       ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=12', '-ac', '2', source],
       { encoding: 'utf8' }
     );
@@ -209,7 +209,7 @@ describe('preparing a recording the owner has', () => {
   }, 30_000);
 
   it('says which binary is missing rather than failing as a bad file', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-audio-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-audio-'));
     roots.push(root);
     await mkdir(path.join(root, 'workspace'), { recursive: true });
     await writeFile(path.join(root, 'workspace', 'memo.m4a'), 'x');
@@ -230,12 +230,12 @@ describe('preparing a recording the owner has', () => {
  *
  * ffprobe and ffmpeg are spawned by the runner's own account, with `shell: false` and no sandbox in
  * front, so whichever file answers to those names runs unconfined against the owner's recording.
- * Both directories planted here are ones `scripts/athanor-sandbox` grants the agent write on - the
+ * Both directories planted here are ones `scripts/garden-sandbox` grants the agent write on - the
  * workspace's own tool bin, which led `agentSearchPath`, and `$HOME/.local/bin` inside `.home`.
  */
 describe('a helper the runner spawns as itself', () => {
   const plantedDecoys = async (): Promise<{ root: string; marker: string; bin: string }> => {
-    const root = await mkdtemp(path.join(tmpdir(), 'athanor-audio-decoy-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'garden-audio-decoy-'));
     roots.push(root);
     await mkdir(path.join(root, 'workspace'), { recursive: true });
     await writeFile(path.join(root, 'workspace', 'memo.m4a'), 'x');

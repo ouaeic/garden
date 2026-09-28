@@ -1,4 +1,4 @@
-import type { DesktopHolder } from '@athanor/contracts';
+import type { DesktopHolder } from '@garden/contracts';
 
 /**
  * Who holds the machine, and the one object that answers it.

@@ -1,6 +1,6 @@
-import { TaskPresentation, deliveryFilePath, mediaDeliveryState } from '@athanor/contracts';
-import type { Artifact } from '@athanor/contracts';
-import { AthanorError, decryptJson, unwrapDataKey } from '@athanor/core';
+import { TaskPresentation, deliveryFilePath, mediaDeliveryState } from '@garden/contracts';
+import type { Artifact } from '@garden/contracts';
+import { GardenError, decryptJson, unwrapDataKey } from '@garden/core';
 import { TaskEvidenceReader, PresentationAvailability } from '../task-evidence.js';
 import { downloadSignal, sendDownload } from '../download-response.js';
 import { requireUser } from '../http/auth-hook.js';
@@ -30,10 +30,10 @@ export const registerTaskPresentationRoutes = (context: RouteContext): void => {
     async (request, reply) => {
       const user = requireUser(request.user);
       const task = await store.getTask(user.id, request.params.taskId);
-      if (!task) throw new AthanorError('task_not_found', 'Task not found');
+      if (!task) throw new GardenError('task_not_found', 'Task not found');
       const workspace = await store.getWorkspace(user.id, task.workspaceId);
       if (!workspace?.wrappedKey)
-        throw new AthanorError('workspace_not_found', 'Workspace not found');
+        throw new GardenError('workspace_not_found', 'Workspace not found');
       const key = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
       const execution = await store.getProjectExecution(user.id, task.id);
       const sourceWorkspace =
@@ -235,10 +235,9 @@ export const registerTaskPresentationRoutes = (context: RouteContext): void => {
   app.get<{ Params: { taskId: string } }>('/v1/tasks/:taskId/bundle', async (request, reply) => {
     const user = requireUser(request.user);
     const task = await store.getTask(user.id, request.params.taskId);
-    if (!task) throw new AthanorError('task_not_found', 'Task not found');
+    if (!task) throw new GardenError('task_not_found', 'Task not found');
     const workspace = await store.getWorkspace(user.id, task.workspaceId);
-    if (!workspace?.wrappedKey)
-      throw new AthanorError('workspace_not_found', 'Workspace not found');
+    if (!workspace?.wrappedKey) throw new GardenError('workspace_not_found', 'Workspace not found');
     const key = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
     const { events } = await evidenceReader.read(task.id, key);
     const planRecord = await store.getLatestTaskPlan(task.id);
@@ -253,7 +252,7 @@ export const registerTaskPresentationRoutes = (context: RouteContext): void => {
       )
       .join('\n\n');
     if ((!paths.length && !intended.directories.length) || paths.length > 1_000)
-      throw new AthanorError(
+      throw new GardenError(
         'bundle_unavailable',
         'No bounded set of source files is recorded for this task',
         404

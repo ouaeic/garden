@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { readFile, readdir, rm } from 'node:fs/promises';
 import { z } from 'zod';
-import { ProjectGitExport, ProjectGitExportInput } from '@athanor/contracts';
+import { ProjectGitExport, ProjectGitExportInput } from '@garden/contracts';
 import type { ProjectGit } from './project-git.js';
 import { durableJson, syncDirectory } from './project-version-files.js';
 import { acquireDirectoryReference } from './project-reference-lock.js';

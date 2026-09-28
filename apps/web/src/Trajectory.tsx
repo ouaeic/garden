@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { GitBranch } from 'lucide-react';
-import type { Task, TaskEvent, TaskRewindPreview, RewindScope } from '@athanor/contracts';
+import type { Task, TaskEvent, TaskRewindPreview, RewindScope } from '@garden/contracts';
 import { get, post } from './client';
 import { data, eventText } from './model';
 import MessageAttachmentList from './MessageAttachmentList';

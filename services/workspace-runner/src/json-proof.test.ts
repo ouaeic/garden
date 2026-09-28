@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { JsonProof } from '@athanor/contracts';
+import { JsonProof } from '@garden/contracts';
 import { compareJson, JSON_PROOF_MAX_BYTES, proveJson } from './json-proof.js';
 
 describe('exact JSON evidence', () => {
@@ -102,7 +102,7 @@ describe('exact JSON evidence', () => {
     await writeFile(path.join(root, 'private.json'), JSON.stringify(source));
     await symlink(path.join(root, 'private.json'), path.join(root, 'workspace/result.json'));
     await expect(proveJson(root, { path: 'workspace/result.json', json })).rejects.toThrow();
-    await expect(proveJson(root, { path: '.athanor/private.json', json })).rejects.toThrow();
+    await expect(proveJson(root, { path: '.garden/private.json', json })).rejects.toThrow();
     await expect(proveJson(root, { path: '../other/result.json', json })).rejects.toThrow();
   });
 });

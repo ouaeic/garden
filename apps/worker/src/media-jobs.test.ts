@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { decryptJson, encryptJson, sha256, wrapDataKey } from '@athanor/core';
-import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
-import { MAX_AGENT_NOTIFICATIONS_PER_TASK } from '@athanor/contracts';
-import { VideoSubmissionUncertainError } from '@athanor/model-gateway';
+import { decryptJson, encryptJson, sha256, wrapDataKey } from '@garden/core';
+import { createDatabase, DataStore, migrateDatabase } from '@garden/data';
+import { MAX_AGENT_NOTIFICATIONS_PER_TASK } from '@garden/contracts';
+import { VideoSubmissionUncertainError } from '@garden/model-gateway';
 import { MediaJobWorker } from './media-jobs.js';
 import { mediaJobAad, type StoredVideoRequest } from './media-job-domain.js';
 import type { AgentRunnerClient } from './runner-client.js';
@@ -391,7 +391,7 @@ describe('durable video accounting, recovery and delivery', () => {
       nameCiphertext: encryptJson({ name: 'video.mp4' }, key, `artifact-name:${workspaceId}`),
       sizeBytes: MP4.length,
       sha256: sha256(MP4),
-      storageKey: `.athanor/artifacts/media-${job.id}`
+      storageKey: `.garden/artifacts/media-${job.id}`
     });
     const writeBytes = vi.fn(),
       provider = vi.fn();
@@ -440,7 +440,7 @@ describe('durable video accounting, recovery and delivery', () => {
       nameCiphertext: encryptJson({ name: 'video.mp4' }, key, `artifact-name:${workspaceId}`),
       sizeBytes: MP4.length,
       sha256: sha256(MP4),
-      storageKey: `.athanor/artifacts/media-${job.id}`
+      storageKey: `.garden/artifacts/media-${job.id}`
     });
     expect(completed?.artifactId).toEqual(expect.any(String));
     expect(await store.leaseMediaDelivery('dead-publisher')).toEqual({ jobId: job.id, userId });
@@ -499,7 +499,7 @@ describe('durable video accounting, recovery and delivery', () => {
       nameCiphertext: encryptJson({ name: 'video.mp4' }, key, `artifact-name:${workspaceId}`),
       sizeBytes: MP4.length,
       sha256: sha256(MP4),
-      storageKey: `.athanor/artifacts/media-${ready.id}`
+      storageKey: `.garden/artifacts/media-${ready.id}`
     });
     const pending = await store.createMediaJob(await intent());
     await store.leaseMediaJob('prepare-pending');

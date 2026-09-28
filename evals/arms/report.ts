@@ -50,7 +50,7 @@ export const renderResident = (rows: readonly Resident[]): string => {
   }
   lines.push(
     '',
-    '  Bytes, not opinions: every figure above is athanor own output measured, and the tokens',
+    '  Bytes, not opinions: every figure above is garden own output measured, and the tokens',
     '  column is bytes/4, the same conversion evals/harness.ts bills a request at.',
     ''
   );

@@ -14,7 +14,7 @@
  * only see it by reaching into the runner traffic, and the arithmetic that produces it - one clock
  * for the suite, read from the wall - is worth being able to interrogate a second at a time.
  */
-import type { DataStore, TaskRecord } from '@athanor/data';
+import type { DataStore, TaskRecord } from '@garden/data';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AcceptanceCheck, AcceptanceRecord } from './acceptance.js';
 import { commandFingerprint } from './acceptance.js';
@@ -258,9 +258,9 @@ describe('the acceptance suite deadline', () => {
    *
    * The free answer is asked before the deadline, deliberately, and the comment in the file says so.
    * Without this test the two could be reordered - which would cost nothing at runtime and turn a
-   * command athanor already watched pass into "the suite ran out of time".
+   * command garden already watched pass into "the suite ran out of time".
    */
-  it('still answers from what athanor already ran after the deadline has passed', async () => {
+  it('still answers from what garden already ran after the deadline has passed', async () => {
     vi.useFakeTimers();
     const probed = probe();
     probed.spend = ACCEPTANCE_SUITE_DEADLINE_SECONDS;

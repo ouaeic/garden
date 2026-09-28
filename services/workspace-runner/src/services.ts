@@ -4,7 +4,7 @@ import { uptime } from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
 import { TerminalHistory } from './terminal-history.js';
-import { ProcessResourceSampleSchema } from '@athanor/contracts';
+import { ProcessResourceSampleSchema } from '@garden/contracts';
 import { failureCode, runnerLogger } from './log.js';
 
 /**
@@ -197,10 +197,10 @@ export const serviceView = (record: ServiceRecord | ProcessHistoryRecord) => ({
 });
 
 /**
- * The durable half. One small JSON file per workspace, inside `.athanor`, which `ensureWorkspace`
+ * The durable half. One small JSON file per workspace, inside `.garden`, which `ensureWorkspace`
  * already creates at a mode the agent cannot traverse - which matters, because the record carries
  * the environment the service was started with. It sits deliberately outside what a rewind covers:
- * `CHECKPOINT_CONTENT` and the snapshot archive are `workspace` plus `.athanor/artifacts` and the
+ * `CHECKPOINT_CONTENT` and the snapshot archive are `workspace` plus `.garden/artifacts` and the
  * browser profile, so restoring yesterday's files does not silently un-declare today's service.
  * Deleting the workspace removes the tree and takes this with it.
  */
@@ -213,9 +213,9 @@ export class ServiceRegistry {
   #writtenRevision = 0;
 
   constructor(workspaceRoot: string) {
-    this.#file = path.join(workspaceRoot, '.athanor', 'services.json');
+    this.#file = path.join(workspaceRoot, '.garden', 'services.json');
     this.history = new TerminalHistory(
-      path.join(workspaceRoot, '.athanor', 'process-history'),
+      path.join(workspaceRoot, '.garden', 'process-history'),
       ProcessHistoryRecordSchema,
       32 * 1024 * 1024
     );
@@ -326,7 +326,7 @@ export class ServiceRegistry {
 
 /**
  * Which workspaces exist on this box, so a boot can ask each of them what it was running. The
- * runner is told a workspace root and nothing else; `.athanor-snapshots`, `.athanor-checkpoints`
+ * runner is told a workspace root and nothing else; `.garden-snapshots`, `.garden-checkpoints`
  * and restore staging all live beside the workspaces, hence the dot filter.
  */
 export const workspaceDirectories = async (workspaceRoot: string): Promise<string[]> => {

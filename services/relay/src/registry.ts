@@ -140,7 +140,7 @@ export class Registry {
   }
 
   /**
-   * Called when a peer disappears from the file underneath us, which is how `athanor-relay revoke`
+   * Called when a peer disappears from the file underneath us, which is how `garden-relay revoke`
    * reaches a running relay.
    */
   setPeersRemovedListener(listener: (labels: readonly string[]) => void): void {

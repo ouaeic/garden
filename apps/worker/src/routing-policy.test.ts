@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ModelRelease } from '@athanor/contracts';
-import type { DataStore } from '@athanor/data';
+import type { ModelRelease } from '@garden/contracts';
+import type { DataStore } from '@garden/data';
 import { routingForTurn } from './routing-policy.js';
 
 const model = { id: 'openrouter/vendor/model', providerModelId: 'vendor/model' } as ModelRelease;

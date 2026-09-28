@@ -6,13 +6,13 @@ import {
   timingSafeEqual,
   verify
 } from 'node:crypto';
-import { AthanorError, sha256 } from '@athanor/core';
+import { GardenError, sha256 } from '@garden/core';
 import {
   nativeAuthorizationMessage,
   type NativeAuthorization,
   type NativeAuthorizationProof,
   type NativeAuthorizationStart
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import type { Database } from './database.js';
 
 type Row = Record<string, unknown> & {
@@ -32,7 +32,7 @@ type Row = Record<string, unknown> & {
   expires_at: string | Date;
 };
 const unavailable = () =>
-  new AthanorError(
+  new GardenError(
     'native_authorization_unavailable',
     'This device authorization is unavailable or has expired. Start again in garden.',
     409
@@ -50,7 +50,7 @@ const present = (row: Row): NativeAuthorization => ({
 export function validateNativeOrigin(value: string): void {
   const url = new URL(value);
   if (url.protocol !== 'http:' || url.hostname !== 'localhost' || !url.port || url.origin !== value)
-    throw new AthanorError(
+    throw new GardenError(
       'invalid_native_origin',
       'Device authorization requires an exact local garden address',
       400
@@ -69,7 +69,7 @@ export function nativeDevicePublicKey(value: string) {
       throw new Error();
     return key;
   } catch {
-    throw new AthanorError('invalid_device_key', 'The device authorization key is invalid', 400);
+    throw new GardenError('invalid_device_key', 'The device authorization key is invalid', 400);
   }
 }
 function prove(row: Row, input: NativeAuthorizationProof, serverOrigin: string) {
@@ -95,7 +95,7 @@ function prove(row: Row, input: NativeAuthorizationProof, serverOrigin: string) 
       Buffer.from(input.signature, 'base64url')
     )
   )
-    throw new AthanorError(
+    throw new GardenError(
       'invalid_device_proof',
       'This authorization belongs to a different device or server',
       403
@@ -120,11 +120,7 @@ export class NativeAuthorizationStore {
     validateNativeOrigin(input.nativeOrigin);
     nativeDevicePublicKey(input.devicePublicKey);
     if (input.purpose === 'step_up' && (!input.userId || !input.sessionHash))
-      throw new AthanorError(
-        'authentication_required',
-        'Sign in before verifying this device',
-        401
-      );
+      throw new GardenError('authentication_required', 'Sign in before verifying this device', 401);
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const code = Array.from(randomBytes(8), (value) => alphabet[value % alphabet.length]).join('');
     return this.database.transaction(async (db) => {
@@ -134,7 +130,7 @@ export class NativeAuthorizationStore {
           (await db.query('SELECT COUNT(*) AS count FROM native_authorizations')).rows[0]?.count
         ) >= 1000
       )
-        throw new AthanorError(
+        throw new GardenError(
           'native_authorization_busy',
           'Device authorization is temporarily busy. Try again shortly.',
           503
@@ -201,7 +197,7 @@ export class NativeAuthorizationStore {
       )
         throw unavailable();
       if (row.user_code !== input.userCode)
-        throw new AthanorError(
+        throw new GardenError(
           'device_code_mismatch',
           'Confirm the code displayed by your garden app',
           400
@@ -212,7 +208,7 @@ export class NativeAuthorizationStore {
         [input.sessionHash, input.userId, input.approve, row.id, this.stepUpWindowSeconds]
       );
       if (!session.rowCount)
-        throw new AthanorError(
+        throw new GardenError(
           'fresh_passkey_required',
           'Verify your passkey for this device request',
           403
@@ -254,7 +250,7 @@ export class NativeAuthorizationStore {
         throw unavailable();
       prove(row, input, input.serverOrigin);
       if (row.purpose === 'step_up' && input.sessionHash !== row.target_session_hash)
-        throw new AthanorError(
+        throw new GardenError(
           'native_session_mismatch',
           'Verify the same garden session that requested authorization',
           403

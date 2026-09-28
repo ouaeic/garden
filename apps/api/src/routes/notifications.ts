@@ -7,9 +7,9 @@
  */
 
 import { randomBytes, randomUUID } from 'node:crypto';
-import type { AgentNotification } from '@athanor/contracts';
-import { AthanorError, encryptJson, sha256 } from '@athanor/core';
-import { notificationDestinationAad, type NotificationDestinationRecord } from '@athanor/data';
+import type { AgentNotification } from '@garden/contracts';
+import { GardenError, encryptJson, sha256 } from '@garden/core';
+import { notificationDestinationAad, type NotificationDestinationRecord } from '@garden/data';
 import { z } from 'zod';
 import { UNREADABLE_AGENT_MESSAGE, clockToMinutes, minutesToClock } from '../context.js';
 import { requireUser } from '../http/auth-hook.js';
@@ -49,10 +49,7 @@ const validatePushEndpoint = (endpoint: string, suffixes: string[]): string => {
     url.password ||
     (url.port && url.port !== '443')
   ) {
-    throw new AthanorError(
-      'invalid_push_endpoint',
-      'Push endpoints must use credential-free HTTPS'
-    );
+    throw new GardenError('invalid_push_endpoint', 'Push endpoints must use credential-free HTTPS');
   }
   const host = url.hostname.toLowerCase();
   const allowed = suffixes.some((suffix) => {
@@ -60,7 +57,7 @@ const validatePushEndpoint = (endpoint: string, suffixes: string[]): string => {
     return value.startsWith('.') ? host.endsWith(value) : host === value;
   });
   if (!allowed)
-    throw new AthanorError('invalid_push_endpoint', 'This browser push relay is not allowed');
+    throw new GardenError('invalid_push_endpoint', 'This browser push relay is not allowed');
   return url.toString();
 };
 
@@ -84,7 +81,7 @@ export const registerNotificationRoutes = (context: RouteContext): void => {
     const user = requireUser(request.user);
     return idempotent(request, reply, user, async () => {
       if (!config.PUSH_VAPID_PUBLIC_KEY) {
-        throw new AthanorError(
+        throw new GardenError(
           'push_unavailable',
           'Push notifications are not configured for this deployment'
         );
@@ -96,7 +93,7 @@ export const registerNotificationRoutes = (context: RouteContext): void => {
         ? await store.getSessionPublicId(user.id, sha256(sessionToken))
         : null;
       if (!sessionPublicId)
-        throw new AthanorError('authentication_required', 'Active device session is required');
+        throw new GardenError('authentication_required', 'Active device session is required');
       const subscription = await store.upsertPushSubscription({
         userId: user.id,
         sessionPublicId,
@@ -184,7 +181,7 @@ export const registerNotificationRoutes = (context: RouteContext): void => {
       const input = UpdateNotificationSettingsRequest.parse(request.body);
       // Both ends or neither: half a window is not a window, and it would silently never be quiet.
       if (Boolean(input.quietHoursStart) !== Boolean(input.quietHoursEnd))
-        throw new AthanorError(
+        throw new GardenError(
           'invalid_quiet_hours',
           'Quiet hours need both a start and an end time'
         );
@@ -196,7 +193,7 @@ export const registerNotificationRoutes = (context: RouteContext): void => {
             }
           : null;
       if (quietHours && quietHours.startMinute === quietHours.endMinute)
-        throw new AthanorError(
+        throw new GardenError(
           'invalid_quiet_hours',
           'Quiet hours that start and end at the same minute would never be quiet'
         );
@@ -270,7 +267,7 @@ export const registerNotificationRoutes = (context: RouteContext): void => {
       });
     } catch {
       // No detail from the failure itself: a fetch error quotes the URL, and the URL is the token.
-      throw new AthanorError(
+      throw new GardenError(
         'destination_unreachable',
         'The bot API could not be reached from this box',
         502
@@ -282,7 +279,7 @@ export const registerNotificationRoutes = (context: RouteContext): void => {
       error_code?: number;
     } | null;
     if (!response.ok || !envelope?.ok)
-      throw new AthanorError(
+      throw new GardenError(
         'destination_refused',
         envelope?.error_code === 401 || envelope?.error_code === 404
           ? 'That bot token was not accepted'
@@ -335,7 +332,7 @@ export const registerNotificationRoutes = (context: RouteContext): void => {
     const input = z.object({ botToken: z.string().regex(BOT_TOKEN) }).parse(request.body);
     const me = await botApi<{ username?: string; is_bot?: boolean }>('getMe', input.botToken, {});
     if (!me.username || me.is_bot === false)
-      throw new AthanorError('destination_refused', 'That token does not belong to a bot', 400);
+      throw new GardenError('destination_refused', 'That token does not belong to a bot', 400);
     const existing = await store.getNotificationDestination(user.id, 'telegram', masterKey);
     // The row keeps its id on replacement and the envelope's context carries the id, so the
     // existing id is what a replacement is sealed under.
@@ -357,7 +354,7 @@ export const registerNotificationRoutes = (context: RouteContext): void => {
       ).id;
     } catch (cause) {
       if (cause instanceof Error && cause.message === 'api_token_limit')
-        throw new AthanorError(
+        throw new GardenError(
           'api_token_limit',
           'Revoke an existing API token before pairing a phone; answering from it needs one',
           409
@@ -389,7 +386,7 @@ export const registerNotificationRoutes = (context: RouteContext): void => {
     await requireRecentStepUp(request, user);
     const existing = await store.getNotificationDestination(user.id, 'telegram', masterKey);
     if (!existing?.botUsername)
-      throw new AthanorError('destination_not_found', 'Add a bot token first', 404);
+      throw new GardenError('destination_not_found', 'Add a bot token first', 404);
     return mintPairing(existing.id, existing.botUsername);
   });
 
@@ -408,7 +405,7 @@ export const registerNotificationRoutes = (context: RouteContext): void => {
       if (input.disabled !== undefined)
         await store.setDestinationDisabled(user.id, 'telegram', input.disabled);
       const row = await store.getNotificationDestination(user.id, 'telegram', masterKey);
-      if (!row) throw new AthanorError('destination_not_found', 'No phone is set up', 404);
+      if (!row) throw new GardenError('destination_not_found', 'No phone is set up', 404);
       return destinationResponse(row);
     });
   });
@@ -436,17 +433,17 @@ export const registerNotificationRoutes = (context: RouteContext): void => {
     const user = requireUser(request.user);
     return idempotent(request, reply, user, async () => {
       const row = await store.getNotificationDestination(user.id, 'telegram', masterKey);
-      if (!row?.config) throw new AthanorError('destination_not_found', 'No phone is set up', 404);
+      if (!row?.config) throw new GardenError('destination_not_found', 'No phone is set up', 404);
       if (!row.senderId || row.verifiedAt === null)
-        throw new AthanorError('destination_unpaired', 'Pair your phone first', 409);
+        throw new GardenError('destination_unpaired', 'Pair your phone first', 409);
       await botApi('sendMessage', row.config.botToken, {
         chat_id: row.senderId,
-        text: '<b>athanor</b>\nNotifications reach this phone. Approvals and questions will arrive here.',
+        text: '<b>garden</b>\nNotifications reach this phone. Approvals and questions will arrive here.',
         parse_mode: 'HTML',
         link_preview_options: { is_disabled: true },
         protect_content: true,
         reply_markup: {
-          inline_keyboard: [[{ text: 'Open in athanor', url: config.PUBLIC_APP_URL }]]
+          inline_keyboard: [[{ text: 'Open in garden', url: config.PUBLIC_APP_URL }]]
         }
       });
       return { sent: true };

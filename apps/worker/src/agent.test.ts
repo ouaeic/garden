@@ -5,9 +5,9 @@
  * title and its cases unchanged - so no test's full name changed and the count is the same by name.
  */
 import { readFileSync } from 'node:fs';
-import { buildLabel } from '@athanor/contracts';
-import { AthanorError } from '@athanor/core';
-import type { ModelMessage } from '@athanor/model-gateway';
+import { buildLabel } from '@garden/contracts';
+import { GardenError } from '@garden/core';
+import type { ModelMessage } from '@garden/model-gateway';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { acceptanceCommandRefusal } from './acceptance.js';
 import {
@@ -70,7 +70,7 @@ describe('what may be an acceptance check', () => {
       /cannot be an acceptance/
     );
     expect(
-      acceptanceCommandRefusal('node', ['-e', "require('fs').rmSync('/home/athanor')"])
+      acceptanceCommandRefusal('node', ['-e', "require('fs').rmSync('/home/garden')"])
     ).toMatch(/cannot be an acceptance/);
     // And a wrapper judged by what it runs.
     expect(acceptanceCommandRefusal('timeout', ['30', 'rm', '-rf', 'build'])).toMatch(
@@ -127,7 +127,7 @@ describe('the journal record a failed turn leaves', () => {
 
   it('says which task, how far it got and what the code was', () => {
     const { level, event, fields } = failure(
-      new AthanorError('model_timeout', 'The model provider did not respond')
+      new GardenError('model_timeout', 'The model provider did not respond')
     );
     expect(level).toBe('error');
     expect(event).toBe('task.failed');
@@ -180,14 +180,14 @@ describe('the journal record a failed turn leaves', () => {
   });
 
   /**
-   * Not every AthanorError is written in this repository. `runnerFailure` mints one from the `code`
+   * Not every GardenError is written in this repository. `runnerFailure` mints one from the `code`
    * field of whatever the workspace runner answered with, so the code is a value off a wire: it can
    * be any length, say anything, and carry the newline that would make one failure look like two
    * records in the journal.
    */
   it('will not print a code it did not choose itself', () => {
     const { fields } = failure(
-      new AthanorError(
+      new GardenError(
         'bad_request: could not write /home/owner/therapy.md\noutcome=fine',
         'irrelevant'
       )
@@ -196,7 +196,7 @@ describe('the journal record a failed turn leaves', () => {
     expect(JSON.stringify(fields)).not.toContain('outcome=fine');
     expect(fields.code).toBe('agent_failed');
     // A code that is a code is still recorded whole.
-    expect(failure(new AthanorError('provider_quota_exhausted', 'out of credit')).fields.code).toBe(
+    expect(failure(new GardenError('provider_quota_exhausted', 'out of credit')).fields.code).toBe(
       'provider_quota_exhausted'
     );
   });
@@ -235,9 +235,9 @@ describe('the journal record a failed turn leaves', () => {
   });
 
   it('declares a real failure err and a parked one warning', () => {
-    expect(failure(new AthanorError('model_timeout', 'no reply')).level).toBe('error');
+    expect(failure(new GardenError('model_timeout', 'no reply')).level).toBe('error');
     const parked = failure(
-      new AthanorError('provider_quota_exhausted', 'out of credit'),
+      new GardenError('provider_quota_exhausted', 'out of credit'),
       new Set(),
       { waiting: true }
     );
@@ -252,7 +252,7 @@ describe('the journal record a failed turn leaves', () => {
       turn: 0,
       step: 0,
       modelId: 'model-1',
-      error: new AthanorError('workspace_unreachable', 'no runner'),
+      error: new GardenError('workspace_unreachable', 'no runner'),
       waiting: false
     });
     expect(fields).not.toHaveProperty('durationMs');
@@ -273,7 +273,7 @@ describe('the journal record a failed turn leaves', () => {
     );
     expect(failureFields(refused).code).toBe('57P01');
     expect(JSON.stringify(failureFields(refused))).not.toContain('private-detail-52a7a3a2');
-    expect(failureFields(new AthanorError('workspace_missing', 'gone')).code).toBe(
+    expect(failureFields(new GardenError('workspace_missing', 'gone')).code).toBe(
       'workspace_missing'
     );
     expect(failureFields('a bare string')).toEqual({ code: 'string' });
@@ -401,7 +401,7 @@ describe('the journal every process writes', () => {
 
 /**
  * Which build is running, which nothing could say before: a bug report started with a guess, and an
- * owner who had just run `athanor update` had no way to tell whether anything had changed.
+ * owner who had just run `garden update` had no way to tell whether anything had changed.
  */
 describe('the build identity', () => {
   it('names the version this checkout calls itself and the revision it is on', () => {

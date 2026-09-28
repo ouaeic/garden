@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import type { ModelRelease, MediaModelOption, PrivacyRoute } from '@athanor/contracts';
+import type { ModelRelease, MediaModelOption, PrivacyRoute } from '@garden/contracts';
 const ModelBrowser = lazy(() => import('./ModelBrowser.js'));
 
 export type PickerModel = Pick<ModelRelease, 'id' | 'displayName' | 'provider'> &

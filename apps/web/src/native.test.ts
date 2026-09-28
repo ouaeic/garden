@@ -22,27 +22,24 @@ const packet = {
   version: 2,
   identity: `sha256/${btoa('a'.repeat(32))}`,
   endpoints: ['https://computer.example:443'],
-  discovery: { mdnsService: '_athanor._tcp.local', mdnsPort: 443 },
+  discovery: { mdnsService: '_garden._tcp.local', mdnsPort: 443 },
   pairingCode: 'a-one-time-code-123456789',
   expiresAt: Math.floor(now / 1000) + 300
 };
 const ticket = (changes: Record<string, unknown> = {}) =>
-  `athanor://pair/${btoa(JSON.stringify({ ...packet, ...changes }))
+  `garden://pair/${btoa(JSON.stringify({ ...packet, ...changes }))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '')}`;
 
 describe('native connection boundaries', () => {
-  it('accepts the garden and installed-client schemes with identical ticket validation', () => {
-    expect(previewConnectionTicket(ticket().replace('athanor:', 'garden:'), now)).toEqual(
-      previewConnectionTicket(ticket(), now)
-    );
-    expect(() => previewConnectionTicket(ticket().replace('athanor:', 'https:'), now)).toThrow();
+  it('rejects an unrelated pairing scheme', () => {
+    expect(() => previewConnectionTicket(ticket().replace('garden:', 'https:'), now)).toThrow();
   });
   it('reads a camera-opened enrollment fragment only on its intended server before expiry', () => {
     vi.useFakeTimers();
     vi.setSystemTime(now);
-    const fragment = `#pair=${ticket().replace('athanor://pair/', '')}`;
+    const fragment = `#pair=${ticket().replace('garden://pair/', '')}`;
     expect(enrollmentCodeFromFragment(fragment, 'https://computer.example')).toBe(
       packet.pairingCode
     );
@@ -68,7 +65,7 @@ describe('native connection boundaries', () => {
     expect(() =>
       previewConnectionTicket(ticket({ expiresAt: Math.floor(now / 1000) }), now)
     ).toThrow('expired');
-    expect(() => previewConnectionTicket(`athanor://pair/${'a'.repeat(32768)}`, now)).toThrow(
+    expect(() => previewConnectionTicket(`garden://pair/${'a'.repeat(32768)}`, now)).toThrow(
       'large'
     );
     const invalid = [
@@ -135,9 +132,9 @@ describe('native connection boundaries', () => {
       installerUrl: 'http://localhost:34678/'
     });
     expect(fetcher.mock.calls.map(([path]) => path)).toEqual([
-      '/__athanor/client/pair',
-      '/__athanor/client/network-preference',
-      '/__athanor/client/bootstrap'
+      '/__garden/client/pair',
+      '/__garden/client/network-preference',
+      '/__garden/client/bootstrap'
     ]);
     expect(fetcher.mock.calls[0]![1]?.body).toBe(JSON.stringify({ ticket: raw }));
     expect(fetcher.mock.calls[1]![1]?.body).toBe(JSON.stringify({ preference: 'dynamic' }));
@@ -146,7 +143,7 @@ describe('native connection boundaries', () => {
     const invoke = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal('window', { __TAURI_INTERNALS__: { invoke } });
     const signed =
-      'https://garden.test:8443/__athanor/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/?access=fixture%2Fgrant%3D#scene';
+      'https://garden.test:8443/__garden/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/?access=fixture%2Fgrant%3D#scene';
     await openPreviewBrowser(signed);
     expect(invoke).toHaveBeenCalledExactlyOnceWith('open_preview_browser', { url: signed });
     invoke.mockRejectedValueOnce(new Error('Preview origin unavailable'));

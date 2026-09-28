@@ -1,4 +1,4 @@
-import type { WorkflowProgress, WorkflowStage } from '@athanor/contracts';
+import type { WorkflowProgress, WorkflowStage } from '@garden/contracts';
 import { openDownloadFile } from './open-download-file.js';
 
 const PAGE_BYTES = 1024 * 1024;

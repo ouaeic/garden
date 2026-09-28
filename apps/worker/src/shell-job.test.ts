@@ -8,7 +8,7 @@ import {
   createApprovalFloorMemo,
   type ApprovalFloorDeps
 } from './approval-floor.js';
-import type { TaskRecord } from '@athanor/data';
+import type { TaskRecord } from '@garden/data';
 
 const base = {
   executable: 'python3',

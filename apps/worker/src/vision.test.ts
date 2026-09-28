@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { decryptJson, generateDataKey } from '@athanor/core';
-import type { ModelRelease } from '@athanor/contracts';
-import type { DataStore, TaskRecord } from '@athanor/data';
-import { AthanorError } from '@athanor/core';
-import type { ModelGateway, ModelResponse, ModelToolCall } from '@athanor/model-gateway';
+import { decryptJson, generateDataKey } from '@garden/core';
+import type { ModelRelease } from '@garden/contracts';
+import type { DataStore, TaskRecord } from '@garden/data';
+import { GardenError } from '@garden/core';
+import type { ModelGateway, ModelResponse, ModelToolCall } from '@garden/model-gateway';
 import type { AgentState } from './agent-state.js';
 import { MODEL_CATALOG_CACHE_MS, currentCatalog, routeImageObservation } from './vision.js';
 import type { CatalogCache, VisionDeps } from './vision.js';
@@ -199,7 +199,7 @@ describe('who reads a picture the lead cannot see', () => {
     const first = seer({ id: 'first', displayName: 'First', measuredQuality: 0.9 });
     const second = seer({ id: 'second', displayName: 'Second', measuredQuality: 0.6 });
     const p = probe([lead, first, second], async () => {
-      throw new AthanorError('provider_quota_exhausted', 'the account is out of credit', 402);
+      throw new GardenError('provider_quota_exhausted', 'the account is out of credit', 402);
     });
 
     await routeImageObservation(p.deps, task, dataKey, p.state, call, image, lead, [lead]);

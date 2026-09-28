@@ -1,0 +1,10 @@
+[Unit]
+Description=Shared capacity for garden project execution
+
+[Slice]
+MemoryHigh=60%
+MemoryMax=80%
+MemorySwapMax=0
+TasksMax=4096
+CPUWeight=50
+IOWeight=50

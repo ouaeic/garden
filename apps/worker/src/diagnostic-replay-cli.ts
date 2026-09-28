@@ -3,7 +3,7 @@ import { CapturedRuntimeReplay } from './runtime-replay.js';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
-import { DIAGNOSTIC_CAPTURE_BYTES, DIAGNOSTIC_RECORD_BYTES } from '@athanor/contracts';
+import { DIAGNOSTIC_CAPTURE_BYTES, DIAGNOSTIC_RECORD_BYTES } from '@garden/contracts';
 import { PrivateDecisionReplay } from './diagnostic-replay.js';
 
 async function main() {

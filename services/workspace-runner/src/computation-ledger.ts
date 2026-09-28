@@ -3,7 +3,7 @@ import { constants } from 'node:fs';
 import { open } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
-import { ComputationCellSchema } from '@athanor/contracts';
+import { ComputationCellSchema } from '@garden/contracts';
 import { durableJson } from './project-version-files.js';
 
 const Receipt = z

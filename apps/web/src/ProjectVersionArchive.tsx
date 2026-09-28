@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ProjectRetentionPreview, ProjectRevision } from '@athanor/contracts';
+import type { ProjectRetentionPreview, ProjectRevision } from '@garden/contracts';
 import { post } from './client';
 import { bytes } from './model';
 import { Button, Dialog, ErrorNotice, Spinner } from './ui';

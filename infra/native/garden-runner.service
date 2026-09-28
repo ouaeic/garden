@@ -1,0 +1,142 @@
+[Unit]
+Description=garden native agent computer
+PartOf=garden.target
+After=network-online.target garden-jobs.service garden-gui.service
+Wants=garden-jobs.service garden-gui.service
+Wants=network-online.target
+# The runner is the unit an agent command can wedge, so it must always be allowed back. Under the
+# default start limit a crash loop - a command that exhausts memory, a browser that will not
+# start - leaves the unit `failed` and never retried.
+StartLimitIntervalSec=0
+
+[Service]
+Slice=garden-work.slice
+Type=simple
+User=garden
+Group=garden
+# Agent commands run as garden-agent, a different account, and reach their workspace through
+# this shared group. Without it the runner could not read back what a command wrote.
+SupplementaryGroups=garden-agent
+WorkingDirectory=/opt/garden
+EnvironmentFile=/etc/garden/runner.env
+ExecStart=/usr/local/lib/garden/garden-service runner
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+# Group-writable so the runner and the agent account can each work on the same workspace files;
+# nothing for anyone else. The browser profile is created 0700 in code and stays owner-only.
+UMask=0007
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+# An agent command is a child of this unit, so without this it could read the runner's own
+# /proc entry - and with it every variable the runner was started with. Paired with the separate
+# account for agent commands: hidepid hides processes belonging to *other* users, so it only
+# means anything once the command is not running as the runner.
+ProtectProc=invisible
+
+# What this unit deliberately does NOT carry. Everything above says why it is here and nothing said
+# why the obvious rest is absent, which is the more dangerous half of the file: this is the one unit
+# on the box that runs arbitrary commands, so it reads like the one that was forgotten. It was not.
+# The three below are load-bearing, and each of them turns the agent's hands off if it is added.
+# The `native-units` job in .github/workflows/verify.yml refuses a change that adds one, and drills
+# the routes they protect under this unit's own directive set, so a reversal is a red run rather
+# than a box whose agent quietly stops being able to do anything.
+#
+# NoNewPrivileges - the runner holds no privilege of its own and reaches the `garden-agent` account
+# by asking a root-owned helper for it: `sudo -n /usr/local/lib/garden/garden-sandbox run ...`,
+# under a sudoers rule only this account may use. no_new_privs makes a set-user-ID binary confer
+# nothing, so sudo would find itself unable to become root and refuse. Nothing falls back to running
+# the command as the runner: once AGENT_SANDBOX_HELPER is configured every invocation is rewritten
+# through the helper with no second branch (services/workspace-runner/src/execution.ts), and a
+# helper that is not executable makes `resolveAgentSandbox` throw so the runner refuses to start at
+# all. The cost of the flag is therefore total and loud rather than silent - every agent command,
+# the owner's terminal and every approved package install exit non-zero carrying sudo's own message,
+# while the rest of the box keeps serving. Note that the sandbox does set no_new_privs - `setpriv
+# --no-new-privs` in the helper - on the far side of the drop, where it binds the agent's command
+# rather than the runner's route to it. That is the flag doing its job.
+#
+# RestrictNamespaces - `garden-sandbox run isolated` is `unshare --net`, and this directive is a
+# seccomp filter on the whole control group that the sudo'd helper inherits. With it, network
+# isolation - the ISOLATE_AGENT_NETWORK setting the runner refuses to start without a helper for -
+# fails for every command rather than for none.
+#
+# ProtectSystem - the approved package install is the one command that keeps the runner's own
+# identity and reaches root through sudo (services/workspace-runner/src/execution.ts), and every
+# package manager it dispatches to - apt-get, dnf, zypper, pacman - writes /usr. A read-only /usr is
+# a mount namespace this unit's children cannot leave, so the whole capability would fail with a
+# permission error from the package manager rather than anything that names this file. Handing that one command to `systemd-run` would free the directive; that is
+# a change of its own, and it waits on the package-install drill the verify job now runs rather than
+# riding along with the directives below.
+
+# And what it now does carry, which the same job holds in place. Each was added on its own and
+# measured with `systemd-analyze security` either side, because the failure mode here is a command
+# that stops working at runtime rather than a file that stops parsing.
+#
+# The bounding set is inherited across the sudo transition, so a set chosen here caps what the
+# root-owned helpers may hold: apt needs CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_SETUID and
+# CAP_SETGID, `unshare --net` needs CAP_SYS_ADMIN, and `setpriv` needs the two SET*ID. Only the
+# negative form is available without auditing all three, since a positive list would cap them at
+# whatever was remembered on the day it was written. These six are used by none of them.
+CapabilityBoundingSet=~CAP_SYS_MODULE CAP_SYS_RAWIO CAP_SYS_BOOT CAP_SYS_TIME CAP_MAC_ADMIN CAP_MAC_OVERRIDE
+# The 32-bit and x32 entry points are a second, far less exercised route into the kernel, reachable
+# by every command the agent runs and used by none of the programs this box ships.
+SystemCallArchitectures=native
+# Nothing here asks for a different execution domain, an older kernel's idea of itself, the right to
+# set the system clock, or a realtime scheduling class. An agent command that asks for one of those
+# is either confused or hostile, and both are worth refusing.
+LockPersonality=true
+ProtectHostname=true
+ProtectClock=true
+RestrictRealtime=true
+# One decision in two lines: hide every account's home from an agent command, then give back exactly
+# the one it is meant to be working in. WORKSPACE_ROOT is /home/garden (scripts/install-native.sh),
+# so without the second line the agent has no workspace at all. /run/user goes with /home, which the
+# desktop session already expects - infra/native/start-desktop-session.sh falls back to a runtime
+# directory inside the workspace when /run/user/<uid> is not writable.
+#
+# `tmpfs` AND `BindPaths=`, NOT `true` and `ReadWritePaths=`, and the difference is the whole unit.
+# `ProtectHome=true` mounts over /home, and `ReadWritePaths=` cannot reopen a path something has
+# been mounted over - it changes the access mode of a path the namespace can still see. Measured on
+# a real box the day this first deployed: inside the unit's namespace /home was `d---------` and
+# empty, `/home/garden` did not exist, and every filesystem tool call in every task failed with
+# `EACCES ... mkdir '/home/garden/<workspace>'` on a directory that was there all along. The
+# hardening took the whole product away and the unit read as if it had not.
+#
+# `ProtectHome=tmpfs` mounts an empty tmpfs over /home, and `BindPaths=` mounts the real directory
+# back inside it, which is the documented way to keep one home while hiding the rest. Verified on
+# the same box: `/home/garden` visible with all 41 workspaces, `/home/administrator` still
+# `No such file or directory`. The security goal is unchanged; only the mechanism works now.
+ProtectHome=tmpfs
+BindPaths=/home/garden
+
+# Everything the agent runs stays in this unit's control group, so these bound the whole agent
+# computer at once. PostgreSQL, the API and the interface share this machine, and without a
+# ceiling a hallucinated command takes them down rather than only itself. Reclaim begins at
+# MemoryHigh and only the hard cap kills, so a heavy build finishes slowly instead of being
+# killed outright.
+MemoryHigh=60%
+MemoryMax=80%
+# Swapping a runaway command out does not save the box; it makes every other service crawl and
+# fills the disk with swap on the way.
+MemorySwapMax=0
+# Where a fork bomb stops. The per-command RLIMIT_NPROC is deliberately lower, so the offending
+# command fails first and the runner keeps enough headroom to reap it.
+TasksMax=4096
+LimitNOFILE=65536
+# A core dump from an out-of-memory command is the size of the memory it was using, written to
+# the disk these limits exist to protect.
+LimitCORE=0
+# A command killed for memory must not stop the runner: the correct consequence is one failed
+# tool call, not a workspace that disappears from under every other task.
+OOMPolicy=continue
+# Weight rather than CPUQuota: a quota would slow legitimate work even on an idle machine, while
+# a weight gives the agent the whole processor when nothing else wants it and yields to the
+# database and the API when they do.
+CPUWeight=50
+IOWeight=50
+
+[Install]
+WantedBy=multi-user.target

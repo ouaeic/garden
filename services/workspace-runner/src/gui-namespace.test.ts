@@ -105,16 +105,16 @@ describe('project GUI ownership', () => {
     const desktop = await manager.acquire(root);
     const research = await manager.acquireTemporary(root);
     const researchRoot = start.mock.calls[1]?.[0];
-    expect(researchRoot).toContain(`${root}/.athanor/gui/research/session-`);
+    expect(researchRoot).toContain(`${root}/.garden/gui/research/session-`);
     await research.release();
     expect(stop).toHaveBeenCalledTimes(1);
-    expect(await readdir(path.join(root, '.athanor/gui/research'))).toEqual([]);
+    expect(await readdir(path.join(root, '.garden/gui/research'))).toEqual([]);
     const next = await manager.acquireTemporary(root);
     await manager.closeRoot(root);
     expect(stop).toHaveBeenCalledTimes(3);
     await Promise.all([desktop.release(), next.release()]);
     expect(stop).toHaveBeenCalledTimes(3);
-    expect(await readdir(path.join(root, '.athanor/gui/research'))).toEqual([]);
+    expect(await readdir(path.join(root, '.garden/gui/research'))).toEqual([]);
     await manager.close();
   });
 

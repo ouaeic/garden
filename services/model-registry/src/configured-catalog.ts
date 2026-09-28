@@ -1,5 +1,5 @@
-import { configuredModelCatalog, OpenAICompatibleAdapter } from '@athanor/model-gateway';
-import type { ModelRelease, PrivacyRoute } from '@athanor/contracts';
+import { configuredModelCatalog, OpenAICompatibleAdapter } from '@garden/model-gateway';
+import type { ModelRelease, PrivacyRoute } from '@garden/contracts';
 
 /**
  * The hourly refresh for a provider that is not OpenRouter.

@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createDatabase, DataStore, migrateDatabase, type WorkspaceRecord } from '@athanor/data';
-import { decryptJson, encryptJson, unwrapDataKey, wrapDataKey } from '@athanor/core';
+import { createDatabase, DataStore, migrateDatabase, type WorkspaceRecord } from '@garden/data';
+import { decryptJson, encryptJson, unwrapDataKey, wrapDataKey } from '@garden/core';
 import { registerUsageRoutes } from './usage.js';
 import { registerPrivacyRoutes } from './privacy.js';
 import { registerScheduleRoutes } from './schedules.js';
@@ -56,7 +56,7 @@ async function fixture() {
       summary: 'Encrypted tool started event',
       payloadCiphertext: encryptJson(
         {
-          __athanorEventVersion: 1,
+          __gardenEventVersion: 1,
           summary: `${name} event`,
           payload: { tool: `${name}-tool`, arguments: {} }
         },

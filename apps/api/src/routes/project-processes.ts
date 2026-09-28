@@ -1,7 +1,7 @@
 import { registerProcessHistoryRoutes } from './process-history.js';
 import { z } from 'zod';
-import { AthanorError } from '@athanor/core';
-import type { ComputationSession, ProcessList } from '@athanor/contracts';
+import { GardenError } from '@garden/core';
+import type { ComputationSession, ProcessList } from '@garden/contracts';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 
@@ -13,9 +13,9 @@ export const registerProjectProcessRoutes = (context: RouteContext): void => {
     async (request) => {
       const user = requireUser(request.user);
       if (request.apiToken)
-        throw new AthanorError('session_required', 'Resume workflows from a signed-in device', 403);
+        throw new GardenError('session_required', 'Resume workflows from a signed-in device', 403);
       const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found', 404);
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found', 404);
       const workflowId = z.uuid().parse(request.params.workflowId),
         body = z.object({ attempt: z.number().int().positive() }).strict().parse(request.body);
       return runner.request({
@@ -40,7 +40,7 @@ export const registerProjectProcessRoutes = (context: RouteContext): void => {
           ? !(await store.getProject(user.id, request.params.taskId))
           : !members.some((member) => member.taskId === request.params.taskId)
       )
-        throw new AthanorError('task_not_found', 'Project not found', 404);
+        throw new GardenError('task_not_found', 'Project not found', 404);
       const scopes = new Map<string, Set<string>>();
       for (const member of members) {
         const owners = scopes.get(member.workspaceId) ?? new Set<string>();
@@ -106,7 +106,7 @@ export const registerProjectProcessRoutes = (context: RouteContext): void => {
         })
       );
       if (!results.length && !computationSessions.length)
-        throw new AthanorError(
+        throw new GardenError(
           'runner_unavailable',
           'Process status is temporarily unavailable',
           503

@@ -1,4 +1,4 @@
-import { runtimeNow } from '@athanor/core';
+import { runtimeNow } from '@garden/core';
 /**
  * Running the acceptance record in the harness: once per state of the workspace, and inside one
  * deadline for the suite rather than one per check.
@@ -16,8 +16,8 @@ import { runtimeNow } from '@athanor/core';
  * nothing bounded the suite as a whole. `MAX_ACCEPTANCE_CHECKS` checks at
  * `ACCEPTANCE_COMMAND_TIMEOUT_SECONDS` each compose to two hours.
  */
-import type { DataStore, TaskRecord } from '@athanor/data';
-import type { JsonProofResult } from '@athanor/contracts';
+import type { DataStore, TaskRecord } from '@garden/data';
+import type { JsonProofResult } from '@garden/contracts';
 import {
   acceptanceAlreadyObserved,
   acceptanceCommandText,
@@ -119,7 +119,7 @@ export const runAcceptanceChecks = async (
   options: {
     purpose: 'finish' | 'baseline' | 'continuation';
     /**
-     * Commands athanor already ran this turn, after the last change. Never passed for a baseline:
+     * Commands garden already ran this turn, after the last change. Never passed for a baseline:
      * that run's whole job is to watch the checks fail before the work, which is a question no
      * earlier observation can answer.
      */
@@ -184,7 +184,7 @@ export const acceptanceChecks = async (
    * `shell` tool posts to (apps/worker/src/tools/workspace.ts:743). Nothing snapshots the tree
    * between the moment the record is declared and the moment it runs, so a check CAN be written by
    * the same turn that runs it: `bash workspace/rename-scans.sh` is a pinned-accepted declaration,
-   * and the agent wrote that script this turn. What athanor has instead is a weaker pair - the
+   * and the agent wrote that script this turn. What garden has instead is a weaker pair - the
    * arguments are fixed before the work rather than chosen at finish time, and the red baseline
    * falsifies the record on the paths where it runs - and neither of those is isolation.
    *

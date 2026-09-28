@@ -5,7 +5,7 @@ import { Button, ErrorNotice } from './ui.js';
 import './native.css';
 
 const INSTALL_COMMAND =
-  'curl -fsSL https://raw.githubusercontent.com/ouaeic/athanor/v0.2.0/install.sh | sudo env ATHANOR_REF=v0.2.0 sh';
+  'curl -fsSL https://raw.githubusercontent.com/ouaeic/garden/v0.2.0/install.sh | sudo env GARDEN_REF=v0.2.0 sh';
 
 export default function ServerInstall({ installerUrl }: { installerUrl?: string | null }) {
   const [copied, setCopied] = useState(false);

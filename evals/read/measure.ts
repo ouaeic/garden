@@ -1,5 +1,5 @@
 /**
- * The measurement: displayed lines per landed edit, off athanor's own loop, per turn.
+ * The measurement: displayed lines per landed edit, off garden's own loop, per turn.
  *
  * ── What the number is ────────────────────────────────────────────────────────────────────────
  *
@@ -21,7 +21,7 @@
  * ── Why it is measured off the event stream ───────────────────────────────────────────────────
  *
  * `harness.readLedgerOf` reads `tool_result` events, which carry what the tool returned before the
- * context layer decides how much of it to keep. So this counts what athanor CHOSE TO DISPLAY, not
+ * context layer decides how much of it to keep. So this counts what garden CHOSE TO DISPLAY, not
  * what survived a later squeeze. Both are worth knowing; the second is `evals/context-quality`'s
  * question and measuring it here would silently answer a different one.
  */
@@ -201,7 +201,7 @@ export const pool = (measurements: readonly Measurement[]): Pooled => {
  * The largest file any fixture puts in a workspace, in lines.
  *
  * Read off the fixture declarations rather than asserted, because it is the whole reason the corpus
- * figure below cannot be quoted as athanor's read cost on real work. A corpus whose largest file is
+ * figure below cannot be quoted as garden's read cost on real work. A corpus whose largest file is
  * three lines cannot reach the 800-line display cap, cannot make a windowed read cheaper than a
  * whole one, and cannot tell a narrow reader from a wide one.
  */

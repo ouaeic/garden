@@ -10,7 +10,7 @@ import {
   GitObjectId,
   ProjectVersionPinInput,
   PinnedProjectVersionCursor
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { requireScope } from './auth.js';
 import type { ProjectUpdatesManager } from './project-updates.js';
 

@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { z } from 'zod';
-import type { ConnectorScope } from '@athanor/contracts';
+import type { ConnectorScope } from '@garden/contracts';
 import { type AccountApi, accountResourceId } from './account-api.js';
 import type { AccountOperation } from './account-operation.js';
-import { AthanorError } from './errors.js';
+import { GardenError } from './errors.js';
 
 const zone = z
   .string()
@@ -95,7 +95,7 @@ const Receipt = z
   })
   .strict();
 const missing = (error: unknown) =>
-  error instanceof AthanorError && error.code === 'connector_resource_not_found';
+  error instanceof GardenError && error.code === 'connector_resource_not_found';
 const uncertain = (operationId: string) => ({
   status: 'uncertain' as const,
   operationId,
@@ -129,10 +129,7 @@ export async function readAccountCalendarEvent(
         );
   const event = await api.json(url);
   if (event.id !== id)
-    throw new AthanorError(
-      'connector_response_invalid',
-      'The provider returned a different event.'
-    );
+    throw new GardenError('connector_response_invalid', 'The provider returned a different event.');
   return {
     event,
     ...(api.secret.provider === 'google' ? { target: eventKind(event), version: event.etag } : {})
@@ -148,7 +145,7 @@ function bodyFor(event: Record<string, unknown>, changes: z.infer<typeof Account
       const original = record.parse(event[key]);
       const timeZone = changes.time.timeZone ?? original.timeZone;
       if (!changes.time.allDay && eventKind(event) === 'series' && typeof timeZone !== 'string')
-        throw new AthanorError(
+        throw new GardenError(
           'calendar_time_zone_required',
           'A recurring series needs its IANA time zone.'
         );
@@ -169,7 +166,7 @@ function bodyFor(event: Record<string, unknown>, changes: z.infer<typeof Account
     const previous = z.array(record).parse(event.attendees ?? []);
     const addresses = changes.attendees.map((item) => item.address.toLowerCase());
     if (new Set(addresses).size !== addresses.length)
-      throw new AthanorError('calendar_attendees_invalid', 'Each attendee must appear once.');
+      throw new GardenError('calendar_attendees_invalid', 'Each attendee must appear once.');
     body.attendees = changes.attendees.map((item) => ({
       ...previous.find(
         (value) =>
@@ -226,7 +223,7 @@ export async function mutateAccountCalendarEvent(
   scopes: readonly ConnectorScope[]
 ) {
   if (api.secret.provider !== 'google')
-    throw new AthanorError(
+    throw new GardenError(
       'calendar_conditional_update_unavailable',
       'Conditional calendar changes are unavailable for this provider.'
     );
@@ -245,7 +242,7 @@ export async function mutateAccountCalendarEvent(
   const digest = createHash('sha256').update(JSON.stringify(input)).digest('hex');
   const saved = operation.recovery == null ? null : Checkpoint.parse(operation.recovery);
   if (saved && (saved.operationId !== operation.id || saved.digest !== digest))
-    throw new AthanorError(
+    throw new GardenError(
       'connector_operation_context',
       'The calendar checkpoint belongs to another intent.'
     );
@@ -256,7 +253,7 @@ export async function mutateAccountCalendarEvent(
       result.eventId !== input.eventId ||
       (result.status === 'updated') !== (input.action === 'update')
     )
-      throw new AthanorError(
+      throw new GardenError(
         'connector_operation_context',
         'The calendar receipt belongs to another intent.'
       );
@@ -296,7 +293,7 @@ export async function mutateAccountCalendarEvent(
       throw error;
     }
     if (event.id !== input.eventId)
-      throw new AthanorError(
+      throw new GardenError(
         'connector_response_invalid',
         'The provider returned a different event.'
       );
@@ -322,21 +319,18 @@ export async function mutateAccountCalendarEvent(
     throw error;
   }
   if (current.id !== input.eventId)
-    throw new AthanorError(
-      'connector_response_invalid',
-      'The provider returned a different event.'
-    );
+    throw new GardenError('connector_response_invalid', 'The provider returned a different event.');
   if (current.status === 'cancelled') {
     if (input.action === 'delete') return finish('absent', false);
-    throw new AthanorError('calendar_event_cancelled', 'Choose an active calendar event.');
+    throw new GardenError('calendar_event_cancelled', 'Choose an active calendar event.');
   }
   if (current.etag !== input.expectedVersion)
-    throw new AthanorError(
+    throw new GardenError(
       'calendar_version_changed',
       'The event changed. Read its current version and review the intended changes.'
     );
   if (eventKind(current) !== input.target)
-    throw new AthanorError(
+    throw new GardenError(
       'calendar_target_changed',
       'Choose explicitly between this event, one occurrence and the whole series.'
     );
@@ -372,7 +366,7 @@ export async function mutateAccountCalendarEvent(
       return uncertain(operation.id);
     return finish('updated', false, typeof event.etag === 'string' ? event.etag : undefined);
   } catch (error) {
-    const status = error instanceof AthanorError ? error.details?.statusCode : undefined;
+    const status = error instanceof GardenError ? error.details?.statusCode : undefined;
     if (
       typeof status === 'number' &&
       [400, 401, 403, 404, 412, 413, 415, 422, 429].includes(status)

@@ -5,7 +5,7 @@ import {
   VOICE_SAMPLE_RATE,
   type VoiceAudioFrame,
   type VoiceReasoningEffort
-} from '@athanor/contracts';
+} from '@garden/contracts';
 
 export const REALTIME_MAX_OUTPUT_TOKENS = 4_096;
 export const REALTIME_MAX_ITEM_SECONDS = 120;

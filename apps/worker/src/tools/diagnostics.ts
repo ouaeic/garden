@@ -36,25 +36,25 @@
  *      `resolveInside` refuses a path outside the CONTAINER HOME, not outside `workspace`, and
  *      `isUserData` is not applied to an exec cwd. So the ordinary call - `workspace`, or a
  *      directory under it - runs inside `CHECKPOINT_CONTENT` and is fully rewindable, and a call
- *      naming `.athanor/browser` would not be, since the roots pick that up only when
+ *      naming `.garden/browser` would not be, since the roots pick that up only when
  *      `CHECKPOINT_INCLUDE_BROWSER_PROFILE` is on and it ships off - though on a box that reports
  *      Landlock the command cannot write there at all. Where the command writes once it has
  *      started is a separate question and no longer an unanswered one; it is rung 3.
  *   3. And the limit, which is now a boundary with a hole in it rather than no boundary at all.
  *      The sandbox is an identity boundary AND, where the kernel can apply one, a filesystem one.
- *      `scripts/athanor-sandbox run ... confine $ROOT` is `setpriv --reuid --regid --clear-groups
+ *      `scripts/garden-sandbox run ... confine $ROOT` is `setpriv --reuid --regid --clear-groups
  *      --no-new-privs` plus a Landlock ruleset: read and execute over the system hierarchies
  *      (/usr /bin /lib /lib64 /sbin /opt /etc /var /srv /run /proc /sys), write over
  *      `$ROOT/workspace`, `$ROOT/.home`, /tmp, /var/tmp and /dev/shm, and a device list over /dev.
  *      /home is granted nowhere, which is the whole boundary: every workspace on the box is mode
  *      2770 with the agent account's group, so a build recipe run for this task could previously
- *      read and rewrite every other task's tree, and `$ROOT/.athanor` - the checkpoints, the
+ *      read and rewrite every other task's tree, and `$ROOT/.garden` - the checkpoints, the
  *      browser profile, the artifacts - sat one level above the only directory it needed.
  *      Traversal is not restricted by Landlock, so the command still reaches its own
  *      `$ROOT/workspace` through a `$ROOT` it may not read, list, write or rename.
  *
  *      IT IS REPORTED RATHER THAN ASSUMED, and `filesystem=none` is a real answer on a real box.
- *      `athanor-sandbox check` applies the shipped read rules to `/bin/sh -c :` and prints
+ *      `garden-sandbox check` applies the shipped read rules to `/bin/sh -c :` and prints
  *      `filesystem=landlock` or `filesystem=none`. The probe program is a shell and not
  *      `/bin/true`, which is what this sentence said for one wave after the helper had stopped
  *      doing it: POSIX pins a shell at `/bin/sh` and pins nothing at `/bin/true`, so on a host
@@ -70,7 +70,7 @@
  *      WHAT BOUND 1 STILL CANNOT REWIND IS UNCHANGED. `execution.ts` sets `HOME` to `$ROOT/.home`
  *      at the container root, and the ruleset grants it write precisely because pip, cargo, npm and
  *      the coding CLIs have to write there. `CHECKPOINT_CONTENT` is `['workspace',
- *      '.athanor/artifacts']`, so a recipe that writes `$HOME/.cargo` or `$HOME/.gradle` writes
+ *      '.garden/artifacts']`, so a recipe that writes `$HOME/.cargo` or `$HOME/.gradle` writes
  *      where a rewind will not reach it, and that is chosen rather than overlooked: a home inside
  *      the checkpoint would be walked and hashed every turn against `CHECKPOINT_MAX_FILES` of
  *      250,000, and a Rust toolchain alone is 88,021 files - crossing it throws and the turn loses
@@ -494,8 +494,8 @@ export interface PostEditDiagnostic {
  * that passed. A run reaches the model only through the lines this parser recognised, so exit 0,
  * a checker that is not installed, a checker killed by its timeout and a checker whose output
  * changed shape all produce the identical answer - an empty array, and therefore silence. The
- * failure mode that leaves is "athanor did not tell me about an error", which a model repairs by
- * running the tool. The failure mode it forecloses is "athanor told me this file was clean", which
+ * failure mode that leaves is "garden did not tell me about an error", which a model repairs by
+ * running the tool. The failure mode it forecloses is "garden told me this file was clean", which
  * a model does not repair at all.
  *
  * The two grammars were driven on this machine on 2026-09-01 rather than recalled:

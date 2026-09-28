@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { AthanorError } from '@athanor/core';
-import type { EncryptedEnvelope } from '@athanor/core';
+import { GardenError } from '@garden/core';
+import type { EncryptedEnvelope } from '@garden/core';
 import type { Database } from '../database.js';
 import { TaskSignals, TASK_QUEUE_CHANNEL, TASK_EVENT_CHANNEL } from './tasks.js';
 import { COMMITTED_TASK_STATUSES } from './sql/tasks.js';
@@ -86,7 +86,7 @@ const decodeApprovalCursor = (cursor: string): { createdAt: string; id: string }
   const [createdAt, id] = parts;
   const at = new Date(String(createdAt));
   if (parts.length !== 2 || Number.isNaN(at.getTime()) || !id)
-    throw new AthanorError('invalid_cursor', 'That approval list position is not valid');
+    throw new GardenError('invalid_cursor', 'That approval list position is not valid');
   return { createdAt: String(createdAt), id };
 };
 
@@ -211,9 +211,9 @@ export class ConnectorStore {
     grant?: TaskApprovalGrantInput
   ): Promise<boolean> {
     if (correction && decision !== 'denied')
-      throw new AthanorError('approval_correction_invalid', 'Only a denial may carry a correction');
+      throw new GardenError('approval_correction_invalid', 'Only a denial may carry a correction');
     if (grant && decision !== 'approved')
-      throw new AthanorError('approval_grant_invalid', 'Only an approval may create a permission');
+      throw new GardenError('approval_grant_invalid', 'Only an approval may create a permission');
     const resolved = await this.database.transaction(async (tx) => {
       // Cancellation locks the task before its decisions. Keep that order and hold the task
       // through settlement so a later pause or cancellation cannot be overwritten by queuing.
@@ -230,7 +230,7 @@ export class ConnectorStore {
         (grant.securityMode !== task.security_mode ||
           grant.scopeCiphertext.aad !== `task-approval:${task.task_id}:${id}`)
       )
-        throw new AthanorError('approval_grant_invalid', 'Permission no longer matches this task');
+        throw new GardenError('approval_grant_invalid', 'Permission no longer matches this task');
       if (
         decision === 'approved' &&
         (
@@ -246,7 +246,7 @@ export class ConnectorStore {
         (correction.promptCiphertext.aad !== `task-message:${task.task_id}` ||
           correction.queuedEventCiphertext.aad !== `task-event:${task.task_id}`)
       )
-        throw new AthanorError(
+        throw new GardenError(
           'approval_correction_invalid',
           'Correction encryption context does not match the task'
         );
@@ -594,12 +594,12 @@ export class ConnectorStore {
         [id, userId]
       );
       if (!selected.rows[0])
-        throw new AthanorError('connector_not_found', 'Connected service is unavailable', 404);
+        throw new GardenError('connector_not_found', 'Connected service is unavailable', 404);
       const connector = mapConnector(selected.rows[0]);
       const authorization = await authorize(connector);
       if (authorization.secretCiphertext) {
         if (authorization.secretCiphertext.aad !== `connector:${userId}:${id}`)
-          throw new AthanorError('connector_secret_context', 'Connector secret context is invalid');
+          throw new GardenError('connector_secret_context', 'Connector secret context is invalid');
         await tx.query(
           `UPDATE connectors SET secret_ciphertext=$3::jsonb,updated_at=NOW() WHERE id=$1 AND user_id=$2`,
           [id, userId, JSON.stringify(authorization.secretCiphertext)]

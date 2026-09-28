@@ -1,5 +1,5 @@
 /**
- * What each arm actually puts on the wire, built from athanor's own sources and nothing else.
+ * What each arm actually puts on the wire, built from garden's own sources and nothing else.
  *
  * Every string here is either imported from the shipped module that produces it or sliced out of
  * the shipped module's source by a pattern that throws when it stops matching. Nothing is
@@ -55,7 +55,7 @@ export const EDIT_TOOL = 'file_patch';
  *
  * So the axis is not "swap the candidate in" but "these two arms differ by exactly the editor",
  * and the side that is not in the working tree is read out of the last revision that had it. The
- * arm called `shipped` is now a ROLLBACK - what athanor sent before the format landed - and the
+ * arm called `shipped` is now a ROLLBACK - what garden sent before the format landed - and the
  * arm called `line-edit` is the working tree unmodified. Naming the commit in the table is what
  * lets a reader check that, and `HISTORY_DEPTH` bounds the walk.
  */
@@ -303,7 +303,7 @@ export const toolsFor = (settings: ArmSettings): readonly ModelTool[] => {
   const missing = [...wanted].filter((name) => !chosen.some((tool) => tool.name === name));
   if (missing.length)
     throw new Error(
-      `arm wants tools athanor does not define: ${missing.join(', ')}. A filter that silently drops a name it cannot find measures a smaller arm than the one it claims to.`
+      `arm wants tools garden does not define: ${missing.join(', ')}. A filter that silently drops a name it cannot find measures a smaller arm than the one it claims to.`
     );
   return withEditDialect(chosen, settings);
 };
@@ -487,7 +487,7 @@ export const methodAxis = (supplied?: string): MethodAxis => {
  *
  * `baseSystemPrompt(capabilities)` gates its bullets on which tools the run is actually sending.
  * So handing it the arm's own tool names is not a second edit made by this rig - it is the arm's
- * one edit propagating through athanor's own code, which is what the arm is a model of. Passing
+ * one edit propagating through garden's own code, which is what the arm is a model of. Passing
  * the ungated constant instead would send a five-tool arm a contract that talks about twelve tools
  * it does not have, and the turns that cost would be charged to the tool axis while being caused
  * by the rig.
@@ -507,7 +507,7 @@ export const methodAxis = (supplied?: string): MethodAxis => {
  *
  * The skills axis takes the pointer with the index. A window with no skill index that still carries
  * "both indexed by name in your curated knowledge block ... open the full text with
- * skill(action=view)" is not an athanor without skills, it is an athanor whose contract is lying to
+ * skill(action=view)" is not an garden without skills, it is an garden whose contract is lying to
  * the model about its own window - which costs turns for a reason that has nothing to do with the
  * question being asked. Both byte deltas are reported separately, so the reader can see which half
  * of the removal is which.

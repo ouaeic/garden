@@ -2,7 +2,7 @@
  * What the registry says out loud about a refresh, and when it stays quiet.
  *
  * This service has no listener, no metrics endpoint and nothing watching it. A refresh that keeps
- * failing therefore has exactly one place it can be noticed: the journal, through `athanor logs`.
+ * failing therefore has exactly one place it can be noticed: the journal, through `garden logs`.
  * Left silent, a catalogue that stopped changing looks identical to a provider that shipped
  * nothing new for a month - so the first failure is reported, and so is the recovery.
  *
@@ -37,19 +37,19 @@ export const refreshLogLine = (input: {
     // was rejected, and the difference is the whole of what the owner needs in order to act.
     if (input.state === 'refused')
       return (
-        `athanor model registry: the model catalogue was NOT replaced from the provider's answer - ` +
+        `garden model registry: the model catalogue was NOT replaced from the provider's answer - ` +
         `${input.reason}. Checking again every ${input.intervalSeconds} seconds; until the answer ` +
         `is describable again this will not resolve on its own.\n`
       );
     return (
-      `athanor model registry: the model catalogue could not be refreshed (${input.reason}). ` +
+      `garden model registry: the model catalogue could not be refreshed (${input.reason}). ` +
       `The catalogue already in the database stays in use; retrying every ${input.intervalSeconds} seconds.\n`
     );
   }
   if (input.previousFailures === 0) return null;
   const attempts =
     input.previousFailures === 1 ? '1 failed attempt' : `${input.previousFailures} failed attempts`;
-  return `athanor model registry: the model catalogue refreshed again after ${attempts}.\n`;
+  return `garden model registry: the model catalogue refreshed again after ${attempts}.\n`;
 };
 
 /**
@@ -84,7 +84,7 @@ export const catalogueFrozenLine = (input: {
   if (input.state === 'refreshed') {
     if (!input.alreadySaid) return null;
     return (
-      'athanor model registry: there is a provider key again, and the model catalogue is being ' +
+      'garden model registry: there is a provider key again, and the model catalogue is being ' +
       'refreshed from it.\n'
     );
   }
@@ -100,7 +100,7 @@ export const catalogueFrozenLine = (input: {
       ? 'its 1 model stays exactly as it is'
       : `its ${input.models} models stay exactly as they are`;
   return (
-    `athanor model registry: there is no provider key this catalogue can be refreshed from, so ` +
+    `garden model registry: there is no provider key this catalogue can be refreshed from, so ` +
     `${held} (${written}). A model the provider ` +
     `withdraws will go on being offered in the picker, and the prices a run is charged against ` +
     `are the ones recorded then. Saving a provider key in Settings is what starts the refresh.\n`

@@ -48,13 +48,13 @@ jobs:
           node-version: 24.18.0
           cache: pnpm
       # Three proofs of the product's headline capability - scripts/test-document.mjs, the render
-      # proof and scripts/athanor-document-proof - guarded their real work behind existsSync and
+      # proof and scripts/garden-document-proof - guarded their real work behind existsSync and
       # reported green when the binaries were absent. Nothing was ever installed here, so on this
       # runner the OCR half, the Office half and every rendered-page measurement had never once
       # executed. They fail loudly now instead, which is only worth anything if what they need is
       # actually present.
       #
-      # The package names come from the table in scripts/athanor-host.sh, the one the installer
+      # The package names come from the table in scripts/garden-host.sh, the one the installer
       # reads, so a capability that stops being packaged fails this step rather than quietly
       # skipping a proof on a box and here alike. Document and media tools are installed: PostgreSQL,
       # Nginx and the desktop stack belong to an owner's computer, not to a verification runner.
@@ -62,8 +62,8 @@ jobs:
         run: |
           sudo sh -c '
             set -e
-            . scripts/athanor-host.sh
-            athanor_detect_host
+            . scripts/garden-host.sh
+            garden_detect_host
             packages=""
             for capability in poppler tesseract tesseract-english ffmpeg qpdf img2pdf graphviz \
               office-writer office-impress office-calc \
@@ -71,18 +71,18 @@ jobs:
               python-lxml python-xlsxwriter python-pandas python-pyarrow python-matplotlib \
               python-scipy python-statsmodels \
               font-carlito font-caladea font-liberation font-dejavu font-noto; do
-              name=$(athanor_package_for "$capability" "$athanor_family")
+              name=$(garden_package_for "$capability" "$garden_family")
               [ -n "$name" ] ||
-                { echo "no $athanor_family package for $capability" >&2; exit 1; }
+                { echo "no $garden_family package for $capability" >&2; exit 1; }
               packages="$packages $name"
             done
-            athanor_pm_refresh apt-get
-            athanor_pm_install apt-get $packages
+            garden_pm_refresh apt-get
+            garden_pm_install apt-get $packages
           '
       # typst is not packaged by any distribution, so the installer pins it by version and by the
       # hash of the exact archive. Both are read back out of scripts/install-native.sh rather than
       # written again here: a second copy of a pin is a pin that drifts, and the three typeset jobs
-      # in scripts/athanor-document-proof skip themselves without it.
+      # in scripts/garden-document-proof skip themselves without it.
       - name: Install the pinned typesetting engine
         run: |
           set -e
@@ -99,21 +99,21 @@ jobs:
             "$(dirname "$archive")/typst-x86_64-unknown-linux-musl/typst" /usr/local/bin/typst
           typst --version
       # The same environment the installer builds, at the same path services/workspace-runner reads
-      # from ATHANOR_PYTHON, from the repository's own hash-pinned requirements: pypdf is what every
+      # from GARDEN_PYTHON, from the repository's own hash-pinned requirements: pypdf is what every
       # measurement of a produced PDF goes through, and python-pptx is no longer packaged by Ubuntu.
-      # athanor-office-convert goes where scripts/athanor-document-proof looks for it, because a
+      # garden-office-convert goes where scripts/garden-document-proof looks for it, because a
       # LibreOffice that nothing knows how to call converts nothing.
       - name: Prepare the pinned document Python environment
         run: |
           set -e
-          sudo install -d -m 0755 /usr/local/lib/athanor
-          sudo python3 -m venv --system-site-packages /usr/local/lib/athanor/python
-          sudo /usr/local/lib/athanor/python/bin/python3 -m pip install --quiet \
+          sudo install -d -m 0755 /usr/local/lib/garden
+          sudo python3 -m venv --system-site-packages /usr/local/lib/garden/python
+          sudo /usr/local/lib/garden/python/bin/python3 -m pip install --quiet \
             --disable-pip-version-check --require-hashes --no-deps --only-binary=:all: \
-            --requirement infra/native/athanor-python-requirements.txt
-          sudo chmod -R a+rX /usr/local/lib/athanor
-          /usr/local/lib/athanor/python/bin/python3 -c 'import pypdf, pptx, docx, openpyxl, PIL'
-          sudo install -m 0755 scripts/athanor-office-convert /usr/local/bin/athanor-office-convert
+            --requirement infra/native/garden-python-requirements.txt
+          sudo chmod -R a+rX /usr/local/lib/garden
+          /usr/local/lib/garden/python/bin/python3 -c 'import pypdf, pptx, docx, openpyxl, PIL'
+          sudo install -m 0755 scripts/garden-office-convert /usr/local/bin/garden-office-convert
       - run: pnpm install --frozen-lockfile
       - run: pnpm release:check
       # Every shipped script, the skill library and .env.example are checked by
@@ -198,7 +198,7 @@ jobs:
   # measures the one property every confinement directive on the runner unit can silently take
   # away. Five harnesses shipped in scripts/ and nothing ran any of them, so the only automated
   # proof that the agent-account drop works had never once executed - while it is exactly what
-  # tightening infra/native/athanor-runner.service puts at risk. This job exists so that a
+  # tightening infra/native/garden-runner.service puts at risk. This job exists so that a
   # directive added to that unit is observed here rather than on somebody's server.
   native-units:
     if: github.event_name != 'schedule'
@@ -229,29 +229,29 @@ jobs:
       - name: Build the accounts and paths the units name
         run: |
           set -eu
-          sudo groupadd --force athanor-agent
-          getent passwd athanor >/dev/null ||
-            sudo useradd --create-home --home-dir /home/athanor --shell /bin/bash athanor
-          getent passwd athanor-agent >/dev/null ||
+          sudo groupadd --force garden-agent
+          getent passwd garden >/dev/null ||
+            sudo useradd --create-home --home-dir /home/garden --shell /bin/bash garden
+          getent passwd garden-agent >/dev/null ||
             sudo useradd --system --no-create-home --home-dir /nonexistent \
-              --shell /usr/sbin/nologin --gid athanor-agent athanor-agent
-          getent passwd athanor-control >/dev/null ||
-            sudo useradd --system --create-home --home-dir /var/lib/athanor-control \
-              --shell /usr/sbin/nologin athanor-control
-          sudo install -d -m 0755 /opt/athanor /usr/local/lib/athanor /etc/athanor/tls \
-            /etc/athanor/relay /var/lib/athanor /var/lib/athanor-control /etc/nginx/snippets
-          sudo install -d -m 2710 -o athanor -g athanor-agent /home/athanor
-          for program in athanor-service athanor-certificate athanor-network-refresh \
-            athanor-network-watch; do
+              --shell /usr/sbin/nologin --gid garden-agent garden-agent
+          getent passwd garden-control >/dev/null ||
+            sudo useradd --system --create-home --home-dir /var/lib/garden-control \
+              --shell /usr/sbin/nologin garden-control
+          sudo install -d -m 0755 /opt/garden /usr/local/lib/garden /etc/garden/tls \
+            /etc/garden/relay /var/lib/garden /var/lib/garden-control /etc/nginx/snippets
+          sudo install -d -m 2710 -o garden -g garden-agent /home/garden
+          for program in garden-service garden-certificate garden-network-refresh \
+            garden-network-watch; do
             printf '#!/bin/sh\nexit 0\n' |
-              sudo tee "/usr/local/lib/athanor/$program" >/dev/null
-            sudo chmod 0755 "/usr/local/lib/athanor/$program"
+              sudo tee "/usr/local/lib/garden/$program" >/dev/null
+            sudo chmod 0755 "/usr/local/lib/garden/$program"
           done
-          printf '#!/bin/sh\nexit 0\n' | sudo tee /usr/local/bin/athanor >/dev/null
-          sudo chmod 0755 /usr/local/bin/athanor
+          printf '#!/bin/sh\nexit 0\n' | sudo tee /usr/local/bin/garden >/dev/null
+          sudo chmod 0755 /usr/local/bin/garden
           for environment in runner control; do
-            sudo touch "/etc/athanor/$environment.env"
-            sudo chmod 0600 "/etc/athanor/$environment.env"
+            sudo touch "/etc/garden/$environment.env"
+            sudo chmod 0600 "/etc/garden/$environment.env"
           done
 
       # --recursive-errors=no because these units order themselves behind nginx and postgresql,
@@ -262,7 +262,7 @@ jobs:
           set -eu
           units=$(mktemp -d)
           cp infra/native/*.service infra/native/*.timer infra/native/*.target "$units/"
-          mv "$units/athanor@.service" "$units/athanor@ci.service"
+          mv "$units/garden@.service" "$units/garden@ci.service"
           for unit in "$units"/*; do
             printf '\n== %s\n' "$(basename "$unit")"
             systemd-analyze verify --recursive-errors=no "$unit"
@@ -277,7 +277,7 @@ jobs:
           set -eu
           units=$(mktemp -d)
           cp infra/native/*.service "$units/"
-          mv "$units/athanor@.service" "$units/athanor@ci.service"
+          mv "$units/garden@.service" "$units/garden@ci.service"
           for unit in "$units"/*.service; do
             printf '\n== %s\n' "$(basename "$unit")"
             systemd-analyze security --offline=true --threshold=100 --no-pager "$unit"
@@ -290,7 +290,7 @@ jobs:
       - name: The runner unit's deliberate omissions are still omissions
         run: |
           set -eu
-          unit=infra/native/athanor-runner.service
+          unit=infra/native/garden-runner.service
           carries() { grep -Eq "^$1=" "$unit"; }
           for forbidden in NoNewPrivileges RestrictNamespaces ProtectSystem; do
             if carries "$forbidden"; then
@@ -311,20 +311,20 @@ jobs:
             RestrictRealtime RestrictSUIDSGID ProtectProc ProtectHome; do
             carries "$required" || { printf '%s lost %s\n' "$unit" "$required" >&2; exit 1; }
           done
-          # WORKSPACE_ROOT is /home/athanor (scripts/install-native.sh), so ProtectHome without
+          # WORKSPACE_ROOT is /home/garden (scripts/install-native.sh), so ProtectHome without
           # an exemption takes every workspace away from the agent.
           #
-          # This used to assert `ReadWritePaths=/home/athanor` was present, and it was present, and
+          # This used to assert `ReadWritePaths=/home/garden` was present, and it was present, and
           # it did not work: `ReadWritePaths=` changes the access mode of a path the namespace can
           # still see, and `ProtectHome=true` mounts over /home so there is nothing left to reopen.
           # The line was there, the comment said what it was for, and on a real box the runner saw
-          # `/home` as an empty `d---------` with no `athanor` in it and every task failed. A check
+          # `/home` as an empty `d---------` with no `garden` in it and every task failed. A check
           # that reads the text of a mitigation cannot tell a working one from a decorative one, so
           # this one runs it instead - see the namespace drill below, which is the assertion that
           # actually holds this now.
           grep -q '^ProtectHome=tmpfs$' "$unit" ||
             { printf '%s must hide /home with tmpfs, not true\n' "$unit" >&2; exit 1; }
-          grep -q '^BindPaths=/home/athanor$' "$unit" ||
+          grep -q '^BindPaths=/home/garden$' "$unit" ||
             { printf '%s hides /home without binding the workspace root back\n' "$unit" >&2; exit 1; }
           if grep -Eq '^ReadWritePaths=/home' "$unit"; then
             printf '%s reopens /home with ReadWritePaths, which cannot reopen a mounted-over path\n' "$unit" >&2
@@ -337,24 +337,24 @@ jobs:
       - name: Prove the home confinement still leaves the workspace root reachable
         run: |
           set -eu
-          sudo mkdir -p /home/athanor/probe-workspace
-          sudo touch /home/athanor/probe-workspace/marker
+          sudo mkdir -p /home/garden/probe-workspace
+          sudo touch /home/garden/probe-workspace/marker
           # What the unit does: the workspace root is there and writable, and no other home is.
           sudo systemd-run --wait --pipe --collect --service-type=oneshot \
-            --property=ProtectHome=tmpfs --property=BindPaths=/home/athanor \
-            /bin/sh -c 'test -f /home/athanor/probe-workspace/marker &&
-              touch /home/athanor/probe-workspace/written &&
+            --property=ProtectHome=tmpfs --property=BindPaths=/home/garden \
+            /bin/sh -c 'test -f /home/garden/probe-workspace/marker &&
+              touch /home/garden/probe-workspace/written &&
               ! ls /home/runner >/dev/null 2>&1'
-          sudo test -f /home/athanor/probe-workspace/written
+          sudo test -f /home/garden/probe-workspace/written
           # And the counter-direction, which is the pairing that shipped: it must NOT work, so a
           # future edit back to it fails here rather than on somebody's server.
           if sudo systemd-run --wait --pipe --collect --service-type=oneshot \
-            --property=ProtectHome=true --property=ReadWritePaths=/home/athanor \
-            /bin/sh -c 'test -f /home/athanor/probe-workspace/marker'; then
+            --property=ProtectHome=true --property=ReadWritePaths=/home/garden \
+            /bin/sh -c 'test -f /home/garden/probe-workspace/marker'; then
             printf 'ProtectHome=true with ReadWritePaths now reaches the workspace; this drill is stale\n' >&2
             exit 1
           fi
-          sudo rm -rf /home/athanor/probe-workspace
+          sudo rm -rf /home/garden/probe-workspace
 
       # One directive at a time, which is how this unit has to be tightened and now how it is
       # checked. Each confinement directive is put in front of the sudo call on its own, against a
@@ -364,27 +364,27 @@ jobs:
       - name: The sudo route survives each confinement directive on its own
         run: |
           set -eu
-          printf 'athanor ALL=(root) NOPASSWD: /usr/bin/id, /usr/bin/unshare, /usr/bin/apt-get\n' |
-            sudo tee /etc/sudoers.d/athanor-drill >/dev/null
-          sudo chmod 0440 /etc/sudoers.d/athanor-drill
-          sudo visudo -cf /etc/sudoers.d/athanor-drill >/dev/null
-          sudo install -d -m 0755 /opt/athanor-drill
+          printf 'garden ALL=(root) NOPASSWD: /usr/bin/id, /usr/bin/unshare, /usr/bin/apt-get\n' |
+            sudo tee /etc/sudoers.d/garden-drill >/dev/null
+          sudo chmod 0440 /etc/sudoers.d/garden-drill
+          sudo visudo -cf /etc/sudoers.d/garden-drill >/dev/null
+          sudo install -d -m 0755 /opt/garden-drill
           # /home is not visible under ProtectHome, so no probe may live in the checkout.
-          sudo tee /opt/athanor-drill/sudo-probe.sh >/dev/null <<'SUDOPROBE'
+          sudo tee /opt/garden-drill/sudo-probe.sh >/dev/null <<'SUDOPROBE'
           set -eu
           printf 'no_new_privs=%s ' "$(sed -n 's/^NoNewPrivs:[[:space:]]*//p' /proc/self/status)"
           sudo -n /usr/bin/id -u
           SUDOPROBE
-          sudo chmod 0755 /opt/athanor-drill/sudo-probe.sh
+          sudo chmod 0755 /opt/garden-drill/sudo-probe.sh
           probe() {
             probe_name=$1
             probe_directive=$2
             set --
             [ -z "$probe_directive" ] || set -- --property="$probe_directive"
             sudo systemd-run --wait --pipe --collect --quiet \
-              --unit="athanor-drill-$probe_name" --property=RuntimeMaxSec=60 \
-              --property=User=athanor --property=Group=athanor "$@" \
-              /bin/sh /opt/athanor-drill/sudo-probe.sh
+              --unit="garden-drill-$probe_name" --property=RuntimeMaxSec=60 \
+              --property=User=garden --property=Group=garden "$@" \
+              /bin/sh /opt/garden-drill/sudo-probe.sh
           }
           control=$(probe control '' 2>&1 || true)
           printf '%-46s %s\n' '(no confinement directive)' "$control"
@@ -433,7 +433,7 @@ jobs:
       - name: Drill every privileged route under the runner unit's own directive set
         run: |
           set -eu
-          sudo tee /opt/athanor-drill/probe.sh >/dev/null <<'PROBE'
+          sudo tee /opt/garden-drill/probe.sh >/dev/null <<'PROBE'
           set -eu
           printf 'no_new_privs: %s\n' "$(sed -n 's/^NoNewPrivs:[[:space:]]*//p' /proc/self/status)"
           [ "$(sudo -n /usr/bin/id -u)" = 0 ] ||
@@ -443,13 +443,13 @@ jobs:
           sudo -n /usr/bin/apt-get install -y --no-install-recommends hello >/dev/null ||
             { echo 'an approved package install can no longer write /usr' >&2; exit 1; }
           [ -x /usr/bin/hello ] || { echo 'the package install wrote nothing' >&2; exit 1; }
-          [ -d /home/athanor ] || { echo 'the workspace root is not reachable' >&2; exit 1; }
-          : >/home/athanor/.drill
+          [ -d /home/garden ] || { echo 'the workspace root is not reachable' >&2; exit 1; }
+          : >/home/garden/.drill
           [ ! -e /home/runner/work ] ||
             { echo 'ProtectHome is not hiding the accounts it should' >&2; exit 1; }
           echo 'ok  sudo, unshare --net, an approved install and the workspace root all still work'
           PROBE
-          sudo chmod 0755 /opt/athanor-drill/probe.sh
+          sudo chmod 0755 /opt/garden-drill/probe.sh
           sudo apt-get update >/dev/null
           # ExecStart is replaced by the probe; Type and the restart policy belong to a service
           # that stays up and would make a one-shot drill either hang or loop. Everything else the
@@ -462,7 +462,7 @@ jobs:
               if (key == "ExecStart" || key == "Type" || key == "Restart" || key == "RestartSec")
                 next
               print
-            }' infra/native/athanor-runner.service)
+            }' infra/native/garden-runner.service)
           set --
           while IFS= read -r property; do
             [ -n "$property" ] || continue
@@ -471,8 +471,8 @@ jobs:
           $properties
           PROPERTIES
           printf 'handing %s directives from the unit to the drill\n' "$#"
-          sudo systemd-run --wait --pipe --collect --quiet --unit=athanor-runner-drill \
-            --property=RuntimeMaxSec=300 "$@" /bin/sh /opt/athanor-drill/probe.sh
+          sudo systemd-run --wait --pipe --collect --quiet --unit=garden-runner-drill \
+            --property=RuntimeMaxSec=300 "$@" /bin/sh /opt/garden-drill/probe.sh
 
       # The renewal unit's confinement is only worth having if the renewal still runs under it. It
       # writes four trees and reloads nginx, and the reload is the part a read-only /run could
@@ -481,9 +481,9 @@ jobs:
       - name: Drill the certificate renewal under ProtectSystem=strict
         run: |
           set -eu
-          sudo tee /opt/athanor-drill/certificate.sh >/dev/null <<'CERTIFICATE'
+          sudo tee /opt/garden-drill/certificate.sh >/dev/null <<'CERTIFICATE'
           set -eu
-          for writable in /etc/athanor /etc/nginx/snippets /var/lib/athanor /usr/local/lib/athanor; do
+          for writable in /etc/garden /etc/nginx/snippets /var/lib/garden /usr/local/lib/garden; do
             : >"$writable/.drill" || { echo "$writable is not writable" >&2; exit 1; }
             rm -f "$writable/.drill"
           done
@@ -495,7 +495,7 @@ jobs:
             { echo 'systemctl can no longer reach the manager, so nginx cannot be reloaded' >&2; exit 1; }
           echo 'ok  the four trees are writable, nothing else is, and the reload path is open'
           CERTIFICATE
-          sudo chmod 0755 /opt/athanor-drill/certificate.sh
+          sudo chmod 0755 /opt/garden-drill/certificate.sh
           # Read out of the unit rather than written again here: a second copy of a directive set
           # is a directive set that drifts, and this drill is worth having only while it is the
           # same one the timer will use.
@@ -508,7 +508,7 @@ jobs:
                   key == "RestartSec" || key == "TimeoutStartSec")
                 next
               print
-            }' infra/native/athanor-certificate-renew.service)
+            }' infra/native/garden-certificate-renew.service)
           set --
           while IFS= read -r property; do
             [ -n "$property" ] || continue
@@ -517,8 +517,8 @@ jobs:
           $properties
           PROPERTIES
           printf 'handing %s directives from the unit to the drill\n' "$#"
-          sudo systemd-run --wait --pipe --collect --quiet --unit=athanor-certificate-drill \
-            --property=RuntimeMaxSec=60 "$@" /bin/sh /opt/athanor-drill/certificate.sh
+          sudo systemd-run --wait --pipe --collect --quiet --unit=garden-certificate-drill \
+            --property=RuntimeMaxSec=60 "$@" /bin/sh /opt/garden-drill/certificate.sh
 
   # The installer claims four package families and only one of them has ever been executed. This
   # runs the same table, the same detection and the same install dispatch on a dnf host, so a name
@@ -539,31 +539,31 @@ jobs:
       - name: Detect the host through the installer's own table
         run: |
           set -eu
-          . scripts/athanor-host.sh
-          athanor_detect_host
-          printf 'family=%s manager=%s\n' "$athanor_family" "$athanor_pm"
-          [ "$athanor_family" = rhel ] ||
-            { printf 'a Fedora container was read as %s\n' "$athanor_family" >&2; exit 1; }
-          case "$athanor_pm" in
+          . scripts/garden-host.sh
+          garden_detect_host
+          printf 'family=%s manager=%s\n' "$garden_family" "$garden_pm"
+          [ "$garden_family" = rhel ] ||
+            { printf 'a Fedora container was read as %s\n' "$garden_family" >&2; exit 1; }
+          case "$garden_pm" in
           dnf | dnf5) ;;
           *)
-            printf 'a Fedora container chose %s\n' "$athanor_pm" >&2
+            printf 'a Fedora container chose %s\n' "$garden_pm" >&2
             exit 1
             ;;
           esac
           printf 'capabilities with no rhel package:\n'
-          athanor_missing_for_family rhel | sed 's/^/  /'
+          garden_missing_for_family rhel | sed 's/^/  /'
       # A survey, not a gate. Every name in the rhel column is asked of the real repositories; what
-      # it finds is a defect in scripts/athanor-host.sh, which this job does not own and cannot fix
+      # it finds is a defect in scripts/garden-host.sh, which this job does not own and cannot fix
       # in the same change. The install below is what gates.
       - name: Survey the whole rhel column against the real repositories
         run: |
           set -eu
-          . scripts/athanor-host.sh
-          athanor_detect_host
-          athanor_pm_refresh "$athanor_pm"
+          . scripts/garden-host.sh
+          garden_detect_host
+          garden_pm_refresh "$garden_pm"
           missing=""
-          for name in $(athanor_packages_for_family rhel | sort -u); do
+          for name in $(garden_packages_for_family rhel | sort -u); do
             if [ -n "$(dnf --quiet repoquery "$name" 2>/dev/null)" ]; then
               printf '  ok      %s\n' "$name"
             else
@@ -572,26 +572,26 @@ jobs:
             fi
           done
           [ -z "$missing" ] || printf '\nnot packaged on this host:%s\n' "$missing"
-      # The dispatch itself against a real dnf. The manager strings in athanor_pm_install are the
+      # The dispatch itself against a real dnf. The manager strings in garden_pm_install are the
       # part an apt-only run cannot reach, and a wrong flag there fails an owner's install at the
       # first package rather than at the check.
       - name: Install a spanning subset through the installer's own dispatch
         run: |
           set -eu
-          . scripts/athanor-host.sh
-          athanor_detect_host
+          . scripts/garden-host.sh
+          garden_detect_host
           packages=""
           for capability in curl file jq poppler qpdf ripgrep tar unzip zip \
             tesseract tesseract-english python python-pillow; do
-            name=$(athanor_package_for "$capability" "$athanor_family")
+            name=$(garden_package_for "$capability" "$garden_family")
             [ -n "$name" ] ||
-              { printf 'no %s package for %s\n' "$athanor_family" "$capability" >&2; exit 1; }
+              { printf 'no %s package for %s\n' "$garden_family" "$capability" >&2; exit 1; }
             packages="$packages $name"
           done
           printf 'installing:%s\n' "$packages"
-          athanor_pm_refresh "$athanor_pm"
+          garden_pm_refresh "$garden_pm"
           # shellcheck disable=SC2086
-          athanor_pm_install "$athanor_pm" $packages
+          garden_pm_install "$garden_pm" $packages
           command -v pdftotext >/dev/null
           command -v tesseract >/dev/null
           command -v rg >/dev/null
@@ -618,7 +618,7 @@ jobs:
       - run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --locked --all-targets
       - run: cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --locked --all-targets -- -D warnings
       - run: pnpm native:configure
-      - run: pnpm --filter @athanor/desktop native:build --bundles app
+      - run: pnpm --filter @garden/desktop native:build --bundles app
 
   ios:
     if: github.event_name != 'schedule'
@@ -644,8 +644,8 @@ jobs:
       - name: Build and audit the unsigned iOS simulator client
         env:
           CI: true
-          CARGO_TARGET_DIR: ${{ runner.temp }}/athanor-target
-        run: pnpm --filter @athanor/desktop ios:build --target aarch64-sim --no-sign --ci
+          CARGO_TARGET_DIR: ${{ runner.temp }}/garden-target
+        run: pnpm --filter @garden/desktop ios:build --target aarch64-sim --no-sign --ci
 
   android:
     if: github.event_name != 'schedule'
@@ -687,9 +687,9 @@ jobs:
       - name: Build and audit an unsigned CI APK
         env:
           CI: true
-          CARGO_TARGET_DIR: ${{ runner.temp }}/athanor-target
-          GRADLE_USER_HOME: ${{ runner.temp }}/athanor-gradle
-        run: pnpm --filter @athanor/desktop android:build --apk --target aarch64 --ci
+          CARGO_TARGET_DIR: ${{ runner.temp }}/garden-target
+          GRADLE_USER_HOME: ${{ runner.temp }}/garden-gradle
+        run: pnpm --filter @garden/desktop android:build --apk --target aarch64 --ci
 
   supply-chain:
     if: github.event_name != 'schedule'
@@ -788,7 +788,7 @@ jobs:
       - name: Grade the window with the blinded judge, and drive the injection suite live
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          ATHANOR_EVAL_SPEND: ${{ vars.ATHANOR_EVAL_SPEND }}
+          GARDEN_EVAL_SPEND: ${{ vars.GARDEN_EVAL_SPEND }}
         run: |
           set -eu
           # No `if [ -z "$OPENROUTER_API_KEY" ]` here on purpose. Both rigs already decide this,
@@ -802,10 +802,10 @@ jobs:
           # about 14.7 million prompt tokens plus a grading call per probe, every night, and the
           # live injection half is about 15 more. Without it both rigs print that estimate and
           # stop, so the nightly still proves the credential works and still says what a graded
-          # run would cost. Set the repository variable ATHANOR_EVAL_SPEND to `yes` to buy the
+          # run would cost. Set the repository variable GARDEN_EVAL_SPEND to `yes` to buy the
           # numbers.
           spend=""
-          if [ "${ATHANOR_EVAL_SPEND:-}" = "yes" ]; then
+          if [ "${GARDEN_EVAL_SPEND:-}" = "yes" ]; then
             spend="--yes"
           fi
           # shellcheck disable=SC2086

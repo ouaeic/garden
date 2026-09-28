@@ -34,15 +34,15 @@ export const registerMetrics = (context: ServerBase): void => {
   });
   app.get('/metrics', async (_request, reply) => {
     const lines = [
-      '# HELP athanor_http_requests_total Content-free HTTP request count',
-      '# TYPE athanor_http_requests_total counter'
+      '# HELP garden_http_requests_total Content-free HTTP request count',
+      '# TYPE garden_http_requests_total counter'
     ];
     for (const [key, metric] of requestMetrics) {
       const [method, route, status] = key.split('|');
       const labels = `method=${JSON.stringify(method)},route=${JSON.stringify(route)},status=${JSON.stringify(status)}`;
       lines.push(
-        `athanor_http_requests_total{${labels}} ${metric.count}`,
-        `athanor_http_request_duration_milliseconds_sum{${labels}} ${metric.durationMs.toFixed(3)}`
+        `garden_http_requests_total{${labels}} ${metric.count}`,
+        `garden_http_request_duration_milliseconds_sum{${labels}} ${metric.durationMs.toFixed(3)}`
       );
     }
     return reply.type('text/plain; version=0.0.4').send(`${lines.join('\n')}\n`);

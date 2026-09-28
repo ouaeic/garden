@@ -1,8 +1,8 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
-import { canonicalApprovalScope } from '@athanor/contracts';
-import { wrapDataKey } from '@athanor/core';
-import type { DataStore, TaskRecord } from '@athanor/data';
+import { canonicalApprovalScope } from '@garden/contracts';
+import { wrapDataKey } from '@garden/core';
+import type { DataStore, TaskRecord } from '@garden/data';
 import { approvalRequirement } from './approval-policy.js';
 import { approvalForCall, type ApprovalFloorDeps } from './approval-floor.js';
 import type { AgentState } from './agent-state.js';
@@ -112,7 +112,7 @@ describe('reusable approval scope', () => {
     expect(
       approvalRequirement(
         'file_write',
-        { path: 'workspace/ATHANOR.md', content: 'instructions' },
+        { path: 'workspace/GARDEN.md', content: 'instructions' },
         'review',
         tainted
       )?.taskGrant

@@ -2,13 +2,13 @@
 name: xlsx-authoring
 description: Build or edit .xlsx workbooks with live formulas rather than pasted values, correct number formats, named ranges and native charts using openpyxl, then force a real recalculation and assert zero error cells. Use when the deliverable is a spreadsheet, budget, financial model, tracker or Excel file, or when formulas in an existing workbook are wrong. Do not use when the deliverable is a CSV dump, a chart image, or a written report about data.
 license: AGPL-3.0-or-later
-compatibility: Every tool named here is installed on this computer by athanor - openpyxl and pandas through /usr/local/lib/athanor/python/bin/python3, plus athanor-office-convert for the recalculation.
+compatibility: Every tool named here is installed on this computer by garden - openpyxl and pandas through /usr/local/lib/garden/python/bin/python3, plus garden-office-convert for the recalculation.
 allowed-tools: shell file_read file_write files_list document_read image_read publish_artifact
 metadata:
-  athanor.tier: 'builtin'
-  athanor.version: '2.0.0'
-  athanor.risk: 'workspace'
-  athanor.domain: 'spreadsheets'
+  garden.tier: 'builtin'
+  garden.version: '2.0.0'
+  garden.risk: 'workspace'
+  garden.domain: 'spreadsheets'
 ---
 
 # Spreadsheet authoring
@@ -59,8 +59,8 @@ straight out of openpyxl shows blanks in some viewers until it is recalculated â
 to `.xlsx` is what makes that happen:
 
 ```
-athanor-office-convert model.xlsx model.recalc.xlsx
-/usr/local/lib/athanor/python/bin/python3 scripts/count_error_cells.py model.recalc.xlsx
+garden-office-convert model.xlsx model.recalc.xlsx
+/usr/local/lib/garden/python/bin/python3 scripts/count_error_cells.py model.recalc.xlsx
 ```
 
 `count_error_cells.py` ships in this skill's own directory. It exits non-zero when any cell holds an

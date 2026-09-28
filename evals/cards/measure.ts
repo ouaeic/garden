@@ -319,7 +319,7 @@ export const guardFailures = (
       knownOrigins: entry.knownOrigins ?? [],
       knownAddresses: [],
       ownerText: 'have a look at this and deal with it',
-      selfOrigins: ['box.athanor.invalid'],
+      selfOrigins: ['box.garden.invalid'],
       spentNoveltyBytes: 0
     };
     const clean = approvalRequirement(entry.call.name, entry.call.arguments, entry.mode, {
@@ -396,7 +396,7 @@ export const guardFailures = (
         const call = egressCall(entry);
         const args = declared ? { ...call.arguments, network: true } : call.arguments;
         const requirement = approvalRequirement(call.name, args, mode, {
-          selfOrigins: ['box.athanor.invalid']
+          selfOrigins: ['box.garden.invalid']
         });
         if (entry.cards === Boolean(requirement)) continue;
         const spelling = declared ? 'declaring network: true' : 'with the network field left out';
@@ -592,7 +592,7 @@ export const declarationFailures = (
           knownOrigins: [],
           knownAddresses: [],
           ownerText: 'build the thing I asked for',
-          selfOrigins: ['box.athanor.invalid'],
+          selfOrigins: ['box.garden.invalid'],
           spentNoveltyBytes: 0
         };
         const { network: _declared, ...silent } = call.arguments;

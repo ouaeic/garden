@@ -21,14 +21,14 @@
  * - the plan and the runtime block go at the tail, which is the opposite decision and is argued for
  *   in the file at length.
  */
-import { WEB_TOOL_DISCLOSURE, type WebToolPlan } from '@athanor/contracts';
+import { WEB_TOOL_DISCLOSURE, type WebToolPlan } from '@garden/contracts';
 import {
   encryptBytes,
   encryptJson,
   ownerBlockAad,
   userMemoryAad,
   userMemoryKey
-} from '@athanor/core';
+} from '@garden/core';
 import type {
   DataStore,
   MemoryCandidateRecord,
@@ -39,8 +39,8 @@ import type {
   WorkspaceMemoryRecord,
   WorkspaceRecord,
   WorkspaceSkillRecord
-} from '@athanor/data';
-import type { ModelMessage } from '@athanor/model-gateway';
+} from '@garden/data';
+import type { ModelMessage } from '@garden/model-gateway';
 import { describe, expect, it } from 'vitest';
 import type { AgentState, AgentWorkerConfig } from './agent-state.js';
 import {
@@ -95,7 +95,7 @@ const workspace = {
 
 interface Probe {
   deps: WindowDeps;
-  /** What the runner answers for `workspace/ATHANOR.md`; `null` makes the read fail. */
+  /** What the runner answers for `workspace/GARDEN.md`; `null` makes the read fail. */
   brief: string | null;
   memories: WorkspaceMemoryRecord[];
   /** The owner's own block, or nothing written yet. */
@@ -1010,12 +1010,10 @@ describe('which brief the window reads', () => {
   it('reads GARDEN.md first when every supported brief exists', async () => {
     const text = await briefText({
       'workspace/GARDEN.md': 'Use the garden project workflow.',
-      'workspace/ATHANOR.md': 'Alternative specific workflow.',
       'workspace/OPEN_CLOUD.md': 'Compatibility workflow.',
       'workspace/AGENTS.md': 'Shared repository workflow.'
     });
     expect(text).toContain('Use the garden project workflow.');
-    expect(text).not.toContain('Alternative specific workflow.');
     expect(text).not.toContain('Compatibility workflow.');
     expect(text).not.toContain('Shared repository workflow.');
   });
@@ -1026,9 +1024,9 @@ describe('which brief the window reads', () => {
     ).toContain('Run the tests with pnpm, never npm.');
   });
 
-  it("keeps the owner's own ATHANOR.md ahead of a shared AGENTS.md", async () => {
+  it("keeps the owner's own GARDEN.md ahead of a shared AGENTS.md", async () => {
     const text = await briefText({
-      'workspace/ATHANOR.md': 'This project uses uv.',
+      'workspace/GARDEN.md': 'This project uses uv.',
       'workspace/AGENTS.md': 'Run the tests with pnpm, never npm.'
     });
     expect(text).toContain('This project uses uv.');

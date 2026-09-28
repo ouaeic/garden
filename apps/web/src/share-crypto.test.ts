@@ -2,7 +2,7 @@ import { gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { createHash, randomBytes } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ShareBlob, ShareSnapshot } from '@athanor/contracts';
+import type { ShareBlob, ShareSnapshot } from '@garden/contracts';
 import {
   SHARE_BOUNDS,
   decryptShare,

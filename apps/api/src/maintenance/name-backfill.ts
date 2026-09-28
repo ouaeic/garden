@@ -7,7 +7,7 @@
  * left; the index drain is not, because it walks the whole history oldest first.
  */
 
-import { encryptJson, unwrapDataKey } from '@athanor/core';
+import { encryptJson, unwrapDataKey } from '@garden/core';
 import type { ServerBase } from '../http/server-context.js';
 import { errorFields } from '../log.js';
 

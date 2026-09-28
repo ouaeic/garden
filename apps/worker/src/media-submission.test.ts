@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { seedMediaModels, type ModelToolCall } from '@athanor/model-gateway';
+import { seedMediaModels, type ModelToolCall } from '@garden/model-gateway';
 import type { AgentState, InferenceCredential } from './agent-state.js';
 import type { ToolContext } from './tool-dispatch.js';
 import { pinMediaGenerationApproval } from './media-approval.js';

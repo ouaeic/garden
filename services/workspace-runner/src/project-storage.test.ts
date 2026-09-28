@@ -12,7 +12,7 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it } from 'vitest';
-import { ProjectStorageUsage } from '@athanor/contracts';
+import { ProjectStorageUsage } from '@garden/contracts';
 import { scanProjectStorage } from './project-storage.js';
 
 const roots: string[] = [];

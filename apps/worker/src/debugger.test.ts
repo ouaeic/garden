@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { TaskRecord } from '@athanor/data';
+import type { TaskRecord } from '@garden/data';
 import type { AgentRunnerClient } from './runner-client.js';
 import { debuggerApproval } from './debugger-approval.js';
 import { approvalRequirement } from './approval-policy.js';

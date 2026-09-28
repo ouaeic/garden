@@ -8,7 +8,7 @@ test_root=$(mktemp -d)
 trap 'rm -rf -- "$test_root"' EXIT INT TERM
 
 fake_bin="$test_root/bin"
-config="$test_root/etc/athanor"
+config="$test_root/etc/garden"
 state="$test_root/state"
 mkdir -p "$fake_bin" "$config/tls" "$state"
 
@@ -29,12 +29,12 @@ make_fake nginx 'exit 0'
 
 run_certificate() {
   PATH="$fake_bin:$PATH" \
-    ATHANOR_CONFIG="$config" \
-    ATHANOR_STATE="$state" \
-    sh "$repository_root/scripts/athanor-certificate" "$@"
+    GARDEN_CONFIG="$config" \
+    GARDEN_STATE="$state" \
+    sh "$repository_root/scripts/garden-certificate" "$@"
 }
 
-printf 'ACME_ENABLED=true\nPUBLIC_APP_URL=https://athanor.test\n' >"$config/control.env"
+printf 'ACME_ENABLED=true\nPUBLIC_APP_URL=https://garden.test\n' >"$config/control.env"
 chmod 0600 "$config/control.env"
 
 # A renewal that cannot even start - here, an installation with automatic issuance on and no
@@ -71,10 +71,10 @@ printf 'ok  a renewal killed before it could report still leaves a record\n'
 authority="$test_root/ca"
 mkdir -p "$authority"
 openssl req -x509 -newkey rsa:2048 -nodes -keyout "$authority/ca.key" -out "$authority/ca.crt" \
-  -days 120 -subj '/CN=athanor test authority' >/dev/null 2>&1
+  -days 120 -subj '/CN=garden test authority' >/dev/null 2>&1
 openssl req -newkey rsa:2048 -nodes -keyout "$authority/leaf.key" -out "$authority/leaf.csr" \
-  -subj '/CN=athanor.test' >/dev/null 2>&1
-printf 'subjectAltName=DNS:athanor.test\n' >"$authority/extensions"
+  -subj '/CN=garden.test' >/dev/null 2>&1
+printf 'subjectAltName=DNS:garden.test\n' >"$authority/extensions"
 # Sixty days of validity is outside the thirty-day renewal margin, so this run has nothing to do
 # and must say so by leaving no alarm behind.
 openssl x509 -req -in "$authority/leaf.csr" -CA "$authority/ca.crt" -CAkey "$authority/ca.key" \

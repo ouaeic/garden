@@ -1,5 +1,5 @@
 import { useEffect, useState, type RefObject } from 'react';
-import type { ConversationChanges } from '@athanor/contracts';
+import type { ConversationChanges } from '@garden/contracts';
 import { get } from './client';
 
 export function useProjectChanges(

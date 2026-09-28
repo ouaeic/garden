@@ -1,4 +1,4 @@
-import type { TaskEvent, TaskPresentation } from '@athanor/contracts';
+import type { TaskEvent, TaskPresentation } from '@garden/contracts';
 
 /** Owner steering reaches the surface with the event stream, before a slower projection refresh. */
 export function currentWork(

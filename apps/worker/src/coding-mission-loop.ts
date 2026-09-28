@@ -1,5 +1,5 @@
-import { runtimeClearTimer, runtimeSetTimeout } from '@athanor/core';
-import type { CodingMissionRecord, DataStore } from '@athanor/data';
+import { runtimeClearTimer, runtimeSetTimeout } from '@garden/core';
+import type { CodingMissionRecord, DataStore } from '@garden/data';
 import { AgentRunnerClient } from './runner-client.js';
 
 export async function reconcileCodingMission(

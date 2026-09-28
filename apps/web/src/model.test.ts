@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Task, type TaskEvent } from '@athanor/contracts';
+import { Task, type TaskEvent } from '@garden/contracts';
 import type { Bootstrap } from './model.js';
 import {
   activeQuestion,

@@ -1,6 +1,6 @@
 import { createHmac, randomBytes } from 'node:crypto';
 import { z } from 'zod';
-import { SecurityMode, TaskEventKind, TaskStatus } from '@athanor/contracts';
+import { SecurityMode, TaskEventKind, TaskStatus } from '@garden/contracts';
 
 const number = z.number().finite().nonnegative();
 const reference = z.string().regex(/^[a-f0-9]{32}$/);

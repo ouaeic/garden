@@ -5,10 +5,10 @@ license: AGPL-3.0-or-later
 compatibility: Needs python3 with the venv module, curl and the shell, all installed on every supported host. Probe the live tools before choosing or installing a runtime. Installed capabilities differ across owner machines.
 allowed-tools: shell process file_read file_write files_list set_plan set_acceptance notify
 metadata:
-  athanor.tier: 'builtin'
-  athanor.version: '1.6.0'
-  athanor.risk: 'workspace'
-  athanor.domain: 'science'
+  garden.tier: 'builtin'
+  garden.version: '1.6.0'
+  garden.risk: 'workspace'
+  garden.domain: 'science'
 ---
 
 # Scientific computing

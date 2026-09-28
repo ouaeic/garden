@@ -3,7 +3,7 @@ import { constants } from 'node:fs';
 import { open, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { Readable } from 'node:stream';
-import { GitObjectId } from '@athanor/contracts';
+import { GitObjectId } from '@garden/contracts';
 import { assertHostStorageWrite } from './host-storage.js';
 import {
   durableJson,

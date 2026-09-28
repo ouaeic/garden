@@ -2,8 +2,8 @@ import {
   readInferenceConnections,
   type InferenceConnectionRow,
   type InferenceConnectionSecret
-} from '@athanor/core';
-import type { ModelRelease } from '@athanor/contracts';
+} from '@garden/core';
+import type { ModelRelease } from '@garden/contracts';
 
 export interface CatalogCredential extends InferenceConnectionSecret {
   source: 'environment' | 'owner';

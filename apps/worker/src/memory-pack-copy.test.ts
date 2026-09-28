@@ -11,8 +11,8 @@
  * and never sees the flag. The window's own proof is the count of fusion queries and the AAD on the
  * stored row; this is the same property said in one word.
  */
-import { encryptJson } from '@athanor/core';
-import type { MemoryPackRecord } from '@athanor/data';
+import { encryptJson } from '@garden/core';
+import type { MemoryPackRecord } from '@garden/data';
 import { describe, expect, it } from 'vitest';
 import {
   buildTaskMemoryPack,

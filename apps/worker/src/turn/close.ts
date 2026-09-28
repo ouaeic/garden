@@ -7,7 +7,7 @@
  * differed in a `reason` field, an error code, and six words of one sentence. Everything else was
  * duplicated: the handoff call with its eight-field context, the outstanding-plan read that must
  * not be allowed to throw, the carry-over message, the best-effort state write, and the closing
- * `AthanorError`.
+ * `GardenError`.
  *
  * Three copies of a recovery path is worse than three copies of anything else, because the copy
  * that is exercised least is the one that is wrong. The insurance comment - "a provider that is
@@ -19,10 +19,10 @@
  * the same two would be scaffolding. What this file adds is the *phase* - what the turn does about
  * a ceiling - which is the part that was inline.
  */
-import { encryptJson, AthanorError } from '@athanor/core';
-import type { ModelRelease, WebToolPlan } from '@athanor/contracts';
-import type { TaskRecord } from '@athanor/data';
-import type { ModelGateway, ModelTool } from '@athanor/model-gateway';
+import { encryptJson, GardenError } from '@garden/core';
+import type { ModelRelease, WebToolPlan } from '@garden/contracts';
+import type { TaskRecord } from '@garden/data';
+import type { ModelGateway, ModelTool } from '@garden/model-gateway';
 import type { AgentState } from '../agent-state.js';
 import { handOffAtStepLimit, type HandoffDeps } from '../handoff.js';
 import { stepLimitCarryOver } from '../turn-bounds.js';
@@ -87,7 +87,7 @@ export const closeTurnAtCeiling = async (
         agentStateCiphertext: encryptJson(state, key, `task-state:${task.id}`)
       })
       .catch(() => undefined);
-    throw new AthanorError(
+    throw new GardenError(
       ceiling.code,
       `This turn ${ceiling.spent}, and the closing handoff could not be written either (${error instanceof Error ? error.message : 'unknown error'}).${
         outstanding.length ? ` Still open: ${outstanding.slice(0, 3).join('; ')}.` : ''

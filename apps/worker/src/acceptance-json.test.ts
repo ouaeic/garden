@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { TaskRecord } from '@athanor/data';
+import type { TaskRecord } from '@garden/data';
 import { parseAcceptanceChecks, describeAcceptanceCheck } from './acceptance.js';
 import { acceptanceChecks, type AcceptanceRunnerDeps } from './acceptance-runner.js';
 

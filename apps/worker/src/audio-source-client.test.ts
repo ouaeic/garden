@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { verifyCapabilityToken } from '@athanor/core';
+import { verifyCapabilityToken } from '@garden/core';
 import { AgentRunnerClient, currentRunnerAbortSignal, withRunnerAbort } from './runner-client.js';
 const secret = 'r'.repeat(48),
   workspaceId = '11111111-1111-4111-8111-111111111111';

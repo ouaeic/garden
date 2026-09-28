@@ -202,7 +202,7 @@ export class RelayServer {
             response.end(this.metrics.render());
           });
 
-    // `athanor-relay revoke` edits the registry file; a running relay must drop the session too.
+    // `garden-relay revoke` edits the registry file; a running relay must drop the session too.
     this.registry.setPeersRemovedListener((labels) => {
       for (const label of labels) {
         this.logger.info('peer revoked externally', { label });
@@ -460,7 +460,7 @@ export class RelayServer {
     if (result.ok) {
       const record = { cid: result.cid, label, port };
       if (this.config.logClientIps) {
-        // Emitted at info, not debug: this record is the only thing `athanor-relay abuse` has to
+        // Emitted at info, not debug: this record is the only thing `garden-relay abuse` has to
         // work from, and an operator who turned address logging on should not also have to turn on
         // debug logging for the whole relay to get it.
         this.logger.info('relayed', {

@@ -4,8 +4,8 @@ import {
   UpdateProjectModelPreferences,
   type ProjectModelPreferences,
   type ProjectModelChoices
-} from '@athanor/contracts';
-import { AthanorError, selectPurposeModel } from '@athanor/core';
+} from '@garden/contracts';
+import { GardenError, selectPurposeModel } from '@garden/core';
 import {
   readProjectModelPreferences,
   readTaskModelPreferences,
@@ -14,7 +14,7 @@ import {
   resolvePurposeChoice,
   mergeProjectModelChoices,
   type UserRecord
-} from '@athanor/data';
+} from '@garden/data';
 import { ownerPriceCeiling } from '../context.js';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
@@ -122,9 +122,9 @@ export const projectModelSettings = async (
 ): Promise<ProjectModelPreferences> => {
   const task = await context.store.getTask(user.id, taskId);
   if (!task && !(await context.store.getProject(user.id, taskId)))
-    throw new AthanorError('project_not_found', 'Project not found', 404);
+    throw new GardenError('project_not_found', 'Project not found', 404);
   if (scope === 'conversation' && !task)
-    throw new AthanorError('task_not_found', 'Conversation not found', 404);
+    throw new GardenError('task_not_found', 'Conversation not found', 404);
   const local =
     scope === 'conversation' && task
       ? await readTaskModelPreferences(context.store, context.masterKey, task)
@@ -203,7 +203,7 @@ export const registerProjectModelRoutes = (context: RouteContext): void => {
       return context.idempotent(request, reply, user, async () => {
         const input = UpdateProjectModelPreferences.parse(request.body);
         if (!(await context.store.getProject(user.id, request.params.projectId)))
-          throw new AthanorError('project_not_found', 'Project not found', 404);
+          throw new GardenError('project_not_found', 'Project not found', 404);
         await writeProjectModelPreferences(
           context.store,
           context.masterKey,
@@ -246,7 +246,7 @@ export const registerProjectModelRoutes = (context: RouteContext): void => {
       return context.idempotent(request, reply, user, async () => {
         const input = UpdateProjectModelPreferences.parse(request.body);
         const task = await context.store.getTask(user.id, request.params.taskId);
-        if (!task) throw new AthanorError('task_not_found', 'Task not found', 404);
+        if (!task) throw new GardenError('task_not_found', 'Task not found', 404);
         await writeConversationModelPreferences(context.store, context.masterKey, task, input);
         return projectModelSettings(context, user, task.id, 'conversation');
       });

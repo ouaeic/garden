@@ -1,5 +1,5 @@
 #!/bin/sh
-# What `sudo athanor doctor` says about a model the provider is withdrawing.
+# What `sudo garden doctor` says about a model the provider is withdrawing.
 #
 # The check under test is the only reader anywhere in this repository of a warning the catalogue
 # refresh has been computing and storing since it was written: the withdrawal date on
@@ -21,7 +21,7 @@ test_root=$(mktemp -d)
 trap 'rm -rf -- "$test_root"' EXIT INT TERM
 
 fake_bin="$test_root/bin"
-config="$test_root/etc/athanor"
+config="$test_root/etc/garden"
 state="$test_root/state"
 control_state="$test_root/control-state"
 mkdir -p "$fake_bin" "$config" "$state" "$control_state" "$test_root/home"
@@ -99,7 +99,7 @@ fixtures="$test_root/fixtures"
 mkdir -p "$fixtures"
 
 run_doctor() {
-  # ATHANOR_ROOT is the real checkout, so `model_retirement_horizon_days` reads the horizon out of
+  # GARDEN_ROOT is the real checkout, so `model_retirement_horizon_days` reads the horizon out of
   # the policy that enforces it rather than out of a fixture. That is the point of the constant
   # being read at all, and it is the one input here that is not faked.
   run_doctor_rooted "$repository_root"
@@ -114,12 +114,12 @@ run_doctor() {
 run_doctor_rooted() {
   PATH="$fake_bin:$PATH" \
     FIXTURES="$fixtures" \
-    ATHANOR_ROOT="$1" \
-    ATHANOR_CONFIG="$config" \
-    ATHANOR_STATE="$state" \
-    ATHANOR_CONTROL_STATE="$control_state" \
-    ATHANOR_HOME="$test_root/home" \
-    sh "$repository_root/scripts/athanor" doctor 2>/dev/null || true
+    GARDEN_ROOT="$1" \
+    GARDEN_CONFIG="$config" \
+    GARDEN_STATE="$state" \
+    GARDEN_CONTROL_STATE="$control_state" \
+    GARDEN_HOME="$test_root/home" \
+    sh "$repository_root/scripts/garden" doctor 2>/dev/null || true
 }
 
 expect_line() {
@@ -334,7 +334,7 @@ expect_no_line 'rather than telling the owner their release cannot hold a ceilin
 # THE REASON THIS CASE EXISTS. `model_retirement_columns` and `model_retirement_counts` both end in
 # `| tr`, so psql's exit status is the pipe's and their failures arrive as an empty answer, which
 # the two arms above read correctly. `model_retirement_dependencies` ends in `runuser` itself, so
-# its failure is the assignment's status and `set -eu` at the top of `scripts/athanor` ended
+# its failure is the assignment's status and `set -eu` at the top of `scripts/garden` ended
 # `doctor` on that line - the spending brake, the update state, the backup age and the disk all
 # silently unreached, with a bare exit 2 as the only sign. Hence the third assertion, which is
 # about the rest of the report existing rather than about models at all. Re-run it by putting the

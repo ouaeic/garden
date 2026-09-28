@@ -1,0 +1,7 @@
+[Unit]
+Description=garden AI computer
+Wants=garden-jobs.service garden-gui.service garden-runner.service garden@api.service garden@worker.service garden@registry.service garden@notifications.service garden-network-watch.service nginx.service
+After=garden-jobs.service garden-gui.service garden-runner.service garden@api.service garden@worker.service garden@registry.service garden@notifications.service garden-network-watch.service nginx.service
+
+[Install]
+WantedBy=multi-user.target

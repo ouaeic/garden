@@ -1,10 +1,10 @@
-import type { ModelTool } from '@athanor/model-gateway';
+import type { ModelTool } from '@garden/model-gateway';
 import {
   TASK_TITLE_MAX_LENGTH,
   surfaceDescribable,
   UNKNOWN_SURFACES,
   type WorkspaceSurfaces
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import {
   connectorActions,
   connectorActionSupportsKind,
@@ -12,7 +12,7 @@ import {
   MEMORY_RECALL_MAX_ITEMS,
   type AnyConnectorKind,
   type ConnectorAction
-} from '@athanor/core';
+} from '@garden/core';
 import { MEMORY_SESSION_SEARCH_MAX_RESULTS } from './memory-runtime.js';
 import {
   SUBSCRIPTION_AGENTS,
@@ -46,7 +46,7 @@ import { z } from 'zod';
  * THE FOOTPRINT LADDER - read this before adding anything below.
  *
  * Everything in this file is paid for on every request of every turn of every task, forever, by
- * every owner running this product. That is the only budget in athanor spent by default rather than
+ * every owner running this product. That is the only budget in garden spent by default rather than
  * on use, and it is the one nobody notices spending, because a tool is added once and billed a
  * million times. "Batteries included" is the product's promise; thirty-three thousand tokens of
  * schemas in front of every question is what that promise turns into if nothing arbitrates.
@@ -66,7 +66,7 @@ import { z } from 'zod';
  *      compressed into a tool description is a procedure the model reads a million times and
  *      follows once.
  *
- *   2. A helper on the box: `scripts/athanor-*`, reached through `shell` and named by the skill or
+ *   2. A helper on the box: `scripts/garden-*`, reached through `shell` and named by the skill or
  *      the operating contract that needs it. Cost: zero schema bytes. This is the rung for anything
  *      that is really a binary with an awkward invocation.
  *
@@ -213,7 +213,7 @@ const CONNECTOR_INPUT_PROPERTIES: Record<string, unknown> = {
   attachments: {
     type: 'array',
     items: { type: 'string' },
-    description: 'Workspace file paths to attach. athanor reads and encodes them; 10 MB in total.'
+    description: 'Workspace file paths to attach. garden reads and encodes them; 10 MB in total.'
   },
   replyAll: {
     type: 'boolean',
@@ -454,7 +454,7 @@ export const CONNECTOR_ACTION_INPUTS = {
 /**
  * What the owner calls each kind of connection, and the order the sections are written in.
  *
- * A total map for the same reason `connectorContentOrigins` in @athanor/core is one: a connector
+ * A total map for the same reason `connectorContentOrigins` in @garden/core is one: a connector
  * kind added there without a heading here would leave its actions describable and unnamed, and
  * the compiler is the only reviewer that never forgets to check.
  *
@@ -469,7 +469,7 @@ export const CONNECTOR_ACTION_INPUTS = {
  * empty on every box that has connected one.
  *
  * The order is the record's own, which `Object.entries` preserves for string keys, and it is the
- * order the description reads in rather than the order @athanor/core declares the actions in.
+ * order the description reads in rather than the order @garden/core declares the actions in.
  * @see ALL_CONNECTOR_ACTIONS, which is the enum and deliberately takes the other one.
  */
 const CONNECTOR_GROUP_LABELS = {
@@ -487,7 +487,7 @@ const CONNECTOR_GROUPS = Object.entries(CONNECTOR_GROUP_LABELS) as ReadonlyArray
 >;
 
 /**
- * Every action, in the order @athanor/core declares them: what a box with all five kinds is sent.
+ * Every action, in the order @garden/core declares them: what a box with all five kinds is sent.
  *
  * Read from `connectorActions` and not from the table above, and the difference is not cosmetic.
  * `connectorActions` puts GitHub, WebDAV and MCP first and spreads mail and calendar in at the
@@ -549,7 +549,7 @@ const connectorActionTool = (reachable: readonly ConnectorAction[]): ModelTool =
           // oneOf that has nothing to key on.
           //
           // The per-field lengths and per-field prose that used to sit here were a second, weaker
-          // copy of the Zod schemas in @athanor/core - connectors.ts and mail-connectors.ts - which
+          // copy of the Zod schemas in @garden/core - connectors.ts and mail-connectors.ts - which
           // parse every one of these before a credential is opened, in places more tightly than
           // this could say (partId is a dotted-numeral regex there, mail_search text is capped at
           // 500 rather than 200,000). A duplicate that cannot be enforced is a duplicate that goes
@@ -1409,7 +1409,7 @@ export const agentTools: ModelTool[] = [
          * `localTime` twice with its pattern. Flat, with the per-kind required set stated in the
          * one description the five variants used to state theirs in, it costs 1,028 - 699 bytes
          * back off every request. Nothing became untyped and no kind was withheld - every field
-         * keeps its type, its bounds and its pattern, and `TaskScheduleSpec` in @athanor/contracts
+         * keeps its type, its bounds and its pattern, and `TaskScheduleSpec` in @garden/contracts
          * is still the discriminated union that decides what is accepted. Its members are ordinary
          * `z.object`s, so a field belonging to another kind is stripped rather than fatal, which
          * is what makes the flat bag safe here: the wire says less than the union, and the union
@@ -1442,7 +1442,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'memory',
     description:
-      'List or curate the compact encrypted long-term memory that is loaded into every later task. This is the short reviewed list the user controls and you already have in context - use memory_recall to search what earlier work recorded, which is a much larger store and a different one. Propose the smallest useful add, replacement, or removal when the user explicitly asks you to remember or forget something, or states a stable preference that will materially improve later work. Durable memory holds user preferences, environment facts, and project conventions - never transient task state, uncertain inference, bulk transcript text, or sensitive personal data unless the user explicitly asks for it. A running record of what happened belongs in workspace/ATHANOR.md, not here. Prefer one compact proposal after the main work instead of interrupting the task. Adding a workspace entry that carries a validUntil within the year is saved straight away; anything permanent, anything targeting user memory, and every replace or remove pauses for user review.',
+      'List or curate the compact encrypted long-term memory that is loaded into every later task. This is the short reviewed list the user controls and you already have in context - use memory_recall to search what earlier work recorded, which is a much larger store and a different one. Propose the smallest useful add, replacement, or removal when the user explicitly asks you to remember or forget something, or states a stable preference that will materially improve later work. Durable memory holds user preferences, environment facts, and project conventions - never transient task state, uncertain inference, bulk transcript text, or sensitive personal data unless the user explicitly asks for it. A running record of what happened belongs in workspace/GARDEN.md, not here. Prefer one compact proposal after the main work instead of interrupting the task. Adding a workspace entry that carries a validUntil within the year is saved straight away; anything permanent, anything targeting user memory, and every replace or remove pauses for user review.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -1986,7 +1986,7 @@ const DESKTOP_SURFACE_TOOLS = new Set(['desktop_observe', 'desktop_launch', 'des
  *     `missing` capabilities, so the probe exists and its answer is already on the wire. It is not
  *     taken because of how rarely it can fire and what it would cost to stay findable: the
  *     installer puts ffmpeg on all four distribution families it supports
- *     (`scripts/athanor-host.sh`), so the gate fires only on a partial install, and withdrawing
+ *     (`scripts/garden-host.sh`), so the gate fires only on a partial install, and withdrawing
  *     the tool needs a replacement clause in the operating contract - which spends part of the
  *     1,351 back on the one box that saved it. How many boxes lack ffmpeg is not measured
  *     anywhere in this repository, and that measurement, not this paragraph, is what should

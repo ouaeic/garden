@@ -36,13 +36,13 @@ const roots: string[] = [];
 const fixtureRoot = (
   skills: Record<string, { skill: string; sidecar?: string; resources?: string[] }>
 ): string => {
-  const root = mkdtempSync(join(tmpdir(), 'athanor-skills-'));
+  const root = mkdtempSync(join(tmpdir(), 'garden-skills-'));
   roots.push(root);
   for (const [name, files] of Object.entries(skills)) {
     const directory = join(root, name);
     mkdirSync(directory, { recursive: true });
     writeFileSync(join(directory, 'SKILL.md'), files.skill);
-    if (files.sidecar !== undefined) writeFileSync(join(directory, 'athanor.yaml'), files.sidecar);
+    if (files.sidecar !== undefined) writeFileSync(join(directory, 'garden.yaml'), files.sidecar);
     for (const resource of files.resources ?? []) {
       mkdirSync(join(directory, resource.split('/')[0] ?? 'scripts'), { recursive: true });
       writeFileSync(join(directory, resource), '#\n');
@@ -56,7 +56,7 @@ afterAll(() => {
 });
 
 const skillFile = (name: string, description: string, body = 'Body.'): string =>
-  `---\nname: ${name}\ndescription: ${description}\nlicense: AGPL-3.0-or-later\nallowed-tools: shell file_read\nmetadata:\n  athanor.tier: 'builtin'\n  athanor.version: '2.1.0'\n  athanor.risk: 'workspace'\n  athanor.domain: 'testing'\n---\n\n${body}\n`;
+  `---\nname: ${name}\ndescription: ${description}\nlicense: AGPL-3.0-or-later\nallowed-tools: shell file_read\nmetadata:\n  garden.tier: 'builtin'\n  garden.version: '2.1.0'\n  garden.risk: 'workspace'\n  garden.domain: 'testing'\n---\n\n${body}\n`;
 
 const sidecarFile = (id: string, extra = ''): string =>
   `schema: 1\nid: ${id}\nversion: 2.1.0\ncatalog_line: 'Short resident line for ${id}.'\nlineage:\n  parent: null\n  origin: builtin\n  approved_by: null\n  approved_at: null\nrequires:\n  tools: [shell, file_read]\n  binaries: [python3]\ncapability:\n  fs.read: ['$WORKSPACE/**']\n  fs.write: ['$WORKSPACE/**']\n  net.hosts: []\n  exec: [python3]\n  connectors: []\n  spend: none\nverify:\n  - run: 'python3 check.py'\n    assert: "$.status == 'success'"\n  - check: 'Someone looked at it.'\n${extra}`;
@@ -131,7 +131,7 @@ describe('skill YAML subset', () => {
   it('splits front matter from the body', () => {
     const parsed = parseSkillFrontMatter(skillFile('demo', 'Do a thing.', '# Heading\n\ntext'));
     expect(parsed.data.name).toBe('demo');
-    expect(parsed.data.metadata).toMatchObject({ 'athanor.version': '2.1.0' });
+    expect(parsed.data.metadata).toMatchObject({ 'garden.version': '2.1.0' });
     expect(parsed.body).toBe('# Heading\n\ntext');
     expect(() => parseSkillFrontMatter('no front matter')).toThrow(/front matter/);
   });
@@ -201,7 +201,7 @@ describe('skill library loader', () => {
   });
 
   it('returns an empty library rather than throwing when the directory is absent', () => {
-    const library = loadSkillLibrary(join(tmpdir(), 'athanor-skills-does-not-exist'));
+    const library = loadSkillLibrary(join(tmpdir(), 'garden-skills-does-not-exist'));
     expect(library.skills).toEqual([]);
     expect(library.diagnostics).toEqual([]);
   });
@@ -312,7 +312,7 @@ describe('the shipped built-in library', () => {
 
   it('covers every domain the product promises', () => {
     // `code-change` was on this list and is not a domain the library has to cover. Its orientation
-    // half was already resident verbatim (context.ts:57) and its one athanor-specific instruction -
+    // half was already resident verbatim (context.ts:57) and its one garden-specific instruction -
     // declare the project's test command as a set_acceptance command check, and see it fail first -
     // is resident in `## How to finish` (context.ts:81). Everything else it carried was method, and
     // the model owns method. Deleted with the skill rather than left here as an argument that the
@@ -397,9 +397,9 @@ describe('the shipped built-in library', () => {
      *
      * `openSkill` used to scan four folders under the skill directory and print each entry as
      * `<file>scripts/count_error_cells.py</file>`. Nothing the model holds can read one. `openSkill`
-     * is reachable only for built-in skills, so the directory is always part of the athanor
+     * is reachable only for built-in skills, so the directory is always part of the garden
      * installation and never inside a workspace; `file_read` is answered by the runner, whose
-     * `assertUserDataPath` admits `workspace/` and `.athanor/artifacts/` and nothing else. So the
+     * `assertUserDataPath` admits `workspace/` and `.garden/artifacts/` and nothing else. So the
      * model was handed a list of readable-looking files, two lines under an absolute directory that
      * answers "Only workspace files and published artifacts are accessible" when it tries one -
      * a vetted procedure prescribing a step the platform refuses (ATH-116).
@@ -459,7 +459,7 @@ describe('the shipped built-in library', () => {
     for (const skill of library.skills) {
       const front = parseSkillFrontMatter(readFileSync(join(skill.directory, 'SKILL.md'), 'utf8'));
       const metadata = (front.data.metadata ?? {}) as Record<string, unknown>;
-      expect(String(metadata['athanor.version']), skill.name).toBe(skill.version);
+      expect(String(metadata['garden.version']), skill.name).toBe(skill.version);
     }
   });
 
@@ -473,7 +473,7 @@ describe('the shipped built-in library', () => {
     );
     /*
      * The package names moved into one table read by the installer, the toolchain probe and
-     * `athanor doctor` alike, so a skill's binaries are held against the table - column by column.
+     * `garden doctor` alike, so a skill's binaries are held against the table - column by column.
      *
      * The old check matched `\t<package>(\t|$)` anywhere in the file, which is satisfied by any one
      * cell. Every row begins with the Debian name, so the Debian column alone kept it green:
@@ -492,7 +492,7 @@ describe('the shipped built-in library', () => {
      * about it - so the list can only shrink by intent and can never grow by accident.
      */
     const hostTable = readFileSync(
-      fileURLToPath(new URL('../../../scripts/athanor-host.sh', import.meta.url)),
+      fileURLToPath(new URL('../../../scripts/garden-host.sh', import.meta.url)),
       'utf8'
     ).split('\n');
     const families = hostTable
@@ -540,9 +540,9 @@ describe('the shipped built-in library', () => {
       img2pdf: ['suse']
     };
     const installedPath: Record<string, string> = {
-      'athanor-office-convert': '/usr/local/bin/athanor-office-convert',
+      'garden-office-convert': '/usr/local/bin/garden-office-convert',
       'garden-run': '/usr/local/bin/garden-run',
-      'athanor-pdf-tables': '/usr/local/bin/athanor-pdf-tables',
+      'garden-pdf-tables': '/usr/local/bin/garden-pdf-tables',
       typst: '/usr/local/bin/typst'
     };
     // systemd is the init system of every supported host; the installer writes units rather than
@@ -550,7 +550,7 @@ describe('the shipped built-in library', () => {
     const fromInit = new Set(['systemctl', 'journalctl']);
     // scripts/test-update.sh executes shared native activation and verifies these installed
     // executable paths, active links, acquisition failures and offline rollback retention.
-    const fromNativeActivation = new Set(['/usr/local/lib/athanor/python/bin/python3']);
+    const fromNativeActivation = new Set(['/usr/local/lib/garden/python/bin/python3']);
 
     for (const skill of library.skills)
       for (const binary of new Set([...skill.requiredBinaries, ...skill.capability.exec])) {
@@ -596,7 +596,7 @@ describe('the shipped built-in library', () => {
       ).toBe(true);
 
     // And the one binary whose distribution package does not provide it by that name.
-    expect(installer).toContain('install_asset 0755 "$athanor_root/scripts/athanor-magick"');
+    expect(installer).toContain('install_asset 0755 "$garden_root/scripts/garden-magick"');
   });
 
   /**
@@ -728,8 +728,8 @@ describe('what the approval card is told about a proposed procedure', () => {
       )
     ).toEqual(['a GitHub token']);
     expect(scanSkillBodyForSecrets('Run the reconcile script, then compare totals.')).toEqual([]);
-    expect(scanSkillBodyForPaths('Read /home/athanor/ws-31/data/ledger.csv first.')).toEqual([
-      '/home/athanor/ws-31/data/ledger.csv'
+    expect(scanSkillBodyForPaths('Read /home/garden/ws-31/data/ledger.csv first.')).toEqual([
+      '/home/garden/ws-31/data/ledger.csv'
     ]);
   });
 
@@ -738,7 +738,7 @@ describe('what the approval card is told about a proposed procedure', () => {
     // the pinned interpreter is the single most common correct line a skill can contain.
     expect(
       scanSkillBodyForPaths(
-        'Run /usr/local/lib/athanor/python/bin/python3 build_deck.py, then /usr/local/bin/athanor-office-convert deck.pptx proofs/deck.pdf into /tmp/proofs/ .'
+        'Run /usr/local/lib/garden/python/bin/python3 build_deck.py, then /usr/local/bin/garden-office-convert deck.pptx proofs/deck.pdf into /tmp/proofs/ .'
       )
     ).toEqual([]);
   });
@@ -748,7 +748,7 @@ describe('what the approval card is told about a proposed procedure', () => {
  * The owner's own SKILL.md folders.
  *
  * `SkillOrigin` has declared an `owner` variant since this library was written and nothing on disk
- * could reach it, so the capability ceiling that exists specifically for skills athanor did not
+ * could reach it, so the capability ceiling that exists specifically for skills garden did not
  * ship had nothing to apply to - and an owner with a folder of procedures written in the format
  * this loader already reads had nowhere to put it. These hold both halves: that the folder is
  * read, and that being read does not buy it the built-in library's grant.
@@ -757,7 +757,7 @@ describe('the owner’s own skill folders', () => {
   const ownerSkill = (name: string, description: string): string =>
     `---\nname: ${name}\ndescription: ${description}\n---\n\nBody.\n`;
 
-  it('reads a plain SKILL.md folder with no athanor sidecar at all', () => {
+  it('reads a plain SKILL.md folder with no garden sidecar at all', () => {
     const root = fixtureRoot({
       'invoice-triage': { skill: ownerSkill('invoice-triage', 'Sorts invoices by supplier.') }
     });
@@ -883,7 +883,7 @@ describe('the owner’s own skill folders', () => {
   /* A folder the owner named and never created is silence, not a crash on every window build. */
   it('says nothing about a root that is not there', () => {
     const library = withOwnerSkills(loadSkillLibrary(fixtureRoot({})), [
-      join(tmpdir(), 'athanor-skills-there-is-no-such-directory')
+      join(tmpdir(), 'garden-skills-there-is-no-such-directory')
     ]);
     expect(library.skills).toEqual([]);
     expect(library.diagnostics).toEqual([]);

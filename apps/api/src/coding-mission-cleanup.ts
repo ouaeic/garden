@@ -1,4 +1,4 @@
-import type { TaskRecord } from '@athanor/data';
+import type { TaskRecord } from '@garden/data';
 import type { RouteContext } from './http/server-context.js';
 
 /** Cancellation is not acknowledged until every isolated child has lost native execution authority. */

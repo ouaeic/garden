@@ -1,5 +1,5 @@
 #!/bin/sh
-# What `athanor update` has to keep in agreement with the checkout, and what has to be said out loud
+# What `garden update` has to keep in agreement with the checkout, and what has to be said out loud
 # when it does not.
 #
 # `scripts/test-update.sh` drills the update as a transaction - it succeeds, it rolls back, it puts
@@ -15,7 +15,7 @@
 #   3. `spend-ceiling` set a price per million tokens while wearing the name of a money cap, and the
 #      money cap had no command at all.
 #
-# The script is sourced rather than driven, because `athanor help` prints the usage line and returns
+# The script is sourced rather than driven, because `garden help` prints the usage line and returns
 # without exiting - so every function is in hand afterwards and each rule can be asked directly
 # instead of through a whole update. There is exactly one copy of each rule, which is the point:
 # `doctor` and `update` both call these, so a drill against them is a drill against both.
@@ -25,12 +25,12 @@ repository_root=$(CDPATH='' cd -- "$(dirname "$0")/.." && pwd)
 test_root=$(mktemp -d)
 trap 'rm -rf -- "$test_root"' EXIT INT TERM
 
-fake_root="$test_root/opt/athanor"
-fake_home="$test_root/home/athanor"
+fake_root="$test_root/opt/garden"
+fake_home="$test_root/home/garden"
 fake_state="$test_root/state"
 browsers_json="$fake_root/services/workspace-runner/node_modules/playwright-core/browsers.json"
 mkdir -p "$(dirname "$browsers_json")" "$fake_home" "$fake_state"
-# The two files this script reads a number out of rather than restating it. `athanor_root` is a
+# The two files this script reads a number out of rather than restating it. `garden_root` is a
 # checkout on a real box, so the fixture is one too - and copying them rather than pointing at the
 # originals is what makes a case that silently reads the repository impossible to write here.
 mkdir -p "$fake_root/packages/data/src/store" "$fake_root/packages/contracts/src"
@@ -64,12 +64,12 @@ fail_case() {
 # Sourced with the one command that returns rather than exits. Usage goes to /dev/null; the
 # functions stay. `set --` rather than arguments after the dot, because dash's `.` takes none and
 # would run the dispatch on this script's own arguments instead.
-ATHANOR_ROOT="$fake_root"
-ATHANOR_HOME="$fake_home"
-ATHANOR_STATE="$fake_state"
-export ATHANOR_ROOT ATHANOR_HOME ATHANOR_STATE
+GARDEN_ROOT="$fake_root"
+GARDEN_HOME="$fake_home"
+GARDEN_STATE="$fake_state"
+export GARDEN_ROOT GARDEN_HOME GARDEN_STATE
 set -- help
-. "$repository_root/scripts/athanor" >/dev/null
+. "$repository_root/scripts/garden" >/dev/null
 
 # ---------------------------------------------------------------------------------------------
 # 1. The managed Chromium, by revision.
@@ -93,7 +93,7 @@ test "$(managed_chromium_absent)" = 1234 ||
   fail_case "a Playwright bump left the box on the old revision and nothing noticed"
 printf 'ok  a Playwright bump is seen as a missing browser rather than as a healthy cache\n'
 
-# And fetching it clears the fault, which is what `update_athanor` now does before the restart.
+# And fetching it clears the fault, which is what `update_garden` now does before the restart.
 place_chromium 1234
 test -z "$(managed_chromium_absent)" ||
   fail_case "fetching the wanted revision did not clear the fault"
@@ -183,7 +183,7 @@ done
 printf 'ok  a spending cap is an amount or nothing, and nothing else reaches the statement\n'
 
 # The default the running code applies to a box with no row, read out of the file that decides it.
-# `athanor price-ceiling set` creates that row, and every money cap in a new row is NULL - so before
+# `garden price-ceiling set` creates that row, and every money cap in a new row is NULL - so before
 # this was read, setting a price per million tokens silently removed the only dollar ceiling on the
 # box. A number this script invented instead would stop a run at a figure nothing can account for.
 monthly_default=$(default_monthly_cap)
@@ -211,7 +211,7 @@ test "$moved_default" = 37 ||
 # about dollars per million tokens came to remove the only dollar ceiling there was.
 ceiling_insert=$(
   sed -n '/^INSERT INTO spend_limits (user_id, max_input_usd_per_million_tokens,/,/^SQL$/p' \
-    "$repository_root/scripts/athanor"
+    "$repository_root/scripts/garden"
 )
 case "$ceiling_insert" in
   *monthly_cap_usd*'$(default_monthly_cap)'*) ;;
@@ -227,15 +227,15 @@ printf '#!/bin/sh\nif [ "${1:-}" = "-u" ]; then printf "0\\n"; else printf "root
   >"$fake_bin/id"
 chmod 0755 "$fake_bin/id"
 alias_output=$(
-  PATH="$fake_bin:$PATH" ATHANOR_ROOT="$fake_root" ATHANOR_HOME="$fake_home" \
-    ATHANOR_STATE="$fake_state" \
-    /bin/sh "$repository_root/scripts/athanor" spend-ceiling show 2>&1 || true
+  PATH="$fake_bin:$PATH" GARDEN_ROOT="$fake_root" GARDEN_HOME="$fake_home" \
+    GARDEN_STATE="$fake_state" \
+    /bin/sh "$repository_root/scripts/garden" spend-ceiling show 2>&1 || true
 )
 case "$alias_output" in
-  *'athanor price-ceiling'*'spend-cap'*) ;;
+  *'garden price-ceiling'*'spend-cap'*) ;;
   *) fail_case "the old name does not name the new one: $alias_output" ;;
 esac
-usage_output=$(/bin/sh "$repository_root/scripts/athanor" help 2>&1 || true)
+usage_output=$(/bin/sh "$repository_root/scripts/garden" help 2>&1 || true)
 case "$usage_output" in
   *'price-ceiling'*) ;;
   *) fail_case "the usage line does not offer price-ceiling" ;;

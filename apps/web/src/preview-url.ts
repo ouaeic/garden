@@ -1,7 +1,7 @@
 import { isNativeClient, nativePreviewOrigins, nativeServerOrigin } from './client';
 
 const previewPath = (url: URL): boolean =>
-  /^\/__athanor\/preview\/[0-9a-f]{32}(?:\/|$)/.test(url.pathname);
+  /^\/__garden\/preview\/[0-9a-f]{32}(?:\/|$)/.test(url.pathname);
 const address = (value: string): URL => {
   const url = new URL(value, typeof window === 'undefined' ? undefined : window.location.origin);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password)

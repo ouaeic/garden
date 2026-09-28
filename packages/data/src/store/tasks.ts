@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
-import { AthanorError, isMemoryToken } from '@athanor/core';
-import type { ConversationNameIndex, EncryptedEnvelope } from '@athanor/core';
-import { TaskEventKind, TaskStatus, PENDING_MEDIA_DELIVERY } from '@athanor/contracts';
+import { GardenError, isMemoryToken } from '@garden/core';
+import type { ConversationNameIndex, EncryptedEnvelope } from '@garden/core';
+import { TaskEventKind, TaskStatus, PENDING_MEDIA_DELIVERY } from '@garden/contracts';
 import { taskDeliveryCountsSql } from '../task-delivery.js';
 import type { Database } from '../database.js';
 import type {
@@ -45,15 +45,15 @@ async function releasePromotedMessageReservations(tx: Database, taskId: string):
 }
 
 /** Payload is the task id, so a stream only wakes for the conversation it is showing. */
-export const TASK_EVENT_CHANNEL = 'athanor_task_event';
+export const TASK_EVENT_CHANNEL = 'garden_task_event';
 /** Payload is the task id, but every worker slot wakes: whichever leases it first wins. */
-export const TASK_QUEUE_CHANNEL = 'athanor_task_queued';
+export const TASK_QUEUE_CHANNEL = 'garden_task_queued';
 /**
  * Payload is the task id of a conversation that just gained an answer, which is the only moment a
  * placeholder title can be replaced by a real one. Every titler wakes; the write is conditional on
  * the title still being a placeholder, so a second one finds nothing to do.
  */
-export const TASK_ANSWERED_CHANNEL = 'athanor_task_answered';
+export const TASK_ANSWERED_CHANNEL = 'garden_task_answered';
 
 /**
  * How many times a task may be leased before the queue stops handing it to anyone.
@@ -245,7 +245,7 @@ const decodeTaskCursor = (cursor: string): { pinned: boolean; activityAt: string
   // whatever precision the database wrote it.
   const at = new Date(String(activityAt));
   if (parts.length !== 3 || (pinned !== '0' && pinned !== '1') || Number.isNaN(at.getTime()) || !id)
-    throw new AthanorError('invalid_cursor', 'That conversation list position is not valid');
+    throw new GardenError('invalid_cursor', 'That conversation list position is not valid');
   return { pinned: pinned === '1', activityAt: String(activityAt), id };
 };
 
@@ -877,7 +877,7 @@ export class TaskStore {
       )
         return false;
       if (denial && input.agentStateCiphertext?.aad !== `task-state:${input.taskId}`)
-        throw new AthanorError(
+        throw new GardenError(
           'approval_correction_checkpoint',
           'A denial correction requires its sealed continuation'
         );

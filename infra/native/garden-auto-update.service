@@ -1,0 +1,22 @@
+[Unit]
+Description=garden unattended update
+After=network-online.target postgresql.service
+Wants=network-online.target
+# An update that keeps failing is invisible by construction, because the thing it does on failure is
+# put the server back exactly as it was: every unit runs, every check passes, and the box has simply
+# stopped receiving releases. The timer schedules next week and the same failure repeats for as long
+# as its cause lasts. `garden auto-update run` writes down the endings it can reach itself; this
+# catches the one it cannot - the run stopped by TimeoutStartSec below, or by the machine losing
+# power partway - which gets no further line of its own to run. The daily backup has had this
+# companion since the day its own silence was found.
+OnFailure=garden-auto-update-alert.service
+
+[Service]
+Type=oneshot
+# `garden update` rebuilds the checkout, replaces the runtime, and restarts every unit,
+# so this one deliberately runs without the sandboxing the long-lived services use.
+ExecStart=/usr/local/bin/garden auto-update run
+# Bounded, because this runs unattended and the server is stopped for most of it. `garden update`
+# bounds each of its own steps as well; this is the backstop for the run as a whole, including the
+# half-hour it may spend waiting for a running task to finish before it starts.
+TimeoutStartSec=2h

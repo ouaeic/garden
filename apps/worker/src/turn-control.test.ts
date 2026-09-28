@@ -15,15 +15,15 @@
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import type { ModelMessage, ModelTool } from '@athanor/model-gateway';
-import { UNKNOWN_SURFACES, type ConnectorKind } from '@athanor/contracts';
+import type { ModelMessage, ModelTool } from '@garden/model-gateway';
+import { UNKNOWN_SURFACES, type ConnectorKind } from '@garden/contracts';
 import { describe, expect, it } from 'vitest';
 import { requestDerivationBreach } from './turn-control.js';
 import { agentToolsFor } from './tool-catalogue.js';
 import { COMPACT_CONTEXT_TOOL } from './context.js';
 
 const window = (): ModelMessage[] => [
-  { role: 'system', content: 'ATHANOR RUNTIME CONTEXT (dynamic)' },
+  { role: 'system', content: 'GARDEN RUNTIME CONTEXT (dynamic)' },
   { role: 'user', content: 'fix the importer' },
   {
     role: 'assistant',
@@ -70,7 +70,7 @@ const request = (
   ...overrides
 });
 
-describe('the request athanor is about to send', () => {
+describe('the request garden is about to send', () => {
   it('says nothing about a request the log derives', () => {
     expect(requestDerivationBreach(request())).toBeNull();
   });
@@ -238,7 +238,7 @@ describe('and it is asked before the request goes out', () => {
     // The condition is the breach and nothing else: not a constant, not a flag, not a negation.
     expect(source[guard - 1]?.trim()).toBe('if (derivationBreach)');
     // And the next two statements are the raise, so nothing can be inserted between the two.
-    expect(source[guard]?.trim()).toBe('throw new AthanorError(');
+    expect(source[guard]?.trim()).toBe('throw new GardenError(');
     expect(source[guard + 1]?.trim()).toBe("'request_not_derivable',");
   });
 });

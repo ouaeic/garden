@@ -8,9 +8,9 @@ import {
   userMemoryKey,
   verifyCapabilityToken,
   wrapDataKey
-} from '@athanor/core';
-import type { DataStore, TaskEventRecord, TaskRecord, WorkspaceRecord } from '@athanor/data';
-import type { ModelRelease } from '@athanor/contracts';
+} from '@garden/core';
+import type { DataStore, TaskEventRecord, TaskRecord, WorkspaceRecord } from '@garden/data';
+import type { ModelRelease } from '@garden/contracts';
 import { AgentWorker, approvalPreviewHash } from './agent.js';
 import { fixtureMediaRouting } from './media-fixture.js';
 import type { WorkerConfig } from './config.js';
@@ -112,7 +112,7 @@ type TestConfig = Omit<WorkerConfig, 'WORKER_HEALTH_PORT' | 'WORKER_HEALTH_HOST'
 const config = (overrides: Partial<WorkerConfig> = {}): TestConfig => ({
   WORKER_ID: 'worker-test',
   DATABASE_DRIVER: 'pglite',
-  DATABASE_URL: 'postgres://localhost/athanor',
+  DATABASE_URL: 'postgres://localhost/garden',
   PGLITE_PATH: ':memory:',
   DATA_MASTER_KEY: masterKey.toString('base64'),
   RUNNER_SHARED_SECRET: 'x'.repeat(48),
@@ -403,7 +403,7 @@ const isTurnScaffolding = (call: RunnerCall): boolean =>
   call.path === `${root}/machine` ||
   call.path === `${root}/checkpoints` ||
   call.path === `${root}/file?path=workspace%2FGARDEN.md` ||
-  call.path === `${root}/file?path=workspace%2FATHANOR.md` ||
+  call.path === `${root}/file?path=workspace%2FGARDEN.md` ||
   call.path === `${root}/file?path=workspace%2FOPEN_CLOUD.md` ||
   call.path === `${root}/file?path=workspace%2FAGENTS.md`;
 
@@ -752,7 +752,7 @@ describe('what a turn asks the runner for on its own account', () => {
    * reads today.
    *
    * Brief names are tried in preference order and stop at the first available file. GARDEN.md
-   * is preferred, followed by compatible ATHANOR.md and OPEN_CLOUD.md names and then AGENTS.md.
+   * is preferred, followed by compatible GARDEN.md and OPEN_CLOUD.md names and then AGENTS.md.
    * A workspace carrying none pays the complete lookup chain once per run; the exact sequence
    * below prevents these automatic reads from hiding an unrelated dispatch request.
    */
@@ -780,7 +780,7 @@ describe('what a turn asks the runner for on its own account', () => {
       // runner latency in front of every turn's first token for nothing.
       `GET ${root}/machine exec`,
       `GET ${root}/file?path=workspace%2FGARDEN.md files.read`,
-      `GET ${root}/file?path=workspace%2FATHANOR.md files.read`,
+      `GET ${root}/file?path=workspace%2FGARDEN.md files.read`,
       `GET ${root}/file?path=workspace%2FOPEN_CLOUD.md files.read`,
       `GET ${root}/file?path=workspace%2FAGENTS.md files.read`,
       `POST ${root}/checkpoints workspace.manage`
@@ -1802,7 +1802,7 @@ describe('the repository arms', () => {
     expect((executed.calls[0]?.body as { args: string[] }).args.slice(0, 3)).toEqual([
       'install',
       '--prefix',
-      '.athanor/tools'
+      '.garden/tools'
     ]);
     expect(executed.result).toMatchObject({ agent: 'codex', installed: true });
   });
@@ -3032,7 +3032,7 @@ describe('the publishing arms', () => {
       `PUT ${root}/file`,
       `GET ${root}/usage`
     ]);
-    expect(executed.calls[1]?.path).toMatch(/path=\.athanor%2Fartifacts%2F/);
+    expect(executed.calls[1]?.path).toMatch(/path=\.garden%2Fartifacts%2F/);
     expect(executed.calls[1]?.scopes).toEqual(['files.write']);
     expect(String(executed.calls[1]?.body)).toBe('# Report');
     const stored = executed.asked('createArtifact')?.[0] as Record<string, unknown>;
@@ -3217,7 +3217,7 @@ describe('the publishing arms', () => {
    *
    * Both halves of this used to be their own tool name, so there was no third answer to give. There
    * is now, and it has to fall the same way the approval floor falls: `publishesPublicly` in
-   * @athanor/contracts is one exported equality against the literal `public`, called here and in
+   * @garden/contracts is one exported equality against the literal `public`, called here and in
    * `approval-policy.ts`, so a value neither recognises is private for the card AND private for the
    * thing that gets made. The other pairing - a floor reading private on a call this arm publishes
    * publicly - is the defect that blocked this merge for a wave.
@@ -3549,7 +3549,7 @@ describe('the connector arms', () => {
      * whole further round trip to find out what it may ask for instead. Being wrong has to be
      * cheap: the reachable set travels back with the refusal, in the same result.
      *
-     * Nothing about the enforcement moved. `executeConnectorAction` in @athanor/core still refuses
+     * Nothing about the enforcement moved. `executeConnectorAction` in @garden/core still refuses
      * this action on this connector; what is asserted here is that the refusal is answerable.
      */
     const executed = await dispatch(

@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
-import { decryptJson, encryptJson, generateDataKey, wrapDataKey } from '@athanor/core';
+import { createDatabase, DataStore, migrateDatabase } from '@garden/data';
+import { decryptJson, encryptJson, generateDataKey, wrapDataKey } from '@garden/core';
 import type { AgentState } from './agent-state.js';
 import type { AgentRunnerClient } from './runner-client.js';
 import { parkProcessWait, reconcileJobWaits } from './job-waits.js';
 import type { TurnDispatchDeps } from './turn/dispatch.js';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import type { ModelToolCall } from '@garden/model-gateway';
 
 const database = createDatabase({ driver: 'pglite', pglitePath: ':memory:' });
 const store = new DataStore(database);

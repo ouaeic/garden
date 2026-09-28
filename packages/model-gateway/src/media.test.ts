@@ -13,7 +13,7 @@ const client = () =>
   new MediaClient({
     baseUrl: 'https://openrouter.ai/api/v1',
     apiKey: 'managed-key',
-    appUrl: 'https://athanor.example'
+    appUrl: 'https://garden.example'
   });
 
 describe('managed media generation', () => {
@@ -74,7 +74,7 @@ describe('managed media generation', () => {
     ).resolves.toMatchObject({ outputs: [{ filename: 'gen-3.mp3' }] });
   });
 
-  it('sends no voice to a speech route whose voices athanor does not know', async () => {
+  it('sends no voice to a speech route whose voices garden does not know', async () => {
     const request = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
       const body = typeof init?.body === 'string' ? (JSON.parse(init.body) as object) : {};
       expect(body).not.toHaveProperty('voice');

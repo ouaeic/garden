@@ -7,8 +7,8 @@ import {
   PrivacyRoute,
   type DictationOptions,
   type MediaModelOption
-} from '@athanor/contracts';
-import { AthanorError, decryptJson, encryptJson, sha256, userMemoryKey } from '@athanor/core';
+} from '@garden/contracts';
+import { GardenError, decryptJson, encryptJson, sha256, userMemoryKey } from '@garden/core';
 import {
   MediaClient,
   MediaProviderRejectionError,
@@ -16,7 +16,7 @@ import {
   isNativeOpenAIEndpoint,
   nativeTranscriptionBound,
   quoteMediaPrice
-} from '@athanor/model-gateway';
+} from '@garden/model-gateway';
 import { z } from 'zod';
 import { TRANSCRIPTION_FORMATS, type InferenceSecret } from '../context.js';
 import {
@@ -162,14 +162,14 @@ export const registerTranscriptionRoutes = (context: RouteContext): void => {
     async (request, reply) => {
       const user = requireUser(request.user);
       if (request.apiToken)
-        throw new AthanorError(
+        throw new GardenError(
           'dictation_owner_required',
           'Reconcile dictation from a signed-in browser',
           403
         );
       return idempotent(request, reply, user, async () => {
         if (preparing.has(user.id))
-          throw new AthanorError(
+          throw new GardenError(
             'dictation_active',
             'Wait for the active dictation request to finish before reconciling its charge',
             409
@@ -200,7 +200,7 @@ export const registerTranscriptionRoutes = (context: RouteContext): void => {
     try {
       return (await dictationOptionsFor(context, user.id)).options;
     } catch (error) {
-      if (!(error instanceof AthanorError)) throw error;
+      if (!(error instanceof GardenError)) throw error;
       return {
         available: false,
         reason: error.message,
@@ -224,7 +224,7 @@ export const registerTranscriptionRoutes = (context: RouteContext): void => {
   app.post('/v1/audio/transcriptions', async (request, reply) => {
     const user = requireUser(request.user);
     if (request.apiToken)
-      throw new AthanorError(
+      throw new GardenError(
         'dictation_owner_required',
         'Start dictation from a signed-in browser',
         403
@@ -234,7 +234,7 @@ export const registerTranscriptionRoutes = (context: RouteContext): void => {
       aad = `dictation-response:${user.id}:${sha256(String(request.headers['idempotency-key']))}`;
     const sealed = await idempotent(request, reply, user, async () => {
       if (preparing.has(user.id))
-        throw new AthanorError(
+        throw new GardenError(
           'dictation_busy',
           'Finish the current recording before starting another',
           409
@@ -251,7 +251,7 @@ export const registerTranscriptionRoutes = (context: RouteContext): void => {
         const bytes = decodeDictationBase64(input.data);
         const { secret, route, options } = await dictationOptionsFor(context, user.id);
         if (!route || !options.available)
-          throw new AthanorError(
+          throw new GardenError(
             'transcription_route_unavailable',
             options.reason ?? 'Choose a transcription model in Settings',
             409
@@ -262,14 +262,14 @@ export const registerTranscriptionRoutes = (context: RouteContext): void => {
           (input.expectedRouteProof !== undefined &&
             input.expectedRouteProof !== options.routeProof)
         )
-          throw new AthanorError(
+          throw new GardenError(
             'dictation_selection_changed',
             'The transcription connection or model changed. Review it again before sending this recording.',
             409
           );
         const privacyRoute = input.privacyRoute ?? 'provider_zdr';
         if (!options.privacyRoutes.includes(privacyRoute))
-          throw new AthanorError(
+          throw new GardenError(
             'transcription_privacy_conflict',
             'Choose the advertised privacy route before sending this recording',
             409
@@ -281,20 +281,20 @@ export const registerTranscriptionRoutes = (context: RouteContext): void => {
             !input.expectedModelId ||
             !input.expectedRouteProof)
         )
-          throw new AthanorError(
+          throw new GardenError(
             'transcription_consent_required',
             'Review the selected transcription connection and explicitly allow external retention before sending this recording',
             409
           );
         if (options.usdPerMinute === null && options.reservationUsd === null)
-          throw new AthanorError(
+          throw new GardenError(
             'transcription_price_unbounded',
             'Choose a supported priced transcription model',
             409
           );
         const prepared = await prepareDictationAudio(bytes, input.format, controller.signal);
         if (prepared.seconds > options.maxDurationSeconds)
-          throw new AthanorError(
+          throw new GardenError(
             'transcription_duration_exceeded',
             'This recording exceeds the selected model’s bounded duration. Dictate a shorter direction.',
             413
@@ -302,7 +302,7 @@ export const registerTranscriptionRoutes = (context: RouteContext): void => {
         const estimateUsd =
           options.reservationUsd ?? Math.ceil(prepared.seconds / 60) * options.usdPerMinute!;
         if (input.maxCostUsd !== undefined && estimateUsd > input.maxCostUsd)
-          throw new AthanorError(
+          throw new GardenError(
             'transcription_reservation_exceeded',
             'This recording exceeds the chosen transcription cost limit',
             402
@@ -341,7 +341,7 @@ export const registerTranscriptionRoutes = (context: RouteContext): void => {
             onBeforeSubmit: async () => {
               const current = (await dictationOptionsFor(context, user.id)).options;
               if (!current.available || current.routeProof !== options.routeProof)
-                throw new AthanorError(
+                throw new GardenError(
                   'dictation_selection_changed',
                   'The transcription connection or model changed. Review it again before sending this recording.',
                   409
@@ -375,14 +375,14 @@ export const registerTranscriptionRoutes = (context: RouteContext): void => {
                 state: 'released',
                 settleReservation: true
               });
-            if (error instanceof AthanorError) throw error;
+            if (error instanceof GardenError) throw error;
             if (error instanceof TranscriptionEmptyError)
-              throw new AthanorError(
+              throw new GardenError(
                 'transcription_empty',
                 'The model returned no speech from this recording',
                 422
               );
-            throw new AthanorError(
+            throw new GardenError(
               'transcription_failed',
               reserved && !settled && !(error instanceof MediaProviderRejectionError)
                 ? 'The provider response could not be confirmed. Its spending reservation remains held; this recording will not be submitted again under the same request.'

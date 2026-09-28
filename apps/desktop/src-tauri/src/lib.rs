@@ -67,7 +67,7 @@ fn native_capabilities() -> NativeCapabilities {
          */
         downloads: cfg!(desktop),
         /*
-         * Whether the *page* can subscribe to `athanor://` links. It cannot, on any platform:
+         * Whether the *page* can subscribe to `garden://` links. It cannot, on any platform:
          * `native.ts` reads `window.__TAURI__.deepLink`, `withGlobalTauri` is false, and no
          * `@tauri-apps/plugin-deep-link` is bundled. Deep links themselves work - `run()` below
          * navigates the window - but that costs a document reload, which is what the JS path
@@ -303,7 +303,7 @@ fn download_destination(downloads: Option<&Path>, suggested: &Path) -> Option<Pa
 
 fn deep_link_destination(raw: &str, local_origin: &str) -> Result<Option<Url>, String> {
     let link = Url::parse(raw).map_err(|_| "This is not a garden link")?;
-    if !matches!(link.scheme(), "garden" | "athanor")
+    if !matches!(link.scheme(), "garden")
         || !link.username().is_empty()
         || link.password().is_some()
         || link.query().is_some()
@@ -482,14 +482,14 @@ mod tests {
             )
             .unwrap(),
             deep_link_destination(
-                &format!("athanor://task/{task_id}"),
+                &format!("garden://task/{task_id}"),
                 "http://localhost:49876"
             )
             .unwrap()
         );
         assert_eq!(
             deep_link_destination(
-                &format!("athanor://task/{task_id}"),
+                &format!("garden://task/{task_id}"),
                 "http://localhost:49876"
             )
             .unwrap()
@@ -499,7 +499,7 @@ mod tests {
         );
         assert_eq!(
             deep_link_destination(
-                &format!("athanor://workspace/{workspace_id}"),
+                &format!("garden://workspace/{workspace_id}"),
                 "http://localhost:49876"
             )
             .unwrap()
@@ -508,10 +508,10 @@ mod tests {
             format!("http://localhost:49876/?workspace={workspace_id}")
         );
         assert!(
-            deep_link_destination("athanor://task/not-a-uuid", "http://localhost:49876").is_err()
+            deep_link_destination("garden://task/not-a-uuid", "http://localhost:49876").is_err()
         );
         assert!(
-            deep_link_destination("athanor://pair/ticket", "http://localhost:49876")
+            deep_link_destination("garden://pair/ticket", "http://localhost:49876")
                 .unwrap()
                 .is_none()
         );
@@ -520,7 +520,7 @@ mod tests {
     #[test]
     fn a_download_is_written_to_the_downloads_directory_under_a_plain_name() {
         let downloads =
-            std::env::temp_dir().join(format!("athanor-downloads-test-{}", Uuid::new_v4()));
+            std::env::temp_dir().join(format!("garden-downloads-test-{}", Uuid::new_v4()));
         fs::create_dir_all(&downloads).unwrap();
 
         let chosen =
@@ -554,7 +554,7 @@ mod tests {
     #[test]
     fn rejects_symlinks_that_leave_a_grant() {
         use std::os::unix::fs::symlink;
-        let root = std::env::temp_dir().join(format!("athanor-native-test-{}", Uuid::new_v4()));
+        let root = std::env::temp_dir().join(format!("garden-native-test-{}", Uuid::new_v4()));
         fs::create_dir_all(&root).unwrap();
         symlink("/", root.join("outside")).unwrap();
         let result = checked_path(&root, "outside/etc/passwd", true);

@@ -2,13 +2,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
-import {
-  decryptJson,
-  encryptJson,
-  type AccountOAuth,
-  type ConnectorTransport
-} from '@athanor/core';
-import type { Connector } from '@athanor/contracts';
+import { decryptJson, encryptJson, type AccountOAuth, type ConnectorTransport } from '@garden/core';
+import type { Connector } from '@garden/contracts';
 import { buildServer } from './server.js';
 import type { ApiConfig } from './config.js';
 
@@ -118,7 +113,7 @@ describe('native account authorization routes', () => {
       const completed = await server.app.inject({ method: 'GET', url: callback });
       expect(completed.statusCode, completed.body).toBe(200);
       expect(completed.headers['cache-control']).toBe('no-store');
-      expect(completed.body).toContain('athanor-account-oauth');
+      expect(completed.body).toContain('garden-account-oauth');
       expect(completed.body).toContain('owner@example.org');
       expect(completed.body).not.toContain('CANARY');
       expect((await server.app.inject({ method: 'GET', url: callback })).statusCode).toBe(400);
@@ -196,7 +191,7 @@ const isolatedConfig = (directory: string): ApiConfig => ({
   DEPLOYMENT_MODE: 'development',
   MODEL_CATALOG_SCOPE: 'provider_catalog',
   CONNECTION_MANIFEST_PATH: join(directory, 'connection.json'),
-  ATHANOR_STATE_PATH: directory,
+  GARDEN_STATE_PATH: directory,
   RELAY_STATE_DIR: join(directory, 'relay'),
   RELAY_LOCAL_HOST: '127.0.0.1',
   RELAY_LOCAL_PORT: 443,
@@ -210,7 +205,7 @@ const isolatedConfig = (directory: string): ApiConfig => ({
   PREVIEW_GATEWAY_PORT: 4401,
   RESERVED_PREVIEW_PORTS: '4201,4203',
   DATABASE_DRIVER: 'pglite',
-  DATABASE_URL: 'postgres://athanor:unused@127.0.0.1:5432/athanor',
+  DATABASE_URL: 'postgres://garden:unused@127.0.0.1:5432/garden',
   PGLITE_PATH: join(directory, 'database'),
   DATA_MASTER_KEY: Buffer.alloc(32, 9).toString('base64'),
   SESSION_SIGNING_KEY: 'session-secret-with-at-least-32-characters',
@@ -219,7 +214,7 @@ const isolatedConfig = (directory: string): ApiConfig => ({
   PUBLIC_RUNNER_URL: 'ws://127.0.0.1:4300',
   WORKSPACE_IMAGE_REVISION: 'dev',
   WEBAUTHN_RP_ID: 'localhost',
-  WEBAUTHN_RP_NAME: 'athanor Test',
+  WEBAUTHN_RP_NAME: 'garden Test',
   WEBAUTHN_ORIGIN: 'http://localhost:5173',
   ALLOW_INSECURE_DEV_AUTH: true,
   WORKER_ID: 'authorization-test-worker',

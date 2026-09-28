@@ -1,4 +1,4 @@
-import { AthanorError, type EncryptedEnvelope } from '@athanor/core';
+import { GardenError, type EncryptedEnvelope } from '@garden/core';
 import type { Database } from './database.js';
 import { json, mapTask } from './store/rows.js';
 import { TASK_QUEUE_CHANNEL, type TaskSignals } from './store/tasks.js';
@@ -59,9 +59,9 @@ export class ProjectExecutionStore {
         [input.taskId, input.userId]
       );
       const t = rows.rows[0];
-      if (!t) throw new AthanorError('task_not_found', 'Task not found', 404);
+      if (!t) throw new GardenError('task_not_found', 'Task not found', 404);
       if (t.workspace_status !== 'running')
-        throw new AthanorError('workspace_unavailable', 'Workspace is not running', 409);
+        throw new GardenError('workspace_unavailable', 'Workspace is not running', 409);
       const existing = await this.getProjectExecution(input.userId, input.taskId);
       if (existing?.status === 'ready') return existing;
       if (

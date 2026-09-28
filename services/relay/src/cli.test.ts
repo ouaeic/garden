@@ -18,9 +18,9 @@ describe('parseArgs', () => {
   });
 
   it('treats a flag followed by another flag as a boolean', () => {
-    const args = parseArgs(['serve', '--no-registration', '--config', '/etc/athanor-relay.json']);
+    const args = parseArgs(['serve', '--no-registration', '--config', '/etc/garden-relay.json']);
     expect(args.booleans.has('no-registration')).toBe(true);
-    expect(args.flags.get('config')).toBe('/etc/athanor-relay.json');
+    expect(args.flags.get('config')).toBe('/etc/garden-relay.json');
   });
 
   it('treats a trailing flag as a boolean', () => {

@@ -6,9 +6,9 @@
  * is precisely what models get wrong, so the operation earns its place - but only if the harness
  * can find the same end the model meant.
  *
- * A real syntax tree would be exact. athanor has no parser in the worker and adding one to test an
+ * A real syntax tree would be exact. garden has no parser in the worker and adding one to test an
  * edit format would be building the expensive half first, so this uses two rules that between them
- * cover the languages athanor actually edits:
+ * cover the languages garden actually edits:
  *
  *   - bracket depth, for anything with braces or parentheses: from the opening line, count
  *     `{[(` against `}])` until the depth returns to zero;

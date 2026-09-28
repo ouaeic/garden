@@ -51,7 +51,7 @@
 - PWA/share target/Web Push source plus generated Tauri desktop, Android, and iOS clients.
 - Android release signing, exact package/permission/network/backup policy checks, four-ABI APK/AAB
   audits, 16 KiB package and 64-bit ELF alignment checks, and secret/build-path scanning.
-- iOS generated Xcode source with exact `athanor://` pairing, loopback-only transport policy,
+- iOS generated Xcode source with exact `garden://` pairing, loopback-only transport policy,
   Bonjour and privacy declarations, opaque App Store icons, simulator CI, protected signing, and
   final IPA identity/provisioning/entitlement audit.
 - Fail-closed macOS Developer ID notarization/stapling and Windows timestamped Authenticode release
@@ -79,7 +79,7 @@ new release has passed its deployment and signed-artifact gates:
   native crash errors;
 - a local universal Android release APK and AAB passed exact four-ABI, privacy, archive,
   secret/path, and 16 KiB compatibility audits; they remain deliberately unsigned test artifacts;
-- Avahi loaded and successfully established the `_athanor._tcp` publisher on the VPS's IPv4 and
+- Avahi loaded and successfully established the `_garden._tcp` publisher on the VPS's IPv4 and
   IPv6 interfaces with the manifest identity;
 - native package installation persisted across a runner restart;
 - two consecutive files/browser/GUI/preview/storage drills passed without leaked GUI processes;
@@ -90,15 +90,15 @@ new release has passed its deployment and signed-artifact gates:
 - a synthetic private-content canary passed across garden, Nginx, and PostgreSQL journals/logs;
 - API, worker, native runner, and native-client suites pass at the revisions recorded by the release
   drill; exact counts are reported by CI rather than frozen in this document;
-- `athanor doctor` passes configuration, services, API, database, Nginx, port isolation, outbound
+- `garden doctor` passes configuration, services, API, database, Nginx, port isolation, outbound
   agent internet, Chromium, and disk checks;
 - a quiet reinstall preserved arbitrary control/runner settings and the exact TLS identity, and an
   expired connection ticket refreshed successfully without exposing it.
-- the final synchronized tree has zero checksum content drift from `/opt/athanor`; every installed
+- the final synchronized tree has zero checksum content drift from `/opt/garden`; every installed
   native helper matches that source, the complete native-computer drill passed again, and its
   temporary GUI/process/workspace state was removed;
 - a fresh root-only full-host backup passed strict checksums, restored database, home, configuration,
-  packages, and identity, and was followed by a clean `athanor doctor` run;
+  packages, and identity, and was followed by a clean `garden doctor` run;
 - synthetic terminal and file-content canaries were absent from garden, Nginx, and PostgreSQL logs;
   the only public TCP listeners are SSH and Nginx, while application and database ports stay on
   loopback; and
@@ -128,7 +128,7 @@ points, schedules and previews at deliberately generous values, and `currentPeri
 calendar month the usage pane totals against, because nothing is being billed and so nothing has to
 remember a period. What actually stops a runaway unattended run is the owner's own two numbers, in
 the currency the provider bills: the spending caps, which halt a task once it is over, and the
-pre-flight price ceiling (`sudo athanor price-ceiling`), which refuses to pick a model priced above
+pre-flight price ceiling (`sudo garden price-ceiling`), which refuses to pick a model priced above
 the rates the owner named in the first place. The second is the one that works overnight.
 
 The workspace table can hold more than one row, and the server allows exactly one: `maxWorkspaces`
@@ -160,8 +160,8 @@ removed. Native Linux is the only production server architecture.
   refused; and a recovery point restores the workspace byte-for-byte. What remains is repeating it
   against the _signed artifacts_ rather than a source build.
 - Restore onto a clean second host from an encrypted off-host backup. The in-place half is
-  exercised (2026-08-07): `sudo athanor backup` writes aside and renames only once checksummed and
-  records the revision it was taken from, `sudo athanor rollback DIR` puts code and data back
+  exercised (2026-08-07): `sudo garden backup` writes aside and renames only once checksummed and
+  records the revision it was taken from, `sudo garden rollback DIR` puts code and data back
   together, and the box came up with every check passing and the owner still signed in. A backup
   written by the previous release is still accepted, which is the property that matters on the day
   the current release is what went wrong. What remains is doing it onto a _second_ host.

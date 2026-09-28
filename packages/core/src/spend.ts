@@ -4,8 +4,8 @@ import {
   type SpendWindow,
   type SpendWindowName,
   type SpendWindowState
-} from '@athanor/contracts';
-import { AthanorError } from './errors.js';
+} from '@garden/contracts';
+import { GardenError } from './errors.js';
 
 /**
  * Provider invoices carry seven significant decimals at most, and float addition over a few
@@ -155,7 +155,7 @@ export const evaluateSpendCaps = (input: SpendCapInput): SpendDecision => {
 /** Turns a denial into the error the API and the worker both surface. */
 export const assertSpendAllowed = (decision: SpendDecision): SpendDecision => {
   if (decision.outcome !== 'deny') return decision;
-  throw new AthanorError(
+  throw new GardenError(
     'spend_cap_reached',
     decision.reason ?? 'This work would exceed the spending cap.',
     402,

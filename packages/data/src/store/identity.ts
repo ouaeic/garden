@@ -1,4 +1,4 @@
-import type { EncryptedEnvelope } from '@athanor/core';
+import type { EncryptedEnvelope } from '@garden/core';
 import { randomUUID } from 'node:crypto';
 import type { Database } from '../database.js';
 import type { ApiTokenRecord, PasskeyRecord, UserRecord } from '../types.js';
@@ -36,7 +36,7 @@ export class IdentityStore {
   }
 
   /**
-   * The only account on this box, when there is exactly one - which is the shape athanor is for.
+   * The only account on this box, when there is exactly one - which is the shape garden is for.
    *
    * `LIMIT 2` rather than `LIMIT 1` so one query answers "exactly one" instead of "at least one":
    * the caller needs to know there is nothing to disambiguate, not merely that somebody exists.

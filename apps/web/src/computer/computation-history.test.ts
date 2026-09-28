@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { TaskEvent, ComputationCell } from '@athanor/contracts';
+import type { TaskEvent, ComputationCell } from '@garden/contracts';
 import { computationHistory } from './computation-history';
 const sessionId = 'kernel-example';
 const cell: ComputationCell = {

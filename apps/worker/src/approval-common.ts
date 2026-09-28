@@ -1,5 +1,5 @@
 /** Shared approval facts and presentation bounds; no authority is derived here. */
-import { type TaskApprovalScope } from '@athanor/contracts';
+import { type TaskApprovalScope } from '@garden/contracts';
 import { type ResolvedMediaModel } from './media.js';
 import { textValue } from './values.js';
 
@@ -46,7 +46,7 @@ export const APPROVAL_RANK: Record<ApprovalRequirement['sideEffect'], number> = 
   external_consequential: 2
 };
 
-export { SECURITY_MODE_FLOOR } from '@athanor/contracts/permission-policy';
+export { SECURITY_MODE_FLOOR } from '@garden/contracts/permission-policy';
 
 export const DEFERRED_EXECUTION_ACTION = 'Change a file this computer runs on its own';
 

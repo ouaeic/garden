@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ComputationRequest, ProcessHistoryQuery } from '@athanor/contracts';
+import { ComputationRequest, ProcessHistoryQuery } from '@garden/contracts';
 import type { ComputationManager } from './computation.js';
 import { supervisorRequest } from './supervisor-rpc.js';
 

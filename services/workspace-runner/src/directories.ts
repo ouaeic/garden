@@ -1,7 +1,7 @@
 import { lstat, opendir } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
-import type { DirectoryPage } from '@athanor/contracts';
+import type { DirectoryPage } from '@garden/contracts';
 import { assertUserDataPath, withWorkspaceDirectory, WorkspaceFileError } from './files.js';
 
 const Cursor = z.object({

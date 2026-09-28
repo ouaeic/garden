@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { encryptJson, sha256 } from '@athanor/core';
+import { encryptJson, sha256 } from '@garden/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createDatabase, migrateDatabase, type Database } from '../database.js';
 import { DataStore } from '../store.js';
@@ -316,7 +316,7 @@ describe('an owner with a paired destination and no device', () => {
 
   const sealed = (userId: string, id: string, key: Uint8Array = masterKey) =>
     encryptJson(
-      { botToken: '123456:token-of-the-bot', botUsername: 'athanor_test_bot' },
+      { botToken: '123456:token-of-the-bot', botUsername: 'garden_test_bot' },
       key,
       notificationDestinationAad(userId, id)
     );
@@ -449,7 +449,7 @@ describe('an owner with a paired destination and no device', () => {
     const { destination } = await seeded('verified');
     const [row] = await store.listPendingNotifications(100, masterKey);
     expect(row?.transport === 'telegram' && row.config?.botToken).toBe('123456:token-of-the-bot');
-    expect(row?.transport === 'telegram' && row.config?.botUsername).toBe('athanor_test_bot');
+    expect(row?.transport === 'telegram' && row.config?.botUsername).toBe('garden_test_bot');
     // The wrong key opens nothing and sends nothing: config is null rather than an exception, so
     // the rest of the batch is unaffected.
     const [other] = await store.listPendingNotifications(100, new Uint8Array(32).fill(9));

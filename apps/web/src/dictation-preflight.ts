@@ -1,4 +1,4 @@
-import type { DictationOptions } from '@athanor/contracts';
+import type { DictationOptions } from '@garden/contracts';
 import { spendCap } from './composer-operations';
 
 // Kept in step with the API contract by scripts/check-repository.mjs.

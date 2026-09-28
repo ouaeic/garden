@@ -8,15 +8,15 @@ import type { RefreshOutcome } from './refresh-once.js';
  * Nothing anywhere read the age of the model catalogue. The unit being active is not the same
  * fact: almost all of this service's life is the hour it spends asleep, so a revoked provider key,
  * an owner on a provider this service cannot ask, and a feed that has been failing since Friday
- * all look exactly like a healthy sleeping process to `systemctl`, to `athanor doctor` and to the
+ * all look exactly like a healthy sleeping process to `systemctl`, to `garden doctor` and to the
  * owner. Meanwhile the picker goes on offering models the provider withdrew last quarter, at
  * prices from whenever they were last written - and those prices are what a run is weighed against
  * when it is charged to a spending window.
  *
- * A file rather than a row, because the reader is `athanor doctor`, a shell script that already
+ * A file rather than a row, because the reader is `garden doctor`, a shell script that already
  * reads `connection.json` and `ddns.state` this way and has no database password of its own. It
- * lives under /var/lib/athanor-control because that is the one directory `athanor@.service` is
- * allowed to write to; putting it beside the other state in /var/lib/athanor would need a change
+ * lives under /var/lib/garden-control because that is the one directory `garden@.service` is
+ * allowed to write to; putting it beside the other state in /var/lib/garden would need a change
  * to the unit's ReadWritePaths, and a diagnostic is not worth widening what a service can write.
  */
 export interface CatalogRefreshRecord {

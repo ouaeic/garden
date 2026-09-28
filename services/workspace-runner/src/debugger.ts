@@ -5,7 +5,7 @@ import { connect, type Socket } from 'node:net';
 import { access, mkdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
-import { DebuggerRequest, DebugSessionSchema, type DebugSession } from '@athanor/contracts';
+import { DebuggerRequest, DebugSessionSchema, type DebugSession } from '@garden/contracts';
 import { prepareInvocation, type InvocationPolicy } from './execution.js';
 import {
   discardMissionInvocation,
@@ -18,8 +18,8 @@ import { DapConnection } from './dap-protocol.js';
 
 export const DEBUG_SESSION_LIMIT = 4;
 export const nativeDebugAdapters = {
-  python: '/usr/local/lib/athanor/python/bin/python3',
-  javascript: '/usr/local/lib/athanor/js-debug/src/dapDebugServer.js'
+  python: '/usr/local/lib/garden/python/bin/python3',
+  javascript: '/usr/local/lib/garden/js-debug/src/dapDebugServer.js'
 };
 type AdapterPaths = typeof nativeDebugAdapters;
 type RecordState = {
@@ -73,7 +73,7 @@ export class DebuggerManager {
     private readonly workspaceRoot: string,
     private readonly policy: InvocationPolicy,
     private readonly adapters: AdapterPaths = nativeDebugAdapters,
-    private readonly journalDirectory: string = path.join(workspaceRoot, '.athanor')
+    private readonly journalDirectory: string = path.join(workspaceRoot, '.garden')
   ) {}
   get #journal() {
     return path.join(this.journalDirectory, 'debugger.json');

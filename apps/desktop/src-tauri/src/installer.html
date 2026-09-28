@@ -7,7 +7,7 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'none'; connect-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; form-action 'none'; base-uri 'none'"
     />
-    <title>Install athanor</title>
+    <title>Install garden</title>
     <style>
       :root {
         color-scheme: dark;
@@ -210,7 +210,7 @@
       <p class="eyebrow">Secure client setup</p>
       <h1>Install on your server</h1>
       <p class="intro">
-        The athanor app connects directly over SSH, verifies the server identity, installs from the
+        The garden app connects directly over SSH, verifies the server identity, installs from the
         fixed public source, and imports the one-time connection ticket. SSH secrets stay in this
         local page’s memory and are never stored or relayed.
       </p>
@@ -272,7 +272,7 @@
       <button id="install" class="primary hidden" type="button">Install and connect</button>
       <p class="help">
         Use a fresh supported Ubuntu or Debian server. The login must be root or have passwordless
-        sudo. Athanor never changes the SSH service.
+        sudo. Garden never changes the SSH service.
       </p>
     </main>
     <script>
@@ -367,7 +367,7 @@
         $("probe").disabled = true;
         status.style.color = "#bfc4c7";
         status.textContent =
-          "Installing athanor and verifying the private connection. This can take several minutes…";
+          "Installing garden and verifying the private connection. This can take several minutes…";
         try {
           const result = await request("/install", {
             host: $("host").value.trim(),

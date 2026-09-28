@@ -1,4 +1,4 @@
-import { runtimeNow, runtimeSetTimeout } from '@athanor/core';
+import { runtimeNow, runtimeSetTimeout } from '@garden/core';
 import { repositoryOverview } from './repository-overview.js';
 import { SETTLED_ORDER } from './repository-symbols.js';
 export {
@@ -13,8 +13,8 @@ export {
   SYMBOL_SWEEP_PATTERN
 } from './repository-symbols.js';
 import { executeCodingMission } from '../coding-missions.js';
-import { AthanorError } from '@athanor/core';
-import { type ModelToolCall } from '@athanor/model-gateway';
+import { GardenError } from '@garden/core';
+import { type ModelToolCall } from '@garden/model-gateway';
 import { type ExecObservation, type ProcessObservation } from '../agent-state.js';
 import { event } from '../tool-recording.js';
 import { boundedKnowledge, textValue } from '../values.js';
@@ -154,7 +154,7 @@ export async function executeRepositoryTool(
           { executable: '/usr/bin/rg', args, cwd: path, timeoutSeconds: 60 }
         );
         if (![0, 1].includes(result.exitCode ?? -1))
-          throw new AthanorError('code_search_failed', result.stderr || 'Code search failed');
+          throw new GardenError('code_search_failed', result.stderr || 'Code search failed');
         return result.stdout.split('\n').filter(Boolean);
       };
       let matches = await search(literal);
@@ -191,7 +191,7 @@ export async function executeRepositoryTool(
        * count and the lever names are this file's own words and say everything the model needs.
        */
       if (files.size > CODE_SEARCH_FILE_CEILING)
-        throw new AthanorError(
+        throw new GardenError(
           'code_search_too_broad',
           `${files.size} files match, past the ${CODE_SEARCH_FILE_CEILING} this tool will list - please narrow your search: give path or glob, set wholeWord, or search for a longer string.`
         );
@@ -314,7 +314,7 @@ export async function executeRepositoryTool(
       const action = textValue(call.arguments.action);
       const agent = textValue(call.arguments.agent);
       if (!['codex', 'claude', 'opencode'].includes(agent))
-        throw new AthanorError('coding_agent_invalid', 'Choose Codex, Claude Code, or OpenCode');
+        throw new GardenError('coding_agent_invalid', 'Choose Codex, Claude Code, or OpenCode');
       const subscriptionAgent = agent as SubscriptionAgent;
       const agentName = subscriptionAgentName(subscriptionAgent);
       const executable = subscriptionAgentExecutable(subscriptionAgent);
@@ -368,7 +368,7 @@ export async function executeRepositoryTool(
           authStatus: authText.trim().slice(0, 2_000) || 'Run the login command to confirm access.',
           loginCommand: subscriptionAgentLoginCommand(subscriptionAgent),
           loginInstructions:
-            'Open the Terminal pane, run the login command, and complete the publisher’s browser flow. athanor never receives the password or OAuth token.'
+            'Open the Terminal pane, run the login command, and complete the publisher’s browser flow. garden never receives the password or OAuth token.'
         };
       }
       if (action === 'setup') {
@@ -380,7 +380,7 @@ export async function executeRepositoryTool(
           `${root}/exec`,
           {
             executable: 'npm',
-            args: ['install', '--prefix', '.athanor/tools', packageName],
+            args: ['install', '--prefix', '.garden/tools', packageName],
             cwd: 'workspace',
             network: true,
             timeoutSeconds: 900,
@@ -388,7 +388,7 @@ export async function executeRepositoryTool(
           }
         );
         if (installed.exitCode !== 0)
-          throw new AthanorError(
+          throw new GardenError(
             'coding_agent_setup_failed',
             installed.stderr || `Could not install ${packageName}`
           );
@@ -408,13 +408,13 @@ export async function executeRepositoryTool(
       }
       if (action === 'run') {
         if (task.privacyRoute === 'provider_zdr')
-          throw new AthanorError(
+          throw new GardenError(
             'coding_agent_privacy_conflict',
-            'This task requires zero-retention model routing. Subscription coding CLIs have their own publisher data policies, so Athanor will not send this private task to one. Use the main coding tools here, or start a standard-privacy task if you deliberately want that specialist.'
+            'This task requires zero-retention model routing. Subscription coding CLIs have their own publisher data policies, so Garden will not send this private task to one. Use the main coding tools here, or start a standard-privacy task if you deliberately want that specialist.'
           );
         const prompt = boundedKnowledge(call.arguments.prompt, 100_000);
         if (!prompt.trim())
-          throw new AthanorError('coding_agent_prompt_empty', 'A coding mission is required');
+          throw new GardenError('coding_agent_prompt_empty', 'A coding mission is required');
         const sessionId = textValue(call.arguments.sessionId).trim();
         const maxTurns = clampNumber(call.arguments.maxTurns, { min: 1, max: 40, fallback: 12 });
         const args = buildSubscriptionAgentArgs({
@@ -468,9 +468,9 @@ export async function executeRepositoryTool(
                 `${root}/processes/${encodeURIComponent(process.sessionId)}`,
                 { action: 'kill' }
               );
-              throw new AthanorError(
+              throw new GardenError(
                 'coding_agent_interrupted',
-                `${agentName} stopped with the athanor task`
+                `${agentName} stopped with the garden task`
               );
             }
           }
@@ -572,7 +572,7 @@ export async function executeRepositoryTool(
          * this check so the failure can be read out of the same records the success is.
          */
         if (result.exitCode !== 0 || claudeResult?.is_error === true)
-          throw new AthanorError(
+          throw new GardenError(
             'coding_agent_failed',
             [summary, result.stderr].map((text) => String(text ?? '').trim()).find(Boolean) ??
               `${agentName} exited without completing`
@@ -592,7 +592,7 @@ export async function executeRepositoryTool(
           stderr: result.stderr.slice(-4_000)
         };
       }
-      throw new AthanorError('coding_agent_action_invalid', 'Unknown coding agent action');
+      throw new GardenError('coding_agent_action_invalid', 'Unknown coding agent action');
     }
     default:
       /*

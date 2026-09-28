@@ -1,7 +1,7 @@
 import { constants } from 'node:fs';
 import { lstat, open, opendir } from 'node:fs/promises';
 import path from 'node:path';
-import type { ProjectStorageUsage } from '@athanor/contracts';
+import type { ProjectStorageUsage } from '@garden/contracts';
 import { assertOpenedInPlace, withWorkspaceDirectory } from './files.js';
 
 /** Metadata only: no project file, hook or executable is read or run. */

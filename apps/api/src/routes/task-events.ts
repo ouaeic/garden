@@ -8,9 +8,9 @@
  * where the window ends.
  */
 
-import { TaskEventWindowQuery } from '@athanor/contracts';
-import type { TaskEvent } from '@athanor/contracts';
-import { AthanorError, decryptJson, unwrapDataKey } from '@athanor/core';
+import { TaskEventWindowQuery } from '@garden/contracts';
+import type { TaskEvent } from '@garden/contracts';
+import { GardenError, decryptJson, unwrapDataKey } from '@garden/core';
 import { STREAM_TOKEN_RECHECK_MS, maxEventStreamsPerUser, revealedTaskEvent } from '../context.js';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
@@ -35,10 +35,9 @@ export const registerTaskEventRoutes = (context: RouteContext): void => {
   }>('/v1/tasks/:taskId/events', async (request) => {
     const user = requireUser(request.user);
     const task = await store.getTask(user.id, request.params.taskId);
-    if (!task) throw new AthanorError('task_not_found', 'Task not found');
+    if (!task) throw new GardenError('task_not_found', 'Task not found');
     const workspace = await store.getWorkspace(user.id, task.workspaceId);
-    if (!workspace?.wrappedKey)
-      throw new AthanorError('workspace_not_found', 'Workspace not found');
+    if (!workspace?.wrappedKey) throw new GardenError('workspace_not_found', 'Workspace not found');
     const dataKey = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
     const query = TaskEventWindowQuery.parse(request.query);
     /*
@@ -106,10 +105,10 @@ export const registerTaskEventRoutes = (context: RouteContext): void => {
       // only at the moment it began.
       const streamToken = request.apiToken?.id ?? null;
       const task = await store.getTask(user.id, request.params.taskId);
-      if (!task) throw new AthanorError('task_not_found', 'Task not found');
+      if (!task) throw new GardenError('task_not_found', 'Task not found');
       const workspace = await store.getWorkspace(user.id, task.workspaceId);
       if (!workspace?.wrappedKey)
-        throw new AthanorError('workspace_not_found', 'Workspace not found');
+        throw new GardenError('workspace_not_found', 'Workspace not found');
       const dataKey = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
       const lastEventId = Array.isArray(request.headers['last-event-id'])
         ? request.headers['last-event-id'][0]

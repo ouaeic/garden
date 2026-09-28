@@ -1,5 +1,5 @@
-import { AthanorError } from '@athanor/core';
-import type { ProjectDirectory } from '@athanor/contracts';
+import { GardenError } from '@garden/core';
+import type { ProjectDirectory } from '@garden/contracts';
 import { z } from 'zod';
 import { downloadSignal, sendDownload } from '../download-response.js';
 import { requireUser } from '../http/auth-hook.js';
@@ -16,7 +16,7 @@ export const registerProjectDirectoryRoutes = ({ app, store, runner }: RouteCont
         kind === 'project'
           ? project
           : members.find((member) => member.taskId === request.params.taskId);
-      if (!current) throw new AthanorError('task_not_found', 'Project not found', 404);
+      if (!current) throw new GardenError('task_not_found', 'Project not found', 404);
       const directories: ProjectDirectory[] = [];
       for (const workspaceId of new Set(members.map((member) => member.workspaceId))) {
         const workspace = await store.getWorkspace(user.id, workspaceId);
@@ -36,7 +36,7 @@ export const registerProjectDirectoryRoutes = ({ app, store, runner }: RouteCont
       async (request, reply) => {
         const user = requireUser(request.user);
         const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
-        if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found', 404);
+        if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found', 404);
         const query = z
           .object({
             path: z.string().min(1).max(4096).default('workspace'),

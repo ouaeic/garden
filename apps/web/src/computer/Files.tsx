@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Artifact, Workspace } from '@athanor/contracts';
+import type { Artifact, Workspace } from '@garden/contracts';
 import { del, get, post, request } from '../client.js';
 import { download } from '../management.js';
 import { readWorkspaceFile, saveWorkspaceFile } from './workspace-file';

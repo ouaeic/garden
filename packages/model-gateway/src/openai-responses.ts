@@ -1,6 +1,6 @@
 import { performance } from 'node:perf_hooks';
-import { AthanorError } from '@athanor/core';
-import { duplicatedWebCapabilities } from '@athanor/contracts';
+import { GardenError } from '@garden/core';
+import { duplicatedWebCapabilities } from '@garden/contracts';
 import type { ModelAdapter, ModelRequest, ModelResponse } from './protocol.js';
 import {
   OpenAICompatibleAdapter,
@@ -48,7 +48,7 @@ export class OpenAIResponsesAdapter implements ModelAdapter {
     assertReasoningEffort(input.reasoningEffort, input.reasoningOptions);
     const tools = input.serverTools ?? [];
     if (tools.some((tool) => !['web_search', 'web_search_preview'].includes(tool.type)))
-      throw new AthanorError(
+      throw new GardenError(
         'provider_tool_unsupported',
         'This native route only permits approved web search and Garden function tools'
       );
@@ -58,7 +58,7 @@ export class OpenAIResponsesAdapter implements ModelAdapter {
         input.tools.map((tool) => tool.name)
       ).length
     )
-      throw new AthanorError(
+      throw new GardenError(
         'web_tool_catalogue_conflict',
         'The request contains duplicate web tools'
       );
@@ -105,7 +105,7 @@ export class OpenAIResponsesAdapter implements ModelAdapter {
     while (maxBytes > 0 && bytes > maxBytes) {
       const oldest = messages.findIndex((message) => message.images?.length);
       if (oldest < 0)
-        throw new AthanorError(
+        throw new GardenError(
           'provider_context_overflow',
           'The native request exceeds the transport size limit; condense its context',
           413,
@@ -287,9 +287,9 @@ export class OpenAIResponsesAdapter implements ModelAdapter {
       if (input.signal?.aborted) collector.cutoff = 'cancelled';
       if (collector.cutoff && collector.accepted) return collector.finish();
       const error =
-        cause instanceof AthanorError
+        cause instanceof GardenError
           ? cause
-          : new AthanorError(
+          : new GardenError(
               'provider_unavailable',
               'The native model response was interrupted or invalid',
               502

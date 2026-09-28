@@ -23,7 +23,7 @@
  * in the events and nowhere else.
  *
  * WHAT ASSEMBLY REFUSES. One box, one build, one model per row. A row carries a single `backend`, a
- * single `athanor_commit` and a single `model` column, and every number in it is read as being
+ * single `garden_commit` and a single `model` column, and every number in it is read as being
  * about that triple. Records that disagree on any of the three are two measurements, and averaging
  * them puts a claim on the row that was true of neither half - the same refusal `scoreRun` makes
  * for mixed boxes within one process, applied across processes.
@@ -67,8 +67,8 @@ export interface TaskRecordFile {
     readonly modelRoute: string;
     readonly provider: string;
   };
-  /** Which athanor produced it. */
-  readonly athanor: { readonly version: string; readonly commit: string };
+  /** Which garden produced it. */
+  readonly garden: { readonly version: string; readonly commit: string };
   readonly securityMode: 'review' | 'balanced' | 'autonomous';
   /** Cards the auto-approver answered on this task. Zero under any arm but `unattended`. */
   readonly autoAnswered: number;
@@ -324,7 +324,7 @@ export const assembleRow = (options: AssembleOptions): AssembledRow => {
   const refuseMixedBuild = (commits: readonly string[]): string | null => {
     if (commits.length <= 1) return null;
     const pairs = commits.flatMap((a, i) => commits.slice(i + 1).map((b) => [a, b] as const));
-    if (!pairs.every(([a, b]) => sameBuild(a, b))) return refuseMixed('athanor commit', commits);
+    if (!pairs.every(([a, b]) => sameBuild(a, b))) return refuseMixed('garden commit', commits);
     buildCommit = commits.reduce((newest, commit) =>
       options.sameBuild ? commit : laterCommit(newest, commit)
     );
@@ -340,7 +340,7 @@ export const assembleRow = (options: AssembleOptions): AssembledRow => {
         records.map((one) => `${one.record.ranIn.name}/${String(one.record.ranIn.isolatesNetwork)}`)
       )
     ) ??
-    refuseMixedBuild(distinct(records.map((one) => one.record.athanor.commit))) ??
+    refuseMixedBuild(distinct(records.map((one) => one.record.garden.commit))) ??
     refuseMixed('model', distinct(records.map((one) => one.record.identity.model))) ??
     refuseMixed('benchmark', distinct(records.map((one) => one.record.benchmark))) ??
     refuseMixed('security mode', distinct(records.map((one) => one.record.securityMode)));
@@ -441,8 +441,8 @@ export const assembleRow = (options: AssembleOptions): AssembledRow => {
     model: first.identity.model,
     modelRoute: first.identity.modelRoute,
     provider: first.identity.provider,
-    harnessVersion: first.athanor.version,
-    harnessCommit: buildCommit ?? first.athanor.commit,
+    harnessVersion: first.garden.version,
+    harnessCommit: buildCommit ?? first.garden.commit,
     arm: options.arm,
     securityMode: first.securityMode,
     approvalsAutoAnswered: records.reduce((total, one) => total + one.record.autoAnswered, 0),
@@ -551,7 +551,7 @@ const KEY_COLUMNS = [
   'task_set_sha',
   'arm',
   'model',
-  'athanor_commit',
+  'garden_commit',
   'n_runs'
 ] as const;
 

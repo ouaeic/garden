@@ -1,7 +1,7 @@
 import { performance } from 'node:perf_hooks';
 import { MAX_STREAM_LINE_CHARS, streamLimits } from './stream-limits.js';
-import { duplicatedWebCapabilities, serverToolUseFrom, webCitationsFrom } from '@athanor/contracts';
-import { AthanorError } from '@athanor/core';
+import { duplicatedWebCapabilities, serverToolUseFrom, webCitationsFrom } from '@garden/contracts';
+import { GardenError } from '@garden/core';
 import type {
   ModelAdapter,
   ModelMessage,
@@ -662,10 +662,10 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
   }
 
   /** Turns a payload's own `error` object into the throw the caller's retry logic can reason about. */
-  #fault(frame: unknown, where: string): AthanorError | null {
+  #fault(frame: unknown, where: string): GardenError | null {
     const fault = providerFault(frame);
     if (!fault) return null;
-    return new AthanorError(
+    return new GardenError(
       providerFaultCode(fault.status),
       `${this.provider} reported an error ${where} (${fault.status}): ${fault.message}`,
       fault.status,
@@ -743,10 +743,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
       ...(signal ? { signal } : {})
     });
     if (!response.ok)
-      throw new AthanorError(
-        'provider_unavailable',
-        `${this.provider} returned ${response.status}`
-      );
+      throw new GardenError('provider_unavailable', `${this.provider} returned ${response.status}`);
     const body = (await response.json()) as { data?: Array<{ id: string; owned_by?: string }> };
     return (body.data ?? []).map((model) => ({
       id: model.id,
@@ -763,10 +760,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
       ...(signal ? { signal } : {})
     });
     if (!response.ok)
-      throw new AthanorError(
-        'provider_unavailable',
-        `${this.provider} returned ${response.status}`
-      );
+      throw new GardenError('provider_unavailable', `${this.provider} returned ${response.status}`);
     const body = (await response.json()) as { data?: unknown };
     const entries = Array.isArray(body.data) ? body.data : [];
     const described = entries
@@ -875,7 +869,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
    * inference routing and explicitly does not cover tools - which means a search query is outside
    * that guarantee however this request is built, so refusing to send the tools never protected the
    * query. It only ensured that a box configured the shipped way could not search, since the flag
-   * ships on. Where a query may go is now settled once, by the plan in @athanor/contracts, and
+   * ships on. Where a query may go is now settled once, by the plan in @garden/contracts, and
    * disclosed to the owner in the words that plan hands back; a request arriving here with both is
    * the ordinary case on a zero-retention box, not a caller's bug.
    */
@@ -888,7 +882,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
       input.tools.map((tool) => tool.name)
     );
     if (duplicated.length > 0)
-      throw new AthanorError(
+      throw new GardenError(
         'web_tool_catalogue_conflict',
         `${requested} was sent while ${duplicated.join(', ')} stayed in the tool catalogue, which offers the model two ways to do one thing`
       );
@@ -917,7 +911,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
   #unstreamedCompletion(text: string): CompletionBody {
     const body = completionFromJson(text);
     if (body) return body;
-    throw new AthanorError(
+    throw new GardenError(
       'provider_stream_unparsed',
       `${this.provider} answered a streamed request with ${
         text.trim() ? 'neither a stream nor a completion' : 'an empty body'
@@ -934,7 +928,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
       nativeParts.reduce((sum, part) => sum + Buffer.byteLength(part.data, 'base64'), 0) >
         NATIVE_INPUT_MAX_BYTES
     )
-      throw new AthanorError(
+      throw new GardenError(
         'native_input_too_large',
         'Native media exceeds the combined request limit',
         413
@@ -943,7 +937,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
     for (const [index, message] of input.messages.entries()) {
       if (!message.nativeInputs?.length) continue;
       if (message.role !== 'user')
-        throw new AthanorError(
+        throw new GardenError(
           'native_input_role_invalid',
           'Native media is only accepted as user input data',
           400
@@ -977,7 +971,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
       if (sends('max_tokens')) return { max_tokens: value };
       if (declared?.has('max_completion_tokens')) return { max_completion_tokens: value };
       if (input.textPriceCeiling)
-        throw new AthanorError(
+        throw new GardenError(
           'provider_output_limit_unsupported',
           'This route cannot enforce the title output limit',
           409
@@ -989,7 +983,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
       input.reasoningEffort &&
       !sends(this.provider === 'openrouter' ? 'reasoning' : 'reasoning_effort')
     )
-      throw new AthanorError(
+      throw new GardenError(
         'provider_reasoning_control_unsupported',
         'This route cannot disable reasoning for a title',
         409
@@ -1127,7 +1121,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
         if (this.#maxRequestBytes <= 0 || bytes <= this.#maxRequestBytes) return { body, bytes };
         const oldest = attachments.find((index) => !shed.has(index));
         if (oldest === undefined)
-          throw new AthanorError(
+          throw new GardenError(
             nativeParts.length ? 'native_input_too_large' : 'provider_context_overflow',
             `${this.provider} was not sent this request: the assembled body is ${bytes} bytes, past the ${this.#maxRequestBytes}-byte ceiling this side holds, and there is nothing left to leave out`,
             413,
@@ -1150,11 +1144,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
           body: assembled.body
         });
       } catch {
-        throw new AthanorError(
-          'provider_unavailable',
-          `${this.provider} could not be reached`,
-          503
-        );
+        throw new GardenError('provider_unavailable', `${this.provider} could not be reached`, 503);
       }
     };
     let response = await send(true);
@@ -1213,17 +1203,17 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
         isContextOverflowText(complaint)
       ) {
         const sizes = contextOverflowSizes(complaint);
-        throw new AthanorError(
+        throw new GardenError(
           'provider_context_overflow',
           `${this.provider} refused the request because the window is larger than the route will take (${response.status})${explanation}`,
           response.status,
           sizes
         );
       }
-      // The status has to travel with the error. Without it every 5xx inherits AthanorError's
+      // The status has to travel with the error. Without it every 5xx inherits GardenError's
       // default of 400, `isRetryableError` reads that as a client mistake, and a task that has run
       // for hours dies on one upstream blip that a single retry would have absorbed.
-      throw new AthanorError(
+      throw new GardenError(
         providerFaultCode(response.status),
         `${this.provider} request failed (${response.status})${explanation}`,
         response.status,
@@ -1276,7 +1266,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
       ]).finally(() => clearTimeout(timer));
       if (outcome !== expired) return outcome as T;
       await response.body?.cancel().catch(() => undefined);
-      throw new AthanorError(
+      throw new GardenError(
         'provider_stream_stalled',
         `${this.provider} accepted the request and then sent nothing back for ${Math.round(
           budget.elapsedMs() / 1000
@@ -1514,7 +1504,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
     signal?: AbortSignal
   ): Promise<StreamedBody> {
     if (!response.body)
-      throw new AthanorError('provider_request_failed', `${this.provider} returned no stream`);
+      throw new GardenError('provider_request_failed', `${this.provider} returned no stream`);
     let cutoff: GenerationCutoff | undefined;
     let failure: Error | undefined;
     const reader = response.body.getReader();
@@ -1742,7 +1732,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
         if (!cutoff) await consumeLine('');
       }
       if (!cutoff && !outputLimit && !terminal && !finishReason && frames > 0) {
-        failure = new AthanorError(
+        failure = new GardenError(
           'provider_unavailable',
           `${this.provider} ended the response stream before its completion marker`,
           503
@@ -1759,13 +1749,13 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
         toolCalls.size > 0 ||
         reasoningDetails.length > 0 ||
         (usage?.total_tokens ?? 0) > 0;
-      if (!(cause instanceof AthanorError) && isAbort(cause) && signal?.aborted && generated)
+      if (!(cause instanceof GardenError) && isAbort(cause) && signal?.aborted && generated)
         cutoff = 'cancelled';
       else {
         const fault =
-          cause instanceof AthanorError || (isAbort(cause) && cause instanceof Error)
+          cause instanceof GardenError || (isAbort(cause) && cause instanceof Error)
             ? cause
-            : new AthanorError(
+            : new GardenError(
                 'provider_unavailable',
                 `${this.provider} dropped the response stream: ${transportDetail(cause)}`,
                 503
@@ -1803,7 +1793,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
      * returns, cut off and labelled, and the caller decides.
      */
     if (cutoff && !content && !reasoning && toolCalls.size === 0)
-      throw new AthanorError(
+      throw new GardenError(
         'provider_stream_stalled',
         `${this.provider} accepted the request and then wrote nothing for ${Math.round(budget.elapsedMs() / 1000)} seconds, so the response was abandoned`,
         504

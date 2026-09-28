@@ -1,7 +1,7 @@
 import { replyToCodingMission } from '../coding-mission-reply.js';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { AthanorError, decryptJson, unwrapDataKey, type EncryptedEnvelope } from '@athanor/core';
+import { GardenError, decryptJson, unwrapDataKey, type EncryptedEnvelope } from '@garden/core';
 import { continueTaskOperation, taskContinuationSnapshot } from '../task-continuation.js';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
@@ -30,7 +30,7 @@ export function registerQuestionRoutes(context: RouteContext): void {
     async (request) => {
       const user = requireUser(request.user);
       const task = await context.store.getTask(user.id, request.params.taskId);
-      if (!task) throw new AthanorError('task_not_found', 'Conversation not found', 404);
+      if (!task) throw new GardenError('task_not_found', 'Conversation not found', 404);
       const workspace = await context.store.getWorkspace(user.id, task.workspaceId);
       if (!workspace?.wrappedKey || !task.agentStateCiphertext || task.status !== 'awaiting_user')
         return null;
@@ -98,10 +98,10 @@ export function registerQuestionRoutes(context: RouteContext): void {
         user.id
       ]);
       const task = await context.store.getTask(user.id, request.params.taskId);
-      if (!task) throw new AthanorError('task_not_found', 'Conversation not found', 404);
+      if (!task) throw new GardenError('task_not_found', 'Conversation not found', 404);
       const workspace = await context.store.getWorkspace(user.id, task.workspaceId);
       if (!workspace?.wrappedKey)
-        throw new AthanorError('workspace_not_found', 'Workspace not found', 404);
+        throw new GardenError('workspace_not_found', 'Workspace not found', 404);
       const key = unwrapDataKey(workspace.wrappedKey, context.masterKey, workspace.id);
       const messageId = questionAnswerId(task.id, input.questionId);
       const prior = (
@@ -116,7 +116,7 @@ export function registerQuestionRoutes(context: RouteContext): void {
           key
         );
         if (payload.markdown !== input.prompt)
-          throw new AthanorError(
+          throw new GardenError(
             'question_already_answered',
             'This question already has an answer. Refresh the conversation.',
             409
@@ -147,14 +147,14 @@ export function registerQuestionRoutes(context: RouteContext): void {
         !state?.question ||
         (state.question.id ?? latest?.id) !== input.questionId
       )
-        throw new AthanorError(
+        throw new GardenError(
           'question_changed',
           'This question is no longer waiting for an answer. Refresh the conversation.',
           409
         );
       if (state.question.handoff?.kind === 'challenge') {
         if (request.apiToken)
-          throw new AthanorError(
+          throw new GardenError(
             'session_required',
             'Complete the handoff from a signed-in device',
             403
@@ -180,7 +180,7 @@ export function registerQuestionRoutes(context: RouteContext): void {
           .catch(() => null);
         if (!completion?.ok) {
           const blocked = completion?.error?.code === 'browser_bot_wall';
-          throw new AthanorError(
+          throw new GardenError(
             blocked ? 'human_verification_incomplete' : 'handoff_unavailable',
             blocked
               ? 'The page still needs human verification. Complete it in the browser, then choose Done and continue.'

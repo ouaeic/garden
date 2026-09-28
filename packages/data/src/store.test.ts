@@ -19,7 +19,7 @@ import {
   planMemoryQuery,
   renderMemoryPack,
   spendWindowBounds
-} from '@athanor/core';
+} from '@garden/core';
 import {
   encryptJson,
   generateDataKey,
@@ -27,13 +27,13 @@ import {
   sha256,
   verifyRecoveryCode,
   wrapDataKey
-} from '@athanor/core';
-import type { EncryptedEnvelope, MemoryItemContent, MemoryKind } from '@athanor/core';
+} from '@garden/core';
+import type { EncryptedEnvelope, MemoryItemContent, MemoryKind } from '@garden/core';
 import {
   MAX_AGENT_NOTIFICATIONS_PER_TASK,
   PREVIEW_IDLE_EXPIRY_DAYS,
   TaskStatus
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { createDatabase, migrateDatabase, type Database } from './database.js';
 import { migrations } from './migrations.js';
 /*
@@ -3010,7 +3010,7 @@ describe('DataStore', () => {
         ahead,
         'from_a_newer_build'
       ]);
-      await expect(migrateDatabase(newer)).rejects.toThrow(/migrated by a newer athanor/);
+      await expect(migrateDatabase(newer)).rejects.toThrow(/migrated by a newer garden/);
       await expect(migrateDatabase(newer)).rejects.toThrow(new RegExp(`version ${ahead}`));
     } finally {
       await newer.close();
@@ -3886,22 +3886,22 @@ describe('tiered agent memory', () => {
       { predicate: 'runs_on' }
     );
     await addItem('episode', {
-      title: 'Restarted athanor',
-      body: 'Ran systemctl restart athanor.target after the deploy.'
+      title: 'Restarted garden',
+      body: 'Ran systemctl restart garden.target after the deploy.'
     });
     await addItem('procedure', {
-      title: 'Deploy athanor',
-      tags: ['deploy', 'athanor'],
-      body: 'pnpm build then systemctl restart athanor.target'
+      title: 'Deploy garden',
+      tags: ['deploy', 'garden'],
+      body: 'pnpm build then systemctl restart garden.target'
     });
-    await addSource('$ systemctl restart athanor.target\nJob for athanor.target succeeded.');
+    await addSource('$ systemctl restart garden.target\nJob for garden.target succeeded.');
     await addItem('episode', { title: 'Wrote the brief', body: 'Edited PREFERENCES.md by hand.' });
 
-    const hits = await recall('restart athanor.target after a deploy');
+    const hits = await recall('restart garden.target after a deploy');
     const bodies = hits.map((hit) => opened(hit.documentCiphertext));
     expect(hits.map((hit) => hit.layer)).toContain('source');
-    expect(bodies).toContain('pnpm build then systemctl restart athanor.target');
-    expect(bodies).toContain('Ran systemctl restart athanor.target after the deploy.');
+    expect(bodies).toContain('pnpm build then systemctl restart garden.target');
+    expect(bodies).toContain('Ran systemctl restart garden.target after the deploy.');
     // The unrelated episode never entered the candidate set at all.
     expect(bodies).not.toContain('Edited PREFERENCES.md by hand.');
     // Ordering is deterministic (kind, id), never by score - that is what the cached prefix needs.
@@ -4094,7 +4094,7 @@ describe('tiered agent memory', () => {
   it('leaves a subject that already holds two current values alone rather than failing the upgrade', async () => {
     // The case that decides the shape of the backfill. Under `many` a subject may legitimately hold
     // several current values; the moment the registry says `one`, promoting all of them collides in
-    // the unique index. A plain UPDATE would abort - inside an unattended 3am `athanor update`,
+    // the unique index. A plain UPDATE would abort - inside an unattended 3am `garden update`,
     // against the owner's only copy of their memory. The contested subject stays outside the index
     // and stays retrievable; the uncontested one is converted in the same pass.
     await cardinalityWas('default_shell', 'many');
@@ -4339,7 +4339,7 @@ describe('tiered agent memory', () => {
     const episodeTwo = await addItem('episode', { body: 'Told it again.' });
     const key = {
       workspaceId,
-      subjectKey: 'subject-athanor',
+      subjectKey: 'subject-garden',
       predicate: 'standing_order',
       objectKey: 'object-lead'
     };
@@ -4393,7 +4393,7 @@ describe('tiered agent memory', () => {
     const episodeTwo = await addItem('episode', { body: 'Said it twice.' });
     const key = {
       workspaceId,
-      subjectKey: 'subject-athanor',
+      subjectKey: 'subject-garden',
       predicate: 'standing_order',
       objectKey: 'object-refused'
     };
@@ -4555,7 +4555,7 @@ describe('tiered agent memory', () => {
     for (const objectKey of ['object-two-threads', 'object-one-thread'] as const) {
       await store.observeMemoryFactCandidate({
         workspaceId,
-        subjectKey: 'subject-athanor',
+        subjectKey: 'subject-garden',
         predicate: 'standing_order',
         objectKey,
         episodeId: first.id,
@@ -4563,7 +4563,7 @@ describe('tiered agent memory', () => {
       });
       await store.observeMemoryFactCandidate({
         workspaceId,
-        subjectKey: 'subject-athanor',
+        subjectKey: 'subject-garden',
         predicate: 'standing_order',
         objectKey,
         episodeId: second.id,
@@ -4595,7 +4595,7 @@ describe('tiered agent memory', () => {
     const content = {
       title: 'Standing instruction',
       body: 'Never run git stash in this checkout.',
-      subject: 'athanor',
+      subject: 'garden',
       object: 'Never run git stash in this checkout.'
     };
     const index = buildMemoryItemIndex(content, key);
@@ -4644,7 +4644,7 @@ describe('tiered agent memory', () => {
      * supersession in `#recordMemoryFact` never fires on one: the owner saying a rule again
      * re-accumulated a candidate and minted a second identical, active, pinned row beside the
      * first. It is not a bytes problem. `MEMORY_PACK_QUOTAS` caps facts at four per subject and
-     * every standing order shares the subject `athanor`, so one rule said three times takes three
+     * every standing order shares the subject `garden`, so one rule said three times takes three
      * of the four slots every later turn in the workspace sees - the pack fills with one sentence
      * and the other rules fall out. Restating is also the most natural thing an owner does, so the
      * cost grows with how much they use this.
@@ -4655,7 +4655,7 @@ describe('tiered agent memory', () => {
     const content = {
       title: 'Standing instruction',
       body: 'Never merge to main without the acceptance run.',
-      subject: 'athanor',
+      subject: 'garden',
       object: 'Never merge to main without the acceptance run.'
     };
     const index = buildMemoryItemIndex(content, key);
@@ -4723,7 +4723,7 @@ describe('tiered agent memory', () => {
     const episode = await addItem('episode', { body: 'The owner said it.' });
     const rule = {
       workspaceId,
-      subjectKey: 'subject-athanor',
+      subjectKey: 'subject-garden',
       predicate: 'standing_order',
       objectKey: 'object-approvals'
     };
@@ -4804,7 +4804,7 @@ describe('tiered agent memory', () => {
     const core = 'Ease of use is paramount and approvals should not be heavy-handed';
     const indexFor = (body: string) =>
       buildMemoryItemIndex(
-        { title: 'Standing instruction', body, subject: 'athanor', object: core },
+        { title: 'Standing instruction', body, subject: 'garden', object: core },
         key
       );
     const rule = {
@@ -4900,7 +4900,7 @@ describe('tiered agent memory', () => {
     const content = {
       title: 'Standing instruction',
       body: 'Never open a pull request from the release branch.',
-      subject: 'athanor',
+      subject: 'garden',
       object: 'Never open a pull request from the release branch.'
     };
     const index = buildMemoryItemIndex(content, key);
@@ -4952,12 +4952,12 @@ describe('tiered agent memory', () => {
      * The defect the tier's own comment said could not happen, measured.
      *
      * `pin` has exactly one production writer - a promoted standing order - and standing orders all
-     * share the subject `athanor`, so the more rules the owner states the more pinned rows one
+     * share the subject `garden`, so the more rules the owner states the more pinned rows one
      * subject holds. The comment beside that writer read "four is what a rendered pack shows
      * however many rows exist", on the reasoning that the per-subject cap bounds them at four. It
      * does. What it does not do is bound what those rows cost on the way to being cut: the kind cap
      * and the token share were computed over rows the per-subject cap was about to discard, so
-     * sixty `athanor` rows spent sixty of the fact slot's twenty-five ranks and the whole 35% share
+     * sixty `garden` rows spent sixty of the fact slot's twenty-five ranks and the whole 35% share
      * before one `owner` row was considered. Taking the per-subject cap first is the whole repair.
      *
      * Measured here, on this statement, one workspace, four owner facts - three that share words
@@ -5008,7 +5008,7 @@ describe('tiered agent memory', () => {
           {
             title: 'Standing instruction',
             body: `Never do forbidden thing number ${pinned} in this checkout.`,
-            subject: 'athanor',
+            subject: 'garden',
             object: `Never do forbidden thing number ${pinned} in this checkout.`
           },
           {
@@ -5223,7 +5223,7 @@ describe('tiered agent memory', () => {
     // a declared kind that nothing ever wrote, and removing it from TypeScript left the enum value
     // behind, which is the exact shape of the row this join must not discard.
     await addItem('entity' as MemoryKind, {
-      title: 'athanor-relay',
+      title: 'garden-relay',
       body: 'The SNI relay that fronts every published service on this computer.'
     });
     const hits = await recall('what is the relay');
@@ -5232,18 +5232,18 @@ describe('tiered agent memory', () => {
 
   it('cuts to maxItems by fused score, not alphabetically by row id', async () => {
     await addItem('episode', {
-      title: 'Restarted athanor.target',
-      body: 'Ran systemctl restart athanor.target after the deploy and watched journalctl for it.'
+      title: 'Restarted garden.target',
+      body: 'Ran systemctl restart garden.target after the deploy and watched journalctl for it.'
     });
-    await addItem('episode', { body: 'Mentioned athanor.target once while writing the brief.' });
+    await addItem('episode', { body: 'Mentioned garden.target once while writing the brief.' });
     await addItem('episode', { body: 'A note that only mentions the deploy in passing.' });
 
-    const all = await recall('systemctl restart athanor.target after a deploy');
+    const all = await recall('systemctl restart garden.target after a deploy');
     expect(all.length).toBeGreaterThan(1);
     const best = [...all].sort((left, right) => right.score - left.score)[0]!;
     // The item cap used to be a trailing LIMIT after the (kind, id) sort, so what it discarded was
     // the alphabetically last row rather than the least relevant one.
-    const capped = await recall('systemctl restart athanor.target after a deploy', { maxItems: 1 });
+    const capped = await recall('systemctl restart garden.target after a deploy', { maxItems: 1 });
     expect(capped.map((hit) => hit.id)).toEqual([best.id]);
   });
 
@@ -5409,7 +5409,7 @@ describe('tiered agent memory', () => {
   });
 
   /**
-   * Two checks can name one command - one answered by a run athanor already watched succeed, one it
+   * Two checks can name one command - one answered by a run garden already watched succeed, one it
    * ran again - and a caution written out of that turn would be contradicted by the same turn.
    */
   it('writes nothing about a command the same turn also watched pass', async () => {
@@ -5638,7 +5638,7 @@ describe('tiered agent memory', () => {
     /*
      * The whole of what this method was missing, and the reason it had no caller anywhere.
      *
-     * It selected the id, the range and the instant and NOT `body_ciphertext`, so athanor could
+     * It selected the id, the range and the instant and NOT `body_ciphertext`, so garden could
      * name the exact character range of the exact stored turn behind a remembered fact and hand
      * back a reference nothing could follow. The row now carries the sealed body, and the span
      * addresses the plaintext the key holder opens - which is why the cut is asserted here on the
@@ -5773,7 +5773,7 @@ describe('tiered agent memory', () => {
   });
 
   it('seals provenance and still reaches a compacted source by where it came from', async () => {
-    const locator = '/srv/athanor/deploy.log';
+    const locator = '/srv/garden/deploy.log';
     const source = await addSource('deploy finished in 41s', at(900), locator);
     await addSource('unrelated output', at(900), '/tmp/other.log');
 
@@ -5897,37 +5897,37 @@ describe('tiered agent memory', () => {
       'fact',
       {
         title: 'relay listen address',
-        body: 'athanor-relay binds 0.0.0.0:8443.',
-        subject: 'athanor-relay',
+        body: 'garden-relay binds 0.0.0.0:8443.',
+        subject: 'garden-relay',
         object: '0.0.0.0:8443'
       },
       { predicate: 'runs_on' }
     );
     const other = await addItem('episode', {
       title: 'relay would not start',
-      body: 'athanor-relay was not enabled at boot, so a reboot left it stopped.'
+      body: 'garden-relay was not enabled at boot, so a reboot left it stopped.'
     });
 
-    const everything = await recall('what do we know about athanor-relay');
+    const everything = await recall('what do we know about garden-relay');
     expect(everything.map((row) => row.id).sort()).toEqual([held.id, other.id].sort());
 
-    const remaining = await recall('what do we know about athanor-relay', {
+    const remaining = await recall('what do we know about garden-relay', {
       excludeIds: [held.id]
     });
     expect(remaining.map((row) => row.id)).toEqual([other.id]);
 
     // A pack id the model quoted back imprecisely must narrow nothing rather than fail the turn.
-    const garbled = await recall('what do we know about athanor-relay', {
+    const garbled = await recall('what do we know about garden-relay', {
       excludeIds: ['not-a-uuid']
     });
     expect(garbled.map((row) => row.id).sort()).toEqual([held.id, other.id].sort());
   });
 
   it('excludes a verbatim row by id as well as a curated one', async () => {
-    const source = await addSource('athanor-relay is listening on 0.0.0.0:8443 again.');
-    expect((await recall('is athanor-relay listening')).map((row) => row.id)).toContain(source.id);
+    const source = await addSource('garden-relay is listening on 0.0.0.0:8443 again.');
+    expect((await recall('is garden-relay listening')).map((row) => row.id)).toContain(source.id);
     expect(
-      (await recall('is athanor-relay listening', { excludeIds: [source.id] })).map((row) => row.id)
+      (await recall('is garden-relay listening', { excludeIds: [source.id] })).map((row) => row.id)
     ).not.toContain(source.id);
   });
 
@@ -7066,7 +7066,7 @@ describe('schema migrations against a populated database', () => {
       accessTokenHash: 'preview-hash',
       maxPreviews: 2
     });
-    const sourceIndex = buildMemorySourceIndex('the owner runs athanor on one server', key);
+    const sourceIndex = buildMemorySourceIndex('the owner runs garden on one server', key);
     const source = await store.createMemorySource({
       userId: user.id,
       workspaceId: workspace.id,
@@ -7084,7 +7084,7 @@ describe('schema migrations against a populated database', () => {
       trust: 'stated',
       documentCiphertext: envelope,
       index: buildMemoryItemIndex(
-        { title: 'set up the server', body: 'installed athanor on the box' },
+        { title: 'set up the server', body: 'installed garden on the box' },
         key
       ),
       observedAt: new Date(),
@@ -7168,7 +7168,7 @@ describe('schema migrations against a populated database', () => {
 
 /*
  * The describe above replays the whole chain over rows written in today's shape, which is what
- * proves the migrations are idempotent. It is not the path `athanor update` takes at three in the
+ * proves the migrations are idempotent. It is not the path `garden update` takes at three in the
  * morning. That path is rows an older build wrote, in the shape that build's schema had, meeting a
  * migration that has never seen them - and a backfill can only ever be wrong there, because on a
  * replay every column it fills is already filled: the statement matches nothing and passes whatever
@@ -7180,7 +7180,7 @@ describe('schema migrations against a populated database', () => {
  * store, which would write them in the shape the migration is trying to produce - applies N on its
  * own, and reads back what the owner is left holding.
  */
-describe('the upgrade path onto rows an older athanor wrote', () => {
+describe('the upgrade path onto rows an older garden wrote', () => {
   let database: Database;
 
   const OWNER_ID = '00000000-0000-4000-8000-0000000000a1';
@@ -7533,7 +7533,7 @@ describe('the upgrade path onto rows an older athanor wrote', () => {
    * Before it, `provider` was doing two jobs: naming the id namespace a model lives in, and naming
    * the credential that can call it. That is why a box could hold one provider - every
    * non-OpenRouter endpoint shared the bucket called `custom`. The backfill has to seed the new
-   * column from the old one for rows an older athanor wrote, and it has to leave the ids alone: a
+   * column from the old one for rows an older garden wrote, and it has to leave the ids alone: a
    * finished task names its model by id, and a rewritten id is a history that stops resolving.
    */
   it('gives an older catalogue its connection without touching the ids tasks name', async () => {
@@ -7765,7 +7765,7 @@ describe('the upgrade path onto rows an older athanor wrote', () => {
     expect(await routes('task_schedules')).toEqual([
       { id: '00000000-0000-4000-8000-0000000000f1', privacy_route: 'provider_zdr' }
     ]);
-    // The id at the provider, for a catalogue that predates athanor ever recording one separately.
+    // The id at the provider, for a catalogue that predates garden ever recording one separately.
     const models = await database.query<{ id: string; provider_model_id: string }>(
       'SELECT id,provider_model_id FROM model_releases'
     );
@@ -8328,7 +8328,7 @@ describe('the upgrade path onto rows an older athanor wrote', () => {
 
   /*
    * Migration 68 is the one the owner has been waiting two releases for, and the row it has to
-   * meet is the awkward one: a `spend_limits` row an older athanor wrote, with three caps set and
+   * meet is the awkward one: a `spend_limits` row an older garden wrote, with three caps set and
    * no notion of a price ceiling. What must survive is the caps - a migration that touched them
    * would silently raise or remove the brake the owner is relying on - and what must arrive is two
    * columns that are NULL, because NULL is "no ceiling" and any other value would be this box
@@ -8375,7 +8375,7 @@ describe('the upgrade path onto rows an older athanor wrote', () => {
   });
 
   /*
-   * The three indexes 68 adds, against a table an older athanor filled. Nothing is rewritten, so
+   * The three indexes 68 adds, against a table an older garden filled. Nothing is rewritten, so
    * what is worth proving is that the reads they exist for actually reach them afterwards - an
    * index that is registered and never chosen is the defect this whole band is made of.
    *

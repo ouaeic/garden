@@ -20,7 +20,7 @@ import {
   type BindFrame,
   type RelayToBoxMessage,
   type WelcomeMessage
-} from '@athanor/relay';
+} from '@garden/relay';
 import { reconnectDelayMs } from './backoff.js';
 import { localPortForBind, relayIsUsable, type RelayClientConfig } from './config.js';
 import type { RelayIdentity } from './identity.js';
@@ -205,7 +205,7 @@ export class RelayConnection {
    *
    * `#retry` has two endings and neither fits a box that is misconfigured rather than unwelcome:
    * scheduling an attempt would dial a relay this box has already decided it cannot trust, and
-   * `revoked` would tell `athanor doctor` to send the owner to the relay operator for a fresh
+   * `revoked` would tell `garden doctor` to send the owner to the relay operator for a fresh
    * invite when the operator has done nothing wrong.
    */
   #refuse(reason: string, generation: number): void {
@@ -299,7 +299,7 @@ export class RelayConnection {
         t: 'hello',
         proto: PROTOCOL_VERSION,
         role: 'primary',
-        agent: 'athanor/1',
+        agent: 'garden/1',
         caps: ['http1', 'h2', PREVIEW_HTTPS_CAPABILITY]
       })}\n`
     );

@@ -9,7 +9,7 @@ import {
   type VoiceServerEvent,
   type VoiceSession,
   type VoiceWorkProposal
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import {
   assertRealtimeSessionAcknowledged,
   decodeVoiceFrame,
@@ -19,8 +19,8 @@ import {
   realtimeSessionConfiguration,
   realtimeUsageReceipt,
   type RealtimeModelMetadata
-} from '@athanor/model-gateway';
-import type { VoiceStore } from '@athanor/data';
+} from '@garden/model-gateway';
+import type { VoiceStore } from '@garden/data';
 
 export interface VoiceControllerOptions {
   userId: string;

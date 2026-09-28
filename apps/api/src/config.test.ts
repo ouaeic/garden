@@ -4,7 +4,7 @@ import { loadConfig } from './config.js';
 const productionEnvironment = () => {
   vi.stubEnv('DEPLOYMENT_MODE', 'production');
   vi.stubEnv('PUBLIC_APP_URL', 'https://ai.acme.com');
-  vi.stubEnv('PUBLIC_SOURCE_URL', 'https://code.acme.com/athanor');
+  vi.stubEnv('PUBLIC_SOURCE_URL', 'https://code.acme.com/garden');
   vi.stubEnv('PUBLIC_PRIVACY_URL', 'https://ai.acme.com/legal/privacy');
   vi.stubEnv('PREVIEW_BASE_URL', 'https://preview.ai.acme.com');
   vi.stubEnv('WEBAUTHN_ORIGIN', 'https://ai.acme.com');
@@ -23,10 +23,10 @@ afterEach(() => vi.unstubAllEnvs());
 describe('production configuration', () => {
   it('requires a separate preview origin and accepts an isolated TLS port on the same host', () => {
     productionEnvironment();
-    vi.stubEnv('PREVIEW_BASE_URL', 'https://ai.acme.com/__athanor/preview');
+    vi.stubEnv('PREVIEW_BASE_URL', 'https://ai.acme.com/__garden/preview');
     expect(() => loadConfig()).toThrow('separate HTTPS origin');
-    vi.stubEnv('PREVIEW_BASE_URL', 'https://ai.acme.com:8443/__athanor/preview');
-    expect(loadConfig().PREVIEW_BASE_URL).toBe('https://ai.acme.com:8443/__athanor/preview');
+    vi.stubEnv('PREVIEW_BASE_URL', 'https://ai.acme.com:8443/__garden/preview');
+    expect(loadConfig().PREVIEW_BASE_URL).toBe('https://ai.acme.com:8443/__garden/preview');
     expect(loadConfig().RESERVED_PREVIEW_PORTS.split(',')).toContain('8443');
   });
   it('requires one HTTPS WebAuthn boundary and a first-owner pairing token', () => {
@@ -76,7 +76,7 @@ describe('production configuration', () => {
    * The API and the worker are separate units started from one control.env, and this key bounds
    * the same thing in both: how many model calls one turn may spend. It was capped at 200 here and
    * 400 in the worker, so `TASK_MAX_STEPS=300` gave an operator a worker that ran and an API that
-   * would not start. Both now read the single declaration in @athanor/contracts/env.
+   * would not start. Both now read the single declaration in @garden/contracts/env.
    */
   it('accepts every step ceiling the worker accepts', () => {
     productionEnvironment();
@@ -113,7 +113,7 @@ describe('production configuration', () => {
     vi.stubEnv('DATA_MASTER_KEY', '');
     // The file has to be named, or the owner who reaches this invents a key rather than recovering
     // the one he has - and a key that did not encrypt this database seals off everything in it.
-    expect(() => loadConfig()).toThrow('/etc/athanor/control.env');
+    expect(() => loadConfig()).toThrow('/etc/garden/control.env');
 
     vi.stubEnv('DATA_MASTER_KEY', Buffer.alloc(32, 1).toString('base64'));
     vi.stubEnv('RUNNER_SHARED_SECRET', '');

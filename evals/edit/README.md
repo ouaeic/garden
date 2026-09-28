@@ -109,7 +109,7 @@ do not move.
 ## What it cannot tell you
 
 It runs no model. Every emission in the corpus is one a model plausibly produces, but **the rate at
-which models produce each one is not measured anywhere in athanor and is not measured here.** This
+which models produce each one is not measured anywhere in garden and is not measured here.** This
 bounds the cost of each failure; it does not weight them. A defect that never happens costs nothing
 and a cheap refusal that happens on every third edit costs a great deal, and nothing in this
 directory can tell those apart.

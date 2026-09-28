@@ -1,6 +1,6 @@
-import { UNKNOWN_SURFACES, type ConnectorKind } from '@athanor/contracts';
+import { UNKNOWN_SURFACES, type ConnectorKind } from '@garden/contracts';
 import { expect, it } from 'vitest';
-import { connectorActions, connectorCatalog, accountOAuthScopes } from '@athanor/core';
+import { connectorActions, connectorCatalog, accountOAuthScopes } from '@garden/core';
 import { approvalRequirement } from './approval-policy.js';
 import { agentToolsFor } from './tool-catalogue.js';
 

@@ -14,9 +14,9 @@ import {
   renderMemoryPack,
   type EncryptedEnvelope,
   type MemoryPackEntry
-} from '@athanor/core';
-import type { DataStore, MemoryPackRecord, TaskRecord } from '@athanor/data';
-import type { ModelMessage } from '@athanor/model-gateway';
+} from '@garden/core';
+import type { DataStore, MemoryPackRecord, TaskRecord } from '@garden/data';
+import type { ModelMessage } from '@garden/model-gateway';
 import type { AgentState } from './agent-state.js';
 import type { CompletionVerification } from './completion.js';
 import { captureMemory, type MemoryCaptureDeps } from './memory-capture.js';
@@ -175,7 +175,7 @@ describe('what a finished turn tells the store about the memory it was given', (
    * `completion.ts` makes a `finish` cite the `toolCallId` of the call that justifies each claim,
    * and `tool-recording.ts` writes that call's raw untruncated result into `task_events`. Both ends
    * of the edge existed for as long as both files have; this line - `evidence.map(item =>
-   * item.claim)` - dropped the id one step before storage, so athanor computed the pointer into the
+   * item.claim)` - dropped the id one step before storage, so garden computed the pointer into the
    * only part of the tool-output tier worth keeping and discarded it on every verified turn.
    *
    * The assertion is on the WIRE to the store rather than on the shape of the argument, because the

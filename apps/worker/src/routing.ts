@@ -9,8 +9,8 @@
  *
  * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
-import type { MediaModelOption, ModelRelease } from '@athanor/contracts';
-import { readRoutingMetadata, type RoutingMetadata } from '@athanor/core';
+import type { MediaModelOption, ModelRelease } from '@garden/contracts';
+import { readRoutingMetadata, type RoutingMetadata } from '@garden/core';
 
 /**
  * Which route a request is going to, and how that route caches a repeated prefix.

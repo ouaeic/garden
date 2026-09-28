@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { encryptJson } from '@athanor/core';
+import { encryptJson } from '@garden/core';
 import type { ToolContext } from './tool-dispatch.js';
 import { describeWorkSurface, validateWorkSurface } from './work-surface.js';
 
@@ -11,7 +11,7 @@ function fixture() {
     kind: 'tool_result',
     payloadCiphertext: encryptJson(
       {
-        __athanorEventVersion: 1,
+        __gardenEventVersion: 1,
         payload: { toolCallId: 'measured', result: { samples: [{ seconds: 12.5 }] } }
       },
       key,

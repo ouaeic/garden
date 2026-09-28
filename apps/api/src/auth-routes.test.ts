@@ -10,15 +10,15 @@ const SAFARI_MACOS =
  * A packaged client is a webview, so it forwards a webview user agent and every device the owner
  * had signed in from an app was listed as "Safari on macOS" or "Chrome on Android" - the same
  * words as a browser tab, on the row where the whole question is which of these is which. The
- * proxy in the shell now inserts `x-athanor-client`, and this is the half that reads it.
+ * proxy in the shell now inserts `x-garden-client`, and this is the half that reads it.
  */
 describe('the name a session is listed under', () => {
   test('prefers the packaged client header over the webview user agent it forwards', () => {
     expect(deviceLabel({ 'user-agent': SAFARI_MACOS })).toBe('Safari on macOS');
     expect(
-      deviceLabel({ 'user-agent': SAFARI_MACOS, 'x-athanor-client': 'athanor-macos/0.1.1' })
+      deviceLabel({ 'user-agent': SAFARI_MACOS, 'x-garden-client': 'garden-macos/0.1.1' })
     ).toBe('garden app on macOS');
-    expect(deviceLabel({ 'x-athanor-client': 'athanor-android/0.1.1' })).toBe(
+    expect(deviceLabel({ 'x-garden-client': 'garden-android/0.1.1' })).toBe(
       'garden app on Android'
     );
   });
@@ -33,20 +33,20 @@ describe('the name a session is listed under', () => {
   test('falls back to the user agent for anything it cannot recognise, and never echoes it', () => {
     for (const forged of [
       'Safari on macOS',
-      'athanor-macos/0.1.1 <b>owner</b>',
-      'athanor-solaris/0.1.1',
-      'athanor-macos',
-      `athanor-macos/${'x'.repeat(64)}`,
+      'garden-macos/0.1.1 <b>owner</b>',
+      'garden-solaris/0.1.1',
+      'garden-macos',
+      `garden-macos/${'x'.repeat(64)}`,
       ''
     ]) {
-      expect(deviceLabel({ 'user-agent': SAFARI_MACOS, 'x-athanor-client': forged })).toBe(
+      expect(deviceLabel({ 'user-agent': SAFARI_MACOS, 'x-garden-client': forged })).toBe(
         'Safari on macOS'
       );
     }
     expect(
       deviceLabel({
         'user-agent': SAFARI_MACOS,
-        'x-athanor-client': ['athanor-macos/0.1.1', 'athanor-linux/0.1.1']
+        'x-garden-client': ['garden-macos/0.1.1', 'garden-linux/0.1.1']
       })
     ).toBe('Safari on macOS');
   });

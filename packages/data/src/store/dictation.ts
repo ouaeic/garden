@@ -1,5 +1,5 @@
-import { AthanorError, type EncryptedEnvelope } from '@athanor/core';
-import type { DictationReceipt } from '@athanor/contracts';
+import { GardenError, type EncryptedEnvelope } from '@garden/core';
+import type { DictationReceipt } from '@garden/contracts';
 import type { Database } from '../database.js';
 import { IdentityStore } from './identity.js';
 import { iso, optionalText } from './rows.js';
@@ -34,7 +34,7 @@ export class DictationStore {
     receiptCiphertext: EncryptedEnvelope;
   }): Promise<DictationReceipt> {
     if (!Number.isFinite(input.costUsd) || input.costUsd < 0 || input.costUsd > 1_000_000)
-      throw new AthanorError('dictation_receipt_invalid', 'Enter the actual provider charge', 400);
+      throw new GardenError('dictation_receipt_invalid', 'Enter the actual provider charge', 400);
     return this.database.transaction(async (tx) => {
       await tx.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [input.userId]);
       const updated = await tx.query(
@@ -44,7 +44,7 @@ export class DictationStore {
         [input.id, input.userId, input.costUsd, `dictation:${input.userId}:%`]
       );
       if (updated.rows.length !== 1)
-        throw new AthanorError(
+        throw new GardenError(
           'dictation_receipt_unavailable',
           'This held dictation charge is no longer available',
           409

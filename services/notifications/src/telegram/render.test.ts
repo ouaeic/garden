@@ -50,7 +50,7 @@ describe('renderMessage', () => {
           { text: 'Approve', callback_data: `a:${approvalId}:y:abcdefgh` },
           { text: 'Deny', callback_data: `a:${approvalId}:n:abcdefgh` }
         ],
-        [{ text: 'Open in athanor', url: `${appUrl}/?task=task-1` }]
+        [{ text: 'Open in garden', url: `${appUrl}/?task=task-1` }]
       ]
     });
     expect(rendered.disable_notification).toBe(false);
@@ -68,7 +68,7 @@ describe('renderMessage', () => {
       '<b>Reconcile &lt;the&gt; March &amp; April invoices</b>\nBuild &lt;red&gt; &amp; failing: see &gt; logs'
     );
     expect(rendered.reply_markup).toEqual({
-      inline_keyboard: [[{ text: 'Open in athanor', url: `${appUrl}/?task=task-1` }]]
+      inline_keyboard: [[{ text: 'Open in garden', url: `${appUrl}/?task=task-1` }]]
     });
   });
 
@@ -83,7 +83,7 @@ describe('renderMessage', () => {
       force_reply: true,
       input_field_placeholder: 'Your answer'
     });
-    expect(rendered.text).toContain(`<a href="${appUrl}/?task=task-1">Open in athanor</a>`);
+    expect(rendered.text).toContain(`<a href="${appUrl}/?task=task-1">Open in garden</a>`);
   });
 
   it('lets a receipt arrive silently and everything else make a sound', () => {
@@ -135,7 +135,7 @@ describe('the outcome a decided card is left with', () => {
   it('names the decision and where it was taken, and keeps only the link', () => {
     const at = new Date('2026-07-31T12:31:00.000Z');
     expect(outcomeLabel('approved', 'phone', at)).toBe('✅ Approved from your phone at 12:31');
-    expect(outcomeLabel('denied', 'elsewhere', at)).toBe('❌ Denied in athanor at 12:31');
+    expect(outcomeLabel('denied', 'elsewhere', at)).toBe('❌ Denied in garden at 12:31');
     expect(outcomeLabel('expired', 'elsewhere', at)).toBe('⌛ Expired unanswered');
     const markup = outcomeMarkup('https://ai.example.test/?task=task-1', 'done');
     expect(markup.inline_keyboard.flat().some((button) => 'callback_data' in button)).toBe(false);

@@ -1,6 +1,6 @@
 import { chmod, chown, lstat, readFile, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { ProjectGitWorkingCopy, type ProjectRepository } from '@athanor/contracts';
+import { ProjectGitWorkingCopy, type ProjectRepository } from '@garden/contracts';
 import { withWorkspaceDirectory, workspacePath } from './files.js';
 import { durableJson, durableMkdir, syncDirectory } from './project-version-files.js';
 import { moveVersionDirectory } from './project-retention-move.js';
@@ -25,7 +25,7 @@ export class ProjectGitWorkingCopies {
   private stage(copy: ProjectGitWorkingCopy) {
     return path.join(
       workspacePath(this.root, copy.workspaceId),
-      '.athanor',
+      '.garden',
       'git-copies',
       copy.repositoryId
     );

@@ -31,7 +31,7 @@ export function releasePathMappings(environment = process.env) {
 export function withReleaseRustFlags(environment = process.env, platform) {
   if (environment.RUSTFLAGS && !environment.CARGO_ENCODED_RUSTFLAGS) {
     throw new Error(
-      'RUSTFLAGS is set. Move those arguments to CARGO_ENCODED_RUSTFLAGS so athanor can append reproducible-build path remapping safely.'
+      'RUSTFLAGS is set. Move those arguments to CARGO_ENCODED_RUSTFLAGS so garden can append reproducible-build path remapping safely.'
     );
   }
 
@@ -65,7 +65,7 @@ function appendGitHubEnvironment(environment) {
     throw new Error('GITHUB_ENV is not set; this mode is only for GitHub Actions');
   }
   const configured = withReleaseRustFlags(environment);
-  const delimiter = `ATHANOR_RUSTFLAGS_${process.pid}`;
+  const delimiter = `GARDEN_RUSTFLAGS_${process.pid}`;
   appendFileSync(
     githubEnvironment,
     `CARGO_ENCODED_RUSTFLAGS<<${delimiter}\n${configured.CARGO_ENCODED_RUSTFLAGS}\n${delimiter}\n`,

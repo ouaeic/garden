@@ -18,9 +18,9 @@
  * where the question has been answered.
  */
 import { describe, expect, it, vi } from 'vitest';
-import type { ModelRelease, WebToolPlan } from '@athanor/contracts';
-import type { TaskRecord } from '@athanor/data';
-import type { ModelResponse, ModelToolCall } from '@athanor/model-gateway';
+import type { ModelRelease, WebToolPlan } from '@garden/contracts';
+import type { TaskRecord } from '@garden/data';
+import type { ModelResponse, ModelToolCall } from '@garden/model-gateway';
 import type { AgentState } from '../agent-state.js';
 import { agentToolsFor, approvalRequirement } from '../tools.js';
 import { specialistToolNames } from '../tool-catalogue.js';

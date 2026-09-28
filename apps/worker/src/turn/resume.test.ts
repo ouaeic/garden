@@ -24,11 +24,11 @@
  * lines above by a rule that already existed, and a test built on one would prove nothing.
  */
 import { describe, expect, it } from 'vitest';
-import type { ModelRelease, WebToolPlan } from '@athanor/contracts';
-import type { TaskRecord } from '@athanor/data';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import type { ModelRelease, WebToolPlan } from '@garden/contracts';
+import type { TaskRecord } from '@garden/data';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { AgentState } from '../agent-state.js';
-import { decryptJson } from '@athanor/core';
+import { decryptJson } from '@garden/core';
 import { approvalPreviewHash } from '../approval-state.js';
 import { resumeParkedTurn, type TurnResumeDeps } from './resume.js';
 

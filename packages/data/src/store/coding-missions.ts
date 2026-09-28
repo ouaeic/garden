@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { AthanorError, type EncryptedEnvelope } from '@athanor/core';
+import { GardenError, type EncryptedEnvelope } from '@garden/core';
 import type { Database } from '../database.js';
 import { type TaskStore, type TaskSignals, TASK_QUEUE_CHANNEL } from './tasks.js';
 import type { WorkspaceStore } from './workspaces.js';
@@ -133,13 +133,13 @@ export class CodingMissionStore {
         parent.lease_owner !== input.workerId ||
         new Date(String(parent.lease_expires_at)).getTime() <= Date.now()
       )
-        throw new AthanorError(
+        throw new GardenError(
           'coding_parent_not_owned',
           'This worker no longer owns the parent task',
           409
         );
       if (parent.parent_mission_id)
-        throw new AthanorError(
+        throw new GardenError(
           'coding_mission_nested',
           'A coding specialist cannot create another specialist',
           409
@@ -154,7 +154,7 @@ export class CodingMissionStore {
           held.parentTaskId !== input.parentTaskId ||
           held.requestHash !== input.requestHash
         )
-          throw new AthanorError(
+          throw new GardenError(
             'coding_mission_replay_conflict',
             'This mission request already identifies different work',
             409
@@ -168,7 +168,7 @@ export class CodingMissionStore {
         input.task.userId !== input.userId ||
         input.task.workspaceId !== input.workspace.id
       )
-        throw new AthanorError(
+        throw new GardenError(
           'coding_mission_invalid',
           'Mission ownership or allocation is invalid',
           400
@@ -178,7 +178,7 @@ export class CodingMissionStore {
         [input.parentTaskId]
       );
       if (Number(count.rows[0]?.count) >= 32)
-        throw new AthanorError(
+        throw new GardenError(
           'coding_mission_limit',
           'This task has reached its retained coding mission limit',
           409
@@ -194,7 +194,7 @@ export class CodingMissionStore {
       );
       const available = await this.capacity(tx, input.parentTaskId);
       if (input.allocatedCredits > available.parentRemaining + 1e-9)
-        throw new AthanorError(
+        throw new GardenError(
           'coding_family_budget',
           'The parent does not have enough unallocated compute capacity for this mission',
           409
@@ -249,11 +249,7 @@ export class CodingMissionStore {
     );
     const row = totals.rows[0];
     if (!row)
-      throw new AthanorError(
-        'coding_family_missing',
-        'Coding task budget was not initialized',
-        409
-      );
+      throw new GardenError('coding_family_missing', 'Coding task budget was not initialized', 409);
     return {
       parentRemaining:
         Number(row.max_compute_credits) -
@@ -271,7 +267,7 @@ export class CodingMissionStore {
     nativeRequestId?: string
   ): Promise<string> {
     if (nativeRequestId !== undefined && !/^[a-f0-9]{64}$/.test(nativeRequestId))
-      throw new AthanorError(
+      throw new GardenError(
         'native_input_identity_missing',
         'A native request requires a valid source identity',
         400
@@ -290,13 +286,13 @@ export class CodingMissionStore {
       );
       const root = lookup.rows[0]?.root;
       if (!root)
-        throw new AthanorError('coding_task_missing', 'The coding task no longer exists', 409);
+        throw new GardenError('coding_task_missing', 'The coding task no longer exists', 409);
       await tx.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [lookup.rows[0]!.user_id]);
       if (
         nativeRequestId !== undefined &&
         (await tx.query('SELECT id FROM coding_family_calls WHERE id=$1', [id])).rows.length
       )
-        throw new AthanorError(
+        throw new GardenError(
           'native_input_submission_exists',
           'This native recording request was already reserved. Its provider result may be uncertain; do not submit it again.',
           409
@@ -312,7 +308,7 @@ export class CodingMissionStore {
         task.lease_owner !== workerId ||
         new Date(String(task.lease_expires_at)).getTime() <= Date.now()
       )
-        throw new AthanorError(
+        throw new GardenError(
           'coding_task_stopped',
           'This task no longer has authority to spend',
           409
@@ -323,11 +319,7 @@ export class CodingMissionStore {
         !Number.isFinite(estimateUsd) ||
         estimateUsd < 0
       )
-        throw new AthanorError(
-          'coding_budget_invalid',
-          'The inference reservation is invalid',
-          400
-        );
+        throw new GardenError('coding_budget_invalid', 'The inference reservation is invalid', 400);
       let remaining: number;
       if (taskId === root) remaining = (await this.capacity(tx, String(root))).parentRemaining;
       else {
@@ -339,7 +331,7 @@ export class CodingMissionStore {
           )
         ).rows[0];
         if (!row || row.phase !== 'active')
-          throw new AthanorError(
+          throw new GardenError(
             'coding_task_stopped',
             'The coding mission is no longer active',
             409
@@ -347,7 +339,7 @@ export class CodingMissionStore {
         remaining = Number(row.allocated_credits) - Number(row.used);
       }
       if (credits > remaining + 1e-9)
-        throw new AthanorError(
+        throw new GardenError(
           'coding_family_budget',
           'The next request would exceed this task family’s reserved compute capacity',
           409
@@ -359,7 +351,7 @@ export class CodingMissionStore {
         includeOpenCommitments: true
       });
       if (spend.outcome === 'deny')
-        throw new AthanorError(
+        throw new GardenError(
           'coding_family_spend',
           'This request exceeds the task family or owner spending allowance',
           402
@@ -380,7 +372,7 @@ export class CodingMissionStore {
     await this.database.transaction(async (tx) => {
       const call = (await tx.query('SELECT * FROM coding_family_calls WHERE id=$1', [id])).rows[0];
       if (!call)
-        throw new AthanorError(
+        throw new GardenError(
           'coding_reservation_missing',
           'The coding reservation no longer exists',
           409
@@ -388,12 +380,12 @@ export class CodingMissionStore {
       await tx.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [call.user_id]);
       await tx.query('SELECT id FROM tasks WHERE id=$1 FOR UPDATE', [call.parent_task_id]);
       if (actualCredits !== null && (!Number.isFinite(actualCredits) || actualCredits < 0))
-        throw new AthanorError('coding_charge_invalid', 'The coding usage charge is invalid', 400);
+        throw new GardenError('coding_charge_invalid', 'The coding usage charge is invalid', 400);
       if (
         (actualCredits === null) !== (actualUsd === null) ||
         (actualUsd !== null && (!Number.isFinite(actualUsd) || actualUsd < 0))
       )
-        throw new AthanorError('coding_charge_invalid', 'The coding cost receipt is invalid', 400);
+        throw new GardenError('coding_charge_invalid', 'The coding cost receipt is invalid', 400);
       const updated = await tx.query(
         `UPDATE coding_family_calls SET actual_credits=$2,actual_usd=$3,state=CASE WHEN $2::double precision IS NULL THEN 'uncertain' ELSE 'settled' END WHERE id=$1 AND (state='reserved' OR (state='uncertain' AND $2::double precision IS NOT NULL)) RETURNING id`,
         [id, actualCredits, actualUsd]
@@ -440,13 +432,13 @@ export class CodingMissionStore {
       await tx.query('SELECT id FROM tasks WHERE id=$1 FOR UPDATE', [found.parentTaskId]);
       const mission = (await this.getCodingMission(userId, id))!;
       if (mission.phase === 'integrated')
-        throw new AthanorError(
+        throw new GardenError(
           'coding_already_integrated',
           'These changes are already integrated; use the parent recovery point to undo them',
           409
         );
       if (mission.phase === 'integrating')
-        throw new AthanorError(
+        throw new GardenError(
           'coding_integration_active',
           'Integration is active; wait for its atomic result before cancelling',
           409
@@ -481,7 +473,7 @@ export class CodingMissionStore {
   ): Promise<CodingMissionRecord> {
     return this.database.transaction(async (tx) => {
       const found = await this.getCodingMission(userId, id);
-      if (!found) throw new AthanorError('coding_mission_missing', 'Coding mission not found', 404);
+      if (!found) throw new GardenError('coding_mission_missing', 'Coding mission not found', 404);
       const parent = (
         await tx.query('SELECT * FROM tasks WHERE id=$1 FOR UPDATE', [found.parentTaskId])
       ).rows[0];
@@ -500,7 +492,7 @@ export class CodingMissionStore {
             parent.lease_owner !== workerId ||
             new Date(String(parent.lease_expires_at)).getTime() <= Date.now()))
       )
-        throw new AthanorError(
+        throw new GardenError(
           'coding_parent_busy',
           'Wait until the parent task has released the workspace before integrating',
           409
@@ -511,7 +503,7 @@ export class CodingMissionStore {
         !['active', 'conflicted', 'integrating'].includes(mission.phase) ||
         mission.childStatus !== 'completed'
       )
-        throw new AthanorError(
+        throw new GardenError(
           'coding_review_changed',
           'The completed coding mission must be reviewed again before integration',
           409

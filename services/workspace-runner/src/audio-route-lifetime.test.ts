@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { afterEach, expect, it, vi } from 'vitest';
-import { capabilityAudience, signCapabilityToken } from '@athanor/core';
+import { capabilityAudience, signCapabilityToken } from '@garden/core';
 import type * as Files from './files.js';
 import type * as Audio from './audio.js';
 
@@ -67,7 +67,7 @@ it.each([
   vi.stubEnv('CONFINE_AGENT_FILESYSTEM', 'false');
   vi.stubEnv('AGENT_SANDBOX_HELPER', undefined);
   vi.stubEnv('BROWSER_USE_DESKTOP_DISPLAY', 'false');
-  vi.stubEnv('SNAPSHOT_EXECUTABLE', path.resolve('../../scripts/athanor-snapshot'));
+  vi.stubEnv('SNAPSHOT_EXECUTABLE', path.resolve('../../scripts/garden-snapshot'));
   const app = await buildServer(loadConfig());
   cleanups.push(() => app.close());
   const incoming = deferred<{ request: FastifyRequest; reply: FastifyReply }>();

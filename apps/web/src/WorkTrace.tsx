@@ -1,4 +1,4 @@
-import type { TaskPresentation, WorkEvidence, WorkSurfaceView } from '@athanor/contracts';
+import type { TaskPresentation, WorkEvidence, WorkSurfaceView } from '@garden/contracts';
 import { Button } from './ui';
 import './presentation.css';
 

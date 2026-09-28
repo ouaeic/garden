@@ -1,4 +1,4 @@
-import type { ModelRelease } from '@athanor/contracts';
+import type { ModelRelease } from '@garden/contracts';
 import { decryptJson, inferenceCredentialAad, type EncryptedEnvelope } from './crypto.js';
 
 export interface InferenceConnectionSecret {

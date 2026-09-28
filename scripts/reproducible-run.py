@@ -31,7 +31,7 @@ WORKSPACE_DIRECTORY_MODE = 0o770
 def system_module():
     filename = Path(__file__).with_name("garden_system.py")
     if not filename.is_file():
-        filename = Path("/usr/local/lib/athanor/garden_system.py")
+        filename = Path("/usr/local/lib/garden/garden_system.py")
     definition = importlib.util.spec_from_file_location("garden_system", filename)
     module = importlib.util.module_from_spec(definition)
     definition.loader.exec_module(module)
@@ -1027,7 +1027,7 @@ def run(spec, root, filename, previous=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__, epilog="Recipes can record existing runtimes or rebuild Python/R packages, native packages, or a Linux userland with saved service data. The installed recipe reference is /opt/athanor/docs/AGENT_RUNTIME.md under Declared native environments.")
+    parser = argparse.ArgumentParser(description=__doc__, epilog="Recipes can record existing runtimes or rebuild Python/R packages, native packages, or a Linux userland with saved service data. The installed recipe reference is /opt/garden/docs/AGENT_RUNTIME.md under Declared native environments.")
     sub = parser.add_subparsers(dest="action", required=True)
     launch = sub.add_parser(
         "run", help="Record a declared run in the current directory"

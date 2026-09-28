@@ -1,11 +1,11 @@
-import type { ModelRelease } from '@athanor/contracts';
+import type { ModelRelease } from '@garden/contracts';
 import {
-  AthanorError,
+  GardenError,
   RETIREMENT_HORIZON_DAYS,
   type BenchmarkPopulations,
   type ModelPriceTier,
   type RoutableModel
-} from '@athanor/core';
+} from '@garden/core';
 import { currentCommercialLicenseReview } from './license-manifest.js';
 import { readOpenRouterModels } from './openrouter-shape.js';
 import { promptCacheStyleFor, type PromptCacheStyle } from './prompt-cache.js';
@@ -15,7 +15,7 @@ import type { ReasoningOptions } from './reasoning.js';
  * How much of the provider's catalogue the owner is offered.
  *
  * - `provider_catalog` (default) exposes every model the owner's own provider account can reach.
- *   Athanor never redistributes model weights, so a model's weight licence governs redistribution
+ *   Garden never redistributes model weights, so a model's weight licence governs redistribution
  *   rather than API use; it is reported as a badge instead of a gate. New models appear without a
  *   code change, which is what keeps an unattended server working as providers ship releases.
  * - `reviewed_open_weight` restricts selection to models that carry a current independent
@@ -162,12 +162,12 @@ const JOURNALLED_ID_CHARS = 80;
  * These ids are the feed's own strings and not this repository's. `readOpenRouterModels` passes a
  * stated id through exactly as written - it is the name the provider will be called back with, so
  * tidying it would invent an id nobody published - which makes every id here untrusted text on its
- * way to `athanor logs`. That module is careful that its own `malformed` strings never quote the
+ * way to `garden logs`. That module is careful that its own `malformed` strings never quote the
  * document, and there is a test holding it to that; the two id clauses beside it in `journalDrops`
  * print the document directly, so the bound has to be here.
  *
  * Two things are done to it, and nothing else. Anything outside printable ASCII becomes a dot,
- * because a newline inside an id would end athanor's line and begin one the feed wrote, in the
+ * because a newline inside an id would end garden's line and begin one the feed wrote, in the
  * journal's own voice and indistinguishable from it. Then it is cut to `JOURNALLED_ID_CHARS`.
  *
  * This does NOT make the id safe to act on, and nothing does act on it: it is one line of evidence
@@ -372,13 +372,13 @@ export const verifyOpenRouterKey = async (options: {
     signal: AbortSignal.timeout(15_000)
   });
   if (response.status === 401 || response.status === 403)
-    throw new AthanorError(
+    throw new GardenError(
       'provider_key_rejected',
       'The provider did not accept this key. Paste it again whole — a trailing space or a missing character is enough — and check it has not been revoked.',
       422
     );
   if (!response.ok)
-    throw new AthanorError(
+    throw new GardenError(
       'provider_key_uncheckable',
       `The provider answered ${response.status} when asked about this key, so nothing was saved. Try again in a moment.`,
       502
@@ -393,7 +393,7 @@ export const verifyOpenRouterKey = async (options: {
    */
   const remaining = body?.data?.limit_remaining;
   if (typeof remaining === 'number' && remaining <= 0)
-    throw new AthanorError(
+    throw new GardenError(
       'provider_credit_exhausted',
       'This key works but has nothing left to spend. Add credit to the provider account, or raise this key’s limit, then verify again.',
       422
@@ -455,7 +455,7 @@ export const refreshOpenRouterCatalog = async (
    * seeds behind - in both cases without a single failed request to account for it.
    */
   if (models.size === 0)
-    throw new AthanorError(
+    throw new GardenError(
       'provider_catalog_empty',
       'The provider answered but listed no models, so the catalogue was left as it was',
       502
@@ -632,7 +632,7 @@ export const refreshOpenRouterCatalog = async (
 
   /*
    * One line for the whole refresh, at the same cadence and in the same place as the registry's own
-   * failure line: the journal, read through `athanor logs`. A route that quietly stopped being
+   * failure line: the journal, read through `garden logs`. A route that quietly stopped being
    * offered is otherwise unaccountable - this service has one owner, no listener and no metrics
    * endpoint - and a line per dropped route would bury the rest of the unit's log the first time a
    * provider shipped a broken price column across a vendor's whole range.
@@ -672,7 +672,7 @@ export const refreshOpenRouterCatalog = async (
           } skipped as unreadable: ${named(malformed)}`
         : null
     ].filter((clause): clause is string => clause !== null);
-    if (clauses.length) process.stderr.write(`[athanor] model catalogue: ${clauses.join('; ')}\n`);
+    if (clauses.length) process.stderr.write(`[garden] model catalogue: ${clauses.join('; ')}\n`);
   };
 
   /** Live metadata shared by reviewed and unreviewed models alike. */
@@ -769,7 +769,7 @@ export const refreshOpenRouterCatalog = async (
         metadataSource: 'measured' as const,
         benchmarkRank: rankOf(live),
         benchmarkSource: quality.benchmarkSource,
-        // OpenRouter publishes the score but not the date it was run, so this records when athanor
+        // OpenRouter publishes the score but not the date it was run, so this records when garden
         // last read it - which is the only honest answer available and still tells an owner whether
         // they are looking at something from this week or from a catalogue that stopped refreshing.
         benchmarkUpdatedAt: quality.benchmarkSource ? updatedAt : null,
@@ -875,7 +875,7 @@ export const refreshOpenRouterCatalog = async (
       availability: 'available',
       openness: review ? 'permissive_open_weight' : 'remote_proprietary',
       license: review?.license ?? 'provider-hosted',
-      // The owner licenses a hosted service from their own provider account; Athanor neither
+      // The owner licenses a hosted service from their own provider account; Garden neither
       // redistributes weights nor resells inference.
       commercialUse: true,
       /*

@@ -4,8 +4,8 @@ import type {
   MediaModelOption,
   ModelRelease,
   PrivacyRoute
-} from '@athanor/contracts';
-import type { RoutableModel } from '@athanor/core';
+} from '@garden/contracts';
+import type { RoutableModel } from '@garden/core';
 import { managedMediaModels } from './license-manifest.js';
 import type { ConfiguredModelDescription } from './openai-compatible.js';
 
@@ -79,7 +79,7 @@ export const seedModels = (now = new Date()): ModelRelease[] => {
       commercialUse: true,
       privacyRoute: 'provider_zdr',
       contextTokens: 262_144,
-      // Images and text only, because that is the whole of what athanor ever sends a model: the
+      // Images and text only, because that is the whole of what garden ever sends a model: the
       // only non-text part any request carries is an `image_url`. A seed that advertised video
       // would put a modality in the picker that nothing on this computer can put a model's way.
       modalities: ['text', 'image'],
@@ -222,7 +222,7 @@ const usageClassForPrice = (inputUsdPerMillion: number | null): ModelRelease['us
 };
 
 /**
- * The two media routes athanor has actually run, offered as catalogue entries like any other.
+ * The two media routes garden has actually run, offered as catalogue entries like any other.
  *
  * These are the models that were hard-coded until now - the same ids, the same prices - but they
  * are no longer the answer, only the entry that is always present. Their prices are marked
@@ -306,7 +306,7 @@ export const rankMediaModels = (
       ? byPrice
       : preference === 'best'
         ? [...byPrice].reverse()
-        : // Recommended leads with the route athanor has itself run and priced, because that is the
+        : // Recommended leads with the route garden has itself run and priced, because that is the
           // one entry whose cost figure came from generations rather than from a feed. Everything
           // else follows cheapest-first, which is the safest thing to fall to when it is absent.
           [

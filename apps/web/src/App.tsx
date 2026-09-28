@@ -12,7 +12,7 @@ import {
   Search,
   Settings2
 } from 'lucide-react';
-import type { Task, Workspace, Project, ConversationSource } from '@athanor/contracts';
+import type { Task, Workspace, Project, ConversationSource } from '@garden/contracts';
 import { get, ApiError, post, isNativeClient } from './client';
 import type { NativeStatus } from './native';
 import { createTaskNotifier } from './native-notices';
@@ -58,7 +58,7 @@ const Login = lazy(() => import('./Login'));
 const SearchDialog = lazy(() => import('./SearchDialog'));
 function initialTheme(): 'light' | 'dark' {
   try {
-    return localStorage.getItem('athanor-theme') === 'light' ? 'light' : 'dark';
+    return localStorage.getItem('garden-theme') === 'light' ? 'light' : 'dark';
   } catch {
     return 'dark';
   }
@@ -256,7 +256,7 @@ function WorkspaceApp() {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
     try {
-      localStorage.setItem('athanor-theme', theme);
+      localStorage.setItem('garden-theme', theme);
     } catch {
       /* Appearance remains available without storage. */
     }

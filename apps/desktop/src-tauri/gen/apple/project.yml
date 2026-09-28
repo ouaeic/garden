@@ -1,6 +1,6 @@
-name: athanor-desktop
+name: garden-desktop
 options:
-  bundleIdPrefix: org.athanor.ai
+  bundleIdPrefix: org.garden.ai
   deploymentTarget:
     iOS: 15.0
 fileGroups: [../../src]
@@ -11,7 +11,7 @@ settingGroups:
   app:
     base:
       PRODUCT_NAME: garden
-      PRODUCT_BUNDLE_IDENTIFIER: org.athanor.ai
+      PRODUCT_BUNDLE_IDENTIFIER: org.garden.ai
 targetTemplates:
   app:
     type: application
@@ -24,20 +24,20 @@ targetTemplates:
     settings:
       groups: [app]
 targets:
-  athanor-desktop_iOS:
+  garden-desktop_iOS:
     type: application
     platform: iOS
     sources:
       - path: Sources
       - path: Assets.xcassets
       - path: Externals
-      - path: athanor-desktop_iOS
+      - path: garden-desktop_iOS
       - path: assets
         buildPhase: resources
         type: folder
       - path: LaunchScreen.storyboard
     info:
-      path: athanor-desktop_iOS/Info.plist
+      path: garden-desktop_iOS/Info.plist
       properties:
         LSRequiresIPhoneOS: true
         UILaunchStoryboardName: LaunchScreen
@@ -54,7 +54,7 @@ targets:
         CFBundleShortVersionString: 0.1.0
         CFBundleVersion: "0.1.0"
     entitlements:
-      path: athanor-desktop_iOS/athanor-desktop_iOS.entitlements
+      path: garden-desktop_iOS/garden-desktop_iOS.entitlements
     scheme:
       environmentVariables:
         RUST_BACKTRACE: full

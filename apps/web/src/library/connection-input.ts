@@ -48,7 +48,7 @@ export function oauthCompletion(
   if (!event.data || typeof event.data !== 'object') return null;
   const data = event.data as Record<string, unknown>;
   if (
-    !['athanor-mcp-oauth', 'athanor-account-oauth'].includes(String(data.source)) ||
+    !['garden-mcp-oauth', 'garden-account-oauth'].includes(String(data.source)) ||
     typeof data.ok !== 'boolean'
   )
     return null;

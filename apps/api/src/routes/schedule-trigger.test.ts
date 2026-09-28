@@ -17,7 +17,7 @@ import { createHmac } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { decryptJson, unwrapDataKey, type EncryptedEnvelope } from '@athanor/core';
+import { decryptJson, unwrapDataKey, type EncryptedEnvelope } from '@garden/core';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { ApiConfig } from '../config.js';
 import { buildServer } from '../server.js';
@@ -126,7 +126,7 @@ interface Harness {
 }
 
 const buildHarness = async (options: { minGapMinutes?: number } = {}): Promise<Harness> => {
-  const directory = await mkdtemp(join(tmpdir(), 'athanor-schedule-trigger-'));
+  const directory = await mkdtemp(join(tmpdir(), 'garden-schedule-trigger-'));
   disposers.push(() => rm(directory, { recursive: true, force: true }));
   const calls: RunnerCall[] = [];
   let writesFail = false;
@@ -160,7 +160,7 @@ const buildHarness = async (options: { minGapMinutes?: number } = {}): Promise<H
     DEPLOYMENT_MODE: 'development',
     MODEL_CATALOG_SCOPE: 'reviewed_open_weight',
     CONNECTION_MANIFEST_PATH: join(directory, 'connection.json'),
-    ATHANOR_STATE_PATH: directory,
+    GARDEN_STATE_PATH: directory,
     RELAY_STATE_DIR: join(directory, 'relay'),
     RELAY_LOCAL_HOST: '127.0.0.1',
     RELAY_LOCAL_PORT: 443,
@@ -185,7 +185,7 @@ const buildHarness = async (options: { minGapMinutes?: number } = {}): Promise<H
     PUBLIC_RUNNER_URL: 'ws://127.0.0.1:4300',
     WORKSPACE_IMAGE_REVISION: 'dev',
     WEBAUTHN_RP_ID: 'localhost',
-    WEBAUTHN_RP_NAME: 'athanor Test',
+    WEBAUTHN_RP_NAME: 'garden Test',
     WEBAUTHN_ORIGIN: 'http://localhost:5173',
     ALLOW_INSECURE_DEV_AUTH: true,
     WORKER_ID: 'schedule-trigger-worker',
@@ -275,8 +275,8 @@ const buildHarness = async (options: { minGapMinutes?: number } = {}): Promise<H
         url: deliverOptions.url ?? body.triggerUrlPath,
         headers: {
           'content-type': deliverOptions.contentType ?? 'application/json',
-          'x-athanor-timestamp': String(timestamp),
-          'x-athanor-signature': signature
+          'x-garden-timestamp': String(timestamp),
+          'x-garden-signature': signature
         },
         payload
       });

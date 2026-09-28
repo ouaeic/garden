@@ -16,14 +16,14 @@
   // `declaration` produced 1,700 kB of .d.ts on the owner's box that nothing has ever read: every
   // workspace package points `exports["."].types` at ./src/*.ts, so TypeScript resolves types from
   // source across the whole monorepo and never looks in dist. `sourceMap` produced a further
-  // 2,716 kB that Node cannot read - scripts/athanor-service runs `exec node <entry>` with no
+  // 2,716 kB that Node cannot read - scripts/garden-service runs `exec node <entry>` with no
   // --enable-source-maps, and Node 24 does not apply maps without it (measured: the same throw
   // reports dist/a.js:2 by default and a.ts:3 with the flag). Between them they were 4,416 kB of
   // the 15,744 kB of compiled output an install carries, for two artefacts no reader exists for.
   //
   // If a trace against TypeScript source is ever wanted on the box, the honest change is both
   // halves at once: turn `sourceMap` back on for the build *and* add --enable-source-maps to
-  // athanor-service. Half of that pair is what was here.
+  // garden-service. Half of that pair is what was here.
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
-import type { DataStore, NotificationDestinationRecord } from '@athanor/data';
+import type { DataStore, NotificationDestinationRecord } from '@garden/data';
 import { backoffMs } from '../retry.js';
 import { createTelegramClient, type TelegramClient } from './client.js';
 import {
@@ -73,7 +73,7 @@ export const createPoller = (input: PollerInput) => {
             await input.handle(update);
           } catch (error) {
             client.warn(
-              `athanor-notifications: notification.destination_inbound_failed destination=${input.destination.id} ${error instanceof Error ? error.message : String(error)}\n`
+              `garden-notifications: notification.destination_inbound_failed destination=${input.destination.id} ${error instanceof Error ? error.message : String(error)}\n`
             );
           }
           // Advanced whether or not handling succeeded: an update that cannot be handled once
@@ -89,14 +89,14 @@ export const createPoller = (input: PollerInput) => {
         if (watchdog.aborted) {
           // A stall, not a refusal: the far end went quiet. Started again at once.
           client.warn(
-            `athanor-notifications: notification.destination_poll_stalled destination=${input.destination.id} no answer in ${WATCHDOG_MS / 1000}s; polling again\n`
+            `garden-notifications: notification.destination_poll_stalled destination=${input.destination.id} no answer in ${WATCHDOG_MS / 1000}s; polling again\n`
           );
           continue;
         }
         attempts += 1;
         if (attempts === 1)
           client.warn(
-            `athanor-notifications: notification.destination_poll_failed destination=${input.destination.id} ${error instanceof Error ? error.message : String(error)}; trying again in ${Math.round(backoffMs(attempts) / 1000)}s\n`
+            `garden-notifications: notification.destination_poll_failed destination=${input.destination.id} ${error instanceof Error ? error.message : String(error)}; trying again in ${Math.round(backoffMs(attempts) / 1000)}s\n`
           );
         await delay(backoffMs(attempts), undefined, { signal }).catch(() => undefined);
       }
@@ -207,7 +207,7 @@ export const superviseDestinationPollers = (input: SupervisorInput) => {
       client,
       finished: poller.run().catch((error: unknown) => {
         warn(
-          `athanor-notifications: notification.destination_poll_ended destination=${destination.id} ${error instanceof Error ? error.message : String(error)}\n`
+          `garden-notifications: notification.destination_poll_ended destination=${destination.id} ${error instanceof Error ? error.message : String(error)}\n`
         );
       })
     });
@@ -227,7 +227,7 @@ export const superviseDestinationPollers = (input: SupervisorInput) => {
         if (!unreadable.has(destination.id)) {
           unreadable.add(destination.id);
           warn(
-            `athanor-notifications: notification.destination_unreadable destination=${destination.id} its configuration does not open under DATA_MASTER_KEY; nothing is sent to it and nothing is read from it. Unpair and pair again in Settings\n`
+            `garden-notifications: notification.destination_unreadable destination=${destination.id} its configuration does not open under DATA_MASTER_KEY; nothing is sent to it and nothing is read from it. Unpair and pair again in Settings\n`
           );
         }
         continue;

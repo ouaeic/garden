@@ -1,11 +1,11 @@
 import { z } from 'zod';
-import { DATA_MASTER_KEY_REQUIRED } from '@athanor/core';
+import { DATA_MASTER_KEY_REQUIRED } from '@garden/core';
 
 const Config = z.object({
   WORKER_ID: z.string().default(`worker-${process.pid}`),
   DATABASE_DRIVER: z.enum(['pglite', 'postgres']).default('pglite'),
-  DATABASE_URL: z.string().default('postgres://athanor:athanor@localhost:5432/athanor'),
-  PGLITE_PATH: z.string().default('.athanor/postgres'),
+  DATABASE_URL: z.string().default('postgres://garden:garden@localhost:5432/garden'),
+  PGLITE_PATH: z.string().default('.garden/postgres'),
   DATA_MASTER_KEY: z.preprocess(
     (value) => (value === '' ? undefined : value),
     z.string().min(1).optional()

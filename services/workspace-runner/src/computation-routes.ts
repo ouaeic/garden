@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { ComputationRequest, ProcessHistoryQuery } from '@athanor/contracts';
+import { ComputationRequest, ProcessHistoryQuery } from '@garden/contracts';
 import { requireScope } from './auth.js';
 import type { ComputationService } from './computation-service.js';
 export function registerComputationRoutes(app: FastifyInstance, manager: ComputationService): void {

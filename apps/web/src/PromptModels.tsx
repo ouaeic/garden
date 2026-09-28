@@ -1,8 +1,4 @@
-import type {
-  ProjectModelChoices,
-  ProjectModelPreferences,
-  PrivacyRoute
-} from '@athanor/contracts';
+import type { ProjectModelChoices, ProjectModelPreferences, PrivacyRoute } from '@garden/contracts';
 import { ResourceState, useResource } from './management.js';
 import ModelChoiceFields from './ModelChoiceFields.js';
 import ProjectModels from './ProjectModels.js';

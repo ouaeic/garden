@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
-import { decryptJson, encryptJson, type AccountOperation } from '@athanor/core';
-import { connectorOperationAad, type DataStore } from '@athanor/data';
+import { decryptJson, encryptJson, type AccountOperation } from '@garden/core';
+import { connectorOperationAad, type DataStore } from '@garden/data';
 import { canonicalJson } from './values.js';
 
 /** Identical retries in a turn share intent even if the model gives the tool call a new ID. */

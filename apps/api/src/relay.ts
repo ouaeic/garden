@@ -9,7 +9,7 @@ import {
   relayIsUsable,
   type RelayClientConfig,
   type RelayStatus
-} from '@athanor/relay-client';
+} from '@garden/relay-client';
 import { z } from 'zod';
 import { errorFields, type LogFields, type LogValue, type Logger } from './log.js';
 
@@ -48,10 +48,10 @@ export const RelaySettingsSchema = RelayClientConfigSchema.safeExtend({
    * When the relay operator dropped this box, or null.
    *
    * The dialer learns this from a `goaway reason=revoked` and deliberately never retries, but it
-   * only ever knew it in memory. `athanor-network-refresh` reads this file and nothing else, so
+   * only ever knew it in memory. `garden-network-refresh` reads this file and nothing else, so
    * without the fact written down the relay hostname stayed in the connection manifest and in every
    * pairing ticket handed out, and every client on every device paid a connection attempt to a name
-   * that could not answer again - until the owner noticed and ran `athanor relay off`. It is also
+   * that could not answer again - until the owner noticed and ran `garden relay off`. It is also
    * what closes the window after a restart, where nothing has dialled yet and the status file still
    * describes the last run.
    */
@@ -89,7 +89,7 @@ export const readRelaySettings = async (
 /**
  * Replaces the settings file in one step.
  *
- * `athanor-network-refresh` reads this file to decide whether the box advertises a relay address,
+ * `garden-network-refresh` reads this file to decide whether the box advertises a relay address,
  * and it runs on netlink events at any moment. A half-written file would be read as "off" by the
  * rule above, which would drop a working endpoint out of the connection manifest for no reason.
  */
@@ -131,7 +131,7 @@ export const withRelayEndpoint = (
   return endpoints.includes(endpoint) ? [...endpoints] : [...endpoints, endpoint];
 };
 
-/** What the settings screen and `athanor doctor` are shown. */
+/** What the settings screen and `garden doctor` are shown. */
 export interface RelayReport {
   readonly enabled: boolean;
   readonly host: string | null;
@@ -455,7 +455,7 @@ export class RelaySupervisor {
   }
 
   /**
-   * Records the live state where a root shell can read it. `athanor doctor` runs with no session
+   * Records the live state where a root shell can read it. `garden doctor` runs with no session
    * and must still be able to say whether the relay is working, or say honestly that it is off.
    */
   async #publishStatus(): Promise<void> {

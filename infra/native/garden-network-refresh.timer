@@ -1,0 +1,13 @@
+[Unit]
+Description=Reconcile garden network metadata after missed events
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=6h
+AccuracySec=20min
+RandomizedDelaySec=15min
+Persistent=true
+Unit=garden-network-refresh.service
+
+[Install]
+WantedBy=timers.target

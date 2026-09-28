@@ -6,7 +6,7 @@ import type {
   ProjectRepositoryHistory,
   ProjectRepositoryOperation,
   ProjectRepository
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { apiUrl, get, post } from './client';
 import { Button, Dialog, ErrorNotice, Field, Spinner } from './ui';
 import { processMemory } from './process-display';

@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import type { MediaBatch } from '@athanor/contracts';
+import type { MediaBatch } from '@garden/contracts';
 import MediaBatches from './MediaBatches';
 import MediaRecovery from './MediaRecovery';
 

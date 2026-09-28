@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { DATA_MASTER_KEY_REQUIRED } from '@athanor/core';
-import { sharedEnv } from '@athanor/contracts/env';
+import { DATA_MASTER_KEY_REQUIRED } from '@garden/core';
+import { sharedEnv } from '@garden/contracts/env';
 
 const bool = z
   .string()
@@ -46,7 +46,7 @@ const Config = z.object({
   PREVIEW_GATEWAY_HOST: z.string().default('127.0.0.1'),
   PREVIEW_GATEWAY_PORT: z.coerce.number().int().positive().default(4400),
   /**
-   * Loopback ports belonging to athanor's own services that this process has no other way to learn
+   * Loopback ports belonging to garden's own services that this process has no other way to learn
    * - the worker, media and notification health endpoints. A preview publishes a loopback port to
    * the internet, so anything on this list, plus the API, gateway, runner and database ports read
    * from the settings above, is refused as a preview target.
@@ -70,7 +70,7 @@ const Config = z.object({
   PUBLIC_RUNNER_URL: z.string().url().default('ws://127.0.0.1:4300'),
   WORKSPACE_IMAGE_REVISION: z.string().default('dev'),
   WEBAUTHN_RP_ID: z.string().default('localhost'),
-  WEBAUTHN_RP_NAME: z.string().default('athanor'),
+  WEBAUTHN_RP_NAME: z.string().default('garden'),
   WEBAUTHN_ORIGIN: z.string().url().default('http://localhost:5173'),
   ALLOW_INSECURE_DEV_AUTH: bool,
   WORKER_ID: z.string().default(`embedded-worker-${process.pid}`),
@@ -91,7 +91,7 @@ const Config = z.object({
   TASK_MAX_SELF_CONTINUATIONS: sharedEnv.TASK_MAX_SELF_CONTINUATIONS,
   SECURITY_EVENT_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(30),
   /**
-   * `info` is what an owner reading `athanor logs` wants: lifecycle, scheduled work, and every
+   * `info` is what an owner reading `garden logs` wants: lifecycle, scheduled work, and every
    * handled failure with its code. `debug` adds a line per request, which is useful while
    * diagnosing and far too much to leave on. No level ever prints content.
    */
@@ -110,7 +110,7 @@ const Config = z.object({
    * The non-secret connection manifest the network watcher maintains. Device enrollment reuses it
    * so a new device receives the same endpoint set and pinned identity the installer would print.
    */
-  CONNECTION_MANIFEST_PATH: z.string().default('/var/lib/athanor/connection.json'),
+  CONNECTION_MANIFEST_PATH: z.string().default('/var/lib/garden/connection.json'),
   /**
    * Where the box writes down what went wrong with the parts of itself the API does not run.
    *
@@ -119,14 +119,14 @@ const Config = z.object({
    * certificate had a month in which the app was perfectly reachable and said nothing, and the
    * first the owner heard of it was every device refusing to connect at once.
    */
-  ATHANOR_STATE_PATH: z.string().default('/var/lib/athanor'),
+  GARDEN_STATE_PATH: z.string().default('/var/lib/garden'),
   /**
    * Durable home for the relay identity key and the relay settings. The key is this box's address
    * on every relay it has enrolled with, so it must outlive an update and a rebuild of the source
    * tree; the installer creates this directory owned by the control account and readable by nobody
    * else. Nothing is written here until an owner enrolls with a relay.
    */
-  RELAY_STATE_DIR: z.string().default('.athanor/relay'),
+  RELAY_STATE_DIR: z.string().default('.garden/relay'),
   /**
    * Where a relayed connection is delivered on this box. TLS terminates here, not at the relay,
    * which is why the relay can only ever see byte counts and connection metadata.

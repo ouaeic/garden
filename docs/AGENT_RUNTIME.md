@@ -44,7 +44,7 @@ Each request carries, in this order:
 2. the curated knowledge block: active memory entries ranked against the request the task opened
    with, the index of skills saved for this workspace, and the index of the vetted built-in library;
 3. the recalled memory pack, rendered once per task and re-emitted byte-for-byte on resume;
-4. the workspace brief when the owner keeps one — `ATHANOR.md` first, then the shared conventions
+4. the workspace brief when the owner keeps one — `GARDEN.md` first, then the shared conventions
    the surrounding tooling writes, so a workspace that already carries one is read without the owner
    having to rename anything;
 5. the user’s original request, then the running brief of anything already condensed, then the
@@ -100,7 +100,7 @@ mid-run. What a follow-up turn actually needs from memory is `memory_recall`, wh
 last cache breakpoint and pays for its own answer.
 
 The workspace brief goes behind both memory blocks, because it is the one of the three a running
-agent commonly rewrites — the agent keeping its own journal in `ATHANOR.md` is the usual writer. In
+agent commonly rewrites — the agent keeping its own journal in `GARDEN.md` is the usual writer. In
 front, one appended line moved the divergence point to the second message of the request.
 
 The runtime block deliberately carries no live counters — a changing digit would end the prefix at
@@ -203,7 +203,7 @@ model to pick per task:
 - `print_pdf` captures a page the browser is showing — a posting, a receipt, a statement — and is not
   an authoring route.
 
-Before publishing, a document is proved: converted with `athanor-office-convert IN OUT`, rendered to
+Before publishing, a document is proved: converted with `garden-office-convert IN OUT`, rendered to
 page images with `pdftoppm`, and looked at with `image_read`. Overflowing text boxes, a CV that
 spills onto a second page and `#REF!` cells are invisible in the source and obvious in a render.
 Publishing an Office file also attaches a converted PDF review copy for the owner.
@@ -225,7 +225,7 @@ clear its retry limit. Finite background jobs use durable dependencies and wake 
 when an outcome is available, without model calls while waiting.
 
 There is also a brake and it is the only one that acts before any money is spent: the pre-flight
-price ceiling. `sudo athanor price-ceiling` names a maximum input and output rate in dollars per
+price ceiling. `sudo garden price-ceiling` names a maximum input and output rate in dollars per
 million tokens, and every place garden picks a model _for_ the owner ranks against it — the lead at
 task creation, the vision specialist, the model the picker recommends, and the support picker behind
 titling and the subscription flows. When the ceiling empties the catalogue the outcome is `blocked`,
@@ -308,8 +308,8 @@ stand alone. The lead remains responsible for every decision, every change, and 
 
 ## Native persistent computer
 
-The default execution environment is the host Linux userland. The runner executes as the dedicated `athanor` account
-with `HOME=/home/athanor`; commands the agent runs get their own `athanor-agent` account, so a
+The default execution environment is the host Linux userland. The runner executes as the dedicated `garden` account
+with `HOME=/home/garden`; commands the agent runs get their own `garden-agent` account, so a
 command cannot read the runner’s process, its capability signing secret, or the browser profile the
 owner’s logins live in. Files, installed programs, browser state, CLI publisher credentials, and
 long-running outputs persist across service and client restarts.
@@ -566,7 +566,7 @@ details, and other secure input transfer control to the user and suspend agent o
 ## Previews
 
 User-started services stay on loopback and are published through an unguessable 32-hex-character path
-under `/__athanor/preview/`, which Nginx matches exactly. The agent receives the current public base in its runtime block and returns
+under `/__garden/preview/`, which Nginx matches exactly. The agent receives the current public base in its runtime block and returns
 preview links in chat. Path-based proxying avoids a wildcard-domain requirement; applications that
 hard-code root-relative assets may need an explicit base path.
 
@@ -662,7 +662,7 @@ file format requires, a tool that has to be run twice to be correct, are facts n
 box will tell it. A skill that is method end to end does not belong in the library at all, however
 well written: the resident contract already asks for the same discipline in a sentence, and a
 procedure the model can derive is a bill with no purchase. `pnpm eval:context` is what settles
-whether a cut cost anything. `scripts/athanor-skill-check` lints the library and reports its size;
+whether a cut cost anything. `scripts/garden-skill-check` lints the library and reports its size;
 that is the number to read rather than one written here.
 
 ## Files as knowledge

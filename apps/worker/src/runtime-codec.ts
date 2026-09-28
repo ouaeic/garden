@@ -1,13 +1,13 @@
 import {
-  AthanorError,
+  GardenError,
   decryptBytes,
   encryptBytes,
   encryptJson,
   wrapDataKey,
   userMemoryKey,
   type EncryptedEnvelope
-} from '@athanor/core';
-import { interruptedResponseOf, retainInterruptedResponse } from '@athanor/model-gateway';
+} from '@garden/core';
+import { interruptedResponseOf, retainInterruptedResponse } from '@garden/model-gateway';
 
 type Encoded =
   | null
@@ -257,8 +257,8 @@ export class RuntimeCodec {
       case 'error': {
         const fields = this.decode(row.value) as Record<string, unknown>;
         const error =
-          row.name === 'AthanorError'
-            ? new AthanorError(
+          row.name === 'GardenError'
+            ? new GardenError(
                 String(fields.code),
                 String(row.message),
                 Number(fields.statusCode),

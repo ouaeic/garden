@@ -2,18 +2,18 @@
 name: docx-authoring
 description: Produce or edit Word documents that open cleanly in Word with real heading styles, a working table of contents, headers and footers, tables and images, using python-docx to create and OOXML surgery to edit, then prove the result with a rendered page proof. Use when the deliverable is a .docx, a report, memo, letter, contract or CV in Word format, or when an existing Word file must be changed while keeping its template. Do not use for PDFs authored from scratch, for spreadsheets, or for plain Markdown deliverables.
 license: AGPL-3.0-or-later
-compatibility: athanor-office-convert, poppler-utils, zip and unzip are installed on every supported host. python-docx comes from the host's own packages and Arch and openSUSE do not carry it, so on those the document toolchain reports office-authoring as unavailable rather than failing mid-procedure - read the runtime block before starting.
+compatibility: garden-office-convert, poppler-utils, zip and unzip are installed on every supported host. python-docx comes from the host's own packages and Arch and openSUSE do not carry it, so on those the document toolchain reports office-authoring as unavailable rather than failing mid-procedure - read the runtime block before starting.
 allowed-tools: shell file_read file_write files_list document_read image_read publish_artifact
 metadata:
-  athanor.tier: 'builtin'
-  athanor.version: '2.1.0'
-  athanor.risk: 'workspace'
-  athanor.domain: 'documents'
+  garden.tier: 'builtin'
+  garden.version: '2.1.0'
+  garden.risk: 'workspace'
+  garden.domain: 'documents'
 ---
 
 # Word document authoring
 
-Run every script here with `/usr/local/lib/athanor/python/bin/python3`, which is the interpreter
+Run every script here with `/usr/local/lib/garden/python/bin/python3`, which is the interpreter
 with python-docx on it.
 
 Write the content in Markdown first if the document is long — structure is easier to fix before it
@@ -80,7 +80,7 @@ not mean it is absent.
    was written wrong. Confirm the headings really carry heading styles:
    `[p.style.name for p in doc.paragraphs if p.style.name.startswith('Heading')]` — an empty list
    here is why a TOC comes out empty.
-2. `athanor-office-convert out.docx proofs/out.pdf`, then `pdftoppm -jpeg -r 120 proofs/out.pdf
+2. `garden-office-convert out.docx proofs/out.pdf`, then `pdftoppm -jpeg -r 120 proofs/out.pdf
 proofs/p`.
 3. Run the rest of `render-proof`: placeholder scan, `pdffonts` embedding, image resolution and
    the round-trip word count that detects content lost off a page. Page count and blank pages are

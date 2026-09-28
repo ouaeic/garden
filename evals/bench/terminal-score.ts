@@ -175,7 +175,7 @@ export const runTerminalBench = async (options: TerminalBenchOptions): Promise<n
         modelRoute: providerModelIdOf(options.model),
         provider: credential.provider
       },
-      athanor: { version: identity.version, commit: identity.commit ?? 'uncommitted' },
+      garden: { version: identity.version, commit: identity.commit ?? 'uncommitted' },
       securityMode: scored.securityMode,
       autoAnswered: scored.autoAnswered,
       autoApproveCapReached: scored.autoApproveCapReached,
@@ -283,7 +283,7 @@ export const runAssemble = (options: AssembleCliOptions): number => {
   const cell = (column: string): string => assembled.row?.[COLUMNS.indexOf(column)] ?? '';
   out('');
   out(
-    `Row: ${cell('benchmark')} arm=${cell('arm')} n_tasks=${cell('n_tasks')} n_runs=${cell('n_runs')} score_mean=${cell('score_mean')} score_std=${cell('score_std') || '-'} cost_usd_mean=${cell('cost_usd_mean')} steps_mean=${cell('steps_mean')} steps_p95=${cell('steps_p95')} input_tokens_mean=${cell('input_tokens_mean')} approval_cards_fired_mean=${cell('approval_cards_fired_mean')} approvals_auto_answered=${cell('approvals_auto_answered')} security_mode=${cell('security_mode')} task_max_steps=${cell('task_max_steps')} backend=${cell('backend')} infra_failures_advisory=${cell('infra_failures_advisory')} athanor_commit=${cell('athanor_commit')}`
+    `Row: ${cell('benchmark')} arm=${cell('arm')} n_tasks=${cell('n_tasks')} n_runs=${cell('n_runs')} score_mean=${cell('score_mean')} score_std=${cell('score_std') || '-'} cost_usd_mean=${cell('cost_usd_mean')} steps_mean=${cell('steps_mean')} steps_p95=${cell('steps_p95')} input_tokens_mean=${cell('input_tokens_mean')} approval_cards_fired_mean=${cell('approval_cards_fired_mean')} approvals_auto_answered=${cell('approvals_auto_answered')} security_mode=${cell('security_mode')} task_max_steps=${cell('task_max_steps')} backend=${cell('backend')} infra_failures_advisory=${cell('infra_failures_advisory')} garden_commit=${cell('garden_commit')}`
   );
   if (assembled.missing.length)
     out(

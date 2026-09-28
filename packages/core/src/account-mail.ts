@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { type AccountApi, accountResourceId } from './account-api.js';
-import { AthanorError } from './errors.js';
+import { GardenError } from './errors.js';
 import { htmlToText } from './mime.js';
 
 const object = (value: unknown): Record<string, unknown> =>
@@ -24,16 +24,16 @@ const partId = (kind: 'attachment' | 'part', id: string) =>
 
 function base64Bytes(encoded: unknown, maximum: number): Buffer {
   if (typeof encoded !== 'string')
-    throw new AthanorError('mail_content_invalid', 'The mailbox omitted the requested content.');
+    throw new GardenError('mail_content_invalid', 'The mailbox omitted the requested content.');
   const value = encoded;
   if (!/^[A-Za-z0-9_+/-]*={0,2}$/.test(value) || value.length > Math.ceil(maximum / 3) * 4)
-    throw new AthanorError(
+    throw new GardenError(
       'mail_content_invalid',
       'The mailbox returned invalid or oversized encoded content.'
     );
   const bytes = Buffer.from(value, 'base64url');
   if (bytes.length > maximum)
-    throw new AthanorError(
+    throw new GardenError(
       'mail_content_too_large',
       'The mailbox content exceeds the requested size.'
     );
@@ -53,11 +53,11 @@ function headers(payload: Record<string, unknown>): Record<string, string> {
 
 function gmailParts(payload: unknown): Record<string, unknown>[] {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload))
-    throw new AthanorError('mail_content_invalid', 'The mailbox omitted the message structure.');
+    throw new GardenError('mail_content_invalid', 'The mailbox omitted the message structure.');
   const found: Record<string, unknown>[] = [];
   const visit = (value: unknown, depth: number) => {
     if (depth > 12 || found.length >= 200)
-      throw new AthanorError('mail_structure_too_large', 'This message has too many nested parts.');
+      throw new GardenError('mail_structure_too_large', 'This message has too many nested parts.');
     const part = object(value);
     found.push(part);
     for (const child of list(part.parts)) visit(child, depth + 1);
@@ -68,7 +68,7 @@ function gmailParts(payload: unknown): Record<string, unknown>[] {
 
 function requireIdentity(message: Record<string, unknown>, expected: string) {
   if (message.id !== expected)
-    throw new AthanorError(
+    throw new GardenError(
       'mail_response_invalid',
       'The mailbox returned a different message or attachment.'
     );
@@ -116,7 +116,7 @@ export async function listAccountMessages(api: AccountApi, input: z.input<typeof
     const page = await api.json(api.pageUrl(collection, parsed.cursor));
     const values = records.parse(page.value);
     if (values.length > parsed.limit)
-      throw new AthanorError('mail_page_invalid', 'The provider exceeded the requested page size.');
+      throw new GardenError('mail_page_invalid', 'The provider exceeded the requested page size.');
     return {
       messages: values.map((value) => ({ ...value, id: accountResourceId.parse(value.id) })),
       nextCursor: api.nextCursor(collection, nextLink.parse(page['@odata.nextLink']))
@@ -129,7 +129,7 @@ export async function listAccountMessages(api: AccountApi, input: z.input<typeof
   const page = await api.json(api.pageUrl(collection, parsed.cursor));
   const ids = records.parse(page.messages ?? []).map((value) => accountResourceId.parse(value.id));
   if (ids.length > parsed.limit)
-    throw new AthanorError('mail_page_invalid', 'The provider exceeded the requested page size.');
+    throw new GardenError('mail_page_invalid', 'The provider exceeded the requested page size.');
   const messages: ReturnType<typeof gmailSummary>[] = [];
   for (let offset = 0; offset < ids.length; offset += 4) {
     const batch = await Promise.allSettled(
@@ -167,7 +167,7 @@ export async function listAccountAttachments(api: AccountApi, id: string, cursor
   accountResourceId.parse(id);
   if (api.secret.provider === 'google') {
     if (cursor)
-      throw new AthanorError(
+      throw new GardenError(
         'connector_cursor_invalid',
         'This message has no attachment page cursor.'
       );
@@ -233,7 +233,7 @@ export async function readAccountMessage(
       id
     );
     if (!message.body || typeof message.body !== 'object')
-      throw new AthanorError('mail_content_invalid', 'The mailbox omitted the requested body.');
+      throw new GardenError('mail_content_invalid', 'The mailbox omitted the requested body.');
     const body = object(message.body),
       content = text(body.content);
     const plain = text(body.contentType).toLowerCase() === 'html' ? htmlToText(content) : content;
@@ -347,12 +347,12 @@ export async function readAccountAttachment(
         text(metadata['@odata.type'])
       )
     )
-      throw new AthanorError(
+      throw new GardenError(
         'mail_attachment_unsupported',
         'This attachment is a link; open its destination through the governed browser instead.'
       );
     if (typeof metadata.size === 'number' && metadata.size > maximum)
-      throw new AthanorError('mail_content_too_large', 'The attachment exceeds maxBytes.');
+      throw new GardenError('mail_content_too_large', 'The attachment exceeds maxBytes.');
     const response = await api.request(api.url('graph', `${path}/$value`), { maxBytes: maximum });
     return {
       filename: text(metadata.name) || 'attachment',
@@ -363,7 +363,7 @@ export async function readAccountAttachment(
   }
   const match = /^(attachment|part):([A-Za-z0-9_-]*)$/.exec(selected);
   if (!match)
-    throw new AthanorError('mail_attachment_invalid', 'Use a partId returned by this message.');
+    throw new GardenError('mail_attachment_invalid', 'Use a partId returned by this message.');
   const providerId = Buffer.from(match[2]!, 'base64url').toString('utf8');
   const message = requireIdentity(
     await api.json(api.url('gmail', `messages/${encodeURIComponent(id)}`, { format: 'full' }), {
@@ -377,13 +377,13 @@ export async function readAccountAttachment(
       : value.partId === providerId
   );
   if (!part)
-    throw new AthanorError(
+    throw new GardenError(
       'mail_attachment_invalid',
       'The attachment no longer belongs to this message.'
     );
   const body = object(part.body);
   if (typeof body.size === 'number' && body.size > maximum)
-    throw new AthanorError('mail_content_too_large', 'The attachment exceeds maxBytes.');
+    throw new GardenError('mail_content_too_large', 'The attachment exceeds maxBytes.');
   const data =
     match[1] === 'attachment'
       ? await api.json(

@@ -1,4 +1,4 @@
-import { MessageAttachments } from '@athanor/contracts';
+import { MessageAttachments } from '@garden/contracts';
 
 export interface OwnerMessage {
   prompt: string;

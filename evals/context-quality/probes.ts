@@ -3,12 +3,12 @@
  *
  * `evals/harness.ts` asserts `modelCalls`, `tools`, `status`, `minCachePrefix`, `compactions` and
  * a dozen more counters. Every one of them is a count. None of them is an answer, and structurally
- * none of them can be: the model in that rig is a function of what athanor just said, so a fixture
+ * none of them can be: the model in that rig is a function of what garden just said, so a fixture
  * that narrows the model's window by 75% produces the identical scripted reply and reports green.
  * Every recommendation that changes what the model *sees* is therefore unfalsifiable there.
  *
  * A probe closes that. Take a real long-running trajectory, compress its earlier portion through
- * athanor's own production path at some configuration, then ask a question that can only be
+ * garden's own production path at some configuration, then ask a question that can only be
  * answered from the part that was compressed. Four kinds, because they fail differently:
  *
  *   recall        one specific fact stated once, early, and never repeated;
@@ -19,7 +19,7 @@
  * The published result this design comes from grades those 0-5 with a judge blinded to which
  * method produced the answer, and reports artifact tracking as the worst of the four at 2.45/5
  * even for the winning method - "may need dedicated state tracking beyond summarization". Expect
- * athanor to score badly there too, and report it rather than tune the probe until it passes.
+ * garden to score badly there too, and report it rather than tune the probe until it passes.
  *
  * ── The part that runs with no model, and exactly what it is worth ────────────────────────────
  *

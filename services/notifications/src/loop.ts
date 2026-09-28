@@ -92,7 +92,7 @@ export const createNotifier = (input: NotifierInput) => {
       /*
        * Abortable, unlike the plain `delay` this replaced.
        *
-       * `athanor restart` and every update stop each service in turn, and a flag set by the signal
+       * `garden restart` and every update stop each service in turn, and a flag set by the signal
        * handler is not read until the current wait is over. The registry hit this first and wrote
        * it down - "thirty seconds of the outage the owner is watching, spent on a process that had
        * nothing to finish" - and the fix was never carried the twenty lines across to here.

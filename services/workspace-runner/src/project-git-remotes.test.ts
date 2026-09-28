@@ -4,7 +4,7 @@ import { mkdtemp, open, readFile, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, expect, it, vi } from 'vitest';
-import type { ProjectGitRemoteInput } from '@athanor/contracts';
+import type { ProjectGitRemoteInput } from '@garden/contracts';
 import { ensureWorkspace } from './files.js';
 import * as workspaceFiles from './files.js';
 import { ProjectVersionFiles } from './project-version-files.js';

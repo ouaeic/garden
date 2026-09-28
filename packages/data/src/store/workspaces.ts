@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { AthanorError } from '@athanor/core';
-import type { EncryptedEnvelope } from '@athanor/core';
-import { MAX_WORKSPACE_PREVIEWS, PREVIEW_IDLE_EXPIRY_DAYS } from '@athanor/contracts';
+import { GardenError } from '@garden/core';
+import type { EncryptedEnvelope } from '@garden/core';
+import { MAX_WORKSPACE_PREVIEWS, PREVIEW_IDLE_EXPIRY_DAYS } from '@garden/contracts';
 import type { Database } from '../database.js';
 import type {
   WorkspaceCheckpointRecord,
@@ -465,7 +465,7 @@ export class WorkspaceStore {
     validUntil?: string | null;
   }): Promise<WorkspaceMemoryRecord> {
     if ((input.target as string) !== 'workspace')
-      throw new AthanorError(
+      throw new GardenError(
         'memory_scope_refused',
         'The owner tier is written by the owner in Settings, not through this path.'
       );

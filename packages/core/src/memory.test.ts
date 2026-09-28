@@ -155,14 +155,11 @@ describe('keyed blind index', () => {
       const shared = left.filter((value) => right.includes(value)).length;
       return shared / (left.length + right.length - shared);
     };
-    const plainLeft = memoryTrigrams('athanor.target');
-    const plainRight = memoryTrigrams('athanor.service');
-    const keyedLeft = buildMemoryItemIndex(
-      { body: '', title: 'athanor.target' },
-      indexKey
-    ).trigrams;
+    const plainLeft = memoryTrigrams('garden.target');
+    const plainRight = memoryTrigrams('garden.service');
+    const keyedLeft = buildMemoryItemIndex({ body: '', title: 'garden.target' }, indexKey).trigrams;
     const keyedRight = buildMemoryItemIndex(
-      { body: '', title: 'athanor.service' },
+      { body: '', title: 'garden.service' },
       indexKey
     ).trigrams;
 
@@ -189,7 +186,7 @@ describe('keyed blind index', () => {
     // The row is still worth storing; only the lexical index refuses it.
     expect(source.tokensEst).toBeGreaterThan(0);
 
-    const prose = buildMemorySourceIndex('systemctl restart athanor.target succeeded', indexKey);
+    const prose = buildMemorySourceIndex('systemctl restart garden.target succeeded', indexKey);
     expect(prose.indexed).toBe(true);
     expect(prose.bodyTokens).not.toBe('');
   });
@@ -244,9 +241,9 @@ describe('keyed blind index', () => {
 
     // And through the same alias expansion, so a prefix reaches a compound name by its parts the
     // way the whole word already does.
-    const relay = buildConversationNameIndex('athanor-relay ticket', '', indexKey).prefixTokens!;
+    const relay = buildConversationNameIndex('garden-relay ticket', '', indexKey).prefixTokens!;
     expect(relay.split(' ')).toContain(conversationNamePrefixTokens('rel', indexKey)[0]);
-    expect(relay.split(' ')).toContain(conversationNamePrefixTokens('athanor-rel', indexKey)[0]);
+    expect(relay.split(' ')).toContain(conversationNamePrefixTokens('garden-rel', indexKey)[0]);
 
     // A word nobody is typing the front of has nothing to ask with.
     expect(conversationNamePrefixTokens('what', indexKey)).toEqual([]);
@@ -359,7 +356,7 @@ describe('memory query planning', () => {
     // most worth matching - the ones that occur once in the whole store - were the likeliest
     // casualties. A realistic request is well over two dozen content words.
     const request = `The mail connector has been polling instead of idling since yesterday.
-      Check /srv/athanor/var/log for dovecot errors, confirm imap_idle_notify_interval is not back
+      Check /srv/garden/var/log for dovecot errors, confirm imap_idle_notify_interval is not back
       at its default, and tell me whether the reboot last week is what changed it. Digest mail
       arrives empty in the morning and only catches up later, which first looked like a regression
       in the poll loop but might be the connector reconnecting without a session.`;
@@ -377,14 +374,14 @@ describe('memory query planning', () => {
   });
 
   it('reaches a compound name by the word a person would use for it', () => {
-    // subject 'athanor-relay' is one lexeme, so "relay" shares nothing with it lexically and
+    // subject 'garden-relay' is one lexeme, so "relay" shares nothing with it lexically and
     // nothing structurally either - subject keys are exact equality. The alias surface is the
     // bridge, and it has to work in both directions.
     const stored = buildMemoryItemIndex(
       {
         title: 'bind address',
         body: 'It binds 0.0.0.0:8443 behind the SNI proxy.',
-        subject: 'athanor-relay',
+        subject: 'garden-relay',
         object: '0.0.0.0:8443'
       },
       indexKey
@@ -393,7 +390,7 @@ describe('memory query planning', () => {
     expect(aliasTokens.size).toBeGreaterThan(0);
 
     const plain = planMemoryQuery('what port does the relay listen on', indexKey);
-    const exact = planMemoryQuery('what is athanor-relay bound to', indexKey);
+    const exact = planMemoryQuery('what is garden-relay bound to', indexKey);
     const bodyTokens = new Set(stored.bodyTokens.split(' ').filter(Boolean));
     const titleTokens = new Set(stored.titleTokens.split(' ').filter(Boolean));
 
@@ -407,14 +404,14 @@ describe('memory query planning', () => {
   });
 
   it('splits compounds into words worth asking by and leaves prose alone', () => {
-    expect(memoryAliasLexemes('athanor-relay')).toEqual(['athanor', 'relay']);
+    expect(memoryAliasLexemes('garden-relay')).toEqual(['garden', 'relay']);
     expect(memoryAliasLexemes('imap_idle_notify_interval')).toEqual([
       'idle',
       'imap',
       'interval',
       'notify'
     ]);
-    expect(memoryAliasLexemes('/srv/athanor/var/log')).toEqual(['athanor', 'log', 'srv', 'var']);
+    expect(memoryAliasLexemes('/srv/garden/var/log')).toEqual(['garden', 'log', 'srv', 'var']);
     expect(memoryAliasLexemes('PowerPoint')).toEqual(['point', 'power']);
     // Ordinary prose already produces these lexemes, so it contributes nothing and costs nothing.
     expect(memoryAliasLexemes('the owner uses fish on this computer')).toEqual([]);
@@ -626,7 +623,7 @@ describe('memory pack rendering', () => {
           observedAt: '2026-07-01T00:00:00.000Z',
           validFrom: '2026-07-01T00:00:00.000Z',
           validTo: null,
-          title: 'athanor-relay',
+          title: 'garden-relay',
           tags: [],
           body: 'The SNI relay in front of every published service.'
         }
@@ -641,8 +638,8 @@ describe('excerpting a stored body', () => {
   const transcript = [
     'I asked whether the morning digest had gone out and it had not.',
     'The queue was empty, the notifier was up, and nothing had been delivered since Tuesday.',
-    'athanor-relay was never enabled at boot, so a restart left it stopped.',
-    'I ran systemctl enable --now athanor-relay and it is listening on 0.0.0.0:8443 again.',
+    'garden-relay was never enabled at boot, so a restart left it stopped.',
+    'I ran systemctl enable --now garden-relay and it is listening on 0.0.0.0:8443 again.',
     'After that the digest went out on the next tick and the backlog cleared.'
   ].join('\n');
 
@@ -663,20 +660,20 @@ describe('excerpting a stored body', () => {
   });
 
   it('prefers the window that covers the most of the question', () => {
-    const excerpt = memoryExcerpt(transcript, 'systemctl enable athanor-relay listening 8443', {
+    const excerpt = memoryExcerpt(transcript, 'systemctl enable garden-relay listening 8443', {
       maxChars: 130
     });
-    expect(excerpt).toContain('systemctl enable --now athanor-relay');
+    expect(excerpt).toContain('systemctl enable --now garden-relay');
     expect(excerpt).toContain('0.0.0.0:8443');
   });
 
   it('points at the compound term the index actually matched on', () => {
-    // The index admits this row because the alias surface splits `athanor-relay` into its parts, so
+    // The index admits this row because the alias surface splits `garden-relay` into its parts, so
     // a question asking about "the relay" reaches it. The excerpt has to reach the same place: no
     // token in this body equals `relay`, and matching on lexemes alone excerpts from the top.
     expect(memoryLexemes(transcript)).not.toContain('relay');
     const excerpt = memoryExcerpt(transcript, 'when was the relay last enabled', { maxChars: 90 });
-    expect(excerpt).toContain('athanor-relay');
+    expect(excerpt).toContain('garden-relay');
   });
 
   it('falls back to the head of the body when nothing in the question occurs in it', () => {

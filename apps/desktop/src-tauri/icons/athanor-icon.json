@@ -1,8 +1,0 @@
-{
-  "default": "athanor-logo.png",
-  "bg_color": "#080A0C",
-  "android_bg": "athanor-android-background.svg",
-  "android_fg": "athanor-logo.png",
-  "android_fg_scale": 88,
-  "android_monochrome": "athanor-android-monochrome.svg"
-}

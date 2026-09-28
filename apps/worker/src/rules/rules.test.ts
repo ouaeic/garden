@@ -1,4 +1,4 @@
-import type { ModelMessage } from '@athanor/model-gateway';
+import type { ModelMessage } from '@garden/model-gateway';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { BASE_SYSTEM_PROMPT } from '../context.js';
 import { agentToolsFor } from '../tool-catalogue.js';
@@ -103,7 +103,7 @@ describe('the render-proof rule', () => {
       toolCalls: [call('file_write', { path: 'workspace/quarterly.pptx', content: '...' })]
     });
     expect(applyDormantRules(messages, new Set(['file_write']))).toEqual(['office-render-proof']);
-    expect(messages.at(-1)?.content).toContain('athanor-office-convert');
+    expect(messages.at(-1)?.content).toContain('garden-office-convert');
   });
 
   it('stays quiet once the turn has actually rendered and looked', () => {
@@ -121,7 +121,7 @@ describe('the render-proof rule', () => {
     const messages = window({
       toolCalls: [
         call('shell', {
-          executable: 'athanor-office-convert',
+          executable: 'garden-office-convert',
           args: ['workspace/q.docx', 'workspace/q.pdf']
         })
       ]

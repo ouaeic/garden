@@ -7,7 +7,7 @@ import type {
   ProjectUpdateAction,
   ProjectUpdates as Updates,
   Task
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import ProjectCleanup, { type CleanupRequest } from './ProjectCleanup';
 import { get, post } from './client';
 import { Button, Dialog, ErrorNotice, Field, Spinner } from './ui';

@@ -37,7 +37,7 @@ const expect = (condition: boolean, what: string): void => {
   if (!condition) failures.push(what);
 };
 
-/* ----------------------------------------------- every call names a tool athanor actually sends */
+/* ----------------------------------------------- every call names a tool garden actually sends */
 
 /*
  * The cheapest way for this rig to be wrong. `approvalRequirement` answers null for a name it has
@@ -51,17 +51,17 @@ for (const scenario of SCENARIOS)
   for (const call of scenario.calls)
     expect(
       shipped.has(call.name),
-      `${scenario.id} calls "${call.name}", which athanor does not send: a name with a typo in it is a call the floor has no rule for, and the scenario silently gets cheaper`
+      `${scenario.id} calls "${call.name}", which garden does not send: a name with a typo in it is a call the floor has no rule for, and the scenario silently gets cheaper`
     );
 for (const entry of [...WRITES, ...READS])
   expect(
     shipped.has(entry.call.name),
-    `the guard "${entry.id}" calls "${entry.call.name}", which athanor does not send`
+    `the guard "${entry.id}" calls "${entry.call.name}", which garden does not send`
   );
 for (const entry of SINKS)
   expect(
     shipped.has(entry.call.name),
-    `the sink guard "${entry.id}" calls "${entry.call.name}", which athanor does not send`
+    `the sink guard "${entry.id}" calls "${entry.call.name}", which garden does not send`
   );
 
 /* ------------------------------------------------------- the guard tables are consulted at all */

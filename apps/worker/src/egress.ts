@@ -1,4 +1,4 @@
-import { matchingHostSuffix, reachOfHttpUrl, type NetworkReach } from '@athanor/core';
+import { matchingHostSuffix, reachOfHttpUrl, type NetworkReach } from '@garden/core';
 /**
  * Where a request is allowed to go once untrusted content is in the turn.
  *
@@ -402,7 +402,7 @@ export const classifyDestination = (
    * Somewhere data cannot go is not somewhere data can be sent - and neither of those is "the LAN".
    *
    * This asked the owner to approve the agent reading its own web server. A single "build a page
-   * and serve it" run raised ten approval cards, and every one of them was athanor talking to
+   * and serve it" run raised ten approval cards, and every one of them was garden talking to
    * itself: four to `localhost:8080`, three to its own preview URL on its own domain. Nothing left
    * the machine in any of them, and the owner learned to click Approve without reading - which is
    * the only way this rule can actually fail.

@@ -20,7 +20,7 @@ import {
   ConnectorKind,
   type MediaModelOption,
   type WorkspaceSurfaces
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { z } from 'zod';
 import {
   connectorActions,
@@ -28,7 +28,7 @@ import {
   accountConnectorInputs,
   MEMORY_RECALL_ITEM_CEILING,
   MEMORY_RECALL_MAX_ITEMS
-} from '@athanor/core';
+} from '@garden/core';
 import { agentTools, agentToolsFor, CONNECTOR_ACTION_INPUTS } from './tool-catalogue.js';
 import { approvalRequirement } from './approval-policy.js';
 import { isMutatingToolCall } from './write-classification.js';
@@ -233,7 +233,7 @@ describe('the size of the catalogue the model is sent', () => {
  * fetched by a call the model already makes - above "resident", and `connector_action.input` is
  * 5,018 bytes of the 55,458-byte catalogue, the single largest thing in it. The proposed move is
  * to have `connector_list` return the per-action field map instead, derived from the Zod union in
- * `@athanor/core` that parses every one of these before a credential is opened. `connector_list`
+ * `@garden/core` that parses every one of these before a credential is opened. `connector_list`
  * is already the call the model is told to make first, so the round trip is free.
  *
  * The move was measured and refused, and this is the measurement rather than the argument. Two of
@@ -468,7 +468,7 @@ describe('the wire a box without a browser or a screen is sent', () => {
  * that narrows a tool instead of removing one.
  *
  * `connector_action` declares twenty-four actions across five kinds of connection and was sent
- * whole to every box that had connected any one of them. `executeConnectorAction` in @athanor/core
+ * whole to every box that had connected any one of them. `executeConnectorAction` in @garden/core
  * refuses an action whose `kind` is not the connector's - "Action does not match this connector",
  * thrown before a scope is read or a credential is opened - so on a mailbox-and-calendar box the
  * eleven GitHub, WebDAV and MCP actions were not unlikely calls, they were impossible ones,
@@ -617,7 +617,7 @@ describe('the wire a box is sent about the services it has actually connected', 
      * The set equality the per-action table rests on, and the one thing the compiler cannot check.
      *
      * `CONNECTOR_ACTION_INPUTS` is a total `Record<ConnectorAction, ...>`, so an action added to
-     * @athanor/core cannot compile until somebody says what it takes. What no type can say is that
+     * @garden/core cannot compile until somebody says what it takes. What no type can say is that
      * the fields it names are the fields the bag declares: a typo would orphan a field on every
      * box at once, and a field no action reaches is 40-odd bytes nobody can use.
      *
@@ -651,7 +651,7 @@ describe('the wire a box is sent about the services it has actually connected', 
      * because `calendar_read_range` and `calendar_create_event` reach both.
      *
      * So this reads the schema that actually decides. Thirteen of the twenty-four; the other
-     * eleven are behind an unexported union in @athanor/core and are named as unchecked rather
+     * eleven are behind an unexported union in @garden/core and are named as unchecked rather
      * than quietly skipped.
      */
     const accepted = new Map<string, string[]>();
@@ -697,7 +697,7 @@ describe('the wire a box is sent about the services it has actually connected', 
      * actions narrows the enum to empty - and the tool is still described, still costs its
      * description, and can no longer be called at all. The type only says every heading names a
      * real kind; nothing types the other direction, which is why it is asserted here over the
-     * enum @athanor/contracts actually declares rather than over a list written beside it.
+     * enum @garden/contracts actually declares rather than over a list written beside it.
      */
     for (const kind of ConnectorKind.options) {
       const sent = actionsOf(compacted([kind]));
@@ -1550,7 +1550,7 @@ describe('declared action shapes', () => {
      *
      * The per-kind required set is prose now, so it is asserted as prose - which is the honest
      * shape of the promise, since the wire no longer carries a required list per kind and
-     * `TaskScheduleSpec` in @athanor/contracts is what refuses a spec that is missing one.
+     * `TaskScheduleSpec` in @garden/contracts is what refuses a spec that is missing one.
      */
     const schedule = agentTools.find((tool) => tool.name === 'schedule');
     const spec = (
@@ -1668,7 +1668,7 @@ describe('the reach each publishing call has, and the card the floor raises for 
     const preview = agentTools.find((tool) => tool.name === 'publish_preview');
     const reach = (preview?.parameters.properties as Record<string, { enum?: string[] }>).reach;
     expect(reach?.enum).toEqual(['private', 'public']);
-    // Absent must be the NARROW reach on both sides. `publishesPublicly` in @athanor/contracts is
+    // Absent must be the NARROW reach on both sides. `publishesPublicly` in @garden/contracts is
     // the single reader the floor and `tools/publishing.ts` share, so this is the one place the
     // default and the reader are checked to agree.
     expect(publishesPublicly(undefined)).toBe(false);

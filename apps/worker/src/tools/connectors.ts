@@ -8,12 +8,12 @@ import {
   encryptJson,
   executeConnectorAction,
   parseAccountConnectorAction,
-  AthanorError,
+  GardenError,
   type ConnectorSecret,
   type AccountOperation
-} from '@athanor/core';
+} from '@garden/core';
 import { withAccountOperation } from '../account-operation.js';
-import { type ModelToolCall } from '@athanor/model-gateway';
+import { type ModelToolCall } from '@garden/model-gateway';
 import { connectorHostAllowance, performConnectorAction } from '../connector-call.js';
 import { asRecord, textValue } from '../values.js';
 import { type ToolContext } from '../tool-dispatch.js';
@@ -46,9 +46,9 @@ export async function executeConnectorTool(
       const operation = textValue(call.arguments.action, 'unknown_connector_action');
       const connector = await context.store.getConnector(task.userId, connectorId);
       if (!connector || !connector.enabled)
-        throw new AthanorError('connector_not_found', 'Connected service is unavailable');
+        throw new GardenError('connector_not_found', 'Connected service is unavailable');
       if (connector.secretCiphertext.aad !== `connector:${task.userId}:${connector.id}`)
-        throw new AthanorError(
+        throw new GardenError(
           'connector_secret_context',
           'Connector secret encryption context is invalid'
         );
@@ -74,7 +74,7 @@ export async function executeConnectorTool(
         connectorActions as Record<string, { kinds: readonly string[] } | undefined>
       )[operation];
       if (definition && !definition.kinds.includes(connector.kind))
-        throw new AthanorError(
+        throw new GardenError(
           'connector_action_invalid',
           `${operation} is a ${definition.kinds.join('/')} action and ${connector.label} is a ${connector.kind} connection. On this one: ${Object.entries(
             connectorActions
@@ -124,7 +124,7 @@ export async function executeConnectorTool(
                     )
                   );
                   if (!saved)
-                    throw new AthanorError(
+                    throw new GardenError(
                       'connector_secret_update_failed',
                       'The refreshed connector authorization could not be saved'
                     );
@@ -173,7 +173,7 @@ export async function executeConnectorTool(
           taskId: task.id,
           operation,
           outcome:
-            error instanceof AthanorError && error.code === 'connector_scope_denied'
+            error instanceof GardenError && error.code === 'connector_scope_denied'
               ? 'denied'
               : 'failed'
         });

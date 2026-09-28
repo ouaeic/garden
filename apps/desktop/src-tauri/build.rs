@@ -1,7 +1,7 @@
 use std::process::Command;
 
 fn source_commit() -> String {
-    let configured = std::env::var("ATHANOR_SOURCE_COMMIT").ok();
+    let configured = std::env::var("GARDEN_SOURCE_COMMIT").ok();
     let discovered = Command::new("git")
         .args(["rev-parse", "--verify", "HEAD"])
         .current_dir(std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is set"))
@@ -20,8 +20,8 @@ fn source_commit() -> String {
 }
 
 fn main() {
-    println!("cargo:rerun-if-env-changed=ATHANOR_SOURCE_COMMIT");
-    println!("cargo:rustc-env=ATHANOR_SOURCE_COMMIT={}", source_commit());
+    println!("cargo:rerun-if-env-changed=GARDEN_SOURCE_COMMIT");
+    println!("cargo:rustc-env=GARDEN_SOURCE_COMMIT={}", source_commit());
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
             "native_capabilities",
@@ -33,5 +33,5 @@ fn main() {
             "read_local_file",
         ]),
     ))
-    .expect("failed to build the constrained athanor Tauri manifest")
+    .expect("failed to build the constrained garden Tauri manifest")
 }

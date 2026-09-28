@@ -149,10 +149,10 @@ export const SAFE_ENV_KEYS =
 /**
  * Where the agent's `$HOME` is: `.home` at the container root, beside `workspace/` and not inside
  * it. It used to be the container root itself, which is why every dotfile a toolchain wrote landed
- * in the same directory as `workspace/` and `.athanor`.
+ * in the same directory as `workspace/` and `.garden`.
  *
  * IT IS NOT INSIDE THE UNDO POINT, and nothing here claims it is. `CHECKPOINT_CONTENT` is
- * `['workspace', '.athanor/artifacts']` (checkpoints.ts), so a rewind puts the project tree back
+ * `['workspace', '.garden/artifacts']` (checkpoints.ts), so a rewind puts the project tree back
  * and leaves the toolchain caches and the coding CLIs' OAuth state exactly as the failed run left
  * them. That is deliberate. A home under `workspace/` would be walked and hashed on EVERY turn and
  * counted against `CHECKPOINT_MAX_FILES` = 250,000: measured for scale on the lead's machine, a
@@ -161,18 +161,18 @@ export const SAFE_ENV_KEYS =
  * `CheckpointRefusedError` and the turn loses its rewind point - so a home inside the checkpoint
  * costs the checkpoint, which is the thing it was supposed to protect. Rolling a CLI's OAuth state
  * back to yesterday morning would also sign the agent out mid-task, which is the exact harm
- * checkpoints.ts already excludes `.athanor/browser` to avoid.
+ * checkpoints.ts already excludes `.garden/browser` to avoid.
  *
  * IT IS ALSO OUT OF THE STORAGE FIGURE, and that is a cost as well as a consequence: server.ts's
- * `storageUsage` walks `workspace`, `.athanor/artifacts` and `.athanor/browser`, so a per-workspace
+ * `storageUsage` walks `workspace`, `.garden/artifacts` and `.garden/browser`, so a per-workspace
  * limit does not bound what a task writes into its `$HOME`. Decided rather than inherited, with the
  * argument written out at `storageUsage` itself; the host-disk floor is what stops a `$HOME` filling
  * the box.
  *
  * Being outside `workspace/` means the Landlock ruleset has to name it, and it does:
- * `scripts/athanor-sandbox` grants `$ROOT/.home` the write verbs beside `$ROOT/workspace`, because
+ * `scripts/garden-sandbox` grants `$ROOT/.home` the write verbs beside `$ROOT/workspace`, because
  * a confined command may otherwise write only in `workspace/`, `/tmp`, `/var/tmp` and `/dev/shm` -
- * and a boundary that refuses `pip install` is an outage rather than a boundary. `$ROOT/.athanor`
+ * and a boundary that refuses `pip install` is an outage rather than a boundary. `$ROOT/.garden`
  * is granted nowhere and remains unreachable.
  *
  * The other reason for the container root: files.ts's `assertUserDataPath` folds a bare relative
@@ -283,7 +283,7 @@ export const KILLED_NOTE =
  * The kernel answers a rule violation with EACCES, which every tool on the box prints as the same
  * `Permission denied` it prints for a file mode, a missing directory it may not create, or a file
  * that is not there at all under some shells. Measured in the real-kernel drill for this boundary:
- * `cat: /home/athanor/<other>/workspace/notes.md: Permission denied` and `mv: cannot move ... :
+ * `cat: /home/garden/<other>/workspace/notes.md: Permission denied` and `mv: cannot move ... :
  * Permission denied`, with nothing in either to distinguish policy from a broken path. A model
  * reading that retries with sudo, or retries the same path, or concludes the file does not exist
  * and writes around it - three wrong moves, all cheaper to make than to diagnose.
@@ -303,7 +303,7 @@ export const KILLED_NOTE =
  */
 
 /**
- * Every hierarchy scripts/athanor-sandbox names in a rule, spelled here the way it spells them,
+ * Every hierarchy scripts/garden-sandbox names in a rule, spelled here the way it spells them,
  * and the reason the read half is in the list at all.
  *
  * The write half is obvious. The read half is the one that was wrong: while this held only the
@@ -320,7 +320,7 @@ export const KILLED_NOTE =
  * unprivileged and ordinary Unix permissions refuse those writes with or without Landlock - the
  * VPS drill for this boundary recorded `/etc` unwritable at the same exit status with the ruleset
  * removed. What the boundary actually took away is named nowhere here and still gets the sentence:
- * `/home`, and with it every other task's workspace, and the container root that holds `.athanor`.
+ * `/home`, and with it every other task's workspace, and the container root that holds `.garden`.
  */
 const GRANTED_OUTSIDE_WORKSPACE = [
   '/tmp',
@@ -600,7 +600,7 @@ export interface ExecutionOptions {
  *
  * WHAT THIS DOES NOT DO is serve as the list the RUNNER finds its own helpers on. Its first three
  * entries are all directories the agent can write: index 0 is inside `$ROOT/workspace` and indices
- * 1 and 2 are inside `$ROOT/.home`, and the confine loop in `scripts/athanor-sandbox` grants write
+ * 1 and 2 are inside `$ROOT/.home`, and the confine loop in `scripts/garden-sandbox` grants write
  * on both of those roots. A helper resolved here and then spawned by the runner's own account -
  * outside the sandbox, outside the limiter - would therefore run whatever an agent had left under
  * that name. `hostSearchPath` below is the list for that, and `prepareAudio`, `findRenderTools` and
@@ -612,7 +612,7 @@ export interface ExecutionOptions {
  */
 export const agentSearchPath = (workspaceRoot: string): string =>
   [
-    path.join(workspaceRoot, 'workspace', '.athanor', 'tools', 'node_modules', '.bin'),
+    path.join(workspaceRoot, 'workspace', '.garden', 'tools', 'node_modules', '.bin'),
     path.join(agentHome(workspaceRoot), '.local', 'bin'),
     path.join(agentHome(workspaceRoot), 'bin'),
     '/usr/local/sbin',
@@ -629,8 +629,8 @@ export const agentSearchPath = (workspaceRoot: string): string =>
  * System directories and nothing else, and no workspace root, because nothing on this list depends
  * on one. That is the whole difference from `agentSearchPath` above and it is a privilege boundary:
  * the three entries that list adds ahead of these are all agent-writable, and the helpers that
- * resolve here are then run by the runner's account rather than through `scripts/athanor-sandbox`.
- * `prepareAudio` (ffprobe, ffmpeg), `findRenderTools` (pdftotext, pdftoppm, athanor-office-convert)
+ * resolve here are then run by the runner's account rather than through `scripts/garden-sandbox`.
+ * `prepareAudio` (ffprobe, ffmpeg), `findRenderTools` (pdftotext, pdftoppm, garden-office-convert)
  * and `probeFonts` (fc-list) are those helpers - six names, spawned with `shell: false` and no
  * sandboxed invocation - and they are the callers of this.
  *
@@ -638,7 +638,7 @@ export const agentSearchPath = (workspaceRoot: string): string =>
  * spawns of its own session, and now reads this instead, so a host that ever needs a seventh has
  * one place to gain it rather than two that drift.
  *
- * WHAT THIS DOES NOT DO is decide where the pinned interpreter comes from. `ATHANOR_PYTHON` is an
+ * WHAT THIS DOES NOT DO is decide where the pinned interpreter comes from. `GARDEN_PYTHON` is an
  * absolute path and `resolveExecutable` short-circuits any name holding a separator, so no search
  * path is consulted for it and moving `probePythonModules` here would change nothing.
  *
@@ -792,7 +792,7 @@ export const prepareInvocation = async (
   } else {
     if (privilegeEscalationBinary(request) ?? privilegeEscalationBinary(asResolved)) {
       throw new Error(
-        "Direct privilege escalation is disabled; install packages with this computer's own package manager so Athanor can apply the approval policy"
+        "Direct privilege escalation is disabled; install packages with this computer's own package manager so Garden can apply the approval policy"
       );
     }
     if (
@@ -800,7 +800,7 @@ export const prepareInvocation = async (
       privilegedHelperInvocation(asResolved, privilegedHelpers)
     ) {
       throw new Error(
-        "Athanor's own privileged helpers are reached by the runner after an approval, not by a command"
+        "Garden's own privileged helpers are reached by the runner after an approval, not by a command"
       );
     }
     // A wrapped package run cannot be rewritten onto the approved helper, so it never executes.

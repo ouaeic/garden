@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import { expect, it, vi } from 'vitest';
-import { AthanorError, encryptJson } from '@athanor/core';
-import type { ConnectorScope } from '@athanor/contracts';
+import { GardenError, encryptJson } from '@garden/core';
+import type { ConnectorScope } from '@garden/contracts';
 import type { RouteContext } from '../http/server-context.js';
 import { registerProjectGitRoutes } from './project-git.js';
 
@@ -52,7 +52,7 @@ it('keeps owner Git requests scoped to enabled grants and sends credentials only
     } as unknown as RouteContext,
     async (owner, id) => {
       if (owner !== 'owner' || id !== projectId)
-        throw new AthanorError('project_not_found', 'Project not found', 404);
+        throw new GardenError('project_not_found', 'Project not found', 404);
       return { id, workspaceId: randomUUID() };
     }
   );

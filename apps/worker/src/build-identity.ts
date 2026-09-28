@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import type { BuildIdentity } from '@athanor/contracts';
+import type { BuildIdentity } from '@garden/contracts';
 
 /** Everything below the running file: `apps/worker/{src,dist}` sit the same distance from it. */
 const checkoutRoot = new URL('../../../', import.meta.url);
@@ -23,7 +23,7 @@ const FULL_REVISION = /^[0-9a-f]{40}$/;
  * it runs under systemd where there is barely a PATH, and the files involved are a documented
  * format that has not changed in twenty years.
  *
- * Installing at a pinned tag leaves HEAD detached, so it holds the revision itself. `athanor update`
+ * Installing at a pinned tag leaves HEAD detached, so it holds the revision itself. `garden update`
  * checks out a branch and pulls, so from then on it is a reference to a loose file. A clone that has
  * never moved has neither, and the reference is in the packed set instead. A linked worktree - which
  * is a developer's tree and never a box - keeps its HEAD apart from the refs both of them mean, and
@@ -62,7 +62,7 @@ const headRevision = (): string | null => {
  * running file is sitting in, which cannot go stale: the version out of the one package.json that
  * `scripts/check-repository.mjs` already holds the printed install command to, so it names the
  * release a new box is handed rather than a number in a file; and the revision out of the checkout,
- * because `athanor update` is a `git pull` and HEAD is the thing it moved.
+ * because `garden update` is a `git pull` and HEAD is the thing it moved.
  *
  * Worked out once. A box that has been updated in place is running the code it started with, so a
  * second reading would answer for a tree this process is no longer the product of.

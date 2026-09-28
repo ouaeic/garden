@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { BrowserAction } from '@athanor/contracts';
+import { BrowserAction } from '@garden/contracts';
 import type { BrowserManager } from './browser.js';
 import { BrowserActionJournal, type BrowserActionProgress } from './browser-action-journal.js';
 import { requireScope } from './auth.js';

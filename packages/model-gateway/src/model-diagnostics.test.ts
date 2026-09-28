@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
-import { AthanorError, withPrivateDiagnostics, type PrivateDiagnosticKind } from '@athanor/core';
+import { GardenError, withPrivateDiagnostics, type PrivateDiagnosticKind } from '@garden/core';
 import { ModelGateway } from './gateway.js';
 import { retainInterruptedResponse } from './interrupted-response.js';
 import type { ModelAdapter, ModelRequest, ModelResponse } from './protocol.js';
@@ -49,7 +49,7 @@ describe('model diagnostic projections', () => {
     let attempts = 0;
     const gateway = fixture(async () => {
       if (++attempts === 1)
-        throw new AthanorError('provider_unavailable', 'MANAGED_SECRET', 503, { status: 503 });
+        throw new GardenError('provider_unavailable', 'MANAGED_SECRET', 503, { status: 503 });
       return { ...completion, apiKey: 'MANAGED_SECRET' } as ModelResponse;
     });
     const capture = recorder();
@@ -84,7 +84,7 @@ describe('model diagnostic projections', () => {
   });
   it('records a partial interruption without replaying a paid request', async () => {
     const chat = vi.fn(async () => {
-      const error = new AthanorError('provider_unavailable', 'cut', 503);
+      const error = new GardenError('provider_unavailable', 'cut', 503);
       retainInterruptedResponse(error, completion);
       throw error;
     });

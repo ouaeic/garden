@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import cookie from '@fastify/cookie';
 import Fastify from 'fastify';
-import { generateDataKey, sha256, wrapDataKey } from '@athanor/core';
-import { createDatabase, DataStore, migrateDatabase, type UserRecord } from '@athanor/data';
+import { generateDataKey, sha256, wrapDataKey } from '@garden/core';
+import { createDatabase, DataStore, migrateDatabase, type UserRecord } from '@garden/data';
 import { createIdempotentOperation } from '../http/idempotency.js';
 import type { RouteContext } from '../http/server-context.js';
 import { registerDraftRoutes } from './drafts.js';
@@ -145,7 +145,7 @@ describe('revisioned encrypted drafts', () => {
       app.inject({
         method: 'GET',
         url: '/v1/drafts/device-key',
-        headers: value ? { cookie: `athanor_session=${value}` } : {}
+        headers: value ? { cookie: `garden_session=${value}` } : {}
       });
     expect((await keyFor()).statusCode).toBe(401);
     const first = await keyFor(token),

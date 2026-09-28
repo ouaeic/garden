@@ -28,13 +28,13 @@ The arm ladder and its interpretation are described below.
 
 ### The failure it exists to prevent
 
-athanor's loop reaches its workspace through one client, constructed once from one global
+garden's loop reaches its workspace through one client, constructed once from one global
 `WORKSPACE_RUNNER_URL` (`apps/worker/src/agent.ts:291`). Point that URL at a shim over a benchmark
 container and the whole loop - catalogue, approval floor, compaction, tools - runs against the task
 with no change to `apps/` or `packages/`. That seam is not new; `evals/harness.ts` already
 intercepts it for all 73 fixtures.
 
-The trap in that design is that **a shim missing a route athanor needs does not throw.** Three
+The trap in that design is that **a shim missing a route garden needs does not throw.** Three
 production sites swallow the miss deliberately:
 
 | site                                                 | what it does                     | what it costs a benchmark row                                                        |
@@ -133,7 +133,7 @@ is the guard, and `selftest.ts` proves it by driving an unimplemented route and 
 
 ## 2. The shim
 
-`shim.ts` speaks athanor's runner protocol; `backend.ts` turns it into commands in a box.
+`shim.ts` speaks garden's runner protocol; `backend.ts` turns it into commands in a box.
 
 **Two backends behind one three-method interface** (`ensure`, `exec`, `dispose`):
 
@@ -152,11 +152,11 @@ is the guard, and `selftest.ts` proves it by driving an unimplemented route and 
 production class `apps/worker/src/agent.ts:291` builds and every tool call goes through - points it
 at the shim's listening port and calls its real methods. `selftest.ts`'s route table sends requests
 _this rig composed_ to answers _this rig parses_; if the shim's answers were shaped for the rig
-rather than for athanor, every check in that table would still pass. That is the
+rather than for garden, every check in that table would still pass. That is the
 computed-and-unwired shape, and it is the one this programme keeps finding.
 
 It earned its place on the first run: it was written expecting a five-line file to report five
-lines, and athanor's client said six. `services/workspace-runner/src/files.ts:376` counts
+lines, and garden's client said six. `services/workspace-runner/src/files.ts:376` counts
 `1 + newlines`, so a file ending in a newline has an empty last line. `file_read` prints that
 number to the model and `file_patch` addresses lines by it. A route table could not have found
 that, because the rig would have been agreeing with itself.
@@ -192,7 +192,7 @@ none` would print "egress gated" on the strength of nothing.
 
 ## 2.5 The join, whole: `--score`
 
-Everything above this line was proved in isolation. `wiring.ts` drove athanor's own client over the
+Everything above this line was proved in isolation. `wiring.ts` drove garden's own client over the
 socket, which is the wire; **no `AgentWorker` had ever run against this shim**, so the loop, the
 tool dispatch, the approval floor, the acceptance hold and the score were each argued for and never
 joined. That is the computed-and-unwired shape this programme has now shipped three times.
@@ -289,14 +289,14 @@ diffing the output. Identical. `pnpm eval:gate --filter files-helper-script-then
 
 ---
 
-## 3. The counter-argument, and what athanor should report
+## 3. The counter-argument, and what garden should report
 
-**The case against benchmarking athanor at all.** Every design commitment it has is a cost on a
-leaderboard, and the costs are athanor's own and measurable:
+**The case against benchmarking garden at all.** Every design commitment it has is a cost on a
+leaderboard, and the costs are garden's own and measurable:
 
 - **The catalogue.** 36,926 bytes on every request of every turn on a benchmark box, measured
   below. A scaffold built only to solve coding tasks sends a fraction of that.
-- **The approval floor.** athanor stops for what the computer cannot take back even in
+- **The approval floor.** garden stops for what the computer cannot take back even in
   `autonomous` (`apps/worker/src/approval-policy.ts:692`), and a card that fires with nobody at
   the keyboard parks the task in `awaiting_user`, which scores 0.
 - **Compaction and the sandbox.** Both cost tokens and steps that a benchmark rewards nobody for.
@@ -309,7 +309,7 @@ is an unsupervised number**, and that the highest published scores came from a c
 no sandbox, no approval and no compaction. That configuration is a model under near-ideal harness
 conditions. It is not a product anyone installs.
 
-So: does athanor benchmark the product, or a stripped configuration that is not the product?
+So: does garden benchmark the product, or a stripped configuration that is not the product?
 
 **Both, and the resolution is to refuse to publish one number.** `parity.csv` carries an `arm`
 column and the run refuses to emit a row whose arm is unset:
@@ -321,7 +321,7 @@ column and the run refuses to emit a row whose arm is unset:
   field already is**, and the only arm comparable to a leaderboard.
 
 **The gap between `shipped` and `unattended` is the price of the approval floor in benchmark points,
-and nobody in this field publishes it.** That number is more interesting than athanor's rank.
+and nobody in this field publishes it.** That number is more interesting than garden's rank.
 Publishing `unattended` alone would be dishonest; publishing `shipped` alone would be a number
 nobody can compare to anything. A row with `approvals_auto_answered > 0` under any arm but
 `unattended` is refused as fabricated.
@@ -366,14 +366,14 @@ catalogue that moves more than a description's worth fails this rig rather than 
 stale. The four figures above are what `pnpm eval:bench` printed on 2026-09-03; the row a paid run
 declares is measured again by that run, never copied from here.
 
-So athanor already withdraws about **18 kB, roughly a third of the catalogue**, before a benchmark
+So garden already withdraws about **18 kB, roughly a third of the catalogue**, before a benchmark
 run starts - and it does it without being asked, because connectors and surfaces are gated per box.
 The honest residual charge is **36,926 bytes, about 9,200 tokens per call, of non-withdrawable core
 tooling**, which a purpose-built coding scaffold does not carry. Still a real charge. It does not
 need the overstatement, and the arm ladder does not need a fourth `lean` rung - see the comment on
 `Arm` in `parity.ts` for why that rung would have measured nothing.
 
-**What athanor should report: all three arms, with the knobs as columns.** An instrument that hides
+**What garden should report: all three arms, with the knobs as columns.** An instrument that hides
 its own configuration is the thing the research criticises the whole field for, and the columns
 `security_mode`, `task_max_steps`, `self_continuations`, `max_compute_credits`, `surfaces_*`,
 `catalogue_bytes`, `isolates_network`, `verifier_env` and `declared_drops` exist so that a reader
@@ -416,7 +416,7 @@ Nothing above costs anything. Here is what does, as it is actually run.
 
 ```
 # on administrator@85.190.100.211
-cd /home/administrator/tb/athanor && \
+cd /home/administrator/tb/garden && \
 NODE_OPTIONS=--conditions=development OPENROUTER_API_KEY=... ./node_modules/.bin/tsx evals/bench/run.ts \
     --terminal-bench --root /home/administrator/tb/terminal-bench/original-tasks \
     --model openrouter/z-ai/glm-5.3-flash \
@@ -443,7 +443,7 @@ every arm is the closing handoff a turn at its ceiling makes.
 
 ### The first reading, and what it cost
 
-Terminal-Bench, 20 stratified tasks, GLM 5.3 Flash, arm `shipped`, athanor `fbd5888`:
+Terminal-Bench, 20 stratified tasks, GLM 5.3 Flash, arm `shipped`, garden `fbd5888`:
 
 |                          |                                                                                              |
 | ------------------------ | -------------------------------------------------------------------------------------------- |
@@ -511,7 +511,7 @@ pnpm eval:bench --assemble --results DIR --arm A --runs 3 --tasks <the 20 ids> -
 `results.ts` reads every record under `DIR/A/run-0..2`, puts a task with no record into its run at
 `resolved: null` so `scoreOf` scores it 0 against the declared denominator **and prints which**,
 refuses records from two boxes, two builds or two models (one box, one build, one model per row -
-a single `backend`, `athanor_commit` and `model` column cannot be true of a mixture), recomputes the
+a single `backend`, `garden_commit` and `model` column cannot be true of a mixture), recomputes the
 task-set digest from `--root` and refuses if the tasks on disk are not the tasks that were run, and
 then hands the same `RowInput` the offline path builds to the same `rowFrom` with the same refusals.
 The row is **upserted** into `parity.csv` by its key; the ladder's three rows sit in one file.
@@ -582,11 +582,11 @@ disjoint (arm, run-index) pairs on the 16-vCPU box, 3 runs per arm. The rows are
 and were assembled from the records with `--assemble`; `score_std` is the sample standard
 deviation over the three runs.
 
-| arm          | n_runs | score_mean | score_std | cost_usd_mean | steps_mean | steps_p95 | wall_s_mean | cards_fired_mean | auto_answered | task_max_steps | athanor_commit |
-| ------------ | ------ | ---------- | --------- | ------------- | ---------- | --------- | ----------- | ---------------- | ------------- | -------------- | -------------- |
-| `shipped`    | 3      | **0.200**  | 0.050     | 0.356         | 15.7       | 51        | 280         | 0.68             | 0             | 50             | 9f842f1        |
-| `autonomous` | 3      | **0.317**  | 0.058     | 0.506         | 20.2       | 51        | 425         | 0.55             | 0             | 50             | bbc3a3e        |
-| `unattended` | 3      | **0.467**  | 0.076     | 0.742         | 32.2       | 51        | 694         | 2.58             | 154           | 50             | bbc3a3e        |
+| arm          | n_runs | score_mean | score_std | cost_usd_mean | steps_mean | steps_p95 | wall_s_mean | cards_fired_mean | auto_answered | task_max_steps | garden_commit |
+| ------------ | ------ | ---------- | --------- | ------------- | ---------- | --------- | ----------- | ---------------- | ------------- | -------------- | ------------- |
+| `shipped`    | 3      | **0.200**  | 0.050     | 0.356         | 15.7       | 51        | 280         | 0.68             | 0             | 50             | 9f842f1       |
+| `autonomous` | 3      | **0.317**  | 0.058     | 0.506         | 20.2       | 51        | 425         | 0.55             | 0             | 50             | bbc3a3e       |
+| `unattended` | 3      | **0.467**  | 0.076     | 0.742         | 32.2       | 51        | 694         | 2.58             | 154           | 50             | bbc3a3e       |
 
 **The gap between the first and the last row - 0.27 of a point - is the price of the approval
 floor in benchmark points.** It is the number this instrument exists to publish, and the third row
@@ -620,7 +620,7 @@ Do not start at SWE-bench Verified: 500 instances at 3 runs is a different order
 
 ## Why this is not a gate
 
-`pnpm eval:bench` exits non-zero on a self-test failure, on a route athanor asks for that the shim
+`pnpm eval:bench` exits non-zero on a self-test failure, on a route garden asks for that the shim
 does not implement, or on the end-to-end task failing its verifier; `--score` exits non-zero when a
 task does not resolve or when `rowFrom` refuses the row. So it is usable in CI on its own schedule.
 

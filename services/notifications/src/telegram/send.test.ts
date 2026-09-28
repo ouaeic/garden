@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { PendingDestinationRow } from '@athanor/data';
+import type { PendingDestinationRow } from '@garden/data';
 import type { NotificationSubject } from '../model.js';
 import { TransportError } from '../transport.js';
 import { createTelegramTransport, newNonce } from './send.js';
@@ -15,7 +15,7 @@ const row = (overrides: Partial<PendingDestinationRow> = {}): PendingDestination
   updatedAt: '2026-07-01T00:00:00.000Z',
   senderId: '4242',
   redact: true,
-  config: { botToken: token, botUsername: 'athanor_bot' },
+  config: { botToken: token, botUsername: 'garden_bot' },
   kind: 'approval_required',
   resourceId: approvalId,
   taskId: 'task-1',

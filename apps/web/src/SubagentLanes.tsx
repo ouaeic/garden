@@ -1,4 +1,4 @@
-import type { SubagentLane, TaskEvent } from '@athanor/contracts';
+import type { SubagentLane, TaskEvent } from '@garden/contracts';
 import { data } from './model';
 
 /**

@@ -5,7 +5,7 @@ import {
   ProjectPurgeSelection,
   type ProjectPurgePreview,
   type ProjectPurgeResult
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { ProjectHistoryMetadata, HistoryDigest } from './project-history-metadata.js';
 import { contentRemovalFile } from './project-content-state.js';
 import {

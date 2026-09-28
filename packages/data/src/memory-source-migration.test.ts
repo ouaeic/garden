@@ -7,7 +7,7 @@ import {
   memoryIndexKey,
   memoryOriginKey,
   sha256
-} from '@athanor/core';
+} from '@garden/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createDatabase, migrateDatabase, type Database } from './database.js';
 import { migrations } from './migrations.js';

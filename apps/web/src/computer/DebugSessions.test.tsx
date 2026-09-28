@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import type { DebugSession } from '@athanor/contracts';
+import type { DebugSession } from '@garden/contracts';
 import { DebugSessionCard } from './DebugSessions';
 const session: DebugSession = {
   sessionId: 'debug-test',

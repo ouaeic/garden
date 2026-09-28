@@ -1,5 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import type { WorkspacePreviewRecord } from '@athanor/data';
+import type { WorkspacePreviewRecord } from '@garden/data';
 
 const GRANT_SECONDS = 7 * 24 * 60 * 60;
 type PreviewScope = Pick<WorkspacePreviewRecord, 'id' | 'workspaceId' | 'accessTokenHash'>;

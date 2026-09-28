@@ -6,8 +6,8 @@ import helmet from '@fastify/helmet';
 import websocket from '@fastify/websocket';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import WebSocket from 'ws';
-import { reservedPreviewPorts, sha256 } from '@athanor/core';
-import type { DataStore, WorkspacePreviewRecord } from '@athanor/data';
+import { reservedPreviewPorts, sha256 } from '@garden/core';
+import type { DataStore, WorkspacePreviewRecord } from '@garden/data';
 import type { ApiConfig } from './config.js';
 import type { RunnerClient } from './runner-client.js';
 import { HOST_SESSION_COOKIE, SESSION_COOKIE } from './session.js';
@@ -24,25 +24,25 @@ import {
  *
  * The `__Host-` prefix requires `Path=/` exactly, and the browser rejects any cookie carrying it
  * that says otherwise - silently, as a malformed cookie rather than as an error. This one is set
- * with `Path=/__athanor/preview/<slug>/` on purpose, so no browser ever stored it: the gateway
+ * with `Path=/__garden/preview/<slug>/` on purpose, so no browser ever stored it: the gateway
  * answered the tokenised link with a 303 and a Set-Cookie, the redirect came back with nothing
- * attached, and the owner was told to "open this preview from your authenticated athanor
- * workspace" - which is what they had just done. Every private preview athanor has ever published
+ * attached, and the owner was told to "open this preview from your authenticated garden
+ * workspace" - which is what they had just done. Every private preview garden has ever published
  * was unopenable, including the link at the end of "build me something and give me a link".
  *
  * `__Secure-` carries the half of the guarantee that applies here - it may only be set over HTTPS -
  * and leaves the path alone, which is what keeps one preview's token off another preview's
  * requests.
  */
-const productionAccessCookie = '__Secure-athanor-preview-access';
+const productionAccessCookie = '__Secure-garden-preview-access';
 /** Its predecessor, still read so a preview opened before this fix keeps working. */
-const legacyProductionAccessCookie = '__Host-athanor-preview-access';
-const developmentAccessCookie = 'athanor-preview-access';
+const legacyProductionAccessCookie = '__Host-garden-preview-access';
+const developmentAccessCookie = 'garden-preview-access';
 /**
  * Cookies are not port-scoped. A separate preview origin on this hostname still receives the
  * owner's cookies, so generated applications must not receive or replace control-plane credentials.
  */
-const athanorCookieNames = new Set(
+const gardenCookieNames = new Set(
   [
     SESSION_COOKIE,
     HOST_SESSION_COOKIE,
@@ -89,7 +89,7 @@ const previewHeaders = (request: FastifyRequest): Record<string, string> => {
     const cookies = headers.cookie
       .split(';')
       .map((value) => value.trim())
-      .filter((value) => value && !athanorCookieNames.has(cookieName(value)));
+      .filter((value) => value && !gardenCookieNames.has(cookieName(value)));
     if (cookies.length) headers.cookie = cookies.join('; ');
     else delete headers.cookie;
   }
@@ -106,10 +106,10 @@ const websocketProtocols = (request: FastifyRequest): string[] =>
   request.headers['sec-websocket-protocol']
     ?.split(',')
     .map((value) => value.trim())
-    .filter((value) => value && value !== 'athanor-capability') ?? [];
+    .filter((value) => value && value !== 'garden-capability') ?? [];
 
 const cleanSetCookie = (value: string): string | null => {
-  if (athanorCookieNames.has(cookieName(value.split(';', 1)[0] ?? ''))) return null;
+  if (gardenCookieNames.has(cookieName(value.split(';', 1)[0] ?? ''))) return null;
   return value.replace(/;\s*domain=[^;]*/gi, '').replace(/;\s*samesite=none/gi, '; SameSite=Lax');
 };
 
@@ -276,7 +276,7 @@ export const buildPreviewGateway = async (
         .status(401)
         .type('text/html; charset=utf-8')
         .send(
-          '<!doctype html><title>Private preview</title><h1>Private preview</h1><p>Open this preview from your authenticated athanor workspace.</p>'
+          '<!doctype html><title>Private preview</title><h1>Private preview</h1><p>Open this preview from your authenticated garden workspace.</p>'
         );
     const incoming = new URL(request.raw.url ?? '/', 'http://preview.invalid');
     const queryToken = incoming.searchParams.get('access');

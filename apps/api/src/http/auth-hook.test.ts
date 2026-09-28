@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import cookie from '@fastify/cookie';
-import { AthanorError, sha256 } from '@athanor/core';
-import { createDatabase, DataStore, migrateDatabase, type Database } from '@athanor/data';
+import { GardenError, sha256 } from '@garden/core';
+import { createDatabase, DataStore, migrateDatabase, type Database } from '@garden/data';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, test } from 'vitest';
 import type { ApiConfig } from '../config.js';
@@ -71,7 +71,7 @@ const buildHarness = async (): Promise<Harness> => {
     checkShareRate: (key: string) => {
       shareThrottled.push(key);
     },
-    config: { PUBLIC_APP_URL: 'https://athanor.test' } as ApiConfig
+    config: { PUBLIC_APP_URL: 'https://garden.test' } as ApiConfig
   } as unknown as ServerBase;
 
   registerErrorHandler(context);
@@ -101,7 +101,7 @@ const buildHarness = async (): Promise<Harness> => {
       handlerRuns += 1;
       const workspace = await store.getWorkspace(request.user!.id, request.params.workspaceId);
       // The exact two lines every workspace-scoped route in `routes/` opens with.
-      if (!workspace) throw new AthanorError('workspace_not_found', 'Workspace not found');
+      if (!workspace) throw new GardenError('workspace_not_found', 'Workspace not found');
       return { name: workspace.name };
     }
   );
@@ -138,7 +138,7 @@ const buildHarness = async (): Promise<Harness> => {
   }
   /** A route that fails the way a handler built from an upstream answer might: with a link in it. */
   app.get('/v1/probe/leaky-error', async () => {
-    throw new AthanorError(
+    throw new GardenError(
       'upstream_refused',
       'could not fetch https://box.example/v1/shares/AbCdEfGhIjKlMnOpQrStUv#1.' + 'k'.repeat(43),
       502
@@ -203,7 +203,7 @@ const buildHarness = async (): Promise<Harness> => {
         'Test',
         true
       );
-      return `athanor_session=${token}`;
+      return `garden_session=${token}`;
     }
   };
 };
@@ -333,7 +333,7 @@ describe('workspace pre-handler', () => {
       const response = await harness.app.inject({
         method: 'POST',
         url: `/v1/workspaces/${owner.workspaceId}/${kind}/session/control`,
-        headers: { cookie, origin: 'https://athanor.test' },
+        headers: { cookie, origin: 'https://garden.test' },
         payload: { action: 'stop' }
       });
       expect(response.statusCode).toBe(200);
@@ -516,7 +516,7 @@ describe('the share viewer, which is public in a stronger sense', () => {
 });
 
 describe('what an error carries onto the wire', () => {
-  /** A share link inside an AthanorError message is both halves of a secret; the net takes it whole. */
+  /** A share link inside an GardenError message is both halves of a secret; the net takes it whole. */
   test('redacts a share link out of an error message', async () => {
     const harness = await buildHarness();
     const owner = await seedOwnerWorkspace(harness.store, 'owner');

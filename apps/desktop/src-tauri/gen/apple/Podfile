@@ -1,13 +1,13 @@
 # Uncomment the next line to define a global platform for your project
 
-target 'athanor-desktop_iOS' do
+target 'garden-desktop_iOS' do
 platform :ios, '15.0'
-  # Pods for athanor-desktop_iOS
+  # Pods for garden-desktop_iOS
 end
 
-target 'athanor-desktop_macOS' do
+target 'garden-desktop_macOS' do
 platform :osx, '11.0'
-  # Pods for athanor-desktop_macOS
+  # Pods for garden-desktop_macOS
 end
 
 # Delete the deployment target for iOS and macOS, causing it to be inherited from the Podfile

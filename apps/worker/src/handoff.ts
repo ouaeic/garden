@@ -1,12 +1,12 @@
-import { runtimeNow, runtimeUUID } from '@athanor/core';
+import { runtimeNow, runtimeUUID } from '@garden/core';
 
 import { turnEvidenceCount } from './progress.js';
 import { taskReasoningEffort } from './reasoning.js';
-import type { ModelRelease, WebToolPlan } from '@athanor/contracts';
-import { sha256 } from '@athanor/core';
-import type { DataStore, TaskRecord } from '@athanor/data';
-import type { ModelGateway, ModelTool, ModelToolCall } from '@athanor/model-gateway';
-import { interruptedResponseOf } from '@athanor/model-gateway';
+import type { ModelRelease, WebToolPlan } from '@garden/contracts';
+import { sha256 } from '@garden/core';
+import type { DataStore, TaskRecord } from '@garden/data';
+import type { ModelGateway, ModelTool, ModelToolCall } from '@garden/model-gateway';
+import { interruptedResponseOf } from '@garden/model-gateway';
 import {
   mayRenewStepBudget,
   stepBudgetRenewedNote,
@@ -428,7 +428,7 @@ Nothing you produced was rolled back and none of it is lost. This same task cont
    * Free by the time it is reached: the anchor was resolved for this task record by the preamble
    * and again by the first step, and the answer is memoised on the record itself.
    */
-  const sessionId = sha256(`athanor-task:${await turnRoutingTaskId(deps, task, key)}`).slice(0, 64);
+  const sessionId = sha256(`garden-task:${await turnRoutingTaskId(deps, task, key)}`).slice(0, 64);
   const interruptedFailure: { error?: Error } = {};
   const response = await deps
     .withLeaseRenewal(task, () =>

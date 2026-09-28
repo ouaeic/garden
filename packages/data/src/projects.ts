@@ -1,16 +1,16 @@
 import { randomUUID } from 'node:crypto';
-import { AthanorError, decryptJson, encryptJson, unwrapDataKey } from '@athanor/core';
+import { GardenError, decryptJson, encryptJson, unwrapDataKey } from '@garden/core';
 import type {
   Project,
   UpdateProjectRequest,
   ProjectNote,
   CreateProjectNoteRequest
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import type { Database } from './database.js';
 import { encryptedText, iso, json, mapTask, mapTaskEvent } from './store/rows.js';
-import type { EncryptedEnvelope } from '@athanor/core';
+import type { EncryptedEnvelope } from '@garden/core';
 import { TASK_LIVE_COUNTS } from './store/sql/tasks.js';
-import { PENDING_MEDIA_DELIVERY } from '@athanor/contracts';
+import { PENDING_MEDIA_DELIVERY } from '@garden/contracts';
 import { taskDeliveryCountsSql } from './task-delivery.js';
 
 const counts = `
@@ -157,7 +157,7 @@ export class ProjectStore {
     masterKey: Uint8Array
   ) {
     const project = await this.getProject(userId, projectId);
-    if (!project) throw new AthanorError('project_not_found', 'Project not found', 404);
+    if (!project) throw new GardenError('project_not_found', 'Project not found', 404);
     const key = unwrapDataKey(project.wrappedKey, masterKey, project.workspaceId);
     const result = await this.database.query(
       `UPDATE projects SET title=COALESCE($4,title),brief_ciphertext=COALESCE($5::jsonb,brief_ciphertext),
@@ -180,7 +180,7 @@ export class ProjectStore {
       ]
     );
     if (!result.rows.length)
-      throw new AthanorError(
+      throw new GardenError(
         'project_changed',
         'This project changed elsewhere. Reload before saving.',
         409
@@ -193,7 +193,7 @@ export class ProjectStore {
       `SELECT p.workspace_id,k.wrapped_key FROM projects p JOIN workspace_keys k ON k.workspace_id=p.workspace_id WHERE p.id=$1 AND p.user_id=$2`,
       [projectId, userId]
     );
-    if (!result.rows.length) throw new AthanorError('project_not_found', 'Project not found', 404);
+    if (!result.rows.length) throw new GardenError('project_not_found', 'Project not found', 404);
     return unwrapDataKey(
       String(result.rows[0]!.wrapped_key),
       masterKey,
@@ -255,7 +255,7 @@ export class ProjectStore {
           [input.source.taskId, projectId, userId]
         );
         if (!source.rows.length)
-          throw new AthanorError(
+          throw new GardenError(
             'project_source_unavailable',
             'Choose a source in this project',
             404
@@ -269,7 +269,7 @@ export class ProjectStore {
             ])
           ).rows.length
         )
-          throw new AthanorError(
+          throw new GardenError(
             'project_source_unavailable',
             'The selected message is unavailable',
             404
@@ -282,7 +282,7 @@ export class ProjectStore {
           [input.replacesId, projectId, userId]
         );
         if (!prior.rows.length)
-          throw new AthanorError(
+          throw new GardenError(
             'project_note_changed',
             'This note was already corrected. Reload before adding a correction.',
             409

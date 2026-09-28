@@ -1,11 +1,11 @@
-import type { TaskEvent, TaskResult } from '@athanor/contracts';
+import type { TaskEvent, TaskResult } from '@garden/contracts';
 import { describe, expect, it } from 'vitest';
 import { resultSnapshot } from './result-snapshot';
 const result: TaskResult = {
   id: 'preview',
   kind: 'preview',
   title: 'Game',
-  url: 'https://garden.test/__athanor/preview/owned/index.html',
+  url: 'https://garden.test/__garden/preview/owned/index.html',
   status: 'ready',
   accessPath: '/v1/previews/owned/access',
   downloadUrl: null,
@@ -34,7 +34,7 @@ describe('result snapshots', () => {
     expect(resultSnapshot(result, [{ ...snapshot, taskId: 'other' }], 'task')).toBeNull();
     for (const changes of [
       { url: 'https://untrusted.test/index.html' },
-      { url: 'https://garden.test/__athanor/preview/other/index.html' },
+      { url: 'https://garden.test/__garden/preview/other/index.html' },
       { holder: 'secure_input' },
       { screenshotBase64: 'PHN2Zz4=' }
     ]) {

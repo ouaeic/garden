@@ -2,21 +2,21 @@ import {
   OwnerPreferences,
   TASK_TITLE_MAX_LENGTH,
   type PurposeModelChoice
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import {
-  AthanorError,
+  GardenError,
   buildConversationNameIndex,
   decryptJson,
   encryptJson,
   memoryIndexKey,
   unwrapDataKey
-} from '@athanor/core';
+} from '@garden/core';
 import {
   readTaskModelPreferences,
   resolvePurposeChoice,
   type DataStore,
   type TaskRecord
-} from '@athanor/data';
+} from '@garden/data';
 import { errorFields, type Logger } from './log.js';
 import { TITLE_MAX_COST_USD } from './title-route.js';
 
@@ -213,7 +213,7 @@ const titleOneTask = async (
         admission.costUsd < 0 ||
         admission.costUsd > TITLE_MAX_COST_USD
       )
-        throw new AthanorError(
+        throw new GardenError(
           'title_cost_invalid',
           'Title generation exceeds its spending limit',
           409
@@ -328,11 +328,11 @@ export const titleTasksOnce = async (
       // cooldown and say so once, rather than charging this conversation an attempt it did not get
       // and asking the same refusing provider again for the next one.
       if (
-        error instanceof AthanorError &&
+        error instanceof GardenError &&
         ['media_submission_exists', 'spend_cap_reached'].includes(error.code)
       )
         continue;
-      if (error instanceof AthanorError && PROVIDER_WALL_CODES.has(error.code)) {
+      if (error instanceof GardenError && PROVIDER_WALL_CODES.has(error.code)) {
         state.providerReadyAt = now + PROVIDER_COOLDOWN_MS;
         deps.log.warn('task.title_provider_unavailable', { code: error.code });
         return named;

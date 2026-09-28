@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { DebuggerRequest } from '@athanor/contracts';
+import { DebuggerRequest } from '@garden/contracts';
 import { requireScope } from './auth.js';
 import type { DebuggerManager } from './debugger.js';
 

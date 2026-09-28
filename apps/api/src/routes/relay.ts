@@ -5,8 +5,8 @@
  * turning it on means rather than presenting it as a feature to enable.
  */
 
-import { AthanorError, redactText } from '@athanor/core';
-import { buildIdentity } from '@athanor/worker';
+import { GardenError, redactText } from '@garden/core';
+import { buildIdentity } from '@garden/worker';
 import { z } from 'zod';
 import { isAddressLiteral, readBackupStatus, readStateFailure, timerState } from '../context.js';
 import { requireUser } from '../http/auth-hook.js';
@@ -34,17 +34,17 @@ export const registerRelayRoutes = (context: RouteContext): void => {
    * every device refused at once and the only way to find out why was a shell.
    *
    * Read-only, and deliberately thin: it reports what the box already wrote down rather than
-   * running probes of its own. `athanor doctor` remains the fuller account for somebody who is
+   * running probes of its own. `garden doctor` remains the fuller account for somebody who is
    * already at a terminal.
    */
   app.get('/v1/instance/diagnostics', async (request) => {
     requireUser(request.user);
     const [certificate, dynamicDns, backup, autoUpdate, backupTimer] = await Promise.all([
-      readStateFailure(config.ATHANOR_STATE_PATH, 'certificate.error'),
-      readStateFailure(config.ATHANOR_STATE_PATH, 'ddns.error'),
-      readBackupStatus(config.ATHANOR_STATE_PATH),
-      timerState('athanor-auto-update.timer'),
-      timerState('athanor-backup.timer')
+      readStateFailure(config.GARDEN_STATE_PATH, 'certificate.error'),
+      readStateFailure(config.GARDEN_STATE_PATH, 'ddns.error'),
+      readBackupStatus(config.GARDEN_STATE_PATH),
+      timerState('garden-auto-update.timer'),
+      timerState('garden-backup.timer')
     ]);
     // Which build is answering. It belongs on this route rather than on one of its own because it
     // is the same kind of fact as the three above - something the box knows about itself that an
@@ -105,7 +105,7 @@ export const registerRelayRoutes = (context: RouteContext): void => {
       } catch (error) {
         // The relay wrote this text, so it is bounded before it is shown; it is the only place an
         // owner learns that a token was already used or has expired.
-        throw new AthanorError(
+        throw new GardenError(
           'relay_enrollment_failed',
           error instanceof Error
             ? redactText(error.message).slice(0, 200)
@@ -121,7 +121,7 @@ export const registerRelayRoutes = (context: RouteContext): void => {
     await requireRecentStepUp(request, user);
     const input = z.object({ enabled: z.boolean() }).parse(request.body ?? {});
     if (input.enabled && !relay.settings.label) {
-      throw new AthanorError('relay_not_enrolled', 'Enroll with a relay before turning it on', 422);
+      throw new GardenError('relay_not_enrolled', 'Enroll with a relay before turning it on', 422);
     }
     const report = input.enabled ? await relay.enable() : await relay.disable();
     await recordSecurityEvent(store, {

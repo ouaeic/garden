@@ -12,7 +12,7 @@ async function worker() {
   const openWindow = vi.fn().mockResolvedValue(undefined);
   const matchAll = vi.fn().mockResolvedValue([]);
   const surface = {
-    location: { origin: 'https://athanor.example' },
+    location: { origin: 'https://garden.example' },
     addEventListener: (name: string, callback: (event: unknown) => void) =>
       handlers.set(name, callback),
     registration: { showNotification },
@@ -41,7 +41,7 @@ describe('service worker boundaries', () => {
   it('routes a notification within an existing app without reloading its terminal', async () => {
     const { matchAll, send, openWindow } = await worker();
     const existing = {
-      url: 'https://athanor.example/?view=computer',
+      url: 'https://garden.example/?view=computer',
       postMessage: vi.fn(),
       focus: vi.fn().mockResolvedValue(undefined),
       navigate: vi.fn()
@@ -63,7 +63,7 @@ describe('service worker boundaries', () => {
     const { matchAll, send, openWindow } = await worker();
     const postMessage = vi.fn();
     matchAll.mockResolvedValue([
-      { url: 'https://athanor.example/v1/shares/example', postMessage },
+      { url: 'https://garden.example/v1/shares/example', postMessage },
       { url: 'https://elsewhere.example/', postMessage }
     ]);
     await send('notificationclick', {
@@ -78,14 +78,14 @@ describe('service worker boundaries', () => {
     const paths = [
       '/v1/tasks',
       '/v1/shares/assets/share.js',
-      '/__athanor/preview/example',
-      '/__athanor/client/bootstrap'
+      '/__garden/preview/example',
+      '/__garden/client/bootstrap'
     ];
     expect(paths.length).toBeGreaterThan(0);
     for (const path of paths) {
       const respondWith = vi.fn();
       handlers.get('fetch')!({
-        request: { method: 'GET', url: `https://athanor.example${path}`, mode: 'navigate' },
+        request: { method: 'GET', url: `https://garden.example${path}`, mode: 'navigate' },
         respondWith
       });
       expect(respondWith, path).not.toHaveBeenCalled();

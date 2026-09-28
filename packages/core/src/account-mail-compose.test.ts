@@ -5,7 +5,7 @@ import { executeAccountConnector } from './account-connectors.js';
 import { composeAccountMail, MailCheckpoint } from './account-mail-compose.js';
 import type { AccountOperation } from './account-operation.js';
 import type { ConnectorTransport } from './connector-transport.js';
-import type { ConnectorScope } from '@athanor/contracts';
+import type { ConnectorScope } from '@garden/contracts';
 
 const response = (body: unknown, status = 200) => ({
   status,

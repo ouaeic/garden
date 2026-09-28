@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { WebCitation } from '@athanor/contracts';
-import type { AthanorError } from '@athanor/core';
+import type { WebCitation } from '@garden/contracts';
+import type { GardenError } from '@garden/core';
 import {
   providerSearchMessages,
   providerSearchResults,
@@ -154,9 +154,9 @@ describe('a web search answered by the provider', () => {
       engine: 'provider:search',
       ask
     }).catch((error: unknown) => error);
-    expect((failure as AthanorError).code).toBe('web_search_not_run');
-    expect((failure as AthanorError).message).toContain('not evidence that nothing exists');
-    expect((failure as AthanorError).message).toContain('browser_action');
+    expect((failure as GardenError).code).toBe('web_search_not_run');
+    expect((failure as GardenError).message).toContain('not evidence that nothing exists');
+    expect((failure as GardenError).message).toContain('browser_action');
   });
 
   it('says a search that ran and cited nothing failed to find, not that there is nothing', async () => {
@@ -181,7 +181,7 @@ describe('a web search answered by the provider', () => {
       engine: 'provider:search',
       ask
     }).catch((error: unknown) => error);
-    expect((failure as AthanorError).code).toBe('web_search_invalid');
+    expect((failure as GardenError).code).toBe('web_search_invalid');
     expect(ask).not.toHaveBeenCalled();
   });
 });

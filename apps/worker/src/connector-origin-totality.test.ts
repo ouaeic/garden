@@ -4,7 +4,7 @@ import {
   connectorContentOrigins,
   type AnyConnectorKind,
   type ConnectorAction
-} from '@athanor/core';
+} from '@garden/core';
 import { labelledConnectorResult, untrustedOriginOfResult } from './provenance.js';
 
 /**

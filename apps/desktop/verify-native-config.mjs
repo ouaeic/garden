@@ -45,12 +45,12 @@ const iosInfo = await readFile(new URL('./src-tauri/Info.ios.plist', import.meta
 const macosInfo = await readFile(new URL('./src-tauri/Info.plist', import.meta.url), 'utf8');
 const iosIconDirectory = new URL('./src-tauri/icons/ios/', import.meta.url);
 const generatedIosInfo = await readFile(
-  new URL('./src-tauri/gen/apple/athanor-desktop_iOS/Info.plist', import.meta.url),
+  new URL('./src-tauri/gen/apple/garden-desktop_iOS/Info.plist', import.meta.url),
   'utf8'
 );
 const generatedIosEntitlements = await readFile(
   new URL(
-    './src-tauri/gen/apple/athanor-desktop_iOS/athanor-desktop_iOS.entitlements',
+    './src-tauri/gen/apple/garden-desktop_iOS/garden-desktop_iOS.entitlements',
     import.meta.url
   ),
   'utf8'
@@ -60,7 +60,7 @@ const generatedIosProject = await readFile(
   'utf8'
 );
 const generatedIosPbxProject = await readFile(
-  new URL('./src-tauri/gen/apple/athanor-desktop.xcodeproj/project.pbxproj', import.meta.url),
+  new URL('./src-tauri/gen/apple/garden-desktop.xcodeproj/project.pbxproj', import.meta.url),
   'utf8'
 );
 export const iosBuildPhaseScript = generatedIosProject.match(/^\s*- script: (.+)$/m)?.[1];
@@ -146,7 +146,7 @@ const notificationPermissions = loopbackNotifications.permissions;
 const desktopNotificationPermissions = loopbackNotificationsDesktop.permissions;
 const nativePermissions = loopbackNative.permissions;
 /**
- * Every target athanor packages a client for, and the reason the two capability files are read as a
+ * Every target garden packages a client for, and the reason the two capability files are read as a
  * pair rather than one at a time: what has to hold is that no shipped platform is left out of
  * `notification:default` on the loopback origin, whichever file happens to carry it.
  */
@@ -166,11 +166,11 @@ const requiredIosPairing = [
   'CFBundleURLTypes',
   'CFBundleURLSchemes',
   '<string>garden</string>',
-  '<string>athanor</string>'
+  '<string>garden</string>'
 ];
 const requiredApplePrivacyAndLan = [
   'NSBonjourServices',
-  '<string>_athanor._tcp</string>',
+  '<string>_garden._tcp</string>',
   'NSCameraUsageDescription',
   'NSLocalNetworkUsageDescription',
   'NSMicrophoneUsageDescription',
@@ -188,10 +188,10 @@ if (
   configuredUrl !== undefined ||
   remoteCapability !== undefined ||
   config.app?.withGlobalTauri !== false ||
-  JSON.stringify(desktopSchemes) !== JSON.stringify(['garden', 'athanor']) ||
+  JSON.stringify(desktopSchemes) !== JSON.stringify(['garden']) ||
   !Array.isArray(mobileLinks) ||
   mobileLinks.length !== 1 ||
-  JSON.stringify(mobileLinks[0]?.scheme) !== JSON.stringify(['garden', 'athanor']) ||
+  JSON.stringify(mobileLinks[0]?.scheme) !== JSON.stringify(['garden']) ||
   mobileLinks[0]?.appLink !== false ||
   !Array.isArray(permissions) ||
   !permissions.includes('core:event:default') ||
@@ -245,9 +245,9 @@ if (
   !/<dict\/>\s*<\/plist>\s*$/.test(generatedIosEntitlements) ||
   generatedIosEntitlements.includes('<key>') ||
   !generatedIosProject.includes('deploymentTarget:\n    iOS: 15.0') ||
-  !generatedIosProject.includes('PRODUCT_BUNDLE_IDENTIFIER: org.athanor.ai') ||
+  !generatedIosProject.includes('PRODUCT_BUNDLE_IDENTIFIER: org.garden.ai') ||
   !generatedIosPbxProject.includes('IPHONEOS_DEPLOYMENT_TARGET = 15.0;') ||
-  (generatedIosPbxProject.match(/PRODUCT_BUNDLE_IDENTIFIER = org\.athanor\.ai;/g) ?? []).length !==
+  (generatedIosPbxProject.match(/PRODUCT_BUNDLE_IDENTIFIER = org\.garden\.ai;/g) ?? []).length !==
     2 ||
   generatedIosPbxProject.includes('DEVELOPMENT_TEAM =') ||
   iosIcons.length !== 18 ||

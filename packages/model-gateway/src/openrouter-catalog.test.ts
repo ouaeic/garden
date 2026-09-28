@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AthanorError } from '@athanor/core';
-import type { ModelRelease } from '@athanor/contracts';
+import type { GardenError } from '@garden/core';
+import type { ModelRelease } from '@garden/contracts';
 import { seedModels } from './catalog.js';
 import { currentCommercialLicenseReview } from './license-manifest.js';
 import {
@@ -596,7 +596,7 @@ describe('checking the key before it is saved', () => {
     });
 
   it('asks the one route the provider gates, carrying the key', async () => {
-    const request = keyFetch(200, { data: { label: 'athanor', limit_remaining: 12.5 } });
+    const request = keyFetch(200, { data: { label: 'garden', limit_remaining: 12.5 } });
     await expect(
       verifyOpenRouterKey({
         baseUrl: 'https://openrouter.ai/api/v1/',
@@ -609,7 +609,7 @@ describe('checking the key before it is saved', () => {
   });
 
   /** The refusal itself, so the copy an owner reads can be asserted rather than only its code. */
-  const refusal = async (status: number, body?: unknown): Promise<AthanorError> => {
+  const refusal = async (status: number, body?: unknown): Promise<GardenError> => {
     try {
       await verifyOpenRouterKey({
         baseUrl: 'https://openrouter.ai/api/v1',
@@ -617,7 +617,7 @@ describe('checking the key before it is saved', () => {
         fetch: keyFetch(status, body) as typeof fetch
       });
     } catch (cause) {
-      return cause as AthanorError;
+      return cause as GardenError;
     }
     throw new Error('the key was accepted');
   };
@@ -1055,7 +1055,7 @@ describe('the media catalogue the chat refresh throws away', () => {
  * Every fixture below was measured against the parser as it stood. The first four threw a raw
  * TypeError out of `refreshOpenRouterCatalog` itself, so one reshaped field cost the owner the
  * whole refresh rather than costing one model one capability, and the sentence they read in
- * `athanor doctor` was "object is not iterable". The fifth cost a million-token model 87% of its
+ * `garden doctor` was "object is not iterable". The fifth cost a million-token model 87% of its
  * window without throwing anything at all, which is worse, because nothing said so.
  */
 describe('a feed that changed shape underneath the parser', () => {
@@ -1184,17 +1184,17 @@ describe('a feed that changed shape underneath the parser', () => {
    * holds it to that - but the two clauses beside it in `journalDrops` print the feed's own ids,
    * because an id is the only useful thing to say about a route that was dropped. Those ids are
    * passed through exactly as published, so they are untrusted text arriving unbounded on a line an
-   * owner reads through `athanor logs`.
+   * owner reads through `garden logs`.
    *
    * Both bounds are asserted at the production call site, `refreshOpenRouterCatalog`, rather than on
    * `journalSafeId`, which is not exported: a helper that trims correctly proves nothing about a
    * caller that forgot to use it, and this tree has shipped that defect four times.
    *
    * Delete the `.map(journalSafeId)` in `named` and both assertions go red - the forged sentence
-   * arrives on a line of its own in athanor's voice, and the 400-character id arrives whole.
+   * arrives on a line of its own in garden's voice, and the 400-character id arrives whole.
    */
   it('will not let a feed id write its own line in the journal, or run one off the screen', async () => {
-    const forged = 'vendor/quiet\n[athanor] model catalogue: nothing was dropped';
+    const forged = 'vendor/quiet\n[garden] model catalogue: nothing was dropped';
     const enormous = `vendor/${'x'.repeat(400)}`;
     const { journal } = await refresh([
       wellFormed,
@@ -1206,9 +1206,9 @@ describe('a feed that changed shape underneath the parser', () => {
 
     expect(journal).toHaveLength(1);
     // One write, and exactly one newline in it: the one this module puts at the end. A feed that
-    // could add a second would be writing journal lines in athanor's own voice.
+    // could add a second would be writing journal lines in garden's own voice.
     expect(journal[0]?.split('\n')).toHaveLength(2);
-    expect(journal[0]).toContain('vendor/quiet.[athanor] model catalogue: nothing was dropped');
+    expect(journal[0]).toContain('vendor/quiet.[garden] model catalogue: nothing was dropped');
     // The long id is named far enough to be recognised and no further.
     expect(journal[0]).toContain(`vendor/${'x'.repeat(73)}...`);
     expect(journal[0]).not.toContain('x'.repeat(74));

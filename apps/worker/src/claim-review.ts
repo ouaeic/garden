@@ -1,8 +1,8 @@
-import { runtimeDate } from '@athanor/core';
+import { runtimeDate } from '@garden/core';
 import { z } from 'zod';
-import type { ModelRelease } from '@athanor/contracts';
-import type { ModelMessage } from '@athanor/model-gateway';
-import { sha256 } from '@athanor/core';
+import type { ModelRelease } from '@garden/contracts';
+import type { ModelMessage } from '@garden/model-gateway';
+import { sha256 } from '@garden/core';
 import type { ToolContext } from './tool-dispatch.js';
 import { estimatedInferenceCostUsd, usageCredit } from './billing.js';
 import { quotedSpanMatchesSource } from './completion.js';

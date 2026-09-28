@@ -9,7 +9,7 @@
  * predictable shape, and a scanner with hard limits cannot be talked into expanding an entity or
  * following a doctype.
  */
-import { AthanorError } from './errors.js';
+import { GardenError } from './errors.js';
 import type { ConnectorRequestResult, ConnectorTransport } from './connectors.js';
 
 export interface XmlNode {
@@ -44,7 +44,7 @@ const localName = (tag: string): string => {
 
 export const parseXml = (input: string): XmlNode => {
   if (input.length > MAX_XML_BYTES)
-    throw new AthanorError('caldav_response_too_large', 'The calendar server sent too much XML');
+    throw new GardenError('caldav_response_too_large', 'The calendar server sent too much XML');
   const root: XmlNode = { name: '#document', children: [], text: '' };
   const stack: XmlNode[] = [root];
   // Opens that were refused a place on the stack because the document is deeper than we will
@@ -91,7 +91,7 @@ export const parseXml = (input: string): XmlNode => {
     }
     nodes += 1;
     if (nodes > MAX_XML_NODES)
-      throw new AthanorError('caldav_response_too_large', 'The calendar server sent too much XML');
+      throw new GardenError('caldav_response_too_large', 'The calendar server sent too much XML');
     const node: XmlNode = { name: localName(tag), children: [], text: '' };
     stack[stack.length - 1]!.children.push(node);
     if (tag.endsWith('/')) continue;
@@ -136,15 +136,15 @@ export const resolveHref = (context: CalDavContext, href: string): URL => {
   try {
     url = new URL(href.trim(), context.baseUrl);
   } catch {
-    throw new AthanorError(
+    throw new GardenError(
       'caldav_href_invalid',
       'The calendar server returned an unusable address'
     );
   }
   if (url.origin !== context.baseUrl.origin)
-    throw new AthanorError(
+    throw new GardenError(
       'caldav_href_invalid',
-      'The calendar server pointed at a different host, which athanor will not follow'
+      'The calendar server pointed at a different host, which garden will not follow'
     );
   url.hash = '';
   return url;
@@ -175,19 +175,19 @@ const request = async (
     // If-Match and If-None-Match exist to produce exactly this answer, and until it had its own
     // code it was indistinguishable from the server being broken: "answered 412" told the owner
     // nothing about the one thing that is true and actionable - somebody else changed this event
-    // since athanor read it, so re-read and decide again. 409 and 423 are the same conversation.
+    // since garden read it, so re-read and decide again. 409 and 423 are the same conversation.
     if ([409, 412, 423].includes(response.status))
-      throw new AthanorError(
+      throw new GardenError(
         'caldav_precondition_failed',
         response.status === 423
           ? 'The calendar server has this event locked by another client'
-          : 'This event changed on the server since athanor read it, so the change was not applied',
+          : 'This event changed on the server since garden read it, so the change was not applied',
         409,
         { status: response.status }
       );
     // The status stays spelled out in the message because the owner-facing copy scrapes it back
     // out with /answered (\d{3})/; details carries it in a form that does not depend on prose.
-    throw new AthanorError(
+    throw new GardenError(
       'caldav_request_failed',
       `The calendar server answered ${response.status}`,
       400,
@@ -295,7 +295,7 @@ export const discoverCalendars = async (context: CalDavContext): Promise<CalDavC
 const icalStamp = (iso: string): string => {
   const parsed = Date.parse(iso);
   if (!Number.isFinite(parsed))
-    throw new AthanorError('calendar_range_invalid', `"${iso}" is not a date and time`);
+    throw new GardenError('calendar_range_invalid', `"${iso}" is not a date and time`);
   return `${new Date(parsed).toISOString().replaceAll(/[-:]/g, '').slice(0, 15)}Z`;
 };
 
@@ -352,13 +352,13 @@ export const readEventRange = async (
     };
   } catch (error) {
     // Only "the server refused this request", and only in the 4xx range, is evidence that expand
-    // is the thing it will not do. Retrying on every AthanorError sent a second full REPORT after
+    // is the thing it will not do. Retrying on every GardenError sent a second full REPORT after
     // a blocked redirect, a response that was already too large, and a transport timeout - which
     // on a stalled server doubles a 30-second wait into a minute and then reports the second
     // failure in place of the first. Measured: a blocked redirect produced two transport calls.
-    const status = error instanceof AthanorError ? Number(error.details?.['status'] ?? 0) : 0;
+    const status = error instanceof GardenError ? Number(error.details?.['status'] ?? 0) : 0;
     if (
-      !(error instanceof AthanorError) ||
+      !(error instanceof GardenError) ||
       error.code !== 'caldav_request_failed' ||
       status < 400 ||
       status >= 500

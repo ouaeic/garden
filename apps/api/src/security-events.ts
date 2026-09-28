@@ -1,5 +1,5 @@
-import { redactObject } from '@athanor/core';
-import type { DataStore } from '@athanor/data';
+import { redactObject } from '@garden/core';
+import type { DataStore } from '@garden/data';
 
 type SecurityEvent = Parameters<DataStore['recordSecurityEvent']>[0];
 

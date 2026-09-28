@@ -1,6 +1,6 @@
-# athanor-relay
+# garden-relay
 
-A small rendezvous server so an athanor box behind CGNAT, or on an address that keeps changing, can
+A small rendezvous server so an garden box behind CGNAT, or on an address that keeps changing, can
 still be reached. The box dials out and holds one connection open; clients connect to the relay and
 the relay forwards bytes between the two. **TLS terminates on the box, not here.**
 
@@ -38,7 +38,7 @@ certbot certonly --standalone -d relay.example
 For a local smoke test without ACME:
 
 ```sh
-node dist/cli.js dev-cert --host relay.example --out /etc/athanor-relay/tls
+node dist/cli.js dev-cert --host relay.example --out /etc/garden-relay/tls
 ```
 
 Boxes pin this certificate's public key on first enrollment (trust on first use), so replacing it
@@ -47,7 +47,7 @@ key.
 
 ### 3. Config
 
-Copy `config.example.json` to `/etc/athanor-relay.json` and set `relayDomain`, `tlsCertPath` and
+Copy `config.example.json` to `/etc/garden-relay.json` and set `relayDomain`, `tlsCertPath` and
 `tlsKeyPath`. Everything else has a working default. Quotas are documented under
 [Limits and defaults](#limits-and-defaults).
 
@@ -62,26 +62,26 @@ traffic keeps its own routes. Update the relay before using isolated preview lin
 ### 4. Run it
 
 ```sh
-pnpm --filter @athanor/relay build
-node dist/cli.js serve --config /etc/athanor-relay.json
+pnpm --filter @garden/relay build
+node dist/cli.js serve --config /etc/garden-relay.json
 ```
 
 A systemd unit, which is how it should actually run:
 
 ```ini
 [Unit]
-Description=athanor-relay
+Description=garden-relay
 After=network-online.target
 
 [Service]
-ExecStart=/usr/bin/node /opt/athanor-relay/dist/cli.js serve --config /etc/athanor-relay.json
-User=athanor-relay
+ExecStart=/usr/bin/node /opt/garden-relay/dist/cli.js serve --config /etc/garden-relay.json
+User=garden-relay
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
-StateDirectory=athanor-relay
+StateDirectory=garden-relay
 LimitNOFILE=65535
 Restart=always
 RestartSec=2
@@ -111,7 +111,7 @@ identity key, and gets back its permanent hostname.
 node dist/cli.js peers                     # who is registered, how much they have used
 node dist/cli.js revoke <label>            # delete a peer; its live session is dropped immediately
 node dist/cli.js serve --no-registration   # refuse all enrollment, without editing the config
-node dist/cli.js abuse --log /var/log/athanor-relay.log \
+node dist/cli.js abuse --log /var/log/garden-relay.log \
                        --at 2026-07-30T14:12:00Z --client-ip 203.0.113.9
 ```
 
@@ -134,7 +134,7 @@ counters are exactly the traffic-analysis material this design otherwise avoids 
 ## How it works
 
 The box dials `relay.example:443` and completes a TLS 1.3 handshake in which it presents a
-self-signed certificate whose public key _is_ its athanor identity key. The relay ignores the
+self-signed certificate whose public key _is_ its garden identity key. The relay ignores the
 certificate chain entirely and looks the SHA-256 of the SubjectPublicKeyInfo up in its registry.
 
 There is no challenge-response message, deliberately. TLS 1.3's `CertificateVerify` already signs
@@ -154,7 +154,7 @@ which is where naive SNI proxies break — and routes on SNI:
 
 | SNI                                            | Result                                     |
 | ---------------------------------------------- | ------------------------------------------ |
-| `relay.example` with ALPN `athanor-relay/1`    | a box dialling in; terminated here         |
+| `relay.example` with ALPN `garden-relay/1`     | a box dialling in; terminated here         |
 | `<label>.relay.example`, registered and online | bind to that box's parked stream           |
 | anything else                                  | TLS alert `unrecognized_name`, then closed |
 
@@ -164,7 +164,7 @@ operator, a box's tunnel is indistinguishable from ordinary HTTPS.
 ### Labels
 
 ```
-label = base32-lower-nopad(SHA256("athanor-relay-label-v1\0" || u8(len(domain)) || domain
+label = base32-lower-nopad(SHA256("garden-relay-label-v1\0" || u8(len(domain)) || domain
                                   || raw_ed25519_pubkey))[0:26]
 ```
 
@@ -302,7 +302,7 @@ clock.
 **The desktop preview dominates by an order of magnitude.** At one hour of desktop viewing per box
 per day, 20 TB supports a few hundred boxes; at four hours, well under two hundred. This is why the
 per-peer default is 25 GiB — "control plane plus about half an hour of desktop a day" — and why
-athanor should prefer a direct or LAN path for the desktop stream even when the control session is
+garden should prefer a direct or LAN path for the desktop stream even when the control session is
 on the relay.
 
 **Treat the relay as a control path, not a media path.**
@@ -329,9 +329,9 @@ invite token and a relay hostname. There is no default relay and no discovery.
 ## Development
 
 ```sh
-pnpm --filter @athanor/relay typecheck
-pnpm --filter @athanor/relay test
-pnpm --filter @athanor/relay build
+pnpm --filter @garden/relay typecheck
+pnpm --filter @garden/relay test
+pnpm --filter @garden/relay build
 ```
 
 `src/box-harness.ts` is a minimal box-side tunnel client. It is what the tests drive the relay with

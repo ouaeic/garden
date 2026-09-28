@@ -4,7 +4,7 @@ import {
   capabilityAudience,
   signCapabilityToken,
   verifyCapabilityToken
-} from '@athanor/core';
+} from '@garden/core';
 // The branch itself, not a restatement of it. These four cases used to compare against a local
 // copy of the predicate, so removing a clause from the runner left every one of them green.
 import { renewalExtendsSession } from './server.js';

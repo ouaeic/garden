@@ -10,9 +10,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import { decryptJson, generateDataKey } from '@athanor/core';
-import type { DataStore, TaskRecord } from '@athanor/data';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import { decryptJson, generateDataKey } from '@garden/core';
+import type { DataStore, TaskRecord } from '@garden/data';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { AgentState } from './agent-state.js';
 import { isQuarantinedDownloadPath } from './command-classification.js';
 import {
@@ -649,7 +649,7 @@ describe('what a cut result says when nothing was kept', () => {
    * The left column is quoted far enough to carry the SHAPE of the request and not just the tool's
    * name - "a file_read line range", not "file_read" - because the tool name alone is what the
    * previous version of this table checked, and a sentence telling the model to re-run file_read
-   * with `offset` and `limit`, which no athanor tool takes, satisfies it. Quoting the phrase is
+   * with `offset` and `limit`, which no garden tool takes, satisfies it. Quoting the phrase is
    * what makes the advice's own wording load-bearing; quoting the field makes the catalogue's.
    */
   const performableClaims = [
@@ -711,7 +711,7 @@ describe('what a cut result says when nothing was kept', () => {
 
   it('names nothing this harness cannot do, and forges no pointer', async () => {
     /*
-     * Advice naming a capability athanor does not have is worse than silence, because it spends a
+     * Advice naming a capability garden does not have is worse than silence, because it spends a
      * step of a sixteen-step budget on a call that cannot be made. So every clause is read against
      * the catalogue entry that makes it true, and the case that proves those lines bite is the one
      * directly below this.

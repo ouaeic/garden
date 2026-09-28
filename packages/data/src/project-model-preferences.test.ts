@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
-import { encryptJson, wrapDataKey } from '@athanor/core';
+import { encryptJson, wrapDataKey } from '@garden/core';
 import { createDatabase, migrateDatabase } from './database.js';
 import { DataStore } from './store.js';
 import {

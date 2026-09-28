@@ -1,4 +1,4 @@
-import { runtimeNow } from '@athanor/core';
+import { runtimeNow } from '@garden/core';
 import { runJobWaitLoop } from './job-waits.js';
 import { createServer } from 'node:http';
 import {
@@ -6,9 +6,9 @@ import {
   createDatabase,
   DataStore,
   migrateDatabase
-} from '@athanor/data';
-import { deriveServiceSecret, resolveDataMasterKey } from '@athanor/core';
-import { buildLabel } from '@athanor/contracts';
+} from '@garden/data';
+import { deriveServiceSecret, resolveDataMasterKey } from '@garden/core';
+import { buildLabel } from '@garden/contracts';
 import { AgentWorker } from './agent.js';
 import { buildIdentity } from './build-identity.js';
 import { loadConfig } from './config.js';
@@ -73,7 +73,7 @@ const health = createServer((request, response) => {
   if (request.url === '/metrics') {
     response.setHeader('content-type', 'text/plain; version=0.0.4');
     response.end(
-      `athanor_worker_active ${counters.active}\nathanor_worker_concurrency ${config.WORKER_CONCURRENCY}\nathanor_worker_completed_total ${counters.completed}\nathanor_worker_failed_total ${counters.failed}\nathanor_worker_lease_errors_total ${counters.leaseErrors}\n`
+      `garden_worker_active ${counters.active}\ngarden_worker_concurrency ${config.WORKER_CONCURRENCY}\ngarden_worker_completed_total ${counters.completed}\ngarden_worker_failed_total ${counters.failed}\ngarden_worker_lease_errors_total ${counters.leaseErrors}\n`
     );
   } else {
     response.setHeader('content-type', 'application/json');
@@ -148,7 +148,7 @@ await runLeaseLoops({
    * has been for.
    *
    * The API's embedded worker has waited this way for a while; this loop - the one a box with a
-   * postgres database actually runs, as athanor@worker.service - slept a flat interval and heard
+   * postgres database actually runs, as garden@worker.service - slept a flat interval and heard
    * none of it. So a conversation queued behind a running turn became leasable the instant that
    * turn let go and then sat out the rest of a poll before anyone looked, at exactly the moment
    * the owner is watching one answer finish and the next begin. `waitForQueuedTask` returns on the

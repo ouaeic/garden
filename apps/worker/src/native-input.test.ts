@@ -4,15 +4,15 @@ import {
   type ModelAdapter,
   type ModelRequest,
   type ModelResponse
-} from '@athanor/model-gateway';
-import type { ModelRelease } from '@athanor/contracts';
-import { UNKNOWN_SURFACES } from '@athanor/contracts';
-import type { ModelGateway } from '@athanor/model-gateway';
+} from '@garden/model-gateway';
+import type { ModelRelease } from '@garden/contracts';
+import { UNKNOWN_SURFACES } from '@garden/contracts';
+import type { ModelGateway } from '@garden/model-gateway';
 import { generateModelStep, type TurnGenerateDeps } from './turn/generate.js';
 import type { TurnRun } from './turn/claim.js';
 import { COMPACT_CONTEXT_TOOL, prepareModelContext } from './context.js';
 import { agentToolsFor } from './tools.js';
-import type { DataStore, TaskRecord } from '@athanor/data';
+import type { DataStore, TaskRecord } from '@garden/data';
 import type { AgentState, InferenceCredential } from './agent-state.js';
 import type { ToolContext } from './tool-dispatch.js';
 import {

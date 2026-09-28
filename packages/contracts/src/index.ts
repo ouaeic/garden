@@ -56,7 +56,7 @@ export type SecurityMode = z.infer<typeof SecurityMode>;
 /**
  * Whether this conversation is allowed to change anything yet.
  *
- * `act` is every task athanor has ever run, and it is the default everywhere by absence: a state
+ * `act` is every task garden has ever run, and it is the default everywhere by absence: a state
  * written before this field existed, and every caller that never names it, is `act` and behaves
  * exactly as it did. `plan` is the owner saying "work the approach out and show me before you touch
  * anything", and it is a different question from `SecurityMode` beside it - that one decides what
@@ -399,7 +399,7 @@ export const CreateConnectorRequest = z.discriminatedUnion('kind', [
     scopes: z.array(ConnectorScope).min(1)
   }),
   /**
-   * `address` is the address other people invite the owner by. It is what tells athanor which
+   * `address` is the address other people invite the owner by. It is what tells garden which
    * attendee on an event is the owner, so answering an invitation changes the right line.
    */
   z.object({
@@ -1189,7 +1189,7 @@ export const MediaModelOption = z.object({
   retirementAt: IsoDate.optional(),
   /**
    * `provider` when the figure came off the provider's own feed, `measured` when it is a price
-   * athanor recorded from real generations on this route, `unknown` when nobody has said.
+   * garden recorded from real generations on this route, `unknown` when nobody has said.
    */
   priceSource: z.enum(['provider', 'measured', 'unknown']),
   /** The voice name to send for speech, when this route names its voices and one was chosen. */
@@ -1612,7 +1612,7 @@ export const SpendLimits = z.object({
    * The owner's price ceiling, as two published rates, and the pre-flight half of the brake the
    * caps above are the running half of. A cap stops a task that is already spending; this stops an
    * over-priced route being chosen in the first place, which is the only one of the two that works
-   * while the owner is asleep. `@athanor/core`'s `priceCeilingFields` turns these into the
+   * while the owner is asleep. `@garden/core`'s `priceCeilingFields` turns these into the
    * `ModelRequest` fields `selectModel` reads; either may be null on its own.
    *
    * Still optional, and the reason is written down here because it looks like an oversight and is
@@ -1765,7 +1765,7 @@ export type TaskScheduleSpec = z.infer<typeof TaskScheduleSpec>;
  * ceiling this software is proudest of.
  *
  * DELIBERATELY NOT A SIXTH `kind`. That was the first design and it cannot be built from one place:
- * `nextScheduleRun` in @athanor/core reads `spec.timeZone` after narrowing away `once` and
+ * `nextScheduleRun` in @garden/core reads `spec.timeZone` after narrowing away `once` and
  * `interval`, and `scheduleDescription` and `specKey` in the web client both fall through to
  * `spec.weekdays`. A sixth member makes all three stop compiling, and there is no shape for a
  * webhook that satisfies them without lying about what it is. So the trigger is orthogonal to the
@@ -2000,7 +2000,7 @@ export type BrowserAction = z.infer<typeof BrowserAction>;
  *
  * One URL or a batch, because the same capability is called both ways and must present the same
  * name either way. A provider-side fetch takes one URL per call and is called several times within
- * a turn; athanor's own route takes the batch and opens up to twelve browsers at once. If those
+ * a turn; garden's own route takes the batch and opens up to twelve browsers at once. If those
  * were two differently named tools the model would be choosing between two descriptions of one
  * thing, and the name would change under it whenever the privacy route did - so the schema accepts
  * both shapes and the difference stops at this boundary.
@@ -2370,12 +2370,12 @@ export interface ParallelWebReadResult {
 }
 
 /**
- * Which build of athanor is running.
+ * Which build of garden is running.
  *
  * Both halves are needed and neither is enough. The version is the number a person can say out
  * loud, the one the install command pins and the one a release is cut at - but it does not move
  * between releases, so two boxes that are weeks apart on `main` both call themselves 0.1.1 and an
- * owner asking whether `athanor update` changed anything gets the same answer either way. The
+ * owner asking whether `garden update` changed anything gets the same answer either way. The
  * revision moves with every commit and settles that, and on its own it means nothing to anybody
  * who is not holding the repository.
  *

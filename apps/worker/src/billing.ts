@@ -11,10 +11,10 @@
  *
  * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
-import type { ModelRelease } from '@athanor/contracts';
-import { pricesAtPromptSize, readRoutingMetadata, sha256 } from '@athanor/core';
-import type { DataStore } from '@athanor/data';
-import type { ModelResponse } from '@athanor/model-gateway';
+import type { ModelRelease } from '@garden/contracts';
+import { pricesAtPromptSize, readRoutingMetadata, sha256 } from '@garden/core';
+import type { DataStore } from '@garden/data';
+import type { ModelResponse } from '@garden/model-gateway';
 
 /** A native request settles or holds its own durable receipt before the ordinary step returns. */
 export const recordModelStepUsage = async (
@@ -57,7 +57,7 @@ export const stepUsageKey = (taskId: string, turn: number, step: number): string
  * the response type and produced by nothing: no adapter has ever set it, so the term was zero on
  * every call this product has ever made, and the six `computeSeconds ? 'gpu_seconds' : 'tokens'`
  * ternaries beside its call sites each had one reachable arm. Removed rather than wired: a rented
- * GPU billed by the second is not a route athanor offers, and a parameter that has never once been
+ * GPU billed by the second is not a route garden offers, and a parameter that has never once been
  * non-zero is a claim about the product that is not true.
  */
 export const usageCredit = (model: ModelRelease, input: number, output: number): number => {

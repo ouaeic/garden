@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { AthanorError } from '@athanor/core';
+import { GardenError } from '@garden/core';
 import { createLogger, errorFields, installProcessGuards, type Logger } from './log.js';
 
 const capture = (level: Parameters<typeof createLogger>[0]['level'] = 'info') => {
@@ -43,7 +43,7 @@ describe('server logging', () => {
       message: 'the assistant replied',
       title: 'Private task',
       apiKey: 'sk-live-000111222333444555666',
-      cookie: 'athanor_session=abcdef'
+      cookie: 'garden_session=abcdef'
     });
     expect(lines[0]).toEqual({
       time: '2026-07-31T12:00:00.000Z',
@@ -90,8 +90,8 @@ describe('server logging', () => {
 });
 
 describe('error identity in logs', () => {
-  test('keeps the Athanor code and the frames but never the wording', () => {
-    const error = new AthanorError('quota_exceeded', 'Task "Email the board" needs 40 credits');
+  test('keeps the Garden code and the frames but never the wording', () => {
+    const error = new GardenError('quota_exceeded', 'Task "Email the board" needs 40 credits');
     const fields = errorFields(error);
     expect(fields.code).toBe('quota_exceeded');
     expect(String(fields.frames)).toContain('at ');
@@ -130,14 +130,14 @@ describe('error identity in logs', () => {
 
   /*
    * `code` looks like the one field on this line nobody could hide anything in, and it is the field
-   * two different wires write. `runnerFailure` builds an AthanorError whose code is the `code` of
+   * two different wires write. `runnerFailure` builds an GardenError whose code is the `code` of
    * whatever JSON the workspace runner answered with, and `name` is a writable property a library
    * may put a sentence in. Both were printed whole, so a runner that quoted the failing command
    * back published it - the same shape of leak as the message, wearing the one field that had
    * always been safe. One machine word, or the line says only that something failed.
    */
   test('will not print a sentence that arrived where a code was expected', () => {
-    const fromTheRunner = new AthanorError(
+    const fromTheRunner = new GardenError(
       'refused: psql -c "select * from clients" --password=hunter2',
       'the runner said no'
     );
@@ -147,8 +147,8 @@ describe('error identity in logs', () => {
     renamed.name = 'Failed while reading /home/owner/tax-return-2025/settlement.pdf';
     expect(errorFields(renamed).code).toBe('Error');
 
-    // And the ordinary case is untouched: athanor's own vocabulary still reads as itself.
-    expect(errorFields(new AthanorError('workspace_busy', 'busy')).code).toBe('workspace_busy');
+    // And the ordinary case is untouched: garden's own vocabulary still reads as itself.
+    expect(errorFields(new GardenError('workspace_busy', 'busy')).code).toBe('workspace_busy');
   });
 });
 
@@ -172,7 +172,7 @@ describe('process guards', () => {
     const { logger, lines } = capture();
     const target = guardTarget();
     installProcessGuards(logger, target);
-    target.listeners.get('unhandledRejection')!(new AthanorError('workspace_missing', 'gone'));
+    target.listeners.get('unhandledRejection')!(new GardenError('workspace_missing', 'gone'));
     expect(lines[0]).toMatchObject({
       event: 'process.unhandled_rejection',
       code: 'workspace_missing'

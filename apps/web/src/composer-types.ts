@@ -5,7 +5,7 @@ import type {
   Project,
   ConversationSource,
   DirectionContext
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import type { Bootstrap, Draft } from './model';
 
 export interface ComposerProps {

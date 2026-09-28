@@ -1,11 +1,11 @@
-import { AUDIO_READ_MAX_SECONDS } from '@athanor/contracts';
-import { AthanorError } from '@athanor/core';
+import { AUDIO_READ_MAX_SECONDS } from '@garden/contracts';
+import { GardenError } from '@garden/core';
 import {
   MediaClient,
   isNativeOpenAIEndpoint,
   MediaProviderRejectionError,
   type ModelToolCall
-} from '@athanor/model-gateway';
+} from '@garden/model-gateway';
 import { type ToolContext } from './tool-dispatch.js';
 import { TranscriptionControls } from './media-controls.js';
 import {
@@ -35,7 +35,7 @@ export const transcribeRecording = async (
   const controls = TranscriptionControls.parse(call.arguments.options ?? {});
   const path = textValue(call.arguments.path).trim();
   if (!path || path.split('/').includes('..'))
-    throw new AthanorError(
+    throw new GardenError(
       'transcription_path_invalid',
       'Choose a recording inside this workspace',
       400
@@ -65,14 +65,14 @@ export const transcribeRecording = async (
   });
   const modelId = chosen?.modelId ?? '';
   if (!modelId || route?.unavailableReason)
-    throw new AthanorError(
+    throw new GardenError(
       'transcription_route_unavailable',
       'Choose an available transcription model in Settings',
       503
     );
   const privacyRoute = transcriptionPrivacy(secret, call);
   if (privacyRoute === 'external' && !context.consequentialApproved)
-    throw new AthanorError(
+    throw new GardenError(
       'transcription_approval_required',
       'Approve external handling for this exact recording before sending it',
       409
@@ -80,13 +80,13 @@ export const transcribeRecording = async (
   const rate = transcriptionRate(chosen);
   const bound = chosen?.transcriptionBound;
   if (transcriptionEstimateUsd(60, chosen) === null)
-    throw new AthanorError(
+    throw new GardenError(
       'transcription_price_unbounded',
       'This route has no verified whole-request cost bound. Choose a supported priced transcription model in Settings.',
       400
     );
   if (rate.usdPerMinute === null && !context.consequentialApproved)
-    throw new AthanorError(
+    throw new GardenError(
       'transcription_approval_required',
       'Approve the full model-bound transcription reservation before sending this recording',
       409
@@ -98,7 +98,7 @@ export const transcribeRecording = async (
   const assertActive = async () => {
     signal?.throwIfAborted();
     if (haltReason(await context.store.taskClaim(task.id), context.config.WORKER_ID))
-      throw new AthanorError(
+      throw new GardenError(
         'transcription_task_inactive',
         'This task no longer has authority to send a recording',
         409
@@ -123,7 +123,7 @@ export const transcribeRecording = async (
     prepared.preparedSeconds > maxSeconds ||
     prepared.preparedSeconds > readingWindow.endSeconds - startSeconds
   )
-    throw new AthanorError(
+    throw new GardenError(
       'transcription_window_invalid',
       'The prepared recording exceeds its approved request window',
       400
@@ -132,14 +132,14 @@ export const transcribeRecording = async (
     proof &&
     (prepared.sourceSha256 !== proof.sourceSha256 || prepared.sourceBytes !== proof.sourceBytes)
   )
-    throw new AthanorError(
+    throw new GardenError(
       'transcription_source_changed',
       'The recording no longer matches its approved source receipt',
       409
     );
   const estimateUsd = transcriptionEstimateUsd(prepared.preparedSeconds, chosen)!;
   if (controls.maxCostUsd !== undefined && estimateUsd > controls.maxCostUsd)
-    throw new AthanorError(
+    throw new GardenError(
       'transcription_reservation_exceeded',
       'The selected recording window exceeds its spending reservation',
       402
@@ -184,7 +184,7 @@ export const transcribeRecording = async (
           transcriptionBinding(context.key, task, state, call, latest) !==
           transcriptionBinding(context.key, task, state, call, secret)
         )
-          throw new AthanorError(
+          throw new GardenError(
             'transcription_approval_changed',
             'The transcription route or credential changed during preparation; request a new approval',
             409
@@ -225,8 +225,8 @@ export const transcribeRecording = async (
           state: 'released',
           settleReservation: true
         });
-      if (error instanceof AthanorError) throw error;
-      throw new AthanorError(
+      if (error instanceof GardenError) throw error;
+      throw new GardenError(
         'audio_read_failed',
         error instanceof Error ? error.message : 'The recording could not be read'
       );

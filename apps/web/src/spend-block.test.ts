@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { SpendWindow, TaskSpendBlock } from '@athanor/contracts';
+import type { SpendWindow, TaskSpendBlock } from '@garden/contracts';
 import { spendBlockCopy, suggestedCeiling } from './SpendBlock';
 
 const window: SpendWindow = {

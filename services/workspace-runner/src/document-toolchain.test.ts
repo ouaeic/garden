@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { ATHANOR_PYTHON, DOCUMENT_TOOLCHAIN } from './toolchain.js';
+import { GARDEN_PYTHON, DOCUMENT_TOOLCHAIN } from './toolchain.js';
 
 const repositoryRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../../..');
 const script = (name: string) => path.join(repositoryRoot, 'scripts', name);
@@ -16,9 +16,9 @@ const script = (name: string) => path.join(repositoryRoot, 'scripts', name);
  * exists so a developer can point the suite at an environment that has the document libraries.
  */
 const resolveInterpreter = (): string => {
-  const named = process.env.ATHANOR_DOCUMENT_PYTHON;
+  const named = process.env.GARDEN_DOCUMENT_PYTHON;
   if (named) return named;
-  if (existsSync(ATHANOR_PYTHON)) return ATHANOR_PYTHON;
+  if (existsSync(GARDEN_PYTHON)) return GARDEN_PYTHON;
   // Resolved to an absolute path here, once, because one case below narrows PATH to hide
   // LibreOffice - and a bare `python3` would be hidden along with it, so the wrapper under test
   // would never start and the assertion would be about spawning rather than about its message.
@@ -77,7 +77,7 @@ describe('the document toolchain is declared where the drill can assert it', () 
   });
 
   it('links every runtime capability to a representative workflow contract', () => {
-    const result = runPython([script('athanor-document-proof'), '--manifest']);
+    const result = runPython([script('garden-document-proof'), '--manifest']);
     expect(result.status, result.stderr).toBe(0);
     const manifest = JSON.parse(result.stdout) as { id: string; capabilities: string[] }[];
     expect(manifest.length).toBeGreaterThan(0);
@@ -89,7 +89,7 @@ describe('the document toolchain is declared where the drill can assert it', () 
   });
 
   it('rejects an unknown workflow instead of returning an empty passing report', () => {
-    const result = runPython([script('athanor-document-proof'), '--only', 'nonexistent-job']);
+    const result = runPython([script('garden-document-proof'), '--only', 'nonexistent-job']);
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain('unknown jobs');
   });
@@ -98,13 +98,13 @@ describe('the document toolchain is declared where the drill can assert it', () 
     // An empty declaration list routes nothing anywhere and passes this in no time at all.
     expect(DOCUMENT_TOOLCHAIN.length).toBeGreaterThan(0);
     for (const capability of DOCUMENT_TOOLCHAIN)
-      if (capability.pythonModules.length) expect(capability.binaries).toContain(ATHANOR_PYTHON);
+      if (capability.pythonModules.length) expect(capability.binaries).toContain(GARDEN_PYTHON);
   });
 
   it('names the two vetted commands the skills call rather than the tools underneath them', () => {
     const binaries = DOCUMENT_TOOLCHAIN.flatMap((capability) => capability.binaries);
-    expect(binaries).toContain('athanor-office-convert');
-    expect(binaries).toContain('athanor-pdf-tables');
+    expect(binaries).toContain('garden-office-convert');
+    expect(binaries).toContain('garden-pdf-tables');
   });
 });
 
@@ -123,7 +123,7 @@ describe('what the skills ask for is what the drill refuses to ship without', ()
     const declared = new Set<string>();
     for (const entry of await readdir(skillsDirectory, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
-      const sidecar = path.join(skillsDirectory, entry.name, 'athanor.yaml');
+      const sidecar = path.join(skillsDirectory, entry.name, 'garden.yaml');
       if (!existsSync(sidecar)) continue;
       const text = await readFile(sidecar, 'utf8');
       const block = /\n\s*binaries:\s*\[([^\]]*)\]/s.exec(text)?.[1];
@@ -161,7 +161,7 @@ describe('what the skills ask for is what the drill refuses to ship without', ()
   it('asserts every document binary and module in the release drill', async () => {
     const drillBinaries = await drillList('REQUIRED_BINARIES');
     const missing = DOCUMENT_TOOLCHAIN.flatMap((capability) => capability.binaries)
-      .filter((name) => name !== ATHANOR_PYTHON)
+      .filter((name) => name !== GARDEN_PYTHON)
       .filter((name) => !drillBinaries.has(name));
     expect([...new Set(missing)], 'release-drill.mjs would ship a box without these').toEqual([]);
 
@@ -180,13 +180,13 @@ describe('what the skills ask for is what the drill refuses to ship without', ()
     expect([...new Set(missing)]).toEqual([]);
   });
 
-  it('installs everything the toolchain names, on every host athanor supports', async () => {
+  it('installs everything the toolchain names, on every host garden supports', async () => {
     // The names moved out of the installer and into one table read by the installer, the toolchain
-    // probe and `athanor doctor` alike. Asserting against the table rather than the apt list is the
+    // probe and `garden doctor` alike. Asserting against the table rather than the apt list is the
     // stronger claim: it holds for every family at once, so a capability the document skills name
     // cannot be silently unavailable on a host merely because nobody wrote its package down.
     const hostTable = await readFile(
-      path.join(repositoryRoot, 'scripts', 'athanor-host.sh'),
+      path.join(repositoryRoot, 'scripts', 'garden-host.sh'),
       'utf8'
     );
     // python3-pptx is deliberately absent: Ubuntu stopped packaging it after 24.04, so it comes
@@ -225,7 +225,7 @@ describe('what the skills ask for is what the drill refuses to ship without', ()
     // Native activation and wheel verification run in scripts/test-update.sh. This manifest
     // contract requires an exact version and at least one allowed wheel hash per dependency.
     const requirements = await readFile(
-      path.join(repositoryRoot, 'infra', 'native', 'athanor-python-requirements.txt'),
+      path.join(repositoryRoot, 'infra', 'native', 'garden-python-requirements.txt'),
       'utf8'
     );
     const pinnedRequirements = requirements
@@ -259,14 +259,14 @@ describe('what the skills ask for is what the drill refuses to ship without', ()
    *
    * Both rows carried a dash while the package was sitting in the family's own repositories -
    * Arch has python-statsmodels in extra, openSUSE has both in the main OSS repo - so the
-   * capability was quietly off on two of the four families athanor supports.
+   * capability was quietly off on two of the four families garden supports.
    *
    * The families come from the table's own header rather than a count written here, so adding a
    * fifth column asks that family for a package instead of failing on arithmetic.
    */
   it('names a statistics package on every family, because a dash is a number nobody computed', async () => {
     const lines = (
-      await readFile(path.join(repositoryRoot, 'scripts', 'athanor-host.sh'), 'utf8')
+      await readFile(path.join(repositoryRoot, 'scripts', 'garden-host.sh'), 'utf8')
     ).split('\n');
     const families = lines
       .find((line) => line.startsWith('capability\t'))
@@ -289,18 +289,18 @@ describe('what the skills ask for is what the drill refuses to ship without', ()
   });
 });
 
-describe('athanor-office-convert refuses to report a conversion that did not happen', () => {
+describe('garden-office-convert refuses to report a conversion that did not happen', () => {
   let root: string;
   let stub: string;
 
   const convert = (source: string, target: string, behaviour: string) =>
-    runPython([script('athanor-office-convert'), source, target], {
+    runPython([script('garden-office-convert'), source, target], {
       cwd: root,
-      env: { ATHANOR_SOFFICE: stub, ATHANOR_STUB_BEHAVIOUR: behaviour }
+      env: { GARDEN_SOFFICE: stub, GARDEN_STUB_BEHAVIOUR: behaviour }
     });
 
   beforeAll(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'athanor-office-'));
+    root = await mkdtemp(path.join(tmpdir(), 'garden-office-'));
     stub = path.join(root, 'soffice-stub');
     // Stands in for LibreOffice so the wrapper's failure handling is proven without one. Each
     // behaviour is a thing LibreOffice genuinely does, including exiting 0 having written nothing.
@@ -312,7 +312,7 @@ describe('athanor-office-convert refuses to report a conversion that did not hap
         'while [ $# -gt 0 ]; do',
         '  case "$1" in --outdir) outdir="$2"; shift 2 ;; *) shift ;; esac',
         'done',
-        'case "$ATHANOR_STUB_BEHAVIOUR" in',
+        'case "$GARDEN_STUB_BEHAVIOUR" in',
         '  silent) exit 0 ;;',
         '  garbage) printf "not a pdf" > "$outdir/input.pdf"; exit 0 ;;',
         '  empty) : > "$outdir/input.pdf"; exit 0 ;;',
@@ -361,11 +361,11 @@ describe('athanor-office-convert refuses to report a conversion that did not hap
           'with patch("os.access", return_value=False), patch("shutil.which", return_value=None):',
           '    runpy.run_path(sys.argv[0], run_name="__main__")'
         ].join('\n'),
-        script('athanor-office-convert'),
+        script('garden-office-convert'),
         'input.docx',
         'out.pdf'
       ],
-      { cwd: root, env: { ATHANOR_SOFFICE: '' } }
+      { cwd: root, env: { GARDEN_SOFFICE: '' } }
     );
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain('apt-get install -y libreoffice-writer');
@@ -377,9 +377,9 @@ describe('documents this computer produces, measured', () => {
   let workdir: string;
 
   beforeAll(async () => {
-    workdir = await mkdtemp(path.join(tmpdir(), 'athanor-proof-'));
+    workdir = await mkdtemp(path.join(tmpdir(), 'garden-proof-'));
     const result = runPython([
-      script('athanor-document-proof'),
+      script('garden-document-proof'),
       '--json',
       '--workdir',
       workdir,
@@ -406,7 +406,7 @@ describe('documents this computer produces, measured', () => {
       report.passed.length + report.failed.length,
       `${python} ran no document jobs: ${report.jobs
         .map((job) => `${job.id}: ${(job.missing ?? []).join(', ')}`)
-        .join('; ')}. Set ATHANOR_DOCUMENT_PYTHON to an environment with document libraries.`
+        .join('; ')}. Set GARDEN_DOCUMENT_PYTHON to an environment with document libraries.`
     ).toBeGreaterThan(0);
     // On a laptop "something" is the honest floor: LibreOffice is a gigabyte nobody should have to
     // install to fix a typo. On the runner the floor is everything. This assertion used to read
@@ -451,7 +451,7 @@ describe('documents this computer produces, measured', () => {
 /**
  * The one script in this pair an agent reaches by name.
  *
- * `athanor-document` is run by the worker at an absolute path it chose; `athanor-pdf-tables` is run
+ * `garden-document` is run by the worker at an absolute path it chose; `garden-pdf-tables` is run
  * by the model itself, out of the pdf-extraction skill, through `shell` - so it inherits the
  * agent's own PATH, and the agent can write to directories on it. It resolved poppler with
  * `shutil.which("pdftotext")` when /usr/bin/pdftotext was missing, which is precisely the
@@ -463,7 +463,7 @@ describe('the table reader an agent runs by name', () => {
   let planted: string;
 
   beforeAll(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'athanor-pdf-tables-'));
+    root = await mkdtemp(path.join(tmpdir(), 'garden-pdf-tables-'));
     planted = path.join(root, 'was-run');
     // What an agent would have written: something named like poppler, on a directory it controls.
     const decoy = path.join(root, 'pdftotext');
@@ -477,11 +477,11 @@ describe('the table reader an agent runs by name', () => {
   afterAll(async () => rm(root, { recursive: true, force: true }));
 
   const run = (pdftotext: string) =>
-    runPython([script('athanor-pdf-tables'), '--path', 'doc.pdf', '--page', '1'], {
+    runPython([script('garden-pdf-tables'), '--path', 'doc.pdf', '--page', '1'], {
       cwd: root,
       // The override is pointed somewhere on purpose in both cases, so the result does not depend
       // on whether the machine running this suite happens to have poppler in /usr/bin.
-      env: { ATHANOR_PDFTOTEXT: pdftotext, PATH: root }
+      env: { GARDEN_PDFTOTEXT: pdftotext, PATH: root }
     });
 
   it('says what to install rather than running whatever the search path offers', () => {

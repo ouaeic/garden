@@ -9,7 +9,7 @@ import {
   runtimeNow,
   runtimeSetTimeout,
   runtimeClearTimer
-} from '@athanor/core';
+} from '@garden/core';
 import { RuntimeCodec, REPLAY_WORKSPACE_KEY, REPLAY_MASTER_KEY } from './runtime-codec.js';
 import { RuntimeRecorder, RuntimePlayback, type RuntimeEvent } from './runtime-tape.js';
 

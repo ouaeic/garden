@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Gauge, HardDrive, MemoryStick } from 'lucide-react';
-import type { Workspace } from '@athanor/contracts';
+import type { Workspace } from '@garden/contracts';
 import type { Bootstrap } from './model';
 import { bytes, money } from './model';
 import { Button } from './ui';

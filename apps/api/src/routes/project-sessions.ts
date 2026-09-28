@@ -1,5 +1,5 @@
-import { AthanorError } from '@athanor/core';
-import type { ComputerSessions, ProjectSessions } from '@athanor/contracts';
+import { GardenError } from '@garden/core';
+import type { ComputerSessions, ProjectSessions } from '@garden/contracts';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 
@@ -16,7 +16,7 @@ export function registerProjectSessionRoutes({
       const user = requireUser(request.user);
       const projectId = request.params.projectId;
       if (!(await store.getProject(user.id, projectId)))
-        throw new AthanorError('project_not_found', 'Project not found', 404);
+        throw new GardenError('project_not_found', 'Project not found', 404);
       const members = await store.projectExecutionMembers(user.id, projectId, 'project');
       const roots = [...new Map(members.map((member) => [member.workspaceId, member])).values()];
       const result: ProjectSessions = {

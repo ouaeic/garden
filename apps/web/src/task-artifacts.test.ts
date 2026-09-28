@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import type { TaskPresentation } from '@athanor/contracts';
+import type { TaskPresentation } from '@garden/contracts';
 import { presentationArtifacts } from './task-artifacts';
 
 it('supplies complete immutable metadata for a source-workspace artifact absent from the new workspace list', () => {

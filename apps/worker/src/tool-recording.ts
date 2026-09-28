@@ -14,16 +14,16 @@ import { evidenceProgressKey } from './progress.js';
  * is the only reason the split falls where it does: a `tool-recording -> vision -> tool-recording`
  * cycle is the alternative.
  */
-import type { ModelRelease, TaskEventKind, WebToolPlan } from '@athanor/contracts';
+import type { ModelRelease, TaskEventKind, WebToolPlan } from '@garden/contracts';
 import { ZodError } from 'zod';
 import {
-  AthanorError,
+  GardenError,
   encryptJson,
   privateDiagnostics,
   recordPrivateDiagnostic
-} from '@athanor/core';
-import type { DataStore, TaskRecord } from '@athanor/data';
-import type { ModelToolCall } from '@athanor/model-gateway';
+} from '@garden/core';
+import type { DataStore, TaskRecord } from '@garden/data';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { AgentState, AgentWorkerConfig } from './agent-state.js';
 import { callDestinations } from './command-classification.js';
 import { completionReference, shellObservation, processObservation } from './completion.js';
@@ -161,7 +161,7 @@ export const event = async (
     kind,
     summary: `Encrypted ${kind.replaceAll('_', ' ')} event`,
     payloadCiphertext: encryptJson(
-      { __athanorEventVersion: 1, summary, payload },
+      { __gardenEventVersion: 1, summary, payload },
       key,
       `task-event:${task.id}`
     ),
@@ -215,7 +215,7 @@ export const recordToolFailure = async (
   await event(deps.store, task, key, 'error', `${call.name} failed`, {
     toolCallId: call.id,
     message,
-    ...(error instanceof AthanorError ? { code: error.code } : {}),
+    ...(error instanceof GardenError ? { code: error.code } : {}),
     ...(wall ? { botWall: wall } : {})
   });
   state.messages.push({ role: 'tool', toolCallId: call.id, content: `Tool failed: ${message}` });

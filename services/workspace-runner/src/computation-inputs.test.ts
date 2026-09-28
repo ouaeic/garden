@@ -48,12 +48,12 @@ describe('bounded computation input records', () => {
     ]);
   });
   it('does not read protected state, escaping paths, symbolic links, directories or missing files', async () => {
-    await mkdir(path.join(root, '.athanor'));
-    await writeFile(path.join(root, '.athanor/canary'), 'PROTECTED_INPUT_CANARY');
-    await symlink('../.athanor', path.join(root, 'workspace/linked'));
-    await symlink('../.athanor/canary', path.join(root, 'workspace/link'));
+    await mkdir(path.join(root, '.garden'));
+    await writeFile(path.join(root, '.garden/canary'), 'PROTECTED_INPUT_CANARY');
+    await symlink('../.garden', path.join(root, 'workspace/linked'));
+    await symlink('../.garden/canary', path.join(root, 'workspace/link'));
     const rows = await computationInputs(root, [
-      '.athanor/canary',
+      '.garden/canary',
       '../outside',
       'linked/canary',
       'link',

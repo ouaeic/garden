@@ -1,7 +1,7 @@
 import { Readable } from 'node:stream';
-import { DiagnosticCaptureControl } from '@athanor/contracts';
+import { DiagnosticCaptureControl } from '@garden/contracts';
 import {
-  AthanorError,
+  GardenError,
   decryptJson,
   diagnosticCipherHash,
   diagnosticPlainHash,
@@ -9,7 +9,7 @@ import {
   DIAGNOSTIC_EMPTY_HASH,
   PrivateDiagnosticBody,
   unwrapDataKey
-} from '@athanor/core';
+} from '@garden/core';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 
@@ -24,7 +24,7 @@ export function registerPrivateDiagnosticRoutes({
     async (request, reply) => {
       const user = requireUser(request.user);
       if (!(await store.getTask(user.id, request.params.taskId)))
-        throw new AthanorError('task_not_found', 'Conversation not found', 404);
+        throw new GardenError('task_not_found', 'Conversation not found', 404);
       return reply.header('cache-control', 'private, no-store').send({
         capture: (await store.diagnostics.get(user.id, request.params.taskId))?.status ?? null
       });
@@ -52,10 +52,10 @@ export function registerPrivateDiagnosticRoutes({
       const user = requireUser(request.user);
       const capture = await store.diagnostics.get(user.id, request.params.taskId);
       if (!capture || capture.status.id !== request.params.id)
-        throw new AthanorError('diagnostic_not_found', 'Recording not found', 404);
+        throw new GardenError('diagnostic_not_found', 'Recording not found', 404);
       const workspace = await store.getWorkspace(user.id, capture.workspaceId);
       if (!workspace?.wrappedKey)
-        throw new AthanorError('workspace_not_found', 'Workspace not found', 404);
+        throw new GardenError('workspace_not_found', 'Workspace not found', 404);
       const key = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
       const header = {
         type: 'private_capture',

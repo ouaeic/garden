@@ -1,4 +1,4 @@
-export class AthanorError extends Error {
+export class GardenError extends Error {
   constructor(
     public readonly code: string,
     message: string,
@@ -6,6 +6,6 @@ export class AthanorError extends Error {
     public readonly details?: Record<string, unknown>
   ) {
     super(message);
-    this.name = 'AthanorError';
+    this.name = 'GardenError';
   }
 }

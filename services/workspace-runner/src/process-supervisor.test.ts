@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { signCapabilityToken, capabilityAudience } from '@athanor/core';
+import { signCapabilityToken, capabilityAudience } from '@garden/core';
 import { loadConfig } from './config.js';
 import { buildServer } from './server.js';
 import { listenProcessSupervisor, connectProcessSupervisor } from './process-supervisor.js';

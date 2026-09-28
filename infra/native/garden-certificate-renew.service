@@ -1,0 +1,45 @@
+[Unit]
+Description=Renew the garden TLS certificate
+After=network-online.target nginx.service
+Wants=network-online.target
+# Four attempts, a quarter of an hour apart. The common failure is a machine that has just come
+# back online with DNS or its uplink not settled, which the next few minutes usually fix; waiting
+# for the six-hourly tick instead means hours of browser warnings for a fault that cleared almost
+# immediately.
+StartLimitIntervalSec=1h
+StartLimitBurst=4
+# A renewal that keeps failing is invisible: the served certificate simply expires and every
+# client gets a full-page warning with nothing said to the owner. This records the failure where
+# `garden doctor` and the login banner will report it.
+OnFailure=garden-certificate-alert.service
+
+[Service]
+Type=oneshot
+# `renew` is a no-op unless ACME is enabled and the certificate is inside its renewal window,
+# so the timer can run often and cheaply. Issuance failure leaves the served certificate in
+# place, which is why a failed run is not allowed to disable the timer.
+ExecStart=/usr/local/lib/garden/garden-certificate renew
+TimeoutStartSec=15min
+Restart=on-failure
+RestartSec=15min
+# lego is a network-facing binary, it runs as root, it runs every six hours whether or not anyone
+# is watching, and it had nothing at all between it and the rest of the machine. `strict` is
+# reachable here for the reason it is not reachable on the runner: this unit runs four known
+# programs rather than whatever an agent asked for, so its write set can be written down.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+# The whole of it. /etc/garden rather than the two files under it that the renewal actually
+# rewrites - the served certificate in tls/, and ACME_INCLUDE_IPS in control.env - because
+# `set_control_value` (scripts/garden-certificate) replaces control.env atomically through a
+# sibling temp file, so it needs the directory and not the file. /etc/nginx/snippets for the same
+# reason: on the first successful issuance the HSTS snippet is created rather than rewritten.
+# /var/lib/garden holds the ACME webroot and the recorded failure `garden doctor` reads, and
+# /usr/local/lib/garden is where `require_acme_client` installs the pinned lego binary the first
+# time a renewal needs it. Nothing else on the box is writable from here, including /tmp, which
+# PrivateTmp gives this unit privately for lego's working directory.
+ReadWritePaths=/etc/garden
+ReadWritePaths=/etc/nginx/snippets
+ReadWritePaths=/var/lib/garden
+ReadWritePaths=/usr/local/lib/garden

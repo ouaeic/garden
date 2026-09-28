@@ -2,13 +2,13 @@
 name: media-creation
 description: Produce images, speech, diagrams and video edits — pictures and voiceovers generated through the owner's configured provider, everything else edited deterministically with ffmpeg, ImageMagick and Graphviz — and inspect the result before delivering it. Use when the deliverable is a picture, an illustration, a diagram, an audio clip, a voiceover, a video edit or a screen recording. Do not use to run any model locally, do not use to generate a video from a prompt because there is no route to one, and do not use for charts derived from data, which belong to data-analysis.
 license: AGPL-3.0-or-later
-compatibility: Every deterministic tool named here is installed on this computer by athanor - ffmpeg, ImageMagick as `magick`, and Graphviz. Generated images and speech go through the owner's configured provider; there is no generated video here at all.
+compatibility: Every deterministic tool named here is installed on this computer by garden - ffmpeg, ImageMagick as `magick`, and Graphviz. Generated images and speech go through the owner's configured provider; there is no generated video here at all.
 allowed-tools: generate_media image_read audio_read shell file_read file_write files_list publish_artifact
 metadata:
-  athanor.tier: 'builtin'
-  athanor.version: '2.2.0'
-  athanor.risk: 'workspace'
-  athanor.domain: 'media'
+  garden.tier: 'builtin'
+  garden.version: '2.2.0'
+  garden.risk: 'workspace'
+  garden.domain: 'media'
 ---
 
 # Media creation

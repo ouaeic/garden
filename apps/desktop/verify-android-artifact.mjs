@@ -15,7 +15,7 @@ const EXPECTED_PERMISSIONS = new Set([
   'android.permission.RECORD_AUDIO',
   'android.permission.RECEIVE_BOOT_COMPLETED',
   'android.permission.WAKE_LOCK',
-  'org.athanor.ai.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
+  'org.garden.ai.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
 ]);
 const EXPECTED_BACKUP_DOMAINS = [
   'root',
@@ -155,7 +155,7 @@ export function validateManifestTree(manifest) {
     ['network security config is attached', /networkSecurityConfig[^=\n]*=@/],
     ['Android 12 backup rules are attached', /dataExtractionRules[^=\n]*=@/],
     ['legacy backup rules are attached', /fullBackupContent[^=\n]*=@/],
-    ['the private deep-link scheme is present', /scheme[^=\n]*="athanor"/],
+    ['the private deep-link scheme is present', /scheme[^=\n]*="garden"/],
     ['the file provider is not exported', /FileProvider[\s\S]*?exported[^=\n]*=false/]
   ];
   for (const [label, pattern] of requirements) {
@@ -294,7 +294,7 @@ function ndkReadelfPath(ndkRoot) {
 
 async function auditNativeLibraries(archivePath, nativeLibraries, environment) {
   invariant(nativeLibraries.length > 0, 'Android package has no native library');
-  const auditDirectory = await mkdtemp(join(tmpdir(), 'athanor-android-audit-'));
+  const auditDirectory = await mkdtemp(join(tmpdir(), 'garden-android-audit-'));
   try {
     const readelf = ndkReadelfPath(environment.NDK_HOME ?? environment.ANDROID_NDK_HOME);
     for (const entry of nativeLibraries) {
@@ -339,7 +339,7 @@ export async function verifyAndroidApk(
   const tauri = JSON.parse(
     await readFile(new URL('./src-tauri/tauri.conf.json', import.meta.url), 'utf8')
   );
-  invariant(parsed.packageName === 'org.athanor.ai', 'Android package identifier changed');
+  invariant(parsed.packageName === 'org.garden.ai', 'Android package identifier changed');
   invariant(parsed.versionName === tauri.version, 'Android and Tauri versions do not match');
   invariant(/^[1-9]\d*$/.test(parsed.versionCode ?? ''), 'Android versionCode is not positive');
   invariant(parsed.minSdk === '26', 'Android minSdk must remain 26');
@@ -440,7 +440,7 @@ export async function verifyAndroidBundle(
   const sourceConfig = JSON.parse(
     await readFile(new URL('./src-tauri/tauri.conf.json', import.meta.url), 'utf8')
   );
-  invariant(embeddedConfig.identifier === 'org.athanor.ai', 'Android bundle identifier changed');
+  invariant(embeddedConfig.identifier === 'org.garden.ai', 'Android bundle identifier changed');
   invariant(
     embeddedConfig.version === sourceConfig.version,
     'Android bundle and Tauri versions do not match'

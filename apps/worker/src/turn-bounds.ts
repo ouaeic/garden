@@ -12,16 +12,16 @@
  *
  * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
-import { AthanorError, sha256, spendHalt, spendWarning } from '@athanor/core';
+import { GardenError, sha256, spendHalt, spendWarning } from '@garden/core';
 
 /*
- * The two owner-facing spending sentences now live in `@athanor/core`, because the API builds the
+ * The two owner-facing spending sentences now live in `@garden/core`, because the API builds the
  * same card the worker's halt writes and the two must quote one set of numbers. They are re-exported
  * here so the worker's own callers - and the tests that cover the wording - keep the import they
  * had; nothing about what they say has changed.
  */
 export { spendHalt, spendWarning };
-import type { ModelMessage, ModelToolCall } from '@athanor/model-gateway';
+import type { ModelMessage, ModelToolCall } from '@garden/model-gateway';
 import type { AcceptanceResult } from './acceptance.js';
 import type { AgentState } from './agent-state.js';
 import { canonicalJson } from './values.js';
@@ -310,7 +310,7 @@ const OWNER_FIXABLE_CHECKPOINT_CODES = new Set([
  * its error through `runnerFailure` - it threw `Checkpoint failed (<status>): <body>` with the
  * runner's own `{error:{code,message,…}}` envelope flattened into the sentence, so the code was
  * present on the wire and thrown away by the client rather than by the runner. That half is now
- * fixed and the code arrives as an `AthanorError` field.
+ * fixed and the code arrives as an `GardenError` field.
  *
  * This stays as the fallback, for the same reason the prose regex below does: a worker is routinely
  * a release ahead of the box it talks to, and a runner that still flattens is still readable.
@@ -439,17 +439,17 @@ export const ACCEPTANCE_EARLIER_TURN_CAVEAT =
  * without anyone rereading the sentence.
  *
  * Two of them, not one, because a check that failed and a check that could not be run are different
- * news and the owner's next move differs. "Your test says no" sends them to the failure. "athanor
+ * news and the owner's next move differs. "Your test says no" sends them to the failure. "garden
  * never got to run your test" sends them to the runner, the network or the disk, and telling them
- * the first when the second happened is athanor claiming an observation it did not make.
+ * the first when the second happened is garden claiming an observation it did not make.
  *
- * Both begin with what athanor did rather than with a verdict, and both say plainly what is NOT
+ * Both begin with what garden did rather than with a verdict, and both say plainly what is NOT
  * being claimed - the second in as many words, because "unchecked" is routinely read as "failed".
  */
 export const ACCEPTANCE_FAILED_CAVEAT =
-  'athanor ran the checks this turn declared and they did not pass, so nothing here is verified - read the failures below before relying on it.';
+  'garden ran the checks this turn declared and they did not pass, so nothing here is verified - read the failures below before relying on it.';
 export const ACCEPTANCE_COULD_NOT_RUN_CAVEAT =
-  'athanor could not run the checks this turn declared, so this result is unchecked - neither proved nor disproved.';
+  'garden could not run the checks this turn declared, so this result is unchecked - neither proved nor disproved.';
 
 /**
  * The caveats that belong beside the tick rather than behind the disclosure.
@@ -568,7 +568,7 @@ export const idleStepBreak = (steps: number): string =>
  * What it would not have caught, said plainly, because it was the turn that prompted it: the
  * seventy-two-call turn on the owner's box that spent $3.78 while ignoring an instruction to stop
  * was making progress by every measure the loop has. Its calls succeeded. Nothing below would have
- * touched it, and a bound that claimed otherwise would be athanor asserting something it cannot
+ * touched it, and a bound that claimed otherwise would be garden asserting something it cannot
  * see. That turn needs a different bound; this one is for the retry that cannot work.
  */
 export const MAX_REPEATED_FAILURES = 3;
@@ -595,7 +595,7 @@ const TRACKED_FAILING_CALLS = 16;
  *
  * The wording carries the parts that legitimately move between two attempts at the same thing - a
  * duration, a byte count, a request id - and two attempts differing only in those are the same
- * attempt. `AthanorError` already publishes the kind as its code, which is the runner's own reason
+ * attempt. `GardenError` already publishes the kind as its code, which is the runner's own reason
  * for refusing; everything else is reduced to its shape.
  *
  * Not `failureClass` in failure-record.ts, which answers a different question for the journal: that
@@ -605,7 +605,7 @@ const TRACKED_FAILING_CALLS = 16;
  * state.
  */
 export const failureSignature = (error: unknown): string =>
-  error instanceof AthanorError
+  error instanceof GardenError
     ? error.code
     : (error instanceof Error ? error.message : 'tool failed')
         .toLowerCase()
@@ -709,7 +709,7 @@ export const repeatedFailureBreak = (count: number, tool: string): string =>
  * The distinction the stationarity guard below is built on, and the reason it needs two tiers.
  * `LOOP_ANSWERED_TOOLS` is already this set minus its one writer: those are answered by the loop
  * itself, so their result is written a few lines from where the call was read. `set_plan` is added
- * because it writes only athanor's account of what it is doing - the plan document, versioned
+ * because it writes only garden's account of what it is doing - the plan document, versioned
  * against the owner's own edits - and never the computer, the outside world, or the owner's bill.
  *
  * Derived rather than listed, so a tool the loop learns to answer joins both sets in one edit, with
@@ -1071,7 +1071,7 @@ export const VISION_SPECIALIST_MIN_CONTEXT_TOKENS = 8_000;
 export const VISION_SPECIALIST_ATTEMPTS = 2;
 
 /**
- * The host package managers athanor's privileged helper can carry out an operation for.
+ * The host package managers garden's privileged helper can carry out an operation for.
  *
  * `PACKAGE_MANAGERS` in `services/workspace-runner/src/command-policy.ts` is the full list - what
  * counts as installing software on the host, for the approval card and for the desktop refusal -

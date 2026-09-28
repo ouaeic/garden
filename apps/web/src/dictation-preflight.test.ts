@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DictationOptions } from '@athanor/contracts';
+import type { DictationOptions } from '@garden/contracts';
 import { authorizeDictation } from './dictation-preflight';
 
 const options: DictationOptions = {

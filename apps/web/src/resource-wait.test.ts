@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import type { TaskEvent } from '@athanor/contracts';
+import type { TaskEvent } from '@garden/contracts';
 import { resourceWaitReason } from './resource-wait';
 
 const notice = (sequence: number, code: string, summary: string): TaskEvent => ({

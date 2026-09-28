@@ -1,8 +1,8 @@
-import { runtimeValue } from '@athanor/core';
+import { runtimeValue } from '@garden/core';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { AthanorError } from '@athanor/core';
-import type { ModelToolCall } from '@athanor/model-gateway';
-import type { TaskRecord } from '@athanor/data';
+import { GardenError } from '@garden/core';
+import type { ModelToolCall } from '@garden/model-gateway';
+import type { TaskRecord } from '@garden/data';
 import type { AgentState, InferenceCredential } from './agent-state.js';
 import { canonicalJson, textValue } from './values.js';
 
@@ -24,7 +24,7 @@ const binding = (
       ? secret.mediaRoutes?.[kind]
       : undefined;
   if (!route || route.modality !== kind || !route.providerModelId || route.unavailableReason)
-    throw new AthanorError(
+    throw new GardenError(
       'media_route_unavailable',
       'Choose a currently available media route in Settings.',
       409
@@ -88,7 +88,7 @@ export const requireMediaGenerationApproval = (
   const before = Buffer.from(saved?.binding ?? '', 'hex');
   const after = Buffer.from(current.binding, 'hex');
   if (before.length !== after.length || !timingSafeEqual(before, after))
-    throw new AthanorError(
+    throw new GardenError(
       'media_route_changed',
       'The media route, credential or price changed. Request this generation again so its current details can be reviewed.',
       409

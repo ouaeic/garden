@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ArrowUpRight, Command, FileText, Search } from 'lucide-react';
-import type { Task, Workspace } from '@athanor/contracts';
+import type { Task, Workspace } from '@garden/contracts';
 import { get } from './client';
 import { taskStatusLabel } from './model';
 import { Dialog, ErrorNotice, Spinner } from './ui';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DataStore } from '@athanor/data';
+import type { DataStore } from '@garden/data';
 import { notificationSubject, ownerPresent, ownerSettings, type PendingRow } from './context.js';
 
 const now = new Date('2026-07-31T12:00:00.000Z');

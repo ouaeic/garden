@@ -12,7 +12,7 @@ import type {
   TaskReasoningEffort,
   ProjectModelChoices,
   TaskSchedule
-} from '@athanor/contracts';
+} from '@garden/contracts';
 export interface DraftAttachment {
   path: string;
   name: string;

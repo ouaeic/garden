@@ -1,5 +1,5 @@
 /**
- * Drives one trajectory through athanor's production context path at one configuration, and comes
+ * Drives one trajectory through garden's production context path at one configuration, and comes
  * back with both axes: what the prompt cache got, and what the model lost.
  *
  * The loop below is the step loop `agent.ts:9249-9337` runs, in its order: the runtime block is
@@ -105,7 +105,7 @@ const mean = (values: readonly number[]): number =>
  *
  * IT IS ALSO THE ONLY SUMMARISER THIS RIG HAS, IN BOTH HALVES. `--judge` replaces the model that
  * ANSWERS a probe from a compressed window and the model that grades the answer; it does not
- * replace this. So nothing here measures athanor's real brief, and no change to `compactionRequest`
+ * replace this. So nothing here measures garden's real brief, and no change to `compactionRequest`
  * - the summariser's instructions, what it is asked to preserve, the lookup-terms line it is told
  * to end on - can move a single number this directory prints. The comment that used to sit here
  * said judged mode replaced this function, which is what a reader would have to believe to think
@@ -281,7 +281,7 @@ export const measure = async (
     }
     // The files this turn has written, removed from wherever it sits and re-pushed, which is what
     // `openStep` does immediately before the runtime block. Nothing is reimplemented here: this is
-    // the shipped function, so the block the rig measures is the block athanor renders.
+    // the shipped function, so the block the rig measures is the block garden renders.
     context.refreshArtifactLedger(messages, ledger);
     // Last of the tail blocks and re-pushed every step, exactly as refreshRuntimeContext does -
     // and the reason the newest assistant message is never the last message in the window.
@@ -292,7 +292,7 @@ export const measure = async (
     messages.push({
       role: 'system',
       content: context.runtimeContext(
-        { name: 'athanor', securityMode: 'balanced' },
+        { name: 'garden', securityMode: 'balanced' },
         'https://preview.example.com',
         { now: new Date(Date.UTC(2026, 2, 3, 9, 15) + step * 45_000), timeZone: 'Europe/London' },
         'python3 3.11, typst 0.12, libreoffice 24.2',

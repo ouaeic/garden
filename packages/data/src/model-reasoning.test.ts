@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, it } from 'vitest';
-import type { ReasoningOptions } from '@athanor/contracts';
+import type { ReasoningOptions } from '@garden/contracts';
 import { createDatabase, migrateDatabase } from './database.js';
 import { DataStore } from './store.js';
 

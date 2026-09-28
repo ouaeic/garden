@@ -1,4 +1,4 @@
-import { ComputationState } from '@athanor/contracts';
+import { ComputationState } from '@garden/contracts';
 import { z } from 'zod';
 
 export const ComputationWaitIdentity = z

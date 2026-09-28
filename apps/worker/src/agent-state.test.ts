@@ -23,7 +23,7 @@
  *   or dropped at the turn boundary - rather than silently inheriting whichever `startTurnState`
  *   happens to do.
  */
-import { decryptJson, encryptJson } from '@athanor/core';
+import { decryptJson, encryptJson } from '@garden/core';
 import { describe, expect, it } from 'vitest';
 import type { AgentState } from './agent-state.js';
 import { startTurnState } from './completion.js';
@@ -189,7 +189,7 @@ const FULL: Required<AgentState> = {
   jobWaitId: 'job-wait-fixture',
   codingMissionReviews: { mission: { digest: 'reviewed', generation: 1 } },
   messages: [
-    { role: 'system', content: 'ATHANOR RUNTIME CONTEXT (dynamic)' },
+    { role: 'system', content: 'GARDEN RUNTIME CONTEXT (dynamic)' },
     { role: 'user', content: 'fix the importer' },
     {
       role: 'assistant',

@@ -5,10 +5,10 @@ const MASTER_KEY_BYTES = 32;
 
 const Config = z.object({
   DATABASE_DRIVER: z.enum(['pglite', 'postgres']).default('postgres'),
-  DATABASE_URL: z.string().default('postgres://athanor:athanor@localhost:5432/athanor'),
-  PGLITE_PATH: z.string().default('.athanor/postgres'),
+  DATABASE_URL: z.string().default('postgres://garden:garden@localhost:5432/garden'),
+  PGLITE_PATH: z.string().default('.garden/postgres'),
   /*
-   * Web Push is optional: athanor works without it, the API already reports the feature as
+   * Web Push is optional: garden works without it, the API already reports the feature as
    * disabled when no key is present, and the client hides the control. These are therefore
    * optional here too. A service that refuses to start over absent optional configuration does
    * not fail safe - it crash-loops under systemd, turns one disabled feature into a permanently
@@ -31,7 +31,7 @@ const Config = z.object({
    * the key to unwrap it, so it decrypts them - but only when it is handed a key. This schema had
    * no field for it at all, so the sender could not have passed one, and the result was that every
    * notification on every device read "Untitled conversation" while docs/PRIVACY.md described the
-   * opposite. The unit already reads the /etc/athanor/control.env that carries this value.
+   * opposite. The unit already reads the /etc/garden/control.env that carries this value.
    *
    * Optional, like the signing keys above and for the same reason: a box without it still delivers
    * notifications, worded without the title, and a service that refuses to start over absent
@@ -69,7 +69,7 @@ const Config = z.object({
    */
   NOTIFICATION_INBOUND_POLL_TIMEOUT_S: z.coerce.number().int().min(1).max(50).default(50),
   /*
-   * The address a card's "Open in athanor" button carries. Web Push needs no such thing - the
+   * The address a card's "Open in garden" button carries. Web Push needs no such thing - the
    * service worker resolves a relative path against its own origin - but a message on a phone is
    * opened by a browser that knows nothing about this box. Shared with every other service, and
    * declared here rather than imported from the contracts package for the reason DATA_MASTER_KEY
@@ -92,7 +92,7 @@ const Config = z.object({
  *
  * Nginx is the only public listener on this box, and binding 0.0.0.0 here once published a health
  * and metrics endpoint straight onto the internet. The port is fixed for the same reason the host
- * is: `athanor doctor` probes it and the runner is told it as a port a published preview may never
+ * is: `garden doctor` probes it and the runner is told it as a port a published preview may never
  * take, both as literals, so a setting that moved it could only make those two wrong.
  */
 export const NOTIFICATION_HEALTH_HOST = '127.0.0.1';
@@ -104,7 +104,7 @@ export const loadConfig = (env: unknown = process.env): NotificationConfig => Co
 /**
  * The master key as bytes, for the one call that needs it.
  *
- * Decoded here rather than through `@athanor/core`'s `decodeMasterKey` because this service's
+ * Decoded here rather than through `@garden/core`'s `decodeMasterKey` because this service's
  * dependencies are the data layer, the push library and zod, and reaching for another workspace
  * package to run four lines would mean an undeclared import at runtime. `core`'s own
  * `service-keys.ts` keeps a second private copy for the same reason. The length is already refused

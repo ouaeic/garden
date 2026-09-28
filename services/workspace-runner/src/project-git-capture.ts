@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { openDownloadFile } from './open-download-file.js';
 import { rm } from 'node:fs/promises';
-import type { ProjectGitWorkingCopy } from '@athanor/contracts';
+import type { ProjectGitWorkingCopy } from '@garden/contracts';
 import { withWorkspaceDirectory, workspacePath } from './files.js';
 import type { ProjectGit } from './project-git.js';
 import type { ProjectCheckExecution } from './project-updates.js';

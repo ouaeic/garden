@@ -1,6 +1,6 @@
 /* eslint jsx-a11y/no-noninteractive-tabindex: ["error", {"roles": ["region"]}] -- Keyboard users must be able to scroll the labeled data region. */
 import { useEffect, useRef, useState } from 'react';
-import type { TablePage } from '@athanor/contracts';
+import type { TablePage } from '@garden/contracts';
 import { get } from '../client';
 import { Button, ErrorNotice, Spinner } from '../ui';
 import { processMemory } from '../process-display';

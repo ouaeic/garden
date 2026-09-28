@@ -1,11 +1,11 @@
-import { ModelRelease } from '@athanor/contracts';
+import { ModelRelease } from '@garden/contracts';
 import {
-  AthanorError,
+  GardenError,
   modelConnectionId,
   priceCeilingFields,
   readRoutingMetadata
-} from '@athanor/core';
-import { createModelAdapter, isNativeOpenAIEndpoint } from '@athanor/model-gateway';
+} from '@garden/core';
+import { createModelAdapter, isNativeOpenAIEndpoint } from '@garden/model-gateway';
 import { ownerPriceCeiling, type InferenceSecret } from './context.js';
 import type { ServerBase } from './http/server-context.js';
 import { providerWalls } from './maintenance/provider-walls.js';
@@ -64,7 +64,7 @@ export const createTitleCompletion =
       fetch: async (url, init) => {
         if (init?.method === 'POST') {
           if (submitted)
-            throw new AthanorError(
+            throw new GardenError(
               'title_already_submitted',
               'This title request has already been submitted',
               409
@@ -100,7 +100,7 @@ export const createTitleCompletion =
           : AbortSignal.timeout(20_000)
       })
       .catch((error: unknown) => {
-        if (error instanceof AthanorError && error.code in providerWalls) return null;
+        if (error instanceof GardenError && error.code in providerWalls) return null;
         throw error;
       });
     if (!response) return null;

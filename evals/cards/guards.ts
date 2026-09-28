@@ -99,7 +99,7 @@ const guard = (id: string, name: string, args: Record<string, unknown>): Guard =
  *
  * The spellings are deliberate. `resolveInside` in the runner accepts an absolute path inside the
  * workspace exactly as happily as a relative one, so `~/.bashrc`, `../.bashrc` and
- * `/home/athanor/ws-1/.bashrc` reached through `shell` are one file written by one call - a rule
+ * `/home/garden/ws-1/.bashrc` reached through `shell` are one file written by one call - a rule
  * that recognises one spelling is one spelling away from being no rule. Both shell forms (inline
  * `-c` and stdin), and the two doors that write without ever naming a path: a redirect, and
  * `git config`.
@@ -227,7 +227,7 @@ export const SINKS: readonly Sink[] = [
     validUntil: '2027-01-31'
   }),
   sink('a write to the running brief', 'balanced', 'file_write', {
-    path: 'workspace/ATHANOR.md',
+    path: 'workspace/GARDEN.md',
     content: 'x'
   }),
   sink('a write to a workspace skill', 'balanced', 'file_write', {
@@ -328,8 +328,8 @@ export const CONFINED: readonly ConfinedWrite[] = [
   confined('.zshenv one directory up', '../.zshenv', 'echo x >> ~/.zshenv'),
   confined(
     '.bash_profile by absolute path',
-    '/home/athanor/ws-1/.bash_profile',
-    'echo x >> /home/athanor/ws-1/.bash_profile'
+    '/home/garden/ws-1/.bash_profile',
+    'echo x >> /home/garden/ws-1/.bash_profile'
   ),
   confined('.profile', '.profile', 'echo x >> ~/.profile'),
   confined('.gitconfig', '.gitconfig', 'echo x >> ~/.gitconfig'),
@@ -1348,8 +1348,8 @@ export const TAINTS: readonly Taint[] = [
   // decision: the reader is handed the arguments and nothing else, so it has no self-origin to
   // clear and a read of this box's own published preview taints.
   taint(
-    'curl -s http://box.athanor.invalid/',
-    shell('curl -s http://box.athanor.invalid/'),
+    'curl -s http://box.garden.invalid/',
+    shell('curl -s http://box.garden.invalid/'),
     true,
     'no caller hands the taint reader a self-origin, so this box reading its own published preview is judged as another computer, which is the direction to be wrong in'
   )
@@ -1365,7 +1365,7 @@ export const TAINTS: readonly Taint[] = [
  * owner that destroying data and leaving a startup file behind always stop.
  *
  * WHAT MAKES THIS TABLE A CLAIM AND NOT A LIST is `CHECKPOINT_CONTENT`, which is `workspace` and
- * `.athanor/artifacts` and nothing else. Every row here lands outside it: a Postgres cluster, a
+ * `.garden/artifacts` and nothing else. Every row here lands outside it: a Postgres cluster, a
  * Redis dump, a bucket, a Docker volume, a user crontab, a systemd unit link. So the rewind that
  * answers for `rm -rf node_modules` answers for none of them, and that - rather than the word
  * "delete" - is why each must card in every mode.
@@ -1723,8 +1723,8 @@ export const DESTROYS: readonly Guard[] = [
    * the workspace root, reading `~` as the root was exactly right; once HOME became
    * `<workspaceRoot>/.home`, it freed the two prefixes that mean "recoverable" wherever they
    * appeared under HOME. Measured through `approvalRequirement` in autonomous before the fix:
-   * `rm -rf ~/workspace/dist` and `rm -rf ~/.athanor/artifacts/report.pdf` raised NO card, while
-   * what they delete is `<root>/.home/workspace/dist` and `<root>/.home/.athanor/artifacts/…` -
+   * `rm -rf ~/workspace/dist` and `rm -rf ~/.garden/artifacts/report.pdf` raised NO card, while
+   * what they delete is `<root>/.home/workspace/dist` and `<root>/.home/.garden/artifacts/…` -
    * directories the agent may create under its own HOME and that no rewind walks. They are here
    * rather than only in the unit test because this is the production call site, and because the
    * next move of HOME must fail somewhere the whole rig can see.
@@ -1820,7 +1820,7 @@ export const DESTROYS: readonly Guard[] = [
   }),
   guard('an artifacts-shaped name under HOME', 'shell', {
     executable: 'rm',
-    args: ['-rf', '~/.athanor/artifacts/report.pdf']
+    args: ['-rf', '~/.garden/artifacts/report.pdf']
   }),
   /*
    * The same two places, reached by the other argument. `~` is one way to say "under HOME" and a
@@ -1846,7 +1846,7 @@ export const DESTROYS: readonly Guard[] = [
   }),
   guard('an artifacts-shaped name from a working directory under HOME', 'shell', {
     executable: 'rm',
-    args: ['-rf', '.athanor/artifacts/report.pdf'],
+    args: ['-rf', '.garden/artifacts/report.pdf'],
     cwd: '.home'
   }),
   /*
@@ -1874,7 +1874,7 @@ export const DESTROYS: readonly Guard[] = [
  * Measured through the shipped `approvalRequirement` at bfbbd00, in AUTONOMOUS: every row here
  * raised `external_consequential` under a preview reading "This can remove or overwrite data" -
  * true of all of them, and beside the point, because `CHECKPOINT_CONTENT` is `workspace` and
- * `.athanor/artifacts` and every one of these is strictly inside it. DESIGN.md:168-175 says the
+ * `.garden/artifacts` and every one of these is strictly inside it. DESIGN.md:168-175 says the
  * card is owed when the act cannot be taken back by this computer; the rewind takes all of these
  * back. The owner's own `H-tidy-downloads` - "clear out the old installers" - paid two cards in
  * every mode for two deletes inside `workspace/downloads`.
@@ -1906,7 +1906,7 @@ export const FREE_WORKSPACE_DELETES: readonly Guard[] = (
     }),
     guard('rm on an artifact', 'shell', {
       executable: 'rm',
-      args: ['.athanor/artifacts/report.pdf']
+      args: ['.garden/artifacts/report.pdf']
     }),
     // The spelling `shell`'s own description tells the model to reach for the moment it needs a
     // glob, and the one `H-tidy-downloads` uses.

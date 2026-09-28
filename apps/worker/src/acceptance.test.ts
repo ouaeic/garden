@@ -1,4 +1,4 @@
-import type { DataStore, TaskRecord } from '@athanor/data';
+import type { DataStore, TaskRecord } from '@garden/data';
 import { describe, expect, it, vi } from 'vitest';
 import {
   acceptanceAlreadyObserved,
@@ -304,7 +304,7 @@ describe('a check that could not run, told apart from one that failed', () => {
     expect(acceptanceObservation(result(true, 'exit 0'))).toBe('passed');
     expect(
       acceptanceObservation(
-        result(true, 'exit 0, from athanor running this same command after the last change')
+        result(true, 'exit 0, from garden running this same command after the last change')
       )
     ).toBe('passed');
   });
@@ -634,7 +634,7 @@ describe('what the owner is shown as proved carries the command beside the label
     expect(line).toContain('exit 0');
   });
 
-  it('in a result answered from a run athanor already watched', () => {
+  it('in a result answered from a run garden already watched', () => {
     const observed = new Map([[commandFingerprint(check), 0]]);
     expect(acceptanceAlreadyObserved(check, observed)?.command).toBe(ran);
   });

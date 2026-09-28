@@ -1,11 +1,11 @@
 import { z } from 'zod';
-import { GitHubProjectAction } from '@athanor/contracts';
+import { GitHubProjectAction } from '@garden/contracts';
 import {
-  AthanorError,
+  GardenError,
   decryptJson,
   executeConnectorAction,
   type ConnectorSecret
-} from '@athanor/core';
+} from '@garden/core';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 
@@ -30,9 +30,9 @@ export function registerProjectGitRoutes(
       const run = async () => {
         const connector = await store.getConnector(user.id, input.connectorId);
         if (!connector?.enabled)
-          throw new AthanorError('connector_not_found', 'Connected service is unavailable', 404);
+          throw new GardenError('connector_not_found', 'Connected service is unavailable', 404);
         if (connector.secretCiphertext.aad !== `connector:${user.id}:${connector.id}`)
-          throw new AthanorError(
+          throw new GardenError(
             'connector_secret_context',
             'Connector secret encryption context is invalid'
           );
@@ -109,7 +109,7 @@ export function registerProjectGitRoutes(
             userId: user.id,
             operation: input.operation.action,
             outcome:
-              error instanceof AthanorError && error.code === 'connector_scope_denied'
+              error instanceof GardenError && error.code === 'connector_scope_denied'
                 ? 'denied'
                 : 'failed'
           });

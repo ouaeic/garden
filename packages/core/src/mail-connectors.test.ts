@@ -11,7 +11,7 @@ import {
   type ConnectorTransport
 } from './connectors.js';
 import { findFirst, parseXml } from './caldav.js';
-import { AthanorError } from './errors.js';
+import { GardenError } from './errors.js';
 import { parseImapEndpoint } from './mail-connectors.js';
 import { ImapSession, SmtpSession, type MailSocketFactory } from './mail-protocol.js';
 import { extractPart, parseMessage } from './mime.js';
@@ -185,7 +185,7 @@ const harness = (refuse?: RegExp): Harness => {
           imapScript(self, command);
         });
         imap.push(server);
-        server.say('* OK [CAPABILITY IMAP4rev1 SASL-IR AUTH=PLAIN] athanor test ready\r\n');
+        server.say('* OK [CAPABILITY IMAP4rev1 SASL-IR AUTH=PLAIN] garden test ready\r\n');
         return server;
       }
       const server = new FakeMailServer(smtpScript());
@@ -481,7 +481,7 @@ const invitation = [
 ].join('\r\n');
 
 /**
- * The realistic shape of an event athanor is asked to move: a repeat, a reminder, a named zone
+ * The realistic shape of an event garden is asked to move: a repeat, a reminder, a named zone
  * with the VTIMEZONE that defines it, a status, a category, and two people who have already said
  * yes. Everything here is something a rebuild-from-scalars update silently threw away, so the
  * fixture is deliberately larger than anything `buildEventComponent` can express.
@@ -750,7 +750,7 @@ describe('calendar connector', () => {
    * `serializeIcalendar` escaped ';' and ',' in every value, but RRULE, EXDATE, RDATE, CATEGORIES,
    * GEO and REQUEST-STATUS are structured values where those characters are separators, not text.
    * So a preserved `RRULE:FREQ=WEEKLY;BYDAY=TU` went back out as `FREQ=WEEKLY\;BYDAY=TU`.
-   * athanor's own parser unescapes it again, which is why nothing here saw it, but a CalDAV server
+   * garden's own parser unescapes it again, which is why nothing here saw it, but a CalDAV server
    * or another client reads one malformed rule part - and the answer to a repeating invitation
    * writes the whole VCALENDAR back, so this reached servers on the accept path too.
    */
@@ -1103,7 +1103,7 @@ describe('caldav transport bounds', () => {
               }
             : { status: 412, headers: {}, body: Buffer.alloc(0), durationMs: 1 }
       )
-    ).rejects.toThrow('changed on the server since athanor read it');
+    ).rejects.toThrow('changed on the server since garden read it');
   });
 
   it('does not send a second report after a failure that says nothing about expand', async () => {
@@ -1120,7 +1120,7 @@ describe('caldav transport bounds', () => {
         },
         async () => {
           calls += 1;
-          throw new AthanorError(
+          throw new GardenError(
             'connector_redirect_blocked',
             'Connector redirects are blocked to prevent credential forwarding'
           );

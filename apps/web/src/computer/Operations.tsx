@@ -5,7 +5,7 @@ import type {
   Workspace,
   WorkspacePreview,
   WorkspaceSnapshot
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { del, get, isNativeClient, post } from '../client.js';
 import { previewIsolated, previewUrl } from '../preview-url';
 import { stepUp } from '../auth.js';

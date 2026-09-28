@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile, mkdir, symlink, stat } from 'node:fs/
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it } from 'vitest';
-import type { ProjectUpdate } from '@athanor/contracts';
+import type { ProjectUpdate } from '@garden/contracts';
 import { ensureWorkspace, workspacePath } from './files.js';
 import { ProjectUpdatesManager, type ProjectCheckExecution } from './project-updates.js';
 import { ProjectVersionFiles } from './project-version-files.js';

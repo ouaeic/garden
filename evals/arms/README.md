@@ -2,8 +2,8 @@
 
 `pnpm eval:arms`
 
-Two configurations of athanor, the same work, and one difference between them. It exists because
-every argument about athanor's resident weight — the catalogue is too large, the skill index is
+Two configurations of garden, the same work, and one difference between them. It exists because
+every argument about garden's resident weight — the catalogue is too large, the skill index is
 dead, the contract carries method it should not — has so far been settled by reading source and
 forming a view. None of them has been measured, and none of them can be settled without an
 instrument that can hold two configurations against the same sample honestly.
@@ -22,7 +22,7 @@ behind every tool. Needs `OPENROUTER_API_KEY`. It reports success rate and mean 
 the same row, always, and excludes ghost and unmetered rows from both.
 
 The offline half cannot say whether an arm finishes the work, and it says so where it prints. A
-scripted model is a function of what athanor just said, so a smaller catalogue produces a
+scripted model is a function of what garden just said, so a smaller catalogue produces a
 byte-identical reply and every arm would tie. A tie in that table means the instrument is blind
 there, not that the candidate is free.
 
@@ -90,7 +90,7 @@ weak tier is where a correctness risk shows and the strong tier is where the sav
 <release id>` names the weak tier, and named explicitly it may run alone - the table then says it
 informs and does not settle.
 
-**The live half goes through athanor's own gateway.** `edit-live.ts` builds the transport from
+**The live half goes through garden's own gateway.** `edit-live.ts` builds the transport from
 `evals/bench/provider.ts`'s credential and model-id rules and `packages/model-gateway`'s adapter,
 so the request a row is scored on is the request the worker would have sent - same client, same
 retry policy, same usage parsing. The key is `AI_API_KEY` or `OPENROUTER_API_KEY`, in that order,
@@ -115,18 +115,18 @@ Nothing about this ships or unships the format. `--edit` costs nothing until `--
 
 ## The files
 
-| file           | what it holds                                                     |
-| -------------- | ----------------------------------------------------------------- |
-| `arms.ts`      | the arms, the inheritance rule, the pre-registration              |
-| `wire.ts`      | what each arm puts on the wire, sliced from athanor's own sources |
-| `tasks.ts`     | the sample, taken from `evals/fixtures.ts`                        |
-| `measure.ts`   | the offline half                                                  |
-| `live.ts`      | the judged half, and the key's three arms                         |
-| `world.ts`     | the deterministic computer every tool is a window onto            |
-| `edit-arm.ts`  | the edit axis: its sample, its world, both editors, its scoring   |
-| `edit-live.ts` | the edit axis on the worker's own gateway, for the run that pays  |
-| `price.ts`     | the token arithmetic, the provider's rates, the break-even        |
-| `report.ts`    | the tables and the baseline check                                 |
-| `selftest.ts`  | the checks running it cannot perform                              |
+| file           | what it holds                                                    |
+| -------------- | ---------------------------------------------------------------- |
+| `arms.ts`      | the arms, the inheritance rule, the pre-registration             |
+| `wire.ts`      | what each arm puts on the wire, sliced from garden's own sources |
+| `tasks.ts`     | the sample, taken from `evals/fixtures.ts`                       |
+| `measure.ts`   | the offline half                                                 |
+| `live.ts`      | the judged half, and the key's three arms                        |
+| `world.ts`     | the deterministic computer every tool is a window onto           |
+| `edit-arm.ts`  | the edit axis: its sample, its world, both editors, its scoring  |
+| `edit-live.ts` | the edit axis on the worker's own gateway, for the run that pays |
+| `price.ts`     | the token arithmetic, the provider's rates, the break-even       |
+| `report.ts`    | the tables and the baseline check                                |
+| `selftest.ts`  | the checks running it cannot perform                             |
 
 `NODE_OPTIONS=--conditions=development pnpm exec tsx evals/arms/selftest.ts`

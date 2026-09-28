@@ -10,8 +10,8 @@
  *
  * ── What is seeded ───────────────────────────────────────────────────────────────────────────
  *
- * - **One task per conversation.** A transcript session is a conversation and athanor's `tasks` row
- *   is a conversation, so the turns of one session share a task exactly as the turns of one athanor
+ * - **One task per conversation.** A transcript session is a conversation and garden's `tasks` row
+ *   is a conversation, so the turns of one session share a task exactly as the turns of one garden
  *   conversation do. It is the harder shape on purpose: with one task per turn the citation edge
  *   would be unambiguous by construction, and this rig would stop measuring the edge that carries
  *   it.

@@ -1,6 +1,6 @@
-import { TaskEvent } from '@athanor/contracts';
-import { decryptJson } from '@athanor/core';
-import type { Database } from '@athanor/data';
+import { TaskEvent } from '@garden/contracts';
+import { decryptJson } from '@garden/core';
+import type { Database } from '@garden/data';
 import { z } from 'zod';
 import { revealedTaskEvent } from './context.js';
 

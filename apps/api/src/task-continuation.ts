@@ -1,17 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { ensureProjectExecution, configureConversationInputs } from './project-execution.js';
 import { z } from 'zod';
-import { ContinueTaskRequest } from '@athanor/contracts';
+import { ContinueTaskRequest } from '@garden/contracts';
 import {
-  AthanorError,
+  GardenError,
   assertSpendAllowed,
   decryptJson,
   encryptJson,
   unwrapDataKey
-} from '@athanor/core';
-import type { EncryptedEnvelope } from '@athanor/core';
-import type { TaskRecord, UserRecord } from '@athanor/data';
-import { startTurnState } from '@athanor/worker';
+} from '@garden/core';
+import type { EncryptedEnvelope } from '@garden/core';
+import type { TaskRecord, UserRecord } from '@garden/data';
+import { startTurnState } from '@garden/worker';
 import type { RouteContext } from './http/server-context.js';
 import { validateTaskReasoning } from './task-reasoning.js';
 import { replyToCodingMission } from './coding-mission-reply.js';
@@ -109,9 +109,9 @@ async function performContinuation(
   );
   const catalogRead = started(retained?.questionId ? Promise.resolve([]) : modelsForUser(user));
   let task = (await taskRead)();
-  if (!task) throw new AthanorError('task_not_found', 'Task not found');
+  if (!task) throw new GardenError('task_not_found', 'Task not found');
   if (task.userId !== user.id)
-    throw new AthanorError(
+    throw new GardenError(
       'task_owner_required',
       'Start a new task to continue work created by another team member',
       403
@@ -125,13 +125,13 @@ async function performContinuation(
           retained.expected[field as keyof TaskContinuationSnapshot]
       )
     )
-      throw new AthanorError(
+      throw new GardenError(
         'task_proposal_changed',
         'This task’s model, privacy, effort, security, or spending allowance changed. Review a new work proposal.',
         409
       );
     if (task.parentMissionId)
-      throw new AthanorError(
+      throw new GardenError(
         'coding_mission_scoped',
         'Send this work proposal to the parent task',
         409
@@ -144,16 +144,16 @@ async function performContinuation(
     !activeTask &&
     !['completed', 'failed', 'awaiting_resource', 'cancelled'].includes(task.status)
   )
-    throw new AthanorError(
+    throw new GardenError(
       'task_not_continuable',
       'This task cannot accept another message; branch it or start a new task',
       409
     );
   if (task.parentMissionId) return replyToCodingMission(context, task, body);
   let workspace = await store.getWorkspace(user.id, task.workspaceId);
-  if (!workspace?.wrappedKey) throw new AthanorError('workspace_not_found', 'Workspace not found');
+  if (!workspace?.wrappedKey) throw new GardenError('workspace_not_found', 'Workspace not found');
   if (workspace.status !== 'running')
-    throw new AthanorError('workspace_unavailable', 'Workspace is not running');
+    throw new GardenError('workspace_unavailable', 'Workspace is not running');
   const dataKey = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
   if (retained) {
     const prior = (
@@ -168,7 +168,7 @@ async function performContinuation(
         dataKey
       );
       if (payload.markdown !== input.prompt)
-        throw new AthanorError(
+        throw new GardenError(
           'task_message_identity_conflict',
           'This message identity already belongs to different work',
           409
@@ -208,7 +208,7 @@ async function performContinuation(
         )
       });
       if (!queued)
-        throw new AthanorError(
+        throw new GardenError(
           'question_changed',
           'The task changed before its answer could be saved.',
           409
@@ -245,7 +245,7 @@ async function performContinuation(
         })
       : catalog.find((model) => model.id === selectedModelId);
   if (!selected || selected.availability !== 'available' || selected.privacyRoute !== privacyRoute)
-    throw new AthanorError(
+    throw new GardenError(
       'model_unavailable',
       'The selected model is not available for this privacy route'
     );
@@ -261,7 +261,7 @@ async function performContinuation(
       task = await ensureProjectExecution(context, task);
       workspace = await store.getWorkspace(user.id, task.workspaceId);
       if (!workspace?.wrappedKey)
-        throw new AthanorError('workspace_not_found', 'Workspace not found');
+        throw new GardenError('workspace_not_found', 'Workspace not found');
     }
   }
   if (activeTask) {
@@ -303,7 +303,7 @@ async function performContinuation(
       )
     });
     if (!queued)
-      throw new AthanorError(
+      throw new GardenError(
         'task_message_queue_conflict',
         'The task changed while this message was being queued; send it again',
         409
@@ -318,7 +318,7 @@ async function performContinuation(
     );
   }
   if (!task.agentStateCiphertext || task.agentStateCiphertext.aad !== `task-state:${task.id}`)
-    throw new AthanorError(
+    throw new GardenError(
       'task_context_unavailable',
       'This task stopped before a resumable conversation checkpoint was saved',
       409
@@ -327,7 +327,7 @@ async function performContinuation(
     Record<string, unknown> & { messages: Array<Record<string, unknown>>; turn?: number }
   >(task.agentStateCiphertext, dataKey);
   if (!Array.isArray(previousState.messages))
-    throw new AthanorError('task_context_invalid', 'Task conversation state is invalid');
+    throw new GardenError('task_context_invalid', 'Task conversation state is invalid');
   const nextTurn = Math.max(0, Number(previousState.turn ?? 0)) + 1;
   const reservationKey = retained
     ? `task:${task.id}:message:${retained.messageId}:reservation`
@@ -362,7 +362,7 @@ async function performContinuation(
     ...(retained ? { userMessageId: retained.messageId } : {})
   });
   if (!updated)
-    throw new AthanorError(
+    throw new GardenError(
       'task_continue_conflict',
       'This task changed before the follow-up could be queued',
       409

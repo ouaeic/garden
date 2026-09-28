@@ -1,4 +1,4 @@
-import { AthanorError } from '@athanor/core';
+import { GardenError } from '@garden/core';
 import { describe, expect, it } from 'vitest';
 import {
   UNTRUSTED_NOTICE_MARKER,
@@ -24,7 +24,7 @@ describe('a challenge the agent cannot pass', () => {
 
   it('reads the wall out of a refusal, whichever route raised it', () => {
     expect(
-      botWallFromError(new AthanorError('browser_bot_wall', 'Blocked', 409, { botWall: wall }))
+      botWallFromError(new GardenError('browser_bot_wall', 'Blocked', 409, { botWall: wall }))
     ).toEqual({
       vendor: 'Cloudflare Turnstile',
       url: 'https://careers.example.com/apply?id=7',
@@ -33,7 +33,7 @@ describe('a challenge the agent cannot pass', () => {
       tabId: 'tab-2'
     });
     // Every other failure is an ordinary one, including a 409 that carries no wall.
-    expect(botWallFromError(new AthanorError('browser_bot_wall', 'Blocked', 409))).toBeNull();
+    expect(botWallFromError(new GardenError('browser_bot_wall', 'Blocked', 409))).toBeNull();
     expect(botWallFromError(new Error('Tool failed'))).toBeNull();
   });
 
@@ -49,7 +49,7 @@ describe('a challenge the agent cannot pass', () => {
     // says different things about the same challenge depending on which call hit it.
     const fromSnapshot = botWallFromRunner(wall);
     const fromRefusal = botWallFromError(
-      new AthanorError('browser_bot_wall', 'Blocked', 409, { botWall: wall })
+      new GardenError('browser_bot_wall', 'Blocked', 409, { botWall: wall })
     );
     expect(fromRefusal).toEqual(fromSnapshot);
     expect(Object.keys(fromRefusal ?? {}).sort()).toEqual([
@@ -281,7 +281,7 @@ describe('what the turn treats as somebody else’s words', () => {
     ).toBeNull();
     // The over-reach in the other direction, stated as well: no caller hands the reader a
     // self-origin, so this box reading its own published preview is judged as another computer.
-    expect(untrustedOriginOfResult(shell('curl -s http://box.athanor.invalid/'), {})).toBe(
+    expect(untrustedOriginOfResult(shell('curl -s http://box.garden.invalid/'), {})).toBe(
       'network command output'
     );
     // And the coverage the limits are bounded by. The same estate read behind the prefixes a model
@@ -418,13 +418,13 @@ describe('what the turn treats as somebody else’s words', () => {
     expect(egress?.preview).toContain('vendor.example');
     // Writing the brief that is loaded ahead of every later task on this computer.
     expect(
-      approvalRequirement('file_write', { path: 'workspace/ATHANOR.md' }, 'balanced', {
+      approvalRequirement('file_write', { path: 'workspace/GARDEN.md' }, 'balanced', {
         taintSources: sources
       })
     ).not.toBeNull();
     // And the same call with a clean turn behind it is not held.
     expect(
-      approvalRequirement('file_write', { path: 'workspace/ATHANOR.md' }, 'balanced', {})
+      approvalRequirement('file_write', { path: 'workspace/GARDEN.md' }, 'balanced', {})
     ).toBeNull();
   });
 

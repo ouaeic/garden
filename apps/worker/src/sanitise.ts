@@ -1,4 +1,4 @@
-import { runtimeValue } from '@athanor/core';
+import { runtimeValue } from '@garden/core';
 /**
  * The two things done to untrusted text on its way into a window: the characters a person reading
  * the same page cannot see are removed, and what is left is fenced off as data.

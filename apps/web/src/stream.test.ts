@@ -1,4 +1,4 @@
-import type { TaskEvent } from '@athanor/contracts';
+import type { TaskEvent } from '@garden/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   MAX_SSE_FRAME_CHARACTERS,

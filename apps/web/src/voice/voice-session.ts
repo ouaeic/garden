@@ -5,7 +5,7 @@ import type {
   VoiceSession,
   VoiceStartRequest,
   VoiceWorkProposal
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { ApiError, post } from '../client';
 import { createVoiceAudio } from './voice-audio';
 

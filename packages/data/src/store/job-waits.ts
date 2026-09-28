@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { EncryptedEnvelope } from '@athanor/core';
+import type { EncryptedEnvelope } from '@garden/core';
 import type { Database } from '../database.js';
 import { type TaskSignals, TASK_EVENT_CHANNEL, TASK_QUEUE_CHANNEL } from './tasks.js';
 import { json } from './rows.js';

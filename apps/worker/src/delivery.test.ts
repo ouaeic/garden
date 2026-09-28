@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { encryptJson } from '@athanor/core';
-import type { DataStore, TaskRecord } from '@athanor/data';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import { encryptJson } from '@garden/core';
+import type { DataStore, TaskRecord } from '@garden/data';
+import type { ModelToolCall } from '@garden/model-gateway';
 import { declaredTaskOutputs, resolveDelivery } from './delivery.js';
 import type { AgentState } from './agent-state.js';
 import { AgentRunnerClient } from './runner-client.js';
@@ -30,7 +30,7 @@ const fixture = () => {
         kind: 'preview',
         payloadCiphertext: encryptJson(
           {
-            __athanorEventVersion: 1,
+            __gardenEventVersion: 1,
             payload: { previewId: preview.id }
           },
           key,

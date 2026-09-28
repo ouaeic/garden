@@ -1,0 +1,45 @@
+[Unit]
+Description=garden persistent project processes
+After=network-online.target
+Wants=network-online.target
+Before=garden-runner.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=garden
+Group=garden
+SupplementaryGroups=garden-agent
+WorkingDirectory=/opt/garden
+EnvironmentFile=/etc/garden/runner.env
+ExecStart=/usr/local/lib/garden/garden-service jobs
+ExecReload=/bin/kill -USR2 $MAINPID
+Restart=always
+RestartSec=2
+TimeoutStopSec=30
+RuntimeDirectory=garden-jobs
+RuntimeDirectoryMode=0700
+UMask=0007
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+ProtectProc=invisible
+CapabilityBoundingSet=~CAP_SYS_MODULE CAP_SYS_RAWIO CAP_SYS_BOOT CAP_SYS_TIME CAP_MAC_ADMIN CAP_MAC_OVERRIDE
+SystemCallArchitectures=native
+LockPersonality=true
+ProtectHostname=true
+ProtectClock=true
+RestrictRealtime=true
+ProtectHome=tmpfs
+BindPaths=/home/garden
+Slice=garden-work.slice
+LimitNOFILE=65536
+LimitCORE=0
+OOMPolicy=continue
+CPUWeight=50
+IOWeight=50
+
+[Install]
+WantedBy=multi-user.target

@@ -1,4 +1,4 @@
-import { CONVERSATION_NAME_INDEX_STAMP } from '@athanor/core';
+import { CONVERSATION_NAME_INDEX_STAMP } from '@garden/core';
 
 export const migrations = [
   {
@@ -1011,7 +1011,7 @@ export const migrations = [
     // Tiered memory: an append-only verbatim layer (mem.source) that is never rewritten, and a
     // curated overlay (mem.item) of episodes, facts, procedures and entities that cites it through
     // mem.evidence. Bodies stay encrypted like every other owner artefact, so the lexical surface
-    // is a keyed blind index built by @athanor/core: each lexeme becomes an HMAC token before it
+    // is a keyed blind index built by @garden/core: each lexeme becomes an HMAC token before it
     // reaches the server. Positions and field weights survive that substitution, which is what
     // keeps @@, ts_rank_cd and the BM25 function below working over data the database cannot read.
     //
@@ -1691,7 +1691,7 @@ export const migrations = [
   {
     version: 46,
     name: 'drop_organizations',
-    // athanor is one person's computer. There is one account on it, it holds the keys to its own
+    // garden is one person's computer. There is one account on it, it holds the keys to its own
     // workspace, and every screen in the product is written for that person - so a subsystem for
     // sharing a workspace with colleagues under a policy an administrator sets was never a feature
     // this product could finish. What it was instead was a second answer to "who may do this",
@@ -1834,12 +1834,12 @@ export const migrations = [
     // A fourth weighted field on mem.item, carrying the component words of the entry's compound
     // terms: the parts of its subject, object, title, tags and the identifiers in its body.
     //
-    // The tokenizer keeps `athanor-relay`, `imap_idle_notify_interval` and `/srv/athanor/var/log`
+    // The tokenizer keeps `garden-relay`, `imap_idle_notify_interval` and `/srv/garden/var/log`
     // whole on purpose - shredding them is how a stemmer destroys the substance of an agent
-    // computer's memory. The cost was that a fact whose subject is `athanor-relay` shared no lexeme
+    // computer's memory. The cost was that a fact whose subject is `garden-relay` shared no lexeme
     // with "what port does the relay listen on": not a low rank, no channel at all. The lexical
     // channel could not reach it, the structural channel matches subject keys by exact equality so
-    // `relay` was not `athanor-relay`, and the fuzzy channel is built from identifier-shaped query
+    // `relay` was not `garden-relay`, and the fuzzy channel is built from identifier-shaped query
     // terms, of which a plain-English question has none. A fact about a named service was
     // unretrievable by the name people use for it.
     //
@@ -1951,7 +1951,7 @@ export const migrations = [
     // which hands anything with read access on the database a recoverable copy of exactly the text
     // the encryption is there to hide. It does not matter what produced the vector, which is what
     // makes this the objection that decides it. The two costs easier to reach for do not decide
-    // anything: an embedding API puts a second vendor on the write path, which athanor's rule
+    // anything: an embedding API puts a second vendor on the write path, which garden's rule
     // against third-party SaaS on a core path forbids, and a local model is a new runtime
     // dependency with a download behind it - both true, but a model running on this computer
     // answers the first outright, and the second is a price rather than a reason.
@@ -1964,8 +1964,8 @@ export const migrations = [
     // misses (packages/data/src/memory-eval.ts) rather than being talked out of existence here.
     //
     // The column drops are guarded because they only exist where pgvector was installed. The
-    // extension itself is left alone: this migration removes what athanor put in the database, and
-    // an extension the owner may be using elsewhere is not athanor's to withdraw.
+    // extension itself is left alone: this migration removes what garden put in the database, and
+    // an extension the owner may be using elsewhere is not garden's to withdraw.
     sql: `
       DROP INDEX IF EXISTS mem.mem_item_vec_hnsw;
       DROP INDEX IF EXISTS mem.mem_source_vec_hnsw;
@@ -2253,7 +2253,7 @@ export const migrations = [
     // the header reads off this column went on telling the owner a message was on its way.
     //
     // 'undelivered' is that fourth end, and it is deliberately not 'cancelled': the owner cancelling
-    // and athanor running out of attempts are different events, and the row is the only place that
+    // and garden running out of attempts are different events, and the row is the only place that
     // difference survives once the timeline has scrolled.
     //
     // Safe on a live box: a constraint swap on a table whose every existing row already satisfies
@@ -2387,7 +2387,7 @@ export const migrations = [
     // already spending. These two are the pre-flight half - they stop an over-priced route being
     // chosen in the first place, which is the only one of the two that works while the owner is
     // asleep. The whole apparatus for applying them has existed for two releases (`selectModel`,
-    // `priceCeilingFields`, `CeilingOutcome`, `pricesAtPromptSize`) and `athanor spend-ceiling set`
+    // `priceCeilingFields`, `CeilingOutcome`, `pricesAtPromptSize`) and `garden spend-ceiling set`
     // validates the number, refuses a bad one, and then exits 1 - because there has never been a
     // column to put it in. This is that column.
     //
@@ -2406,7 +2406,7 @@ export const migrations = [
     // conversations: Seq Scan + top-N heapsort, 14.1 ms, on every API boot for the life of the box
     // - to discover there is nothing to do.
     //
-    // The stamp is interpolated from `@athanor/core` rather than written out, so it is the same
+    // The stamp is interpolated from `@garden/core` rather than written out, so it is the same
     // value the statement and every write use and cannot drift from them. A future stamp bump makes
     // this predicate stop matching, at which point the read falls back to the sequential scan it
     // does today and is correct but slow until a migration rebuilds the index - which is the right
@@ -2830,7 +2830,7 @@ export const migrations = [
      *
      * exact when the folded uses are uniform in their own span and correct in the limit at both
      * ends. That integral is evaluated in `consolidateMemory`, beside the live sum it is added to,
-     * because `d` lives in `@athanor/core` and must not be written down twice.
+     * because `d` lives in `@garden/core` and must not be written down twice.
      *
      * Bounded by construction: one row per item, arriving only once an item has uses older than
      * the horizon, cascading with the item. `uses`/`cites`/`fails` mirror the three signals the
@@ -3061,7 +3061,7 @@ export const migrations = [
      * occurrence to find out that nothing happened.
      *
      * COLUMNS RATHER THAN A SIXTH `spec.kind`, for the reason `TaskScheduleTrigger` in
-     * @athanor/contracts states: three exhaustive narrowings elsewhere in the tree stop compiling on
+     * @garden/contracts states: three exhaustive narrowings elsewhere in the tree stop compiling on
      * a sixth member, and a webhook is orthogonal to a timing rather than a case of it. All three
      * are NULL on every row that exists, so nothing is backfilled and no reader has to decide what
      * an absent trigger means - `trigger_path IS NULL` is "no door", which is every schedule today.
@@ -3218,7 +3218,7 @@ export const migrations = [
      * by its index in this list, so no artifact id, storage key or workspace path is ever public.
      *
      * `task_share_artifacts` holds the bytes, copied out of the workspace at share time - the agent
-     * can rewrite `.athanor/artifacts/*` afterwards, and a link is a promise about what it showed
+     * can rewrite `.garden/artifacts/*` afterwards, and a link is a promise about what it showed
      * when it was made. BYTEA rather than a directory on disk, deliberately: the task cascade then
      * removes them for free, a backup carries them as the ciphertext they are, and the embedded
      * database the tests run on covers the same statement production runs. `envelope_meta` is the

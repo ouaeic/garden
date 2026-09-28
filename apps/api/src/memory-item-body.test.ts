@@ -22,7 +22,7 @@ import {
   memoryIndexKey,
   unwrapDataKey,
   generateDataKey
-} from '@athanor/core';
+} from '@garden/core';
 import type { ApiConfig } from './config.js';
 import { UNREADABLE_MEMORY_ITEM } from './context.js';
 import { buildServer } from './server.js';
@@ -62,7 +62,7 @@ const configFor = (directory: string): ApiConfig => ({
   DEPLOYMENT_MODE: 'development',
   MODEL_CATALOG_SCOPE: 'provider_catalog',
   CONNECTION_MANIFEST_PATH: join(directory, 'connection.json'),
-  ATHANOR_STATE_PATH: directory,
+  GARDEN_STATE_PATH: directory,
   RELAY_STATE_DIR: join(directory, 'relay'),
   RELAY_LOCAL_HOST: '127.0.0.1',
   RELAY_LOCAL_PORT: 443,
@@ -84,7 +84,7 @@ const configFor = (directory: string): ApiConfig => ({
   PUBLIC_RUNNER_URL: 'ws://127.0.0.1:4300',
   WORKSPACE_IMAGE_REVISION: 'dev',
   WEBAUTHN_RP_ID: 'localhost',
-  WEBAUTHN_RP_NAME: 'athanor Test',
+  WEBAUTHN_RP_NAME: 'garden Test',
   WEBAUTHN_ORIGIN: 'http://localhost:5173',
   ALLOW_INSECURE_DEV_AUTH: true,
   WORKER_ID: 'memory-body-worker',
@@ -171,7 +171,7 @@ const seed = async (directory: string) => {
 
 describe('the whole of a remembered item', () => {
   test('serves the body the excerpt was standing in for', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-memory-body-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-memory-body-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, cookie, workspaceId, write } = await seed(directory);
     const item = await write('Reconcile the quarterly numbers', LONG_BODY);
@@ -215,7 +215,7 @@ describe('the whole of a remembered item', () => {
    * two it is looking at without matching on the sentence.
    */
   test('says so plainly where the key no longer opens the row, rather than failing', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-memory-body-sealed-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-memory-body-sealed-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, cookie, workspaceId, write } = await seed(directory);
     // Sealed under a key this workspace has never had, which is what a row restored from another
@@ -240,7 +240,7 @@ describe('the whole of a remembered item', () => {
      have to be told apart by a screen that removes what it is holding on the first and not the
      second. */
   test('answers 404 for a row this workspace does not have', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-memory-body-missing-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-memory-body-missing-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, cookie, workspaceId } = await seed(directory);
     const missing = await app.inject({
@@ -255,7 +255,7 @@ describe('the whole of a remembered item', () => {
   /* The whole body is more of the owner's own life than the excerpt was, so the door it opens has
      to be the same door. Signed out is refused before anything is decrypted. */
   test('will not hand a body to a request with no session', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'athanor-api-memory-body-anon-'));
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-memory-body-anon-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
     const { app, cookie, workspaceId, write } = await seed(directory);
     const item = await write('Reconcile the quarterly numbers', LONG_BODY);

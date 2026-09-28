@@ -6,8 +6,8 @@
  * are all read inside it.
  */
 
-import { decryptJson, unwrapDataKey } from '@athanor/core';
-import { projectResponse } from '@athanor/data';
+import { decryptJson, unwrapDataKey } from '@garden/core';
+import { projectResponse } from '@garden/data';
 import { cpus, freemem, loadavg, totalmem } from 'node:os';
 import { workspaceResponse } from '../context.js';
 import type { HostStorage } from '../context.js';
@@ -200,9 +200,9 @@ export const registerBootstrapRoutes = (context: RouteContext): void => {
         plan: plan
       }
     };
-    reply.header('x-athanor-preview-base-url', config.PREVIEW_BASE_URL);
+    reply.header('x-garden-preview-base-url', config.PREVIEW_BASE_URL);
     const relayPreviewOrigin = relay.publicPreviewOrigin();
-    if (relayPreviewOrigin) reply.header('x-athanor-relay-preview-origin', relayPreviewOrigin);
+    if (relayPreviewOrigin) reply.header('x-garden-relay-preview-origin', relayPreviewOrigin);
     return response;
   });
 };

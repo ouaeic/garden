@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { AthanorError } from '@athanor/core';
-import { type ModelToolCall } from '@athanor/model-gateway';
+import { GardenError } from '@garden/core';
+import { type ModelToolCall } from '@garden/model-gateway';
 import { executeWorkspaceTool } from './workspace.js';
 import { forgetReads, toLines } from '../edit/index.js';
 import { type AgentState } from '../agent-state.js';
@@ -139,8 +139,8 @@ describe('a shell command that would replace a file the turn has only partly rea
 
     const refusal = await run('shell', shell('echo x > app.ts')).catch((error: unknown) => error);
 
-    expect(refusal).toBeInstanceOf(AthanorError);
-    expect((refusal as AthanorError).code).toBe('write_unread');
+    expect(refusal).toBeInstanceOf(GardenError);
+    expect((refusal as GardenError).code).toBe('write_unread');
     // The same recovery `file_write` names, because it is the same floor: read the rest, or patch
     // the lines that were shown.
     expect((refusal as Error).message).toMatch(/line 51 onwards has never been shown to you/);
@@ -169,7 +169,7 @@ describe('a shell command that would replace a file the turn has only partly rea
   ])('sees %s', async (_shape, script) => {
     const { executed, run } = await turn({ 'workspace/app.ts': tall(400) }, WINDOWED);
 
-    await expect(run('shell', shell(script))).rejects.toThrow(AthanorError);
+    await expect(run('shell', shell(script))).rejects.toThrow(GardenError);
     expect(executed).toEqual([]);
   });
 
@@ -180,7 +180,7 @@ describe('a shell command that would replace a file the turn has only partly rea
       /would replace workspace\/app\.ts whole/
     );
     await expect(run('shell', { executable: 'cp', args: ['other.ts', 'app.ts'] })).rejects.toThrow(
-      AthanorError
+      GardenError
     );
     expect(executed).toEqual([]);
   });
@@ -191,7 +191,7 @@ describe('a shell command that would replace a file the turn has only partly rea
     ]);
 
     await expect(run('shell', shell('echo x > app.ts', { cwd: 'workspace/src' }))).rejects.toThrow(
-      AthanorError
+      GardenError
     );
     // The same spelling from the default cwd names a different file, which nothing has read.
     await run('shell', shell('echo x > app.ts'));
@@ -202,7 +202,7 @@ describe('a shell command that would replace a file the turn has only partly rea
     const { executed, run } = await turn({ 'workspace/app.ts': tall(400) }, WINDOWED);
 
     await expect(run('shell', shell('echo x > app.ts', { background: true }))).rejects.toThrow(
-      AthanorError
+      GardenError
     );
     expect(executed).toEqual([]);
   });
@@ -369,7 +369,7 @@ describe('the spellings of a replacement the floor has to read as the shell read
       WINDOWED
     );
 
-    await expect(run('shell', shell(script))).rejects.toThrow(AthanorError);
+    await expect(run('shell', shell(script))).rejects.toThrow(GardenError);
     expect(executed).toEqual([]);
   });
 
@@ -381,7 +381,7 @@ describe('the spellings of a replacement the floor has to read as the shell read
   ])('sees the script behind %s', async (_shape, args) => {
     const { executed, run } = await turn({ 'workspace/app.ts': tall(400) }, WINDOWED);
 
-    await expect(run('shell', args)).rejects.toThrow(AthanorError);
+    await expect(run('shell', args)).rejects.toThrow(GardenError);
     expect(executed).toEqual([]);
   });
 
@@ -390,14 +390,14 @@ describe('the spellings of a replacement the floor has to read as the shell read
 
     // `''` is the container root at the runner, so `workspace/app.ts` from there is the file.
     await expect(run('shell', shell('echo x > workspace/app.ts', { cwd: '' }))).rejects.toThrow(
-      AthanorError
+      GardenError
     );
     await expect(
       run('shell', shell('echo x > workspace/app.ts', { cwd: 'workspace/..' }))
-    ).rejects.toThrow(AthanorError);
+    ).rejects.toThrow(GardenError);
     await expect(
       run('shell', shell('echo x > app.ts', { cwd: 'workspace/src/..' }))
-    ).rejects.toThrow(AthanorError);
+    ).rejects.toThrow(GardenError);
     expect(executed).toEqual([]);
     // And from the container root a bare name is a file at the root, which nothing has read.
     await run('shell', shell('echo x > app.ts', { cwd: '' }));

@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { StartAccountOAuthRequest, type Connector } from '@athanor/contracts';
+import { StartAccountOAuthRequest, type Connector } from '@garden/contracts';
 import {
   AccountOAuth,
-  AthanorError,
+  GardenError,
   accountConnectorBase,
   beginAccountOAuth,
   completeAccountOAuth,
@@ -11,7 +11,7 @@ import {
   encryptJson,
   secureConnectorRequest,
   sha256
-} from '@athanor/core';
+} from '@garden/core';
 import type { FastifyReply } from 'fastify';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
@@ -70,12 +70,12 @@ export function registerAccountConnectorRoutes(
     '/v1/connectors/accounts/oauth/callback',
     async (request, reply) => {
       const page = (ok: boolean, message: string) =>
-        helpers.oauthPage(reply, ok, message, ok ? 200 : 400, 'athanor-account-oauth');
+        helpers.oauthPage(reply, ok, message, ok ? 200 : 400, 'garden-account-oauth');
       try {
         const state = z.string().min(32).max(128).parse(request.query.state);
         const attempt = await store.consumeConnectorOAuthAttempt(sha256(state));
         if (!attempt || attempt.secretCiphertext.aad !== `connector-oauth:${attempt.id}`)
-          throw new AthanorError(
+          throw new GardenError(
             'connector_oauth_attempt_invalid',
             'This connection link has expired or was already used. Start again from Connected services.'
           );
@@ -90,7 +90,7 @@ export function registerAccountConnectorRoutes(
           secret.redirectUrl !== redirectUrl ||
           attempt.baseUrl !== accountConnectorBase(secret.provider)
         )
-          throw new AthanorError(
+          throw new GardenError(
             'connector_oauth_state_invalid',
             'The account callback does not match this connection attempt.'
           );
@@ -125,12 +125,12 @@ export function registerAccountConnectorRoutes(
         return page(true, `${attempt.label} is connected as ${completed.account!.address}.`);
       } catch (error) {
         request.log.warn(
-          { code: error instanceof AthanorError ? error.code : 'connector_oauth_failed' },
+          { code: error instanceof GardenError ? error.code : 'connector_oauth_failed' },
           'Account connection was not completed'
         );
         return page(
           false,
-          error instanceof AthanorError
+          error instanceof GardenError
             ? error.message
             : 'The connection could not be completed. Start again from Connected services.'
         );

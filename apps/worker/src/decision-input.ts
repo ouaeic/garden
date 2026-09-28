@@ -3,7 +3,7 @@ import {
   DecisionQuestion,
   validateDecisionInput,
   type DecisionInput as Input
-} from '@athanor/model-gateway';
+} from '@garden/model-gateway';
 import type { AgentState } from './agent-state.js';
 
 /** References only reach text already present in this conversation's model-visible window. */

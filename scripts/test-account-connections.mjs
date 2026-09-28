@@ -107,7 +107,7 @@ test(
           });
           res.setHeader('content-type', 'text/html');
           res.end(
-            `<script>${input.provider === 'google' ? `window.opener.postMessage({source:'athanor-account-oauth',ok:true,message:'Account connected'},${JSON.stringify(origin)});` : 'window.opener=null;'}setTimeout(()=>window.close(),20)</script>`
+            `<script>${input.provider === 'google' ? `window.opener.postMessage({source:'garden-account-oauth',ok:true,message:'Account connected'},${JSON.stringify(origin)});` : 'window.opener=null;'}setTimeout(()=>window.close(),20)</script>`
           );
         } else if (url.pathname === '/v1/connectors') json(connections);
         else if (url.pathname === '/v1/connectors/audit') json([]);

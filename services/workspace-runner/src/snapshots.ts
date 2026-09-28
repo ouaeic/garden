@@ -15,7 +15,7 @@ import path from 'node:path';
 import { workspaceUsage } from './files.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const SNAPSHOT_CONTENT = ['workspace', '.athanor/browser', '.athanor/artifacts'] as const;
+const SNAPSHOT_CONTENT = ['workspace', '.garden/browser', '.garden/artifacts'] as const;
 const MAX_ERROR_BYTES = 16 * 1024;
 const MINIMUM_CONFIGURED_RESERVE_BYTES = 64 * 1024 ** 2;
 const MAXIMUM_CONFIGURED_RESERVE_BYTES = 1024 ** 4;
@@ -33,7 +33,7 @@ const snapshotPath = (workspaceRoot: string, workspaceId: string, snapshotId: st
   const snapshot = safeId(snapshotId, 'snapshot ID');
   return path.join(
     path.resolve(workspaceRoot),
-    '.athanor-snapshots',
+    '.garden-snapshots',
     workspace,
     `${snapshot}.tar.gz`
   );
@@ -79,13 +79,13 @@ const localSnapshotBytes = async (root: string): Promise<number> =>
 
 export const snapshotReserveBytes = (
   totalBytes: number,
-  configured = process.env.ATHANOR_SNAPSHOT_RESERVE_BYTES
+  configured = process.env.GARDEN_SNAPSHOT_RESERVE_BYTES
 ): number => {
   if (configured === undefined || configured === '') {
     return Math.min(20 * 1024 ** 3, Math.max(2 * 1024 ** 3, totalBytes * 0.02));
   }
   if (!/^[0-9]+$/.test(configured)) {
-    throw new Error('ATHANOR_SNAPSHOT_RESERVE_BYTES must be a whole number of bytes');
+    throw new Error('GARDEN_SNAPSHOT_RESERVE_BYTES must be a whole number of bytes');
   }
   const bytes = Number(configured);
   if (
@@ -94,7 +94,7 @@ export const snapshotReserveBytes = (
     bytes > MAXIMUM_CONFIGURED_RESERVE_BYTES
   ) {
     throw new Error(
-      `ATHANOR_SNAPSHOT_RESERVE_BYTES must be between ${MINIMUM_CONFIGURED_RESERVE_BYTES} and ${MAXIMUM_CONFIGURED_RESERVE_BYTES}`
+      `GARDEN_SNAPSHOT_RESERVE_BYTES must be between ${MINIMUM_CONFIGURED_RESERVE_BYTES} and ${MAXIMUM_CONFIGURED_RESERVE_BYTES}`
     );
   }
   return bytes;
@@ -203,7 +203,7 @@ export const deleteAllSnapshots = async (
   workspaceId: string
 ): Promise<void> => {
   const workspace = safeId(workspaceId, 'workspace ID');
-  await rm(path.join(path.resolve(workspaceRoot), '.athanor-snapshots', workspace), {
+  await rm(path.join(path.resolve(workspaceRoot), '.garden-snapshots', workspace), {
     recursive: true,
     force: true
   });
@@ -224,7 +224,7 @@ export const restoreSnapshot = async (input: {
 
   const staging = path.join(
     path.resolve(input.workspaceRoot),
-    `.athanor-restore-${safeId(input.workspaceId, 'workspace ID')}-${safeId(input.snapshotId, 'snapshot ID')}`
+    `.garden-restore-${safeId(input.workspaceId, 'workspace ID')}-${safeId(input.snapshotId, 'snapshot ID')}`
   );
   const extracted = path.join(staging, 'extracted');
   const previous = path.join(staging, 'previous');

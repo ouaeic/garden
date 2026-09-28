@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { type AccountApi, accountResourceId, accountResponseObject } from './account-api.js';
 import type { AccountMailComposition, MailCheckpoint } from './account-mail-compose.js';
-import { AthanorError } from './errors.js';
+import { GardenError } from './errors.js';
 
 const hash = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 const object = z.record(z.string(), z.unknown());
@@ -39,7 +39,7 @@ export async function attachAccountMailFiles(
   };
   const rejected = async (error: unknown) => {
     if (
-      error instanceof AthanorError &&
+      error instanceof GardenError &&
       [400, 401, 403, 404, 413, 422, 429].includes(Number(error.details?.statusCode))
     ) {
       await save({ ...state, phase: 'attachments' });

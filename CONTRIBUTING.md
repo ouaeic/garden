@@ -2,7 +2,7 @@
 
 Contributions are welcome when they preserve garden’s core boundary: self-hosted software, one
 persistent agent computer, user-owned model access, no local model weights, and no mandatory hosted
-athanor service.
+garden service.
 
 `AGENTS.md` in this directory carries the same rules in the shape a coding agent reads them, and is
 the shorter document. Everything below is the reasoning behind it.
@@ -31,7 +31,7 @@ local machine. If your document libraries live in another environment, select it
 interpreter path before running the gate:
 
 ```bash
-ATHANOR_DOCUMENT_PYTHON=/absolute/path/to/document-environment/bin/python3 CI=true pnpm check
+GARDEN_DOCUMENT_PYTHON=/absolute/path/to/document-environment/bin/python3 CI=true pnpm check
 ```
 
 The selected interpreter must actually produce a document; absent local dependencies are reported
@@ -95,7 +95,7 @@ fixtures. They need no root, no network and no server, and they finish in second
 
 ```bash
 python3 scripts/test-gui-entry.py      # namespace handles, pinned mounts and private GUI state
-python3 infra/native/athanor-desktop-bridge.test.py # native accessibility identity and states
+python3 infra/native/garden-desktop-bridge.test.py # native accessibility identity and states
 python3 scripts/test-reproducible-run.py # analysis manifests, clean rerun and changed-dependency refusal
 python3 scripts/test-system-environment.py # confined image extraction; Linux service/data replay with bwrap and cc
 sh scripts/test-sandbox.sh          # which account an agent command really lands on
@@ -114,8 +114,8 @@ stand-in API on a loopback port. Both run inside `scripts/check-repository.mjs`;
 read its output:
 
 ```bash
-node scripts/test-task-cli.mjs        # athanor task: one JSON object, and an exit code per ending
-pnpm acp:check                        # athanor acp: the ACP wire shapes, and the approval floor
+node scripts/test-task-cli.mjs        # garden task: one JSON object, and an exit code per ending
+pnpm acp:check                        # garden acp: the ACP wire shapes, and the approval floor
 ```
 
 `pnpm acp:check` is `node scripts/acp/test-acp-bridge.mjs`. It is the one whose callers are code
@@ -236,7 +236,7 @@ A test is what is left when none of the four fit.
 `scripts/install-native.sh` does two kinds of work, and every new step is one or the other.
 
 A step a **release carries** - a package, a permission, a setting, a data migration - goes in one of
-the `release_step_*` functions near the top of that file. `sudo athanor update` runs those, and only
+the `release_step_*` functions near the top of that file. `sudo garden update` runs those, and only
 those, by calling `install-native.sh --release-steps` from the revision it has just pulled, so a step
 added there reaches every existing box with the release that adds it. Say beside it why running it
 again on a machine that is serving is safe; the ones already there are safe because they converge -

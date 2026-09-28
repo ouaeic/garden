@@ -78,7 +78,7 @@ export class GuiNamespaceManager {
       let released = false;
       return {
         executable: this.executable,
-        environment: { ...held.namespace.environment, ATHANOR_GUI_HELPER: this.executable },
+        environment: { ...held.namespace.environment, GARDEN_GUI_HELPER: this.executable },
         release: () =>
           this.#serial(root, async () => {
             if (!released) {
@@ -96,7 +96,7 @@ export class GuiNamespaceManager {
 
   async acquireTemporary(root: string): Promise<GuiLease> {
     if ((await realpath(root)) !== root) throw new Error('GUI workspace root must be canonical');
-    const parent = await directory(root, '.athanor/gui/research');
+    const parent = await directory(root, '.garden/gui/research');
     const temporary = await mkdtemp(path.join(parent, 'session-'));
     try {
       const lease = await this.acquire(temporary);
@@ -167,7 +167,7 @@ export const spawnGui: typeof spawn = ((
   const options = Array.isArray(argsOrOptions)
     ? passedOptions
     : (argsOrOptions as SpawnOptions | undefined);
-  const helper = options?.env?.ATHANOR_GUI_HELPER;
+  const helper = options?.env?.GARDEN_GUI_HELPER;
   return helper
     ? spawn(helper, ['--run', executable, ...(args ?? [])], options)
     : spawn(executable, args ?? [], options ?? {});
@@ -229,7 +229,7 @@ const readReply = (socket: Socket): Promise<unknown> =>
 
 export const startGuiNamespace = async (
   root: string,
-  socketPath = '/run/athanor-gui/control.sock'
+  socketPath = '/run/garden-gui/control.sock'
 ): Promise<GuiNamespace> => {
   const socket = createConnection(socketPath);
   // The connection can end between setup and release when the broker restarts.
@@ -286,14 +286,14 @@ export const startGuiNamespace = async (
     if (socket.destroyed) throw new Error('GUI broker exited during startup');
     return {
       environment: {
-        ATHANOR_GUI_NAMESPACES: JSON.stringify({
+        GARDEN_GUI_NAMESPACES: JSON.stringify({
           process: `/proc/${process.pid}/fd/${handles[0]?.fd}`,
           root: `/proc/${process.pid}/fd/${handles[1]?.fd}`,
           pid: info.pid,
           startTime: info.startTime
         }),
-        ATHANOR_GUI_ROOT: root,
-        HOME: path.join(root, '.athanor/gui/home'),
+        GARDEN_GUI_ROOT: root,
+        HOME: path.join(root, '.garden/gui/home'),
         XDG_RUNTIME_DIR: '/run'
       },
       stop

@@ -3,22 +3,20 @@ import { BrowserAction, WebFetchRequest } from './index.js';
 
 describe('browser action contract', () => {
   it('accepts the element-driven actions a real form needs', () => {
-    expect(BrowserAction.parse({ type: 'hover', selector: '[data-athanor-ref="oc-0-3"]' })).toEqual(
-      {
-        type: 'hover',
-        selector: '[data-athanor-ref="oc-0-3"]'
-      }
-    );
+    expect(BrowserAction.parse({ type: 'hover', selector: '[data-garden-ref="oc-0-3"]' })).toEqual({
+      type: 'hover',
+      selector: '[data-garden-ref="oc-0-3"]'
+    });
     expect(
-      BrowserAction.parse({ type: 'double_click', selector: '[data-athanor-ref="oc-0-3"]' })
-    ).toEqual({ type: 'double_click', selector: '[data-athanor-ref="oc-0-3"]' });
+      BrowserAction.parse({ type: 'double_click', selector: '[data-garden-ref="oc-0-3"]' })
+    ).toEqual({ type: 'double_click', selector: '[data-garden-ref="oc-0-3"]' });
     expect(
       BrowserAction.parse({
         type: 'select_option',
-        selector: '[data-athanor-ref="oc-1-2"]',
+        selector: '[data-garden-ref="oc-1-2"]',
         values: ['DE']
       })
-    ).toEqual({ type: 'select_option', selector: '[data-athanor-ref="oc-1-2"]', values: ['DE'] });
+    ).toEqual({ type: 'select_option', selector: '[data-garden-ref="oc-1-2"]', values: ['DE'] });
   });
 
   it('requires at least one option value and at least one upload path', () => {
@@ -54,12 +52,12 @@ describe('browser action contract', () => {
     expect(
       BrowserAction.parse({
         type: 'scroll',
-        selector: '[data-athanor-ref="oc-0-9"]',
+        selector: '[data-garden-ref="oc-0-9"]',
         deltaY: -200
       })
     ).toEqual({
       type: 'scroll',
-      selector: '[data-athanor-ref="oc-0-9"]',
+      selector: '[data-garden-ref="oc-0-9"]',
       deltaX: 0,
       deltaY: -200
     });
@@ -85,7 +83,7 @@ describe('browser action contract', () => {
 
 describe('web fetch contract', () => {
   /**
-   * One capability, called two ways. A provider-side fetch takes a single URL per call; athanor's
+   * One capability, called two ways. A provider-side fetch takes a single URL per call; garden's
    * own route takes a batch. The names have to match in both modes - a model shown two tools for
    * one job picks badly, and a name that changed with the privacy route would change the prompt
    * prefix mid-task - so both shapes arrive at the same request here.

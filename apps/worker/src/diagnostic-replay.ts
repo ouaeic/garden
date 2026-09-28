@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import { z } from 'zod';
-import { PrivateDiagnosticReader } from '@athanor/core';
+import { PrivateDiagnosticReader } from '@garden/core';
 import {
   ModelMessage,
   ModelTool,
@@ -8,8 +8,8 @@ import {
   validateDecisionInput,
   validateDecisionAnswers,
   type DecisionInput
-} from '@athanor/model-gateway';
-import { SecurityMode } from '@athanor/contracts';
+} from '@garden/model-gateway';
+import { SecurityMode } from '@garden/contracts';
 import { approvalRequirement, type ApprovalContext } from './approval-policy.js';
 import { requestDerivationBreach } from './turn-control.js';
 

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import type { CodingMission, CodingMissionReview } from '@athanor/contracts';
+import type { CodingMission, CodingMissionReview } from '@garden/contracts';
 import { get, post } from './client';
 import { Button, Dialog, ErrorNotice } from './ui';
 import { bytes, money } from './model';

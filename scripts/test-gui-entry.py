@@ -21,8 +21,8 @@ def load(name):
     return module
 
 
-entry = load('athanor-gui')
-broker = load('athanor-gui-broker')
+entry = load('garden-gui')
+broker = load('garden-gui-broker')
 
 
 class NamespaceHandles(unittest.TestCase):
@@ -55,12 +55,12 @@ class NamespaceHandles(unittest.TestCase):
 
 class BrokerBoundary(unittest.TestCase):
     def test_only_execution_roots_and_transient_research_roots_are_accepted(self):
-        root = '/home/athanor/11111111-2222-4333-8444-555555555555'
+        root = '/home/garden/11111111-2222-4333-8444-555555555555'
         self.assertEqual(str(broker.workspace_root(root)), root)
-        self.assertEqual(str(broker.workspace_root(root + '/.athanor/gui/research/session-abc123')),
-                         root + '/.athanor/gui/research/session-abc123')
-        rejected = ['/', '/home/athanor', '/etc/athanor', root + '/workspace',
-                    root + '/../other', root + '/.athanor/gui/research/session-../x', root + '\n', None, 1]
+        self.assertEqual(str(broker.workspace_root(root + '/.garden/gui/research/session-abc123')),
+                         root + '/.garden/gui/research/session-abc123')
+        rejected = ['/', '/home/garden', '/etc/garden', root + '/workspace',
+                    root + '/../other', root + '/.garden/gui/research/session-../x', root + '\n', None, 1]
         self.assertTrue(rejected)
         for candidate in rejected:
             with self.subTest(candidate=candidate), self.assertRaises(ValueError):
@@ -77,9 +77,9 @@ class BrokerBoundary(unittest.TestCase):
                 self.assertIn('--unshare-pid', args)
                 self.assertIn('--unshare-ipc', args)
                 self.assertEqual(args[-1], 'printf READY; exec /usr/bin/sleep infinity')
-                for forbidden in ['/', '/home/athanor', '/etc/athanor', '/etc/ssl/private']:
+                for forbidden in ['/', '/home/garden', '/etc/garden', '/etc/ssl/private']:
                     self.assertNotIn(forbidden, args)
-            identity = root / '.athanor/gui/machine-id'
+            identity = root / '.garden/gui/machine-id'
             first = identity.read_text()
             self.assertRegex(first, r'^[a-f0-9]{32}\n$')
             with contextlib.ExitStack() as stack:
@@ -110,7 +110,7 @@ class BrokerBoundary(unittest.TestCase):
             alias = root / 'alias'; alias.symlink_to(actual, target_is_directory=True)
             with contextlib.ExitStack() as stack, self.assertRaises(OSError):
                 broker.namespace_command(alias, stack)
-            gui = actual / '.athanor/gui'; gui.mkdir(parents=True); gui.chmod(0o770)
+            gui = actual / '.garden/gui'; gui.mkdir(parents=True); gui.chmod(0o770)
             with contextlib.ExitStack() as stack, self.assertRaises(ValueError):
                 broker.namespace_command(actual, stack)
 

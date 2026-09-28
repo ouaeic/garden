@@ -2,13 +2,13 @@ import { captureConversationHistory } from './project-git-capture.js';
 import { ProjectGitRemotes } from './project-git-remotes.js';
 import { ProjectGitExports } from './project-git-exports.js';
 import { ProjectGitWorkingCopies } from './project-git-working-copies.js';
-import { MAX_CAPABILITY_TTL_SECONDS } from '@athanor/core';
+import { MAX_CAPABILITY_TTL_SECONDS } from '@garden/core';
 import { ProjectGit } from './project-git.js';
 import {
   ProjectRepositoryInput,
   ProjectRepositoryOperation,
   ProjectRepositoryRemovalInput
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { ProjectPurge } from './project-purge.js';
 import { contentRemoval, assertHistoryContentAvailable } from './project-content-state.js';
 import { createHash, randomUUID } from 'node:crypto';
@@ -23,8 +23,8 @@ import type {
   ProjectUpdate,
   ProjectUpdates,
   ProjectGitWorkingCopy
-} from '@athanor/contracts';
-import { PrepareProjectUpdate } from '@athanor/contracts';
+} from '@garden/contracts';
+import { PrepareProjectUpdate } from '@garden/contracts';
 import { ensureWorkspace, workspacePath, withWorkspaceDirectory } from './files.js';
 import { ProjectLiveChanges } from './project-live-changes.js';
 import { ProjectVersionPins } from './project-version-pins.js';
@@ -1190,17 +1190,17 @@ export class ProjectUpdatesManager {
         try {
           const checkRoot = workspacePath(this.root, check.id);
           await ensureWorkspace(checkRoot);
-          await durableJson(path.join(checkRoot, '.athanor', 'project-inputs.json'), {
+          await durableJson(path.join(checkRoot, '.garden', 'project-inputs.json'), {
             sources: [],
             projects: [projectId]
           });
-          await durableJson(path.join(checkRoot, '.athanor', 'project-check.json'), {
+          await durableJson(path.join(checkRoot, '.garden', 'project-check.json'), {
             projectId,
             updateId: id,
             checkId: check.id,
             candidateDigest: expectedDigest
           });
-          await durableJson(path.join(checkRoot, '.athanor', 'project-source.json'), {
+          await durableJson(path.join(checkRoot, '.garden', 'project-source.json'), {
             sourceWorkspaceId: (await this.registry(projectId)).workspaceId,
             taskId: update.taskId
           });

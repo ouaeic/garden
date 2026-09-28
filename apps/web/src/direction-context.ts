@@ -1,4 +1,4 @@
-import type { DirectionContext } from '@athanor/contracts';
+import type { DirectionContext } from '@garden/contracts';
 
 export function directionPrompt(
   body: string,

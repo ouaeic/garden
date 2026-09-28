@@ -1,10 +1,10 @@
-import { runtimeValue } from '@athanor/core';
+import { runtimeValue } from '@garden/core';
 import { textValue } from './values.js';
 import { createHmac } from 'node:crypto';
 import { posix } from 'node:path';
-import { canonicalApprovalScope, TaskApprovalScope } from '@athanor/contracts';
-import { reachOfHttpUrl, unwrapDataKey } from '@athanor/core';
-import type { TaskRecord } from '@athanor/data';
+import { canonicalApprovalScope, TaskApprovalScope } from '@garden/contracts';
+import { reachOfHttpUrl, unwrapDataKey } from '@garden/core';
+import type { TaskRecord } from '@garden/data';
 import {
   callDestinations,
   effectiveCommands,
@@ -69,7 +69,7 @@ export const withTaskApproval = (
         !(
           path === 'workspace' ||
           path.startsWith('workspace/') ||
-          path.startsWith('.athanor/artifacts/')
+          path.startsWith('.garden/artifacts/')
         )
     )
   )

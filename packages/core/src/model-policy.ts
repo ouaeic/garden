@@ -1,5 +1,5 @@
-import type { ModelRelease, PrivacyRoute } from '@athanor/contracts';
-import { ReasoningOptions } from '@athanor/contracts';
+import type { ModelRelease, PrivacyRoute } from '@garden/contracts';
+import { ReasoningOptions } from '@garden/contracts';
 
 export type ModelCapability = ModelRelease['capabilities'][number];
 export type ModelModality = ModelRelease['modalities'][number];
@@ -11,7 +11,7 @@ export type ModelPreference = 'fast' | 'balanced' | 'best';
  *
  * - `measured` - an independent benchmark ran the model and published a score.
  * - `declared` - the endpoint or the owner told us, at configure time, what this route is.
- * - `unknown` - nobody has said anything. Athanor invents nothing for these: they are reachable by
+ * - `unknown` - nobody has said anything. Garden invents nothing for these: they are reachable by
  *   name and never by automatic ranking, because a route we know nothing about must not be scored
  *   as if we did.
  */
@@ -983,7 +983,7 @@ const withoutCeiling = (request: ModelRequest): ModelRequest => ({
 
 export const rankModels = (models: RoutableModel[], request: ModelRequest): RankedModel[] => {
   if (request.requestedId) {
-    // An explicit pick is never constrained by the ceiling: it governs what athanor chooses for the
+    // An explicit pick is never constrained by the ceiling: it governs what garden chooses for the
     // owner, never what the owner chooses for themselves.
     const relaxed = withoutCeiling(request);
     return models
@@ -1172,7 +1172,7 @@ export const selectModel = (models: RoutableModel[], request: ModelRequest): Mod
 
   if (request.requestedId) {
     /*
-     * An explicit pick is never constrained by the ceiling - it governs what athanor chooses for
+     * An explicit pick is never constrained by the ceiling - it governs what garden chooses for
      * the owner, never what the owner chooses for themselves - but it is not silent about it
      * either. A model the owner named that is over their own ceiling is worth one sentence.
      *
@@ -1505,7 +1505,7 @@ export interface ModelFit {
  * Whether the model about to answer suits the work in front of it.
  *
  * `rankModels` short-circuits a named model to a score of 1 and the reason "Explicitly selected by
- * the user" - correct, because the owner's pick is not athanor's to overrule, and the reason
+ * the user" - correct, because the owner's pick is not garden's to overrule, and the reason
  * nothing anywhere compares the model in use against the one the router would have reached for. A
  * fast route pointed at precise multi-step work degenerates quietly: it costs almost nothing per
  * call, so no ceiling fires, and the only signal reaching the owner is a spinner.

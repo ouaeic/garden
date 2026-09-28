@@ -3,7 +3,7 @@ import {
   CreateConnectorRequest,
   CreateTaskScheduleRequest,
   UpdateTaskScheduleRequest
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import { connectionInput, oauthCompletion, secretValue } from './connection-input.js';
 import { watchInput } from './watch-input.js';
 
@@ -124,7 +124,7 @@ describe('connection credentials and access boundaries', () => {
     const message = {
       origin,
       source: popup,
-      data: { source: 'athanor-mcp-oauth', ok: true, message: 'Connected' }
+      data: { source: 'garden-mcp-oauth', ok: true, message: 'Connected' }
     };
     expect(oauthCompletion(message, popup, origin)).toEqual({ ok: true, message: 'Connected' });
     expect(

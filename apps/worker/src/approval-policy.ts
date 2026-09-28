@@ -1,7 +1,7 @@
-import { runtimeDate } from '@athanor/core';
+import { runtimeDate } from '@garden/core';
 /** The strongest provenance, lifetime and ordinary-effect requirement is authoritative. */
-import { publishesPublicly, type SecurityMode } from '@athanor/contracts';
-import { connectorActions, privateDiagnostics, recordPrivateDiagnostic } from '@athanor/core';
+import { publishesPublicly, type SecurityMode } from '@garden/contracts';
+import { connectorActions, privateDiagnostics, recordPrivateDiagnostic } from '@garden/core';
 import {
   classifyDestination,
   MAX_TURN_NOVEL_BYTES,

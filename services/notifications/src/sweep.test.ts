@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DataStore } from '@athanor/data';
+import type { DataStore } from '@garden/data';
 import type { PendingRow } from './context.js';
 import { notificationPayload, type PushPayload } from './payload.js';
 import { EndpointHealth, RETRY_HORIZON_MS, backoffMs } from './retry.js';
@@ -38,7 +38,7 @@ const destinationRow = (overrides: Partial<PendingRow> = {}): PendingRow =>
     updatedAt: '2026-07-01T00:00:00.000Z',
     senderId: '4242',
     redact: true,
-    config: { botToken: '1000:bot-secret', botUsername: 'athanor_bot' },
+    config: { botToken: '1000:bot-secret', botUsername: 'garden_bot' },
     kind: 'task_finished',
     resourceId: 'task-1',
     taskId: 'task-1',
@@ -156,7 +156,7 @@ const sweep = (
 
 describe('runSweep', () => {
   it('hands the data layer the key, which is the whole difference between a named conversation and "Untitled conversation"', async () => {
-    // The service read the same /etc/athanor/control.env that carries DATA_MASTER_KEY and never
+    // The service read the same /etc/garden/control.env that carries DATA_MASTER_KEY and never
     // asked for it, so the only production caller of listPendingNotifications passed one argument
     // and every title came back null. This is the assertion that the key gets as far as the query.
     const key = new Uint8Array(32).fill(7);
@@ -315,7 +315,7 @@ describe('runSweep', () => {
     /*
      * A full batch is a hundred serial sends with a ten-second ceiling each, so a pass that meets a
      * push service which accepts the connection and then says nothing outlives the thirty seconds
-     * `athanor@.service` allows a stop - and the SIGKILL that follows can land in the gap between a
+     * `garden@.service` allows a stop - and the SIGKILL that follows can land in the gap between a
      * notification that was sent and the ledger row saying it was sent, which is how the owner gets
      * the same push twice on the next start. The item that was in flight when the signal arrived
      * must therefore finish both halves, and the ones behind it must not be started at all.

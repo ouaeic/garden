@@ -5,10 +5,10 @@
  * with its own summariser, its own billing and its own event, and it was reachable only by driving
  * a whole task through the step loop.
  */
-import type { ModelRelease } from '@athanor/contracts';
-import { sha256 } from '@athanor/core';
-import type { DataStore, TaskRecord } from '@athanor/data';
-import type { ModelGateway } from '@athanor/model-gateway';
+import type { ModelRelease } from '@garden/contracts';
+import { sha256 } from '@garden/core';
+import type { DataStore, TaskRecord } from '@garden/data';
+import type { ModelGateway } from '@garden/model-gateway';
 import { acceptanceAcceptedResult } from './acceptance.js';
 import type { AgentState } from './agent-state.js';
 import { estimatedInferenceCostUsd, usageCredit } from './billing.js';
@@ -91,7 +91,7 @@ export const summariseForCompaction = async (
           // transcript rather than the window. Inheriting a parent's key would point a route at a
           // prefix that was never sent under it, and the `:compaction` suffix keeps it off the
           // main conversation's prefix for the same reason.
-          sessionId: sha256(`athanor-task:${task.id}:compaction`).slice(0, 64),
+          sessionId: sha256(`garden-task:${task.id}:compaction`).slice(0, 64),
           signal
         }),
       COMPACTION_REQUEST_TIMEOUT_MS

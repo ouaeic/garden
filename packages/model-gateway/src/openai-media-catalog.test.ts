@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MediaModelOption } from '@athanor/contracts';
+import { MediaModelOption } from '@garden/contracts';
 import { isNativeOpenAIEndpoint, refreshOpenAIMediaCatalog } from './openai-media-catalog.js';
 import { quoteMediaPrice } from './media-capabilities.js';
 

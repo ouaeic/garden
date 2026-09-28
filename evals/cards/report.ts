@@ -8,7 +8,7 @@
  * anybody having to read a transcript.
  *
  * The baseline is a tripwire, not a specification. A change that moves a number here is a decision
- * about how often athanor interrupts its owner, and the intended way to make it is `--accept` in
+ * about how often garden interrupts its owner, and the intended way to make it is `--accept` in
  * the commit that moves it, with the new figure in the message. The two directions that are NOT
  * decisions - a genuine write that stopped carding, a read that started - are assertions in
  * `guards.ts` and fail on every run, flag or no flag.
@@ -23,7 +23,7 @@ import type { ScenarioMeasurement } from './measure.js';
 /* ------------------------------------------------------------- what produced a number, exactly */
 
 /**
- * Which athanor, and which rig, a committed row was measured by. The twin of the block in
+ * Which garden, and which rig, a committed row was measured by. The twin of the block in
  * `evals/context-quality/report.ts`, and a twin rather than a shared import for the reason given
  * there: the file lists differ, because what decides a number differs.
  */
@@ -191,9 +191,9 @@ export const render = (
     '',
     `how often this computer stops and asks ${RULE}`,
     '',
-    `  measured now against athanor ${now.version} at ${now.commit ?? 'an uncommitted tree'}, rig ${now.rig}`,
+    `  measured now against garden ${now.version} at ${now.commit ?? 'an uncommitted tree'}, rig ${now.rig}`,
     stamp
-      ? `  baseline accepted ${stamp.acceptedAt} against athanor ${stamp.version} at ${stamp.commit ?? 'an uncommitted tree'}, rig ${stamp.rig}${stamp.rig === now.rig ? '' : ' (the rig has changed since; --accept in the commit that changed it)'}`
+      ? `  baseline accepted ${stamp.acceptedAt} against garden ${stamp.version} at ${stamp.commit ?? 'an uncommitted tree'}, rig ${stamp.rig}${stamp.rig === now.rig ? '' : ' (the rig has changed since; --accept in the commit that changed it)'}`
       : '  no committed baseline',
     ''
   ];

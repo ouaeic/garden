@@ -66,9 +66,9 @@ if (!sshInstallerSource.includes('concat!("v", env!("CARGO_PKG_VERSION"))')) {
   throw new Error('The native SSH installer must pin to the compiled package version');
 }
 if (
-  !sshInstallerSource.includes('env!("ATHANOR_SOURCE_COMMIT")') ||
-  !sshInstallerSource.includes("ATHANOR_EXPECTED_COMMIT='{SOURCE_COMMIT}'") ||
-  !installerSource.includes('ATHANOR_EXPECTED_COMMIT') ||
+  !sshInstallerSource.includes('env!("GARDEN_SOURCE_COMMIT")') ||
+  !sshInstallerSource.includes("GARDEN_EXPECTED_COMMIT='{SOURCE_COMMIT}'") ||
+  !installerSource.includes('GARDEN_EXPECTED_COMMIT') ||
   !installerSource.includes('installed_commit')
 ) {
   throw new Error('The native SSH installer must pin the downloaded source to its compiled commit');
@@ -83,7 +83,7 @@ if (!webInstallerSource.includes(`v${expectedVersion}`)) {
  * `curl … | sh` command aimed anywhere else hands whoever owns that namespace root on every
  * installation, so a stale or mistyped owner is a release-blocking supply-chain defect.
  */
-const PUBLIC_NAMESPACE = 'ouaeic/athanor';
+const PUBLIC_NAMESPACE = 'ouaeic/garden';
 const foreignNamespaces = [
   ['install.sh', installerSource],
   ['README.md', readmeSource],
@@ -114,14 +114,14 @@ for (const [path, source] of [
   if (!source.includes('install.sh |')) continue;
   if (
     !source.includes(`/v${expectedVersion}/install.sh`) ||
-    !source.includes(`ATHANOR_REF=v${expectedVersion}`)
+    !source.includes(`GARDEN_REF=v${expectedVersion}`)
   ) {
     throw new Error(`${path} does not pin the public installer to v${expectedVersion}`);
   }
 }
 
 const releaseTag =
-  process.env.ATHANOR_RELEASE_TAG ??
+  process.env.GARDEN_RELEASE_TAG ??
   (process.env.GITHUB_REF_TYPE === 'tag' ? (process.env.GITHUB_REF_NAME ?? '') : undefined);
 if (releaseTag !== undefined && releaseTag !== `v${expectedVersion}`) {
   throw new Error(`Release tag ${releaseTag} does not match v${expectedVersion}`);
@@ -130,12 +130,12 @@ if (releaseTag !== undefined && releaseTag !== `v${expectedVersion}`) {
 /**
  * What a build leaves on the owner's disk.
  *
- * An update is `pnpm install && pnpm -r build` against the checkout at /opt/athanor, and the five
+ * An update is `pnpm install && pnpm -r build` against the checkout at /opt/garden, and the five
  * systemd services then run `node <package>/dist/index.js` from that tree. So whatever `tsc` emits
  * is shipped weight on a box that has one owner and no CI - and for a long time 7,092 kB of the
  * 15,744 kB it emitted was compiled test files, which cannot run there and which the test runner
  * then found beside their own sources. A further 2,716 kB was source maps that nothing reads, since
- * athanor-service execs plain `node` with no --enable-source-maps, and 1,700 kB was declarations
+ * garden-service execs plain `node` with no --enable-source-maps, and 1,700 kB was declarations
  * that nothing reads either, since every package points `exports["."].types` at ./src.
  *
  * Two halves, deliberately. The configuration half runs on every checkout, built or not, which is
@@ -260,7 +260,7 @@ if (process.env.GITHUB_OUTPUT) {
 }
 
 console.log(
-  `Verified athanor release version v${expectedVersion}; compiled output ${
+  `Verified garden release version v${expectedVersion}; compiled output ${
     emittedBytes > 0 ? `${Math.round(emittedBytes / 1024)} kB` : 'not built here'
   }`
 );

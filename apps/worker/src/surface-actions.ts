@@ -27,7 +27,7 @@
  * *required set* moved into prose; nothing became untyped and nothing was withheld.
  *
  * The runner still validates against the BrowserAction and DesktopAction discriminated unions in
- * @athanor/contracts, which did not move - `surfaceActionRequest` below is the single place the
+ * @garden/contracts, which did not move - `surfaceActionRequest` below is the single place the
  * two spellings meet.
  */
 import { textValue } from './values.js';
@@ -237,7 +237,7 @@ const surfaceActionFields = (bag: Record<string, unknown>): Record<string, unkno
  *
  * `browser_action` and `desktop_action` are declared as one property bag discriminated by a sibling
  * `action` string, because a twenty-variant `oneOf` cost about five kilobytes of every request in
- * scaffolding. BrowserAction and DesktopAction in @athanor/contracts are still discriminated on a
+ * scaffolding. BrowserAction and DesktopAction in @garden/contracts are still discriminated on a
  * nested `type`, and deliberately so - the runner's acceptance surface did not widen by a byte.
  * This is the one place the two spellings meet, and it is also where `purpose` is dropped: it is
  * the model's sentence for the owner's card, and forwarding it would put it in the request.

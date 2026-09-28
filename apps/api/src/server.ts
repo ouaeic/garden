@@ -26,8 +26,8 @@ import { registerProjectUpdateRoutes } from './routes/project-updates.js';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
-import { AgentWorker, runCodingMissionLoop } from '@athanor/worker';
-import { runMediaJobLoop } from '@athanor/worker/media-jobs';
+import { AgentWorker, runCodingMissionLoop } from '@garden/worker';
+import { runMediaJobLoop } from '@garden/worker/media-jobs';
 import { registerAuthRoutes } from './auth-routes.js';
 import type { ApiConfig } from './config.js';
 import {

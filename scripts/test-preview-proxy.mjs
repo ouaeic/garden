@@ -97,13 +97,13 @@ try {
   );
   assert.equal(certificate.status, 0, 'The drill needs a temporary TLS certificate');
   const generated = {
-    'athanor-https-listen.conf': `listen 127.0.0.1:${appPort} ssl;\n`,
-    'athanor-preview-origin.conf': `set $athanor_preview_origin "${previewOrigin}";\n`,
-    'athanor-hsts.conf': '',
+    'garden-https-listen.conf': `listen 127.0.0.1:${appPort} ssl;\n`,
+    'garden-preview-origin.conf': `set $garden_preview_origin "${previewOrigin}";\n`,
+    'garden-hsts.conf': '',
     'mime.types': 'types { text/html html; application/javascript js; }\n'
   };
   for (const name of ['security-headers', 'app-csp']) {
-    generated[`athanor-${name}.conf`] = await readFile(
+    generated[`garden-${name}.conf`] = await readFile(
       path.join(root, 'infra/native', `nginx-${name}.conf`),
       'utf8'
     );
@@ -122,8 +122,8 @@ try {
     .replace('listen [::]:8443 ssl;', '')
     .replaceAll('/etc/nginx/snippets/', `${temporary}/`)
     .replaceAll('/etc/nginx/mime.types', `${temporary}/mime.types`)
-    .replaceAll('/etc/athanor/tls/', `${temporary}/`)
-    .replaceAll('/opt/athanor/apps/web/dist', temporary)
+    .replaceAll('/etc/garden/tls/', `${temporary}/`)
+    .replaceAll('/opt/garden/apps/web/dist', temporary)
     .replaceAll('127.0.0.1:4100', `127.0.0.1:${apiPort}`)
     .replaceAll('127.0.0.1:4400', `127.0.0.1:${gatewayPort}`);
   await writeFile(path.join(temporary, 'index.html'), '<p>garden application fixture</p>');
@@ -162,7 +162,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
   assert(available, `nginx never became ready: ${stderr}`);
-  const previewPath = `/__athanor/preview/${'a'.repeat(32)}/api/state?grant=synthetic%2Btoken&x=1`;
+  const previewPath = `/__garden/preview/${'a'.repeat(32)}/api/state?grant=synthetic%2Btoken&x=1`;
   const oldLink = await request(appOrigin + previewPath);
   assert.equal(oldLink.status, 308);
   assert.equal(
@@ -189,7 +189,7 @@ try {
     '/runner/v1/workspaces/00000000-0000-4000-8000-000000000001/browser/stream',
     '/assets/index.js',
     '/',
-    '/__athanor/preview/not-a-preview'
+    '/__garden/preview/not-a-preview'
   ]) {
     assert.equal(
       (await request(previewOrigin + forbidden)).status,

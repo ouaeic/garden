@@ -1,4 +1,4 @@
-import type { AnalysisRunFile, AnalysisRunRecord } from '@athanor/contracts/analysis-run';
+import type { AnalysisRunFile, AnalysisRunRecord } from '@garden/contracts/analysis-run';
 import { readAnalysisRecord } from './analysis-record';
 import type { WorkspaceTextFile } from './workspace-file';
 

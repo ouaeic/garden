@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import type { Artifact } from '@athanor/contracts';
+import type { Artifact } from '@garden/contracts';
 import { responseError } from '../client.js';
 import { shareArtifactDocument } from '../share-html.js';
 import { message, mimeTypeForFile } from './format.js';

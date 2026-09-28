@@ -7,8 +7,8 @@ import {
   verifyRegistrationResponse
 } from '@simplewebauthn/server';
 import { z } from 'zod';
-import { hashRecoveryCode, AthanorError, sha256, verifyRecoveryCode } from '@athanor/core';
-import type { DataStore } from '@athanor/data';
+import { hashRecoveryCode, GardenError, sha256, verifyRecoveryCode } from '@garden/core';
+import type { DataStore } from '@garden/data';
 import type { ApiConfig } from './config.js';
 import { recordSecurityEvent } from './security-events.js';
 import {
@@ -35,7 +35,7 @@ const internalUsername = (name: string | undefined): string => {
 const validDisplayName = (value: string | undefined): string => {
   const displayName = value?.trim();
   if (!displayName || displayName.length > 80)
-    throw new Error('Enter the name you want athanor to use');
+    throw new Error('Enter the name you want garden to use');
   return displayName;
 };
 
@@ -45,7 +45,7 @@ const validDisplayName = (value: string | undefined): string => {
  * A Tauri shell renders in the platform webview and forwards its User-Agent unchanged, so the
  * macOS app was labelled "Safari on macOS" - byte-identical to the owner's real Safari in the
  * Devices list, which is also the revoke-a-session control. The shell now stamps
- * `x-athanor-client: athanor-<platform>/<version>` on every request it proxies
+ * `x-garden-client: garden-<platform>/<version>` on every request it proxies
  * (`apps/desktop/src-tauri/src/proxy.rs`).
  *
  * Matched against a closed list rather than echoed. Any caller can set a header, and a device
@@ -62,16 +62,16 @@ const NATIVE_CLIENT_PLATFORMS: Record<string, string> = {
 
 const nativeClientLabel = (value: string | string[] | undefined): string | undefined => {
   if (typeof value !== 'string') return undefined;
-  const platform = /^athanor-([a-z]{3,10})\/[0-9A-Za-z.+-]{1,32}$/.exec(value.trim())?.[1];
+  const platform = /^garden-([a-z]{3,10})\/[0-9A-Za-z.+-]{1,32}$/.exec(value.trim())?.[1];
   const named = platform ? NATIVE_CLIENT_PLATFORMS[platform] : undefined;
   return named ? `garden app on ${named}` : undefined;
 };
 
 export const deviceLabel = (headers: {
   'user-agent'?: string | undefined;
-  'x-athanor-client'?: string | string[] | undefined;
+  'x-garden-client'?: string | string[] | undefined;
 }): string => {
-  const native = nativeClientLabel(headers['x-athanor-client']);
+  const native = nativeClientLabel(headers['x-garden-client']);
   if (native) return native;
   const value = headers['user-agent'] ?? '';
   const browser = value.includes('Firefox/')
@@ -125,7 +125,7 @@ export const registerAuthRoutes = (
     try {
       parsed = new URL(nativeOrigin);
     } catch {
-      throw new AthanorError('invalid_native_origin', 'The native client origin is invalid', 400);
+      throw new GardenError('invalid_native_origin', 'The native client origin is invalid', 400);
     }
     if (
       parsed.protocol !== 'http:' ||
@@ -138,7 +138,7 @@ export const registerAuthRoutes = (
       parsed.hash ||
       parsed.origin !== nativeOrigin
     ) {
-      throw new AthanorError(
+      throw new GardenError(
         'invalid_native_origin',
         'Native passkeys require an exact http://localhost:<port> origin',
         400
@@ -166,15 +166,15 @@ export const registerAuthRoutes = (
       config.REGISTRATION_BOOTSTRAP_EXPIRES_AT &&
       config.REGISTRATION_BOOTSTRAP_EXPIRES_AT <= Math.floor(Date.now() / 1000)
     )
-      throw new AthanorError(
+      throw new GardenError(
         'pairing_expired',
-        'The installer pairing code expired. Run sudo athanor pairing-code on the server.',
+        'The installer pairing code expired. Run sudo garden pairing-code on the server.',
         403
       );
     if (!pairingMatches(pairingCode))
-      throw new AthanorError(
+      throw new GardenError(
         'pairing_required',
-        'Enter the one-time pairing code printed by the athanor installer',
+        'Enter the one-time pairing code printed by the garden installer',
         403
       );
   };
@@ -188,7 +188,7 @@ export const registerAuthRoutes = (
           if (attempt.resetAt <= now) recoveryAttempts.delete(candidate);
         }
         if (recoveryAttempts.size >= 10_000) {
-          throw new AthanorError(
+          throw new GardenError(
             'recovery_rate_limited',
             'Recovery is temporarily busy; try again later',
             429
@@ -200,7 +200,7 @@ export const registerAuthRoutes = (
     }
     current.count += 1;
     if (current.count > 5) {
-      throw new AthanorError(
+      throw new GardenError(
         'recovery_rate_limited',
         'Too many recovery attempts; try again later',
         429
@@ -213,9 +213,9 @@ export const registerAuthRoutes = (
     cookies: Record<string, string | undefined>;
   }): Promise<{ id: string }> => {
     const user = request.user;
-    if (!user) throw new AthanorError('authentication_required', 'Sign in to continue', 401);
+    if (!user) throw new GardenError('authentication_required', 'Sign in to continue', 401);
     if (!(await hasRecentStepUp(store, user.id, request.cookies[sessionCookieName(secure)]))) {
-      throw new AthanorError(
+      throw new GardenError(
         'step_up_required',
         'Confirm this sensitive action with your passkey',
         403
@@ -237,9 +237,9 @@ export const registerAuthRoutes = (
     // account on - reachable only by editing the environment over SSH, which is to say by the one
     // route this software is trying to stop needing.
     if ((await store.countUsers()) > 0)
-      throw new AthanorError(
+      throw new GardenError(
         'registration_closed',
-        'This athanor server already has an owner. Sign in, or add this device from one that is already signed in.',
+        'This garden server already has an owner. Sign in, or add this device from one that is already signed in.',
         403
       );
     await requireFirstOwnerPairing(request.body.pairingCode);
@@ -277,11 +277,7 @@ export const registerAuthRoutes = (
     };
   }>('/v1/auth/register/verify', async (request, reply) => {
     if ((await store.countUsers()) > 0)
-      throw new AthanorError(
-        'registration_closed',
-        'This athanor server already has an owner.',
-        403
-      );
+      throw new GardenError('registration_closed', 'This garden server already has an owner.', 403);
     await requireFirstOwnerPairing(request.body.pairingCode);
     const pending = await store.consumeChallenge(request.body.challengeId, 'registration');
     if (!pending?.username) throw new Error('Registration challenge expired');
@@ -403,7 +399,7 @@ export const registerAuthRoutes = (
         user?.recoveryHash ?? (await dummyRecoveryHash)
       );
       if (!user?.recoveryHash || !verified) {
-        throw new AthanorError(
+        throw new GardenError(
           'recovery_failed',
           sole ? 'That recovery code is not valid' : 'The username or recovery code is not valid',
           401
@@ -446,7 +442,7 @@ export const registerAuthRoutes = (
   }>('/v1/auth/recover/verify', async (request, reply) => {
     const pending = await store.consumeChallenge(request.body.challengeId, 'recovery');
     if (!pending?.username)
-      throw new AthanorError('recovery_failed', 'Recovery challenge expired', 401);
+      throw new GardenError('recovery_failed', 'Recovery challenge expired', 401);
     // Throttled on its own account, not only through the /options route that issued the challenge:
     // this route derives the same memory-hard hash, and a challenge is reusable until it is spent.
     checkRecoveryRate(`${request.ip}:${pending.username}`);
@@ -456,7 +452,7 @@ export const registerAuthRoutes = (
       user?.recoveryHash ?? (await dummyRecoveryHash)
     );
     if (!user?.recoveryHash || !verifiedCode) {
-      throw new AthanorError('recovery_failed', 'The username or recovery code is not valid', 401);
+      throw new GardenError('recovery_failed', 'The username or recovery code is not valid', 401);
     }
     const context = pendingContext(pending);
     const verification = await verifyRegistrationResponse({
@@ -467,7 +463,7 @@ export const registerAuthRoutes = (
       requireUserVerification: true
     });
     if (!verification.verified || !verification.registrationInfo) {
-      throw new AthanorError('recovery_failed', 'New passkey verification failed', 401);
+      throw new GardenError('recovery_failed', 'New passkey verification failed', 401);
     }
     const newRecoveryCode = randomBytes(18).toString('base64url');
     const { credential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
@@ -496,7 +492,7 @@ export const registerAuthRoutes = (
 
   app.get('/v1/auth/passkeys', async (request) => {
     const user = request.user;
-    if (!user) throw new AthanorError('authentication_required', 'Sign in to continue', 401);
+    if (!user) throw new GardenError('authentication_required', 'Sign in to continue', 401);
     return (await store.listPasskeys(user.id)).map((key) => ({
       id: key.id,
       deviceType: key.deviceType,
@@ -509,7 +505,7 @@ export const registerAuthRoutes = (
   app.post<{ Body: { nativeOrigin?: string } }>('/v1/auth/passkeys/options', async (request) => {
     const user = await requireRecentStepUp(request);
     const fullUser = await store.getUserById(user.id);
-    if (!fullUser) throw new AthanorError('authentication_required', 'Sign in to continue', 401);
+    if (!fullUser) throw new GardenError('authentication_required', 'Sign in to continue', 401);
     const passkeys = await store.listPasskeys(fullUser.id);
     const context = webauthnContext(request.body.nativeOrigin);
     const options = await generateRegistrationOptions({
@@ -544,7 +540,7 @@ export const registerAuthRoutes = (
     const fullUser = await store.getUserById(user.id);
     const pending = await store.consumeChallenge(request.body.challengeId, 'passkey_add');
     if (!fullUser || !pending || pending.username !== fullUser.username) {
-      throw new AthanorError('passkey_add_failed', 'Passkey challenge expired', 401);
+      throw new GardenError('passkey_add_failed', 'Passkey challenge expired', 401);
     }
     const context = pendingContext(pending);
     const verification = await verifyRegistrationResponse({
@@ -555,7 +551,7 @@ export const registerAuthRoutes = (
       requireUserVerification: true
     });
     if (!verification.verified || !verification.registrationInfo) {
-      throw new AthanorError('passkey_add_failed', 'New passkey verification failed', 401);
+      throw new GardenError('passkey_add_failed', 'New passkey verification failed', 401);
     }
     const { credential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
     const added = await store.addPasskey({
@@ -604,13 +600,13 @@ export const registerAuthRoutes = (
       // produced a credential, so dismissing the biometric prompt costs nothing but the tap.
       const enrollment = await store.findDeviceEnrollment(enrollmentTokenHash(token));
       if (!enrollment)
-        throw new AthanorError(
+        throw new GardenError(
           'enrollment_invalid',
           'This device link has expired or was already used. Create a new one from a device that is already signed in.',
           403
         );
       const owner = await store.getUserById(enrollment.userId);
-      if (!owner) throw new AthanorError('enrollment_invalid', 'Enrollment target is gone', 403);
+      if (!owner) throw new GardenError('enrollment_invalid', 'Enrollment target is gone', 403);
       const context = webauthnContext(request.body?.nativeOrigin);
       const options = await generateRegistrationOptions({
         rpName: config.WEBAUTHN_RP_NAME,
@@ -647,9 +643,9 @@ export const registerAuthRoutes = (
     const token = z.string().min(20).max(200).parse(request.body?.token);
     const pending = await store.consumeChallenge(request.body.challengeId, 'passkey_add');
     if (!pending?.username)
-      throw new AthanorError('enrollment_invalid', 'Enrollment challenge expired', 401);
+      throw new GardenError('enrollment_invalid', 'Enrollment challenge expired', 401);
     const owner = await store.getUserByUsername(pending.username);
-    if (!owner) throw new AthanorError('enrollment_invalid', 'Enrollment target is gone', 403);
+    if (!owner) throw new GardenError('enrollment_invalid', 'Enrollment target is gone', 403);
     const context = pendingContext(pending);
     const verification = await verifyRegistrationResponse({
       response: request.body.response,
@@ -659,7 +655,7 @@ export const registerAuthRoutes = (
       requireUserVerification: true
     });
     if (!verification.verified || !verification.registrationInfo)
-      throw new AthanorError('enrollment_invalid', 'New device verification failed', 401);
+      throw new GardenError('enrollment_invalid', 'New device verification failed', 401);
     // Spent here, now that an authenticator has actually produced a credential. The UPDATE is
     // atomic and still guarded on `consumed_at IS NULL`, so a second device racing the same link
     // finds nothing and exactly one passkey is ever created from it. The owner check matters
@@ -667,7 +663,7 @@ export const registerAuthRoutes = (
     // agreeing on the account is the only thing that makes them one claim.
     const enrollment = await store.consumeDeviceEnrollment(enrollmentTokenHash(token));
     if (!enrollment || enrollment.userId !== owner.id)
-      throw new AthanorError(
+      throw new GardenError(
         'enrollment_invalid',
         'This device link has expired or was already used. Create a new one from a device that is already signed in.',
         403
@@ -707,7 +703,7 @@ export const registerAuthRoutes = (
     const passkeyId = z.string().uuid().parse(request.params.passkeyId);
     const result = await store.deletePasskeyForUser(user.id, passkeyId);
     if (result === 'last_passkey') {
-      throw new AthanorError(
+      throw new GardenError(
         'last_passkey',
         'Add another passkey before removing the final sign-in method',
         409
@@ -728,7 +724,7 @@ export const registerAuthRoutes = (
     '/v1/auth/step-up/options',
     async (request) => {
       const user = request.user;
-      if (!user) throw new AthanorError('authentication_required', 'Sign in to continue', 401);
+      if (!user) throw new GardenError('authentication_required', 'Sign in to continue', 401);
       /*
        * A ceremony that already happened, inside the window, is the answer.
        *
@@ -762,7 +758,7 @@ export const registerAuthRoutes = (
         if (devAuthEnabled) {
           const token = request.cookies[sessionCookieName(secure)];
           if (!token || !(await store.markSessionStepUp(user.id, sha256(token)))) {
-            throw new AthanorError(
+            throw new GardenError(
               'step_up_failed',
               'The current development session is unavailable',
               401
@@ -770,7 +766,7 @@ export const registerAuthRoutes = (
           }
           return { verified: true };
         }
-        throw new AthanorError('passkey_required', 'Register a passkey to continue', 403);
+        throw new GardenError('passkey_required', 'Register a passkey to continue', 403);
       }
       const context = webauthnContext(request.body.nativeOrigin);
       const options = await generateAuthenticationOptions({
@@ -799,13 +795,13 @@ export const registerAuthRoutes = (
     };
   }>('/v1/auth/step-up/verify', async (request) => {
     const user = request.user;
-    if (!user) throw new AthanorError('authentication_required', 'Sign in to continue', 401);
+    if (!user) throw new GardenError('authentication_required', 'Sign in to continue', 401);
     const pending = await store.consumeChallenge(request.body.challengeId, 'step_up');
     if (!pending || pending.username !== user.username)
-      throw new AthanorError('step_up_failed', 'Passkey challenge expired', 401);
+      throw new GardenError('step_up_failed', 'Passkey challenge expired', 401);
     const key = await store.getPasskeyByCredentialId(request.body.response.id);
     if (!key || key.userId !== user.id)
-      throw new AthanorError('step_up_failed', 'Passkey is not registered', 401);
+      throw new GardenError('step_up_failed', 'Passkey is not registered', 401);
     const context = pendingContext(pending);
     const verification = await verifyAuthenticationResponse({
       response: request.body.response,
@@ -821,11 +817,11 @@ export const registerAuthRoutes = (
       requireUserVerification: true
     });
     if (!verification.verified)
-      throw new AthanorError('step_up_failed', 'Passkey verification failed', 401);
+      throw new GardenError('step_up_failed', 'Passkey verification failed', 401);
     await store.updatePasskeyCounter(key.id, verification.authenticationInfo.newCounter);
     const token = request.cookies[sessionCookieName(secure)];
     if (!token || !(await store.markSessionStepUp(user.id, sha256(token)))) {
-      throw new AthanorError('step_up_failed', 'The current session is unavailable', 401);
+      throw new GardenError('step_up_failed', 'The current session is unavailable', 401);
     }
     await recordSecurityEvent(store, {
       userId: user.id,

@@ -17,7 +17,7 @@ import {
   encodeCbor,
   createSelfSignedCertificate,
   generateIdentityKeyPair
-} from '@athanor/relay';
+} from '@garden/relay';
 import { RelayClientConfigSchema, RelayConnection, loadOrCreateIdentity } from '../src/index.js';
 
 const directory = await mkdtemp(join(tmpdir(), 'garden-relay-bind-'));

@@ -3,7 +3,7 @@ import { acceptanceAcceptedResult } from './acceptance.js';
 import { agentToolsFor } from './tools.js';
 import { ACCEPTANCE_MARKER } from './agent.js';
 import { describe, expect, it } from 'vitest';
-import { MAX_CACHE_BREAKPOINTS, seedModels, type ModelMessage } from '@athanor/model-gateway';
+import { MAX_CACHE_BREAKPOINTS, seedModels, type ModelMessage } from '@garden/model-gateway';
 import {
   appendBriefSection,
   BASE_PROMPT_MARKER,
@@ -64,7 +64,7 @@ import {
   MAX_CUT_ADVICE_CHARS,
   type ContextBrief
 } from './context.js';
-import { recallMemories } from '@athanor/core';
+import { recallMemories } from '@garden/core';
 import { SPILL_DIRECTORY, spillPathFor, spillRecovery } from './output-spill.js';
 import { sanitiseUntrustedText, untrustedEnvelope } from './sanitise.js';
 
@@ -75,7 +75,7 @@ const breakpointIndexes = (messages: ModelMessage[]): number[] =>
 /** A window shaped like a real tool-using run: system preamble, one goal, then call/result pairs. */
 const trajectory = (turns: number, size = 4_000): ModelMessage[] => [
   { role: 'system', content: `contract ${filler(3_000)}` },
-  { role: 'system', content: 'ATHANOR RUNTIME CONTEXT: computer details' },
+  { role: 'system', content: 'GARDEN RUNTIME CONTEXT: computer details' },
   { role: 'user', content: 'Keep this original goal.' },
   ...Array.from({ length: turns }, (_, index): ModelMessage[] => [
     {
@@ -1265,7 +1265,7 @@ describe('compaction and prompt caching', () => {
     // tool definitions sit in front of it in the same cached prefix and clear the threshold easily.
     const fresh: ModelMessage[] = [
       { role: 'system', content: `contract ${filler(1_200)}` },
-      { role: 'system', content: 'ATHANOR RUNTIME CONTEXT: computer details' },
+      { role: 'system', content: 'GARDEN RUNTIME CONTEXT: computer details' },
       { role: 'user', content: 'Fix the failing build.' },
       { role: 'tool', toolCallId: 'a', content: `output ${filler(1_500)}` }
     ];
@@ -1293,7 +1293,7 @@ describe('compaction and prompt caching', () => {
 describe('runtime context in the cached preamble', () => {
   const workspace = (storageBytes: number) => ({
     id: 'workspace-1',
-    name: 'athanor',
+    name: 'garden',
     region: 'local',
     storageBytes,
     storageLimitBytes: 100_000_000_000,
@@ -1310,7 +1310,7 @@ describe('runtime context in the cached preamble', () => {
     const after = runtimeContext(workspace(11_004_096), 'https://preview.example.com', clock);
     expect(after).toBe(before);
     // The agent is still told where the authoritative number is.
-    expect(before).toContain('df -h /home/athanor');
+    expect(before).toContain('df -h /home/garden');
   });
 
   /**
@@ -1474,7 +1474,7 @@ describe('the operating contract in the window', () => {
 
   it.each([
     'You operate a persistent, private Linux cloud computer. Old text.',
-    '# athanor operating contract\nStored task instructions.'
+    '# garden operating contract\nStored task instructions.'
   ])('replaces a stored preamble in place, keeping the goal at index 1: %s', (old) => {
     const messages: ModelMessage[] = [
       {
@@ -1541,7 +1541,7 @@ describe('the operating contract in the window', () => {
   });
 
   it('says where a running record belongs, and that the step ceiling is not a failure', () => {
-    expect(BASE_SYSTEM_PROMPT).toContain('workspace/ATHANOR.md');
+    expect(BASE_SYSTEM_PROMPT).toContain('workspace/GARDEN.md');
     expect(BASE_SYSTEM_PROMPT).toContain('not for a diary');
     expect(BASE_SYSTEM_PROMPT).toMatch(/turn that ends at the limit is not a failure/);
   });
@@ -1691,7 +1691,7 @@ describe('the contract as a function of the box it is on', () => {
     // exiting zero, which route controls pagination, what this box cannot do at all, and where an
     // app has to bind for the owner to reach it.
     for (const fact of [
-      '/usr/local/lib/athanor/python/bin/python3',
+      '/usr/local/lib/garden/python/bin/python3',
       'No model weights run on this computer',
       '127.0.0.1',
       'anti-bot challenge'
@@ -1750,14 +1750,14 @@ describe('the contract as a function of the box it is on', () => {
     const provisioned = baseSystemPrompt({
       toolchainSummary: 'Available on this computer: office-authoring, typeset-pdf.'
     });
-    expect(provisioned).toContain('/usr/local/lib/athanor/python/bin/python3');
+    expect(provisioned).toContain('/usr/local/lib/garden/python/bin/python3');
     expect(provisioned).not.toContain('Run every document or analysis script');
     expect(provisioned).not.toContain('typeset with typst');
     expect(provisioned).not.toContain('Publishing an Office file');
     const bare = baseSystemPrompt({
       toolchainSummary: 'No document toolchain is installed on this computer.'
     });
-    expect(bare).not.toContain('/usr/local/lib/athanor/python/bin/python3');
+    expect(bare).not.toContain('/usr/local/lib/garden/python/bin/python3');
     expect(bare).toContain('toolchain is unavailable');
     expect(baseSystemPrompt({ toolchainSummary: '' })).toBe(BASE_SYSTEM_PROMPT);
     expect(baseSystemPrompt()).toBe(BASE_SYSTEM_PROMPT);
@@ -2183,7 +2183,7 @@ describe('the pointer to a parked result, through the passes that used to drop i
     );
     const cut = prepared.messages.find((message) => message.toolCallId === 'plain')?.content ?? '';
     expect(cut).toContain('run the tool again for just the part you need');
-    expect(cut).not.toContain('workspace/.athanor/output');
+    expect(cut).not.toContain('workspace/.garden/output');
   });
 
   /**
@@ -2873,7 +2873,7 @@ describe('sixty steps of one task, measured on the bytes that leave the machine'
       messages.push({
         role: 'system',
         content: runtimeContext(
-          { name: 'athanor', securityMode: 'balanced' },
+          { name: 'garden', securityMode: 'balanced' },
           'https://preview.example.com',
           { now: new Date(Date.UTC(2026, 2, 3, 9, 15) + step * 45_000), timeZone: 'Europe/London' },
           'python3 3.11, typst 0.12, libreoffice 24.2',
@@ -3487,7 +3487,7 @@ describe('sixty steps of one task, measured on the bytes that leave the machine'
 describe('the money the model can see', () => {
   const workspace = {
     id: 'workspace-1',
-    name: 'athanor',
+    name: 'garden',
     region: 'local',
     storageBytes: 1_000,
     storageLimitBytes: 100_000_000_000,
@@ -3619,7 +3619,7 @@ describe('the runtime block on a record that has no ceiling on it', () => {
     // `undefined <= 0` is false - so the obvious guard let it through and the block threw while it
     // was being assembled. A runtime block that cannot be rendered is a turn that cannot start.
     const line = runtimeContext(
-      { name: 'athanor', securityMode: 'balanced' as const },
+      { name: 'garden', securityMode: 'balanced' as const },
       'https://preview.example.com',
       { now: new Date('2026-08-02T09:41:22Z'), timeZone: 'UTC' },
       '',
@@ -3743,7 +3743,7 @@ describe('the bound on what the owner has accumulated', () => {
    * It was a content test - the marker's own middle, searched for in the body - defended on the
    * grounds that only the owner's typed words reach a `user` message. That is true of all three
    * entry points and beside the point, because what the owner types can quote anything: the phrase
-   * lives in this repository's own test files, so pasting athanor's source into athanor made a
+   * lives in this repository's own test files, so pasting garden's source into garden made a
    * message uncuttable and pushed its weight onto its neighbours. Driven through the shipped
    * function, fifty-nine characters in the middle of one correction turned thirteen cuts and
    * nothing dropped into twelve cuts and a whole forty-thousand-character message given up.

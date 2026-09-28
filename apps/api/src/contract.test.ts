@@ -33,8 +33,8 @@ import {
   Workspace,
   WorkspacePreview,
   WorkspaceSnapshot
-} from '@athanor/contracts';
-import { seedModels } from '@athanor/model-gateway';
+} from '@garden/contracts';
+import { seedModels } from '@garden/model-gateway';
 import type { ApiConfig } from './config.js';
 import { buildServer } from './server.js';
 
@@ -119,7 +119,7 @@ const stubUpstreams = (holdModel?: { reached: () => void; release: Promise<void>
             taskId: expect.any(String) as unknown,
             workspaceId: expect.any(String) as unknown,
             kind: 'new',
-            paths: ['workspace/AGENTS.md', 'workspace/ATHANOR.md', 'workspace/OPEN_CLOUD.md']
+            paths: ['workspace/AGENTS.md', 'workspace/GARDEN.md', 'workspace/OPEN_CLOUD.md']
           });
           return json({
             status: 'ready',
@@ -164,7 +164,7 @@ const configFor = (directory: string, overrides: Partial<ApiConfig> = {}): ApiCo
   DEPLOYMENT_MODE: 'development',
   MODEL_CATALOG_SCOPE: 'reviewed_open_weight',
   CONNECTION_MANIFEST_PATH: join(directory, 'connection.json'),
-  ATHANOR_STATE_PATH: directory,
+  GARDEN_STATE_PATH: directory,
   RELAY_STATE_DIR: join(directory, 'relay'),
   RELAY_LOCAL_HOST: '127.0.0.1',
   RELAY_LOCAL_PORT: 443,
@@ -188,7 +188,7 @@ const configFor = (directory: string, overrides: Partial<ApiConfig> = {}): ApiCo
   PUBLIC_RUNNER_URL: 'ws://127.0.0.1:4300',
   WORKSPACE_IMAGE_REVISION: 'dev',
   WEBAUTHN_RP_ID: 'localhost',
-  WEBAUTHN_RP_NAME: 'athanor Test',
+  WEBAUTHN_RP_NAME: 'garden Test',
   WEBAUTHN_ORIGIN: 'http://localhost:5173',
   ALLOW_INSECURE_DEV_AUTH: true,
   WORKER_ID: 'contract-worker',
@@ -218,7 +218,7 @@ const start = async (
   overrides: Partial<ApiConfig> = {},
   holdModel?: { reached: () => void; release: Promise<void> }
 ) => {
-  const directory = await mkdtemp(join(tmpdir(), 'athanor-contract-'));
+  const directory = await mkdtemp(join(tmpdir(), 'garden-contract-'));
   disposers.push(() => rm(directory, { recursive: true, force: true }));
   stubUpstreams(holdModel);
   const built = await buildServer(configFor(directory, overrides));

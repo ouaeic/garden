@@ -30,7 +30,7 @@ const FILES: Record<string, string> = {
   'workspace/contract.pdf':
     'Clause 7: either party may terminate with 60 days written notice.\nClause 8: renewal is automatic unless notice is given.\n',
   'workspace/importer.py': 'def load(rows):\n    return rows\n',
-  'workspace/ATHANOR.md': '# Project brief\n\nNothing recorded yet.\n'
+  'workspace/GARDEN.md': '# Project brief\n\nNothing recorded yet.\n'
 };
 
 const written = new Map<string, string>();
@@ -83,7 +83,7 @@ const shell = (command: string): string => {
     return hits.length ? hits.join('\n') : '';
   }
   if (/^find\b/.test(trimmed)) return allPaths().join('\n');
-  return `athanor-eval: this rig's shell understands ls, cat, grep and find over the workspace, and was given: ${trimmed}`;
+  return `garden-eval: this rig's shell understands ls, cat, grep and find over the workspace, and was given: ${trimmed}`;
 };
 
 export interface OracleResult {
@@ -143,7 +143,7 @@ export const answer = (name: string, args: Record<string, unknown>): OracleResul
       );
     default:
       return ok(
-        `athanor-eval: ${name} is not modelled by this rig. Reach the same fact another way, or finish with what you have.`
+        `garden-eval: ${name} is not modelled by this rig. Reach the same fact another way, or finish with what you have.`
       );
   }
 };

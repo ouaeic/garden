@@ -81,7 +81,7 @@ export interface Run {
   readonly attempted: number;
   readonly registered: number;
   readonly modes: readonly ModeSummary[];
-  /** The discriminator, on the surfaces athanor's provenance link actually gates. Not AgentDojo. */
+  /** The discriminator, on the surfaces garden's provenance link actually gates. Not AgentDojo. */
   readonly attribution: readonly Attribution[];
   /** The same measurement with taint propagation cut, three ways. */
   readonly falsification: readonly Falsification[];
@@ -139,7 +139,7 @@ export interface Baseline {
    * failure rather than a smaller denominator, which is the whole reason the table exists.
    */
   attribution?: Record<string, Record<string, string>>;
-  /** Per route: what athanor's own classifier called the origin, and what attribution survived. */
+  /** Per route: what garden's own classifier called the origin, and what attribution survived. */
   falsification?: Record<string, { origin: string | null } & Partial<Record<Mode, number>>>;
   residuals?: Record<string, boolean>;
   novelty?: { leaked: number; bytes: number };
@@ -189,7 +189,7 @@ export const baselineFrom = (run: Run): Baseline => ({
  * Everything this run disagrees with the committed one about.
  *
  * A residual becoming contained is a *failure* here, and that is not a mistake: the committed row
- * says what athanor does today, and a channel that closed is a change to the safety story that
+ * says what garden does today, and a channel that closed is a change to the safety story that
  * somebody has to accept deliberately with `--accept`, exactly as a step count is. The alternative
  * - letting improvements through silently - is how a rig ends up unable to say when the thing it
  * measures got better.
@@ -257,7 +257,7 @@ export const check = (run: Run, baseline: Baseline | undefined): readonly string
     const committed = baseline.falsification?.[entry.route.id];
     if (!committed) continue;
     compare(
-      `${entry.route.id}: the origin athanor's classifier returned`,
+      `${entry.route.id}: the origin garden's classifier returned`,
       entry.origin ?? 'none',
       committed.origin ?? 'none'
     );
@@ -283,12 +283,10 @@ export const render = (run: Run): string => {
   const lines: string[] = [];
   const write = (line = ''): void => void lines.push(line);
 
-  write(`AgentDojo against athanor's reference monitor - ${run.stamp}`);
+  write(`AgentDojo against garden's reference monitor - ${run.stamp}`);
   write();
   write('This is the deterministic half. It reports no utility and no attack success rate: both');
-  write(
-    'need a live model and a simulated environment. What it reports is what athanor decides on'
-  );
+  write('need a live model and a simulated environment. What it reports is what garden decides on');
   write('its own, assuming the model has already been completely compromised.');
   write();
 
@@ -310,7 +308,7 @@ export const render = (run: Run): string => {
   for (const suite of SUITES) {
     const absent = suite.tools.filter((tool) => coverageOf(tool).kind === 'absent');
     write(
-      `  ${suite.name.padEnd(10)} ${String(REGISTERED[suite.name].userTasks).padStart(2)} x ${REGISTERED[suite.name].injectionTasks} = ${String(REGISTERED[suite.name].userTasks * REGISTERED[suite.name].injectionTasks).padStart(3)} cases   ${absent.length}/${suite.tools.length} tools absent from athanor`
+      `  ${suite.name.padEnd(10)} ${String(REGISTERED[suite.name].userTasks).padStart(2)} x ${REGISTERED[suite.name].injectionTasks} = ${String(REGISTERED[suite.name].userTasks * REGISTERED[suite.name].injectionTasks).padStart(3)} cases   ${absent.length}/${suite.tools.length} tools absent from garden`
     );
   }
   write();
@@ -353,7 +351,7 @@ export const render = (run: Run): string => {
   write();
 
   write('── attribution: which refusals are refusals BECAUSE the turn was tainted ───────────────');
-  write("  Not AgentDojo. These are the surfaces athanor's provenance link actually gates, each");
+  write("  Not AgentDojo. These are the surfaces garden's provenance link actually gates, each");
   write('  judged twice: the same call, the same world, the same mode, differing in one bit -');
   write('  whether the turn has read untrusted content. The difference is the attribution.');
   write();
@@ -380,7 +378,7 @@ export const render = (run: Run): string => {
 
   write('── the instrument moving: taint propagation cut on purpose ────────────────────────────');
   write('  Intact routes and deliberately broken result boundaries. Every origin below');
-  write("  is what athanor's own untrustedOriginOfResult answered when handed a real result; this");
+  write("  is what garden's own untrustedOriginOfResult answered when handed a real result; this");
   write('  rig never asserts one. An instrument nobody has seen move is not an instrument.');
   write();
   write(

@@ -1,6 +1,6 @@
-import { AthanorError } from '@athanor/core';
-import { CreateProjectNoteRequest, UpdateProjectRequest } from '@athanor/contracts';
-import { projectResponse } from '@athanor/data';
+import { GardenError } from '@garden/core';
+import { CreateProjectNoteRequest, UpdateProjectRequest } from '@garden/contracts';
+import { projectResponse } from '@garden/data';
 import { z } from 'zod';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
@@ -58,7 +58,7 @@ export function registerProjectRoutes(context: RouteContext) {
   app.get<{ Params: { projectId: string } }>('/v1/projects/:projectId', async (request) => {
     const user = requireUser(request.user);
     const project = await store.getProject(user.id, request.params.projectId);
-    if (!project) throw new AthanorError('project_not_found', 'Project not found', 404);
+    if (!project) throw new GardenError('project_not_found', 'Project not found', 404);
     return projectResponse(project, masterKey);
   });
   app.patch<{ Params: { projectId: string } }>(
@@ -84,7 +84,7 @@ export function registerProjectRoutes(context: RouteContext) {
       const user = requireUser(request.user),
         query = Page.parse(request.query);
       if (!(await store.getProject(user.id, request.params.projectId)))
-        throw new AthanorError('project_not_found', 'Project not found', 404);
+        throw new GardenError('project_not_found', 'Project not found', 404);
       const page = await store.listProjectConversations(user.id, request.params.projectId, {
         ...(query.before ? { before: query.before } : {}),
         ...(query.archived ? { archived: query.archived === 'true' } : {})

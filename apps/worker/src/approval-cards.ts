@@ -178,7 +178,7 @@ export const connectorApprovalCard = (
     case 'mcp_call_tool':
       return {
         action: `Run ${textValue(input.tool, 'a tool')} on the connected MCP server`,
-        preview: `The server decides what this does; athanor cannot bound it. Arguments:\n${JSON.stringify(input.arguments ?? {}).slice(0, 1_500)}`
+        preview: `The server decides what this does; garden cannot bound it. Arguments:\n${JSON.stringify(input.arguments ?? {}).slice(0, 1_500)}`
       };
     default:
       return {

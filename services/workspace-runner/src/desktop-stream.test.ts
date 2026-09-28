@@ -232,7 +232,7 @@ describe('display wire framing', () => {
 describe('display geometry', () => {
   it('produces cvt reduced blanking timings that match cvt -r', () => {
     expect(cvtReducedBlankingMode(1920, 1080)).toEqual({
-      name: 'athanor-1920x1080',
+      name: 'garden-1920x1080',
       clockMhz: 138.5,
       horizontal: [1920, 1968, 2000, 2080],
       vertical: [1080, 1083, 1088, 1111],
@@ -245,7 +245,7 @@ describe('display geometry', () => {
     });
     expect(newModeArguments(cvtReducedBlankingMode(1280, 800))).toEqual([
       '--newmode',
-      'athanor-1280x800',
+      'garden-1280x800',
       '71.00',
       '1280',
       '1328',
@@ -308,19 +308,19 @@ describe('display geometry', () => {
     );
   });
 
-  it('reads the output name, current size and leaked athanor modes from xrandr', () => {
+  it('reads the output name, current size and leaked garden modes from xrandr', () => {
     const output = [
       'Screen 0: minimum 1 x 1, current 1280 x 800, maximum 3840 x 2160',
       'screen connected 1280x800+0+0 (normal left inverted right x axis y axis) 0mm x 0mm',
       '   1280x800      59.98*+',
-      '   athanor-1280x800  59.81',
-      '   athanor-2560x1600  59.94'
+      '   garden-1280x800  59.81',
+      '   garden-2560x1600  59.94'
     ].join('\n');
     expect(parseRandrState(output)).toEqual({
       output: 'screen',
       current: { width: 1280, height: 800 },
       maximum: { width: 3840, height: 2160 },
-      athanorModes: ['athanor-1280x800', 'athanor-2560x1600']
+      gardenModes: ['garden-1280x800', 'garden-2560x1600']
     });
     expect(parseRandrState('nonsense')).toBeNull();
   });

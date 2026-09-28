@@ -1,12 +1,12 @@
-import { UNKNOWN_SURFACES, type ModelRelease } from '@athanor/contracts';
-import { AthanorError } from '@athanor/core';
-import type { DataStore, TaskRecord } from '@athanor/data';
+import { UNKNOWN_SURFACES, type ModelRelease } from '@garden/contracts';
+import { GardenError } from '@garden/core';
+import type { DataStore, TaskRecord } from '@garden/data';
 import {
   retainInterruptedResponse,
   type ModelGateway,
   type ModelRequest,
   type ModelResponse
-} from '@athanor/model-gateway';
+} from '@garden/model-gateway';
 import { describe, expect, it, vi } from 'vitest';
 import type { AgentState, AgentWorkerConfig } from '../agent-state.js';
 import { COMPACT_CONTEXT_TOOL, prepareModelContext } from '../context.js';
@@ -36,7 +36,7 @@ describe('interrupted model calls', () => {
       } as ModelRelease;
       const state = {
         messages: [
-          { role: 'system', content: 'ATHANOR RUNTIME CONTEXT (dynamic)' },
+          { role: 'system', content: 'GARDEN RUNTIME CONTEXT (dynamic)' },
           { role: 'user', content: 'Complete the analysis.' }
         ],
         step: mode === 'handoff' ? 120 : 0,
@@ -54,7 +54,7 @@ describe('interrupted model calls', () => {
         usage: { inputTokens: 0, outputTokens: 4, totalTokens: 4, estimated: true },
         metadata: { provider: 'custom', model: 'model', latencyMs: 5, privacyRoute: 'provider_zdr' }
       };
-      const failure = new AthanorError('provider_unavailable', 'connection interrupted', 503);
+      const failure = new GardenError('provider_unavailable', 'connection interrupted', 503);
       retainInterruptedResponse(failure, response);
       const chat = vi.fn(async (_provider: string, input: ModelRequest) => {
         await input.onTextDelta?.('Partial answer');

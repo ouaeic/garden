@@ -1,5 +1,5 @@
 /**
- * The seam that puts a REAL model where `evals/harness.ts`'s script is, through athanor's own
+ * The seam that puts a REAL model where `evals/harness.ts`'s script is, through garden's own
  * gateway - and the meter that says what the turn cost.
  *
  * WHY THIS FILE EXISTS. `score.ts` drives a real `AgentWorker` against a real box and scores it
@@ -11,7 +11,7 @@
  *
  * WHAT IS REAL AND WHAT IS NOT, before any number below is read:
  *
- *   real - the request. It is athanor's OWN assembled body - the same messages, the same tool
+ *   real - the request. It is garden's OWN assembled body - the same messages, the same tool
  *          catalogue, the same cache markers the worker's adapter just built - taken off the wire
  *          rather than composed here. See `attach` for why it has to be taken and not composed.
  *   real - the client. `ModelGateway` and `OpenAICompatibleAdapter` are the objects the worker
@@ -33,7 +33,7 @@
  * because a script already knows what it means to say. A model needs the window. Reconstructing
  * one from `ScriptContext` would mean sending a real provider a conversation with no tools on
  * offer and no call any tool result belongs to; it would answer in prose, every task would score
- * zero, and the rig would report that as athanor's number. So this file does not reconstruct: it
+ * zero, and the rig would report that as garden's number. So this file does not reconstruct: it
  * reads the request the worker's own adapter put on the wire, and it REFUSES rather than send a
  * degraded one (see `script`).
  *
@@ -146,7 +146,7 @@ export interface ProviderTotals {
    * Calls the route priced at nothing because it reported no cost at all.
    *
    * Kept apart from `calls` and never filled in from a price table. A benchmark row whose spend
-   * came from multiplying tokens by a published rate is a row that reports what athanor believes
+   * came from multiplying tokens by a published rate is a row that reports what garden believes
    * the model costs, and the point of measuring on the wire is that those two numbers disagree -
    * over cache reads, over a provider's own routing, over a discount nobody's table has. If this
    * is non-zero the honest reading of `costUsd` is "at least this much".
@@ -202,7 +202,7 @@ interface DecodedContent {
  *
  * A message the context layer marked as a cache breakpoint, and any message carrying an image,
  * travels as a block array rather than as a string - so reading `content` as a string alone drops
- * exactly the messages athanor considers most important. The same trap `evals/harness.ts`'s
+ * exactly the messages garden considers most important. The same trap `evals/harness.ts`'s
  * `contentOf` documents, on the same bodies.
  */
 const decodeContent = (raw: unknown): DecodedContent => {
@@ -275,7 +275,7 @@ const decodeMessages = (raw: unknown): ModelMessage[] => {
  * A provider-side tool travels in the same `tools` array on the wire and is a different kind of
  * thing entirely - a name the provider answers without the request ever coming back to this box.
  * Which of those may be sent is not this rig's decision to make: `resolveWebToolPlan` in
- * @athanor/contracts is the only thing that answers it, and it answers per task from the owner's
+ * @garden/contracts is the only thing that answers it, and it answers per task from the owner's
  * settings. So they are counted and left off, and the count travels into the run's report rather
  * than being silently dropped. On a bench run there are none - `evals/harness.ts` pins
  * `AI_FORCE_INHOUSE_WEB: true` - and this exists so that if that ever changes, the number moves
@@ -356,7 +356,7 @@ export interface ProviderDriver {
 }
 
 /** Marks a request this driver has already seen, so the harness's own forward cannot loop. */
-const FORWARDED = Symbol('athanor.bench.provider.forwarded');
+const FORWARDED = Symbol('garden.bench.provider.forwarded');
 
 const isForwarded = (init: RequestInit | undefined): boolean =>
   init !== undefined && FORWARDED in (init as Record<PropertyKey, unknown>);
@@ -461,7 +461,7 @@ export const providerDriver = (options: ProviderDriverOptions): ProviderDriver =
     const messages = decodeMessages(body.messages);
     const maxTokens = asFiniteNumber(body.max_tokens) ?? asFiniteNumber(body.max_completion_tokens);
     const effort = asText(asRecord(body.reasoning)?.effort);
-    // Whether athanor decided this route bills explicit breakpoints is already recorded in the
+    // Whether garden decided this route bills explicit breakpoints is already recorded in the
     // body: a `cache_control` block is only ever written on the `explicit` style. Read back rather
     // than re-derived, so the request that goes out carries the markers the one that came in had.
     // Absent, the adapter falls back to reading the slug, which is its own documented default.
@@ -549,7 +549,7 @@ export const providerDriver = (options: ProviderDriverOptions): ProviderDriver =
     pending = null;
     if (turn) return turn;
     // Never a fabricated reply. A `ScriptContext` has no roles, no tool calls and no catalogue, so
-    // anything composed here would be a different conversation from the one athanor assembled, and
+    // anything composed here would be a different conversation from the one garden assembled, and
     // the score would belong to it. @see this file's header.
     throw new Error(
       `The provider driver was asked for step ${String(context.step)} (call ${String(context.index)}) with no answer in hand. attach() must run before runFixture, and only a request this driver forwarded can be answered: a ScriptContext carries no tool catalogue, so there is nothing honest to send.`
@@ -579,11 +579,11 @@ export const providerDriver = (options: ProviderDriverOptions): ProviderDriver =
           // `provider_zdr` and a request that did not ask for it is the one pair worth writing out.
           privacyRoute: credential.enforceZeroDataRetention ? 'provider_zdr' : 'external',
           appUrl: options.appUrl ?? 'http://localhost:5173',
-          appTitle: 'athanor',
+          appTitle: 'garden',
           enforceZeroDataRetention: credential.enforceZeroDataRetention,
           // The wire, captured before `runFixture` replaces the global. The adapter would otherwise
-          // read `globalThis.fetch` at construction and a driver built late would send athanor's
-          // request to athanor's own stub, which answers it for nothing and looks like a free run.
+          // read `globalThis.fetch` at construction and a driver built late would send garden's
+          // request to garden's own stub, which answers it for nothing and looks like a free run.
           fetch: wireFetch
         })
       );

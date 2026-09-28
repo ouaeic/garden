@@ -1,9 +1,9 @@
 import { executeProjectUpdate } from './project-updates.js';
 import { enableToolGroups, rememberToolGroup } from './tool-groups.js';
 import { CODING_CHILD_TOOLS } from './coding-missions.js';
-import type { ModelRelease, WebToolPlan } from '@athanor/contracts';
-import type { DataStore, TaskRecord } from '@athanor/data';
-import type { ModelGateway, ModelToolCall } from '@athanor/model-gateway';
+import type { ModelRelease, WebToolPlan } from '@garden/contracts';
+import type { DataStore, TaskRecord } from '@garden/data';
+import type { ModelGateway, ModelToolCall } from '@garden/model-gateway';
 import type { AgentState, AgentWorkerConfig, InferenceCredential } from './agent-state.js';
 import { executeDelegateTool } from './delegate.js';
 import type { DestinationContext } from './egress.js';

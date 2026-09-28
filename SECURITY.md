@@ -13,7 +13,7 @@ assessment within seven. Security fixes target the current release line.
 
 garden is designed for one owner. Registration closes the moment the first account is created —
 there is no setting that reopens it — and claiming the server needs the single-use pairing token the
-installer prints, which expires and can be rotated with `sudo athanor pairing-code`. There is no
+installer prints, which expires and can be rotated with `sudo garden pairing-code`. There is no
 sharing model, no roles and no second party to authorize against. It is not a hardened hostile multi-tenant compute service.
 Anyone with root access to the host, control of the configured operating-system package
 repositories, live process memory, or an unencrypted backup can compromise the installation.
@@ -114,17 +114,17 @@ The relevant adversaries are:
   request and response bodies, and timeouts. The host itself is allowed because the owner named it
   when connecting; `CONNECTOR_ALLOWED_HOST_SUFFIXES` narrows which mail and calendar hosts may be
   reached at all, and ships empty, which leaves the owner's own choice standing.
-- No local model server, model weight, or inference GPU is installed by athanor.
+- No local model server, model weight, or inference GPU is installed by garden.
 - No secret is committed, baked into an image, or returned after initial token issuance.
 
 ## Native host boundary
 
 The agent computer is the installed Linux host. Shell commands, background processes,
-publisher CLIs and software started through the shell run as `athanor-agent`, an unprivileged
-account separate from the runner's `athanor` account.
+publisher CLIs and software started through the shell run as `garden-agent`, an unprivileged
+account separate from the runner's `garden` account.
 
 The installed GUI broker creates a private user, mount, PID, IPC and UTS namespace for each
-execution workspace. It runs as `athanor` with no capabilities and `NoNewPrivileges`; it does not
+execution workspace. It runs as `garden` with no capabilities and `NoNewPrivileges`; it does not
 receive the runner's environment or a sudo grant. Its private Unix socket checks the peer identity,
 accepts only validated execution roots, and holds one namespace for the lifetime of a runner lease.
 A disconnected runner releases its keepers. Browser and desktop leases share their own namespace,
@@ -157,17 +157,17 @@ the same exec line: a Landlock ruleset that admits the task's own `workspace/` a
 at `.home` for writing, the system directories for reading and running, and `/tmp`, `/var/tmp` and
 `/dev/shm` for scratch. `/home` is granted nowhere, and that omission is the boundary. Every workspace on the box is group-writable
 by the agent account, so without it a command run for one task could read and rewrite every other
-task's files, and could rename the runner's own `.athanor` directory - the checkpoints, the browser
+task's files, and could rename the runner's own `.garden` directory - the checkpoints, the browser
 profile's parent - out from under it. Re-measured on a 7.0 kernel with util-linux 2.41.3 after
-`$HOME` moved to `.home`: reading a neighbouring workspace, reading or writing `.athanor`, renaming
-`.athanor`, listing or writing anything in the container root, moving a file out of the container -
+`$HOME` moved to `.home`: reading a neighbouring workspace, reading or writing `.garden`, renaming
+`.garden`, listing or writing anything in the container root, moving a file out of the container -
 into that root, into a neighbour or into an ungranted `/tmp` - and reading anything through a
 symbolic link that points outside the grant all fail, while the command's own `workspace/` and
 `.home` are writable, renames between those two succeed, `echo x > /dev/null` and `2>/dev/null` work,
 and `/etc/resolv.conf` still resolves through `/run`. `pip`, `npm`, `pnpm`, `git`, a pty and a
 sixty-four-way parallel write are unaffected, at a cost of about 10 ms on a 145,403-file `find` over
 `/usr`. What that measurement does not establish: it was run against a stand-in root under `/tmp`,
-because `/home/athanor` is not writable by an account a drill may use, so no ruleset in it was ever
+because `/home/garden` is not writable by an account a drill may use, so no ruleset in it was ever
 applied to a real workspace - and the shipped helper hard-codes the parent those workspaces live
 under, so the drill exercised the mechanism rather than the installed helper. What it does
 establish, and the reason the deny cases mean anything at all: every one of them was re-run with the
@@ -175,7 +175,7 @@ ruleset removed and came back permitted, so it was the ruleset that refused and 
 permissions.
 
 The two grants inside a task's own directory are named one by one, and the directory that holds them
-is not. That is what keeps `.athanor` — the checkpoints, the artifact store, the browser profile's
+is not. That is what keeps `.garden` — the checkpoints, the artifact store, the browser profile's
 parent — out of reach while the two directories beside it are writable. The agent's `$HOME` is one of
 them and it sits outside `workspace/` deliberately: `workspace/` is what the turn checkpoint walks
 and hashes, and a single Rust toolchain is 88,021 files against a 250,000-file ceiling that, once
@@ -184,7 +184,7 @@ project tree goes back; the toolchain caches and the coding CLIs' sign-in state 
 run left them, for the same reason the browser profile is excluded from checkpoints — rolling a
 session back signs the account out.
 
-It is a rung and it says which rung it is on. The installer runs `athanor-sandbox check`, which
+It is a rung and it says which rung it is on. The installer runs `garden-sandbox check`, which
 reports `filesystem=landlock` or `filesystem=none`, and writes `CONFINE_AGENT_FILESYSTEM` in the
 runner's environment from that answer rather than from a preference; `/healthz` reports
 `agentFilesystemConfined` from the sandbox the runner actually resolved, not from the setting it was
@@ -234,8 +234,8 @@ package-name-only install passes through a root-owned helper that rejects option
 shell syntax. Package maintainer scripts still execute as root, so approving a package extends trust
 to the host's configured package repositories and to that package.
 
-The API, worker, registry, media, and notification services run as a separate `athanor-control`
-account under systemd hardening and cannot read `/home/athanor` directly. They reach the runner over a loopback-only
+The API, worker, registry, media, and notification services run as a separate `garden-control`
+account under systemd hardening and cannot read `/home/garden` directly. They reach the runner over a loopback-only
 port using short-lived, task/workspace-bound capabilities. PostgreSQL and every application service
 other than Nginx remain loopback-only; Nginx is the sole public application gateway.
 
@@ -260,12 +260,12 @@ host is on rather than taking a preference for it.
 - _No sandbox helper._ Commands run as the runner's own account, with no identity boundary and no
   filesystem one. This is a developer laptop with no second account to drop to, and the runner says
   so instead of pretending otherwise.
-- _`AGENT_SANDBOX_HELPER` set._ Commands run as `athanor-agent` with `no_new_privs`, so a
+- _`AGENT_SANDBOX_HELPER` set._ Commands run as `garden-agent` with `no_new_privs`, so a
   set-user-ID binary confers nothing, but they still reach every file that account can reach -
   including every other task's workspace.
 - _`CONFINE_AGENT_FILESYSTEM=true`._ The same exec line also carries a Landlock ruleset: this task's
   `workspace/` and `.home` writable, the system directories readable, `/home` granted nowhere - so
-  a neighbouring workspace and the runner's own `.athanor` stop being reachable at all.
+  a neighbouring workspace and the runner's own `.garden` stop being reachable at all.
 - _`ISOLATE_AGENT_NETWORK=true`._ The command additionally gets a network namespace of its own. It
   ships off, because that namespace has a loopback of its own and published previews then stop
   answering.
@@ -347,7 +347,7 @@ to change for the two dials to be worth joining, is recorded beside `ApprovalCon
 - A connection relay, once enrolled, sees the server's label, the addresses of the server and of
   every device that connects to it, byte counts and connection timings. It sees no traffic: TLS
   terminates on the server, so no URL, header, token or message is readable there. It ships off,
-  there is no default and no athanor-operated relay, and enrolling takes a hostname and a
+  there is no default and no garden-operated relay, and enrolling takes a hostname and a
   single-use token from an operator the owner chose. [docs/relay.md](docs/relay.md) sets out both
   halves in full.
 - Browser logins and cookies live in the persistent browser profile.
@@ -357,30 +357,30 @@ to change for the two dials to be worth joining, is recorded beside `ApprovalCon
 
 ## Backups and recovery
 
-`athanor backup` pauses mutating services, dumps PostgreSQL, archives `/home/athanor` and
-`/etc/athanor`, records the additional packages the owner approved, and writes checksums. The backup contains
+`garden backup` pauses mutating services, dumps PostgreSQL, archives `/home/garden` and
+`/etc/garden`, records the additional packages the owner approved, and writes checksums. The backup contains
 encryption keys, browser state, publisher logins, installed user tooling, and user files, so it is as
 sensitive as the live server. Store it in an operator-provided encrypted destination and off-host,
-then test `athanor restore` before depending on it.
+then test `garden restore` before depending on it.
 
 Losing `DATA_MASTER_KEY` makes encrypted records unrecoverable. Rotating or replacing
-`/etc/athanor/control.env` without a coordinated migration can cause permanent data loss.
+`/etc/garden/control.env` without a coordinated migration can cause permanent data loss.
 
 ## Hardening checklist
 
 1. Patch the host and reboot when kernel/security updates require it. Any of the four supported
-   distribution families is fine; the installer and `athanor doctor` both know which one this is.
-2. Expose only SSH as needed and Nginx on 80/443; use `athanor doctor` to verify every private service
+   distribution families is fine; the installer and `garden doctor` both know which one this is.
+2. Expose only SSH as needed and Nginx on 80/443; use `garden doctor` to verify every private service
    remains loopback-only.
 3. Restrict SSH, disable password login where practical, and protect the server provider account.
-4. Rotate an unused pairing ticket after accidental disclosure: `sudo athanor pairing-code`.
+4. Rotate an unused pairing ticket after accidental disclosure: `sudo garden pairing-code`.
    Registration closes on its own once an owner exists and cannot be reopened by configuration.
 5. Do not rewrite the passkey origin after owner registration. Native clients follow address changes
    by the pinned server identity.
 6. Keep custom connector and MCP hosts to the minimum required.
 7. Review model-provider retention and training settings; keep `AI_REQUIRE_ZDR=true` where supported.
 8. Store backups encrypted and off-host, with access independent of the server being recovered.
-9. Run `athanor doctor`, dependency/secret scans, content-log canaries, and restore drills after
+9. Run `garden doctor`, dependency/secret scans, content-log canaries, and restore drills after
    upgrades.
 10. Do not install untrusted skills, MCP servers, coding agents, or packages merely because a webpage
     asks.

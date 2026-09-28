@@ -1,5 +1,5 @@
 import { retainInterruptedResponse, interruptedResponseOf } from './interrupted-response.js';
-import { AthanorError } from '@athanor/core';
+import { GardenError } from '@garden/core';
 import { describe, expect, it } from 'vitest';
 import { ModelGateway } from './gateway.js';
 import { OpenAICompatibleAdapter } from './openai-compatible.js';
@@ -52,7 +52,7 @@ describe('ModelGateway.chat retries', () => {
       'test',
       stubAdapter(async () => {
         attempts += 1;
-        throw new AthanorError('provider_unavailable', 'upstream down', 503);
+        throw new GardenError('provider_unavailable', 'upstream down', 503);
       })
     );
     await expect(gateway.chat('test', baseRequest, { retry: false })).rejects.toThrow(
@@ -70,8 +70,8 @@ describe('ModelGateway.chat retries', () => {
       'test',
       stubAdapter(async () => {
         attempts += 1;
-        if (attempts === 1) throw new AthanorError('provider_unavailable', 'upstream down', 503);
-        if (attempts === 2) throw new AthanorError('provider_quota_exhausted', 'rate limited', 429);
+        if (attempts === 1) throw new GardenError('provider_unavailable', 'upstream down', 503);
+        if (attempts === 2) throw new GardenError('provider_quota_exhausted', 'rate limited', 429);
         return completion('recovered');
       })
     );
@@ -88,7 +88,7 @@ describe('ModelGateway.chat retries', () => {
       'test',
       stubAdapter(async () => {
         attempts += 1;
-        throw new AthanorError('provider_unavailable', 'upstream down', 503);
+        throw new GardenError('provider_unavailable', 'upstream down', 503);
       })
     );
 
@@ -105,7 +105,7 @@ describe('ModelGateway.chat retries', () => {
       stubAdapter(async (input) => {
         attempts += 1;
         await input.onTextDelta?.('half an answer');
-        throw new AthanorError('provider_unavailable', 'stream cut', 503);
+        throw new GardenError('provider_unavailable', 'stream cut', 503);
       })
     );
 
@@ -138,7 +138,7 @@ describe('ModelGateway.chat retries', () => {
       stubAdapter(async (input) => {
         attempts += 1;
         await input.onReasoningDelta?.('weighing the two approaches');
-        throw new AthanorError('provider_unavailable', 'stream cut', 503);
+        throw new GardenError('provider_unavailable', 'stream cut', 503);
       })
     );
 
@@ -165,7 +165,7 @@ describe('ModelGateway.chat retries', () => {
       stubAdapter(async () => {
         attempts += 1;
         controller.abort();
-        throw new AthanorError('provider_unavailable', 'cancelled mid-flight', 503);
+        throw new GardenError('provider_unavailable', 'cancelled mid-flight', 503);
       })
     );
 
@@ -181,7 +181,7 @@ describe('ModelGateway.chat retries', () => {
       'test',
       stubAdapter(async () => {
         attempts += 1;
-        throw new AthanorError('provider_request_failed', 'unknown model');
+        throw new GardenError('provider_request_failed', 'unknown model');
       })
     );
 
@@ -239,7 +239,7 @@ describe('interrupted usage evidence', () => {
   it('does not replay a partial tool-only or unobserved response', async () => {
     const waits: number[] = [];
     let attempts = 0;
-    const failure = new AthanorError('provider_unavailable', 'stream cut', 503);
+    const failure = new GardenError('provider_unavailable', 'stream cut', 503);
     const partial = {
       ...completion(''),
       toolCalls: [{ id: 'pending', name: 'shell', arguments: { command: 'echo pending' } }]

@@ -1,4 +1,4 @@
-import { GitHubProjectActions, type GitHubProjectAction } from '@athanor/contracts';
+import { GitHubProjectActions, type GitHubProjectAction } from '@garden/contracts';
 import type { AccountOperation } from './account-operation.js';
 import {
   secureConnectorRequest,
@@ -23,7 +23,7 @@ import {
   executeAccountConnector
 } from './account-connectors.js';
 import { AccountOAuth, verifyAccountOAuthIdentity } from './account-oauth.js';
-import type { ConnectorKind, ConnectorScope } from '@athanor/contracts';
+import type { ConnectorKind, ConnectorScope } from '@garden/contracts';
 import {
   auth as authorizeMcp,
   type OAuthClientProvider,
@@ -38,7 +38,7 @@ import type {
 } from '@modelcontextprotocol/sdk/shared/auth.js';
 import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { z } from 'zod';
-import { AthanorError } from './errors.js';
+import { GardenError } from './errors.js';
 import {
   executeMailConnectorAction,
   mailConnectorActionInputs,
@@ -109,7 +109,7 @@ export const connectorCatalog: ConnectorDefinition[] = [
       'Read repositories and, when granted, publish project Git branches, issues or pull requests.',
     dataAccess: 'Only the selected account and repository capabilities are sent to GitHub.',
     tokenLocation:
-      'Encrypted in the athanor control-plane secret store; never placed in a model prompt.',
+      'Encrypted in the garden control-plane secret store; never placed in a model prompt.',
     providerLogging:
       'GitHub may retain API metadata and content under the connected account policy.',
     scopes: [
@@ -143,7 +143,7 @@ export const connectorCatalog: ConnectorDefinition[] = [
     dataAccess:
       'The selected MCP server receives only tool arguments explicitly approved for a task.',
     tokenLocation:
-      'OAuth refresh tokens or an optional bearer token are encrypted in athanor and never placed in a model prompt.',
+      'OAuth refresh tokens or an optional bearer token are encrypted in garden and never placed in a model prompt.',
     providerLogging:
       'The MCP server operator controls its own content and request retention policy.',
     scopes: [
@@ -321,13 +321,13 @@ const jsonBody = <T>(response: ConnectorRequestResult): T => {
   try {
     return JSON.parse(response.body.toString('utf8')) as T;
   } catch {
-    throw new AthanorError('connector_invalid_response', 'Connector returned invalid JSON');
+    throw new GardenError('connector_invalid_response', 'Connector returned invalid JSON');
   }
 };
 
 const requireSuccess = (response: ConnectorRequestResult, allowed: number[] = []): void => {
   if ((response.status < 200 || response.status >= 300) && !allowed.includes(response.status))
-    throw new AthanorError(
+    throw new GardenError(
       'connector_request_failed',
       `Connector request failed with status ${response.status}`
     );
@@ -352,14 +352,14 @@ const requestBody = async (body: BodyInit | null | undefined): Promise<Uint8Arra
   if (body instanceof ArrayBuffer) return new Uint8Array(body);
   if (body instanceof URLSearchParams) return Buffer.from(body.toString());
   if (body instanceof Blob) return new Uint8Array(await body.arrayBuffer());
-  throw new AthanorError('connector_request_invalid', 'Unsupported MCP request body');
+  throw new GardenError('connector_request_invalid', 'Unsupported MCP request body');
 };
 
 const oauthUrl = (value: string, code: string, label: string): URL => {
   try {
     return new URL(value);
   } catch {
-    throw new AthanorError(code, `${label} is not a valid URL`);
+    throw new GardenError(code, `${label} is not a valid URL`);
   }
 };
 
@@ -381,7 +381,7 @@ class StoredMcpOAuthProvider implements OAuthClientProvider {
 
   state(): string {
     if (!this.data.state)
-      throw new AthanorError(
+      throw new GardenError(
         'connector_oauth_state_invalid',
         'The MCP authorization state is missing'
       );
@@ -414,7 +414,7 @@ class StoredMcpOAuthProvider implements OAuthClientProvider {
 
   codeVerifier(): string {
     if (!this.data.codeVerifier)
-      throw new AthanorError(
+      throw new GardenError(
         'connector_oauth_state_invalid',
         'The MCP authorization verifier is missing'
       );
@@ -453,7 +453,7 @@ const connectorFetch =
       url.origin === baseUrl.origin &&
       url.pathname.replace(/\/+$/, '') === baseUrl.pathname.replace(/\/+$/, '')
     ) {
-      // Server-to-client SSE is optional. athanor uses bounded request/response calls and does not
+      // Server-to-client SSE is optional. garden uses bounded request/response calls and does not
       // keep an unbounded connector stream open between tasks.
       return new Response(null, { status: 405, statusText: 'SSE stream disabled' });
     }
@@ -502,7 +502,7 @@ export const beginMcpOAuth = async (input: {
     'The MCP callback address'
   );
   if (input.state.length < 32 || input.state.length > 512)
-    throw new AthanorError(
+    throw new GardenError(
       'connector_oauth_state_invalid',
       'MCP OAuth state must contain 32 to 512 characters'
     );
@@ -518,7 +518,7 @@ export const beginMcpOAuth = async (input: {
     redirectUrl.password ||
     redirectUrl.hash
   )
-    throw new AthanorError(
+    throw new GardenError(
       'connector_oauth_redirect_invalid',
       'MCP OAuth requires a credential-free HTTPS callback URL'
     );
@@ -535,7 +535,7 @@ export const beginMcpOAuth = async (input: {
       metadataUrl.hash ||
       metadataUrl.pathname === '/'
     )
-      throw new AthanorError(
+      throw new GardenError(
         'connector_oauth_client_metadata_invalid',
         'MCP client metadata must use a credential-free HTTPS URL with a path'
       );
@@ -553,8 +553,8 @@ export const beginMcpOAuth = async (input: {
       token_endpoint_auth_method: input.clientSecret ? 'client_secret_basic' : 'none',
       grant_types: ['authorization_code', 'refresh_token'],
       response_types: ['code'],
-      client_name: 'athanor',
-      software_id: 'org.athanor.ai',
+      client_name: 'garden',
+      software_id: 'org.garden.ai',
       software_version: '0.1.0',
       ...(input.scope ? { scope: input.scope } : {})
     },
@@ -586,19 +586,19 @@ export const beginMcpOAuth = async (input: {
     )
   });
   if (result !== 'REDIRECT' || !provider.authorizationUrl)
-    throw new AthanorError(
+    throw new GardenError(
       'connector_oauth_flow_invalid',
       'The MCP server did not begin an interactive authorization flow'
     );
   if (!oauth.discoveryState?.resourceMetadata)
-    throw new AthanorError(
+    throw new GardenError(
       'connector_oauth_resource_metadata_missing',
       'The MCP server does not publish required protected-resource metadata'
     );
   const pkceMethods =
     oauth.discoveryState.authorizationServerMetadata?.code_challenge_methods_supported;
   if (!pkceMethods?.includes('S256'))
-    throw new AthanorError(
+    throw new GardenError(
       'connector_oauth_pkce_unsupported',
       'The MCP authorization server does not advertise required S256 PKCE support'
     );
@@ -609,7 +609,7 @@ export const beginMcpOAuth = async (input: {
     authorizationUrl.password ||
     authorizationUrl.hash
   )
-    throw new AthanorError(
+    throw new GardenError(
       'connector_oauth_authorization_invalid',
       'The MCP server returned an unsafe authorization address'
     );
@@ -627,7 +627,7 @@ export const completeMcpOAuth = async (input: {
   transport?: ConnectorTransport;
 }): Promise<ConnectorSecret> => {
   if (!input.secret.mcpOAuth)
-    throw new AthanorError(
+    throw new GardenError(
       'connector_oauth_state_invalid',
       'The MCP authorization state is missing'
     );
@@ -656,7 +656,7 @@ export const completeMcpOAuth = async (input: {
     )
   });
   if (result !== 'AUTHORIZED' || !input.secret.mcpOAuth.tokens?.access_token)
-    throw new AthanorError(
+    throw new GardenError(
       'connector_oauth_exchange_failed',
       'The MCP authorization code did not produce an access token'
     );
@@ -682,7 +682,7 @@ const withMcpClient = async <T>(
     responseBytes: 0,
     durationMs: 0
   };
-  const client = new Client({ name: 'athanor', version: '0.1.0' });
+  const client = new Client({ name: 'garden', version: '0.1.0' });
   const oauthProvider = secret.mcpOAuth ? new StoredMcpOAuthProvider(secret.mcpOAuth) : undefined;
   const secretBefore = JSON.stringify(secret);
   const transport = new StreamableHTTPClientTransport(url, {
@@ -724,18 +724,18 @@ const withMcpClient = async <T>(
 };
 
 const githubHeaders = (secret: ConnectorSecret): Record<string, string> => {
-  if (!secret.token) throw new AthanorError('connector_secret_invalid', 'GitHub token is missing');
+  if (!secret.token) throw new GardenError('connector_secret_invalid', 'GitHub token is missing');
   return {
     authorization: `Bearer ${secret.token}`,
     accept: 'application/vnd.github+json',
-    'user-agent': 'athanor-AI-Workspace',
+    'user-agent': 'garden-AI-Workspace',
     'x-github-api-version': '2022-11-28'
   };
 };
 
 const webdavHeaders = (secret: ConnectorSecret): Record<string, string> => {
   if (!secret.username || !secret.password)
-    throw new AthanorError('connector_secret_invalid', 'WebDAV credentials are missing');
+    throw new GardenError('connector_secret_invalid', 'WebDAV credentials are missing');
   return {
     authorization: `Basic ${Buffer.from(`${secret.username}:${secret.password}`).toString('base64')}`
   };
@@ -772,7 +772,7 @@ export const verifyConnector = async (
   if (isAccountConnectorKind(input.kind)) {
     const secret = AccountOAuth.parse(input.secret.accountOAuth);
     if (secret.provider !== input.kind || input.baseUrl !== accountConnectorBase(secret.provider))
-      throw new AthanorError('connector_secret_context', 'The account provider does not match.');
+      throw new GardenError('connector_secret_context', 'The account provider does not match.');
     const verified = await verifyAccountOAuthIdentity(secret, transport);
     return { accountLabel: verified.account!.address, statusCode: 200 };
   }
@@ -796,7 +796,7 @@ export const verifyConnector = async (
     requireSuccess(response);
     const account = jsonBody<{ login?: unknown }>(response);
     if (typeof account.login !== 'string')
-      throw new AthanorError('connector_invalid_response', 'GitHub account identity is missing');
+      throw new GardenError('connector_invalid_response', 'GitHub account identity is missing');
     return { accountLabel: account.login, statusCode: response.status };
   }
   if (input.kind === 'mcp_http') {
@@ -833,9 +833,9 @@ export const executeConnectorAction = async (
   const parsed = connectorActionInput.parse(input.action);
   const definition = connectorActions[parsed.action];
   if (!connectorActionSupportsKind(parsed.action, input.kind))
-    throw new AthanorError('connector_action_invalid', 'Action does not match this connector');
+    throw new GardenError('connector_action_invalid', 'Action does not match this connector');
   if (!input.scopes.includes(definition.scope))
-    throw new AthanorError(
+    throw new GardenError(
       'connector_scope_denied',
       `Connector has not granted ${definition.scope}`
     );
@@ -845,12 +845,12 @@ export const executeConnectorAction = async (
     parsed.action === 'github_git_status'
   ) {
     if (!input.scopes.includes('github:repository.read'))
-      throw new AthanorError(
+      throw new GardenError(
         'connector_scope_denied',
         'Git synchronization also requires repository read access'
       );
     if (!input.projectGit)
-      throw new AthanorError(
+      throw new GardenError(
         'project_required',
         'Git synchronization requires a project conversation'
       );
@@ -909,7 +909,7 @@ export const executeConnectorAction = async (
             )
           : null;
     if (!executed)
-      throw new AthanorError('connector_action_invalid', 'Action does not match this connector');
+      throw new GardenError('connector_action_invalid', 'Action does not match this connector');
     return {
       action: parsed.action,
       result: executed.value,
@@ -964,7 +964,7 @@ export const executeConnectorAction = async (
         headers['content-type'] = 'application/json';
         break;
       default:
-        throw new AthanorError('connector_action_invalid', 'Unsupported GitHub action');
+        throw new GardenError('connector_action_invalid', 'Unsupported GitHub action');
     }
     url = github;
   } else {
@@ -993,7 +993,7 @@ export const executeConnectorAction = async (
         method = 'DELETE';
         break;
       default:
-        throw new AthanorError('connector_action_invalid', 'Unsupported WebDAV action');
+        throw new GardenError('connector_action_invalid', 'Unsupported WebDAV action');
     }
   }
 
@@ -1019,13 +1019,13 @@ export const executeConnectorAction = async (
       response
     );
     if (file.encoding !== 'base64' || typeof file.content !== 'string')
-      throw new AthanorError(
+      throw new GardenError(
         'connector_invalid_response',
         'GitHub file response is not base64 content'
       );
     const content = Buffer.from(file.content.replaceAll('\n', ''), 'base64');
     if (content.byteLength > 512_000)
-      throw new AthanorError('connector_response_too_large', 'GitHub file exceeds 512 KB');
+      throw new GardenError('connector_response_too_large', 'GitHub file exceeds 512 KB');
     result = { content: content.toString('utf8'), sha: file.sha, size: file.size };
   } else if (parsed.action === 'github_list_issues') {
     result = jsonBody<Array<Record<string, unknown>>>(response).map((issue) => ({

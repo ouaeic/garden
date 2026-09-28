@@ -11,17 +11,17 @@
  *
  * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
-import type { ServerToolUse, WebCitation } from '@athanor/contracts';
+import type { ServerToolUse, WebCitation } from '@garden/contracts';
 import {
-  AthanorError,
+  GardenError,
   connectorActions,
   connectorContentOrigin,
   connectorContentOrigins,
   isMailConnectorKind,
   untrustedFromOutside,
   type AnyConnectorKind
-} from '@athanor/core';
-import type { ModelMessage, ModelToolCall } from '@athanor/model-gateway';
+} from '@garden/core';
+import type { ModelMessage, ModelToolCall } from '@garden/model-gateway';
 import { originOf } from './egress.js';
 import { sanitiseUntrustedText } from './sanitise.js';
 import { isQuarantinedDownloadPath, untrustedShellOrigin } from './tools.js';
@@ -196,7 +196,7 @@ export const botWallFromRunner = (value: unknown): BotWall | null => {
 };
 
 export const botWallFromError = (error: unknown): BotWall | null =>
-  error instanceof AthanorError && error.code === 'browser_bot_wall'
+  error instanceof GardenError && error.code === 'browser_bot_wall'
     ? botWallFromRunner(error.details?.botWall)
     : null;
 
@@ -222,7 +222,7 @@ export const takeoverNotice = (wall: BotWall): string =>
  * an origin and a trust word. The sixty-word notice mail used to carry is paid on every read and
  * earns nothing the always-on contract does not already say once.
  *
- * The word itself comes from `connectorContentOrigins` in `@athanor/core`, which is a total map
+ * The word itself comes from `connectorContentOrigins` in `@garden/core`, which is a total map
  * over `AnyConnectorKind` - a kind cannot be added without that file failing to compile until
  * somebody has said what reading through it means. This file used to keep a second copy as a chain
  * of ternaries, so the guarantee held over a table nothing on this path read.

@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { constants, type BigIntStats } from 'node:fs';
 import { lstat, open, opendir, readFile, type FileHandle } from 'node:fs/promises';
 import path from 'node:path';
-import type { ConversationChanges, ProjectFileVersion } from '@athanor/contracts';
+import type { ConversationChanges, ProjectFileVersion } from '@garden/contracts';
 import { openDownloadFile } from './file-downloads.js';
 import { withWorkspaceDirectory } from './files.js';
 import { ProjectVersionFiles, projectPath, type VersionTree } from './project-version-files.js';

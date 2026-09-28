@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AthanorError } from '@athanor/core';
+import { GardenError } from '@garden/core';
 
 export const TranscriptionControls = z
   .object({
@@ -130,7 +130,7 @@ export const mediaArguments = (args: Record<string, unknown>): Record<string, un
       args[key] !== undefined &&
       JSON.stringify(args[key]) !== JSON.stringify((options as Record<string, unknown>)[key])
     )
-      throw new AthanorError('media_options_conflict', `Choose one value for ${key}`, 400);
+      throw new GardenError('media_options_conflict', `Choose one value for ${key}`, 400);
   const { options: _options, ...top } = args;
   return { ...top, ...options };
 };

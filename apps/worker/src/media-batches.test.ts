@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { encryptJson, wrapDataKey } from '@athanor/core';
-import { createDatabase, DataStore, migrateDatabase } from '@athanor/data';
+import { encryptJson, wrapDataKey } from '@garden/core';
+import { createDatabase, DataStore, migrateDatabase } from '@garden/data';
 import {
   NativeMediaSubmissionUncertainError,
   OPENAI_VIDEO_RETIREMENT_AT
-} from '@athanor/model-gateway';
+} from '@garden/model-gateway';
 import { MediaBatchWorker, queueVideoBatch } from './media-batches.js';
 import { MediaJobWorker } from './media-jobs.js';
 import { approvalRequirement } from './approval-policy.js';

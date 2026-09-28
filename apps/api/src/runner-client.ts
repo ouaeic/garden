@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import {
-  AthanorError,
+  GardenError,
   capabilityAudience,
   capabilityAudiences,
   redactText,
   signCapabilityToken
-} from '@athanor/core';
+} from '@garden/core';
 
 type Role = 'control' | 'agent' | 'user';
 
@@ -18,7 +18,7 @@ const explainedRunnerErrors = new Set([
   'checkpoint_workspace_too_large'
 ]);
 
-function rejectedRequest(status: number, body: string): AthanorError {
+function rejectedRequest(status: number, body: string): GardenError {
   let explained: { code: string; message: string } | undefined;
   try {
     const value = JSON.parse(body) as { error?: { code?: unknown; message?: unknown } } | null;
@@ -33,7 +33,7 @@ function rejectedRequest(status: number, body: string): AthanorError {
   } catch {
     // Proxy pages and malformed upstream bodies are not owner-facing explanations.
   }
-  return new AthanorError(
+  return new GardenError(
     explained?.code ?? 'workspace_request_rejected',
     explained?.message ?? 'The workspace rejected this request. Refresh its status and try again.',
     status

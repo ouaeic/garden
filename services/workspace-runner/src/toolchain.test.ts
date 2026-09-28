@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  ATHANOR_PYTHON,
+  GARDEN_PYTHON,
   DOCUMENT_TOOLCHAIN,
   parseFontFamilies,
   parseImportableModules,
@@ -69,7 +69,7 @@ describe('document toolchain report', () => {
   it('keeps CSV analysis available when the Parquet reader is missing', () => {
     const reports = reportToolchain(DOCUMENT_TOOLCHAIN, {
       ...nothing,
-      binaries: new Set([ATHANOR_PYTHON]),
+      binaries: new Set([GARDEN_PYTHON]),
       pythonModules: new Set(['pandas', 'numpy', 'matplotlib'])
     });
     expect(reports.find((item) => item.id === 'data-analysis')).toMatchObject({ ready: true });
@@ -138,21 +138,21 @@ describe('probe parsing', () => {
 describe('binary probing', () => {
   let root: string;
   beforeEach(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'athanor-toolchain-'));
+    root = await mkdtemp(path.join(tmpdir(), 'garden-toolchain-'));
     await mkdir(path.join(root, 'workspace'), { recursive: true });
   });
   afterEach(async () => rm(root, { recursive: true, force: true }));
 
   it('resolves a binary exactly as an agent command would', async () => {
     // /bin/sh is on the agent's own search path on every host this runs on.
-    const found = await probeBinaries(root, ['sh', 'athanor-not-a-real-binary']);
+    const found = await probeBinaries(root, ['sh', 'garden-not-a-real-binary']);
     expect(found.has('sh')).toBe(true);
-    expect(found.has('athanor-not-a-real-binary')).toBe(false);
+    expect(found.has('garden-not-a-real-binary')).toBe(false);
   });
 
   it('does not count a file the agent could not execute', async () => {
-    const binary = `athanor-probe-${path.basename(root)}`;
-    const tools = path.join(root, 'workspace', '.athanor', 'tools', 'node_modules', '.bin');
+    const binary = `garden-probe-${path.basename(root)}`;
+    const tools = path.join(root, 'workspace', '.garden', 'tools', 'node_modules', '.bin');
     await mkdir(tools, { recursive: true });
     await writeFile(path.join(tools, binary), '#!/bin/sh\n');
     await chmod(path.join(tools, binary), 0o644);
@@ -173,25 +173,25 @@ describe('binary probing', () => {
    * putting either one back on the other's list fails here.
    */
   it('sees an agent-planted fc-list but will not run it', async () => {
-    const tools = path.join(root, 'workspace', '.athanor', 'tools', 'node_modules', '.bin');
+    const tools = path.join(root, 'workspace', '.garden', 'tools', 'node_modules', '.bin');
     await mkdir(tools, { recursive: true });
     const marker = path.join(root, 'fc-list-was-run');
     await writeFile(
       path.join(tools, 'fc-list'),
-      `#!/bin/sh\n: > ${JSON.stringify(marker)}\nprintf 'Athanor Decoy Sans\\n'\n`
+      `#!/bin/sh\n: > ${JSON.stringify(marker)}\nprintf 'Garden Decoy Sans\\n'\n`
     );
     await chmod(path.join(tools, 'fc-list'), 0o755);
 
     // A name no host carries, so this half is a statement about `probeBinaries` reading the agent's
     // list rather than about whether this machine happens to have fontconfig in /usr/local/bin.
-    await writeFile(path.join(tools, 'athanor-planted-probe'), '#!/bin/sh\nexit 0\n');
-    await chmod(path.join(tools, 'athanor-planted-probe'), 0o755);
-    expect(
-      (await probeBinaries(root, ['athanor-planted-probe'])).has('athanor-planted-probe')
-    ).toBe(true);
+    await writeFile(path.join(tools, 'garden-planted-probe'), '#!/bin/sh\nexit 0\n');
+    await chmod(path.join(tools, 'garden-planted-probe'), 0o755);
+    expect((await probeBinaries(root, ['garden-planted-probe'])).has('garden-planted-probe')).toBe(
+      true
+    );
 
-    const families = await probeFonts(root, ['Athanor Decoy Sans']);
-    expect(families.has('athanor decoy sans')).toBe(false);
+    const families = await probeFonts(root, ['Garden Decoy Sans']);
+    expect(families.has('garden decoy sans')).toBe(false);
     expect(existsSync(marker), 'the runner executed an fc-list the agent wrote').toBe(false);
   });
 

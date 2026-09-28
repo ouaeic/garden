@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-# Exercises scripts/athanor-sandbox without root. The tools that need privilege - setpriv,
+# Exercises scripts/garden-sandbox without root. The tools that need privilege - setpriv,
 # unshare - are replaced by recorders, so what is asserted here is the chain the helper builds:
 # which account a command is dropped to, whether it asks for a network namespace, and that the
 # command and its environment arrive on the other side intact. Those are the parts that would
@@ -28,8 +28,8 @@ make_fake() {
 make_fake id '
 case "$*" in
   "-u") printf "0\n" ;;
-  "-u athanor-agent") printf "4321\n" ;;
-  "-g athanor-agent") printf "4322\n" ;;
+  "-u garden-agent") printf "4321\n" ;;
+  "-g garden-agent") printf "4322\n" ;;
   *) printf "unexpected id arguments: %s\n" "$*" >&2; exit 1 ;;
 esac'
 
@@ -52,7 +52,7 @@ esac'
 # The rule paths come from the fixed lists in the helper and from a mktemp directory, so splitting
 # the collected paths on whitespace is safe here in a way it would not be in production.
 make_fake setpriv '
-printf "%s\n" "$*" >"$ATHANOR_TEST_RECORDS/setpriv"
+printf "%s\n" "$*" >"$GARDEN_TEST_RECORDS/setpriv"
 landlocked=""
 granted=""
 for word in "$@"; do
@@ -83,7 +83,7 @@ fi
 exec "$@"'
 
 make_fake unshare '
-printf "%s\n" "$*" >"$ATHANOR_TEST_RECORDS/unshare"
+printf "%s\n" "$*" >"$GARDEN_TEST_RECORDS/unshare"
 while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do shift; done
 shift
 exec "$@"'
@@ -100,9 +100,9 @@ if record["phase"] != "prepared" or os.read(gate, 16) != b"go":
     raise RuntimeError("Mission was not authorized to launch")
 os.close(fd)
 os.close(gate)
-with open(os.environ["ATHANOR_TEST_RECORDS"] + "/mission", "w") as stream:
+with open(os.environ["GARDEN_TEST_RECORDS"] + "/mission", "w") as stream:
     stream.write("closed-private-fds")
-with open(os.environ["ATHANOR_TEST_RECORDS"] + "/mission-inputs", "w") as stream:
+with open(os.environ["GARDEN_TEST_RECORDS"] + "/mission-inputs", "w") as stream:
     stream.write(str(len(inputs)))
 os.execv(sys.argv[5], sys.argv[5:])
 PYTHON
@@ -112,18 +112,18 @@ PYTHON
 #
 # `workspace_parent` is redirected the same way and for the same reason: the confinement rules name
 # a real directory, setpriv refuses a rule it cannot open, and this harness deliberately runs
-# without the privilege that would let it create anything under /home/athanor. Pointing it at the
+# without the privilege that would let it create anything under /home/garden. Pointing it at the
 # temporary tree is what lets the rules the helper builds be asserted at all.
-sandbox="$test_root/athanor-sandbox"
+sandbox="$test_root/garden-sandbox"
 workspaces="$test_root/workspaces"
 workspace_id="0f4b0c2e-7a1d-4b3f-9c2a-6d5e4f3a2b1c"
 mkdir -p "$workspaces/$workspace_id/workspace"
 sed \
   -e "s|/usr/bin/setpriv|$fake_bin/setpriv|g" \
   -e "s|/usr/bin/unshare|$fake_bin/unshare|g" \
-  -e "s|/usr/local/lib/athanor/mission-supervisor.py|$fake_bin/mission-supervisor.py|g" \
-  -e "s|^workspace_parent=\"/home/athanor\"$|workspace_parent=\"$workspaces\"|" \
-  "$repository_root/scripts/athanor-sandbox" >"$sandbox"
+  -e "s|/usr/local/lib/garden/mission-supervisor.py|$fake_bin/mission-supervisor.py|g" \
+  -e "s|^workspace_parent=\"/home/garden\"$|workspace_parent=\"$workspaces\"|" \
+  "$repository_root/scripts/garden-sandbox" >"$sandbox"
 chmod 0755 "$sandbox"
 grep -q "^workspace_parent=\"$workspaces\"$" "$sandbox" ||
   { printf 'the harness could not redirect workspace_parent; the assertions below would be vacuous\n' >&2; exit 1; }
@@ -135,17 +135,17 @@ grep -q "^workspace_parent=\"$workspaces\"$" "$sandbox" ||
 # assertion below is about the helper's reading of it. A request with fewer than four words after
 # `run` is passed through untouched, which is how the malformed-request cases below reach the helper.
 #
-# The file is where the runner puts it - `<workspace parent>/.athanor/sandbox/<hex>.spec`, the one
+# The file is where the runner puts it - `<workspace parent>/.garden/sandbox/<hex>.spec`, the one
 # path shape the helper reads - and the word after its header is the directory the command is to
 # run in, which is how that directory stays off sudo's own record of where it was started.
-spec_parent="$workspaces/.athanor/sandbox"
+spec_parent="$workspaces/.garden/sandbox"
 mkdir -p "$spec_parent"
 chmod 0700 "$spec_parent"
 spec="$spec_parent/0123456789abcdef0123456789abcdef.spec"
 spec_cwd="$test_root"
 write_spec() {
   {
-    printf 'athanor-sandbox-spec 2\0%s\0' "$spec_cwd"
+    printf 'garden-sandbox-spec 2\0%s\0' "$spec_cwd"
     [ "$#" -eq 0 ] || printf '%s\0' "$@"
   } >"$spec"
 }
@@ -163,7 +163,7 @@ run_sandbox() {
     fi
     set -- run "$run_network" "$run_confinement" "$run_root" --spec "$spec"
   fi
-  PATH="$fake_bin:$PATH" ATHANOR_TEST_RECORDS="$records" SUDO_UID="$runner_uid" "$sandbox" "$@"
+  PATH="$fake_bin:$PATH" GARDEN_TEST_RECORDS="$records" SUDO_UID="$runner_uid" "$sandbox" "$@"
 }
 
 # A command that was granted the network keeps the host's, and is still handed to the agent
@@ -179,8 +179,8 @@ printf 'ok  a command runs as the agent account with no route back to a higher o
 
 # The environment is carried in arguments because sudo resets it, so the whole point is that it
 # survives - and that nothing the caller did not pass survives with it.
-output=$(ATHANOR_LEAK=must-not-arrive run_sandbox run network open - PATH=/usr/bin:/bin \
-  /bin/sh -c 'printf "%s|%s" "$PATH" "${ATHANOR_LEAK-unset}"')
+output=$(GARDEN_LEAK=must-not-arrive run_sandbox run network open - PATH=/usr/bin:/bin \
+  /bin/sh -c 'printf "%s|%s" "$PATH" "${GARDEN_LEAK-unset}"')
 test "$output" = '/usr/bin:/bin|unset'
 printf 'ok  the command gets exactly the environment it was given\n'
 
@@ -193,7 +193,7 @@ printf 'ok  the command gets exactly the environment it was given\n'
 tricky=$(printf 'line one\ttab "quoted" \\back $dollar `tick` \001\177\303\251 trailing\n\n'; printf x)
 tricky=${tricky%x}
 printf '%s' "$tricky" >"$test_root/expected"
-run_sandbox run network open - /bin/sh -c 'printf "%s" "$1" >"$2"' athanor-sandbox "$tricky" \
+run_sandbox run network open - /bin/sh -c 'printf "%s" "$1" >"$2"' garden-sandbox "$tricky" \
   "$test_root/delivered"
 cmp "$test_root/expected" "$test_root/delivered" ||
   { printf 'the command did not arrive byte for byte\n' >&2; exit 1; }
@@ -253,11 +253,11 @@ printf 'ok  an ungranted command is put in a network namespace before it is drop
 # the negative assertions below matter more than the positive ones.
 root="$workspaces/$workspace_id"
 # Shaped like a workspace the runner has prepared - `ensureWorkspace` in files.ts makes all three -
-# because `confine_to` skips a directory that is not there. Without `.athanor` on disk, adding it to
+# because `confine_to` skips a directory that is not there. Without `.garden` on disk, adding it to
 # the helper's write loop granted nothing and every assertion below stayed green while the ruleset
 # said something new; that is the saturation this harness exists to avoid.
-mkdir -p "$root/.home" "$root/.athanor/artifacts"
-chmod 0700 "$root/.athanor"
+mkdir -p "$root/.home" "$root/.garden/artifacts"
+chmod 0700 "$root/.garden"
 output=$(run_sandbox run network confine "$root" /bin/sh -c 'printf confined')
 test "$output" = confined
 grep -q -- '--landlock-access fs' "$records/setpriv"
@@ -277,15 +277,15 @@ cp "$records/setpriv" "$test_root/confined-rules"
 printf 'ok  a confined command carries the workspace grant, the home grant and the /dev grant\n'
 
 # The other half of that, and the reason the home is a second rule instead of a grant on $ROOT:
-# $ROOT/.athanor is the checkpoints, the browser profile's parent and the artifact store, and a
+# $ROOT/.garden is the checkpoints, the browser profile's parent and the artifact store, and a
 # command that could rename it could take the undo point away from the turn that is running it.
 # Named literally as well as caught by the closed-ruleset check below, so this one fact can be
 # watched failing on its own rather than only as "a directory nobody wrote down".
-if grep -Eq -- "path-beneath:[a-z,-]+:$root(/\.athanor)?( |\$)" "$records/setpriv"; then
-  printf 'the ruleset granted the container root or its .athanor, which is the undo point\n' >&2
+if grep -Eq -- "path-beneath:[a-z,-]+:$root(/\.garden)?( |\$)" "$records/setpriv"; then
+  printf 'the ruleset granted the container root or its .garden, which is the undo point\n' >&2
   exit 1
 fi
-printf 'ok  the container root and its .athanor are granted nowhere\n'
+printf 'ok  the container root and its .garden are granted nowhere\n'
 
 # /home is the omission the whole boundary rests on: every workspace on the box shares the agent
 # account's primary group, so any grant at or above /home hands one task every other task's files.
@@ -297,9 +297,9 @@ if grep -Eq -- "path-beneath:[a-z,-]+:($workspaces|$(dirname "$workspaces"))( |\
   exit 1
 fi
 # And the same fact spelled the way the shipped helper spells it, because the line above is asked
-# against the redirected parent this harness installed. A `/home` or `/home/athanor` written
+# against the redirected parent this harness installed. A `/home` or `/home/garden` written
 # literally into the read list would satisfy that check and hand every workspace away on the box.
-if grep -Eq -- 'path-beneath:[a-z,-]+:/home(/athanor)?( |$)' "$records/setpriv"; then
+if grep -Eq -- 'path-beneath:[a-z,-]+:/home(/garden)?( |$)' "$records/setpriv"; then
   printf 'the ruleset named /home, which is every workspace on the installed host\n' >&2
   exit 1
 fi
@@ -311,7 +311,7 @@ printf 'ok  the parent of every workspace is granted nowhere in the ruleset\n'
 # at the head of the write loop, each granted the whole disk and the whole container respectively
 # and left all eleven assertions green. So the ruleset is closed instead: every rule it carries has
 # to name a directory written down here, or the `workspace` or `.home` of the one container the
-# command belongs to - never the container root itself, which is what holds `.athanor`.
+# command belongs to - never the container root itself, which is what holds `.garden`.
 #
 # The list is spelled out in this file rather than read back out of the helper, because a list
 # derived from the thing under test cannot disagree with it. A directory this harness's host does
@@ -476,13 +476,13 @@ fi
 # a host for. A copy of the helper with the read loop narrowed back to /usr has to answer `none` -
 # if it answers `landlock`, the simulation above is not simulating anything and the assertion above
 # is worth nothing.
-narrowed="$test_root/athanor-sandbox-usr-only"
+narrowed="$test_root/garden-sandbox-usr-only"
 sed -e 's|^  for confine_directory in /usr /bin .*; do$|  for confine_directory in /usr; do|' \
   "$sandbox" >"$narrowed"
 chmod 0755 "$narrowed"
 grep -q '^  for confine_directory in /usr; do$' "$narrowed" ||
   { printf 'the harness could not narrow the read list; the assertion below would be vacuous\n' >&2; exit 1; }
-narrowed_report=$(rm -f "$records/setpriv"; PATH="$fake_bin:$PATH" ATHANOR_TEST_RECORDS="$records" \
+narrowed_report=$(rm -f "$records/setpriv"; PATH="$fake_bin:$PATH" GARDEN_TEST_RECORDS="$records" \
   "$narrowed" check)
 if [ "$(printf '%s' "$narrowed_report" | sed -n 's/^filesystem=//p')" != none ]; then
   printf 'the old /usr-only probe still reported a filesystem rung; the harness proves nothing\n' >&2
@@ -513,13 +513,13 @@ printf 'ok  a malformed request is refused rather than guessed at\n'
 # spelled there would let one stale caller put file contents back on disk outside every checkpoint.
 # Called directly rather than through `run_sandbox`, which would rewrite the request into a spec.
 raw_sandbox() {
-  PATH="$fake_bin:$PATH" ATHANOR_TEST_RECORDS="$records" SUDO_UID="$runner_uid" "$sandbox" "$@"
+  PATH="$fake_bin:$PATH" GARDEN_TEST_RECORDS="$records" SUDO_UID="$runner_uid" "$sandbox" "$@"
 }
 # The same, asking as an account other than the one that wrote the spec.
 raw_sandbox_as() {
   asking_uid="$1"
   shift
-  PATH="$fake_bin:$PATH" ATHANOR_TEST_RECORDS="$records" SUDO_UID="$asking_uid" "$sandbox" "$@"
+  PATH="$fake_bin:$PATH" GARDEN_TEST_RECORDS="$records" SUDO_UID="$asking_uid" "$sandbox" "$@"
 }
 if raw_sandbox run network open - /bin/sh -c : >/dev/null 2>&1; then
   printf 'the sandbox ran a command spelled on its argument list\n' >&2
@@ -570,19 +570,19 @@ printf 'ok  a command on the argument list, or a spec the helper cannot vouch fo
 #
 # The helper removes the file it is handed, as root. Accepting any path for it was a root-level
 # delete of any file on the box for the runner's account: name the sudoers policy or /etc/shadow,
-# be refused, and find it gone. So a spec is `<workspace parent>/.athanor/sandbox/<hex>.spec` and
+# be refused, and find it gone. So a spec is `<workspace parent>/.garden/sandbox/<hex>.spec` and
 # nothing else, owned by the account that asked, with one name - and a file refused on any of
 # those is still there afterwards, on the reading path and on a refusal path alike.
 mkdir -p "$test_root/etc/sudoers.d"
-printf 'athanor-sandbox-spec 2\0%s\0/bin/sh\0-c\0:\0' "$test_root" \
-  >"$test_root/etc/sudoers.d/athanor-packages"
+printf 'garden-sandbox-spec 2\0%s\0/bin/sh\0-c\0:\0' "$test_root" \
+  >"$test_root/etc/sudoers.d/garden-packages"
 printf 'root:x:0:0\n' >"$test_root/etc/shadow"
-if raw_sandbox run network open - --spec "$test_root/etc/sudoers.d/athanor-packages" \
+if raw_sandbox run network open - --spec "$test_root/etc/sudoers.d/garden-packages" \
   >/dev/null 2>&1; then
   printf 'the sandbox read a spec from outside its directory\n' >&2
   exit 1
 fi
-if [ ! -e "$test_root/etc/sudoers.d/athanor-packages" ]; then
+if [ ! -e "$test_root/etc/sudoers.d/garden-packages" ]; then
   printf 'a refused spec outside the spec directory was removed\n' >&2
   exit 1
 fi
@@ -602,7 +602,7 @@ for planted in \
   "$spec_parent/planted.spec" \
   "$spec_parent/0123456789abcdef"
 do
-  printf 'athanor-sandbox-spec 2\0%s\0/bin/sh\0-c\0:\0' "$test_root" >"$planted"
+  printf 'garden-sandbox-spec 2\0%s\0/bin/sh\0-c\0:\0' "$test_root" >"$planted"
   if raw_sandbox run network open - --spec "$planted" >/dev/null 2>&1; then
     printf 'the sandbox read a spec not named the way the runner names one: %s\n' "$planted" >&2
     exit 1
@@ -628,7 +628,7 @@ if [ ! -e "$spec" ]; then
   printf 'a spec owned by another account was removed\n' >&2
   exit 1
 fi
-if PATH="$fake_bin:$PATH" ATHANOR_TEST_RECORDS="$records" env -u SUDO_UID \
+if PATH="$fake_bin:$PATH" GARDEN_TEST_RECORDS="$records" env -u SUDO_UID \
   "$sandbox" run network open - --spec "$spec" >/dev/null 2>&1; then
   printf 'the sandbox ran without knowing which account asked\n' >&2
   exit 1
@@ -652,9 +652,9 @@ printf 'ok  a spec the asking account does not own, or with a second name, is re
 # A project read grant names held directory descriptors, never its parent or a writable rule.
 input_id=aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee
 mkdir -p "$workspaces/$input_id/workspace"
-chmod 0700 "$root/.athanor"
-printf '{"sources":["%s"]}' "$input_id" > "$root/.athanor/project-inputs.json"
-chmod 0600 "$root/.athanor/project-inputs.json"
+chmod 0700 "$root/.garden"
+printf '{"sources":["%s"]}' "$input_id" > "$root/.garden/project-inputs.json"
+chmod 0600 "$root/.garden/project-inputs.json"
 output=$(run_sandbox run network confine "$root" /bin/sh -c 'printf project-input')
 test "$output" = project-input
 grep -Eq -- 'path-beneath:execute,read-file,read-dir:/proc/self/fd/[0-9]+' "$records/setpriv"
@@ -662,14 +662,14 @@ if grep -Eq -- 'path-beneath:[a-z,-]*(write|remove|make|truncate)[a-z,-]*:/proc/
   printf 'project inputs acquired write access\n' >&2
   exit 1
 fi
-chmod 0644 "$root/.athanor/project-inputs.json"
+chmod 0644 "$root/.garden/project-inputs.json"
 if run_sandbox run network confine "$root" /bin/sh -c 'printf should-not-run' > "$records/input-refusal" 2>&1; then
   printf 'unprotected project membership was accepted\n' >&2
   exit 1
 fi
 grep -q 'invalid project input membership' "$records/input-refusal"
-chmod 0600 "$root/.athanor/project-inputs.json"
-printf '{"sources":["../private"]}' > "$root/.athanor/project-inputs.json"
+chmod 0600 "$root/.garden/project-inputs.json"
+printf '{"sources":["../private"]}' > "$root/.garden/project-inputs.json"
 if run_sandbox run network confine "$root" /bin/sh -c 'printf should-not-run' > "$records/input-refusal" 2>&1; then
   printf 'invalid project input identity was accepted\n' >&2
   exit 1
@@ -678,7 +678,7 @@ grep -q 'invalid project input identity' "$records/input-refusal"
 version_id=bbbbbbbb-cccc-4ddd-8eee-ffffffffffff
 mkdir -p "$workspaces/.project-store/$version_id/public"
 chmod 0755 "$workspaces/.project-store/$version_id/public"
-printf '{"sources":[],"projects":["%s"]}' "$version_id" > "$root/.athanor/project-inputs.json"
+printf '{"sources":[],"projects":["%s"]}' "$version_id" > "$root/.garden/project-inputs.json"
 output=$(run_sandbox run network confine "$root" /bin/sh -c 'printf project-version')
 test "$output" = project-version
 grep -Eq -- 'path-beneath:execute,read-file,read-dir:/proc/self/fd/[0-9]+' "$records/setpriv"
@@ -697,13 +697,13 @@ if run_sandbox run network confine "$root" /bin/sh -c 'printf should-not-run' > 
 fi
 grep -q 'project versions are not protected' "$records/input-refusal"
 chmod 0755 "$workspaces/.project-store/$version_id/public"
-printf '{"sources":[],"projects":["../private"]}' > "$root/.athanor/project-inputs.json"
+printf '{"sources":[],"projects":["../private"]}' > "$root/.garden/project-inputs.json"
 if run_sandbox run network confine "$root" /bin/sh -c 'printf should-not-run' > "$records/input-refusal" 2>&1; then
   printf 'project version traversal was accepted\n' >&2
   exit 1
 fi
 grep -q 'invalid project version identity' "$records/input-refusal"
-rm "$root/.athanor/project-inputs.json"
+rm "$root/.garden/project-inputs.json"
 printf 'ok  protected project inputs grant only reads and reject tampered membership\n'
 
 # Without root the helper cannot drop privilege at all, so it must not pretend to have.

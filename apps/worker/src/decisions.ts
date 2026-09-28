@@ -1,10 +1,10 @@
-import { sha256 } from '@athanor/core';
+import { sha256 } from '@garden/core';
 import {
   validateDecisionInput,
   validateDecisionAnswers,
   type DecisionAnswer,
   type DecisionInput
-} from '@athanor/model-gateway';
+} from '@garden/model-gateway';
 import type { ToolContext } from './tool-dispatch.js';
 import { resolveDecisionRoute } from './decision-route.js';
 import { approvalRequirement } from './approval-policy.js';

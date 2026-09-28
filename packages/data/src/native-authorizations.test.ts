@@ -1,7 +1,7 @@
 import { createHash, generateKeyPairSync, randomBytes, sign } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { nativeAuthorizationMessage, type NativeAuthorizationProof } from '@athanor/contracts';
-import { sha256 } from '@athanor/core';
+import { nativeAuthorizationMessage, type NativeAuthorizationProof } from '@garden/contracts';
+import { sha256 } from '@garden/core';
 import { createDatabase, migrateDatabase } from './database.js';
 import { DataStore } from './store.js';
 import { NativeAuthorizationStore } from './native-authorizations.js';

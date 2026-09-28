@@ -1,4 +1,4 @@
-import { runtimeDate } from '@athanor/core';
+import { runtimeDate } from '@garden/core';
 /**
  * Running one tool call the floor let through, and recording what it did.
  *
@@ -23,9 +23,9 @@ import { runtimeDate } from '@athanor/core';
  *
  * Lifted out of `AgentWorker.run()`'s batch loop unchanged.
  */
-import type { ModelRelease, WebToolPlan } from '@athanor/contracts';
-import type { TaskRecord } from '@athanor/data';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import type { ModelRelease, WebToolPlan } from '@garden/contracts';
+import type { TaskRecord } from '@garden/data';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { AgentState } from '../agent-state.js';
 import { event } from '../tool-recording.js';
 import { REPEATABLE_TOOLS, failingCallKey, repeatedFailuresAfter } from '../turn-bounds.js';

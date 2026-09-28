@@ -1,10 +1,10 @@
-import { runtimeClearTimer, runtimeSetTimeout, runtimeUUID } from '@athanor/core';
+import { runtimeClearTimer, runtimeSetTimeout, runtimeUUID } from '@garden/core';
 import { invalidateWorkspaceReadCache } from './read-invalidation.js';
 
-import { decryptJson, encryptJson, unwrapDataKey } from '@athanor/core';
-import type { DataStore, TaskRecord } from '@athanor/data';
-import type { ModelRelease, WebToolPlan } from '@athanor/contracts';
-import type { ModelToolCall } from '@athanor/model-gateway';
+import { decryptJson, encryptJson, unwrapDataKey } from '@garden/core';
+import type { DataStore, TaskRecord } from '@garden/data';
+import type { ModelRelease, WebToolPlan } from '@garden/contracts';
+import type { ModelToolCall } from '@garden/model-gateway';
 import { z } from 'zod';
 import type { AgentState } from './agent-state.js';
 import type { TurnDispatchDeps } from './turn/dispatch.js';
@@ -133,7 +133,7 @@ export async function parkProcessWait(
     agentStateCiphertext: encryptJson(state, key, `task-state:${task.id}`),
     eventCiphertext: encryptJson(
       {
-        __athanorEventVersion: 1,
+        __gardenEventVersion: 1,
         summary: 'Background work is running',
         payload: { jobWait: { id, processes: observed } }
       },
@@ -250,7 +250,7 @@ export async function reconcileJobWaits(
         agentStateCiphertext: encryptJson(state, key, `task-state:${task.id}`),
         outcomeCiphertext: encryptJson(
           {
-            __athanorEventVersion: 1,
+            __gardenEventVersion: 1,
             summary: 'Background work is ready to review',
             payload: { jobWait: { id: wait.id, processes: outcomes, resumed: true } }
           },

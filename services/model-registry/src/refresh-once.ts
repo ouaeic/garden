@@ -1,9 +1,9 @@
-import { ModelRelease } from '@athanor/contracts';
+import { ModelRelease } from '@garden/contracts';
 import {
   refreshOpenRouterCatalog,
   seedModels,
   type ModelCatalogScope
-} from '@athanor/model-gateway';
+} from '@garden/model-gateway';
 import {
   catalogCredentials,
   type CatalogCredentialInput,
@@ -22,7 +22,7 @@ import { refreshFailureReason } from './refresh-log.js';
  * that mattered most had already cost the owner their picker once (see `!existing.length` below).
  *
  * Naming the outcome is also what lets the pass be *said* and *written down* rather than only
- * done: the journal line and the timestamp `athanor doctor` reads are both built from this value.
+ * done: the journal line and the timestamp `garden doctor` reads are both built from this value.
  */
 export interface CatalogStore extends CredentialSource {
   listModels(): Promise<Array<Record<string, unknown>>>;

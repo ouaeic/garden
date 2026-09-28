@@ -2,22 +2,22 @@ import { conversationContext } from './conversation-context.js';
 import { AgentRunnerClient } from './runner-client.js';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
-import type { ModelRelease } from '@athanor/contracts';
+import type { ModelRelease } from '@garden/contracts';
 import {
-  AthanorError,
+  GardenError,
   decryptJson,
   encryptJson,
   generateDataKey,
   selectPurposeModel,
   wrapDataKey
-} from '@athanor/core';
+} from '@garden/core';
 import {
   createDatabase,
   DataStore,
   migrateDatabase,
   writeProjectModelPreferences,
   writeConversationModelPreferences
-} from '@athanor/data';
+} from '@garden/data';
 import {
   applyProjectMainModel,
   pinnedPurposeModel,
@@ -209,7 +209,7 @@ it('uses the connected provider after migration and never falls back to the task
   const disconnected = {
     ...f.context,
     connectedModels: async () => {
-      throw new AthanorError('provider_not_connected', 'Disconnected');
+      throw new GardenError('provider_not_connected', 'Disconnected');
     }
   };
   await expect(
@@ -321,7 +321,7 @@ it('shares bounded source-linked context and corrections without importing other
     nextCursor: null,
     observedAt: new Date().toISOString(),
     sources: [
-      { workspaceId: f.task.workspaceId, path: `/home/athanor/${f.task.workspaceId}/workspace` }
+      { workspaceId: f.task.workspaceId, path: `/home/garden/${f.task.workspaceId}/workspace` }
     ]
   });
   const result = await conversationContext({ ...f.context, runner }, child, key);

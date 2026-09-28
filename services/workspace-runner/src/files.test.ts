@@ -45,7 +45,7 @@ const B = { task: 'task-b' };
 describe('workspace files', () => {
   let root: string;
   beforeEach(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'athanor-runner-'));
+    root = await mkdtemp(path.join(tmpdir(), 'garden-runner-'));
     await ensureWorkspace(root);
   });
   afterEach(async () => rm(root, { recursive: true, force: true }));
@@ -83,11 +83,11 @@ describe('workspace files', () => {
     expect(assertUserDataPath(root, 'workspace/project/file.txt')).toBe(
       'workspace/project/file.txt'
     );
-    expect(assertUserDataPath(root, '.athanor/artifacts/result.png')).toBe(
-      '.athanor/artifacts/result.png'
+    expect(assertUserDataPath(root, '.garden/artifacts/result.png')).toBe(
+      '.garden/artifacts/result.png'
     );
     expect(() => assertUserDataPath(root, '/etc/shadow')).toThrow('escapes workspace');
-    expect(() => assertUserDataPath(root, '.athanor/browser/Cookies')).toThrow(
+    expect(() => assertUserDataPath(root, '.garden/browser/Cookies')).toThrow(
       'Only workspace files'
     );
     expect(() => assertUserDataPath(root, '.config/gh/hosts.yml')).toThrow('Only workspace files');
@@ -97,8 +97,8 @@ describe('workspace files', () => {
    * The agent's `$HOME` is `.home` at the container root (execution.ts `agentHome`), and it holds
    * the coding CLIs' OAuth credentials and the `.bashrc` the owner's own interactive terminal
    * sources. Nothing at the container root has ever resolved - `isUserData` admits `workspace/` and
-   * `.athanor/artifacts` alone - so the question this pins is what a BARE name means. Answered no,
-   * the way `.athanor` and `.config` are answered no, rather than folded into `workspace/.home`,
+   * `.garden/artifacts` alone - so the question this pins is what a BARE name means. Answered no,
+   * the way `.garden` and `.config` are answered no, rather than folded into `workspace/.home`,
    * which would be a write that looks like it landed somewhere and did not.
    *
    * The refusal is on the container's own name, not on the string: a project directory the agent
@@ -133,7 +133,7 @@ describe('workspace files', () => {
     expect(assertUserDataPath(root, 'workspace/machine.md')).toBe(
       path.join('workspace', 'machine.md')
     );
-    expect(() => assertUserDataPath(root, 'workspace/../.athanor/browser/Cookies')).toThrow(
+    expect(() => assertUserDataPath(root, 'workspace/../.garden/browser/Cookies')).toThrow(
       'Only workspace files'
     );
   });
@@ -223,7 +223,7 @@ describe('workspace files', () => {
     expect(await readFile(staged, 'utf8')).toBe('cv');
     // The browser opens this name when the form is submitted, so no part of it may be a name the
     // agent's account can repoint: the copy sits under the runner-only half of the workspace.
-    expect(staged.startsWith(path.join(root, '.athanor', 'uploads') + path.sep)).toBe(true);
+    expect(staged.startsWith(path.join(root, '.garden', 'uploads') + path.sep)).toBe(true);
     expect(path.relative(root, staged).startsWith('workspace')).toBe(false);
     expect((await lstat(path.dirname(staged))).mode & 0o077).toBe(0);
 
@@ -234,13 +234,13 @@ describe('workspace files', () => {
     await expect(stageUserFileForUpload(root, '/etc/passwd', 1024)).rejects.toThrow(
       'escapes workspace'
     );
-    await expect(stageUserFileForUpload(root, '.athanor/browser/Cookies', 1024)).rejects.toThrow(
+    await expect(stageUserFileForUpload(root, '.garden/browser/Cookies', 1024)).rejects.toThrow(
       'Only workspace files'
     );
     await expect(stageUserFileForUpload(root, 'workspace', 1024)).rejects.toThrow(
       'not a regular file'
     );
-    const outside = await mkdtemp(path.join(tmpdir(), 'athanor-outside-'));
+    const outside = await mkdtemp(path.join(tmpdir(), 'garden-outside-'));
     try {
       await writeFile(path.join(outside, 'secret.txt'), 'outside');
       await symlink(outside, path.join(root, 'workspace', 'escape'));
@@ -252,7 +252,7 @@ describe('workspace files', () => {
     }
 
     await clearStagedUploads(root);
-    await expect(stat(path.join(root, '.athanor', 'uploads'))).rejects.toMatchObject({
+    await expect(stat(path.join(root, '.garden', 'uploads'))).rejects.toMatchObject({
       code: 'ENOENT'
     });
   });
@@ -260,17 +260,17 @@ describe('workspace files', () => {
   it('refuses a descriptor the path no longer names', async () => {
     // The symbolic-link walk and the kernel's own resolution are two separate answers to the same
     // question, and between them the agent's account can turn a directory it owns into a link into
-    // `.athanor`. An open that resolved through such a component hands back a descriptor for a
+    // `.garden`. An open that resolved through such a component hands back a descriptor for a
     // file the path does not name - which is exactly the second case here.
     await writeWorkspaceFile(root, 'workspace/mine.md', Buffer.from('mine'), 100);
-    await writeFile(path.join(root, '.athanor', 'browser', 'Cookies'), 'session=live');
+    await writeFile(path.join(root, '.garden', 'browser', 'Cookies'), 'session=live');
     const handle = await open(path.join(root, 'workspace', 'mine.md'), 'r');
     try {
       await expect(
         assertOpenedInPlace(root, path.join(root, 'workspace', 'mine.md'), handle)
       ).resolves.toBeUndefined();
       await expect(
-        assertOpenedInPlace(root, path.join(root, '.athanor', 'browser', 'Cookies'), handle)
+        assertOpenedInPlace(root, path.join(root, '.garden', 'browser', 'Cookies'), handle)
       ).rejects.toThrow('changed while it was being opened');
     } finally {
       await handle.close();
@@ -278,7 +278,7 @@ describe('workspace files', () => {
   });
 
   it('rejects symbolic-link escapes for reads and writes', async () => {
-    const outside = await mkdtemp(path.join(tmpdir(), 'athanor-outside-'));
+    const outside = await mkdtemp(path.join(tmpdir(), 'garden-outside-'));
     try {
       await writeFile(path.join(outside, 'secret.txt'), 'outside');
       await symlink(outside, path.join(root, 'workspace', 'escape'));
@@ -311,7 +311,7 @@ describe('a whole-file write that claims what it is replacing', () => {
 
   let root: string;
   beforeEach(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'athanor-runner-'));
+    root = await mkdtemp(path.join(tmpdir(), 'garden-runner-'));
     await ensureWorkspace(root);
   });
   afterEach(async () => rm(root, { recursive: true, force: true }));
@@ -396,7 +396,7 @@ describe('a whole-file write that claims what it is replacing', () => {
 describe('reading a window of a file', () => {
   let root: string;
   beforeEach(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'athanor-runner-'));
+    root = await mkdtemp(path.join(tmpdir(), 'garden-runner-'));
     await ensureWorkspace(root);
   });
   afterEach(async () => rm(root, { recursive: true, force: true }));
@@ -595,7 +595,7 @@ describe('reading a window of a file', () => {
 describe('a read that carries a display budget', () => {
   let root: string;
   beforeEach(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'athanor-runner-'));
+    root = await mkdtemp(path.join(tmpdir(), 'garden-runner-'));
     await ensureWorkspace(root);
     forgetDisplayedLines();
   });
@@ -689,7 +689,7 @@ describe('a read that carries a display budget', () => {
 describe('renaming and folders', () => {
   let root: string;
   beforeEach(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'athanor-runner-'));
+    root = await mkdtemp(path.join(tmpdir(), 'garden-runner-'));
     await ensureWorkspace(root);
   });
   afterEach(async () => rm(root, { recursive: true, force: true }));
@@ -747,7 +747,7 @@ describe('renaming and folders', () => {
     await expect(renameWorkspaceEntry(root, 'workspace', 'workspace-2')).rejects.toThrow(
       'Workspace root cannot be renamed'
     );
-    const outside = await mkdtemp(path.join(tmpdir(), 'athanor-outside-'));
+    const outside = await mkdtemp(path.join(tmpdir(), 'garden-outside-'));
     try {
       await symlink(outside, path.join(root, 'workspace', 'escape'));
       await expect(
@@ -768,12 +768,12 @@ describe('renaming and folders', () => {
     expect(await readFile(path.join(root, 'workspace', 'applications', 'cv.pdf'), 'utf8')).toBe(
       '%PDF-1.7'
     );
-    expect(() => assertUserDataPath(root, '../../etc/cron.d/athanor')).toThrow('escapes workspace');
-    expect(() => assertUserDataPath(root, '.athanor/browser/Cookies')).toThrow(
+    expect(() => assertUserDataPath(root, '../../etc/cron.d/garden')).toThrow('escapes workspace');
+    expect(() => assertUserDataPath(root, '.garden/browser/Cookies')).toThrow(
       'Only workspace files'
     );
     // A traversal that lands back inside is still refused rather than folded into a write.
-    expect(() => assertUserDataPath(root, '../athanor/escape.pdf')).toThrow('escapes workspace');
+    expect(() => assertUserDataPath(root, '../garden/escape.pdf')).toThrow('escapes workspace');
   });
 
   it('carries a status the file browser can act on', () => {
@@ -814,7 +814,7 @@ describe('the seen-line guard', () => {
   const lines = Array.from({ length: 400 }, (_, index) => `line ${index + 1}`);
   const file = 'workspace/app.ts';
   beforeEach(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'athanor-runner-'));
+    root = await mkdtemp(path.join(tmpdir(), 'garden-runner-'));
     await ensureWorkspace(root);
     forgetDisplayedLines();
     await writeFile(path.join(root, 'workspace', 'app.ts'), `${lines.join('\n')}\n`);
@@ -1185,7 +1185,7 @@ describe('who the seen-line record is about', () => {
   const file = 'workspace/app.ts';
   const onDisk = (): Promise<string> => readFile(path.join(root, 'workspace', 'app.ts'), 'utf8');
   beforeEach(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'athanor-runner-'));
+    root = await mkdtemp(path.join(tmpdir(), 'garden-runner-'));
     await ensureWorkspace(root);
     forgetDisplayedLines();
     await writeFile(path.join(root, 'workspace', 'app.ts'), `${lines.join('\n')}\n`);

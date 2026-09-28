@@ -1,8 +1,8 @@
 import { executeWorkflowTool } from './workflow.js';
 import { recordPatchReceipt, type PatchReceipt } from '../edit/receipts.js';
 import { executeDebuggerTool } from './debugger.js';
-import { sha256, AthanorError } from '@athanor/core';
-import { type ModelToolCall } from '@athanor/model-gateway';
+import { sha256, GardenError } from '@garden/core';
+import { type ModelToolCall } from '@garden/model-gateway';
 import {
   applyEdit,
   boundRepeatedRefusal,
@@ -57,7 +57,7 @@ const ECHO_MAX_ROWS = 24;
  * actually wrote, which is the only number here that is a measurement rather than an intention.
  * `AgentRunnerClient.writeFile` types that answer as `unknown` because it is JSON from a separate
  * service across a version boundary - the worker and the runner are deployed separately, and
- * `athanor update` can leave one ahead of the other - so the field is read defensively and the
+ * `garden update` can leave one ahead of the other - so the field is read defensively and the
  * bytes this call handed over stand in when it is absent. Both are true; only one is measured, and
  * the measured one is preferred wherever it is there.
  */
@@ -1016,7 +1016,7 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
         ? (call.arguments.patches as Array<Record<string, unknown>>)
         : [];
       if (!patches.length || patches.length > MAX_PATCH_FILES)
-        throw new AthanorError('patch_invalid', `Provide between 1 and ${MAX_PATCH_FILES} patches`);
+        throw new GardenError('patch_invalid', `Provide between 1 and ${MAX_PATCH_FILES} patches`);
       const applied: Array<{
         path: string;
         sha256: string;
@@ -1035,7 +1035,7 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
         const path = textValue(patch?.path);
         const edit = textValue(patch?.edit);
         if (!path || !edit)
-          throw new AthanorError(
+          throw new GardenError(
             'patch_invalid',
             'Every patch requires a path and a non-empty edit.'
           );
@@ -1045,13 +1045,13 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
           .filter((part) => part !== '.' && part !== '')
           .join('/');
         if (path.includes('\0') || path.split('/').includes('..'))
-          throw new AthanorError(
+          throw new GardenError(
             'patch_invalid',
             'Patch paths must not contain traversal or null bytes.'
           );
         const previous = grouped.get(identity);
         if (previous && previous.path !== path)
-          throw new AthanorError(
+          throw new GardenError(
             'patch_invalid',
             `${path} and ${previous.path} address the same file. Use one exact path for its operations.`
           );
@@ -1234,7 +1234,7 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
         });
       }
       if (!applied.length && !uncertain.length)
-        throw new AthanorError(
+        throw new GardenError(
           'patch_conflict',
           failures.map((failure) => failure.reason).join('\n\n') || 'No patch could be applied'
         );
@@ -1331,7 +1331,7 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
       const unshownFrom =
         outstanding === undefined ? undefined : firstUnshown(reader, writePath, outstanding);
       if (unshownFrom !== undefined)
-        throw new AthanorError(
+        throw new GardenError(
           'write_unread',
           /*
            * One outstanding line is the file with no newlines in it, and it needs a different

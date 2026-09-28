@@ -1,6 +1,6 @@
-import { runtimeNow } from '@athanor/core';
+import { runtimeNow } from '@garden/core';
 import { CODING_CHILD_TOOLS } from '../coding-missions.js';
-import { codingMissionView } from '@athanor/data';
+import { codingMissionView } from '@garden/data';
 /**
  * Everything a turn needs before it can say a word, gathered in one place.
  *
@@ -16,23 +16,23 @@ import { codingMissionView } from '@athanor/data';
  * `state` is the trajectory, and the caller mutates it from the next line onward. Handing back one
  * object that mixed them would make the read-only half look editable.
  */
-import { ownerMessageContent, type OwnerMessage, decryptJson, unwrapDataKey } from '@athanor/core';
+import { ownerMessageContent, type OwnerMessage, decryptJson, unwrapDataKey } from '@garden/core';
 import {
   resolveWebToolPlan,
   type ConnectorKind,
   type ModelRelease,
   type WebToolPlan,
   type WorkspaceSurfaces
-} from '@athanor/contracts';
-import type { DataStore, TaskRecord, WorkspaceRecord } from '@athanor/data';
-import type { ModelGateway, ModelTool } from '@athanor/model-gateway';
+} from '@garden/contracts';
+import type { DataStore, TaskRecord, WorkspaceRecord } from '@garden/data';
+import type { ModelGateway, ModelTool } from '@garden/model-gateway';
 import type { AgentState, AgentWorkerConfig } from '../agent-state.js';
 import { BASE_SYSTEM_PROMPT, COMPACT_CONTEXT_TOOL } from '../context.js';
 import { agentToolsFor } from '../tools.js';
 import { requestToolsFor } from '../request-tools.js';
 import { applyProjectMainModel } from '../purpose-model.js';
 import { routingForTurn } from '../routing-policy.js';
-import type { ProviderPreferences } from '@athanor/core';
+import type { ProviderPreferences } from '@garden/core';
 
 /** What claiming a turn needs from the worker that owns it. */
 export interface TurnClaimDeps {
@@ -226,7 +226,7 @@ export const claimTurn = async (
    *
    * The withdrawal above is all-or-nothing and the enum underneath it was too: twenty-four actions
    * across mail, calendar, GitHub, WebDAV and MCP, sent whole to a box that had connected one of
-   * the five. `executeConnectorAction` in @athanor/core refuses any action whose `kind` is not the
+   * the five. `executeConnectorAction` in @garden/core refuses any action whose `kind` is not the
    * connector's - "Action does not match this connector", thrown before a scope is checked or a
    * credential is opened - so those were not unlikely calls, they were impossible ones, described
    * at the head of the cached prefix on every request of every task. Measured through

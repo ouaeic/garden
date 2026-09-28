@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { encryptJson, wrapDataKey } from '@athanor/core';
-import type { VoiceSession } from '@athanor/contracts';
+import { encryptJson, wrapDataKey } from '@garden/core';
+import type { VoiceSession } from '@garden/contracts';
 import { createDatabase, migrateDatabase } from './database.js';
 import { DataStore } from './store.js';
 import { VoiceStore } from './store/voice-sessions.js';

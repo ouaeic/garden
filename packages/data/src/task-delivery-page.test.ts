@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createDatabase, migrateDatabase } from './database.js';
 import { DataStore } from './store.js';
 import { taskDeliveryCountsSql } from './task-delivery.js';
-import { PENDING_MEDIA_DELIVERY } from '@athanor/contracts';
+import { PENDING_MEDIA_DELIVERY } from '@garden/contracts';
 const database = createDatabase({ driver: 'pglite', pglitePath: ':memory:' });
 const store = new DataStore(database);
 const sealed = { v: 1 as const, iv: 'a', tag: 'b', ciphertext: 'c' };

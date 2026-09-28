@@ -141,7 +141,7 @@ pub fn identity_digest(identity: &str) -> Result<[u8; 32], String> {
 }
 
 fn validate_discovery(discovery: &Discovery) -> Result<(), String> {
-    if discovery.mdns_service != "_athanor._tcp.local" || discovery.mdns_port != 443 {
+    if discovery.mdns_service != "_garden._tcp.local" || discovery.mdns_port != 443 {
         return Err("The connection ticket contains unsupported discovery settings".into());
     }
     Ok(())
@@ -152,7 +152,7 @@ pub fn parse_pairing_uri(raw: &str, now: SystemTime) -> Result<ImportedConnectio
         return Err("The connection ticket is too large".into());
     }
     let parsed = Url::parse(raw.trim()).map_err(|_| "This is not a garden connection ticket")?;
-    if !matches!(parsed.scheme(), "garden" | "athanor")
+    if !matches!(parsed.scheme(), "garden")
         || parsed.host_str() != Some("pair")
         || parsed.query().is_some()
         || parsed.fragment().is_some()
@@ -498,7 +498,7 @@ pub fn pinned_http_client(
         .use_preconfigured_tls(pinned_tls_config(identity)?)
         .https_only(true)
         .redirect(reqwest::redirect::Policy::none())
-        .user_agent(concat!("athanor-client/", env!("CARGO_PKG_VERSION")));
+        .user_agent(concat!("garden-client/", env!("CARGO_PKG_VERSION")));
     if let Some(value) = timeout {
         builder = builder.timeout(value);
     }
@@ -519,7 +519,7 @@ pub async fn probe_profile(profile: &ServerProfile) -> Result<ServerProfile, Str
         let client = client.clone();
         probes.push(async move {
             let result = client
-                .get(format!("{endpoint}/.well-known/athanor"))
+                .get(format!("{endpoint}/.well-known/garden"))
                 .send()
                 .await;
             (endpoint, result)
@@ -649,26 +649,20 @@ mod tests {
             ],
             "identity": format!("sha256/{}", STANDARD.encode([7_u8; 32])),
             "discovery": {
-                "mdnsService": "_athanor._tcp.local",
+                "mdnsService": "_garden._tcp.local",
                 "mdnsPort": 443
             },
             "pairingCode": "0123456789abcdef0123456789abcdef",
             "expiresAt": expires_at
         });
         format!(
-            "athanor://pair/{}",
+            "garden://pair/{}",
             URL_SAFE_NO_PAD.encode(serde_json::to_vec(&payload).unwrap())
         )
     }
 
     #[test]
     fn parses_and_canonicalizes_a_v2_ticket_without_persisting_the_code() {
-        let garden = parse_pairing_uri(
-            &pairing_uri(2_000).replacen("athanor:", "garden:", 1),
-            UNIX_EPOCH + Duration::from_secs(1_000),
-        )
-        .unwrap();
-        assert_eq!(garden.profile.endpoints[0], "https://example.test");
         let imported =
             parse_pairing_uri(&pairing_uri(2_000), UNIX_EPOCH + Duration::from_secs(1_000))
                 .unwrap();
@@ -685,7 +679,7 @@ mod tests {
     #[test]
     fn pending_pairing_is_private_crash_safe_and_expires() {
         let directory = std::env::temp_dir().join(format!(
-            "athanor-pending-pairing-{}",
+            "garden-pending-pairing-{}",
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
@@ -721,7 +715,7 @@ mod tests {
             "identity": format!("sha256/{}", STANDARD.encode([7_u8; 32])),
             "endpoints": ["https://example.test"],
             "discovery": {
-                "mdnsService": "_athanor._tcp.local",
+                "mdnsService": "_garden._tcp.local",
                 "mdnsPort": 443
             }
         }))
@@ -807,7 +801,7 @@ mod tests {
 
     #[tokio::test]
     async fn probes_a_live_profile_when_explicitly_requested() {
-        let Ok(path) = std::env::var("ATHANOR_LIVE_MANIFEST") else {
+        let Ok(path) = std::env::var("GARDEN_LIVE_MANIFEST") else {
             return;
         };
         let manifest: ConnectionManifest =

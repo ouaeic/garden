@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AthanorError } from '@athanor/core';
-import { verifyCapabilityToken } from '@athanor/core';
+import { GardenError } from '@garden/core';
+import { verifyCapabilityToken } from '@garden/core';
 import { AgentRunnerClient, RUNNER_CONNECT_ATTEMPTS } from './runner-client.js';
 
 const client = new AgentRunnerClient('http://127.0.0.1:4300', 'r'.repeat(48));
@@ -68,11 +68,11 @@ describe('a workspace runner that is restarting', () => {
     const failure = await pending;
 
     expect(attempts).toBe(RUNNER_CONNECT_ATTEMPTS);
-    expect(failure).toBeInstanceOf(AthanorError);
-    expect((failure as AthanorError).code).toBe('workspace_runner_unreachable');
-    expect((failure as AthanorError).message).toContain('nothing from this call ran');
-    expect((failure as AthanorError).message).toContain('athanor-runner');
-    expect((failure as AthanorError).message).not.toContain('fetch failed');
+    expect(failure).toBeInstanceOf(GardenError);
+    expect((failure as GardenError).code).toBe('workspace_runner_unreachable');
+    expect((failure as GardenError).message).toContain('nothing from this call ran');
+    expect((failure as GardenError).message).toContain('garden-runner');
+    expect((failure as GardenError).message).not.toContain('fetch failed');
   });
 
   it('never replays a call the connection dropped after sending, and says it may have run', async () => {
@@ -85,8 +85,8 @@ describe('a workspace runner that is restarting', () => {
     const failure = await run().catch((error: unknown) => error);
 
     expect(attempts).toBe(1);
-    expect((failure as AthanorError).code).toBe('workspace_runner_interrupted');
-    expect((failure as AthanorError).message).toContain('may have partly run');
+    expect((failure as GardenError).code).toBe('workspace_runner_interrupted');
+    expect((failure as GardenError).message).toContain('may have partly run');
   });
 
   it('describes a runner that accepted the call and never answered', async () => {
@@ -96,8 +96,8 @@ describe('a workspace runner that is restarting', () => {
 
     const failure = await run().catch((error: unknown) => error);
 
-    expect((failure as AthanorError).code).toBe('workspace_runner_timeout');
-    expect((failure as AthanorError).message).toContain('It may still be running');
+    expect((failure as GardenError).code).toBe('workspace_runner_timeout');
+    expect((failure as GardenError).message).toContain('It may still be running');
   });
 
   it('carries an anti-bot challenge across as data, not as a sentence about one', async () => {
@@ -127,9 +127,9 @@ describe('a workspace runner that is restarting', () => {
         )
     );
 
-    const failure = (await run().catch((error: unknown) => error)) as AthanorError;
+    const failure = (await run().catch((error: unknown) => error)) as GardenError;
 
-    expect(failure).toBeInstanceOf(AthanorError);
+    expect(failure).toBeInstanceOf(GardenError);
     expect(failure.code).toBe('browser_bot_wall');
     expect(failure.statusCode).toBe(409);
     expect(failure.message).toContain('Cloudflare Turnstile');
@@ -156,7 +156,7 @@ describe('a workspace runner that is restarting', () => {
         )
     );
 
-    const failure = (await run().catch((error: unknown) => error)) as AthanorError;
+    const failure = (await run().catch((error: unknown) => error)) as GardenError;
 
     expect(failure.code).toBe('runner_request_failed');
     expect(failure.message).toBe('Browser control is held by user');
@@ -168,7 +168,7 @@ describe('a workspace runner that is restarting', () => {
 
     const failure = (await run().catch((error: unknown) => error)) as Error;
 
-    expect(failure).not.toBeInstanceOf(AthanorError);
+    expect(failure).not.toBeInstanceOf(GardenError);
     expect(failure.message).toContain('Workspace tool failed (502)');
     expect(failure.message).toContain('bad gateway');
   });
@@ -180,7 +180,7 @@ describe('a workspace runner that is restarting', () => {
 
     const failure = await run().catch((error: unknown) => error);
 
-    expect(failure).not.toBeInstanceOf(AthanorError);
+    expect(failure).not.toBeInstanceOf(GardenError);
     expect((failure as Error).name).toBe('AbortError');
   });
 });

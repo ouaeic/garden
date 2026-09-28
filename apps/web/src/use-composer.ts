@@ -4,7 +4,7 @@ import type {
   TaskReasoningEffort,
   ProjectModelChoices,
   ProjectModelPreferences
-} from '@athanor/contracts';
+} from '@garden/contracts';
 import type { Draft, DraftAttachment } from './model';
 import { defaultPrivacy, isWorking, text, data } from './model';
 import { get, patch, post, request } from './client';

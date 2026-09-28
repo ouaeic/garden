@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Plus, X } from 'lucide-react';
-import type { Task, TaskPlan, TaskPlanStep } from '@athanor/contracts';
+import type { Task, TaskPlan, TaskPlanStep } from '@garden/contracts';
 import { get, post } from './client';
 import { date } from './model';
 import { Button, Empty, ErrorNotice, Field } from './ui';

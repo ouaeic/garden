@@ -1,5 +1,5 @@
 {
-  "name": "@athanor/desktop",
+  "name": "@garden/desktop",
   "version": "0.2.0",
   "private": true,
   "scripts": {

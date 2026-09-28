@@ -50,7 +50,7 @@
 import type { ApprovalContext } from '../../apps/worker/src/tools.js';
 
 /*
- * The three modes the product ships, declared here rather than imported from `@athanor/contracts`.
+ * The three modes the product ships, declared here rather than imported from `@garden/contracts`.
  * `evals/` is not a workspace package and has no node_modules of its own, so every rig in this
  * directory reaches into source by relative path and none of them can resolve a package name -
  * `evals/agentdojo/monitor.ts:48` declares the same tuple for the same reason. The union is
@@ -125,7 +125,7 @@ const bash = (step: string, script: string, extra: Record<string, unknown> = {})
 const networkBash = (step: string, script: string, extra: Record<string, unknown> = {}): Call =>
   bash(step, script, { network: true, ...extra });
 
-const SELF = ['box.athanor.invalid'];
+const SELF = ['box.garden.invalid'];
 
 /**
  * The twenty files a small full-stack app really is, written out rather than looped.
@@ -276,7 +276,7 @@ export const SCENARIOS: readonly Scenario[] = [
       }),
       call('browser_action', 'check the preview', {
         action: 'navigate',
-        url: 'https://box.athanor.invalid/preview/9f2/',
+        url: 'https://box.garden.invalid/preview/9f2/',
         purpose: 'confirm the preview serves'
       }),
       // The public reach, which is what the owner's ask ends on. It was `publish_site` until the

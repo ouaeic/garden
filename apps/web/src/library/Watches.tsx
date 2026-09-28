@@ -1,6 +1,6 @@
 import ModelPicker from '../ModelPicker';
 import { useState } from 'react';
-import type { ModelRelease, TaskSchedule, TaskScheduleSpec, Workspace } from '@athanor/contracts';
+import type { ModelRelease, TaskSchedule, TaskScheduleSpec, Workspace } from '@garden/contracts';
 import { del, patch, post } from '../client.js';
 import { Button, Dialog, Field } from '../ui.js';
 import {
@@ -151,8 +151,8 @@ export function WatchesLibrary({
             <SecretResult label="Endpoint" value={secret.url} />
             <SecretResult label="Signing secret · shown once" value={secret.secret} />
             <p className="muted">
-              Save the secret now. Deliveries need X-Athanor-Timestamp and X-Athanor-Signature,
-              signed as HMAC-SHA256 of v1:timestamp: followed by the raw request body.
+              Save the secret now. Deliveries need X-Garden-Timestamp and X-Garden-Signature, signed
+              as HMAC-SHA256 of v1:timestamp: followed by the raw request body.
             </p>
             <Button onClick={() => setSecret(null)}>I have saved the secret</Button>
           </div>

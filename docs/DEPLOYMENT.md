@@ -24,7 +24,7 @@ The host needs:
 Published release:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ouaeic/athanor/v0.2.0/install.sh | sudo env ATHANOR_REF=v0.2.0 sh
+curl -fsSL https://raw.githubusercontent.com/ouaeic/garden/v0.2.0/install.sh | sudo env GARDEN_REF=v0.2.0 sh
 ```
 
 Checked-out source:
@@ -37,17 +37,17 @@ With a domain already pointed at the server, browser sign-in can be working when
 finishes rather than two commands later:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ouaeic/athanor/v0.2.0/install.sh | sudo env ATHANOR_REF=v0.2.0 ATHANOR_HOSTNAME=your.domain ATHANOR_ACME_EMAIL=you@example.com sh
+curl -fsSL https://raw.githubusercontent.com/ouaeic/garden/v0.2.0/install.sh | sudo env GARDEN_REF=v0.2.0 GARDEN_HOSTNAME=your.domain GARDEN_ACME_EMAIL=you@example.com sh
 ```
 
 Both variables are needed for that, for two unrelated reasons set out under **Network and TLS**:
 the name is what a passkey is bound to, and the trusted certificate is what allows a browser to
-create one at all. `ATHANOR_ACME_EMAIL` is also the act of accepting the certificate authority's
+create one at all. `GARDEN_ACME_EMAIL` is also the act of accepting the certificate authority's
 subscriber agreement, which is why no certificate is requested without it. Neither is required to
 install: without them the server runs, desktop clients can sign in, and the installer reports that
 browser sign-in does not work yet instead of reporting success.
 
-The bootstrap clones or updates `/opt/athanor`; the native installer then:
+The bootstrap clones or updates `/opt/garden`; the native installer then:
 
 1. validates the OS, CPU architecture, memory and free disk, and stops before doing any work if the
    host cannot finish;
@@ -64,8 +64,8 @@ The bootstrap clones or updates `/opt/athanor`; the native installer then:
    release's `convert` and `identify`, because garden names `magick` everywhere and ImageMagick 6
    has no such binary. It stands aside for a real ImageMagick 7, and uninstall removes it;
 4. builds the source in place;
-5. creates three service accounts — `athanor-control` for the control plane, `athanor` for the
-   runner, and `athanor-agent` for the commands the agent runs — then proves the drop to the agent
+5. creates three service accounts — `garden-control` for the control plane, `garden` for the
+   runner, and `garden-agent` for the commands the agent runs — then proves the drop to the agent
    account actually takes effect and refuses to finish the install if it does not;
 6. creates database, encryption, session, runner, Web Push, TLS identity, and pairing secrets,
    reusing any that already exist so a reinstall does not invalidate paired devices;
@@ -75,9 +75,9 @@ The bootstrap clones or updates `/opt/athanor`; the native installer then:
 9. binds internal services to `127.0.0.1` and the HTTPS gateway to 80/443 and isolated workspace previews to 8443;
 10. enables native systemd services and the dynamic-address watcher, and installs the certificate
     renewal and unattended-update units without enabling them;
-11. configures dynamic DNS when `ATHANOR_DDNS_TOKEN` was supplied, and otherwise says plainly that a
+11. configures dynamic DNS when `GARDEN_DDNS_TOKEN` was supplied, and otherwise says plainly that a
     server without a hostname cannot be signed into from a browser and how to fix that;
-12. requests a publicly trusted certificate when `ATHANOR_ACME_EMAIL` was supplied, and afterwards
+12. requests a publicly trusted certificate when `GARDEN_ACME_EMAIL` was supplied, and afterwards
     inspects whatever certificate is actually being served: a server that is still on its
     self-signed one is reported as an installation the owner account cannot be created on, with the
     command that fixes it, rather than as "garden is ready"; and
@@ -90,14 +90,14 @@ applications and datasets live once on the host.
 
 Steps 2 and 4 above, the workspace layout, and the runner settings written in step 6 other than the
 generated secret are not install-only. They are the things a release carries that are not compiled,
-and `sudo athanor update` runs them by calling `scripts/install-native.sh --release-steps` from the
+and `sudo garden update` runs them by calling `scripts/install-native.sh --release-steps` from the
 revision it has just pulled - one entry point rather than a second copy of the list, so a package
 added to the capability table or a key added to `runner.env` reaches an existing box with the
 release that adds it. `scripts/check-repository.mjs` fails the build if a `runner.env` key is written
 outside that step, and `scripts/test-update.sh` runs the entry point and watches the key land.
 
 Native tools also have a required activation step, shared with installation through
-`scripts/athanor-native-runtime`. It verifies the locked language-server versions and entry points,
+`scripts/garden-native-runtime`. It verifies the locked language-server versions and entry points,
 prepares the hash-locked Python environment and checksum-verified JavaScript debugger before
 switching their active paths, and validates the runner's sudo policy before replacing it atomically.
 The process supervisor is installed with the runtime files. Failure in this phase prevents the new
@@ -118,7 +118,7 @@ The updater restores verified private configuration before activating the previo
 rollback, including failures before the new services start. When upgrading an installation whose
 updater predates that configuration rollback, run the exact reviewed incoming updater from a
 root-owned staging file through its normal `update` command. Verify the staging file against the
-committed release before invoking it with `ATHANOR_ROOT=/opt/athanor`; retain the installed command
+committed release before invoking it with `GARDEN_ROOT=/opt/garden`; retain the installed command
 until the ordinary runtime installation replaces it. This preserves backup, maintenance locking,
 build, activation and rollback gates during the transition.
 
@@ -160,8 +160,8 @@ The connection ticket contains endpoints and a public-key fingerprint; the pairi
 after 24 hours and is consumed when the first owner is created. Registration then closes.
 
 ```bash
-sudo athanor connect
-sudo athanor pairing-code
+sudo garden connect
+sudo garden pairing-code
 ```
 
 `connect` shows the current ticket. If its embedded first-owner code has expired, the root-only
@@ -171,7 +171,7 @@ remains closed once the owner exists. `pairing-code` always invalidates the prev
 a new 24-hour code explicitly.
 
 Re-running the checked-out installer preserves unowned operator settings already present in
-`/etc/athanor/control.env` and `runner.env`, including provider/privacy/connector and runtime limits,
+`/etc/garden/control.env` and `runner.env`, including provider/privacy/connector and runtime limits,
 while refreshing only the security-critical managed bindings and generated secrets that must stay
 consistent. A stable custom HTTPS hostname is retained; a raw IP origin follows the currently
 detected address. The server identity, data key, session key, runner secret, and database password
@@ -212,7 +212,7 @@ created or used, which means no owner account. Accepting the interstitial does n
 the page is loaded but still marked as having certificate errors.
 
 ```bash
-sudo athanor certificate enable --agree-tos --email you@example.com
+sudo garden certificate enable --agree-tos --email you@example.com
 ```
 
 That command obtains a publicly trusted certificate and enables a renewal timer. It is a separate,
@@ -237,12 +237,12 @@ desktop clients only. See **Getting a hostname** below.
 either.** Browsers disable WebAuthn on any page carrying a certificate error, which is why a server
 with a perfectly good domain name and its own self-signed certificate presents a working sign-in
 screen that nothing can get through. It is not a warning the owner can dismiss and it is not
-reachable with a command-line flag. Both conditions have to hold, so `athanor doctor` reports the
+reachable with a command-line flag. Both conditions have to hold, so `garden doctor` reports the
 origin as working only when both do, and the installer says which one is missing.
 
 Renewal also reissues when the served certificate is missing a configured name, not only when it is
 close to expiry. Acquiring a hostname after issuance is the normal case, and no expiry check would
-ever notice it. `sudo athanor certificate status` prints which configured names the served
+ever notice it. `sudo garden certificate status` prints which configured names the served
 certificate covers. IPv6 address SANs are excluded from that comparison because OpenSSL prints them
 fully expanded, and comparing that against the compact form would report a permanent mismatch and
 reissue on every timer firing.
@@ -252,18 +252,18 @@ clients pinned at first pairing is unchanged by issuance or renewal. Trusted TLS
 are not alternatives here — the same key satisfies both.
 
 The ACME client is lego, installed on demand as a single static binary at a pinned version and
-verified against a checksum recorded in `scripts/athanor-certificate`. It is used rather than
+verified against a checksum recorded in `scripts/garden-certificate`. It is used rather than
 certbot because certbot refuses an address identifier when the request supplies its own key, which
 is exactly what preserving the pinned identity requires.
 
 ## Getting a hostname
 
-The installer prints this when it finds no usable hostname, and `sudo athanor doctor` repeats it as
+The installer prints this when it finds no usable hostname, and `sudo garden doctor` repeats it as
 a warning for as long as it is true. Warnings do not fail `doctor`: an address-only server works,
 it just cannot be signed into from a browser.
 
 ```bash
-sudo athanor ddns configure
+sudo garden ddns configure
 ```
 
 With no arguments on a terminal that asks which provider to use — DuckDNS (`NAME.duckdns.org`),
@@ -272,7 +272,7 @@ hostname, then for the provider token with the input hidden. It then:
 
 1. publishes this computer's current address under that name;
 2. waits up to a minute for the name to resolve;
-3. runs `athanor set-hostname`, which moves `PUBLIC_APP_URL`, `PREVIEW_BASE_URL`,
+3. runs `garden set-hostname`, which moves `PUBLIC_APP_URL`, `PREVIEW_BASE_URL`,
    `PUBLIC_RUNNER_URL`, `WEBAUTHN_ORIGIN`, and `WEBAUTHN_RP_ID` onto the name;
 4. reissues the certificate for the new name when automatic issuance is already on; and
 5. refreshes the connection manifest and restarts the services.
@@ -284,8 +284,8 @@ is conditional — on a server with automatic issuance still off, the name is in
 certificate is still self-signed, so browser sign-in remains impossible. `set-hostname` says which
 of the two states it left the server in rather than announcing that sign-in works.
 
-Unattended installs pass `ATHANOR_DDNS_PROVIDER`, `ATHANOR_DDNS_HOSTNAME`, optionally
-`ATHANOR_DDNS_ZONE_ID`, and `ATHANOR_DDNS_TOKEN` to the installer, which runs the same path without
+Unattended installs pass `GARDEN_DDNS_PROVIDER`, `GARDEN_DDNS_HOSTNAME`, optionally
+`GARDEN_DDNS_ZONE_ID`, and `GARDEN_DDNS_TOKEN` to the installer, which runs the same path without
 prompting. The token stays in the environment and is never placed in a command argument.
 
 Passkeys already registered against the old address origin do not carry over, because they were
@@ -296,19 +296,19 @@ Operational detail, including the per-provider address handling and the credenti
 
 ## Dynamic addresses
 
-`athanor-network-watch.service` listens to Linux netlink events from the kernel. It refreshes
+`garden-network-watch.service` listens to Linux netlink events from the kernel. It refreshes
 immediately after a route, link, or interface-address change, without polling an IP service. A
-low-frequency `athanor-network-refresh.timer` runs every six hours (with jitter) only to reconcile a
+low-frequency `garden-network-refresh.timer` runs every six hours (with jitter) only to reconcile a
 missed event or manual file change. The refresh operation:
 
 1. keeps the existing private identity key;
 2. regenerates the address SAN list;
 3. reloads Nginx only when the network set actually changed;
-4. refreshes `/var/lib/athanor/connection.json`; and
+4. refreshes `/var/lib/garden/connection.json`; and
 5. leaves user data, sessions, provider credentials, and the pairing identity unchanged.
 
-The same non-secret manifest is available at `/.well-known/athanor`. Avahi advertises
-`_athanor._tcp.local` with the pinned identity and follows LAN address changes.
+The same non-secret manifest is available at `/.well-known/garden`. Avahi advertises
+`_garden._tcp.local` with the pinned identity and follows LAN address changes.
 
 The native client stores the identity and the non-secret endpoint set, but never persists the
 first-owner code. On each cold connection it races the saved endpoints, verifies the TLS public key,
@@ -367,10 +367,10 @@ the garden server key, so DNS cannot silently substitute another server.
 
 If a server has no useful hostname, garden uses its raw IPv4/IPv6 addresses and never invents a
 domain for it. It does say plainly, at install and in `doctor`, that browser sign-in is unavailable
-until the server has a name, and offers `sudo athanor ddns configure` as the shortest way to get
+until the server has a name, and offers `sudo garden ddns configure` as the shortest way to get
 one; the choice of provider and whether to have a name at all stays with the operator. LAN changes
 remain automatic. If an address-only server's public address changes while every client is offline
-and away from the LAN, run `sudo athanor connect` through the operator's existing recovery access
+and away from the LAN, run `sudo garden connect` through the operator's existing recovery access
 and paste the refreshed ticket. Pairing the new route cannot change the already pinned server
 identity.
 
@@ -395,14 +395,14 @@ opencode auth login
 ```
 
 The owner completes the publisher’s device/browser flow. garden does not ask for the account
-password. Publisher credentials live in `/home/athanor` and are therefore included in a full backup.
+password. Publisher credentials live in `/home/garden` and are therefore included in a full backup.
 OpenCode supports the publisher logins described in its own documentation; Claude Pro/Max remains on
 the official Claude Code integration rather than an unofficial OpenCode auth plugin.
 
 ## Installing software
 
-Commands the agent runs execute as `athanor-agent`, an unprivileged account separate from the
-`athanor` account the runner itself uses, so a command cannot read the runner's process, its
+Commands the agent runs execute as `garden-agent`, an unprivileged account separate from the
+`garden` account the runner itself uses, so a command cannot read the runner's process, its
 capability signing secret, or the browser profile the owner's logins live in. The two share a group,
 which is how the runner still reads back what a command wrote. A fixed root helper permits only an
 approved package-index refresh and package-name-only installs; it rejects options, paths, hooks and
@@ -415,16 +415,16 @@ the private Xvfb/Openbox session; the user opens the computer panel only when us
 
 ## Storage
 
-`/home/athanor` is the persistent computer. Mount large block, network, or object-backed filesystems
-using ordinary Linux administration and grant only the required paths to the `athanor` account and
-the `athanor-agent` group it shares with the commands the agent runs. garden imposes no storage
+`/home/garden` is the persistent computer. Mount large block, network, or object-backed filesystems
+using ordinary Linux administration and grant only the required paths to the `garden` account and
+the `garden-agent` group it shares with the commands the agent runs. garden imposes no storage
 tier and does not copy a second guest filesystem.
 
 Recovery points normally preserve the greater of 2 GB or 2% of the filesystem (capped at 20 GB) as
 free staging headroom. A trusted administrator of a deliberately small host may set
-`ATHANOR_SNAPSHOT_RESERVE_BYTES` in `/etc/athanor/runner.env` to a whole number from 67,108,864 bytes
+`GARDEN_SNAPSHOT_RESERVE_BYTES` in `/etc/garden/runner.env` to a whole number from 67,108,864 bytes
 (64 MiB) through 1,099,511,627,776 bytes (1 TiB), then run
-`sudo systemctl restart athanor-runner`. The create and restore paths enforce the same setting; an
+`sudo systemctl restart garden-runner`. The create and restore paths enforce the same setting; an
 invalid or dangerously low value fails closed.
 
 ## Failure rules

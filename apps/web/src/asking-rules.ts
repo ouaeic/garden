@@ -1,1 +1,1 @@
-export { permissionModeSummary } from '@athanor/contracts/permission-policy';
+export { permissionModeSummary } from '@garden/contracts/permission-policy';

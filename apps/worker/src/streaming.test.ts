@@ -31,20 +31,20 @@ describe('agent chat output', () => {
      * had just written sat one path away. Saying so in the tool description was tried first and the
      * model went on serving the workspace root, so the address itself carries the answer now.
      */
-    const base = 'https://box.example/__athanor/preview';
+    const base = 'https://box.example/__garden/preview';
     expect(previewUrl(base, 'abc', undefined, 'inspire.html')).toBe(
-      'https://box.example/__athanor/preview/abc/inspire.html'
+      'https://box.example/__garden/preview/abc/inspire.html'
     );
     // A leading slash is the owner's, not a second root.
     expect(previewUrl(base, 'abc', undefined, '/inspire.html')).toBe(
-      'https://box.example/__athanor/preview/abc/inspire.html'
+      'https://box.example/__garden/preview/abc/inspire.html'
     );
     // An app that serves its own root keeps the address it always had, token and all.
     expect(previewUrl(base, 'abc', 'tok')).toBe(
-      'https://box.example/__athanor/preview/abc/?access=tok'
+      'https://box.example/__garden/preview/abc/?access=tok'
     );
     expect(previewUrl(base, 'abc', 'tok', 'app/index.html')).toBe(
-      'https://box.example/__athanor/preview/abc/app/index.html?access=tok'
+      'https://box.example/__garden/preview/abc/app/index.html?access=tok'
     );
   });
 

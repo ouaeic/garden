@@ -1,12 +1,12 @@
-import { runtimeDate, runtimeNow } from '@athanor/core';
-import type { ModelRelease, SubagentLane, WebToolPlan } from '@athanor/contracts';
-import { AthanorError, sha256 } from '@athanor/core';
-import type { TaskRecord } from '@athanor/data';
+import { runtimeDate, runtimeNow } from '@garden/core';
+import type { ModelRelease, SubagentLane, WebToolPlan } from '@garden/contracts';
+import { GardenError, sha256 } from '@garden/core';
+import type { TaskRecord } from '@garden/data';
 import {
   interruptedResponseOf,
   type ModelMessage,
   type ModelToolCall
-} from '@athanor/model-gateway';
+} from '@garden/model-gateway';
 import { type AgentState } from './agent-state.js';
 import { delegateBudget, estimatedInferenceCostUsd, usageCredit } from './billing.js';
 import type { DelegateEvidenceCheck } from './completion.js';
@@ -190,7 +190,7 @@ async function runDelegatedMission(
   const messages: ModelMessage[] = [
     {
       role: 'system',
-      content: `You are an isolated read-only specialist inside athanor, working on the user's persistent Linux computer. Investigate the assigned mission with the available read-only tools. You cannot change files, run commands, drive the shared browser or reach the user; the lead agent does all of that. Do not claim you changed anything.
+      content: `You are an isolated read-only specialist inside garden, working on the user's persistent Linux computer. Investigate the assigned mission with the available read-only tools. You cannot change files, run commands, drive the shared browser or reach the user; the lead agent does all of that. Do not claim you changed anything.
 
 Your whole output is one report to the lead, and it is the only thing that survives you. Write it as one JSON object and nothing else:
 {"answer": "<the answer to the mission, in prose, leading with the conclusion>", "evidence": [{"claim": "<what this supports>", "source": "<the exact URL or workspace path>", "quotedSpan": "<a short span copied verbatim from that source>"}], "couldNotEstablish": ["<what the evidence did not settle>"]}
@@ -226,7 +226,7 @@ ${clockLine(runtimeDate(), timeZone)}
 
   let toolOutputFloor: number | undefined;
 
-  const window = sha256(`athanor-task:${task.id}:delegate:${parentCallId}:${missionIndex}`).slice(
+  const window = sha256(`garden-task:${task.id}:delegate:${parentCallId}:${missionIndex}`).slice(
     0,
     64
   );
@@ -572,7 +572,7 @@ export async function executeDelegateTool(
       }))
     : [];
   if (!missions.length)
-    throw new AthanorError('delegate_invalid', 'At least one mission is required');
+    throw new GardenError('delegate_invalid', 'At least one mission is required');
   const reports = await Promise.all(
     missions.map((mission, index) => {
       const progress: MissionProgress = { credits: 0, steps: 0 };

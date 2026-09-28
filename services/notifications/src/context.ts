@@ -1,4 +1,4 @@
-import type { DataStore, PendingNotificationRecord } from '@athanor/data';
+import type { DataStore, PendingNotificationRecord } from '@garden/data';
 import {
   defaultNotificationSettings,
   type ApprovalSideEffect,

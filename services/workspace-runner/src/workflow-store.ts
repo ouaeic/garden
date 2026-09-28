@@ -3,8 +3,8 @@ import { chmod, lstat } from 'node:fs/promises';
 import { durableMkdir } from './project-version-files.js';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { decryptJson, encryptJson, type EncryptedEnvelope } from '@athanor/core';
-import { WorkflowStart } from '@athanor/contracts';
+import { decryptJson, encryptJson, type EncryptedEnvelope } from '@garden/core';
+import { WorkflowStart } from '@garden/contracts';
 import { z } from 'zod';
 
 const Spec = WorkflowStart.omit({ action: true });
@@ -47,7 +47,7 @@ const canonical = (value: unknown): unknown =>
 export class WorkflowStore {
   constructor(private readonly secret: string) {}
   async #use<T>(root: string, work: (db: DatabaseSync, key: Buffer) => T): Promise<T> {
-    const directory = path.join(root, '.athanor', 'workflows');
+    const directory = path.join(root, '.garden', 'workflows');
     await durableMkdir(directory, 0o700);
     if (!(await lstat(directory)).isDirectory())
       throw new Error('Invalid workflow store directory');

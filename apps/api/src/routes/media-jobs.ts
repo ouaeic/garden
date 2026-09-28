@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { Id, MediaJob, MediaCharacterAsset, MediaBatch } from '@athanor/contracts';
-import { AthanorError, decryptJson, encryptJson, unwrapDataKey } from '@athanor/core';
-import type { MediaJobRecord } from '@athanor/data';
-import { mediaJobErrorAad } from '@athanor/worker/media-job-domain';
-import { NativeMediaLibraryClient } from '@athanor/model-gateway';
+import { Id, MediaJob, MediaCharacterAsset, MediaBatch } from '@garden/contracts';
+import { GardenError, decryptJson, encryptJson, unwrapDataKey } from '@garden/core';
+import type { MediaJobRecord } from '@garden/data';
+import { mediaJobErrorAad } from '@garden/worker/media-job-domain';
+import { NativeMediaLibraryClient } from '@garden/model-gateway';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 
@@ -28,13 +28,13 @@ export const registerMediaJobRoutes = (context: RouteContext): void => {
     const owner = requireUser(request.user),
       taskId = Id.parse(request.params.taskId);
     if (!(await store.getTask(owner.id, taskId)))
-      throw new AthanorError('task_not_found', 'Task not found', 404);
+      throw new GardenError('task_not_found', 'Task not found', 404);
     return Promise.all((await store.listMediaJobs(owner.id, taskId)).map(responseFor));
   });
   app.get<{ Params: { id: string } }>('/v1/media/jobs/:id', async (request) => {
     const owner = requireUser(request.user);
     const job = await store.getMediaJob(owner.id, Id.parse(request.params.id));
-    if (!job) throw new AthanorError('media_job_not_found', 'Video job not found', 404);
+    if (!job) throw new GardenError('media_job_not_found', 'Video job not found', 404);
     return responseFor(job);
   });
   app.patch<{ Params: { id: string } }>('/v1/media/jobs/:id', async (request, reply) => {
@@ -46,7 +46,7 @@ export const registerMediaJobRoutes = (context: RouteContext): void => {
         Id.parse(request.params.id),
         input.watching
       );
-      if (!job) throw new AthanorError('media_job_not_found', 'Video job not found', 404);
+      if (!job) throw new GardenError('media_job_not_found', 'Video job not found', 404);
       return responseFor(job);
     });
   });
@@ -63,7 +63,7 @@ export const registerMediaJobRoutes = (context: RouteContext): void => {
         input.providerJobId
       );
       if (!job)
-        throw new AthanorError(
+        throw new GardenError(
           'media_job_not_reconcilable',
           'This job is not an uncertain submission belonging to this account',
           409
@@ -75,7 +75,7 @@ export const registerMediaJobRoutes = (context: RouteContext): void => {
   const assetFor = async (asset: NonNullable<Awaited<ReturnType<typeof store.getMediaAsset>>>) => {
     const workspace = await store.getWorkspace(asset.userId, asset.workspaceId);
     if (!workspace?.wrappedKey)
-      throw new AthanorError('workspace_not_found', 'Workspace not found', 404);
+      throw new GardenError('workspace_not_found', 'Workspace not found', 404);
     const key = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
     const request = decryptJson<{ name: string }>(asset.requestCiphertext, key, assetAad(asset.id));
     return MediaCharacterAsset.parse({
@@ -95,7 +95,7 @@ export const registerMediaJobRoutes = (context: RouteContext): void => {
     const owner = requireUser(request.user),
       taskId = Id.parse(request.params.taskId);
     if (!(await store.getTask(owner.id, taskId)))
-      throw new AthanorError('task_not_found', 'Task not found', 404);
+      throw new GardenError('task_not_found', 'Task not found', 404);
     return Promise.all((await store.listTaskMediaAssets(owner.id, taskId)).map(assetFor));
   });
   app.post<{ Params: { id: string } }>('/v1/media/assets/:id/reconcile', async (request, reply) => {
@@ -109,10 +109,10 @@ export const registerMediaJobRoutes = (context: RouteContext): void => {
         .strict()
         .parse(request.body);
       const asset = await store.getMediaAsset(owner.id, Id.parse(request.params.id));
-      if (!asset) throw new AthanorError('media_asset_not_found', 'Character asset not found', 404);
+      if (!asset) throw new GardenError('media_asset_not_found', 'Character asset not found', 404);
       const workspace = await store.getWorkspace(owner.id, asset.workspaceId);
       if (!workspace?.wrappedKey)
-        throw new AthanorError('workspace_not_found', 'Workspace not found', 404);
+        throw new GardenError('workspace_not_found', 'Workspace not found', 404);
       const key = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
       const original = decryptJson<{
         name: string;
@@ -125,14 +125,14 @@ export const registerMediaJobRoutes = (context: RouteContext): void => {
           assetAad(asset.id)
         );
         if (receipt.id !== input.providerCharacterId)
-          throw new AthanorError(
+          throw new GardenError(
             'media_asset_id_mismatch',
             'Use the provider ID already recorded for this asset',
             409
           );
       } else {
         if (!original.provider)
-          throw new AthanorError(
+          throw new GardenError(
             'media_asset_provider_missing',
             'The original provider account is unavailable for reconciliation',
             409
@@ -153,7 +153,7 @@ export const registerMediaJobRoutes = (context: RouteContext): void => {
         )
       });
       if (!updated)
-        throw new AthanorError(
+        throw new GardenError(
           'media_asset_not_reconcilable',
           'This asset no longer has an unresolved reservation',
           409
@@ -164,7 +164,7 @@ export const registerMediaJobRoutes = (context: RouteContext): void => {
   const batchFor = async (batch: NonNullable<Awaited<ReturnType<typeof store.getMediaBatch>>>) => {
     const workspace = await store.getWorkspace(batch.userId, batch.workspaceId);
     if (!workspace?.wrappedKey)
-      throw new AthanorError('workspace_not_found', 'Workspace not found', 404);
+      throw new GardenError('workspace_not_found', 'Workspace not found', 404);
     const key = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
     return MediaBatch.parse({
       ...batch,
@@ -188,7 +188,7 @@ export const registerMediaJobRoutes = (context: RouteContext): void => {
     const owner = requireUser(request.user),
       taskId = Id.parse(request.params.taskId);
     if (!(await store.getTask(owner.id, taskId)))
-      throw new AthanorError('task_not_found', 'Task not found', 404);
+      throw new GardenError('task_not_found', 'Task not found', 404);
     return Promise.all((await store.listMediaBatches(owner.id, taskId)).map(batchFor));
   });
   app.patch<{ Params: { id: string } }>('/v1/media/batches/:id', async (request, reply) => {
@@ -200,7 +200,7 @@ export const registerMediaJobRoutes = (context: RouteContext): void => {
         Id.parse(request.params.id),
         input.watching
       );
-      if (!batch) throw new AthanorError('media_batch_not_found', 'Video batch not found', 404);
+      if (!batch) throw new GardenError('media_batch_not_found', 'Video batch not found', 404);
       return batchFor(batch);
     });
   });
@@ -218,7 +218,7 @@ export const registerMediaJobRoutes = (context: RouteContext): void => {
           .parse(request.body);
         const batch = await store.reconcileMediaBatch(owner.id, Id.parse(request.params.id), input);
         if (!batch)
-          throw new AthanorError(
+          throw new GardenError(
             'media_batch_not_reconcilable',
             'Use the expected receipt type for an uncertain batch owned by this account',
             409
@@ -235,7 +235,7 @@ export const registerMediaJobRoutes = (context: RouteContext): void => {
         .parse(request.body ?? {});
       const batch = await store.requestMediaBatchCancel(owner.id, Id.parse(request.params.id));
       if (!batch)
-        throw new AthanorError(
+        throw new GardenError(
           'media_batch_not_cancellable',
           'This batch is already terminal or needs submission reconciliation first',
           409

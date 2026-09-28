@@ -1,11 +1,11 @@
-import { runtimeUUID } from '@athanor/core';
+import { runtimeUUID } from '@garden/core';
 import { reconcileCodingMission } from './coding-mission-loop.js';
 
 import { z } from 'zod';
-import { CodingMissionStart, CodingMissionChange, type ModelRelease } from '@athanor/contracts';
+import { CodingMissionStart, CodingMissionChange, type ModelRelease } from '@garden/contracts';
 import { resolveTaskPurposeModel } from './purpose-model.js';
 import {
-  AthanorError,
+  GardenError,
   buildConversationNameIndex,
   decryptJson,
   encryptJson,
@@ -13,9 +13,9 @@ import {
   memoryIndexKey,
   sha256,
   wrapDataKey
-} from '@athanor/core';
-import { codingMissionView, type DataStore, type TaskRecord } from '@athanor/data';
-import type { ModelToolCall } from '@athanor/model-gateway';
+} from '@garden/core';
+import { codingMissionView, type DataStore, type TaskRecord } from '@garden/data';
+import type { ModelToolCall } from '@garden/model-gateway';
 import type { ToolContext } from './tool-dispatch.js';
 import type { AgentState, AgentWorkerConfig } from './agent-state.js';
 import { event } from './tool-recording.js';
@@ -76,7 +76,7 @@ export async function executeCodingMission(
   const action = textValue(call.arguments.action),
     options = call.arguments.options ?? {};
   if (task.parentMissionId)
-    throw new AthanorError(
+    throw new GardenError(
       'coding_mission_nested',
       'Coding specialists cannot create or control other specialists',
       409
@@ -105,13 +105,13 @@ export async function executeCodingMission(
       '/v1/coding-missions/capabilities'
     );
     if (!capabilities.available)
-      throw new AthanorError(
+      throw new GardenError(
         'coding_isolation_unavailable',
         capabilities.reason ?? 'Isolated coding execution is unavailable',
         409
       );
     const parent = await store.getWorkspace(task.userId, task.workspaceId);
-    if (!parent) throw new AthanorError('workspace_not_found', 'Parent workspace not found', 404);
+    if (!parent) throw new GardenError('workspace_not_found', 'Parent workspace not found', 404);
     const childWorkspaceId = runtimeUUID(),
       childKey = generateDataKey(),
       id = runtimeUUID();
@@ -197,10 +197,10 @@ export async function executeCodingMission(
       )
     };
   if (!asked.missionId)
-    throw new AthanorError('coding_mission_required', 'Name the coding mission', 400);
+    throw new GardenError('coding_mission_required', 'Name the coding mission', 400);
   const mission = await store.getCodingMission(task.userId, asked.missionId);
   if (!mission || mission.parentTaskId !== task.id)
-    throw new AthanorError(
+    throw new GardenError(
       'coding_mission_missing',
       'Coding mission not found in this parent task',
       404
@@ -249,7 +249,7 @@ export async function executeCodingMission(
       seen?.digest !== asked.digest ||
       seen.generation !== asked.generation
     )
-      throw new AthanorError(
+      throw new GardenError(
         'coding_review_required',
         'Read an inspectable mission review in this parent context before integrating its exact digest',
         409
@@ -297,11 +297,7 @@ export async function executeCodingMission(
     }
     return { mission: cancelled ? codingMissionView(cancelled, key) : null };
   }
-  throw new AthanorError(
-    'coding_mission_action',
-    'Unknown native coding action; use describe',
-    400
-  );
+  throw new GardenError('coding_mission_action', 'Unknown native coding action; use describe', 400);
 }
 
 export async function parkCodingMissionWait(

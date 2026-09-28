@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import type { ConnectorScope } from '@athanor/contracts';
+import type { ConnectorScope } from '@garden/contracts';
 import type { ConnectorTransport, ConnectorRequestResult } from './connectors.js';
 import { AccountOAuth, type AccountProvider } from './account-oauth.js';
-import { AthanorError } from './errors.js';
+import { GardenError } from './errors.js';
 
 export const accountResourceId = z
   .string()
@@ -41,7 +41,7 @@ export const accountResponseObject = (
   } catch {
     /* Do not put upstream bodies or credentials into surfaced errors. */
   }
-  throw new AthanorError(
+  throw new GardenError(
     'connector_response_invalid',
     'The account provider returned an unreadable response.'
   );
@@ -58,12 +58,12 @@ export class AccountApi {
   ) {
     this.secret = AccountOAuth.parse(secret);
     if (!this.secret.tokens || !this.secret.account || this.secret.pending)
-      throw new AthanorError(
+      throw new GardenError(
         'connector_reauthorization_required',
         'Connect this account before using it.'
       );
     if (this.secret.tokens.expiresAt <= Date.now())
-      throw new AthanorError(
+      throw new GardenError(
         'connector_authorization_expired',
         'Refresh the account authorization before using it.'
       );
@@ -77,13 +77,13 @@ export class AccountApi {
       path.startsWith('/') ||
       /[?#\\\0]/.test(path)
     )
-      throw new AthanorError(
+      throw new GardenError(
         'connector_resource_invalid',
         'The resource does not belong to this account service.'
       );
     const url = new URL(endpoint.prefix + path, endpoint.origin);
     if (!url.pathname.startsWith(endpoint.prefix))
-      throw new AthanorError('connector_resource_invalid', 'The resource is outside this account.');
+      throw new GardenError('connector_resource_invalid', 'The resource is outside this account.');
     for (const [key, value] of Object.entries(query))
       if (value !== undefined) url.searchParams.set(key, value);
     return url;
@@ -91,7 +91,7 @@ export class AccountApi {
 
   requireScope(scopes: readonly ConnectorScope[], required: ConnectorScope): void {
     if (!scopes.includes(required))
-      throw new AthanorError('connector_scope_denied', `Connector has not granted ${required}`);
+      throw new GardenError('connector_scope_denied', `Connector has not granted ${required}`);
   }
 
   private assertUrl(url: URL): void {
@@ -106,7 +106,7 @@ export class AccountApi {
           url.pathname.startsWith(endpoint.prefix)
       )
     )
-      throw new AthanorError(
+      throw new GardenError(
         'connector_resource_invalid',
         'The request is outside this account service.'
       );
@@ -131,7 +131,7 @@ export class AccountApi {
       maxBytes > 40_000_000 ||
       (body?.length ?? 0) > 40_000_000
     )
-      throw new AthanorError(
+      throw new GardenError(
         'connector_size_invalid',
         'The account request exceeds its transfer limit.'
       );
@@ -159,7 +159,7 @@ export class AccountApi {
     this.metrics.durationMs += response.durationMs;
     this.metrics.statusCode = response.status;
     if (response.body.length > maxBytes)
-      throw new AthanorError(
+      throw new GardenError(
         'connector_response_too_large',
         'The account response exceeds its transfer limit.'
       );
@@ -192,7 +192,7 @@ export class AccountApi {
       const retryAfter = response.headers['retry-after'];
       const seconds =
         retryAfter && /^\d+$/.test(retryAfter) ? Math.min(Number(retryAfter), 86400) : undefined;
-      throw new AthanorError(code, message, 400, {
+      throw new GardenError(code, message, 400, {
         statusCode: response.status,
         ...(seconds === undefined ? {} : { retryAfterSeconds: seconds })
       });
@@ -233,7 +233,7 @@ export class AccountApi {
       )
         throw new Error('invalid upload');
     } catch {
-      throw new AthanorError(
+      throw new GardenError(
         'connector_upload_invalid',
         'The mail upload capability or byte range is invalid.'
       );
@@ -256,7 +256,7 @@ export class AccountApi {
         ...(this.signal ? { signal: this.signal } : {})
       });
     } catch {
-      throw new AthanorError(
+      throw new GardenError(
         'connector_upload_interrupted',
         'The mail attachment upload was interrupted.'
       );
@@ -266,7 +266,7 @@ export class AccountApi {
     this.metrics.durationMs += response.durationMs;
     this.metrics.statusCode = response.status;
     if (![200, 201].includes(response.status) || response.body.length > 100_000)
-      throw new AthanorError(
+      throw new GardenError(
         'connector_upload_failed',
         'The mail attachment upload needs reconciliation.'
       );
@@ -301,7 +301,7 @@ export class AccountApi {
         throw new Error('wrong collection');
       return url;
     } catch {
-      throw new AthanorError(
+      throw new GardenError(
         'connector_cursor_invalid',
         'Use the next page cursor with the same account and search.'
       );

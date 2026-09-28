@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from 'react';
-import type { ComputationSession } from '@athanor/contracts';
+import type { ComputationSession } from '@garden/contracts';
 import { Dialog } from '../ui';
 import { bytes } from './format';
 import { useVisibleClock } from '../visible-clock';

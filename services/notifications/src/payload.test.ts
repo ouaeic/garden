@@ -209,7 +209,7 @@ describe('optional Web Push configuration', () => {
   const base = {
     DATABASE_DRIVER: 'postgres' as const,
     DATABASE_URL: 'postgres://x',
-    PGLITE_PATH: '.athanor/postgres',
+    PGLITE_PATH: '.garden/postgres',
     NOTIFICATION_POLL_MS: 2000,
     NOTIFICATION_BATCH_SIZE: 100,
     NOTIFICATION_HEALTH_PORT: 4203,
