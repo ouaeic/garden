@@ -1,6 +1,7 @@
 /*
  * The living layer. Nothing here can be clicked or read by a screen reader; it sits above the
- * interface and below every dialog, and it steps rather than glides.
+ * interface and below every dialog. Creatures glide on the compositor - transform only - and only
+ * their own frames step, the way sprites do.
  */
 .life-layer {
   position: fixed;
@@ -10,245 +11,26 @@
   overflow: hidden;
   contain: strict;
 }
+/* A border a creature lives behind: anything above its top edge is out of sight. */
+.life-clip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+}
 .life-actor {
   position: absolute;
   left: 0;
   top: 0;
   will-change: transform;
+  backface-visibility: hidden;
   transition-property: transform;
-  transition-timing-function: steps(var(--life-steps, 12), end);
+  transition-timing-function: var(--life-ease, ease-in-out);
   transition-duration: var(--life-travel, 0s);
 }
-
-/* The garden plot on the home screen. */
-.garden-plot {
-  position: relative;
-  height: 152px;
-  border: 1px solid var(--text);
-  background: var(--lcd-texture), var(--bg);
-  overflow: hidden;
-  isolation: isolate;
-}
-.garden-plot-sky {
-  position: absolute;
-  inset: 0 0 32px;
-}
-.garden-plot-sky .garden-plot-sun {
-  position: absolute;
-  right: 48px;
-  top: 16px;
-}
-.garden-plot-cloud {
-  position: absolute;
-  top: var(--cloud-top, 24px);
-  left: 0;
-  animation: plot-cloud var(--cloud-time, 240s) steps(160, end) infinite;
-  animation-delay: var(--cloud-delay, 0s);
-}
-@keyframes plot-cloud {
-  from {
-    transform: translateX(-80px);
-  }
-  to {
-    transform: translateX(calc(var(--plot-width, 1200px) + 20px));
-  }
-}
-.garden-plot-star {
-  position: absolute;
-  width: 2px;
-  height: 2px;
-  background: var(--text);
-  animation: cursor-blink var(--star-time, 3s) steps(1, end) infinite;
-}
-.garden-plot-ground {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 24px;
-  border-top: 2px solid var(--text);
-  background: var(--lcd-texture), var(--dither), var(--bg);
-}
-.garden-plot-scenery > .life-sprite {
-  position: absolute;
-  bottom: 24px;
-}
-.garden-plot-scenery > .garden-plot-fence {
-  left: auto;
-  right: 24px;
-}
-.garden-plot-beds {
-  position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: 22px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-evenly;
-  gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding-top: 40px;
-}
-.garden-plot-beds::-webkit-scrollbar {
-  display: none;
-}
-.garden-plant {
-  position: relative;
-  display: grid;
-  justify-items: center;
-  align-content: end;
-  min-width: 56px;
-  min-height: 56px;
-  padding: 0 4px;
-  border: 0;
-  background: none;
-  color: inherit;
-  cursor: pointer;
-}
-.garden-plant:hover,
-.garden-plant:focus-visible {
-  background: none;
-}
-.garden-plant > .garden-plant-tag {
-  position: absolute;
-  bottom: calc(100% + 4px);
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: 220px;
-  padding: 4px 8px;
-  border: 1px solid var(--text);
-  background: var(--lcd-texture), var(--bg);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  visibility: hidden;
-  z-index: 2;
-}
-.garden-plant:is(:hover, :focus-visible) > .garden-plant-tag {
-  visibility: visible;
-}
-.garden-plant:is(:hover, :focus-visible) .life-sprite {
-  outline: 1px dashed var(--text);
-  outline-offset: 2px;
-}
-.garden-plant-bubble {
-  position: absolute;
-  top: -10px;
-  right: 0;
-  animation: cursor-blink 1.2s steps(1, end) infinite;
-}
-.garden-plant-bee {
-  position: absolute;
-  top: -8px;
-  left: 50%;
-  animation: plant-bee 3.2s steps(8, end) infinite;
-}
-/* A bee works a slow loop over whatever is growing. */
-@keyframes plant-bee {
-  0% {
-    transform: translate(-24px, 0);
-  }
-  25% {
-    transform: translate(8px, -14px);
-  }
-  50% {
-    transform: translate(20px, 4px);
-  }
-  75% {
-    transform: translate(-6px, 10px);
-  }
-  100% {
-    transform: translate(-24px, 0);
-  }
-}
-.garden-plot-firefly {
-  position: absolute;
-  animation: plot-firefly 9s steps(18, end) infinite;
-  animation-delay: var(--firefly-delay, 0s);
-}
-@keyframes plot-firefly {
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-  33% {
-    transform: translate(40px, -18px);
-  }
-  66% {
-    transform: translate(-24px, 12px);
-  }
-}
-.garden-plot-wrap {
-  display: grid;
-  gap: 12px;
-}
-.garden-plot-heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 8px 24px;
-  flex-wrap: wrap;
-}
-.garden-plot-heading h1 {
-  margin: 0;
-  font-size: 32px;
-  font-weight: 400;
-  line-height: 1;
-}
-.garden-plot-heading .eyebrow {
-  margin: 0 0 8px;
-}
-.garden-plot-heading > p {
-  margin: 0;
-  color: var(--muted);
-}
-@media (max-width: 640px) {
-  .garden-plot {
-    height: 136px;
-  }
-  .garden-plot-scenery > .life-sprite {
-    position: absolute;
-    bottom: 24px;
-  }
-  .garden-plot-scenery > .garden-plot-fence {
-    left: auto;
-    right: 24px;
-  }
-  .garden-plot-beds {
-    justify-content: flex-start;
-  }
-  .garden-plot-sky .garden-plot-sun {
-    right: 16px;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .garden-plot-cloud {
-    animation: none;
-    transform: translateX(calc(var(--plot-width, 1200px) * var(--cloud-rest, 0.5)));
-  }
-  .garden-plot-cloud,
-  .garden-plot-star,
-  .garden-plant-bee,
-  .garden-plot-firefly,
-  .garden-plant-bubble {
-    animation: none;
-  }
   .life-actor {
     transition: none;
   }
-}
-
-.title-scene {
-  height: 136px;
-  margin: 24px 0;
-}
-.title-scene .garden-plant {
-  cursor: default;
-}
-.title-scene-bird {
-  position: absolute;
-  top: -16px;
-  left: 50%;
-  transform: translateX(-50%);
 }

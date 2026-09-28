@@ -1,11 +1,10 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowUpRight, Check, Moon, Sun } from './icons';
 import { get } from './client';
 import { devSignIn, enroll, recover, register, signIn } from './auth';
 import type { AuthResult } from './auth';
 import { Button, ErrorNotice, Field } from './ui';
 import Brand from './Brand';
-const TitleScene = lazy(() => import('./life/TitleScene'));
 
 export default function Login({
   pairingCode,
@@ -94,9 +93,6 @@ export default function Login({
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </Button>
       </div>
-      <Suspense fallback={null}>
-        <TitleScene />
-      </Suspense>
       <section className="welcome-content">
         <div className="eyebrow">Your own space to think and make</div>
         <h1>

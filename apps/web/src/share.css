@@ -91,7 +91,7 @@ p {
 }
 .share-heading h1 {
   font-family: var(--font-display);
-  font-size: 48px;
+  font-size: 24px;
   line-height: 1.08;
   letter-spacing: 0;
   font-weight: 400;
@@ -134,7 +134,7 @@ details[open] > summary {
   letter-spacing: 0;
 }
 .shared-prose h1 {
-  font-size: 32px;
+  font-size: 24px;
 }
 .shared-prose h2 {
   font-size: 24px;
@@ -205,7 +205,7 @@ details[open] > summary {
 }
 .share-files h2 {
   font-family: var(--font-display);
-  font-size: 32px;
+  font-size: 24px;
   letter-spacing: 0;
   font-weight: 400;
   margin-bottom: 26px;
@@ -311,14 +311,14 @@ details[open] > summary {
 }
 .share-orbit {
   display: block;
-  font-size: 48px;
+  font-size: 24px;
   font-weight: 200;
   margin-bottom: 30px;
-  animation: unfold 1.2s steps(6, end) both;
+  animation: unfold 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 .share-state h1 {
   font-family: var(--font-display);
-  font-size: 40px;
+  font-size: 24px;
   font-weight: 400;
   letter-spacing: 0;
 }
@@ -352,7 +352,7 @@ details[open] > summary {
     padding: 47px 0 30px;
   }
   .share-heading h1 {
-    font-size: 40px;
+    font-size: 24px;
   }
   .shared-prose {
     font-size: 16px;
@@ -384,7 +384,7 @@ details[open] > summary {
     padding: 85px 0 110px;
   }
   .share-state h1 {
-    font-size: 32px;
+    font-size: 24px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -418,7 +418,7 @@ details[open] > summary {
     padding: 30px 0;
   }
   .share-heading h1 {
-    font-size: 40px;
+    font-size: 24px;
   }
   .share-record,
   .shared-file-actions button,

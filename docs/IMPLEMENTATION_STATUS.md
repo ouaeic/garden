@@ -2,9 +2,10 @@
 
 ## Implemented in source
 
-- A four-shade dot-matrix interface: a home garden where each project is a plant, masthead doors
-  on wide screens and a button row on phones, docked project panels, three hardware palettes in
-  light and dark mode, and an optional living layer of visiting creatures that never takes input;
+- A four-shade dot-matrix interface that fits the screen with only its cards scrolling: status as
+  small plant sprites, masthead doors on wide screens and a button row on phones, docked project
+  panels, three hardware palettes in light and dark mode, and an optional living layer of small
+  visiting creatures that never takes input or space;
   event-derived progress, model effort controls, direct result links and scoped source downloads.
 - One primary agent computer; no SaaS pricing, provisioning, subscriptions, model resale, or local
   inference.

@@ -43,15 +43,6 @@ export const growth = {
   ]
 } satisfies Record<string, Frames>;
 
-/** The garden mark in the masthead: a sprout that grows out of the wordmark. */
-export const markSprout: Frames = [
-  ['.....', '.....', '.....', '.....', '..3..'],
-  ['.....', '.....', '.....', '..3..', '..3..'],
-  ['.....', '.....', '33...', '.33..', '..3..'],
-  ['.....', '33.33', '3223.', '.33..', '..3..'],
-  ['.333.', '32023', '.333.', '.33..', '..3..']
-];
-
 /** The bird that waits on the bell while something needs you. */
 export const bellBird: Frames = [
   [

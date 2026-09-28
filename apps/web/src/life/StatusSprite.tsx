@@ -1,4 +1,4 @@
-import type { Task } from '@garden/contracts';
+import type { Project, Task } from '@garden/contracts';
 import { growth } from './growth';
 import { Sprite } from './Sprite';
 
@@ -34,6 +34,13 @@ export function stageOf(task: Pick<Task, 'status' | 'hasOpenQuestion' | 'deliver
     default:
       return 'bloom';
   }
+}
+
+/** A project's plant: what needs you first, then what is running, then its latest conversation. */
+export function projectStage(project: Project, latest: Task | undefined): Stage {
+  if (project.attentionCount) return 'needs';
+  if (project.activeCount) return 'sprout';
+  return latest ? stageOf(latest) : 'bloom';
 }
 
 const bloom = [

@@ -269,3 +269,47 @@ progress::-moz-progress-bar {
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 10' shape-rendering='crispEdges'%3E%3Cpath d='M6 0h4v1H6zM5 1h1v2H5zM10 1h1v2h-1zM0 2h1v1H0zM1 3h1v1H1zM4 3h8v1H4zM2 4h1v1H2zM4 4h8v1H4zM3 5h10v1H3zM4 6h8v3H4zM5 9h6v1H5zM0 5h1v1H0zM1 7h1v1H1zM0 9h1v1H0z'/%3E%3C/svg%3E")
     center / contain no-repeat;
 }
+
+/*
+ * Interface motion is smooth: it rides the compositor (transform and opacity) and eases. Only
+ * sprite frames and blinking cursors step, as they would on the hardware.
+ */
+.button,
+button {
+  transition:
+    transform 0.12s ease-out,
+    box-shadow 0.16s ease-out,
+    color 0.16s ease-out,
+    border-color 0.16s ease-out;
+}
+.button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+@media (prefers-reduced-motion: no-preference) {
+  dialog[open]::backdrop {
+    animation: veil-in 0.2s ease-out both;
+  }
+  :popover-open {
+    animation: pop-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .garden-health-popover {
+    animation: pop-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+}
+@keyframes veil-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .button,
+  button {
+    transition: none;
+  }
+}

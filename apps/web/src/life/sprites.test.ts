@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as art from './sprites';
-import { bellBird, growth, markSprout } from './growth';
+import { bellBird, growth } from './growth';
 import type { Frames } from './growth';
 
 /** Every sprite in the garden, flattened to named frame lists. */
@@ -14,15 +14,14 @@ function catalogue() {
     }
     named.push([name, (typeof value[0] === 'string' ? [value] : value) as Frames]);
   };
-  for (const [name, value] of Object.entries({ ...art, growth, bellBird, markSprout }))
-    visit(name, value);
+  for (const [name, value] of Object.entries({ ...art, growth, bellBird })) visit(name, value);
   return named;
 }
 
 describe('garden sprites', () => {
   const sprites = catalogue();
   it('finds the whole catalogue', () => {
-    expect(sprites.length).toBeGreaterThan(25);
+    expect(sprites.length).toBeGreaterThan(15);
   });
   it.each(sprites)(
     '%s keeps one size across its frames and uses only the four shades',

@@ -27,9 +27,12 @@ interface Actor {
   fps?: number;
   scale?: number;
   travel?: number;
-  steps?: number;
-  bubble?: boolean;
+  /** Timing for the current glide; creatures move smoothly, only their frames step. */
+  ease?: string;
+  /** A border this actor lives behind: it is clipped above this line, so it can slip out of sight. */
+  clipTop?: number;
 }
+const GLIDE = 'cubic-bezier(0.45, 0, 0.55, 1)';
 
 const wait = (ms: number, signal: { cancelled: boolean }) =>
   new Promise<void>((done, fail) =>
@@ -90,14 +93,8 @@ export default function GardenLife() {
     const update = (id: number, patch: Partial<Actor>) =>
       setActors((list) => list.map((actor) => (actor.id === id ? { ...actor, ...patch } : actor)));
     const remove = (id: number) => setActors((list) => list.filter((actor) => actor.id !== id));
-    const move = async (
-      id: number,
-      x: number,
-      y: number,
-      ms: number,
-      steps = Math.ceil(ms / 90)
-    ) => {
-      update(id, { x, y, travel: ms, steps });
+    const move = async (id: number, x: number, y: number, ms: number, ease = GLIDE) => {
+      update(id, { x, y, travel: ms, ease });
       await wait(ms, signal);
       update(id, { travel: 0 });
     };
@@ -173,17 +170,19 @@ export default function GardenLife() {
         if (narrow()) return;
         const bar = document.querySelector('.garden-masthead')?.getBoundingClientRect();
         if (!bar) return;
+        // It lives above the masthead's lower border: it drops out from behind it and climbs back.
         const x = between(innerWidth * 0.35, innerWidth * 0.62);
-        const id = spawn({ frames: monkey.hang, fps: 2, x, y: bar.bottom - 32 });
+        const hidden = bar.bottom - 30;
+        const id = spawn({ frames: monkey.hang, fps: 2, x, y: hidden, clipTop: bar.bottom });
         await wait(60, signal);
-        await move(id, x, bar.bottom - 2, 420, 4);
+        await move(id, x, bar.bottom - 1, 520, 'cubic-bezier(0.2, 0.9, 0.3, 1.2)');
         await wait(2400, signal);
         update(id, { frames: monkey.wave, fps: 1 });
         chirp('ook');
         await wait(1400, signal);
         update(id, { frames: monkey.hang, fps: 2 });
-        await wait(900, signal);
-        await move(id, x, bar.bottom - 40, 420, 4);
+        await wait(700, signal);
+        await move(id, x, hidden, 460, 'cubic-bezier(0.5, 0, 0.8, 0.4)');
         remove(id);
       },
       async snailCrawl() {
@@ -194,7 +193,7 @@ export default function GardenLife() {
         const distance = Math.min(220, box.width - 60);
         const id = spawn({ frames: snail, fps: 1, x: start, y: box.top - 13 });
         await wait(60, signal);
-        await move(id, start + distance, box.top - 13, distance * 120, distance / 2);
+        await move(id, start + distance, box.top - 13, distance * 120, 'linear');
         await wait(1500, signal);
         remove(id);
       },
@@ -219,7 +218,7 @@ export default function GardenLife() {
             await wait(60, signal);
             for (let y = 70; y < innerHeight + 20; y += 110) {
               x += pick([-28, 28, -16, 16]);
-              await move(id, x, y + 110, 1100, 8);
+              await move(id, x, y + 110, 1100, 'ease-in-out');
             }
             remove(id);
           })
@@ -242,7 +241,7 @@ export default function GardenLife() {
               x: between(20, innerWidth - 20),
               y: between(100, innerHeight - 40),
               travel: 2000,
-              steps: 10
+              ease: GLIDE
             });
         }
         await wait(2000, signal);
@@ -327,26 +326,35 @@ export default function GardenLife() {
   }, [mode]);
 
   if (mode === 'still') return null;
+  const draw = (actor: Actor) => (
+    <div
+      key={actor.id}
+      className="life-actor"
+      style={
+        {
+          transform: `translate3d(${actor.x}px, ${actor.y - (actor.clipTop ?? 0)}px, 0)`,
+          '--life-travel': `${actor.travel ?? 0}ms`,
+          '--life-ease': actor.ease ?? GLIDE
+        } as CSSProperties
+      }
+    >
+      <Sprite
+        frames={actor.frames}
+        fps={actor.fps ?? 4}
+        scale={actor.scale ?? 2}
+        flip={actor.flip ?? false}
+      />
+    </div>
+  );
+  const clips = [
+    ...new Set(actors.flatMap((actor) => (actor.clipTop === undefined ? [] : [actor.clipTop])))
+  ];
   return (
     <div className="life-layer" aria-hidden="true">
-      {actors.map((actor) => (
-        <div
-          key={actor.id}
-          className="life-actor"
-          style={
-            {
-              transform: `translate(${Math.round(actor.x)}px, ${Math.round(actor.y)}px)`,
-              '--life-travel': `${actor.travel ?? 0}ms`,
-              '--life-steps': actor.steps ?? 12
-            } as CSSProperties
-          }
-        >
-          <Sprite
-            frames={actor.frames}
-            fps={actor.fps ?? 4}
-            scale={actor.scale ?? 2}
-            flip={actor.flip ?? false}
-          />
+      {actors.filter((actor) => actor.clipTop === undefined).map(draw)}
+      {clips.map((top) => (
+        <div key={`clip-${top}`} className="life-clip" style={{ top }}>
+          {actors.filter((actor) => actor.clipTop === top).map(draw)}
         </div>
       ))}
     </div>

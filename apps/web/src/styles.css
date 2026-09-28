@@ -88,13 +88,13 @@ h3 {
   font-weight: 400;
 }
 h1 {
-  font-size: 48px;
+  font-size: 24px;
   letter-spacing: 0;
   line-height: 1.12;
   margin: 12px 0 24px;
 }
 h2 {
-  font-size: 32px;
+  font-size: 24px;
   line-height: 1.22;
   letter-spacing: 0;
   margin: 0 0 18px;
@@ -405,7 +405,7 @@ canvas {
   display: flex;
   align-items: center;
   gap: 12px;
-  font: 700 40px/1 var(--font-display);
+  font: 700 24px/1 var(--font-display);
   letter-spacing: 0;
   color: var(--text);
 }
@@ -575,12 +575,12 @@ canvas {
   margin-top: 0;
 }
 .markdown h1 {
-  font-size: 32px;
+  font-size: 24px;
   letter-spacing: 0;
   line-height: 1.2;
 }
 .markdown h2 {
-  font-size: 32px;
+  font-size: 24px;
   margin: 32px 0 17px;
 }
 .markdown h3 {
@@ -821,7 +821,7 @@ canvas {
 }
 .decision-card > h3,
 .question-card h2 {
-  font-size: 32px;
+  font-size: 24px;
   margin: 17px 0;
   line-height: 1.22;
   color: var(--text);
@@ -989,7 +989,7 @@ canvas {
   backdrop-filter: none;
 }
 .dialog[open] {
-  animation: arrive 0.2s steps(4, end);
+  animation: arrive 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 .dialog-heading {
   display: flex;
@@ -1087,8 +1087,8 @@ canvas {
   margin: 8vh 0 50px;
 }
 .welcome-content h1 {
-  font-size: 48px;
-  line-height: 1.03;
+  font-size: 24px;
+  line-height: 1.3;
   letter-spacing: 0;
   margin: 22px 0 28px;
 }
@@ -1166,12 +1166,9 @@ canvas {
   }
 }
 @keyframes arrive {
-  /* A window wipes down the screen in whole rows; it never fades. */
   from {
-    clip-path: inset(0 0 100% 0);
-  }
-  to {
-    clip-path: inset(0);
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
   }
 }
 @media (max-width: 1100px) {
@@ -1250,7 +1247,7 @@ canvas {
     line-height: 1.8;
   }
   .markdown h1 {
-    font-size: 32px;
+    font-size: 24px;
   }
   .markdown h2 {
     font-size: 24px;
@@ -1264,7 +1261,7 @@ canvas {
   }
   .decision-card h3,
   .question-card h2 {
-    font-size: 32px;
+    font-size: 24px;
   }
   .completion-record {
     padding: 21px;
@@ -1354,7 +1351,7 @@ canvas {
     margin: 9vh 0 40px;
   }
   .welcome-content h1 {
-    font-size: 48px;
+    font-size: 24px;
     letter-spacing: 0;
   }
   .welcome-content > p {
@@ -1385,7 +1382,7 @@ canvas {
     font-size: 16px;
   }
   .section-intro h1 {
-    font-size: 40px;
+    font-size: 24px;
   }
 }
 @media (max-width: 480px) {
@@ -1448,12 +1445,13 @@ canvas {
 /* The boot screen: the wordmark drops into place in whole rows while the workspace loads. */
 @media (prefers-reduced-motion: no-preference) {
   .startup .brand {
-    animation: boot-drop 0.64s steps(8, end) both;
+    animation: boot-drop 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
 }
 @keyframes boot-drop {
   from {
-    transform: translateY(-50vh);
+    transform: translateY(-12px);
+    opacity: 0;
   }
   to {
     transform: translateY(0);

@@ -18,7 +18,7 @@ body:has(.desk-shell),
   padding-inline: clamp(18px, 3vw, 44px);
 }
 .desk-shell .garden-masthead .brand {
-  font-size: 40px;
+  font-size: 24px;
 }
 .desk-shell .garden-masthead .brand-button {
   margin: 0 12px 0 0;
@@ -235,7 +235,7 @@ body:has(.desk-shell),
   min-width: 0;
 }
 .desk-shell .desk-project .project-space-title h1 {
-  font-size: 32px;
+  font-size: 24px;
   line-height: 1.2;
   margin: 0;
   display: block;
@@ -750,7 +750,7 @@ body:has(.desk-shell),
   color: var(--accent);
 }
 .garden-preview-placeholder strong {
-  font: 400 22px/1.3 var(--font-display);
+  font: 400 24px/1.3 var(--font-display);
   color: var(--text);
 }
 .garden-preview-placeholder p {
@@ -894,7 +894,7 @@ body:has(.desk-shell),
   margin: 0 0 20px;
 }
 .desk-project-index .management-heading h1 {
-  font-size: 32px;
+  font-size: 24px;
   margin: 0;
 }
 .desk-project-index .work-filter {
@@ -961,7 +961,7 @@ body:has(.desk-shell),
   margin-bottom: 16px;
 }
 .desk-shell .management-heading h1 {
-  font-size: 32px;
+  font-size: 24px;
   margin: 3px 0 7px;
 }
 .desk-shell .management-heading .eyebrow {
@@ -1041,7 +1041,7 @@ body:has(.desk-shell),
     margin-right: 0;
   }
   .desk-shell .garden-masthead .brand {
-    font-size: 32px;
+    font-size: 24px;
   }
   .desk-shell .desk-project-index,
   .desk-shell .management-page {
@@ -1227,7 +1227,7 @@ html[data-workspace-short='true'] .desk-shell .management-heading p {
   position: static;
 }
 .desk-sheet > .dialog-heading h2 {
-  font-size: 32px;
+  font-size: 24px;
 }
 .desk-sheet > .dialog-body {
   flex: 1;
@@ -1338,15 +1338,12 @@ html[data-workspace-short='true'] .desk-shell .management-heading p {
 
 @media (prefers-reduced-motion: no-preference) {
   .desk-sheet[open] {
-    animation: desk-reveal 160ms steps(4, end);
+    animation: desk-reveal 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
   @keyframes desk-reveal {
-    /* A window wipes down the screen in whole rows; it never fades. */
     from {
-      clip-path: inset(0 0 100% 0);
-    }
-    to {
-      clip-path: inset(0);
+      opacity: 0;
+      transform: translateX(24px);
     }
   }
 }

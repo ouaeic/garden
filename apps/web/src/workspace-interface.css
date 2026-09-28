@@ -316,7 +316,7 @@
   margin-bottom: 24px;
 }
 .garden-shell .management-heading h1 {
-  font-size: 40px;
+  font-size: 24px;
 }
 .garden-shell .management-tabs {
   flex-wrap: wrap;
@@ -422,7 +422,7 @@
     min-height: 40px;
   }
   .garden-shell .management-heading h1 {
-    font-size: 32px;
+    font-size: 24px;
   }
 }
 

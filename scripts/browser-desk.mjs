@@ -158,13 +158,13 @@ export async function checkDesk({
       if (width > 760 && height > 540) {
         const prompt = await page.locator('.desk-start-card').boundingBox();
         const editor = await page.locator('.desk-start-card .intent-editor').boundingBox();
-        const garden = await page.locator('.garden-plot').boundingBox();
-        assert(prompt && editor && garden);
+        const lists = await page.locator('.home-lists').boundingBox();
+        assert(prompt && editor && lists);
         assert(prompt.height <= editor.height + 20, 'The prompt card must fit its contents');
-        assert(garden.y + garden.height <= prompt.y, 'The garden sits above the prompt');
+        assert(prompt.y + prompt.height <= lists.y, 'The lists sit under the prompt');
         assert(
-          Math.abs(garden.width - prompt.width) < 2,
-          'The garden and the prompt share one column'
+          lists.y + lists.height <= height + 1,
+          'The lists take the height that is left and no more'
         );
       }
       await page.getByLabel('Describe what you want to do').fill('A useful new project');
@@ -177,16 +177,18 @@ export async function checkDesk({
         'The prompt must not stretch into an empty card'
       );
       await page.screenshot({ path: resolve(report, `desk-prompt-${width}-${height}.png`) });
-      // Home is one scrolling page: the garden, the prompt, then the three lists.
-      const home = page.locator('.desk-home');
-      assert(await home.evaluate((element) => element.scrollHeight > element.clientHeight));
-      await home.evaluate((element) => {
+      // Home never scrolls as a page: each list scrolls inside its own card.
+      if (width <= 700)
+        await page
+          .getByRole('navigation', { name: 'Home lists' })
+          .getByRole('button', { name: 'Recent', exact: true })
+          .click();
+      const recent = page.locator('.desk-recent .scroll-region');
+      assert(await recent.evaluate((element) => element.scrollHeight > element.clientHeight));
+      await recent.evaluate((element) => {
         element.scrollTop = element.scrollHeight;
       });
-      assert(await home.evaluate((element) => element.scrollTop > 0));
-      const lastRecent = page.locator('.desk-recent .home-row').last();
-      assert.equal(await page.locator('.desk-recent .home-row').count(), 6, 'Recent shows six');
-      await inWindow(lastRecent);
+      assert(await recent.evaluate((element) => element.scrollTop > 0));
       await fit();
       await page.screenshot({ path: resolve(report, `desk-home-${width}-${height}.png`) });
       await page.goto(`${origin}/?task=${task.id}`);

@@ -3,7 +3,7 @@
   gap: 8px;
 }
 .desk-shell .garden-masthead .brand {
-  font-size: 40px;
+  font-size: 24px;
   gap: 0;
   align-items: flex-end;
 }
@@ -11,9 +11,6 @@
   position: relative;
   gap: 0;
   align-items: flex-end;
-}
-.brand > .brand-sprout {
-  margin: 0 0 0.3em 1px;
 }
 .desk-navigation .button {
   gap: 8px;
@@ -231,7 +228,7 @@
     z-index: 15;
     display: flex;
     flex-direction: column;
-    animation: none;
+    animation: desk-reveal 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
   .garden-shell.desk-shell .project-space.has-docked-panel {
     padding-right: min(760px, 46vw);
@@ -341,5 +338,46 @@
     margin: 0;
     padding: 8px;
     border: 0;
+  }
+}
+
+/* The wordmark's motion: letters rise in on open, a breeze now and then, a ripple on hover. */
+.brand-word {
+  display: inline-flex;
+}
+.brand-letter {
+  display: inline-block;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .brand-letter {
+    animation:
+      brand-rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both,
+      brand-breeze 36s ease-in-out infinite;
+    animation-delay: calc(var(--letter) * 55ms), calc(12s + var(--letter) * 90ms);
+  }
+  .brand-button:is(:hover, :focus-visible) .brand-letter {
+    animation: brand-ripple 0.6s ease-in-out both;
+    animation-delay: calc(var(--letter) * 45ms);
+  }
+}
+@keyframes brand-rise {
+  from {
+    transform: translateY(0.6em);
+    opacity: 0;
+  }
+}
+@keyframes brand-breeze {
+  0%,
+  3%,
+  100% {
+    transform: none;
+  }
+  1.5% {
+    transform: translateY(-2px) rotate(-3deg);
+  }
+}
+@keyframes brand-ripple {
+  50% {
+    transform: translateY(-3px);
   }
 }

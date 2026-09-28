@@ -1,11 +1,14 @@
 .desk-home {
   height: 100%;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  min-height: 0;
+  overflow: hidden;
   display: grid;
-  align-content: start;
-  gap: 24px;
-  padding: 24px clamp(16px, 3vw, 44px) 48px;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px clamp(16px, 3vw, 44px);
+}
+.home-switcher {
+  display: none;
 }
 .desk-home .desk-start-card {
   position: relative;
@@ -24,15 +27,14 @@
 .home-lists {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
-  align-items: start;
+  gap: 16px;
+  min-height: 0;
 }
 .home-card {
   min-height: 0;
 }
-.home-card-list {
-  display: grid;
-  padding: 4px 0;
+.home-card > .desk-card-scroll {
+  padding: 0;
 }
 .home-row {
   display: grid;
@@ -70,6 +72,14 @@
 .home-row time {
   color: var(--muted);
 }
+.home-divider {
+  margin: 0;
+  padding: 8px 16px 4px;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
 .home-quiet {
   margin: 0;
   padding: 16px;
@@ -78,53 +88,65 @@
 .home-card > .button {
   margin: 16px;
 }
-@media (max-width: 1100px) {
+@media (max-width: 1000px) {
   .home-lists {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
   }
-  .home-lists > .desk-recent {
-    grid-column: 1 / -1;
+  .home-lists > .home-recent {
+    grid-column: 2;
+    grid-row: 1 / span 2;
   }
 }
+/* Phones: one list at a time takes the height left under the prompt. */
 @media (max-width: 700px) {
   .desk-home {
-    gap: 16px;
-    padding: 16px 12px 32px;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 8px;
+    padding: 8px;
+  }
+  .home-switcher {
+    display: flex;
+    border-bottom: 1px solid var(--line);
+  }
+  .home-switcher > button {
+    flex: 1;
+    min-height: 40px;
+    padding: 4px;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .home-switcher > button[aria-pressed='true'] {
+    color: var(--ink);
+    background: var(--lcd-texture-inverse), var(--paper);
   }
   .home-lists {
     grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
+    grid-template-rows: minmax(0, 1fr);
   }
-}
-
-.garden-vine {
-  position: absolute;
-  left: -21px;
-  bottom: -1px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  pointer-events: none;
-}
-@media (max-width: 700px) {
-  .garden-vine {
+  .home-lists > .home-card {
+    display: none;
+  }
+  .desk-home[data-home-card='needs'] .home-needs,
+  .desk-home[data-home-card='growing'] .home-growing,
+  .desk-home[data-home-card='recent'] .home-recent {
+    display: flex;
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .home-card > .desk-card-heading {
     display: none;
   }
 }
-/* On a short screen the prompt comes first; the garden steps aside. */
+/* On a short screen the prompt comes first and the lists keep what is left. */
 @media (max-height: 540px) {
   .desk-home {
-    gap: 12px;
-    padding-top: 12px;
+    gap: 8px;
+    padding-block: 8px;
   }
-  .desk-home .garden-plot {
-    display: none;
-  }
-  .desk-home .garden-plot-heading .eyebrow,
-  .desk-home .garden-plot-heading > p {
-    display: none;
-  }
-  .desk-home .garden-plot-heading h1 {
-    font-size: 24px;
+  .desk-home .desk-start-card .intent-editor > textarea {
+    min-height: 40px;
   }
 }

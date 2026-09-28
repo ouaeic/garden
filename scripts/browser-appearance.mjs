@@ -35,7 +35,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     })
   );
   await page.goto(origin);
-  await page.getByRole('heading', { name: 'Your garden' }).waitFor();
+  await page.locator('.desk-start-card').waitFor();
   await page.locator('.intent-editor textarea').waitFor();
   await page.evaluate(() => document.fonts.ready);
   assert.equal(await page.evaluate(() => document.fonts.check('16px "Pixel Operator"')), true);
@@ -47,7 +47,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
   await statsPanel.getByText('CPU 17%', { exact: true }).hover();
   assert.equal(await stats.getAttribute('aria-expanded'), 'true');
   await page.screenshot({ path: resolve(report, 'stats-desktop.png') });
-  await page.getByRole('heading', { name: 'Your garden' }).hover();
+  await page.locator('.desk-start-card').hover();
   await statsPanel.waitFor({ state: 'hidden' });
   await stats.focus();
   await page.keyboard.press('Enter');
@@ -55,7 +55,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
   await page.keyboard.press('Escape');
   await statsPanel.waitFor({ state: 'hidden' });
   await stats.click();
-  await page.getByRole('heading', { name: 'Your garden' }).click();
+  await page.locator('.home-lists').click({ position: { x: 4, y: 4 } });
   await statsPanel.waitFor({ state: 'hidden' });
   await page.getByRole('button', { name: 'Prompt settings', exact: true }).click();
   const promptSettings = page.getByRole('dialog', { name: 'Prompt settings', exact: true });
@@ -95,7 +95,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
         'Hovered navigation retains its matrix'
       );
     }
-    const heading = page.getByRole('heading', { name: 'Your garden' });
+    const heading = page.locator('.home-card .desk-card-heading h2').first();
     await heading.evaluate((element) => {
       const range = document.createRange();
       range.selectNodeContents(element);
@@ -166,7 +166,9 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     palette.push(
       await page.evaluate(() => {
         const root = getComputedStyle(document.documentElement);
-        const muted = getComputedStyle(document.querySelector('.garden-plot-heading > p')).color;
+        const muted = getComputedStyle(
+          document.querySelector('.home-row small, .home-quiet')
+        ).color;
         const luminance = (color) => {
           const values = color
             .match(/[\d.]+/g)
