@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { ArrowUpRight, File, Folder, RefreshCw } from 'lucide-react';
+import { ArrowUpRight, File, Folder, RefreshCw } from './icons';
 import type { DirectoryPage, Project, ProjectDirectory, Task } from '@garden/contracts';
 import { get } from './client';
 import { Button, ErrorNotice, Spinner } from './ui';

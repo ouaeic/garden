@@ -1,6 +1,6 @@
 import ScrollRegion from './ScrollRegion';
 import { lazy, Suspense, useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, MessageSquarePlus, Settings2 } from 'lucide-react';
+import { ArrowLeft, MessageSquarePlus, Settings2 } from './icons';
 import type {
   Artifact,
   ConversationSource,

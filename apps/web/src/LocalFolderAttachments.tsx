@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FolderOpen } from 'lucide-react';
+import { FolderOpen } from './icons';
 import { Button, Dialog, ErrorNotice } from './ui.js';
 import { bytes } from './model.js';
 import {

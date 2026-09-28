@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Copy, ExternalLink } from 'lucide-react';
+import { Copy, ExternalLink } from './icons';
 import { localInstallerUrl } from './native.js';
 import { Button, ErrorNotice } from './ui.js';
 import './native.css';

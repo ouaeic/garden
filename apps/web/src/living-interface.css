@@ -1,20 +1,17 @@
 .garden-welcome {
   position: relative;
   isolation: isolate;
-  border-radius: 26px;
+  border-radius: 0;
   padding: clamp(24px, 3.5vw, 48px);
   margin-bottom: 38px;
   overflow: hidden;
-}
-.garden-welcome > .garden-living-field {
-  z-index: -1;
 }
 .garden-welcome .overview-top {
   margin: 0 0 26px;
 }
 .garden-welcome h1 {
   font-size: clamp(32px, 3.5vw, 49px);
-  letter-spacing: -1.5px;
+  letter-spacing: 0;
   margin: 12px 0;
 }
 .garden-welcome .eyebrow {
@@ -24,7 +21,7 @@
   max-width: 32rem;
   color: var(--muted);
   margin: 14px 0 0;
-  font-size: 14px;
+  font-size: 16px;
 }
 .garden-welcome .first-intent {
   max-width: none;
@@ -52,7 +49,7 @@
 }
 .garden-projects-heading span {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 16px;
 }
 .garden-health {
   border: 0;
@@ -63,7 +60,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 16px;
   color: var(--muted);
   cursor: pointer;
 }
@@ -78,17 +75,17 @@
 .garden-health-panel {
   padding: 20px;
   border: 1px solid var(--line-strong);
-  border-radius: 18px;
+  border-radius: 0;
   background: var(--panel);
-  box-shadow: 0 16px 50px var(--shadow);
+  box-shadow: var(--surface-shadow);
 }
 .garden-health-panel p {
   margin: 5px 0 16px;
-  font-size: 12px;
+  font-size: 16px;
 }
 .garden-health-panel h3 {
   font-family: inherit;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 500;
   line-height: 1.5;
   margin: 0 0 10px;
@@ -104,7 +101,7 @@
 }
 .garden-prompt-options {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 16px;
 }
 .garden-prompt-options > summary {
   min-height: 32px;
@@ -118,7 +115,7 @@
   border-top: 1px solid var(--line);
 }
 .garden-prompt-options-grid > label {
-  font-size: 12px;
+  font-size: 16px;
 }
 .garden-shell .garden-model-controls {
   margin-top: 8px;
@@ -128,7 +125,7 @@
 }
 .garden-shell .garden-model-controls select,
 .garden-shell .garden-model-controls .model-picker-trigger {
-  font-size: 12px;
+  font-size: 16px;
 }
 .garden-shell .garden-new-work:hover {
   background: var(--paper);
@@ -141,38 +138,40 @@
   color: var(--accent);
 }
 .garden-shell .project-conversation-tabs button[aria-selected='true'] {
-  color: var(--accent);
-  background: var(--raised);
+  color: var(--ink);
+  background: var(--paper);
   border-color: transparent;
+  --muted: var(--ink);
+  --dim: var(--ink);
 }
 .garden-shell .garden-task-aside {
   border-left-color: transparent;
   background: var(--chrome);
-  border-radius: 18px;
+  border-radius: 0;
   padding: 20px;
 }
 .garden-shell .garden-working-note {
   background: var(--chrome);
   border-color: transparent;
-  border-radius: 18px;
+  border-radius: 0;
 }
 .garden-shell .garden-task .completion-record {
   background: var(--chrome);
   border-color: transparent;
-  border-radius: 16px;
+  border-radius: 0;
 }
 .garden-shell .garden-task .completion-record.needs-review {
-  border-color: #c9a9796b;
+  border-color: color-mix(in srgb, var(--text) 42%, transparent);
 }
 .garden-shell .garden-output-primary {
-  border-radius: 18px;
-  box-shadow: 0 6px 24px var(--shadow);
+  border-radius: 0;
+  box-shadow: var(--surface-shadow);
 }
 .garden-shell .garden-project-tools {
   margin: 12px 0 0;
 }
 .garden-shell .garden-project-tools > summary {
-  font-size: 12px;
+  font-size: 16px;
 }
 .garden-shell .garden-task .run-summary {
   padding-top: 12px;
@@ -187,17 +186,19 @@
 }
 .garden-shell .garden-delivery {
   background: var(--panel);
-  border-radius: 14px;
+  border-radius: 0;
 }
 .garden-shell .management-tabs {
   gap: 6px;
 }
 .garden-shell .management-tabs button {
-  border-radius: 10px;
+  border-radius: 0;
 }
 .garden-shell .management-tabs button[aria-current] {
-  background: var(--raised);
-  color: var(--accent);
+  background: var(--paper);
+  color: var(--ink);
+  --muted: var(--ink);
+  --dim: var(--ink);
 }
 @media (min-width: 1500px) {
   .garden-main > .overview {
@@ -223,7 +224,7 @@
   .garden-welcome {
     padding: 24px 18px 18px;
     margin: -4px -6px 28px;
-    border-radius: 22px;
+    border-radius: 0;
   }
   .garden-welcome .overview-top {
     margin-bottom: 20px;
@@ -232,12 +233,12 @@
     font-size: 33px;
   }
   .garden-welcome .eyebrow {
-    font-size: 9px;
-    letter-spacing: 1.2px;
+    font-size: 16px;
+    letter-spacing: 0;
   }
   .garden-welcome .overview-top p {
     max-width: 19rem;
-    font-size: 13px;
+    font-size: 16px;
   }
   .garden-welcome .intent-editor {
     padding: 12px;
@@ -263,13 +264,9 @@
 .garden-shell .project-space-header {
   position: relative;
   isolation: isolate;
-  border-radius: 18px;
+  border-radius: 0;
   padding: 22px;
   margin-bottom: 12px;
-}
-.garden-shell .project-space-header > .garden-living-field {
-  z-index: -1;
-  border-radius: inherit;
 }
 .garden-shell .has-conversation .project-space-header {
   padding: 14px clamp(1rem, 3vw, 2.75rem);
@@ -301,7 +298,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 1.25rem;
+  border-radius: 0;
 }
 .garden-shell .project-summary-card:has(.project-open:hover),
 .garden-shell .project-summary-card:focus-within {

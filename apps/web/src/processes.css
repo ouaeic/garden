@@ -1,6 +1,6 @@
 .project-processes {
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 0;
   padding: 22px;
   margin-block: 20px;
   background: var(--panel);
@@ -24,7 +24,7 @@
 .process-panel-heading p,
 .process-note,
 .process-empty {
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1.6;
   color: var(--muted);
 }
@@ -32,12 +32,12 @@
   margin: 6px 0 0;
 }
 .process-count {
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 500;
   color: var(--muted);
 }
 .process-capacity {
-  font-size: 12px;
+  font-size: 16px;
   color: var(--muted);
   margin: 15px 0;
 }
@@ -59,19 +59,19 @@
 .process-card {
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 13px;
+  border-radius: 0;
   padding: 18px;
 }
 .process-card h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
 .process-status {
   flex-shrink: 0;
-  font-size: 11px;
-  border-radius: 20px;
+  font-size: 16px;
+  border-radius: 0;
   padding: 4px 9px;
   color: var(--muted);
   background: var(--raised);
@@ -87,7 +87,7 @@
   margin: 18px 0 12px;
 }
 .process-metrics dt {
-  font-size: 11px;
+  font-size: 16px;
   line-height: 1.5;
   color: var(--muted);
 }
@@ -100,7 +100,7 @@
 }
 .process-timing,
 .process-sample-age {
-  font-size: 11px;
+  font-size: 16px;
   color: var(--muted);
   line-height: 1.7;
   overflow-wrap: anywhere;
@@ -110,7 +110,7 @@
   margin-top: 12px;
   border-top: 1px solid var(--line);
   padding-top: 6px;
-  font-size: 12px;
+  font-size: 16px;
   line-height: 1.6;
 }
 .process-details pre,
@@ -119,9 +119,9 @@
   overflow-wrap: anywhere;
   max-height: 360px;
   overflow: auto;
-  font-size: 12px;
+  font-size: 16px;
   padding: 12px;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--raised);
   margin-block: 10px;
 }
@@ -137,11 +137,11 @@
   resize: vertical;
   border: 1px solid var(--line);
   color: var(--text);
-  font-family: monospace;
+  font-family: var(--font-mono);
 }
 .process-actions .button {
   min-height: 36px;
-  font-size: 12px;
+  font-size: 16px;
 }
 .process-stop {
   margin-left: auto;
@@ -166,7 +166,7 @@
 @media (max-width: 620px) {
   .project-processes {
     padding: 16px;
-    border-radius: 14px;
+    border-radius: 0;
   }
   .process-card {
     padding: 15px;
@@ -203,7 +203,7 @@
 }
 .workflow-summary {
   margin: 0 0 6px;
-  font-size: 13px;
+  font-size: 16px;
 }
 .workflow-stages {
   list-style: none;
@@ -215,7 +215,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 3px 12px;
   padding: 7px 0;
-  font-size: 12px;
+  font-size: 16px;
 }
 .workflow-stages li > :last-child {
   grid-column: 1 / -1;
@@ -228,7 +228,7 @@
 .workflow-files {
   display: grid;
   gap: 7px;
-  font-size: 12px;
+  font-size: 16px;
 }
 .workflow-files div {
   min-width: 0;

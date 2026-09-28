@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown } from './icons';
 import type { ModelRelease, MediaModelOption, PrivacyRoute } from '@garden/contracts';
 const ModelBrowser = lazy(() => import('./ModelBrowser.js'));
 

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { ArrowUpRight, Copy, RefreshCw } from 'lucide-react';
+import { ArrowUpRight, Copy, RefreshCw } from './icons';
 import type {
   Artifact,
   CreateShareResponse,

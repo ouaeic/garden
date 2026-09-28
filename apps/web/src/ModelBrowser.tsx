@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Check, Search } from 'lucide-react';
+import { Check, Search } from './icons';
 import { Dialog, ErrorNotice } from './ui.js';
 import type { ModelPickerProps, PickerModel } from './ModelPicker.js';
 import { mediaRouteIsRetired } from './media-state.js';

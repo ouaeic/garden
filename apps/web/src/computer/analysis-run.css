@@ -2,7 +2,7 @@
   min-width: 0;
   padding: clamp(0.75rem, 2vw, 1.25rem);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 0;
 }
 .analysis-run h3,
 .analysis-run p {
@@ -20,7 +20,7 @@
 .analysis-run-status {
   padding: 0.3rem 0.55rem;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 0;
   font-size: 0.8rem;
 }
 .analysis-run-status.failed,

@@ -38,15 +38,18 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   padding: 0.6rem 0.85rem;
-  border-radius: 0.7rem;
+  border-radius: 0;
   background: transparent;
   border: 1px solid transparent;
 }
 .project-conversation-tabs button[aria-current],
 .project-open[aria-current],
 .project-conversation-links button[aria-current] {
-  background: var(--surface-raised, rgba(127, 127, 127, 0.12));
+  background: var(--paper);
   border-color: var(--line);
+  color: var(--ink);
+  --muted: var(--ink);
+  --dim: var(--ink);
 }
 .project-overview {
   display: grid;
@@ -72,7 +75,7 @@
 }
 .project-brief {
   border: 1px solid var(--line);
-  border-radius: 1rem;
+  border-radius: 0;
   padding: 1rem 1.2rem;
 }
 .project-brief summary {
@@ -98,11 +101,11 @@
 .project-summary-card {
   position: relative;
   border: 1px solid var(--line);
-  border-radius: 1.25rem;
+  border-radius: 0;
   padding: 1.45rem;
   min-width: 0;
   background: var(--panel);
-  box-shadow: 0 5px 18px var(--shadow);
+  box-shadow: var(--surface-shadow);
 }
 .project-conversation-grid > button {
   display: flex;
@@ -112,7 +115,7 @@
   padding: 1rem 1.15rem;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 0.85rem;
+  border-radius: 0;
   background: transparent;
 }
 .project-conversation-grid strong {
@@ -156,7 +159,7 @@
   background: transparent;
   text-align: left;
   padding: 0.6rem 0.45rem;
-  border-radius: 0.5rem;
+  border-radius: 0;
 }
 .project-open > span:nth-child(2) {
   min-width: 0;
@@ -196,7 +199,7 @@
   align-items: center;
   gap: 0.5rem;
   border: 1px solid transparent;
-  border-radius: 0.5rem;
+  border-radius: 0;
   background: transparent;
   text-align: left;
   padding: 0.55rem 0.45rem;
@@ -331,7 +334,7 @@
   padding: 1rem 1.2rem;
   margin: 0.7rem 0;
   border: 1px solid var(--line);
-  border-radius: 1rem;
+  border-radius: 0;
 }
 .project-note > p {
   white-space: pre-wrap;
@@ -363,7 +366,7 @@
 .project-session {
   padding: 1rem;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 0;
   margin-block: 0.75rem;
   min-width: 0;
 }
@@ -383,8 +386,8 @@
   font-size: 0.75rem;
 }
 .project-line-changes span:first-child {
-  color: var(--success, #297748);
+  color: var(--success, var(--muted));
 }
 .project-line-changes span:nth-child(2) {
-  color: var(--danger, #ad4545);
+  color: var(--danger, var(--muted));
 }

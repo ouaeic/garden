@@ -1,3 +1,4 @@
+import { storedDisplayMode } from './appearance';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import ReactMarkdown from 'react-markdown';
@@ -262,5 +263,6 @@ function ShareViewer() {
   );
 }
 
+document.documentElement.dataset.theme = storedDisplayMode();
 const root = document.getElementById('root');
 if (root) createRoot(root).render(<ShareViewer />);

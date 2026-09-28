@@ -19,7 +19,7 @@ import {
   Share2,
   TextSelect,
   X
-} from 'lucide-react';
+} from './icons';
 import type {
   Artifact,
   Task,

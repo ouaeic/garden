@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { MediaJob, MediaCharacterAsset, MediaBatch } from '@garden/contracts';
-import { Download, Film, RefreshCw } from 'lucide-react';
+import { Download, Film, RefreshCw } from './icons';
 import { get, patch, post } from './client';
 import { Button, ErrorNotice } from './ui';
 import { money } from './model';

@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'garden-shell-2026-09-28';
+const SHELL_CACHE = 'garden-shell-lcd-2026-09-28';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 self.addEventListener('install', (event) => {

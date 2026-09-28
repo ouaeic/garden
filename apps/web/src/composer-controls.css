@@ -52,7 +52,7 @@
   border-color: transparent;
   background: transparent;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 16px;
 }
 .intent-editor .compact-prompt-settings[aria-expanded='true'] {
   background: var(--raised);
@@ -72,7 +72,7 @@
 .intent-editor .composer-submit > .primary {
   min-height: 34px;
   padding: 7px 12px;
-  font-size: 12px;
+  font-size: 16px;
   white-space: nowrap;
 }
 .intent-editor .draft-status {
@@ -81,7 +81,7 @@
   gap: 4px;
   min-width: 70px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 16px;
   white-space: nowrap;
 }
 .prompt-settings-content:not(.is-open) {

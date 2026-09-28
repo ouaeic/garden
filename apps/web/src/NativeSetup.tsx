@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Leaf, ArrowUpRight, RefreshCw } from 'lucide-react';
+import { Leaf, ArrowUpRight, RefreshCw } from './icons';
 import { nativeBootstrap, nativeStatus, pairNative, previewConnectionTicket } from './native.js';
 import type { NativeBootstrap, NativeStatus, NetworkPreference } from './native.js';
 import { Button, ErrorNotice, Field } from './ui.js';

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, Check, Moon, Sun } from 'lucide-react';
+import { ArrowUpRight, Check, Moon, Sun } from './icons';
 import { get } from './client';
 import { devSignIn, enroll, recover, register, signIn } from './auth';
 import type { AuthResult } from './auth';
@@ -93,12 +93,9 @@ export default function Login({
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </Button>
       </div>
-      <div className="welcome-art" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-        <i />
-      </div>
+      <svg className="welcome-art" viewBox="0 0 32 40" aria-hidden="true">
+        <path d="M15 15h2v16h-2zM8 8h5v2h2v5h-5v-2H8zM19 4h6v6h-2v2h-6V8h2zM5 20h5v2h3v4h-5v-2H5zM19 17h7v5h-3v2h-6v-4h2zM9 31h14v3H9zM11 34h10v4H11z" />
+      </svg>
       <section className="welcome-content">
         <div className="eyebrow">Your own space to think and make</div>
         <h1>

@@ -1,6 +1,6 @@
 import ScrollRegion from './ScrollRegion';
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ArrowUpRight, Check, Download, FileText, Globe, Maximize2, X } from 'lucide-react';
+import { ArrowUpRight, Check, Download, FileText, Globe, Maximize2, X } from './icons';
 import type { Artifact, TaskPresentation, TaskResult, TaskEvent } from '@garden/contracts';
 import { isNativeClient, post } from './client';
 import { resultSnapshot } from './result-snapshot';

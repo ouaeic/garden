@@ -18,8 +18,6 @@ export interface SettingsProps {
   theme: 'dark' | 'light';
   onThemeChange: (theme: 'dark' | 'light') => void;
   onComputer: () => void;
-  motionPaused: boolean;
-  onMotionPausedChange: (paused: boolean) => void;
 }
 const sections = [
   'General',
@@ -30,15 +28,7 @@ const sections = [
   'Account & devices',
   'Computer & maintenance'
 ] as const;
-export function Settings({
-  workspace,
-  onComputer,
-  onChange,
-  theme,
-  onThemeChange,
-  motionPaused,
-  onMotionPausedChange
-}: SettingsProps) {
+export function Settings({ workspace, onComputer, onChange, theme, onThemeChange }: SettingsProps) {
   const [maintenanceOpened, setMaintenanceOpened] = useState(false);
   const [locationSection, setSection] = useSurfaceLocation('section', 'General');
   const section = sections.includes(locationSection as (typeof sections)[number])
@@ -78,26 +68,10 @@ export function Settings({
                     onThemeChange(event.target.value === 'light' ? 'light' : 'dark')
                   }
                 >
-                  <option value="dark">Dark</option>
-                  <option value="light">Light</option>
+                  <option value="dark">Dark mode</option>
+                  <option value="light">Light mode</option>
                 </select>
               </Field>
-              <label className="management-check">
-                <input
-                  type="checkbox"
-                  checked={!motionPaused}
-                  onChange={(event) => onMotionPausedChange(!event.target.checked)}
-                  aria-label="Background motion"
-                  aria-describedby="background-motion-hint"
-                />
-                <span>
-                  Background motion
-                  <small id="background-motion-hint" className="muted">
-                    Gentle movement in the green panels. Respects your device’s reduced-motion
-                    setting.
-                  </small>
-                </span>
-              </label>
             </div>
           </Section>
         )}

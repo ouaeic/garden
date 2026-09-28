@@ -3246,7 +3246,7 @@ try {
         : process.env.GARDEN_UI_FOCUS === 'workspace'
           ? 'Workspace navigation and human intervention checks passed.'
           : process.env.GARDEN_UI_FOCUS === 'appearance'
-            ? 'Appearance checks passed: themes, responsive layouts, prompt disclosure, reduced motion, pause persistence and animation layout cost.'
+            ? 'Appearance checks passed: inverse LCD palettes, text contrast, local fonts, responsive layouts, prompt disclosure and mode persistence.'
             : process.env.GARDEN_UI_FOCUS === 'models'
               ? 'Model and draft browser checks passed: prompt, conversation and settings persistence, responsive controls, connection handling and draft recovery.'
               : process.env.GARDEN_UI_FOCUS === 'drafts'

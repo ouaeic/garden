@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { DictationOptions } from '@garden/contracts';
-import { Mic } from 'lucide-react';
+import { Mic } from './icons';
 import { get } from './client';
 import { money } from './model';
 import { Button, Dialog, ErrorNotice, Field, Spinner } from './ui';

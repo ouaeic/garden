@@ -50,14 +50,14 @@
   overflow-anchor: none;
   width: 100%;
   height: min(75dvh, 900px);
-  background: #d5d4ce;
-  border-radius: 8px;
+  background: var(--raised);
+  border-radius: 0;
 }
 .pdf-page {
   position: relative;
   margin: 0 auto 8px;
   background: #ffffff;
-  box-shadow: 0 2px 14px #0002;
+  box-shadow: var(--surface-shadow);
   display: grid;
   place-items: center;
 }
@@ -67,7 +67,7 @@
 }
 .pdf-page-placeholder {
   color: #8a8a84;
-  font-size: 13px;
+  font-size: 16px;
   user-select: none;
 }
 .pdf-page-text {

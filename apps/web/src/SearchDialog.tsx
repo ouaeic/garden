@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, Command, FileText, Search } from 'lucide-react';
+import { ArrowUpRight, Command, FileText, Search } from './icons';
 import type { Task, Workspace } from '@garden/contracts';
 import { get } from './client';
 import { taskStatusLabel } from './model';

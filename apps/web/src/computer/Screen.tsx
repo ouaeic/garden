@@ -5,7 +5,7 @@ import type {
   BrowserTabCleanup,
   BrowserRecovery
 } from '@garden/contracts';
-import { Maximize2, Minimize2, Pin, X } from 'lucide-react';
+import { Maximize2, Minimize2, Pin, X } from '../icons';
 import { remotePoint } from './screen-geometry';
 import { useExpandedView } from '../use-expanded-view';
 import { stepUp } from '../auth';

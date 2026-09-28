@@ -30,7 +30,7 @@ export const shareViewerHeaders: ReadonlyArray<readonly [string, string]> = [
   [
     'content-security-policy',
     "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; " +
-      "media-src blob:; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'none'; " +
+      "media-src blob:; font-src 'self'; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'none'; " +
       "form-action 'none'; frame-ancestors 'none'"
   ],
   ['referrer-policy', 'no-referrer'],

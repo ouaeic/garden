@@ -3,7 +3,7 @@
   display: none !important;
 }
 .garden-location {
-  font-size: 13px;
+  font-size: 16px;
   color: var(--muted);
   margin-left: 16px;
 }
@@ -22,20 +22,22 @@
   text-align: left;
   background: transparent;
   border: 0;
-  border-radius: 9px;
+  border-radius: 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 16px;
 }
 .garden-primary-navigation button:hover,
 .garden-primary-navigation button[aria-current] {
-  background: var(--raised);
-  color: var(--text);
+  background: var(--paper);
+  color: var(--ink);
+  --muted: var(--ink);
+  --dim: var(--ink);
 }
 .garden-primary-navigation small {
   margin-left: auto;
   padding: 1px 6px;
   background: var(--panel);
-  border-radius: 20px;
+  border-radius: 0;
 }
 .sidebar-project-label {
   margin-top: 18px;
@@ -62,7 +64,7 @@
 .returning-home .garden-welcome {
   padding: 24px 28px;
   margin-bottom: 24px;
-  border-radius: 20px;
+  border-radius: 0;
 }
 .returning-home .garden-welcome .overview-top {
   margin-bottom: 16px;
@@ -114,14 +116,14 @@
   color: var(--muted);
 }
 .garden-shell .project-space-header {
-  border-radius: 16px;
+  border-radius: 0;
   padding: 12px 20px;
   margin-bottom: 8px;
 }
 .garden-shell .has-conversation .project-space-header {
   margin: 12px 24px 0;
   padding: 10px 16px;
-  border-radius: 16px;
+  border-radius: 0;
 }
 .project-workspace-bar {
   display: flex;
@@ -150,7 +152,7 @@
   background: transparent;
   color: var(--text);
   text-overflow: ellipsis;
-  font-size: 12px;
+  font-size: 16px;
   min-height: 28px;
   padding: 3px 24px 3px 0;
 }
@@ -165,8 +167,10 @@
   padding: 8px 14px;
 }
 .project-view-nav .button[aria-current] {
-  background: var(--raised);
-  color: var(--text);
+  background: var(--paper);
+  color: var(--ink);
+  --muted: var(--ink);
+  --dim: var(--ink);
 }
 .project-space.has-conversation > .project-view-content {
   flex: 1;
@@ -262,7 +266,7 @@
   gap: 0;
 }
 .garden-delivery-actions > .button {
-  font-size: 12px;
+  font-size: 16px;
   min-height: 34px;
 }
 .garden-delivery-actions > .button:not(:hover) {
@@ -282,7 +286,7 @@
   font-family: inherit;
   font-size: 20px;
   font-weight: 500;
-  letter-spacing: -0.3px;
+  letter-spacing: 0;
 }
 .conversation-activity .garden-task-aside {
   grid-area: auto;
@@ -324,7 +328,7 @@
 }
 .project-result-group .project-section-heading > button {
   font-weight: 500;
-  font-size: 15px;
+  font-size: 16px;
 }
 .settings-disclosure {
   padding: 16px 0;
@@ -332,7 +336,7 @@
 }
 .settings-disclosure > summary,
 .advanced-model-choices > summary {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 500;
   min-height: 36px;
   cursor: pointer;
@@ -360,7 +364,7 @@
   margin-top: 26px;
 }
 .library-project-results h3 {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 500;
   margin: 0 0 12px;
 }
@@ -384,9 +388,9 @@
 .library-page .library-file-icon {
   width: 64px;
   height: 64px;
-  border-radius: 10px;
+  border-radius: 0;
   object-fit: cover;
-  font-size: 11px;
+  font-size: 16px;
 }
 .library-page .library-result-body {
   padding: 0;
@@ -394,11 +398,11 @@
 }
 .library-page .library-result h4 {
   margin: 0 0 5px;
-  font-size: 15px;
+  font-size: 16px;
   overflow-wrap: anywhere;
 }
 .library-page .management-metadata {
-  font-size: 12px;
+  font-size: 16px;
   margin: 0 0 9px;
 }
 .result-management {
@@ -406,7 +410,7 @@
   min-width: 0;
 }
 .result-management > summary {
-  font-size: 12px;
+  font-size: 16px;
   color: var(--muted);
   cursor: pointer;
 }
@@ -426,7 +430,7 @@
   border-bottom: 1px solid var(--line);
 }
 .attention-task strong {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 500;
 }
 .attention-task span {
@@ -472,7 +476,7 @@
   .garden-shell .garden-stats-trigger {
     min-width: 40px;
     padding: 8px;
-    font-size: 12px;
+    font-size: 16px;
     gap: 4px;
   }
   .garden-shell .garden-stats-trigger svg {
@@ -524,7 +528,7 @@
     padding-bottom: 4px;
   }
   .garden-task .run-summary > .row {
-    font-size: 11px;
+    font-size: 16px;
     gap: 5px;
   }
   .garden-task .run-cost {
@@ -574,7 +578,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 16px;
   color: var(--muted);
 }
 
@@ -602,7 +606,7 @@
   padding: 7px 5px;
   min-height: 34px;
   border: 0;
-  font-size: 12px;
+  font-size: 16px;
 }
 .garden-sidebar-theme {
   grid-column: 1 / -1;
@@ -651,7 +655,7 @@
   align-items: end;
 }
 .project-jobs-link {
-  font-size: 12px;
+  font-size: 16px;
 }
 
 .project-shortcuts {
@@ -663,7 +667,7 @@
 .project-shortcuts .button {
   min-height: 32px;
   padding: 5px 10px;
-  font-size: 12px;
+  font-size: 16px;
 }
 
 .garden-shell .library-page .management-section {
@@ -674,7 +678,7 @@
 }
 .garden-shell .library-project-results > h3 {
   font-family: inherit;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 500;
 }
 .library-page .library-result .management-actions {
@@ -710,7 +714,7 @@
 .scroll-region:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 8px;
+  border-radius: 0;
 }
 .scroll-region[data-overflow] {
   border-block: 1px solid var(--line);
@@ -732,12 +736,15 @@
   border-color: transparent;
 }
 .job-view-nav .button[aria-pressed='true'] {
-  background: var(--raised);
+  background: var(--paper);
   border-color: var(--line);
+  color: var(--ink);
+  --muted: var(--ink);
+  --dim: var(--ink);
 }
 .job-view-nav span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 16px;
 }
 .project-processes .project-computations {
   display: contents;
@@ -752,7 +759,7 @@
 }
 .job-debugging > summary {
   cursor: pointer;
-  font-size: 13px;
+  font-size: 16px;
   color: var(--muted);
 }
 .job-debugging[open] > summary {

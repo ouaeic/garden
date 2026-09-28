@@ -32,7 +32,7 @@
 }
 .garden-masthead .brand {
   font-size: 34px;
-  letter-spacing: -1.8px;
+  letter-spacing: 0;
   color: var(--text);
   line-height: 1;
   transform: translateY(-1px);
@@ -43,7 +43,7 @@
   gap: 10px;
   margin-left: auto;
   color: var(--text);
-  font-size: 10px;
+  font-size: 16px;
   letter-spacing: 0.01em;
 }
 .garden-computer-status span {
@@ -52,7 +52,7 @@
   gap: 4px;
   padding: 5px 7px;
   border: 1px solid color-mix(in srgb, var(--text) 16%, transparent);
-  border-radius: 999px;
+  border-radius: 0;
   background: color-mix(in srgb, var(--text) 5%, transparent);
 }
 .garden-work-heading h1,
@@ -72,7 +72,7 @@
   margin-left: 34px;
 }
 .garden-main-navigation .button {
-  font-size: 13px;
+  font-size: 16px;
   color: var(--muted);
 }
 .garden-main-navigation .selected {
@@ -92,7 +92,7 @@
   margin-right: 12px;
   gap: 10px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 16px;
 }
 .garden-sidebar {
   grid-column: 1;
@@ -123,7 +123,7 @@
   background: var(--paper);
   border-color: transparent;
   color: var(--ink);
-  font-size: 13px;
+  font-size: 16px;
   padding: 12px;
 }
 .garden-sidebar-home {
@@ -135,8 +135,8 @@
   padding: 8px 9px;
   color: var(--muted);
   text-align: left;
-  font-size: 12px;
-  border-radius: 7px;
+  font-size: 16px;
+  border-radius: 0;
 }
 .garden-sidebar-home.selected {
   background: var(--raised);
@@ -145,7 +145,7 @@
 .garden-sidebar-home > span {
   margin-left: auto;
   color: var(--dim);
-  font-size: 10px;
+  font-size: 16px;
 }
 .garden-sidebar-search {
   display: flex;
@@ -159,7 +159,7 @@
   background: transparent;
   padding: 7px 2px;
   width: 100%;
-  font-size: 11px;
+  font-size: 16px;
 }
 .garden-project-list {
   display: flex;
@@ -179,18 +179,21 @@
   width: 100%;
   text-align: left;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: 0;
   background: none;
   padding: 8px;
   min-height: 36px;
   min-width: 0;
 }
 .garden-project-list > button:hover {
-  background: #b0c59608;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
 }
 .garden-project-list > button[aria-current] {
-  background: #b0c59610;
+  background: var(--paper);
   border-color: var(--line);
+  color: var(--ink);
+  --muted: var(--ink);
+  --dim: var(--ink);
 }
 .garden-project-title {
   display: block;
@@ -203,7 +206,7 @@
 .garden-project-title strong {
   display: inline-block;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 400;
   line-height: 1.45;
 }
@@ -233,7 +236,7 @@
 .garden-project-dot {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: 0;
   flex-shrink: 0;
   background: var(--dim);
   opacity: 0.6;
@@ -241,11 +244,11 @@
 .garden-project-dot.status-running {
   background: var(--accent);
   opacity: 1;
-  box-shadow: 0 0 0 4px #d5e8a90b;
+  box-shadow: var(--surface-shadow);
 }
 .garden-project-dot.status-awaiting_user,
 .garden-project-dot.status-failed {
-  background: #d8b68b;
+  background: var(--text);
   opacity: 1;
 }
 .garden-sidebar-bottom {
@@ -257,10 +260,10 @@
   color: var(--muted);
 }
 .garden-sidebar-bottom .status-line {
-  font-size: 11px;
+  font-size: 16px;
 }
 .garden-sidebar-bottom small {
-  font-size: 10px;
+  font-size: 16px;
   color: var(--dim);
   padding-left: 14px;
 }
@@ -272,7 +275,7 @@
   overflow-y: auto;
   padding: 32px clamp(22px, 3vw, 48px);
   background: var(--bg);
-  border-radius: 24px 0 0 0;
+  border-radius: 0;
   scroll-padding-bottom: 24px;
   scrollbar-width: thin;
 }
@@ -303,7 +306,7 @@
   background: var(--panel);
   color: var(--text);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 0;
   padding: 21px;
   min-height: 200px;
 }
@@ -332,7 +335,7 @@
   gap: 12px;
   align-items: center;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 16px;
   overflow-wrap: anywhere;
 }
 .garden-card-artifact svg {
@@ -361,7 +364,7 @@
 .garden-work-navigation .button {
   padding: 3px 7px;
   min-height: 30px;
-  font-size: 11px;
+  font-size: 16px;
 }
 .garden-work-heading {
   display: flex;
@@ -423,12 +426,12 @@
   padding-bottom: 10px;
 }
 .garden-answer .markdown {
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.85;
 }
 .garden-working-note {
   padding: 26px 28px;
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--panel);
   border: 1px solid var(--line);
 }
@@ -438,12 +441,12 @@
 }
 .garden-working-note p {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 16px;
 }
 .garden-task .completion-record {
   background: none;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 0;
   padding: 20px 24px;
   min-width: 0;
   overflow-wrap: anywhere;
@@ -462,7 +465,7 @@
   white-space: normal;
 }
 .garden-task .completion-record.needs-review {
-  border-color: #c9a9796b;
+  border-color: color-mix(in srgb, var(--text) 42%, transparent);
 }
 .garden-task .work-tools {
   margin: 0 0 12px;
@@ -470,7 +473,7 @@
   gap: 6px;
 }
 .garden-task .work-tools .button {
-  font-size: 12px;
+  font-size: 16px;
   padding: 8px 11px;
   min-height: 36px;
 }
@@ -487,14 +490,14 @@
   margin: 0;
   padding: 12px 15px 8px;
   border: 1px solid var(--line-strong);
-  border-radius: 14px;
+  border-radius: 0;
   background: var(--panel);
-  box-shadow: 0 5px 22px var(--shadow);
+  box-shadow: var(--surface-shadow);
 }
 .garden-task-composer .intent-editor > textarea {
   min-height: 44px;
   max-height: min(180px, 25dvh);
-  font-size: 13px;
+  font-size: 16px;
   padding: 6px 3px;
 }
 .garden-task-composer .intent-footnote {
@@ -510,7 +513,7 @@
 .garden-task-composer .selected-context p {
   max-height: 40px;
   overflow-y: auto;
-  font-size: 11px;
+  font-size: 16px;
   margin: 0;
   flex: 1;
 }
@@ -522,7 +525,7 @@
 .garden-output-primary {
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 0;
   background: var(--panel);
   overflow: hidden;
 }
@@ -555,10 +558,10 @@
   border-top: 1px solid var(--line);
 }
 .garden-output-actions .button {
-  font-size: 12px;
+  font-size: 16px;
 }
 .garden-output-actions p {
-  font-size: 11px;
+  font-size: 16px;
   margin: 3px 0;
 }
 .garden-preview-frame {
@@ -566,7 +569,7 @@
   border: 0;
   width: 100%;
   height: clamp(280px, 49dvh, 620px);
-  background: #101613;
+  background: var(--bg);
 }
 .dialog .garden-preview-frame {
   height: min(72dvh, 900px);
@@ -582,7 +585,7 @@
   align-items: center;
   gap: 14px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 0;
   padding: 16px 18px;
 }
 .garden-delivery > svg {
@@ -603,7 +606,7 @@
 }
 .garden-delivery strong {
   display: block;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 500;
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -611,13 +614,13 @@
 .garden-delivery small {
   display: block;
   color: var(--dim);
-  font-size: 11px;
+  font-size: 16px;
   line-height: 1.5;
   overflow-wrap: anywhere;
   margin-top: 3px;
 }
 .garden-delivery .button {
-  font-size: 11px;
+  font-size: 16px;
   padding: 7px 10px;
   min-height: 32px;
   text-decoration: none;
@@ -674,21 +677,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
+  font-size: 16px;
 }
 .garden-phase-count small {
   color: var(--dim);
-  font-size: 10px;
+  font-size: 16px;
 }
 .garden-now {
   padding: 13px 15px;
-  background: #d5e8a90a;
+  background: color-mix(in srgb, var(--text) 4%, transparent);
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 0;
   margin-bottom: 20px;
 }
 .garden-now p {
-  font-size: 12px;
+  font-size: 16px;
   line-height: 1.65;
   margin: 8px 0 0;
 }
@@ -696,9 +699,9 @@
    together, so the panel keeps one lead element whichever state it is in. */
 .garden-outcome {
   padding: 13px 15px;
-  background: #d5e8a90a;
+  background: color-mix(in srgb, var(--text) 4%, transparent);
   border: 1px solid var(--line-strong);
-  border-radius: 9px;
+  border-radius: 0;
   margin-bottom: 20px;
 }
 .garden-outcome-summary {
@@ -732,7 +735,7 @@
   top: 8px;
   width: 4px;
   height: 4px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--line-strong);
 }
 /* A risk is not decoration on a finished run; it is the reason to read the card. The palette
@@ -771,7 +774,7 @@
   width: 100%;
   padding: 0;
   text-align: left;
-  font-size: 12px;
+  font-size: 16px;
   color: var(--muted);
 }
 .garden-phase-dot {
@@ -779,16 +782,16 @@
   height: 24px;
   display: grid;
   place-items: center;
-  font-size: 9px;
+  font-size: 16px;
   flex-shrink: 0;
   border: 1px solid var(--line-strong);
-  border-radius: 50%;
+  border-radius: 0;
 }
 .garden-phases button > span:last-child {
   padding-top: 2px;
 }
 .garden-phases [data-status='completed'] .garden-phase-dot {
-  background: #d5e8a918;
+  background: color-mix(in srgb, var(--text) 9%, transparent);
   color: var(--accent);
 }
 .garden-phases [data-status='in_progress'] button {
@@ -803,7 +806,7 @@
   gap: 11px;
   align-items: flex-start;
   width: 100%;
-  font-size: 12px;
+  font-size: 16px;
   color: var(--muted);
 }
 .garden-phase-line > span:nth-child(2) {
@@ -837,7 +840,7 @@
   display: flex;
   gap: 8px;
   align-items: center;
-  font-size: 11px;
+  font-size: 16px;
   color: var(--muted);
   padding: 0;
 }
@@ -859,7 +862,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: 16px;
   color: var(--muted);
   list-style: none;
 }
@@ -880,7 +883,7 @@
 }
 .garden-phase-partial {
   margin: 0 0 0 12px;
-  font-size: 11px;
+  font-size: 16px;
 }
 .garden-metrics {
   display: grid;
@@ -896,17 +899,17 @@
   gap: 3px;
 }
 .garden-metrics dt {
-  font-size: 10px;
+  font-size: 16px;
   color: var(--muted);
 }
 .garden-metrics dd {
   margin: 0;
   font:
-    27px Georgia,
+    27px var(--font-display),
     serif;
 }
 .garden-milestone-disclosure > summary {
-  font-size: 11px;
+  font-size: 16px;
   color: var(--muted);
 }
 .garden-milestone-disclosure > summary span {
@@ -932,13 +935,13 @@
 .garden-milestone-kind {
   display: block;
   color: var(--dim);
-  font-size: 9px;
+  font-size: 16px;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0;
   margin-bottom: 5px;
 }
 .garden-milestones strong {
-  font-size: 11px;
+  font-size: 16px;
   font-weight: 400;
   line-height: 1.6;
   display: block;
@@ -950,11 +953,11 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   color: var(--dim);
-  font-size: 10px;
+  font-size: 16px;
   margin-top: 5px;
 }
 .garden-milestones [data-status='failed'] .garden-milestone-kind {
-  color: #e3a48d;
+  color: var(--text);
 }
 @media (max-width: 1150px) {
   .garden-shell {
@@ -1049,14 +1052,14 @@
     width: min(290px, 84vw);
     background: var(--bg);
     border-right: 1px solid var(--line-strong);
-    box-shadow: 20px 0 60px #0007;
+    box-shadow: var(--surface-shadow);
   }
   .garden-sidebar-scrim {
     display: block;
     position: fixed;
     inset: calc(60px + env(safe-area-inset-top, 0px)) 0 0;
     z-index: 35;
-    background: #0006;
+    background: color-mix(in srgb, var(--text) 40%, transparent);
     border: 0;
   }
   .garden-sidebar-close {
@@ -1096,7 +1099,7 @@
   }
   .garden-task .run-summary .status-line,
   .garden-task .run-summary .muted {
-    font-size: 10px;
+    font-size: 16px;
   }
   .garden-task-composer {
     padding: 8px 12px calc(9px + env(safe-area-inset-bottom, 0px));
@@ -1114,7 +1117,7 @@
     padding: 13px 14px;
   }
   .garden-output-actions .button {
-    font-size: 11px;
+    font-size: 16px;
   }
   .garden-delivery {
     gap: 9px;
@@ -1151,7 +1154,7 @@
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 11px;
+  font-size: 16px;
   color: var(--muted);
 }
 .garden-approval-select select {
@@ -1160,7 +1163,7 @@
   padding: 0.25rem 1.5rem 0.25rem 0.3rem;
   border: 0;
   background-color: transparent;
-  font-size: 11px;
+  font-size: 16px;
   color: var(--text);
 }
 .garden-model-controls {
@@ -1182,14 +1185,14 @@
   min-width: 0;
   flex: 1 1 210px;
   max-width: 320px;
-  font-size: 11px;
+  font-size: 16px;
   color: var(--muted);
 }
 .garden-model-select .model-picker-trigger {
   width: 100%;
   min-height: 30px;
   padding: 3px 22px 3px 5px;
-  font-size: 11px;
+  font-size: 16px;
   border: 0;
   background: transparent;
   text-overflow: ellipsis;
@@ -1205,10 +1208,10 @@
   min-height: 42px;
   padding: 10px 12px;
   border: 1px solid var(--line-strong);
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--bg);
   text-align: left;
-  font-size: 13px;
+  font-size: 16px;
 }
 .model-picker-trigger > span {
   min-width: 0;
@@ -1226,7 +1229,7 @@
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 11px;
+  font-size: 16px;
   color: var(--muted);
 }
 .garden-route-control,
@@ -1234,7 +1237,7 @@
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 11px;
+  font-size: 16px;
   color: var(--muted);
 }
 .garden-route-control select,
@@ -1247,7 +1250,7 @@
   border: 0;
   background: transparent;
   color: var(--text);
-  font-size: 11px;
+  font-size: 16px;
 }
 .garden-cap-control input {
   width: 68px;
@@ -1270,7 +1273,7 @@
   }
 }
 .garden-sidebar-theme {
-  font-size: 10px;
+  font-size: 16px;
   justify-content: flex-start;
   border: 0;
   padding: 7px 0;
@@ -1283,7 +1286,7 @@
 }
 .garden-media-job {
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 0;
   padding: 22px;
   background: var(--panel);
 }
@@ -1295,22 +1298,22 @@
   width: 100%;
   max-height: 60dvh;
   display: block;
-  background: #101613;
-  border-radius: 8px;
+  background: var(--bg);
+  border-radius: 0;
 }
 .garden-media-job p {
-  font-size: 12px;
+  font-size: 16px;
 }
 .garden-media-job > small {
   display: block;
   margin-top: 12px;
-  font-size: 10px;
+  font-size: 16px;
 }
 .garden-media-progress {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 11px;
+  font-size: 16px;
 }
 .garden-media-progress progress {
   width: 100%;
@@ -1324,7 +1327,7 @@
 }
 .garden-output-tabs .button {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 16px;
 }
 .garden-output-primary.expanded {
   position: fixed;
@@ -1346,7 +1349,7 @@
 }
 .garden-captured-result {
   margin: 0;
-  background: #101613;
+  background: var(--bg);
 }
 .garden-captured-result img {
   width: 100%;
@@ -1360,7 +1363,7 @@
   gap: 10px;
   padding: 9px 15px;
   color: var(--dim);
-  font-size: 9px;
+  font-size: 16px;
   background: var(--panel);
 }
 @media (max-width: 760px) {
@@ -1372,7 +1375,7 @@
   margin: 0;
   padding: 21px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--panel);
 }
 .garden-work-trace figcaption {
@@ -1384,7 +1387,7 @@
   margin-bottom: 25px;
 }
 .garden-work-trace figcaption small {
-  font-size: 9px;
+  font-size: 16px;
   color: var(--dim);
 }
 .garden-trace-grid {
@@ -1393,7 +1396,7 @@
   align-items: center;
 }
 .garden-trace-label {
-  font-size: 10px;
+  font-size: 16px;
   color: var(--muted);
 }
 .garden-trace-line {
@@ -1422,22 +1425,22 @@
 .garden-trace-point > span {
   width: 10px;
   height: 10px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--raised);
   border: 1px solid var(--muted);
-  box-shadow: 0 0 0 5px var(--panel);
+  box-shadow: var(--surface-shadow);
 }
 .garden-trace-point.passed > span {
   background: var(--accent);
   border-color: var(--accent);
 }
 .garden-trace-point.failed > span {
-  background: #d7967d;
-  border-color: #d7967d;
+  background: var(--muted);
+  border-color: var(--muted);
 }
 .garden-trace-point.waiting > span {
-  background: #d5bb87;
-  border-color: #d5bb87;
+  background: var(--text);
+  border-color: var(--text);
 }
 .garden-trace-point small {
   position: absolute;
@@ -1470,7 +1473,7 @@
 .garden-source-bundle small,
 .garden-coverage {
   color: var(--dim);
-  font-size: 10px;
+  font-size: 16px;
 }
 
 .garden-provider-controls > div {
@@ -1503,24 +1506,24 @@
 .garden-trace-detail small {
   display: block;
   color: var(--dim);
-  font-size: 9px;
+  font-size: 16px;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0;
   margin-bottom: 7px;
 }
 .garden-trace-detail strong {
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 400;
   overflow-wrap: anywhere;
 }
 .garden-trace-detail p {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 16px;
   margin: 6px 0 0;
   overflow-wrap: anywhere;
 }
 .garden-trace-detail .button {
-  font-size: 10px;
+  font-size: 16px;
   flex-shrink: 0;
 }
 .garden-trace-point[aria-pressed='true'] > span {
@@ -1539,7 +1542,7 @@
   gap: 14px;
   padding: 20px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--panel);
 }
 .garden-planned-outputs svg {
@@ -1548,15 +1551,15 @@
 }
 .garden-planned-outputs small {
   display: block;
-  font-size: 9px;
+  font-size: 16px;
   color: var(--dim);
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0;
   margin-bottom: 7px;
 }
 .garden-planned-outputs strong {
   display: block;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 400;
   overflow-wrap: anywhere;
 }
@@ -1571,7 +1574,7 @@
   padding: 1rem;
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 1rem;
+  border-radius: 0;
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -1589,7 +1592,7 @@
   padding: 1rem;
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 0.5rem;
+  border-radius: 0;
   tab-size: 2;
 }
 .garden-mission-changes details {
@@ -1600,7 +1603,7 @@
   margin: 0.75rem 0;
 }
 .garden-device-code {
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: clamp(1.7rem, 6vw, 2.6rem);
   letter-spacing: 0.18em;
   padding: 1rem 0;
@@ -1612,7 +1615,7 @@
   gap: 0.3rem;
   padding: 1rem;
   border: 1px solid var(--line-strong);
-  border-radius: 12px;
+  border-radius: 0;
   overflow-wrap: anywhere;
 }
 .garden-voice-controls {
@@ -1642,7 +1645,7 @@
 .garden-voice-proposal {
   padding: 16px;
   border: 1px solid var(--line-strong);
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--raised);
   overflow-wrap: anywhere;
 }
@@ -1687,7 +1690,7 @@
   cursor: pointer;
   color: var(--muted);
   padding: 8px 0;
-  font-size: 12px;
+  font-size: 16px;
 }
 .garden-task-directions[open] > summary {
   margin-bottom: 12px;
@@ -1701,7 +1704,7 @@
   cursor: pointer;
   width: fit-content;
   padding: 8px 0;
-  font-size: 12px;
+  font-size: 16px;
 }
 .garden-project-tools[open] .work-tools {
   margin-bottom: 0;
@@ -1712,18 +1715,18 @@
   justify-content: flex-start;
   min-height: 48px;
   padding: 12px 16px;
-  border-radius: 14px;
+  border-radius: 0;
   border: 1px solid var(--line-strong);
   color: var(--muted);
   background: color-mix(in srgb, var(--raised) 40%, transparent);
 }
 .garden-compose-prompt span {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 16px;
 }
 .garden-compose-collapse {
   margin: 0 0 6px auto;
-  font-size: 11px;
+  font-size: 16px;
   min-height: 30px;
 }
 @media (max-width: 480px) {
@@ -1736,7 +1739,7 @@
   padding: 16px;
   margin-bottom: 12px;
   border: 1px solid var(--line-strong);
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--raised);
 }
 .draft-conflict pre {

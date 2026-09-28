@@ -1,8 +1,7 @@
 import { useState, type ReactNode } from 'react';
-import { ArrowRight, ArrowUpRight, Bell, FolderOpen, Plus } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Bell, FolderOpen, Plus } from './icons';
 import type { Project, Task } from '@garden/contracts';
 import { hasOngoingWork, needsAttention, shortDate, taskStatusLabel } from './model';
-import LivingBackdrop from './LivingBackdrop';
 import ScrollRegion from './ScrollRegion';
 import { Button } from './ui';
 
@@ -74,7 +73,6 @@ export default function DeskHome({
       <div className="desk-home-middle">
         {resume ? (
           <section className="desk-resume-card" aria-label="Continue your work">
-            <LivingBackdrop />
             <ScrollRegion label="Current project summary" className="desk-card-scroll">
               <span className="desk-resume-eyebrow eyebrow">
                 <span className="desk-seed" aria-hidden="true" />
@@ -101,7 +99,6 @@ export default function DeskHome({
           </section>
         ) : (
           <section className="desk-empty-card">
-            <LivingBackdrop />
             <h2>A place for ideas to take shape.</h2>
             <p>
               Research, build, analyse, write. Your conversations, files, and results stay together.

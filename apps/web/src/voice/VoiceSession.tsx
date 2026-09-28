@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, Square, VolumeX } from 'lucide-react';
+import { Mic, MicOff, Square, VolumeX } from '../icons';
 import type {
   Task,
   VoiceModels,

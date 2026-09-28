@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { MediaBatch } from '@garden/contracts';
-import { Film, RefreshCw, Square } from 'lucide-react';
+import { Film, RefreshCw, Square } from './icons';
 import { patch, post } from './client';
 import { Button, ErrorNotice } from './ui';
 import { money } from './model';

@@ -1,0 +1,164 @@
+@font-face {
+  font-family: 'Pixel Operator';
+  src: url('/fonts/PixelOperator.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Pixel Operator';
+  src: url('/fonts/PixelOperator-Bold.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 600 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Pixel Operator Mono';
+  src: url('/fonts/PixelOperatorMono.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+:root {
+  --lcd-off: #b7c58b;
+  --lcd-faint: #97aa6d;
+  --lcd-dense: #3d4f2b;
+  --lcd-on: #26351f;
+  --bg: var(--lcd-on);
+  --text: var(--lcd-off);
+  --muted: var(--lcd-faint);
+  --dim: var(--muted);
+  --panel: var(--bg);
+  --raised: color-mix(in srgb, var(--text) 10%, var(--bg));
+  --chrome: var(--bg);
+  --line: color-mix(in srgb, var(--text) 30%, var(--bg));
+  --line-strong: var(--muted);
+  --paper: var(--text);
+  --ink: var(--bg);
+  --accent: var(--text);
+  --danger: var(--text);
+  --shadow: color-mix(in srgb, var(--lcd-on) 45%, transparent);
+  --surface-glint: transparent;
+  --surface-shadow: 2px 2px 0 var(--line);
+  --canvas-glow: transparent;
+  --radius: 0;
+  --font-sans: 'Pixel Operator', 'Segoe UI', sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: 'Pixel Operator Mono', ui-monospace, monospace;
+  font: 16px/1.5 var(--font-sans);
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: auto;
+  color: var(--text);
+  background: var(--bg);
+  color-scheme: dark;
+}
+:root[data-theme='light'] {
+  --bg: var(--lcd-off);
+  --text: var(--lcd-on);
+  --muted: var(--lcd-dense);
+  color-scheme: light;
+}
+/* A static glass matrix costs no animation frames or layout work. */
+body::after,
+dialog::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 2px,
+      color-mix(in srgb, var(--text) 4%, transparent) 2px 3px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 2px,
+      color-mix(in srgb, var(--text) 4%, transparent) 2px 3px
+    );
+  box-shadow: inset 0 0 70px 6px #26351f17;
+}
+dialog::after {
+  position: absolute;
+}
+::selection {
+  color: var(--bg);
+  background: var(--text);
+}
+:where(button, input, select, textarea, progress) {
+  accent-color: var(--text);
+  caret-color: var(--text);
+}
+:where(input, textarea)::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+.pixel-icon {
+  shape-rendering: crispEdges;
+  flex-shrink: 0;
+}
+input:is([type='checkbox'], [type='radio']) {
+  appearance: none;
+  padding: 0;
+  border: 1px solid var(--text);
+  background: var(--bg);
+  vertical-align: middle;
+}
+input:is([type='checkbox'], [type='radio']):checked {
+  background: var(--text);
+  box-shadow: inset 0 0 0 3px var(--bg);
+}
+input:is([type='checkbox'], [type='radio']):indeterminate {
+  background: linear-gradient(var(--text), var(--text)) center / 9px 3px no-repeat var(--bg);
+}
+:where(button, a, summary):focus-visible {
+  outline: 2px dashed var(--text);
+  outline-offset: 3px;
+}
+:where(input, textarea, select):focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+:where(*) {
+  scrollbar-color: var(--muted) var(--bg);
+  scrollbar-width: thin;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg);
+  border-left: 1px solid var(--line);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border: 2px solid var(--bg);
+}
+@media (prefers-contrast: more) {
+  :root {
+    --muted: var(--text);
+    --line: var(--text);
+  }
+  body::after,
+  dialog::after {
+    display: none;
+  }
+}
+@media (forced-colors: active) {
+  input:is([type='checkbox'], [type='radio']) {
+    appearance: auto;
+  }
+  body::after,
+  dialog::after {
+    display: none;
+  }
+}
+@media print {
+  body::after,
+  dialog::after {
+    display: none;
+  }
+}

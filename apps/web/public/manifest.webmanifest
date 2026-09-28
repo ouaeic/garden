@@ -4,8 +4,8 @@
   "description": "One private AI computer, available from every device.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#151d19",
-  "theme_color": "#151d19",
+  "background_color": "#26351f",
+  "theme_color": "#26351f",
   "share_target": {
     "action": "/share-target",
     "method": "POST",

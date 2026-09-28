@@ -6,6 +6,37 @@ import { get } from '../client.js';
 import { message } from './format.js';
 import { socketAddress } from './transport.js';
 
+const terminalPalette = () => {
+  const style = getComputedStyle(document.documentElement);
+  const background = style.backgroundColor;
+  const foreground = style.color;
+  const muted = style.getPropertyValue('--muted').trim();
+  return {
+    background,
+    foreground,
+    cursor: foreground,
+    cursorAccent: background,
+    selectionBackground: foreground,
+    selectionForeground: background,
+    black: background,
+    brightBlack: muted,
+    white: foreground,
+    brightWhite: foreground,
+    red: foreground,
+    green: foreground,
+    yellow: foreground,
+    blue: muted,
+    magenta: muted,
+    cyan: muted,
+    brightRed: foreground,
+    brightGreen: foreground,
+    brightYellow: foreground,
+    brightBlue: foreground,
+    brightMagenta: foreground,
+    brightCyan: foreground
+  };
+};
+
 const expiry = (token: string): number => {
   try {
     const payload: unknown = JSON.parse(
@@ -45,15 +76,10 @@ export default function Terminal({
     let renewal: ReturnType<typeof setTimeout> | undefined;
     const term = new XTerm({
       cursorBlink: true,
-      fontSize: 13,
-      fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+      fontSize: 16,
+      fontFamily: getComputedStyle(document.documentElement).getPropertyValue('--font-mono'),
       scrollback: 5000,
-      theme: {
-        background: '#101613',
-        foreground: '#e6e8df',
-        cursor: '#e6e8df',
-        selectionBackground: '#3b4942'
-      }
+      theme: terminalPalette()
     });
     const addon = new FitAddon();
     term.loadAddon(addon);
@@ -68,6 +94,16 @@ export default function Terminal({
           socket.current.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
       }
     };
+    const themeObserver = new MutationObserver(() => {
+      term.options.theme = terminalPalette();
+    });
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    });
+    void document.fonts.load('16px "Pixel Operator Mono"').then(() => {
+      if (active) resize();
+    });
     const observer = new ResizeObserver(resize);
     observer.observe(element.current);
     const input = term.onData((data) => {
@@ -145,6 +181,7 @@ export default function Terminal({
       active = false;
       clearTimeout(renewal);
       observer.disconnect();
+      themeObserver.disconnect();
       input.dispose();
       socket.current?.close();
       socket.current = null;

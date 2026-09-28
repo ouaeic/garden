@@ -23,7 +23,7 @@
   max-height: 32rem;
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: 0.6rem;
+  border-radius: 0;
   overscroll-behavior: contain;
 }
 .table-preview-scroll:focus-visible {

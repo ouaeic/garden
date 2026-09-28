@@ -9,7 +9,7 @@
 }
 .management-heading h1 {
   font:
-    400 clamp(36px, 5vw, 58px)/1.08 Georgia,
+    400 clamp(36px, 5vw, 58px)/1.08 var(--font-display),
     serif;
   margin: 10px 0 14px;
   letter-spacing: -0.04em;
@@ -18,7 +18,7 @@
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-  border-bottom: 1px solid var(--line, rgba(195, 215, 184, 0.15));
+  border-bottom: 1px solid var(--line, color-mix(in srgb, var(--text) 15%, transparent));
   padding-bottom: 16px;
   margin-bottom: 28px;
 }
@@ -27,13 +27,15 @@
   background: transparent;
   color: inherit;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: 0;
   padding: 9px 16px;
   cursor: pointer;
 }
 .management-tabs button[aria-current='page'] {
-  background: var(--paper, #e9eee2);
+  background: var(--paper);
   color: var(--ink);
+  --muted: var(--ink);
+  --dim: var(--ink);
 }
 .management-tabs button:focus-visible {
   outline: 2px solid currentColor;
@@ -41,6 +43,7 @@
 }
 .management-content {
   display: grid;
+  align-content: start;
   gap: 24px;
 }
 .management-section {
@@ -49,12 +52,12 @@
 }
 .management-section h3 {
   font:
-    400 25px/1.2 Georgia,
+    400 25px/1.2 var(--font-display),
     serif;
   margin: 0 0 8px;
 }
 .management-section h4 {
-  font-size: 15px;
+  font-size: 16px;
   margin: 0 0 8px;
 }
 .management-section .section-heading {
@@ -81,10 +84,10 @@
   width: 100%;
   min-height: 42px;
   padding: 10px 12px;
-  background: var(--input-bg, rgba(125, 145, 121, 0.07));
+  background: var(--input-bg, color-mix(in srgb, var(--text) 7%, transparent));
   color: inherit;
-  border: 1px solid var(--line, rgba(195, 215, 184, 0.2));
-  border-radius: 9px;
+  border: 1px solid var(--line, color-mix(in srgb, var(--text) 20%, transparent));
+  border-radius: 0;
   font: inherit;
   box-sizing: border-box;
 }
@@ -105,14 +108,14 @@
 }
 .management-check input {
   margin-top: 5px;
-  accent-color: #b7c6ac;
+  accent-color: var(--text);
 }
 .management-check small {
   display: block;
 }
 .management-feedback {
   color: inherit;
-  font-size: 13px;
+  font-size: 16px;
   border-left: 2px solid currentColor;
   padding-left: 10px;
 }
@@ -126,7 +129,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 18px 0;
-  border-top: 1px solid var(--line, rgba(195, 215, 184, 0.14));
+  border-top: 1px solid var(--line, color-mix(in srgb, var(--text) 14%, transparent));
   min-width: 0;
 }
 .management-item:first-child {
@@ -154,23 +157,23 @@
 .management-stat strong {
   display: block;
   font:
-    400 30px Georgia,
+    400 30px var(--font-display),
     serif;
   margin-bottom: 8px;
 }
 .management-stat span {
-  font-size: 12px;
+  font-size: 16px;
 }
 .management-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 16px;
 }
 .management-table th,
 .management-table td {
   text-align: left;
   padding: 12px 9px;
-  border-bottom: 1px solid var(--line, rgba(195, 215, 184, 0.12));
+  border-bottom: 1px solid var(--line, color-mix(in srgb, var(--text) 12%, transparent));
   vertical-align: top;
 }
 .management-table th {
@@ -190,7 +193,7 @@
   max-width: 100%;
 }
 .management-section details {
-  border-top: 1px solid var(--line, rgba(195, 215, 184, 0.13));
+  border-top: 1px solid var(--line, color-mix(in srgb, var(--text) 13%, transparent));
   padding: 15px 0;
 }
 .management-section summary {
@@ -199,27 +202,27 @@
 .management-section pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-size: 12px;
+  font-size: 16px;
   max-height: 400px;
   overflow: auto;
 }
 .secret-result {
-  border: 1px solid var(--line, rgba(195, 215, 184, 0.2));
-  border-radius: 12px;
+  border: 1px solid var(--line, color-mix(in srgb, var(--text) 20%, transparent));
+  border-radius: 0;
   padding: 16px;
 }
 .secret-result textarea {
-  font-family: monospace !important;
+  font-family: var(--font-mono) !important;
   overflow-wrap: anywhere;
 }
 .management-metadata {
-  font-size: 12px;
+  font-size: 16px;
   line-height: 1.6;
 }
 .management-section progress {
   width: 100%;
   height: 8px;
-  accent-color: #b7c6ac;
+  accent-color: var(--text);
 }
 .management-actions {
   display: flex;
@@ -231,9 +234,9 @@
 }
 .management-note {
   padding: 14px 16px;
-  background: rgba(125, 145, 121, 0.09);
-  border-radius: 10px;
-  font-size: 13px;
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+  border-radius: 0;
+  font-size: 16px;
   line-height: 1.6;
 }
 .management-section .field {
@@ -269,7 +272,7 @@
   }
   .management-tabs button {
     padding: 9px 11px;
-    font-size: 13px;
+    font-size: 16px;
   }
   .management-item {
     flex-direction: column;

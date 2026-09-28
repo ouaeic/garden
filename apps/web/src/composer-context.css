@@ -5,7 +5,7 @@
   padding: 12px;
   margin: 0 0 12px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 0;
 }
 .composer-context-copy {
   min-width: 0;
@@ -17,7 +17,7 @@
   overflow-wrap: anywhere;
   max-height: 160px;
   overflow-y: auto;
-  font-size: 12px;
+  font-size: 16px;
 }
 .composer-context code {
   display: block;
@@ -26,7 +26,7 @@
 }
 .composer-context details {
   margin-top: 8px;
-  font-size: 12px;
+  font-size: 16px;
 }
 .composer-context > button {
   flex-shrink: 0;

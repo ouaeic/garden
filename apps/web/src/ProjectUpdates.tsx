@@ -1,6 +1,6 @@
 import ScrollRegion from './ScrollRegion';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { CheckCircle2, GitMerge, Layers, Plus, RefreshCw, Square } from 'lucide-react';
+import { CheckCircle2, GitMerge, Layers, Plus, RefreshCw, Square } from './icons';
 import type {
   ProjectCheck,
   ProjectUpdate,

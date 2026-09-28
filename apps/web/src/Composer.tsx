@@ -10,7 +10,7 @@ import {
   Mic,
   Square,
   SlidersHorizontal
-} from 'lucide-react';
+} from './icons';
 import type { Task, TaskReasoningEffort } from '@garden/contracts';
 import { permissionModeSummary } from './asking-rules';
 import { effortLabel } from './reasoning-options';

@@ -1,3 +1,4 @@
+import { storedDisplayMode } from './appearance';
 import { recoverDeviceDrafts, forgetDraftKey } from './draft-storage';
 import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -11,7 +12,7 @@ import {
   Plus,
   Search,
   Settings2
-} from 'lucide-react';
+} from './icons';
 import type { Task, Workspace, Project, ConversationSource } from '@garden/contracts';
 import { get, ApiError, post, isNativeClient } from './client';
 import type { NativeStatus } from './native';
@@ -56,13 +57,6 @@ const NativeSetup = lazy(() => import('./NativeSetup'));
 import type { ComputerTool as Tool } from './Computer';
 const Login = lazy(() => import('./Login'));
 const SearchDialog = lazy(() => import('./SearchDialog'));
-function initialTheme(): 'light' | 'dark' {
-  try {
-    return localStorage.getItem('garden-theme') === 'light' ? 'light' : 'dark';
-  } catch {
-    return 'dark';
-  }
-}
 class Boundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   override state = { error: null as Error | null };
   static getDerivedStateFromError(error: Error) {
@@ -108,22 +102,7 @@ function WorkspaceApp() {
     ownerId: string;
     values: Record<string, Workspace>;
   }>({ ownerId: '', values: {} });
-  const [theme, setTheme] = useState(initialTheme);
-  const [motionPaused, setMotionPaused] = useState(() => {
-    try {
-      return localStorage.getItem('garden-motion') === 'paused';
-    } catch {
-      return false;
-    }
-  });
-  useEffect(() => {
-    document.documentElement.dataset.gardenMotion = motionPaused ? 'paused' : 'auto';
-    try {
-      localStorage.setItem('garden-motion', motionPaused ? 'paused' : 'auto');
-    } catch {
-      /* Appearance remains usable without storage. */
-    }
-  }, [motionPaused]);
+  const [theme, setTheme] = useState(storedDisplayMode);
   const [newWork, setNewWork] = useState(false);
   const [newConversation, setNewConversation] = useState<{
     project: Project;
@@ -255,6 +234,9 @@ function WorkspaceApp() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', getComputedStyle(document.documentElement).backgroundColor);
     try {
       localStorage.setItem('garden-theme', theme);
     } catch {
@@ -864,8 +846,6 @@ function WorkspaceApp() {
                 onChange={requestRefresh}
                 theme={theme}
                 onThemeChange={setTheme}
-                motionPaused={motionPaused}
-                onMotionPausedChange={setMotionPaused}
                 onComputer={() => navigate('computer')}
               />
             )}

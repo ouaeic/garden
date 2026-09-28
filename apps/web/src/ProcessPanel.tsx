@@ -1,7 +1,7 @@
 import ScrollRegion from './ScrollRegion';
 import { WorkflowProgress } from './WorkflowProgress';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { Activity, ArrowUpRight, RefreshCw, Square } from 'lucide-react';
+import { Activity, ArrowUpRight, RefreshCw, Square } from './icons';
 import type { ComputationSession, ManagedProcess, ProcessList } from '@garden/contracts';
 import { get, post } from './client';
 import { Button, Dialog, ErrorNotice, Spinner } from './ui';

@@ -1,6 +1,6 @@
 import ScrollRegion from './ScrollRegion';
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, Pin } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pin } from './icons';
 import type { Project, Task } from '@garden/contracts';
 import { get } from './client';
 import { ProjectLink } from './ProjectLink';

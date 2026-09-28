@@ -383,6 +383,7 @@ describe('the public side of a share link', () => {
     );
     expect(policy['style-src']).toEqual(["'self'", "'unsafe-inline'"]);
     expect(policy['script-src']).toEqual(["'self'"]);
+    expect(policy['font-src']).toEqual(["'self'"]);
     expect(policy['connect-src']).toEqual(["'self'"]);
     expect(policy['default-src']).toEqual(["'none'"]);
     expect(policy['frame-src']).toEqual(['blob:']);

@@ -1,7 +1,7 @@
 .project-directories {
   padding: 18px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 0;
   background: var(--panel);
   min-width: 0;
 }
@@ -18,11 +18,11 @@
   align-items: center;
   gap: 8px;
   margin: 0;
-  font-size: 14px;
+  font-size: 16px;
 }
 .directory-heading p {
   margin: 6px 0 0;
-  font-size: 12px;
+  font-size: 16px;
 }
 .directory-heading > div {
   min-width: 0;
@@ -37,7 +37,7 @@
   gap: 6px;
   min-width: 0;
   max-width: 100%;
-  font-size: 12px;
+  font-size: 16px;
   flex: 1 1 220px;
 }
 .directory-root .field {
@@ -47,12 +47,12 @@
 .directory-breadcrumbs {
   overflow-wrap: anywhere;
   margin-block: 14px;
-  font: 12px/1.7 monospace;
+  font: 16px/1.7 var(--font-mono);
 }
 .directory-breadcrumbs:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 4px;
-  border-radius: 4px;
+  border-radius: 0;
 }
 .directory-breadcrumbs button {
   font: inherit;
@@ -87,7 +87,7 @@
   flex: 1 1 120px;
   min-width: 0;
   overflow-wrap: anywhere;
-  font-size: 13px;
+  font-size: 16px;
 }
 .directory-entry-name button {
   color: var(--text);
@@ -102,7 +102,7 @@
 }
 .directory-entry-name small {
   display: block;
-  font-size: 11px;
+  font-size: 16px;
   margin-top: 3px;
 }
 .directory-entry-actions {
@@ -112,10 +112,10 @@
 }
 .project-directories .button {
   min-height: 36px;
-  font-size: 12px;
+  font-size: 16px;
 }
 .directory-note {
-  font-size: 11px;
+  font-size: 16px;
   line-height: 1.7;
   margin-bottom: 0;
 }
@@ -126,7 +126,7 @@
 .directory-inspector strong {
   overflow-wrap: anywhere;
   min-width: 0;
-  font-size: 12px;
+  font-size: 16px;
 }
 @media (max-width: 620px) {
   .project-directories {

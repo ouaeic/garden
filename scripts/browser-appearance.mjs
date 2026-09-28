@@ -36,6 +36,8 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
   await page.goto(origin);
   await page.getByRole('heading', { name: 'Space for your next idea.' }).waitFor();
   await page.locator('.intent-editor textarea').waitFor();
+  await page.evaluate(() => document.fonts.ready);
+  assert.equal(await page.evaluate(() => document.fonts.check('16px "Pixel Operator"')), true);
   const stats = page.getByRole('button', { name: 'Stats', exact: true });
   const statsPanel = page.getByRole('region', { name: 'Usage statistics', exact: true });
   await stats.hover();
@@ -106,62 +108,58 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     }
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.waitForFunction(() => {
-    const animations = document
-      .querySelector('.garden-living-field')
-      .getAnimations({ subtree: true });
-    return (
-      animations.length > 0 && animations.every((animation) => animation.playState === 'running')
+  const palette = [];
+  for (const mode of ['light', 'dark']) {
+    await page.evaluate((value) => {
+      document.documentElement.dataset.theme = value;
+    }, mode);
+    palette.push(
+      await page.evaluate(() => {
+        const root = getComputedStyle(document.documentElement);
+        const muted = getComputedStyle(document.querySelector('.desk-home-intro header p')).color;
+        const luminance = (color) => {
+          const values = color
+            .match(/[\d.]+/g)
+            .slice(0, 3)
+            .map(Number)
+            .map((value) => {
+              const c = value / 255;
+              return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+            });
+          return values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722;
+        };
+        const contrast = (a, b) =>
+          (Math.max(luminance(a), luminance(b)) + 0.05) /
+          (Math.min(luminance(a), luminance(b)) + 0.05);
+        return {
+          foreground: root.color,
+          background: root.backgroundColor,
+          contrast: contrast(root.color, root.backgroundColor),
+          secondaryContrast: contrast(muted, root.backgroundColor),
+          overlayInteractive: getComputedStyle(document.body, '::after').pointerEvents !== 'none',
+          overlayAnimation: getComputedStyle(document.body, '::after').animationName
+        };
+      })
     );
-  });
-  // Let viewport changes and pending draft feedback settle before sampling ambient cost.
-  await page.waitForTimeout(1200);
-  const cdp = await context.newCDPSession(page);
-  await cdp.send('Performance.enable');
-  const before = await cdp.send('Performance.getMetrics');
-  await page.waitForTimeout(1200);
-  const after = await cdp.send('Performance.getMetrics');
-  const metric = (result, name) => result.metrics.find((item) => item.name === name).value;
-  assert.equal(
-    metric(after, 'LayoutCount') - metric(before, 'LayoutCount'),
-    0,
-    'Ambient movement must not cause continuous layout'
-  );
-  console.log('Ambient motion sample:', {
-    scriptSeconds: metric(after, 'ScriptDuration') - metric(before, 'ScriptDuration'),
-    layoutCount: 0
-  });
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.waitForFunction(() => {
-    const animations = document
-      .querySelector('.garden-living-field')
-      .getAnimations({ subtree: true });
-    return animations.filter((animation) => animation.playState === 'running').length === 0;
-  });
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  }
+  assert.equal(palette[0].foreground, palette[1].background, 'Modes reverse LCD ink and glass');
+  assert.equal(palette[0].background, palette[1].foreground, 'Modes reverse LCD glass and ink');
+  for (const colors of palette) {
+    assert(colors.contrast >= 4.5, 'Body text must meet normal-text contrast');
+    assert(colors.secondaryContrast >= 4.5, 'Secondary text must meet normal-text contrast');
+    assert.equal(colors.overlayInteractive, false, 'Screen texture never intercepts input');
+    assert.equal(colors.overlayAnimation, 'none', 'Screen texture does not animate');
+  }
+  console.log('LCD contrast:', palette);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  const motion = page.getByRole('checkbox', { name: 'Background motion', exact: true });
-  assert.equal(await motion.isChecked(), true);
-  await motion.uncheck();
-  await page.reload();
-  await motion.waitFor();
-  assert.equal(await motion.isChecked(), false);
-  await page.goto(origin);
-  await page.getByRole('heading', { name: 'Space for your next idea.' }).waitFor();
-  assert.equal(
-    await page.locator('.garden-living-field').evaluate((element) => {
-      const animations = element.getAnimations({ subtree: true });
-      return (
-        animations.length > 0 && animations.every((animation) => animation.playState === 'paused')
-      );
-    }),
-    true
-  );
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await motion.check();
   for (const theme of ['dark', 'light']) {
     await page.getByRole('combobox', { name: 'Theme', exact: true }).selectOption(theme);
+    await page.reload();
+    await page.getByRole('combobox', { name: 'Theme', exact: true }).waitFor();
+    assert.equal(
+      await page.getByRole('combobox', { name: 'Theme', exact: true }).inputValue(),
+      theme
+    );
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: width > 760 ? 1000 : 844 });
       await page.screenshot({ path: resolve(report, `settings-${theme}-${width}.png`) });
@@ -175,9 +173,6 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     .getByRole('navigation', { name: 'Home cards' })
     .getByRole('button', { name: 'New project', exact: true })
     .click();
-  await page.waitForFunction(
-    () => document.querySelector('.garden-living-field').dataset.moving === 'false'
-  );
   await page.goto(`${origin}/?task=${task.id}`);
   await page.locator('.garden-task-composer').waitFor();
   for (const theme of ['dark', 'light']) {

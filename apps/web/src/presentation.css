@@ -29,8 +29,8 @@
   display: grid;
   gap: 0.2rem;
   padding: 0.7rem 0.85rem;
-  border: 1px solid var(--line, #727c6940);
-  border-radius: 0.65rem;
+  border: 1px solid var(--line, color-mix(in srgb, var(--text) 25%, transparent));
+  border-radius: 0;
   overflow-wrap: anywhere;
   min-width: 0;
   color: inherit;
@@ -56,8 +56,8 @@
 }
 .garden-work-block {
   min-width: 0;
-  border: 1px solid var(--line, #727c6940);
-  border-radius: 1rem;
+  border: 1px solid var(--line, color-mix(in srgb, var(--text) 25%, transparent));
+  border-radius: 0;
   padding: 1.15rem;
   background: var(--panel);
 }
@@ -81,7 +81,7 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
 }
 .garden-block-sections.timeline {
-  border-left: 2px solid var(--accent, #9caf88);
+  border-left: 2px solid var(--accent, var(--muted));
   padding-left: 1.1rem;
 }
 .garden-block-sections small {
@@ -102,7 +102,7 @@
 .garden-block-table td {
   padding: 0.7rem;
   vertical-align: top;
-  border-bottom: 1px solid var(--line, #727c6940);
+  border-bottom: 1px solid var(--line, color-mix(in srgb, var(--text) 25%, transparent));
   min-width: 6rem;
   overflow-wrap: anywhere;
 }
@@ -133,7 +133,7 @@
   text-transform: uppercase;
 }
 .garden-check-state.done {
-  color: var(--accent, #9caf88);
+  color: var(--accent, var(--muted));
 }
 .garden-chart-row {
   display: grid;
@@ -147,15 +147,15 @@
 }
 .garden-chart-bar-track {
   height: 1rem;
-  background: var(--line, #727c6920);
+  background: var(--line, color-mix(in srgb, var(--text) 13%, transparent));
 }
 .garden-chart-bar-track i {
   display: block;
   height: 100%;
-  background: var(--accent, #9caf88);
+  background: var(--accent, var(--muted));
 }
 .garden-chart-bar-track i.negative {
-  background: var(--danger, #c48875);
+  background: var(--danger, var(--muted));
 }
 .garden-recorded-actions > div {
   display: flex;
@@ -185,8 +185,8 @@
   margin: 0.5rem 0 1.25rem;
 }
 .garden-direction {
-  border: 1px solid var(--line, #727c6940);
-  border-radius: 0.85rem;
+  border: 1px solid var(--line, color-mix(in srgb, var(--text) 25%, transparent));
+  border-radius: 0;
   padding: 0.85rem 1rem;
 }
 .garden-direction > header {
@@ -203,7 +203,7 @@
   line-height: 1.6;
 }
 .garden-direction .garden-acknowledgment {
-  border-top: 1px solid var(--line, #727c6940);
+  border-top: 1px solid var(--line, color-mix(in srgb, var(--text) 25%, transparent));
   padding-top: 0.5rem;
 }
 .garden-acknowledgment > small {
@@ -218,7 +218,7 @@
 .garden-direction-history > summary {
   cursor: pointer;
   font-size: 0.82rem;
-  color: var(--muted, #727c69);
+  color: var(--muted);
   padding: 0.35rem 0;
   list-style: none;
 }
@@ -256,10 +256,10 @@
   margin: 16px 0;
   padding: 16px 18px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 0;
   background: var(--panel);
   overflow-wrap: anywhere;
-  font-size: 13px;
+  font-size: 16px;
 }
 .resource-wait-note p {
   margin: 8px 0 0;
@@ -287,7 +287,7 @@
 .private-diagnostic-delete {
   padding: 1rem;
   border: 1px solid var(--line);
-  border-radius: 0.75rem;
+  border-radius: 0;
   display: grid;
   gap: 0.75rem;
 }

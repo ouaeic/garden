@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { ShieldCheck, ArrowUpRight } from 'lucide-react';
+import { ShieldCheck, ArrowUpRight } from './icons';
 import type { Task } from '@garden/contracts';
 import type { Decision } from './model';
 import { data, text, date } from './model';

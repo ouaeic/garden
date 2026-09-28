@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus, X } from './icons';
 import type { Task, TaskPlan, TaskPlanStep } from '@garden/contracts';
 import { get, post } from './client';
 import { date } from './model';

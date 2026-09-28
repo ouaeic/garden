@@ -18,7 +18,7 @@ body:has(.desk-shell),
   padding-inline: clamp(18px, 3vw, 44px);
 }
 .desk-shell .garden-masthead .brand {
-  font-size: 32px;
+  font-size: 40px;
 }
 .desk-shell .garden-masthead .brand-button {
   margin: 0 12px 0 0;
@@ -29,7 +29,7 @@ body:has(.desk-shell),
   align-items: center;
 }
 .desk-navigation .button {
-  font-size: 12px;
+  font-size: 16px;
   color: var(--muted);
 }
 .desk-navigation .button[aria-expanded='true'] {
@@ -61,9 +61,9 @@ body:has(.desk-shell),
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(145deg, var(--surface-glint), transparent 65%), var(--panel);
+  background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 0;
   box-shadow: var(--surface-shadow);
   overflow: hidden;
 }
@@ -81,14 +81,14 @@ body:has(.desk-shell),
   display: flex;
   align-items: center;
   gap: 7px;
-  font: 500 13px/1.3 var(--font-sans, sans-serif);
+  font: 500 16px/1.3 var(--font-sans, sans-serif);
   letter-spacing: 0;
   margin: 0;
 }
 .desk-card-heading .button {
   min-height: 28px;
   padding: 3px 4px;
-  font-size: 11px;
+  font-size: 16px;
   background: transparent;
   border: 0;
 }
@@ -109,7 +109,7 @@ body:has(.desk-shell),
 }
 .desk-empty-state {
   padding: 14px 0;
-  font-size: 12px;
+  font-size: 16px;
   line-height: 1.6;
   margin: 0;
 }
@@ -153,7 +153,7 @@ body:has(.desk-shell),
 }
 .desk-project-row strong {
   display: block;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -162,12 +162,12 @@ body:has(.desk-shell),
 .desk-project-row small {
   display: block;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 16px;
   margin-top: 4px;
 }
 .desk-project-row time {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 16px;
   flex-shrink: 0;
 }
 .desk-update-row {
@@ -178,7 +178,7 @@ body:has(.desk-shell),
 }
 .desk-update-row time {
   display: block;
-  font-size: 10px;
+  font-size: 16px;
   color: var(--muted);
   margin-top: 8px;
 }
@@ -187,13 +187,13 @@ body:has(.desk-shell),
   min-width: 0;
 }
 .desk-update-row strong {
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 500;
   overflow-wrap: anywhere;
 }
 .desk-update-row small {
   display: block;
-  font-size: 11px;
+  font-size: 16px;
   color: var(--muted);
   margin-top: 4px;
   overflow-wrap: anywhere;
@@ -203,7 +203,7 @@ body:has(.desk-shell),
   align-items: center;
   gap: 8px;
   padding: 11px 0;
-  font-size: 12px;
+  font-size: 16px;
 }
 .desk-file-row svg {
   flex-shrink: 0;
@@ -217,7 +217,7 @@ body:has(.desk-shell),
   white-space: nowrap;
 }
 .desk-file-row small {
-  font-size: 10px;
+  font-size: 16px;
   color: var(--muted);
   flex-shrink: 0;
 }
@@ -250,13 +250,13 @@ body:has(.desk-shell),
   min-width: 0;
 }
 .desk-home h1 {
-  font-size: clamp(30px, 3.3vw, 48px);
+  font-size: clamp(32px, 3.3vw, 48px);
   line-height: 1.12;
-  letter-spacing: -1.6px;
+  letter-spacing: 0;
   margin: 10px 0 12px;
 }
 .desk-home-intro header p {
-  font-size: 12px;
+  font-size: 16px;
   margin: 0;
 }
 .desk-start-card {
@@ -265,11 +265,9 @@ body:has(.desk-shell),
   max-height: min(240px, 30dvh);
   display: flex;
   border: 1px solid var(--line);
-  border-radius: 18px;
-  background: linear-gradient(140deg, var(--surface-glint), transparent), var(--panel);
-  box-shadow:
-    var(--surface-shadow),
-    0 12px 36px var(--shadow);
+  border-radius: 0;
+  background: var(--panel);
+  box-shadow: var(--surface-shadow);
 }
 .desk-shell .desk-start-card .desk-card-scroll {
   padding: 0;
@@ -280,22 +278,22 @@ body:has(.desk-shell),
   background: transparent;
   margin: 0;
   padding: 15px 18px;
-  border-radius: 17px;
+  border-radius: 0;
   box-shadow: none;
 }
 .desk-start-card .intent-editor > textarea {
   min-height: 42px;
   max-height: 20dvh;
-  font-size: 15px;
+  font-size: 16px;
   padding: 4px 0;
 }
 .desk-start-card .setup-note {
   padding: 12px;
   margin: 0;
-  font-size: 12px;
+  font-size: 16px;
 }
 .desk-start-card .setup-note h3 {
-  font-size: 14px;
+  font-size: 16px;
 }
 .desk-home-middle {
   display: contents;
@@ -320,26 +318,13 @@ body:has(.desk-shell),
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border-radius: 22px;
-  border: 1px solid #b8f5cc26;
-  box-shadow:
-    inset 0 1px 0 #dcffe80c,
-    0 12px 36px var(--shadow);
+  border-radius: 0;
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--surface-shadow);
   display: flex;
   flex-direction: column;
   padding: clamp(20px, 2.8vh, 32px);
-  color: var(--living-text, #edf5e9);
-}
-.desk-resume-card,
-.desk-empty-card {
-  --living-ground: #122e20;
-  --living-veil: #122e20e6;
-}
-.desk-resume-card > .garden-living-field,
-.desk-empty-card > .garden-living-field {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
+  color: var(--text);
 }
 .desk-resume-card .desk-card-scroll {
   padding: 0;
@@ -348,7 +333,7 @@ body:has(.desk-shell),
 .desk-resume-card h2 {
   font-size: clamp(26px, 2.65vw, 38px);
   max-width: 21ch;
-  letter-spacing: -1px;
+  letter-spacing: 0;
   margin: 12px 0 10px;
   line-height: 1.2;
   overflow-wrap: anywhere;
@@ -356,10 +341,10 @@ body:has(.desk-shell),
 .desk-resume-card .eyebrow,
 .desk-resume-card p,
 .desk-resume-status {
-  color: #d2e5d4;
+  color: var(--text);
 }
 .desk-resume-card p {
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1.55;
   margin: 0 0 9px;
   max-width: 60ch;
@@ -369,7 +354,7 @@ body:has(.desk-shell),
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 12px;
+  font-size: 16px;
   margin-top: 10px;
 }
 .desk-resume-card > .desk-resume-open {
@@ -379,26 +364,26 @@ body:has(.desk-shell),
   margin-top: 12px;
   padding: 10px 0 0;
   border: 0;
-  border-top: 1px solid #ffffff26;
+  border-top: 1px solid color-mix(in srgb, var(--text) 15%, transparent);
   border-radius: 0;
   background: transparent;
   color: inherit;
-  font-size: 13px;
+  font-size: 16px;
 }
 .desk-resume-arrow {
   display: grid;
   place-items: center;
   width: 36px;
   height: 36px;
-  border: 1px solid #ffffff30;
-  border-radius: 50%;
-  background: #ffffff0c;
+  border: 1px solid color-mix(in srgb, var(--text) 19%, transparent);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--text) 5%, transparent);
   transition:
     background 180ms,
     transform 180ms;
 }
 .desk-resume-open:hover .desk-resume-arrow {
-  background: #ffffff20;
+  background: color-mix(in srgb, var(--text) 13%, transparent);
   transform: translateX(3px);
 }
 .desk-resume-eyebrow {
@@ -410,9 +395,24 @@ body:has(.desk-shell),
   width: 12px;
   height: 16px;
   border: 1px solid currentColor;
-  border-radius: 10px 2px 10px 2px;
-  transform: rotate(20deg);
-  opacity: 0.8;
+  border-radius: 0;
+  transform: none;
+  background: currentColor;
+  clip-path: polygon(
+    0 25%,
+    25% 25%,
+    25% 0,
+    75% 0,
+    75% 25%,
+    100% 25%,
+    100% 75%,
+    75% 75%,
+    75% 100%,
+    25% 100%,
+    25% 75%,
+    0 75%
+  );
+  opacity: 1;
 }
 .desk-home-intro h1 em {
   font-weight: inherit;
@@ -432,7 +432,7 @@ body:has(.desk-shell),
   padding: 0 0 14px;
 }
 .desk-home .desk-card-heading h2 {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 23px;
   font-weight: 400;
 }
@@ -446,11 +446,11 @@ body:has(.desk-shell),
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  border-radius: 12px;
+  border-radius: 0;
   background: linear-gradient(145deg, var(--raised), var(--panel));
   border: 1px solid var(--line);
   color: var(--accent);
-  box-shadow: inset 0 1px 0 var(--surface-glint);
+  box-shadow: var(--surface-shadow);
 }
 .desk-update-row > .garden-project-dot {
   margin-top: 7px;
@@ -472,7 +472,7 @@ body:has(.desk-shell),
 }
 .desk-action-row strong {
   display: block;
-  font-size: 14px;
+  font-size: 16px;
   margin: 0;
   font-weight: 500;
 }
@@ -482,13 +482,13 @@ body:has(.desk-shell),
   -webkit-box-orient: vertical;
   overflow: hidden;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 16px;
   line-height: 1.5;
   margin-top: 5px;
 }
 .desk-action-copy > .desk-action-status {
   color: var(--accent);
-  font-size: 11px;
+  font-size: 16px;
 }
 .desk-home-switcher {
   display: none;
@@ -501,8 +501,8 @@ body:has(.desk-shell),
   font-size: clamp(24px, 3vw, 38px);
 }
 .desk-empty-card p {
-  color: #d2e5d4;
-  font-size: 13px;
+  color: var(--text);
+  font-size: 16px;
   max-width: 50ch;
 }
 .desk-home.is-empty {
@@ -612,7 +612,7 @@ body:has(.desk-shell),
   border-bottom: 2px solid transparent;
   border-radius: 0;
   background: transparent;
-  font-size: 12px;
+  font-size: 16px;
   color: var(--muted);
   padding: 10px 0;
   min-height: 36px;
@@ -628,7 +628,7 @@ body:has(.desk-shell),
   margin: 0;
 }
 .desk-shell .project-view-nav .button {
-  font-size: 11px;
+  font-size: 16px;
   min-height: 32px;
   border: 0;
   padding: 6px 8px;
@@ -636,8 +636,10 @@ body:has(.desk-shell),
   color: var(--muted);
 }
 .desk-shell .project-view-nav .button[aria-current] {
-  background: var(--raised);
-  color: var(--text);
+  background: var(--paper);
+  color: var(--ink);
+  --muted: var(--ink);
+  --dim: var(--ink);
 }
 .desk-shell .project-shortcuts {
   margin: 0 0 8px;
@@ -677,7 +679,7 @@ body:has(.desk-shell),
   scrollbar-width: thin;
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 13px;
+  border-radius: 0;
 }
 .desk-work-card > .project-overview > * + * {
   margin-top: 22px;
@@ -713,11 +715,11 @@ body:has(.desk-shell),
   display: flex;
   align-items: center;
   gap: 5px;
-  font: 500 13px/1.3 var(--font-sans, sans-serif);
+  font: 500 16px/1.3 var(--font-sans, sans-serif);
   margin: 0;
 }
 .desk-processes .process-count {
-  font-size: 10px;
+  font-size: 16px;
 }
 .desk-processes .process-panel-heading h2 svg {
   width: 15px;
@@ -725,7 +727,7 @@ body:has(.desk-shell),
 .desk-processes .process-panel-heading .button {
   min-height: 25px;
   padding: 3px;
-  font-size: 11px;
+  font-size: 16px;
   border: 0;
   background: transparent;
 }
@@ -758,7 +760,7 @@ body:has(.desk-shell),
   margin: 0;
 }
 .desk-processes .process-card h3 {
-  font: 500 12px/1.5 var(--font-sans);
+  font: 500 16px/1.5 var(--font-sans);
   letter-spacing: 0;
 }
 .desk-processes .process-card-heading {
@@ -766,7 +768,7 @@ body:has(.desk-shell),
   gap: 6px;
 }
 .desk-processes .process-status {
-  font-size: 10px;
+  font-size: 16px;
 }
 .desk-processes .process-metrics {
   display: grid;
@@ -778,10 +780,10 @@ body:has(.desk-shell),
   display: none;
 }
 .desk-processes .process-metrics dt {
-  font-size: 10px;
+  font-size: 16px;
 }
 .desk-processes .process-metrics dd {
-  font-size: 12px;
+  font-size: 16px;
   margin-top: 3px;
 }
 .desk-processes .process-actions {
@@ -791,11 +793,11 @@ body:has(.desk-shell),
 .desk-processes .process-actions .button {
   padding: 4px 6px;
   min-height: 27px;
-  font-size: 11px;
+  font-size: 16px;
 }
 .desk-processes .process-note,
 .desk-processes .process-empty {
-  font-size: 11px;
+  font-size: 16px;
   padding: 8px 14px;
   margin: 0;
 }
@@ -821,11 +823,11 @@ body:has(.desk-shell),
   gap: 10px;
 }
 .desk-shell .garden-task .run-summary .status-line {
-  font-size: 12px;
+  font-size: 16px;
   min-width: 0;
 }
 .desk-shell .run-summary .run-cost {
-  font-size: 11px;
+  font-size: 16px;
 }
 .desk-shell .run-summary > .row {
   gap: 5px;
@@ -834,7 +836,7 @@ body:has(.desk-shell),
 .desk-shell .run-summary .button {
   padding: 3px 6px;
   min-height: 29px;
-  font-size: 11px;
+  font-size: 16px;
 }
 .desk-shell .garden-task > .garden-task-scroll {
   grid-row: 2;
@@ -842,7 +844,7 @@ body:has(.desk-shell),
   min-height: 0;
   padding: 0;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 0;
   background: var(--panel);
   box-shadow: var(--surface-shadow);
   overflow: auto;
@@ -886,7 +888,7 @@ body:has(.desk-shell),
 .desk-shell .garden-task-primary > details {
   flex: 0 0 auto;
   padding: 8px 16px;
-  font-size: 12px;
+  font-size: 16px;
   max-height: 45%;
   overflow: auto;
   border-top: 1px solid var(--line);
@@ -912,12 +914,15 @@ body:has(.desk-shell),
 .desk-output-sections .button {
   padding: 5px 9px;
   min-height: 28px;
-  font-size: 11px;
+  font-size: 16px;
   border: 0;
   background: transparent;
 }
 .desk-output-sections .button[aria-pressed='true'] {
-  background: var(--raised);
+  background: var(--paper);
+  color: var(--ink);
+  --muted: var(--ink);
+  --dim: var(--ink);
 }
 .desk-shell .is-fitted > .garden-output-section {
   flex: 1;
@@ -995,18 +1000,18 @@ body:has(.desk-shell),
   box-sizing: content-box;
   padding: 18px;
   border: 1px solid var(--line);
-  border-radius: 22px;
+  border-radius: 0;
   background: var(--raised);
   color: var(--accent);
 }
 .garden-preview-placeholder strong {
-  font: 400 22px/1.3 var(--font-serif);
+  font: 400 22px/1.3 var(--font-display);
   color: var(--text);
 }
 .garden-preview-placeholder p {
   max-width: 42ch;
   margin: 0;
-  font-size: 13px;
+  font-size: 16px;
 }
 .desk-shell .is-fitted .garden-output-actions {
   flex: 0 0 auto;
@@ -1014,13 +1019,13 @@ body:has(.desk-shell),
   padding: 8px 12px;
 }
 .desk-shell .is-fitted .garden-output-actions .button {
-  font-size: 11px;
+  font-size: 16px;
   min-height: 28px;
   padding: 5px 7px;
 }
 .desk-shell .is-fitted .garden-output-actions p {
   margin: 0;
-  font-size: 11px;
+  font-size: 16px;
 }
 .desk-shell .is-fitted .garden-output-answer {
   overflow: auto;
@@ -1084,7 +1089,7 @@ body:has(.desk-shell),
 .desk-shell .garden-task-composer .intent-editor {
   padding: 9px 13px;
   border-color: var(--line);
-  border-radius: 16px;
+  border-radius: 0;
   box-shadow: var(--surface-shadow);
 }
 .desk-shell .garden-task-composer .intent-editor > textarea {
@@ -1095,9 +1100,9 @@ body:has(.desk-shell),
   min-height: 45px;
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 0;
   padding: 11px 14px;
-  font-size: 13px;
+  font-size: 16px;
   justify-content: flex-start;
   background: var(--panel);
 }
@@ -1108,7 +1113,7 @@ body:has(.desk-shell),
 .desk-message {
   padding: 15px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 0;
   min-width: 0;
 }
 .desk-message.owner-message {
@@ -1118,12 +1123,12 @@ body:has(.desk-shell),
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  font-size: 12px;
+  font-size: 16px;
   margin-bottom: 12px;
 }
 .desk-message time {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 16px;
 }
 
 .desk-shell .desk-project-index {
@@ -1158,7 +1163,7 @@ body:has(.desk-shell),
   flex: 1;
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 13px;
+  border-radius: 0;
   padding: 12px 18px;
 }
 .desk-project-index .project-collection > .scroll-region {
@@ -1188,11 +1193,11 @@ body:has(.desk-shell),
 }
 .desk-project-index .project-card-meta {
   margin: 0;
-  font-size: 11px;
+  font-size: 16px;
   gap: 20px;
 }
 .desk-project-index .project-summary-card .project-open strong {
-  font-size: 14px;
+  font-size: 16px;
 }
 .desk-project-index .project-summary-card .project-open::after {
   display: none;
@@ -1218,7 +1223,7 @@ body:has(.desk-shell),
   display: none;
 }
 .desk-shell .management-heading p {
-  font-size: 12px;
+  font-size: 16px;
 }
 .desk-shell .management-tabs {
   flex: 0 0 auto;
@@ -1234,7 +1239,7 @@ body:has(.desk-shell),
   padding: 20px;
   border: 1px solid var(--line);
   background: var(--panel);
-  border-radius: 13px;
+  border-radius: 0;
 }
 .desk-sheet-attention > .dialog-body > section,
 .desk-shell .view-computer > section:not([hidden]) {
@@ -1248,7 +1253,7 @@ body:has(.desk-shell),
   padding: 20px;
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 13px;
+  border-radius: 0;
 }
 .desk-sheet-attention .section-intro {
   margin: 0 0 20px;
@@ -1320,13 +1325,16 @@ body:has(.desk-shell),
   .desk-home-switcher .button {
     border: 0;
     background: transparent;
-    font-size: 12px;
+    font-size: 16px;
     padding: 8px 10px;
     min-height: 34px;
     white-space: nowrap;
   }
   .desk-home-switcher .button[aria-pressed='true'] {
-    background: var(--raised);
+    background: var(--paper);
+    color: var(--ink);
+    --muted: var(--ink);
+    --dim: var(--ink);
   }
   .desk-home .desk-start-card,
   .desk-home .desk-resume-card,
@@ -1363,7 +1371,7 @@ body:has(.desk-shell),
   .desk-home .desk-recent {
     padding: 0;
     border: 1px solid var(--line);
-    border-radius: 13px;
+    border-radius: 0;
     background: var(--panel);
   }
   .desk-home .desk-card-heading {
@@ -1435,7 +1443,7 @@ body:has(.desk-shell),
   .desk-shell .project-conversation-switcher select {
     max-width: 100%;
     padding: 3px 0;
-    font-size: 11px;
+    font-size: 16px;
   }
   .desk-shell .desk-project .project-conversation-tabs {
     display: none;
@@ -1452,11 +1460,11 @@ body:has(.desk-shell),
   .desk-shell .project-view-nav .button {
     flex: 1;
     padding: 7px 8px;
-    font-size: 12px;
+    font-size: 16px;
     min-height: 35px;
   }
   .desk-shell .project-jobs-link {
-    font-size: 10px;
+    font-size: 16px;
     min-height: 30px;
     padding: 4px;
   }
@@ -1467,10 +1475,10 @@ body:has(.desk-shell),
     margin-bottom: 5px;
   }
   .desk-shell .garden-task .run-summary .status-line {
-    font-size: 11px;
+    font-size: 16px;
   }
   .desk-shell .garden-task .run-summary .button {
-    font-size: 10px;
+    font-size: 16px;
     padding: 4px 5px;
   }
   .desk-shell .desk-project .garden-task-composer {
@@ -1549,20 +1557,18 @@ html[data-workspace-short='true'] .desk-shell .management-heading p {
   width: min(780px, calc(100vw - 36px));
   height: min(720px, calc(var(--garden-viewport-height, 100dvh) - var(--desk-bar-height) - 32px));
   max-height: calc(var(--garden-viewport-height, 100dvh) - var(--desk-bar-height) - 32px);
-  border-radius: 22px;
+  border-radius: 0;
   overflow: hidden;
   border-color: var(--line-strong);
-  background: linear-gradient(140deg, var(--surface-glint), transparent 40%), var(--panel);
-  box-shadow:
-    inset 0 1px 0 #ffffff0a,
-    0 28px 90px #0007;
+  background: var(--panel);
+  box-shadow: var(--surface-shadow);
 }
 .desk-shell .desk-sheet-projects[open] {
   width: min(600px, calc(100vw - 36px));
 }
 .desk-shell .desk-sheet::backdrop {
-  background: #06110950;
-  backdrop-filter: blur(3px);
+  background: color-mix(in srgb, var(--text) 31%, transparent);
+  backdrop-filter: none;
 }
 .desk-sheet > .dialog-heading {
   flex-shrink: 0;
@@ -1665,7 +1671,7 @@ html[data-workspace-short='true'] .desk-shell .management-heading p {
     inset-block-start: 8px;
     height: calc(var(--garden-viewport-height, 100dvh) - 16px);
     max-height: calc(var(--garden-viewport-height, 100dvh) - 16px);
-    border-radius: 13px;
+    border-radius: 0;
   }
   .desk-sheet > .dialog-heading {
     padding: 9px 14px;

@@ -1,7 +1,7 @@
 .project-updates {
   padding: 1.25rem;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 0;
   min-width: 0;
 }
 .project-updates h2 {
@@ -137,14 +137,14 @@
   align-items: center;
   padding: 1rem;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 0;
   text-align: left;
   background: transparent;
   color: inherit;
   cursor: pointer;
 }
 .project-update-row:hover {
-  background: var(--hover, #80907015);
+  background: var(--hover, color-mix(in srgb, var(--text) 8%, transparent));
 }
 .project-update-title {
   flex: 1;
@@ -161,7 +161,7 @@
   font-weight: 600;
   padding: 0.4rem 0.6rem;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 0;
   flex-shrink: 0;
 }
 .project-update-state.state-published,
@@ -172,12 +172,12 @@
 .project-update-state.state-checks_failed,
 .check-failed,
 .check-invalidated {
-  color: #e9a678;
+  color: var(--text);
 }
 .project-check {
   padding: 1rem;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 0;
   min-width: 0;
 }
 .project-check strong {
@@ -199,7 +199,7 @@
   max-height: 26rem;
   overflow: auto;
   padding: 1rem;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--bg);
   font-size: 0.8rem;
 }
@@ -243,13 +243,15 @@
 :root[data-theme='light'] .project-update-state.state-checks_failed,
 :root[data-theme='light'] .check-failed,
 :root[data-theme='light'] .check-invalidated {
-  color: #904217;
+  color: var(--muted);
 }
 
 .project-version-history > [role='group'] .button[aria-pressed='true'] {
   background: var(--paper);
   color: var(--ink);
   border-color: var(--paper);
+  --muted: var(--ink);
+  --dim: var(--ink);
 }
 
 .project-repositories {
@@ -260,7 +262,7 @@
   gap: 0.6rem;
   padding: 1rem;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 0;
   min-width: 0;
 }
 .project-repository > .button {
