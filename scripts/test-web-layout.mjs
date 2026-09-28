@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { checkPreviewStart } from './browser-preview-start.mjs';
 import { checkDesk } from './browser-desk.mjs';
 import { checkWorkspaceNavigation } from './browser-workspace.mjs';
 import { checkAppearance } from './browser-appearance.mjs';
@@ -1214,6 +1215,8 @@ try {
   }
   if (process.env.GARDEN_UI_FOCUS === 'appearance')
     await checkAppearance({ context, origin, bootstrap, project, task, report });
+  if (process.env.GARDEN_UI_FOCUS === 'previews')
+    await checkPreviewStart({ context, origin, task, presentation, report, errors });
   if (process.env.GARDEN_UI_FOCUS === 'files-jobs') {
     await checkTaskRecovery({ context, origin, bootstrap, task, report, errors });
     await checkArtifactLinks({ context, origin, task, workspace, presentation, report, errors });
@@ -1257,6 +1260,7 @@ try {
       'appearance',
       'workspace',
       'files-jobs',
+      'previews',
       'conversations'
     ].includes(process.env.GARDEN_UI_FOCUS)
   ) {
@@ -2647,6 +2651,7 @@ try {
       'appearance',
       'workspace',
       'files-jobs',
+      'previews',
       'conversations',
       'journeys'
     ].includes(process.env.GARDEN_UI_FOCUS)
@@ -3119,6 +3124,7 @@ try {
       'appearance',
       'workspace',
       'files-jobs',
+      'previews',
       'conversations',
       'models',
       'journeys'
@@ -3236,19 +3242,21 @@ try {
 
   assert.deepEqual(errors, [], 'The browser must not report uncaught errors');
   console.log(
-    process.env.GARDEN_UI_FOCUS === 'desk'
-      ? 'Desk browser checks passed.'
-      : process.env.GARDEN_UI_FOCUS === 'conversations'
-        ? 'Project conversations and checked updates passed.'
-        : process.env.GARDEN_UI_FOCUS === 'workspace'
-          ? 'Workspace navigation and human intervention checks passed.'
-          : process.env.GARDEN_UI_FOCUS === 'appearance'
-            ? 'Appearance checks passed: inverse LCD palettes, text contrast, local fonts, responsive layouts, prompt disclosure and mode persistence.'
-            : process.env.GARDEN_UI_FOCUS === 'models'
-              ? 'Model and draft browser checks passed: prompt, conversation and settings persistence, responsive controls, connection handling and draft recovery.'
-              : process.env.GARDEN_UI_FOCUS === 'drafts'
-                ? 'Draft browser checks passed: encrypted IndexedDB, close and reopen, offline recovery without auto-send, lost save acknowledgement, conflict choice, and interrupted send receipt replay.'
-                : 'Browser checks passed: encrypted draft recovery, viewport layout, phone focus, effort drafts, playable links, downloads, state-preserving expansion, recorded evidence, mission review, media recovery, analysis sessions, device authorization, dictation consent, model selection persistence, and denial feedback with authentication retry.'
+    process.env.GARDEN_UI_FOCUS === 'previews'
+      ? 'Preview restart, reload recovery, readiness, attention and retry checks passed.'
+      : process.env.GARDEN_UI_FOCUS === 'desk'
+        ? 'Desk browser checks passed.'
+        : process.env.GARDEN_UI_FOCUS === 'conversations'
+          ? 'Project conversations and checked updates passed.'
+          : process.env.GARDEN_UI_FOCUS === 'workspace'
+            ? 'Workspace navigation and human intervention checks passed.'
+            : process.env.GARDEN_UI_FOCUS === 'appearance'
+              ? 'Appearance checks passed: inverse LCD palettes, text contrast, local fonts, responsive layouts, prompt disclosure and mode persistence.'
+              : process.env.GARDEN_UI_FOCUS === 'models'
+                ? 'Model and draft browser checks passed: prompt, conversation and settings persistence, responsive controls, connection handling and draft recovery.'
+                : process.env.GARDEN_UI_FOCUS === 'drafts'
+                  ? 'Draft browser checks passed: encrypted IndexedDB, close and reopen, offline recovery without auto-send, lost save acknowledgement, conflict choice, and interrupted send receipt replay.'
+                  : 'Browser checks passed: encrypted draft recovery, viewport layout, phone focus, effort drafts, playable links, downloads, state-preserving expansion, recorded evidence, mission review, media recovery, analysis sessions, device authorization, dictation consent, model selection persistence, and denial feedback with authentication retry.'
   );
 } catch (error) {
   console.error(error);

@@ -113,7 +113,7 @@ export const registerTaskPresentationRoutes = (context: RouteContext): void => {
           (preview.expiresAt && Date.parse(preview.expiresAt) <= Date.now())
         )
           continue;
-        const cacheKey = `preview:${preview.id}:${preview.updatedAt}`;
+        const cacheKey = `preview:${preview.id}:${preview.updatedAt}:${preview.lastAccessedAt}`;
         const cached = availabilityCache.get(cacheKey);
         if (cached) {
           previewAvailability.set(preview.id, cached.status);

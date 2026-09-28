@@ -35,6 +35,18 @@ export const taskPreviewIds = (events: readonly TaskEvent[]): Map<string, string
   return ids;
 };
 
+export const previewStartState = (
+  events: readonly TaskEvent[],
+  taskStatus: string,
+  previewId: string
+): 'starting' | 'attention' | undefined => {
+  const direction = events.filter((event) => event.kind === 'user_message').at(-1);
+  if (!direction || record(direction.payload).previewStartId !== previewId) return undefined;
+  if (['queued', 'planning', 'running'].includes(taskStatus)) return 'starting';
+  if (['paused', 'awaiting_user', 'awaiting_resource'].includes(taskStatus)) return 'attention';
+  return undefined;
+};
+
 export const taskDeliveryFiles = (events: readonly TaskEvent[]): Map<string, string[]> => {
   const paths = new Map<string, string[]>();
   const artifactNames = new Set(
@@ -173,16 +185,27 @@ export const buildTaskPresentation = (input: PresentationInput): TaskPresentatio
           ? `/v1/previews/${encodeURIComponent(preview.id)}/access`
           : null,
       previewId: preview.id,
+      ...(preview.status !== 'revoked'
+        ? {
+            startPath: `/v1/tasks/${encodeURIComponent(input.taskId)}/previews/${encodeURIComponent(preview.id)}/start`,
+            ...(previewStartState(events, input.taskStatus, preview.id)
+              ? { startState: previewStartState(events, input.taskStatus, preview.id) }
+              : {})
+          }
+        : {}),
       evidenceEventIds: evidence,
       ...(status !== 'ready'
         ? {
-            detail: expired
-              ? 'This preview has expired.'
-              : preview.status === 'active'
-                ? status === 'unknown'
-                  ? 'Availability could not be checked.'
-                  : 'The app is not listening on its published port.'
-                : `This preview is ${preview.status}.`
+            detail:
+              preview.status === 'revoked'
+                ? 'Access to this preview has been removed.'
+                : expired
+                  ? 'This preview has rested for a while. Start it again when you’re ready.'
+                  : preview.status === 'active'
+                    ? status === 'unknown'
+                      ? 'Garden could not reach the app. Try again in a moment.'
+                      : 'The app has stopped. Start its preview again when you’re ready.'
+                    : 'Access to this preview has been removed.'
           }
         : {})
     });

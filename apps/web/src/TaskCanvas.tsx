@@ -6,6 +6,7 @@ import { isNativeClient, post } from './client';
 import { resultSnapshot } from './result-snapshot';
 import { previewIsolated, previewUrl } from './preview-url';
 import { useExpandedView } from './use-expanded-view';
+import { usePreviewStart } from './use-preview-start';
 import { Button, ErrorNotice, Spinner } from './ui';
 import './presentation.css';
 const ResultPreview = lazy(() =>
@@ -63,8 +64,18 @@ export function TaskOutputs({
     url: string;
     copied: boolean;
   } | null>(null);
-  const previews = presentation.results.filter((item) => item.kind === 'preview');
+  const recovery = usePreviewStart(presentation, autoPreview || opened !== null);
+  useEffect(() => {
+    if (recovery.restoredId) setSelectedPreview(recovery.restoredId);
+  }, [recovery.restoredId]);
+  const previews = recovery.previews;
   const preview = previews.find((item) => item.id === selectedPreview) ?? previews[0];
+  useEffect(() => {
+    if (preview?.startState) setSelectedSection('preview');
+  }, [preview?.id, preview?.startState]);
+  const startingPreview =
+    preview?.startState === 'starting' ||
+    (recovery.requestedId === preview?.id && Boolean(preview));
   const files = presentation.results.filter((item) => item.kind !== 'preview');
   const captured = preview ? resultSnapshot(preview, events, presentation.taskId) : null;
   const featured = !preview
@@ -84,7 +95,7 @@ export function TaskOutputs({
   const previewId = preview?.id;
   useEffect(() => {
     if (
-      !autoPreview ||
+      (!autoPreview && selectedPreview === null) ||
       !previewKey ||
       !previewId ||
       previewStatus !== 'ready' ||
@@ -122,7 +133,16 @@ export function TaskOutputs({
     return () => {
       active = false;
     };
-  }, [previewKey, previewId, previewAccess, previewAddress, previewStatus, dismissed, autoPreview]);
+  }, [
+    previewKey,
+    previewId,
+    previewAccess,
+    previewAddress,
+    previewStatus,
+    dismissed,
+    autoPreview,
+    selectedPreview
+  ]);
   useEffect(() => {
     if (!opened || frameState !== 'loading') return;
     const timer = setTimeout(() => setFrameState('slow'), 15_000);
@@ -200,7 +220,7 @@ export function TaskOutputs({
   ];
   const selected =
     sections.find((section) => section.id === selectedSection)?.id ??
-    (preferSummary && afterPreview ? 'summary' : sections[0]?.id);
+    (preferSummary && afterPreview && !preview?.startState ? 'summary' : sections[0]?.id);
   return (
     <section
       className={`garden-outputs${fitted ? ' is-fitted' : ''}`}
@@ -220,6 +240,7 @@ export function TaskOutputs({
         </nav>
       )}
       <ErrorNotice error={error} />
+      <ErrorNotice error={recovery.error} />
       {!presentation.results.length &&
         !presentation.delivery?.pendingJobs &&
         presentation.outputs?.some((output) => output.kind !== 'answer') && (
@@ -313,27 +334,68 @@ export function TaskOutputs({
                     dateStyle: 'medium',
                     timeStyle: 'short'
                   })}
-                  <span>Open for the live version</span>
+                  <span>
+                    {preview.status === 'ready'
+                      ? 'Open for the live version'
+                      : 'Start the preview for the live version'}
+                  </span>
                 </figcaption>
               </figure>
             ) : (
               <div className="garden-preview-state garden-preview-placeholder" role="status">
                 <Globe size={28} strokeWidth={1.25} aria-hidden="true" />
                 <strong>
-                  {preview.status !== 'ready' ? 'Preview unavailable' : 'Project preview'}
+                  {startingPreview
+                    ? 'Starting preview…'
+                    : preview.startState === 'attention'
+                      ? 'A little help is needed'
+                      : preview.status === 'unknown'
+                        ? 'Preview not reachable'
+                        : preview.status !== 'ready'
+                          ? 'Preview stopped'
+                          : 'Project preview'}
                 </strong>
                 <p>
-                  {preview.status !== 'ready'
-                    ? (preview.detail ?? 'The live app is not available right now.')
-                    : dismissed === previewKey
-                      ? 'Embedded preview closed. Open the app or view it here when you are ready.'
-                      : frameState === 'failed'
-                        ? 'The app could not be opened. Use View here to retry.'
-                        : 'Opening the live app…'}
+                  {startingPreview
+                    ? 'Garden is starting the app. It will open here when it’s ready.'
+                    : preview.startState === 'attention'
+                      ? 'Open this conversation to continue starting the app.'
+                      : preview.status !== 'ready'
+                        ? (preview.detail ?? 'The live app is not available right now.')
+                        : dismissed === previewKey
+                          ? 'Embedded preview closed. Open the app or view it here when you are ready.'
+                          : frameState === 'failed'
+                            ? 'The app could not be opened. Use View here to retry.'
+                            : 'Opening the live app…'}
                 </p>
               </div>
             )}
             <div className="garden-output-actions">
+              {preview.status !== 'ready' &&
+                preview.startPath &&
+                (preview.startState === 'attention' ? (
+                  <a
+                    className="button primary"
+                    href={`/?task=${encodeURIComponent(presentation.taskId)}`}
+                  >
+                    Open conversation
+                  </a>
+                ) : (
+                  <Button
+                    className="primary"
+                    busy={startingPreview}
+                    title="Garden will restart the app using this conversation’s model and settings."
+                    onClick={() => {
+                      setSelectedSection('preview');
+                      setSelectedPreview(preview.id);
+                      setDismissed(null);
+                      grants.current.clear();
+                      void recovery.start(preview);
+                    }}
+                  >
+                    {startingPreview ? 'Starting preview…' : 'Start preview'}
+                  </Button>
+                ))}
               {preview.status === 'ready' && (
                 <>
                   <Button
@@ -381,9 +443,12 @@ export function TaskOutputs({
                   Download {files.length === 1 ? 'source' : 'file'}
                 </a>
               )}
-              {preview.detail && (preview.status === 'ready' || captured) && (
-                <p className="muted">{preview.detail}</p>
-              )}
+              {preview.detail &&
+                !startingPreview &&
+                !preview.startState &&
+                (preview.status === 'ready' || captured) && (
+                  <p className="muted">{preview.detail}</p>
+                )}
             </div>
             {sharedLink?.id === preview.id &&
               (sharedLink.copied ? (

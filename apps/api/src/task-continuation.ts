@@ -45,6 +45,7 @@ export interface RetainedTaskContinuation {
   expected: TaskContinuationSnapshot;
   messageId: string;
   questionId?: string;
+  previewStartId?: string;
 }
 const started = <T>(work: Promise<T>): Promise<() => T> =>
   work.then(
@@ -354,6 +355,7 @@ async function performContinuation(
     userMessageCiphertext: encryptJson(
       {
         markdown: input.prompt,
+        ...(retained?.previewStartId ? { previewStartId: retained.previewStartId } : {}),
         attachments: input.attachments?.length ? input.attachments : undefined
       },
       dataKey,

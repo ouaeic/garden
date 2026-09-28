@@ -11,6 +11,9 @@ export const TaskResult = z.object({
   downloadUrl: z.string().nullable(),
   /** POST here when the owner views this result to obtain a private preview URL. */
   accessPath: z.string().nullable(),
+  /** Owner action: restore this app through its conversation's execution policy. */
+  startPath: z.string().optional(),
+  startState: z.enum(['starting', 'attention']).optional(),
   previewId: z.string().optional(),
   artifactId: z.string().optional(),
   workspaceId: z.string().optional(),

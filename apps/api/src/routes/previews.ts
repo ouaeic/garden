@@ -14,8 +14,10 @@ import type { RouteContext } from '../http/server-context.js';
 import { serverLimits } from '../plans.js';
 import { recordSecurityEvent } from '../security-events.js';
 import { issuePreviewAccess } from '../preview-access.js';
+import { registerPreviewStartRoutes } from './preview-start.js';
 
 export const registerPreviewRoutes = (context: RouteContext): void => {
+  registerPreviewStartRoutes(context);
   const {
     app,
     store,
