@@ -92,17 +92,6 @@
   font-weight: 400;
   line-height: 1.45;
 }
-@media (prefers-reduced-motion: no-preference) {
-  :focus-visible)
-    .garden-project-title[data-overflow='true'] {
-    text-overflow: clip;
-  }
-  :focus-visible)
-    .garden-project-title[data-overflow='true']
-    strong {
-    animation: garden-title-reveal var(--title-duration) steps(40, end) 0.8s infinite alternate;
-  }
-}
 @keyframes garden-title-reveal {
   0%,
   15% {
