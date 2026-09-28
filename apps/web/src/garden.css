@@ -405,33 +405,28 @@
   margin-bottom: 20px;
 }
 .garden-phase-count {
-  position: relative;
-  height: 48px;
-  width: 48px;
+  display: grid;
+  justify-items: end;
+  gap: 4px;
   flex-shrink: 0;
-  padding: 0;
+  padding: 4px;
   border: 0;
   background: transparent;
 }
-.garden-phase-count svg {
-  width: 100%;
-  height: 100%;
-  transform: rotate(-90deg);
-}
-.garden-phase-count circle {
-  fill: none;
-  stroke: var(--line);
-  stroke-width: 2;
-}
-.garden-phase-count .garden-progress-arc {
-  stroke: var(--accent);
-}
-.garden-phase-count > span {
-  position: absolute;
-  inset: 0;
+/* One block per step, filled as steps complete: the save bar of the work. */
+.garden-phase-blocks {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  gap: 2px;
+}
+.garden-phase-blocks > i {
+  width: 8px;
+  height: 12px;
+  border: 1px solid var(--text);
+}
+.garden-phase-blocks > i.is-done {
+  background: var(--text);
+}
+.garden-phase-count > span:not(.garden-phase-blocks) {
   font-size: 16px;
 }
 .garden-phase-count small {

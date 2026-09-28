@@ -334,3 +334,12 @@
   font: 16px var(--font-mono);
   text-align: center;
 }
+
+/* Phones give the computer the whole width: one frame, not two. */
+@media (max-width: 700px) {
+  .desk-shell .view-computer > section:not([hidden]) {
+    margin: 0;
+    padding: 8px;
+    border: 0;
+  }
+}

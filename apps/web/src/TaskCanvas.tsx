@@ -718,17 +718,18 @@ export function TaskProgress({
             onClick={onPlan}
             aria-label={`Plan: ${complete} of ${phases.length} steps completed`}
           >
-            <svg viewBox="0 0 48 48" aria-hidden="true">
-              <circle cx="24" cy="24" r="20" />
-              <circle
-                className="garden-progress-arc"
-                cx="24"
-                cy="24"
-                r="20"
-                pathLength="100"
-                strokeDasharray={`${(complete / phases.length) * 100} 100`}
-              />
-            </svg>
+            <span className="garden-phase-blocks" aria-hidden="true">
+              {phases.slice(0, 12).map((phase, index) => (
+                <i
+                  key={phase.id}
+                  className={
+                    index < Math.round((complete / phases.length) * Math.min(phases.length, 12))
+                      ? 'is-done'
+                      : ''
+                  }
+                />
+              ))}
+            </span>
             <span>
               {complete}
               <small>/{phases.length}</small>
