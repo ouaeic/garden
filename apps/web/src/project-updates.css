@@ -200,7 +200,7 @@
   overflow: auto;
   padding: 1rem;
   border-radius: 0;
-  background: var(--bg);
+  background: var(--lcd-texture), var(--bg);
   font-size: 0.8rem;
 }
 .project-change-list {
@@ -247,7 +247,7 @@
 }
 
 .project-version-history > [role='group'] .button[aria-pressed='true'] {
-  background: var(--paper);
+  background: var(--lcd-texture-inverse), var(--paper);
   color: var(--ink);
   border-color: var(--paper);
   --muted: var(--ink);

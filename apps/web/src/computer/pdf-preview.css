@@ -50,7 +50,7 @@
   overflow-anchor: none;
   width: 100%;
   height: min(75dvh, 900px);
-  background: var(--raised);
+  background: var(--lcd-texture), var(--raised);
   border-radius: 0;
 }
 .pdf-page {

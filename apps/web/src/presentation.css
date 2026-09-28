@@ -59,7 +59,7 @@
   border: 1px solid var(--line, color-mix(in srgb, var(--text) 25%, transparent));
   border-radius: 0;
   padding: 1.15rem;
-  background: var(--panel);
+  background: var(--lcd-texture), var(--panel);
 }
 .garden-work-block h3 {
   margin: 0 0 0.9rem;
@@ -152,10 +152,10 @@
 .garden-chart-bar-track i {
   display: block;
   height: 100%;
-  background: var(--accent, var(--muted));
+  background: var(--lcd-texture-inverse), var(--accent, var(--muted));
 }
 .garden-chart-bar-track i.negative {
-  background: var(--danger, var(--muted));
+  background: var(--lcd-texture-inverse), var(--danger, var(--muted));
 }
 .garden-recorded-actions > div {
   display: flex;
@@ -257,7 +257,7 @@
   padding: 16px 18px;
   border: 1px solid var(--line);
   border-radius: 0;
-  background: var(--panel);
+  background: var(--lcd-texture), var(--panel);
   overflow-wrap: anywhere;
   font-size: 16px;
 }
@@ -295,7 +295,7 @@
   padding: 18px 20px;
   border-bottom: 1px solid var(--line);
   color: var(--text);
-  background-color: var(--panel);
+  background: var(--lcd-texture), var(--panel);
 }
 .work-summary-visual > header {
   display: flex;
@@ -337,16 +337,17 @@
   border: 1px solid var(--text);
 }
 .work-summary-visual [data-state='completed'] {
-  background: var(--text);
+  background: var(--lcd-texture-inverse), var(--text);
 }
 .work-summary-visual [data-state='in_progress'] {
-  background: var(--muted);
+  background: var(--lcd-texture-inverse), var(--muted);
 }
 .work-summary-visual [data-state='pending'] {
-  background: var(--bg);
+  background: var(--lcd-texture), var(--bg);
 }
 .work-summary-visual [data-state='skipped'] {
-  background: repeating-linear-gradient(135deg, var(--text) 0 1px, var(--bg) 1px 4px);
+  background:
+    var(--lcd-texture), repeating-linear-gradient(135deg, var(--text) 0 1px, var(--bg) 1px 4px);
 }
 .work-summary-legend {
   display: flex;
@@ -387,7 +388,7 @@
 .work-summary-bar i {
   display: block;
   height: 8px;
-  background: var(--text);
+  background: var(--lcd-texture-inverse), var(--text);
 }
 .summary-image-link {
   display: inline-block;

@@ -34,7 +34,7 @@ body:has(.desk-shell),
 }
 .desk-navigation .button[aria-expanded='true'] {
   color: var(--text);
-  background: var(--raised);
+  background: var(--lcd-texture), var(--raised);
 }
 .desk-shell .garden-masthead-end {
   gap: 5px;
@@ -49,7 +49,9 @@ body:has(.desk-shell),
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: radial-gradient(ellipse at 60% 0%, var(--canvas-glow), transparent 65%), var(--bg);
+  background:
+    var(--lcd-texture), radial-gradient(ellipse at 60% 0%, var(--canvas-glow), transparent 65%),
+    var(--bg);
 }
 .desk-shell .garden-main > .error {
   max-height: 25%;
@@ -61,7 +63,7 @@ body:has(.desk-shell),
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--panel);
+  background: var(--lcd-texture), var(--panel);
   border: 1px solid var(--line);
   border-radius: 0;
   box-shadow: var(--surface-shadow);
@@ -133,7 +135,7 @@ body:has(.desk-shell),
 .desk-action-row:hover,
 .desk-update-row:hover,
 .desk-file-row:hover {
-  background: var(--raised);
+  background: var(--lcd-texture), var(--raised);
 }
 .desk-project-row:last-child,
 .desk-action-row:last-child,
@@ -266,7 +268,7 @@ body:has(.desk-shell),
   display: flex;
   border: 1px solid var(--line);
   border-radius: 0;
-  background: var(--panel);
+  background: var(--lcd-texture), var(--panel);
   box-shadow: var(--surface-shadow);
 }
 .desk-shell .desk-start-card .desk-card-scroll {
@@ -397,7 +399,7 @@ body:has(.desk-shell),
   border: 1px solid currentColor;
   border-radius: 0;
   transform: none;
-  background: currentColor;
+  background: var(--lcd-texture-inverse), currentColor;
   clip-path: polygon(
     0 25%,
     25% 25%,
@@ -447,7 +449,7 @@ body:has(.desk-shell),
   display: grid;
   place-items: center;
   border-radius: 0;
-  background: linear-gradient(145deg, var(--raised), var(--panel));
+  background: var(--lcd-texture), linear-gradient(145deg, var(--raised), var(--panel));
   border: 1px solid var(--line);
   color: var(--accent);
   box-shadow: var(--surface-shadow);
@@ -636,7 +638,7 @@ body:has(.desk-shell),
   color: var(--muted);
 }
 .desk-shell .project-view-nav .button[aria-current] {
-  background: var(--paper);
+  background: var(--lcd-texture-inverse), var(--paper);
   color: var(--ink);
   --muted: var(--ink);
   --dim: var(--ink);
@@ -674,7 +676,7 @@ body:has(.desk-shell),
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  background: var(--panel);
+  background: var(--lcd-texture), var(--panel);
   border: 1px solid var(--line);
   border-radius: 0;
 }
@@ -842,7 +844,7 @@ body:has(.desk-shell),
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 0;
-  background: var(--panel);
+  background: var(--lcd-texture), var(--panel);
   box-shadow: var(--surface-shadow);
   overflow: auto;
   overscroll-behavior: contain;
@@ -907,8 +909,7 @@ body:has(.desk-shell),
   z-index: 2;
   margin: 0 -16px;
   padding: 10px 16px;
-  background: var(--panel);
-  background-image: var(--lcd-texture);
+  background: var(--lcd-texture), var(--panel);
   border-bottom: 1px solid transparent;
 }
 .garden-history[open] > summary {
@@ -968,7 +969,7 @@ body:has(.desk-shell),
   background: transparent;
 }
 .desk-output-sections .button[aria-pressed='true'] {
-  background: var(--paper);
+  background: var(--lcd-texture-inverse), var(--paper);
   color: var(--ink);
   --muted: var(--ink);
   --dim: var(--ink);
@@ -1050,7 +1051,7 @@ body:has(.desk-shell),
   padding: 18px;
   border: 1px solid var(--line);
   border-radius: 0;
-  background: var(--raised);
+  background: var(--lcd-texture), var(--raised);
   color: var(--accent);
 }
 .garden-preview-placeholder strong {
@@ -1153,7 +1154,7 @@ body:has(.desk-shell),
   padding: 11px 14px;
   font-size: 16px;
   justify-content: flex-start;
-  background: var(--panel);
+  background: var(--lcd-texture), var(--panel);
 }
 .desk-conversation-history {
   display: grid;
@@ -1166,7 +1167,7 @@ body:has(.desk-shell),
   min-width: 0;
 }
 .desk-message.owner-message {
-  background: var(--raised);
+  background: var(--lcd-texture), var(--raised);
 }
 .desk-message header {
   display: flex;
@@ -1210,7 +1211,7 @@ body:has(.desk-shell),
   display: flex;
   flex-direction: column;
   flex: 1;
-  background: var(--panel);
+  background: var(--lcd-texture), var(--panel);
   border: 1px solid var(--line);
   border-radius: 0;
   padding: 12px 18px;
@@ -1287,7 +1288,7 @@ body:has(.desk-shell),
   scrollbar-width: thin;
   padding: 20px;
   border: 1px solid var(--line);
-  background: var(--panel);
+  background: var(--lcd-texture), var(--panel);
   border-radius: 0;
 }
 .desk-sheet-attention > .dialog-body > section,
@@ -1300,7 +1301,7 @@ body:has(.desk-shell),
   scrollbar-width: thin;
   margin: 20px 26px;
   padding: 20px;
-  background: var(--panel);
+  background: var(--lcd-texture), var(--panel);
   border: 1px solid var(--line);
   border-radius: 0;
 }
@@ -1380,7 +1381,7 @@ body:has(.desk-shell),
     white-space: nowrap;
   }
   .desk-home-switcher .button[aria-pressed='true'] {
-    background: var(--paper);
+    background: var(--lcd-texture-inverse), var(--paper);
     color: var(--ink);
     --muted: var(--ink);
     --dim: var(--ink);
@@ -1421,7 +1422,7 @@ body:has(.desk-shell),
     padding: 0;
     border: 1px solid var(--line);
     border-radius: 0;
-    background: var(--panel);
+    background: var(--lcd-texture), var(--panel);
   }
   .desk-home .desk-card-heading {
     padding: 13px 14px;
@@ -1609,7 +1610,7 @@ html[data-workspace-short='true'] .desk-shell .management-heading p {
   border-radius: 0;
   overflow: hidden;
   border-color: var(--line-strong);
-  background: var(--panel);
+  background: var(--lcd-texture), var(--panel);
   box-shadow: var(--surface-shadow);
 }
 .desk-shell .desk-sheet-projects[open] {

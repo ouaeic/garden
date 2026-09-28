@@ -28,7 +28,7 @@
 }
 .garden-primary-navigation button:hover,
 .garden-primary-navigation button[aria-current] {
-  background: var(--paper);
+  background: var(--lcd-texture-inverse), var(--paper);
   color: var(--ink);
   --muted: var(--ink);
   --dim: var(--ink);
@@ -36,7 +36,7 @@
 .garden-primary-navigation small {
   margin-left: auto;
   padding: 1px 6px;
-  background: var(--panel);
+  background: var(--lcd-texture), var(--panel);
   border-radius: 0;
 }
 .sidebar-project-label {
@@ -167,7 +167,7 @@
   padding: 8px 14px;
 }
 .project-view-nav .button[aria-current] {
-  background: var(--paper);
+  background: var(--lcd-texture-inverse), var(--paper);
   color: var(--ink);
   --muted: var(--ink);
   --dim: var(--ink);
@@ -724,7 +724,7 @@
   border-color: transparent;
 }
 .job-view-nav .button[aria-pressed='true'] {
-  background: var(--paper);
+  background: var(--lcd-texture-inverse), var(--paper);
   border-color: var(--line);
   color: var(--ink);
   --muted: var(--ink);

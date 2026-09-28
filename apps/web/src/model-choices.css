@@ -91,7 +91,7 @@
   overflow-wrap: anywhere;
 }
 .model-browser-option[data-active='true'] {
-  background: var(--raised);
+  background: var(--lcd-texture), var(--raised);
   border-color: var(--line-strong);
 }
 .model-browser-option[aria-selected='true'] {
@@ -239,7 +239,7 @@
   font: inherit;
 }
 .prompt-model-row > button:hover {
-  background: var(--raised);
+  background: var(--lcd-texture), var(--raised);
 }
 .prompt-model-role-value {
   color: var(--muted);

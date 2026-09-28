@@ -1,6 +1,37 @@
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
+export async function checkInterfaceTexture(page) {
+  const coverage = await page.evaluate(() => {
+    const painted = [...document.querySelectorAll('*')].filter((element) => {
+      if (element.matches('img, canvas, iframe, video, object, embed')) return false;
+      const box = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return (
+        box.width >= 12 &&
+        box.height >= 12 &&
+        box.bottom > 0 &&
+        box.right > 0 &&
+        box.top < innerHeight &&
+        box.left < innerWidth &&
+        style.visibility === 'visible' &&
+        /^(?:rgb\(|color\([^/]+\)$)/.test(style.backgroundColor)
+      );
+    });
+    return {
+      count: painted.length,
+      missing: painted
+        .filter(
+          (element) =>
+            !getComputedStyle(element).backgroundImage.includes('repeating-linear-gradient')
+        )
+        .map((element) => `${element.tagName.toLowerCase()}.${element.className}`)
+    };
+  });
+  assert(coverage.count > 0, 'Check visible painted interface surfaces');
+  assert.deepEqual(coverage.missing, [], 'Every opaque interface surface retains the LCD matrix');
+}
+
 export async function checkOutputAppearance({ context, origin, task, report }) {
   const page = await context.newPage();
   await page.goto(`${origin}/?task=${task.id}`);
@@ -15,6 +46,7 @@ export async function checkOutputAppearance({ context, origin, task, report }) {
     }, theme);
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: width === 1440 ? 1000 : 844 });
+      await checkInterfaceTexture(page);
       await page.screenshot({ path: resolve(report, `summary-${theme}-${width}.png`) });
       assert(await visual.evaluate((element) => element.scrollWidth <= element.clientWidth));
     }
@@ -22,6 +54,7 @@ export async function checkOutputAppearance({ context, origin, task, report }) {
       await page.evaluate((surface) => {
         const host = document.createElement(surface === 'dialog' ? 'dialog' : 'div');
         host.id = 'output-color-check';
+        host.className = 'garden-media-job';
         host.style.cssText =
           'position:fixed;inset:20px auto auto 20px;padding:10px;margin:0;z-index:10000;width:300px;';
         if (surface === 'popover') host.setAttribute('popover', 'manual');
@@ -30,7 +63,8 @@ export async function checkOutputAppearance({ context, origin, task, report }) {
         host.innerHTML =
           `<img class="computer-result-image" alt="Color fidelity fixture" src="data:image/svg+xml,${encodeURIComponent(svg)}" style="width:120px;height:60px;display:block">` +
           '<canvas width="120" height="60" style="display:block"></canvas>' +
-          '<iframe title="Color fidelity frame" style="display:block;width:120px;height:60px;border:0" srcdoc="<style>html,body{margin:0;background:#3976d8}</style>"></iframe>';
+          `<video poster="data:image/svg+xml,${encodeURIComponent(svg)}" style="display:block;width:120px;height:60px"></video>` +
+          '<iframe class="garden-preview-frame" title="Color fidelity frame" style="display:block;width:120px;height:60px;border:0" srcdoc="<style>html,body{margin:0;background:#3976d8}</style>"></iframe>';
         document.body.append(host);
         host.querySelector('canvas').getContext('2d').fillStyle = '#3976d8';
         host.querySelector('canvas').getContext('2d').fillRect(0, 0, 60, 60);
@@ -50,7 +84,7 @@ export async function checkOutputAppearance({ context, origin, task, report }) {
             else frame.addEventListener('load', done, { once: true });
           })
       );
-      for (const tag of ['img', 'canvas', 'iframe']) {
+      for (const tag of ['img', 'canvas', 'iframe', 'video']) {
         const screenshot = await host.locator(tag).screenshot();
         const colors = await page.evaluate(async (base64) => {
           const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
@@ -68,7 +102,9 @@ export async function checkOutputAppearance({ context, origin, task, report }) {
         }, screenshot.toString('base64'));
         assert.deepEqual(
           colors,
-          tag === 'iframe' ? ['57,118,216,255'] : ['255,255,255,255', '57,118,216,255'],
+          tag === 'iframe'
+            ? ['57,118,216,255']
+            : [tag === 'video' ? '0,0,0,255' : '255,255,255,255', '57,118,216,255'],
           `${theme} ${surface} ${tag}: originals retain exact colors and a neutral transparent background`
         );
       }

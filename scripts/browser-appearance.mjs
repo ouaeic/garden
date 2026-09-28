@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { checkOutputAppearance } from './browser-output-appearance.mjs';
+import { checkInterfaceTexture, checkOutputAppearance } from './browser-output-appearance.mjs';
 
 export async function checkAppearance({ context, origin, bootstrap, project, task, report }) {
   const page = await context.newPage();
@@ -126,6 +126,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
         composerBefore,
         'Settings must not resize or move the prompt'
       );
+      await checkInterfaceTexture(page);
       await page.screenshot({ path: resolve(report, `prompt-settings-${theme}-${width}.png`) });
       await page.keyboard.press('Escape');
     }
@@ -189,6 +190,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     );
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: width > 760 ? 1000 : 844 });
+      await checkInterfaceTexture(page);
       await page.screenshot({ path: resolve(report, `settings-${theme}-${width}.png`) });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
     }
@@ -215,6 +217,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
       });
       await page.getByRole('button', { name: 'Prompt settings', exact: true }).click();
       await page.getByRole('dialog', { name: 'Prompt settings', exact: true }).waitFor();
+      await checkInterfaceTexture(page);
       await page.screenshot({
         path: resolve(report, `conversation-settings-${theme}-${width}.png`)
       });

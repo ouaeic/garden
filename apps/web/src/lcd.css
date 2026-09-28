@@ -50,7 +50,7 @@
   text-rendering: geometricPrecision;
   -webkit-font-smoothing: auto;
   color: var(--text);
-  background: var(--bg);
+  background: var(--lcd-texture), var(--bg);
   color-scheme: light;
 }
 :root[data-theme='dark'] {
@@ -72,37 +72,17 @@
       transparent 0 2px,
       color-mix(in srgb, var(--text) 4%, transparent) 2px 3px
     );
-}
-:where(
-  body,
-  dialog,
-  [popover],
-  .dialog-heading,
-  .lcd-surface,
-  .garden-shell,
-  .garden-main,
-  .garden-masthead,
-  .garden-sidebar,
-  .desk-card,
-  .desk-start-card,
-  .desk-resume-card,
-  .desk-empty-card,
-  .garden-task-aside,
-  .garden-answer,
-  .garden-progress,
-  .garden-output-header,
-  .garden-output-actions,
-  .garden-delivery,
-  .garden-working-note,
-  .completion-record,
-  .project-overview,
-  .project-summary-card,
-  .intent-editor,
-  .panel,
-  .management-section,
-  .garden-health-panel
-) {
-  background-image: var(--lcd-texture) !important;
+  --lcd-texture-inverse:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 2px,
+      color-mix(in srgb, var(--bg) 4%, transparent) 2px 3px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 2px,
+      color-mix(in srgb, var(--bg) 4%, transparent) 2px 3px
+    );
 }
 /* Opaque neutral backing also keeps the interface grid out of transparent images and frames. */
 :root :is(img, canvas, iframe, video) {
@@ -133,15 +113,18 @@ input:is([type='checkbox'], [type='radio']) {
   appearance: none;
   padding: 0;
   border: 1px solid var(--text);
-  background: var(--bg);
+  background: var(--lcd-texture), var(--bg);
   vertical-align: middle;
 }
 input:is([type='checkbox'], [type='radio']):checked {
-  background: var(--text);
+  background: var(--lcd-texture-inverse), var(--text);
   box-shadow: inset 0 0 0 3px var(--bg);
 }
 input:is([type='checkbox'], [type='radio']):indeterminate {
-  background: linear-gradient(var(--text), var(--text)) center / 9px 3px no-repeat var(--bg);
+  background:
+    linear-gradient(var(--text), var(--text)) center / 9px 3px no-repeat,
+    var(--lcd-texture),
+    var(--bg);
 }
 :where(button, a, summary):focus-visible {
   outline: 2px dashed var(--text);
@@ -160,11 +143,11 @@ input:is([type='checkbox'], [type='radio']):indeterminate {
   height: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--bg);
+  background: var(--lcd-texture), var(--bg);
   border-left: 1px solid var(--line);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--muted);
+  background: var(--lcd-texture-inverse), var(--muted);
   border: 2px solid var(--bg);
 }
 @media (prefers-contrast: more) {
@@ -174,6 +157,7 @@ input:is([type='checkbox'], [type='radio']):indeterminate {
   }
   :root {
     --lcd-texture: none;
+    --lcd-texture-inverse: none;
   }
 }
 @media (forced-colors: active) {
@@ -182,10 +166,12 @@ input:is([type='checkbox'], [type='radio']):indeterminate {
   }
   :root {
     --lcd-texture: none;
+    --lcd-texture-inverse: none;
   }
 }
 @media print {
   :root {
     --lcd-texture: none;
+    --lcd-texture-inverse: none;
   }
 }

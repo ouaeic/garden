@@ -27,7 +27,7 @@
 .analysis-run-status.interrupted {
   font-weight: 600;
   border-left: 3px solid currentColor;
-  background: var(--raised);
+  background: var(--lcd-texture), var(--raised);
 }
 .analysis-run-facts {
   display: grid;

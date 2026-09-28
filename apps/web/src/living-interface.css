@@ -76,7 +76,7 @@
   padding: 20px;
   border: 1px solid var(--line-strong);
   border-radius: 0;
-  background: var(--panel);
+  background: var(--lcd-texture), var(--panel);
   box-shadow: var(--surface-shadow);
 }
 .garden-health-panel p {
@@ -100,7 +100,7 @@
   flex-wrap: wrap;
 }
 .garden-shell .garden-new-work:hover {
-  background: var(--paper);
+  background: var(--lcd-texture-inverse), var(--paper);
   filter: brightness(0.96);
 }
 .garden-shell .garden-masthead-end {
@@ -111,24 +111,24 @@
 }
 .garden-shell .project-conversation-tabs button[aria-selected='true'] {
   color: var(--ink);
-  background: var(--paper);
+  background: var(--lcd-texture-inverse), var(--paper);
   border-color: transparent;
   --muted: var(--ink);
   --dim: var(--ink);
 }
 .garden-shell .garden-task-aside {
   border-left-color: transparent;
-  background: var(--chrome);
+  background: var(--lcd-texture), var(--chrome);
   border-radius: 0;
   padding: 20px;
 }
 .garden-shell .garden-working-note {
-  background: var(--chrome);
+  background: var(--lcd-texture), var(--chrome);
   border-color: transparent;
   border-radius: 0;
 }
 .garden-shell .garden-task .completion-record {
-  background: var(--chrome);
+  background: var(--lcd-texture), var(--chrome);
   border-color: transparent;
   border-radius: 0;
 }
@@ -157,7 +157,7 @@
   border-radius: 0;
 }
 .garden-shell .garden-delivery {
-  background: var(--panel);
+  background: var(--lcd-texture), var(--panel);
   border-radius: 0;
 }
 .garden-shell .management-tabs {
@@ -167,7 +167,7 @@
   border-radius: 0;
 }
 .garden-shell .management-tabs button[aria-current] {
-  background: var(--paper);
+  background: var(--lcd-texture-inverse), var(--paper);
   color: var(--ink);
   --muted: var(--ink);
   --dim: var(--ink);

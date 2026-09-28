@@ -32,7 +32,7 @@
   cursor: pointer;
 }
 .management-tabs button[aria-current='page'] {
-  background: var(--paper);
+  background: var(--lcd-texture-inverse), var(--paper);
   color: var(--ink);
   --muted: var(--ink);
   --dim: var(--ink);
@@ -92,7 +92,7 @@
   box-sizing: border-box;
 }
 .management-section select option {
-  background: var(--panel);
+  background: var(--lcd-texture), var(--panel);
   color: var(--text);
 }
 .management-section textarea {
