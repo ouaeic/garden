@@ -385,7 +385,7 @@ body:has(.desk-shell),
     transform 180ms;
 }
 .desk-resume-open:hover .desk-resume-arrow {
-  background: color-mix(in srgb, var(--text) 13%, transparent);
+  background-color: color-mix(in srgb, var(--text) 13%, transparent);
   transform: translateX(3px);
 }
 .desk-resume-eyebrow {

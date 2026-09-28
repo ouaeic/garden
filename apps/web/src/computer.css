@@ -59,7 +59,7 @@ div.computer-file-row > .row {
 }
 .computer-file-row.selected,
 button.computer-file-row:hover {
-  background: color-mix(in srgb, currentColor 7%, transparent);
+  background-color: color-mix(in srgb, currentColor 7%, transparent);
 }
 .computer-path,
 .computer-command {

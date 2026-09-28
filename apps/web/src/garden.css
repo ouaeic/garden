@@ -186,7 +186,7 @@
   min-width: 0;
 }
 .garden-project-list > button:hover {
-  background: color-mix(in srgb, var(--text) 3%, transparent);
+  background-color: color-mix(in srgb, var(--text) 3%, transparent);
 }
 .garden-project-list > button[aria-current] {
   background: var(--lcd-texture-inverse), var(--paper);

@@ -93,9 +93,10 @@
 :root video {
   background-color: #000;
 }
+/* Native text selection cannot paint gradients; translucency preserves the surface matrix. */
 ::selection {
-  color: var(--bg);
-  background: var(--text);
+  color: inherit;
+  background-color: color-mix(in srgb, currentColor 18%, transparent);
 }
 :where(button, input, select, textarea, progress) {
   accent-color: var(--text);

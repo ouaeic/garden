@@ -83,6 +83,37 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     await page.evaluate((value) => {
       document.documentElement.dataset.theme = value;
     }, theme);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const navigation = page.locator('.desk-navigation button');
+    assert((await navigation.count()) > 0, 'Exercise primary navigation interaction states');
+    for (const button of await navigation.all()) {
+      await button.hover();
+      await checkInterfaceTexture(page);
+      assert.match(
+        await button.evaluate((element) => getComputedStyle(element).backgroundImage),
+        /repeating-linear-gradient/,
+        'Hovered navigation retains its matrix'
+      );
+    }
+    const heading = page.getByRole('heading', { name: 'Space for your next idea.' });
+    await heading.evaluate((element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      getSelection().removeAllRanges();
+      getSelection().addRange(range);
+    });
+    const selection = await heading.evaluate((element) => ({
+      text: getSelection().toString(),
+      background: getComputedStyle(element, '::selection').backgroundColor
+    }));
+    assert(selection.text.length > 0, 'Text is selected');
+    assert.match(
+      selection.background,
+      /(?:\/\s*0\.18|,\s*0\.18)\)/,
+      'Selection lets the matrix show through'
+    );
+    await page.screenshot({ path: resolve(report, `selection-${theme}.png`) });
+    await page.evaluate(() => getSelection().removeAllRanges());
     for (const width of [1440, 768, 390, 320]) {
       await page.setViewportSize({ width, height: width > 760 ? 1000 : 844 });
       if (width <= 760)

@@ -144,7 +144,7 @@
   cursor: pointer;
 }
 .project-update-row:hover {
-  background: var(--hover, color-mix(in srgb, var(--text) 8%, transparent));
+  background-color: var(--hover, color-mix(in srgb, var(--text) 8%, transparent));
 }
 .project-update-title {
   flex: 1;
