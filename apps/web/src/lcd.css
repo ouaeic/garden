@@ -59,16 +59,9 @@
   --muted: var(--lcd-faint);
   color-scheme: dark;
 }
-/* A static glass matrix costs no animation frames or layout work. */
-body::after,
-dialog::after,
-[popover]::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 2147483646;
-  pointer-events: none;
-  background-image:
+/* Texture belongs to interface backgrounds so delivered content keeps its own pixels. */
+:root {
+  --lcd-texture:
     repeating-linear-gradient(
       0deg,
       transparent 0 2px,
@@ -79,11 +72,46 @@ dialog::after,
       transparent 0 2px,
       color-mix(in srgb, var(--text) 4%, transparent) 2px 3px
     );
-  box-shadow: inset 0 0 70px 6px #26351f17;
 }
-dialog::after,
-[popover]::after {
-  position: absolute;
+:where(
+  body,
+  dialog,
+  [popover],
+  .dialog-heading,
+  .lcd-surface,
+  .garden-shell,
+  .garden-main,
+  .garden-masthead,
+  .garden-sidebar,
+  .desk-card,
+  .desk-start-card,
+  .desk-resume-card,
+  .desk-empty-card,
+  .garden-task-aside,
+  .garden-answer,
+  .garden-progress,
+  .garden-output-header,
+  .garden-output-actions,
+  .garden-delivery,
+  .garden-working-note,
+  .completion-record,
+  .project-overview,
+  .project-summary-card,
+  .intent-editor,
+  .panel,
+  .management-section,
+  .garden-health-panel
+) {
+  background-image: var(--lcd-texture) !important;
+}
+/* Opaque neutral backing also keeps the interface grid out of transparent images and frames. */
+:root :is(img, canvas, iframe, video) {
+  background-color: #fff;
+  background-image: none;
+  color-scheme: normal;
+}
+:root video {
+  background-color: #000;
 }
 ::selection {
   color: var(--bg);
@@ -144,26 +172,20 @@ input:is([type='checkbox'], [type='radio']):indeterminate {
     --muted: var(--text);
     --line: var(--text);
   }
-  body::after,
-  dialog::after,
-  [popover]::after {
-    display: none;
+  :root {
+    --lcd-texture: none;
   }
 }
 @media (forced-colors: active) {
   input:is([type='checkbox'], [type='radio']) {
     appearance: auto;
   }
-  body::after,
-  dialog::after,
-  [popover]::after {
-    display: none;
+  :root {
+    --lcd-texture: none;
   }
 }
 @media print {
-  body::after,
-  dialog::after,
-  [popover]::after {
-    display: none;
+  :root {
+    --lcd-texture: none;
   }
 }

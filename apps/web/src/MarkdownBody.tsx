@@ -14,12 +14,14 @@ export default function Markdown({
   children,
   artifacts = [],
   onArtifact,
-  imageSources
+  imageSources,
+  imageMode = 'inline'
 }: {
   children: string;
   artifacts?: readonly ArtifactReference[];
   onArtifact?: (id: string) => void;
   imageSources?: ReadonlyMap<string, string>;
+  imageMode?: 'inline' | 'links';
 }) {
   const artifactUrl = (id: string) => `/v1/artifacts/${encodeURIComponent(id)}/content`;
   return (
@@ -82,11 +84,37 @@ export default function Markdown({
               </a>
             );
           },
-          img: ({ node: _node, src, alt, ...props }) =>
-            src &&
-            (imageSources
-              ? true
-              : (src.startsWith('/') && !src.startsWith('//')) || src.startsWith('blob:')) ? (
+          img: ({ node: _node, src, alt, ...props }) => {
+            if (src && imageMode === 'links') {
+              const artifact = artifacts.find((item) => artifactUrl(item.id) === src);
+              return (
+                <a
+                  className="summary-image-link"
+                  href={src}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(event) => {
+                    if (
+                      !artifact ||
+                      !onArtifact ||
+                      event.ctrlKey ||
+                      event.metaKey ||
+                      event.shiftKey ||
+                      event.altKey
+                    )
+                      return;
+                    event.preventDefault();
+                    onArtifact(artifact.id);
+                  }}
+                >
+                  {alt || artifact?.name || 'View original image'} ↗
+                </a>
+              );
+            }
+            return src &&
+              (imageSources
+                ? true
+                : (src.startsWith('/') && !src.startsWith('//')) || src.startsWith('blob:')) ? (
               <img {...props} src={src} alt={alt ?? ''} loading="lazy" />
             ) : src ? (
               <a href={src} target="_blank" rel="noopener noreferrer">
@@ -94,7 +122,8 @@ export default function Markdown({
               </a>
             ) : (
               <span className="muted">{alt || 'Image'} (image unavailable in this preview)</span>
-            )
+            );
+          }
         }}
       >
         {children}

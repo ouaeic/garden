@@ -477,7 +477,7 @@ export default function TaskSurface({
         </div>
       </div>
       <Suspense fallback={<Spinner label="Opening the result…" />}>
-        <Markdown artifacts={artifacts} onArtifact={showArtifact}>
+        <Markdown artifacts={artifacts} onArtifact={showArtifact} imageMode="links">
           {answer.markdown}
         </Markdown>
       </Suspense>

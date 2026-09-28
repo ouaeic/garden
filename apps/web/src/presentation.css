@@ -291,3 +291,107 @@
   display: grid;
   gap: 0.75rem;
 }
+.work-summary-visual {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  background-color: var(--panel);
+}
+.work-summary-visual > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.work-summary-visual h2 {
+  margin: 0;
+  font-size: 22px;
+}
+.work-summary-visual .muted,
+.work-summary-visual figcaption {
+  font-size: 16px;
+}
+.work-summary-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: 20px 28px;
+}
+.work-summary-charts figure,
+.work-summary-outputs {
+  margin: 0;
+  min-width: 0;
+}
+.work-summary-charts figcaption {
+  margin-bottom: 10px;
+  color: var(--muted);
+}
+.work-summary-plan {
+  display: flex;
+  gap: 3px;
+  height: 22px;
+}
+.work-summary-plan span {
+  flex-basis: 0;
+  border: 1px solid var(--text);
+}
+.work-summary-visual [data-state='completed'] {
+  background: var(--text);
+}
+.work-summary-visual [data-state='in_progress'] {
+  background: var(--muted);
+}
+.work-summary-visual [data-state='pending'] {
+  background: var(--bg);
+}
+.work-summary-visual [data-state='skipped'] {
+  background: repeating-linear-gradient(135deg, var(--text) 0 1px, var(--bg) 1px 4px);
+}
+.work-summary-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 14px;
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  font-size: 16px;
+}
+.work-summary-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.work-summary-legend i {
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--text);
+}
+.work-summary-outputs > div {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  font-size: 16px;
+}
+.work-summary-outputs dd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+.work-summary-bar {
+  flex: 1;
+  min-width: 0;
+}
+.work-summary-bar i {
+  display: block;
+  height: 8px;
+  background: var(--text);
+}
+.summary-image-link {
+  display: inline-block;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  font-family: var(--font-sans);
+}

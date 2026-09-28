@@ -9,6 +9,7 @@ import { useExpandedView } from './use-expanded-view';
 import { usePreviewStart } from './use-preview-start';
 import { Button, ErrorNotice, Spinner } from './ui';
 import './presentation.css';
+import WorkSummaryVisual from './WorkSummaryVisual';
 const ResultPreview = lazy(() =>
   import('./computer/ResultPreview').then((module) => ({ default: module.ResultPreview }))
 );
@@ -480,6 +481,7 @@ export function TaskOutputs({
         className="garden-output-section garden-output-answer"
         hidden={fitted && selected !== 'summary'}
       >
+        {afterPreview && <WorkSummaryVisual presentation={presentation} />}
         {afterPreview}
       </div>
       <div

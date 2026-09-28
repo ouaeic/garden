@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { TaskPresentation } from '@garden/contracts';
 import { TaskOutputs, TaskProgress } from './TaskCanvas';
 import WorkTrace from './WorkTrace';
+import WorkSummaryVisual from './WorkSummaryVisual';
 
 const presentation: TaskPresentation = {
   version: 1,
@@ -49,6 +50,37 @@ const presentation: TaskPresentation = {
 };
 
 describe('usable task delivery and recorded progress', () => {
+  it('summarizes recorded steps and distinct outputs without estimating task completion', () => {
+    const html = renderToStaticMarkup(
+      <WorkSummaryVisual
+        presentation={{
+          ...presentation,
+          results: [...presentation.results, presentation.results[1]!],
+          coverage: { scope: 'recent', eventCount: 4, omittedPayloads: 0 }
+        }}
+      />
+    );
+    expect(html).toContain('Recorded plan · 2 steps');
+    expect(html).toContain('1 completed');
+    expect(html).toContain('1 in progress');
+    expect(html).toContain('Recorded outputs · 2');
+    expect(html).toContain('<dt>Apps</dt>');
+    expect(html).toContain('<dt>Files</dt>');
+    expect(html).toContain('Recent recorded work');
+    expect(html).not.toContain('<img');
+    expect(html).not.toContain('50% complete');
+    expect(
+      renderToStaticMarkup(
+        <WorkSummaryVisual
+          presentation={{
+            ...presentation,
+            results: [],
+            progress: { ...presentation.progress, phases: [] }
+          }}
+        />
+      )
+    ).toBe('');
+  });
   it('does not show a cached completion while another direction is paused or waiting', () => {
     const outcome = {
       summary: 'An earlier direction finished.',

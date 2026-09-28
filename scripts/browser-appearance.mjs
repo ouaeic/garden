@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { checkOutputAppearance } from './browser-output-appearance.mjs';
 
 export async function checkAppearance({ context, origin, bootstrap, project, task, report }) {
   const page = await context.newPage();
@@ -158,8 +159,8 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
           background: root.backgroundColor,
           contrast: contrast(root.color, root.backgroundColor),
           secondaryContrast: contrast(muted, root.backgroundColor),
-          overlayInteractive: getComputedStyle(document.body, '::after').pointerEvents !== 'none',
-          overlayAnimation: getComputedStyle(document.body, '::after').animationName
+          overlayContent: getComputedStyle(document.body, '::after').content,
+          texture: getComputedStyle(document.querySelector('.desk-card')).backgroundImage
         };
       })
     );
@@ -169,8 +170,12 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
   for (const colors of palette) {
     assert(colors.contrast >= 4.5, 'Body text must meet normal-text contrast');
     assert(colors.secondaryContrast >= 4.5, 'Secondary text must meet normal-text contrast');
-    assert.equal(colors.overlayInteractive, false, 'Screen texture never intercepts input');
-    assert.equal(colors.overlayAnimation, 'none', 'Screen texture does not animate');
+    assert.equal(
+      colors.overlayContent,
+      'none',
+      'Screen texture must not overlay delivered content'
+    );
+    assert.match(colors.texture, /repeating-linear-gradient/, 'Garden cards retain the LCD matrix');
   }
   console.log('LCD contrast:', palette);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
@@ -235,4 +240,5 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     'Older webviews retain prompt controls without native popovers'
   );
   await fallback.close();
+  await checkOutputAppearance({ context, origin, task, report });
 }

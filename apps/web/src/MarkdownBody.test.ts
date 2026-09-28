@@ -7,6 +7,22 @@ const render = (children: string, artifacts = [{ id: 'immutable-id', name: 'resu
   renderToStaticMarkup(createElement(Markdown, { children, artifacts }));
 
 describe('result Markdown links', () => {
+  it('uses a source link in summaries while preserving inline images in document previews', () => {
+    const children = '![Recorded plot](/v1/artifacts/immutable-id/content)';
+    const summary = renderToStaticMarkup(createElement(Markdown, { children, imageMode: 'links' }));
+    expect(summary).toContain('href="/v1/artifacts/immutable-id/content"');
+    expect(summary).toContain('Recorded plot');
+    expect(summary).not.toContain('<img');
+    expect(render(children)).toContain('<img');
+    expect(
+      renderToStaticMarkup(
+        createElement(Markdown, {
+          children: '![Unsafe](javascript:alert%281%29)',
+          imageMode: 'links'
+        })
+      )
+    ).not.toContain('href=');
+  });
   it('turns a known artifact reference into the authenticated immutable download route', () => {
     expect(render('[result.json](artifact:result.json)')).toContain(
       'href="/v1/artifacts/immutable-id/content"'
