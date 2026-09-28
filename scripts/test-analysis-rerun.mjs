@@ -222,7 +222,8 @@ createRoot(document.getElementById('root')).render(React.createElement(Proof));`
         page.getByRole('button', { name: 'Rerun with changes', exact: true }).click();
       const input = page.getByRole('textbox', { name: 'Add direction to this work', exact: true });
       const context = page.getByRole('region', { name: 'Selected analysis', exact: true });
-      const synced = () => page.getByText('Draft synced', { exact: true }).waitFor();
+      const synced = () =>
+        page.getByRole('status', { name: 'Draft synced', exact: true }).waitFor();
       const saveAction = async (action, matches) => {
         await Promise.all([
           page.waitForResponse(
@@ -298,7 +299,7 @@ createRoot(document.getElementById('root')).render(React.createElement(Proof));`
         ),
         input.fill('Use a minimum length of 30.')
       ]);
-      await page.getByText(/Saved on this device/).waitFor();
+      await page.getByRole('status', { name: /Saved on this device/ }).waitFor();
       await page.reload();
       await context.waitFor();
       assert.equal(await input.inputValue(), 'Use a minimum length of 30.');
@@ -314,7 +315,7 @@ createRoot(document.getElementById('root')).render(React.createElement(Proof));`
       };
       conflict = true;
       await input.fill('A conflicting local edit');
-      await page.getByText('Choose a draft version', { exact: true }).waitFor();
+      await page.getByRole('status', { name: 'Choose a draft version', exact: true }).waitFor();
       conflict = false;
       await page.getByRole('button', { name: 'Use other draft', exact: true }).click();
       await page.getByRole('region', { name: 'Selected context', exact: true }).waitFor();

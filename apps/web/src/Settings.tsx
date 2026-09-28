@@ -88,7 +88,7 @@ export function Settings({
         {section === 'Appearance' && (
           <Section title="Screen" description="Applies immediately on this device.">
             <div className="stack">
-              <Field label="Mode">
+              <Field label="Theme">
                 <select
                   value={theme}
                   onChange={(event) =>

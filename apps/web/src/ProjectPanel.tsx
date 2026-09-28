@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Activity, Folder, SlidersHorizontal } from './icons';
 import { Button, Dialog } from './ui';
 import { closeProjectPanel, useProjectView } from './surface-location';
@@ -44,11 +44,27 @@ export function useDockedPanels() {
 
 export default function ProjectPanel({ scope, children }: { scope: string; children: ReactNode }) {
   const [view] = useProjectView();
-  const docked = useDockedPanels();
+  const dockable = useDockedPanels();
+  const content = useRef<HTMLDivElement>(null);
+  const [docked, setDocked] = useState(dockable);
+  const open = view !== 'work';
+  // Follow the screen, except while another dialog is showing: switching the panel between
+  // docked and modal would re-stack it above that dialog.
+  useEffect(() => {
+    const own = content.current?.closest('dialog');
+    const others = () =>
+      [...document.querySelectorAll('dialog[open]')].some((dialog) => dialog !== own);
+    if (!others()) setDocked(dockable);
+    const settle = () => {
+      if (!others()) setDocked(matchMedia(DOCK_QUERY).matches);
+    };
+    document.addEventListener('close', settle, true);
+    return () => document.removeEventListener('close', settle, true);
+  }, [dockable, open]);
   return (
     <Dialog
       title={scope}
-      open={view !== 'work'}
+      open={open}
       wide
       modal={!docked}
       className={`desk-sheet project-panel project-panel-${view}${docked ? ' is-docked' : ''}`}
@@ -56,7 +72,9 @@ export default function ProjectPanel({ scope, children }: { scope: string; child
       onClose={closeProjectPanel}
     >
       <ProjectPanelLinks inside />
-      <div className="project-panel-content">{children}</div>
+      <div className="project-panel-content" ref={content}>
+        {children}
+      </div>
     </Dialog>
   );
 }

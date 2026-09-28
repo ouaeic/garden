@@ -61,10 +61,11 @@
 }
 @media (max-width: 700px) {
   .garden-shell.desk-shell {
+    --desk-bar-height: calc(44px + env(safe-area-inset-top, 0px));
     grid-template-rows: var(--desk-bar-height) minmax(0, 1fr) auto;
   }
   .desk-shell .garden-masthead .brand {
-    font-size: 32px;
+    font-size: 24px;
   }
   .desk-navigation,
   .desk-shell .garden-health,
@@ -86,7 +87,7 @@
     display: grid;
     justify-items: center;
     gap: 2px;
-    min-height: 56px;
+    min-height: 52px;
     padding: 6px 2px 4px;
     border: 0;
     background: transparent;
@@ -106,9 +107,38 @@
     left: calc(50% + 6px);
     right: auto;
   }
-  /* While typing, the keyboard needs the room more than the button row does. */
-  .desk-shell:has(textarea:focus, input:not([type='checkbox'], [type='radio']):focus) .phone-bar {
+  /* Inside a project the back arrow leads home, and the work needs every row of the screen. */
+  .desk-shell.has-project .phone-bar {
     display: none;
+  }
+  /* ...so the doors move up into the masthead as icons, as they sit on wider screens. */
+  .desk-shell.has-project .desk-navigation {
+    display: flex;
+    gap: 0;
+  }
+  .desk-shell.has-project .desk-navigation .button {
+    min-width: 32px;
+    padding: 4px 6px;
+  }
+  /* While typing, the keyboard needs the room more than the button row does. */
+  :root[data-keyboard='true'] .desk-shell .phone-bar {
+    display: none;
+  }
+}
+
+/* Short or very narrow phones keep the row to icons so the work keeps its height. */
+@media (max-width: 700px) and (max-height: 640px), (max-width: 360px) {
+  .phone-bar > button {
+    min-height: 44px;
+    align-content: center;
+  }
+  .phone-bar > button > span:not(.notification-count) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
 
@@ -187,27 +217,96 @@
  * On wide screens a project's files, activity and tools dock to the right and the work narrows
  * beside them, so a file can be read while the app it belongs to stays in view.
  */
-.desk-shell .project-panel.is-docked[open] {
-  position: fixed;
-  inset: var(--desk-bar-height) 0 0 auto;
-  margin: 0;
-  width: min(760px, 46vw);
-  height: auto;
-  max-height: none;
-  border: 0;
-  border-left: 2px solid var(--text);
-  box-shadow: none;
-  z-index: 15;
-  display: flex;
-  flex-direction: column;
-  animation: none;
+@media (min-width: 1100px) and (min-height: 600px) {
+  .desk-shell .project-panel.is-docked[open] {
+    position: fixed;
+    inset: var(--desk-bar-height) 0 0 auto;
+    margin: 0;
+    width: min(760px, 46vw);
+    height: auto;
+    max-height: none;
+    border: 0;
+    border-left: 2px solid var(--text);
+    box-shadow: none;
+    z-index: 15;
+    display: flex;
+    flex-direction: column;
+    animation: none;
+  }
+  .garden-shell.desk-shell .project-space.has-docked-panel {
+    padding-right: min(760px, 46vw);
+  }
+  .garden-shell.desk-shell .project-space.has-docked-panel .project-view-content.desk-with-support {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .project-space.has-docked-panel .project-view-content > :not(.desk-work-card) {
+    display: none;
+  }
 }
-.garden-shell.desk-shell .project-space.has-docked-panel {
-  padding-right: min(760px, 46vw);
+
+/* The narrowest phones keep the project's jobs and panels on one row by dropping the glyphs. */
+@media (max-width: 380px) {
+  .desk-shell .desk-project .project-workspace-bar {
+    gap: 4px;
+  }
+  .desk-shell .desk-project .project-view-nav .button {
+    padding: 6px 4px;
+  }
+  .desk-shell .desk-project .project-view-nav .button > svg {
+    display: none;
+  }
 }
-.garden-shell.desk-shell .project-space.has-docked-panel .project-view-content.desk-with-support {
-  grid-template-columns: minmax(0, 1fr);
+
+/* On phones a result's actions stay on one row and scroll sideways, so the result keeps its height. */
+@media (max-width: 700px) {
+  .desk-shell .is-fitted .garden-output-actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .desk-shell .is-fitted .garden-output-actions .button {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
 }
-.project-space.has-docked-panel .project-view-content > :not(.desk-work-card) {
-  display: none;
+
+/* Small phones: the prompt scrolls within a shorter box so the result above it keeps some room. */
+@media (max-width: 700px) and (max-height: 620px) {
+  .desk-shell .desk-project .garden-task-composer {
+    max-height: min(34dvh, 196px);
+  }
+  .garden-shell.desk-shell .desk-project .project-space-header {
+    padding-block: 6px 2px;
+  }
+}
+@media (max-width: 700px) and (max-height: 620px) {
+  .desk-shell .is-fitted .garden-output-header {
+    display: none;
+  }
+  .desk-shell .garden-task-primary > details.garden-history > summary {
+    padding-block: 6px;
+    min-height: 0;
+  }
+}
+@media (max-width: 700px) and (max-height: 620px) {
+  .desk-shell .garden-task-primary > .garden-history {
+    min-height: 32px;
+  }
+  .desk-shell .garden-task-primary > .garden-history > summary {
+    padding-block: 4px;
+  }
+  .desk-shell .is-fitted .desk-output-sections {
+    padding-block: 4px;
+  }
+  .desk-shell .is-fitted .desk-output-sections .button {
+    min-height: 28px;
+    padding-block: 2px;
+  }
+  .desk-shell .is-fitted .garden-output-actions {
+    padding-block: 4px;
+  }
+  .desk-shell .is-fitted .garden-output-actions .button {
+    min-height: 28px;
+    padding-block: 2px;
+  }
 }

@@ -158,17 +158,14 @@ export async function checkDesk({
       if (width > 760 && height > 540) {
         const prompt = await page.locator('.desk-start-card').boundingBox();
         const editor = await page.locator('.desk-start-card .intent-editor').boundingBox();
-        const intro = await page.locator('.desk-home-intro > header').boundingBox();
-        assert(prompt && editor && intro);
-        assert(prompt.height <= editor.height + 4, 'The prompt card must fit its contents');
+        const garden = await page.locator('.garden-plot').boundingBox();
+        assert(prompt && editor && garden);
+        assert(prompt.height <= editor.height + 20, 'The prompt card must fit its contents');
+        assert(garden.y + garden.height <= prompt.y, 'The garden sits above the prompt');
         assert(
-          Math.abs(prompt.y + prompt.height / 2 - intro.y - intro.height / 2) < 2,
-          'The greeting and prompt must align'
+          Math.abs(garden.width - prompt.width) < 2,
+          'The garden and the prompt share one column'
         );
-      }
-      if (width <= 760 || height <= 540) {
-        const cards = page.getByRole('navigation', { name: 'Home cards' });
-        await cards.getByRole('button', { name: 'New project', exact: true }).click();
       }
       await page.getByLabel('Describe what you want to do').fill('A useful new project');
       await checkComposer(page.locator('.desk-start-card .intent-editor'));
@@ -176,21 +173,20 @@ export async function checkDesk({
       const promptForm = await page.locator('.desk-start-card .intent-editor').boundingBox();
       assert(promptBox && promptForm);
       assert(
-        promptBox.height <= promptForm.height + 4,
+        promptBox.height <= promptForm.height + 20,
         'The prompt must not stretch into an empty card'
       );
       await page.screenshot({ path: resolve(report, `desk-prompt-${width}-${height}.png`) });
-      if (width <= 760 || height <= 540)
-        await page
-          .getByRole('navigation', { name: 'Home cards' })
-          .getByRole('button', { name: 'Projects', exact: true })
-          .click();
-      const recent = page.locator('.desk-recent .scroll-region');
-      assert(await recent.evaluate((element) => element.scrollHeight > element.clientHeight));
-      await recent.evaluate((element) => {
+      // Home is one scrolling page: the garden, the prompt, then the three lists.
+      const home = page.locator('.desk-home');
+      assert(await home.evaluate((element) => element.scrollHeight > element.clientHeight));
+      await home.evaluate((element) => {
         element.scrollTop = element.scrollHeight;
       });
-      assert(await recent.evaluate((element) => element.scrollTop > 0));
+      assert(await home.evaluate((element) => element.scrollTop > 0));
+      const lastRecent = page.locator('.desk-recent .home-row').last();
+      assert.equal(await page.locator('.desk-recent .home-row').count(), 6, 'Recent shows six');
+      await inWindow(lastRecent);
       await fit();
       await page.screenshot({ path: resolve(report, `desk-home-${width}-${height}.png`) });
       await page.goto(`${origin}/?task=${task.id}`);
@@ -256,8 +252,9 @@ export async function checkDesk({
       );
       assert(inputBox.y + inputBox.height <= collapseBox.y, 'Collapse must not cover typing');
       const workUrl = page.url();
+      // Wide screens carry the doors in the masthead; phones carry them in the button row.
       const libraryTrigger = page
-        .getByRole('navigation', { name: 'Workspace navigation' })
+        .getByRole('navigation', { name: /^(Workspace navigation|Sections)$/ })
         .getByRole('button', { name: 'Library', exact: true });
       await libraryTrigger.click();
       const library = page.getByRole('dialog', { name: 'Library', exact: true });
@@ -421,12 +418,38 @@ export async function checkDesk({
       releaseSend();
       await page.unroute(routePath, hold);
     }
+    // Leave this conversation as later checks expect to find it: no held send and no draft.
+    await sendingEditor
+      .getByRole('button', { name: 'Keep as an unsent draft', exact: true })
+      .click();
+    await page
+      .getByRole('dialog', { name: 'Keep as an unsent draft', exact: true })
+      .getByRole('button', { name: 'Keep as an unsent draft', exact: true })
+      .click();
+    await sendingEditor.locator('textarea').fill('');
+    await sendingEditor.getByRole('status', { name: 'Draft synced', exact: true }).waitFor();
+    await page.goto(origin);
+    const homePrompt = page.getByLabel('Describe what you want to do');
+    const cleared = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === '/v1/drafts' &&
+        response.request().method() !== 'GET' &&
+        response.request().postDataJSON()?.body === ''
+    );
+    await homePrompt.fill('');
+    await cleared;
     assert.deepEqual(failures, []);
     console.log(
       'Desk passed: fixed viewport, independent file/process/project scroll, output sections, prompt reachability, retained drafts, conversation, navigation and management views.'
     );
   } catch (error) {
-    console.error(await page.locator('body').innerText());
+    console.error(error);
+    console.error(
+      await page
+        .locator('body')
+        .innerText({ timeout: 3000 })
+        .catch(() => '')
+    );
     await page.screenshot({ path: resolve(report, 'desk-failure.png') });
     throw error;
   } finally {

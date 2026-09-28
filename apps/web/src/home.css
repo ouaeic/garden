@@ -111,3 +111,20 @@
     display: none;
   }
 }
+/* On a short screen the prompt comes first; the garden steps aside. */
+@media (max-height: 540px) {
+  .desk-home {
+    gap: 12px;
+    padding-top: 12px;
+  }
+  .desk-home .garden-plot {
+    display: none;
+  }
+  .desk-home .garden-plot-heading .eyebrow,
+  .desk-home .garden-plot-heading > p {
+    display: none;
+  }
+  .desk-home .garden-plot-heading h1 {
+    font-size: 24px;
+  }
+}

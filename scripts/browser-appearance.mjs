@@ -35,7 +35,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     })
   );
   await page.goto(origin);
-  await page.getByRole('heading', { name: 'Space for your next idea.' }).waitFor();
+  await page.getByRole('heading', { name: 'Your garden' }).waitFor();
   await page.locator('.intent-editor textarea').waitFor();
   await page.evaluate(() => document.fonts.ready);
   assert.equal(await page.evaluate(() => document.fonts.check('16px "Pixel Operator"')), true);
@@ -47,7 +47,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
   await statsPanel.getByText('CPU 17%', { exact: true }).hover();
   assert.equal(await stats.getAttribute('aria-expanded'), 'true');
   await page.screenshot({ path: resolve(report, 'stats-desktop.png') });
-  await page.getByRole('heading', { name: 'Space for your next idea.' }).hover();
+  await page.getByRole('heading', { name: 'Your garden' }).hover();
   await statsPanel.waitFor({ state: 'hidden' });
   await stats.focus();
   await page.keyboard.press('Enter');
@@ -55,7 +55,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
   await page.keyboard.press('Escape');
   await statsPanel.waitFor({ state: 'hidden' });
   await stats.click();
-  await page.getByRole('heading', { name: 'Space for your next idea.' }).click();
+  await page.getByRole('heading', { name: 'Your garden' }).click();
   await statsPanel.waitFor({ state: 'hidden' });
   await page.getByRole('button', { name: 'Prompt settings', exact: true }).click();
   const promptSettings = page.getByRole('dialog', { name: 'Prompt settings', exact: true });
@@ -95,7 +95,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
         'Hovered navigation retains its matrix'
       );
     }
-    const heading = page.getByRole('heading', { name: 'Space for your next idea.' });
+    const heading = page.getByRole('heading', { name: 'Your garden' });
     await heading.evaluate((element) => {
       const range = document.createRange();
       range.selectNodeContents(element);
@@ -116,11 +116,6 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     await page.evaluate(() => getSelection().removeAllRanges());
     for (const width of [1440, 768, 390, 320]) {
       await page.setViewportSize({ width, height: width > 760 ? 1000 : 844 });
-      if (width <= 760)
-        await page
-          .getByRole('navigation', { name: 'Home cards' })
-          .getByRole('button', { name: 'New project', exact: true })
-          .click();
       await page.screenshot({
         animations: 'disabled',
         path: resolve(report, `home-${theme}-${width}.png`)
@@ -171,7 +166,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     palette.push(
       await page.evaluate(() => {
         const root = getComputedStyle(document.documentElement);
-        const muted = getComputedStyle(document.querySelector('.desk-home-intro header p')).color;
+        const muted = getComputedStyle(document.querySelector('.garden-plot-heading > p')).color;
         const luminance = (color) => {
           const values = color
             .match(/[\d.]+/g)
@@ -229,10 +224,6 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
   await page.goto(origin);
   await page.locator('.desk-home').waitFor();
   await page.setViewportSize({ width: 390, height: 500 });
-  await page
-    .getByRole('navigation', { name: 'Home cards' })
-    .getByRole('button', { name: 'New project', exact: true })
-    .click();
   await page.goto(`${origin}/?task=${task.id}`);
   await page.locator('.garden-task-composer').waitFor();
   await page.getByRole('button', { name: /^Continue this conversation/ }).click();

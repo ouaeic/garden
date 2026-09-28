@@ -528,7 +528,9 @@ function WorkspaceApp() {
     ...attentionTasks.map((item) => item.id)
   ]).size;
   return (
-    <div className={`garden-shell desk-shell ${task && baseView === 'work' ? 'task-open' : ''}`}>
+    <div
+      className={`garden-shell desk-shell ${task && baseView === 'work' ? 'task-open' : ''} ${activeProjectId && baseView === 'work' ? 'has-project' : ''}`}
+    >
       <a className="skip-link" href="#main">
         Skip to work
       </a>
@@ -786,6 +788,7 @@ function WorkspaceApp() {
           <button
             type="button"
             key={view}
+            aria-label={label}
             aria-current={
               (
                 view === 'work'

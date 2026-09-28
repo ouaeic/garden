@@ -53,10 +53,16 @@ export async function checkPermissionModes({
       return route.fulfill({ json: { markdown: '', path: 'workspace/GARDEN.md' } });
     return route.fallback();
   });
+  // Earlier checks leave device drafts for this conversation; this one starts from none.
+  await page.addInitScript(() => indexedDB.deleteDatabase('garden-private-drafts'));
   try {
     await page.goto(`${origin}/?task=${task.id}`);
-    await page.getByRole('button', { name: /^Continue this conversation/ }).click();
-    await page.getByRole('button', { name: 'Prompt settings', exact: true }).click();
+    // An earlier check can leave this conversation with an unsent draft, which opens the prompt.
+    const compose = page.getByRole('button', { name: /^Continue this conversation/ });
+    const settings = page.getByRole('button', { name: 'Prompt settings', exact: true });
+    await compose.or(settings).first().waitFor();
+    if (await compose.isVisible()) await compose.click();
+    await settings.click();
     const descriptions = new Map();
     const prompt = page.getByRole('combobox', { name: 'Approvals for this prompt', exact: true });
     for (const mode of ['review', 'balanced', 'autonomous']) {
@@ -84,7 +90,7 @@ export async function checkPermissionModes({
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page
       .getByRole('navigation', { name: 'Settings sections' })
-      .getByRole('button', { name: 'Computer & maintenance', exact: true })
+      .getByRole('button', { name: 'Computer', exact: true })
       .click();
     const control = page.getByLabel('Review level for new work', { exact: true });
     for (const mode of ['review', 'balanced', 'autonomous']) {
@@ -95,10 +101,11 @@ export async function checkPermissionModes({
     await page.getByText('Default review level saved', { exact: true }).waitFor();
     assert.deepEqual(saved, [{ securityMode: 'autonomous' }]);
     await page.reload();
-    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    // The open sheet is part of the address, so a reload brings Settings straight back.
+    await page.getByRole('dialog', { name: 'Settings', exact: true }).waitFor();
     await page
       .getByRole('navigation', { name: 'Settings sections' })
-      .getByRole('button', { name: 'Computer & maintenance', exact: true })
+      .getByRole('button', { name: 'Computer', exact: true })
       .click();
     assert.equal(await control.inputValue(), 'autonomous');
     const form = control.locator('xpath=ancestor::form');

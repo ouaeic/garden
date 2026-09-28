@@ -135,15 +135,31 @@ export function Dialog({
       ref={ref}
       aria-labelledby={titleId}
       className={`dialog ${wide ? 'wide' : ''} ${className}`}
-      onKeyDown={
-        modal
-          ? undefined
-          : (event) => {
-              if (event.key !== 'Escape' || event.defaultPrevented) return;
-              event.preventDefault();
-              onClose();
-            }
-      }
+      onKeyDown={(event) => {
+        if (!modal) {
+          if (event.key !== 'Escape' || event.defaultPrevented) return;
+          event.preventDefault();
+          onClose();
+          return;
+        }
+        // Keep Tab cycling inside a modal instead of escaping to the page behind it.
+        if (event.key !== 'Tab' || event.defaultPrevented) return;
+        const focusable = [
+          ...event.currentTarget.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])'
+          )
+        ].filter((element) => element.getClientRects().length && !element.closest('[inert]'));
+        const first = focusable[0];
+        const last = focusable.at(-1);
+        if (!first || !last) return;
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }}
       onCancel={(event) => {
         event.preventDefault();
         event.stopPropagation();

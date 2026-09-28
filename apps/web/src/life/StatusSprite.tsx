@@ -15,6 +15,8 @@ export function stageOf(task: Pick<Task, 'status' | 'hasOpenQuestion' | 'deliver
     (task.status === 'completed' && task.deliveryStatus === 'incomplete')
   )
     return 'needs';
+  // Output still generating after the run ended is still growing, not in bloom.
+  if (task.status === 'completed' && task.deliveryStatus === 'pending') return 'sprout';
   switch (task.status) {
     case 'running':
     case 'planning':

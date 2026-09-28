@@ -690,7 +690,9 @@ try {
     if (url.origin !== origin) return route.abort();
     const path = url.pathname;
     const json = (body) => route.fulfill({ json: body });
-    if (path === '/sw.js') return route.fulfill({ contentType: 'text/javascript', body: '' });
+    // No worker: an empty one registered through a routed response stalls headless navigations
+    // that start while requests are still in flight. The worker has its own unit suite.
+    if (path === '/sw.js') return route.fulfill({ status: 404, body: '' });
     if (path.startsWith('/__garden/preview/'))
       return route.fulfill({ contentType: 'text/html', body: previewHtml });
     if (!path.startsWith('/v1/')) return route.continue();
@@ -1521,10 +1523,6 @@ try {
       [320, 600]
     ]) {
       await page.setViewportSize({ width, height });
-      if (width <= 760)
-        await page.waitForFunction(() =>
-          document.querySelector('.garden-shell').classList.contains('sidebar-closed')
-        );
       const layout = await page.evaluate(() => {
         const box = (selector) => {
           const b = document.querySelector(selector).getBoundingClientRect();
@@ -1662,6 +1660,12 @@ try {
         }
       })
     );
+    // Prompt settings float above the work; close them before reaching for a result's controls.
+    const closePromptSettings = page.getByRole('button', {
+      name: 'Close prompt settings',
+      exact: true
+    });
+    if (await closePromptSettings.isVisible()) await closePromptSettings.click();
     await page.getByRole('button', { name: 'Copy link', exact: true }).click();
     await page.getByRole('status').filter({ hasText: 'Link copied.' }).waitFor();
     assert.equal(await page.evaluate(() => window.copiedResultLink), presentation.results[0].url);
@@ -1870,12 +1874,15 @@ try {
     await page.waitForFunction(() =>
       document.querySelector('.run-summary')?.textContent.includes('Generating media')
     );
-    assert.match(
-      await page
-        .locator('.project-conversation-links button[aria-current]')
-        .getAttribute('aria-label'),
-      /Generating media/,
-      'The project list must not announce pending output as complete'
+    assert.equal(
+      await page.locator('.desk-updates .desk-update-row .status-sprite.stage-bloom').count(),
+      0,
+      'The project list must not show pending output as finished'
+    );
+    assert(
+      (await page.locator('.desk-updates .desk-update-row .status-sprite.stage-sprout').count()) >
+        0,
+      'Pending output reads as still growing'
     );
     missions = [mission];
     mediaJobs = [
@@ -2906,7 +2913,7 @@ try {
       'Successful delivery must clear the saved draft while retaining its revision'
     );
 
-    await modelsPage.getByRole('button', { name: 'garden · All work', exact: true }).waitFor();
+    await modelsPage.getByRole('button', { name: 'garden · Home', exact: true }).waitFor();
     if (
       (await modelsPage
         .getByRole('button', { name: 'Settings', exact: true })
@@ -3016,7 +3023,7 @@ try {
     assert.equal(decisionModelsEnabled, false);
     assert.equal(await modelsPage.getByRole('button', { name: /^Decisions:/ }).count(), 0);
     await modelsPage.reload();
-    await modelsPage.getByRole('button', { name: 'garden · All work', exact: true }).waitFor();
+    await modelsPage.getByRole('button', { name: 'garden · Home', exact: true }).waitFor();
     if (
       (await modelsPage
         .getByRole('button', { name: 'Settings', exact: true })
@@ -3043,7 +3050,7 @@ try {
     await modelsPage.getByText('Generation choices saved', { exact: true }).waitFor();
     assert.equal(generationChoices.image.modelId, 'fixture/image-studio');
     await modelsPage.reload();
-    await modelsPage.getByRole('button', { name: 'garden · All work', exact: true }).waitFor();
+    await modelsPage.getByRole('button', { name: 'garden · Home', exact: true }).waitFor();
     if (
       (await modelsPage
         .getByRole('button', { name: 'Settings', exact: true })
@@ -3136,7 +3143,7 @@ try {
     }
     assert.notEqual(namedConnections[0].connectionId, namedConnections[1].connectionId);
     await modelsPage.reload();
-    await modelsPage.getByRole('button', { name: 'garden · All work', exact: true }).waitFor();
+    await modelsPage.getByRole('button', { name: 'garden · Home', exact: true }).waitFor();
     if (
       (await modelsPage
         .getByRole('button', { name: 'Settings', exact: true })
@@ -3159,7 +3166,7 @@ try {
     await modelsPage.getByText('Model defaults saved', { exact: true }).waitFor();
     assert.equal(defaultChoices.decisions.modelId, 'openrouter/typesafe/jev-test');
     await modelsPage.reload();
-    await modelsPage.getByRole('button', { name: 'garden · All work', exact: true }).waitFor();
+    await modelsPage.getByRole('button', { name: 'garden · Home', exact: true }).waitFor();
     if (
       (await modelsPage
         .getByRole('button', { name: 'Settings', exact: true })
@@ -3235,7 +3242,7 @@ try {
     draftOffline = true;
     await draftInput.fill('PRIVATE OFFLINE DRAFT — retain this across a closed tab.');
     await draftDialog
-      .getByText('Saved on this device · waiting to sync', { exact: true })
+      .getByRole('status', { name: 'Saved on this device · waiting to sync', exact: true })
       .waitFor();
     const ciphertext = await draftPage.evaluate(async () => {
       const db = await new Promise((resolve, reject) => {
@@ -3278,7 +3285,7 @@ try {
     loseDraftAcknowledgement = true;
     await draftInput.fill('Save committed, acknowledgement lost.');
     await draftDialog
-      .getByText('Saved on this device · waiting to sync', { exact: true })
+      .getByRole('status', { name: 'Saved on this device · waiting to sync', exact: true })
       .waitFor();
     // Wait for the request to commit, not merely for the immediate local persistence status.
     await draftCommit;

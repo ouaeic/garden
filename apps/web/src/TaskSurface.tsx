@@ -1103,7 +1103,7 @@ export default function TaskSurface({
             <ArrowUpRight size={16} />
           </Button>
         )}
-        {lastDirection && !task.parentMissionId && (
+        {lastDirection && !task.parentMissionId && !showComposer && !attentionPanel && (
           <button
             type="button"
             className="last-exchange cursor-row"

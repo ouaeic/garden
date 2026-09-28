@@ -11,6 +11,8 @@ export function useWorkspaceViewport() {
         const height = viewport && viewport.scale === 1 ? viewport.height : window.innerHeight;
         document.documentElement.style.setProperty('--garden-viewport-height', `${height}px`);
         document.documentElement.dataset.workspaceShort = String(height < 540);
+        // A visual viewport well short of the window means an on-screen keyboard is up.
+        document.documentElement.dataset.keyboard = String(height < window.innerHeight - 120);
       });
     };
     update();
@@ -22,6 +24,7 @@ export function useWorkspaceViewport() {
       window.removeEventListener('resize', update);
       document.documentElement.style.removeProperty('--garden-viewport-height');
       delete document.documentElement.dataset.workspaceShort;
+      delete document.documentElement.dataset.keyboard;
     };
   }, []);
 }
