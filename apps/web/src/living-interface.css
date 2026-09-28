@@ -99,34 +99,6 @@
   display: flex;
   flex-wrap: wrap;
 }
-.garden-prompt-options {
-  color: var(--muted);
-  font-size: 16px;
-}
-.garden-prompt-options > summary {
-  min-height: 32px;
-  padding: 7px 2px;
-}
-.garden-prompt-options-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 20px;
-  padding: 10px 0;
-  border-top: 1px solid var(--line);
-}
-.garden-prompt-options-grid > label {
-  font-size: 16px;
-}
-.garden-shell .garden-model-controls {
-  margin-top: 8px;
-}
-.garden-shell .garden-model-settings {
-  gap: 6px 14px;
-}
-.garden-shell .garden-model-controls select,
-.garden-shell .garden-model-controls .model-picker-trigger {
-  font-size: 16px;
-}
 .garden-shell .garden-new-work:hover {
   background: var(--paper);
   filter: brightness(0.96);
@@ -256,9 +228,6 @@
   .garden-shell .garden-task-aside {
     padding: 18px;
   }
-  .garden-prompt-options-grid {
-    gap: 14px;
-  }
 }
 
 .garden-shell .project-space-header {
@@ -279,11 +248,6 @@
 .garden-shell .garden-project-tools > summary {
   min-height: 32px;
   padding: 6px 0;
-}
-.garden-prompt-options > summary small {
-  margin-left: 10px;
-  color: var(--text);
-  font-size: inherit;
 }
 @media (max-width: 760px) {
   .garden-shell .project-space-header {

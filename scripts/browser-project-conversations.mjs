@@ -292,6 +292,20 @@ export async function checkProjectConversations({
         response.request().method() === 'PUT' &&
         response.request().postDataJSON().controls?.conversation?.execution === 'independent'
     );
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: resolve(report, 'new-conversation-settings-phone.png') });
+    await page.keyboard.press('Escape');
+    assert.equal(
+      await dialog.isVisible(),
+      true,
+      'Dismissing prompt settings keeps the new conversation open'
+    );
+    assert.equal(
+      await dialog.getByRole('combobox', { name: 'Approvals for this prompt' }).isVisible(),
+      false
+    );
+    assert.equal(await input.inputValue(), 'Review quality without changing the assembly.');
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await page.reload();
     await page.getByRole('button', { name: 'New conversation', exact: true }).click();
     dialog = page.getByRole('dialog', { name: 'New conversation', exact: true });

@@ -57,24 +57,27 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
   await page.getByRole('heading', { name: 'Space for your next idea.' }).click();
   await statsPanel.waitFor({ state: 'hidden' });
   await page.getByRole('button', { name: 'Prompt settings', exact: true }).click();
-  const options = page.locator('.garden-prompt-options');
-  assert.equal(
-    await page.getByRole('combobox', { name: 'Approvals for this prompt' }).isVisible(),
-    true
-  );
+  const promptSettings = page.getByRole('dialog', { name: 'Prompt settings', exact: true });
+  await promptSettings.waitFor();
   assert.equal(
     await page.getByRole('combobox', { name: 'Model reasoning effort' }).isVisible(),
-    false
+    true
   );
-  await options.locator('summary').click();
   await page.getByRole('spinbutton', { name: 'Task spend limit in USD' }).fill('2.50');
-  await options.locator('summary').click();
-  await options.locator('summary').click();
+  await page.keyboard.press('Escape');
+  await promptSettings.waitFor({ state: 'hidden' });
+  assert(
+    await page
+      .getByRole('button', { name: 'Prompt settings', exact: true })
+      .evaluate((element) => element === document.activeElement),
+    'Escape returns focus to prompt settings'
+  );
+  await page.getByRole('button', { name: 'Prompt settings', exact: true }).click();
   assert.equal(
     await page.getByRole('spinbutton', { name: 'Task spend limit in USD' }).inputValue(),
     '2.50'
   );
-  await options.locator('summary').click();
+  await page.getByRole('button', { name: 'Close prompt settings', exact: true }).click();
   for (const theme of ['dark', 'light']) {
     await page.evaluate((value) => {
       document.documentElement.dataset.theme = value;
@@ -105,6 +108,25 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
       assert.equal(geometry.actual, geometry.width, 'Appearance must fit the viewport');
       assert.equal(geometry.mainOverflow, false, 'Work must not overflow sideways');
       assert.equal(geometry.separated, true, 'Send controls stay below the prompt');
+      const composerBefore = await page.locator('.intent-editor').boundingBox();
+      await page.getByRole('button', { name: 'Prompt settings', exact: true }).click();
+      await promptSettings.waitFor();
+      const panel = await promptSettings.boundingBox();
+      assert(
+        panel &&
+          panel.x >= 0 &&
+          panel.y >= 0 &&
+          panel.x + panel.width <= width &&
+          panel.y + panel.height <= (width > 760 ? 1000 : 844),
+        'Prompt settings fit the viewport'
+      );
+      assert.deepEqual(
+        await page.locator('.intent-editor').boundingBox(),
+        composerBefore,
+        'Settings must not resize or move the prompt'
+      );
+      await page.screenshot({ path: resolve(report, `prompt-settings-${theme}-${width}.png`) });
+      await page.keyboard.press('Escape');
     }
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -175,6 +197,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     .click();
   await page.goto(`${origin}/?task=${task.id}`);
   await page.locator('.garden-task-composer').waitFor();
+  await page.getByRole('button', { name: /^Continue this conversation/ }).click();
   for (const theme of ['dark', 'light']) {
     await page.evaluate((value) => {
       document.documentElement.dataset.theme = value;
@@ -185,7 +208,31 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
         animations: 'disabled',
         path: resolve(report, `conversation-${theme}-${width}.png`)
       });
+      await page.getByRole('button', { name: 'Prompt settings', exact: true }).click();
+      await page.getByRole('dialog', { name: 'Prompt settings', exact: true }).waitFor();
+      await page.screenshot({
+        path: resolve(report, `conversation-settings-${theme}-${width}.png`)
+      });
+      await page.keyboard.press('Escape');
     }
   }
   await page.close();
+  const fallback = await context.newPage();
+  await fallback.addInitScript(() => {
+    delete HTMLElement.prototype.showPopover;
+  });
+  await fallback.goto(origin);
+  await fallback.getByRole('button', { name: 'Prompt settings', exact: true }).click();
+  const fallbackDialog = fallback.getByRole('dialog', { name: 'Prompt settings', exact: true });
+  await fallbackDialog.waitFor();
+  await fallbackDialog.getByRole('spinbutton', { name: 'Task spend limit in USD' }).fill('3.00');
+  await fallback.keyboard.press('Escape');
+  await fallbackDialog.waitFor({ state: 'hidden' });
+  await fallback.getByRole('button', { name: 'Prompt settings', exact: true }).click();
+  assert.equal(
+    await fallbackDialog.getByRole('spinbutton', { name: 'Task spend limit in USD' }).inputValue(),
+    '3.00',
+    'Older webviews retain prompt controls without native popovers'
+  );
+  await fallback.close();
 }

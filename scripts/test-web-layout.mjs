@@ -1610,7 +1610,6 @@ try {
     );
     await page.setViewportSize({ width: 320, height: 600 });
     await revealPromptSettings(page);
-    await page.locator('.garden-prompt-options > summary').click();
     const limit = page.getByRole('spinbutton', {
       name: 'Additional spend limit in USD',
       exact: true
@@ -2672,7 +2671,6 @@ try {
     if (await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).isVisible())
       await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).click();
     await revealPromptSettings(modelsPage);
-    await modelsPage.locator('.garden-prompt-options > summary').click();
     await modelsPage
       .getByRole('button', { name: 'Model choices for this direction', exact: true })
       .click();
@@ -2762,7 +2760,6 @@ try {
     await openNewProject(modelsPage);
     const newWork = modelsPage.getByRole('dialog', { name: 'Begin something new', exact: true });
     await revealPromptSettings(newWork);
-    await newWork.locator('.garden-prompt-options > summary').click();
     await newWork
       .getByRole('button', { name: 'Model choices for this direction', exact: true })
       .click();

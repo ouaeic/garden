@@ -32,6 +32,7 @@ export interface ModelPickerProps {
   disabled?: boolean | undefined;
   loadDetails?: boolean;
   privacyRoute?: PrivacyRoute;
+  triggerLabel?: string;
   onChange: (value: string) => void;
 }
 
@@ -56,7 +57,7 @@ export default function ModelPicker(props: ModelPickerProps) {
         title={selected}
         onClick={() => setOpen(true)}
       >
-        <span>{selected}</span>
+        <span>{props.triggerLabel ?? selected}</span>
         <ChevronDown size={14} aria-hidden="true" />
       </button>
       {open && (

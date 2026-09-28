@@ -1150,45 +1150,7 @@
     scroll-behavior: auto;
   }
 }
-.garden-approval-select {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 16px;
-  color: var(--muted);
-}
-.garden-approval-select select {
-  width: auto;
-  min-height: 30px;
-  padding: 0.25rem 1.5rem 0.25rem 0.3rem;
-  border: 0;
-  background-color: transparent;
-  font-size: 16px;
-  color: var(--text);
-}
-.garden-model-controls {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--line);
-}
-.garden-model-settings {
-  display: contents;
-}
-.garden-model-select {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  flex: 1 1 210px;
-  max-width: 320px;
-  font-size: 16px;
-  color: var(--muted);
-}
-.garden-model-select .model-picker-trigger {
+.model-picker-trigger {
   width: 100%;
   min-height: 30px;
   padding: 3px 22px 3px 5px;
@@ -1224,53 +1186,6 @@
 }
 .model-picker-trigger:hover {
   background: var(--raised);
-}
-.garden-effort-control {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 16px;
-  color: var(--muted);
-}
-.garden-route-control,
-.garden-cap-control {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 16px;
-  color: var(--muted);
-}
-.garden-route-control select,
-.garden-effort-control select,
-.garden-cap-control input {
-  width: auto;
-  min-height: 30px;
-  max-width: 110px;
-  padding: 0.25rem 1.4rem 0.25rem 0.3rem;
-  border: 0;
-  background: transparent;
-  color: var(--text);
-  font-size: 16px;
-}
-.garden-cap-control input {
-  width: 68px;
-  padding-right: 0.3rem;
-}
-.garden-model-controls label > span {
-  white-space: nowrap;
-}
-@media (max-width: 760px) {
-  .garden-model-controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 12px;
-    margin-top: 7px;
-    padding-top: 7px;
-  }
-  .garden-model-select {
-    flex: 1 1 calc(100% - 56px);
-    max-width: none;
-  }
 }
 .garden-sidebar-theme {
   font-size: 16px;
@@ -1676,16 +1591,6 @@
   }
 }
 
-.garden-model-controls .button {
-  min-height: 30px;
-  padding: 5px 8px;
-  border-color: transparent;
-  color: var(--muted);
-}
-.garden-model-controls .button[aria-expanded='true'] {
-  color: var(--text);
-  background: var(--raised);
-}
 .garden-task-directions > summary {
   cursor: pointer;
   color: var(--muted);
