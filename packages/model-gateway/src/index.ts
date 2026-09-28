@@ -31,6 +31,8 @@ export * from './media-routing.js';
 export * from './openrouter-generation.js';
 
 export * from './adapter.js';
+export * from './vendors.js';
+export { isNativeAnthropicEndpoint, anthropicBridge } from './anthropic-bridge.js';
 export * from './native-continuation.js';
 export * from './openai-responses.js';
 export * from './model-diagnostics.js';

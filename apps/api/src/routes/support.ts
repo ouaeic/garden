@@ -45,6 +45,8 @@ import type { MediaModelOption } from '@garden/contracts';
 import type { UserRecord, WorkspaceRecord } from '@garden/data';
 import {
   createModelAdapter,
+  vendorForEndpoint,
+  vendorPresets,
   MediaRouteResolver,
   applyOpenRouterPrivacyPolicy,
   refreshOpenRouterCatalog,
@@ -670,6 +672,7 @@ export const createServerSupport = (context: ServerBase) => {
       label: secret.label ?? null,
       source,
       provider: secret.provider,
+      vendor: secret.vendor ?? vendorForEndpoint(secret.baseUrl)?.id ?? null,
       baseUrl: secret.baseUrl,
       modelId: secret.modelId ?? null,
       hasApiKey: Boolean(secret.apiKey),
@@ -686,7 +689,15 @@ export const createServerSupport = (context: ServerBase) => {
     return {
       ...(primary ?? (await describe(config.AI_PROVIDER, unconfigured, 'server_environment'))),
       configured: Boolean(primary),
-      connections: listed
+      connections: listed,
+      vendors: vendorPresets.map(({ id, label, maker, baseUrl, keyUrl, contextTokens }) => ({
+        id,
+        label,
+        maker,
+        baseUrl,
+        keyUrl,
+        contextTokens
+      }))
     };
   };
 

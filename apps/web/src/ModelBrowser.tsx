@@ -4,13 +4,9 @@ import { Button, Dialog, ErrorNotice } from './ui.js';
 import type { ModelPickerProps, PickerModel } from './ModelPicker.js';
 import { mediaRouteIsRetired } from './media-state.js';
 import { get } from './client.js';
+import { makerOf, routeOf } from './model-makers.js';
 import './model-choices.css';
 
-const providerName = (model: PickerModel) => {
-  if (model.connectionLabel) return model.connectionLabel;
-  const parts = model.id.split('/');
-  return model.provider === 'openrouter' && parts.length > 2 ? parts[1]! : model.provider;
-};
 const price = (value: number) =>
   `$${value.toLocaleString(undefined, { maximumFractionDigits: 4 })}`;
 function details(model: PickerModel): string {
@@ -80,28 +76,38 @@ export default function ModelBrowser({
   const search = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const id = useId();
-  const providers = useMemo(() => [...new Set(models.map(providerName))].sort(), [models]);
+  const makers = useMemo(() => [...new Set(models.map(makerOf))].sort(), [models]);
+  const routes = useMemo(() => [...new Set(models.map(routeOf))].sort(), [models]);
   const rows = useMemo(() => {
     const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
     const matches = (text: string) => words.every((word) => text.toLowerCase().includes(word));
+    // The filter holds either a maker or a route, so one control answers both questions.
+    const inFilter = (model: PickerModel) =>
+      !provider ||
+      (provider.startsWith('route:')
+        ? routeOf(model) === provider.slice(6)
+        : makerOf(model) === provider.slice(6));
     const concrete = models
       .filter(
         (model) =>
-          (!provider || providerName(model) === provider) &&
+          inFilter(model) &&
           matches(
-            `${model.displayName} ${model.id} ${model.provider} ${model.connectionLabel ?? ''} ${Array.isArray(model.capabilities) ? model.capabilities.join(' ') : ''}`
+            `${model.displayName} ${model.id} ${makerOf(model)} ${routeOf(model)} ${Array.isArray(model.capabilities) ? model.capabilities.join(' ') : ''}`
           )
       )
       .sort(
         (a, b) =>
-          providerName(a).localeCompare(providerName(b)) ||
-          a.displayName.localeCompare(b.displayName)
+          makerOf(a).localeCompare(makerOf(b)) ||
+          a.displayName.localeCompare(b.displayName) ||
+          routeOf(a).localeCompare(routeOf(b))
       )
       .map((model) => ({
         value: model.id,
         label: model.displayName,
-        identity: model.id,
-        group: providerName(model),
+        // The name the provider itself uses, which is what the owner would recognise or search for.
+        identity: model.providerModelId ?? model.id,
+        group: makerOf(model),
+        route: routes.length > 1 ? routeOf(model) : '',
         detail: details(model),
         reason:
           (loading
@@ -119,7 +125,7 @@ export default function ModelBrowser({
     return [
       ...shortcuts
         .filter((item) => !provider && matches(item.label))
-        .map((item) => ({ ...item, identity: '', group: 'Selection', reason: '' })),
+        .map((item) => ({ ...item, identity: '', group: 'Selection', route: '', reason: '' })),
       ...(value &&
       !models.some((model) => model.id === value) &&
       !shortcuts.some((item) => item.value === value) &&
@@ -131,6 +137,7 @@ export default function ModelBrowser({
               label: value,
               identity: '',
               group: 'Saved choice',
+              route: '',
               detail: '',
               reason: 'Unavailable in the connected catalogue'
             }
@@ -138,7 +145,7 @@ export default function ModelBrowser({
         : []),
       ...concrete
     ];
-  }, [models, shortcuts, query, provider, value, loading, loadError]);
+  }, [models, routes, shortcuts, query, provider, value, loading, loadError]);
   useEffect(() => {
     search.current?.focus();
   }, []);
@@ -214,11 +221,22 @@ export default function ModelBrowser({
             }}
           >
             <option value="">All providers</option>
-            {providers.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
+            <optgroup label="Made by">
+              {makers.map((name) => (
+                <option key={name} value={`maker:${name}`}>
+                  {name}
+                </option>
+              ))}
+            </optgroup>
+            {routes.length > 1 && (
+              <optgroup label="Connected through">
+                {routes.map((name) => (
+                  <option key={name} value={`route:${name}`}>
+                    {name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
         </label>
         <small className="muted" role="status">
@@ -248,7 +266,10 @@ export default function ModelBrowser({
               }}
             >
               <span>
-                <strong>{row.label}</strong>
+                <strong>
+                  {row.label}
+                  {row.route && <em className="model-route">via {row.route}</em>}
+                </strong>
                 {row.identity && <small>{row.identity}</small>}
                 {(row.reason || row.detail) && (
                   <small className={row.reason ? 'model-unavailable' : ''}>

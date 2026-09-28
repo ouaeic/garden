@@ -1,4 +1,4 @@
-import { configuredModelCatalog, OpenAICompatibleAdapter } from '@garden/model-gateway';
+import { configuredModelCatalog, createModelAdapter } from '@garden/model-gateway';
 import type { ModelRelease, PrivacyRoute } from '@garden/contracts';
 
 /**
@@ -102,7 +102,7 @@ export const refreshConfiguredCatalog = async (
   input: ConfiguredCatalogInput
 ): Promise<Array<Record<string, unknown>>> => {
   const privacyRoute: PrivacyRoute = input.enforceZeroDataRetention ? 'provider_zdr' : 'external';
-  const adapter = new OpenAICompatibleAdapter({
+  const adapter = createModelAdapter({
     provider: input.provider,
     privacyRoute,
     baseUrl: input.baseUrl,

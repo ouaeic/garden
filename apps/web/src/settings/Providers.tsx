@@ -19,8 +19,33 @@ import DefaultModels from './DefaultModels.js';
 import ModelCatalog from './ModelCatalog.js';
 import ModelPicker from '../ModelPicker.js';
 
+interface Vendor {
+  id: string;
+  label: string;
+  maker: string;
+  baseUrl: string;
+  keyUrl: string;
+  contextTokens: number;
+}
+/** What each listed company's models are known as, so the owner finds the one they came for. */
+const KNOWN_AS: Record<string, string> = {
+  anthropic: 'Claude',
+  openai: 'GPT and o-series, the models behind ChatGPT',
+  google: 'Gemini',
+  xai: 'Grok',
+  mistral: 'Mistral and Codestral',
+  deepseek: 'DeepSeek',
+  groq: 'fast open models',
+  together: 'open models',
+  fireworks: 'open models',
+  cerebras: 'fast open models',
+  moonshot: 'Kimi',
+  qwen: 'Qwen'
+};
 interface Provider {
   configured: boolean;
+  vendor?: string | null;
+  vendors?: Vendor[];
   connectionId?: string;
   label?: string | null;
   connections?: Provider[];
@@ -49,6 +74,7 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
     onChange();
   });
   const [choice, setChoice] = useState('');
+  const [vendorChoice, setVendorChoice] = useState('');
   const [mediaSelections, setMediaSelections] = useState<Record<string, string>>({});
   const mediaAction = useAction(() => onChange());
   const selected =
@@ -62,6 +88,25 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
       : undefined);
   const selectedProvider =
     saved?.provider ?? (selected.startsWith('openai-compatible:') ? 'openai-compatible' : selected);
+  const vendors = provider.value?.vendors ?? [];
+  const vendor = vendors.find((entry) => entry.id === (saved ? saved.vendor : vendorChoice));
+  const connectionName = (entry: Provider) =>
+    entry.label ??
+    vendors.find((known) => known.id === entry.vendor)?.label ??
+    (entry.provider === 'openrouter'
+      ? 'OpenRouter'
+      : entry.provider === 'ollama-cloud'
+        ? 'Ollama Cloud'
+        : 'Compatible endpoint');
+  const pick = (value: string) => {
+    if (value.startsWith('vendor:')) {
+      setVendorChoice(value.slice('vendor:'.length));
+      setChoice(`openai-compatible:${crypto.randomUUID()}`);
+      return;
+    }
+    setVendorChoice('');
+    setChoice(value);
+  };
   return (
     <>
       <Section
@@ -93,28 +138,29 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
                   key={entry.connectionId ?? entry.provider}
                   type="button"
                   aria-pressed={selected === (entry.connectionId ?? entry.provider)}
-                  onClick={() => setChoice(entry.connectionId ?? entry.provider)}
+                  onClick={() => {
+                    setVendorChoice('');
+                    setChoice(entry.connectionId ?? entry.provider);
+                  }}
                 >
-                  {entry.label ??
-                    (entry.provider === 'openrouter'
-                      ? 'OpenRouter'
-                      : entry.provider === 'ollama-cloud'
-                        ? 'Ollama Cloud'
-                        : 'Compatible endpoint')}
+                  {connectionName(entry)}
                 </Button>
               ))}
             </div>
           )}
           <Button
             type="button"
-            onClick={() => setChoice(`openai-compatible:${crypto.randomUUID()}`)}
+            onClick={() => {
+              setVendorChoice('');
+              setChoice(`openai-compatible:${crypto.randomUUID()}`);
+            }}
           >
-            Add custom endpoint
+            Add a provider
           </Button>
           {provider.value && preferences.value && (
             <form
               className="stack"
-              key={selected + (saved?.baseUrl ?? '') + (saved?.modelId ?? '')}
+              key={selected + (vendor?.id ?? '') + (saved?.baseUrl ?? '') + (saved?.modelId ?? '')}
               onSubmit={(event) => {
                 event.preventDefault();
                 const form = new FormData(event.currentTarget);
@@ -130,7 +176,9 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
                       ...(apiKey ? { apiKey } : {}),
                       ...(selectedProvider === 'openai-compatible'
                         ? {
-                            baseUrl: fieldValue(form, 'baseUrl'),
+                            ...(vendor
+                              ? { vendor: vendor.id }
+                              : { baseUrl: fieldValue(form, 'baseUrl') }),
                             ...(fieldValue(form, 'modelId')
                               ? { modelId: fieldValue(form, 'modelId') }
                               : {}),
@@ -172,16 +220,26 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
               <div className="management-note">
                 {saved && saved.configured !== false
                   ? `Connected through ${saved?.source === 'server_environment' ? 'server configuration' : 'your saved settings'}. ${saved?.hasApiKey ? 'A key is securely stored.' : 'This endpoint uses no saved key.'}`
-                  : 'Add this provider alongside your other connections.'}
+                  : 'Add this provider alongside your other connections. Every connected provider’s models appear together when you choose one.'}
               </div>
               <div className="management-grid">
                 <Field label="Provider">
                   <select
-                    value={selectedProvider}
-                    disabled={selected !== selectedProvider}
-                    onChange={(event) => setChoice(event.target.value)}
+                    value={vendor ? `vendor:${vendor.id}` : selectedProvider}
+                    disabled={Boolean(saved) && selected !== selectedProvider}
+                    onChange={(event) => pick(event.target.value)}
                   >
-                    <option value="openrouter">OpenRouter</option>
+                    <option value="openrouter">OpenRouter · every maker with one key</option>
+                    {vendors.length > 0 && (
+                      <optgroup label="Direct from the maker">
+                        {vendors.map((entry) => (
+                          <option key={entry.id} value={`vendor:${entry.id}`}>
+                            {entry.label}
+                            {KNOWN_AS[entry.id] ? ` · ${KNOWN_AS[entry.id]}` : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                     <option value="ollama-cloud">Ollama Cloud</option>
                     <option value="openai-compatible">Compatible endpoint</option>
                   </select>
@@ -195,30 +253,48 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
                     type="password"
                     autoComplete="new-password"
                     placeholder={saved?.hasApiKey ? 'Stored securely' : 'Paste your key'}
+                    required={Boolean(vendor) && !saved?.hasApiKey}
                   />
                 </Field>
+                {vendor && (
+                  <p className="management-note">
+                    <a href={vendor.keyUrl} target="_blank" rel="noreferrer">
+                      Get a key from {vendor.label}
+                    </a>{' '}
+                    and paste it here. Every model the key can use is listed, and requests go
+                    straight to {vendor.label}.
+                    {(vendor.id === 'anthropic' || vendor.id === 'openai') &&
+                      ` A ${vendor.id === 'anthropic' ? 'Claude' : 'ChatGPT'} chat subscription does not include API access; the key is billed separately.`}
+                  </p>
+                )}
                 {selectedProvider === 'openai-compatible' && (
                   <>
                     <Field
                       label="Connection name"
-                      hint="Optional. A named connection uses its endpoint hostname by default."
+                      hint={
+                        vendor
+                          ? `Optional. Name a second ${vendor.label} key to tell them apart.`
+                          : 'Optional. A named connection uses its endpoint hostname by default.'
+                      }
                     >
                       <input
                         name="label"
                         maxLength={80}
                         defaultValue={saved?.label ?? ''}
-                        placeholder="Work models"
+                        placeholder={vendor?.label ?? 'Work models'}
                       />
                     </Field>
-                    <Field label="Endpoint URL">
-                      <input
-                        required
-                        name="baseUrl"
-                        type="url"
-                        defaultValue={saved?.baseUrl ?? ''}
-                        placeholder="https://provider.example/v1"
-                      />
-                    </Field>
+                    {!vendor && (
+                      <Field label="Endpoint URL">
+                        <input
+                          required
+                          name="baseUrl"
+                          type="url"
+                          defaultValue={saved?.baseUrl ?? ''}
+                          placeholder="https://provider.example/v1"
+                        />
+                      </Field>
+                    )}
                     <Field
                       label="Restrict to model ID"
                       hint="Optional. Leave empty to discover every model this endpoint offers."
@@ -231,7 +307,7 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
                         type="number"
                         min={4096}
                         max={10000000}
-                        defaultValue={saved?.contextTokens ?? 128000}
+                        defaultValue={saved?.contextTokens ?? vendor?.contextTokens ?? 128000}
                         required
                       />
                     </Field>
@@ -240,7 +316,9 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
                         <input
                           name="vision"
                           type="checkbox"
-                          defaultChecked={saved?.capabilities?.includes('vision')}
+                          defaultChecked={
+                            saved?.capabilities?.includes('vision') ?? Boolean(vendor)
+                          }
                         />
                         Accepts images
                       </label>

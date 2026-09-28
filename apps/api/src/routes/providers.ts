@@ -22,6 +22,7 @@ import {
   configuredModelCatalog,
   refreshOpenRouterCatalog,
   seedModels,
+  vendorPreset,
   verifyOpenRouterKey
 } from '@garden/model-gateway';
 import { z } from 'zod';
@@ -81,13 +82,23 @@ export const registerProviderRoutes = (context: RouteContext): void => {
       const input = z
         .object({
           provider: z.enum(['openrouter', 'ollama-cloud', 'openai-compatible']),
+          /**
+           * A model company from the preset list. It fixes the address and names the connection;
+           * the connection itself is an ordinary named compatible endpoint, so several companies
+           * can be connected side by side.
+           */
+          vendor: z
+            .string()
+            .max(40)
+            .refine((id) => vendorPreset(id) !== null, 'Choose a listed provider')
+            .optional(),
           connectionId: z.string().max(100).optional(),
           label: z.string().trim().max(80).optional(),
           baseUrl: z.string().url().optional(),
           apiKey: z.string().max(2_000).optional(),
           modelId: z.string().trim().min(1).max(300).optional(),
           enforceZeroDataRetention: z.boolean().default(true),
-          contextTokens: z.number().int().min(4_096).max(10_000_000).default(128_000),
+          contextTokens: z.number().int().min(4_096).max(10_000_000).optional(),
           capabilities: z
             .array(z.enum(['chat', 'vision', 'tools', 'reasoning', 'embedding']))
             .min(1)
@@ -117,6 +128,12 @@ export const registerProviderRoutes = (context: RouteContext): void => {
             .optional()
         })
         .superRefine((value, context) => {
+          if (value.vendor && value.provider !== 'openai-compatible')
+            context.addIssue({
+              code: 'custom',
+              path: ['vendor'],
+              message: 'A listed provider is saved as its own compatible connection'
+            });
           // Ollama Cloud is exempt because it no longer needs one: the catalogue below lists every
           // model that account can reach, the same way OpenRouter's does, so naming a single model
           // by hand went from a requirement to an optional pin.
@@ -134,6 +151,8 @@ export const registerProviderRoutes = (context: RouteContext): void => {
         })
         .parse(request.body);
       const connectionId = input.connectionId ?? input.provider;
+      const preset = vendorPreset(input.vendor);
+      const contextTokens = input.contextTokens ?? preset?.contextTokens ?? 128_000;
       if (inferenceConnectionProvider(connectionId) !== input.provider)
         throw new GardenError(
           'provider_connection_invalid',
@@ -145,7 +164,7 @@ export const registerProviderRoutes = (context: RouteContext): void => {
           ? 'https://openrouter.ai/api/v1'
           : input.provider === 'ollama-cloud'
             ? 'https://ollama.com/v1'
-            : (input.baseUrl ?? config.AI_BASE_URL);
+            : (preset?.baseUrl ?? input.baseUrl ?? config.AI_BASE_URL);
       const existingSecret = (await inferenceConnections(user.id)).get(connectionId)?.secret;
       const sameEndpoint = (secret: InferenceSecret | undefined) =>
         secret?.provider === input.provider &&
@@ -163,10 +182,10 @@ export const registerProviderRoutes = (context: RouteContext): void => {
           'Enter the key issued for this endpoint. A saved key cannot be sent to a different endpoint.',
           422
         );
-      if (['openrouter', 'ollama-cloud'].includes(input.provider) && !apiKey)
+      if ((['openrouter', 'ollama-cloud'].includes(input.provider) || preset) && !apiKey)
         throw new GardenError(
           'provider_key_required',
-          `${input.provider === 'openrouter' ? 'OpenRouter' : 'Ollama Cloud'} requires an API key`,
+          `${preset?.label ?? (input.provider === 'openrouter' ? 'OpenRouter' : 'Ollama Cloud')} requires an API key`,
           422
         );
       const url = new URL(baseUrl);
@@ -265,7 +284,7 @@ export const registerProviderRoutes = (context: RouteContext): void => {
           );
         pendingModels = configuredModelCatalog(catalogue, {
           privacyRoute: input.enforceZeroDataRetention ? 'provider_zdr' : 'external',
-          contextTokens: input.contextTokens,
+          contextTokens,
           capabilities: input.capabilities,
           modalities: input.modalities,
           tag: input.provider === 'ollama-cloud' ? 'Ollama Cloud' : 'Configured endpoint',
@@ -294,13 +313,15 @@ export const registerProviderRoutes = (context: RouteContext): void => {
         (existingSecret?.provider === input.provider ? existingSecret.mediaModels : undefined);
       const connectionLabel =
         (input.label === undefined ? existingSecret?.label : input.label) ||
+        preset?.label ||
         (connectionId !== input.provider ? new URL(baseUrl).hostname : undefined);
       const saved: InferenceSecret = {
         connectionId,
         ...(connectionLabel ? { label: connectionLabel } : {}),
         provider: input.provider,
+        ...(preset ? { vendor: preset.id } : {}),
         catalogDefaults: {
-          contextTokens: input.contextTokens,
+          contextTokens,
           capabilities: input.capabilities,
           modalities: input.modalities
         },
@@ -334,7 +355,7 @@ export const registerProviderRoutes = (context: RouteContext): void => {
         userId: user.id,
         kind: 'inference_provider_configured',
         outcome: 'completed',
-        metadata: { provider: input.provider }
+        metadata: { provider: input.provider, ...(preset ? { vendor: preset.id } : {}) }
       });
       /*
        * A ceiling only ever gets put in place here, never moved.

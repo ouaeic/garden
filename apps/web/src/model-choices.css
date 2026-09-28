@@ -60,7 +60,6 @@
   padding: 12px 10px 6px;
   font-size: 16px;
   color: var(--muted);
-  text-transform: capitalize;
 }
 .model-browser-option {
   display: flex;
@@ -81,6 +80,18 @@
   font-size: 16px;
   font-weight: 500;
   overflow-wrap: anywhere;
+}
+.model-route {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  color: var(--muted);
+  font-style: normal;
+  font-size: 16px;
+  font-weight: 400;
+  vertical-align: 1px;
+  white-space: nowrap;
 }
 .model-browser-option small {
   display: block;

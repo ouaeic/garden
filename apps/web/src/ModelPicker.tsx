@@ -14,6 +14,7 @@ export type PickerModel = Pick<ModelRelease, 'id' | 'displayName' | 'provider'> 
       | 'outputUsdPerMillionTokens'
       | 'reasoning'
       | 'connectionLabel'
+      | 'providerModelId'
     >
   > & {
     capabilities?: ModelRelease['capabilities'] | MediaModelOption['capabilities'] | undefined;

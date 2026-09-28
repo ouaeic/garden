@@ -112,7 +112,8 @@ describe('saved provider connection lifecycle', () => {
       connections: unknown[];
     }>();
     expect(settings.connections).toHaveLength(2);
-    expect(JSON.stringify(settings)).not.toContain('-key');
+    expect(JSON.stringify(settings)).not.toContain('ollama-cloud-key');
+    expect(JSON.stringify(settings)).not.toContain('openai-compatible-key');
     const removed = await app.inject({
       method: 'DELETE',
       url: '/v1/providers?connectionId=ollama-cloud'
@@ -178,6 +179,81 @@ describe('saved provider connection lifecycle', () => {
     const remaining = await support.modelsForUser(user);
     expect(remaining).toHaveLength(2);
     expect(remaining.every((model) => model.connectionId === second)).toBe(true);
+  });
+
+  it('connects model companies from the preset list side by side, each on its own protocol', async () => {
+    const claude = 'openai-compatible:10000000-0000-4000-8000-000000000004';
+    const gemini = 'openai-compatible:10000000-0000-4000-8000-000000000005';
+    const saves = [
+      [claude, 'anthropic', 'anthropic-key'],
+      [gemini, 'google', 'gemini-key']
+    ] as const;
+    for (const [connectionId, vendor, apiKey] of saves) {
+      const response = await connect('openai-compatible', {
+        connectionId,
+        vendor,
+        apiKey,
+        baseUrl: undefined
+      });
+      expect(response.statusCode, response.body).toBe(200);
+    }
+    // The address came from the preset, and each vendor heard its own key its own way.
+    const anthropic = calls.filter((call) => call.url.startsWith('https://api.anthropic.com/v1/'));
+    const google = calls.filter((call) =>
+      call.url.startsWith('https://generativelanguage.googleapis.com/v1beta/openai/')
+    );
+    expect(anthropic.length).toBeGreaterThan(0);
+    expect(google.length).toBeGreaterThan(0);
+    expect(anthropic.every((call) => call.authorization === null)).toBe(true);
+    expect(google.every((call) => call.authorization === 'Bearer gemini-key')).toBe(true);
+    const settings = (await app.inject({ method: 'GET', url: '/v1/providers' })).json<{
+      connections: Array<{ connectionId: string; label: string; vendor: string | null }>;
+      vendors: Array<{ id: string; keyUrl: string }>;
+    }>();
+    expect(settings.vendors.map((vendor) => vendor.id)).toEqual(
+      expect.arrayContaining(['anthropic', 'openai', 'google'])
+    );
+    expect(
+      settings.connections.map(({ connectionId, label, vendor }) => ({
+        connectionId,
+        label,
+        vendor
+      }))
+    ).toEqual(
+      expect.arrayContaining([
+        { connectionId: claude, label: 'Anthropic', vendor: 'anthropic' },
+        { connectionId: gemini, label: 'Google Gemini', vendor: 'google' }
+      ])
+    );
+    const user = (await store.getUserById(userId))!;
+    const labels = new Set(
+      (await support.modelsForUser(user)).map((model) => model.connectionLabel)
+    );
+    expect(labels).toEqual(new Set(['Anthropic', 'Google Gemini']));
+  });
+
+  it('refuses a preset without a key, on another protocol or that is not on the list', async () => {
+    const connectionId = 'openai-compatible:10000000-0000-4000-8000-000000000006';
+    // The server's error handler turns the schema refusals into a 400; this app has none, so the
+    // reason is what the assertion reads.
+    for (const [provider, extra, reason] of [
+      ['openai-compatible', { connectionId, vendor: 'anthropic' }, 'Anthropic requires an API key'],
+      [
+        'ollama-cloud',
+        { vendor: 'anthropic', apiKey: 'key' },
+        'A listed provider is saved as its own compatible connection'
+      ],
+      [
+        'openai-compatible',
+        { connectionId, vendor: 'nobody', apiKey: 'key' },
+        'Choose a listed provider'
+      ]
+    ] as const) {
+      const response = await connect(provider, { ...extra, baseUrl: undefined });
+      expect(response.statusCode).not.toBe(200);
+      expect(response.body).toContain(reason);
+    }
+    expect(calls).toHaveLength(0);
   });
 
   it('does not borrow a saved key for a newly named account at the same endpoint', async () => {

@@ -16,7 +16,10 @@
   Xvfb/Openbox GUI, AT-SPI semantics, screenshots, and takeover.
 - Narrow approval-gated host package helper with arbitrary privilege escalation rejected.
 - Private path-based previews, artifacts, file browser, and rich Markdown/media display.
-- OpenRouter, Ollama Cloud, and compatible inference plus capability-aware effort and vision
+- OpenRouter, direct model-company keys (Anthropic through a native Messages bridge, OpenAI through
+  Responses, and presets for Google, xAI, Mistral, DeepSeek, Groq, Together, Fireworks, Cerebras,
+  Moonshot and Qwen), Ollama Cloud, and compatible inference, side by side as named connections,
+  plus capability-aware effort and vision
   routing. Provider image, speech, transcription and video discovery retains advertised pricing,
   inputs and privacy requirements. Asynchronous jobs, compatible edits, provider libraries and
   batch work use durable receipts and explicit approval for retained provider processing.

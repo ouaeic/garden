@@ -360,6 +360,7 @@ const modelCatalog = [
   ...Array.from({ length: 80 }, (_, index) => ({
     ...bootstrap.models[0],
     id: `openrouter/${index % 2 ? 'beta' : 'alpha'}/model-${index}`,
+    providerModelId: `${index % 2 ? 'beta' : 'alpha'}/model-${index}`,
     provider: 'openrouter',
     displayName: `Research model ${index}`,
     contextTokens: 200000,
@@ -2758,9 +2759,11 @@ try {
     const modelSearch = modelsPage.getByRole('combobox', { name: 'Search models', exact: true });
     await modelsPage
       .getByRole('combobox', { name: 'Filter models by provider', exact: true })
-      .selectOption('beta');
+      .selectOption({ label: 'Beta' });
+    // The picker groups by who made a model; filtering to one maker leaves only its models.
+    assert((await modelsPage.getByRole('option').filter({ hasText: 'beta/model-' }).count()) > 0);
     assert.equal(
-      await modelsPage.getByRole('option').filter({ hasText: 'openrouter/alpha/' }).count(),
+      await modelsPage.getByRole('option').filter({ hasText: 'alpha/model-' }).count(),
       0
     );
     await modelSearch.fill('model-79');
@@ -3119,7 +3122,7 @@ try {
       ['Work models', 'work-models.example'],
       ['Research models', 'research-models.example']
     ]) {
-      await modelsPage.getByRole('button', { name: 'Add custom endpoint', exact: true }).click();
+      await modelsPage.getByRole('button', { name: 'Add a provider', exact: true }).click();
       await modelsPage.getByLabel('Connection name', { exact: true }).fill(label);
       await modelsPage.getByLabel('Endpoint URL', { exact: true }).fill(`https://${host}/v1`);
       await modelsPage.getByLabel('API key', { exact: true }).fill('synthetic-account-key');

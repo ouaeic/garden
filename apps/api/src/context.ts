@@ -326,6 +326,12 @@ export interface InferenceSecret {
     modalities: ModelRelease['modalities'];
   };
   provider: 'openrouter' | 'ollama-cloud' | 'openai-compatible';
+  /**
+   * The model company this compatible connection was made for, when the owner chose one from the
+   * list rather than typing an address. It names the preset only; the address the connection uses
+   * is still `baseUrl`, and the protocol is still decided from that address. @see vendorPresets
+   */
+  vendor?: string;
   baseUrl: string;
   apiKey?: string;
   modelId?: string;
