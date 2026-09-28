@@ -1,42 +1,4 @@
-/**
- * What a fork's preamble costs, asserted as bytes.
- *
- * A fork busted its own cache by construction. Two blocks in the anchored preamble were keyed to
- * the task rather than to the conversation - the reviewed knowledge block is ranked against the
- * task's opening request and clocked to its creation instant, and the memory pack is stored per
- * task id - so a retry re-ranked both against a sentence it invented for itself and served none of
- * the 70.4% of a request this repository measures as cache-servable on a 131k window. It is the
- * one action an owner takes when something has already gone wrong.
- *
- * The assertions here are byte equality of the LEADING SYSTEM RUN, because that run is what sits
- * ahead of the cache breakpoint and is the whole of what a fork can inherit. Byte equality alone is
- * a saturated assertion, so each case carries the two levers that would move it independently:
- *
- * - the fixture's fusion query answers DIFFERENTLY on its second call, so a fork that re-ranked its
- *   memory pack cannot come out equal by luck on a workspace whose ranking happens to be stable;
- * - the fork's stored pack row is inspected for its own encryption context, which is the one way
- *   the copy fails silently - an aliased row is refused by `openStoredPack`'s AAD equality, returns
- *   null, and re-ranks while looking fixed.
- *
- * And the arm that matters more than the equality: a fork taken after the owner edited their own
- * block must NOT match, because that block is installed by position from live storage. Without it
- * every case here would be satisfied by freezing the preamble outright, which is a worse defect
- * than the one being fixed.
- *
- * Three more arms answer the three ways the inheritance was too wide. It is bounded by the AGE of
- * the family root, because the clock it carries decides which memory rows are temporally admissible
- * and an unbounded one re-admits rows the owner's own `validUntil` retired; it is refused when the
- * ancestor's prompt is sealed for another workspace; and it does not apply to an `edit` at all,
- * because an edit of the first message carries no inherited trajectory and would be ranked against
- * the request its owner deliberately replaced.
- *
- * The clock is FAKED here and then MOVED, which is the last arm's whole subject. The age ceiling is
- * measured between two stored columns - the root's creation and the fork's - so every case below is
- * a fixed function of its own fixture and none of them depend on the day the file is run. The last
- * arm advances the fake clock past the ceiling between two turns of one run and asserts that
- * nothing moves, because a ceiling read against `Date.now()` would be re-decided on every turn and
- * would rewrite the block whose header says "frozen for this run".
- */
+/** Retry forks share valid context and encryption-safe cached packs without borrowing authority. */
 import { encryptBytes, encryptJson, ownerBlockAad, userMemoryKey } from '@garden/core';
 import type {
   DataStore,
@@ -350,12 +312,13 @@ const probe = (): Probe => {
         sha256: string;
         itemIds: string[];
         tokensEst: number;
+        briefVersion?: string | null;
       }) => {
         const existing = packs.get(input.taskId);
         if (existing) return existing;
         const record = {
           ...input,
-          briefVersion: null,
+          briefVersion: input.briefVersion ?? null,
           itemIds: [...input.itemIds],
           createdAt: '2026-08-01T00:00:00.000Z'
         } as unknown as MemoryPackRecord;
@@ -414,7 +377,7 @@ const leadingSystemRun = (state: AgentState): string => {
     if (message.role !== 'system') break;
     run.push(message.content);
   }
-  return run.join(' ');
+  return run.join('\u0000');
 };
 
 /**
@@ -583,10 +546,9 @@ describe('a fork and the prefix it was forked out of', () => {
       contextTokens: 200_000
     });
 
-    // The parent was clocked before the row expired and carried it; the fork is clocked at its own
-    // instant, which is after, so it must not be told it.
-    expect(leadingSystemRun(parent)).toContain(EXPIRING_ROW);
-    expect(leadingSystemRun(fork)).not.toContain(EXPIRING_ROW);
+    // Neither a parent nor its retry may revive an expired owner fact.
+    expect(leadingSystemRun(parent)).not.toContain(EXPIRING_ROW);
+    expect(leadingSystemRun(fork)).not.not.toContain(EXPIRING_ROW);
     expect(leadingSystemRun(fork)).not.toBe(leadingSystemRun(parent));
     // It walked to the ancestor and then refused it, rather than never looking.
     expect(probed.taskReads).toEqual([staleRootId]);
@@ -690,7 +652,7 @@ describe('a fork and the prefix it was forked out of', () => {
     expect(probed.taskReads).toEqual([foreignRootId]);
     // And having refused it, it is indistinguishable from a task that was never forked at all.
     expect(leadingSystemRun(fork)).toBe(leadingSystemRun(own));
-    expect(leadingSystemRun(fork)).not.toContain(EXPIRING_ROW);
+    expect(leadingSystemRun(fork)).not.not.toContain(EXPIRING_ROW);
     // The refusal reaches the pack. There IS a row to copy here, so this is a refusal and not an
     // absence: the fork's bytes are its own and the copy never happened.
     expect(probed.packs.get(foreignRootId)).toBeDefined();
@@ -739,9 +701,9 @@ describe('a fork and the prefix it was forked out of', () => {
       contextTokens: 200_000
     });
 
-    // The root's bytes, two links away, and the expired row the root's clock still admits.
+    // The root's valid bytes are reusable across the retry chain.
     expect(leadingSystemRun(twice)).toBe(leadingSystemRun(parent));
-    expect(leadingSystemRun(twice)).toContain(EXPIRING_ROW);
+    expect(leadingSystemRun(twice)).not.toContain(EXPIRING_ROW);
     // The walk went all the way to the root rather than stopping at the parent it reads the pack
     // from, and it stopped there rather than asking a fourth time.
     expect(probed.taskReads).toEqual([rootId, retryOnceId, rootId]);
@@ -753,22 +715,7 @@ describe('a fork and the prefix it was forked out of', () => {
     expect(probed.packs.get(retryTwiceId)?.bodyCiphertext.aad).toBe(memoryPackAad(retryTwiceId));
   });
 
-  /**
-   * THE CEILING IS A FACT ABOUT TWO ROWS, not about the moment the question is asked.
-   *
-   * `assemblePreamble` runs once per TURN. An age measured against `Date.now()` is therefore
-   * re-decided on every turn of the same run, so a retry that starts inside the hour and is still
-   * working when its root ages out inherits the family's request and clock on turn one and its own
-   * on turn two: the block whose header says "frozen for this run" rewrites itself mid-run, drops
-   * the row the first turn carried, and re-bills the pack, the goal and the whole trajectory behind
-   * it at the write premium. That is the same disease the `validUntil` refusal in `window.ts` exists
-   * to prevent, arriving through the ceiling that was added to prevent it.
-   *
-   * So the gap measured is `task.createdAt - anchor.createdAt`, two columns neither of which ever
-   * moves. This arm moves the clock two hours - well past the ceiling - between two turns of ONE
-   * task and asserts the leading system run does not change by a byte. Point the subtraction back
-   * at `Date.now()` and it goes red on the expired row and on the ranking order together.
-   */
+  /** Family age is measured between task creation times, independently of evidence expiry. */
   it('holds a retry preamble across a turn taken after the root would have aged out', async () => {
     const probed = probe();
     probed.block = ownerBlockRow('Dan. Ships on Fridays.');
@@ -785,7 +732,7 @@ describe('a fork and the prefix it was forked out of', () => {
     const firstTurn = leadingSystemRun(fork);
     // The inheritance is live on turn one, so this arm is about holding something rather than
     // about two ways of producing nothing.
-    expect(firstTurn).toContain(EXPIRING_ROW);
+    expect(firstTurn).not.toContain(EXPIRING_ROW);
     expect(firstTurn).toBe(leadingSystemRun(parent));
 
     // Two hours later, on the same run's next turn. Nothing about either task has changed.

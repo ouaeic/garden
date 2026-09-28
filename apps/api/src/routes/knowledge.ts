@@ -17,6 +17,8 @@ import {
   encryptBytes,
   encryptJson,
   memoryExcerpt,
+  memoryIndexKey,
+  planMemoryQuery,
   memoryTemporalStatus,
   ownerBlockAad,
   userMemoryAad,
@@ -288,6 +290,7 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
   const memoryResponse = (record: WorkspaceMemoryRecord, document: MemoryDocument) => ({
     id: record.id,
     target: record.target,
+    workspaceId: record.workspaceId,
     scope: record.keyScope,
     content: document.content,
     status: memoryTemporalStatus(document),
@@ -600,16 +603,12 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
    * about its owner is invisible to them, and a row dropped for being unreadable would be the one
    * row they would most want to reach.
    */
-  const memoryItemExcerpt = (
-    record: MemoryItemRecord,
-    key: Buffer,
-    workspaceId: string
-  ): string => {
+  const memoryItemExcerpt = (record: MemoryItemRecord, key: Buffer): string => {
     try {
       const document = decryptJson<{ title?: string | null; body: string }>(
         record.documentCiphertext,
         key,
-        `memory-item:${workspaceId}`
+        `memory-item:${record.workspaceId}`
       );
       return memoryExcerpt(document.body, '', { maxChars: 200 }) || (document.title ?? '');
     } catch {
@@ -645,7 +644,7 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
         const document = decryptJson<{ title?: string | null; body: string }>(
           record.documentCiphertext,
           key,
-          `memory-item:${workspaceId}`
+          `memory-item:${record.workspaceId}`
         );
         return {
           id: record.id,
@@ -681,6 +680,69 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
    * so the field the review queue has always projected is now on the list the owner actually
    * browses, beside the three-way answer `trust` alone cannot give.
    */
+  app.get<{ Params: { workspaceId: string }; Querystring: Record<string, string> }>(
+    '/v1/workspaces/:workspaceId/memory-library',
+    async (request) => {
+      const user = requireUser(request.user);
+      const workspaceId = request.params.workspaceId;
+      const { key } = await workspaceKnowledgeKey(user.id, workspaceId);
+      const query = z
+        .object({
+          q: z.string().trim().max(500).optional(),
+          scope: z.string().uuid().optional(),
+          kind: z.enum(['episode', 'fact', 'procedure']).optional(),
+          status: z.enum(['active', 'superseded', 'disputed', 'archived', 'retracted']).optional(),
+          cursor: z.string().max(512).optional(),
+          limit: z.coerce.number().int().min(1).max(100).default(40)
+        })
+        .parse(request.query);
+      let cursor: { at: string; id: string } | undefined;
+      if (query.cursor) {
+        try {
+          cursor = z
+            .object({ at: z.string().datetime(), id: z.string().uuid() })
+            .parse(JSON.parse(Buffer.from(query.cursor, 'base64url').toString()));
+        } catch {
+          throw new GardenError('memory_cursor_invalid', 'Invalid memory page', 400);
+        }
+      }
+      const page = await store.listOwnerMemoryItems(user.id, workspaceId, {
+        limit: query.limit,
+        ...(query.scope ? { scope: query.scope } : {}),
+        ...(query.kind ? { kind: query.kind } : {}),
+        ...(query.status ? { status: query.status } : {}),
+        ...(query.q ? { lexemes: planMemoryQuery(query.q, memoryIndexKey(key)).lexemes } : {}),
+        ...(cursor ? { cursor } : {})
+      });
+      const keys = new Map<string, Buffer>([[workspaceId, key]]);
+      for (const origin of new Set(page.items.map((item) => item.workspaceId)))
+        if (!keys.has(origin)) keys.set(origin, (await workspaceKnowledgeKey(user.id, origin)).key);
+      const last = page.items.at(-1);
+      return {
+        items: page.items.map((record) => ({
+          id: record.id,
+          workspaceId: record.workspaceId,
+          projectId: record.projectId,
+          taskId: record.taskId,
+          kind: record.kind,
+          status: record.status,
+          excerpt: memoryItemExcerpt(record, keys.get(record.workspaceId)!),
+          observedAt: record.observedAt,
+          trust: record.trust,
+          origin: memoryItemOrigin(record),
+          validTo: record.validTo,
+          lastVerified: record.lastVerified
+        })),
+        nextCursor:
+          page.hasMore && last
+            ? Buffer.from(JSON.stringify({ at: last.observedAt, id: last.id })).toString(
+                'base64url'
+              )
+            : null
+      };
+    }
+  );
+
   app.get<{ Params: { workspaceId: string }; Querystring: { limit?: string } }>(
     '/v1/workspaces/:workspaceId/memory-items',
     async (request) => {
@@ -691,10 +753,12 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
         id: record.id,
         kind: record.kind,
         status: record.status,
-        excerpt: memoryItemExcerpt(record, key, request.params.workspaceId),
+        excerpt: memoryItemExcerpt(record, key),
         observedAt: record.observedAt,
         trust: record.trust,
-        origin: memoryItemOrigin(record)
+        origin: memoryItemOrigin(record),
+        workspaceId: record.workspaceId,
+        taskId: record.taskId
       }));
     }
   );
@@ -732,11 +796,11 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
    * browsable list carries both now, because provenance is not a fact about a decision, it is a
    * fact about the row.
    */
-  const memoryReviewFields = (record: MemoryItemRecord, key: Buffer, workspaceId: string) => ({
+  const memoryReviewFields = (record: MemoryItemRecord, key: Buffer) => ({
     id: record.id,
     kind: record.kind,
     status: record.status,
-    excerpt: memoryItemExcerpt(record, key, workspaceId),
+    excerpt: memoryItemExcerpt(record, key),
     observedAt: record.observedAt,
     origin: memoryItemOrigin(record),
     taskId: record.taskId,
@@ -839,13 +903,13 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
     ]);
     return {
       procedures: procedures.slice(0, query.limit).map((record) => ({
-        ...memoryReviewFields(record, key, workspaceId),
+        ...memoryReviewFields(record, key),
         reason: record.reason,
         recentOkCount: record.recentOkCount,
         recentGradedCount: record.recentGradedCount
       })),
       disputed: disputed.map((record) => ({
-        ...memoryReviewFields(record, key, workspaceId),
+        ...memoryReviewFields(record, key),
         contradicts: record.contradicts
       })),
       proposals: proposals.map((record) => memoryProposalFields(record, key, workspaceId))

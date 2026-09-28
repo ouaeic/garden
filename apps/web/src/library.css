@@ -142,3 +142,29 @@
     flex-grow: 1;
   }
 }
+
+.memory-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block: 12px;
+}
+.memory-filters input {
+  flex: 1 1 220px;
+}
+.memory-filters select {
+  flex: 1 1 160px;
+}
+.memory-record-list {
+  max-block-size: min(60dvh, 680px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.memory-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}

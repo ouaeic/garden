@@ -1,3 +1,4 @@
+import { appendMemoryOwnerInput } from './memory-owner-input.js';
 /**
  * Whether a turn has actually done what it said it did.
  *
@@ -144,6 +145,7 @@ export const startTurnState = <T extends Record<string, unknown>>(
   const next = {
     ...previous,
     messages: [...messages, { role: 'user', content: ownerMessageContent(input) }],
+    memoryOwnerRequest: appendMemoryOwnerInput(undefined, input.prompt),
     step: 0,
     turn: input.turn,
     reservationKey: input.reservationKey,

@@ -40,6 +40,7 @@ const aad = `task-state:${taskId}`;
  * a person has said what a new turn should do with it.
  */
 const FIELDS: ReadonlyArray<keyof AgentState> = [
+  'memoryOwnerRequest',
   'enabledToolGroups',
   'messages',
   'step',
@@ -130,6 +131,7 @@ const FIELDS: ReadonlyArray<keyof AgentState> = [
  * as a present field.
  */
 const FULL: Required<AgentState> = {
+  memoryOwnerRequest: 'I prefer concise answers.',
   enabledToolGroups: ['browser', 'documents'],
   mainModelPreference: '[true,"best",""]',
   decisionFloorBindings: { call: 'a'.repeat(64) },
@@ -402,6 +404,7 @@ describe('what a new turn inherits', () => {
       'decisionReceipts'
     ]);
     expect(reset).toEqual([
+      'memoryOwnerRequest',
       // The trajectory gains the owner's new message; everything else here goes back to zero.
       'messages',
       'step',

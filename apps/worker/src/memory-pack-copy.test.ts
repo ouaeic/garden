@@ -30,7 +30,7 @@ const BODY = 'RECALLED MEMORY\n- the importer batches at 500 rows';
 const packRow = (taskId: string, aadTaskId: string): MemoryPackRecord => ({
   taskId,
   workspaceId,
-  briefVersion: null,
+  briefVersion: 'resident-excerpts-v1:1500',
   bodyCiphertext: encryptJson({ body: BODY }, dataKey, memoryPackAad(aadTaskId)),
   sha256: 'sha-of-the-parent-body',
   itemIds: ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'],
@@ -54,12 +54,13 @@ const store = (
       sha256: string;
       itemIds: readonly string[];
       tokensEst: number;
+      briefVersion?: string | null;
     }) => {
       const existing = rows.get(input.taskId);
       if (existing) return existing;
       const record: MemoryPackRecord = {
         ...input,
-        briefVersion: null,
+        briefVersion: input.briefVersion ?? null,
         itemIds: [...input.itemIds],
         createdAt: '2026-08-02T00:00:00.000Z'
       };
@@ -131,22 +132,8 @@ describe('a fork taking its parent pack', () => {
     expect(backing.recalls).toBe(1);
   });
 
-  /**
-   * The overshoot, written down as a fact rather than left to be discovered.
-   *
-   * `openStoredPack` returns `reused` without ever consulting `budgetTokens`, and a fork may run on
-   * a DIFFERENT model from its parent (`apps/api/src/routes/trajectory.ts` reads `input.modelId`),
-   * so a retry that moves to a smaller window can inherit a pack rendered against a larger one. The
-   * budget is `min(6000, 12% of the window)`, so the overshoot is bounded by 6,000 minus the fork's
-   * own share - about 1,200 tokens at the worst reachable window, inside a block that is 12% of the
-   * window anyway.
-   *
-   * It is accepted rather than refused, because refusing costs the whole cache win on the one
-   * request the win exists for and buys back a fraction of one block. THIS ARM IS THE DECISION, not
-   * an incidental pass: if `openStoredPack` is ever given the budget and made to refuse an oversized
-   * row, this case is what must be changed, deliberately and with the reason written here replaced.
-   */
-  it('reuses a parent pack that overshoots the fork own budget, and does not re-rank', async () => {
+  /** A retry's model budget remains binding even when a larger parent pack is cached. */
+  it('rebuilds a parent pack when the fork has a smaller budget', async () => {
     const backing = store([[rootId, packRow(rootId, rootId)]]);
 
     const pack = await buildTaskMemoryPack({
@@ -161,10 +148,9 @@ describe('a fork taking its parent pack', () => {
       budgetTokens: 8
     });
 
-    expect(pack.reused).toBe(true);
-    expect(pack.tokensEst).toBe(24);
-    expect(pack.tokensEst).toBeGreaterThan(8);
-    expect(backing.recalls).toBe(0);
+    expect(pack.reused).toBe(false);
+    expect(pack.itemIds).toHaveLength(0);
+    expect(backing.recalls).toBe(1);
   });
 
   /**

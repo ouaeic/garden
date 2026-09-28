@@ -507,18 +507,8 @@ export const assemblePreamble = async (deps: WindowDeps, input: PreambleInput): 
         record.contentCiphertext,
         owned ? ownerMemoryKey : key
       );
-      // Anchored for the same reason the ranking below it is, and it is the half that was
-      // missing. With the wall clock as its `now`, an entry whose `validUntil` fell between the
-      // task starting and the current step was in this block on one request and gone from the
-      // next: the block the header calls frozen rewriting itself mid-run, and every byte behind
-      // it - the pack, the goal, the whole trajectory - re-billed at the write premium because a
-      // boundary nobody crossed on purpose went past. `clockAnchor` is a fixed point for as long
-      // as the task exists, which is exactly the life the header promises - and on a retry it is
-      // the parent's instant rather than the fork's, so the fork admits and drops the same rows
-      // the parent did instead of rewriting the block it inherited. That inheritance is itself
-      // bounded by FORK_ANCHOR_MAX_AGE_MS, because an unbounded one would re-admit rows the owner
-      // has since let expire.
-      if (memoryTemporalStatus(document, clockAnchor) !== 'active') return [];
+      // Explicit validity takes precedence over preserving a cached prefix.
+      if (memoryTemporalStatus(document, runtimeDate()) !== 'active') return [];
       return [
         {
           id: record.id,
@@ -706,40 +696,15 @@ Open a full procedure with skill(action=view,id=...) - by id for a workspace ski
       dataKey: key,
       query: goal,
       clockAnchor,
-      /*
-       * A retry takes the parent's rendered bytes rather than ranking its own.
-       *
-       * Passing the anchor's request and clock above is not enough on its own: `mem.pack` is keyed
-       * by task id, so a fork with no row of its own re-runs the fusion query, and a fusion query
-       * re-run over a store the parent's turns have since written to does not have to come back
-       * with the same rows in the same order. The copy makes the fork's pack the parent's bytes by
-       * construction rather than by hoping the ranking is stable. @see copyMemoryPack, which
-       * re-encrypts under the fork's own context rather than aliasing the row - an aliased row
-       * fails `openStoredPack`'s AAD equality, returns null, and re-ranks silently, which is
-       * today's behaviour wearing a fix as a hat.
-       *
-       * It is `forkCacheAnchor`'s answer and not `cachePrefixTaskId(task)`, so that the bytes and
-       * the question they were ranked against always come from the same task: an anchor refused for
-       * age, for a foreign encryption context or for a deleted parent refuses the copy with it.
-       *
-       * WHAT THIS DOES NOT DO: it does not re-fit the copied bytes to the fork's own budget.
-       * `openStoredPack` returns `reused` without consulting `budgetTokens`, and a fork may pick a
-       * different model from its parent (`routes/trajectory.ts` reads `input.modelId`), so a retry
-       * that moves to a smaller window can inherit a pack rendered against a larger one. The
-       * overshoot is bounded by MEMORY_PACK_BUDGET_TOKENS (6,000) minus this fork's own budget, so
-       * at the worst reachable window it is about 1,200 tokens of a share that is 12% of the window
-       * anyway. Accepted rather than fixed here because refusing the copy costs the whole cache win
-       * on the request the win exists for, and the refusal belongs in `openStoredPack` where the
-       * stored size is in hand.
-       */
+      validAt: runtimeDate(),
       inheritFromTaskId,
       budgetTokens: memoryPackBudgetTokens(contextTokens)
     });
     injectMemoryPack(state.messages, pack);
   } catch (cause) {
     // Memory is an aid, not a precondition: a store that cannot be read must not stop the task.
-    // A pack a previous step already injected is deliberately left in place - its bytes are what
-    // the provider has cached, and dropping them would rewrite the prefix to no benefit.
+    // A revoked pack must not survive a failed refresh in the checkpoint.
+    injectMemoryPack(state.messages, null);
     await event(
       deps.store,
       task,

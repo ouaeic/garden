@@ -543,6 +543,12 @@ export class MemoryStore {
   /** Detected once per process: extension availability cannot change under a running server. */
   #memoryCapabilities: Promise<MemoryCapabilities> | null = null;
 
+  private async invalidatePacks(database: Database, itemIds: readonly string[]): Promise<void> {
+    if (itemIds.length === 0) return;
+    // Shared items can also appear in child-project packs.
+    await database.query('DELETE FROM mem.pack WHERE item_ids && $1::uuid[]', [[...itemIds]]);
+  }
+
   async #sharedWorkspace(workspaceId: string): Promise<string | null> {
     const row = (
       await this.database.query(
@@ -990,6 +996,7 @@ export class MemoryStore {
       );
       supersededIds.push(...retired.rows.map((row) => row.id));
     }
+    await this.invalidatePacks(transaction, supersededIds);
     const item = await this.#insertMemoryItem(transaction, { ...input, kind: 'fact' });
     for (const supersededId of supersededIds)
       await transaction.query(
@@ -1049,6 +1056,7 @@ export class MemoryStore {
         );
         retired.push(...result.rows.map((row) => row.id));
       }
+      await this.invalidatePacks(transaction, retired);
       const recorded: string[] = [];
       for (const item of failed) {
         const written = await this.#insertMemoryItem(transaction, { ...item, kind: 'procedure' });
@@ -1064,6 +1072,53 @@ export class MemoryStore {
       [workspaceId, id]
     );
     return result.rows[0] ? mapMemoryItem(result.rows[0]) : null;
+  }
+
+  /** Owner browsing is deliberately separate from project-agent recall. */
+  async listOwnerMemoryItems(
+    userId: string,
+    workspaceId: string,
+    options: {
+      scope?: string;
+      kind?: MemoryKind;
+      status?: MemoryStatus;
+      lexemes?: readonly string[];
+      cursor?: { at: string; id: string };
+      limit?: number;
+    } = {}
+  ): Promise<{ items: (MemoryItemRecord & { projectId: string | null })[]; hasMore: boolean }> {
+    const limit = Math.max(1, Math.min(100, options.limit ?? 40));
+    const result = await this.database.query(
+      `SELECT i.*, p.id AS project_id FROM mem.item i
+       JOIN workspaces w ON w.id=i.workspace_id AND w.user_id=$1
+       LEFT JOIN mem.item episode ON episode.id=i.episode_id
+       LEFT JOIN tasks t ON t.id=COALESCE(i.task_id,episode.task_id) AND t.user_id=$1
+       LEFT JOIN projects p ON p.id=t.project_id AND p.user_id=$1
+       WHERE i.user_id=$1 AND (w.id=$2 OR w.parent_workspace_id=$2)
+         AND ($3::uuid IS NULL OR w.id=$3)
+         AND ($4::text IS NULL OR i.kind::text=$4)
+         AND ($5::text IS NULL OR i.status::text=$5)
+         AND ($6::text[] IS NULL OR i.tsv @@ to_tsquery('simple',array_to_string($6::text[],' | ')))
+         AND ($7::timestamptz IS NULL OR i.observed_at<$7 OR (i.observed_at=$7 AND i.id>$8::uuid))
+       ORDER BY i.observed_at DESC,i.id LIMIT $9`,
+      [
+        userId,
+        workspaceId,
+        options.scope ?? null,
+        options.kind ?? null,
+        options.status ?? null,
+        options.lexemes ? options.lexemes.filter(isMemoryToken) : null,
+        options.cursor?.at ?? null,
+        options.cursor?.id ?? null,
+        limit + 1
+      ]
+    );
+    return {
+      items: result.rows
+        .slice(0, limit)
+        .map((row) => ({ ...mapMemoryItem(row), projectId: optionalText(row.project_id) })),
+      hasMore: result.rows.length > limit
+    };
   }
 
   async listMemoryItems(
@@ -1893,11 +1948,13 @@ export class MemoryStore {
     return this.database.transaction(async (transaction) => {
       const result = await transaction.query(
         `UPDATE mem.item SET status='disputed', updated_at=NOW()
-         WHERE workspace_id=$1 AND id = ANY($2::uuid[]) AND status='active'`,
+         WHERE workspace_id=$1 AND id = ANY($2::uuid[]) AND status='active' RETURNING id`,
         [workspaceId, [...ids]]
       );
-      for (const [index, left] of ids.entries())
-        for (const right of ids.slice(index + 1))
+      const changed = result.rows.map((row) => String(row.id));
+      await this.invalidatePacks(transaction, changed);
+      for (const [index, left] of changed.entries())
+        for (const right of changed.slice(index + 1))
           await transaction.query(
             `INSERT INTO mem.link(src_id,dst_id,rel) VALUES ($1,$2,'contradicts')
              ON CONFLICT DO NOTHING`,
@@ -1999,6 +2056,7 @@ export class MemoryStore {
         [input.workspaceId, input.loserId, input.at ?? null]
       );
       if (retired.rowCount !== 1) return false;
+      await this.invalidatePacks(transaction, [input.loserId]);
       await transaction.query(
         `INSERT INTO mem.link(src_id,dst_id,rel) VALUES ($1,$2,'supersedes')
          ON CONFLICT DO NOTHING`,
@@ -2025,13 +2083,17 @@ export class MemoryStore {
    * `status='retracted'` says the same thing. It is not a place to add a signal to.
    */
   async retractMemoryItem(workspaceId: string, id: string): Promise<boolean> {
-    const result = await this.database.query(
-      `UPDATE mem.item SET status='retracted', retired_at=NOW(), valid_to=COALESCE(valid_to,NOW()),
-                           neg_count=neg_count+1, updated_at=NOW()
-       WHERE workspace_id=$1 AND id=$2 AND status <> 'retracted'`,
-      [workspaceId, id]
-    );
-    return result.rowCount === 1;
+    return this.database.transaction(async (transaction) => {
+      const result = await transaction.query(
+        `UPDATE mem.item SET status='retracted', retired_at=NOW(), valid_to=COALESCE(valid_to,NOW()),
+                             neg_count=neg_count+1, updated_at=NOW()
+         WHERE workspace_id=$1 AND id=$2 AND status <> 'retracted'`,
+        [workspaceId, id]
+      );
+      if (result.rowCount !== 1) return false;
+      await this.invalidatePacks(transaction, [id]);
+      return true;
+    });
   }
 
   /** Records the outcome of injecting an item so salience and procedure health stay honest. */
@@ -2401,7 +2463,14 @@ export class MemoryStore {
     return result.rows.map(mapMemoryItem);
   }
 
-  async getMemoryPack(taskId: string): Promise<MemoryPackRecord | null> {
+  async getMemoryPack(taskId: string, validAt?: Date | string): Promise<MemoryPackRecord | null> {
+    await this.database.query(
+      `DELETE FROM mem.pack p WHERE p.task_id=$1 AND EXISTS (
+         SELECT 1 FROM mem.item i WHERE i.id=ANY(p.item_ids)
+         AND (i.status <> 'active' OR ($2::timestamptz IS NOT NULL AND
+           (i.valid_from>$2 OR i.valid_to<=$2))))`,
+      [taskId, validAt ?? null]
+    );
     const result = await this.database.query('SELECT * FROM mem.pack WHERE task_id=$1', [taskId]);
     return result.rows[0] ? mapMemoryPack(result.rows[0]) : null;
   }
@@ -2419,25 +2488,58 @@ export class MemoryStore {
     tokensEst: number;
     briefVersion?: string | null;
   }): Promise<MemoryPackRecord> {
-    const inserted = await this.database.query(
-      `INSERT INTO mem.pack(
-         task_id,workspace_id,brief_version,body_ciphertext,sha256,item_ids,tokens_est
-       ) VALUES ($1,$2,$3,$4::jsonb,$5,$6::uuid[],$7)
-       ON CONFLICT (task_id) DO NOTHING RETURNING *`,
-      [
-        input.taskId,
-        input.workspaceId,
-        input.briefVersion ?? null,
-        JSON.stringify(input.bodyCiphertext),
-        input.sha256,
-        [...input.itemIds],
-        input.tokensEst
-      ]
-    );
-    if (inserted.rows[0]) return mapMemoryPack(inserted.rows[0]);
-    const existing = await this.getMemoryPack(input.taskId);
-    if (!existing) throw new GardenError('memory_pack_missing', 'Memory pack could not be stored');
-    return existing;
+    return this.database.transaction(async (transaction) => {
+      // Lock evidence until the pack is stored so a concurrent correction invalidates the
+      // finished pack rather than racing between ranking and insertion.
+      const ids = [...new Set(input.itemIds)];
+      const items = await transaction.query(
+        `SELECT id,status FROM mem.item WHERE id=ANY($1::uuid[])
+         AND workspace_id IN ($2,(SELECT p.id FROM workspaces w JOIN workspaces p ON p.id=w.parent_workspace_id AND p.user_id=w.user_id WHERE w.id=$2))
+         ORDER BY id FOR SHARE`,
+        [ids, input.workspaceId]
+      );
+      const sources = await transaction.query(
+        `SELECT id FROM mem.source WHERE id=ANY($1::uuid[])
+         AND workspace_id IN ($2,(SELECT p.id FROM workspaces w JOIN workspaces p ON p.id=w.parent_workspace_id AND p.user_id=w.user_id WHERE w.id=$2))
+         ORDER BY id FOR SHARE`,
+        [ids, input.workspaceId]
+      );
+      if (
+        items.rows.some((row) => row.status !== 'active') ||
+        items.rows.length + sources.rows.length !== ids.length
+      )
+        throw new GardenError(
+          'memory_evidence_changed',
+          'Memory changed during recall; retry retrieval'
+        );
+      const inserted = await transaction.query(
+        `INSERT INTO mem.pack(
+           task_id,workspace_id,brief_version,body_ciphertext,sha256,item_ids,tokens_est
+         ) VALUES ($1,$2,$3,$4::jsonb,$5,$6::uuid[],$7)
+         ON CONFLICT (task_id) DO UPDATE SET
+           brief_version=EXCLUDED.brief_version,body_ciphertext=EXCLUDED.body_ciphertext,
+           sha256=EXCLUDED.sha256,item_ids=EXCLUDED.item_ids,tokens_est=EXCLUDED.tokens_est,
+           created_at=NOW()
+         WHERE mem.pack.brief_version IS DISTINCT FROM EXCLUDED.brief_version
+         RETURNING *`,
+        [
+          input.taskId,
+          input.workspaceId,
+          input.briefVersion ?? null,
+          JSON.stringify(input.bodyCiphertext),
+          input.sha256,
+          ids,
+          input.tokensEst
+        ]
+      );
+      if (inserted.rows[0]) return mapMemoryPack(inserted.rows[0]);
+      const existing = await transaction.query('SELECT * FROM mem.pack WHERE task_id=$1', [
+        input.taskId
+      ]);
+      if (!existing.rows[0])
+        throw new GardenError('memory_pack_missing', 'Memory pack could not be stored');
+      return mapMemoryPack(existing.rows[0]);
+    });
   }
 
   /*
@@ -3015,6 +3117,11 @@ export class MemoryStore {
    */
   forgetMemoryItem(workspaceId: string, itemId: string): Promise<boolean> {
     return this.database.transaction(async (transaction) => {
+      const owned = await transaction.query(
+        'SELECT id FROM mem.item WHERE workspace_id=$1 AND id=$2 FOR UPDATE',
+        [workspaceId, itemId]
+      );
+      if (owned.rowCount === 0) return false;
       const chunks = await transaction.query<{ id: string }>(
         'DELETE FROM mem.source WHERE workspace_id=$1 AND episode_id=$2 RETURNING id',
         [workspaceId, itemId]
@@ -3037,10 +3144,9 @@ export class MemoryStore {
       await transaction.query('DELETE FROM mem.link WHERE src_id=$1 OR dst_id=$1', [itemId]);
       // A bundle cites verbatim chunks by their own id alongside the items, so both go into the
       // overlap test: matching on the item alone would leave the owner's own words quoted.
-      await transaction.query(
-        'DELETE FROM mem.pack WHERE workspace_id=$1 AND item_ids && $2::uuid[]',
-        [workspaceId, [itemId, ...chunks.rows.map((chunk) => chunk.id)]]
-      );
+      await transaction.query('DELETE FROM mem.pack WHERE item_ids && $1::uuid[]', [
+        [itemId, ...chunks.rows.map((chunk) => chunk.id)]
+      ]);
       /*
        * And the turn stops vouching for anything it was about to prove. A drafted fact waits in
        * `mem.fact_candidate` until two separate turns have observed it, holding a sealed draft and

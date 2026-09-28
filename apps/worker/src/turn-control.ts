@@ -1,3 +1,4 @@
+import { appendMemoryOwnerInput } from './memory-owner-input.js';
 /**
  * The three questions a turn asks between steps: has the owner said something, is this run still the
  * one in charge, and is the request about to go out the one this turn's own log accounts for?
@@ -70,6 +71,8 @@ export const drainCorrection = async (
     nextState.ownerReasoningEffort = queued.reasoningEffort ?? task.reasoningEffort ?? 'auto';
   sealUnansweredToolCalls(nextState.messages, 'the user redirected the task before this call ran');
   nextState.messages.push({ role: 'user', content: ownerMessageContent(message) });
+  if (!queued.approvalId)
+    nextState.memoryOwnerRequest = appendMemoryOwnerInput(nextState.memoryOwnerRequest, correction);
   const consumed = await deps.store.consumeQueuedTaskMessageInTurn({
     taskId: task.id,
     messageId: queued.id,

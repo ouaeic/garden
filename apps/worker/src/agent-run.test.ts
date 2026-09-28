@@ -439,7 +439,7 @@ const probeStore = (task: () => TaskRecord): StoreProbe => {
       memoryPack = {
         taskId,
         workspaceId,
-        briefVersion: null,
+        briefVersion: 'resident-excerpts-v1:1500',
         bodyCiphertext: encryptJson(
           { body: '# MEMORY PACK\n- `make notes` tidies the notes directory' },
           dataKey,
@@ -2242,7 +2242,7 @@ describe('asking memory a question mid-task', () => {
       getMemoryPack: async () => ({
         taskId,
         workspaceId,
-        briefVersion: null,
+        briefVersion: 'resident-excerpts-v1:1500',
         bodyCiphertext: encryptJson({ body: 'PACKED' }, dataKey, `memory-pack:${taskId}`),
         sha256: 'pack-sha',
         itemIds: ['mem-packed'],
@@ -6583,18 +6583,7 @@ describe('the prompt prefix a follow-up turn re-sends', () => {
     expect(after).toBe(before);
   });
 
-  it('leaves the reviewed block where it is when a resume cannot rebuild the memory pack', async () => {
-    /*
-     * The two recalled blocks have a fixed order - what the owner approved, then what recall found -
-     * and the pack's own comment says so. The knowledge block used to be spliced out of the window
-     * and re-inserted at the end of the leading system run, which puts it *after* the pack; the
-     * pack's injector happened to do the same dance a few lines later and put it back, so the two
-     * moves cancelled and nothing showed. They stop cancelling the moment the pack cannot be
-     * rebuilt - a store that is briefly unavailable on a follow-up, which is the one case that path
-     * exists for - and then the two blocks swap for the rest of the task and every cached byte
-     * behind them is written again. Replacing the block where it already sits removes the
-     * dependence on one bug undoing another.
-     */
+  it('keeps reviewed context but removes unverified recall when a resume cannot refresh it', async () => {
     const item = {
       id: 'memory-item-1',
       layer: 'item' as const,
@@ -6669,10 +6658,8 @@ describe('the prompt prefix a follow-up turn re-sends', () => {
     expect(
       resumed.findIndex((message) => message.content.startsWith('CURATED ENCRYPTED KNOWLEDGE'))
     ).toBe(knowledgeAt);
-    expect(resumed.findIndex((message) => message.content.startsWith(MEMORY_PACK_MARKER))).toBe(
-      packAt
-    );
-    expect(sharedPrefix(opening, resumed)).toBeGreaterThan(packAt);
+    expect(resumed.findIndex((message) => message.content.startsWith(MEMORY_PACK_MARKER))).toBe(-1);
+    expect(sharedPrefix(opening, resumed)).toBe(packAt);
   });
 
   it('ranks the curated knowledge block once, so a follow-up does not reshuffle it', async () => {

@@ -1,3 +1,4 @@
+import { MEMORY_PACK_BUDGET_TOKENS } from '@garden/core';
 /**
  * The order of the preamble, asserted as an order.
  *
@@ -41,7 +42,7 @@ import type {
   WorkspaceSkillRecord
 } from '@garden/data';
 import type { ModelMessage } from '@garden/model-gateway';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { AgentState, AgentWorkerConfig } from './agent-state.js';
 import {
   BASE_PROMPT_MARKER,
@@ -474,19 +475,61 @@ describe('the preamble', () => {
    * rendered bytes for the same reason. Reading it off the recall query is the only place the claim
    * is observable without waiting for a day to pass.
    */
-  it('anchors recall to the task start rather than to now', async () => {
+  it('removes expired owner-managed facts when resuming instead of reviving their opening validity', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-28T00:00:00Z'));
+    try {
+      const probed = probe(),
+        state = freshState();
+      const record = memory('expiring', 'workspace', 'Temporary access is permitted');
+      record.contentCiphertext = encryptJson(
+        { content: 'Temporary access is permitted', validUntil: '2026-08-02T00:00:00Z' },
+        key,
+        `workspace-memory:${workspaceId}`
+      );
+      probed.memories = [record];
+      await assemblePreamble(probed.deps, { ...preamble, state });
+      expect(
+        state.messages.some((message) => message.content.includes('Temporary access is permitted'))
+      ).toBe(false);
+      record.contentCiphertext = encryptJson(
+        { content: 'Temporary access is permitted', validUntil: '2999-01-01T00:00:00Z' },
+        key,
+        `workspace-memory:${workspaceId}`
+      );
+      await assemblePreamble(probed.deps, { ...preamble, state });
+      expect(
+        state.messages.some((message) => message.content.includes('Temporary access is permitted'))
+      ).toBe(true);
+      record.contentCiphertext = encryptJson(
+        { content: 'Temporary access is permitted', validUntil: '2026-08-02T00:00:00Z' },
+        key,
+        `workspace-memory:${workspaceId}`
+      );
+      await assemblePreamble(probed.deps, { ...preamble, state });
+      expect(
+        state.messages.some((message) => message.content.includes('Temporary access is permitted'))
+      ).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps ranking stable while checking validity at the time of resumption', async () => {
     const probed = probe();
     const state = freshState();
 
+    const before = Date.now();
     await assemblePreamble(probed.deps, { ...preamble, state });
 
     expect(probed.recallQueries).toHaveLength(1);
     const query = probed.recallQueries[0] as { now: Date; asOf: Date; budgetTokens: number };
     expect(query.now.toISOString()).toBe(task.createdAt);
-    expect(query.asOf.toISOString()).toBe(task.createdAt);
+    expect(query.asOf.getTime()).toBeGreaterThanOrEqual(before);
+    expect(query.asOf.getTime()).toBeLessThanOrEqual(Date.now());
     // The pack's share of the lead model's window - a share with a ceiling on it, which is why
     // this reads the helper rather than restating the arithmetic.
-    expect(query.budgetTokens).toBe(memoryPackBudgetTokens(200_000));
+    expect(query.budgetTokens).toBe(MEMORY_PACK_BUDGET_TOKENS);
     expect(memoryPackBudgetTokens(4_096)).toBeLessThan(memoryPackBudgetTokens(200_000));
   });
 

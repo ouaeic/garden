@@ -55,7 +55,9 @@ export function Library({
             onTaskDeleted={onTaskDeleted}
           />
         )}
-        {section === 'Memory' && <MemoryLibrary workspace={workspace} onOpenTask={onOpenTask} />}
+        {section === 'Memory' && (
+          <MemoryLibrary workspace={workspace} projects={projects} onOpenTask={onOpenTask} />
+        )}
         {section === 'Skills' && <SkillsLibrary workspace={workspace} />}
       </div>
     </div>

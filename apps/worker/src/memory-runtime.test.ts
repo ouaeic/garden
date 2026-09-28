@@ -437,9 +437,9 @@ describe('memory pack read path', () => {
     ]);
   });
 
-  it('budgets the pack against the smaller of 6000 tokens and a share of the window', () => {
-    expect(memoryPackBudgetTokens(1_000_000)).toBe(6_000);
-    expect(memoryPackBudgetTokens(32_000)).toBe(3_840);
+  it('bounds resident memory independently of the retrieval pool', () => {
+    expect(memoryPackBudgetTokens(1_000_000)).toBe(1_500);
+    expect(memoryPackBudgetTokens(32_000)).toBe(1_280);
     expect(memoryPackBudgetTokens(1_000)).toBeGreaterThan(0);
   });
 });

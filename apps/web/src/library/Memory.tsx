@@ -1,5 +1,6 @@
+import { MemoryRecords } from './MemoryRecords.js';
 import { useState } from 'react';
-import type { MemoryItemBody, Workspace } from '@garden/contracts';
+import type { MemoryItemBody, Project, Workspace } from '@garden/contracts';
 import { ApiError, del, get, patch, post, put } from '../client.js';
 import { Button, Dialog, Field } from '../ui.js';
 import {
@@ -16,6 +17,7 @@ import { date } from '../model.js';
 
 interface Memory {
   id: string;
+  workspaceId: string | null;
   target: 'workspace' | 'user';
   scope: string;
   content: string;
@@ -68,15 +70,19 @@ const localDate = (value: string): string => {
 
 export function MemoryLibrary({
   workspace,
+  projects,
   onOpenTask
 }: {
   workspace: Workspace | null;
+  projects: Project[];
   onOpenTask: (id: string) => void;
 }) {
-  const root = workspace ? `/v1/workspaces/${workspace.id}` : null;
+  const [scope, setScope] = useState('');
+  const root = workspace ? `/v1/workspaces/${scope || workspace.id}` : null;
+  const memoryRoot = (memory: Memory) =>
+    `/v1/workspaces/${memory.workspaceId ?? (scope || workspace!.id)}`;
   const memories = useResource<Memory[]>(root ? `${root}/memories` : null);
   const block = useResource<OwnerBlock>('/v1/account/memory-block');
-  const items = useResource<MemoryItem[]>(root ? `${root}/memory-items?limit=200` : null);
   const review = useResource<Review>(root ? `${root}/memory-review?limit=200` : null);
   const [editing, setEditing] = useState<Memory | 'new' | null>(null);
   const [opened, setOpened] = useState<MemoryItemBody | null>(null);
@@ -84,10 +90,17 @@ export function MemoryLibrary({
   const refresh = () => {
     memories.refresh();
     review.refresh();
-    items.refresh();
   };
   return (
     <>
+      {workspace && (
+        <MemoryRecords
+          workspaceId={workspace.id}
+          projects={projects}
+          onOpenTask={onOpenTask}
+          onChange={() => review.refresh()}
+        />
+      )}
       <Section
         title="Your own words"
         description="A compact block you control, carried across your work."
@@ -144,20 +157,36 @@ export function MemoryLibrary({
         <p className="empty">Select a workspace to review its memory.</p>
       ) : (
         <>
+          {workspace && (
+            <Field label="Facts and review for">
+              <select value={scope} onChange={(event) => setScope(event.target.value)}>
+                <option value="">Shared memory</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.workspaceId}>
+                    {project.title}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
           <Section
             title="Remembered facts"
             description="Stated facts can belong to this workspace or follow you across workspaces."
           >
             <ResourceState resource={memories} />
             <Button onClick={() => setEditing('new')}>Add a fact</Button>
-            <div className="management-list">
+            <div className="management-list memory-record-list">
               {memories.value?.map((memory) => (
                 <article key={memory.id} className="management-item">
                   <div className="library-memory">
                     <p className="library-instruction">{memory.content}</p>
                     <p className="muted">
-                      {memory.target === 'user' ? 'About you' : 'This workspace'} · {memory.status}{' '}
-                      · {memory.source}
+                      {memory.target === 'user'
+                        ? 'About you'
+                        : memory.workspaceId === workspace.id
+                          ? 'Shared memory'
+                          : 'This project'}{' '}
+                      · {memory.status} · {memory.source}
                       {memory.validUntil && ` · expires ${date(memory.validUntil)}`}
                     </p>
                     {memory.sourceTaskId && (
@@ -172,7 +201,7 @@ export function MemoryLibrary({
                       label="Forget"
                       description="Remove this saved fact from memory. Future tasks will no longer recall it."
                       action={async () => {
-                        await del(`${root}/memories/${memory.id}`);
+                        await del(`${memoryRoot(memory)}/memories/${memory.id}`);
                         memories.refresh();
                       }}
                     />
@@ -190,7 +219,7 @@ export function MemoryLibrary({
           >
             <ResourceState resource={review} />
             {review.value && (
-              <div className="library-review">
+              <div className="library-review memory-record-list">
                 {(['procedures', 'disputed'] as const).map((kind) => (
                   <div key={kind}>
                     <h4>{kind === 'procedures' ? 'Procedures to verify' : 'Disputed memories'}</h4>
@@ -295,48 +324,6 @@ export function MemoryLibrary({
             )}
             <ActionFeedback action={action} />
           </Section>
-          <Section
-            title="Memory record"
-            description="Inspect what the computer has retained, with its origin and status."
-          >
-            <ResourceState resource={items} />
-            {items.value?.map((item) => (
-              <article className="management-item" key={item.id}>
-                <div>
-                  <p>{item.excerpt}</p>
-                  <p className="muted management-metadata">
-                    {item.kind} · {item.status} · {item.origin} · {date(item.observedAt)}
-                  </p>
-                </div>
-                <div className="row">
-                  <Button
-                    disabled={action.busy}
-                    onClick={() =>
-                      void action.run(
-                        async () =>
-                          setOpened(await get<MemoryItemBody>(`${root}/memory-items/${item.id}`)),
-                        ''
-                      )
-                    }
-                  >
-                    Read full item
-                  </Button>
-                  <ConfirmButton
-                    label="Forget"
-                    description="Delete this item from remembered knowledge."
-                    action={async () => {
-                      await del(`${root}/memory-items/${item.id}`);
-                      refresh();
-                    }}
-                  />
-                </div>
-              </article>
-            ))}
-            {items.value?.length === 0 && (
-              <p className="empty">Memory records will appear as work produces useful knowledge.</p>
-            )}
-            <ActionFeedback action={action} />
-          </Section>
         </>
       )}
       {editing && (
@@ -361,7 +348,7 @@ export function MemoryLibrary({
                     content: common.content,
                     ...(common.validUntil ? { validUntil: common.validUntil } : {})
                   });
-                else await patch(`${root}/memories/${editing.id}`, common);
+                else await patch(`${memoryRoot(editing)}/memories/${editing.id}`, common);
                 setEditing(null);
                 refresh();
               }, 'Fact saved');

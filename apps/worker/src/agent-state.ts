@@ -39,6 +39,8 @@ export interface AgentState {
   codingMissionWaiting?: boolean;
   codingMissionReviews?: Record<string, { digest: string; generation: number }>;
 
+  /** Direct owner text, kept separately from tool output and model summaries. */
+  memoryOwnerRequest?: string;
   messages: ModelMessage[];
   step: number;
   credits: number;

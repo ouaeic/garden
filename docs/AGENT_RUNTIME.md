@@ -43,7 +43,7 @@ Each request carries, in this order:
 1. the operating contract and the safety floor, gated on what this box can do;
 2. the curated knowledge block: active memory entries ranked against the request the task opened
    with, the index of skills saved for this workspace, and the index of the vetted built-in library;
-3. the recalled memory pack, rendered once per task and re-emitted byte-for-byte on resume;
+3. a bounded recalled-memory preview, reused while its evidence, validity and model budget remain unchanged;
 4. the workspace brief when the owner keeps one — `GARDEN.md` first, then the shared conventions
    the surrounding tooling writes, so a workspace that already carries one is read without the owner
    having to rename anything;
@@ -614,6 +614,26 @@ Encrypted task history is searchable. Durable memory is separate:
 - credentials and sensitive ephemeral content are forbidden; and
 - size limits force consolidation instead of unbounded prompt growth.
 
+Automatic capture keeps direct owner statements separate from tool output and model summaries.
+Reading an external page does not disqualify an owner's own statement. Quoted examples,
+transformation requests, scheduled prompts and delegated requests do not count as owner assertions.
+Repeated independent observations can promote a fact; verified procedures keep their source taint
+and are recalled as fallible derived knowledge.
+
+The resident preview counts its framing and entry metadata against the budget implemented by
+`memoryPackBudgetTokens`. Long history entries use query-focused excerpts with source handles;
+full evidence remains available through `session_search`. Explicit owner-managed context has its
+own storage bounds and is not silently condensed by this preview. Model-budget changes rebuild the
+preview. Retraction, supersession, dispute and deletion invalidate affected caches, including child
+conversations that inherited shared evidence. Evidence locks prevent a correction from racing a
+new pack into storage. Resuming a conversation checks validity again; a failed refresh removes the
+previous preview instead of retaining possibly revoked content.
+
+The owner's Memory Library uses paginated, source-linked search across project workspaces. Its
+project selector also exposes saved facts and review queues. This owner browsing surface does not
+widen agent recall to unrelated projects. Reads decrypt with the record's origin context; mutation
+routes use that origin workspace's ownership checks.
+
 Recall is lexical throughout, and the semantic channel was removed rather than finished. Migration
 35 had created `halfvec(1024)` columns on `mem.item` and `mem.source`, two partial HNSW indexes over
 them, and an `embed_state` enum to sequence a queue that did not exist. Nothing ever wrote a vector
@@ -636,8 +656,8 @@ runtime dependency for a corpus of a few thousand rows.
 
 What a vector index would buy here is reaching a stored row from a paraphrase sharing none of its
 words, and that is narrowed rather than closed by letting the agent ask its own memory a question.
-The recalled pack is chosen once, from the opening request, and frozen so the cached prefix survives
-the task — right for what a task opens with and wrong for what it turns out to need. `memory_recall`
+The recalled preview is chosen from the opening request and reused while its evidence remains
+valid, preserving the cached prefix without preserving revoked beliefs. `memory_recall`
 runs the same fusion query again mid-task, in the agent's own words, landing after the last cache
 breakpoint so it costs the question and its answer rather than the window behind them. It excludes
 what the pack already printed and says which entries those were, so an empty result means there is

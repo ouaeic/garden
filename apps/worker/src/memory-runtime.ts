@@ -118,12 +118,36 @@ export interface TaskMemoryPack {
   readonly reused: boolean;
 }
 
-/**
- * §2.6 budget: `min(6000 tokens, 12% of the window)`, computed from stored token estimates so no
- * token-counting API is ever on the packing path.
- */
+/** Resident recall is a small preview; source detail is fetched only when needed. */
+export const MEMORY_RESIDENT_BUDGET_TOKENS = 1_500;
+const memoryPackVersion = (budget: number) => `resident-excerpts-v1:${budget}`;
 export const memoryPackBudgetTokens = (contextTokens: number): number =>
-  Math.max(256, Math.min(MEMORY_PACK_BUDGET_TOKENS, Math.floor(contextTokens * 0.12)));
+  Math.max(256, Math.min(MEMORY_RESIDENT_BUDGET_TOKENS, Math.floor(contextTokens * 0.04)));
+
+export const renderResidentMemory = (
+  entries: readonly MemoryPackEntry[],
+  query: string,
+  budgetTokens: number
+) => {
+  const selected: MemoryPackEntry[] = [];
+  let rendered = renderMemoryPack(selected);
+  for (const entry of entries) {
+    const excerpted =
+      (entry.kind === 'episode' || entry.kind === 'source') && entry.body.length > 480;
+    const candidate = excerpted
+      ? {
+          ...entry,
+          body: `${memoryExcerpt(entry.body, query, { maxChars: 480 })}\n[Excerpt; use session_search with this id for source detail.]`
+        }
+      : entry;
+    const next = renderMemoryPack([...selected, candidate]);
+    // Include framing and metadata, not just the stored body's estimate.
+    if (estimateMemoryTokens(memoryPackMessage(next.body).content) > budgetTokens) continue;
+    selected.push(candidate);
+    rendered = next;
+  }
+  return rendered;
+};
 
 /**
  * Opens one candidate, refusing anything sealed for a different tier.
@@ -219,9 +243,15 @@ export const copyMemoryPack = async (input: {
   toTaskId: string;
   workspaceId: string;
   dataKey: Uint8Array;
+  budgetTokens?: number;
+  validAt?: Date;
 }): Promise<TaskMemoryPack | null> => {
-  const source = await input.store.getMemoryPack(input.fromTaskId);
-  if (!source) return null;
+  const source = await input.store.getMemoryPack(input.fromTaskId, input.validAt);
+  if (
+    !source ||
+    source.briefVersion !== memoryPackVersion(input.budgetTokens ?? MEMORY_RESIDENT_BUDGET_TOKENS)
+  )
+    return null;
   const opened = openStoredPack(source, input.fromTaskId, input.dataKey);
   if (!opened) return null;
   const saved = await input.store.saveMemoryPack({
@@ -242,14 +272,7 @@ export const copyMemoryPack = async (input: {
   return openStoredPack(saved, input.toTaskId, input.dataKey);
 };
 
-/**
- * One fusion query per task, never per turn.
- *
- * A resume must re-emit the bytes it emitted the first time rather than re-rank against a newer
- * clock: re-ranking would reorder or replace entries, rewrite the pack, and invalidate every
- * cached token behind it. So the stored pack wins whenever it exists, and a fresh ranking is
- * anchored to the task's start instant rather than to `now()`.
- */
+/** Reuse valid, budget-compatible previews; rank new previews against the original request. */
 export const buildTaskMemoryPack = async (input: {
   store: MemoryPackStore;
   taskId: string;
@@ -267,9 +290,13 @@ export const buildTaskMemoryPack = async (input: {
    */
   inheritFromTaskId?: string;
   budgetTokens?: number;
+  validAt?: Date;
 }): Promise<TaskMemoryPack> => {
-  const stored = await input.store.getMemoryPack(input.taskId);
-  const reused = stored ? openStoredPack(stored, input.taskId, input.dataKey) : null;
+  const stored = await input.store.getMemoryPack(input.taskId, input.validAt ?? input.clockAnchor);
+  const reused =
+    stored?.briefVersion === memoryPackVersion(input.budgetTokens ?? MEMORY_RESIDENT_BUDGET_TOKENS)
+      ? openStoredPack(stored, input.taskId, input.dataKey)
+      : null;
   if (reused) return reused;
   // Between the task's own row and a fresh ranking, because a fork that has already saved a pack
   // has bytes a provider may have cached and those win over its parent's. @see copyMemoryPack.
@@ -279,7 +306,9 @@ export const buildTaskMemoryPack = async (input: {
       fromTaskId: input.inheritFromTaskId,
       toTaskId: input.taskId,
       workspaceId: input.workspaceId,
-      dataKey: input.dataKey
+      dataKey: input.dataKey,
+      validAt: input.validAt ?? input.clockAnchor,
+      budgetTokens: input.budgetTokens ?? MEMORY_RESIDENT_BUDGET_TOKENS
     });
     if (inherited) return inherited;
   }
@@ -288,30 +317,15 @@ export const buildTaskMemoryPack = async (input: {
     workspaceId: input.workspaceId,
     plan: planMemoryQuery(input.query, memoryIndexKey(input.dataKey)),
     now: input.clockAnchor,
-    // The bitemporal clause, finally armed for the one query that fills the prompt.
-    //
-    // `now` and `asOf` are different parameters answering different questions: `now` anchors the
-    // decayed recency and salience scores, `asOf` is what the admissibility predicate compares
-    // `valid_from`/`valid_to` against. This call passed only the first, so `q.as_of` was NULL on
-    // every pack ever built and the validity half of the predicate short-circuited to true - a
-    // fact whose validity had already ended stayed `active`, stayed admissible, and was ranked
-    // into the block at the top of the window as a current fact. The only thing holding it back
-    // was a x0.12 soft prior, which reciprocal-rank fusion over four channels leaves well above
-    // the noise floor on a request with little lexical grip. A dead end recorded with
-    // `validTo = observedAt + 14 days` was still being told to the next turn a month later, which
-    // is precisely what `memory.ts` says a remembered belief must never do, and what
-    // `docs/AGENT_RUNTIME.md` asserts is a hard filter (ATH-045).
-    //
-    // The task's start instant, the same one the ranking is anchored to, and for the same reason:
-    // a resumed task must re-rank against the clock it opened with or it rewrites bytes the
-    // provider has already cached. It also makes the pack answer the question the task actually
-    // asked - what was true when the owner asked it - rather than what is true at whatever moment
-    // a worker happens to rebuild it.
-    asOf: input.clockAnchor,
-    budgetTokens: input.budgetTokens ?? MEMORY_PACK_BUDGET_TOKENS
+    // Keep ranking stable at the request's observation time; each entry states its validity.
+    asOf: input.validAt ?? input.clockAnchor,
+    budgetTokens: MEMORY_PACK_BUDGET_TOKENS
   });
-  const rendered = renderMemoryPack(
-    memoryPackEntries(candidates, input.workspaceId, input.dataKey)
+  const ranked = [...candidates].sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
+  const rendered = renderResidentMemory(
+    memoryPackEntries(ranked, input.workspaceId, input.dataKey),
+    input.query,
+    input.budgetTokens ?? MEMORY_RESIDENT_BUDGET_TOKENS
   );
   const saved = await input.store.saveMemoryPack({
     taskId: input.taskId,
@@ -321,6 +335,7 @@ export const buildTaskMemoryPack = async (input: {
       input.dataKey,
       memoryPackAad(input.taskId)
     ),
+    briefVersion: memoryPackVersion(input.budgetTokens ?? MEMORY_RESIDENT_BUDGET_TOKENS),
     sha256: rendered.sha256,
     itemIds: rendered.itemIds,
     tokensEst: rendered.tokensEst
@@ -462,7 +477,7 @@ export const recallMemory = async (input: MemoryRecallInput): Promise<MemoryReca
     excludeIds: alreadyInContext,
     ...(kinds.length > 0 ? { kinds } : {}),
     ...(input.scope ? { scope: input.scope } : {}),
-    ...(input.asOf ? { asOf: input.asOf } : {}),
+    asOf: input.asOf ?? input.now ?? runtimeDate(),
     ...(input.includeSuperseded === undefined ? {} : { includeSuperseded: input.includeSuperseded })
   });
 
@@ -1521,6 +1536,28 @@ const observationSubject = (value: string): string =>
  */
 const OBSERVATION_KEY_SEPARATOR = '\u0000';
 
+/** Extract only standalone assertions; quoted examples remain searchable history. */
+export const ownerFactAssertions = (text: string): string =>
+  ownerWritten(text)
+    .split(/\n|(?<=[.!?])\s+/u)
+    .map((line) =>
+      line
+        .replace(/^\s*(?:[-*]\s+|\d+[.)]\s+)?/u, '')
+        .replace(/^(?:by the way|also|for context|as a reminder)[, ]+/iu, '')
+        .trim()
+    )
+    .filter(
+      (line) =>
+        /^(?:I (?:prefer|use|live|work)\b|My (?:default |login )?shell is\b|(?:(?:the|my|our) )?[\w.-]+(?: [\w.-]+)? (?:runs on|listens on|lives (?:in|at))\b)/iu.test(
+          line
+        ) &&
+        !/[?"“”«»`]/u.test(line) &&
+        !/\b(?:if|would|might|could|suppose|imagine|pretend|said|says|wrote|quote|example)\b/iu.test(
+          line
+        )
+    )
+    .join('\n');
+
 export const observedMemoryFacts = (text: string): MemoryFactObservation[] => {
   const seen = new Set<string>();
   const found: MemoryFactObservation[] = [];
@@ -1528,7 +1565,7 @@ export const observedMemoryFacts = (text: string): MemoryFactObservation[] => {
     if (!memoryPredicate(rule.predicate)) continue;
     // A shared lastIndex across calls would silently skip matches on the next turn.
     const pattern = new RegExp(rule.pattern.source, rule.pattern.flags);
-    for (const match of text.matchAll(pattern)) {
+    for (const match of ownerFactAssertions(text).matchAll(pattern)) {
       const subject =
         rule.subject === 'owner' ? 'owner' : observationSubject(match[rule.subject] ?? '');
       const object = observationTerm(match[rule.object] ?? '');
@@ -2078,6 +2115,12 @@ const STANDING_TRAILING_MARKUP = /[\s*_]+$/u;
  * closed the hole; this line stays because the regex path still reads pasted documents.
  */
 const ownerWritten = (text: string): string => {
+  if (
+    /(?:^|\n)\s*(?:please\s+)?(?:translate|summari[sz]e|rewrite|paraphrase|proofread|classify|extract|analy[sz]e|explain|evaluate)\b/iu.test(
+      text
+    )
+  )
+    return '';
   const kept: string[] = [];
   let inFence = false;
   for (const line of text.split('\n')) {
@@ -2621,11 +2664,11 @@ export const procedureFromCheck = (
   check: { label: string; executable: string; args: readonly string[]; cwd: string },
   indexKey: Uint8Array
 ): { content: MemoryItemContent; index: ReturnType<typeof buildMemoryItemIndex> } => {
-  const command = [check.executable, ...check.args].join(' ').slice(0, 400);
+  const command = redactText([check.executable, ...check.args].join(' ')).slice(0, 400);
   const content: MemoryItemContent = {
-    title: check.label.slice(0, 200),
+    title: redactText(check.label).slice(0, 200),
     subject: command,
-    body: `In ${check.cwd}, \`${command}\` succeeds. Verified by the harness when this was last checked: ${check.label}.`
+    body: `In ${redactText(check.cwd)}, \`${command}\` succeeds. Verified by the harness when this was last checked: ${redactText(check.label)}.`
   };
   return { content, index: buildMemoryItemIndex(content, indexKey) };
 };
@@ -2637,34 +2680,25 @@ export const recordTurnEpisode = async (input: {
   taskId: string;
   dataKey: Uint8Array;
   request: string;
+
+  ownerRequest?: string;
   summary: string;
   outcome: EpisodeOutcome;
   verifiedClaims?: readonly string[];
   remainingRisks?: readonly string[];
   artifacts?: readonly string[];
-  /** Acceptance checks the harness ran and watched pass, which is what it durably learnt. */
+
   verifiedCommands?: readonly {
     label: string;
     executable: string;
     args: readonly string[];
     cwd: string;
   }[];
-  /**
-   * The tool calls this turn's `finish` cited, paired with the timeline rows their raw results were
-   * written to. Both ids come from the harness's own ledger of what it ran, never from the model's
-   * arguments, so a citation that names a call this turn did not make never reaches here.
-   *
-   * This is the whole of the reach into the tool-output tier. It stores two ids per call and copies
-   * no bytes: `task_events` already holds the result untruncated, and `mem.cited_call` is a foreign
-   * key onto it that dies with the conversation.
-   */
+
   citedCalls?: readonly { toolCallId: string; eventId: string }[];
-  /**
-   * Whether this turn read somebody else's words. A tainted turn still records what happened, but
-   * nothing it saw is allowed to settle into a durable fact on the strength of that turn.
-   */
+
   tainted?: boolean;
-  /** Which source it read them from, so a later reach into this turn can name what it is replaying. */
+
   taintOrigin?: string;
   occurredAt: Date;
 }): Promise<TurnEpisodeResult | null> => {
@@ -2703,24 +2737,7 @@ export const recordTurnEpisode = async (input: {
     observedAt: input.occurredAt,
     validFrom: input.occurredAt,
     taskId: input.taskId,
-    /*
-     * The taint gate, written down instead of only acted on.
-     *
-     * Every other use of `input.tainted` in this function is a branch taken now and forgotten: the
-     * observations are skipped, the promotion is skipped, the procedures are skipped, and nothing
-     * survives to say why. The verbatim owner text below is written either way, because a tainted
-     * turn is still a turn the owner had and still has to be searchable - so `mem.source` ends up
-     * holding text that no gate anywhere in the database refuses.
-     *
-     * That was fine while the only reader of a source row was a search the owner typed, and it
-     * stopped being fine the moment a nightly pass read yesterday's turns and proposed what this
-     * computer should believe. That pass is deleted; the column stays, because it is the only
-     * representation the taint gate has in the database and the next reader of `mem.source` that
-     * is not a search the owner typed has to be refusable there rather than in a comment.
-     *
-     * Always a boolean from this writer, never left unset: `null` in that column means an episode
-     * from before the column existed, and the readers treat unknown as tainted.
-     */
+
     tainted: Boolean(input.tainted),
     // Kept beside the flag it explains, and only meaningful with it: the store writes null here on
     // any row whose `tainted` is not true, so an origin can never outlive the taint it named.
@@ -2774,61 +2791,26 @@ export const recordTurnEpisode = async (input: {
       episodeId,
       sourceIds.map((sourceId) => ({ sourceId }))
     );
-  /*
-   * The other provenance edge, and the one that reaches the eighty per cent.
-   *
-   * `mem.evidence` above cites the verbatim rows this episode was assembled from - the owner's own
-   * request and the agent's own summary, which together are under one per cent of what a trajectory
-   * is made of. This cites the tool calls the turn's `finish` named, whose raw results are already
-   * retained untruncated and were readable by nothing.
-   *
-   * Bounded at `MEMORY_REACH_MAX_PIECES`, which is the number of claims `episodeContent` renders
-   * into the body: a memory that cites more calls than it can show claims for is storing pointers
-   * nothing will ever print. Deduplicated by id, because a `finish` may cite one call for two
-   * claims and the primary key would otherwise make the second insert an update of the first.
-   */
+
   const citedCalls = [
     ...new Map((input.citedCalls ?? []).map((call) => [call.toolCallId, call] as const)).values()
   ].slice(0, MEMORY_REACH_MAX_PIECES);
   if (citedCalls.length > 0) await input.store.attachMemoryCitedCalls(episodeId, citedCalls);
 
-  /*
-   * Only the owner's own words are scanned. The agent's summary is its own account of its work, so
-   * treating it as an observation would let the agent nominate its own beliefs for promotion.
-   *
-   * Two rules, each bounded at `MEMORY_MAX_FACT_OBSERVATIONS` on its own rather than sharing one
-   * allowance, because sharing it would let five junk `runs_on` hits out of a pasted log crowd out
-   * the standing orders in the same message - the shape that matters most losing its slot to the
-   * shape that measured 2.3% usable.
-   *
-   * Both read the whole request, not the chunked head, so a rule stated in the "Standards" section
-   * at the bottom of a long brief is observed even when the source cap dropped the paragraph it
-   * was written in. That is 33 turns of the 3,950 whose only standing order lived past the cap.
-   *
-   * Behind the taint gate, and not only the promotion below it. The gate used to sit on promotion
-   * alone, and the sentence that justified it - that a page cannot talk its way into the store by
-   * being read twice - was not true of what the code did: `mem.fact_candidate` has no taint column
-   * to carry the fact forward, and `listPromotableMemoryFactCandidates` selects on workspace,
-   * count and gap and nothing else. So two tainted turns left two sightings a day apart, and the
-   * next ordinary turn about anything at all promoted them. A turn that read somebody else's words
-   * now nominates nothing, which is what the sentence always said.
-   */
+  const ownerRequest =
+    input.ownerRequest === undefined
+      ? input.tainted
+        ? ''
+        : request
+      : redactText(input.ownerRequest);
   let factCandidates = 0;
-  if (!input.tainted)
+  if (ownerRequest)
     for (const observation of [
-      ...observedMemoryFacts(request),
-      ...observedStandingOrders(request)
+      ...observedMemoryFacts(ownerRequest),
+      ...observedStandingOrders(ownerRequest)
     ]) {
       if (!observationIsProse(observation)) continue;
-      /*
-       * The rule is keyed without its carve-out and the carve-out is written beside it.
-       *
-       * This is the whole of the identity change on the pattern path. The owner types "never be
-       * heavy-handed with approvals" on four days and attaches the safety floor on one of them;
-       * keyed on the whole sentence those are two rows, the bare one collects the sightings, and
-       * the floor dies a singleton. Keyed on the rule they are one row with three sightings, and
-       * the floor is in the accumulator waiting to ride along.
-       */
+
       const keys = factCandidateKeys(observation, indexKey, input.dataKey, input.workspaceId);
       await input.store.observeMemoryFactCandidate({
         workspaceId: input.workspaceId,
@@ -2846,37 +2828,9 @@ export const recordTurnEpisode = async (input: {
       });
       factCandidates += 1;
     }
-  /**
-   * A corroborated candidate becomes a fact here, on the turn that corroborates it.
-   *
-   * This is what makes the memory automatic rather than a queue of chores. A candidate is something
-   * the owner said; it becomes a fact once they have said it in at least two episodes at least a
-   * day apart, which is the store's own rule and is unchanged. Nothing in the running system ever
-   * asked for that before, so candidates accumulated in a table nothing drained and the only kind
-   * of entry the store could hold was `episode` - the curated layer that makes memory more than a
-   * transcript was built, tested, and unreachable.
-   *
-   * No options are passed, and that is deliberate rather than incidental: both bounds in the
-   * corroboration gate - two sightings and the day - are defaults in
-   * `listPromotableMemoryFactCandidates`, so there is exactly one place to read them and exactly
-   * one place to change them. A caller that passed its own would be a second policy nothing in the
-   * store could see.
-   *
-   * What keeps it safe is upstream: `observedMemoryFacts` reads the owner's own words and never
-   * the agent's account of its work, so an agent cannot nominate its own beliefs; the observation
-   * above skips the quoted and fenced parts of the message, so a page the owner pasted is not read
-   * as a sentence the owner wrote; and a tainted turn now nominates nothing, so a page cannot talk
-   * its way in by being read twice. That last one is a bound and not a hope only because it is
-   * taken where the candidate is written - the candidate table has no taint column, so a taint
-   * gate here, on promotion alone, was a gate two tainted turns walked around by leaving their
-   * sightings behind for the next clean turn to promote. Trust is `stated` because the owner
-   * stated it.
-   *
-   * Never fatal. A turn that has already done its work must not fail because the store could not be
-   * tidied afterwards.
-   */
+
   let promotedFacts = 0;
-  if (!input.tainted) {
+  if (ownerRequest) {
     try {
       const promotions = await input.store.promoteMemoryFactCandidates(
         input.workspaceId,
@@ -2892,19 +2846,7 @@ export const recordTurnEpisode = async (input: {
           // candidate's own keys or the store refuses the promotion, which is what stops a
           // promotion quietly minting a different fact from the one that was corroborated.
           const standing = observation.predicate === 'standing_order';
-          /*
-           * The rule and every carve-out anybody has stated on it, or nothing at all.
-           *
-           * `object` is the CORE, because that is what the candidate's key hashes and the store
-           * refuses a promotion whose keys are not the candidate's. `body` is the composed
-           * sentence, which is what a later turn actually reads. The two differ by exactly the
-           * clauses, which is why the guard still does its job: a promotion cannot mint a different
-           * RULE from the one that was corroborated, and it can only ever make that rule smaller.
-           *
-           * Null when the union will not compose, and that refusal is the safety property in one
-           * line: a rule whose sightings carried a carve-out promotes carrying it or does not
-           * promote. There is no branch here that reaches `mem.item` with the bare sentence.
-           */
+
           const clauses = (candidate.qualifications ?? []).flatMap((qualification) => {
             const opened = decryptJson<{ qualification?: string }>(
               qualification.ciphertext,
@@ -2939,29 +2881,7 @@ export const recordTurnEpisode = async (input: {
             qualificationKeys: (candidate.qualifications ?? []).map(
               (qualification) => qualification.key
             ),
-            /*
-             * `stated` is a claim about WHOSE SENTENCE this is, so it follows the candidate rather
-             * than the call site.
-             *
-             * A candidate the shipped patterns produced carries the owner's own line, sliced out of
-             * their own message and stored unedited - the tier's whole claim is that they wrote it,
-             * and `stated` is that claim. A candidate a model proposed carries the model's wording
-             * of what the owner said across several turns. It may be a better sentence than any the
-             * owner typed; it is still not one they typed, and minting it at `stated` would be the
-             * store telling every later turn that the owner said something they did not.
-             *
-             * The `proposed` arm has no writer left in this program - the nightly proposer that
-             * wrote it is deleted - and it stays because the rows it judges outlive the code that
-             * made them. A box that ran that version has `origin='proposed'` candidates sitting in
-             * `mem.fact_candidate` now, and they are still promotable; dropping this branch would
-             * mint every one of them at `stated`, which is the exact lie it was added to stop.
-             *
-             * `derived` is the honest level and it is not a demotion into uselessness: recall
-             * admits it and prices it at 0.85 against 1.00, and `inferred` - the level that IS
-             * excluded from recall - means the agent concluded it about its own work, which this is
-             * not either. The exact discount was already in the table; this only picks the right row
-             * of it.
-             */
+
             trust: candidate.origin === 'proposed' ? ('derived' as const) : ('stated' as const),
             documentCiphertext: encryptJson(
               content,
@@ -2969,33 +2889,7 @@ export const recordTurnEpisode = async (input: {
               memoryItemAad(input.workspaceId)
             ),
             index: buildMemoryItemIndex(content, indexKey),
-            /*
-             * The first production writer `mem.item.pin` has ever had, and the reason this repair
-             * is worth making rather than merely correct.
-             *
-             * The pack is one fusion query planned from the opening request, so an unpinned fact
-             * is recalled when the owner's words happen to reach it. That is the wrong test for a
-             * rule: "never run git stash" is needed on the turn where the AGENT is about to run
-             * it, which is exactly the turn whose request never mentions git. `pin` is the one
-             * thing the recall SQL admits with no lexical grip at all, and it was declared, read
-             * by the structural channel and by the salience formula, and written by nobody.
-             *
-             * Bounded in the pack, and it was NOT bounded in what those rows cost on the way to
-             * being bounded. This comment used to say that four per subject "is what a rendered
-             * pack shows however many rows exist", and then guess that forty pinned rows was a
-             * long way off. Both halves were wrong. The cap held; what it did not do was stop the
-             * rows it was about to discard from spending the fact slot's rank cap and token share
-             * first, because all three were computed over the same unfiltered set. Measured on
-             * PGlite, sweeping every pin count from 0 to 70: the owner's facts start falling out
-             * at 37 and by 40 the pack is four rows, all of them standing orders, with every owner
-             * fact gone - so the more rules the owner stated, the less of what they had told this
-             * computer came back.
-             *
-             * Fixed where it belonged, in `MEMORY_RECALL_SQL`, by taking the per-subject cap
-             * before the window rather than beside it; the numbers are beside it there and in
-             * `docs/design/quality/RECALL.md`. Kept here because this writer is why the ceiling is
-             * reachable at all: `pin` has exactly one production author, and it is this line.
-             */
+
             pin: standing
           };
         }
@@ -3009,51 +2903,36 @@ export const recordTurnEpisode = async (input: {
     }
   }
 
-  /**
-   * The commands the harness verified, written as procedures beside the episode.
-   *
-   * Same taint gate as a fact: a turn that read somebody else's words settles nothing durable, even
-   * though what it verified came from the machine rather than from the page. Never fatal, for the
-   * same reason as the promotion above - the work is already done.
-   */
   let procedures = 0;
-  if (!input.tainted)
-    for (const check of (input.verifiedCommands ?? []).slice(0, 8)) {
-      const { content, index } = procedureFromCheck(check, indexKey);
-      await input.store
-        .createMemoryItem({
-          id: runtimeUUID(),
-          userId: input.userId,
-          workspaceId: input.workspaceId,
-          kind: 'procedure',
-          // Derived, not stated and not inferred: the harness observed it, the owner did not say it
-          // and the agent did not conclude it.
-          trust: 'derived',
-          documentCiphertext: encryptJson(content, input.dataKey, memoryItemAad(input.workspaceId)),
-          index,
-          observedAt: input.occurredAt,
-          validFrom: input.occurredAt,
-          lastVerified: input.occurredAt,
-          taskId: input.taskId
-        })
-        .then(() => {
-          procedures += 1;
-        })
-        .catch(() => undefined);
-    }
+  for (const check of (input.verifiedCommands ?? []).slice(0, 8)) {
+    const { content, index } = procedureFromCheck(check, indexKey);
+    await input.store
+      .createMemoryItem({
+        id: runtimeUUID(),
+        userId: input.userId,
+        workspaceId: input.workspaceId,
+        kind: 'procedure',
+        // Derived, not stated and not inferred: the harness observed it, the owner did not say it
+        // and the agent did not conclude it.
+        trust: 'derived',
+        tainted: Boolean(input.tainted),
+        ...(input.taintOrigin ? { taintOrigin: input.taintOrigin } : {}),
+        documentCiphertext: encryptJson(content, input.dataKey, memoryItemAad(input.workspaceId)),
+        index,
+        observedAt: input.occurredAt,
+        validFrom: input.occurredAt,
+        lastVerified: input.occurredAt,
+        taskId: input.taskId
+      })
+      .then(() => {
+        procedures += 1;
+      })
+      .catch(() => undefined);
+  }
 
   return { episodeId, sourceIds, sourceChunksDropped, factCandidates, promotedFacts, procedures };
 };
 
-/**
- * Closes the loop on what was injected. `mem.item_use` is what salience and procedure demotion are
- * computed from, so an outcome is recorded once per task, when the turn is actually verified,
- * rather than optimistically at injection time where every row would read `unknown`.
- *
- * The grade is a `MemoryUseOutcome` and not the episode's own label, because "how did the turn end"
- * and "did the recalled items earn their place" are different questions. Sharing one type let the
- * first answer the second, which is how a turn that ran out of steps came to certify its pack.
- */
 export const recordMemoryPackOutcome = async (input: {
   store: MemoryCaptureStore;
   workspaceId: string;

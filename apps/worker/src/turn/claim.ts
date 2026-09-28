@@ -1,3 +1,4 @@
+import { appendMemoryOwnerInput } from '../memory-owner-input.js';
 import { runtimeNow } from '@garden/core';
 import { CODING_CHILD_TOOLS } from '../coding-missions.js';
 import { codingMissionView } from '@garden/data';
@@ -148,6 +149,9 @@ export const claimTurn = async (
       { role: 'system', content: BASE_SYSTEM_PROMPT },
       { role: 'user', content: ownerMessageContent(prompt) }
     ],
+    memoryOwnerRequest: task.parentMissionId
+      ? ''
+      : appendMemoryOwnerInput(undefined, prompt.prompt),
     step: 0,
     credits: 0,
     turnToolResults: {},
@@ -169,6 +173,7 @@ export const claimTurn = async (
   // runtime block is written. Probed only when the saved state does not already carry the answer:
   // a task that ran before this field existed pays one indexed row read, once, and then persists.
   const unattended = savedState?.unattended ?? (await deps.startedBySchedule(task, key));
+  if (!savedState && unattended) state.memoryOwnerRequest = '';
   /**
    * Where this run's web searches go, decided once and then pinned.
    *

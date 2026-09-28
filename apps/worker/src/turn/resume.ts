@@ -1,3 +1,4 @@
+import { appendMemoryOwnerInput } from '../memory-owner-input.js';
 import { runtimeDate } from '@garden/core';
 /**
  * What a turn has to settle before it can take another step: everything the last one left behind.
@@ -351,6 +352,10 @@ export const resumeParkedTurn = async (
         waiting?.reasoningEffort ?? task.reasoningEffort ?? 'auto';
       delete answeredState.question;
       answeredState.questionsAsked = 0;
+      answeredState.memoryOwnerRequest = appendMemoryOwnerInput(
+        answeredState.memoryOwnerRequest,
+        answer
+      );
       answeredState.messages.push({
         role: 'user',
         content: ownerMessageContent({ prompt: answer, attachments: message?.attachments })

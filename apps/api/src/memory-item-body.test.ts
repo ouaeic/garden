@@ -12,6 +12,7 @@
  * also keep, because a shared one would be a fifth caller's constraints on every other suite's
  * fixture.
  */
+import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -21,7 +22,8 @@ import {
   encryptJson,
   memoryIndexKey,
   unwrapDataKey,
-  generateDataKey
+  generateDataKey,
+  wrapDataKey
 } from '@garden/core';
 import type { ApiConfig } from './config.js';
 import { UNREADABLE_MEMORY_ITEM } from './context.js';
@@ -60,6 +62,7 @@ const stubRunnerFetch = () =>
 
 const configFor = (directory: string): ApiConfig => ({
   DEPLOYMENT_MODE: 'development',
+  EMBEDDED_WORKER: false,
   MODEL_CATALOG_SCOPE: 'provider_catalog',
   CONNECTION_MANIFEST_PATH: join(directory, 'connection.json'),
   GARDEN_STATE_PATH: directory,
@@ -265,5 +268,108 @@ describe('the whole of a remembered item', () => {
     // The same address with the owner's own session, so this is a statement about the route rather
     // than about a URL nothing serves — which is what it would have been before the route existed.
     expect((await app.inject({ method: 'GET', url, headers: { cookie } })).statusCode).toBe(200);
+  }, 40_000);
+  test('searches and pages owner memory with project origins, while shared reads use the origin encryption context', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-memory-library-'));
+    disposers.push(() => rm(directory, { recursive: true, force: true }));
+    const { app, store, cookie, workspaceId, key, write } = await seed(directory);
+    const owner = (await store.getWorkspaceById(workspaceId))!;
+    const shared = await write('Shared quartz history', 'Shared quartz release instructions.');
+    const task = await store.createTask({
+      userId: owner.userId,
+      workspaceId,
+      titleCiphertext: encryptJson({ title: 'Quartz project' }, key),
+      promptCiphertext: encryptJson({ prompt: 'Quartz project' }, key),
+      nameIndex: { nameTokens: '', openingTokens: '' },
+      modelId: 'fixture',
+      privacyRoute: 'provider_zdr',
+      maxComputeCredits: 1
+    });
+    await store.updateWorkspaceStatus(workspaceId, 'running');
+    const childId = randomUUID();
+    expect(
+      await store.beginProjectExecution({
+        userId: owner.userId,
+        taskId: task.id,
+        workspaceId: childId,
+        wrappedKey: wrapDataKey(key, masterKey, childId),
+        sourceManifestCiphertext: encryptJson({}, key),
+        seedKind: 'new'
+      })
+    ).not.toBeNull();
+    const body = 'Quartz project-only sequence analysis notes.';
+    const child = await store.createMemoryItem({
+      userId: owner.userId,
+      workspaceId: childId,
+      taskId: task.id,
+      kind: 'episode',
+      trust: 'derived',
+      documentCiphertext: encryptJson({ body }, key, `memory-item:${childId}`),
+      index: buildMemoryItemIndex({ body }, memoryIndexKey(key)),
+      observedAt: '2026-02-01T09:00:00.000Z'
+    });
+    const read = async (suffix: string, auth = cookie) =>
+      app.inject({
+        method: 'GET',
+        url: `/v1/workspaces/${workspaceId}/memory-library${suffix}`,
+        headers: { cookie: auth }
+      });
+    const first = await read('?limit=1');
+    expect(first.statusCode, first.body).toBe(200);
+    const page = first.json<{ items: Array<{ id: string }>; nextCursor: string }>();
+    expect(page.items).toHaveLength(1);
+    expect(page.nextCursor).toBeTruthy();
+    const second = await read(`?limit=1&cursor=${page.nextCursor}`);
+    const next = second.json<{ items: Array<{ id: string }>; nextCursor: null }>();
+    expect(next.nextCursor).toBeNull();
+    expect(new Set([...page.items, ...next.items].map((i) => i.id))).toEqual(
+      new Set([shared.id, child.id])
+    );
+    const search = await read('?q=sequence');
+    expect(search.json<{ items: unknown[] }>().items).toEqual([
+      expect.objectContaining({
+        id: child.id,
+        workspaceId: childId,
+        projectId: task.projectId,
+        taskId: task.id,
+        excerpt: body
+      })
+    ]);
+    const sharedRead = await app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${childId}/memory-items/${shared.id}`,
+      headers: { cookie }
+    });
+    expect(sharedRead.json()).toMatchObject({
+      readable: true,
+      body: 'Shared quartz release instructions.'
+    });
+    const curated = await app.inject({
+      method: 'POST',
+      url: `/v1/workspaces/${workspaceId}/memories`,
+      headers: { cookie },
+      payload: { target: 'workspace', content: 'Keep shared notes concise.' }
+    });
+    expect(curated.statusCode, curated.body).toBe(200);
+    const savedFact = curated.json<{ id: string; workspaceId: string }>();
+    expect(savedFact.workspaceId).toBe(workspaceId);
+    const inheritedFacts = await app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${childId}/memories`,
+      headers: { cookie }
+    });
+    expect(inheritedFacts.json<Array<{ id: string; workspaceId: string }>>()).toContainEqual(
+      expect.objectContaining({ id: savedFact.id, workspaceId })
+    );
+    expect((await read('?cursor=broken')).statusCode).toBe(400);
+    expect((await read('', '')).statusCode).toBe(401);
+    const otherCookie = sessionCookie(
+      await app.inject({
+        method: 'POST',
+        url: '/v1/auth/dev',
+        payload: { username: 'other-owner' }
+      })
+    );
+    expect((await read('', otherCookie)).statusCode).toBe(404);
   }, 40_000);
 });

@@ -820,6 +820,10 @@ export class DataStore {
     return this.#memory.getMemoryItem(...args);
   }
 
+  listOwnerMemoryItems(...args: Parameters<MemoryStore['listOwnerMemoryItems']>) {
+    return this.#memory.listOwnerMemoryItems(...args);
+  }
+
   listMemoryItems(...args: Parameters<MemoryStore['listMemoryItems']>) {
     return this.#memory.listMemoryItems(...args);
   }

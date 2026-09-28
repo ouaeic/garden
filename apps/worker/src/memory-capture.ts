@@ -82,7 +82,8 @@ export const captureMemory = async (
       workspaceId: task.workspaceId,
       taskId: task.id,
       dataKey: key,
-      request,
+      request: state.memoryOwnerRequest || request,
+      ...(state.memoryOwnerRequest === undefined ? {} : { ownerRequest: state.memoryOwnerRequest }),
       summary: completion.summary,
       // Every turn that reaches #completeTurn is recorded here, the verified finish and the
       // step-limit handoff alike, so the label has to say which one this was. Keyed off
