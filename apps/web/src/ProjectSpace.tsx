@@ -1,4 +1,4 @@
-import ProjectPanel, { ProjectPanelLinks } from './ProjectPanel';
+import ProjectPanel, { ProjectPanelLinks, useDockedPanels } from './ProjectPanel';
 import ScrollRegion from './ScrollRegion';
 import { lazy, Suspense, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, MessageSquarePlus, Settings2 } from './icons';
@@ -24,6 +24,7 @@ import { permissionModeSummary } from './asking-rules';
 import './projects.css';
 import { fileNavigationBlocked } from './file-navigation';
 import { useProjectView, setSurfaceLocation } from './surface-location';
+import StatusSprite, { stageOf } from './life/StatusSprite';
 const DeskSupport = lazy(() => import('./DeskSupport'));
 const ProjectJobsLink = lazy(() => import('./ProjectJobsLink'));
 const ProjectUpdates = lazy(() => import('./ProjectUpdates'));
@@ -151,6 +152,7 @@ export default function ProjectSpace({
     return () => media.removeEventListener('change', update);
   }, []);
   const [view, selectView] = useProjectView();
+  const docked = useDockedPanels();
   const [filesOpened, setFilesOpened] = useState(view === 'files');
   useEffect(() => {
     if (view === 'files') setFilesOpened(true);
@@ -300,7 +302,7 @@ export default function ProjectSpace({
   };
   return (
     <section
-      className={`project-space desk-project project-view-work${taskId ? ' has-conversation' : ''}`}
+      className={`project-space desk-project project-view-work${taskId ? ' has-conversation' : ''}${docked && view !== 'work' ? ' has-docked-panel' : ''}`}
     >
       <header className="project-space-header">
         <Button className="project-back" aria-label="All projects" onClick={onAllProjects}>
@@ -367,6 +369,14 @@ export default function ProjectSpace({
       </header>
       <div className="project-workspace-bar">
         <nav className="project-conversation-tabs" aria-label="Project conversations">
+          <Button
+            aria-current={!taskId ? 'page' : undefined}
+            onClick={() => {
+              if (!fileNavigationBlocked()) onOverview();
+            }}
+          >
+            Overview
+          </Button>
           {conversations.map((conversation) => (
             <Button
               key={conversation.id}
@@ -406,7 +416,7 @@ export default function ProjectSpace({
                         .filter((task) => needsAttention(task) || hasOngoingWork(task))
                         .map((task) => (
                           <button key={task.id} onClick={() => onTask(task.id)}>
-                            <span className={`garden-project-dot status-${task.status}`} />
+                            <StatusSprite stage={stageOf(task)} />
                             <span>
                               <strong>{task.title}</strong>
                               <small>{taskStatusLabel(task)}</small>
@@ -492,7 +502,7 @@ export default function ProjectSpace({
                   <div className="project-conversation-grid" ref={conversationGrid}>
                     {visible.map((task) => (
                       <button key={task.id} data-task-id={task.id} onClick={() => onTask(task.id)}>
-                        <span className={`garden-project-dot status-${task.status}`} />
+                        <StatusSprite stage={stageOf(task)} />
                         <span>
                           <strong>{task.title}</strong>
                           <small>

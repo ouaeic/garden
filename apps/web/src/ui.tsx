@@ -86,7 +86,8 @@ export function Dialog({
   wide = false,
   className = '',
   dismissOnBackdrop = false,
-  open = true
+  open = true,
+  modal = true
 }: {
   title: string;
   children: ReactNode;
@@ -95,6 +96,8 @@ export function Dialog({
   className?: string;
   dismissOnBackdrop?: boolean;
   open?: boolean;
+  /** A docked panel sits beside the work instead of blocking it. */
+  modal?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -102,12 +105,13 @@ export function Dialog({
     if (!open) return;
     const previous = document.activeElement;
     const dialog = ref.current;
-    dialog?.showModal();
+    if (modal) dialog?.showModal();
+    else dialog?.show();
     return () => {
       dialog?.close();
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
     };
-  }, [open]);
+  }, [open, modal]);
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog || !dismissOnBackdrop) return;
@@ -131,6 +135,15 @@ export function Dialog({
       ref={ref}
       aria-labelledby={titleId}
       className={`dialog ${wide ? 'wide' : ''} ${className}`}
+      onKeyDown={
+        modal
+          ? undefined
+          : (event) => {
+              if (event.key !== 'Escape' || event.defaultPrevented) return;
+              event.preventDefault();
+              onClose();
+            }
+      }
       onCancel={(event) => {
         event.preventDefault();
         event.stopPropagation();

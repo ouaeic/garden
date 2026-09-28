@@ -81,7 +81,7 @@ export function DecisionCard({
   }
   if (privateInput)
     return (
-      <article className="decision-card computer-handoff">
+      <article className="decision-card computer-handoff text-box">
         <div className="eyebrow">Needs you · personal action</div>
         <h3>{decision.action}</h3>
         <p>
@@ -108,7 +108,7 @@ export function DecisionCard({
       </article>
     );
   return (
-    <article className="decision-card">
+    <article className="decision-card text-box">
       <div className="eyebrow">
         <ShieldCheck size={14} aria-hidden="true" />
         {preview.securityMode === 'autonomous' ? 'Autonomous · needs approval' : 'Your approval'}

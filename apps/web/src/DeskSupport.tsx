@@ -8,6 +8,7 @@ import { setSurfaceLocation, useProjectView } from './surface-location';
 import { processMemory } from './process-display';
 import { taskStatusLabel } from './model';
 import { changeSummary, useProjectChanges } from './use-project-changes';
+import StatusSprite, { stageOf } from './life/StatusSprite';
 
 const ProcessPanel = lazy(() => import('./ProcessPanel'));
 
@@ -184,7 +185,7 @@ export default function DeskSupport({
                   setSurfaceLocation({ panel: 'activity' }, true);
                 }}
               >
-                <i className={`garden-project-dot status-${task.status}`} aria-hidden="true" />
+                <StatusSprite stage={stageOf(task)} />
                 <span>
                   <strong>{task.title}</strong>
                   <small>{task.activity?.latest ?? taskStatusLabel(task)}</small>

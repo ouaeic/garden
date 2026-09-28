@@ -518,7 +518,7 @@ export default function TaskSurface({
         </Markdown>
       </Suspense>
       {writing && (
-        <div className="writing-indicator" role="status">
+        <div className="writing-indicator typing-cursor" role="status">
           Writing…
         </div>
       )}

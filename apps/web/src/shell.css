@@ -180,3 +180,32 @@
 .management-tabs {
   flex-wrap: wrap;
 }
+
+/*
+ * On wide screens a project's files, activity and tools dock to the right and the work narrows
+ * beside them, so a file can be read while the app it belongs to stays in view.
+ */
+.desk-shell .project-panel.is-docked[open] {
+  position: fixed;
+  inset: var(--desk-bar-height) 0 0 auto;
+  margin: 0;
+  width: min(760px, 46vw);
+  height: auto;
+  max-height: none;
+  border: 0;
+  border-left: 2px solid var(--text);
+  box-shadow: none;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  animation: none;
+}
+.garden-shell.desk-shell .project-space.has-docked-panel {
+  padding-right: min(760px, 46vw);
+}
+.garden-shell.desk-shell .project-space.has-docked-panel .project-view-content.desk-with-support {
+  grid-template-columns: minmax(0, 1fr);
+}
+.project-space.has-docked-panel .project-view-content > :not(.desk-work-card) {
+  display: none;
+}

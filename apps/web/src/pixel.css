@@ -9,6 +9,12 @@
   line-height: 0;
   vertical-align: middle;
 }
+/* Doubled so a row's own rules for its text spans never stretch or re-flow a sprite. */
+.life-sprite.life-sprite {
+  display: inline-block;
+  flex: none;
+  min-width: 0;
+}
 .life-sprite > svg {
   display: block;
   max-width: none;
@@ -103,7 +109,7 @@
 }
 
 /* Selects keep the native list, which is the right picker on phones, behind a pixel face. */
-select {
+html select:not([multiple]) {
   appearance: none;
   padding-right: 40px;
   /* A four-row chevron drawn in the ink shade, so it follows the palette and the mode. */

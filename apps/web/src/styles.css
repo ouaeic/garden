@@ -371,6 +371,7 @@ canvas {
 }
 .startup {
   min-height: 100svh;
+  --boot: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1679,4 +1680,19 @@ canvas {
 }
 .diagnostic-download summary {
   cursor: pointer;
+}
+
+/* The boot screen: the wordmark drops into place in whole rows while the workspace loads. */
+@media (prefers-reduced-motion: no-preference) {
+  .startup .brand {
+    animation: boot-drop 0.64s steps(8, end) both;
+  }
+}
+@keyframes boot-drop {
+  from {
+    transform: translateY(-50vh);
+  }
+  to {
+    transform: translateY(0);
+  }
 }

@@ -276,6 +276,12 @@ export default function GardenLife() {
     };
     const onBloom = () => void bloom().catch(() => undefined);
     addEventListener('garden:bloom', onBloom);
+    // A named scene on request, so a visit can be watched on purpose rather than waited for.
+    const onScene = (event: Event) => {
+      const name = (event as CustomEvent<string>).detail;
+      if (scenes[name]) void scenes[name]().catch(() => undefined);
+    };
+    addEventListener('garden:scene', onScene);
 
     const weights: [string, number][] = [
       ['logoVisit', 5],
@@ -315,6 +321,7 @@ export default function GardenLife() {
       signal.cancelled = true;
       clearTimeout(timer);
       removeEventListener('garden:bloom', onBloom);
+      removeEventListener('garden:scene', onScene);
       setActors([]);
     };
   }, [mode]);

@@ -52,18 +52,16 @@ export default function SearchDialog({
       controller.abort();
     };
   }, [query, workspace?.id]);
+  // Each entry leads with the name of the door it opens, then the words people search for.
   const commands = [
-    { label: 'Start new work', action: onNew },
+    { label: 'New project', action: onNew },
     { label: 'Home', action: () => onView('work') },
     { label: 'Projects', action: () => onView('projects') },
-    { label: 'Automations and schedules', action: () => onView('automations') },
-    {
-      label: 'All computer work: files, terminal, browser and desktop',
-      action: () => onView('computer')
-    },
-    { label: 'Library: results, memory and skills', action: () => onView('library') },
-    { label: 'Models, access and settings', action: () => onView('settings') },
-    { label: 'Decisions and attention', action: () => onView('attention') }
+    { label: 'Needs you — questions and approvals', action: () => onView('attention') },
+    { label: 'Computer — files, terminal, browser, desktop', action: () => onView('computer') },
+    { label: 'Automations — schedules and watches', action: () => onView('automations') },
+    { label: 'Library — results, memory, skills', action: () => onView('library') },
+    { label: 'Settings — models, spending, appearance, account', action: () => onView('settings') }
   ];
   return (
     <Dialog title="Find anything" onClose={onClose}>

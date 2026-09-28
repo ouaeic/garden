@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import type { Task } from '@garden/contracts';
 import { taskStatusLabel } from './model';
+import StatusSprite, { stageOf } from './life/StatusSprite';
 
 export function ProjectLink({
   task,
@@ -31,10 +32,7 @@ export function ProjectLink({
       onPointerEnter={prepareReveal}
       onFocus={prepareReveal}
     >
-      <span
-        aria-hidden="true"
-        className={`garden-project-dot status-${task.deliveryStatus === 'pending' ? 'running' : task.status}`}
-      />
+      <StatusSprite stage={task.deliveryStatus === 'pending' ? 'sprout' : stageOf(task)} />
       <span className="garden-project-title" ref={viewport}>
         <strong>{task.title}</strong>
       </span>

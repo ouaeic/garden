@@ -75,6 +75,14 @@
   border-top: 2px solid var(--text);
   background: var(--lcd-texture), var(--dither), var(--bg);
 }
+.garden-plot-scenery > .life-sprite {
+  position: absolute;
+  bottom: 24px;
+}
+.garden-plot-scenery > .garden-plot-fence {
+  left: auto;
+  right: 24px;
+}
 .garden-plot-beds {
   position: absolute;
   left: 16px;
@@ -170,6 +178,14 @@
 @media (max-width: 640px) {
   .garden-plot {
     height: 136px;
+  }
+  .garden-plot-scenery > .life-sprite {
+    position: absolute;
+    bottom: 24px;
+  }
+  .garden-plot-scenery > .garden-plot-fence {
+    left: auto;
+    right: 24px;
   }
   .garden-plot-beds {
     justify-content: flex-start;

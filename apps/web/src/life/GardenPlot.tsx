@@ -2,7 +2,19 @@ import { useEffect, useRef, type CSSProperties } from 'react';
 import type { Project, Task } from '@garden/contracts';
 import { Sprite } from './Sprite';
 import { stageOf, type Stage } from './StatusSprite';
-import { blooms, cloud, growth, moon, speech, sun, tree, type Frames } from './sprites';
+import {
+  blooms,
+  cloud,
+  fence,
+  growth,
+  moon,
+  speech,
+  stone,
+  sun,
+  tree,
+  tuft,
+  type Frames
+} from './sprites';
 import './life.css';
 
 const species = Object.keys(blooms) as (keyof typeof blooms)[];
@@ -130,6 +142,15 @@ export default function GardenPlot({
           ))}
         </div>
         <div className="garden-plot-ground" aria-hidden="true" />
+        <div className="garden-plot-scenery" aria-hidden="true">
+          {[3, 9, 17, 26, 38, 44, 53, 61, 72, 79, 86, 93].map((left) => (
+            <Sprite key={`t${left}`} frames={[tuft]} scale={3} style={{ left: `${left}%` }} />
+          ))}
+          {[14, 57, 83].map((left) => (
+            <Sprite key={`s${left}`} frames={[stone]} scale={3} style={{ left: `${left}%` }} />
+          ))}
+          <Sprite frames={[fence]} scale={3} className="garden-plot-fence" />
+        </div>
         <nav className="garden-plot-beds" aria-label="Projects in your garden">
           {planted.map(({ project, stage }) => (
             <button

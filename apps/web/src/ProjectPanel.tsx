@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Activity, Folder, SlidersHorizontal } from './icons';
 import { Button, Dialog } from './ui';
 import { closeProjectPanel, useProjectView } from './surface-location';
@@ -29,15 +29,30 @@ export function ProjectPanelLinks({ inside = false }: { inside?: boolean }) {
 }
 
 /** Keep editors and terminal state mounted while the desk remains the navigation anchor. */
+const DOCK_QUERY = '(min-width: 1100px) and (min-height: 600px)';
+/** Wide screens dock the panel beside the work; narrow ones give it the whole screen. */
+export function useDockedPanels() {
+  const [docked, setDocked] = useState(() => matchMedia(DOCK_QUERY).matches);
+  useEffect(() => {
+    const media = matchMedia(DOCK_QUERY);
+    const update = () => setDocked(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  return docked;
+}
+
 export default function ProjectPanel({ scope, children }: { scope: string; children: ReactNode }) {
   const [view] = useProjectView();
+  const docked = useDockedPanels();
   return (
     <Dialog
       title={scope}
       open={view !== 'work'}
       wide
-      className={`desk-sheet project-panel project-panel-${view}`}
-      dismissOnBackdrop
+      modal={!docked}
+      className={`desk-sheet project-panel project-panel-${view}${docked ? ' is-docked' : ''}`}
+      dismissOnBackdrop={!docked}
       onClose={closeProjectPanel}
     >
       <ProjectPanelLinks inside />

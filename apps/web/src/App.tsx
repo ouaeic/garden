@@ -955,7 +955,7 @@ function WorkspaceApp() {
                   )
                   .map((item) => (
                     <button
-                      className="attention-task"
+                      className="attention-task cursor-row"
                       key={item.id}
                       onClick={() => openTask(item.id)}
                     >

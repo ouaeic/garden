@@ -7,6 +7,7 @@ import { ProjectLink } from './ProjectLink';
 import { money } from './model';
 import { Button, ErrorNotice } from './ui';
 import './projects.css';
+import StatusSprite from './life/StatusSprite';
 
 export const projectStatus = (project: Project) =>
   [
@@ -196,12 +197,12 @@ export default function ProjectCollection({
               </button>
             )}
             <button
-              className="project-open"
+              className="project-open cursor-row"
               aria-current={currentProjectId === project.id && !currentTaskId ? 'page' : undefined}
               onClick={() => onProject(project.id)}
             >
-              <span
-                className={`garden-project-dot status-${project.activeCount ? 'running' : project.attentionCount ? 'awaiting_user' : 'completed'}`}
+              <StatusSprite
+                stage={project.attentionCount ? 'needs' : project.activeCount ? 'sprout' : 'bloom'}
               />
               <span>
                 <strong>{project.title}</strong>
