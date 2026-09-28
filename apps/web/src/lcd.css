@@ -24,9 +24,9 @@
   --lcd-faint: #97aa6d;
   --lcd-dense: #3d4f2b;
   --lcd-on: #26351f;
-  --bg: var(--lcd-on);
-  --text: var(--lcd-off);
-  --muted: var(--lcd-faint);
+  --bg: var(--lcd-off);
+  --text: var(--lcd-on);
+  --muted: var(--lcd-dense);
   --dim: var(--muted);
   --panel: var(--bg);
   --raised: color-mix(in srgb, var(--text) 10%, var(--bg));
@@ -51,13 +51,13 @@
   -webkit-font-smoothing: auto;
   color: var(--text);
   background: var(--bg);
-  color-scheme: dark;
-}
-:root[data-theme='light'] {
-  --bg: var(--lcd-off);
-  --text: var(--lcd-on);
-  --muted: var(--lcd-dense);
   color-scheme: light;
+}
+:root[data-theme='dark'] {
+  --bg: var(--lcd-on);
+  --text: var(--lcd-off);
+  --muted: var(--lcd-faint);
+  color-scheme: dark;
 }
 /* A static glass matrix costs no animation frames or layout work. */
 body::after,

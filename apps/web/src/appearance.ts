@@ -1,7 +1,7 @@
 export function storedDisplayMode(): 'light' | 'dark' {
   try {
-    return localStorage.getItem('garden-theme') === 'light' ? 'light' : 'dark';
+    return localStorage.getItem('garden-theme') === 'dark' ? 'dark' : 'light';
   } catch {
-    return 'dark';
+    return 'light';
   }
 }
