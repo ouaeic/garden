@@ -86,7 +86,7 @@
   margin-block: 22px 28px;
 }
 .home-current-work h2 {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 500;
 }
 .home-current-work > button {
@@ -284,7 +284,7 @@
 .project-overview h2,
 .management-content h2 {
   font-family: inherit;
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 500;
   letter-spacing: 0;
 }
@@ -441,7 +441,7 @@
   margin-bottom: 24px;
 }
 .garden-shell .management-heading h1 {
-  font-size: 36px;
+  font-size: 40px;
 }
 .garden-shell .management-tabs {
   flex-wrap: wrap;
@@ -500,7 +500,7 @@
     min-width: 0;
   }
   .garden-shell .project-space-title h1 {
-    font-size: 18px;
+    font-size: 16px;
   }
   .has-conversation .project-workspace-bar {
     margin-inline: 12px;
@@ -539,7 +539,7 @@
     margin-bottom: 20px;
   }
   .returning-home .garden-welcome h1 {
-    font-size: 29px;
+    font-size: 32px;
   }
   .garden-shell .garden-task-composer {
     padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
@@ -557,7 +557,7 @@
     min-height: 40px;
   }
   .garden-shell .management-heading h1 {
-    font-size: 30px;
+    font-size: 32px;
   }
 }
 
@@ -763,7 +763,7 @@
     padding-inline: 5px;
   }
   .project-space-header .project-space-title h1 {
-    font-size: 17px;
+    font-size: 16px;
   }
   .project-space-header .project-conversation-switcher {
     max-width: 100%;

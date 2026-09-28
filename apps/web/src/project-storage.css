@@ -20,12 +20,12 @@
   justify-self: start;
 }
 .project-storage-body > button[aria-disabled='true'] {
-  opacity: 0.55;
+  color: var(--muted);
   cursor: progress;
 }
 .project-storage-scope > summary {
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 16px;
 }
 .project-storage-scope p {
   margin: 0.65rem 0 0;
@@ -37,11 +37,11 @@
   margin: 0;
 }
 .project-storage-metrics dt {
-  font-size: 0.85rem;
+  font-size: 16px;
 }
 .project-storage-metrics dd {
   margin: 0.35rem 0 0;
-  font-size: 1.25rem;
+  font-size: 24px;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }

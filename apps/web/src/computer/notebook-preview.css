@@ -19,7 +19,7 @@
   margin: 0;
 }
 .notebook-note {
-  font-size: 0.85rem;
+  font-size: 16px;
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
@@ -32,7 +32,7 @@
   overflow-wrap: anywhere;
 }
 .notebook-cell > header {
-  font-size: 0.8rem;
+  font-size: 16px;
   margin-bottom: 0.8rem;
 }
 .notebook-text {
@@ -45,7 +45,7 @@
   padding: 0.8rem;
   border-radius: 0;
   background: var(--lcd-texture), var(--panel);
-  font-size: 0.8rem;
+  font-size: 16px;
   line-height: 1.6;
   max-height: 32rem;
   overflow: auto;
@@ -55,7 +55,7 @@
 }
 .notebook-text p,
 .notebook-pages {
-  font-size: 0.8rem;
+  font-size: 16px;
 }
 .notebook-output {
   padding-top: 0.8rem;
@@ -63,11 +63,11 @@
   border-top: 1px solid var(--line);
 }
 .notebook-empty {
-  font-size: 0.8rem;
+  font-size: 16px;
 }
 .notebook-cell details {
   margin-top: 0.65rem;
-  font-size: 0.8rem;
+  font-size: 16px;
 }
 .notebook-cell summary {
   cursor: pointer;
@@ -127,7 +127,7 @@
   min-width: 0;
   resize: vertical;
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: 16px;
   line-height: 1.6;
   tab-size: 4;
 }
@@ -135,7 +135,7 @@
   padding: 0.65rem 0.8rem;
   border-left: 3px solid var(--muted);
   background: var(--lcd-texture), var(--panel);
-  font-size: 0.85rem;
+  font-size: 16px;
 }
 .notebook-editor .row {
   flex-wrap: wrap;

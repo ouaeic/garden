@@ -29,14 +29,14 @@
   display: grid;
   gap: 0.2rem;
   padding: 0.7rem 0.85rem;
-  border: 1px solid var(--line, color-mix(in srgb, var(--text) 25%, transparent));
+  border: 1px solid var(--line);
   border-radius: 0;
   overflow-wrap: anywhere;
   min-width: 0;
   color: inherit;
 }
 .message-attachment-list small {
-  opacity: 0.7;
+  color: var(--muted);
 }
 .garden-preview-live {
   position: relative;
@@ -52,18 +52,18 @@
 }
 .garden-work-surface > h2 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 24px;
 }
 .garden-work-block {
   min-width: 0;
-  border: 1px solid var(--line, color-mix(in srgb, var(--text) 25%, transparent));
+  border: 1px solid var(--line);
   border-radius: 0;
   padding: 1.15rem;
   background: var(--lcd-texture), var(--panel);
 }
 .garden-work-block h3 {
   margin: 0 0 0.9rem;
-  font-size: 1.05rem;
+  font-size: 16px;
 }
 .garden-work-block h4 {
   margin: 0.35rem 0;
@@ -85,7 +85,7 @@
   padding-left: 1.1rem;
 }
 .garden-block-sections small {
-  font-size: 0.75rem;
+  font-size: 16px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -102,7 +102,7 @@
 .garden-block-table td {
   padding: 0.7rem;
   vertical-align: top;
-  border-bottom: 1px solid var(--line, color-mix(in srgb, var(--text) 25%, transparent));
+  border-bottom: 1px solid var(--line);
   min-width: 6rem;
   overflow-wrap: anywhere;
 }
@@ -113,7 +113,7 @@
   margin-top: 0.35rem;
 }
 .garden-block-evidence .button {
-  font-size: 0.72rem;
+  font-size: 16px;
   padding: 0.3rem 0.5rem;
 }
 .garden-block-checklist {
@@ -128,7 +128,7 @@
 }
 .garden-check-state {
   flex: 0 0 4rem;
-  font-size: 0.72rem;
+  font-size: 16px;
   padding-top: 0.2rem;
   text-transform: uppercase;
 }
@@ -147,7 +147,7 @@
 }
 .garden-chart-bar-track {
   height: 1rem;
-  background: var(--line, color-mix(in srgb, var(--text) 13%, transparent));
+  background: var(--line);
 }
 .garden-chart-bar-track i {
   display: block;
@@ -185,7 +185,7 @@
   margin: 0.5rem 0 1.25rem;
 }
 .garden-direction {
-  border: 1px solid var(--line, color-mix(in srgb, var(--text) 25%, transparent));
+  border: 1px solid var(--line);
   border-radius: 0;
   padding: 0.85rem 1rem;
 }
@@ -197,13 +197,13 @@
 }
 .garden-direction p {
   margin: 0.45rem 0;
-  font-size: 0.85rem;
+  font-size: 16px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   line-height: 1.6;
 }
 .garden-direction .garden-acknowledgment {
-  border-top: 1px solid var(--line, color-mix(in srgb, var(--text) 25%, transparent));
+  border-top: 1px solid var(--line);
   padding-top: 0.5rem;
 }
 .garden-acknowledgment > small {
@@ -217,7 +217,7 @@
  */
 .garden-direction-history > summary {
   cursor: pointer;
-  font-size: 0.82rem;
+  font-size: 16px;
   color: var(--muted);
   padding: 0.35rem 0;
   list-style: none;
@@ -248,7 +248,7 @@
   white-space: nowrap;
 }
 .garden-prior-direction p {
-  font-size: 0.8rem;
+  font-size: 16px;
   margin: 0.3rem 0;
   overflow-wrap: anywhere;
 }
@@ -307,7 +307,7 @@
 }
 .work-summary-visual h2 {
   margin: 0;
-  font-size: 22px;
+  font-size: 24px;
 }
 .work-summary-visual .muted,
 .work-summary-visual figcaption {

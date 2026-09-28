@@ -31,7 +31,7 @@
   padding: 7px 10px;
 }
 .garden-masthead .brand {
-  font-size: 34px;
+  font-size: 32px;
   letter-spacing: 0;
   color: var(--text);
   line-height: 1;
@@ -51,9 +51,9 @@
   align-items: center;
   gap: 4px;
   padding: 5px 7px;
-  border: 1px solid color-mix(in srgb, var(--text) 16%, transparent);
+  border: 1px solid var(--line);
   border-radius: 0;
-  background: color-mix(in srgb, var(--text) 5%, transparent);
+  background: var(--raised-fill);
 }
 .garden-work-heading h1,
 .garden-output-header h2,
@@ -77,7 +77,7 @@
 }
 .garden-main-navigation .selected {
   color: var(--text);
-  background: var(--lcd-texture), var(--raised);
+  background: var(--raised-fill);
 }
 .garden-masthead-end {
   display: flex;
@@ -139,7 +139,7 @@
   border-radius: 0;
 }
 .garden-sidebar-home.selected {
-  background: var(--lcd-texture), var(--raised);
+  background: var(--raised-fill);
   color: var(--text);
 }
 .garden-sidebar-home > span {
@@ -186,7 +186,7 @@
   min-width: 0;
 }
 .garden-project-list > button:hover {
-  background-color: color-mix(in srgb, var(--text) 3%, transparent);
+  background: var(--raised-fill);
 }
 .garden-project-list > button[aria-current] {
   background: var(--lcd-texture-inverse), var(--paper);
@@ -220,7 +220,7 @@
     button:is(:hover, :focus-visible)
     .garden-project-title[data-overflow='true']
     strong {
-    animation: garden-title-reveal var(--title-duration) linear 0.8s infinite alternate;
+    animation: garden-title-reveal var(--title-duration) steps(40, end) 0.8s infinite alternate;
   }
 }
 @keyframes garden-title-reveal {
@@ -312,7 +312,7 @@
 }
 .garden-work-card:hover {
   border-color: var(--line-strong);
-  background: var(--lcd-texture), var(--raised);
+  background: var(--raised-fill);
 }
 .garden-work-card .card-top {
   padding: 0;
@@ -322,7 +322,7 @@
   margin-top: auto;
 }
 .garden-work-card .card-bottom h2 {
-  font-size: 23px;
+  font-size: 24px;
   margin: 22px 0 20px;
   line-height: 1.25;
 }
@@ -376,7 +376,7 @@
   min-width: 0;
 }
 .garden-work-heading h1 {
-  font-size: clamp(29px, 2.7vw, 42px);
+  font-size: 32px;
   margin: 8px 0 14px;
   max-width: 880px;
   text-wrap: balance;
@@ -437,7 +437,7 @@
 }
 .garden-working-note h2 {
   margin: 15px 0;
-  font-size: 29px;
+  font-size: 32px;
 }
 .garden-working-note p {
   color: var(--muted);
@@ -465,7 +465,7 @@
   white-space: normal;
 }
 .garden-task .completion-record.needs-review {
-  border-color: color-mix(in srgb, var(--text) 42%, transparent);
+  border-color: var(--muted);
 }
 .garden-task .work-tools {
   margin: 0 0 12px;
@@ -538,7 +538,7 @@
   border-bottom: 1px solid var(--line);
 }
 .garden-output-header h2 {
-  font-size: 25px;
+  font-size: 24px;
   margin: 7px 0 0;
   overflow-wrap: anywhere;
 }
@@ -685,7 +685,7 @@
 }
 .garden-now {
   padding: 13px 15px;
-  background: color-mix(in srgb, var(--text) 4%, transparent);
+  background: var(--raised-fill);
   border: 1px solid var(--line);
   border-radius: 0;
   margin-bottom: 20px;
@@ -699,13 +699,13 @@
    together, so the panel keeps one lead element whichever state it is in. */
 .garden-outcome {
   padding: 13px 15px;
-  background: color-mix(in srgb, var(--text) 4%, transparent);
+  background: var(--raised-fill);
   border: 1px solid var(--line-strong);
   border-radius: 0;
   margin-bottom: 20px;
 }
 .garden-outcome-summary {
-  font-size: 12.5px;
+  font-size: 16px;
   line-height: 1.65;
   margin: 8px 0 6px;
 }
@@ -719,7 +719,7 @@
   padding: 0;
   display: grid;
   gap: 5px;
-  font-size: 11.5px;
+  font-size: 16px;
   line-height: 1.6;
   color: var(--muted);
 }
@@ -791,7 +791,7 @@
   padding-top: 2px;
 }
 .garden-phases [data-status='completed'] .garden-phase-dot {
-  background: color-mix(in srgb, var(--text) 9%, transparent);
+  background: var(--raised-fill);
   color: var(--accent);
 }
 .garden-phases [data-status='in_progress'] button {
@@ -871,12 +871,12 @@
 }
 .garden-phase-history .garden-phases {
   margin-top: 8px;
-  opacity: 0.72;
+  color: var(--muted);
 }
 .garden-subphases .garden-phase-dot {
   width: 14px;
   height: 14px;
-  font-size: 7px;
+  font-size: 16px;
 }
 .garden-subphases [data-status='completed'] {
   color: var(--accent);
@@ -1020,7 +1020,7 @@
     gap: 8px;
   }
   .garden-masthead .brand {
-    font-size: 31px;
+    font-size: 32px;
   }
   .garden-masthead .button {
     min-width: 34px;
@@ -1059,7 +1059,7 @@
     position: fixed;
     inset: calc(60px + env(safe-area-inset-top, 0px)) 0 0;
     z-index: 35;
-    background: color-mix(in srgb, var(--text) 40%, transparent);
+    background: var(--veil);
     border: 0;
   }
   .garden-sidebar-close {
@@ -1080,7 +1080,7 @@
     gap: 10px;
   }
   .garden-work-heading h1 {
-    font-size: 29px;
+    font-size: 32px;
     margin-bottom: 14px;
     text-wrap: initial;
   }
@@ -1111,7 +1111,7 @@
     font-size: 16px;
   }
   .garden-output-header h2 {
-    font-size: 23px;
+    font-size: 24px;
   }
   .garden-output-actions {
     padding: 13px 14px;
@@ -1185,7 +1185,7 @@
   flex-shrink: 0;
 }
 .model-picker-trigger:hover {
-  background: var(--lcd-texture), var(--raised);
+  background: var(--raised-fill);
 }
 .garden-sidebar-theme {
   font-size: 16px;
@@ -1206,7 +1206,7 @@
   background: var(--lcd-texture), var(--panel);
 }
 .garden-media-job h3 {
-  font-size: 23px;
+  font-size: 24px;
   margin-block: 16px;
 }
 .garden-media-job video {
@@ -1341,7 +1341,7 @@
   width: 10px;
   height: 10px;
   border-radius: 0;
-  background: var(--lcd-texture), var(--raised);
+  background: var(--raised-fill);
   border: 1px solid var(--muted);
   box-shadow: var(--surface-shadow);
 }
@@ -1360,7 +1360,7 @@
 .garden-trace-point small {
   position: absolute;
   top: calc(50% + 12px);
-  font-size: 8px;
+  font-size: 16px;
   color: var(--dim);
   background: var(--lcd-texture), var(--panel);
   line-height: 1;
@@ -1502,7 +1502,7 @@
 .garden-mission-diff {
   max-height: 55dvh;
   overflow: auto;
-  font-size: 0.8rem;
+  font-size: 16px;
   line-height: 1.6;
   padding: 1rem;
   background: var(--lcd-texture), var(--bg);
@@ -1519,7 +1519,7 @@
 }
 .garden-device-code {
   font-family: var(--font-mono);
-  font-size: clamp(1.7rem, 6vw, 2.6rem);
+  font-size: 32px;
   letter-spacing: 0.18em;
   padding: 1rem 0;
   color: var(--primary);
@@ -1561,7 +1561,7 @@
   padding: 16px;
   border: 1px solid var(--line-strong);
   border-radius: 0;
-  background: var(--lcd-texture), var(--raised);
+  background: var(--raised-fill);
   overflow-wrap: anywhere;
 }
 .garden-voice-active meter {
@@ -1623,7 +1623,7 @@
   border-radius: 0;
   border: 1px solid var(--line-strong);
   color: var(--muted);
-  background: color-mix(in srgb, var(--raised) 40%, transparent);
+  background: var(--raised-fill);
 }
 .garden-compose-prompt span {
   margin-left: auto;
@@ -1645,7 +1645,7 @@
   margin-bottom: 12px;
   border: 1px solid var(--line-strong);
   border-radius: 0;
-  background: var(--lcd-texture), var(--raised);
+  background: var(--raised-fill);
 }
 .draft-conflict pre {
   max-height: 180px;

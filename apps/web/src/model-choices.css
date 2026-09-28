@@ -91,7 +91,7 @@
   overflow-wrap: anywhere;
 }
 .model-browser-option[data-active='true'] {
-  background: var(--lcd-texture), var(--raised);
+  background: var(--raised-fill);
   border-color: var(--line-strong);
 }
 .model-browser-option[aria-selected='true'] {
@@ -239,7 +239,7 @@
   font: inherit;
 }
 .prompt-model-row > button:hover {
-  background: var(--lcd-texture), var(--raised);
+  background: var(--raised-fill);
 }
 .prompt-model-role-value {
   color: var(--muted);
@@ -289,7 +289,7 @@
 }
 .prompt-model-editor-heading h3 {
   margin: 0;
-  font-size: 20px;
+  font-size: 24px;
 }
 .prompt-model-editor-heading p {
   margin: 3px 0 0;

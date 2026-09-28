@@ -27,7 +27,7 @@ button:hover {
   background: var(--lcd-texture), var(--panel);
 }
 button:disabled {
-  opacity: 0.55;
+  color: var(--muted);
   cursor: wait;
 }
 button:focus-visible,
@@ -76,7 +76,7 @@ p {
   text-decoration: none;
 }
 .share-wordmark span {
-  font-size: 25px;
+  font-size: 24px;
 }
 .share-heading {
   padding: 72px 0 40px;
@@ -91,9 +91,9 @@ p {
 }
 .share-heading h1 {
   font-family: var(--font-display);
-  font-size: clamp(36px, 6vw, 68px);
+  font-size: 48px;
   line-height: 1.08;
-  letter-spacing: -0.05em;
+  letter-spacing: 0;
   font-weight: 400;
   margin: 0;
   text-wrap: balance;
@@ -131,16 +131,16 @@ details[open] > summary {
   line-height: 1.3;
   margin: 1.7em 0 0.7em;
   font-weight: 550;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 .shared-prose h1 {
-  font-size: 1.85em;
+  font-size: 32px;
 }
 .shared-prose h2 {
-  font-size: 1.5em;
+  font-size: 24px;
 }
 .shared-prose h3 {
-  font-size: 1.18em;
+  font-size: 16px;
 }
 .shared-prose p {
   margin-bottom: 1.2em;
@@ -150,7 +150,7 @@ details[open] > summary {
   padding-left: 24px;
   border-left: 2px solid var(--muted);
   font-family: var(--font-display);
-  font-size: 1.1em;
+  font-size: 16px;
 }
 .shared-prose pre,
 .shared-file-preview pre {
@@ -165,7 +165,7 @@ details[open] > summary {
 }
 .shared-prose code {
   font-family: var(--font-mono);
-  font-size: 0.86em;
+  font-size: 16px;
 }
 .shared-prose :not(pre) > code {
   background: var(--lcd-texture), var(--panel);
@@ -205,8 +205,8 @@ details[open] > summary {
 }
 .share-files h2 {
   font-family: var(--font-display);
-  font-size: 28px;
-  letter-spacing: -0.03em;
+  font-size: 32px;
+  letter-spacing: 0;
   font-weight: 400;
   margin-bottom: 26px;
 }
@@ -311,16 +311,16 @@ details[open] > summary {
 }
 .share-orbit {
   display: block;
-  font-size: 55px;
+  font-size: 48px;
   font-weight: 200;
   margin-bottom: 30px;
-  animation: unfold 1.8s ease both;
+  animation: unfold 1.2s steps(6, end) both;
 }
 .share-state h1 {
   font-family: var(--font-display);
-  font-size: 36px;
+  font-size: 40px;
   font-weight: 400;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
 }
 .share-state p {
   line-height: 1.7;
@@ -352,7 +352,7 @@ details[open] > summary {
     padding: 47px 0 30px;
   }
   .share-heading h1 {
-    font-size: 41px;
+    font-size: 40px;
   }
   .shared-prose {
     font-size: 16px;
@@ -384,7 +384,7 @@ details[open] > summary {
     padding: 85px 0 110px;
   }
   .share-state h1 {
-    font-size: 31px;
+    font-size: 32px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -418,7 +418,7 @@ details[open] > summary {
     padding: 30px 0;
   }
   .share-heading h1 {
-    font-size: 36px;
+    font-size: 40px;
   }
   .share-record,
   .shared-file-actions button,

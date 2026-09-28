@@ -200,7 +200,7 @@ export const shortDate = (value: string): string =>
 /**
  * How long a run has been going, or took, for the owner to glance at. `from`/`to` are ISO
  * timestamps; a `to` of undefined means the clock is still running. Under an hour reads as
- * minutes, past it as hours and the remaining minutes.
+ * minutes, past it as hours and the remaining minutes, and past two days as days.
  */
 export const duration = (from: string, to?: string | null): string => {
   const start = Date.parse(from);
@@ -210,7 +210,9 @@ export const duration = (from: string, to?: string | null): string => {
   const totalMinutes = Math.floor(totalMs / 60_000);
   if (totalMinutes < 1) return `${Math.floor(totalMs / 1000)}s`;
   if (totalMinutes < 60) return `${totalMinutes}m`;
-  return `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
+  if (totalMinutes < 48 * 60) return `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
+  const days = Math.floor(totalMinutes / (24 * 60));
+  return `${days} days`;
 };
 export function lastEvent(events: TaskEvent[], kind: TaskEvent['kind']): TaskEvent | undefined {
   return [...events].reverse().find((event) => event.kind === kind);

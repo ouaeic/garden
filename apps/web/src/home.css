@@ -1,0 +1,97 @@
+.desk-home {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  align-content: start;
+  gap: 24px;
+  padding: 24px clamp(16px, 3vw, 44px) 48px;
+}
+.desk-home .desk-start-card {
+  border: 1px solid var(--text);
+  background: var(--lcd-texture), var(--bg);
+  box-shadow: 4px 4px 0 var(--tint);
+  padding: 8px;
+}
+.desk-home .desk-start-card .intent-editor {
+  border: 0;
+  box-shadow: none;
+}
+.desk-home .desk-start-card .intent-editor > textarea {
+  min-height: 72px;
+}
+.home-lists {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+.home-card {
+  min-height: 0;
+}
+.home-card-list {
+  display: grid;
+  padding: 4px 0;
+}
+.home-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+.home-row:last-child {
+  border-bottom: 0;
+}
+.home-row:hover,
+.home-row:focus-visible {
+  background: var(--raised-fill);
+}
+.home-row > span {
+  display: grid;
+  min-width: 0;
+}
+.home-row strong,
+.home-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 400;
+}
+.home-row small,
+.home-row time {
+  color: var(--muted);
+}
+.home-quiet {
+  margin: 0;
+  padding: 16px;
+  color: var(--muted);
+}
+.home-card > .button {
+  margin: 16px;
+}
+@media (max-width: 1100px) {
+  .home-lists {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .home-lists > .desk-recent {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 700px) {
+  .desk-home {
+    gap: 16px;
+    padding: 16px 12px 32px;
+  }
+  .home-lists {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+}

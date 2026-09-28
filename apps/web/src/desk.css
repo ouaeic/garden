@@ -34,7 +34,7 @@ body:has(.desk-shell),
 }
 .desk-navigation .button[aria-expanded='true'] {
   color: var(--text);
-  background: var(--lcd-texture), var(--raised);
+  background: var(--raised-fill);
 }
 .desk-shell .garden-masthead-end {
   gap: 5px;
@@ -109,17 +109,7 @@ body:has(.desk-shell),
 .desk-card-scroll > .scroll-region-content {
   min-height: 0;
 }
-.desk-empty-state {
-  padding: 14px 0;
-  font-size: 16px;
-  line-height: 1.6;
-  margin: 0;
-}
-.desk-empty-state p {
-  margin: 0 0 6px;
-}
 .desk-project-row,
-.desk-action-row,
 .desk-update-row,
 .desk-file-row {
   width: 100%;
@@ -132,13 +122,11 @@ body:has(.desk-shell),
   min-width: 0;
 }
 .desk-project-row:hover,
-.desk-action-row:hover,
 .desk-update-row:hover,
 .desk-file-row:hover {
-  background: var(--lcd-texture), var(--raised);
+  background: var(--raised-fill);
 }
 .desk-project-row:last-child,
-.desk-action-row:last-child,
 .desk-update-row:last-child,
 .desk-file-row:last-child {
   border-bottom: 0;
@@ -148,10 +136,6 @@ body:has(.desk-shell),
   align-items: center;
   gap: 14px;
   padding: 13px 8px;
-}
-.desk-project-row > .desk-project-copy {
-  flex: 1;
-  min-width: 0;
 }
 .desk-project-row strong {
   display: block;
@@ -223,260 +207,16 @@ body:has(.desk-shell),
   color: var(--muted);
   flex-shrink: 0;
 }
-
-.desk-home {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  grid-template-rows: minmax(112px, max-content) minmax(160px, min(320px, 36dvh)) minmax(70px, 1fr);
-  gap: clamp(18px, 2.8vh, 30px);
-  padding: clamp(20px, 3.6vh, 36px) clamp(24px, 4vw, 64px) 28px;
-}
-.desk-home-intro,
-.desk-home-middle,
-.desk-home-bottom {
-  min-width: 0;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: clamp(18px, 3vw, 38px);
-}
-.desk-home-intro {
-  grid-column: 1 / -1;
-  align-items: center;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.25fr);
-}
-.desk-home-intro header {
-  min-width: 0;
-}
-.desk-home h1 {
-  font-size: clamp(32px, 3.3vw, 48px);
-  line-height: 1.12;
-  letter-spacing: 0;
-  margin: 10px 0 12px;
-}
-.desk-home-intro header p {
-  font-size: 16px;
-  margin: 0;
-}
-.desk-start-card {
-  min-width: 0;
-  min-height: 0;
-  max-height: min(240px, 30dvh);
-  display: flex;
-  border: 1px solid var(--line);
-  border-radius: 0;
-  background: var(--lcd-texture), var(--panel);
-  box-shadow: var(--surface-shadow);
-}
-.desk-shell .desk-start-card .desk-card-scroll {
-  padding: 0;
-  flex: 1 1 auto;
-}
-.desk-start-card .intent-editor {
-  border: 0;
-  background: transparent;
-  margin: 0;
-  padding: 15px 18px;
-  border-radius: 0;
-  box-shadow: none;
-}
-.desk-start-card .intent-editor > textarea {
-  min-height: 42px;
-  max-height: 20dvh;
-  font-size: 16px;
-  padding: 4px 0;
-}
-.desk-start-card .setup-note {
-  padding: 12px;
-  margin: 0;
-  font-size: 16px;
-}
-.desk-start-card .setup-note h3 {
-  font-size: 16px;
-}
-.desk-home-middle {
-  display: contents;
-}
-.desk-home-bottom {
-  display: contents;
-}
-.desk-home-attention {
-  grid-column: 2;
-  grid-row: 2 / 4;
-}
-.desk-recent {
-  grid-column: 1;
-  grid-row: 3;
-}
-.desk-resume-card,
-.desk-empty-card {
-  grid-column: 1;
-  grid-row: 2;
-  position: relative;
-  isolation: isolate;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  border-radius: 0;
-  border: 1px solid var(--line-strong);
-  box-shadow: var(--surface-shadow);
-  display: flex;
-  flex-direction: column;
-  padding: clamp(20px, 2.8vh, 32px);
-  color: var(--text);
-}
-.desk-resume-card .desk-card-scroll {
-  padding: 0;
-  flex: 1;
-}
-.desk-resume-card h2 {
-  font-size: clamp(26px, 2.65vw, 38px);
-  max-width: 21ch;
-  letter-spacing: 0;
-  margin: 12px 0 10px;
-  line-height: 1.2;
-  overflow-wrap: anywhere;
-}
-.desk-resume-card .eyebrow,
-.desk-resume-card p,
-.desk-resume-status {
-  color: var(--text);
-}
-.desk-resume-card p {
-  font-size: 16px;
-  line-height: 1.55;
-  margin: 0 0 9px;
-  max-width: 60ch;
-}
-.desk-resume-status {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 16px;
-  margin-top: 10px;
-}
-.desk-resume-card > .desk-resume-open {
-  justify-content: space-between;
-  align-self: stretch;
-  flex-shrink: 0;
-  margin-top: 12px;
-  padding: 10px 0 0;
-  border: 0;
-  border-top: 1px solid color-mix(in srgb, var(--text) 15%, transparent);
-  border-radius: 0;
-  background: transparent;
-  color: inherit;
-  font-size: 16px;
-}
-.desk-resume-arrow {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid color-mix(in srgb, var(--text) 19%, transparent);
-  border-radius: 0;
-  background: color-mix(in srgb, var(--text) 5%, transparent);
-  transition:
-    background 180ms,
-    transform 180ms;
-}
-.desk-resume-open:hover .desk-resume-arrow {
-  background-color: color-mix(in srgb, var(--text) 13%, transparent);
-  transform: translateX(3px);
-}
-.desk-resume-eyebrow {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-.desk-seed {
-  width: 12px;
-  height: 16px;
-  border: 1px solid currentColor;
-  border-radius: 0;
-  transform: none;
-  background: var(--lcd-texture-inverse), currentColor;
-  clip-path: polygon(
-    0 25%,
-    25% 25%,
-    25% 0,
-    75% 0,
-    75% 25%,
-    100% 25%,
-    100% 75%,
-    75% 75%,
-    75% 100%,
-    25% 100%,
-    25% 75%,
-    0 75%
-  );
-  opacity: 1;
-}
-.desk-home-intro h1 em {
-  font-weight: inherit;
-  color: var(--accent);
-}
-.desk-home-attention {
-  padding: 20px 22px 8px;
-}
-.desk-home-bottom .desk-card {
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-}
-.desk-home-attention .desk-card-heading,
-.desk-home-bottom .desk-card-heading {
-  padding: 0 0 14px;
-}
-.desk-home .desk-card-heading h2 {
-  font-family: var(--font-display);
-  font-size: 23px;
-  font-weight: 400;
-}
-.desk-home-attention .desk-card-scroll,
-.desk-home-bottom .desk-card-scroll {
-  padding: 0;
-}
-.desk-project-icon {
-  width: 40px;
-  height: 40px;
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  border-radius: 0;
-  background: var(--lcd-texture), linear-gradient(145deg, var(--raised), var(--panel));
-  border: 1px solid var(--line);
-  color: var(--accent);
-  box-shadow: var(--surface-shadow);
-}
 .desk-update-row > .garden-project-dot {
   margin-top: 7px;
 }
-.desk-update-row > svg,
-.desk-action-row > svg {
+.desk-update-row > svg {
   color: var(--muted);
   margin-top: 3px;
-}
-.desk-action-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 0;
 }
 .desk-action-copy {
   flex: 1;
   min-width: 0;
-}
-.desk-action-row strong {
-  display: block;
-  font-size: 16px;
-  margin: 0;
-  font-weight: 500;
 }
 .desk-action-copy > span {
   display: -webkit-box;
@@ -491,30 +231,6 @@ body:has(.desk-shell),
 .desk-action-copy > .desk-action-status {
   color: var(--accent);
   font-size: 16px;
-}
-.desk-home-switcher {
-  display: none;
-}
-.desk-empty-card {
-  justify-content: center;
-}
-.desk-empty-card h2 {
-  margin: 0 0 12px;
-  font-size: clamp(24px, 3vw, 38px);
-}
-.desk-empty-card p {
-  color: var(--text);
-  font-size: 16px;
-  max-width: 50ch;
-}
-.desk-home.is-empty {
-  grid-template-rows: minmax(112px, max-content) minmax(130px, 1fr);
-}
-.desk-home.is-empty .desk-home-attention {
-  grid-row: 2;
-}
-.desk-home.is-empty .desk-home-bottom {
-  display: none;
 }
 
 .garden-shell.desk-shell .desk-project {
@@ -540,7 +256,7 @@ body:has(.desk-shell),
   min-width: 0;
 }
 .desk-shell .desk-project .project-space-title h1 {
-  font-size: 28px;
+  font-size: 32px;
   line-height: 1.2;
   margin: 0;
   display: block;
@@ -1006,7 +722,7 @@ body:has(.desk-shell),
 }
 .desk-shell .is-fitted .garden-output-header h2 {
   margin: 0;
-  font-size: 17px;
+  font-size: 16px;
   overflow-wrap: anywhere;
 }
 .desk-shell .is-fitted .garden-output-header > svg {
@@ -1051,7 +767,7 @@ body:has(.desk-shell),
   padding: 18px;
   border: 1px solid var(--line);
   border-radius: 0;
-  background: var(--lcd-texture), var(--raised);
+  background: var(--raised-fill);
   color: var(--accent);
 }
 .garden-preview-placeholder strong {
@@ -1167,7 +883,7 @@ body:has(.desk-shell),
   min-width: 0;
 }
 .desk-message.owner-message {
-  background: var(--lcd-texture), var(--raised);
+  background: var(--raised-fill);
 }
 .desk-message header {
   display: flex;
@@ -1199,7 +915,7 @@ body:has(.desk-shell),
   margin: 0 0 20px;
 }
 .desk-project-index .management-heading h1 {
-  font-size: 30px;
+  font-size: 32px;
   margin: 0;
 }
 .desk-project-index .work-filter {
@@ -1266,7 +982,7 @@ body:has(.desk-shell),
   margin-bottom: 16px;
 }
 .desk-shell .management-heading h1 {
-  font-size: 30px;
+  font-size: 32px;
   margin: 3px 0 7px;
 }
 .desk-shell .management-heading .eyebrow {
@@ -1346,101 +1062,7 @@ body:has(.desk-shell),
     margin-right: 0;
   }
   .desk-shell .garden-masthead .brand {
-    font-size: 29px;
-  }
-  .desk-home {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-    gap: 12px;
-    padding: 14px;
-  }
-  .desk-home-intro,
-  .desk-home-middle,
-  .desk-home-bottom {
-    display: contents;
-  }
-  .desk-home-intro > header,
-  .desk-home .desk-empty-card {
-    display: none;
-  }
-  .desk-home-switcher {
-    display: flex;
-    gap: 4px;
-    min-width: 0;
-    overflow-x: auto;
-    grid-row: 1;
-    scrollbar-width: thin;
-  }
-  .desk-home-switcher .button {
-    border: 0;
-    background: transparent;
-    font-size: 16px;
-    padding: 8px 10px;
-    min-height: 34px;
-    white-space: nowrap;
-  }
-  .desk-home-switcher .button[aria-pressed='true'] {
-    background: var(--lcd-texture-inverse), var(--paper);
-    color: var(--ink);
-    --muted: var(--ink);
-    --dim: var(--ink);
-  }
-  .desk-home .desk-start-card,
-  .desk-home .desk-resume-card,
-  .desk-home .desk-home-attention,
-  .desk-home .desk-recent {
-    display: none;
-    grid-column: 1;
-    grid-row: 2;
-    min-height: 0;
-    height: 100%;
-    max-height: none;
-  }
-  .desk-home[data-home-panel='new'] .desk-start-card,
-  .desk-home[data-home-panel='continue'] .desk-resume-card,
-  .desk-home[data-home-panel='attention'] .desk-home-attention,
-  .desk-home[data-home-panel='recent'] .desk-recent {
-    display: flex;
-  }
-  .desk-start-card .intent-editor {
-    padding: 12px 14px;
-  }
-  .desk-home .desk-start-card {
-    align-self: start;
-    height: auto;
-    max-height: 100%;
-  }
-  .desk-home.is-empty {
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-  .desk-home.is-empty .desk-home-bottom {
-    display: contents;
-  }
-  .desk-home .desk-home-attention,
-  .desk-home .desk-recent {
-    padding: 0;
-    border: 1px solid var(--line);
-    border-radius: 0;
-    background: var(--lcd-texture), var(--panel);
-  }
-  .desk-home .desk-card-heading {
-    padding: 13px 14px;
-  }
-  .desk-home .desk-card-scroll {
-    padding-inline: 14px;
-  }
-  .desk-home .desk-resume-card .desk-card-scroll {
-    padding: 0;
-  }
-  .desk-home .desk-resume-card {
-    padding: 24px;
-  }
-  .desk-home .desk-resume-card h2 {
     font-size: 32px;
-  }
-  .desk-home .desk-resume-card > .button {
-    margin-top: 20px;
   }
   .desk-shell .desk-project-index,
   .desk-shell .management-page {
@@ -1448,7 +1070,7 @@ body:has(.desk-shell),
   }
   .desk-project-index .management-heading h1,
   .desk-shell .management-heading h1 {
-    font-size: 25px;
+    font-size: 24px;
   }
   .desk-project-index .work-filter {
     gap: 10px;
@@ -1483,7 +1105,7 @@ body:has(.desk-shell),
     gap: 7px;
   }
   .desk-shell .desk-project .project-space-title h1 {
-    font-size: 20px;
+    font-size: 24px;
   }
   .desk-shell .project-conversation-switcher {
     display: flex;
@@ -1617,7 +1239,7 @@ html[data-workspace-short='true'] .desk-shell .management-heading p {
   width: min(600px, calc(100vw - 36px));
 }
 .desk-shell .desk-sheet::backdrop {
-  background: color-mix(in srgb, var(--text) 31%, transparent);
+  background: var(--veil);
   backdrop-filter: none;
 }
 .desk-sheet > .dialog-heading {
@@ -1626,7 +1248,7 @@ html[data-workspace-short='true'] .desk-shell .management-heading p {
   position: static;
 }
 .desk-sheet > .dialog-heading h2 {
-  font-size: 28px;
+  font-size: 32px;
 }
 .desk-sheet > .dialog-body {
   flex: 1;
@@ -1727,7 +1349,7 @@ html[data-workspace-short='true'] .desk-shell .management-heading p {
     padding: 9px 14px;
   }
   .desk-sheet > .dialog-heading h2 {
-    font-size: 21px;
+    font-size: 24px;
   }
   .desk-shell .desk-sheet .management-page,
   .desk-shell .desk-sheet .desk-project-index {
@@ -1737,22 +1359,16 @@ html[data-workspace-short='true'] .desk-shell .management-heading p {
 
 @media (prefers-reduced-motion: no-preference) {
   .desk-sheet[open] {
-    animation: desk-reveal 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    animation: desk-reveal 160ms steps(4, end);
   }
   @keyframes desk-reveal {
+    /* A window wipes down the screen in whole rows; it never fades. */
     from {
-      opacity: 0;
-      transform: translateY(6px);
+      clip-path: inset(0 0 100% 0);
     }
     to {
-      opacity: 1;
-      transform: translateY(0);
+      clip-path: inset(0);
     }
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .desk-resume-arrow {
-    transition: none;
   }
 }
 
@@ -1783,7 +1399,7 @@ html[data-workspace-short='true'] .desk-shell .management-heading p {
   gap: 12px;
 }
 .project-panel > .dialog-heading h2 {
-  font-size: 22px;
+  font-size: 24px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;

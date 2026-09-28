@@ -1,17 +1,19 @@
-import { storedDisplayMode } from './appearance';
+import { storedDisplayMode, storedPalette } from './appearance';
 import { recoverDeviceDrafts, forgetDraftKey } from './draft-storage';
 import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   ArrowUpRight,
   Bell,
-  FolderOpen,
-  LibraryBig,
-  Sparkles,
   Clock3,
+  Cog,
+  FolderOpen,
+  House,
+  LibraryBig,
+  Monitor,
+  Sparkles,
   Plus,
-  Search,
-  Settings2
+  Search
 } from './icons';
 import type { Task, Workspace, Project, ConversationSource } from '@garden/contracts';
 import { get, ApiError, post, isNativeClient } from './client';
@@ -19,6 +21,8 @@ import type { NativeStatus } from './native';
 import { createTaskNotifier } from './native-notices';
 import { subscribeWorkerNavigation } from './worker-navigation';
 import Brand from './Brand';
+import { Sprite } from './life/Sprite';
+import { bellBird } from './life/growth';
 import Stats from './Stats';
 import './living-interface.css';
 import { fileNavigationBlocked } from './file-navigation';
@@ -33,8 +37,11 @@ import './styles.css';
 import './garden.css';
 import './workspace-interface.css';
 import './desk.css';
+import './pixel.css';
+import './shell.css';
 import { useWorkspaceViewport } from './use-workspace-viewport';
 const DeskHome = lazy(() => import('./DeskHome'));
+const GardenLife = lazy(() => import('./life/GardenLife'));
 import { setSurfaceLocation, sheetHistoryDepth } from './surface-location';
 const Composer = lazy(() => import('./Composer'));
 const TaskSurface = lazy(() => import('./TaskSurface'));
@@ -103,6 +110,7 @@ function WorkspaceApp() {
     values: Record<string, Workspace>;
   }>({ ownerId: '', values: {} });
   const [theme, setTheme] = useState(storedDisplayMode);
+  const [palette, setPalette] = useState(storedPalette);
   const [newWork, setNewWork] = useState(false);
   const [newConversation, setNewConversation] = useState<{
     project: Project;
@@ -124,6 +132,18 @@ function WorkspaceApp() {
   const bootstrapRef = useRef(bootstrap);
   const taskNotifier = useRef(createTaskNotifier());
   bootstrapRef.current = bootstrap;
+  const seenStatuses = useRef(new Map<string, Task['status']>());
+  useEffect(() => {
+    if (!bootstrap) return;
+    // A run that finishes while you watch makes the garden bloom; one found finished does not.
+    let bloomed = false;
+    for (const item of bootstrap.tasks) {
+      const before = seenStatuses.current.get(item.id);
+      if (before && before !== 'completed' && item.status === 'completed') bloomed = true;
+      seenStatuses.current.set(item.id, item.status);
+    }
+    if (bloomed) dispatchEvent(new Event('garden:bloom'));
+  }, [bootstrap?.tasks]);
   const refresh = useCallback(async () => {
     try {
       const result = await get<Bootstrap>('/v1/bootstrap');
@@ -231,6 +251,18 @@ function WorkspaceApp() {
     }, 15000);
     return () => clearInterval(timer);
   }, [Boolean(bootstrap), refresh, refreshDecisions]);
+  useEffect(() => {
+    if (palette === 'field') delete document.documentElement.dataset.palette;
+    else document.documentElement.dataset.palette = palette;
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', getComputedStyle(document.documentElement).backgroundColor);
+    try {
+      localStorage.setItem('garden-palette', palette);
+    } catch {
+      /* Appearance remains available without storage. */
+    }
+  }, [palette]);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
@@ -504,7 +536,7 @@ function WorkspaceApp() {
         <button
           className="brand-button"
           onClick={() => navigate('work')}
-          aria-label="garden · All work"
+          aria-label="garden · Home"
         >
           <Brand />
         </button>
@@ -512,14 +544,20 @@ function WorkspaceApp() {
           {(
             [
               ['projects', 'Projects', FolderOpen],
-              ['library', 'Library', LibraryBig]
+              ['library', 'Library', LibraryBig],
+              ['computer', 'Computer', Monitor],
+              ['automations', 'Automations', Clock3]
             ] as const
           ).map(([view, label, Icon]) => (
             <Button
               key={view}
               aria-label={label}
-              aria-haspopup="dialog"
-              aria-expanded={navigation.view === view}
+              {...(view === 'computer'
+                ? { 'aria-current': baseView === 'computer' ? ('page' as const) : undefined }
+                : {
+                    'aria-haspopup': 'dialog' as const,
+                    'aria-expanded': navigation.view === view
+                  })}
               onClick={() => navigate(view)}
             >
               <Icon size={17} />
@@ -527,11 +565,6 @@ function WorkspaceApp() {
             </Button>
           ))}
         </nav>
-        <Stats
-          bootstrap={bootstrap}
-          workspace={workspace}
-          onComputer={() => navigate('computer')}
-        />
         <div className="garden-masthead-end">
           <Button
             className="global-search"
@@ -539,15 +572,25 @@ function WorkspaceApp() {
             aria-label="Find anything"
           >
             <Search size={17} />
-            <span>Find anything</span>
-            <kbd>⌘ K</kbd>
+            <span>Find</span>
+            <kbd>⌘K</kbd>
           </Button>
+          <Stats
+            bootstrap={bootstrap}
+            workspace={workspace}
+            onComputer={() => navigate('computer')}
+          />
           <Button
-            className={navigation.view === 'attention' ? 'selected' : ''}
+            className={`masthead-bell ${navigation.view === 'attention' ? 'selected' : ''}`}
+            data-perch-bell
             onClick={() => navigate('attention')}
             aria-label={`${attentionCount} work items need attention`}
           >
-            <Bell size={18} />
+            {attentionCount > 0 ? (
+              <Sprite frames={bellBird} fps={0.6} className="bell-bird" />
+            ) : (
+              <Bell size={18} />
+            )}
             {attentionCount > 0 && <span className="notification-count">{attentionCount}</span>}
           </Button>
           <Button
@@ -556,7 +599,7 @@ function WorkspaceApp() {
             aria-expanded={navigation.view === 'settings'}
             onClick={() => navigate('settings')}
           >
-            <Settings2 size={17} />
+            <Cog size={18} />
           </Button>
         </div>
       </header>
@@ -730,6 +773,42 @@ function WorkspaceApp() {
           )}
         </Suspense>
       </main>
+      <nav className="phone-bar" aria-label="Sections">
+        {(
+          [
+            ['work', 'Home', House],
+            ['projects', 'Projects', FolderOpen],
+            ['attention', 'Needs you', Bell],
+            ['computer', 'Computer', Monitor],
+            ['library', 'Library', LibraryBig]
+          ] as const
+        ).map(([view, label, Icon]) => (
+          <button
+            type="button"
+            key={view}
+            aria-current={
+              (
+                view === 'work'
+                  ? navigation.view === 'work' && !navigation.taskId && !activeProjectId
+                  : navigation.view === view
+              )
+                ? 'page'
+                : undefined
+            }
+            onClick={() => navigate(view)}
+            {...(view === 'attention' ? { 'data-perch-bell': true } : {})}
+          >
+            <Icon size={20} />
+            <span>{label}</span>
+            {view === 'attention' && attentionCount > 0 && (
+              <span className="notification-count">{attentionCount}</span>
+            )}
+          </button>
+        ))}
+      </nav>
+      <Suspense fallback={null}>
+        <GardenLife />
+      </Suspense>
       {sheetTitle && (
         <Dialog
           title={sheetTitle}
@@ -846,6 +925,8 @@ function WorkspaceApp() {
                 onChange={requestRefresh}
                 theme={theme}
                 onThemeChange={setTheme}
+                palette={palette}
+                onPaletteChange={setPalette}
                 onComputer={() => navigate('computer')}
               />
             )}

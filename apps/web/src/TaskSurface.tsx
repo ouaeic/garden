@@ -60,6 +60,8 @@ import { currentWork } from './current-work';
 import { completionChecks, evidenceSource } from './completion-checks';
 import MessageAttachmentList from './MessageAttachmentList';
 import './presentation.css';
+import './conversation.css';
+import StatusSprite, { stageOf } from './life/StatusSprite';
 import { effortLabel } from './reasoning-options';
 import { resourceWaitReason } from './resource-wait';
 const ProjectNoteEditor = lazy(() =>
@@ -321,6 +323,36 @@ export default function TaskSurface({
    * growing after it stopped. A run still going has to track the wall clock, and the only state
    * that re-renders this on a tick is `clock` - so that branch reads it rather than Date.now().
    */
+  const conversationEvents = events.filter((event) =>
+    ['user_message', 'assistant_message', 'queued_message'].includes(event.kind)
+  );
+  const messageCount = conversationEvents.length;
+  const lastDirection = [...conversationEvents]
+    .reverse()
+    .find((event) => event.kind !== 'assistant_message');
+  const [attentionVisible, setAttentionVisible] = useState(false);
+  const hasAttention = taskDecisions.length > 0 || Boolean(question);
+  useEffect(() => {
+    // The jump to a request is only worth showing while the request itself is out of view.
+    if (!hasAttention) return;
+    const target = document.getElementById(`attention-${task.id}`);
+    if (!target) return;
+    const observer = new IntersectionObserver(([entry]) =>
+      setAttentionVisible(Boolean(entry?.isIntersecting))
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasAttention, task.id, loading]);
+  const previousStatus = useRef(task.status);
+  const [justFinished, setJustFinished] = useState(false);
+  useEffect(() => {
+    const before = previousStatus.current;
+    previousStatus.current = task.status;
+    if (before === task.status || task.status !== 'completed') return;
+    setJustFinished(true);
+    const timer = setTimeout(() => setJustFinished(false), 1200);
+    return () => clearTimeout(timer);
+  }, [task.status]);
   const elapsed = isFinished(task)
     ? duration(task.createdAt, task.completedAt ?? task.updatedAt)
     : duration(task.createdAt, new Date(clock).toISOString());
@@ -401,7 +433,7 @@ export default function TaskSurface({
           />
         ))}
         {question && (!task.parentMissionId || taskDecisions.length === 0) && (
-          <article className="question-card" id={`question-${task.id}`}>
+          <article className="question-card text-box" id={`question-${task.id}`}>
             <div className="eyebrow">
               <MessageSquare size={14} />
               Needs your answer
@@ -418,9 +450,13 @@ export default function TaskSurface({
             )}
             <div className="stack">
               {strings(questionData.options).map((option) => (
-                <Button key={option} disabled={busy} onClick={() => answerQuestion(option)}>
+                <Button
+                  key={option}
+                  className="answer-choice cursor-row"
+                  disabled={busy}
+                  onClick={() => answerQuestion(option)}
+                >
                   {option}
-                  <ArrowUpRight size={15} />
                 </Button>
               ))}
             </div>
@@ -516,8 +552,10 @@ export default function TaskSurface({
     <section className={`garden-task workspace-view-work${attentionPanel ? ' has-attention' : ''}`}>
       <div className="run-summary">
         <h2 className="sr-only">{task.title}</h2>
-        <div className={`status-line ${isWorking(task) || pendingDelivery ? 'active' : ''}`}>
-          <i />
+        <div
+          className={`status-line ${isWorking(task) || pendingDelivery ? 'active' : ''} ${justFinished ? 'finish-flash' : ''}`}
+        >
+          <StatusSprite stage={stageOf(task)} />
           <button
             className="run-status-button"
             onClick={() => selectView('activity')}
@@ -531,17 +569,25 @@ export default function TaskSurface({
         </div>
         <div className="row">
           <Button
+            className="run-tool"
             aria-label="Open conversation"
             title="Open conversation"
             onClick={() => setPanel('conversation')}
           >
             <MessageSquare size={17} />
+            <span>Conversation</span>
           </Button>
-          <Button aria-label="Live voice" title="Live voice" onClick={() => setPanel('voice')}>
+          <Button
+            className="run-tool"
+            aria-label="Live voice"
+            title="Live voice"
+            onClick={() => setPanel('voice')}
+          >
             <AudioLines size={17} />
+            <span>Voice</span>
           </Button>
           <span
-            className={`connection ${connection} ${connection === 'connected' || connection === 'idle' ? 'connection-quiet' : ''}`}
+            className={`connection power-lamp ${connection} ${connection === 'connected' ? 'is-live' : connection === 'idle' ? 'is-live connection-quiet' : connection === 'closed' ? '' : 'is-waiting'} ${connection === 'connected' || connection === 'idle' ? 'connection-quiet' : ''}`}
             title={
               connection === 'connected'
                 ? 'Live updates connected'
@@ -565,11 +611,13 @@ export default function TaskSurface({
             </span>
           </span>
           <Button
+            className="run-tool"
             aria-label="Work options"
             title="Work options"
             onClick={() => setPanel('settings')}
           >
             <MoreHorizontal size={19} />
+            <span>More</span>
           </Button>
           {/*
            * Labelled, because an unattributed currency figure beside a status line is a number
@@ -1042,7 +1090,7 @@ export default function TaskSurface({
         </Dialog>
       )}
       <div className="garden-task-composer">
-        {attentionPanel && (
+        {attentionPanel && !attentionVisible && (
           <Button
             className="primary garden-attention-jump"
             onClick={() =>
@@ -1054,6 +1102,20 @@ export default function TaskSurface({
             Needs you · View request
             <ArrowUpRight size={16} />
           </Button>
+        )}
+        {lastDirection && !task.parentMissionId && (
+          <button
+            type="button"
+            className="last-exchange cursor-row"
+            onClick={() => setPanel('conversation')}
+            aria-label={`Open the conversation, ${messageCount} messages`}
+          >
+            <span className="eyebrow">You</span>
+            <span className="last-exchange-text">{eventText(lastDirection)}</span>
+            <span className="last-exchange-count">
+              <MessageSquare size={15} /> {messageCount}
+            </span>
+          </button>
         )}
         {!attentionPanel && !task.parentMissionId && !showComposer && (
           <Button

@@ -10,7 +10,7 @@
   margin: 0 0 26px;
 }
 .garden-welcome h1 {
-  font-size: clamp(32px, 3.5vw, 49px);
+  font-size: 48px;
   letter-spacing: 0;
   margin: 12px 0;
 }
@@ -43,7 +43,7 @@
 .garden-projects-heading h2 {
   font-family: inherit;
   font-weight: 500;
-  font-size: 21px;
+  font-size: 24px;
   line-height: 1.3;
   margin: 0;
 }
@@ -133,7 +133,7 @@
   border-radius: 0;
 }
 .garden-shell .garden-task .completion-record.needs-review {
-  border-color: color-mix(in srgb, var(--text) 42%, transparent);
+  border-color: var(--muted);
 }
 .garden-shell .garden-output-primary {
   border-radius: 0;
@@ -202,7 +202,7 @@
     margin-bottom: 20px;
   }
   .garden-welcome h1 {
-    font-size: 33px;
+    font-size: 32px;
   }
   .garden-welcome .eyebrow {
     font-size: 16px;

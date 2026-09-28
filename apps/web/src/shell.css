@@ -1,0 +1,182 @@
+/* The frame around every screen: the masthead on wide screens, a button row on phones. */
+.desk-shell .garden-masthead {
+  gap: 8px;
+}
+.desk-shell .garden-masthead .brand {
+  font-size: 40px;
+  gap: 0;
+  align-items: flex-end;
+}
+.brand {
+  position: relative;
+}
+.brand > .brand-sprout {
+  margin: 0 0 0.3em 1px;
+}
+.desk-navigation .button {
+  gap: 8px;
+  color: var(--muted);
+}
+.desk-navigation .button:is([aria-expanded='true'], [aria-current='page']) {
+  color: var(--text);
+  border-color: var(--text);
+  background: var(--raised-fill);
+}
+.desk-shell .garden-masthead-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.desk-shell .garden-masthead .global-search span,
+.desk-shell .garden-masthead .global-search kbd {
+  display: inline;
+}
+.desk-shell .garden-masthead .global-search kbd {
+  margin-left: 8px;
+  padding: 0 4px;
+  border: 1px solid var(--tint);
+}
+.desk-shell .garden-health {
+  margin-left: 0;
+}
+.masthead-bell {
+  position: relative;
+}
+.phone-bar {
+  display: none;
+}
+@media (max-width: 1180px) {
+  .desk-shell .garden-masthead .global-search span,
+  .desk-shell .garden-masthead .global-search kbd {
+    display: none;
+  }
+}
+@media (max-width: 1000px) {
+  .desk-navigation .button span {
+    display: none;
+  }
+}
+@media (max-width: 700px) {
+  .garden-shell.desk-shell {
+    grid-template-rows: var(--desk-bar-height) minmax(0, 1fr) auto;
+  }
+  .desk-shell .garden-masthead .brand {
+    font-size: 32px;
+  }
+  .desk-navigation,
+  .desk-shell .garden-health,
+  .desk-shell .masthead-bell {
+    display: none;
+  }
+  .phone-bar {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    border-top: 2px solid var(--text);
+    background: var(--lcd-texture), var(--bg);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    z-index: 20;
+  }
+  .phone-bar > button {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    min-height: 56px;
+    padding: 6px 2px 4px;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: 16px;
+    line-height: 1;
+  }
+  .phone-bar > button > span:not(.notification-count) {
+    white-space: nowrap;
+  }
+  .phone-bar > button[aria-current='page'] {
+    color: var(--ink);
+    background: var(--lcd-texture-inverse), var(--paper);
+  }
+  .phone-bar .notification-count {
+    top: 4px;
+    left: calc(50% + 6px);
+    right: auto;
+  }
+  /* While typing, the keyboard needs the room more than the button row does. */
+  .desk-shell:has(textarea:focus, input:not([type='checkbox'], [type='radio']):focus) .phone-bar {
+    display: none;
+  }
+}
+
+/* Palette swatches in Settings: four blocks per screen, painted in that screen's shades. */
+.palette-picker {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.palette-picker legend {
+  margin-bottom: 8px;
+}
+.palette-picker label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+.palette-swatch {
+  display: inline-flex;
+  border: 1px solid var(--text);
+}
+.palette-swatch > i {
+  width: 16px;
+  height: 16px;
+  background-image: var(--lcd-texture);
+}
+[data-palette-swatch='field'] .palette-swatch > i:nth-child(1) {
+  background-color: #b7c58b;
+}
+[data-palette-swatch='field'] .palette-swatch > i:nth-child(2) {
+  background-color: #91a266;
+}
+[data-palette-swatch='field'] .palette-swatch > i:nth-child(3) {
+  background-color: #3d4f2b;
+}
+[data-palette-swatch='field'] .palette-swatch > i:nth-child(4) {
+  background-color: #26351f;
+}
+[data-palette-swatch='pocket'] .palette-swatch > i:nth-child(1) {
+  background-color: #c5c7b8;
+}
+[data-palette-swatch='pocket'] .palette-swatch > i:nth-child(2) {
+  background-color: #9a9c8c;
+}
+[data-palette-swatch='pocket'] .palette-swatch > i:nth-child(3) {
+  background-color: #46483e;
+}
+[data-palette-swatch='pocket'] .palette-swatch > i:nth-child(4) {
+  background-color: #2a2b25;
+}
+[data-palette-swatch='backlight'] .palette-swatch > i:nth-child(1) {
+  background-color: #8fd3c3;
+}
+[data-palette-swatch='backlight'] .palette-swatch > i:nth-child(2) {
+  background-color: #5fa89a;
+}
+[data-palette-swatch='backlight'] .palette-swatch > i:nth-child(3) {
+  background-color: #1f4a45;
+}
+[data-palette-swatch='backlight'] .palette-swatch > i:nth-child(4) {
+  background-color: #12302c;
+}
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.management-tabs {
+  flex-wrap: wrap;
+}

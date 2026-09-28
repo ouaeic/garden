@@ -20,43 +20,74 @@
   font-display: swap;
 }
 :root {
-  --lcd-off: #b7c58b;
-  --lcd-faint: #97aa6d;
-  --lcd-dense: #3d4f2b;
-  --lcd-on: #26351f;
-  --bg: var(--lcd-off);
-  --text: var(--lcd-on);
-  --muted: var(--lcd-dense);
+  /*
+   * Four shades and nothing between them, as on the screen this imitates. s0 is the lightest.
+   * Light mode reads dark ink on a lit field; dark mode inverts the ramp. A fifth tone is never
+   * mixed: it is dithered from two neighbours, which is how the hardware did it.
+   */
+  --s0: #b7c58b;
+  --s1: #91a266;
+  --s2: #3d4f2b;
+  --s3: #26351f;
+  --bg: var(--s0);
+  --tint: var(--s1);
+  --muted: var(--s2);
+  --text: var(--s3);
   --dim: var(--muted);
   --panel: var(--bg);
-  --raised: color-mix(in srgb, var(--text) 10%, var(--bg));
+  --raised: var(--bg);
   --chrome: var(--bg);
-  --line: color-mix(in srgb, var(--text) 30%, var(--bg));
+  --line: var(--tint);
   --line-strong: var(--muted);
   --paper: var(--text);
   --ink: var(--bg);
   --accent: var(--text);
   --danger: var(--text);
-  --shadow: color-mix(in srgb, var(--lcd-on) 45%, transparent);
   --surface-glint: transparent;
-  --surface-shadow: 2px 2px 0 var(--line);
+  --surface-shadow: 2px 2px 0 var(--tint);
   --canvas-glow: transparent;
   --radius: 0;
+  /* A one-pixel checkerboard of the tint over whatever lies beneath: the in-between tone. */
+  --dither: conic-gradient(var(--tint) 0 25%, transparent 0 50%, var(--tint) 0 75%, transparent 0) 0
+    0 / 2px 2px;
+  /* One lit pixel in four: the veil behind sheets and dialogs. */
+  --veil: conic-gradient(var(--text) 0 25%, transparent 0) 0 0 / 2px 2px;
+  --raised-fill: var(--lcd-texture), var(--dither), var(--bg);
+  --type-s: 16px;
+  --type-m: 24px;
+  --type-l: 32px;
+  --type-xl: 48px;
+  --step: 8px;
   --font-sans: 'Pixel Operator', 'Segoe UI', sans-serif;
   --font-display: var(--font-sans);
   --font-mono: 'Pixel Operator Mono', ui-monospace, monospace;
   font: 16px/1.5 var(--font-sans);
   font-synthesis: none;
   text-rendering: geometricPrecision;
-  -webkit-font-smoothing: auto;
+  -webkit-font-smoothing: none;
   color: var(--text);
   background: var(--lcd-texture), var(--bg);
   color-scheme: light;
 }
+/* The pocket model's grey glass. */
+:root[data-palette='pocket'] {
+  --s0: #c5c7b8;
+  --s1: #9a9c8c;
+  --s2: #46483e;
+  --s3: #2a2b25;
+}
+/* The lit screen of the backlit model, seen in a dark room. */
+:root[data-palette='backlight'] {
+  --s0: #8fd3c3;
+  --s1: #5fa89a;
+  --s2: #1f4a45;
+  --s3: #12302c;
+}
 :root[data-theme='dark'] {
-  --bg: var(--lcd-on);
-  --text: var(--lcd-off);
-  --muted: var(--lcd-faint);
+  --bg: var(--s3);
+  --tint: var(--s2);
+  --muted: var(--s1);
+  --text: var(--s0);
   color-scheme: dark;
 }
 /* Texture belongs to interface backgrounds so delivered content keeps its own pixels. */
@@ -155,10 +186,10 @@ input:is([type='checkbox'], [type='radio']):indeterminate {
   :root {
     --muted: var(--text);
     --line: var(--text);
-  }
-  :root {
+    --tint: var(--muted);
     --lcd-texture: none;
     --lcd-texture-inverse: none;
+    --dither: none;
   }
 }
 @media (forced-colors: active) {

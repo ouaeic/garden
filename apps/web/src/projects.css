@@ -13,14 +13,14 @@
   min-width: min(18rem, 100%);
 }
 .project-space-title h1 {
-  font-size: clamp(1.45rem, 2.3vw, 2.2rem);
+  font-size: 32px;
   line-height: 1.25;
   margin: 0.35rem 0;
   overflow-wrap: anywhere;
 }
 .project-space-title p {
-  font-size: 0.8rem;
-  opacity: 0.7;
+  font-size: 16px;
+  color: var(--muted);
   margin: 0.5rem 0 0;
 }
 .project-conversation-tabs {
@@ -65,13 +65,13 @@
 }
 .project-section-heading h2 {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 16px;
 }
 .project-section-heading label {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.85rem;
+  font-size: 16px;
 }
 .project-brief {
   border: 1px solid var(--line);
@@ -124,14 +124,14 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   overflow-wrap: anywhere;
-  font-size: 0.95rem;
+  font-size: 16px;
 }
 .project-conversation-grid small,
 .project-open small {
   display: block;
   margin-top: 0.55rem;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 16px;
 }
 .project-conversation-grid .garden-project-dot {
   margin-top: 0.4rem;
@@ -167,7 +167,7 @@
 }
 .project-open strong {
   display: block;
-  font-size: 0.85rem;
+  font-size: 16px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -177,7 +177,7 @@
   align-items: flex-start;
 }
 .project-summary-card .project-open strong {
-  font-size: 1.08rem;
+  font-size: 16px;
   white-space: normal;
   overflow-wrap: anywhere;
 }
@@ -186,7 +186,7 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 0.4rem;
-  font-size: 0.75rem;
+  font-size: 16px;
   color: var(--muted);
   margin: 1rem 0 0;
 }
@@ -203,7 +203,7 @@
   background: transparent;
   text-align: left;
   padding: 0.55rem 0.45rem;
-  font-size: 0.78rem;
+  font-size: 16px;
 }
 .project-conversation-links > button > .garden-project-title {
   flex: 1;
@@ -220,8 +220,8 @@
   background: transparent;
   border: 0;
   text-align: left;
-  font-size: 0.9rem;
-  opacity: 0.75;
+  font-size: 16px;
+  color: var(--muted);
 }
 .project-conversation .garden-project {
   padding-top: 0;
@@ -278,7 +278,7 @@
 }
 .has-conversation .project-space-title h1 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 24px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -299,7 +299,7 @@
   margin: 0.35rem 0;
   font-family: inherit;
   font-weight: 500;
-  font-size: clamp(1.6rem, 2.5vw, 2.3rem);
+  font-size: 32px;
   line-height: 1.18;
   overflow-wrap: anywhere;
 }
@@ -321,7 +321,7 @@
     padding: 0.5rem;
   }
   .has-conversation .project-space-title h1 {
-    font-size: 1.05rem;
+    font-size: 16px;
   }
   .has-conversation .project-space-header {
     gap: 0.45rem;
@@ -381,9 +381,9 @@
 }
 .project-session small {
   display: block;
-  opacity: 0.65;
+  color: var(--muted);
   font-weight: normal;
-  font-size: 0.75rem;
+  font-size: 16px;
 }
 .project-line-changes span:first-child {
   color: var(--success, var(--muted));

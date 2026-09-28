@@ -12,13 +12,13 @@
     400 clamp(36px, 5vw, 58px)/1.08 var(--font-display),
     serif;
   margin: 10px 0 14px;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
 }
 .management-tabs {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-  border-bottom: 1px solid var(--line, color-mix(in srgb, var(--text) 15%, transparent));
+  border-bottom: 1px solid var(--line);
   padding-bottom: 16px;
   margin-bottom: 28px;
 }
@@ -84,9 +84,9 @@
   width: 100%;
   min-height: 42px;
   padding: 10px 12px;
-  background: var(--input-bg, color-mix(in srgb, var(--text) 7%, transparent));
+  background: var(--bg);
   color: inherit;
-  border: 1px solid var(--line, color-mix(in srgb, var(--text) 20%, transparent));
+  border: 1px solid var(--line);
   border-radius: 0;
   font: inherit;
   box-sizing: border-box;
@@ -129,7 +129,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 18px 0;
-  border-top: 1px solid var(--line, color-mix(in srgb, var(--text) 14%, transparent));
+  border-top: 1px solid var(--line);
   min-width: 0;
 }
 .management-item:first-child {
@@ -173,7 +173,7 @@
 .management-table td {
   text-align: left;
   padding: 12px 9px;
-  border-bottom: 1px solid var(--line, color-mix(in srgb, var(--text) 12%, transparent));
+  border-bottom: 1px solid var(--line);
   vertical-align: top;
 }
 .management-table th {
@@ -193,7 +193,7 @@
   max-width: 100%;
 }
 .management-section details {
-  border-top: 1px solid var(--line, color-mix(in srgb, var(--text) 13%, transparent));
+  border-top: 1px solid var(--line);
   padding: 15px 0;
 }
 .management-section summary {
@@ -207,7 +207,7 @@
   overflow: auto;
 }
 .secret-result {
-  border: 1px solid var(--line, color-mix(in srgb, var(--text) 20%, transparent));
+  border: 1px solid var(--line);
   border-radius: 0;
   padding: 16px;
 }
@@ -234,7 +234,7 @@
 }
 .management-note {
   padding: 14px 16px;
-  background: color-mix(in srgb, var(--text) 9%, transparent);
+  background: var(--raised-fill);
   border-radius: 0;
   font-size: 16px;
   line-height: 1.6;
@@ -265,7 +265,7 @@
     grid-template-columns: 1fr;
   }
   .management-heading h1 {
-    font-size: 38px;
+    font-size: 40px;
   }
   .management-tabs {
     gap: 2px;

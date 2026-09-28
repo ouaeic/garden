@@ -19,7 +19,7 @@
   flex-wrap: wrap;
   gap: 9px;
   margin: 0;
-  font-size: 17px;
+  font-size: 16px;
 }
 .process-panel-heading p,
 .process-note,
@@ -74,11 +74,11 @@
   border-radius: 0;
   padding: 4px 9px;
   color: var(--muted);
-  background: var(--lcd-texture), var(--raised);
+  background: var(--raised-fill);
 }
 .process-status.is-active {
   color: var(--accent);
-  background: var(--lcd-texture), var(--raised);
+  background: var(--raised-fill);
 }
 .process-metrics {
   display: grid;
@@ -93,7 +93,7 @@
 }
 .process-metrics dd {
   margin: 4px 0 0;
-  font-size: 17px;
+  font-size: 16px;
   font-variant-numeric: tabular-nums;
   line-height: 1.4;
   overflow-wrap: anywhere;
@@ -122,7 +122,7 @@
   font-size: 16px;
   padding: 12px;
   border-radius: 0;
-  background: var(--lcd-texture), var(--raised);
+  background: var(--raised-fill);
   margin-block: 10px;
 }
 .process-actions {

@@ -35,11 +35,11 @@
 .project-update-title small {
   display: block;
   margin-top: 0.35rem;
-  opacity: 0.7;
+  color: var(--muted);
   line-height: 1.5;
 }
 .project-version-head > span {
-  font-size: 0.8rem;
+  font-size: 16px;
 }
 .project-version-path,
 .project-update-detail details {
@@ -62,7 +62,7 @@
   min-width: 0;
 }
 .project-version-history > p {
-  font-size: 0.8rem;
+  font-size: 16px;
   line-height: 1.6;
 }
 .project-version-history-list {
@@ -144,7 +144,7 @@
   cursor: pointer;
 }
 .project-update-row:hover {
-  background-color: var(--hover, color-mix(in srgb, var(--text) 8%, transparent));
+  background-color: var(--tint);
 }
 .project-update-title {
   flex: 1;
@@ -152,12 +152,12 @@
   overflow-wrap: anywhere;
 }
 .project-update-row > span:last-child {
-  font-size: 0.8rem;
+  font-size: 16px;
 }
 .project-update-state {
   display: inline-flex;
   align-items: center;
-  font-size: 0.75rem;
+  font-size: 16px;
   font-weight: 600;
   padding: 0.4rem 0.6rem;
   border: 1px solid var(--line);
@@ -188,7 +188,7 @@
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 0.8rem;
+  font-size: 16px;
 }
 .project-update-detail h3 {
   margin: 0.5rem 0 0;
@@ -201,7 +201,7 @@
   padding: 1rem;
   border-radius: 0;
   background: var(--lcd-texture), var(--bg);
-  font-size: 0.8rem;
+  font-size: 16px;
 }
 .project-change-list {
   max-height: 32rem;

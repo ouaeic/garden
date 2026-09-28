@@ -22,7 +22,7 @@
   overflow-wrap: anywhere;
   padding: 0.75rem;
   border-radius: 0;
-  background: color-mix(in srgb, currentColor 4%, transparent);
+  background: var(--raised-fill);
 }
 .project-computations {
   display: grid;

@@ -1,0 +1,194 @@
+/*
+ * The living layer. Nothing here can be clicked or read by a screen reader; it sits above the
+ * interface and below every dialog, and it steps rather than glides.
+ */
+.life-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  overflow: hidden;
+  contain: strict;
+}
+.life-actor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+  transition-property: transform;
+  transition-timing-function: steps(var(--life-steps, 12), end);
+  transition-duration: var(--life-travel, 0s);
+}
+.life-actor > .life-bubble {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+}
+
+/* The garden plot on the home screen. */
+.garden-plot {
+  position: relative;
+  height: 152px;
+  border: 1px solid var(--text);
+  background: var(--lcd-texture), var(--bg);
+  overflow: hidden;
+  isolation: isolate;
+}
+.garden-plot-sky {
+  position: absolute;
+  inset: 0 0 32px;
+}
+.garden-plot-sky .garden-plot-sun {
+  position: absolute;
+  right: 48px;
+  top: 16px;
+}
+.garden-plot-cloud {
+  position: absolute;
+  top: var(--cloud-top, 24px);
+  left: 0;
+  animation: plot-cloud var(--cloud-time, 240s) steps(160, end) infinite;
+  animation-delay: var(--cloud-delay, 0s);
+}
+@keyframes plot-cloud {
+  from {
+    transform: translateX(-80px);
+  }
+  to {
+    transform: translateX(calc(var(--plot-width, 1200px) + 20px));
+  }
+}
+.garden-plot-star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: var(--text);
+  animation: cursor-blink var(--star-time, 3s) steps(1, end) infinite;
+}
+.garden-plot-ground {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 24px;
+  border-top: 2px solid var(--text);
+  background: var(--lcd-texture), var(--dither), var(--bg);
+}
+.garden-plot-beds {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 22px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-evenly;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-top: 40px;
+}
+.garden-plot-beds::-webkit-scrollbar {
+  display: none;
+}
+.garden-plant {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: end;
+  min-width: 56px;
+  min-height: 56px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.garden-plant:hover,
+.garden-plant:focus-visible {
+  background: none;
+}
+.garden-plant > .garden-plant-tag {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 220px;
+  padding: 4px 8px;
+  border: 1px solid var(--text);
+  background: var(--lcd-texture), var(--bg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  visibility: hidden;
+  z-index: 2;
+}
+.garden-plant:is(:hover, :focus-visible) > .garden-plant-tag {
+  visibility: visible;
+}
+.garden-plant:is(:hover, :focus-visible) .life-sprite {
+  outline: 1px dashed var(--text);
+  outline-offset: 2px;
+}
+.garden-plant-bubble {
+  position: absolute;
+  top: -10px;
+  right: 0;
+  animation: cursor-blink 1.2s steps(1, end) infinite;
+}
+.garden-plot-wrap {
+  display: grid;
+  gap: 12px;
+}
+.garden-plot-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px 24px;
+  flex-wrap: wrap;
+}
+.garden-plot-heading h1 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 400;
+  line-height: 1;
+}
+.garden-plot-heading .eyebrow {
+  margin: 0 0 8px;
+}
+.garden-plot-heading > p {
+  margin: 0;
+  color: var(--muted);
+}
+.garden-plot-empty {
+  position: absolute;
+  left: 50%;
+  bottom: 30px;
+  transform: translateX(-50%);
+  color: var(--muted);
+}
+@media (max-width: 640px) {
+  .garden-plot {
+    height: 136px;
+  }
+  .garden-plot-beds {
+    justify-content: flex-start;
+  }
+  .garden-plot-sky .garden-plot-sun {
+    right: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .garden-plot-cloud {
+    animation: none;
+    transform: translateX(calc(var(--plot-width, 1200px) * var(--cloud-rest, 0.5)));
+  }
+  .garden-plot-cloud,
+  .garden-plot-star,
+  .garden-plant-bubble {
+    animation: none;
+  }
+  .life-actor {
+    transition: none;
+  }
+}
