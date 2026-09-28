@@ -727,8 +727,14 @@ export default function TaskSurface({
                 presentation.results.some(
                   (result) => !presentation.surface!.currentResultIds.includes(result.id)
                 ) && (
-                  <details className="garden-previous-results">
+                  <details
+                    className="garden-previous-results garden-history"
+                    name={`history-${task.id}`}
+                  >
                     <summary>Earlier results</summary>
+                    <p className="garden-history-context muted">
+                      Files and app previews from before your latest message in this conversation.
+                    </p>
                     <TaskOutputs
                       {...(onDiscuss
                         ? {
@@ -737,6 +743,7 @@ export default function TaskSurface({
                           }
                         : {})}
                       autoPreview={false}
+                      compact={false}
                       events={events}
                       artifacts={artifacts}
                       presentation={{
@@ -750,10 +757,16 @@ export default function TaskSurface({
                   </details>
                 )}
               {previousAnswer?.markdown && (
-                <details className="garden-previous-answer">
-                  <summary>Earlier answer</summary>
+                <details
+                  className="garden-previous-answer garden-history"
+                  name={`history-${task.id}`}
+                >
+                  <summary>Previous response</summary>
+                  <p className="garden-history-context muted">
+                    Garden’s last written response before your latest message.
+                  </p>
                   <Suspense fallback={null}>
-                    <Markdown artifacts={artifacts} onArtifact={showArtifact}>
+                    <Markdown artifacts={artifacts} onArtifact={showArtifact} imageMode="links">
                       {previousAnswer.markdown}
                     </Markdown>
                   </Suspense>

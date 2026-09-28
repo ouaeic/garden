@@ -890,6 +890,58 @@ body:has(.desk-shell),
   overflow: auto;
   border-top: 1px solid var(--line);
 }
+.desk-shell .garden-task-primary > .garden-history {
+  padding: 0 16px 12px;
+  min-height: 44px;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scroll-padding-top: 52px;
+}
+.desk-shell .garden-task-primary > .garden-history:not([open]) {
+  padding-bottom: 0;
+}
+.garden-history > summary {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0 -16px;
+  padding: 10px 16px;
+  background: var(--panel);
+  background-image: var(--lcd-texture);
+  border-bottom: 1px solid transparent;
+}
+.garden-history[open] > summary {
+  margin-bottom: 10px;
+  border-bottom-color: var(--line);
+}
+.garden-history-context {
+  margin: 0 0 14px;
+  font-size: 16px;
+}
+.garden-history .garden-delivery-list {
+  gap: 8px;
+}
+.garden-history .garden-output-downloads > .scroll-region {
+  max-block-size: none;
+  overflow: visible;
+  scrollbar-gutter: auto;
+  border: 0;
+  padding: 0;
+}
+@media (max-height: 700px) {
+  .desk-shell
+    .garden-task:not(.has-attention)
+    .garden-task-primary:has(> .garden-history[open])
+    > .garden-outputs {
+    display: none;
+  }
+  .desk-shell .garden-task:not(.has-attention) .garden-task-primary > .garden-history[open] {
+    flex: 1 1 0;
+    max-height: none;
+    min-height: 0;
+  }
+}
 .garden-outputs:not(.is-fitted) > .garden-output-section {
   display: contents;
 }
