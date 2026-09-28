@@ -780,7 +780,6 @@ describe('what a turn asks the runner for on its own account', () => {
       // runner latency in front of every turn's first token for nothing.
       `GET ${root}/machine exec`,
       `GET ${root}/file?path=workspace%2FGARDEN.md files.read`,
-      `GET ${root}/file?path=workspace%2FGARDEN.md files.read`,
       `GET ${root}/file?path=workspace%2FOPEN_CLOUD.md files.read`,
       `GET ${root}/file?path=workspace%2FAGENTS.md files.read`,
       `POST ${root}/checkpoints workspace.manage`

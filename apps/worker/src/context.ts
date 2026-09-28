@@ -1214,16 +1214,16 @@ export const CUT_TOOL_OUTPUT_ADVICE =
  * would not drop it until it reached half of the smallest bound this is called with (8,000 at
  * `delegate.ts`'s 16,000), and a sentence that long would be absurd long before it were unsafe.
  *
- * 369 is what the case with MORE to say costs. Measured on a 200,026-character `shell` result
- * through `recordToolResult`: the spilled marker is 421 characters, of which 50 are the base
- * marker and 369 are `spillRecovery` - a path, an offset, and its own coaching clause. This case
+ * 368 is what the case with MORE to say costs. Measured on a 200,026-character `shell` result
+ * through `recordToolResult`: the spilled marker is 420 characters, of which 50 are the base
+ * marker and 368 are `spillRecovery` - a path, an offset, and its own coaching clause. This case
  * has strictly less to say: no path exists and no offset is worth naming without one. So the point
  * past which the cheaper case has become the dearer one is the bound, and the assertion that bites
  * is not this number but the relation - `output-spill.test.ts` drives the same result through the
  * same call site twice, once with a writer and once without, and the marker with no file to name
  * must be the shorter of the two. Raising this constant alone changes nothing the model reads.
  */
-export const MAX_CUT_ADVICE_CHARS = 369;
+export const MAX_CUT_ADVICE_CHARS = 368;
 
 /**
  * The window's bound applied to a form already serialised by `toolResultText`.
