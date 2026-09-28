@@ -9,6 +9,8 @@
 }
 .brand {
   position: relative;
+  gap: 0;
+  align-items: flex-end;
 }
 .brand > .brand-sprout {
   margin: 0 0 0.3em 1px;

@@ -3,6 +3,7 @@ import { ArrowUpRight, Plus } from './icons';
 import type { Project, Task } from '@garden/contracts';
 import { hasOngoingWork, needsAttention, shortDate, taskStatusLabel } from './model';
 import GardenPlot, { projectStage } from './life/GardenPlot';
+import GardenVine from './life/GardenVine';
 import StatusSprite, { stageOf } from './life/StatusSprite';
 import { Button } from './ui';
 import './home.css';
@@ -45,6 +46,17 @@ export default function DeskHome({
     <section className="desk-home" aria-label="Home">
       <GardenPlot projects={projects} tasks={tasks} onProject={onProject} />
       <section className="desk-start-card" aria-label="Start a project" data-perch>
+        <GardenVine
+          blooms={
+            projects.filter(
+              (project) =>
+                projectStage(
+                  project,
+                  tasks.find((task) => task.id === project.latestTaskId)
+                ) === 'bloom'
+            ).length
+          }
+        />
         {notice}
         {composer}
       </section>

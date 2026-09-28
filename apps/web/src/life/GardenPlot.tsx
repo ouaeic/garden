@@ -3,6 +3,8 @@ import type { Project, Task } from '@garden/contracts';
 import { Sprite } from './Sprite';
 import { stageOf, type Stage } from './StatusSprite';
 import {
+  bee,
+  firefly,
   blooms,
   cloud,
   fence,
@@ -104,6 +106,21 @@ export default function GardenPlot({
           {night ? (
             <>
               <Sprite frames={[moon]} scale={3} className="garden-plot-sun" />
+              {[18, 36, 64, 82].map((left, index) => (
+                <span
+                  key={`f${left}`}
+                  className="garden-plot-firefly"
+                  style={
+                    {
+                      left: `${left}%`,
+                      top: `${56 + (index % 2) * 24}px`,
+                      '--firefly-delay': `${index * -1.3}s`
+                    } as CSSProperties
+                  }
+                >
+                  <Sprite frames={firefly} fps={1.2} />
+                </span>
+              ))}
               {[12, 27, 41, 58, 73, 88].map((left, index) => (
                 <i
                   key={left}
@@ -163,6 +180,11 @@ export default function GardenPlot({
               <span className="garden-plant-tag" aria-hidden="true">
                 {project.title}
               </span>
+              {stage === 'sprout' && (
+                <span className="garden-plant-bee" aria-hidden="true">
+                  <Sprite frames={bee} scale={2} fps={8} />
+                </span>
+              )}
               {stage === 'needs' && (
                 <span className="garden-plant-bubble" aria-hidden="true">
                   <Sprite frames={[speech]} scale={2} />

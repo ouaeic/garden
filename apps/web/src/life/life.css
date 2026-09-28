@@ -144,6 +144,47 @@
   right: 0;
   animation: cursor-blink 1.2s steps(1, end) infinite;
 }
+.garden-plant-bee {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  animation: plant-bee 3.2s steps(8, end) infinite;
+}
+/* A bee works a slow loop over whatever is growing. */
+@keyframes plant-bee {
+  0% {
+    transform: translate(-24px, 0);
+  }
+  25% {
+    transform: translate(8px, -14px);
+  }
+  50% {
+    transform: translate(20px, 4px);
+  }
+  75% {
+    transform: translate(-6px, 10px);
+  }
+  100% {
+    transform: translate(-24px, 0);
+  }
+}
+.garden-plot-firefly {
+  position: absolute;
+  animation: plot-firefly 9s steps(18, end) infinite;
+  animation-delay: var(--firefly-delay, 0s);
+}
+@keyframes plot-firefly {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  33% {
+    transform: translate(40px, -18px);
+  }
+  66% {
+    transform: translate(-24px, 12px);
+  }
+}
 .garden-plot-wrap {
   display: grid;
   gap: 12px;
@@ -201,10 +242,26 @@
   }
   .garden-plot-cloud,
   .garden-plot-star,
+  .garden-plant-bee,
+  .garden-plot-firefly,
   .garden-plant-bubble {
     animation: none;
   }
   .life-actor {
     transition: none;
   }
+}
+
+.title-scene {
+  height: 136px;
+  margin: 24px 0;
+}
+.title-scene .garden-plant {
+  cursor: default;
+}
+.title-scene-bird {
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
 }
