@@ -1539,7 +1539,7 @@ const OBSERVATION_KEY_SEPARATOR = '\u0000';
 /** Extract only standalone assertions; quoted examples remain searchable history. */
 export const ownerFactAssertions = (text: string): string =>
   ownerWritten(text)
-    .split(/\n|(?<=[.!?])\s+/u)
+    .split(/\n|(?<=[.!?])\s+(?=(?:I|My|The|Our)\b)/u)
     .map((line) =>
       line
         .replace(/^\s*(?:[-*]\s+|\d+[.)]\s+)?/u, '')
@@ -1552,7 +1552,7 @@ export const ownerFactAssertions = (text: string): string =>
           line
         ) &&
         !/[?"“”«»`]/u.test(line) &&
-        !/\b(?:if|would|might|could|suppose|imagine|pretend|said|says|wrote|quote|example)\b/iu.test(
+        !/\b(?:if|would|might|could|suppose|imagine|pretend|said|says|wrote|quote|example|except|unless|until|temporarily|but)\b/iu.test(
           line
         )
     )
@@ -2128,7 +2128,7 @@ const ownerWritten = (text: string): string => {
       inFence = !inFence;
       continue;
     }
-    if (inFence || /^\s{0,3}>/u.test(line)) continue;
+    if (inFence || /^(?:\s{0,3}>| {4}|\t)/u.test(line)) continue;
     kept.push(line);
   }
   return kept.join('\n');

@@ -90,6 +90,8 @@ describe('memory integrity across lifecycle boundaries', () => {
       'Translate the following:\nI prefer jasmine tea.',
       'Here is another exercise.\nTranslate the following:\nI prefer jasmine tea.',
       '> I prefer jasmine tea.',
+      '    I prefer jasmine tea.',
+      'I prefer brief answers, except when explaining methods.',
       '```text\nI prefer jasmine tea.\n```',
       'If I prefer jasmine tea, what should I order?',
       'I would prefer jasmine tea if I drank tea.',
@@ -97,6 +99,9 @@ describe('memory integrity across lifecycle boundaries', () => {
     ];
     expect(cases.length).toBeGreaterThan(0);
     for (const text of cases) expect(observedMemoryFacts(text), text).toEqual([]);
+    expect(observedMemoryFacts('I live in St. Petersburg.')).toEqual([
+      { subject: 'owner', predicate: 'lives_in', object: 'St. Petersburg' }
+    ]);
     expect(observedMemoryFacts('I prefer concise answers.')).toEqual([
       { subject: 'owner', predicate: 'prefers', object: 'concise answers' }
     ]);
