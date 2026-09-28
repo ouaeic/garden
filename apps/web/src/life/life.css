@@ -29,6 +29,15 @@
   transition-timing-function: var(--life-ease, ease-in-out);
   transition-duration: var(--life-travel, 0s);
 }
+.life-turn > .life-sprite {
+  display: block;
+}
+/* Turning to face the way it walks is a quarter turn, eased rather than snapped. */
+.life-turn {
+  display: block;
+  line-height: 0;
+  transition: transform 0.35s cubic-bezier(0.45, 0, 0.55, 1);
+}
 @media (prefers-reduced-motion: reduce) {
   .life-actor {
     transition: none;

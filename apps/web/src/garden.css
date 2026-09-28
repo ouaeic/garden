@@ -679,7 +679,7 @@
   .garden-shell {
     grid-template-columns: 206px minmax(0, 1fr);
   }
-  .garden-masthead-end .global-search span,
+  .garden-masthead-end .global-search > span,
   .garden-masthead-end .global-search kbd {
     display: none;
   }

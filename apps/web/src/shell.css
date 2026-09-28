@@ -28,11 +28,12 @@
   align-items: center;
   gap: 4px;
 }
-.desk-shell .garden-masthead .global-search span,
-.desk-shell .garden-masthead .global-search kbd {
+.desk-shell .garden-masthead .global-search > span {
   display: inline;
 }
 .desk-shell .garden-masthead .global-search kbd {
+  display: inline-flex;
+  height: 20px;
   margin-left: 8px;
   padding: 0 4px;
   border: 1px solid var(--tint);
@@ -47,7 +48,7 @@
   display: none;
 }
 @media (max-width: 1180px) {
-  .desk-shell .garden-masthead .global-search span,
+  .desk-shell .garden-masthead .global-search > span,
   .desk-shell .garden-masthead .global-search kbd {
     display: none;
   }
@@ -324,7 +325,8 @@
   margin: 0;
 }
 .key-list kbd {
-  display: inline-block;
+  display: inline-flex;
+  justify-content: center;
   min-width: 48px;
   padding: 4px 8px;
   border: 1px solid var(--text);
@@ -343,10 +345,11 @@
 }
 
 /*
- * The wordmark's motion. It powers on letter by letter like an LCD warming up, ripples under the
- * pointer, and in the masthead plays one small idle scene now and then (`Brand.tsx` picks it).
+ * The wordmark's motion. It comes up softly when the app opens, and in the masthead grows into a
+ * plant and back now and then, or when the pointer comes to it (`Brand.tsx` draws it).
  */
 .brand-word {
+  position: relative;
   display: inline-flex;
 }
 .brand-letter {
@@ -354,131 +357,43 @@
   display: inline-block;
   transform-origin: 50% 100%;
 }
-.brand-sprout {
+/* One cell a screen pixel, so no pixel of the plant falls between two. */
+.brand-plant {
   position: absolute;
-  left: 50%;
-  bottom: 88%;
-  margin-left: -8px;
-  transform-origin: 50% 100%;
+  left: 0;
+  bottom: 0;
+  width: 80px;
+  height: 24px;
+  overflow: visible;
+  pointer-events: none;
+}
+.brand-plant rect {
+  opacity: 0;
 }
 @media (prefers-reduced-motion: no-preference) {
   .brand-letter {
-    animation: brand-power 0.9s ease-out both;
-    animation-delay: calc(var(--letter) * 70ms);
-  }
-  .brand-button:is(:hover, :focus-visible) .brand-letter {
-    animation: brand-ripple 0.6s ease-in-out both;
-    animation-delay: calc(var(--letter) * 45ms);
-  }
-  .brand[data-idle='hop'] .brand-letter {
-    animation: brand-hop 0.5s cubic-bezier(0.3, 0, 0.3, 1) both;
-    animation-delay: calc(var(--letter) * 90ms);
-  }
-  .brand[data-idle='flip'] .brand-letter {
-    animation: brand-flip 0.34s steps(1, end) 2 both;
-    animation-delay: calc(var(--letter) * 110ms);
-  }
-  .brand[data-idle='sprout'] .brand-sprout {
-    animation: brand-sprout 4.2s cubic-bezier(0.3, 0, 0.3, 1) both;
-  }
-  .brand[data-idle='doze'] .brand-letter:nth-child(3) {
-    animation: brand-doze 3.6s cubic-bezier(0.4, 0, 0.2, 1) both;
+    animation: brand-wake 1.2s cubic-bezier(0.3, 0, 0.3, 1) both;
+    animation-delay: calc(var(--letter) * 60ms);
   }
 }
-/* Letters warm up: a faint ghost first, then full ink, the way a cold LCD comes on. */
-@keyframes brand-power {
-  0% {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  40% {
-    opacity: 0.35;
-  }
-  100% {
-    opacity: 1;
-    transform: none;
-  }
-}
-@keyframes brand-ripple {
-  50% {
-    transform: translateY(-3px);
-  }
-}
-@keyframes brand-hop {
-  0%,
-  100% {
-    transform: none;
-  }
-  15% {
-    transform: scaleY(0.82);
-  }
-  45% {
-    transform: translateY(-7px) scaleY(1.06);
-  }
-  80% {
-    transform: scaleY(0.9);
-  }
-}
-/* A cell flips to ink and back, like a segment being addressed. */
-@keyframes brand-flip {
-  0% {
-    color: var(--bg);
-    background: var(--text);
-  }
-  50% {
-    color: inherit;
-    background: transparent;
-  }
-}
-@keyframes brand-sprout {
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-  12% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  30% {
-    transform: rotate(-8deg);
-  }
-  48% {
-    transform: rotate(6deg);
-  }
-  66% {
-    transform: rotate(-4deg);
-  }
-  84% {
-    transform: none;
-    opacity: 1;
-  }
-  100% {
-    transform: scale(0);
+@keyframes brand-wake {
+  from {
     opacity: 0;
   }
 }
-/* The r nods off, tips over, and springs back up. */
-@keyframes brand-doze {
-  0%,
-  100% {
-    transform: none;
-  }
-  20% {
-    transform: rotate(8deg);
-  }
-  30% {
-    transform: rotate(4deg);
-  }
-  50% {
-    transform: rotate(22deg);
-  }
-  62% {
-    transform: rotate(18deg);
-  }
-  74% {
-    transform: translateY(-6px) rotate(-6deg);
-  }
-  86% {
-    transform: rotate(3deg);
-  }
+
+/* A shortcut's keys on one line, the drawn symbols at the letters' cap height. */
+.keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1;
+}
+.keys > svg {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  /* The font's letters sit a pixel low in their line; the symbol sits with them. */
+  margin-top: 2px;
+  fill: currentColor;
 }

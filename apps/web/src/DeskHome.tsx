@@ -5,8 +5,6 @@ import type { Bootstrap } from './model';
 import { bytes, hasOngoingWork, money, needsAttention, shortDate, taskStatusLabel } from './model';
 import ScrollRegion from './ScrollRegion';
 import StatusSprite, { projectStage, stageOf } from './life/StatusSprite';
-import { Sprite } from './life/Sprite';
-import { monitorResting, monitorWorking } from './life/sprites';
 import { Button } from './ui';
 import './home.css';
 
@@ -161,17 +159,15 @@ export default function DeskHome({
         {composer}
       </section>
       <button type="button" className="home-machine" onClick={onComputer} data-perch>
-        <Sprite
-          frames={growing.length ? monitorWorking : monitorResting}
-          fps={growing.length ? 6 : 1.5}
-          scale={3}
-          className="home-monitor"
-        />
+        <strong className="home-machine-title">
+          <i
+            className={growing.length ? 'home-pulse is-working' : 'home-pulse'}
+            aria-hidden="true"
+          />
+          {workspace?.name ?? 'Your computer'} ·{' '}
+          {growing.length ? `working on ${growing.length}` : (workspace?.status ?? 'idle')}
+        </strong>
         <span className="home-machine-readout">
-          <strong>
-            {workspace?.name ?? 'Your computer'} ·{' '}
-            {growing.length ? 'working' : (workspace?.status ?? 'idle')}
-          </strong>
           {computer ? (
             <>
               <Meter

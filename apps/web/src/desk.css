@@ -39,7 +39,7 @@ body:has(.desk-shell),
 .desk-shell .garden-masthead-end {
   gap: 5px;
 }
-.desk-shell .global-search span,
+.desk-shell .global-search > span,
 .desk-shell .global-search kbd {
   display: none;
 }

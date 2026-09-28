@@ -264,7 +264,7 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
                     and paste it here. Every model the key can use is listed, and requests go
                     straight to {vendor.label}.
                     {(vendor.id === 'anthropic' || vendor.id === 'openai') &&
-                      ` A ${vendor.id === 'anthropic' ? 'Claude' : 'ChatGPT'} chat subscription does not include API access; the key is billed separately.`}
+                      ` A ${vendor.id === 'anthropic' ? 'Claude' : 'ChatGPT'} plan is not an API key: to put your plan to work, ask garden to set up ${vendor.id === 'anthropic' ? 'Claude Code' : 'Codex'} and sign in from the Terminal, and it will hand coding work to it.`}
                   </p>
                 )}
                 {selectedProvider === 'openai-compatible' && (

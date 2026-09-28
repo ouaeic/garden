@@ -49,7 +49,7 @@ import {
   text
 } from './model';
 import { post } from './client';
-import { loadEventPage } from './stream';
+import { loadEventPage, type StreamConnection } from './stream';
 import { useTaskRecord } from './useTaskRecord';
 import { Button, Dialog, ErrorNotice, Field, Spinner } from './ui';
 import { DecisionCard } from './DecisionQueue';
@@ -69,6 +69,25 @@ const ProjectNoteEditor = lazy(() =>
 );
 const PrivateDiagnostics = lazy(() => import('./PrivateDiagnostics'));
 const VoiceSession = lazy(() => import('./voice/VoiceSession'));
+
+/**
+ * The live-updates lamp as the owner should see it. The stream reopens routinely - after a proxy
+ * timeout, a wake, a finished page - and each reopen passes through `connecting` for a moment;
+ * showing that would blink the lamp for nothing. A reconnect only shows once it has lasted a few
+ * seconds, and a lost connection shows at once.
+ */
+function useSteadyConnection(connection: StreamConnection) {
+  const [shown, setShown] = useState(connection);
+  useEffect(() => {
+    if (connection !== 'connecting' && connection !== 'reconnecting') {
+      setShown(connection);
+      return;
+    }
+    const timer = setTimeout(() => setShown(connection), 3000);
+    return () => clearTimeout(timer);
+  }, [connection]);
+  return shown;
+}
 const Computer = lazy(() => import('./Computer'));
 const DirectoryPanel = lazy(() => import('./DirectoryPanel'));
 const PlanEditor = lazy(() => import('./PlanEditor'));
@@ -128,7 +147,7 @@ export default function TaskSurface({
     loading,
     error,
     setError,
-    connection,
+    connection: liveConnection,
     reload
   } = useTaskRecord({
     taskId: task.id,
@@ -136,6 +155,7 @@ export default function TaskSurface({
     onTask,
     onRefresh
   });
+  const connection = useSteadyConnection(liveConnection);
   const [preview, setPreview] = useState<Artifact | null>(null);
   const [panel, setPanel] = useState<
     | 'direction'
@@ -587,7 +607,7 @@ export default function TaskSurface({
             <span>Voice</span>
           </Button>
           <span
-            className={`connection power-lamp ${connection} ${connection === 'connected' ? 'is-live' : connection === 'idle' ? 'is-live connection-quiet' : connection === 'closed' ? '' : 'is-waiting'} ${connection === 'connected' || connection === 'idle' ? 'connection-quiet' : ''}`}
+            className={`connection power-lamp ${connection} ${connection === 'connected' || connection === 'idle' ? 'is-live' : connection === 'closed' ? '' : 'is-waiting'} ${connection === 'closed' ? '' : 'connection-quiet'}`}
             title={
               connection === 'connected'
                 ? 'Live updates connected'

@@ -384,7 +384,8 @@ provider routing/contract property, not proof of zero billing, abuse, or network
 
 ### Codex, Claude Code, and OpenCode
 
-Install the official CLI from **Settings → AI**, then use the visible terminal:
+Ask garden to set one up; it installs the publisher's unmodified CLI into the workspace after you
+approve, and you sign in from the Terminal pane:
 
 ```bash
 codex login
@@ -395,7 +396,8 @@ opencode auth login
 ```
 
 The owner completes the publisher’s device/browser flow. garden does not ask for the account
-password. Publisher credentials live in `/home/garden` and are therefore included in a full backup.
+password and never reads, stores or forwards the resulting token: the subscription is used only by
+the publisher's own CLI, for the coding missions garden hands it. garden's own agent uses API keys. Publisher credentials live in `/home/garden` and are therefore included in a full backup.
 OpenCode supports the publisher logins described in its own documentation; Claude Pro/Max remains on
 the official Claude Code integration rather than an unofficial OpenCode auth plugin.
 

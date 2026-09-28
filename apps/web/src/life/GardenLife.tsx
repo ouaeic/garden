@@ -2,10 +2,11 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Sprite } from './Sprite';
 import {
   bat,
+  batHanging,
   butterfly,
-  flowerBloom,
   frog,
   ladybird,
+  ladybirdFlying,
   monkey,
   owl,
   snail,
@@ -25,24 +26,33 @@ type Clip = { side: 'below' | 'above'; line: number };
 
 interface Actor {
   id: number;
-  kind: 'bird' | 'owl' | 'bat' | 'butterfly' | 'monkey' | 'frog' | 'ladybird' | 'snail' | 'flower';
+  kind: 'bird' | 'owl' | 'bat' | 'butterfly' | 'monkey' | 'frog' | 'ladybird' | 'snail';
   frames: Frames;
   x: number;
   y: number;
   flip?: boolean;
   fps?: number;
+  /** Degrees the sprite is turned, for the one seen from above that walks along an edge. */
+  turn?: number;
   clip?: Clip | undefined;
 }
 
 type Signal = { cancelled: boolean };
+class Cancelled extends Error {}
 const wait = (ms: number, signal: Signal) =>
   new Promise<void>((done, fail) =>
-    setTimeout(() => (signal.cancelled ? fail(new Error('cancelled')) : done()), ms)
+    setTimeout(() => (signal.cancelled ? fail(new Cancelled()) : done()), ms)
   );
 const pick = <T,>(items: readonly T[]) => items[Math.floor(Math.random() * items.length)];
 const between = (low: number, high: number) => low + Math.random() * (high - low);
+const chance = (share: number) => Math.random() < share;
 const isNight = (date = new Date()) => date.getHours() >= 20 || date.getHours() < 6;
 const clipKey = (clip?: Clip) => (clip ? `${clip.side}:${Math.round(clip.line)}` : 'free');
+/** Just past the left or right edge of the screen, where a visitor comes from and goes back to. */
+const offscreen = (left: boolean) => (left ? -48 : innerWidth + 48);
+/** How long a flight takes at a creature's own speed, in pixels a millisecond. */
+const flight = (from: { x: number; y: number }, x: number, y: number, speed: number) =>
+  Math.max(600, Math.hypot(x - from.x, y - from.y) / speed);
 
 function visible(element: Element | null) {
   if (!element) return null;
@@ -63,11 +73,32 @@ function ledges() {
 }
 
 /**
+ * Who visits, and how often: each is its own chance a minute rather than a turn in a rotation, so
+ * a quiet stretch, a busy minute and a rare visitor all happen the way they do outside. `wide`
+ * visitors need room along the card edges that a phone does not have; `night` ones come after dark.
+ */
+const visitors: Array<{ scene: string; perMinute: number; night?: boolean }> = [
+  { scene: 'birdVisit', perMinute: 0.7 },
+  { scene: 'monkeyTour', perMinute: 0.55 },
+  { scene: 'butterflyVisit', perMinute: 0.55 },
+  { scene: 'frogHop', perMinute: 0.3 },
+  { scene: 'ladybirdWalk', perMinute: 0.3 },
+  { scene: 'snailCrawl', perMinute: 0.12 },
+  { scene: 'owlVisit', perMinute: 0.35, night: true },
+  { scene: 'batVisit', perMinute: 0.45, night: true }
+];
+const TICK = 3000;
+/** A creature that has just left does not come straight back. */
+const COOLDOWN = 45_000;
+const CROWD = 2;
+
+/**
  * The creatures that live around the interface. They visit now and then, never while you are
  * typing or reading a dialog, and never where they could take a click: the whole layer ignores
- * the pointer. They move on the compositor through the Web Animations API, so a leap is a smooth
- * arc at the display's own rate; only their sprite frames step. The garden blooms when a run
- * finishes well.
+ * the pointer. Every one arrives from beyond the edge of the screen or from behind a border and
+ * leaves the same way, frightened or not - nothing blinks into or out of existence. They move on
+ * the compositor through the Web Animations API, so a leap is a smooth arc at the display's own
+ * rate; only their sprite frames step.
  */
 export default function GardenLife() {
   const [mode, setMode] = useState<LifeMode>(lifeMode);
@@ -110,9 +141,10 @@ export default function GardenLife() {
         return world.cancelled || (lives.get(id)?.cancelled ?? true);
       }
     });
-    const pose = (id: number, patch: Partial<Actor>) => {
+    /** A frightened creature's scene no longer steers it; only its escape does (`force`). */
+    const pose = (id: number, patch: Partial<Actor>, force = false) => {
       const actor = state.get(id);
-      if (!actor) return;
+      if (!actor || (!force && life(id).cancelled)) return;
       state.set(id, { ...actor, ...patch });
       commit();
     };
@@ -132,10 +164,16 @@ export default function GardenLife() {
       const matrix = new DOMMatrixReadOnly(getComputedStyle(node).transform);
       return { x: matrix.m41, y: matrix.m42 + offset(actor) };
     };
+    const at = (id: number) => {
+      const actor = state.get(id)!;
+      return { x: actor.x, y: actor.y };
+    };
 
     /**
-     * Glide along a path of points, arcing upward by `arc` pixels at the midpoint or weaving
-     * sideways by `sway`. The keyframes are computed once and the compositor interpolates them.
+     * Glide to a point, arcing upward by `arc` pixels at the midpoint (downward when negative) or
+     * weaving sideways by `sway`. The keyframes are computed once and the compositor interpolates
+     * them. A scene's move that is interrupted throws, so the scene stops where it is and the
+     * creature's escape takes over; only the escape itself moves with `force`.
      */
     const travel = async (
       id: number,
@@ -144,10 +182,11 @@ export default function GardenLife() {
       ms: number,
       { arc = 0, easing = 'cubic-bezier(0.45, 0, 0.55, 1)', sway = 0, force = false } = {}
     ) => {
+      const going = () => !world.cancelled && state.has(id) && (force || !life(id).cancelled);
       await settle();
       const actor = state.get(id);
       const node = nodes.current.get(id);
-      if (!actor || !node || (!force && life(id).cancelled) || world.cancelled) return;
+      if (!actor || !node || !going()) throw new Cancelled();
       const shift = offset(actor);
       const steps = arc || sway ? 16 : 1;
       const keyframes = Array.from({ length: steps + 1 }, (_, index) => {
@@ -163,9 +202,8 @@ export default function GardenLife() {
         fill: 'forwards'
       });
       await animation.finished.catch(() => undefined);
-      if (world.cancelled || !state.has(id)) return;
-      if (!force && life(id).cancelled) return;
-      state.set(id, { ...actor, x, y });
+      if (!going()) throw new Cancelled();
+      state.set(id, { ...state.get(id)!, x, y });
       node.style.transform = `translate3d(${x}px, ${y - shift}px, 0)`;
       animation.cancel();
     };
@@ -187,122 +225,186 @@ export default function GardenLife() {
         .catch(() => undefined)
         .finally(() => remove(id));
     };
-    /** Away from the pointer, and off the nearest edge of the screen. */
-    const flee = (id: number, pointer: { x: number; y: number }, frames: Frames, ms: number) => {
+    const pointer = { x: -9999, y: -9999 };
+    /** Away from the pointer, and on until it is past the nearest edge of the screen. */
+    const flee = (id: number, frames: Frames, ms: number, patch: Partial<Actor> = {}) => {
       escapes.set(id, async () => {
         const here = where(id);
         if (!here) return;
-        pose(id, { frames, fps: 12, clip: undefined });
+        pose(id, { frames, fps: 12, clip: undefined, turn: 0, ...patch }, true);
         const dx = here.x - pointer.x || 1;
-        const dy = here.y - pointer.y || -1;
+        const dy = Math.min(-0.3, (here.y - pointer.y) / 100) * 100;
         const length = Math.hypot(dx, dy);
-        const reach = Math.max(innerWidth, innerHeight);
-        await travel(id, here.x + (dx / length) * reach, here.y + (dy / length) * reach - 80, ms, {
+        const reach = Math.max(innerWidth, innerHeight) + 100;
+        await travel(id, here.x + (dx / length) * reach, here.y + (dy / length) * reach, ms, {
           easing: 'cubic-bezier(0.3, 0, 0.2, 1)',
           force: true
         });
       });
     };
-    const pointer = { x: -9999, y: -9999 };
     /** Down behind the line it stands on, the way it came. */
     const duck = (id: number, line: () => number, depth: number, ms: number) => {
       escapes.set(id, async () => {
         const here = where(id);
         if (!here) return;
-        pose(id, { clip: { side: 'above', line: line() } });
-        await travel(id, here.x, here.y + depth, ms, {
+        pose(id, { clip: { side: 'above', line: line() }, turn: 0 }, true);
+        await travel(id, here.x, line() + depth, ms, {
           easing: 'cubic-bezier(0.5, 0, 0.9, 0.5)',
           force: true
         });
       });
     };
     const narrow = () => innerWidth < 700;
+    const brandBox = () => visible(document.querySelector('.garden-masthead .brand'));
+
+    /** Places a bird or an owl can land: card edges and, on top of the word, the logo. */
+    type Perch = { left: number; right: number; y: number };
+    const perches = (height: number, logo: boolean): Perch[] => {
+      const brand = brandBox();
+      return [
+        ...ledges().map((box) => ({
+          left: box.left + 12,
+          right: box.right - 36,
+          y: box.top - height
+        })),
+        ...(logo && brand
+          ? [{ left: brand.left, right: brand.right - 18, y: brand.top - height + 4 }]
+          : [])
+      ];
+    };
 
     const scenes: Record<string, () => Promise<void>> = {
-      async logoVisit() {
-        const brand = visible(document.querySelector('.garden-masthead .brand'));
-        if (!brand) return;
-        const top = brand.top - 14;
-        if (isNight()) {
-          const id = spawn({
-            kind: 'owl',
-            frames: owl.perch,
-            fps: 0.5,
-            x: brand.left + brand.width * 0.55,
-            y: top - 6
-          });
-          duck(id, () => brand.top + 4, 24, 360);
-          await wait(between(9000, 16000), life(id));
-          await travel(id, state.get(id)!.x, top + 30, 500, { easing: 'ease-in' });
-          remove(id);
-          return;
-        }
-        const perch = (share: number) => brand.left + brand.width * share;
-        const id = spawn({ kind: 'bird', frames: sparrow.fly, fps: 8, x: -40, y: top - 40 });
-        flee(id, pointer, sparrow.fly, 700);
-        const own = life(id);
-        await travel(id, perch(0.1), top, 1500, { arc: -30 });
-        pose(id, { frames: sparrow.perch, fps: 4 });
-        chirp('tweet');
-        await wait(700, own);
-        // Hops along the word, pecking at a letter or two.
-        for (const share of [0.3, 0.5, 0.68]) {
-          await travel(id, perch(share), top, 260, { arc: 10 });
-          pose(id, { frames: sparrow.peck });
-          await wait(between(300, 700), own);
-          pose(id, { frames: sparrow.perch });
-          await wait(between(300, 900), own);
-        }
-        pose(id, { frames: sparrow.look });
-        await wait(900, own);
-        pose(id, { frames: sparrow.fly, fps: 8 });
-        await travel(id, innerWidth + 40, -60, 1900, { arc: 40 });
-        remove(id);
-      },
-      async birdLedge() {
-        const box = pick(ledges());
-        if (!box) return;
-        const top = box.top - 17;
-        const fromLeft = Math.random() < 0.5;
+      async birdVisit() {
+        const all = perches(17, true);
+        if (!all.length) return;
+        const logo = all.at(-1)!;
+        let perch = chance(0.3) && brandBox() ? logo : pick(all)!;
+        const fromLeft = chance(0.5);
         const id = spawn({
           kind: 'bird',
           frames: sparrow.fly,
           fps: 8,
-          x: fromLeft ? -40 : innerWidth + 40,
-          y: top - 90
+          x: offscreen(fromLeft),
+          y: perch.y - between(80, 180)
         });
-        flee(id, pointer, sparrow.fly, 700);
+        flee(id, sparrow.fly, 700);
         const own = life(id);
-        let x = box.left + box.width * between(0.2, 0.5);
-        await travel(id, x, top, 1600, { arc: -40 });
+        let x = between(perch.left, perch.right);
+        // A swoop down under the straight line, and up onto the perch.
+        await travel(id, x, perch.y, flight(at(id), x, perch.y, 0.4), { arc: -between(20, 50) });
         pose(id, { frames: sparrow.perch, fps: 4 });
-        for (let hop = 0; hop < 3; hop++) {
-          await wait(between(500, 1200), own);
-          x = Math.min(box.right - 40, x + between(24, 60));
-          await travel(id, x, top, 280, { arc: 12 });
-          pose(id, { frames: pick([sparrow.peck, sparrow.look, sparrow.perch])! });
+        chirp('tweet');
+        const potter = async (turns: number) => {
+          for (let turn = 0; turn < turns; turn++) {
+            const doing = pick(['hop', 'hop', 'peck', 'look', 'rest'] as const)!;
+            if (doing === 'hop') {
+              const hops = chance(0.4) ? 2 : 1;
+              const way = chance(0.5) ? -1 : 1;
+              for (let hop = 0; hop < hops; hop++) {
+                const next = Math.max(perch.left, Math.min(perch.right, x + way * between(14, 36)));
+                await travel(id, next, perch.y, 240, { arc: 10 });
+                x = next;
+              }
+            } else if (doing === 'peck') {
+              for (let peck = 0; peck < 2 + Math.floor(Math.random() * 2); peck++) {
+                pose(id, { frames: sparrow.peck });
+                await wait(170, own);
+                pose(id, { frames: sparrow.perch });
+                await wait(between(150, 320), own);
+              }
+            } else if (doing === 'look') {
+              pose(id, { frames: sparrow.look, flip: chance(0.5) });
+              await wait(between(600, 1400), own);
+              pose(id, { frames: sparrow.perch, flip: false });
+            }
+            await wait(between(300, 1200), own);
+          }
+        };
+        await potter(3 + Math.floor(Math.random() * 3));
+        // Sometimes on to a second perch before leaving.
+        const others = perches(17, true).filter((other) => Math.abs(other.y - perch.y) > 8);
+        if (others.length && chance(0.45)) {
+          perch = pick(others)!;
+          x = between(perch.left, perch.right);
+          pose(id, { frames: sparrow.fly, fps: 8 });
+          await travel(id, x, perch.y, flight(at(id), x, perch.y, 0.35), {
+            arc: between(40, 80)
+          });
+          pose(id, { frames: sparrow.perch, fps: 4 });
+          await potter(2 + Math.floor(Math.random() * 2));
         }
-        await wait(1000, own);
         pose(id, { frames: sparrow.fly, fps: 8 });
-        await travel(id, fromLeft ? innerWidth + 40 : -40, top - 160, 1800, { arc: 30 });
+        const away = offscreen(chance(0.5));
+        const high = Math.max(-40, perch.y - 220);
+        await travel(id, away, high, flight(at(id), away, high, 0.45), { arc: 30 });
         remove(id);
       },
-      async butterflyPlant() {
+      async owlVisit() {
+        if (!isNight()) return;
+        const all = perches(17, true);
+        if (!all.length) return;
+        const perch = chance(0.6) && brandBox() ? all.at(-1)! : pick(all)!;
+        const fromLeft = chance(0.5);
+        const id = spawn({
+          kind: 'owl',
+          frames: owl.fly,
+          fps: 3,
+          x: offscreen(fromLeft),
+          y: perch.y - between(60, 140)
+        });
+        flee(id, owl.fly, 900);
+        const own = life(id);
+        const x = between(perch.left, perch.right);
+        // Wide and silent: a long glide in, a few slow beats, and it settles.
+        await travel(id, x, perch.y, flight(at(id), x, perch.y, 0.22), { arc: -30 });
+        pose(id, { frames: owl.perch, fps: 0.4 });
+        await wait(between(4000, 7000), own);
+        pose(id, { flip: true });
+        await wait(between(3000, 6000), own);
+        pose(id, { frames: owl.fly, fps: 3, flip: false });
+        const away = offscreen(!fromLeft);
+        await travel(id, away, perch.y - 160, flight(at(id), away, perch.y - 160, 0.25), {
+          arc: 20
+        });
+        remove(id);
+      },
+      async butterflyVisit() {
         const plants = [...document.querySelectorAll('.status-sprite.stage-bloom')]
           .map((element) => visible(element))
           .filter((box): box is DOMRect => Boolean(box));
-        const target = pick(plants) ?? pick(ledges());
-        if (!target) return;
-        const x = target.left + target.width / 2 - 9;
-        const y = target.top - 12;
-        const id = spawn({ kind: 'butterfly', frames: butterfly, fps: 10, x: x - 240, y: y - 160 });
-        flee(id, pointer, butterfly, 1100);
+        const flowers = plants.length ? plants : ledges();
+        const first = pick(flowers);
+        if (!first) return;
+        const spot = (box: DOMRect) => ({ x: box.left + box.width / 2 - 9, y: box.top - 12 });
+        let target = spot(first);
+        const fromLeft = target.x < innerWidth / 2;
+        const id = spawn({
+          kind: 'butterfly',
+          frames: butterfly,
+          fps: 10,
+          x: offscreen(fromLeft),
+          y: target.y - between(40, 160)
+        });
+        flee(id, butterfly, 1100);
         const own = life(id);
-        await travel(id, x, y, 2600, { sway: 26, easing: 'cubic-bezier(0.3, 0, 0.3, 1)' });
-        pose(id, { frames: butterfly.slice(0, 3), fps: 1.5 });
-        await wait(between(3000, 5000), own);
-        pose(id, { frames: butterfly, fps: 10 });
-        await travel(id, x + 260, y - 200, 2400, { sway: 22, easing: 'ease-in' });
+        const visits = flowers.length > 1 && chance(0.5) ? 2 : 1;
+        for (let visit = 0; visit < visits; visit++) {
+          await travel(id, target.x, target.y, flight(at(id), target.x, target.y, 0.12), {
+            sway: 26,
+            easing: 'cubic-bezier(0.3, 0, 0.3, 1)'
+          });
+          // Resting: wings fold and open slowly.
+          pose(id, { frames: butterfly.slice(0, 3), fps: 1.5 });
+          await wait(between(2500, 5000), own);
+          pose(id, { frames: butterfly, fps: 10 });
+          target = spot(pick(flowers.filter((box) => box !== first)) ?? first);
+        }
+        const away = offscreen(!fromLeft);
+        const high = Math.max(-40, at(id).y - 240);
+        await travel(id, away, high, flight(at(id), away, high, 0.14), {
+          sway: 22,
+          easing: 'ease-in'
+        });
         remove(id);
       },
       async monkeyTour() {
@@ -330,7 +432,7 @@ export default function GardenLife() {
           clip: { side: 'below', line: bar.bottom }
         });
         const hidden = (spot: Spot) => (spot.hang ? spot.y - 30 : spot.y + 26);
-        const start = Math.random() < 0.5 ? onBar() : onCard(pick(cards)!);
+        const start = chance(0.5) ? onBar() : onCard(pick(cards)!);
         const id = spawn({
           kind: 'monkey',
           frames: start.hang ? monkey.hang : monkey.sit,
@@ -342,11 +444,11 @@ export default function GardenLife() {
         const own = life(id);
         let here = start;
         escapes.set(id, async () => {
-          const at = where(id);
-          if (!at) return;
+          const spot = where(id);
+          if (!spot) return;
           chirp('ook');
-          pose(id, { clip: here.clip, frames: here.hang ? monkey.hang : monkey.jump });
-          await travel(id, at.x, hidden(here), 240, {
+          pose(id, { clip: here.clip, frames: here.hang ? monkey.hang : monkey.jump }, true);
+          await travel(id, spot.x, hidden(here), 240, {
             easing: 'cubic-bezier(0.5, 0, 0.9, 0.5)',
             force: true
           });
@@ -357,7 +459,7 @@ export default function GardenLife() {
         chirp('ook');
         await wait(900, own);
         const leaps = 1 + Math.floor(Math.random() * 3);
-        for (let leap = 0; leap < leaps && !own.cancelled; leap++) {
+        for (let leap = 0; leap < leaps; leap++) {
           const box = pick(cards.filter((card) => card !== here.box)) ?? pick(cards)!;
           const next = onCard(box);
           // Free of any border while it is in the air.
@@ -371,7 +473,7 @@ export default function GardenLife() {
           pose(id, { frames: pick([monkey.scratch, monkey.blink, monkey.sit])!, fps: 3 });
           await wait(between(900, 1800), own);
         }
-        const exit = Math.random() < 0.4 ? onBar() : here;
+        const exit = chance(0.4) ? onBar() : here;
         if (exit !== here) {
           pose(id, { frames: monkey.jump, clip: undefined });
           await travel(id, exit.x, exit.y, 900, { arc: 30 });
@@ -379,7 +481,6 @@ export default function GardenLife() {
           pose(id, { frames: monkey.hang, fps: 2 });
           await wait(700, own);
         }
-        if (own.cancelled) return;
         pose(id, { clip: exit.clip, frames: exit.hang ? monkey.hang : monkey.sit });
         await travel(id, exit.x, hidden(exit), 460, { easing: 'cubic-bezier(0.5, 0, 0.8, 0.4)' });
         remove(id);
@@ -388,62 +489,104 @@ export default function GardenLife() {
         if (narrow()) return;
         const box = pick(ledges());
         if (!box) return;
-        const start = box.left + 16;
+        // Up over the edge, a slow crawl with a rest or two, and back down behind it.
+        const rightward = chance(0.5);
         const distance = Math.min(220, box.width - 80);
+        const start = rightward ? box.left + 16 : box.right - 40;
+        const line = box.top;
         const id = spawn({
           kind: 'snail',
           frames: snail,
           fps: 1,
+          // It faces left as drawn.
+          flip: rightward,
           x: start,
-          y: box.top + 2,
-          clip: { side: 'above', line: box.top }
+          y: line + 2,
+          clip: { side: 'above', line }
         });
-        duck(id, () => box.top, 16, 600);
+        duck(id, () => line, 16, 600);
         const own = life(id);
-        // Up over the edge, a slow crawl, and back down behind it.
-        await travel(id, start, box.top - 13, 900, { easing: 'ease-out' });
+        await travel(id, start, line - 13, 900, { easing: 'ease-out' });
         pose(id, { clip: undefined });
-        await travel(id, start + distance, box.top - 13, distance * 110, { easing: 'linear' });
-        await wait(800, own);
-        pose(id, { clip: { side: 'above', line: box.top } });
-        await travel(id, start + distance, box.top + 2, 900, { easing: 'ease-in' });
+        let x = start;
+        const end = start + (rightward ? distance : -distance);
+        while (Math.abs(end - x) > 4) {
+          const next = rightward
+            ? Math.min(end, x + between(40, 90))
+            : Math.max(end, x - between(40, 90));
+          await travel(id, next, line - 13, Math.abs(next - x) * 110, { easing: 'linear' });
+          x = next;
+          pose(id, { fps: 0.5 });
+          await wait(between(600, 1800), own);
+          pose(id, { fps: 1 });
+        }
+        pose(id, { clip: { side: 'above', line } });
+        await travel(id, x, line + 2, 900, { easing: 'ease-in' });
         remove(id);
-      }
-    };
-    Object.assign(scenes, {
-      async batFlit() {
+      },
+      async batVisit() {
         if (!isNight()) return;
-        // A bat at dusk: an erratic loop across the top of the screen and gone.
-        const fromLeft = Math.random() < 0.5;
-        const y = between(70, Math.min(260, innerHeight * 0.35));
+        const bar = document.querySelector('.garden-masthead')?.getBoundingClientRect();
+        const flit = async (id: number, fromLeft: boolean) => {
+          let x = at(id).x;
+          for (let leg = 0; leg < 3; leg++) {
+            x += (fromLeft ? 1 : -1) * between(innerWidth * 0.18, innerWidth * 0.32);
+            const y = between(70, Math.min(280, innerHeight * 0.4));
+            await travel(id, x, y, between(700, 1100), {
+              arc: between(-50, 50),
+              sway: between(8, 20)
+            });
+          }
+          await travel(id, offscreen(!fromLeft), between(40, 160), 900, { arc: 30 });
+        };
+        if (bar && !narrow() && chance(0.5)) {
+          // Down from behind the masthead to hang by its feet a while, then off into the night.
+          const line = bar.bottom;
+          const x = between(innerWidth * 0.2, innerWidth * 0.8);
+          const id = spawn({
+            kind: 'bat',
+            frames: batHanging,
+            fps: 0.5,
+            x,
+            y: line - 16,
+            clip: { side: 'below', line }
+          });
+          const own = life(id);
+          escapes.set(id, async () => {
+            pose(id, { clip: { side: 'below', line }, frames: batHanging }, true);
+            await travel(id, x, line - 16, 260, { easing: 'ease-in', force: true });
+          });
+          await travel(id, x, line - 1, 900, { easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)' });
+          await wait(between(4000, 9000), own);
+          pose(id, { frames: bat, fps: 10, clip: undefined });
+          flee(id, bat, 600);
+          await travel(id, x, line + 40, 400, { easing: 'ease-in' });
+          await flit(id, x < innerWidth / 2);
+          remove(id);
+          return;
+        }
+        // An erratic loop across the top of the screen and gone.
+        const fromLeft = chance(0.5);
         const id = spawn({
           kind: 'bat',
           frames: bat,
           fps: 10,
-          x: fromLeft ? -30 : innerWidth + 30,
-          y
+          x: offscreen(fromLeft),
+          y: between(70, Math.min(260, innerHeight * 0.35))
         });
-        flee(id, pointer, bat, 600);
-        const own = life(id);
-        let x = fromLeft ? -30 : innerWidth + 30;
-        for (let leg = 0; leg < 4 && !own.cancelled; leg++) {
-          x += (fromLeft ? 1 : -1) * between(innerWidth * 0.18, innerWidth * 0.32);
-          await travel(id, x, between(60, Math.min(280, innerHeight * 0.4)), between(700, 1100), {
-            arc: between(-50, 50),
-            sway: between(8, 20)
-          });
-        }
-        await travel(id, fromLeft ? innerWidth + 40 : -40, between(40, 160), 900, { arc: 30 });
+        flee(id, bat, 600);
+        await flit(id, fromLeft);
         remove(id);
       },
       async frogHop() {
         if (narrow()) return;
         const cards = ledges();
-        const box = pick(cards);
+        let box = pick(cards);
         if (!box) return;
-        // Up over a card's top edge, a few hops along it, and back down behind it.
-        const line = box.top;
-        let x = box.left + between(20, box.width * 0.4);
+        // Eyes over a card's edge first, then up, hopping along - maybe across to another card -
+        // and back down behind whichever edge it ends on.
+        let line = box.top;
+        let x = box.left + between(20, box.width * 0.5);
         const id = spawn({
           kind: 'frog',
           frames: frog.sit,
@@ -453,18 +596,47 @@ export default function GardenLife() {
         });
         duck(id, () => line, 16, 260);
         const own = life(id);
-        await travel(id, x, line - 14, 380, { easing: 'cubic-bezier(0.2, 0.9, 0.3, 1.2)' });
+        await travel(id, x, line - 5, 500, { easing: 'ease-out' });
+        await wait(between(900, 1800), own);
+        pose(id, { frames: frog.blink });
+        await wait(200, own);
+        pose(id, { frames: frog.sit });
+        await wait(between(400, 900), own);
+        await travel(id, x, line - 14, 320, { easing: 'cubic-bezier(0.2, 0.9, 0.3, 1.2)' });
         pose(id, { clip: undefined });
-        for (let hop = 0; hop < 3 + Math.floor(Math.random() * 3) && !own.cancelled; hop++) {
-          await wait(between(500, 1300), own);
-          pose(id, { frames: Math.random() < 0.3 ? frog.blink : frog.sit });
-          await wait(between(200, 600), own);
-          const next = Math.min(box.right - 30, x + between(30, 70));
-          if (next <= x) break;
+        const hopAlong = async (count: number) => {
+          for (let hop = 0; hop < count; hop++) {
+            await wait(between(500, 1300), own);
+            if (chance(0.3)) {
+              pose(id, { frames: frog.blink });
+              await wait(180, own);
+              pose(id, { frames: frog.sit });
+            }
+            const way = x > box!.right - 70 ? -1 : x < box!.left + 40 ? 1 : chance(0.65) ? 1 : -1;
+            const next = Math.max(
+              box!.left + 12,
+              Math.min(box!.right - 30, x + way * between(28, 64))
+            );
+            pose(id, { frames: frog.leap });
+            await travel(id, next, line - 14, 420, { arc: 22 });
+            pose(id, { frames: frog.sit });
+            x = next;
+          }
+        };
+        await hopAlong(2 + Math.floor(Math.random() * 3));
+        const across = cards.filter((card) => card !== box && Math.abs(card.left - x) < 600);
+        if (across.length && chance(0.35)) {
+          box = pick(across)!;
+          const next = box.left + between(20, box.width * 0.6);
+          await wait(between(400, 900), own);
           pose(id, { frames: frog.leap });
-          await travel(id, next, line - 14, 420, { arc: 22 });
+          await travel(id, next, box.top - 14, 700 + Math.abs(next - x) * 0.5, {
+            arc: between(50, 90)
+          });
           pose(id, { frames: frog.sit });
           x = next;
+          line = box.top;
+          await hopAlong(1 + Math.floor(Math.random() * 2));
         }
         await wait(700, own);
         pose(id, { clip: { side: 'above', line } });
@@ -475,48 +647,51 @@ export default function GardenLife() {
         if (narrow()) return;
         const box = pick(ledges());
         if (!box) return;
-        const leftward = Math.random() < 0.5;
-        const from = leftward ? box.right - 30 : box.left + 16;
-        const to = leftward ? box.left + 16 : box.right - 30;
-        const id = spawn({ kind: 'ladybird', frames: ladybird, fps: 6, x: from, y: box.top - 10 });
-        flee(id, pointer, ladybird, 700);
-        await travel(id, to, box.top - 10, Math.abs(to - from) * 28, { easing: 'linear' });
-        await travel(id, to + (leftward ? -60 : 60), box.top - 120, 1400, { sway: 12 });
+        // Up over a card's edge, a walk in short bursts along it, then wings out and away.
+        const line = box.top;
+        let rightward = chance(0.5);
+        let x = rightward ? box.left + between(16, 60) : box.right - between(40, 90);
+        const id = spawn({
+          kind: 'ladybird',
+          frames: ladybird,
+          fps: 6,
+          turn: 0,
+          x,
+          y: line + 1,
+          clip: { side: 'above', line }
+        });
+        duck(id, () => line, 12, 500);
+        const own = life(id);
+        await travel(id, x, line - 10, 900, { easing: 'ease-out' });
+        pose(id, { clip: undefined, turn: rightward ? 90 : -90 });
+        await travel(id, x, line - 12, 300);
+        flee(id, ladybirdFlying, 1400);
+        for (let burst = 0; burst < 4 + Math.floor(Math.random() * 4); burst++) {
+          if (chance(0.25)) {
+            rightward = !rightward;
+            pose(id, { turn: rightward ? 90 : -90 });
+            await wait(350, own);
+          }
+          const next = rightward
+            ? Math.min(box.right - 30, x + between(20, 60))
+            : Math.max(box.left + 12, x - between(20, 60));
+          if (Math.abs(next - x) < 4) {
+            rightward = !rightward;
+            continue;
+          }
+          pose(id, { fps: 6 });
+          await travel(id, next, line - 12, Math.abs(next - x) * 28, { easing: 'linear' });
+          x = next;
+          pose(id, { fps: 1 });
+          await wait(between(300, 1200), own);
+        }
+        pose(id, { frames: ladybirdFlying, fps: 14, turn: 0 });
+        await wait(500, own);
+        const away = offscreen(rightward);
+        await travel(id, (x + away) / 2, line - between(100, 180), 1400, { sway: 14 });
+        await travel(id, away, Math.max(-40, line - between(200, 320)), 1600, { sway: 10 });
         remove(id);
       }
-    });
-    const bloom = async () => {
-      const brand = visible(document.querySelector('.garden-masthead .brand'));
-      if (!brand) return;
-      chirp('bloom');
-      const flower = spawn({
-        kind: 'flower',
-        frames: flowerBloom,
-        fps: 3,
-        x: brand.right + 6,
-        y: brand.bottom - 16
-      });
-      const flutters = [0, 1, 2].map((index) =>
-        spawn({
-          kind: 'butterfly',
-          frames: butterfly,
-          fps: 10,
-          x: brand.right,
-          y: brand.top + index * 4
-        })
-      );
-      for (const id of flutters) flee(id, pointer, butterfly, 1000);
-      await Promise.all(
-        flutters.map((id, index) =>
-          travel(id, brand.right + between(160, 420), between(120, 320) + index * 30, 2600, {
-            sway: 24
-          })
-        )
-      );
-      for (const id of flutters) if (state.has(id) && !lives.get(id)?.cancelled) remove(id);
-      pose(flower, { frames: [flowerBloom[2]!] });
-      await wait(5000, world);
-      remove(flower);
     };
 
     /*
@@ -546,58 +721,60 @@ export default function GardenLife() {
     // Capture, so a tap that lands on a button still counts.
     addEventListener('pointerdown', onPointer, { passive: true, capture: true });
 
-    const onBloom = () => void bloom().catch(() => undefined);
-    addEventListener('garden:bloom', onBloom);
-    // A named scene on request, so a visit can be watched on purpose rather than waited for.
-    const onScene = (event: Event) => {
-      const name = (event as CustomEvent<string>).detail;
-      if (scenes[name]) void scenes[name]().catch(() => undefined);
+    const active = new Set<string>();
+    const left = new Map<string, number>();
+    const run = (scene: string) => {
+      if (active.has(scene) || !scenes[scene]) return;
+      active.add(scene);
+      void scenes[scene]()
+        .catch(() => undefined)
+        .finally(() => {
+          active.delete(scene);
+          left.set(scene, Date.now());
+        });
     };
+    // A named visitor on request, so a visit can be watched on purpose rather than waited for.
+    const onScene = (event: Event) => run((event as CustomEvent<string>).detail);
     addEventListener('garden:scene', onScene);
 
-    const weights: [string, number][] = [
-      ['monkeyTour', 5],
-      ['logoVisit', 4],
-      ['birdLedge', 3],
-      ['butterflyPlant', 3],
-      ['snailCrawl', 1],
-      ['frogHop', 3],
-      ['ladybirdWalk', 2],
-      ['batFlit', isNight() ? 4 : 0]
-    ];
-    const choose = () => {
-      const total = weights.reduce((sum, [, weight]) => sum + weight, 0);
-      let roll = Math.random() * total;
-      for (const [name, weight] of weights) if ((roll -= weight) < 0) return name;
-      return 'logoVisit';
-    };
-    let timer: ReturnType<typeof setTimeout>;
     const quiet = () =>
       document.visibilityState !== 'visible' ||
       Date.now() - lastInput.current < 5000 ||
       Boolean(document.querySelector('dialog[open]:modal'));
-    const schedule = (first = false) => {
-      const [low, high] = first
-        ? [3000, 6000]
-        : mode === 'lively'
-          ? [9000, 22000]
-          : [60000, 120000];
-      timer = setTimeout(
-        async () => {
-          if (!quiet()) await scenes[choose()]!().catch(() => undefined);
-          if (!world.cancelled) schedule();
-        },
-        between(low, high)
+    const eligible = () =>
+      visitors.filter(
+        (visitor) =>
+          (!visitor.night || isNight()) &&
+          !active.has(visitor.scene) &&
+          Date.now() - (left.get(visitor.scene) ?? 0) > COOLDOWN
       );
-    };
-    schedule(true);
+    const pace = mode === 'lively' ? 1 : 0.15;
+    const tick = setInterval(() => {
+      if (quiet() || active.size >= CROWD) return;
+      // Everyone gets their own roll; at most one arrives in a tick.
+      for (const visitor of eligible().sort(() => Math.random() - 0.5))
+        if (chance(1 - Math.exp(-(visitor.perMinute * pace * TICK) / 60_000)))
+          return run(visitor.scene);
+    }, TICK);
+    // Someone is usually about soon after the garden opens.
+    const hello = setTimeout(
+      () => {
+        if (quiet() || active.size) return;
+        const choices = eligible();
+        const total = choices.reduce((sum, visitor) => sum + visitor.perMinute, 0);
+        let roll = Math.random() * total;
+        for (const visitor of choices)
+          if ((roll -= visitor.perMinute) < 0) return run(visitor.scene);
+      },
+      mode === 'lively' ? between(4000, 8000) : between(30_000, 60_000)
+    );
     return () => {
       world.cancelled = true;
-      clearTimeout(timer);
+      clearInterval(tick);
+      clearTimeout(hello);
       cancelAnimationFrame(measuring);
       removeEventListener('pointermove', onPointer);
       removeEventListener('pointerdown', onPointer, { capture: true });
-      removeEventListener('garden:bloom', onBloom);
       removeEventListener('garden:scene', onScene);
       state.clear();
       setActors([]);
@@ -613,6 +790,7 @@ export default function GardenLife() {
         else nodes.current.delete(actor.id);
       }}
       className="life-actor"
+      data-life={actor.id}
       style={
         {
           transform: `translate3d(${actor.x}px, ${
@@ -621,7 +799,9 @@ export default function GardenLife() {
         } as CSSProperties
       }
     >
-      <Sprite frames={actor.frames} fps={actor.fps ?? 4} scale={2} flip={actor.flip ?? false} />
+      <span className="life-turn" style={{ transform: `rotate(${actor.turn ?? 0}deg)` }}>
+        <Sprite frames={actor.frames} fps={actor.fps ?? 4} scale={2} flip={actor.flip ?? false} />
+      </span>
     </div>
   );
   const groups = new Map<string, { clip?: Clip; actors: Actor[] }>();

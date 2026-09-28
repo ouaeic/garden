@@ -1,3 +1,4 @@
+import { Keys } from './Keys';
 import { palettes, storedDisplayMode, storedPalette } from './appearance';
 import { setLifeMode } from './life/settings';
 import { recoverDeviceDrafts, forgetDraftKey } from './draft-storage';
@@ -587,7 +588,7 @@ function WorkspaceApp() {
           >
             <Search size={17} />
             <span>Find</span>
-            <kbd>⌘K</kbd>
+            <Keys keys={['mod', 'K']} />
           </Button>
           <Stats
             bootstrap={bootstrap}
@@ -1047,17 +1048,17 @@ function WorkspaceApp() {
           <dl className="key-list">
             {(
               [
-                ['⌘ K', 'Find anything, jump anywhere, change the screen'],
-                ['⌘ J', 'Start a new project'],
-                ['⌘ ⏎', 'Send what you have typed'],
-                ['Esc', 'Close the sheet or panel in front'],
-                ['Tab', 'Move between controls; the pointer follows'],
-                ['?', 'Show these keys']
+                [['mod', 'K'], 'Find anything, jump anywhere, change the screen'],
+                [['mod', 'J'], 'Start a new project'],
+                [['mod', 'enter'], 'Send what you have typed'],
+                [['Esc'], 'Close the sheet or panel in front'],
+                [['Tab'], 'Move between controls; the pointer follows'],
+                [['?'], 'Show these keys']
               ] as const
             ).map(([keys, meaning]) => (
-              <div key={keys}>
+              <div key={meaning}>
                 <dt>
-                  <kbd>{keys}</kbd>
+                  <Keys keys={keys} />
                 </dt>
                 <dd>{meaning}</dd>
               </div>
