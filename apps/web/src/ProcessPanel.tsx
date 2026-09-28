@@ -25,12 +25,14 @@ export default function ProcessPanel({
   taskId,
   projectId,
   compact = false,
+  visible = true,
   onOpen
 }: {
   workspaceId: string;
   taskId?: string;
   projectId?: string;
   compact?: boolean;
+  visible?: boolean;
   onOpen?: () => void;
 }) {
   const endpoint = projectId
@@ -48,7 +50,7 @@ export default function ProcessPanel({
   const [showSaved, setShowSaved] = useState(false);
   const [historyLimit, setHistoryLimit] = useState(10);
   const clock = useVisibleClock(
-    Boolean(list?.processes.some(processActive)),
+    visible && Boolean(list?.processes.some(processActive)),
     30_000,
     list?.observedAt
   );
@@ -91,29 +93,33 @@ export default function ProcessPanel({
     setShowFinished(false);
     setShowSaved(false);
     setHistoryLimit(10);
-    void refresh();
     return () => {
       generation.current++;
       request.current?.abort();
     };
   }, [refresh]);
+  useEffect(() => {
+    if (visible) void refresh();
+    else request.current?.abort();
+  }, [refresh, visible]);
   const refreshAfterMs = Math.max(60_000, list?.refreshAfterMs ?? 120_000);
   const kernels = list?.computationSessions ?? [];
   const kernelCount = kernels.filter((session) => computationActive(session.state)).length;
   const pollAfterMs = kernels.some((session) => session.state === 'busy') ? 10_000 : refreshAfterMs;
   useEffect(() => {
+    if (!visible) return;
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') void refresh();
     }, pollAfterMs);
-    const visible = () => {
+    const onVisibility = () => {
       if (document.visibilityState === 'visible') void refresh();
     };
-    document.addEventListener('visibilitychange', visible);
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       clearInterval(interval);
-      document.removeEventListener('visibilitychange', visible);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [refresh, pollAfterMs]);
+  }, [refresh, pollAfterMs, visible]);
   const active = list?.processes.filter(processActive) ?? [];
   const attention = list?.processes.filter(processNeedsAttention) ?? [];
   const finished = (
@@ -161,7 +167,9 @@ export default function ProcessPanel({
   return (
     <section
       className={`project-processes${compact ? ' desk-card desk-processes' : ''}`}
-      aria-label={taskId || projectId ? 'Project processes' : 'Computer processes'}
+      aria-label={
+        compact ? 'Jobs card' : taskId || projectId ? 'Project processes' : 'Computer processes'
+      }
     >
       <header className="process-panel-heading">
         <div>

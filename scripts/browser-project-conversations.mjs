@@ -242,7 +242,9 @@ export async function checkProjectConversations({
     await page.goto(`${origin}/?project=${project.id}`);
     await page.getByRole('heading', { name: project.title, exact: true }).waitFor();
     await page
-      .getByRole('navigation', { name: 'Project views' })
+      .locator(
+        'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+      )
       .getByRole('button', { name: 'Tools', exact: true })
       .click();
     await page
@@ -250,10 +252,8 @@ export async function checkProjectConversations({
       .getByRole('button', { name: /Assembly reference/ })
       .waitFor();
     await page.getByText('Alignment viewer', { exact: true }).waitFor();
-    await page
-      .getByRole('navigation', { name: 'Project views' })
-      .getByRole('button', { name: 'Work', exact: true })
-      .click();
+    await page.locator('.project-panel[open] > .dialog-heading > button').click();
+    await page.locator('.project-panel[open]').waitFor({ state: 'hidden' });
     const result = page.locator('.garden-delivery').filter({ hasText: resultArtifact.title });
     await result.getByRole('button', { name: 'View', exact: true }).click();
     const resultDialog = page.getByRole('dialog', { name: resultArtifact.title, exact: true });
@@ -384,7 +384,9 @@ export async function checkProjectConversations({
       .getByRole('button', { name: `${project.title} · Project overview`, exact: true })
       .click();
     await page
-      .getByRole('navigation', { name: 'Project views' })
+      .locator(
+        'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+      )
       .getByRole('button', { name: 'Activity', exact: true })
       .click();
     const journal = page.getByRole('region', { name: 'Project notes' });
@@ -409,10 +411,8 @@ export async function checkProjectConversations({
       .getByText('Use assembly version two; version one failed coverage.', { exact: true })
       .waitFor();
     await page.screenshot({ path: resolve(report, 'project-note-history.png') });
-    await page
-      .getByRole('navigation', { name: 'Project views' })
-      .getByRole('button', { name: 'Work', exact: true })
-      .click();
+    await page.locator('.project-panel[open] > .dialog-heading > button').click();
+    await page.locator('.project-panel[open]').waitFor({ state: 'hidden' });
     await page.getByRole('button', { name: 'Discuss', exact: true }).first().click();
     const linked = page.getByRole('dialog', { name: 'New conversation', exact: true });
     await linked.getByPlaceholder('Describe what you want to do…').fill('Explain this result.');
@@ -431,7 +431,9 @@ export async function checkProjectConversations({
       .getByRole('button', { name: `${project.title} · Project overview`, exact: true })
       .click();
     await page
-      .getByRole('navigation', { name: 'Project views' })
+      .locator(
+        'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+      )
       .getByRole('button', { name: 'Activity', exact: true })
       .click();
     await checkProjectUpdates({ page, fixture: updates, project, report });
@@ -454,7 +456,6 @@ export async function checkProjectConversations({
     project.conversationCount = tasks.length;
     reads.length = 0;
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.clock.install();
     const began = performance.now();
     await page.goto(`${origin}/?project=${project.id}`);
     await tabs.locator('option').nth(50).waitFor({ state: 'attached' });
@@ -462,18 +463,17 @@ export async function checkProjectConversations({
     assert.equal(await tabs.locator('option').count(), 51);
     const focusedTab = desktopTabs.getByRole('button').first();
     await focusedTab.focus();
-    await Promise.all([
-      page.waitForResponse(
-        (response) => new URL(response.url()).pathname === `/v1/projects/${project.id}`
-      ),
-      page.clock.runFor(15_100)
-    ]);
+    await page.waitForResponse(
+      (response) => new URL(response.url()).pathname === `/v1/projects/${project.id}`
+    );
     assert(
       await focusedTab.evaluate((element) => element === document.activeElement),
       'Refreshing progress must not steal conversation focus'
     );
     await page
-      .getByRole('navigation', { name: 'Project views' })
+      .locator(
+        'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+      )
       .getByRole('button', { name: 'Activity', exact: true })
       .click();
     await page
@@ -504,6 +504,8 @@ export async function checkProjectConversations({
       4,
       'Result presentation reads must stay bounded by visible recent results'
     );
+    await page.locator('.project-panel[open] > .dialog-heading > button').click();
+    await page.locator('.project-panel[open]').waitFor({ state: 'hidden' });
     let enteredTask;
     const taskPending = new Promise((done) => {
       releaseTask = done;
@@ -530,14 +532,16 @@ export async function checkProjectConversations({
       .getByRole('button', { name: `${project.title} · Project overview`, exact: true })
       .click();
     await page
-      .getByRole('navigation', { name: 'Project views' })
+      .locator(
+        'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+      )
       .getByRole('button', { name: 'Activity', exact: true })
       .click();
     await page.getByRole('region', { name: 'Conversations', exact: true }).waitFor();
     assert.equal(await tabs.locator('option').count(), 101);
     const smallInput = page.getByRole('textbox', { name: 'Find a conversation', exact: true });
     await page.setViewportSize({ width: 360, height: 340 });
-    await page.clock.runFor(50);
+    await page.evaluate(() => new Promise(requestAnimationFrame));
     await smallInput.scrollIntoViewIfNeeded();
     await smallInput.fill('Analysis');
     assert(await smallInput.evaluate((el) => document.activeElement === el));
@@ -547,13 +551,19 @@ export async function checkProjectConversations({
     await page.screenshot({ path: resolve(report, 'project-keyboard-compact-viewport.png') });
     await smallInput.fill('');
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.clock.runFor(50);
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+    await page.locator('.project-panel[open] > .dialog-heading > button').click();
+    await page.locator('.project-panel[open]').waitFor({ state: 'hidden' });
     const trigger = page.getByRole('button', { name: 'Project settings', exact: true });
     await trigger.focus();
     await trigger.press('Enter');
     await page.getByRole('dialog', { name: 'Project settings', exact: true }).waitFor();
     await page.keyboard.press('Escape');
     assert(await trigger.evaluate((el) => document.activeElement === el));
+    await page
+      .getByRole('navigation', { name: 'Project panels', exact: true })
+      .getByRole('button', { name: 'Activity', exact: true })
+      .click();
     let releasePage, enteredPage;
     const pendingPage = new Promise((done) => {
       releasePage = done;
@@ -586,7 +596,7 @@ export async function checkProjectConversations({
       .waitFor({ state: 'attached' });
     releasePage();
     await cancelledPage;
-    await page.clock.runFor(100);
+    await page.evaluate(() => new Promise(requestAnimationFrame));
     assert.deepEqual(await tabs.locator('option').allTextContents(), [
       'Open a conversation…',
       archivedTask.title
@@ -600,7 +610,7 @@ export async function checkProjectConversations({
     );
     for (const width of [1440, 360]) {
       await page.setViewportSize({ width, height: 540 });
-      await page.clock.runFor(50);
+      await page.evaluate(() => new Promise(requestAnimationFrame));
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
       await page.screenshot({ path: resolve(report, `project-keyboard-${width}.png`) });
     }
@@ -610,7 +620,10 @@ export async function checkProjectConversations({
       'Project conversation browser checks passed: persistent working-area drafts, inherited autonomy, independent creation, stable conversation order across navigation and activity, pinned conversations and restored selection, reloads, responsive names and controls, notes with correction history, and exact result references.'
     );
   } catch (error) {
-    await page.screenshot({ path: resolve(report, 'conversation-failure.png') });
+    console.error(error);
+    await page
+      .screenshot({ path: resolve(report, 'conversation-failure.png'), timeout: 5000 })
+      .catch(() => {});
     throw error;
   } finally {
     releaseTask?.();

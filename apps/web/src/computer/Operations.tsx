@@ -337,7 +337,7 @@ export function Operations({
           <ProcessPanel
             key={workspace.id}
             workspaceId={workspace.id}
-            {...(task ? { taskId: task.id } : {})}
+            {...(task?.projectId ? { projectId: task.projectId } : task ? { taskId: task.id } : {})}
           />
           <details
             className="job-debugging"

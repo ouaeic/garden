@@ -658,18 +658,6 @@
   font-size: 16px;
 }
 
-.project-shortcuts {
-  display: flex;
-  gap: 6px;
-  margin: 0 24px 8px;
-  flex-shrink: 0;
-}
-.project-shortcuts .button {
-  min-height: 32px;
-  padding: 5px 10px;
-  font-size: 16px;
-}
-
 .garden-shell .library-page .management-section {
   background: transparent;
   border: 0;

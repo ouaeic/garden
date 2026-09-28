@@ -22,6 +22,7 @@ export default function DirectoryPanel({
   taskId,
   projectId,
   openRequest = 0,
+  embedded = false,
   readOnlyRoot,
   rerunWorkspaceId,
   onRerunAnalysis
@@ -31,6 +32,7 @@ export default function DirectoryPanel({
   onRerunAnalysis?: (selection: AnalysisSelection) => void;
   projectId?: string;
   openRequest?: number;
+  embedded?: boolean;
   readOnlyRoot?: { base: string; id: string; name: string; description: string };
 }) {
   const readOnlyId = readOnlyRoot?.id,
@@ -237,27 +239,29 @@ export default function DirectoryPanel({
   }
   return (
     <section className="project-directories" aria-label="Project files">
-      <div className="directory-heading">
-        <div>
-          <h3>
-            <FolderOpen size={17} aria-hidden="true" /> Project files
-          </h3>
-          <p className="muted">
-            {readOnlyRoot
-              ? readOnlyRoot.description
-              : 'Browse working copies, scripts, data and results. Edits apply to the selected copy.'}
-          </p>
+      {!embedded && (
+        <div className="directory-heading">
+          <div>
+            <h3>
+              <FolderOpen size={17} aria-hidden="true" /> Project files
+            </h3>
+            <p className="muted">
+              {readOnlyRoot
+                ? readOnlyRoot.description
+                : 'Browse working copies, scripts, data and results. Edits apply to the selected copy.'}
+            </p>
+          </div>
+          {!openRequest && (
+            <Button
+              disabled={dirty}
+              aria-expanded={expanded}
+              onClick={() => setExpanded((value) => !value)}
+            >
+              {expanded ? 'Hide files' : 'Browse files'}
+            </Button>
+          )}
         </div>
-        {!openRequest && (
-          <Button
-            disabled={dirty}
-            aria-expanded={expanded}
-            onClick={() => setExpanded((value) => !value)}
-          >
-            {expanded ? 'Hide files' : 'Browse files'}
-          </Button>
-        )}
-      </div>
+      )}
       {expanded && (
         <>
           <ErrorNotice
@@ -304,6 +308,47 @@ export default function DirectoryPanel({
                     </label>
                   </>
                 )}
+                <Button
+                  aria-label="Refresh directory"
+                  aria-disabled={loading}
+                  onClick={() => {
+                    if (!loading) void load();
+                  }}
+                >
+                  <RefreshCw size={14} aria-hidden="true" />{' '}
+                  <span className="directory-control-label">Refresh</span>
+                </Button>
+                <a
+                  className="button"
+                  href={zipUrl(root.path)}
+                  download
+                  onClick={downloadClick}
+                  aria-label="Download directory ZIP"
+                >
+                  <Download size={14} aria-hidden="true" />{' '}
+                  <span className="directory-control-label">Download</span> ZIP
+                </a>
+              </div>
+              <div className="directory-location">
+                <nav
+                  ref={directoryPath}
+                  tabIndex={-1}
+                  className="directory-breadcrumbs"
+                  aria-label="Project directory path"
+                >
+                  {folder.split('/').map((part, index, parts) => (
+                    <span key={index}>
+                      {index > 0 && <span aria-hidden="true"> / </span>}
+                      <button
+                        disabled={dirty || index === parts.length - 1}
+                        aria-current={index === parts.length - 1 ? 'location' : undefined}
+                        onClick={() => navigate(parts.slice(0, index + 1).join('/'))}
+                      >
+                        {part}
+                      </button>
+                    </span>
+                  ))}
+                </nav>
                 <label className="directory-hidden-toggle">
                   <input
                     type="checkbox"
@@ -312,38 +357,7 @@ export default function DirectoryPanel({
                   />{' '}
                   Hidden files
                 </label>
-                <Button
-                  aria-label="Refresh directory"
-                  aria-disabled={loading}
-                  onClick={() => {
-                    if (!loading) void load();
-                  }}
-                >
-                  <RefreshCw size={14} aria-hidden="true" /> Refresh
-                </Button>
-                <a className="button" href={zipUrl(root.path)} download onClick={downloadClick}>
-                  <Download size={14} aria-hidden="true" /> Download directory ZIP
-                </a>
               </div>
-              <nav
-                ref={directoryPath}
-                tabIndex={-1}
-                className="directory-breadcrumbs"
-                aria-label="Project directory path"
-              >
-                {folder.split('/').map((part, index, parts) => (
-                  <span key={index}>
-                    {index > 0 && <span aria-hidden="true"> / </span>}
-                    <button
-                      disabled={dirty || index === parts.length - 1}
-                      aria-current={index === parts.length - 1 ? 'location' : undefined}
-                      onClick={() => navigate(parts.slice(0, index + 1).join('/'))}
-                    >
-                      {part}
-                    </button>
-                  </span>
-                ))}
-              </nav>
               {folder !== root.path && (
                 <a
                   className="button directory-folder-download"
@@ -469,11 +483,15 @@ export default function DirectoryPanel({
                   )}
                 </>
               )}
-              <p className="directory-note muted">
-                Downloads stream directly to your device. ZIPs include hidden files and empty
-                folders. Finish writing files before downloading a consistent copy. Downloads use
-                the selected working copy; running jobs keep their original inputs.
-              </p>
+              <details className="directory-note muted">
+                <summary>About these files</summary>
+                <p>
+                  Edits apply to the selected working copy. Downloads stream directly to your
+                  device. ZIPs include hidden files and empty folders. Finish writing files before
+                  downloading a consistent copy. Downloads use the selected working copy; running
+                  jobs keep their original inputs.
+                </p>
+              </details>
             </>
           )}
           {loading && <Spinner label="Loading directory…" />}

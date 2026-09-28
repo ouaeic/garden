@@ -4,7 +4,7 @@ import type { DirectoryPage, Project, ProjectDirectory, Task } from '@garden/con
 import { get } from './client';
 import { Button, ErrorNotice, Spinner } from './ui';
 import ScrollRegion from './ScrollRegion';
-import { setSurfaceLocation } from './surface-location';
+import { setSurfaceLocation, useProjectView } from './surface-location';
 import { processMemory } from './process-display';
 import { taskStatusLabel } from './model';
 import { changeSummary, useProjectChanges } from './use-project-changes';
@@ -144,6 +144,7 @@ export default function DeskSupport({
   onProcesses: () => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
+  const [view] = useProjectView();
   const recent = [...tasks].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 8);
   const changes = useProjectChanges(project.id, container, true, taskId ?? '');
   return (
@@ -160,6 +161,7 @@ export default function DeskSupport({
           workspaceId={project.workspaceId}
           projectId={project.id}
           compact
+          visible={view === 'work'}
           onOpen={onProcesses}
         />
       </Suspense>

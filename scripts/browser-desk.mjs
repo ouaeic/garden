@@ -268,6 +268,8 @@ export async function checkDesk({
       await library.getByRole('button', { name: 'Close Library', exact: true }).click();
       await library.waitFor({ state: 'detached' });
       assert.equal(page.url(), workUrl, 'Closing a panel must restore the exact project location');
+      await page.keyboard.press('Escape');
+      await page.locator('.project-panel[open]').waitFor({ state: 'hidden' });
       assert.equal(await draft.inputValue(), 'Keep this direction while I inspect my work.');
       await page
         .frameLocator('.garden-preview-frame')
@@ -325,11 +327,15 @@ export async function checkDesk({
         .waitFor();
       await settings.click();
       await fit();
-      const views = page.getByRole('navigation', { name: 'Project views', exact: true });
-      for (const view of ['Files', 'Activity', 'Tools', 'Work']) {
+      const views = page.locator(
+        'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+      );
+      for (const view of ['Files', 'Activity', 'Tools']) {
         await views.getByRole('button', { name: view, exact: true }).click();
         await fit();
       }
+      await page.keyboard.press('Escape');
+      await page.locator('.project-panel[open]').waitFor({ state: 'hidden' });
       assert.equal(await draft.inputValue(), 'Keep this direction while I inspect my work.');
       await page.getByRole('button', { name: 'Open conversation', exact: true }).click();
       await page.getByRole('dialog', { name: 'Conversation', exact: true }).waitFor();

@@ -281,16 +281,18 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
       projectBefore,
       'The project job shortcut also avoids fast polling'
     );
-    const next = page.waitForResponse((response) =>
-      response.url().endsWith(`/tasks/${taskId}/processes`)
+    const next = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname.startsWith('/v1/projects/') &&
+        response.url().endsWith('/processes')
     );
     await page.clock.runFor(2_000);
     await next;
-    assert.equal(fixture.reads, before + 1, 'Refresh process status on the relaxed interval');
+    assert.equal(fixture.reads, before, 'Project jobs do not also poll conversation jobs');
     assert.equal(
       fixture.projectReads,
-      projectBefore,
-      'The full process view must not also poll a hidden project shortcut'
+      projectBefore + 1,
+      'Only the open panel refreshes project jobs on the relaxed interval'
     );
     await card.getByText('Command & details', { exact: true }).click();
     await card.getByText('Interactive terminal · 120 × 36.', { exact: false }).waitFor();

@@ -18,8 +18,16 @@ export async function checkWorkspaceNavigation({ context, origin, task, report }
   );
   try {
     await page.goto(`${origin}/?task=${task.id}`);
-    const views = page.getByRole('navigation', { name: 'Project views', exact: true });
-    await views.getByRole('button', { name: 'Work', exact: true }).waitFor();
+    const views = page.locator(
+      'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+    );
+    const panel = page.locator('.project-panel[open]');
+    const closePanel = async () => {
+      await panel.locator(':scope > .dialog-heading > button').click();
+      await panel.waitFor({ state: 'hidden' });
+    };
+    await views.getByRole('button', { name: 'Files', exact: true }).waitFor();
+    assert.equal(await views.getByRole('button', { name: 'Work', exact: true }).count(), 0);
     await page.getByRole('button', { name: 'Continue this conversation…', exact: true }).waitFor();
     assert.equal(
       reads.some((path) => path.endsWith('/directories')),
@@ -38,9 +46,28 @@ export async function checkWorkspaceNavigation({ context, origin, task, report }
     });
     const order = await conversations.locator('option').allTextContents();
     assert(order.length > 1);
-    await views.getByRole('button', { name: 'Files', exact: true }).click();
+    const originalOutput = await page
+      .getByRole('region', { name: 'Project output', exact: true })
+      .elementHandle();
+    const originalComposer = await page.locator('.garden-task-composer').elementHandle();
+    await page
+      .getByRole('region', { name: 'Files card', exact: true })
+      .getByRole('button', { name: 'results Folder', exact: true })
+      .click();
+    await panel.waitFor();
+    assert.equal(new URL(page.url()).searchParams.get('task'), task.id);
+    assert.equal(new URL(page.url()).searchParams.get('folder'), 'workspace/results');
+    assert(
+      await originalOutput.evaluate((element) => element.isConnected),
+      'Opening a folder keeps the output mounted'
+    );
+    assert(
+      await originalComposer.evaluate((element) => element.isConnected),
+      'Opening a folder keeps the composer mounted'
+    );
     const files = page.getByRole('region', { name: 'Project files', exact: true });
     await files.getByRole('combobox', { name: 'Working copy', exact: true }).waitFor();
+    await files.getByRole('button', { name: 'workspace', exact: true }).click();
     await files.getByRole('button', { name: 'results', exact: true }).click();
     await files.getByRole('button', { name: 'View table summary.tsv', exact: true }).click();
     await files.getByRole('table').waitFor();
@@ -67,13 +94,43 @@ export async function checkWorkspaceNavigation({ context, origin, task, report }
     await page.reload();
     await page.getByRole('region', { name: 'Project processes', exact: true }).waitFor();
     assert.deepEqual(await conversations.locator('option').allTextContents(), order);
-    await views.getByRole('button', { name: 'Work', exact: true }).click();
+    await closePanel();
     await page.getByRole('button', { name: /^Continue this conversation/ }).click();
     const draft = page.locator('.garden-task-composer textarea');
     await draft.fill('Keep this follow-up draft while I inspect the files.');
     await views.getByRole('button', { name: 'Files', exact: true }).click();
-    await views.getByRole('button', { name: 'Work', exact: true }).click();
+    await closePanel();
     assert.equal(await draft.inputValue(), 'Keep this follow-up draft while I inspect the files.');
+    // A floating editor must keep unsaved changes through every dismissal path.
+    await page.route('**/file?**', (route) =>
+      route.fulfill({
+        contentType: 'text/plain',
+        headers: {
+          'x-content-sha256': 'fixture-source',
+          'x-truncated': 'false',
+          'x-end-line': '2'
+        },
+        body: 'name\tvalue\nexample\t1\n'
+      })
+    );
+    await views.getByRole('button', { name: 'Files', exact: true }).click();
+    await files.getByRole('button', { name: 'results', exact: true }).click();
+    await files.getByRole('button', { name: 'Inspect summary.tsv', exact: true }).click();
+    const editor = files.getByRole('textbox', {
+      name: 'Contents of workspace/results/summary.tsv',
+      exact: true
+    });
+    await editor.fill('name\tvalue\nchanged\t2\n');
+    await page.keyboard.press('Escape');
+    await files.getByText('Save or discard file edits before leaving.', { exact: true }).waitFor();
+    await panel.locator(':scope > .dialog-heading > button').click();
+    await views.getByRole('button', { name: 'Tools', exact: true }).click();
+    await page.goBack();
+    assert.equal(await editor.inputValue(), 'name\tvalue\nchanged\t2\n');
+    assert.equal(new URL(page.url()).searchParams.get('panel'), 'files');
+    await files.getByRole('button', { name: 'Discard edits', exact: true }).click();
+    await closePanel();
+    await page.unroute('**/file?**');
     for (const width of [1440, 768, 390, 320]) {
       await page.setViewportSize({ width, height: 900 });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
@@ -81,7 +138,7 @@ export async function checkWorkspaceNavigation({ context, origin, task, report }
         await page.getByRole('button', { name: 'Find anything', exact: true }).isVisible(),
         true
       );
-      for (const label of ['Work', 'Files', 'Activity', 'Tools'])
+      for (const label of ['Files', 'Activity', 'Tools'])
         assert.equal(
           await views.getByRole('button', { name: label, exact: true }).isVisible(),
           true
@@ -96,16 +153,41 @@ export async function checkWorkspaceNavigation({ context, origin, task, report }
             .evaluate((element) => element.clientHeight <= innerHeight * 0.4)
         );
         await settings.click();
-        assert.equal(await mode.isVisible(), true, 'Advanced controls remain directly accessible');
+        await mode.waitFor({ state: 'visible' });
         const saved = await mode.inputValue();
         await mode.selectOption('autonomous');
         await settings.click();
+        await mode.waitFor({ state: 'hidden' });
         await settings.click();
+        await mode.waitFor({ state: 'visible' });
         assert.equal(await mode.inputValue(), 'autonomous', 'Folding settings preserves choices');
         await mode.selectOption(saved);
         await settings.click();
       }
       await page.screenshot({ path: resolve(report, `workspace-${width}.png`) });
+      for (const section of ['Files', 'Activity', 'Tools']) {
+        await views.getByRole('button', { name: section, exact: true }).click();
+        await panel.waitFor();
+        const box = await panel.boundingBox();
+        assert(
+          box.x >= 0 && box.y >= 0 && box.x + box.width <= width && box.y + box.height <= 900,
+          `${section} panel fits ${width}px`
+        );
+        assert.equal(
+          await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight),
+          true,
+          'The page does not scroll'
+        );
+        await page.screenshot({
+          path: resolve(report, `panel-${section.toLowerCase()}-${width}.png`)
+        });
+      }
+      await page.keyboard.press('Escape');
+      await panel.waitFor({ state: 'hidden' });
+      assert.equal(
+        await draft.inputValue(),
+        'Keep this follow-up draft while I inspect the files.'
+      );
     }
     await page.goto(`${origin}/?view=settings&section=Models`);
     await page.getByRole('heading', { name: 'Model defaults', exact: true }).waitFor();
@@ -127,6 +209,9 @@ export async function checkWorkspaceNavigation({ context, origin, task, report }
     console.log(
       'Workspace navigation passed: lazy files, deep-linked table and tool selection, history, stable conversations, draft retention, responsive search and model disclosure.'
     );
+  } catch (error) {
+    await page.screenshot({ path: resolve(report, 'workspace-failure.png') });
+    throw error;
   } finally {
     await page.close();
   }

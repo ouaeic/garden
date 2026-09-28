@@ -83,7 +83,9 @@ export async function checkArtifactLinks({
         .getByRole('link', { name: 'Open result.json', exact: true });
       await link.waitFor();
       await page
-        .getByRole('navigation', { name: 'Project views' })
+        .locator(
+          'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+        )
         .getByRole('button', { name: 'Activity', exact: true })
         .click();
       const lane = page.locator('.garden-mission').filter({ hasText: 'Clinical source review' });
@@ -94,10 +96,8 @@ export async function checkArtifactLinks({
       const laneBounds = await lane.boundingBox();
       assert(laneBounds && laneBounds.x >= 0 && laneBounds.x + laneBounds.width <= width + 1);
       await page.screenshot({ path: resolve(report, `claim-review-${width}.png`) });
-      await page
-        .getByRole('navigation', { name: 'Project views' })
-        .getByRole('button', { name: 'Work', exact: true })
-        .click();
+      await page.locator('.project-panel[open] > .dialog-heading > button').click();
+      await page.locator('.project-panel[open]').waitFor({ state: 'hidden' });
       assert.equal(await link.getAttribute('href'), `/v1/artifacts/${artifact.id}/content`);
       assert.equal(await page.getByRole('link', { name: 'missing file', exact: true }).count(), 0);
       const before = reads;

@@ -1,3 +1,4 @@
+import ProjectPanel from './ProjectPanel';
 import { setSurfaceLocation, useProjectView, useProjectTool } from './surface-location';
 import type { ComputerTool } from './Computer';
 import { readQuestionDraft, writeQuestionDraft } from './draft-storage';
@@ -512,10 +513,8 @@ export default function TaskSurface({
     </article>
   );
   return (
-    <section
-      className={`garden-task workspace-view-${view}${attentionPanel ? ' has-attention' : ''}`}
-    >
-      <div className="run-summary" hidden={view === 'files' || view === 'tools'}>
+    <section className={`garden-task workspace-view-work${attentionPanel ? ' has-attention' : ''}`}>
+      <div className="run-summary">
         <h2 className="sr-only">{task.title}</h2>
         <div className={`status-line ${isWorking(task) || pendingDelivery ? 'active' : ''}`}>
           <i />
@@ -637,20 +636,8 @@ export default function TaskSurface({
           )}
         </div>
       </div>
-      <div
-        className="garden-task-scroll"
-        role="region"
-        aria-label={
-          view === 'work'
-            ? 'Project output'
-            : view === 'files'
-              ? 'Project files view'
-              : view === 'activity'
-                ? 'Conversation activity view'
-                : 'Project tools view'
-        }
-      >
-        <div className="garden-parent-navigation" hidden={view === 'files' || view === 'tools'}>
+      <div className="garden-task-scroll" role="region" aria-label="Project output">
+        <div className="garden-parent-navigation">
           {(!onDiscuss || task.parentTaskId) && (
             <Button
               className="quiet-button"
@@ -682,7 +669,7 @@ export default function TaskSurface({
         {loading ? (
           <Spinner label="Opening this work…" />
         ) : (
-          <div className="garden-task-layout" hidden={view !== 'work'}>
+          <div className="garden-task-layout">
             <div className="garden-task-primary">
               {/*
                * A run a ceiling stopped is the one pause that has an answer, and the answer is a
@@ -803,6 +790,8 @@ export default function TaskSurface({
             </div>
           </div>
         )}
+      </div>
+      <ProjectPanel scope={task.title}>
         {view === 'activity' && (
           <section className="conversation-activity" aria-label="Conversation activity">
             <div className="section-heading">
@@ -965,6 +954,7 @@ export default function TaskSurface({
           <div id={`directories-${task.id}`} hidden={view !== 'files'}>
             <Suspense fallback={null}>
               <DirectoryPanel
+                embedded
                 key={task.id}
                 taskId={task.id}
                 openRequest={1}
@@ -1018,7 +1008,7 @@ export default function TaskSurface({
             ))}
           </details>
         )}
-      </div>
+      </ProjectPanel>
       {panel === 'voice' && (
         <Suspense fallback={<Spinner label="Opening live voice…" />}>
           <VoiceSession
@@ -1038,7 +1028,7 @@ export default function TaskSurface({
           </Suspense>
         </Dialog>
       )}
-      <div className="garden-task-composer" hidden={view !== 'work'}>
+      <div className="garden-task-composer">
         {attentionPanel && (
           <Button
             className="primary garden-attention-jump"

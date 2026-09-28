@@ -641,9 +641,6 @@ body:has(.desk-shell),
   --muted: var(--ink);
   --dim: var(--ink);
 }
-.desk-shell .project-shortcuts {
-  margin: 0 0 8px;
-}
 .desk-shell .desk-project > .error {
   flex-shrink: 0;
   max-height: 20%;
@@ -1714,5 +1711,131 @@ html[data-workspace-short='true'] .desk-shell .management-heading p {
   }
   .garden-preview-placeholder > svg {
     display: none;
+  }
+}
+
+/* Project utilities share a floating surface while work stays visible beneath it. */
+.desk-shell .project-view-nav .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.desk-shell .project-panel[open] {
+  width: min(1120px, calc(100vw - 48px));
+  max-width: none;
+  height: min(820px, calc(var(--garden-viewport-height, 100dvh) - var(--desk-bar-height) - 48px));
+}
+.project-panel > .dialog-heading {
+  padding: 14px 20px;
+  gap: 12px;
+}
+.project-panel > .dialog-heading h2 {
+  font-size: 22px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.project-panel > .dialog-body > .project-view-nav {
+  flex: 0 0 auto;
+  justify-content: start;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.project-panel-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 20px;
+}
+.project-panel-content > :not([hidden]) + :not([hidden]) {
+  margin-top: 20px;
+}
+.project-panel .project-directories,
+.project-panel .computer,
+.project-panel .project-processes {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+}
+.project-panel .directory-toolbar {
+  margin-top: 0;
+  gap: 10px;
+}
+.project-panel .directory-root {
+  flex-basis: 240px;
+}
+.project-panel .computer-tabs {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+.project-panel .computer-tabs .button {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  min-height: 34px;
+}
+.project-panel .directory-note {
+  margin-top: 14px;
+}
+.project-panel .directory-note summary {
+  cursor: pointer;
+}
+@media (max-width: 620px) {
+  .desk-shell .project-panel[open] {
+    inset: auto 0 8px;
+    margin: 0 auto;
+    width: calc(100vw - 16px);
+    height: calc(var(--garden-viewport-height, 100dvh) - var(--desk-bar-height) - 20px);
+    max-height: calc(var(--garden-viewport-height, 100dvh) - var(--desk-bar-height) - 20px);
+  }
+  .project-panel > .dialog-heading {
+    padding: 10px 12px;
+  }
+  .project-panel > .dialog-body > .project-view-nav {
+    padding: 5px 12px;
+  }
+  .project-panel-content {
+    padding: 12px;
+  }
+  .project-panel .directory-toolbar {
+    gap: 8px;
+  }
+  .project-panel .directory-root {
+    flex-basis: 100%;
+  }
+  .desk-shell .project-view-nav .button {
+    justify-content: center;
+  }
+}
+
+.directory-location {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.directory-location .directory-hidden-toggle {
+  margin: 0;
+}
+@media (max-width: 620px) {
+  .project-panel .directory-control-label {
+    display: none;
+  }
+  .project-panel .directory-toolbar > .button {
+    flex: 0 0 auto;
+    padding-inline: 10px;
+  }
+  .project-panel .directory-entry-name {
+    flex-basis: 120px;
+  }
+  .project-panel .directory-entry-actions {
+    padding-left: 0;
   }
 }

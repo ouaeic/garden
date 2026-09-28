@@ -1335,7 +1335,9 @@ try {
     assert(projectEventRequests.length > 0, 'Opening a project must load its event page');
     assert.equal(projectEventRequests[0], null, 'Open the most recent page without a sentinel');
     await page
-      .getByRole('navigation', { name: 'Project views' })
+      .locator(
+        'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+      )
       .getByRole('button', { name: 'Activity', exact: true })
       .click();
     await page.getByRole('button', { name: 'Full activity', exact: true }).click();
@@ -1488,10 +1490,8 @@ try {
     );
     await planDialog.getByRole('button', { name: 'Close The plan', exact: true }).click();
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await page
-      .getByRole('navigation', { name: 'Project views' })
-      .getByRole('button', { name: 'Work', exact: true })
-      .click();
+    await page.locator('.project-panel[open] > .dialog-heading > button').click();
+    await page.locator('.project-panel[open]').waitFor({ state: 'hidden' });
     await revealPromptSettings(page);
     const autonomy = page.getByRole('combobox', { name: 'Approvals for this prompt', exact: true });
     await autonomy.selectOption('autonomous');
@@ -1791,7 +1791,9 @@ try {
       .click();
     await page.locator('.garden-answer').getByText('harbor-cobalt-46', { exact: true }).waitFor();
     await page
-      .getByRole('navigation', { name: 'Project views' })
+      .locator(
+        'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+      )
       .getByRole('button', { name: 'Activity', exact: true })
       .click();
     await page
@@ -1849,10 +1851,8 @@ try {
       'Created maze/index.html'
     );
     await page.screenshot({ path: resolve(report, 'recorded-trace.png') });
-    await page
-      .getByRole('navigation', { name: 'Project views' })
-      .getByRole('button', { name: 'Work', exact: true })
-      .click();
+    await page.locator('.project-panel[open] > .dialog-heading > button').click();
+    await page.locator('.project-panel[open]').waitFor({ state: 'hidden' });
     task.deliveryStatus = 'pending';
     task.pendingDeliveryCount = 1;
     presentation.delivery = { status: 'pending', pendingJobs: 1, failedJobs: 0, completedJobs: 0 };
@@ -1928,7 +1928,9 @@ try {
     assert.equal(await batchCard.locator('.badge').textContent(), 'Rendering');
     assert.equal(await batchCard.getByText('Cancelled', { exact: true }).count(), 0);
     await page
-      .getByRole('navigation', { name: 'Project views' })
+      .locator(
+        'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+      )
       .getByRole('button', { name: 'Activity', exact: true })
       .click();
     await page.getByRole('button', { name: 'Review changes', exact: true }).click();
@@ -2032,7 +2034,9 @@ try {
       .getByRole('dialog', { name: 'Projects', exact: true })
       .waitFor({ state: 'detached' });
     await page
-      .getByRole('navigation', { name: 'Project views' })
+      .locator(
+        'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+      )
       .getByRole('button', { name: 'Tools', exact: true })
       .click();
     await page.locator('.computer.panel').waitFor();

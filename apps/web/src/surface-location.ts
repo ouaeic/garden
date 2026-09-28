@@ -3,13 +3,23 @@ import { fileNavigationBlocked } from './file-navigation';
 
 const eventName = 'garden:surface-location';
 export function sheetHistoryDepth(): number {
+  return historyDepth('gardenSheetDepth');
+}
+function historyDepth(key: string): number {
   const state: unknown = history.state;
   if (!state || typeof state !== 'object') return 0;
-  const depth = (state as Record<string, unknown>).gardenSheetDepth;
+  const depth = (state as Record<string, unknown>)[key];
   return typeof depth === 'number' && Number.isSafeInteger(depth) && depth > 0 ? depth : 0;
 }
 export const projectViews = ['work', 'files', 'activity', 'tools'] as const;
 export type ProjectView = (typeof projectViews)[number];
+
+export function closeProjectPanel() {
+  if (fileNavigationBlocked()) return;
+  const depth = historyDepth('gardenProjectPanelDepth');
+  if (depth) history.go(-depth);
+  else setSurfaceLocation({ panel: null }, true);
+}
 
 /** URLs contain navigation identifiers only; drafts and credentials stay out of history. */
 export function setSurfaceLocation(values: Record<string, string | null>, replace = false) {
@@ -21,9 +31,23 @@ export function setSurfaceLocation(values: Record<string, string | null>, replac
   }
   if (url.href !== location.href) {
     const depth = sheetHistoryDepth();
+    const previousPanel = new URL(location.href).searchParams.get('panel');
+    const nextPanel = url.searchParams.get('panel');
+    const panelOpen = nextPanel && nextPanel !== 'work';
+    const previousDepth = historyDepth('gardenProjectPanelDepth');
+    const nextDepth = !panelOpen
+      ? 0
+      : previousPanel && previousPanel !== 'work'
+        ? previousDepth && previousDepth + (replace ? 0 : 1)
+        : replace
+          ? 0
+          : 1;
     // Panel sections share one close destination, including after Back and Forward.
     history[replace ? 'replaceState' : 'pushState'](
-      depth ? { gardenSheetDepth: replace ? depth : depth + 1 } : {},
+      {
+        ...(depth ? { gardenSheetDepth: replace ? depth : depth + 1 } : {}),
+        ...(nextDepth ? { gardenProjectPanelDepth: nextDepth } : {})
+      },
       '',
       url
     );

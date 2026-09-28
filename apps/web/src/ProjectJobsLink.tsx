@@ -3,6 +3,7 @@ import type { ProcessList } from '@garden/contracts';
 import { get } from './client';
 import { processActive } from './process-display';
 import { Button } from './ui';
+import { useProjectView } from './surface-location';
 
 export default function ProjectJobsLink({
   projectId,
@@ -12,7 +13,9 @@ export default function ProjectJobsLink({
   onOpen: () => void;
 }) {
   const [count, setCount] = useState<number | null>(null);
+  const [view] = useProjectView();
   useEffect(() => {
+    if (view !== 'work') return;
     const controller = new AbortController();
     let pending = false;
     const refresh = async () => {
@@ -43,7 +46,7 @@ export default function ProjectJobsLink({
       clearInterval(timer);
       document.removeEventListener('visibilitychange', refresh);
     };
-  }, [projectId]);
+  }, [projectId, view]);
   return count ? (
     <Button className="project-jobs-link" onClick={onOpen}>
       {count} {count === 1 ? 'job' : 'jobs'} running

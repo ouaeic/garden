@@ -85,7 +85,8 @@ export function Dialog({
   onClose,
   wide = false,
   className = '',
-  dismissOnBackdrop = false
+  dismissOnBackdrop = false,
+  open = true
 }: {
   title: string;
   children: ReactNode;
@@ -93,10 +94,12 @@ export function Dialog({
   wide?: boolean;
   className?: string;
   dismissOnBackdrop?: boolean;
+  open?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   useEffect(() => {
+    if (!open) return;
     const previous = document.activeElement;
     const dialog = ref.current;
     dialog?.showModal();
@@ -104,7 +107,7 @@ export function Dialog({
       dialog?.close();
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
     };
-  }, []);
+  }, [open]);
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog || !dismissOnBackdrop) return;
