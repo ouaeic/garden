@@ -207,30 +207,9 @@ body:has(.desk-shell),
   color: var(--muted);
   flex-shrink: 0;
 }
-.desk-update-row > .garden-project-dot {
-  margin-top: 7px;
-}
 .desk-update-row > svg {
   color: var(--muted);
   margin-top: 3px;
-}
-.desk-action-copy {
-  flex: 1;
-  min-width: 0;
-}
-.desk-action-copy > span {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 16px;
-  line-height: 1.5;
-  margin-top: 5px;
-}
-.desk-action-copy > .desk-action-status {
-  color: var(--accent);
-  font-size: 16px;
 }
 
 .garden-shell.desk-shell .desk-project {

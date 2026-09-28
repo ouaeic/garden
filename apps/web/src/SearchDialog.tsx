@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, Command, FileText, Search } from './icons';
+import { Command, FileText, Search } from './icons';
 import type { Task, Workspace } from '@garden/contracts';
 import { get } from './client';
 import { taskStatusLabel } from './model';
@@ -12,7 +12,8 @@ export default function SearchDialog({
   onClose,
   onTask,
   onView,
-  onNew
+  onNew,
+  settings = []
 }: {
   workspace: Workspace | null;
   tasks: Task[];
@@ -20,6 +21,8 @@ export default function SearchDialog({
   onTask: (id: string) => void;
   onView: (view: View) => void;
   onNew: () => void;
+  /** Screen preferences that can be flipped without opening Settings. */
+  settings?: { label: string; action: () => void }[];
 }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Array<{ taskId: string; title: string; excerpt: string }>>(
@@ -61,7 +64,8 @@ export default function SearchDialog({
     { label: 'Computer — files, terminal, browser, desktop', action: () => onView('computer') },
     { label: 'Automations — schedules and watches', action: () => onView('automations') },
     { label: 'Library — results, memory, skills', action: () => onView('library') },
-    { label: 'Settings — models, spending, appearance, account', action: () => onView('settings') }
+    { label: 'Settings — models, spending, appearance, account', action: () => onView('settings') },
+    ...settings
   ];
   return (
     <Dialog title="Find anything" onClose={onClose}>
@@ -79,10 +83,9 @@ export default function SearchDialog({
         {commands
           .filter((command) => command.label.toLowerCase().includes(query.toLowerCase()))
           .map((command) => (
-            <button key={command.label} onClick={command.action}>
+            <button key={command.label} className="cursor-row" onClick={command.action}>
               <Command size={15} />
               {command.label}
-              <ArrowUpRight size={15} />
             </button>
           ))}
         {(query
@@ -93,13 +96,12 @@ export default function SearchDialog({
               excerpt: taskStatusLabel(task)
             }))
         ).map((result) => (
-          <button key={result.taskId} onClick={() => onTask(result.taskId)}>
+          <button key={result.taskId} className="cursor-row" onClick={() => onTask(result.taskId)}>
             <FileText size={17} />
             <span>
               {result.title}
               <small>{result.excerpt}</small>
             </span>
-            <ArrowUpRight size={15} />
           </button>
         ))}
       </div>

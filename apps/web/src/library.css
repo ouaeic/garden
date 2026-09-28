@@ -122,12 +122,6 @@
 .library-connector-scope small {
   display: block;
 }
-.library-draft-preview {
-  margin: 14px 0;
-  padding: 14px;
-  background: var(--raised-fill);
-  border-radius: 0;
-}
 @media (max-width: 600px) {
   .library-results {
     grid-template-columns: 1fr;

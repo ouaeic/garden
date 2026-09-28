@@ -310,3 +310,27 @@
     padding-block: 2px;
   }
 }
+
+.key-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+.key-list > div {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+}
+.key-list dd {
+  margin: 0;
+}
+.key-list kbd {
+  display: inline-block;
+  min-width: 48px;
+  padding: 4px 8px;
+  border: 1px solid var(--text);
+  box-shadow: 2px 2px 0 var(--tint);
+  font: 16px var(--font-mono);
+  text-align: center;
+}

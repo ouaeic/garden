@@ -1,56 +1,3 @@
-.garden-welcome {
-  position: relative;
-  isolation: isolate;
-  border-radius: 0;
-  padding: clamp(24px, 3.5vw, 48px);
-  margin-bottom: 38px;
-  overflow: hidden;
-}
-.garden-welcome .overview-top {
-  margin: 0 0 26px;
-}
-.garden-welcome h1 {
-  font-size: 48px;
-  letter-spacing: 0;
-  margin: 12px 0;
-}
-.garden-welcome .eyebrow {
-  color: var(--muted);
-}
-.garden-welcome .overview-top p {
-  max-width: 32rem;
-  color: var(--muted);
-  margin: 14px 0 0;
-  font-size: 16px;
-}
-.garden-welcome .first-intent {
-  max-width: none;
-  margin: 0;
-}
-.garden-welcome .intent-editor {
-  border-color: var(--line);
-}
-.garden-welcome .intent-editor > textarea {
-  min-height: 72px;
-}
-.garden-projects-heading {
-  display: flex;
-  align-items: baseline;
-  gap: 16px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-}
-.garden-projects-heading h2 {
-  font-family: inherit;
-  font-weight: 500;
-  font-size: 24px;
-  line-height: 1.3;
-  margin: 0;
-}
-.garden-projects-heading span {
-  color: var(--muted);
-  font-size: 16px;
-}
 .garden-health {
   border: 0;
   position: relative;
@@ -99,15 +46,8 @@
   display: flex;
   flex-wrap: wrap;
 }
-.garden-shell .garden-new-work:hover {
-  background: var(--lcd-texture-inverse), var(--paper);
-  filter: brightness(0.96);
-}
 .garden-shell .garden-masthead-end {
   margin-left: 12px;
-}
-.garden-shell .garden-main-navigation .selected {
-  color: var(--accent);
 }
 .garden-shell .project-conversation-tabs button[aria-selected='true'] {
   color: var(--ink);
@@ -138,12 +78,6 @@
 .garden-shell .garden-output-primary {
   border-radius: 0;
   box-shadow: var(--surface-shadow);
-}
-.garden-shell .garden-project-tools {
-  margin: 12px 0 0;
-}
-.garden-shell .garden-project-tools > summary {
-  font-size: 16px;
 }
 .garden-shell .garden-task .run-summary {
   padding-top: 12px;
@@ -193,38 +127,6 @@
   .garden-shell .garden-main {
     border-radius: 0;
   }
-  .garden-welcome {
-    padding: 24px 18px 18px;
-    margin: -4px -6px 28px;
-    border-radius: 0;
-  }
-  .garden-welcome .overview-top {
-    margin-bottom: 20px;
-  }
-  .garden-welcome h1 {
-    font-size: 32px;
-  }
-  .garden-welcome .eyebrow {
-    font-size: 16px;
-    letter-spacing: 0;
-  }
-  .garden-welcome .overview-top p {
-    max-width: 19rem;
-    font-size: 16px;
-  }
-  .garden-welcome .intent-editor {
-    padding: 12px;
-  }
-  .garden-welcome .intent-editor > textarea {
-    font-size: 16px;
-  }
-  .garden-projects-heading {
-    gap: 6px;
-    margin-bottom: 16px;
-  }
-  .garden-projects-heading span {
-    width: 100%;
-  }
   .garden-shell .garden-task-aside {
     padding: 18px;
   }
@@ -241,13 +143,6 @@
   padding: 14px clamp(1rem, 3vw, 2.75rem);
   border-radius: 0;
   margin-bottom: 0;
-}
-.garden-shell .garden-project-tools {
-  border-top: 0;
-}
-.garden-shell .garden-project-tools > summary {
-  min-height: 32px;
-  padding: 6px 0;
 }
 @media (max-width: 760px) {
   .garden-shell .project-space-header {

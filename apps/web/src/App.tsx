@@ -1,4 +1,5 @@
-import { storedDisplayMode, storedPalette } from './appearance';
+import { palettes, storedDisplayMode, storedPalette } from './appearance';
+import { setLifeMode } from './life/settings';
 import { recoverDeviceDrafts, forgetDraftKey } from './draft-storage';
 import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -117,6 +118,7 @@ function WorkspaceApp() {
     source?: ConversationSource;
   } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [keysOpen, setKeysOpen] = useState(false);
   const [tool, setTool] = useState<Tool>('files');
   const [computerOpened, setComputerOpened] = useState(
     initialNavigation().view === 'computer' ||
@@ -333,6 +335,16 @@ function WorkspaceApp() {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'j') {
         event.preventDefault();
         setNewWork(true);
+      }
+      const target = event.target as HTMLElement | null;
+      if (
+        event.key === '?' &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !target?.closest('input, textarea, select, [contenteditable="true"], dialog[open]')
+      ) {
+        event.preventDefault();
+        setKeysOpen(true);
       }
     };
     document.addEventListener('keydown', key);
@@ -1026,6 +1038,29 @@ function WorkspaceApp() {
           </Suspense>
         </Dialog>
       )}
+      {keysOpen && (
+        <Dialog title="Keys" onClose={() => setKeysOpen(false)}>
+          <dl className="key-list">
+            {(
+              [
+                ['⌘ K', 'Find anything, jump anywhere, change the screen'],
+                ['⌘ J', 'Start a new project'],
+                ['⌘ ⏎', 'Send what you have typed'],
+                ['Esc', 'Close the sheet or panel in front'],
+                ['Tab', 'Move between controls; the pointer follows'],
+                ['?', 'Show these keys']
+              ] as const
+            ).map(([keys, meaning]) => (
+              <div key={keys}>
+                <dt>
+                  <kbd>{keys}</kbd>
+                </dt>
+                <dd>{meaning}</dd>
+              </div>
+            ))}
+          </dl>
+        </Dialog>
+      )}
       {searchOpen && (
         <Suspense fallback={<Spinner label="Opening search…" />}>
           <SearchDialog
@@ -1044,6 +1079,22 @@ function WorkspaceApp() {
               setSearchOpen(false);
               setNewWork(true);
             }}
+            settings={[
+              {
+                label: theme === 'dark' ? 'Theme — light mode' : 'Theme — dark mode',
+                action: () => setTheme(theme === 'dark' ? 'light' : 'dark')
+              },
+              ...palettes
+                .filter((item) => item.value !== palette)
+                .map((item) => ({
+                  label: `Palette — ${item.label}`,
+                  action: () => setPalette(item.value)
+                })),
+              ...(['lively', 'calm', 'still'] as const).map((mode) => ({
+                label: `Garden life — ${mode}`,
+                action: () => setLifeMode(mode)
+              }))
+            ]}
           />
         </Suspense>
       )}

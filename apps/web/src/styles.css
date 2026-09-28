@@ -401,10 +401,6 @@ canvas {
   margin: 0;
   overflow-wrap: anywhere;
 }
-.load-more {
-  text-align: center;
-  margin: 28px 0;
-}
 .brand {
   display: flex;
   align-items: center;
@@ -463,29 +459,6 @@ canvas {
   color: var(--ink);
   font-size: 16px;
 }
-.overview-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 22px;
-  margin: 10px 0 32px;
-}
-.overview-top h1 {
-  margin-bottom: 0;
-}
-.overview-top .row {
-  flex-shrink: 0;
-}
-.first-intent {
-  max-width: 780px;
-  margin: 35px auto 60px;
-  position: relative;
-}
-.first-intent > p {
-  font-size: 16px;
-  text-align: center;
-  margin: 18px 0;
-}
 .setup-note {
   display: flex;
   align-items: center;
@@ -507,27 +480,6 @@ canvas {
   color: var(--muted);
   font-size: 16px;
   margin: 0;
-}
-.attention-strip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 15px;
-  padding: 17px 22px;
-  width: 100%;
-  border: 1px solid var(--line-strong);
-  border-radius: 0;
-  background: var(--raised-fill);
-  margin: 0 0 32px;
-  font-size: 16px;
-}
-.attention-strip span {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.attention-strip > span:last-child {
-  color: var(--muted);
 }
 .work-filter {
   display: flex;
@@ -572,45 +524,6 @@ canvas {
   padding: 8px 0;
   font-size: 16px;
   width: 165px;
-}
-.work-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
-}
-.card-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  color: var(--muted);
-}
-.card-bottom {
-  margin-top: auto;
-}
-.card-bottom h2 {
-  font-size: 24px;
-  letter-spacing: 0;
-  line-height: 1.2;
-  max-height: 90px;
-  overflow: hidden;
-  margin: 0 0 19px;
-}
-.card-bottom small {
-  color: var(--muted);
-  font-size: 16px;
-}
-.card-bottom .status-line {
-  font-size: 16px;
-}
-.scheduled-work {
-  margin-top: 40px;
-}
-.scheduled-work details {
-  margin-bottom: 12px;
-}
-.scheduled-work summary .muted {
-  font-size: 16px;
-  margin-left: 12px;
 }
 .connection {
   display: inline-flex;
@@ -825,33 +738,6 @@ canvas {
 .notices article {
   padding: 12px 0;
 }
-.work-tools {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  border-top: 1px solid var(--line);
-  padding: 24px 0;
-  margin-top: 30px;
-}
-.work-tools > .eyebrow {
-  margin-right: 15px;
-}
-.work-tools .button {
-  border-color: transparent;
-  color: var(--muted);
-  font-size: 16px;
-}
-.mode-floor {
-  display: flex;
-  gap: 12px;
-  font-size: 16px;
-  line-height: 1.7;
-  color: var(--muted);
-}
-.mode-floor svg {
-  margin-top: 3px;
-}
 .plan-editor-group {
   display: grid;
   gap: 8px;
@@ -919,11 +805,6 @@ canvas {
   font-size: 16px;
   max-height: 180px;
   overflow: auto;
-}
-.scope-label {
-  font-size: 16px;
-  color: var(--muted);
-  padding: 4px 10px;
 }
 .decision-grid {
   display: grid;
@@ -1061,19 +942,6 @@ canvas {
 .intent-editor > textarea::placeholder {
   color: var(--muted);
   color: var(--muted);
-}
-.intent-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px;
-}
-.intent-options .field {
-  font-size: 16px;
-  min-width: 0;
-}
-.intent-options input,
-.intent-options select {
-  font-size: 16px;
 }
 .intent-editor > .check {
   margin: 16px 0 3px;
@@ -1261,17 +1129,6 @@ canvas {
   position: relative;
   z-index: 1;
 }
-.welcome-art {
-  position: absolute;
-  right: 10%;
-  top: 20%;
-  width: min(36vw, 400px);
-  height: auto;
-  fill: var(--text);
-  opacity: 0.13;
-  shape-rendering: crispEdges;
-  pointer-events: none;
-}
 .recovery-record {
   max-width: 500px;
   padding: 26px;
@@ -1317,18 +1174,10 @@ canvas {
     clip-path: inset(0);
   }
 }
-@media (min-width: 1550px) {
-  .work-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
 @media (max-width: 1100px) {
   .global-search span,
   .global-search kbd {
     display: none;
-  }
-  .work-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .decision-card,
   .question-card {
@@ -1339,33 +1188,6 @@ canvas {
   .brand {
     font-size: 24px;
     gap: 10px;
-  }
-  .overview-top {
-    margin: 7px 0 27px;
-    align-items: flex-start;
-    gap: 15px;
-  }
-  .overview-top h1 {
-    font-size: 40px;
-    letter-spacing: 0;
-    max-width: 450px;
-  }
-  .overview-top > .row {
-    flex-direction: column;
-    align-items: flex-end;
-  }
-  .overview-top > .row > .primary {
-    font-size: 0;
-    gap: 0;
-    padding: 11px;
-    min-width: 43px;
-  }
-  .overview-top .eyebrow {
-    font-size: 16px;
-  }
-  .overview-top select {
-    font-size: 16px;
-    max-width: 110px;
   }
   .work-filter {
     align-items: stretch;
@@ -1389,12 +1211,6 @@ canvas {
     flex: 1;
     width: 100%;
   }
-  .work-grid {
-    gap: 16px;
-  }
-  .card-bottom h2 {
-    font-size: 24px;
-  }
   .setup-note {
     gap: 15px;
     padding: 22px;
@@ -1405,20 +1221,6 @@ canvas {
   }
   .setup-note .button {
     width: 100%;
-  }
-  .attention-strip {
-    font-size: 16px;
-    padding: 16px;
-  }
-  .attention-strip > span:last-child {
-    font-size: 0;
-    gap: 0;
-  }
-  .attention-strip > span:last-child svg {
-    width: 19px;
-  }
-  .first-intent {
-    margin: 20px auto 36px;
   }
   .work-attention {
     order: -1;
@@ -1471,20 +1273,6 @@ canvas {
     align-items: flex-start;
     gap: 12px;
   }
-  .work-tools {
-    gap: 2px;
-    margin-top: 22px;
-    padding: 19px 0;
-  }
-  .work-tools > .eyebrow {
-    width: 100%;
-    margin-bottom: 8px;
-  }
-  .work-tools .button {
-    padding: 8px 10px;
-    font-size: 16px;
-    min-height: 40px;
-  }
   .artifact-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
@@ -1532,14 +1320,6 @@ canvas {
     font-size: 16px;
     min-height: 54px;
   }
-  .intent-options {
-    grid-template-columns: 1fr;
-    gap: 24px;
-  }
-  .intent-options input,
-  .intent-options select {
-    font-size: 16px;
-  }
   .intent-editor .check {
     font-size: 16px;
     line-height: 1.6;
@@ -1581,13 +1361,6 @@ canvas {
     font-size: 16px;
     max-width: 300px;
   }
-  .welcome-art {
-    right: -90%;
-    width: 140vw;
-    height: 140vw;
-    top: 15%;
-    opacity: 0.25;
-  }
   .login-form {
     margin-top: 30px;
   }
@@ -1616,15 +1389,6 @@ canvas {
   }
 }
 @media (max-width: 480px) {
-  .work-grid {
-    grid-template-columns: 1fr;
-  }
-  .overview-top h1 {
-    font-size: 32px;
-  }
-  .welcome-art {
-    display: none;
-  }
   .welcome-content {
     margin-top: 65px;
   }
@@ -1642,7 +1406,6 @@ canvas {
   }
 }
 @media print {
-  .work-tools,
   .run-summary .button,
   .work-attention,
   .skip-link {

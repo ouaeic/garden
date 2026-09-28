@@ -67,3 +67,24 @@
     display: none;
   }
 }
+/* The status gives way to the controls on narrow screens rather than running under them. */
+.run-summary .status-line {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.run-summary .run-status-button {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.run-summary > .row {
+  flex-shrink: 0;
+}
+@media (max-width: 700px) {
+  .question-card h2,
+  .decision-card h2 {
+    font-size: 24px;
+  }
+}

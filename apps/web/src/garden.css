@@ -6,9 +6,6 @@
   grid-template-rows: calc(66px + env(safe-area-inset-top, 0px)) minmax(0, 1fr);
   overflow: hidden;
 }
-.garden-shell.sidebar-closed {
-  grid-template-columns: 0 minmax(0, 1fr);
-}
 .garden-shell > * {
   min-width: 0;
   min-height: 0;
@@ -55,7 +52,6 @@
   border-radius: 0;
   background: var(--raised-fill);
 }
-.garden-work-heading h1,
 .garden-output-header h2,
 .garden-progress h2 {
   color: var(--text);
@@ -65,19 +61,6 @@
   place-items: center;
   min-height: 40px;
   flex-shrink: 0;
-}
-.garden-main-navigation {
-  display: flex;
-  gap: 3px;
-  margin-left: 34px;
-}
-.garden-main-navigation .button {
-  font-size: 16px;
-  color: var(--muted);
-}
-.garden-main-navigation .selected {
-  color: var(--text);
-  background: var(--raised-fill);
 }
 .garden-masthead-end {
   display: flex;
@@ -93,107 +76,6 @@
   gap: 10px;
   color: var(--muted);
   font-size: 16px;
-}
-.garden-sidebar {
-  grid-column: 1;
-  grid-row: 2 / -1;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  width: 232px;
-  padding: 24px 18px 16px;
-  border-right: 1px solid var(--line);
-  background: var(--lcd-texture), var(--chrome);
-  overflow: hidden;
-}
-.sidebar-closed .garden-sidebar {
-  visibility: hidden;
-}
-.garden-sidebar-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.garden-sidebar-close,
-.garden-sidebar-scrim {
-  display: none;
-}
-.garden-new-work {
-  justify-content: flex-start;
-  background: var(--lcd-texture-inverse), var(--paper);
-  border-color: transparent;
-  color: var(--ink);
-  font-size: 16px;
-  padding: 12px;
-}
-.garden-sidebar-home {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border: 0;
-  background: none;
-  padding: 8px 9px;
-  color: var(--muted);
-  text-align: left;
-  font-size: 16px;
-  border-radius: 0;
-}
-.garden-sidebar-home.selected {
-  background: var(--raised-fill);
-  color: var(--text);
-}
-.garden-sidebar-home > span {
-  margin-left: auto;
-  color: var(--dim);
-  font-size: 16px;
-}
-.garden-sidebar-search {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  border-bottom: 1px solid var(--line);
-  color: var(--dim);
-}
-.garden-sidebar-search input {
-  border: 0;
-  background: transparent;
-  padding: 7px 2px;
-  width: 100%;
-  font-size: 16px;
-}
-.garden-project-list {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  overflow-y: auto;
-  min-height: 0;
-  flex: 1;
-  scrollbar-width: thin;
-  margin: 0 -7px;
-  padding: 0 7px;
-}
-.garden-project-list > button {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  text-align: left;
-  border: 1px solid transparent;
-  border-radius: 0;
-  background: none;
-  padding: 8px;
-  min-height: 36px;
-  min-width: 0;
-}
-.garden-project-list > button:hover {
-  background: var(--raised-fill);
-}
-.garden-project-list > button[aria-current] {
-  background: var(--lcd-texture-inverse), var(--paper);
-  border-color: var(--line);
-  color: var(--ink);
-  --muted: var(--ink);
-  --dim: var(--ink);
 }
 .garden-project-title {
   display: block;
@@ -211,13 +93,11 @@
   line-height: 1.45;
 }
 @media (prefers-reduced-motion: no-preference) {
-  .garden-project-list
-    button:is(:hover, :focus-visible)
+  :focus-visible)
     .garden-project-title[data-overflow='true'] {
     text-overflow: clip;
   }
-  .garden-project-list
-    button:is(:hover, :focus-visible)
+  :focus-visible)
     .garden-project-title[data-overflow='true']
     strong {
     animation: garden-title-reveal var(--title-duration) steps(40, end) 0.8s infinite alternate;
@@ -232,40 +112,6 @@
   100% {
     transform: translateX(var(--title-overflow));
   }
-}
-.garden-project-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 0;
-  flex-shrink: 0;
-  background: var(--lcd-texture-inverse), var(--dim);
-  opacity: 0.6;
-}
-.garden-project-dot.status-running {
-  background: var(--lcd-texture-inverse), var(--accent);
-  opacity: 1;
-  box-shadow: var(--surface-shadow);
-}
-.garden-project-dot.status-awaiting_user,
-.garden-project-dot.status-failed {
-  background: var(--lcd-texture-inverse), var(--text);
-  opacity: 1;
-}
-.garden-sidebar-bottom {
-  border-top: 1px solid var(--line);
-  padding: 14px 4px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  color: var(--muted);
-}
-.garden-sidebar-bottom .status-line {
-  font-size: 16px;
-}
-.garden-sidebar-bottom small {
-  font-size: 16px;
-  color: var(--dim);
-  padding-left: 14px;
 }
 .garden-main {
   grid-column: 2;
@@ -298,49 +144,6 @@
   right: 0;
   z-index: 30;
 }
-.garden-work-card {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  text-align: left;
-  background: var(--lcd-texture), var(--panel);
-  color: var(--text);
-  border: 1px solid var(--line);
-  border-radius: 0;
-  padding: 21px;
-  min-height: 200px;
-}
-.garden-work-card:hover {
-  border-color: var(--line-strong);
-  background: var(--raised-fill);
-}
-.garden-work-card .card-top {
-  padding: 0;
-}
-.garden-work-card .card-bottom {
-  padding: 0;
-  margin-top: auto;
-}
-.garden-work-card .card-bottom h2 {
-  font-size: 24px;
-  margin: 22px 0 20px;
-  line-height: 1.25;
-}
-.garden-work-card .card-bottom > .row {
-  flex-wrap: wrap;
-}
-.garden-card-artifact {
-  margin: 22px 0 0;
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  color: var(--muted);
-  font-size: 16px;
-  overflow-wrap: anywhere;
-}
-.garden-card-artifact svg {
-  flex-shrink: 0;
-}
 .garden-task {
   flex: 1;
   min-width: 0;
@@ -354,41 +157,6 @@
   padding: 24px clamp(22px, 3vw, 44px) 25px;
   scrollbar-width: thin;
   scroll-padding: 24px;
-}
-.garden-work-navigation {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-}
-.garden-work-navigation .button {
-  padding: 3px 7px;
-  min-height: 30px;
-  font-size: 16px;
-}
-.garden-work-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 24px;
-}
-.garden-work-heading > div:first-child {
-  min-width: 0;
-}
-.garden-work-heading h1 {
-  font-size: 32px;
-  margin: 8px 0 14px;
-  max-width: 880px;
-  text-wrap: balance;
-}
-.garden-heading-actions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-  padding-top: 4px;
-}
-.garden-heading-actions .primary {
-  display: none;
 }
 .garden-task .run-summary {
   padding: 10px 0 18px;
@@ -467,16 +235,6 @@
 .garden-task .completion-record.needs-review {
   border-color: var(--muted);
 }
-.garden-task .work-tools {
-  margin: 0 0 12px;
-  padding: 10px 0;
-  gap: 6px;
-}
-.garden-task .work-tools .button {
-  font-size: 16px;
-  padding: 8px 11px;
-  min-height: 36px;
-}
 .garden-task-composer {
   min-width: 0;
   min-height: 0;
@@ -499,9 +257,6 @@
   max-height: min(180px, 25dvh);
   font-size: 16px;
   padding: 6px 3px;
-}
-.garden-task-composer .intent-footnote {
-  margin-bottom: 0;
 }
 .garden-task-composer .selected-context {
   display: flex;
@@ -885,29 +640,6 @@
   margin: 0 0 0 12px;
   font-size: 16px;
 }
-.garden-metrics {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 20px;
-  border-block: 1px solid var(--line);
-  padding: 16px 0;
-  margin: 0 0 22px;
-}
-.garden-metrics > div {
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 3px;
-}
-.garden-metrics dt {
-  font-size: 16px;
-  color: var(--muted);
-}
-.garden-metrics dd {
-  margin: 0;
-  font:
-    27px var(--font-display),
-    serif;
-}
 .garden-milestone-disclosure > summary {
   font-size: 16px;
   color: var(--muted);
@@ -963,16 +695,9 @@
   .garden-shell {
     grid-template-columns: 206px minmax(0, 1fr);
   }
-  .garden-sidebar {
-    width: 206px;
-    padding-inline: 14px;
-  }
   .garden-masthead-end .global-search span,
   .garden-masthead-end .global-search kbd {
     display: none;
-  }
-  .garden-main-navigation {
-    margin-left: 10px;
   }
   .garden-task-layout {
     grid-template-columns: minmax(0, 1fr) 235px;
@@ -1009,8 +734,7 @@
   }
 }
 @media (max-width: 760px) {
-  .garden-shell,
-  .garden-shell.sidebar-closed {
+  .garden-shell {
     grid-template-columns: 0 minmax(0, 1fr);
     grid-template-rows: calc(60px + env(safe-area-inset-top, 0px)) minmax(0, 1fr);
   }
@@ -1026,16 +750,6 @@
     min-width: 34px;
     padding: 7px;
   }
-  .garden-main-navigation {
-    margin-left: auto;
-    gap: 0;
-  }
-  .garden-main-navigation .button {
-    padding: 8px;
-  }
-  .garden-main-navigation .button > span {
-    display: none;
-  }
   .garden-masthead-end {
     margin-left: 0;
   }
@@ -1043,53 +757,11 @@
   .garden-masthead-end > .button[aria-label^='Switch'] {
     display: none;
   }
-  .garden-sidebar {
-    position: fixed;
-    top: calc(60px + env(safe-area-inset-top, 0px));
-    bottom: 0;
-    left: 0;
-    z-index: 40;
-    width: min(290px, 84vw);
-    background: var(--lcd-texture), var(--bg);
-    border-right: 1px solid var(--line-strong);
-    box-shadow: var(--surface-shadow);
-  }
-  .garden-sidebar-scrim {
-    display: block;
-    position: fixed;
-    inset: calc(60px + env(safe-area-inset-top, 0px)) 0 0;
-    z-index: 35;
-    background: var(--veil);
-    border: 0;
-  }
-  .garden-sidebar-close {
-    display: inline-flex;
-    padding: 4px;
-    min-height: 28px;
-  }
   .garden-main {
     padding: 22px 18px;
   }
   .garden-task-scroll {
     padding: 17px 18px 20px;
-  }
-  .garden-work-navigation {
-    margin-bottom: 12px;
-  }
-  .garden-work-heading {
-    gap: 10px;
-  }
-  .garden-work-heading h1 {
-    font-size: 32px;
-    margin-bottom: 14px;
-    text-wrap: initial;
-  }
-  .garden-heading-actions .button {
-    padding: 7px;
-    min-height: 34px;
-  }
-  .garden-heading-actions .button span {
-    display: none;
   }
   .garden-task .run-summary {
     gap: 10px;
@@ -1187,14 +859,6 @@
 .model-picker-trigger:hover {
   background: var(--raised-fill);
 }
-.garden-sidebar-theme {
-  font-size: 16px;
-  justify-content: flex-start;
-  border: 0;
-  padding: 7px 0;
-  min-height: 28px;
-  color: var(--dim);
-}
 .garden-media-jobs {
   display: grid;
   gap: 16px;
@@ -1286,90 +950,6 @@
     flex-wrap: wrap;
   }
 }
-.garden-work-trace {
-  margin: 0;
-  padding: 21px;
-  border: 1px solid var(--line);
-  border-radius: 0;
-  background: var(--lcd-texture), var(--panel);
-}
-.garden-work-trace figcaption {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 25px;
-}
-.garden-work-trace figcaption small {
-  font-size: 16px;
-  color: var(--dim);
-}
-.garden-trace-grid {
-  display: grid;
-  min-width: 0;
-  align-items: center;
-}
-.garden-trace-label {
-  font-size: 16px;
-  color: var(--muted);
-}
-.garden-trace-line {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  overflow: visible;
-}
-.garden-trace-line path {
-  fill: none;
-  stroke: var(--line-strong);
-  stroke-width: 1.5px;
-  vector-effect: non-scaling-stroke;
-}
-.garden-trace-point {
-  position: relative;
-  border: 0;
-  background: none;
-  width: 100%;
-  height: 42px;
-  min-width: 0;
-  display: grid;
-  place-items: center;
-  z-index: 1;
-}
-.garden-trace-point > span {
-  width: 10px;
-  height: 10px;
-  border-radius: 0;
-  background: var(--raised-fill);
-  border: 1px solid var(--muted);
-  box-shadow: var(--surface-shadow);
-}
-.garden-trace-point.passed > span {
-  background: var(--lcd-texture-inverse), var(--accent);
-  border-color: var(--accent);
-}
-.garden-trace-point.failed > span {
-  background: var(--lcd-texture-inverse), var(--muted);
-  border-color: var(--muted);
-}
-.garden-trace-point.waiting > span {
-  background: var(--lcd-texture-inverse), var(--text);
-  border-color: var(--text);
-}
-.garden-trace-point small {
-  position: absolute;
-  top: calc(50% + 12px);
-  font-size: 16px;
-  color: var(--dim);
-  background: var(--lcd-texture), var(--panel);
-  line-height: 1;
-}
-@media (max-width: 760px) {
-  .garden-work-trace {
-    padding: 18px 12px;
-  }
-}
 .garden-artifact-view {
   padding: clamp(16px, 3vw, 30px);
   min-width: 0;
@@ -1405,45 +985,6 @@
 .garden-provider-controls dd {
   margin: 0;
   overflow-wrap: anywhere;
-}
-.garden-trace-detail {
-  display: flex;
-  gap: 16px;
-  justify-content: space-between;
-  align-items: center;
-  border-top: 1px solid var(--line);
-  margin-top: 16px;
-  padding-top: 16px;
-}
-.garden-trace-detail > div {
-  min-width: 0;
-}
-.garden-trace-detail small {
-  display: block;
-  color: var(--dim);
-  font-size: 16px;
-  text-transform: uppercase;
-  letter-spacing: 0;
-  margin-bottom: 7px;
-}
-.garden-trace-detail strong {
-  font-size: 16px;
-  font-weight: 400;
-  overflow-wrap: anywhere;
-}
-.garden-trace-detail p {
-  color: var(--muted);
-  font-size: 16px;
-  margin: 6px 0 0;
-  overflow-wrap: anywhere;
-}
-.garden-trace-detail .button {
-  font-size: 16px;
-  flex-shrink: 0;
-}
-.garden-trace-point[aria-pressed='true'] > span {
-  outline: 1px solid var(--accent);
-  outline-offset: 5px;
 }
 
 .garden-planned-outputs {
@@ -1601,20 +1142,6 @@
   margin-bottom: 12px;
 }
 
-.garden-project-tools {
-  margin: 0 0 10px;
-  color: var(--muted);
-}
-.garden-project-tools > summary {
-  cursor: pointer;
-  width: fit-content;
-  padding: 8px 0;
-  font-size: 16px;
-}
-.garden-project-tools[open] .work-tools {
-  margin-bottom: 0;
-}
-
 .garden-compose-prompt {
   width: 100%;
   justify-content: flex-start;
@@ -1628,11 +1155,6 @@
 .garden-compose-prompt span {
   margin-left: auto;
   font-size: 16px;
-}
-.garden-compose-collapse {
-  margin: 0 0 6px auto;
-  font-size: 16px;
-  min-height: 30px;
 }
 @media (max-width: 480px) {
   .garden-compose-prompt span {

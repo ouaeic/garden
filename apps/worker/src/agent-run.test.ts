@@ -6710,14 +6710,12 @@ describe('the prompt prefix a follow-up turn re-sends', () => {
     expect(knowledge(first)).toContain('workspace/archive');
     expect(knowledge(second)).toBe(knowledge(first));
   });
-  it('freezes the reviewed block against the wall clock, not only against the ranking', async () => {
+  it('drops a reviewed entry once its own validity ends, and changes nothing else', async () => {
     /*
-     * The header says "frozen for this run", and the ranking beneath it was anchored to
-     * `task.createdAt` to make that true. The filter above the ranking was not: it took the wall
-     * clock, so an entry whose `validUntil` fell between the task starting and the current step was
-     * in the block on one request and gone from the next - the whole preamble rewritten mid-task by
-     * a boundary nobody crossed on purpose, and every byte behind it re-billed. Two builds either
-     * side of that instant, asserted byte-identical.
+     * The owner's `validUntil` outranks a cached prefix: a fact they said stops being true at six
+     * o'clock is not shown to the model at one minute past, even mid-run. What stays frozen is
+     * everything else - the ranking is anchored to the task's own instant - so the only bytes that
+     * move are the expired entry's. Two builds either side of that instant.
      */
     vi.useFakeTimers({ toFake: ['Date'] });
     const expiring = {
@@ -6759,9 +6757,15 @@ describe('the prompt prefix a follow-up turn re-sends', () => {
     const before = await knowledgeAt('2026-07-01T05:59:00.000Z');
     const after = await knowledgeAt('2026-07-01T06:01:00.000Z');
 
-    // Vacuous unless the entry reached the block at all at the anchored instant.
+    // Vacuous unless the entry reached the block at all before it expired.
     expect(before).toContain('Tidy the notes into workspace/archive');
-    expect(after).toBe(before);
+    expect(after).not.toContain('Tidy the notes into workspace/archive');
+    expect(after).toBe(
+      before.replace(
+        'Workspace memory:\n- Tidy the notes into workspace/archive before the loan laptop goes back\n',
+        ''
+      )
+    );
   });
 
   it('survives the workspace brief being rewritten between turns, because the brief sits last', async () => {
