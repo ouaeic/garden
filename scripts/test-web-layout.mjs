@@ -2768,18 +2768,79 @@ try {
 
     await openNewProject(modelsPage);
     const newWork = modelsPage.getByRole('dialog', { name: 'Begin something new', exact: true });
-    await revealPromptSettings(newWork);
-    await newWork
-      .getByRole('button', { name: 'Model choices for this direction', exact: true })
-      .click();
+    const openPromptModels = async () => {
+      await newWork.getByRole('button', { name: /^Model for this direction:/ }).click();
+      await modelsPage.getByRole('button', { name: 'Model roles', exact: true }).click();
+      await advanced.getByRole('button', { name: /^Main agent:/ }).waitFor();
+    };
+    await openPromptModels();
+    const openDialogs = await modelsPage.locator('dialog[open]').count();
+    assert(openDialogs > 0);
+    await advanced.getByRole('button', { name: /^Coding agents:/ }).click();
+    assert.equal(
+      await modelsPage.locator('dialog[open]').count(),
+      openDialogs,
+      'Editing a role must stay in the same dialog'
+    );
+    await advanced.getByRole('combobox', { name: 'Search models', exact: true }).press('Escape');
+    assert(
+      await advanced
+        .getByRole('button', { name: /^Coding agents:/ })
+        .evaluate((element) => element === document.activeElement),
+      'Returning from the model list must restore focus to its role'
+    );
+    await advanced.getByRole('button', { name: /^Coding agents:/ }).click();
+    await advanced.getByRole('option', { name: /^Automatic\s/ }).click();
+    await advanced.getByRole('combobox', { name: 'Coding agents preference' }).selectOption('fast');
     await pick(advanced, 'Main agent', 'openrouter/alpha/model-78');
     await pick(advanced, 'Research specialists', 'openrouter/beta/model-79');
     assert.equal(await advanced.getByRole('button', { name: /^Decisions:/ }).count(), 0);
+    await advanced.getByText('Inactive roles', { exact: true }).click();
     await advanced
       .getByText('Decision models are not in use. All features work without one.', {
         exact: true
       })
       .waitFor();
+    await advanced.getByText('Inactive roles', { exact: true }).click();
+    await advanced.locator('.prompt-model-roles').evaluate((element) => {
+      element.scrollTop = 0;
+    });
+    await modelsPage.screenshot({ path: resolve(report, 'prompt-model-roles-desktop.png') });
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 320, height: 568 }
+    ]) {
+      await modelsPage.setViewportSize(viewport);
+      await modelsPage.waitForFunction(() => {
+        const dialog = document.querySelector('.prompt-model-dialog');
+        return dialog && dialog.getBoundingClientRect().bottom <= innerHeight;
+      });
+      const bounds = await advanced.evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        const footer = element.querySelector('.prompt-model-footer').getBoundingClientRect();
+        return {
+          scrollWidth: element.scrollWidth,
+          clientWidth: element.clientWidth,
+          bottom: bounds.bottom,
+          viewportHeight: window.innerHeight,
+          footerBottom: footer.bottom
+        };
+      });
+      assert(
+        bounds.scrollWidth <= bounds.clientWidth + 1 &&
+          bounds.bottom <= bounds.viewportHeight &&
+          bounds.footerBottom <= bounds.bottom,
+        `Model choices must fit the viewport and keep their footer visible: ${JSON.stringify(bounds)}`
+      );
+      await modelsPage.screenshot({
+        path: resolve(report, `prompt-model-roles-${viewport.width}.png`)
+      });
+    }
+    await advanced.getByRole('button', { name: /^Main agent:/ }).click();
+    await advanced.getByRole('combobox', { name: 'Search models', exact: true }).waitFor();
+    await modelsPage.screenshot({ path: resolve(report, 'prompt-model-picker-phone.png') });
+    await advanced.getByRole('button', { name: 'Back to model roles', exact: true }).click();
+    await modelsPage.setViewportSize({ width: 1440, height: 1000 });
     await advanced.getByRole('button', { name: 'Close Model choices', exact: true }).click();
     await newWork.getByRole('status', { name: 'Draft synced', exact: true }).waitFor();
     assert.equal(modelDrafts.get(`new:${workspace.id}`).body, '');
@@ -2789,7 +2850,19 @@ try {
     );
     await modelsPage.reload();
     await openNewProject(modelsPage);
-    await revealPromptSettings(newWork);
+    await openPromptModels();
+    assert.equal(
+      await advanced.getByRole('combobox', { name: 'Coding agents preference' }).inputValue(),
+      'fast',
+      'Automatic routing preferences must persist with the new prompt'
+    );
+    await advanced.getByRole('button', { name: /^Coding agents:/ }).click();
+    await advanced.getByRole('option', { name: /^Use Settings default\s/ }).click();
+    assert.equal(
+      await advanced.getByRole('combobox', { name: 'Coding agents preference' }).count(),
+      0
+    );
+    await advanced.getByRole('button', { name: 'Done', exact: true }).click();
     await newWork
       .getByRole('button', { name: 'Model for this direction: Research model 78', exact: true })
       .waitFor();

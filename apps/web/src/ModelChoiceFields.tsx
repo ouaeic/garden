@@ -33,7 +33,7 @@ export const textPurposes = [
   'summarise',
   'title'
 ] as const;
-const descriptions: Record<ModelPurpose, string> = {
+export const purposeDescriptions: Record<ModelPurpose, string> = {
   main: 'Leads the work and brings the results together.',
   specialist: 'Researches and reviews delegated work.',
   coding: 'Makes and verifies code changes.',
@@ -110,7 +110,7 @@ export default function ModelChoiceFields({
       >
         <div>
           <h3>{purposeLabels[item.purpose]}</h3>
-          <p className="muted">{descriptions[item.purpose]}</p>
+          <p className="muted">{purposeDescriptions[item.purpose]}</p>
         </div>
         {!item.disabled && (
           <ModelPicker

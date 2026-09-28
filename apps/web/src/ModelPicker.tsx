@@ -34,6 +34,7 @@ export interface ModelPickerProps {
   privacyRoute?: PrivacyRoute;
   triggerLabel?: string;
   onChange: (value: string) => void;
+  onAdvanced?: () => void;
 }
 
 export default function ModelPicker(props: ModelPickerProps) {
@@ -64,6 +65,14 @@ export default function ModelPicker(props: ModelPickerProps) {
         <Suspense fallback={<span role="status">Opening models…</span>}>
           <ModelBrowser
             {...props}
+            {...(props.onAdvanced
+              ? {
+                  onAdvanced: () => {
+                    setOpen(false);
+                    props.onAdvanced?.();
+                  }
+                }
+              : {})}
             onClose={() => setOpen(false)}
             onChange={(value) => {
               props.onChange(value);

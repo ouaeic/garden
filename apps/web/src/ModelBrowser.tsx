@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Check, Search } from './icons';
-import { Dialog, ErrorNotice } from './ui.js';
+import { Check, Search, SlidersHorizontal } from './icons';
+import { Button, Dialog, ErrorNotice } from './ui.js';
 import type { ModelPickerProps, PickerModel } from './ModelPicker.js';
 import { mediaRouteIsRetired } from './media-state.js';
 import { get } from './client.js';
@@ -40,9 +40,12 @@ export default function ModelBrowser({
   loadDetails = false,
   privacyRoute,
   shortcuts = [],
+  disabled = false,
+  embedded = false,
+  onAdvanced,
   onChange,
   onClose
-}: ModelPickerProps & { onClose: () => void }) {
+}: ModelPickerProps & { onClose: () => void; embedded?: boolean }) {
   const [query, setQuery] = useState('');
   const [provider, setProvider] = useState('');
   const [active, setActive] = useState(0);
@@ -152,109 +155,131 @@ export default function ModelBrowser({
       }
     }
   };
-  return (
-    <Dialog title={`Choose ${label.toLowerCase()}`} onClose={onClose} wide>
-      <div className="model-browser">
-        <ErrorNotice error={loadError} onRetry={() => setAttempt((value) => value + 1)} />
-        <div className="model-browser-search">
-          <Search size={18} aria-hidden="true" />
-          <input
-            ref={search}
-            type="search"
-            role="combobox"
-            aria-label="Search models"
-            placeholder="Search models, providers or capabilities…"
-            aria-autocomplete="list"
-            aria-expanded="true"
-            aria-controls={id}
-            aria-activedescendant={rows[active] ? `${id}-${active}` : undefined}
-            value={query}
+  const content = (
+    <div
+      className="model-browser"
+      onKeyDownCapture={(event) => {
+        if (embedded && event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          onClose();
+        }
+      }}
+    >
+      <ErrorNotice error={loadError} onRetry={() => setAttempt((value) => value + 1)} />
+      <div className="model-browser-search">
+        <Search size={18} aria-hidden="true" />
+        <input
+          ref={search}
+          type="search"
+          role="combobox"
+          aria-label="Search models"
+          placeholder="Search models, providers or capabilities…"
+          aria-autocomplete="list"
+          aria-expanded="true"
+          aria-controls={id}
+          aria-activedescendant={rows[active] ? `${id}-${active}` : undefined}
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setActive(0);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              event.stopPropagation();
+              onClose();
+              return;
+            }
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault();
+              move(event.key === 'ArrowDown' ? 1 : -1);
+            }
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              if (!disabled && rows[active] && !rows[active].reason) onChange(rows[active].value);
+            }
+          }}
+        />
+      </div>
+      <div className="model-browser-filter">
+        <label>
+          Provider{' '}
+          <select
+            aria-label="Filter models by provider"
+            value={provider}
             onChange={(event) => {
-              setQuery(event.target.value);
+              setProvider(event.target.value);
               setActive(0);
             }}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                event.preventDefault();
-                event.stopPropagation();
-                onClose();
-                return;
-              }
-              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-                event.preventDefault();
-                move(event.key === 'ArrowDown' ? 1 : -1);
-              }
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                if (rows[active] && !rows[active].reason) onChange(rows[active].value);
-              }
-            }}
-          />
-        </div>
-        <div className="model-browser-filter">
-          <label>
-            Provider{' '}
-            <select
-              aria-label="Filter models by provider"
-              value={provider}
-              onChange={(event) => {
-                setProvider(event.target.value);
-                setActive(0);
+          >
+            <option value="">All providers</option>
+            {providers.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <small className="muted" role="status">
+          {rows.length} {rows.length === 1 ? 'choice' : 'choices'}
+        </small>
+      </div>
+      <div ref={list} className="model-browser-list" role="listbox" id={id} aria-label={label}>
+        {rows.map((row, index) => (
+          <div key={row.value}>
+            {rows[index - 1]?.group !== row.group && (
+              <div className="model-browser-group" role="presentation">
+                {row.group}
+              </div>
+            )}
+            <button
+              type="button"
+              role="option"
+              id={`${id}-${index}`}
+              aria-selected={row.value === value}
+              aria-disabled={disabled || Boolean(row.reason)}
+              data-active={index === active}
+              tabIndex={-1}
+              className="model-browser-option"
+              onMouseMove={() => setActive(index)}
+              onClick={() => {
+                if (!disabled && !row.reason) onChange(row.value);
               }}
             >
-              <option value="">All providers</option>
-              {providers.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <small className="muted" role="status">
-            {rows.length} {rows.length === 1 ? 'choice' : 'choices'}
-          </small>
-        </div>
-        <div ref={list} className="model-browser-list" role="listbox" id={id} aria-label={label}>
-          {rows.map((row, index) => (
-            <div key={row.value}>
-              {rows[index - 1]?.group !== row.group && (
-                <div className="model-browser-group" role="presentation">
-                  {row.group}
-                </div>
-              )}
-              <button
-                type="button"
-                role="option"
-                id={`${id}-${index}`}
-                aria-selected={row.value === value}
-                aria-disabled={Boolean(row.reason)}
-                data-active={index === active}
-                tabIndex={-1}
-                className="model-browser-option"
-                onMouseMove={() => setActive(index)}
-                onClick={() => {
-                  if (!row.reason) onChange(row.value);
-                }}
-              >
-                <span>
-                  <strong>{row.label}</strong>
-                  {row.identity && <small>{row.identity}</small>}
-                  {(row.reason || row.detail) && (
-                    <small className={row.reason ? 'model-unavailable' : ''}>
-                      {row.reason || row.detail}
-                    </small>
-                  )}
-                </span>
-                {row.value === value && <Check size={17} aria-hidden="true" />}
-              </button>
-            </div>
-          ))}
-          {!rows.length && (
-            <p className="empty">No matching models. Try another name or provider.</p>
-          )}
-        </div>
-        <small className="muted">↑ ↓ to browse · Enter to choose · Esc to close</small>
+              <span>
+                <strong>{row.label}</strong>
+                {row.identity && <small>{row.identity}</small>}
+                {(row.reason || row.detail) && (
+                  <small className={row.reason ? 'model-unavailable' : ''}>
+                    {row.reason || row.detail}
+                  </small>
+                )}
+              </span>
+              {row.value === value && <Check size={17} aria-hidden="true" />}
+            </button>
+          </div>
+        ))}
+        {!rows.length && <p className="empty">No matching models. Try another name or provider.</p>}
       </div>
+      <div className="model-browser-footer">
+        <small className="muted">
+          ↑ ↓ to browse · Enter to choose · Esc to {embedded ? 'go back' : 'close'}
+        </small>
+        {onAdvanced && (
+          <Button onClick={onAdvanced}>
+            <SlidersHorizontal size={15} />
+            Model roles
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+  return embedded ? (
+    content
+  ) : (
+    <Dialog title={`Choose ${label.toLowerCase()}`} onClose={onClose} wide>
+      {content}
     </Dialog>
   );
 }

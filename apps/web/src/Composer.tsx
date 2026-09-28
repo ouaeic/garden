@@ -263,6 +263,7 @@ export default function Composer(props: ComposerProps) {
             ]}
             disabled={editingDisabled || uploading || voiceBusy}
             onChange={changeModel}
+            {...(!task ? { onAdvanced: () => setAdvancedModels(true) } : {})}
           />
         </div>
         <Button
@@ -454,27 +455,36 @@ export default function Composer(props: ComposerProps) {
             </label>
           )}
         </div>
-        <Button
-          className="composer-models-link"
-          aria-label="Model choices for this direction"
-          onClick={() => {
-            promptSettingsPanel.current?.hidePopover();
-            setPromptSettingsOpen(false);
-            promptSettingsTrigger.current?.focus();
-            setAdvancedModels(true);
-          }}
-        >
-          More model choices <ArrowUpRight size={16} />
-        </Button>
+        {task && (
+          <Button
+            className="composer-models-link"
+            aria-label="Model choices for this direction"
+            onClick={() => {
+              promptSettingsPanel.current?.hidePopover();
+              setPromptSettingsOpen(false);
+              promptSettingsTrigger.current?.focus();
+              setAdvancedModels(true);
+            }}
+          >
+            More model choices <ArrowUpRight size={16} />
+          </Button>
+        )}
       </ComposerPopover>
       {advancedModels && (
-        <Dialog title="Model choices" onClose={() => setAdvancedModels(false)} wide>
+        <Dialog
+          title="Model choices"
+          className={!task ? 'prompt-model-dialog' : ''}
+          onClose={() => setAdvancedModels(false)}
+          wide
+        >
           <Suspense fallback={<p className="muted">Loading…</p>}>
             <PromptModelChoices
               projectId={props.project?.id}
               {...(task ? { taskId: task.id } : { taskId: '' })}
               disabled={editingDisabled}
               choices={modelChoices}
+              saved={saved}
+              onClose={() => setAdvancedModels(false)}
               privacyRoute={privacyRoute}
               onChange={changeModelChoices}
             />
