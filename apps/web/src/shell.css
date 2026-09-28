@@ -1,6 +1,7 @@
 /* The frame around every screen: the masthead on wide screens, a button row on phones. */
 .desk-shell .garden-masthead {
   gap: 8px;
+  padding-left: 16px;
 }
 .desk-shell .garden-masthead .brand {
   font-size: 24px;
@@ -341,43 +342,143 @@
   }
 }
 
-/* The wordmark's motion: letters rise in on open, a breeze now and then, a ripple on hover. */
+/*
+ * The wordmark's motion. It powers on letter by letter like an LCD warming up, ripples under the
+ * pointer, and in the masthead plays one small idle scene now and then (`Brand.tsx` picks it).
+ */
 .brand-word {
   display: inline-flex;
 }
 .brand-letter {
+  position: relative;
   display: inline-block;
+  transform-origin: 50% 100%;
+}
+.brand-sprout {
+  position: absolute;
+  left: 50%;
+  bottom: 88%;
+  margin-left: -8px;
+  transform-origin: 50% 100%;
 }
 @media (prefers-reduced-motion: no-preference) {
   .brand-letter {
-    animation:
-      brand-rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both,
-      brand-breeze 36s ease-in-out infinite;
-    animation-delay: calc(var(--letter) * 55ms), calc(12s + var(--letter) * 90ms);
+    animation: brand-power 0.9s ease-out both;
+    animation-delay: calc(var(--letter) * 70ms);
   }
   .brand-button:is(:hover, :focus-visible) .brand-letter {
     animation: brand-ripple 0.6s ease-in-out both;
     animation-delay: calc(var(--letter) * 45ms);
   }
+  .brand[data-idle='hop'] .brand-letter {
+    animation: brand-hop 0.5s cubic-bezier(0.3, 0, 0.3, 1) both;
+    animation-delay: calc(var(--letter) * 90ms);
+  }
+  .brand[data-idle='flip'] .brand-letter {
+    animation: brand-flip 0.34s steps(1, end) 2 both;
+    animation-delay: calc(var(--letter) * 110ms);
+  }
+  .brand[data-idle='sprout'] .brand-sprout {
+    animation: brand-sprout 4.2s cubic-bezier(0.3, 0, 0.3, 1) both;
+  }
+  .brand[data-idle='doze'] .brand-letter:nth-child(3) {
+    animation: brand-doze 3.6s cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
 }
-@keyframes brand-rise {
-  from {
-    transform: translateY(0.6em);
+/* Letters warm up: a faint ghost first, then full ink, the way a cold LCD comes on. */
+@keyframes brand-power {
+  0% {
     opacity: 0;
+    transform: translateY(4px);
   }
-}
-@keyframes brand-breeze {
-  0%,
-  3%,
+  40% {
+    opacity: 0.35;
+  }
   100% {
+    opacity: 1;
     transform: none;
-  }
-  1.5% {
-    transform: translateY(-2px) rotate(-3deg);
   }
 }
 @keyframes brand-ripple {
   50% {
     transform: translateY(-3px);
+  }
+}
+@keyframes brand-hop {
+  0%,
+  100% {
+    transform: none;
+  }
+  15% {
+    transform: scaleY(0.82);
+  }
+  45% {
+    transform: translateY(-7px) scaleY(1.06);
+  }
+  80% {
+    transform: scaleY(0.9);
+  }
+}
+/* A cell flips to ink and back, like a segment being addressed. */
+@keyframes brand-flip {
+  0% {
+    color: var(--bg);
+    background: var(--text);
+  }
+  50% {
+    color: inherit;
+    background: transparent;
+  }
+}
+@keyframes brand-sprout {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  12% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  30% {
+    transform: rotate(-8deg);
+  }
+  48% {
+    transform: rotate(6deg);
+  }
+  66% {
+    transform: rotate(-4deg);
+  }
+  84% {
+    transform: none;
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0);
+    opacity: 0;
+  }
+}
+/* The r nods off, tips over, and springs back up. */
+@keyframes brand-doze {
+  0%,
+  100% {
+    transform: none;
+  }
+  20% {
+    transform: rotate(8deg);
+  }
+  30% {
+    transform: rotate(4deg);
+  }
+  50% {
+    transform: rotate(22deg);
+  }
+  62% {
+    transform: rotate(18deg);
+  }
+  74% {
+    transform: translateY(-6px) rotate(-6deg);
+  }
+  86% {
+    transform: rotate(3deg);
   }
 }

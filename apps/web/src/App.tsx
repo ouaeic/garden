@@ -552,7 +552,7 @@ function WorkspaceApp() {
           onClick={() => navigate('work')}
           aria-label="garden · Home"
         >
-          <Brand />
+          <Brand alive />
         </button>
         <nav className="desk-navigation" aria-label="Workspace navigation">
           {(
@@ -706,6 +706,10 @@ function WorkspaceApp() {
                 onProject={(id) => navigate('work', null, id)}
                 onProjects={() => navigate('projects')}
                 onAttention={() => navigate('attention')}
+                onAutomations={() => navigate('automations')}
+                onComputer={() => navigate('computer')}
+                bootstrap={bootstrap}
+                workspace={workspace}
                 onNew={() => setNewWork(true)}
                 notice={
                   <>

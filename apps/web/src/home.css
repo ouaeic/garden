@@ -1,16 +1,22 @@
+/*
+ * Home fits the window. The prompt sits beside the computer panel; under them the project tiles
+ * and the Today column take all the height that is left, and only they scroll.
+ */
 .desk-home {
   height: 100%;
   min-height: 0;
   overflow: hidden;
   display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
   grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    'prompt machine'
+    'projects today';
   gap: 16px;
-  padding: 16px clamp(16px, 3vw, 44px);
-}
-.home-switcher {
-  display: none;
+  padding: 16px 16px 16px;
 }
 .desk-home .desk-start-card {
+  grid-area: prompt;
   position: relative;
   border: 1px solid var(--text);
   background: var(--lcd-texture), var(--bg);
@@ -24,25 +30,158 @@
 .desk-home .desk-start-card .intent-editor > textarea {
   min-height: 72px;
 }
-.home-lists {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.home-switcher {
+  display: none;
+}
+
+/* The computer: a small monitor whose screen scrolls while work runs, beside its meters. */
+.home-machine {
+  grid-area: machine;
+  display: flex;
+  align-items: center;
   gap: 16px;
+  min-width: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  background: var(--lcd-texture), var(--bg);
+  box-shadow: var(--surface-shadow);
+  color: var(--text);
+  text-align: left;
+}
+.home-machine:hover,
+.home-machine:focus-visible {
+  border-color: var(--text);
+}
+.home-machine-readout {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+.home-machine-readout > strong {
+  font-weight: 400;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.meter {
+  display: grid;
+  grid-template-columns: 48px auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+.meter > span:first-child,
+.meter > small {
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.blocks {
+  display: inline-flex;
+  gap: 2px;
+}
+.blocks > i {
+  width: 6px;
+  height: 10px;
+  border: 1px solid var(--text);
+  background: transparent;
+}
+.blocks > i.is-on {
+  background: var(--text);
+}
+
+.home-projects {
+  grid-area: projects;
   min-height: 0;
 }
-.home-card {
+.home-today {
+  grid-area: today;
   min-height: 0;
 }
-.home-card > .desk-card-scroll {
+.home-projects > .desk-card-scroll,
+.home-today > .desk-card-scroll {
   padding: 0;
 }
+.home-projects .desk-card-heading h2 {
+  margin-right: auto;
+}
+/* Fourteen days of activity as pixel columns, sitting in the card's own heading. */
+.home-activity {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 16px;
+}
+.home-activity > i {
+  width: 5px;
+  background: var(--tint);
+}
+.home-activity > i.is-on {
+  background: var(--text);
+}
+
+.project-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+  padding: 12px;
+}
+.project-tile {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  min-height: 96px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: var(--lcd-texture), var(--bg);
+  color: var(--text);
+  text-align: left;
+}
+.project-tile:hover,
+.project-tile:focus-visible {
+  border-color: var(--text);
+  background: var(--raised-fill);
+  box-shadow: 3px 3px 0 var(--tint);
+  transform: translate(-1px, -1px);
+}
+.project-tile > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.project-tile strong,
+.project-tile small {
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-tile small {
+  color: var(--muted);
+}
+.project-tile-new {
+  place-items: center;
+  grid-template-columns: auto auto;
+  justify-content: center;
+  align-items: center;
+  border-style: dashed;
+  color: var(--muted);
+}
+.tile-steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .home-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   width: 100%;
-  min-height: 56px;
+  min-height: 52px;
   padding: 8px 16px;
   border: 0;
   border-bottom: 1px solid var(--line);
@@ -50,15 +189,13 @@
   color: var(--text);
   text-align: left;
 }
-.home-row:last-child {
-  border-bottom: 0;
-}
 .home-row:hover,
 .home-row:focus-visible {
   background: var(--raised-fill);
 }
 .home-row > span {
   display: grid;
+  gap: 2px;
   min-width: 0;
 }
 .home-row strong,
@@ -82,30 +219,44 @@
 }
 .home-quiet {
   margin: 0;
-  padding: 16px;
+  padding: 12px 16px;
   color: var(--muted);
 }
-.home-card > .button {
-  margin: 16px;
+.home-link {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
-@media (max-width: 1000px) {
-  .home-lists {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+
+/* Narrower screens drop the computer panel; its readout stays in the masthead's Stats. */
+@media (max-width: 1100px) {
+  .desk-home {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+    grid-template-areas:
+      'prompt prompt'
+      'projects today';
   }
-  .home-lists > .home-recent {
-    grid-column: 2;
-    grid-row: 1 / span 2;
+  .home-machine {
+    display: none;
   }
 }
-/* Phones: one list at a time takes the height left under the prompt. */
+/* Phones: one card at a time takes the height left under the prompt. */
 @media (max-width: 700px) {
   .desk-home {
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      'prompt'
+      'switcher'
+      'card';
     gap: 8px;
     padding: 8px;
   }
   .home-switcher {
+    grid-area: switcher;
     display: flex;
     border-bottom: 1px solid var(--line);
   }
@@ -122,25 +273,24 @@
     color: var(--ink);
     background: var(--lcd-texture-inverse), var(--paper);
   }
-  .home-lists {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-  }
-  .home-lists > .home-card {
+  .home-projects,
+  .home-today {
     display: none;
+    grid-area: card;
   }
-  .desk-home[data-home-card='needs'] .home-needs,
-  .desk-home[data-home-card='growing'] .home-growing,
-  .desk-home[data-home-card='recent'] .home-recent {
+  .desk-home[data-home-card='today'] .home-today,
+  .desk-home[data-home-card='projects'] .home-projects {
     display: flex;
-    grid-column: 1;
-    grid-row: 1;
   }
-  .home-card > .desk-card-heading {
+  .project-tiles {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 8px;
+  }
+  .home-activity {
     display: none;
   }
 }
-/* On a short screen the prompt comes first and the lists keep what is left. */
 @media (max-height: 540px) {
   .desk-home {
     gap: 8px;
@@ -148,5 +298,11 @@
   }
   .desk-home .desk-start-card .intent-editor > textarea {
     min-height: 40px;
+  }
+}
+@media (max-width: 700px) {
+  .home-projects > .desk-card-heading,
+  .home-today > .desk-card-heading {
+    display: none;
   }
 }

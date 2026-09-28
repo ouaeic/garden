@@ -1,55 +1,155 @@
 import { useState, type ReactNode } from 'react';
-import { ArrowUpRight, Plus } from './icons';
-import type { Project, Task } from '@garden/contracts';
-import { hasOngoingWork, needsAttention, shortDate, taskStatusLabel } from './model';
+import { ArrowUpRight, Clock3, Plus } from './icons';
+import type { Project, Task, Workspace } from '@garden/contracts';
+import type { Bootstrap } from './model';
+import { bytes, hasOngoingWork, money, needsAttention, shortDate, taskStatusLabel } from './model';
 import ScrollRegion from './ScrollRegion';
 import StatusSprite, { projectStage, stageOf } from './life/StatusSprite';
+import { Sprite } from './life/Sprite';
+import { monitorResting, monitorWorking } from './life/sprites';
 import { Button } from './ui';
 import './home.css';
 
+/** A row of blocks, filled in proportion: the save bar every meter on this screen is drawn as. */
+function Blocks({ value, total, count = 10 }: { value: number; total: number; count?: number }) {
+  const filled = total > 0 ? Math.round((Math.min(value, total) / total) * count) : 0;
+  return (
+    <span className="blocks" aria-hidden="true">
+      {Array.from({ length: count }, (_, index) => (
+        <i key={index} className={index < filled ? 'is-on' : ''} />
+      ))}
+    </span>
+  );
+}
+
+function Meter({
+  label,
+  value,
+  total,
+  text
+}: {
+  label: string;
+  value: number;
+  total: number;
+  text: string;
+}) {
+  return (
+    <div
+      className="meter"
+      role="meter"
+      aria-label={label}
+      aria-valuenow={value}
+      aria-valuemin={0}
+      aria-valuemax={total}
+    >
+      <span>{label}</span>
+      <Blocks value={value} total={total} />
+      <small>{text}</small>
+    </div>
+  );
+}
+
+const DAY = 86_400_000;
+function until(iso: string) {
+  const ms = Date.parse(iso) - Date.now();
+  if (!Number.isFinite(ms)) return '';
+  if (ms < 60_000) return 'now';
+  if (ms < 3_600_000) return `in ${Math.round(ms / 60_000)}m`;
+  if (ms < DAY) return `in ${Math.round(ms / 3_600_000)}h`;
+  return `in ${Math.round(ms / DAY)}d`;
+}
+
 /**
- * Home is the prompt and three lists in the order you act on them: what needs you, what is
- * growing, where you were. It fits the screen; only the lists scroll, and on a phone one list at a
- * time takes the remaining height.
+ * Home fits the screen and only its cards scroll. The prompt sits beside the computer it runs on;
+ * under them, your projects as tiles - each a small plant with its steps as a meter - and a Today
+ * column in the order you act: what needs you, what is growing, what is ready, what runs next.
  */
 export default function DeskHome({
   projects,
   tasks,
   composer,
   notice,
+  bootstrap,
+  workspace,
   onTask,
   onProject,
   onProjects,
   onAttention,
+  onAutomations,
+  onComputer,
   onNew
 }: {
   projects: Project[];
   tasks: Task[];
   composer: ReactNode;
   notice?: ReactNode;
+  bootstrap: Bootstrap;
+  workspace: Workspace | null;
   onTask: (id: string) => void;
   onProject: (id: string) => void;
   onProjects: () => void;
   onAttention: () => void;
+  onAutomations: () => void;
+  onComputer: () => void;
   onNew: () => void;
 }) {
   const recent = [...tasks].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const attention = recent.filter(needsAttention);
   const growing = recent.filter((task) => hasOngoingWork(task) && !needsAttention(task));
   // The latest finished conversation of each project, so a busy project is listed once.
-  const ready = recent.filter(
-    (task, index) =>
-      task.status === 'completed' &&
-      !needsAttention(task) &&
-      recent.findIndex((other) => other.projectId === task.projectId) === index
-  );
+  const ready = recent
+    .filter(
+      (task, index) =>
+        task.status === 'completed' &&
+        !needsAttention(task) &&
+        recent.findIndex((other) => other.projectId === task.projectId) === index
+    )
+    .slice(0, 6);
+  const upcoming = [...(bootstrap.schedules ?? [])]
+    .filter((schedule) => schedule.enabled && schedule.nextRunAt)
+    .sort((a, b) => a.nextRunAt!.localeCompare(b.nextRunAt!))
+    .slice(0, 4);
   const projectTitle = (task: Task) =>
     projects.find((project) => project.id === task.projectId)?.title ?? task.title;
+  const latestOf = (project: Project) => tasks.find((task) => task.id === project.latestTaskId);
   const sortedProjects = [...projects].sort(
     (a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt)
   );
-  const [shown, setShown] = useState<'needs' | 'growing' | 'recent'>(() =>
-    attention.length ? 'needs' : growing.length ? 'growing' : 'recent'
+  // Fourteen days of activity, one column a day, from the work this device has loaded.
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Array.from({ length: 14 }, (_, index) => {
+    const start = today.getTime() - (13 - index) * DAY;
+    const count = tasks.filter((task) => {
+      const at = Date.parse(task.updatedAt);
+      return at >= start && at < start + DAY;
+    }).length;
+    return { start, count };
+  });
+  const busiest = Math.max(1, ...days.map((day) => day.count));
+  const computer = bootstrap.computer;
+  const credit = bootstrap.usage.plan?.windows.find((window) => window.unit === 'usd');
+  const diskUsed =
+    workspace?.hostStorageTotalBytes && workspace.hostStorageAvailableBytes !== undefined
+      ? workspace.hostStorageTotalBytes - workspace.hostStorageAvailableBytes
+      : null;
+  const [shown, setShown] = useState<'today' | 'projects'>(() =>
+    attention.length || growing.length ? 'today' : 'projects'
+  );
+  const row = (task: Task, detail: ReactNode, meter?: ReactNode) => (
+    <button
+      type="button"
+      className="home-row cursor-row"
+      key={task.id}
+      onClick={() => onTask(task.id)}
+    >
+      <StatusSprite stage={stageOf(task)} />
+      <span>
+        <strong>{projectTitle(task)}</strong>
+        <small>{detail}</small>
+        {meter}
+      </span>
+    </button>
   );
   return (
     <section className="desk-home" aria-labelledby="home-title" data-home-card={shown}>
@@ -60,12 +160,59 @@ export default function DeskHome({
         {notice}
         {composer}
       </section>
+      <button type="button" className="home-machine" onClick={onComputer} data-perch>
+        <Sprite
+          frames={growing.length ? monitorWorking : monitorResting}
+          fps={growing.length ? 6 : 1.5}
+          scale={3}
+          className="home-monitor"
+        />
+        <span className="home-machine-readout">
+          <strong>
+            {workspace?.name ?? 'Your computer'} ·{' '}
+            {growing.length ? 'working' : (workspace?.status ?? 'idle')}
+          </strong>
+          {computer ? (
+            <>
+              <Meter
+                label="CPU"
+                value={computer.cpuPercent}
+                total={100}
+                text={`${computer.cpuPercent}%`}
+              />
+              <Meter
+                label="RAM"
+                value={computer.memoryUsedBytes}
+                total={computer.memoryTotalBytes}
+                text={bytes(computer.memoryUsedBytes)}
+              />
+            </>
+          ) : (
+            <small>Load unavailable</small>
+          )}
+          {diskUsed !== null && workspace?.hostStorageTotalBytes && (
+            <Meter
+              label="Disk"
+              value={diskUsed}
+              total={workspace.hostStorageTotalBytes}
+              text={`${bytes(workspace.hostStorageAvailableBytes!)} free`}
+            />
+          )}
+          {credit && credit.limit !== null && credit.used !== null && (
+            <Meter
+              label="Credit"
+              value={credit.limit - credit.used}
+              total={credit.limit}
+              text={`${money(credit.limit - credit.used)} left`}
+            />
+          )}
+        </span>
+      </button>
       <nav className="home-switcher" aria-label="Home lists">
         {(
           [
-            ['needs', `Needs you${attention.length ? ` · ${attention.length}` : ''}`],
-            ['growing', `Growing${growing.length ? ` · ${growing.length}` : ''}`],
-            ['recent', 'Recent']
+            ['today', `Today${attention.length ? ` · ${attention.length}` : ''}`],
+            ['projects', 'Projects']
           ] as const
         ).map(([value, label]) => (
           <button
@@ -78,128 +225,151 @@ export default function DeskHome({
           </button>
         ))}
       </nav>
-      <div className="home-lists">
-        <section className="desk-card home-card home-needs" aria-labelledby="home-needs" data-perch>
-          <header className="desk-card-heading">
-            <h2 id="home-needs">Needs you{attention.length ? ` · ${attention.length}` : ''}</h2>
-            {attention.length > 0 && (
-              <Button onClick={onAttention}>
-                All <ArrowUpRight size={14} />
-              </Button>
-            )}
-          </header>
-          <ScrollRegion label="Work that needs you" className="desk-card-scroll">
-            {attention.map((task) => (
-              <button
-                type="button"
-                className="home-row cursor-row"
-                key={task.id}
-                onClick={() => onTask(task.id)}
-              >
-                <StatusSprite stage={stageOf(task)} />
-                <span>
-                  <strong>{projectTitle(task)}</strong>
-                  <small>
-                    {task.hasOpenQuestion ? 'Answer a question' : taskStatusLabel(task)}
-                    {task.activity?.latest ? ` · ${task.activity.latest}` : ''}
-                  </small>
-                </span>
-              </button>
+      <section
+        className="desk-card home-projects desk-recent"
+        aria-labelledby="home-recent"
+        data-perch
+      >
+        <header className="desk-card-heading">
+          <h2 id="home-recent">Projects · {projects.length}</h2>
+          <span
+            className="home-activity"
+            role="img"
+            aria-label="Activity over the last fourteen days"
+          >
+            {days.map((day) => (
+              <i
+                key={day.start}
+                title={`${new Date(day.start).toLocaleDateString()}: ${day.count} updated`}
+                style={{ height: `${Math.max(2, Math.round((day.count / busiest) * 16))}px` }}
+                className={day.count ? 'is-on' : ''}
+              />
             ))}
-            {!attention.length && <p className="home-quiet">Nothing needs you right now.</p>}
-          </ScrollRegion>
-        </section>
-        <section
-          className="desk-card home-card home-growing"
-          aria-labelledby="home-growing"
-          data-perch
-        >
-          <header className="desk-card-heading">
-            <h2 id="home-growing">Growing{growing.length ? ` · ${growing.length}` : ''}</h2>
-          </header>
-          <ScrollRegion label="Work in progress" className="desk-card-scroll">
-            {growing.map((task) => (
-              <button
-                type="button"
-                className="home-row cursor-row"
-                key={task.id}
-                onClick={() => onTask(task.id)}
-              >
-                <StatusSprite stage={stageOf(task)} />
-                <span>
-                  <strong>{projectTitle(task)}</strong>
-                  <small>
-                    {task.activity?.currentStep ?? task.activity?.latest ?? taskStatusLabel(task)}
-                  </small>
-                </span>
-              </button>
-            ))}
-            {ready.length > 0 && <h3 className="home-divider">Ready</h3>}
-            {ready.map((task) => (
-              <button
-                type="button"
-                className="home-row cursor-row"
-                key={task.id}
-                onClick={() => onTask(task.id)}
-              >
-                <StatusSprite stage={stageOf(task)} />
-                <span>
-                  <strong>{projectTitle(task)}</strong>
-                  <small>
-                    {task.activity?.latest ?? taskStatusLabel(task)} · {shortDate(task.updatedAt)}
-                  </small>
-                </span>
-              </button>
-            ))}
-            {!growing.length && !ready.length && (
-              <p className="home-quiet">Nothing is running. Start something above.</p>
-            )}
-          </ScrollRegion>
-        </section>
-        <section
-          className="desk-card home-card home-recent desk-recent"
-          aria-labelledby="home-recent"
-          data-perch
-        >
-          <header className="desk-card-heading">
-            <h2 id="home-recent">Recent projects</h2>
-            <Button onClick={onProjects}>
-              All projects <ArrowUpRight size={14} />
+          </span>
+          <Button onClick={onProjects}>
+            All <ArrowUpRight size={14} />
+          </Button>
+        </header>
+        <ScrollRegion label="Recent projects" className="desk-card-scroll">
+          <div className="project-tiles">
+            {sortedProjects.map((project) => {
+              const latest = latestOf(project);
+              const activity = latest?.activity;
+              return (
+                <button
+                  type="button"
+                  className="project-tile"
+                  key={project.id}
+                  onClick={() => onProject(project.id)}
+                >
+                  <StatusSprite stage={projectStage(project, latest)} scale={3} />
+                  <span>
+                    <strong>{project.title}</strong>
+                    <small>
+                      {latest
+                        ? (activity?.currentStep ?? activity?.latest ?? taskStatusLabel(latest))
+                        : `${project.conversationCount} conversations`}
+                    </small>
+                    {activity && activity.stepsTotal > 0 && (
+                      <span className="tile-steps">
+                        <Blocks
+                          value={activity.stepsCompleted}
+                          total={activity.stepsTotal}
+                          count={Math.min(activity.stepsTotal, 10)}
+                        />
+                        <small>
+                          {activity.stepsCompleted}/{activity.stepsTotal}
+                        </small>
+                      </span>
+                    )}
+                    <small className="tile-meta">
+                      {project.conversationCount}{' '}
+                      {project.conversationCount === 1 ? 'conversation' : 'conversations'} ·{' '}
+                      {money(project.spentUsd)} · {shortDate(project.updatedAt)}
+                    </small>
+                  </span>
+                </button>
+              );
+            })}
+            <button type="button" className="project-tile project-tile-new" onClick={onNew}>
+              <Plus size={18} />
+              <span>New project</span>
+            </button>
+          </div>
+        </ScrollRegion>
+      </section>
+      <section className="desk-card home-today" aria-labelledby="home-today" data-perch>
+        <header className="desk-card-heading">
+          <h2 id="home-today">Today</h2>
+          {attention.length > 0 && (
+            <Button onClick={onAttention}>
+              Needs you · {attention.length} <ArrowUpRight size={14} />
             </Button>
-          </header>
-          <ScrollRegion label="Recent projects" className="desk-card-scroll">
-            {sortedProjects.map((project) => (
-              <button
-                type="button"
-                className="home-row desk-project-row cursor-row"
-                key={project.id}
-                onClick={() => onProject(project.id)}
-              >
-                <StatusSprite
-                  stage={projectStage(
-                    project,
-                    tasks.find((task) => task.id === project.latestTaskId)
-                  )}
-                />
-                <span>
-                  <strong>{project.title}</strong>
+          )}
+        </header>
+        <ScrollRegion label="Today" className="desk-card-scroll">
+          <h3 className="home-divider">Needs you</h3>
+          {attention.map((task) =>
+            row(
+              task,
+              <>
+                {task.hasOpenQuestion ? 'Answer a question' : taskStatusLabel(task)}
+                {task.activity?.latest ? ` · ${task.activity.latest}` : ''}
+              </>
+            )
+          )}
+          {!attention.length && <p className="home-quiet">Nothing needs you.</p>}
+          <h3 className="home-divider">Growing</h3>
+          {growing.map((task) =>
+            row(
+              task,
+              task.activity?.currentStep ?? task.activity?.latest ?? taskStatusLabel(task),
+              task.activity && task.activity.stepsTotal > 0 ? (
+                <span className="tile-steps">
+                  <Blocks
+                    value={task.activity.stepsCompleted}
+                    total={task.activity.stepsTotal}
+                    count={Math.min(task.activity.stepsTotal, 10)}
+                  />
                   <small>
-                    {project.conversationCount}{' '}
-                    {project.conversationCount === 1 ? 'conversation' : 'conversations'}
+                    {task.activity.stepsCompleted}/{task.activity.stepsTotal}
                   </small>
                 </span>
-                <time dateTime={project.updatedAt}>{shortDate(project.updatedAt)}</time>
-              </button>
-            ))}
-            {!projects.length && (
-              <Button onClick={onNew}>
-                <Plus size={16} />
-                Start your first project
-              </Button>
-            )}
-          </ScrollRegion>
-        </section>
-      </div>
+              ) : undefined
+            )
+          )}
+          {!growing.length && <p className="home-quiet">Nothing is running.</p>}
+          {ready.length > 0 && <h3 className="home-divider">Ready</h3>}
+          {ready.map((task) =>
+            row(
+              task,
+              <>
+                {task.activity?.latest ?? taskStatusLabel(task)} · {shortDate(task.updatedAt)}
+              </>
+            )
+          )}
+          <h3 className="home-divider">Next up</h3>
+          {upcoming.map((schedule) => (
+            <button
+              type="button"
+              className="home-row cursor-row"
+              key={schedule.id}
+              onClick={onAutomations}
+            >
+              <Clock3 size={16} />
+              <span>
+                <strong>{schedule.title}</strong>
+                <small>{until(schedule.nextRunAt!)}</small>
+              </span>
+            </button>
+          ))}
+          {!upcoming.length && (
+            <button type="button" className="home-quiet home-link" onClick={onAutomations}>
+              No automations scheduled. Set one up
+            </button>
+          )}
+        </ScrollRegion>
+      </section>
     </section>
   );
 }

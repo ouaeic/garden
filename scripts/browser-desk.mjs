@@ -158,7 +158,7 @@ export async function checkDesk({
       if (width > 760 && height > 540) {
         const prompt = await page.locator('.desk-start-card').boundingBox();
         const editor = await page.locator('.desk-start-card .intent-editor').boundingBox();
-        const lists = await page.locator('.home-lists').boundingBox();
+        const lists = await page.locator('.home-projects').boundingBox();
         assert(prompt && editor && lists);
         assert(prompt.height <= editor.height + 20, 'The prompt card must fit its contents');
         assert(prompt.y + prompt.height <= lists.y, 'The lists sit under the prompt');
@@ -181,7 +181,7 @@ export async function checkDesk({
       if (width <= 700)
         await page
           .getByRole('navigation', { name: 'Home lists' })
-          .getByRole('button', { name: 'Recent', exact: true })
+          .getByRole('button', { name: 'Projects', exact: true })
           .click();
       const recent = page.locator('.desk-recent .scroll-region');
       assert(await recent.evaluate((element) => element.scrollHeight > element.clientHeight));

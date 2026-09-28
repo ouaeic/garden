@@ -55,7 +55,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
   await page.keyboard.press('Escape');
   await statsPanel.waitFor({ state: 'hidden' });
   await stats.click();
-  await page.locator('.home-lists').click({ position: { x: 4, y: 4 } });
+  await page.locator('.home-projects .desk-card-heading').click({ position: { x: 4, y: 4 } });
   await statsPanel.waitFor({ state: 'hidden' });
   await page.getByRole('button', { name: 'Prompt settings', exact: true }).click();
   const promptSettings = page.getByRole('dialog', { name: 'Prompt settings', exact: true });
@@ -95,7 +95,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
         'Hovered navigation retains its matrix'
       );
     }
-    const heading = page.locator('.home-card .desk-card-heading h2').first();
+    const heading = page.locator('.home-projects .desk-card-heading h2');
     await heading.evaluate((element) => {
       const range = document.createRange();
       range.selectNodeContents(element);
