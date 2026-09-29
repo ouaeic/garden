@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
+import { sha256 } from '../packages/core/src/index.ts';
 import { createRequire } from 'node:module';
 import { mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
@@ -45,11 +47,12 @@ try {
       import React,{useEffect,useState} from 'react';import {createRoot} from 'react-dom/client';
       import ${JSON.stringify(path.join(root, 'src/styles.css'))};
       import Login from ${JSON.stringify(path.join(root, 'src/Login.tsx'))};
+      import {useAuthEntry} from ${JSON.stringify(path.join(root, 'src/auth-entry.ts'))};
       import {stepUp,signOut} from ${JSON.stringify(path.join(root, 'src/auth.ts'))};
       import {get,post} from ${JSON.stringify(path.join(root, 'src/client.ts'))};
-      function Proof(){const [user,setUser]=useState(null),[loading,setLoading]=useState(true),[confirmed,setConfirmed]=useState(false),[error,setError]=useState('');
+      function Proof(){const [entry,setEntry]=useAuthEntry();const [user,setUser]=useState(null),[loading,setLoading]=useState(true),[confirmed,setConfirmed]=useState(false),[error,setError]=useState('');
         const refresh=()=>get('/v1/auth/me').then(r=>setUser(r.user)).catch(()=>setUser(null)).finally(()=>setLoading(false));useEffect(()=>{void refresh()},[]);
-        if(loading)return null;if(!user)return React.createElement(Login,{pairingCode:'',theme:'dark',toggleTheme:()=>{},onAuthenticated:refresh});
+        if(loading)return null;if(!user||entry.startsWith('#password-reset='))return React.createElement(Login,{pairingCode:'',theme:'dark',toggleTheme:()=>{},onAuthenticated:()=>{setEntry('');void refresh()}});
         return React.createElement('main',{},React.createElement('h1',{},'Signed in as '+user.displayName),
           React.createElement('button',{onClick:()=>stepUp(true).then(()=>post('/v1/probe/sensitive',{})).then(()=>setConfirmed(true)).catch(e=>setError(e.message))},'Confirm account change'),
           React.createElement('button',{onClick:()=>signOut().then(refresh)},'Sign out'),
@@ -202,9 +205,25 @@ try {
         fullPage: true
       });
     }
+    const resetToken = randomBytes(32).toString('base64url');
+    await store.createPasswordReset(owner.id, sha256(resetToken));
+    await page.goto(`${origin}/#password-reset=${resetToken}`);
+    await page.getByRole('heading', { name: 'Recover access.' }).waitFor();
+    assert.equal(await page.getByLabel('Recovery or setup code').inputValue(), resetToken);
+    assert.equal(new URL(page.url()).hash, '');
+    await page.getByLabel('New password', { exact: true }).fill(password);
+    await page.getByRole('button', { name: 'Set password and sign in' }).click();
+    await page.getByRole('heading', { name: 'Save your recovery code.' }).waitFor();
+    await page.getByRole('button', { name: 'I have saved it' }).click();
+    await page.getByRole('heading', { name: 'Signed in as Garden owner' }).waitFor();
+    const nextToken = randomBytes(32).toString('base64url');
+    await store.createPasswordReset(owner.id, sha256(nextToken));
+    await page.goto(`${origin}/#password-reset=${nextToken}`);
+    await page.getByRole('heading', { name: 'Recover access.' }).waitFor();
+    assert.equal(await page.getByLabel('Recovery or setup code').inputValue(), nextToken);
     assert.deepEqual(errors, []);
     console.log(
-      'Password browser workflows passed: first-owner setup, independent devices, remembered session after reload, wrong-password retry, password step-up, recovery, old-session revocation and phone layout.'
+      'Password browser workflows passed: first-owner setup, independent devices, remembered session after reload, wrong-password retry, password step-up, recovery, old-session revocation, setup links in open signed-in and signed-out tabs, and phone layout.'
     );
   } finally {
     await staticServer.close();

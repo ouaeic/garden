@@ -1,3 +1,4 @@
+import { useAuthEntry } from './auth-entry';
 import { useEffect, useState } from 'react';
 import { ArrowUpRight, Check, Moon, Sun } from './icons';
 import { get } from './client';
@@ -29,6 +30,7 @@ export default function Login({
   const [legal, setLegal] = useState<{ registrationAvailable?: boolean; passkeysUsable?: boolean }>(
     {}
   );
+  const [entryFragment] = useAuthEntry();
   const [mode, setMode] = useState<'login' | 'register' | 'recover' | 'enroll'>('login');
   const [method, setMethod] = useState<'password' | 'passkey'>('password');
   const [password, setPassword] = useState('');
@@ -41,15 +43,15 @@ export default function Login({
     let alive = true;
     void (async () => {
       const native = await import('./native');
-      const token = native.enrollmentCodeFromFragment(location.hash, location.origin);
+      const token = native.enrollmentCodeFromFragment(entryFragment, location.origin);
       const browserAuthorization = (
         await import('./native-authorization')
       ).browserAuthorizationLocation();
-      const resetCode = location.hash.startsWith('#password-reset=')
-        ? decodeURIComponent(location.hash.slice('#password-reset='.length))
+      const resetCode = entryFragment.startsWith('#password-reset=')
+        ? decodeURIComponent(entryFragment.slice('#password-reset='.length))
         : '';
       if (resetCode) history.replaceState({}, '', `${location.pathname}${location.search}`);
-      if (location.hash.startsWith('#pair=')) {
+      if (entryFragment.startsWith('#pair=')) {
         history.replaceState({}, '', `${location.pathname}${location.search}`);
         if (!token)
           throw new Error(
@@ -60,6 +62,9 @@ export default function Login({
       if (!alive) return;
       setLegal(value);
       if (resetCode) {
+        setMethod('password');
+        setPassword('');
+        setError(null);
         setCode(resetCode);
         setMode('recover');
       } else if (
@@ -81,7 +86,7 @@ export default function Login({
     return () => {
       alive = false;
     };
-  }, [pairingCode]);
+  }, [pairingCode, entryFragment]);
   async function run(development = false) {
     setBusy(true);
     setError(null);

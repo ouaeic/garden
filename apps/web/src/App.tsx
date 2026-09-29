@@ -1,3 +1,4 @@
+import { useAuthEntry } from './auth-entry';
 import { Keys } from './Keys';
 import { palettes, storedDisplayMode, storedPalette } from './appearance';
 import { setLifeMode } from './life/settings';
@@ -102,6 +103,7 @@ function WorkspaceApp() {
   const [nativeState, setNativeState] = useState<NativeStatus | null>(null);
   const [nativePairingCode, setNativePairingCode] = useState('');
   const [authRequired, setAuthRequired] = useState(false);
+  const [authEntry, setAuthEntry] = useAuthEntry();
   const [error, setError] = useState<unknown>(null);
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [navigation, setNavigation] = useState(initialNavigation);
@@ -510,12 +512,13 @@ function WorkspaceApp() {
         <Spinner label="Opening your workspace…" />
       </div>
     );
-  if (authRequired)
+  if (authRequired || authEntry.startsWith('#password-reset='))
     return (
       <Suspense fallback={<Spinner label="Opening sign-in…" />}>
         <Login
           pairingCode={nativePairingCode}
           onAuthenticated={() => {
+            setAuthEntry('');
             setLoading(true);
             setNativePairingCode('');
             void refresh();
