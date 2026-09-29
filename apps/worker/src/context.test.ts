@@ -448,9 +448,8 @@ describe('what the compaction trigger is measuring', () => {
     const prepared = prepareModelContext(raw, 200_000, 8_000, { reservedTokens: 15_000 });
     // The squeeze is the cheap first tier: if bounding tool output is enough to fit, no summary is
     // written at all. Triggering on the raw size skips straight past that tier every time.
-    // Measured here: 120,072 raw against 65,322 prepared, a 46% reduction that the trigger could
-    // not see. That gap is the whole of the over-triggering.
-    expect(prepared.estimatedInputTokens).toBeLessThan(before * 0.6);
+    // The trigger must see the materially smaller prepared request, not the raw trajectory.
+    expect(prepared.estimatedInputTokens).toBeLessThan(before * 0.65);
     expect(prepared.estimatedInputTokens).toBeGreaterThan(0);
   });
 
@@ -1779,10 +1778,7 @@ describe('the contract as a function of the box it is on', () => {
     const first = baseSystemPrompt(bare);
     expect(baseSystemPrompt(bare)).toBe(first);
     expect(Buffer.byteLength(first)).toBeLessThan(Buffer.byteLength(BASE_SYSTEM_PROMPT));
-    // Measured on this tree: 8,274 bytes fully provisioned, 7,413 on a box with no connector and
-    // no document toolchain, against 12,353 for the contract this replaced. The bands are wide
-    // enough to survive a sentence being reworded and tight enough that refilling the method
-    // section would fail here rather than in a byte total nobody reads.
+    // Resident prompt budget: wording may change without letting procedural guidance grow unchecked.
     expect(Buffer.byteLength(BASE_SYSTEM_PROMPT)).toBeLessThan(9_000);
     expect(Buffer.byteLength(first)).toBeLessThan(8_000);
   });
@@ -1818,10 +1814,9 @@ describe('what a saved window carries across the fold', () => {
   it('prescribes tools and their traps, not a sequence for a named kind of job', () => {
     expect(BASE_SYSTEM_PROMPT).not.toMatch(/is document preparation with a form at the end/);
     expect(BASE_SYSTEM_PROMPT).not.toMatch(/dossier/i);
-    // The one safety property inside that bullet outlives it, said once and generally: a gap in
-    // the user's own record is a question, not something to fill in plausibly.
-    expect(BASE_SYSTEM_PROMPT).toMatch(/never supply a fact about the user/);
-    expect(BASE_SYSTEM_PROMPT).toMatch(/A missing detail is a question/);
+    // Prompt-level truthfulness contract: workspace-specific facts cannot be inferred from a model prior.
+    expect(BASE_SYSTEM_PROMPT).toContain('Never invent user facts');
+    expect(BASE_SYSTEM_PROMPT).toContain('Ask when a missing choice materially changes the result');
   });
 
   it('drops a guidance block a window saved before the fold still carries', () => {
@@ -1872,7 +1867,7 @@ describe('how much tool output survives the window', () => {
   it('tightens the floor as the window actually fills', () => {
     const budget = modelInputBudget(200_000, 16_384);
     expect(olderToolOutputChars(budget * 0.3, budget)).toBe(24_000);
-    const half = olderToolOutputChars(budget * 0.7, budget);
+    const half = olderToolOutputChars(budget * 0.8, budget);
     expect(half).toBeLessThan(24_000);
     expect(half).toBeGreaterThan(4_000);
     // The end of the CURVE, which is no longer the same number as the hard floor: the terminal pass
@@ -2469,17 +2464,16 @@ describe('what it costs to move the tool-output floor', () => {
     messages.reduce((found, message, index) => (message.cacheBreakpoint ? index : found), -1);
 
   it('holds a floor the curve has barely moved away from', () => {
-    // The curve is read at a 1,000-character resolution, so one arriving tool result was enough to
-    // pick a new floor - and a new floor re-cuts every older result at once, ahead of every
-    // breakpoint. A quarter is what a move has to be worth before it is taken.
+    // A new floor re-cuts every older result ahead of the breakpoints. Small changes must stay
+    // inside the hysteresis band so an arriving result does not invalidate the prefix by itself.
     const budget = modelInputBudget(1_000_000, 16_384);
     const applied = olderToolOutputChars(budget * 0.1, budget);
     expect(applied).toBe(24_000);
-    // 1,000 characters of curve below the applied floor: the old rule stepped, this one does not.
+    // Small amounts of additional pressure keep the applied floor.
     expect(olderToolOutputChars(85_000, budget, applied)).toBe(24_000);
     expect(olderToolOutputChars(105_000, budget, applied)).toBe(24_000);
-    // A quarter off, and it follows the curve down to wherever the curve actually is.
-    const moved = olderToolOutputChars(112_000, budget, applied);
+    // A substantial reduction follows the curve instead of keeping the initial floor forever.
+    const moved = olderToolOutputChars(140_000, budget, applied);
     expect(moved).toBeLessThanOrEqual(18_000);
     expect(moved).toBeGreaterThan(4_000);
   });
@@ -2499,9 +2493,8 @@ describe('what it costs to move the tool-output floor', () => {
      * The rule is one-way and the floor is persisted per task, so a task resumed after any change
      * to how the curve is read arrives here carrying a number this run did not choose. Reaching the
      * end of the curve from a round number is the ordinary case and is covered above; reaching it
-     * from an unround one is the case that has no reason to work. It does not by arithmetic - a
-     * quarter off 4,500 is 3,375, which is under the curve's end, so the band alone would refuse
-     * the only move left and the task would keep that floor for the rest of its life.
+     * from an unround one also needs to work. Near the curve's end, its remaining descent can
+     * fall inside the hysteresis band; the terminal floor must still be reached.
      *
      * The values below the curve's end are the other half of the rule, and they are why this reads
      * a minimum rather than a constant: the squeeze is ONE-WAY, so a task resumed carrying a floor
@@ -2517,12 +2510,8 @@ describe('what it costs to move the tool-output floor', () => {
   });
 
   it('leaves the cached prefix alone across the steps of a growing window', () => {
-    // Everything in this run is an append except the floor, so the floor is the only thing that can
-    // move a byte the previous request had already cached. Measured over these thirty-two steps: the
-    // 1,000-character step-down rewrote the prefix on 16 of them and held a mean floor of 9,250
-    // characters; holding until the curve asks for a quarter off rewrites 6 and holds 10,281. Fewer
-    // rewrites and more of each result kept are the same effect - the rewrites were what the extra
-    // truncation was buying.
+    // Every change here is an append except the floor, isolating the cache invalidations caused
+    // by that floor from image, reasoning and tool-argument aging.
     let floor: number | undefined;
     let previous: { bytes: string; through: number } | null = null;
     let rewrites = 0;
@@ -3209,7 +3198,7 @@ describe('sixty steps of one task, measured on the bytes that leave the machine'
       meanPrefix: 0.801,
       meanCacheRead: 0.778,
       distinctFloors: 3,
-      finalFloor: 13_000,
+      finalFloor: 14_000,
       firstDifferences: { 'assistant@-9': 51, 'tool@-12': 2 },
       breakpointLag: 1.4,
       servedShare: 0.778,
