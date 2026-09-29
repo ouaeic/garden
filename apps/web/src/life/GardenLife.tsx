@@ -80,7 +80,7 @@ function visible(element: Element | null, edge: 'top' | 'bottom' = 'top'): Ledge
     const under = document.elementFromPoint(x, edge === 'top' ? y + 0.5 : y - 0.5);
     if (!under || !(under === element || element.contains(under))) return null;
     const over = document.elementFromPoint(x, Math.max(0, edge === 'top' ? y - 8 : y + 8));
-    if (over?.closest('dialog, [role="dialog"], [aria-modal="true"]')) return null;
+    if (over?.closest('dialog:modal, [role="dialog"], [aria-modal="true"]')) return null;
   }
   const { left, top, right, bottom, width } = box;
   return { left, top, right, bottom, width, element };
@@ -126,11 +126,15 @@ function paintedEdge(element: Element | null, edge: 'top' | 'bottom' = 'top'): L
 /** Card edges a creature can stand on: wide enough, fully on screen, below the masthead. */
 function ledges() {
   const bar = document.querySelector('.garden-masthead')?.getBoundingClientRect().bottom ?? 56;
-  return [...document.querySelectorAll('[data-perch], .desk-card, .desk-work-card')]
-    .filter((element) => !element.closest('dialog'))
+  return [
+    ...document.querySelectorAll('[data-perch], .desk-card, .desk-work-card, .panel, .phone-bar')
+  ]
+    .filter((element) => !element.closest('dialog:modal, [role="dialog"], [aria-modal="true"]'))
     .map((element) => paintedEdge(element))
     .filter((box): box is Ledge =>
-      Boolean(box && box.top > bar + 20 && box.width > 140 && box.right <= innerWidth - 8)
+      Boolean(
+        box && box.top > bar + 20 && box.width > 140 && box.left >= 0 && box.right <= innerWidth
+      )
     );
 }
 
@@ -176,10 +180,10 @@ export default function GardenLife() {
       lastInput.current = Date.now();
     };
     addEventListener('keydown', touch, true);
-    addEventListener('pointerdown', touch, true);
+    addEventListener('input', touch, true);
     return () => {
       removeEventListener('keydown', touch, true);
-      removeEventListener('pointerdown', touch, true);
+      removeEventListener('input', touch, true);
     };
   }, []);
 
@@ -376,7 +380,6 @@ export default function GardenLife() {
         });
       });
     };
-    const narrow = () => innerWidth < 700;
     /** Birds settle along the painted top borders of cards. */
     const perches = (height: number) =>
       ledges().map((box) => ({
@@ -679,7 +682,7 @@ export default function GardenLife() {
           }
           await travel(id, offscreen(!fromLeft), between(40, 160), 900, { arc: 30 });
         };
-        if (bar && !narrow() && chance(0.5)) {
+        if (bar && chance(0.5)) {
           // Down from behind the masthead to hang by its feet a while, then off into the night.
           const line = bar.bottom;
           const x = between(innerWidth * 0.2, innerWidth * 0.8);

@@ -203,14 +203,14 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
         const snail = page.locator('[data-creature="snail"]');
         await snail.waitFor({ state: 'attached' });
         const candidates = page.locator(
-          '[data-perch], .desk-card, .desk-work-card, .garden-masthead'
+          '[data-perch], .desk-card, .desk-work-card, .panel, .phone-bar, .garden-masthead'
         );
         assert(
           (await candidates.count()) > 0,
           'The border visibility check needs real candidate edges'
         );
         const hiddenBorders = await page.addStyleTag({
-          content: `[data-perch], .desk-card, .desk-work-card, .garden-masthead { ${rule} !important; }`
+          content: `[data-perch], .desk-card, .desk-work-card, .panel, .phone-bar, .garden-masthead { ${rule} !important; }`
         });
         await snail.waitFor({ state: 'detached' });
         await page.evaluate((names) => {
@@ -237,13 +237,109 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
     console.log(
       'Painted-edge checks passed on desktop and mobile: absent, transparent and hidden borders are rejected; returning borders can be used again.'
     );
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${origin}/?view=library`);
+    await page.locator('.navigation-page[open]').waitFor();
+    await page.locator('.life-layer').waitFor({ state: 'attached' });
+    // Leave only the phone bar's real top border available on this page.
+    const onlyBar = await page.addStyleTag({
+      content:
+        '[data-perch], .desk-card, .desk-work-card, .panel, .garden-masthead { border-style: none !important; }'
+    });
+    await page.evaluate(() =>
+      dispatchEvent(new CustomEvent('garden:scene', { detail: 'snailCrawl' }))
+    );
+    const barSnail = page.locator('[data-creature="snail"]');
+    await barSnail.waitFor({ state: 'attached' });
+    await page.waitForFunction(() => {
+      const actor = document.querySelector('[data-creature="snail"]')?.getBoundingClientRect();
+      const bar = document.querySelector('.phone-bar')?.getBoundingClientRect();
+      return actor && bar && actor.top < bar.top && Math.abs(actor.bottom - bar.top) < 3;
+    });
+    await page.screenshot({ path: resolve(report, 'mobile-library-border-creature.png') });
+    await onlyBar.evaluate((element) => element.remove());
+    // A normal page may contain usable borders; only actual modal dialogs exclude them.
+    const pagePanel = await page.locator('.navigation-page .dialog-body').evaluateHandle((body) => {
+      const panel = document.createElement('section');
+      panel.className = 'panel';
+      panel.style.cssText =
+        'position:fixed;left:24px;top:200px;width:250px;height:100px;border:1px solid currentColor';
+      body.append(panel);
+      return panel;
+    });
+    const hideOtherEdges = await page.addStyleTag({
+      content:
+        '[data-perch], .desk-card, .desk-work-card, .phone-bar, .garden-masthead { border-style:none !important; }'
+    });
+    await barSnail.waitFor({ state: 'detached' });
+    await page.evaluate(() =>
+      dispatchEvent(new CustomEvent('garden:scene', { detail: 'snailCrawl' }))
+    );
+    await barSnail.waitFor({ state: 'attached' });
+    await page.waitForFunction(() => {
+      const actor = document.querySelector('[data-creature="snail"]')?.getBoundingClientRect();
+      return actor && actor.top < 200 && Math.abs(actor.bottom - 200) < 3;
+    });
+    const modal = await page.evaluateHandle(() => {
+      const dialog = document.createElement('dialog');
+      dialog.textContent = 'Modal test';
+      document.body.append(dialog);
+      dialog.showModal();
+      return dialog;
+    });
+    await barSnail.waitFor({ state: 'detached' });
+    await page.evaluate(() =>
+      dispatchEvent(new CustomEvent('garden:scene', { detail: 'snailCrawl' }))
+    );
+    await page.waitForTimeout(400);
+    assert.equal(await barSnail.count(), 0, 'A true modal still excludes covered borders');
+    await modal.evaluate((element) => element.remove());
+    await pagePanel.evaluate((element) => element.remove());
+    await hideOtherEdges.evaluate((element) => element.remove());
+    console.log('Mobile creatures use actual page borders and the full-width phone bar.');
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.reload();
+    await page.goto(origin);
     await page.locator('.home-projects').waitFor();
     assert.equal(
       await page.locator('.life-actor').count(),
       0,
       'Reduced-motion preference is respected'
+    );
+    await page.clock.install({ time: new Date('2026-09-29T22:00:00') });
+    await page.addInitScript(() => {
+      Math.random = () => 0;
+    });
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.goto(`${origin}/?view=library`);
+    await page.locator('.navigation-page[open]').waitFor();
+    await page.locator('.life-layer').waitFor({ state: 'attached' });
+    await page.evaluate(() =>
+      dispatchEvent(new CustomEvent('garden:scene', { detail: 'batVisit' }))
+    );
+    await page.locator('.life-clip [data-creature="bat"]').waitFor({ state: 'attached' });
+    assert.equal(
+      await page
+        .locator('.life-clip:has([data-creature="bat"])')
+        .evaluate((clip) => clip.getBoundingClientRect().top),
+      await page.locator('.garden-masthead').evaluate((bar) => bar.getBoundingClientRect().bottom),
+      'Bats can hang from the same painted masthead on phones'
+    );
+    await page.clock.setFixedTime(new Date('2026-09-29T12:00:00'));
+    await page.reload();
+    await page.locator('.navigation-page[open]').waitFor();
+    await page.locator('.life-layer').waitFor({ state: 'attached' });
+    for (let second = 0; second < 8; second++) {
+      await page
+        .locator('body')
+        .dispatchEvent('pointerdown', { pointerType: 'touch', clientX: 0, clientY: 0 });
+      await page.clock.runFor(1000);
+    }
+    assert(
+      (await page.locator('.life-actor').count()) > 0,
+      'Ordinary taps do not continually postpone natural arrivals'
+    );
+    console.log(
+      'Natural visitors arrive on mobile pages during ordinary taps, without forced scenes.'
     );
     assert.deepEqual(errors, [], 'Mobile navigation must not trigger render errors');
   } catch (error) {
