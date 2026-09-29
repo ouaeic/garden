@@ -1566,6 +1566,7 @@ try {
       );
       await page.screenshot({ path: resolve(report, `task-${width}.png`) });
     }
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await page
       .getByRole('navigation', { name: 'Workspace navigation' })
       .getByRole('button', { name: 'Projects', exact: true })
@@ -1581,7 +1582,6 @@ try {
     }
     await page.keyboard.press('Escape');
     await projectPanel.waitFor({ state: 'detached' });
-    await page.setViewportSize({ width: 1440, height: 1000 });
     assert.equal(
       await page.locator('.garden-status-footer').count(),
       0,
