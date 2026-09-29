@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Activity, Folder, SlidersHorizontal } from './icons';
 import { Button, Dialog } from './ui';
 import { closeProjectPanel, useProjectView } from './surface-location';
+import { usePhoneLayout } from './use-phone-layout';
 
 const panels = [
   { id: 'files', label: 'Files', icon: Folder },
@@ -11,13 +12,14 @@ const panels = [
 
 export function ProjectPanelLinks({ inside = false }: { inside?: boolean }) {
   const [view, selectView] = useProjectView();
+  const phone = usePhoneLayout();
   return (
     <nav className="project-view-nav" aria-label={inside ? 'Panel sections' : 'Project panels'}>
       {panels.map(({ id, label, icon: Icon }) => (
         <Button
           key={id}
           aria-current={view === id ? 'true' : undefined}
-          {...(!inside ? { 'aria-haspopup': 'dialog' as const } : {})}
+          {...(!inside && !phone ? { 'aria-haspopup': 'dialog' as const } : {})}
           onClick={() => selectView(id)}
         >
           <Icon size={15} />
@@ -44,6 +46,7 @@ export function useDockedPanels() {
 
 export default function ProjectPanel({ scope, children }: { scope: string; children: ReactNode }) {
   const [view] = useProjectView();
+  const phone = usePhoneLayout();
   const dockable = useDockedPanels();
   const content = useRef<HTMLDivElement>(null);
   const [docked, setDocked] = useState(dockable);
@@ -64,6 +67,7 @@ export default function ProjectPanel({ scope, children }: { scope: string; child
   return (
     <Dialog
       title={scope}
+      page={phone}
       open={open}
       wide
       modal={!docked}

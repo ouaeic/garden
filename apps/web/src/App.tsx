@@ -1,4 +1,5 @@
 import { useAuthEntry } from './auth-entry';
+import { usePhoneLayout } from './use-phone-layout';
 import { Keys } from './Keys';
 import { palettes, storedDisplayMode, storedPalette } from './appearance';
 import { setLifeMode } from './life/settings';
@@ -98,6 +99,7 @@ export default function App() {
 const NativeAuthorizationPortal = lazy(() => import('./NativeAuthorization'));
 function WorkspaceApp() {
   useWorkspaceViewport();
+  const phone = usePhoneLayout();
   const [bootstrap, setBootstrap] = useState<Bootstrap | null>(null);
   const [loading, setLoading] = useState(true);
   const [nativeState, setNativeState] = useState<NativeStatus | null>(null);
@@ -547,7 +549,7 @@ function WorkspaceApp() {
     <div
       className={`garden-shell desk-shell ${task && baseView === 'work' ? 'task-open' : ''} ${activeProjectId && baseView === 'work' ? 'has-project' : ''}`}
     >
-      <a className="skip-link" href="#main">
+      <a className="skip-link" href={phone && sheetTitle ? '#navigation-page' : '#main'}>
         Skip to work
       </a>
       <header className="garden-masthead">
@@ -613,7 +615,7 @@ function WorkspaceApp() {
           </Button>
           <Button
             aria-label="Settings"
-            aria-haspopup="dialog"
+            aria-haspopup={phone ? undefined : 'dialog'}
             aria-expanded={navigation.view === 'settings'}
             onClick={() => navigate('settings')}
           >
@@ -626,7 +628,11 @@ function WorkspaceApp() {
           You’re offline. Your work continues on the computer; updates will reconnect here.
         </div>
       )}
-      <main id="main" className={`garden-main view-${baseView}`}>
+      <main
+        id="main"
+        className={`garden-main view-${baseView}`}
+        hidden={phone && Boolean(sheetTitle)}
+      >
         <ErrorNotice
           context="Could not refresh the workspace."
           error={error}
@@ -835,6 +841,8 @@ function WorkspaceApp() {
       {sheetTitle && (
         <Dialog
           title={sheetTitle}
+          page={phone}
+          id="navigation-page"
           onClose={closeSheet}
           className={`desk-sheet desk-sheet-${navigation.view}`}
           dismissOnBackdrop

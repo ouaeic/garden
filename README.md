@@ -31,7 +31,7 @@ further: it passes the exact commit its own build was made from, and the install
 continue if the source it checked out is not that commit.
 
 That command installs the computer, and native clients pin the server’s own key. For browser
-access, configure a hostname and a trusted HTTPS certificate. You can sign in with a password;
+access, configure trusted HTTPS for the server's public IP address or hostname. You can sign in with a password;
 optional passkeys also require a domain name and a secure browser context. If a domain already
 points at the server, configure it during installation:
 
@@ -42,9 +42,10 @@ curl -fsSL https://raw.githubusercontent.com/ouaeic/garden/v0.2.0/install.sh | s
 `GARDEN_ACME_EMAIL` is the contact address the certificate authority is given, and supplying it is
 how the subscriber agreement is accepted — garden will not accept it on the operator’s behalf, so
 without that variable no certificate is requested. Install without them and nothing is lost: the
-installer ends by saying that browser sign-in does not work yet, and prints whichever of
-`sudo garden set-hostname` and `sudo garden certificate enable` that server still needs. Both do
-the same job afterwards, and `sudo garden doctor` keeps saying so until they are done.
+installer explains the remaining certificate setup. `sudo garden certificate enable` enables
+trusted HTTPS; `sudo garden set-hostname` adds an optional domain name. `sudo garden doctor`
+reports certificate readiness. See [home servers and direct addresses](docs/relay.md) for
+changing addresses, router forwarding and connections behind carrier-grade NAT.
 
 From a checked-out source tree:
 

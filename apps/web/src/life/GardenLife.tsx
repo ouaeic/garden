@@ -73,7 +73,7 @@ type Ledge = {
 function visible(element: Element | null): Ledge | null {
   if (!element) return null;
   const box = element.getBoundingClientRect();
-  if (box.width === 0 || box.bottom < 40 || box.top > innerHeight - 40) return null;
+  if (box.width === 0 || box.bottom <= 0 || box.top >= innerHeight) return null;
   for (const share of [0.2, 0.5, 0.8]) {
     const x = box.left + box.width * share;
     const under = document.elementFromPoint(x, Math.min(box.bottom - 1, box.top + 3));
@@ -92,14 +92,14 @@ function ledges() {
     .filter((element) => !element.closest('dialog'))
     .map((element) => visible(element))
     .filter((box): box is Ledge =>
-      Boolean(box && box.top > bar + 20 && box.width > 140 && box.right < innerWidth - 8)
+      Boolean(box && box.top > bar + 20 && box.width > 140 && box.right <= innerWidth - 8)
     );
 }
 
 /**
  * Who visits, and how often: each is its own chance a minute rather than a turn in a rotation, so
- * a quiet stretch, a busy minute and a rare visitor all happen the way they do outside. `wide`
- * visitors need room along the card edges that a phone does not have; `night` ones come after dark.
+ * a quiet stretch, a busy minute and a rare visitor all happen the way they do outside.
+ * `night` visitors come after dark.
  */
 const visitors: Array<{ scene: string; perMinute: number; night?: boolean }> = [
   { scene: 'birdVisit', perMinute: 0.7 },
@@ -227,6 +227,8 @@ export default function GardenLife() {
     ) => {
       const going = () => !world.cancelled && state.has(id) && (force || !life(id).cancelled);
       await settle();
+      // Rendering can take more than one frame on a busy device.
+      while (going() && !nodes.current.has(id)) await settle();
       const actor = state.get(id);
       const node = nodes.current.get(id);
       if (!actor || !node || !going()) throw new Cancelled();
@@ -350,7 +352,7 @@ export default function GardenLife() {
               {
                 left: brand.left,
                 right: brand.right - 18,
-                y: brand.top - height + 4,
+                y: Math.max(2, brand.top - height + 4),
                 element: brand.element
               }
             ]
@@ -509,7 +511,6 @@ export default function GardenLife() {
         remove(id);
       },
       async monkeyTour() {
-        if (narrow()) return;
         const masthead = document.querySelector('.garden-masthead');
         const bar = masthead?.getBoundingClientRect();
         const cards = ledges();
@@ -598,7 +599,6 @@ export default function GardenLife() {
         remove(id);
       },
       async snailCrawl() {
-        if (narrow()) return;
         const box = pick(ledges());
         if (!box) return;
         // Up over the edge, a slow crawl with a rest or two, and back down behind it.
@@ -695,7 +695,6 @@ export default function GardenLife() {
         remove(id);
       },
       async frogHop() {
-        if (narrow()) return;
         const cards = ledges();
         let box = pick(cards);
         if (!box) return;
@@ -766,7 +765,6 @@ export default function GardenLife() {
         remove(id);
       },
       async ladybirdWalk() {
-        if (narrow()) return;
         const box = pick(ledges());
         if (!box) return;
         // Up over a card's edge, a walk in short bursts along it, then wings out and away.
@@ -904,17 +902,19 @@ export default function GardenLife() {
           return run(visitor.scene);
     }, TICK);
     // Someone is usually about soon after the garden opens.
-    const hello = setTimeout(
-      () => {
-        if (quiet() || active.size) return;
-        const choices = eligible();
-        const total = choices.reduce((sum, visitor) => sum + visitor.perMinute, 0);
-        let roll = Math.random() * total;
-        for (const visitor of choices)
-          if ((roll -= visitor.perMinute) < 0) return run(visitor.scene);
-      },
-      mode === 'lively' ? between(4000, 8000) : between(30_000, 60_000)
-    );
+    let hello: ReturnType<typeof setTimeout>;
+    const greet = () => {
+      if (quiet()) {
+        hello = setTimeout(greet, TICK);
+        return;
+      }
+      if (active.size) return;
+      const choices = eligible();
+      const total = choices.reduce((sum, visitor) => sum + visitor.perMinute, 0);
+      let roll = Math.random() * total;
+      for (const visitor of choices) if ((roll -= visitor.perMinute) < 0) return run(visitor.scene);
+    };
+    hello = setTimeout(greet, mode === 'lively' ? between(4000, 8000) : between(30_000, 60_000));
     return () => {
       world.cancelled = true;
       clearInterval(tick);
@@ -939,6 +939,7 @@ export default function GardenLife() {
       }}
       className="life-actor"
       data-life={actor.id}
+      data-creature={actor.kind}
       style={
         {
           transform: `translate3d(${actor.x}px, ${

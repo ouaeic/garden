@@ -1380,11 +1380,7 @@ for attempt in $(seq 1 60); do
   sleep 1
 done
 
-# A WebAuthn Relying Party ID has to be a registrable domain name; the specification does not
-# allow an address literal. Trusted TLS for a bare address is now obtainable, so an address-only
-# server does get the installable app and push notifications - but a passkey cannot be created
-# or used in a browser against it, which means the owner can only ever sign in from a native
-# client. A hostname is therefore part of ordinary setup, not an optional extra.
+# Passwords work by address with trusted HTTPS. Optional passkeys need a hostname.
 if [ -n "${GARDEN_DDNS_TOKEN:-}" ]; then
   say "Publishing this computer under ${GARDEN_DDNS_HOSTNAME:-the requested hostname}"
   # The token stays in the environment: garden-ddns reads it from there rather than from an
@@ -1404,12 +1400,8 @@ case "$webauthn_rp_id" in
   *) server_has_hostname="" ;;
 esac
 if [ -z "$server_has_hostname" ]; then
-  warn "this computer has no hostname, so signing in from a browser is not possible: a passkey is bound to a domain name and the standard does not allow an IP address"
-  # Ordered by what is true of most servers. A rented server has a fixed address, so it needs one A
-  # record and nothing else; dynamic DNS exists for an address that changes, which is a home
-  # connection, and offering it first sent owners of perfectly stable servers to configure a service
-  # that solves a problem they do not have.
-  say "  Fixed address: point a domain at $(printf '%s' "$ipv4_addresses" | awk '{print $1}') and re-run with GARDEN_HOSTNAME=your.domain GARDEN_ACME_EMAIL=you@example.com, or run sudo garden set-hostname your.domain"
+  say "Password sign-in works by address once HTTPS is trusted. Optional passkeys need a hostname."
+  say "  Public address: sudo garden certificate enable --agree-tos --email you@example.com"
   say "  Address that changes, as on a home connection: sudo garden ddns configure"
 fi
 
@@ -1566,23 +1558,12 @@ printf 'Detected endpoints:\n'
 printf '%s' "$endpoints_json" | jq -r '.[] | "  " + .'
 printf 'Server identity: sha256/%s\n' "$server_identity"
 if [ -z "$server_has_hostname" ]; then
-  printf '\nThis computer has no hostname, so it is reachable only by address. Signing in from a\n'
-  printf 'browser needs a hostname: a passkey is bound to a domain name and the WebAuthn standard\n'
-  printf 'does not allow an IP address, so today only the native clients can sign in.\n'
-  # Fixed address first, because that is what a rented server has. Dynamic DNS chases an address
-  # that moves, and leading with it sent owners of perfectly stable servers to set up a service
-  # against a problem they do not have.
-  printf '\nIf this address is fixed, which it usually is on a rented server, point a domain at\n'
-  printf '%s and then:\n' "$(printf '%s' "$ipv4_addresses" | awk '{print $1}')"
-  printf '  sudo garden set-hostname your.domain\n'
+  printf '\nThis computer is reachable by address. Browser password sign-in needs trusted HTTPS.\n'
+  printf 'For a public address, enable its certificate:\n'
   printf '  sudo garden certificate enable --agree-tos --email you@example.com\n'
-  printf 'Both, not either: the name is what a passkey is bound to, and the trusted certificate is\n'
-  printf 'what lets the browser create one at all. Or re-run this installer with\n'
-  printf 'GARDEN_HOSTNAME=your.domain GARDEN_ACME_EMAIL=you@example.com to do it in one step.\n'
-  printf '\nIf the address changes, as on a home connection, dynamic DNS is the tool for that:\n'
-  printf '  1. create a name at https://www.duckdns.org or https://desec.io\n'
-  printf '  2. sudo garden ddns configure\n'
-  printf 'Either way the name becomes the public origin and goes into the TLS certificate.\n'
+  printf 'Optional passkeys need a hostname. Add one with sudo garden set-hostname your.domain.\n'
+  printf 'If the address changes, as on a home connection, use sudo garden ddns configure.\n'
+  printf 'Private LAN addresses need a locally trusted certificate or a hostname with trusted HTTPS.\n'
 fi
 printf '\nUpdates are manual (sudo garden update). For weekly unattended updates with\n'
 printf 'automatic rollback: sudo garden auto-update on\n'

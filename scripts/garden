@@ -791,41 +791,29 @@ doctor() {
         ;;
     esac
   fi
-  # Two separate things have to be true before anyone can sign in from a browser, and each one on
-  # its own looks like success. A WebAuthn Relying Party ID has to be a registrable domain name,
-  # because the specification does not allow an address literal. And the page has to be one the
-  # browser trusts: a certificate error switches WebAuthn off entirely, which accepting the warning
-  # does not undo. Either one missing leaves the owner able to sign in from a native client only.
+  # Password sign-in needs trusted HTTPS; only optional passkeys need a hostname.
   configured_rp_id=$(
     sed -n 's/^WEBAUTHN_RP_ID=//p' "$garden_config/control.env" 2>/dev/null | sed -n '1p'
   )
+  configured_browser_origin=$(
+    sed -n 's/^PUBLIC_APP_URL=//p' "$garden_config/control.env" 2>/dev/null | sed -n '1p'
+  )
+  certificate_trust=$(certificate_trust_state)
+  case "$certificate_trust" in
+    trusted) check_ok "browser password sign-in origin $configured_browser_origin" ;;
+    self-signed)
+      check_warn "browser access needs trusted HTTPS: this server is serving a certificate it signed itself"
+      check_warn "for a public address or hostname: sudo garden certificate enable --agree-tos --email you@example.com"
+      ;;
+    *) check_warn "browser certificate trust could not be confirmed; run sudo garden certificate status" ;;
+  esac
   case "$configured_rp_id" in
     ''|'['*|*:*) rp_id_is_hostname="" ;;
     *[!0-9.]*) rp_id_is_hostname=yes ;;
     *) rp_id_is_hostname="" ;;
   esac
-  certificate_trust=$(certificate_trust_state)
-  if [ -n "$rp_id_is_hostname" ]; then
-    case "$certificate_trust" in
-      trusted) check_ok "browser sign-in origin https://$configured_rp_id" ;;
-      self-signed)
-        check_warn "browser sign-in cannot work at https://$configured_rp_id yet: this server is serving a certificate it signed itself, and a browser will not create or use a passkey on a page whose certificate it does not trust"
-        check_warn "to finish: sudo garden certificate enable --agree-tos --email you@example.com"
-        ;;
-      *)
-        check_warn "browser sign-in origin https://$configured_rp_id: the name is right, but what certificate this server is serving could not be confirmed, and a browser refuses a passkey on one it does not trust; run sudo garden certificate status"
-        ;;
-    esac
-  else
-    check_warn "this server has no hostname, so browser sign-in cannot work: a passkey is bound to a domain name and the standard does not allow an IP address"
-    if [ -n "$configured_ddns_provider" ]; then
-      check_warn "dynamic DNS publishes $configured_ddns_hostname but it is not the public origin; run sudo garden set-hostname $configured_ddns_hostname"
-    else
-      # A fixed address needs one A record, which is what a rented server has. Dynamic DNS chases an
-      # address that moves and is the answer to a different question, so it is named second.
-      check_warn "fixed address: point a domain at this server and run sudo garden set-hostname your.domain"
-      check_warn "address that changes, as on a home connection: sudo garden ddns configure"
-    fi
+  if [ -z "$rp_id_is_hostname" ]; then
+    check_note "optional passkeys need a hostname; passwords work with trusted HTTPS by address"
   fi
   expected_identity=$(
     openssl pkey -in "$garden_config/tls/server.key" -pubout 2>/dev/null |
@@ -4509,9 +4497,8 @@ usage() {
   printf '%s\n' \
     'Usage: garden {install|start|stop|restart|status|logs [api|worker|runner|registry|notifications|nginx]|doctor|connect|pairing-code|password-reset|set-hostname HOST|price-ceiling [show|set INPUT OUTPUT|clear]|spend-cap [show|set DAILY MONTHLY|clear]|backup [dir]|backup auto on|off|status|backup destination [show|PATH --recipient FILE|off]|restore DIR --yes [--keep-stopped | --new-host [--hostname NAME]]|update|rollback [dir]|auto-update on|off|status|relay status|on|off|uninstall|certificate ...|ddns ...|task ...|tool-opens [DAYS] [--json]|acp --workspace ID [--approvals park|relay]}' \
     '' \
-    'Browser sign-in needs a hostname: a passkey is bound to a domain name and the WebAuthn' \
-    'standard does not allow an IP address. If this server has no name, run:' \
-    '  sudo garden ddns configure'
+    'Browser passwords work at a public IP address or hostname with trusted HTTPS.' \
+    'Optional passkeys need a hostname. For changing home addresses: sudo garden ddns configure'
 }
 
 command_name="${1:-help}"

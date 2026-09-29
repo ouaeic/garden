@@ -35,9 +35,15 @@ Two things to get right:
 
   Address certificates last 160 hours, so the renewal timer matters; `doctor` reports it.
 
-The limitation of an address-only server is sign-in, not reachability: a passkey is bound to a
-domain name and the WebAuthn standard does not allow an IP address, so a browser cannot register or
-use one. The native clients are unaffected. That is what the next section fixes.
+Password sign-in works at a public IP address with trusted HTTPS. Optional passkeys require a
+domain name; the WebAuthn standard does not allow an IP address as the relying-party identifier.
+Native clients pin the server's identity and can also connect directly by address.
+
+For a home server used only on your local network, native clients can use its reachable local
+address. Browser access still needs a certificate trusted by the device for the address or name
+you open. A private LAN address does not qualify for a public IP certificate. A domain with a
+trusted certificate, or a locally managed certificate authority trusted on each device, is needed
+for that browser setup. Garden does not install trust on your devices or configure your router.
 
 ## Second choice: a name that follows your address
 
@@ -92,7 +98,7 @@ You need two things from them: the relay's **hostname**, and a single-use **enro
 ### Turning it on
 
 In Settings, open the relay section, paste the hostname and the token, and confirm with your
-passkey. The server enrolls, records the relay's public key so a later change of hands is refused,
+password or optional passkey. The server enrolls, records the relay's public key so a later change of hands is refused,
 and dials. Your relay address appears immediately and looks like:
 
 ```

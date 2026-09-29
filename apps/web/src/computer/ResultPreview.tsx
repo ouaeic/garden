@@ -94,13 +94,22 @@ export function ResultPreview({
     return content === null ? (
       <p className="muted">Loading preview…</p>
     ) : (
-      <iframe
-        className="computer-preview"
-        srcDoc={shareArtifactDocument(content)}
-        title={artifact.name}
-        sandbox=""
-        referrerPolicy="no-referrer"
-      />
+      <>
+        <p className="muted">
+          Static preview.{' '}
+          <a href={url} download>
+            Download this page
+          </a>{' '}
+          to use its interactive controls.
+        </p>
+        <iframe
+          className="computer-preview"
+          srcDoc={shareArtifactDocument(content)}
+          title={artifact.name}
+          sandbox=""
+          referrerPolicy="no-referrer"
+        />
+      </>
     );
   if (mime === 'application/pdf')
     return (

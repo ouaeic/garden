@@ -5,6 +5,7 @@ import { checkDesk } from './browser-desk.mjs';
 import { checkWorkspaceNavigation } from './browser-workspace.mjs';
 import { checkProjectHistory } from './browser-project-history.mjs';
 import { checkAppearance } from './browser-appearance.mjs';
+import { checkMobileNavigation } from './browser-mobile.mjs';
 import { checkPermissionModes } from './browser-permissions.mjs';
 import { checkRunningQuestion } from './browser-questions.mjs';
 import { checkHumanInterventions } from './browser-interventions.mjs';
@@ -1226,6 +1227,11 @@ try {
     await checkMemoryLibrary({ context, origin, workspace, project, task, report });
   if (process.env.GARDEN_UI_FOCUS === 'appearance')
     await checkAppearance({ context, origin, bootstrap, project, task, report });
+  if (
+    !process.env.GARDEN_UI_FOCUS ||
+    ['mobile', 'appearance'].includes(process.env.GARDEN_UI_FOCUS)
+  )
+    await checkMobileNavigation({ context, origin, task, bootstrap, report });
   if (process.env.GARDEN_UI_FOCUS === 'previews')
     await checkPreviewStart({ context, origin, task, presentation, report, errors });
   if (process.env.GARDEN_UI_FOCUS === 'files-jobs') {
@@ -1270,6 +1276,7 @@ try {
       'drafts',
       'models',
       'appearance',
+      'mobile',
       'workspace',
       'history',
       'files-jobs',
@@ -2672,6 +2679,7 @@ try {
       'desk',
       'drafts',
       'appearance',
+      'mobile',
       'workspace',
       'history',
       'files-jobs',
@@ -3227,6 +3235,7 @@ try {
       'memory',
       'desk',
       'appearance',
+      'mobile',
       'workspace',
       'history',
       'files-jobs',

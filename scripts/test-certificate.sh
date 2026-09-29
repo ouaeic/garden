@@ -101,3 +101,43 @@ printf 'boom\n' >"$state/certificate.error"
 run_certificate disable >/dev/null 2>&1 || true
 test ! -e "$state/certificate.error"
 printf 'ok  disabling automatic issuance clears the alarm\n'
+
+# Browser readiness is independent of whether the server has a DNS name.
+runtime="$test_root/runtime"
+mkdir -p "$runtime/usr/local/lib/garden"
+cat >"$runtime/usr/local/lib/garden/garden-certificate" <<'SCRIPT'
+#!/bin/sh
+printf 'Certificate: %s\n' "$TEST_CERTIFICATE_STATUS"
+SCRIPT
+chmod 0755 "$runtime/usr/local/lib/garden/garden-certificate"
+make_fake curl 'exit 1'
+make_fake runuser 'exit 1'
+make_fake pg_isready 'exit 1'
+make_fake fc-list 'exit 0'
+make_fake df 'printf "Filesystem 1024-blocks Used Available Capacity Mounted\n/dev/fake 1 1 99999999 1%% /\n"'
+run_browser_doctor() {
+  PATH="$fake_bin:$PATH" \
+    GARDEN_ROOT="$repository_root" \
+    GARDEN_CONFIG="$config" \
+    GARDEN_STATE="$state" \
+    GARDEN_CONTROL_STATE="$state" \
+    GARDEN_HOME="$test_root/home" \
+    GARDEN_RUNTIME_PREFIX="$runtime" \
+    TEST_CERTIFICATE_STATUS="$1" \
+    sh "$repository_root/scripts/garden" doctor 2>/dev/null || true
+}
+printf 'PUBLIC_APP_URL=https://203.0.113.10\nWEBAUTHN_RP_ID=203.0.113.10\n' >"$config/control.env"
+browser_report=$(run_browser_doctor 'issued by a certificate authority')
+printf '%s\n' "$browser_report" | grep -q 'ok    browser password sign-in origin https://203.0.113.10'
+printf '%s\n' "$browser_report" | grep -q 'optional passkeys need a hostname'
+if printf '%s\n' "$browser_report" | grep -q 'browser sign-in cannot work'; then
+  printf 'doctor incorrectly requires a hostname for browser passwords\n' >&2
+  exit 1
+fi
+browser_report=$(run_browser_doctor 'self-signed')
+printf '%s\n' "$browser_report" | grep -q 'browser access needs trusted HTTPS'
+if printf '%s\n' "$browser_report" | grep -q 'ok    browser password sign-in'; then
+  printf 'doctor accepts an untrusted browser certificate\n' >&2
+  exit 1
+fi
+printf 'ok  doctor separates password certificate readiness from optional passkey hostnames\n'

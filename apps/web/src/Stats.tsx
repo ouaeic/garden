@@ -19,6 +19,14 @@ export default function Stats({
   const trigger = useRef<HTMLButtonElement>(null);
   const hovered = useRef(false);
   const pinned = useRef(false);
+  const hold = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const held = useRef(false);
+  const pressAt = useRef({ x: 0, y: 0 });
+  const cancelHold = () => {
+    if (hold.current) clearTimeout(hold.current);
+    hold.current = null;
+  };
+  useEffect(() => cancelHold, []);
   const id = useId();
   useEffect(() => {
     if (!open) return;
@@ -69,19 +77,53 @@ export default function Stats({
         aria-label="Stats"
         aria-expanded={open}
         aria-controls={id}
-        onClick={() => {
+        title="Stats · tap or press and hold"
+        onPointerDown={(event) => {
+          if (event.pointerType === 'mouse') return;
+          cancelHold();
+          held.current = false;
+          pressAt.current = { x: event.clientX, y: event.clientY };
+          hold.current = setTimeout(() => {
+            held.current = true;
+            pinned.current = true;
+            setOpen(true);
+          }, 450);
+        }}
+        onPointerMove={(event) => {
+          if (Math.hypot(event.clientX - pressAt.current.x, event.clientY - pressAt.current.y) > 10)
+            cancelHold();
+        }}
+        onPointerUp={cancelHold}
+        onPointerCancel={cancelHold}
+        onPointerLeave={cancelHold}
+        onContextMenu={(event) => event.preventDefault()}
+        onClick={(event) => {
+          if (held.current && event.detail !== 0) {
+            held.current = false;
+            return;
+          }
           pinned.current = !pinned.current;
           setOpen(pinned.current);
         }}
       >
         <Gauge size={14} />
-        Stats
+        <span>Stats</span>
       </Button>
       {open && (
         <div className="garden-health-popover" id={id} role="region" aria-label="Usage statistics">
           <div className="garden-health-panel">
             <StatsContent bootstrap={bootstrap} workspace={workspace} />
-            {onComputer && <Button onClick={onComputer}>All computer work</Button>}
+            {onComputer && (
+              <Button
+                onClick={() => {
+                  pinned.current = false;
+                  setOpen(false);
+                  onComputer();
+                }}
+              >
+                All computer work
+              </Button>
+            )}
           </div>
         </div>
       )}

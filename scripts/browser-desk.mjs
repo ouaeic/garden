@@ -259,12 +259,20 @@ export async function checkDesk({
         .getByRole('navigation', { name: /^(Workspace navigation|Sections)$/ })
         .getByRole('button', { name: 'Library', exact: true });
       await libraryTrigger.click();
-      const library = page.getByRole('dialog', { name: 'Library', exact: true });
+      const library = page.getByRole(width <= 700 ? 'region' : 'dialog', {
+        name: 'Library',
+        exact: true
+      });
       await library.waitFor();
       await inWindow(library);
       await library.getByRole('button', { name: 'Memory', exact: true }).click();
       await library.getByRole('button', { name: 'Skills', exact: true }).click();
-      await library.getByRole('button', { name: 'Close Library', exact: true }).click();
+      await library
+        .getByRole('button', {
+          name: width <= 700 ? 'Back from Library' : 'Close Library',
+          exact: true
+        })
+        .click();
       await library.waitFor({ state: 'detached' });
       assert.equal(page.url(), workUrl, 'Closing a panel must restore the exact project location');
       await page.keyboard.press('Escape');

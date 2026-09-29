@@ -1,6 +1,6 @@
 import { cloneElement, useEffect, useId, useRef } from 'react';
 import type { ComponentProps, ReactElement, ReactNode } from 'react';
-import { X, LoaderCircle } from './icons';
+import { ArrowLeft, X, LoaderCircle } from './icons';
 
 export function Button({
   children,
@@ -87,7 +87,9 @@ export function Dialog({
   className = '',
   dismissOnBackdrop = false,
   open = true,
-  modal = true
+  modal = true,
+  page = false,
+  id
 }: {
   title: string;
   children: ReactNode;
@@ -98,6 +100,9 @@ export function Dialog({
   open?: boolean;
   /** A docked panel sits beside the work instead of blocking it. */
   modal?: boolean;
+  /** Navigation occupies the content area on phones while the app's bars stay usable. */
+  page?: boolean;
+  id?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -105,16 +110,16 @@ export function Dialog({
     if (!open) return;
     const previous = document.activeElement;
     const dialog = ref.current;
-    if (modal) dialog?.showModal();
+    if (modal && !page) dialog?.showModal();
     else dialog?.show();
     return () => {
       dialog?.close();
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
     };
-  }, [open, modal]);
+  }, [open, modal, page]);
   useEffect(() => {
     const dialog = ref.current;
-    if (!dialog || !dismissOnBackdrop) return;
+    if (!dialog || !dismissOnBackdrop || page) return;
     // The native backdrop has no DOM element; Escape and the close button share this action.
     const dismiss = (event: MouseEvent) => {
       if (event.target !== dialog) return;
@@ -129,14 +134,21 @@ export function Dialog({
     };
     dialog.addEventListener('click', dismiss);
     return () => dialog.removeEventListener('click', dismiss);
-  }, [dismissOnBackdrop, onClose]);
+  }, [dismissOnBackdrop, onClose, page]);
   return (
     <dialog
       ref={ref}
+      id={id}
+      role={page ? 'region' : undefined}
       aria-labelledby={titleId}
-      className={`dialog ${wide ? 'wide' : ''} ${className}`}
+      className={`dialog ${wide ? 'wide' : ''} ${page ? 'navigation-page' : ''} ${className}`}
       onKeyDown={(event) => {
-        if (!modal) {
+        if (
+          event.target instanceof Element &&
+          event.target.closest('dialog') !== event.currentTarget
+        )
+          return;
+        if (!modal || page) {
           if (event.key !== 'Escape' || event.defaultPrevented) return;
           event.preventDefault();
           onClose();
@@ -168,8 +180,8 @@ export function Dialog({
     >
       <div className="dialog-heading">
         <h2 id={titleId}>{title}</h2>
-        <Button aria-label={`Close ${title}`} onClick={onClose}>
-          <X size={18} />
+        <Button aria-label={`${page ? 'Back from' : 'Close'} ${title}`} onClick={onClose}>
+          {page ? <ArrowLeft size={18} /> : <X size={18} />}
         </Button>
       </div>
       <div className="dialog-body">{children}</div>
