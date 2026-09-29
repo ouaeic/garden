@@ -239,7 +239,7 @@ describe('OpenRouter live catalog', () => {
     expect(alias?.promptCacheStyle).toBe('explicit');
   });
 
-  it('decides prompt caching from what the route charges, not from its vendor prefix', async () => {
+  it('combines route cache capabilities with pricing', async () => {
     const result = await refreshOpenRouterCatalog(seedModels(NOW), {
       baseUrl: 'https://openrouter.ai/api/v1',
       apiKey: 'registry-key',
@@ -248,12 +248,43 @@ describe('OpenRouter live catalog', () => {
     });
     const byId = new Map(result.map((model) => [model.providerModelId, model]));
     expect(byId.get('anthropic/claude-opus-5')?.promptCacheStyle).toBe('explicit');
-    // The whole openai/gpt-5.6 family bills cache writes and used to be sent nothing at all.
-    expect(byId.get('openai/gpt-5.6-terra')?.promptCacheStyle).toBe('explicit');
+    // Automatic caches can charge for writes without requiring explicit markers.
+    expect(byId.get('openai/gpt-5.6-terra')?.promptCacheStyle).toBe('automatic');
     expect(byId.get('openai/gpt-5.6-terra')?.cacheReadUsdPerMillionTokens).toBeCloseTo(0.1, 6);
     expect(byId.get('openai/gpt-5.6-terra')?.cacheWriteUsdPerMillionTokens).toBeCloseTo(1.25, 6);
     expect(byId.get('z-ai/glm-5.2')?.promptCacheStyle).toBe('none');
   });
+
+  it.each([
+    { implicit: [true, true], expected: 'automatic' },
+    { implicit: [true, false], expected: 'explicit' }
+  ])(
+    'keeps explicit markers when eligible endpoints disagree: $implicit',
+    async ({ implicit, expected }) => {
+      const fallback = liveFetch();
+      const result = await refreshOpenRouterCatalog(seedModels(NOW), {
+        baseUrl: 'https://openrouter.ai/api/v1',
+        apiKey: 'registry-key',
+        now: NOW,
+        fetch: (async (input) => {
+          const url = input instanceof Request ? input.url : input.toString();
+          if (url.endsWith('/endpoints/zdr'))
+            return respondWith({
+              data: implicit.map((supported) => ({
+                model_id: 'anthropic/claude-opus-5',
+                status: 0,
+                supports_implicit_caching: supported
+              }))
+            });
+          return fallback(input);
+        }) as typeof fetch
+      });
+      expect(
+        result.find((model) => model.providerModelId === 'anthropic/claude-opus-5')
+          ?.promptCacheStyle
+      ).toBe(expected);
+    }
+  );
 
   it('carries the fields that keep an unattended server working', async () => {
     const result = await refreshOpenRouterCatalog(seedModels(NOW), {

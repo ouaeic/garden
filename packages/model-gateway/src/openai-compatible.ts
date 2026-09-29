@@ -844,6 +844,13 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
    * breakpoints than the provider accepts.
    */
   #cacheBreakpointIndexes(input: ModelRequest): Set<number> {
+    // OpenAI's explicit format differs from cache_control. A stored catalogue hint must not
+    // override the route's wire contract; automatic caching remains available without markers.
+    if (
+      this.provider === 'openrouter' &&
+      input.model.toLowerCase().replace(/^~/, '').startsWith('openai/')
+    )
+      return new Set();
     const style = input.promptCacheStyle ?? promptCacheStyle(input.model);
     if (style !== 'explicit') return new Set();
     const eligible: number[] = [];

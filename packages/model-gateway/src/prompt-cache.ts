@@ -1,25 +1,7 @@
 /**
- * Provider prompt caching.
- *
- * An agent turn resends the whole operating contract, tool catalogue and trajectory on every
- * step, so the input prefix is byte-identical across steps and is the dominant cost of a long
- * task. Providers cache that prefix in one of three ways:
- *
- * - **explicit**: the caller must mark where the stable prefix ends with a `cache_control`
- *   breakpoint, otherwise nothing is cached at all. A route that publishes a price for writing to
- *   the cache is billing for exactly that, which is what identifies it.
- * - **automatic**: the provider detects a repeated prefix itself. Nothing has to be sent, and
- *   sending a marker is at best ignored.
- * - **none**: the route does not cache, so a breakpoint is wasted bytes.
- *
- * This used to be decided by a hardcoded two-vendor prefix list, which missed every route outside
- * `anthropic/` and `google/` - the whole `openai/gpt-5.6-*` family among them - and missed every
- * `~vendor/model-latest` alias, because those ids start with a tilde. On a route that reads cached
- * input at a tenth of the prompt price, guessing that wrong costs more than any model swap.
- *
- * The catalogue publishes the answer, so it is read from the catalogue. The slug rule survives only
- * as the last resort for a route the catalogue said nothing about, where sending nothing is the
- * safe failure: emitting an unknown field is what breaks requests.
+ * Provider prompt caching. Explicit routes accept `cache_control` breakpoints; automatic routes
+ * detect repeated prefixes without that field. Cache-write pricing alone does not prove a route
+ * needs explicit markers, since automatic caches can charge for writes too.
  */
 export type PromptCacheStyle = 'explicit' | 'automatic' | 'none';
 
@@ -63,27 +45,28 @@ export interface PromptCacheFacts {
   readonly providerModelId: string;
   readonly cacheReadUsdPerMillionTokens?: number | null;
   readonly cacheWriteUsdPerMillionTokens?: number | null;
-  /** True when at least one endpoint serving this route reports implicit caching. */
+  /** True when every eligible endpoint serving this route reports implicit caching. */
   readonly supportsImplicitCaching?: boolean;
   /** Whether the provider catalogue described this route at all. */
   readonly catalogued?: boolean;
 }
 
 /**
- * The pricing table is the rule. A route that prices cache writes bills explicit writes and needs
- * breakpoints; a route that prices cache reads without them, or an endpoint that reports implicit
- * caching, caches on its own; a route that prices neither does not cache.
+ * Prefer declared automatic caching over pricing heuristics. OpenAI caches automatically even
+ * when it charges for writes; its optional explicit format is not `cache_control`.
  */
 export const promptCacheStyleFor = (facts: PromptCacheFacts): PromptCacheStyle => {
-  if (typeof facts.cacheWriteUsdPerMillionTokens === 'number') return 'explicit';
   if (facts.supportsImplicitCaching === true) return 'automatic';
+  if (facts.providerModelId.toLowerCase().replace(/^~/, '').startsWith('openai/'))
+    return 'automatic';
+  if (typeof facts.cacheWriteUsdPerMillionTokens === 'number') return 'explicit';
   if (typeof facts.cacheReadUsdPerMillionTokens === 'number') return 'automatic';
   if (facts.catalogued === true) return 'none';
   return promptCacheStyle(facts.providerModelId);
 };
 
 export interface CacheUsageFields {
-  prompt_tokens_details?: { cached_tokens?: number } | null;
+  prompt_tokens_details?: { cached_tokens?: number; cache_write_tokens?: number } | null;
   cache_creation_input_tokens?: number | null;
   cache_read_input_tokens?: number | null;
 }
@@ -103,7 +86,9 @@ export const readCacheUsage = (
   const cached =
     nonNegativeInteger(usage.prompt_tokens_details?.cached_tokens) ??
     nonNegativeInteger(usage.cache_read_input_tokens);
-  const written = nonNegativeInteger(usage.cache_creation_input_tokens);
+  const written =
+    nonNegativeInteger(usage.prompt_tokens_details?.cache_write_tokens) ??
+    nonNegativeInteger(usage.cache_creation_input_tokens);
   return {
     ...(cached === undefined ? {} : { cachedInputTokens: cached }),
     ...(written === undefined ? {} : { cacheWriteTokens: written })

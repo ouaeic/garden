@@ -23,8 +23,25 @@ describe('promptCacheStyle', () => {
 });
 
 describe('promptCacheStyleFor', () => {
-  it('reads the pricing table rather than the vendor prefix', () => {
-    // A route that charges to write the cache will not cache without a breakpoint.
+  it('honors implicit support even when the endpoint charges for writes', () => {
+    expect(
+      promptCacheStyleFor({
+        providerModelId: 'vendor/model',
+        supportsImplicitCaching: true,
+        cacheWriteUsdPerMillionTokens: 1,
+        catalogued: true
+      })
+    ).toBe('automatic');
+    expect(
+      promptCacheStyleFor({
+        providerModelId: '~OpenAI/model-latest',
+        cacheWriteUsdPerMillionTokens: 1,
+        catalogued: true
+      })
+    ).toBe('automatic');
+  });
+  it('combines automatic-cache contracts with pricing', () => {
+    // Write pricing must not override the automatic-cache contract.
     expect(
       promptCacheStyleFor({
         providerModelId: 'openai/gpt-5.6-terra',
@@ -32,7 +49,7 @@ describe('promptCacheStyleFor', () => {
         cacheWriteUsdPerMillionTokens: 1.25,
         catalogued: true
       })
-    ).toBe('explicit');
+    ).toBe('automatic');
     // A read price with no write price is a route that caches on its own.
     expect(
       promptCacheStyleFor({
@@ -61,6 +78,25 @@ describe('promptCacheStyleFor', () => {
 });
 
 describe('readCacheUsage', () => {
+  it('reads nested cache writes, preserving zero and falling back on invalid counts', () => {
+    expect(
+      readCacheUsage({
+        prompt_tokens_details: { cached_tokens: 64, cache_write_tokens: 30 }
+      })
+    ).toEqual({ cachedInputTokens: 64, cacheWriteTokens: 30 });
+    expect(
+      readCacheUsage({
+        prompt_tokens_details: { cache_write_tokens: 0 },
+        cache_creation_input_tokens: 30
+      })
+    ).toEqual({ cacheWriteTokens: 0 });
+    expect(
+      readCacheUsage({
+        prompt_tokens_details: { cache_write_tokens: Number.NaN },
+        cache_creation_input_tokens: 30
+      })
+    ).toEqual({ cacheWriteTokens: 30 });
+  });
   it('reads OpenAI-shaped cached prompt tokens', () => {
     expect(readCacheUsage({ prompt_tokens_details: { cached_tokens: 4_096 } })).toEqual({
       cachedInputTokens: 4_096

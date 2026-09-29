@@ -437,6 +437,17 @@ describe('OpenAICompatibleAdapter', () => {
       }
     });
 
+  it('preserves nested cache read and write counters from the final streaming usage frame', async () => {
+    const frames = [
+      'data: {"choices":[{"delta":{"content":"OK"},"finish_reason":"stop"}]}\n\n',
+      'data: {"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":1,"total_tokens":101,"prompt_tokens_details":{"cached_tokens":64,"cache_write_tokens":30}}}\n\n',
+      'data: [DONE]\n\n'
+    ].join('');
+    await expect(streamRequest(streamingAdapter(frames), [])).resolves.toMatchObject({
+      usage: { inputTokens: 100, cachedInputTokens: 64, cacheWriteTokens: 30 }
+    });
+  });
+
   it('raises a mid-stream error frame instead of returning a truncated turn as a success', async () => {
     const deltas: string[] = [];
     const frames = [
@@ -1120,7 +1131,7 @@ describe('OpenAICompatibleAdapter', () => {
   it('takes the cache style from the catalogue when the caller supplies it', async () => {
     const marked: { body?: unknown } = {};
     await cachingAdapter(marked).chat({
-      model: 'openai/gpt-5.6-terra',
+      model: 'vendor/explicit-cache-model',
       promptCacheStyle: 'explicit',
       messages: [{ role: 'system', content: 'contract', cacheBreakpoint: true }],
       tools: [],
@@ -1143,6 +1154,20 @@ describe('OpenAICompatibleAdapter', () => {
       temperature: 0.2
     });
     expect((plain.body as { messages: unknown[] }).messages).toEqual([
+      { role: 'system', content: 'contract' }
+    ]);
+  });
+
+  it('keeps OpenAI automatic caching compatible with a stored explicit-cache hint', async () => {
+    const capture: { body?: unknown } = {};
+    await cachingAdapter(capture).chat({
+      model: '~openai/model-latest',
+      promptCacheStyle: 'explicit',
+      messages: [{ role: 'system', content: 'contract', cacheBreakpoint: true }],
+      tools: [],
+      temperature: 0.2
+    });
+    expect((capture.body as { messages: unknown[] }).messages).toEqual([
       { role: 'system', content: 'contract' }
     ]);
   });

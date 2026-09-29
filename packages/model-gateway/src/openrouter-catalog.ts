@@ -753,9 +753,9 @@ export const refreshOpenRouterCatalog = async (
           providerModelId,
           cacheReadUsdPerMillionTokens: perMillion(live?.pricing?.input_cache_read),
           cacheWriteUsdPerMillionTokens: perMillion(live?.pricing?.input_cache_write),
-          supportsImplicitCaching: endpoints.some(
-            (endpoint) => endpoint.supports_implicit_caching === true
-          ),
+          supportsImplicitCaching:
+            endpoints.length > 0 &&
+            endpoints.every((endpoint) => endpoint.supports_implicit_caching === true),
           catalogued: live !== undefined
         }) satisfies PromptCacheStyle,
         supportsReasoningEffort: supported.has('reasoning_effort'),
