@@ -81,6 +81,38 @@ test('Android release flags preserve caller flags and align LOAD and RELRO witho
   assert.equal(environment.CARGO_ENCODED_RUSTFLAGS, '-C\u001flto=thin');
 });
 
+test(
+  'C dependency source paths pass the artifact audit only with compiler maps',
+  {
+    skip: process.platform === 'win32'
+  },
+  async () => {
+    const directory = await realpath(await mkdtemp(join(tmpdir(), 'garden-c-source maps-')));
+    const release = join(directory, 'release');
+    const source = join(directory, 'source.c');
+    const executable = join(release, 'garden-desktop');
+    const environment = { ...process.env, GITHUB_WORKSPACE: directory, CFLAGS: '-O2' };
+    try {
+      await mkdir(release);
+      await writeFile(source, '#include <stdio.h>\nint main(void) { puts(__FILE__); return 0; }\n');
+      execFileSync('cc', [source, '-o', executable]);
+      await assert.rejects(
+        checkNativeBinaries(directory, environment, 'desktop'),
+        /build-machine path/
+      );
+      const configured = withReleaseRustFlags(environment);
+      const flags = configured.CFLAGS.match(/"(?:\\.|[^"\\])*"|\S+/g).map((value) =>
+        value.startsWith('"') ? JSON.parse(value) : value
+      );
+      execFileSync('cc', [...flags, source, '-o', executable]);
+      await checkNativeBinaries(directory, environment, 'desktop');
+      assert.equal(execFileSync(executable, { encoding: 'utf8' }).trim(), '/workspace/source.c');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+);
+
 test('native artifact audit rejects a build home and accepts remapped output', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'garden-native-audit-'));
   const release = join(directory, 'release');

@@ -65,7 +65,7 @@ jobs:
             . scripts/garden-host.sh
             garden_detect_host
             packages=""
-            for capability in poppler tesseract tesseract-english ffmpeg qpdf img2pdf graphviz \
+            for capability in poppler tesseract tesseract-english ffmpeg qpdf img2pdf graphviz ripgrep \
               office-writer office-impress office-calc \
               python python-pip python-docx python-openpyxl python-pillow \
               python-lxml python-xlsxwriter python-pandas python-matplotlib \

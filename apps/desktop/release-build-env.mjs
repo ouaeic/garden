@@ -67,6 +67,15 @@ export function withReleaseRustFlags(environment = process.env, platform, host =
       CFLAGS: [environment.CFLAGS, ...flags].filter(Boolean).join(' '),
       CXXFLAGS: [environment.CXXFLAGS, ...flags].filter(Boolean).join(' ')
     });
+  } else {
+    const flags = releasePathMappings(environment).map(({ source, destination }) =>
+      JSON.stringify(`-ffile-prefix-map=${source}=${destination}`)
+    );
+    Object.assign(nativeCompiler, {
+      CC_SHELL_ESCAPED_FLAGS: '1',
+      CFLAGS: [environment.CFLAGS, ...flags].filter(Boolean).join(' '),
+      CXXFLAGS: [environment.CXXFLAGS, ...flags].filter(Boolean).join(' ')
+    });
   }
   return {
     ...environment,
@@ -87,20 +96,20 @@ function appendGitHubEnvironment(environment) {
     `CARGO_ENCODED_RUSTFLAGS<<${delimiter}\n${configured.CARGO_ENCODED_RUSTFLAGS}\n${delimiter}\n`,
     'utf8'
   );
-  if (process.platform === 'win32') {
-    for (const key of [
-      'CC',
-      'CXX',
-      'CC_SHELL_ESCAPED_FLAGS',
-      'AWS_LC_SYS_CMAKE_BUILDER',
-      'CFLAGS',
-      'CXXFLAGS'
-    ])
-      appendFileSync(
-        githubEnvironment,
-        `${key}<<${delimiter}\n${configured[key]}\n${delimiter}\n`,
-        'utf8'
-      );
+  for (const key of [
+    'CC',
+    'CXX',
+    'CC_SHELL_ESCAPED_FLAGS',
+    'AWS_LC_SYS_CMAKE_BUILDER',
+    'CFLAGS',
+    'CXXFLAGS'
+  ]) {
+    if (configured[key] === undefined) continue;
+    appendFileSync(
+      githubEnvironment,
+      `${key}<<${delimiter}\n${configured[key]}\n${delimiter}\n`,
+      'utf8'
+    );
   }
   console.log('Configured stable Rust source-path remapping for the release build');
 }
