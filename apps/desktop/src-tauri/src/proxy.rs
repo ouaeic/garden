@@ -358,6 +358,7 @@ pub async fn start(state: Arc<ClientState>) -> Result<String, String> {
     *state.installer_origin.write().await = installer_origin;
     let installer_router = Router::new()
         .route("/", get(installer))
+        .route("/__garden/theme/{asset}", get(crate::native_theme::asset))
         .route("/probe", post(probe_ssh))
         .route("/install", post(install_server));
     #[cfg(desktop)]
@@ -418,6 +419,7 @@ pub async fn start(state: Arc<ClientState>) -> Result<String, String> {
     preview_proxy::start(state.clone()).await?;
     let router = Router::new()
         .route("/__garden/client/status", get(client_status))
+        .route("/__garden/theme/{asset}", get(crate::native_theme::asset))
         .route("/__garden/client/pair", post(pair))
         .route(
             "/__garden/client/network-preference",
@@ -665,7 +667,7 @@ async fn installer(State(state): State<Arc<ClientState>>) -> Response {
     headers.insert(
         HeaderName::from_static("content-security-policy"),
         HeaderValue::from_static(
-            "default-src 'none'; connect-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; form-action 'none'; base-uri 'none'; frame-ancestors 'none'",
+            "default-src 'none'; connect-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'unsafe-inline'; img-src data:; form-action 'none'; base-uri 'none'; frame-ancestors 'none'",
         ),
     );
     headers.insert(
@@ -1087,7 +1089,7 @@ fn gateway_error(
         headers.insert(
             HeaderName::from_static("content-security-policy"),
             HeaderValue::from_static(
-                "default-src 'none'; connect-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+                "default-src 'none'; connect-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
             ),
         );
         headers.insert(
@@ -1464,39 +1466,8 @@ fn offline_page(
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Connect garden</title>
-<style>
-  :root {{ color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }}
-  * {{ box-sizing: border-box; }}
-  body {{ margin: 0; min-height: 100vh; display: grid; place-items: center; color: #e9eee2;
-    background: #151d19; }}
-  main {{ width: min(580px, calc(100vw - 32px)); padding: 36px; border-radius: 24px;
-    border: 1px solid #48573e; background: #202c24;
-    box-shadow: 0 24px 80px #000a, inset 0 1px #ffffff1a; }}
-  .brand {{ font: 38px Georgia, serif; letter-spacing: -.05em; margin-bottom: 32px; }}
-  .eyebrow {{ color: #adbaa4; text-transform: uppercase; letter-spacing: .14em; font-size: 11px; }}
-  h1 {{ font-size: clamp(29px, 5vw, 42px); line-height: 1.05; margin: 10px 0 14px; }}
-  p {{ color: #adbaa4; line-height: 1.55; }}
-  label {{ display: block; margin-top: 20px; font-size: 14px; font-weight: 650; }}
-  textarea {{ width: 100%; min-height: 120px; resize: vertical; margin: 8px 0 12px; padding: 15px;
-    color: #e9eee2; background: #151d19; border: 1px solid #48573e; border-radius: 14px; outline: none; }}
-  textarea:focus {{ border-color: #d5e8a9; box-shadow: 0 0 0 3px #e9ecef14, 0 0 28px #dfe3e61c; }}
-  button {{ width: 100%; border: 1px solid #d5e8a9; border-radius: 13px; padding: 13px 18px;
-    color: #151d19; background: #d5e8a9; font-weight: 720;
-    cursor: pointer; }}
-  button:disabled {{ opacity: .55; cursor: wait; }}
-  .error {{ min-height: 24px; margin-top: 12px; color: #e6a8a8; font-size: 13px; }}
-  .hint {{ font-size: 13px; }}
-  .network-help {{ margin-top: 22px; padding-top: 20px; border-top: 1px solid #48573e; }}
-  .network-help strong {{ display: block; margin-bottom: 4px; }}
-  .network-help ol {{ padding-left: 21px; color: #adbaa4; line-height: 1.55; }}
-  .network-help code {{ color: #e9eee2; }}
-  .choice-row {{ display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 12px; }}
-  .choice-row button {{ padding: 10px; }}
-  button.secondary {{ color: #e9eee2; background: #2a382d; border-color: #48573e; box-shadow: none; }}
-  button.quiet {{ color: #adbaa4; background: transparent; border-color: #48573e; box-shadow: none; }}
-  .privacy {{ font-size: 12px; }}
-  .install-link {{ display: block; margin-top: 18px; color: #adbaa4; text-align: center; font-size: 13px; }}
-</style>
+<link rel="stylesheet" href="/__garden/theme/lcd.css">
+<link rel="stylesheet" href="/__garden/theme/setup.css">
 <main>
   <div class="brand">garden</div>
   <div class="eyebrow">Private server connection</div>
