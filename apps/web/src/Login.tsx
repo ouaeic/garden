@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react';
 import { ArrowUpRight, Check, Moon, Sun } from './icons';
 import { get } from './client';
-import { devSignIn, enroll, recover, register, signIn } from './auth';
+import {
+  devSignIn,
+  enroll,
+  recover,
+  register,
+  signIn,
+  passwordSignIn,
+  passwordRegister,
+  passwordRecover
+} from './auth';
 import type { AuthResult } from './auth';
 import { Button, ErrorNotice, Field } from './ui';
 import Brand from './Brand';
@@ -21,6 +30,8 @@ export default function Login({
     {}
   );
   const [mode, setMode] = useState<'login' | 'register' | 'recover' | 'enroll'>('login');
+  const [method, setMethod] = useState<'password' | 'passkey'>('password');
+  const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [code, setCode] = useState(pairingCode);
   const [error, setError] = useState<unknown>(null);
@@ -34,6 +45,10 @@ export default function Login({
       const browserAuthorization = (
         await import('./native-authorization')
       ).browserAuthorizationLocation();
+      const resetCode = location.hash.startsWith('#password-reset=')
+        ? decodeURIComponent(location.hash.slice('#password-reset='.length))
+        : '';
+      if (resetCode) history.replaceState({}, '', `${location.pathname}${location.search}`);
       if (location.hash.startsWith('#pair=')) {
         history.replaceState({}, '', `${location.pathname}${location.search}`);
         if (!token)
@@ -44,7 +59,13 @@ export default function Login({
       const value = await get<typeof legal>('/v1/legal');
       if (!alive) return;
       setLegal(value);
-      if (browserAuthorization?.onboarding && browserAuthorization.onboarding.mode !== 'passkey') {
+      if (resetCode) {
+        setCode(resetCode);
+        setMode('recover');
+      } else if (
+        browserAuthorization?.onboarding &&
+        browserAuthorization.onboarding.mode !== 'passkey'
+      ) {
         setMode(browserAuthorization.onboarding.mode);
         setCode(browserAuthorization.onboarding.code);
         setName(browserAuthorization.onboarding.name ?? '');
@@ -67,13 +88,20 @@ export default function Login({
     try {
       const result: AuthResult = development
         ? await devSignIn()
-        : mode === 'register'
-          ? await register({ displayName: name || 'Owner', pairingCode: code })
-          : mode === 'recover'
-            ? await recover(code)
-            : mode === 'enroll'
-              ? await enroll(code, name || undefined)
-              : await signIn();
+        : method === 'password' && mode !== 'enroll'
+          ? mode === 'register'
+            ? await passwordRegister(name || 'Owner', code, password)
+            : mode === 'recover'
+              ? await passwordRecover(code, password)
+              : await passwordSignIn(password)
+          : mode === 'register'
+            ? await register({ displayName: name || 'Owner', pairingCode: code })
+            : mode === 'recover'
+              ? await recover(code)
+              : mode === 'enroll'
+                ? await enroll(code, name || undefined)
+                : await signIn();
+      setPassword('');
       if (result.recoveryCode) setRecovery(result.recoveryCode);
       else onAuthenticated();
     } catch (err) {
@@ -104,7 +132,10 @@ export default function Login({
         {recovery ? (
           <div className="recovery-record">
             <h2>Save your recovery code.</h2>
-            <p>This is how you regain access if you lose your passkeys. It is shown once.</p>
+            <p>
+              This is how you regain access if you forget your password or lose your passkeys. It is
+              shown once.
+            </p>
             <code>{recovery}</code>
             <Button onClick={() => navigator.clipboard.writeText(recovery).catch(setError)}>
               Copy recovery code
@@ -149,7 +180,7 @@ export default function Login({
               <Field
                 label={
                   mode === 'recover'
-                    ? 'Recovery code'
+                    ? 'Recovery or setup code'
                     : mode === 'enroll'
                       ? 'Device enrollment token'
                       : 'Installer pairing code'
@@ -164,31 +195,86 @@ export default function Login({
                 />
               </Field>
             )}
+            {method === 'password' && mode !== 'enroll' && (
+              <Field label={mode === 'login' ? 'Password' : 'New password'}>
+                <input
+                  type="password"
+                  name="password"
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                  maxLength={1024}
+                />
+              </Field>
+            )}
+            {method === 'password' && mode !== 'login' && mode !== 'enroll' && (
+              <p className="muted">Use at least 15 characters. A few words work well.</p>
+            )}
+            {mode === 'login' && method === 'password' && (
+              <p className="muted">
+                This device stays signed in until you sign out or revoke it in Settings.
+              </p>
+            )}
+            {mode === 'recover' && method === 'password' && (
+              <p className="muted">
+                Use your saved recovery code, or run <code>sudo garden password-reset</code> on your
+                server for a one-time setup link. Recovery signs out other devices and revokes
+                existing passkeys, API tokens and device invitations.
+              </p>
+            )}
+            {mode === 'enroll' && (
+              <p className="muted">
+                Have a Garden password? Choose Sign in to connect this device directly. An
+                invitation adds a passkey.
+              </p>
+            )}
             <Button
               type="submit"
               className="primary"
               busy={busy}
-              disabled={legal.passkeysUsable === false}
+              disabled={
+                (method === 'passkey' || mode === 'enroll') && legal.passkeysUsable === false
+              }
             >
-              {mode === 'register'
-                ? 'Create your passkey'
-                : mode === 'recover'
-                  ? 'Create a replacement passkey'
-                  : mode === 'enroll'
-                    ? 'Add this device'
-                    : 'Continue with your passkey'}
+              {method === 'password' && mode !== 'enroll'
+                ? mode === 'register'
+                  ? 'Create your account'
+                  : mode === 'recover'
+                    ? 'Set password and sign in'
+                    : 'Sign in'
+                : mode === 'register'
+                  ? 'Create your passkey'
+                  : mode === 'recover'
+                    ? 'Create a replacement passkey'
+                    : mode === 'enroll'
+                      ? 'Add this device'
+                      : 'Continue with your passkey'}
               <ArrowUpRight size={18} />
             </Button>
-            {legal.passkeysUsable === false && (
+            {(method === 'passkey' || mode === 'enroll') && legal.passkeysUsable === false && (
               <p className="error">
                 Open this computer through its configured HTTPS hostname to use passkeys.
               </p>
             )}
             <div className="row login-links">
+              {mode !== 'enroll' && (
+                <Button
+                  onClick={() => {
+                    setMethod(method === 'password' ? 'passkey' : 'password');
+                    setPassword('');
+                    setError(null);
+                  }}
+                >
+                  {method === 'password' ? 'Use a passkey instead' : 'Use a password instead'}
+                </Button>
+              )}
               {mode !== 'login' && (
                 <Button
                   onClick={() => {
                     setMode('login');
+                    setMethod('password');
+                    setError(null);
                     setCode('');
                   }}
                 >
@@ -199,6 +285,7 @@ export default function Login({
                 <Button
                   onClick={() => {
                     setMode('recover');
+                    setError(null);
                     setCode('');
                   }}
                 >

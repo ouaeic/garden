@@ -50,11 +50,11 @@ The relevant adversaries are:
   constant time; the request hook returns before the session lookup, so these routes neither read a
   cookie nor set one; every one of them is throttled per address through one bucket sized for a
   reader, and the two data routes share a box-wide ceiling; a closed, expired, malformed or unknown link and a box with sharing switched
-  off answer one identical 404. Making a link takes a recent passkey; what the link shows is an
+  off answer one identical 404. Making a link takes recent identity verification; what the link shows is an
   allow-list of kinds with the tool arguments, tool results, reasoning and every identifier left
   out unless the owner switches the first two on; the credential net runs over all of it.
 - The first account claims the server; registration then closes by default.
-- Passkeys, origin checks, secure cookies, revocable sessions, and recent-authentication checks guard
+- Passwords or optional passkeys, origin checks, secure cookies, revocable sessions, and recent-authentication checks guard
   owner settings.
 - Generated previews use a separate browser origin from the owner application. The preview
   gateway verifies the configured public host, port and protocol before serving content; a
@@ -430,3 +430,17 @@ lease protect remote history. Transfers retain intent before network writes and 
 ambiguous push during recovery. Tokens exist only in the trusted transport child's environment;
 provider diagnostics are replaced with credential-free status. Fetched bundles remain untrusted
 content and confer no command or publication authority.
+
+### Password sign-in and recovery
+
+Owners may use a password or a passkey. Passwords use salted, memory-hard scrypt hashes;
+password guesses are throttled both by caller and by a persistent account-wide bucket. Authentication
+opens a remembered, revocable device session. Sensitive settings accept recent password or passkey
+verification; a session alone cannot change the password after that verification window expires.
+
+The installer pairing code can create the first owner with either method. Existing owners can add a
+password in Settings, redeem their recovery code, or run `sudo garden password-reset` on the host.
+That command creates an expiring, single-use setup link; issuing it does not change existing access.
+Redeeming recovery rotates the recovery code and revokes previous sessions, passkeys, API tokens and
+device invitations. Password changes from Settings sign out other devices. Credentials and setup
+codes are never included in account responses or security-event metadata.

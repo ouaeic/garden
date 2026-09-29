@@ -66,11 +66,20 @@ export const createSession = async (
   userId: string,
   secure: boolean,
   deviceLabel = 'Unknown device',
-  steppedUp = false
+  steppedUp = false,
+  expectedPasswordHash?: string
 ): Promise<void> => {
   const token = randomBytes(32).toString('base64url');
   const expiresAt = new Date(Date.now() + SESSION_LIFETIME_SECONDS * 1000);
-  await store.createSession(userId, sha256(token), expiresAt, undefined, deviceLabel, steppedUp);
+  await store.createSession(
+    userId,
+    sha256(token),
+    expiresAt,
+    undefined,
+    deviceLabel,
+    steppedUp,
+    expectedPasswordHash
+  );
   setSessionCookie(reply, token, secure, expiresAt);
 };
 

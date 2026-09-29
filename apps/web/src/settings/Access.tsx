@@ -68,6 +68,7 @@ export function AccessSettings({ onChange }: { onChange: () => void }) {
   const tokens = useResource<ApiToken[]>('/v1/api-tokens');
   const [enrollment, setEnrollment] = useState<EnrollmentLink | null>(null);
   const [secret, setSecret] = useState<{ label: string; value: string } | null>(null);
+  const [password, setPassword] = useState('');
   const [qr, setQr] = useState('');
   const action = useAction(() => {
     sessions.refresh();
@@ -128,8 +129,39 @@ export function AccessSettings({ onChange }: { onChange: () => void }) {
         <ActionFeedback action={action} />
       </Section>
       <Section
+        title="Password"
+        description="Sign in on any device with your Garden password. Devices stay signed in until you sign them out."
+      >
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void action.run(async () => {
+              await sensitive(() => post('/v1/auth/password', { password }));
+              setPassword('');
+            }, 'Password saved. Other devices have been signed out.');
+          }}
+        >
+          <Field label="New password">
+            <input
+              type="password"
+              name="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+              maxLength={1024}
+            />
+          </Field>
+          <p className="muted">Use at least 15 characters. A few words work well.</p>
+          <Button type="submit" busy={action.busy}>
+            Save password
+          </Button>
+        </form>
+        <ActionFeedback action={action} />
+      </Section>
+      <Section
         title="Passkeys"
-        description="Passkeys protect sign-in and sensitive account changes."
+        description="An optional way to sign in without typing your password."
       >
         <ResourceState resource={passkeys} />
         <div className="management-list">
@@ -146,7 +178,7 @@ export function AccessSettings({ onChange }: { onChange: () => void }) {
               </div>
               <ConfirmButton
                 label="Remove passkey"
-                description="This passkey will no longer sign in. Keep another working passkey or a recovery code before removing it."
+                description="This passkey will no longer sign in. Keep a working password or another passkey before removing it."
                 action={async () => {
                   await sensitive(() => del(`/v1/auth/passkeys/${key.id}`));
                   passkeys.refresh();
@@ -156,7 +188,7 @@ export function AccessSettings({ onChange }: { onChange: () => void }) {
           ))}
         </div>
         {passkeys.value?.length === 0 && (
-          <p className="muted">No passkeys registered for this development account.</p>
+          <p className="muted">No passkeys added. You can use your password.</p>
         )}
         <Button busy={action.busy} onClick={() => void action.run(addPasskey, 'Passkey added')}>
           Add a passkey
@@ -165,7 +197,7 @@ export function AccessSettings({ onChange }: { onChange: () => void }) {
       </Section>
       <Section
         title="Connect another device"
-        description="Create a short-lived invitation for a device you own."
+        description="Open your Garden address on the new device and sign in with your password, or create an invitation to add a passkey."
       >
         <form
           className="row"

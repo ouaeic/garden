@@ -30,12 +30,10 @@ The command is pinned to a tag rather than a branch. The install action in the n
 further: it passes the exact commit its own build was made from, and the installer refuses to
 continue if the source it checked out is not that commit.
 
-That command installs the computer, and the native clients can sign in to it immediately — they
-pin the server’s own key rather than trusting a certificate authority. Signing in from a **browser**
-needs two more things, and it needs both: a domain name, because a passkey is bound to one and the
-standard does not allow an address; and a publicly trusted certificate, because no current browser
-will create a passkey on a page whose certificate it does not trust, and clicking past the warning
-does not change that. If a domain already points at the server, ask for both during the install:
+That command installs the computer, and native clients pin the server’s own key. For browser
+access, configure a hostname and a trusted HTTPS certificate. You can sign in with a password;
+optional passkeys also require a domain name and a secure browser context. If a domain already
+points at the server, configure it during installation:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ouaeic/garden/v0.2.0/install.sh | sudo env GARDEN_REF=v0.2.0 GARDEN_HOSTNAME=your.domain GARDEN_ACME_EMAIL=you@example.com sh
@@ -335,6 +333,23 @@ garden is an independent implementation. Its code, prompts, and interface are it
 not affiliated with or endorsed by any provider it can connect to. Product names appear only to
 identify services the owner may choose to use. See
 [Third-party notices](THIRD_PARTY_NOTICES.md).
+
+## Sign in with a password
+
+Create your owner account with a password and the installer pairing code. Passkeys are optional.
+On another device, open your Garden address and sign in with the same password. Device sessions
+stay signed in and can be revoked from Settings → Access.
+
+For an existing account, add a password in Settings → Access or choose **Recover access** with your
+saved recovery code. If you cannot sign in, run this on your server:
+
+```sh
+sudo garden password-reset
+```
+
+Open the temporary setup link it prints. Choose your own password in the browser and save the new recovery
+code. Recovery signs out existing devices and revokes prior passkeys, API tokens and invitations;
+issuing a setup link alone does not change access.
 
 ## License
 

@@ -5,7 +5,7 @@ import { agentTools } from './tool-catalogue.js';
 import { isMutatingToolCall } from './write-classification.js';
 
 describe('native language-tool authority and dispatch', () => {
-  it.each(['review', 'balanced', 'autonomous'] as const)(
+  it.each(['review', 'balanced'] as const)(
     'requires explicit native launch approval in %s mode while read actions remain reads',
     (mode) => {
       expect(

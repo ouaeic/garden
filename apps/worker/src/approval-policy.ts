@@ -399,7 +399,11 @@ const ordinaryRequirement = (
   context: ApprovalContext,
   now: Date
 ): ApprovalRequirement | null => {
-  if (name === 'code_diagnostics' && textValue(args.action) === 'start')
+  if (
+    name === 'code_diagnostics' &&
+    textValue(args.action) === 'start' &&
+    securityMode !== 'autonomous'
+  )
     return withTaskApproval(
       {
         sideEffect: 'external_reversible',
@@ -487,7 +491,11 @@ const ordinaryRequirement = (
       };
     return null;
   }
-  if (name === 'coding_agent' && textValue(args.action) === 'setup')
+  if (
+    name === 'coding_agent' &&
+    textValue(args.action) === 'setup' &&
+    SECURITY_MODE_FLOOR[securityMode].asksBeforeInstallingSoftware
+  )
     return {
       sideEffect: 'external_reversible',
       action: `Install ${codingAgentName(args.agent)}`,

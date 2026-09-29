@@ -504,6 +504,38 @@ export class DataStore {
     return this.#identity.getSession(...args);
   }
 
+  createOwner(...args: Parameters<IdentityStore['createOwner']>) {
+    return this.#identity.createOwner(...args);
+  }
+
+  markPasswordStepUp(...args: Parameters<IdentityStore['markPasswordStepUp']>) {
+    return this.#identity.markPasswordStepUp(...args);
+  }
+
+  getPasswordHash(...args: Parameters<IdentityStore['getPasswordHash']>) {
+    return this.#identity.getPasswordHash(...args);
+  }
+
+  claimPasswordAttempt(...args: Parameters<IdentityStore['claimPasswordAttempt']>) {
+    return this.#identity.claimPasswordAttempt(...args);
+  }
+
+  clearPasswordAttempts(...args: Parameters<IdentityStore['clearPasswordAttempts']>) {
+    return this.#identity.clearPasswordAttempts(...args);
+  }
+
+  createPasswordReset(...args: Parameters<IdentityStore['createPasswordReset']>) {
+    return this.#identity.createPasswordReset(...args);
+  }
+
+  findPasswordReset(...args: Parameters<IdentityStore['findPasswordReset']>) {
+    return this.#identity.findPasswordReset(...args);
+  }
+
+  replacePassword(...args: Parameters<IdentityStore['replacePassword']>) {
+    return this.#identity.replacePassword(...args);
+  }
+
   createDeviceEnrollment(...args: Parameters<IdentityStore['createDeviceEnrollment']>) {
     return this.#identity.createDeviceEnrollment(...args);
   }

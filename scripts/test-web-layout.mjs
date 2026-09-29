@@ -2243,7 +2243,7 @@ try {
       exact: true
     });
     const authorizeButton = authorizeDialog.getByRole('button', {
-      name: 'Verify passkey and authorize',
+      name: 'Confirm and authorize',
       exact: true
     });
     await authorizeButton.waitFor();
@@ -2261,7 +2261,7 @@ try {
     assert.deepEqual(
       nativeStepUp,
       { force: true },
-      'Device approval must force fresh passkey verification'
+      'Device approval must force fresh identity verification'
     );
     assert.deepEqual(nativeDecision, { userCode: 'ABCD-2345', approve: true });
     await authorizationPage.screenshot({ path: resolve(report, 'device-authorization.png') });

@@ -5058,3 +5058,44 @@ describe('the removal card, as a sentence', () => {
     }
   });
 });
+
+describe('routine Autonomous coding setup', () => {
+  it.each(['review', 'balanced'] as const)(
+    'asks before installing a coding CLI in %s mode',
+    (mode) => {
+      expect(
+        approvalRequirement('coding_agent', { action: 'setup', agent: 'codex' }, mode)?.sideEffect
+      ).toBe('external_reversible');
+      expect(
+        approvalRequirement(
+          'code_diagnostics',
+          { action: 'start', language: 'typescript', path: 'workspace/app' },
+          mode
+        )?.sideEffect
+      ).toBe('external_reversible');
+    }
+  );
+  it('runs routine tools without an approval while keeping external delegation explicit', () => {
+    expect(
+      approvalRequirement('coding_agent', { action: 'setup', agent: 'codex' }, 'autonomous')
+    ).toBeNull();
+    expect(
+      approvalRequirement(
+        'code_diagnostics',
+        { action: 'start', language: 'typescript', path: 'workspace/app' },
+        'autonomous'
+      )
+    ).toBeNull();
+    expect(
+      approvalRequirement(
+        'coding_agent',
+        { action: 'run', agent: 'codex', prompt: 'Inspect the project' },
+        'autonomous'
+      )?.sideEffect
+    ).toBe('external_reversible');
+    expect(
+      approvalRequirement('shell', { executable: 'git', args: ['push', '--force'] }, 'autonomous')
+        ?.sideEffect
+    ).toBe('external_consequential');
+  });
+});

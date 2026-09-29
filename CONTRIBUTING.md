@@ -304,6 +304,9 @@ it was written for.
 Contributions are accepted under the license of the component changed. By submitting a change, you
 certify that you have the right to do so.
 
+The password workflow drill is `pnpm test:auth-ui`. It exercises the real authentication routes and
+database with browser sign-in, recovery, remembered sessions and password confirmation.
+
 The browser layout drill is `pnpm test:ui`. It uses the runner’s installed Chromium and local
 fixtures, with no provider credentials or network calls. It exercises responsive layout, keyboard
 focus, effort drafts, preview playback, downloads, and expansion without restarting the preview.

@@ -81,6 +81,9 @@ const publicPaths = new Set([
    */
   '/v1/auth/enroll/options',
   '/v1/auth/enroll/verify',
+  '/v1/auth/password/register',
+  '/v1/auth/password/login',
+  '/v1/auth/password/recover',
   '/v1/auth/dev',
   '/v1/connectors/mcp/oauth/callback',
   '/v1/connectors/accounts/oauth/callback',
@@ -106,6 +109,11 @@ const publicPaths = new Set([
  * caller address the way account recovery already is.
  */
 const authRateLimitedPaths = new Set([
+  '/v1/auth/password/register',
+  '/v1/auth/password/login',
+  '/v1/auth/password/recover',
+  '/v1/auth/password/step-up',
+  '/v1/auth/password',
   '/v1/auth/native/start',
   '/v1/auth/native/:id/decision',
   /*
@@ -277,11 +285,7 @@ export const createStepUpGuard = (context: ServerBase): StepUpGuard => {
   const { store, secure } = context;
   const requireRecentStepUp = async (request: FastifyRequest, user: UserRecord): Promise<void> => {
     if (!(await hasRecentStepUp(store, user.id, request.cookies[sessionCookieName(secure)]))) {
-      throw new GardenError(
-        'step_up_required',
-        'Confirm this sensitive action with your passkey',
-        403
-      );
+      throw new GardenError('step_up_required', 'Confirm your identity to continue', 403);
     }
   };
 

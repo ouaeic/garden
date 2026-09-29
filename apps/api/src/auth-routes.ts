@@ -1,3 +1,4 @@
+import { registerPasswordRoutes } from './password-routes.js';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import {
@@ -215,14 +216,12 @@ export const registerAuthRoutes = (
     const user = request.user;
     if (!user) throw new GardenError('authentication_required', 'Sign in to continue', 401);
     if (!(await hasRecentStepUp(store, user.id, request.cookies[sessionCookieName(secure)]))) {
-      throw new GardenError(
-        'step_up_required',
-        'Confirm this sensitive action with your passkey',
-        403
-      );
+      throw new GardenError('step_up_required', 'Confirm your identity to continue', 403);
     }
     return user;
   };
+
+  registerPasswordRoutes(app, store, config, requireFirstOwnerPairing);
 
   app.post<{
     Body: {
@@ -292,11 +291,13 @@ export const registerAuthRoutes = (
     if (!verification.verified || !verification.registrationInfo)
       throw new Error('Passkey verification failed');
     const recoveryCode = randomBytes(18).toString('base64url');
-    const user = await store.createUser({
+    const user = await store.createOwner({
       username: pending.username,
       displayName: request.body.displayName?.trim() || pending.username,
       recoveryHash: await hashRecoveryCode(recoveryCode)
     });
+    if (!user)
+      throw new GardenError('registration_closed', 'This Garden already has an owner.', 403);
     const { credential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
     await store.addPasskey({
       userId: user.id,
@@ -750,6 +751,7 @@ export const registerAuthRoutes = (
       ) {
         return { verified: true };
       }
+      if (await store.getPasswordHash(user.id)) return { method: 'password' as const };
       const passkeys = await store.listPasskeys(user.id);
       if (!passkeys.length) {
         // Step-up exists to prove a person is present. On a real deployment there is nothing to fall

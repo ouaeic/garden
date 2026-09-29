@@ -149,8 +149,8 @@ export default function NativeAuthorizationPortal() {
             This code matches the garden app I opened.
           </label>
           <p className="muted">
-            Authorize only a device you are using. Your passkey verifies this request before access
-            is granted.
+            Authorize only a device you are using. Your identity is confirmed before access is
+            granted.
           </p>
           <div className="row">
             <Button
@@ -159,7 +159,7 @@ export default function NativeAuthorizationPortal() {
               className="primary"
               onClick={() => void decide(true)}
             >
-              Verify passkey and authorize
+              Confirm and authorize
             </Button>
             <Button busy={busy} onClick={() => void decide(false)}>
               Decline

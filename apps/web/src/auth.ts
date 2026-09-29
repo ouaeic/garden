@@ -74,6 +74,14 @@ export function stepUp(force = false): Promise<void> {
     return pendingStepUp.then(() => stepUp(true));
   }
   pendingStepUp = (async () => {
+    const ceremony = await post<
+      Ceremony<AuthenticationOptions> | { verified: true } | { method: 'password' }
+    >('/v1/auth/step-up/options', { ...nativeContext(), ...(force ? { force: true } : {}) });
+    if ('verified' in ceremony && ceremony.verified) return;
+    if ('method' in ceremony && ceremony.method === 'password') {
+      await (await import('./PasswordConfirmation')).confirmPassword();
+      return;
+    }
     if (isNativeClient()) {
       const native = await import('./native-authorization');
       if (await native.prefersBrowserAuthorization()) {
@@ -81,11 +89,7 @@ export function stepUp(force = false): Promise<void> {
         return;
       }
     }
-    const ceremony = await post<Ceremony<AuthenticationOptions> | { verified: true }>(
-      '/v1/auth/step-up/options',
-      { ...nativeContext(), ...(force ? { force: true } : {}) }
-    );
-    if ('verified' in ceremony && ceremony.verified) return;
+
     if (!('options' in ceremony)) throw new Error('The server returned no passkey challenge');
     const { startAuthentication } = await import('@simplewebauthn/browser');
     const response = await startAuthentication({ optionsJSON: ceremony.options });
@@ -159,3 +163,14 @@ export async function addPasskey(): Promise<unknown> {
 export const devSignIn = (displayName = 'Local User'): Promise<AuthResult> =>
   post<AuthResult>('/v1/auth/dev', { displayName });
 export const signOut = (): Promise<{ ok: boolean }> => post('/v1/auth/logout');
+
+export const passwordSignIn = (password: string): Promise<AuthResult> =>
+  post('/v1/auth/password/login', { password });
+export const passwordRegister = (
+  displayName: string,
+  pairingCode: string,
+  password: string
+): Promise<AuthResult> =>
+  post('/v1/auth/password/register', { displayName, pairingCode, password });
+export const passwordRecover = (code: string, password: string): Promise<AuthResult> =>
+  post('/v1/auth/password/recover', { code, password });

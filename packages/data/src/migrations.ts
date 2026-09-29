@@ -3990,5 +3990,20 @@ CREATE TABLE IF NOT EXISTS model_throughput_ceiling (
       ciphertext JSONB NOT NULL,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`
+  },
+  {
+    version: 112,
+    name: 'owner_password_authentication',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        token_hash TEXT PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        expires_at TIMESTAMPTZ NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS password_attempts (
+        bucket TEXT PRIMARY KEY,
+        attempts INTEGER NOT NULL,
+        resets_at TIMESTAMPTZ NOT NULL
+      );`
   }
 ] as const;

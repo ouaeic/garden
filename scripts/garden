@@ -1374,6 +1374,11 @@ relay_set_enabled() {
   "$(runtime_path /usr/local/lib/garden/garden-network-refresh)"
 }
 
+password_reset() {
+  need_root password-reset
+  GARDEN_CONFIG="$garden_config" node "$garden_root/apps/api/dist/password-reset.js"
+}
+
 pairing_code() {
   need_root pairing-code
   fresh_code=$(openssl rand -hex 16)
@@ -4502,7 +4507,7 @@ task_command() {
 
 usage() {
   printf '%s\n' \
-    'Usage: garden {install|start|stop|restart|status|logs [api|worker|runner|registry|notifications|nginx]|doctor|connect|pairing-code|set-hostname HOST|price-ceiling [show|set INPUT OUTPUT|clear]|spend-cap [show|set DAILY MONTHLY|clear]|backup [dir]|backup auto on|off|status|backup destination [show|PATH --recipient FILE|off]|restore DIR --yes [--keep-stopped | --new-host [--hostname NAME]]|update|rollback [dir]|auto-update on|off|status|relay status|on|off|uninstall|certificate ...|ddns ...|task ...|tool-opens [DAYS] [--json]|acp --workspace ID [--approvals park|relay]}' \
+    'Usage: garden {install|start|stop|restart|status|logs [api|worker|runner|registry|notifications|nginx]|doctor|connect|pairing-code|password-reset|set-hostname HOST|price-ceiling [show|set INPUT OUTPUT|clear]|spend-cap [show|set DAILY MONTHLY|clear]|backup [dir]|backup auto on|off|status|backup destination [show|PATH --recipient FILE|off]|restore DIR --yes [--keep-stopped | --new-host [--hostname NAME]]|update|rollback [dir]|auto-update on|off|status|relay status|on|off|uninstall|certificate ...|ddns ...|task ...|tool-opens [DAYS] [--json]|acp --workspace ID [--approvals park|relay]}' \
     '' \
     'Browser sign-in needs a hostname: a passkey is bound to a domain name and the WebAuthn' \
     'standard does not allow an IP address. If this server has no name, run:' \
@@ -4528,6 +4533,7 @@ case "$command_name" in
     connection_details
     ;;
   pairing-code) pairing_code ;;
+  password-reset) password_reset ;;
   price-ceiling) spend_ceiling_command "$@" ;;
   # The name this was shipped under, kept answering rather than removed. It set a price per million
   # tokens while wearing the name of a money cap, which is the confusion the rename exists to end -

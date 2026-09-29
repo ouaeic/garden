@@ -30,6 +30,147 @@ export class IdentityStore {
     return mapUser(result.rows[0]!);
   }
 
+  async createOwner(input: {
+    displayName: string;
+    username?: string;
+    passwordHash?: string;
+    recoveryHash: string;
+  }): Promise<UserRecord | null> {
+    return this.database.transaction(async (tx) => {
+      // Serializes first-owner registration against both password and passkey inserts.
+      await tx.query('LOCK TABLE users IN EXCLUSIVE MODE');
+      const existing = await tx.query('SELECT id FROM users LIMIT 1');
+      if (existing.rows.length) return null;
+      const result = await tx.query(
+        `INSERT INTO users(id,username,display_name,recovery_hash,password_hash)
+        VALUES ($1,$5,$2,$3,$4) RETURNING *`,
+        [
+          randomUUID(),
+          input.displayName,
+          input.recoveryHash,
+          input.passwordHash ?? null,
+          input.username ?? 'owner'
+        ]
+      );
+      return mapUser(result.rows[0]!);
+    });
+  }
+
+  async markPasswordStepUp(
+    userId: string,
+    sessionHash: string,
+    passwordHash: string
+  ): Promise<boolean> {
+    return this.database.transaction(async (tx) => {
+      const owner = await tx.query('SELECT password_hash FROM users WHERE id=$1 FOR UPDATE', [
+        userId
+      ]);
+      if (owner.rows[0]?.password_hash !== passwordHash) return false;
+      const updated = await tx.query(
+        'UPDATE sessions SET step_up_at=NOW() WHERE user_id=$1 AND id_hash=$2 AND expires_at>NOW()',
+        [userId, sessionHash]
+      );
+      return updated.rowCount === 1;
+    });
+  }
+
+  async getPasswordHash(userId: string): Promise<string | null> {
+    const result = await this.database.query('SELECT password_hash FROM users WHERE id=$1', [
+      userId
+    ]);
+    return optionalText(result.rows[0]?.password_hash);
+  }
+
+  /** Shared across addresses and restarts; the HTTP layer also throttles each caller. */
+  async claimPasswordAttempt(): Promise<boolean> {
+    const result = await this.database
+      .query(`INSERT INTO password_attempts(bucket,attempts,resets_at)
+      VALUES ('owner',1,NOW() + INTERVAL '15 minutes')
+      ON CONFLICT(bucket) DO UPDATE SET
+        attempts=CASE WHEN password_attempts.resets_at<=NOW() THEN 1 ELSE password_attempts.attempts+1 END,
+        resets_at=CASE WHEN password_attempts.resets_at<=NOW() THEN NOW() + INTERVAL '15 minutes' ELSE password_attempts.resets_at END
+      RETURNING attempts`);
+    return Number(result.rows[0]?.attempts ?? 21) <= 20;
+  }
+
+  async clearPasswordAttempts(): Promise<void> {
+    await this.database.query("DELETE FROM password_attempts WHERE bucket='owner'");
+  }
+
+  async createPasswordReset(userId: string, tokenHash: string): Promise<void> {
+    await this.database.transaction(async (tx) => {
+      await tx.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [userId]);
+      await tx.query('DELETE FROM password_reset_tokens WHERE user_id=$1', [userId]);
+      await tx.query(
+        `INSERT INTO password_reset_tokens(token_hash,user_id,expires_at)
+        VALUES ($1,$2,NOW() + INTERVAL '15 minutes')`,
+        [tokenHash, userId]
+      );
+    });
+  }
+
+  async findPasswordReset(tokenHash: string): Promise<string | null> {
+    const result = await this.database.query(
+      'SELECT user_id FROM password_reset_tokens WHERE token_hash=$1 AND expires_at>NOW()',
+      [tokenHash]
+    );
+    return optionalText(result.rows[0]?.user_id);
+  }
+
+  /** Password changes and recovery invalidate previous sessions in the same transaction. */
+  async replacePassword(input: {
+    userId: string;
+    passwordHash: string;
+    proof:
+      | { recoveryHash: string; newRecoveryHash: string }
+      | { tokenHash: string; newRecoveryHash: string }
+      | { passwordHash: string | null };
+  }): Promise<boolean> {
+    return this.database.transaction(async (tx) => {
+      const result = await tx.query(
+        'SELECT password_hash,recovery_hash FROM users WHERE id=$1 FOR UPDATE',
+        [input.userId]
+      );
+      const user = result.rows[0];
+      if (!user) return false;
+      const proof = input.proof;
+      if ('recoveryHash' in proof && user.recovery_hash !== proof.recoveryHash) return false;
+      if ('passwordHash' in proof && optionalText(user.password_hash) !== proof.passwordHash)
+        return false;
+      if ('tokenHash' in proof) {
+        const consumed = await tx.query(
+          'DELETE FROM password_reset_tokens WHERE token_hash=$1 AND user_id=$2 AND expires_at>NOW() RETURNING user_id',
+          [proof.tokenHash, input.userId]
+        );
+        if (!consumed.rows.length) return false;
+      }
+      await tx.query('UPDATE users SET password_hash=$2,updated_at=NOW() WHERE id=$1', [
+        input.userId,
+        input.passwordHash
+      ]);
+      await tx.query('DELETE FROM sessions WHERE user_id=$1', [input.userId]);
+      await tx.query('DELETE FROM password_reset_tokens WHERE user_id=$1', [input.userId]);
+      if ('newRecoveryHash' in proof) {
+        await tx.query('UPDATE users SET recovery_hash=$2 WHERE id=$1', [
+          input.userId,
+          proof.newRecoveryHash
+        ]);
+        await tx.query('DELETE FROM passkeys WHERE user_id=$1', [input.userId]);
+        await tx.query(
+          'UPDATE api_tokens SET revoked_at=NOW() WHERE user_id=$1 AND revoked_at IS NULL',
+          [input.userId]
+        );
+        await tx.query('DELETE FROM device_enrollments WHERE user_id=$1', [input.userId]);
+        await tx.query('DELETE FROM native_authorizations WHERE user_id=$1', [input.userId]);
+        await tx.query(
+          'DELETE FROM auth_challenges WHERE username=(SELECT username FROM users WHERE id=$1)',
+          [input.userId]
+        );
+      }
+      return true;
+    });
+  }
+
   async countUsers(): Promise<number> {
     const result = await this.database.query('SELECT COUNT(*) AS count FROM users');
     return Number(result.rows[0]?.count ?? 0);
@@ -166,11 +307,12 @@ export class IdentityStore {
   }): Promise<PasskeyRecord> {
     return this.database.transaction(async (tx) => {
       const rotated = await tx.query(
-        `UPDATE users SET recovery_hash=$3,updated_at=NOW()
+        `UPDATE users SET recovery_hash=$3,password_hash=NULL,updated_at=NOW()
          WHERE id=$1 AND recovery_hash=$2 RETURNING id`,
         [input.userId, input.expectedRecoveryHash, input.newRecoveryHash]
       );
       if (rotated.rowCount !== 1) throw new Error('Recovery code has already been rotated');
+      await tx.query('DELETE FROM password_reset_tokens WHERE user_id=$1', [input.userId]);
       await tx.query('DELETE FROM passkeys WHERE user_id=$1', [input.userId]);
       await tx.query('DELETE FROM sessions WHERE user_id=$1', [input.userId]);
       await tx.query("DELETE FROM auth_challenges WHERE username=$1 AND kind='recovery'", [
@@ -252,7 +394,10 @@ export class IdentityStore {
         [userId]
       );
       if (!locked.rows.some((row) => String(row.id) === passkeyId)) return 'not_found';
-      if (locked.rows.length <= 1) return 'last_passkey';
+      if (locked.rows.length <= 1) {
+        const owner = await tx.query('SELECT password_hash FROM users WHERE id=$1', [userId]);
+        if (!owner.rows[0]?.password_hash) return 'last_passkey';
+      }
       const deleted = await tx.query('DELETE FROM passkeys WHERE user_id=$1 AND id=$2', [
         userId,
         passkeyId
@@ -271,14 +416,24 @@ export class IdentityStore {
     expiresAt: Date,
     publicId = randomUUID(),
     deviceLabel = 'Unknown device',
-    steppedUp = false
+    steppedUp = false,
+    expectedPasswordHash?: string
   ): Promise<string> {
-    await this.database.query(
-      `INSERT INTO sessions(id_hash,user_id,expires_at,public_id,device_label,step_up_at)
+    return this.database.transaction(async (tx) => {
+      if (expectedPasswordHash !== undefined) {
+        const owner = await tx.query('SELECT password_hash FROM users WHERE id=$1 FOR UPDATE', [
+          userId
+        ]);
+        if (owner.rows[0]?.password_hash !== expectedPasswordHash)
+          throw new Error('Password changed during sign-in. Try again.');
+      }
+      await tx.query(
+        `INSERT INTO sessions(id_hash,user_id,expires_at,public_id,device_label,step_up_at)
        VALUES ($1,$2,$3,$4,$5,CASE WHEN $6 THEN NOW() ELSE NULL END)`,
-      [idHash, userId, expiresAt.toISOString(), publicId, deviceLabel, steppedUp]
-    );
-    return publicId;
+        [idHash, userId, expiresAt.toISOString(), publicId, deviceLabel, steppedUp]
+      );
+      return publicId;
+    });
   }
 
   /**
