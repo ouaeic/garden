@@ -179,8 +179,8 @@ export const DOCUMENT_TOOLCHAIN: readonly ToolchainCapability[] = [
     binaries: [GARDEN_PYTHON],
     pythonModules: ['pandas', 'pyarrow'],
     fonts: [],
-    packages: ['python-pandas', 'python-pyarrow'],
-    install: "install this host's pandas and pyarrow packages"
+    packages: ['python-pandas'],
+    install: 'run sudo garden update to restore the pinned Parquet reader and pandas'
   },
   {
     /**

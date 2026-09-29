@@ -28,7 +28,7 @@ export function releasePathMappings(environment = process.env) {
   return [...mappings].map(([source, destination]) => ({ source, destination }));
 }
 
-export function withReleaseRustFlags(environment = process.env, platform) {
+export function withReleaseRustFlags(environment = process.env, platform, host = process.platform) {
   if (environment.RUSTFLAGS && !environment.CARGO_ENCODED_RUSTFLAGS) {
     throw new Error(
       'RUSTFLAGS is set. Move those arguments to CARGO_ENCODED_RUSTFLAGS so garden can append reproducible-build path remapping safely.'
@@ -53,8 +53,24 @@ export function withReleaseRustFlags(environment = process.env, platform) {
           'link-arg=-Wl,-z,common-page-size=16384'
         ]
       : [];
+  const nativeCompiler = {};
+  if (host === 'win32') {
+    // Clang rewrites C __FILE__ paths; Rust's maps cannot reach native dependency objects.
+    const flags = releasePathMappings(environment).map(({ source, destination }) =>
+      JSON.stringify(`/clang:-ffile-prefix-map=${source}=${destination}`)
+    );
+    Object.assign(nativeCompiler, {
+      CC: environment.CC ?? 'clang-cl',
+      CXX: environment.CXX ?? 'clang-cl',
+      CC_SHELL_ESCAPED_FLAGS: '1',
+      AWS_LC_SYS_CMAKE_BUILDER: environment.AWS_LC_SYS_CMAKE_BUILDER ?? '0',
+      CFLAGS: [environment.CFLAGS, ...flags].filter(Boolean).join(' '),
+      CXXFLAGS: [environment.CXXFLAGS, ...flags].filter(Boolean).join(' ')
+    });
+  }
   return {
     ...environment,
+    ...nativeCompiler,
     CARGO_ENCODED_RUSTFLAGS: [...existing, ...remapArguments, ...pageArguments].join(unitSeparator)
   };
 }
@@ -71,6 +87,21 @@ function appendGitHubEnvironment(environment) {
     `CARGO_ENCODED_RUSTFLAGS<<${delimiter}\n${configured.CARGO_ENCODED_RUSTFLAGS}\n${delimiter}\n`,
     'utf8'
   );
+  if (process.platform === 'win32') {
+    for (const key of [
+      'CC',
+      'CXX',
+      'CC_SHELL_ESCAPED_FLAGS',
+      'AWS_LC_SYS_CMAKE_BUILDER',
+      'CFLAGS',
+      'CXXFLAGS'
+    ])
+      appendFileSync(
+        githubEnvironment,
+        `${key}<<${delimiter}\n${configured[key]}\n${delimiter}\n`,
+        'utf8'
+      );
+  }
   console.log('Configured stable Rust source-path remapping for the release build');
 }
 

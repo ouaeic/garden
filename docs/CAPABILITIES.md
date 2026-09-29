@@ -126,22 +126,21 @@ One table carries most of it - `scripts/garden-host.sh`, a row per capability an
 supported distribution family - and the installer hands that family's whole column to the package
 manager: the office suite and the metric-compatible fonts a document needs to hold its layout,
 poppler, qpdf, ghostscript, tesseract, ImageMagick, graphviz, ffmpeg, and the distribution's own
-pandas, matplotlib, scipy, statsmodels, Pillow, lxml, openpyxl, XlsxWriter and pyarrow - numpy
+pandas, matplotlib, scipy, statsmodels, Pillow, lxml, openpyxl and XlsxWriter - numpy
 arrives with them rather than as a row of its own, and python-docx is a row only the Debian and Red
 Hat columns fill, which the installer names out loud before it installs anything on the other two.
 Two mechanisms are deliberately outside that table, because a distribution name is the wrong pin
 for what they carry: the typst release, fetched by `scripts/install-native.sh` at a version and a
 sha256, and the hash-pinned `infra/native/garden-python-requirements.txt`, which supplies
-python-pptx and pypdf - one that Ubuntu stopped packaging after 24.04, one whose form-writer API
-changed between two packaged releases. Both land in the one pinned Python at
+python-pptx, pypdf and pyarrow. These supply slide generation, PDF form writing and Parquet
+support consistently across supported distributions. Both land in the one pinned Python at
 `/usr/local/lib/garden/python`, built with `--system-site-packages` so it is a superset of the
 packages above rather than a second environment competing with them. Editing the table is therefore
-the right move for an operating-system package and the wrong one for those three.
+the right move for an operating-system package and the wrong one for these pinned Python dependencies.
 
-pyarrow is on that list to close a claim rather than to widen the bench, and that distinction is the
-whole policy. The data-analysis skill's description triggers on a parquet file and
-`pandas.read_parquet` carries no reader without it, so the computer was offering a format it could
-not open. A package earns a place here when a skill already claims what it provides, or when its
+The data-analysis skill names Parquet, and `pandas.read_parquet` needs a reader. PyArrow therefore
+comes from verified wheels because its OS package is absent on some supported releases. A package
+earns a place here when a skill already claims what it provides, or when its
 absence makes the first hour of a workload the product is sold on fail. Nothing earns one by being
 generally useful.
 

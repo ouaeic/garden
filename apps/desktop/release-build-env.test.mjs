@@ -48,6 +48,20 @@ test('release Rust flags never silently discard caller flags', () => {
   assert.ok(configured.CARGO_ENCODED_RUSTFLAGS.startsWith('-C\u001ftarget-cpu=native\u001f'));
 });
 
+test('Windows C dependencies receive the same path maps without dropping caller flags', () => {
+  const environment = { HOME: '/Users/build owner', CFLAGS: '/O2', CXXFLAGS: '/W3' };
+  const configured = withReleaseRustFlags(environment, undefined, 'win32');
+  assert.equal(configured.CC, 'clang-cl');
+  assert.equal(configured.AWS_LC_SYS_CMAKE_BUILDER, '0');
+  assert.ok(configured.CFLAGS.startsWith('/O2 '));
+  assert.ok(configured.CXXFLAGS.startsWith('/W3 '));
+  assert.ok(
+    configured.CFLAGS.includes('"/clang:-ffile-prefix-map=/Users/build owner=/build-user"')
+  );
+  assert.equal(environment.CFLAGS, '/O2');
+  assert.equal(withReleaseRustFlags(environment, undefined, 'darwin').CC, undefined);
+});
+
 test('Android release flags preserve caller flags and align LOAD and RELRO without affecting Apple builds', () => {
   const environment = { HOME: '/home/builder', CARGO_ENCODED_RUSTFLAGS: '-C\u001flto=thin' };
   const args = withReleaseRustFlags(environment, 'android').CARGO_ENCODED_RUSTFLAGS.split('\u001f');

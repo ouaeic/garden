@@ -94,6 +94,7 @@ jobs:
           libappindicator3-dev
           librsvg2-dev
           patchelf
+          xdg-utils
       - run: pnpm install --frozen-lockfile
       - run: pnpm native:configure
       - name: Require Apple distribution and notarization credentials

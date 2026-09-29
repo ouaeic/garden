@@ -68,7 +68,7 @@ jobs:
             for capability in poppler tesseract tesseract-english ffmpeg qpdf img2pdf graphviz \
               office-writer office-impress office-calc \
               python python-pip python-docx python-openpyxl python-pillow \
-              python-lxml python-xlsxwriter python-pandas python-pyarrow python-matplotlib \
+              python-lxml python-xlsxwriter python-pandas python-matplotlib \
               python-scipy python-statsmodels \
               font-carlito font-caladea font-liberation font-dejavu font-noto; do
               name=$(garden_package_for "$capability" "$garden_family")
@@ -112,7 +112,7 @@ jobs:
             --disable-pip-version-check --require-hashes --no-deps --only-binary=:all: \
             --requirement infra/native/garden-python-requirements.txt
           sudo chmod -R a+rX /usr/local/lib/garden
-          /usr/local/lib/garden/python/bin/python3 -c 'import pypdf, pptx, docx, openpyxl, PIL'
+          /usr/local/lib/garden/python/bin/python3 -c 'import pypdf, pptx, docx, openpyxl, PIL, pyarrow'
           sudo install -m 0755 scripts/garden-office-convert /usr/local/bin/garden-office-convert
       - run: pnpm install --frozen-lockfile
       - run: pnpm release:check
@@ -241,8 +241,10 @@ jobs:
           sudo install -d -m 0755 /opt/garden /usr/local/lib/garden /etc/garden/tls \
             /etc/garden/relay /var/lib/garden /var/lib/garden-control /etc/nginx/snippets
           sudo install -d -m 2710 -o garden -g garden-agent /home/garden
-          for program in garden-service garden-certificate garden-network-refresh \
-            garden-network-watch; do
+          programs=$(sed -n 's|^ExecStart=/usr/local/lib/garden/\([a-z][a-z0-9-]*\).*|\1|p' \
+            infra/native/*.service | sort -u)
+          [ -n "$programs" ] || { echo 'No native unit executables found.' >&2; exit 1; }
+          for program in $programs; do
             printf '#!/bin/sh\nexit 0\n' |
               sudo tee "/usr/local/lib/garden/$program" >/dev/null
             sudo chmod 0755 "/usr/local/lib/garden/$program"

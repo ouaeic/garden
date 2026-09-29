@@ -550,10 +550,9 @@ mod tests {
         assert_eq!(transport.path(), canonical.path());
         let headers = request_headers(&HeaderMap::new(), &canonical);
         assert_eq!(headers.get(HOST).unwrap(), "garden.test:8443");
-        let distinct = Url::parse(
-            "https://apps.test:8443/__garden/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/",
-        )
-        .unwrap();
+        let distinct =
+            Url::parse("https://apps.test:8443/__garden/preview/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/")
+                .unwrap();
         assert_eq!(
             transport_url(&active, &connection_fixture(), &distinct).unwrap(),
             distinct

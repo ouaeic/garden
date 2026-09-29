@@ -100,14 +100,14 @@ install_tools() (
     "$python_target/bin/python3" -m pip install --quiet --disable-pip-version-check \
       --require-hashes --no-deps --only-binary=:all: --requirement "$requirements"
     "$python_target/bin/python3" -I -c \
-      'import debugpy, pypdf, pptx, docx, openpyxl, pandas, matplotlib, PIL; assert debugpy.__version__ == "1.8.21"'
+      'import debugpy, pypdf, pptx, docx, openpyxl, pandas, matplotlib, PIL, pyarrow; assert debugpy.__version__ == "1.8.21"'
     chmod -R a+rX "$python_target"
     printf '%s\n' "$requirement_hash" >"$python_ready"
     trap - EXIT INT TERM
   fi
   [ "$(cat "$python_ready")" = "$requirement_hash" ] || fail 'the Python cache receipt does not match'
   "$python_target/bin/python3" -I -c \
-    'import debugpy, pypdf, pptx, docx, openpyxl, pandas, matplotlib, PIL; assert debugpy.__version__ == "1.8.21"'
+    'import debugpy, pypdf, pptx, docx, openpyxl, pandas, matplotlib, PIL, pyarrow; assert debugpy.__version__ == "1.8.21"'
 
   js_version=1.117.0
   js_hash=ad8d04ede9d4b75cc290fd5438a65047a06f786d04f604b6112485b36f090772

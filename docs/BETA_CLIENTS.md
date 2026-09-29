@@ -8,7 +8,9 @@ installed shell. No server address or model credential is compiled into a packag
 ## Build without a store account
 
 Use the repository's pinned Node and pnpm toolchain. Desktop builds also need Rust and the
-platform's Tauri build dependencies; Android builds need the Android SDK, NDK and a compatible JDK.
+platform's Tauri build dependencies; Windows release builds also need LLVM's `clang-cl` so native
+C dependencies receive source-path remapping. Android builds need the Android SDK, NDK and a
+compatible JDK.
 
 ```sh
 pnpm native:configure

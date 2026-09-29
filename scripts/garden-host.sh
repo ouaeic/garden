@@ -105,24 +105,6 @@ garden_detect_host() {
 # at all the cell is a dash, which is a supported outcome: `garden_missing_for_family` reports it
 # and the installer warns once, by name, before anything is installed.
 #
-# python-pyarrow is here to close a claim rather than to widen the bench. The data-analysis skill's
-# description triggers on "parquet file", and without pyarrow `pandas.read_parquet` answers "A
-# suitable version of pyarrow or fastparquet is required for parquet support" - measured on the
-# owner's own box, Ubuntu 26.04, with pandas installed and pyarrow absent. fastparquet is not an
-# alternative route there: that release packages no python3-fastparquet at all.
-#
-# It is not a cheap row: 21 packages and 88,059 KB installed on that host, Qt5 among them, arriving
-# behind libgandiva. Those two figures come from `apt-get install -s` on that one box and not from a
-# real install, and they are not a ranking - the other 59 rows were not measured, so whether this is
-# the second-heaviest row here is not something this comment knows. It is paid because a skill
-# naming a format the computer cannot read is worse than one that never mentions it.
-#
-# The suse cell is the reasoned kind rather than the measured kind, and this is the row where that
-# is written down. openSUSE packages pyarrow per interpreter flavour - python313-pyarrow,
-# python314-pyarrow - which is the same scheme it uses for the pandas, scipy, matplotlib and
-# statsmodels rows below, and `python3-` is the spelling those four already carry in that column. So
-# a `python3-pyarrow` that does not resolve would mean the pattern is broken for all five, and
-# openSUSE installs would already be failing on the four that shipped before this one.
 garden_package_table() {
   # DNF resolves file provides, so X11 utilities work with both split and grouped RPM packages.
   cat <<'TABLE'
@@ -167,7 +149,6 @@ python-lxml	python3-lxml	python3-lxml	python-lxml	python3-lxml
 python-matplotlib	python3-matplotlib	python3-matplotlib	python-matplotlib	python3-matplotlib
 python-openpyxl	python3-openpyxl	python3-openpyxl	python-openpyxl	python3-openpyxl
 python-pandas	python3-pandas	python3-pandas	python-pandas	python3-pandas
-python-pyarrow	python3-pyarrow	python3-pyarrow	python-pyarrow	python3-pyarrow
 python-scipy	python3-scipy	python3-scipy	python-scipy	python3-scipy
 python-statsmodels	python3-statsmodels	python3-statsmodels	python-statsmodels	python3-statsmodels
 python-pillow	python3-pil	python3-pillow	python-pillow	python3-Pillow

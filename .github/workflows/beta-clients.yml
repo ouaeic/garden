@@ -36,7 +36,7 @@ jobs:
           - name: macos-universal
             runner: macos-15
             targets: 'x86_64-apple-darwin,aarch64-apple-darwin'
-            args: '--target universal-apple-darwin --bundles dmg'
+            args: '--target universal-apple-darwin --bundles app,dmg'
           - name: windows-x64
             runner: windows-2025
             targets: ''
@@ -59,7 +59,7 @@ jobs:
         if: runner.os == 'Linux'
         run: >-
           sudo apt-get update && sudo apt-get install --yes
-          libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils
       - run: pnpm install --frozen-lockfile
       - run: pnpm native:configure
       - run: pnpm --filter @garden/desktop beta:desktop ${{ matrix.args }}
