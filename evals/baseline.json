@@ -1,385 +1,385 @@
 {
   "$stamp": {
-    "acceptedAt": "2026-09-29T18:50:48.696Z",
+    "acceptedAt": "2026-09-29T19:07:49.604Z",
     "version": "0.2.0",
-    "commit": "2cf26b5",
+    "commit": "3db6b38",
     "harness": "c041ea78bbb3"
   },
   "ambiguous-a-question-before-looking-is-refused": {
     "modelCalls": 3,
-    "promptTokens": 27853,
-    "catalogueTokens": 21441,
+    "promptTokens": 27844,
+    "catalogueTokens": 21432,
     "cachePrefix": 94,
     "displayedLines": 2
   },
   "ambiguous-a-real-blocker-parks-the-conversation": {
     "modelCalls": 2,
-    "promptTokens": 18488,
-    "catalogueTokens": 14294,
+    "promptTokens": 18482,
+    "catalogueTokens": 14288,
     "cachePrefix": 93,
     "displayedLines": 2
   },
   "ambiguous-question-after-a-read-costs-a-round-trip": {
     "modelCalls": 3,
-    "promptTokens": 28031,
-    "catalogueTokens": 21441,
+    "promptTokens": 28022,
+    "catalogueTokens": 21432,
     "cachePrefix": 93,
     "displayedLines": 0
   },
   "ambiguous-question-finished-cheaply": {
     "modelCalls": 1,
-    "promptTokens": 9129,
-    "catalogueTokens": 7147,
+    "promptTokens": 9126,
+    "catalogueTokens": 7144,
     "cachePrefix": 0,
     "displayedLines": 0
   },
   "ambiguous-question-without-finish-is-nagged": {
     "modelCalls": 5,
-    "promptTokens": 46723,
-    "catalogueTokens": 35735,
+    "promptTokens": 46708,
+    "catalogueTokens": 35720,
     "cachePrefix": 95,
     "displayedLines": 0
   },
   "answer-a-procedure-opened-twice-is-sent-once": {
     "modelCalls": 5,
-    "promptTokens": 54665,
-    "catalogueTokens": 37808,
+    "promptTokens": 54650,
+    "catalogueTokens": 37793,
     "cachePrefix": 84,
     "displayedLines": 2
   },
   "answer-a-remembered-fact-the-answer-used-is-recorded-as-cited": {
     "modelCalls": 1,
-    "promptTokens": 9559,
-    "catalogueTokens": 7147,
+    "promptTokens": 9556,
+    "catalogueTokens": 7144,
     "cachePrefix": 0,
     "displayedLines": 0
   },
   "answer-a-remembering-workspace-pays-for-its-preamble-once": {
     "modelCalls": 3,
-    "promptTokens": 30551,
-    "catalogueTokens": 22132,
+    "promptTokens": 30542,
+    "catalogueTokens": 22123,
     "cachePrefix": 80,
     "displayedLines": 2
   },
   "answer-conversational-no-tools": {
     "modelCalls": 1,
-    "promptTokens": 9137,
-    "catalogueTokens": 7147,
+    "promptTokens": 9134,
+    "catalogueTokens": 7144,
     "cachePrefix": 0,
     "displayedLines": 0
   },
   "answer-discovers-document-tools-before-reading": {
     "modelCalls": 3,
-    "promptTokens": 29225,
-    "catalogueTokens": 22823,
+    "promptTokens": 29216,
+    "catalogueTokens": 22814,
     "cachePrefix": 83,
     "displayedLines": 0
   },
   "answer-document-question": {
     "modelCalls": 3,
-    "promptTokens": 29228,
-    "catalogueTokens": 22823,
+    "promptTokens": 29219,
+    "catalogueTokens": 22814,
     "cachePrefix": 83,
     "displayedLines": 0
   },
   "answer-missing-file-is-not-a-dead-turn": {
     "modelCalls": 4,
-    "promptTokens": 37307,
-    "catalogueTokens": 28588,
+    "promptTokens": 37295,
+    "catalogueTokens": 28576,
     "cachePrefix": 94,
     "displayedLines": 2
   },
   "answer-not-applicable-after-tools-is-refused": {
     "modelCalls": 3,
-    "promptTokens": 28104,
-    "catalogueTokens": 21441,
+    "promptTokens": 28095,
+    "catalogueTokens": 21432,
     "cachePrefix": 93,
     "displayedLines": 2
   },
   "answer-saved-keyed-connection": {
     "modelCalls": 1,
-    "promptTokens": 9126,
-    "catalogueTokens": 7147,
+    "promptTokens": 9123,
+    "catalogueTokens": 7144,
     "cachePrefix": 0,
     "displayedLines": 0
   },
   "answer-saved-keyless-connection": {
     "modelCalls": 1,
-    "promptTokens": 9126,
-    "catalogueTokens": 7147,
+    "promptTokens": 9123,
+    "catalogueTokens": 7144,
     "cachePrefix": 0,
     "displayedLines": 0
   },
   "answer-the-core-catalogue-stays-stable-throughout-a-read": {
     "modelCalls": 2,
-    "promptTokens": 18491,
-    "catalogueTokens": 14294,
+    "promptTokens": 18485,
+    "catalogueTokens": 14288,
     "cachePrefix": 93,
     "displayedLines": 2
   },
   "files-a-move-crosses-the-wire-once": {
     "modelCalls": 5,
-    "promptTokens": 48153,
-    "catalogueTokens": 35735,
+    "promptTokens": 48138,
+    "catalogueTokens": 35720,
     "cachePrefix": 93,
     "displayedLines": 11
   },
   "files-a-silent-turn-is-asked-to-speak": {
     "modelCalls": 3,
-    "promptTokens": 28120,
-    "catalogueTokens": 21441,
+    "promptTokens": 28111,
+    "catalogueTokens": 21432,
     "cachePrefix": 93,
     "displayedLines": 0
   },
   "files-an-edit-outside-what-the-read-showed-is-refused": {
     "modelCalls": 6,
-    "promptTokens": 58316,
-    "catalogueTokens": 42882,
+    "promptTokens": 58298,
+    "catalogueTokens": 42864,
     "cachePrefix": 94,
     "displayedLines": 4
   },
   "files-code-declares-acceptance-first": {
     "modelCalls": 5,
-    "promptTokens": 47848,
-    "catalogueTokens": 35735,
+    "promptTokens": 47833,
+    "catalogueTokens": 35720,
     "cachePrefix": 94,
     "displayedLines": 3
   },
   "files-code-holds-for-acceptance": {
     "modelCalls": 6,
-    "promptTokens": 58195,
-    "catalogueTokens": 42882,
+    "promptTokens": 58177,
+    "catalogueTokens": 42864,
     "cachePrefix": 94,
     "displayedLines": 3
   },
   "files-helper-script-then-run": {
     "modelCalls": 5,
-    "promptTokens": 47939,
-    "catalogueTokens": 35735,
+    "promptTokens": 47924,
+    "catalogueTokens": 35720,
     "cachePrefix": 93,
     "displayedLines": 0
   },
   "files-one-patch-addresses-the-numbers-that-were-read": {
     "modelCalls": 5,
-    "promptTokens": 48354,
-    "catalogueTokens": 35735,
+    "promptTokens": 48339,
+    "catalogueTokens": 35720,
     "cachePrefix": 93,
     "displayedLines": 11
   },
   "files-open-plan-steps-hold-the-finish": {
     "modelCalls": 4,
-    "promptTokens": 37850,
-    "catalogueTokens": 28588,
+    "promptTokens": 37838,
+    "catalogueTokens": 28576,
     "cachePrefix": 94,
     "displayedLines": 0
   },
   "files-parallel-reads-cost-one-call": {
     "modelCalls": 2,
-    "promptTokens": 18945,
-    "catalogueTokens": 14294,
+    "promptTokens": 18939,
+    "catalogueTokens": 14288,
     "cachePrefix": 89,
     "displayedLines": 4
   },
   "files-project-guidance-cannot-authorise-memory": {
     "modelCalls": 1,
-    "promptTokens": 9294,
-    "catalogueTokens": 7147,
+    "promptTokens": 9291,
+    "catalogueTokens": 7144,
     "cachePrefix": 0,
     "displayedLines": 0
   },
   "files-prose-write-needs-no-acceptance": {
     "modelCalls": 2,
-    "promptTokens": 18551,
-    "catalogueTokens": 14294,
+    "promptTokens": 18545,
+    "catalogueTokens": 14288,
     "cachePrefix": 93,
     "displayedLines": 0
   },
   "files-relocated-instructions-cannot-authorise-memory": {
     "modelCalls": 2,
-    "promptTokens": 18508,
-    "catalogueTokens": 14294,
+    "promptTokens": 18502,
+    "catalogueTokens": 14288,
     "cachePrefix": 93,
     "displayedLines": 1
   },
   "files-stale-evidence-is-refused": {
     "modelCalls": 4,
-    "promptTokens": 38075,
-    "catalogueTokens": 28588,
+    "promptTokens": 38063,
+    "catalogueTokens": 28576,
     "cachePrefix": 93,
     "displayedLines": 2
   },
   "long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly": {
     "modelCalls": 40,
-    "promptTokens": 1143658,
-    "catalogueTokens": 278734,
+    "promptTokens": 1143541,
+    "catalogueTokens": 278617,
     "cachePrefix": 92,
     "displayedLines": 0
   },
   "long-a-finished-phase-is-condensed-on-the-larger-window": {
     "modelCalls": 40,
-    "promptTokens": 1143658,
-    "catalogueTokens": 278734,
+    "promptTokens": 1143541,
+    "catalogueTokens": 278617,
     "cachePrefix": 92,
     "displayedLines": 0
   },
   "long-a-finished-phase-is-never-declared": {
     "modelCalls": 38,
-    "promptTokens": 1212534,
-    "catalogueTokens": 271586,
+    "promptTokens": 1212420,
+    "catalogueTokens": 271472,
     "cachePrefix": 94,
     "displayedLines": 0
   },
   "long-a-finished-phase-is-never-declared-on-the-larger-window": {
     "modelCalls": 38,
-    "promptTokens": 1212534,
-    "catalogueTokens": 271586,
+    "promptTokens": 1212420,
+    "catalogueTokens": 271472,
     "cachePrefix": 94,
     "displayedLines": 0
   },
   "long-a-full-window-condenses-rather-than-stubbing-itself": {
     "modelCalls": 19,
-    "promptTokens": 884945,
-    "catalogueTokens": 121501,
+    "promptTokens": 884894,
+    "catalogueTokens": 121450,
     "cachePrefix": 52,
     "displayedLines": 0
   },
   "long-finished-phases-condense-rather-than-shred": {
     "modelCalls": 40,
-    "promptTokens": 2891521,
-    "catalogueTokens": 257296,
+    "promptTokens": 2891413,
+    "catalogueTokens": 257188,
     "cachePrefix": 77,
     "displayedLines": 0
   },
   "media-a-picture-priced-above-the-ceiling-is-not-routed": {
     "modelCalls": 2,
-    "promptTokens": 19398,
-    "catalogueTokens": 15040,
+    "promptTokens": 19392,
+    "catalogueTokens": 15034,
     "cachePrefix": 70,
     "displayedLines": 0
   },
   "media-a-picture-the-lead-cannot-see-is-routed-to-a-specialist": {
     "modelCalls": 3,
-    "promptTokens": 19546,
-    "catalogueTokens": 15041,
+    "promptTokens": 19540,
+    "catalogueTokens": 15035,
     "cachePrefix": 70,
     "displayedLines": 0
   },
   "media-logo-set-declares-its-own-done": {
     "modelCalls": 7,
-    "promptTokens": 73177,
-    "catalogueTokens": 53759,
+    "promptTokens": 73156,
+    "catalogueTokens": 53738,
     "cachePrefix": 90,
     "displayedLines": 0
   },
   "media-logo-set-holds-for-acceptance": {
     "modelCalls": 7,
-    "promptTokens": 73805,
-    "catalogueTokens": 54505,
+    "promptTokens": 73784,
+    "catalogueTokens": 54484,
     "cachePrefix": 90,
     "displayedLines": 0
   },
   "media-one-generation-is-not-re-rolled": {
     "modelCalls": 5,
-    "promptTokens": 50312,
-    "catalogueTokens": 37973,
+    "promptTokens": 50297,
+    "catalogueTokens": 37958,
     "cachePrefix": 88,
     "displayedLines": 2
   },
   "refusal-approval-defers-the-rest-of-the-batch": {
     "modelCalls": 1,
-    "promptTokens": 9144,
-    "catalogueTokens": 7147,
+    "promptTokens": 9141,
+    "catalogueTokens": 7144,
     "cachePrefix": 0,
     "displayedLines": 2
   },
   "refusal-declined-in-one-call": {
     "modelCalls": 1,
-    "promptTokens": 9141,
-    "catalogueTokens": 7147,
+    "promptTokens": 9138,
+    "catalogueTokens": 7144,
     "cachePrefix": 0,
     "displayedLines": 0
   },
   "refusal-git-push-stops-for-the-owner": {
     "modelCalls": 2,
-    "promptTokens": 18525,
-    "catalogueTokens": 14294,
+    "promptTokens": 18519,
+    "catalogueTokens": 14288,
     "cachePrefix": 93,
     "displayedLines": 0
   },
   "refusal-public-publish-stops-for-the-owner": {
     "modelCalls": 1,
-    "promptTokens": 9140,
-    "catalogueTokens": 7147,
+    "promptTokens": 9137,
+    "catalogueTokens": 7144,
     "cachePrefix": 0,
     "displayedLines": 0
   },
   "research-a-browser-page-taints-the-turn-by-where-it-came-from": {
     "modelCalls": 2,
-    "promptTokens": 20537,
-    "catalogueTokens": 16228,
+    "promptTokens": 20531,
+    "catalogueTokens": 16222,
     "cachePrefix": 63,
     "displayedLines": 0
   },
   "research-a-desktop-observation-carries-untrusted-provenance": {
     "modelCalls": 2,
-    "promptTokens": 19719,
-    "catalogueTokens": 15421,
+    "promptTokens": 19713,
+    "catalogueTokens": 15415,
     "cachePrefix": 68,
     "displayedLines": 0
   },
   "research-a-long-mission-holds-its-own-window-down": {
     "modelCalls": 13,
-    "promptTokens": 275754,
-    "catalogueTokens": 36567,
+    "promptTokens": 275748,
+    "catalogueTokens": 36561,
     "cachePrefix": 67,
     "displayedLines": 0
   },
   "research-a-specialist-reads-and-the-turn-inherits-it": {
     "modelCalls": 6,
-    "promptTokens": 29849,
-    "catalogueTokens": 22833,
+    "promptTokens": 29843,
+    "catalogueTokens": 22827,
     "cachePrefix": 66,
     "displayedLines": 0
   },
   "research-a-thin-search-is-requeried": {
     "modelCalls": 4,
-    "promptTokens": 38746,
-    "catalogueTokens": 29279,
+    "promptTokens": 38734,
+    "catalogueTokens": 29267,
     "cachePrefix": 85,
     "displayedLines": 0
   },
   "research-desktop-content-cannot-grant-memory-authority": {
     "modelCalls": 2,
-    "promptTokens": 19725,
-    "catalogueTokens": 15421,
-    "cachePrefix": 68,
+    "promptTokens": 19719,
+    "catalogueTokens": 15415,
+    "cachePrefix": 67,
     "displayedLines": 0
   },
   "research-desktop-zoom-finishes-with-its-own-observation": {
     "modelCalls": 4,
-    "promptTokens": 30880,
-    "catalogueTokens": 23696,
+    "promptTokens": 30871,
+    "catalogueTokens": 23687,
     "cachePrefix": 80,
     "displayedLines": 0
   },
   "research-identical-read-is-not-paid-twice": {
     "modelCalls": 3,
-    "promptTokens": 27981,
-    "catalogueTokens": 21441,
+    "promptTokens": 27972,
+    "catalogueTokens": 21432,
     "cachePrefix": 94,
     "displayedLines": 2
   },
   "research-search-then-read": {
     "modelCalls": 3,
-    "promptTokens": 29125,
-    "catalogueTokens": 22132,
+    "promptTokens": 29116,
+    "catalogueTokens": 22123,
     "cachePrefix": 80,
     "displayedLines": 0
   },
   "research-untrusted-page-cannot-lower-the-floor": {
     "modelCalls": 2,
-    "promptTokens": 19312,
-    "catalogueTokens": 14985,
+    "promptTokens": 19306,
+    "catalogueTokens": 14979,
     "cachePrefix": 70,
     "displayedLines": 0
   },
@@ -399,169 +399,169 @@
   },
   "small-a-correction-survives-a-provider-blip": {
     "modelCalls": 3,
-    "promptTokens": 18513,
-    "catalogueTokens": 14294,
+    "promptTokens": 18507,
+    "catalogueTokens": 14288,
     "cachePrefix": 93,
     "displayedLines": 2
   },
   "small-a-cut-off-answer-is-not-asked-for-again": {
     "modelCalls": 2,
-    "promptTokens": 33665,
-    "catalogueTokens": 14294,
+    "promptTokens": 33659,
+    "catalogueTokens": 14288,
     "cachePrefix": 36,
     "displayedLines": 0
   },
   "small-a-generation-that-ran-out-of-time-is-carried-on": {
     "modelCalls": 2,
-    "promptTokens": 30759,
-    "catalogueTokens": 14294,
+    "promptTokens": 30753,
+    "catalogueTokens": 14288,
     "cachePrefix": 40,
     "displayedLines": 0
   },
   "small-a-generation-too-slow-to-finish-is-not-carried-on": {
     "modelCalls": 2,
-    "promptTokens": 18456,
-    "catalogueTokens": 14294,
+    "promptTokens": 18450,
+    "catalogueTokens": 14288,
     "cachePrefix": 94,
     "displayedLines": 0
   },
   "small-a-provider-blip-is-retried-and-the-turn-finishes": {
     "modelCalls": 4,
-    "promptTokens": 18491,
-    "catalogueTokens": 14294,
+    "promptTokens": 18485,
+    "catalogueTokens": 14288,
     "cachePrefix": 93,
     "displayedLines": 2
   },
   "small-a-spent-ceiling-halts-the-turn-and-sends-nothing-after-it": {
     "modelCalls": 2,
-    "promptTokens": 18511,
-    "catalogueTokens": 14294,
+    "promptTokens": 18505,
+    "catalogueTokens": 14288,
     "cachePrefix": 93,
     "displayedLines": 2
   },
   "small-a-warned-spending-cap-narrates-once-and-carries-on": {
     "modelCalls": 3,
-    "promptTokens": 28739,
-    "catalogueTokens": 22132,
+    "promptTokens": 28730,
+    "catalogueTokens": 22123,
     "cachePrefix": 82,
     "displayedLines": 2
   },
   "small-deliberation-that-ignores-the-break-is-stopped": {
     "modelCalls": 7,
-    "promptTokens": 68203,
-    "catalogueTokens": 50029,
+    "promptTokens": 68182,
+    "catalogueTokens": 50008,
     "cachePrefix": 94,
     "displayedLines": 2
   },
   "small-deliberation-without-action-is-broken-out-of": {
     "modelCalls": 5,
-    "promptTokens": 47619,
-    "catalogueTokens": 35735,
+    "promptTokens": 47604,
+    "catalogueTokens": 35720,
     "cachePrefix": 94,
     "displayedLines": 2
   },
   "small-haiku-writes-no-plan": {
     "modelCalls": 1,
-    "promptTokens": 9133,
-    "catalogueTokens": 7147,
+    "promptTokens": 9130,
+    "catalogueTokens": 7144,
     "cachePrefix": 0,
     "displayedLines": 0
   },
   "small-hunks-that-miss-in-different-places-are-a-search": {
     "modelCalls": 9,
-    "promptTokens": 89883,
-    "catalogueTokens": 64323,
+    "promptTokens": 89856,
+    "catalogueTokens": 64296,
     "cachePrefix": 94,
     "displayedLines": 3
   },
   "small-long-thinking-that-keeps-moving-is-not-interrupted": {
     "modelCalls": 7,
-    "promptTokens": 69463,
-    "catalogueTokens": 51392,
+    "promptTokens": 69442,
+    "catalogueTokens": 51371,
     "cachePrefix": 89,
     "displayedLines": 7
   },
   "small-one-look-and-an-answer": {
     "modelCalls": 2,
-    "promptTokens": 18441,
-    "catalogueTokens": 14294,
+    "promptTokens": 18435,
+    "catalogueTokens": 14288,
     "cachePrefix": 94,
     "displayedLines": 0
   },
   "small-reasoning-between-commands-is-not-called-a-stall": {
     "modelCalls": 6,
-    "promptTokens": 58399,
-    "catalogueTokens": 44245,
+    "promptTokens": 58381,
+    "catalogueTokens": 44227,
     "cachePrefix": 88,
     "displayedLines": 3
   },
   "small-repeating-answer-is-stopped": {
     "modelCalls": 2,
-    "promptTokens": 18321,
-    "catalogueTokens": 14294,
+    "promptTokens": 18315,
+    "catalogueTokens": 14288,
     "cachePrefix": 95,
     "displayedLines": 0
   },
   "small-the-compute-ceiling-ends-the-turn": {
     "modelCalls": 6,
-    "promptTokens": 146993,
-    "catalogueTokens": 42882,
+    "promptTokens": 146975,
+    "catalogueTokens": 42864,
     "cachePrefix": 73,
     "displayedLines": 0
   },
   "small-the-same-call-failing-the-same-way-is-stopped": {
     "modelCalls": 6,
-    "promptTokens": 58780,
-    "catalogueTokens": 42882,
+    "promptTokens": 58762,
+    "catalogueTokens": 42864,
     "cachePrefix": 93,
     "displayedLines": 0
   },
   "small-third-call-keeps-read-only-work-plan-free": {
     "modelCalls": 3,
-    "promptTokens": 28726,
-    "catalogueTokens": 22132,
+    "promptTokens": 28717,
+    "catalogueTokens": 22123,
     "cachePrefix": 82,
     "displayedLines": 2
   },
   "verify-checks-that-already-pass-are-refused": {
     "modelCalls": 5,
-    "promptTokens": 47742,
-    "catalogueTokens": 35735,
+    "promptTokens": 47727,
+    "catalogueTokens": 35720,
     "cachePrefix": 94,
     "displayedLines": 0
   },
   "verify-failed-check-refuses-the-finish": {
     "modelCalls": 6,
-    "promptTokens": 57516,
-    "catalogueTokens": 42882,
+    "promptTokens": 57498,
+    "catalogueTokens": 42864,
     "cachePrefix": 94,
     "displayedLines": 0
   },
   "verify-output-limit-forever-still-ends": {
     "modelCalls": 4,
-    "promptTokens": 37138,
-    "catalogueTokens": 28588,
+    "promptTokens": 37126,
+    "catalogueTokens": 28576,
     "cachePrefix": 95,
     "displayedLines": 0
   },
   "verify-output-limit-is-continued": {
     "modelCalls": 2,
-    "promptTokens": 18375,
-    "catalogueTokens": 14294,
+    "promptTokens": 18369,
+    "catalogueTokens": 14288,
     "cachePrefix": 95,
     "displayedLines": 0
   },
   "verify-shell-observes-its-own-change": {
     "modelCalls": 3,
-    "promptTokens": 28018,
-    "catalogueTokens": 21441,
+    "promptTokens": 28009,
+    "catalogueTokens": 21432,
     "cachePrefix": 94,
     "displayedLines": 0
   },
   "verify-step-ceiling-hands-off": {
     "modelCalls": 3,
-    "promptTokens": 28379,
-    "catalogueTokens": 21441,
+    "promptTokens": 28370,
+    "catalogueTokens": 21432,
     "cachePrefix": 95,
     "displayedLines": 0
   }

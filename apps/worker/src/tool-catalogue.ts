@@ -1840,7 +1840,7 @@ export const agentTools: ModelTool[] = [
         answer: {
           type: 'string',
           description:
-            'Complete user-facing answer in Markdown when summary is insufficient. Put the answer here once; ordinary streamed messages are progress.'
+            'Complete user-facing answer when summary is insufficient. Put the answer here once; ordinary streamed messages are progress.'
         },
         deliverables: {
           type: 'array',
