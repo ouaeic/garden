@@ -1,6 +1,6 @@
 import { CAPTURE_GIT_HISTORY } from './project-git-capture.js';
 import { GuiNamespaceManager } from './gui-namespace.js';
-import { ProcessHistoryQuery } from '@garden/contracts';
+import { BrowserTabId, ProcessHistoryQuery } from '@garden/contracts';
 import { RepositoryMapper, registerRepositoryMapRoute } from './repository-map.js';
 import { registerRepositoryGitRoute } from './repository-git.js';
 import { WorkflowManager } from './workflows.js';
@@ -227,7 +227,7 @@ const PrepareAudioRequest = z.object({
 const ReadElementsRequest = z.object({
   /** Scopes the read to one form or panel; omitted, it reads the whole page as a snapshot would. */
   selector: z.string().min(1).max(1_024).optional(),
-  tabId: z.string().min(1).max(32).optional()
+  tabId: BrowserTabId.optional()
 });
 const WebSearchRequest = z.object({
   query: z.string().min(1).max(500),
@@ -238,7 +238,7 @@ const PrintPdfRequest = z.object({
   format: z.enum(['A4', 'A3', 'A5', 'Letter', 'Legal', 'Tabloid']).default('A4'),
   landscape: z.boolean().default(false),
   printBackground: z.boolean().default(true),
-  tabId: z.string().min(1).max(32).optional()
+  tabId: BrowserTabId.optional()
 });
 
 /** A query value that has to be a count. Anything else is treated as if it had not been sent. */

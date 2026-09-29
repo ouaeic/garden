@@ -54,11 +54,35 @@ const offscreen = (left: boolean) => (left ? -48 : innerWidth + 48);
 const flight = (from: { x: number; y: number }, x: number, y: number, speed: number) =>
   Math.max(600, Math.hypot(x - from.x, y - from.y) / speed);
 
-function visible(element: Element | null) {
+/** An edge a creature can stand on or hide behind, with the element it belongs to. */
+type Ledge = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  element: Element;
+};
+
+/**
+ * An element whose top edge is really on show: inside the window, and not covered by a sheet or a
+ * panel or scrolled out of its own card. Checked where a creature would stand, by asking the page
+ * what is at three points just under the edge and just over it - so an edge behind a dialog, or
+ * one a scroller has clipped away, is never somewhere to go.
+ */
+function visible(element: Element | null): Ledge | null {
   if (!element) return null;
   const box = element.getBoundingClientRect();
   if (box.width === 0 || box.bottom < 40 || box.top > innerHeight - 40) return null;
-  return box;
+  for (const share of [0.2, 0.5, 0.8]) {
+    const x = box.left + box.width * share;
+    const under = document.elementFromPoint(x, Math.min(box.bottom - 1, box.top + 3));
+    if (!under || !(under === element || element.contains(under))) return null;
+    const over = document.elementFromPoint(x, Math.max(0, box.top - 8));
+    if (over?.closest('dialog, [role="dialog"], [aria-modal="true"]')) return null;
+  }
+  const { left, top, right, bottom, width } = box;
+  return { left, top, right, bottom, width, element };
 }
 
 /** Card edges a creature can stand on: wide enough, fully on screen, below the masthead. */
@@ -67,7 +91,7 @@ function ledges() {
   return [...document.querySelectorAll('[data-perch], .desk-card, .desk-work-card')]
     .filter((element) => !element.closest('dialog'))
     .map((element) => visible(element))
-    .filter((box): box is DOMRect =>
+    .filter((box): box is Ledge =>
       Boolean(box && box.top > bar + 20 && box.width > 140 && box.right < innerWidth - 8)
     );
 }
@@ -152,7 +176,26 @@ export default function GardenLife() {
       state.delete(id);
       escapes.delete(id);
       lives.delete(id);
+      anchors.delete(id);
       commit();
+    };
+    /**
+     * What each creature is standing on or tucked behind, and where that edge was when it got
+     * there. A creature in the air has none. The watch below compares the two, so a creature never
+     * goes on standing on an edge that has moved, been covered, or belongs to the page just left.
+     */
+    const anchors = new Map<number, { element: Element; edge: 'top' | 'bottom'; at: number }>();
+    const anchor = (
+      id: number,
+      element: Element | null | undefined,
+      edge: 'top' | 'bottom' = 'top'
+    ) => {
+      if (!element || life(id).cancelled) {
+        anchors.delete(id);
+        return;
+      }
+      const box = element.getBoundingClientRect();
+      anchors.set(id, { element, edge, at: edge === 'top' ? box.top : box.bottom });
     };
     const offset = (actor: Actor) => (actor.clip?.side === 'below' ? actor.clip.line : 0);
     const settle = () => new Promise<void>((done) => requestAnimationFrame(() => done()));
@@ -225,6 +268,40 @@ export default function GardenLife() {
         .catch(() => undefined)
         .finally(() => remove(id));
     };
+    /**
+     * Off at once, by the shortest way out of sight, because the place it was standing has gone:
+     * back behind the border it is tucked behind, or else off the nearer side of the screen.
+     */
+    const evacuate = (id: number) => {
+      const own = lives.get(id);
+      if (!own || own.cancelled) return;
+      own.cancelled = true;
+      anchors.delete(id);
+      const node = nodes.current.get(id);
+      const here = where(id);
+      node?.getAnimations().forEach((running) => running.cancel());
+      const actor = state.get(id);
+      if (!actor || !here) {
+        remove(id);
+        return;
+      }
+      state.set(id, { ...actor, x: here.x, y: here.y });
+      if (node) node.style.transform = `translate3d(${here.x}px, ${here.y - offset(actor)}px, 0)`;
+      const height = node?.getBoundingClientRect().height ?? 24;
+      const leave = actor.clip
+        ? travel(
+            id,
+            here.x,
+            actor.clip.side === 'above' ? actor.clip.line + 2 : actor.clip.line - height - 2,
+            220,
+            { easing: 'cubic-bezier(0.5, 0, 0.9, 0.5)', force: true }
+          )
+        : travel(id, offscreen(here.x < innerWidth / 2), here.y - 60, 450, {
+            easing: 'cubic-bezier(0.3, 0, 0.2, 1)',
+            force: true
+          });
+      void leave.catch(() => undefined).finally(() => remove(id));
+    };
     const pointer = { x: -9999, y: -9999 };
     /** Away from the pointer, and on until it is past the nearest edge of the screen. */
     const flee = (id: number, frames: Frames, ms: number, patch: Partial<Actor> = {}) => {
@@ -258,17 +335,25 @@ export default function GardenLife() {
     const brandBox = () => visible(document.querySelector('.garden-masthead .brand'));
 
     /** Places a bird or an owl can land: card edges and, on top of the word, the logo. */
-    type Perch = { left: number; right: number; y: number };
+    type Perch = { left: number; right: number; y: number; element: Element };
     const perches = (height: number, logo: boolean): Perch[] => {
       const brand = brandBox();
       return [
         ...ledges().map((box) => ({
           left: box.left + 12,
           right: box.right - 36,
-          y: box.top - height
+          y: box.top - height,
+          element: box.element
         })),
         ...(logo && brand
-          ? [{ left: brand.left, right: brand.right - 18, y: brand.top - height + 4 }]
+          ? [
+              {
+                left: brand.left,
+                right: brand.right - 18,
+                y: brand.top - height + 4,
+                element: brand.element
+              }
+            ]
           : [])
       ];
     };
@@ -293,6 +378,7 @@ export default function GardenLife() {
         // A swoop down under the straight line, and up onto the perch.
         await travel(id, x, perch.y, flight(at(id), x, perch.y, 0.4), { arc: -between(20, 50) });
         pose(id, { frames: sparrow.perch, fps: 4 });
+        anchor(id, perch.element);
         chirp('tweet');
         const potter = async (turns: number) => {
           for (let turn = 0; turn < turns; turn++) {
@@ -327,13 +413,16 @@ export default function GardenLife() {
           perch = pick(others)!;
           x = between(perch.left, perch.right);
           pose(id, { frames: sparrow.fly, fps: 8 });
+          anchor(id, null);
           await travel(id, x, perch.y, flight(at(id), x, perch.y, 0.35), {
             arc: between(40, 80)
           });
           pose(id, { frames: sparrow.perch, fps: 4 });
+          anchor(id, perch.element);
           await potter(2 + Math.floor(Math.random() * 2));
         }
         pose(id, { frames: sparrow.fly, fps: 8 });
+        anchor(id, null);
         const away = offscreen(chance(0.5));
         const high = Math.max(-40, perch.y - 220);
         await travel(id, away, high, flight(at(id), away, high, 0.45), { arc: 30 });
@@ -358,10 +447,12 @@ export default function GardenLife() {
         // Wide and silent: a long glide in, a few slow beats, and it settles.
         await travel(id, x, perch.y, flight(at(id), x, perch.y, 0.22), { arc: -30 });
         pose(id, { frames: owl.perch, fps: 0.4 });
+        anchor(id, perch.element);
         await wait(between(4000, 7000), own);
         pose(id, { flip: true });
         await wait(between(3000, 6000), own);
         pose(id, { frames: owl.fly, fps: 3, flip: false });
+        anchor(id, null);
         const away = offscreen(!fromLeft);
         await travel(id, away, perch.y - 160, flight(at(id), away, perch.y - 160, 0.25), {
           arc: 20
@@ -371,11 +462,15 @@ export default function GardenLife() {
       async butterflyVisit() {
         const plants = [...document.querySelectorAll('.status-sprite.stage-bloom')]
           .map((element) => visible(element))
-          .filter((box): box is DOMRect => Boolean(box));
+          .filter((box): box is Ledge => Boolean(box));
         const flowers = plants.length ? plants : ledges();
         const first = pick(flowers);
         if (!first) return;
-        const spot = (box: DOMRect) => ({ x: box.left + box.width / 2 - 9, y: box.top - 12 });
+        const spot = (box: Ledge) => ({
+          x: box.left + box.width / 2 - 9,
+          y: box.top - 12,
+          element: box.element
+        });
         let target = spot(first);
         const fromLeft = target.x < innerWidth / 2;
         const id = spawn({
@@ -395,9 +490,15 @@ export default function GardenLife() {
           });
           // Resting: wings fold and open slowly.
           pose(id, { frames: butterfly.slice(0, 3), fps: 1.5 });
+          anchor(id, target.element);
           await wait(between(2500, 5000), own);
           pose(id, { frames: butterfly, fps: 10 });
-          target = spot(pick(flowers.filter((box) => box !== first)) ?? first);
+          anchor(id, null);
+          // Only on to a flower that is still on show; otherwise straight off.
+          const nextBox = pick(flowers.filter((box) => box !== first));
+          const fresh = nextBox ? visible(nextBox.element) : null;
+          if (!fresh) break;
+          target = spot(fresh);
         }
         const away = offscreen(!fromLeft);
         const high = Math.max(-40, at(id).y - 240);
@@ -409,16 +510,17 @@ export default function GardenLife() {
       },
       async monkeyTour() {
         if (narrow()) return;
-        const bar = document.querySelector('.garden-masthead')?.getBoundingClientRect();
+        const masthead = document.querySelector('.garden-masthead');
+        const bar = masthead?.getBoundingClientRect();
         const cards = ledges();
-        if (!bar || !cards.length) return;
+        if (!masthead || !bar || !cards.length) return;
         /*
          * Out from behind one border, a leap or two between card edges, and back behind another -
          * the masthead's lower edge (it climbs up out of sight) or a card's top edge (it sinks).
          * Frightened, it takes the nearest of those at once.
          */
-        type Spot = { x: number; y: number; hang: boolean; clip: Clip; box?: DOMRect };
-        const onCard = (box: DOMRect): Spot => ({
+        type Spot = { x: number; y: number; hang: boolean; clip: Clip; box?: Ledge };
+        const onCard = (box: Ledge): Spot => ({
           x: box.left + between(24, Math.max(30, box.width - 60)),
           y: box.top - 24,
           hang: false,
@@ -433,6 +535,8 @@ export default function GardenLife() {
         });
         const hidden = (spot: Spot) => (spot.hang ? spot.y - 30 : spot.y + 26);
         const start = chance(0.5) ? onBar() : onCard(pick(cards)!);
+        const hold = (spot: Spot) =>
+          spot.hang ? anchor(id, masthead, 'bottom') : anchor(id, spot.box?.element);
         const id = spawn({
           kind: 'monkey',
           frames: start.hang ? monkey.hang : monkey.sit,
@@ -453,6 +557,7 @@ export default function GardenLife() {
             force: true
           });
         });
+        hold(start);
         await travel(id, start.x, start.y, 520, { easing: 'cubic-bezier(0.2, 0.9, 0.3, 1.15)' });
         await wait(900, own);
         pose(id, { frames: start.hang ? monkey.wave : monkey.blink, fps: 1 });
@@ -460,14 +565,19 @@ export default function GardenLife() {
         await wait(900, own);
         const leaps = 1 + Math.floor(Math.random() * 3);
         for (let leap = 0; leap < leaps; leap++) {
-          const box = pick(cards.filter((card) => card !== here.box)) ?? pick(cards)!;
+          // Only to an edge on show right now, not one from when the visit began.
+          const now = ledges();
+          const box = pick(now.filter((card) => card.element !== here.box?.element)) ?? pick(now);
+          if (!box) break;
           const next = onCard(box);
           // Free of any border while it is in the air.
           pose(id, { frames: monkey.jump, clip: undefined });
+          anchor(id, null);
           await travel(id, next.x, next.y, 700 + Math.abs(next.x - here.x) * 0.6, {
             arc: 70 + Math.random() * 50
           });
           here = next;
+          hold(here);
           pose(id, { frames: monkey.sit, fps: 2 });
           await wait(between(700, 1400), own);
           pose(id, { frames: pick([monkey.scratch, monkey.blink, monkey.sit])!, fps: 3 });
@@ -476,8 +586,10 @@ export default function GardenLife() {
         const exit = chance(0.4) ? onBar() : here;
         if (exit !== here) {
           pose(id, { frames: monkey.jump, clip: undefined });
+          anchor(id, null);
           await travel(id, exit.x, exit.y, 900, { arc: 30 });
           here = exit;
+          hold(here);
           pose(id, { frames: monkey.hang, fps: 2 });
           await wait(700, own);
         }
@@ -505,6 +617,7 @@ export default function GardenLife() {
           clip: { side: 'above', line }
         });
         duck(id, () => line, 16, 600);
+        anchor(id, box.element);
         const own = life(id);
         await travel(id, start, line - 13, 900, { easing: 'ease-out' });
         pose(id, { clip: undefined });
@@ -526,7 +639,8 @@ export default function GardenLife() {
       },
       async batVisit() {
         if (!isNight()) return;
-        const bar = document.querySelector('.garden-masthead')?.getBoundingClientRect();
+        const masthead = document.querySelector('.garden-masthead');
+        const bar = masthead?.getBoundingClientRect();
         const flit = async (id: number, fromLeft: boolean) => {
           let x = at(id).x;
           for (let leg = 0; leg < 3; leg++) {
@@ -556,9 +670,11 @@ export default function GardenLife() {
             pose(id, { clip: { side: 'below', line }, frames: batHanging }, true);
             await travel(id, x, line - 16, 260, { easing: 'ease-in', force: true });
           });
+          anchor(id, masthead, 'bottom');
           await travel(id, x, line - 1, 900, { easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)' });
           await wait(between(4000, 9000), own);
           pose(id, { frames: bat, fps: 10, clip: undefined });
+          anchor(id, null);
           flee(id, bat, 600);
           await travel(id, x, line + 40, 400, { easing: 'ease-in' });
           await flit(id, x < innerWidth / 2);
@@ -595,6 +711,7 @@ export default function GardenLife() {
           clip: { side: 'above', line }
         });
         duck(id, () => line, 16, 260);
+        anchor(id, box.element);
         const own = life(id);
         await travel(id, x, line - 5, 500, { easing: 'ease-out' });
         await wait(between(900, 1800), own);
@@ -624,16 +741,21 @@ export default function GardenLife() {
           }
         };
         await hopAlong(2 + Math.floor(Math.random() * 3));
-        const across = cards.filter((card) => card !== box && Math.abs(card.left - x) < 600);
+        // Across only to an edge on show right now.
+        const across = ledges().filter(
+          (card) => card.element !== box!.element && Math.abs(card.left - x) < 600
+        );
         if (across.length && chance(0.35)) {
           box = pick(across)!;
           const next = box.left + between(20, box.width * 0.6);
           await wait(between(400, 900), own);
           pose(id, { frames: frog.leap });
+          anchor(id, null);
           await travel(id, next, box.top - 14, 700 + Math.abs(next - x) * 0.5, {
             arc: between(50, 90)
           });
           pose(id, { frames: frog.sit });
+          anchor(id, box.element);
           x = next;
           line = box.top;
           await hopAlong(1 + Math.floor(Math.random() * 2));
@@ -661,6 +783,7 @@ export default function GardenLife() {
           clip: { side: 'above', line }
         });
         duck(id, () => line, 12, 500);
+        anchor(id, box.element);
         const own = life(id);
         await travel(id, x, line - 10, 900, { easing: 'ease-out' });
         pose(id, { clip: undefined, turn: rightward ? 90 : -90 });
@@ -686,6 +809,7 @@ export default function GardenLife() {
           await wait(between(300, 1200), own);
         }
         pose(id, { frames: ladybirdFlying, fps: 14, turn: 0 });
+        anchor(id, null);
         await wait(500, own);
         const away = offscreen(rightward);
         await travel(id, (x + away) / 2, line - between(100, 180), 1400, { sway: 14 });
@@ -721,6 +845,29 @@ export default function GardenLife() {
     // Capture, so a tap that lands on a button still counts.
     addEventListener('pointerdown', onPointer, { passive: true, capture: true });
 
+    /*
+     * Four times a second, while anyone is out: a creature whose edge has moved, been covered or
+     * gone - a sheet opened over it, the card scrolled, the page changed - leaves at once rather
+     * than standing on nothing. A new page sends everyone off, since every edge they knew was the
+     * last page's.
+     */
+    let page = location.href;
+    const watch = setInterval(() => {
+      const turned = location.href !== page;
+      page = location.href;
+      if (!state.size) return;
+      for (const id of [...state.keys()]) {
+        if (turned) {
+          evacuate(id);
+          continue;
+        }
+        const held = anchors.get(id);
+        if (!held) continue;
+        const box = held.element.isConnected ? held.element.getBoundingClientRect() : null;
+        const edge = box ? (held.edge === 'top' ? box.top : box.bottom) : Number.NaN;
+        if (!box || !(Math.abs(edge - held.at) <= 2) || !visible(held.element)) evacuate(id);
+      }
+    }, 250);
     const active = new Set<string>();
     const left = new Map<string, number>();
     const run = (scene: string) => {
@@ -771,6 +918,7 @@ export default function GardenLife() {
     return () => {
       world.cancelled = true;
       clearInterval(tick);
+      clearInterval(watch);
       clearTimeout(hello);
       cancelAnimationFrame(measuring);
       removeEventListener('pointermove', onPointer);

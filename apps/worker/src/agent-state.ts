@@ -32,6 +32,12 @@ export interface AgentState {
    * that walking in a circle between two providers that are both having a bad afternoon.
    */
   walledProviders?: string[];
+  /**
+   * The models this task has been walled by on their own, when the provider said the limit was the
+   * model's host rather than the account - a new release behind one saturated zero-retention
+   * endpoint, say. The rest of that provider is still open to a re-route; these are not.
+   */
+  walledModels?: string[];
   pendingNativeInputs?: NativeInputReference[];
   nativeInputApprovals?: Record<string, NativeInputApproval>;
   mediaApprovals?: Record<string, MediaGenerationApproval>;

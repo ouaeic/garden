@@ -51,6 +51,8 @@ import {
   applyOpenRouterPrivacyPolicy,
   refreshOpenRouterCatalog,
   planUsageFor,
+  type PlanUsage,
+  vendorPreset,
   resolveVisionInputRoutes,
   seedModels
 } from '@garden/model-gateway';
@@ -125,10 +127,61 @@ export const createServerSupport = (context: ServerBase) => {
    * not answer arrives as null - the strip renders nothing for it - because an outage should
    * cost the owner a missing number, not their first paint.
    */
-  const planUsage = async (userId: string) => {
-    const { secret, configured } = await inferenceCredential(userId);
-    if (!configured) return null;
-    return planUsageFor(secret.provider, secret.apiKey);
+  /**
+   * One connection's balance, held for a minute: the strip is drawn on every bootstrap and the
+   * settings list on every visit, and neither is worth a request to each provider every time.
+   */
+  const balances = new Map<string, { at: number; key: string; usage: PlanUsage | null }>();
+  const connectionUsage = async (connectionId: string, secret: InferenceSecret) => {
+    const key = `${secret.baseUrl}\n${secret.apiKey ?? ''}`;
+    const held = balances.get(connectionId);
+    if (held && held.key === key && Date.now() - held.at < 60_000) return held.usage;
+    const usage = await planUsageFor(
+      secret.provider,
+      secret.apiKey,
+      overrides.modelCatalogFetch ?? globalThis.fetch,
+      secret.baseUrl
+    );
+    balances.set(connectionId, { at: Date.now(), key, usage });
+    return usage;
+  };
+  /** The name a connection goes by on the strip, the same one the settings list shows. */
+  const connectionName = (secret: InferenceSecret) =>
+    secret.label ??
+    vendorPreset(secret.vendor)?.label ??
+    vendorForEndpoint(secret.baseUrl)?.label ??
+    (secret.provider === 'openrouter'
+      ? 'OpenRouter'
+      : secret.provider === 'ollama-cloud'
+        ? 'Ollama Cloud'
+        : new URL(secret.baseUrl).hostname);
+  /**
+   * What every connected provider's own account endpoint says, read live so the strip beside CPU
+   * and RAM is each plan's current state rather than this box's own bookkeeping. With several
+   * connections, each window carries the name of the one it came from. A provider that will not
+   * answer, or publishes no balance, contributes nothing - an outage should cost the owner a
+   * missing number, not their first paint.
+   */
+  const planUsage = async (userId: string): Promise<PlanUsage | null> => {
+    const connections = [...(await inferenceConnections(userId))];
+    if (!connections.length) return null;
+    const read = await Promise.all(
+      connections.map(async ([id, entry]) => ({
+        name: connectionName(entry.secret),
+        usage: await connectionUsage(id, entry.secret)
+      }))
+    );
+    const windows = read.flatMap(({ name, usage }) =>
+      (usage?.windows ?? []).map((window) =>
+        connections.length > 1 ? { ...window, connection: name } : window
+      )
+    );
+    if (!windows.length) return null;
+    return {
+      provider: read.find((entry) => entry.usage)?.usage?.provider ?? 'several',
+      windows,
+      queriedAt: new Date().toISOString()
+    };
   };
 
   /**
@@ -679,6 +732,11 @@ export const createServerSupport = (context: ServerBase) => {
       enforceZeroDataRetention: secret.enforceZeroDataRetention,
       mediaModels: secret.mediaModels ?? null,
       webSearch: webSearchRoute(secret),
+      name: connectionName(secret),
+      usage:
+        source === 'server_environment' && !secret.apiKey
+          ? null
+          : await connectionUsage(connectionId, secret),
       ...(secret.catalogDefaults ?? (await configuredModelFacts(secret.modelId, connectionId)))
     });
     const listed = await Promise.all(

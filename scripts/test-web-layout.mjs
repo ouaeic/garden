@@ -2930,8 +2930,9 @@ try {
     await revealDefaults();
     await modelsPage.getByRole('heading', { name: 'Model defaults', exact: true }).waitFor();
     await pick(modelsPage, 'Condensing long work', 'openrouter/alpha/model-78');
+    // Connected providers are rows; a row opens that connection's settings.
     await modelsPage.getByRole('button', { name: 'Compatible endpoint', exact: true }).click();
-    await modelsPage.getByRole('combobox', { name: 'Provider', exact: true }).waitFor();
+    await modelsPage.getByLabel('Endpoint URL', { exact: true }).waitFor();
     const accessibility = await context.newCDPSession(modelsPage);
     const tree = await accessibility.send('Accessibility.getFullAXTree');
     assert(tree.nodes.length > 0, 'The browser must expose an accessibility tree');
@@ -2966,10 +2967,10 @@ try {
       '98304'
     );
     assert.equal(await modelsPage.getByLabel(/^API key/).inputValue(), '');
+    // Across to another connection and back, which opens each one's own form in turn.
     await modelsPage.getByRole('button', { name: 'Ollama Cloud', exact: true }).click();
-    await modelsPage
-      .getByRole('combobox', { name: 'Provider', exact: true })
-      .selectOption('openai-compatible');
+    assert.equal(await modelsPage.getByLabel('Endpoint URL', { exact: true }).count(), 0);
+    await modelsPage.getByRole('button', { name: 'Compatible endpoint', exact: true }).click();
     await modelsPage.getByLabel(/^Restrict to model ID/).fill('');
     await modelsPage.getByLabel('Context window in tokens', { exact: true }).fill('65536');
     await modelsPage.getByRole('button', { name: 'Verify and save', exact: true }).click();
@@ -3074,6 +3075,9 @@ try {
     await modelsPage
       .getByRole('button', { name: 'image model: Image Studio', exact: true })
       .waitFor();
+    // Settings open with every connection closed; the saved endpoint is one row away.
+    assert.equal(await modelsPage.getByLabel('Endpoint URL', { exact: true }).count(), 0);
+    await modelsPage.getByRole('button', { name: 'Compatible endpoint', exact: true }).click();
     assert.equal(
       await modelsPage.getByLabel('Endpoint URL', { exact: true }).inputValue(),
       'https://compatible.example/v1'
@@ -3123,6 +3127,7 @@ try {
       ['Research models', 'research-models.example']
     ]) {
       await modelsPage.getByRole('button', { name: 'Add a provider', exact: true }).click();
+      await modelsPage.getByRole('button', { name: 'Other endpoint', exact: true }).click();
       await modelsPage.getByLabel('Connection name', { exact: true }).fill(label);
       await modelsPage.getByLabel('Endpoint URL', { exact: true }).fill(`https://${host}/v1`);
       await modelsPage.getByLabel('API key', { exact: true }).fill('synthetic-account-key');

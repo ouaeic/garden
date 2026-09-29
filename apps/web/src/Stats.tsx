@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Gauge, HardDrive, MemoryStick } from './icons';
 import type { Workspace } from '@garden/contracts';
 import type { Bootstrap } from './model';
-import { bytes, money } from './model';
+import { bytes, dollarsLeft, money } from './model';
 import { Button } from './ui';
 
 export default function Stats({
@@ -141,8 +141,7 @@ function StatsContent({
           <h3>Limits &amp; credits</h3>
           <div className="garden-computer-status">
             {plan?.windows.map((window, index) => {
-              const remaining =
-                window.limit !== null && window.used !== null ? window.limit - window.used : null;
+              const remaining = dollarsLeft(window);
               const label = window.label.startsWith('Session')
                 ? 'Session'
                 : window.label.startsWith('Weekly')
@@ -152,6 +151,9 @@ function StatsContent({
                     : window.label === 'Key limit'
                       ? 'Key'
                       : window.label;
+              const named = window.connection
+                ? `${window.connection} ${label.toLowerCase()}`
+                : label;
               const shown =
                 window.unit === 'usd'
                   ? remaining === null
@@ -164,12 +166,14 @@ function StatsContent({
                     : `${Math.round(window.used * 100)}%`;
               const detail =
                 window.unit === 'usd'
-                  ? `${window.label}: ${window.used === null ? 'spend unavailable' : `${money(window.used)} used`}${window.limit === null ? ', no limit set' : ` of ${money(window.limit)}`}`
+                  ? window.used === null && remaining !== null
+                    ? `${window.connection ? `${window.connection} ` : ''}${window.label}: ${money(remaining)} left`
+                    : `${window.label}: ${window.used === null ? 'spend unavailable' : `${money(window.used)} used`}${window.limit === null ? ', no limit set' : ` of ${money(window.limit)}`}`
                   : `${window.label}: ${window.used === null ? 'unavailable' : `${Math.round(window.used * 100)}% of plan`}${window.resetsAt ? `, resets at ${new Date(window.resetsAt).toLocaleString()}` : ''}`;
               return (
                 <span key={`${window.label}-${index}`} title={detail}>
                   <Gauge size={13} />
-                  {label} {shown}
+                  {named} {shown}
                 </span>
               );
             })}

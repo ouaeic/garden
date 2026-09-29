@@ -1895,9 +1895,10 @@ export type UpdateTaskScheduleRequest = z.input<typeof UpdateTaskScheduleRequest
 
 /**
  * A tab identity handed out by the runner. It is bound to the page itself, so it survives
- * navigation, reordering and other tabs closing — none of which is true of a strip position.
+ * navigation, reordering and other tabs closing — none of which is true of a strip position. The
+ * ceiling has room for the `tab-<uuid>` the runner gives every tab after the first.
  */
-export const BrowserTabId = z.string().min(1).max(32);
+export const BrowserTabId = z.string().min(1).max(64);
 export type BrowserTabId = z.infer<typeof BrowserTabId>;
 
 /**

@@ -109,3 +109,54 @@ describe('what an Ollama Cloud plan has left', () => {
     ]);
   });
 });
+
+describe('balances from a model company’s own account endpoint', () => {
+  it('shows a DeepSeek dollar balance and ignores other currencies', async () => {
+    const answer = (infos: unknown) => async () =>
+      new Response(JSON.stringify({ is_available: true, balance_infos: infos }));
+    const usd = await planUsageFor(
+      'openai-compatible',
+      'key',
+      answer([
+        { currency: 'CNY', total_balance: '80.00' },
+        { currency: 'USD', total_balance: '12.50' }
+      ]) as typeof fetch,
+      'https://api.deepseek.com/v1'
+    );
+    expect(usd?.windows).toEqual([
+      expect.objectContaining({ label: 'Credit balance', remaining: 12.5, unit: 'usd' })
+    ]);
+    const yuanOnly = await planUsageFor(
+      'openai-compatible',
+      'key',
+      answer([{ currency: 'CNY', total_balance: '80.00' }]) as typeof fetch,
+      'https://api.deepseek.com/v1'
+    );
+    expect(yuanOnly).toBeNull();
+  });
+
+  it('shows a Moonshot balance, and nothing for a company that publishes none', async () => {
+    const moonshot = await planUsageFor(
+      'openai-compatible',
+      'key',
+      (async () =>
+        new Response(
+          JSON.stringify({ code: 0, data: { available_balance: 4.2 } })
+        )) as typeof fetch,
+      'https://api.moonshot.ai/v1'
+    );
+    expect(moonshot?.windows[0]).toMatchObject({ remaining: 4.2 });
+    let asked = false;
+    const anthropic = await planUsageFor(
+      'openai-compatible',
+      'key',
+      (async () => {
+        asked = true;
+        return new Response('{}');
+      }) as typeof fetch,
+      'https://api.anthropic.com/v1'
+    );
+    expect(anthropic).toBeNull();
+    expect(asked).toBe(false);
+  });
+});

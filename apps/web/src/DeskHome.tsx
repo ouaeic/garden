@@ -2,7 +2,15 @@ import { useState, type ReactNode } from 'react';
 import { ArrowUpRight, Clock3, Plus } from './icons';
 import type { Project, Task, Workspace } from '@garden/contracts';
 import type { Bootstrap } from './model';
-import { bytes, hasOngoingWork, money, needsAttention, shortDate, taskStatusLabel } from './model';
+import {
+  bytes,
+  dollarsLeft,
+  hasOngoingWork,
+  money,
+  needsAttention,
+  shortDate,
+  taskStatusLabel
+} from './model';
 import ScrollRegion from './ScrollRegion';
 import StatusSprite, { projectStage, stageOf } from './life/StatusSprite';
 import { Button } from './ui';
@@ -24,24 +32,28 @@ function Meter({
   label,
   value,
   total,
-  text
+  text,
+  title
 }: {
   label: string;
   value: number;
-  total: number;
+  /** Null when only the amount left is known, so there is nothing to fill a bar against. */
+  total: number | null;
   text: string;
+  title?: string;
 }) {
   return (
     <div
       className="meter"
       role="meter"
-      aria-label={label}
+      aria-label={title ?? label}
       aria-valuenow={value}
       aria-valuemin={0}
-      aria-valuemax={total}
+      {...(total === null ? {} : { 'aria-valuemax': total })}
+      title={title}
     >
       <span>{label}</span>
-      <Blocks value={value} total={total} />
+      {total !== null && <Blocks value={value} total={total} />}
       <small>{text}</small>
     </div>
   );
@@ -126,7 +138,11 @@ export default function DeskHome({
   });
   const busiest = Math.max(1, ...days.map((day) => day.count));
   const computer = bootstrap.computer;
-  const credit = bootstrap.usage.plan?.windows.find((window) => window.unit === 'usd');
+  // The tightest balance across every connected provider, since that is the one that stops work.
+  const credit = (bootstrap.usage.plan?.windows ?? [])
+    .map((window) => ({ window, left: dollarsLeft(window) }))
+    .filter((entry): entry is { window: typeof entry.window; left: number } => entry.left !== null)
+    .sort((a, b) => a.left - b.left)[0];
   const diskUsed =
     workspace?.hostStorageTotalBytes && workspace.hostStorageAvailableBytes !== undefined
       ? workspace.hostStorageTotalBytes - workspace.hostStorageAvailableBytes
@@ -194,12 +210,13 @@ export default function DeskHome({
               text={`${bytes(workspace.hostStorageAvailableBytes!)} free`}
             />
           )}
-          {credit && credit.limit !== null && credit.used !== null && (
+          {credit && (
             <Meter
               label="Credit"
-              value={credit.limit - credit.used}
-              total={credit.limit}
-              text={`${money(credit.limit - credit.used)} left`}
+              value={credit.left}
+              total={credit.window.limit}
+              text={`${money(credit.left)} left`}
+              title={`${credit.window.connection ? `${credit.window.connection} ` : ''}${credit.window.label.toLowerCase()}: ${money(credit.left)} left`}
             />
           )}
         </span>

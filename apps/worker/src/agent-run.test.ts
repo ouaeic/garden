@@ -9664,6 +9664,7 @@ describe('a task walled on one provider while another is connected', () => {
     catalogue?: ModelRelease[];
     connections?: string[];
     already?: string[];
+    error?: GardenError;
   }) => {
     const task = {
       ...makeTask({
@@ -9688,7 +9689,7 @@ describe('a task walled on one provider while another is connected', () => {
     });
     await new AgentWorker(probe.store, config(), masterKey, runnerSecret, silentLogger).fail(
       task,
-      new GardenError('provider_quota_exhausted', 'The provider is out of quota')
+      options.error ?? new GardenError('provider_quota_exhausted', 'The provider is out of quota')
     );
     return { probe, moves };
   };
@@ -9715,6 +9716,51 @@ describe('a task walled on one provider while another is connected', () => {
       dataKey
     );
     expect(state.walledProviders).toEqual(['custom']);
+  });
+
+  it('steps around one model whose host is rate-limited, on the same provider', async () => {
+    const busy: ModelRelease = {
+      ...elsewhere,
+      id: 'openrouter/vendor/busy',
+      providerModelId: 'vendor/busy',
+      displayName: 'Busy Model'
+    };
+    const { probe, moves } = await walled({
+      on: busy,
+      catalogue: [busy, elsewhere],
+      connections: ['openrouter'],
+      error: new GardenError(
+        'provider_quota_exhausted',
+        'openrouter request failed (429): vendor/busy is temporarily rate-limited upstream',
+        429,
+        { limitScope: 'model' }
+      )
+    });
+    expect(moves).toHaveLength(1);
+    expect(moves[0]).toMatchObject({ modelId: elsewhere.id });
+    expect(probe.checkpoints).toHaveLength(0);
+    const state = decryptJson<{ walledProviders?: string[]; walledModels?: string[] }>(
+      moves[0]?.agentStateCiphertext as never,
+      dataKey
+    );
+    // The account was never the problem, so the provider stays open and only the model is set aside.
+    expect(state.walledProviders).toEqual([]);
+    expect(state.walledModels).toEqual([busy.id]);
+    const told = probe.events
+      .filter((entry) => (entry.payload as { owner?: unknown } | undefined)?.owner === true)
+      .map((entry) => entry.summary);
+    expect(told.at(-1)).toContain('rate-limited at its host');
+  });
+
+  it('keeps an account-wide limit on the whole provider', async () => {
+    const busy: ModelRelease = { ...elsewhere, id: 'openrouter/vendor/busy', displayName: 'Busy' };
+    const { probe, moves } = await walled({
+      on: busy,
+      catalogue: [busy, elsewhere],
+      connections: ['openrouter']
+    });
+    expect(moves).toHaveLength(0);
+    expect(probe.checkpoints).toMatchObject([{ status: 'awaiting_resource' }]);
   });
 
   it('parks rather than returning to a provider that has already walled this turn', async () => {

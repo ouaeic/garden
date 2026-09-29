@@ -32,6 +32,7 @@ export * from './openrouter-generation.js';
 
 export * from './adapter.js';
 export * from './vendors.js';
+export { withListPrices, listPriceName } from './list-prices.js';
 export { isNativeAnthropicEndpoint, anthropicBridge } from './anthropic-bridge.js';
 export * from './native-continuation.js';
 export * from './openai-responses.js';

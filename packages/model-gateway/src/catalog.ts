@@ -213,7 +213,9 @@ export const configuredModelCatalog = (
 };
 
 /** Price per million input tokens decides how a run is weighed against the owner's usage windows. */
-const usageClassForPrice = (inputUsdPerMillion: number | null): ModelRelease['usageClass'] => {
+export const usageClassForPrice = (
+  inputUsdPerMillion: number | null
+): ModelRelease['usageClass'] => {
   if (inputUsdPerMillion === null || !Number.isFinite(inputUsdPerMillion)) return 'medium';
   if (inputUsdPerMillion <= 1) return 'light';
   if (inputUsdPerMillion <= 3) return 'medium';

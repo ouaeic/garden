@@ -1,4 +1,4 @@
-import { configuredModelCatalog, createModelAdapter } from '@garden/model-gateway';
+import { configuredModelCatalog, createModelAdapter, withListPrices } from '@garden/model-gateway';
 import type { ModelRelease, PrivacyRoute } from '@garden/contracts';
 
 /**
@@ -143,10 +143,12 @@ export const refreshConfiguredCatalog = async (
    * serving instead of the picker emptying.
    */
   if (catalogue.length === 0) return [];
-  return configuredModelCatalog(catalogue, {
+  const rows = configuredModelCatalog(catalogue, {
     privacyRoute,
     tag: tagFor(input.provider),
     ...(input.connectionId ? { connectionId: input.connectionId, previous: input.previous } : {}),
     ...(input.defaults ?? declaredBy(input.previous))
   });
+  // Refreshed with the list prices each hour too, so a price change reaches the spending limits.
+  return withListPrices(rows, input.baseUrl, input.fetch ?? globalThis.fetch);
 };

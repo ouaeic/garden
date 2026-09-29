@@ -2,6 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { BrowserAction, WebFetchRequest } from './index.js';
 
 describe('browser action contract', () => {
+  it('accepts the id the runner gives a tab the owner opened', () => {
+    // The runner names every tab after the first `tab-<uuid>`; closing one used to be refused here.
+    const tabId = `tab-${crypto.randomUUID()}`;
+    expect(BrowserAction.parse({ type: 'close_tab', tabId })).toEqual({ type: 'close_tab', tabId });
+    expect(BrowserAction.parse({ type: 'select_tab', tabId })).toEqual({
+      type: 'select_tab',
+      tabId
+    });
+  });
   it('accepts the element-driven actions a real form needs', () => {
     expect(BrowserAction.parse({ type: 'hover', selector: '[data-garden-ref="oc-0-3"]' })).toEqual({
       type: 'hover',

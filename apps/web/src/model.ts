@@ -87,12 +87,16 @@ export interface Bootstrap {
     storageBytes: number;
     storageLimitBytes: number;
     plan: {
-      provider: 'ollama-cloud' | 'openrouter';
+      provider: string;
       windows: {
         label: string;
         used: number | null;
         limit: number | null;
         unit: 'fraction' | 'usd';
+        /** What is left, where the provider publishes a balance but not what it started from. */
+        remaining?: number | null;
+        /** Which connection this came from, once more than one is connected. */
+        connection?: string;
         resetsAt: string | null;
       }[];
       queriedAt: string;
@@ -366,3 +370,11 @@ export function conversationResultSource(taskId: string, result: TaskResult): Co
     }
   };
 }
+
+type PlanWindow = NonNullable<Bootstrap['usage']['plan']>['windows'][number];
+/** Dollars left in a window, however the provider states it, or null when it does not say. */
+export const dollarsLeft = (window: PlanWindow): number | null =>
+  window.unit !== 'usd'
+    ? null
+    : (window.remaining ??
+      (window.limit !== null && window.used !== null ? window.limit - window.used : null));

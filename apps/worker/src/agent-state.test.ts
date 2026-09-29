@@ -117,6 +117,7 @@ const FIELDS: ReadonlyArray<keyof AgentState> = [
   'mainModelPreference',
   'projectContextFingerprint',
   'walledProviders',
+  'walledModels',
   'decisionFloorBindings',
   'decisionReceipts'
 ];
@@ -148,6 +149,7 @@ const FULL: Required<AgentState> = {
   },
   projectContextFingerprint: 'f'.repeat(64),
   walledProviders: ['openrouter'],
+  walledModels: ['openrouter/vendor/busy-model'],
   mediaApprovals: { image: { binding: 'a'.repeat(64), modelId: 'test/image' } },
   transcriptionApprovals: {
     'transcription-1': { binding: 'd'.repeat(64), sourceSha256: 'e'.repeat(64), sourceBytes: 4096 }
@@ -476,7 +478,8 @@ describe('what a new turn inherits', () => {
       // the task on a different provider for its *next* turn, and a list reset in between would
       // send it straight back to the provider that was rate-limiting it. Cleared on the first step
       // that actually produces a response, which is the honest signal that routing is working.
-      'walledProviders'
+      'walledProviders',
+      'walledModels'
     ]);
     expect(dropped.length + reset.length + carried.length).toBe(FIELDS.length);
   });

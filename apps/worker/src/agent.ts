@@ -2204,6 +2204,7 @@ export class AgentWorker {
        * life and put it back to parking on the first wall after that.
        */
       if (state.walledProviders?.length) delete state.walledProviders;
+      if (state.walledModels?.length) delete state.walledModels;
       /*
        * What the step said: the provenance notice for anything the provider fetched itself, the
        * assistant message into the window, and - only when this is a new answer rather than a round
@@ -2318,12 +2319,24 @@ export class AgentWorker {
       const state = decryptJson<AgentState>(current.agentStateCiphertext, key);
       const catalog = (await this.store.listModels()) as unknown as ModelRelease[];
       const walledModel = catalog.find((entry) => entry.id === task.modelId);
-      // The provider that refused, not the model: a quota is spent per account per provider, and
-      // moving to that provider's next model would meet the same wall a moment later.
+      /*
+       * Usually the provider that refused, not the model: a quota is spent per account per
+       * provider, and moving to that provider's next model would meet the same wall a moment later.
+       * Unless the provider said the limit was this model's own host - then the account is fine and
+       * only this model is set aside.
+       */
+      const modelOnly = error.details?.limitScope === 'model';
       const walled = [
-        ...new Set([...(state.walledProviders ?? []), walledModel?.provider ?? ''].filter(Boolean))
+        ...new Set(
+          [...(state.walledProviders ?? []), modelOnly ? '' : (walledModel?.provider ?? '')].filter(
+            Boolean
+          )
+        )
       ];
-      if (walled.length > AgentWorker.#MAX_WALL_REROUTES) return false;
+      const walledModels = [
+        ...new Set([...(state.walledModels ?? []), ...(modelOnly ? [task.modelId] : [])])
+      ];
+      if (walled.length + walledModels.length > AgentWorker.#MAX_WALL_REROUTES) return false;
       /*
        * Only routes this account can actually reach. Without this the selector would happily hand
        * back a model from a provider the owner has never connected, and the next turn would fail
@@ -2332,7 +2345,7 @@ export class AgentWorker {
       const connections = await this.#inferenceConnections(task);
       const reachable = catalog.filter((entry) => {
         const id = modelConnectionId(entry, connections.keys());
-        return id !== null && !walled.includes(entry.provider);
+        return id !== null && !walled.includes(entry.provider) && !walledModels.includes(entry.id);
       });
       if (reachable.length === 0) return false;
       const chosen = selectModel(reachable, {
@@ -2345,6 +2358,7 @@ export class AgentWorker {
       }).choice?.model;
       if (!chosen || chosen.id === task.modelId) return false;
       state.walledProviders = walled;
+      if (walledModels.length) state.walledModels = walledModels;
       const moved = await this.store.rerouteTaskModel({
         id: task.id,
         workerId: this.config.WORKER_ID,
@@ -2358,7 +2372,9 @@ export class AgentWorker {
         task,
         key,
         'status',
-        `${walledModel?.displayName ?? 'The chosen model'} is not answering, so this moved to ${chosen.displayName} and carried on`,
+        modelOnly
+          ? `${walledModel?.displayName ?? 'The chosen model'} is rate-limited at its host right now, so this moved to ${chosen.displayName} and carried on`
+          : `${walledModel?.displayName ?? 'The chosen model'} is not answering, so this moved to ${chosen.displayName} and carried on`,
         { owner: true, code: error.code, from: task.modelId, to: chosen.id }
       ).catch(() => undefined);
       return true;

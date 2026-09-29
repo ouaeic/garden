@@ -69,8 +69,73 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
 }
-.model-connection-tabs {
-  margin-bottom: 16px;
+/*
+ * Connected providers as a list you can read at a glance - name, what it offers, how many models,
+ * what is left - each row opening its own settings; and the providers you could add, as tiles.
+ */
+.connection-list {
+  display: grid;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+}
+.connection-list > li + li {
+  border-top: 1px solid var(--line);
+}
+.connection-row {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+.connection-row > strong {
+  font-weight: 400;
+}
+.connection-row > small,
+.provider-tile > small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.connection-row:is(:hover, :focus-visible),
+.connection-row[aria-pressed='true'] {
+  background: var(--raised-fill);
+}
+.provider-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr));
+  gap: 8px;
+}
+.provider-tile {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-height: 64px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: var(--lcd-texture), var(--bg);
+  color: var(--text);
+  text-align: left;
+}
+.provider-tile > strong {
+  font-weight: 400;
+}
+.provider-tile:is(:hover, :focus-visible) {
+  border-color: var(--text);
+  background: var(--raised-fill);
+}
+.connection-form {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.connection-form > h3 {
+  margin: 0;
+  font-weight: 400;
 }
 .management-grid .span-all {
   grid-column: 1/-1;

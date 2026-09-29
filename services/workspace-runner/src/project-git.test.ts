@@ -68,7 +68,7 @@ async function fixture() {
   await write(wa, 'src/one.ts', 'export const one = 1;\n');
   await write(wa, 'src/two.ts', 'export const two = 2;\n');
   const seed = await prepare(a, ['src']);
-  expect(seed.state).toBe('ready');
+  expect(seed.state, seed.detail ?? '').toBe('ready');
   const first = await manager.publish(
     project,
     seed.id,

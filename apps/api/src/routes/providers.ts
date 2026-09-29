@@ -23,7 +23,8 @@ import {
   refreshOpenRouterCatalog,
   seedModels,
   vendorPreset,
-  verifyOpenRouterKey
+  verifyOpenRouterKey,
+  withListPrices
 } from '@garden/model-gateway';
 import { z } from 'zod';
 import { DataStore } from '@garden/data';
@@ -282,7 +283,7 @@ export const registerProviderRoutes = (context: RouteContext): void => {
             'The endpoint listed no models for this key',
             422
           );
-        pendingModels = configuredModelCatalog(catalogue, {
+        const listed = configuredModelCatalog(catalogue, {
           privacyRoute: input.enforceZeroDataRetention ? 'provider_zdr' : 'external',
           contextTokens,
           capabilities: input.capabilities,
@@ -300,6 +301,13 @@ export const registerProviderRoutes = (context: RouteContext): void => {
                 ))
           )
         });
+        // A company's own endpoint lists no prices; its published list prices stand in for them,
+        // so spending limits count these calls at what they cost rather than at a guess.
+        pendingModels = await withListPrices(
+          listed,
+          baseUrl,
+          overrides.modelCatalogFetch ?? globalThis.fetch
+        );
       }
       /*
        * Carried forward when this save did not mention it, and dropped when the provider changes.

@@ -469,6 +469,17 @@ const providerFault = (
  * identically however often it is asked, and calling that a wall would park a task behind a
  * condition that never lifts.
  */
+/**
+ * Whether a rate limit belongs to one model's host rather than to the account.
+ *
+ * An aggregator answers 429 for both, and they need opposite responses: an account that is out of
+ * quota meets the same wall on every model it asks for, while a model whose only eligible host is
+ * saturated - a new release behind a single zero-retention endpoint, say - is one model the task
+ * can step around. The aggregator says which in its own sentence, so that is what is read.
+ */
+export const isModelScopedLimit = (status: number, complaint: string): boolean =>
+  status === 429 && /rate[- ]limited upstream|upstream (provider|rate)/i.test(complaint);
+
 const providerFaultCode = (status: number): string =>
   status === 429
     ? 'provider_quota_exhausted'
@@ -669,7 +680,10 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
       providerFaultCode(fault.status),
       `${this.provider} reported an error ${where} (${fault.status}): ${fault.message}`,
       fault.status,
-      fault.retryAfter ? { retryAfter: fault.retryAfter } : {}
+      {
+        ...(fault.retryAfter ? { retryAfter: fault.retryAfter } : {}),
+        ...(isModelScopedLimit(fault.status, fault.message) ? { limitScope: 'model' } : {})
+      }
     );
   }
 
@@ -1217,7 +1231,10 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
         providerFaultCode(response.status),
         `${this.provider} request failed (${response.status})${explanation}`,
         response.status,
-        { retryAfter: response.headers.get('retry-after') ?? undefined }
+        {
+          retryAfter: response.headers.get('retry-after') ?? undefined,
+          ...(isModelScopedLimit(response.status, complaint) ? { limitScope: 'model' } : {})
+        }
       );
     }
     // Nothing publishes a usable latency for these routes, so the only honest number is the one
