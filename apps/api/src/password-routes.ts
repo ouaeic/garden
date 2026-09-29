@@ -9,8 +9,20 @@ import { createSession, hasRecentStepUp, sessionCookieName } from './session.js'
 import { recordSecurityEvent } from './security-events.js';
 
 const passwordInput = z.string().min(1).max(1024);
-const newPassword = passwordInput.refine((value) => [...value.normalize('NFKC')].length >= 15, {
-  message: 'Use at least 15 characters. A few words work well.'
+const newPassword = z.string().transform((value) => {
+  if ([...value.normalize('NFKC')].length < 15)
+    throw new GardenError(
+      'password_too_short',
+      'Use at least 15 characters for your password. A few words work well.',
+      400
+    );
+  if (value.length > 1024)
+    throw new GardenError(
+      'password_too_long',
+      'Use no more than 1024 characters for your password.',
+      400
+    );
+  return value;
 });
 const publicUser = (user: UserRecord) => ({
   id: user.id,

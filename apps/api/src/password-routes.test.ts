@@ -71,6 +71,43 @@ describe('password and remembered-device workflows', () => {
     await database.close();
   });
 
+  it('explains password length failures and leaves a setup grant usable for retry', async () => {
+    const short = 'short password';
+    const rejected = await post('/v1/auth/password/register', {
+      displayName: 'Owner',
+      pairingCode,
+      password: short
+    });
+    expect(rejected.statusCode).toBe(400);
+    expect(rejected.json<{ error: { code: string; message: string } }>().error).toMatchObject({
+      code: 'password_too_short',
+      message: 'Use at least 15 characters for your password. A few words work well.'
+    });
+    expect(rejected.body).not.toContain(short);
+    expect(await store.countUsers()).toBe(0);
+    const oversized = await post('/v1/auth/password/register', {
+      displayName: 'Owner',
+      pairingCode,
+      password: 'x'.repeat(1025)
+    });
+    expect(oversized.statusCode).toBe(400);
+    expect(oversized.json<{ error: { code: string } }>().error.code).toBe('password_too_long');
+    const created = await register();
+    expect(created.statusCode).toBe(200);
+    const token = randomBytes(32).toString('base64url');
+    const owner = (await store.soleUser())!;
+    await store.createPasswordReset(owner.id, sha256(token));
+    const recovery = await post('/v1/auth/password/recover', { code: token, password: short });
+    expect(recovery.statusCode).toBe(400);
+    expect(recovery.json<{ error: { code: string } }>().error.code).toBe('password_too_short');
+    expect(await store.findPasswordReset(sha256(token))).toBe(owner.id);
+    const accepted = await post('/v1/auth/password/recover', {
+      code: token,
+      password: 'fifteen letters'
+    });
+    expect(accepted.statusCode, accepted.body).toBe(200);
+  });
+
   it('claims the server with a password, remembers two devices and revokes one independently', async () => {
     const created = await register();
     expect(created.statusCode, created.body).toBe(200);

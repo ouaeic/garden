@@ -158,6 +158,13 @@ try {
     await page.getByLabel('Your name').fill('Garden owner');
     await page.getByLabel('Installer pairing code').fill(config.REGISTRATION_BOOTSTRAP_TOKEN);
     const password = 'several words for a private garden';
+    await page.getByLabel('New password', { exact: true }).fill('short password');
+    await page.getByRole('button', { name: 'Create your account', exact: true }).click();
+    await page
+      .getByText('Use at least 15 characters for your password. A few words work well.', {
+        exact: true
+      })
+      .waitFor();
     await page.getByLabel('New password', { exact: true }).fill(password);
     await page.getByRole('button', { name: 'Create your account', exact: true }).click();
     await page.getByRole('heading', { name: 'Save your recovery code.' }).waitFor();

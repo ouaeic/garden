@@ -49,12 +49,8 @@ export const registerErrorHandler = (context: ServerBase): void => {
     if (status >= 500) log.error('http.request_failed', { ...fields, ...errorFields(error) });
     else if (status === 401) log.debug('http.request_rejected', fields);
     else log.warn('http.request_rejected', fields);
-    /**
-     * A rejected field says which one it was. The web client cannot send a malformed body - it is
-     * built from the same schemas - so the only reader of this message is someone driving the API
-     * directly, for whom "something is invalid" means guessing. The paths come from the request
-     * the caller just sent and carry none of its values, so nothing is disclosed by naming them.
-     */
+    // Schema errors expose field paths without echoing input values. GardenError carries
+    // owner-facing guidance for expected failures such as an unsuitable password length.
     const invalidFields = invalid
       ? [...new Set(error.issues.map((issue) => issue.path.join('.')).filter(Boolean))]
           .slice(0, 8)
