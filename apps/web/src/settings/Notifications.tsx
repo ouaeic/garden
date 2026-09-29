@@ -167,7 +167,7 @@ export function NotificationSettings() {
       {nativeNotifications && (
         <Section
           title="Native app notifications"
-          description="Allow this computer’s operating system to show notices from garden."
+          description="Show notices from garden while this app is running. Android background delivery is not included in this beta."
         >
           <Button
             disabled={nativeGranted}

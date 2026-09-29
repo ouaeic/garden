@@ -66,7 +66,11 @@ if [ ! -f "$garden_root/scripts/install-native.sh" ]; then
   else
     # Not shallow. The update path rolls back by resetting to the revision it came from, and a
     # depth-1 clone has no revision to go back to.
-    git clone --branch "$revision" "$repository" "$garden_root"
+    if [ -n "$expected_commit" ] && [ "$revision" = "$expected_commit" ]; then
+      git clone "$repository" "$garden_root"
+    else
+      git clone --branch "$revision" "$repository" "$garden_root"
+    fi
   fi
 fi
 

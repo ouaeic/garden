@@ -329,6 +329,9 @@ struct ClientStatus {
     error: Option<String>,
     network_preference: Option<NetworkPreference>,
     app_version: &'static str,
+    app_revision: &'static str,
+    app_channel: &'static str,
+    app_platform: &'static str,
 }
 
 #[derive(Serialize)]
@@ -456,6 +459,9 @@ async fn client_status(State(state): State<Arc<ClientState>>) -> Json<ClientStat
         },
         network_preference: profile.as_ref().map(|value| value.network_preference),
         app_version: env!("CARGO_PKG_VERSION"),
+        app_revision: env!("GARDEN_SOURCE_COMMIT"),
+        app_channel: env!("GARDEN_BUILD_CHANNEL"),
+        app_platform: std::env::consts::OS,
     })
 }
 

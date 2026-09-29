@@ -62,6 +62,9 @@ export function Settings({
   const [sound, setSoundState] = useState(soundOn);
   useEffect(() => onLifeModeChange(setLife), []);
   const [locationSection, setSection] = useSurfaceLocation('section', 'Appearance');
+  useEffect(() => {
+    if (locationSection === 'Instance') setMaintenanceOpened(true);
+  }, [locationSection]);
   const section = sections.includes(locationSection as (typeof sections)[number])
     ? locationSection
     : (aliases[locationSection] ?? 'Appearance');
@@ -162,6 +165,7 @@ export function Settings({
             <ComputerSettings workspace={workspace} onChange={onChange} />
             <details
               className="settings-disclosure"
+              open={locationSection === 'Instance' ? true : undefined}
               onToggle={(event) => {
                 if (event.currentTarget.open) setMaintenanceOpened(true);
               }}

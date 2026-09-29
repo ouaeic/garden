@@ -1,11 +1,10 @@
-const SHELL_CACHE = 'garden-shell-lcd-2026-09-28';
+const SHELL_CACHE = 'garden-shell-__GARDEN_SHELL_BUILD__';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(SHELL_CACHE).then(async (cache) => {
       await cache.add('/');
-      await self.skipWaiting();
     })
   );
 });
@@ -14,9 +13,12 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
       const names = await caches.keys();
+      const previous = names
+        .filter((name) => name.startsWith('garden-shell-') && name !== SHELL_CACHE)
+        .at(-1);
       await Promise.all(
         names
-          .filter((name) => name.startsWith('garden') && name !== SHELL_CACHE)
+          .filter((name) => name.startsWith('garden') && name !== SHELL_CACHE && name !== previous)
           .map((name) => caches.delete(name))
       );
       await self.clients.claim();
@@ -61,7 +63,7 @@ self.addEventListener('fetch', (event) => {
   if (!url.pathname.startsWith('/assets/') && request.destination !== 'font') return;
   event.respondWith(
     (async () => {
-      const cached = await (await caches.open(SHELL_CACHE)).match(request);
+      const cached = await caches.match(request);
       if (cached) return cached;
       const response = await fetch(request);
       if (response.ok && response.type === 'basic') {

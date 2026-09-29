@@ -6,6 +6,7 @@ import { checkWorkspaceNavigation } from './browser-workspace.mjs';
 import { checkProjectHistory } from './browser-project-history.mjs';
 import { checkAppearance } from './browser-appearance.mjs';
 import { checkMobileNavigation } from './browser-mobile.mjs';
+import { checkUpdates } from './browser-updates.mjs';
 import { checkPermissionModes } from './browser-permissions.mjs';
 import { checkRunningQuestion } from './browser-questions.mjs';
 import { checkHumanInterventions } from './browser-interventions.mjs';
@@ -743,6 +744,23 @@ try {
       return json({ text: '', bytes: 0, limit: 4096, version: 1, updatedAt: null });
     if (path === '/v1/bootstrap')
       return json({ ...bootstrap, models: modelCatalog, drafts: [...modelDrafts.values()] });
+    if (path === '/v1/instance/updates')
+      return json({ checkedAt: time, server: { status: 'current', revision: null }, client: null });
+    if (path === '/v1/instance/diagnostics')
+      return json({
+        certificate: null,
+        dynamicDns: null,
+        backup: null,
+        autoUpdate: 'off',
+        backupTimer: 'off',
+        build: { version: '0.2.0', commit: '1234567' }
+      });
+    if (path === '/v1/relay') return json({ enabled: false });
+    if (path === `/v1/workspaces/${workspace.id}/snapshots`) return json([]);
+    if (path === `/v1/workspaces/${workspace.id}/brief`)
+      return json({ markdown: '', path: 'GARDEN.md' });
+    if (path === '/v1/legal')
+      return json({ applicationLicense: 'AGPL-3.0-only', sourceUrl: null, privacyUrl: null });
     if (path.endsWith('/updates') && path.startsWith('/v1/projects/'))
       return json({
         head: null,
@@ -1253,6 +1271,7 @@ try {
     await checkMemoryLibrary({ context, origin, workspace, project, task, report });
   if (process.env.GARDEN_UI_FOCUS === 'appearance')
     await checkAppearance({ context, origin, bootstrap, project, task, report });
+  if (process.env.GARDEN_UI_FOCUS === 'updates') await checkUpdates({ context, origin, report });
   if (
     !process.env.GARDEN_UI_FOCUS ||
     ['mobile', 'appearance'].includes(process.env.GARDEN_UI_FOCUS)
@@ -1303,6 +1322,7 @@ try {
       'models',
       'appearance',
       'mobile',
+      'updates',
       'workspace',
       'history',
       'files-jobs',
@@ -2708,6 +2728,7 @@ try {
       'drafts',
       'appearance',
       'mobile',
+      'updates',
       'workspace',
       'history',
       'files-jobs',
@@ -3293,6 +3314,7 @@ try {
       'desk',
       'appearance',
       'mobile',
+      'updates',
       'workspace',
       'history',
       'files-jobs',

@@ -5035,6 +5035,7 @@ describe('authentication posture', () => {
     expect((await app.inject({ method: 'GET', url: '/v1/instance/diagnostics' })).statusCode).toBe(
       401
     );
+    expect((await app.inject({ method: 'GET', url: '/v1/instance/updates' })).statusCode).toBe(401);
   }, 30_000);
 
   test('throttles account recovery per caller as well as per username', async () => {

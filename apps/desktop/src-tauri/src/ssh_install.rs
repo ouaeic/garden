@@ -15,13 +15,10 @@ const RELEASE_REF: &str = concat!("v", env!("CARGO_PKG_VERSION"));
 const SOURCE_COMMIT: &str = env!("GARDEN_SOURCE_COMMIT");
 /// The hash of `install.sh` as this build ships it, checked on the server before the script runs.
 ///
-/// It is a release gate rather than a comment: `scripts/check-release.mjs` recomputes it, so a
-/// change to the installer that forgets this line cannot be released. It was forgotten once - the
-/// commit that tagged v0.1.1 rewrote the installer's checkout so a pinned box could receive updates
-/// and left this pointing at the previous script, which meant the desktop app's own `sha256sum -c`
-/// refused the installer it had just fetched. That is the first thing a new owner does.
+/// `scripts/check-release.mjs` recomputes this hash so the client only executes the bootstrap
+/// shipped with its source revision.
 const INSTALL_BOOTSTRAP_SHA256: &str =
-    "11d5467241a2d2d33ec7a004e272bb55e17a68b8b9e13d87c1c84a436dd22a99";
+    "ba8f3e40ff9a6c7a7901a1f8c46de535d632fac696db42552a3d52bbcfed85e6";
 const MAX_OUTPUT_BYTES: usize = 4 * 1024 * 1024;
 const INSTALLER_PAGE: &str = include_str!("installer.html");
 
@@ -186,9 +183,18 @@ fn append_bounded(target: &mut Vec<u8>, data: &[u8]) {
     target.extend_from_slice(data);
 }
 
+fn source_ref(channel: &str) -> &'static str {
+    if channel == "beta" {
+        SOURCE_COMMIT
+    } else {
+        RELEASE_REF
+    }
+}
+
 fn install_command(username: &str) -> String {
+    let release_ref = source_ref(env!("GARDEN_BUILD_CHANNEL"));
     let install_url =
-        format!("https://raw.githubusercontent.com/ouaeic/garden/{RELEASE_REF}/install.sh");
+        format!("https://raw.githubusercontent.com/ouaeic/garden/{release_ref}/install.sh");
     let bootstrap = format!(
         "temporary=$(mktemp); trap 'rm -f \"$temporary\"' EXIT INT TERM; \
          curl -fsSL '{install_url}' -o \"$temporary\"; \
@@ -196,11 +202,11 @@ fn install_command(username: &str) -> String {
     );
     if username == "root" {
         format!(
-            "set -eu; if command -v garden >/dev/null 2>&1; then garden pairing-code; else {bootstrap}; env GARDEN_REF='{RELEASE_REF}' GARDEN_EXPECTED_COMMIT='{SOURCE_COMMIT}' sh \"$temporary\"; fi"
+            "set -eu; if command -v garden >/dev/null 2>&1; then garden pairing-code; else {bootstrap}; env GARDEN_REF='{release_ref}' GARDEN_EXPECTED_COMMIT='{SOURCE_COMMIT}' sh \"$temporary\"; fi"
         )
     } else {
         format!(
-            "set -eu; if command -v garden >/dev/null 2>&1; then sudo -n garden pairing-code; else {bootstrap}; sudo -n env GARDEN_REF='{RELEASE_REF}' GARDEN_EXPECTED_COMMIT='{SOURCE_COMMIT}' sh \"$temporary\"; fi"
+            "set -eu; if command -v garden >/dev/null 2>&1; then sudo -n garden pairing-code; else {bootstrap}; sudo -n env GARDEN_REF='{release_ref}' GARDEN_EXPECTED_COMMIT='{SOURCE_COMMIT}' sh \"$temporary\"; fi"
         )
     }
 }
@@ -416,7 +422,12 @@ mod tests {
     #[test]
     fn installer_command_is_fixed_and_uses_noninteractive_sudo() {
         assert!(install_command("root").contains("sha256sum -c"));
-        assert!(install_command("root").contains("GARDEN_REF='v"));
+        assert!(install_command("root").contains(&format!(
+            "GARDEN_REF='{}'",
+            source_ref(env!("GARDEN_BUILD_CHANNEL"))
+        )));
+        assert!(source_ref("stable").starts_with('v'));
+        assert_eq!(source_ref("beta"), SOURCE_COMMIT);
         assert!(install_command("root").contains("GARDEN_EXPECTED_COMMIT='"));
         assert!(!install_command("root").contains("sudo"));
         assert!(install_command("administrator").contains("sudo -n env"));

@@ -20,6 +20,13 @@ fn source_commit() -> String {
 }
 
 fn main() {
+    println!("cargo:rerun-if-env-changed=GARDEN_BUILD_CHANNEL");
+    let channel = if std::env::var("GARDEN_BUILD_CHANNEL").as_deref() == Ok("beta") {
+        "beta"
+    } else {
+        "stable"
+    };
+    println!("cargo:rustc-env=GARDEN_BUILD_CHANNEL={channel}");
     println!("cargo:rerun-if-env-changed=GARDEN_SOURCE_COMMIT");
     println!("cargo:rustc-env=GARDEN_SOURCE_COMMIT={}", source_commit());
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(

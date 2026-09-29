@@ -9,6 +9,9 @@ export interface NativeStatus {
   error: string | null;
   networkPreference: NetworkPreference | null;
   appVersion: string;
+  appRevision?: string;
+  appChannel?: 'beta' | 'stable';
+  appPlatform?: string;
 }
 export interface NativeBootstrap {
   pairingCode: string | null;

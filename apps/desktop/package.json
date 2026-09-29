@@ -6,6 +6,8 @@
     "dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "test": "node --test release-build-env.test.mjs verify-android-artifact.test.mjs verify-ios-artifact.test.mjs verify-macos-artifact.test.mjs verify-native-config.test.mjs",
     "native:build": "node verify-native-config.mjs && node build-native.mjs",
+    "beta:desktop": "node verify-native-config.mjs && node build-beta.mjs desktop",
+    "beta:android": "node verify-native-config.mjs && node build-beta.mjs android",
     "info": "tauri info",
     "android:init": "tauri android init",
     "android:dev": "tauri android dev",

@@ -2,6 +2,7 @@ import { gzipSync } from 'node:zlib';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { pdfAssets } from './pdf-assets.js';
+import { buildIdentity, webBuildId } from './build-identity.js';
 
 /**
  * What the browser must download before it can paint the first screen: the entry chunk plus
@@ -174,8 +175,10 @@ const eagerBundleGraph = (): Plugin => ({
   }
 });
 
+const buildId = webBuildId();
 export default defineConfig({
-  plugins: [react(), eagerBundleGraph(), pdfAssets()],
+  define: { __GARDEN_WEB_BUILD_ID__: JSON.stringify(buildId) },
+  plugins: [react(), eagerBundleGraph(), pdfAssets(), buildIdentity(buildId)],
   server: {
     host: '127.0.0.1',
     port: 5173,

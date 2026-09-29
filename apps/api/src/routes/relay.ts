@@ -12,9 +12,15 @@ import { isAddressLiteral, readBackupStatus, readStateFailure, timerState } from
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 import { recordSecurityEvent } from '../security-events.js';
+import { createUpdateChecker } from '../updates.js';
 
 export const registerRelayRoutes = (context: RouteContext): void => {
   const { app, store, relay, config, requireRecentStepUp, idempotent } = context;
+  const checkUpdates = createUpdateChecker(buildIdentity().commit);
+  app.get('/v1/instance/updates', async (request) => {
+    requireUser(request.user);
+    return checkUpdates();
+  });
   /**
    * The relay: off, and for most owners that is the right answer.
    *

@@ -11,17 +11,29 @@ async function worker() {
   const showNotification = vi.fn().mockResolvedValue(undefined);
   const openWindow = vi.fn().mockResolvedValue(undefined);
   const matchAll = vi.fn().mockResolvedValue([]);
+  const skipWaiting = vi.fn().mockResolvedValue(undefined);
+  const cache = {
+    add: vi.fn().mockResolvedValue(undefined),
+    put: vi.fn().mockResolvedValue(undefined),
+    match: vi.fn().mockResolvedValue(undefined)
+  };
+  const caches = {
+    open: vi.fn().mockResolvedValue(cache),
+    keys: vi.fn().mockResolvedValue([]),
+    delete: vi.fn().mockResolvedValue(true),
+    match: vi.fn().mockResolvedValue(undefined)
+  };
   const surface = {
     location: { origin: 'https://garden.example' },
     addEventListener: (name: string, callback: (event: unknown) => void) =>
       handlers.set(name, callback),
     registration: { showNotification },
-    clients: { matchAll, openWindow },
-    skipWaiting: async () => undefined
+    clients: { matchAll, openWindow, claim: vi.fn().mockResolvedValue(undefined) },
+    skipWaiting
   };
   const source = await readFile(new URL('../public/sw.js', import.meta.url), 'utf8');
   expect(source.length).toBeGreaterThan(0);
-  runInNewContext(source, { self: surface, URL, Response, fetch: fetcher, caches: {} });
+  runInNewContext(source, { self: surface, URL, Response, fetch: fetcher, caches });
   const send = async (kind: string, fields: Record<string, unknown>) => {
     let pending: Promise<unknown> | undefined;
     const handler = handlers.get(kind);
@@ -34,10 +46,50 @@ async function worker() {
     });
     await pending;
   };
-  return { handlers, fetcher, showNotification, openWindow, matchAll, send };
+  return {
+    handlers,
+    fetcher,
+    showNotification,
+    openWindow,
+    matchAll,
+    send,
+    skipWaiting,
+    caches,
+    cache
+  };
 }
 
 describe('service worker boundaries', () => {
+  it('stages a new shell until the owner requests a refresh', async () => {
+    const { send, skipWaiting, cache } = await worker();
+    await send('install', {});
+    expect(cache.add).toHaveBeenCalledWith('/');
+    expect(skipWaiting).not.toHaveBeenCalled();
+    await send('message', { data: { type: 'SKIP_WAITING' } });
+    expect(skipWaiting).toHaveBeenCalledOnce();
+  });
+  it('retains the previous shell assets for another tab still using that build', async () => {
+    const { send, caches, handlers, fetcher } = await worker();
+    caches.keys.mockResolvedValue([
+      'garden-shell-ancient',
+      'garden-shell-previous',
+      'garden-shell-__GARDEN_SHELL_BUILD__'
+    ]);
+    await send('activate', {});
+    expect(caches.delete).toHaveBeenCalledWith('garden-shell-ancient');
+    expect(caches.delete).not.toHaveBeenCalledWith('garden-shell-previous');
+    const cached = new Response('previous-build-bytes');
+    caches.match.mockResolvedValue(cached);
+    let response: Promise<Response> | undefined;
+    handlers.get('fetch')!({
+      request: { method: 'GET', url: 'https://garden.example/assets/previous.js', mode: 'cors' },
+      respondWith: (value: Promise<Response>) => {
+        response = value;
+      }
+    });
+    expect(await response).toBe(cached);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
   it('routes a notification within an existing app without reloading its terminal', async () => {
     const { matchAll, send, openWindow } = await worker();
     const existing = {

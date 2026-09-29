@@ -64,6 +64,7 @@ const sheetTitles: Partial<Record<View, string>> = {
   attention: 'Needs you'
 };
 const Settings = lazy(() => import('./Settings'));
+const UpdateNotice = lazy(() => import('./UpdateNotice'));
 const NativeSetup = lazy(() => import('./NativeSetup'));
 import type { ComputerTool as Tool } from './Computer';
 const Login = lazy(() => import('./Login'));
@@ -623,11 +624,21 @@ function WorkspaceApp() {
           </Button>
         </div>
       </header>
-      {offline && (
-        <div className="offline-banner" role="status">
-          You’re offline. Your work continues on the computer; updates will reconnect here.
-        </div>
-      )}
+      <div className="shell-notices">
+        <Suspense fallback={null}>
+          <UpdateNotice
+            onSettings={() => {
+              navigate('settings');
+              setSurfaceLocation({ section: 'Instance' }, true);
+            }}
+          />
+        </Suspense>
+        {offline && (
+          <div className="offline-banner" role="status">
+            You’re offline. Your work continues on the computer; updates will reconnect here.
+          </div>
+        )}
+      </div>
       <main
         id="main"
         className={`garden-main view-${baseView}`}

@@ -15,6 +15,7 @@ import {
   useResource
 } from '../management.js';
 import { data, text } from '../model.js';
+import type { UpdateReport } from '../UpdateNotice.js';
 
 interface Diagnostics {
   certificate: unknown;
@@ -22,7 +23,7 @@ interface Diagnostics {
   backup: unknown;
   autoUpdate: unknown;
   backupTimer: unknown;
-  build: { revision?: string; version?: string; dirty?: boolean };
+  build: { commit?: string; version?: string };
 }
 interface Legal {
   applicationLicense: string;
@@ -33,6 +34,7 @@ export function InstanceSettings() {
   const diagnostics = useResource<Diagnostics>('/v1/instance/diagnostics');
   const relay = useResource<Record<string, unknown>>('/v1/relay');
   const legal = useResource<Legal>('/v1/legal');
+  const updates = useResource<UpdateReport>('/v1/instance/updates');
   const native = useResource<NativeStatus>(isNativeClient() ? '/__garden/client/status' : null);
   const [installerUrl, setInstallerUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -111,10 +113,9 @@ export function InstanceSettings() {
           <>
             <p className="management-metadata muted">
               Build{' '}
-              {diagnostics.value.build.revision ||
+              {diagnostics.value.build.commit ||
                 diagnostics.value.build.version ||
                 'identity unavailable'}
-              {diagnostics.value.build.dirty ? ' · local changes' : ''}
             </p>
             <div className="management-list">
               {(['certificate', 'dynamicDns', 'backup', 'autoUpdate', 'backupTimer'] as const).map(
@@ -257,6 +258,32 @@ export function InstanceSettings() {
         title="Maintenance"
         description="Installation and updates run on the server you own."
       >
+        <ResourceState resource={updates} />
+        {updates.value && (
+          <p>
+            {updates.value.server.status === 'available'
+              ? 'An update is available for your server.'
+              : updates.value.server.status === 'current'
+                ? 'Your server is up to date.'
+                : 'Could not check for server updates. Your installed version is still available.'}
+          </p>
+        )}
+        <Button disabled={updates.loading} onClick={updates.refresh}>
+          Check for updates
+        </Button>
+        {native.value && (
+          <p className="muted">
+            This app: {native.value.appVersion}
+            {native.value.appRevision && ` · ${native.value.appRevision.slice(0, 7)}`}
+          </p>
+        )}
+        {updates.value?.client && (
+          <p>
+            <a className="button" href={updates.value.client.url} target="_blank" rel="noreferrer">
+              Download native apps · {updates.value.client.version}
+            </a>
+          </p>
+        )}
         <p className="muted">
           For a health report, run this in your server administration terminal:
         </p>

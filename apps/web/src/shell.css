@@ -147,13 +147,13 @@
     gap: 12px;
     border-bottom: 1px solid var(--line);
   }
-  .desk-shell:has(> .offline-banner) {
+  .desk-shell:has(> .shell-notices:not(:empty)) {
     grid-template-rows: var(--desk-bar-height) auto minmax(0, 1fr) auto;
   }
-  .desk-shell:has(> .offline-banner) > .navigation-page {
+  .desk-shell:has(> .shell-notices:not(:empty)) > .navigation-page {
     grid-row: 3;
   }
-  .desk-shell:has(> .offline-banner) > .phone-bar {
+  .desk-shell:has(> .shell-notices:not(:empty)) > .phone-bar {
     grid-row: 4;
   }
   .desk-shell .project-panel.navigation-page[open] {

@@ -389,6 +389,7 @@ run_bootstrap() {
     GARDEN_TEST_REAL_GIT="$real_git" \
     GARDEN_ROOT="${2:-$bootstrap_root}" \
     GARDEN_REPOSITORY="$remote" \
+    GARDEN_REF="${3:-main}" \
     GARDEN_EXPECTED_COMMIT="$1" \
     /bin/sh "$repository_root/install.sh"
 }
@@ -417,11 +418,17 @@ printf "apt-get %s\n" "$*" >>"$GARDEN_TEST_COMMAND_LOG"'
 : >"$command_log"
 first_install_root="$test_root/first-install-root"
 run_bootstrap "$published_head" "$first_install_root" >/dev/null 2>&1
-rm -f "$fake_bin/apt-get"
 grep -q 'apt-get install' "$command_log"
 grep -q 'the installer ran' "$command_log"
 test "$("$real_git" -C "$first_install_root" rev-parse HEAD)" = "$published_head"
 test "$("$real_git" -C "$first_install_root" rev-parse --abbrev-ref HEAD)" = garden
+: >"$command_log"
+commit_install_root="$test_root/commit-install-root"
+run_bootstrap "$published_head" "$commit_install_root" "$published_head" >/dev/null 2>&1
+grep -q 'the installer ran' "$command_log"
+test "$("$real_git" -C "$commit_install_root" rev-parse HEAD)" = "$published_head"
+test "$("$real_git" -C "$commit_install_root" rev-parse --abbrev-ref HEAD)" = garden
+rm -f "$fake_bin/apt-get"
 printf 'ok  the bootstrap checks the commit pin on a partial install and on a fresh one\n'
 
 run_garden() {
