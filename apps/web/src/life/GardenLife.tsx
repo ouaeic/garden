@@ -70,19 +70,57 @@ type Ledge = {
  * what is at three points just under the edge and just over it - so an edge behind a dialog, or
  * one a scroller has clipped away, is never somewhere to go.
  */
-function visible(element: Element | null): Ledge | null {
+function visible(element: Element | null, edge: 'top' | 'bottom' = 'top'): Ledge | null {
   if (!element) return null;
   const box = element.getBoundingClientRect();
   if (box.width === 0 || box.bottom <= 0 || box.top >= innerHeight) return null;
   for (const share of [0.2, 0.5, 0.8]) {
     const x = box.left + box.width * share;
-    const under = document.elementFromPoint(x, Math.min(box.bottom - 1, box.top + 3));
+    const y = edge === 'top' ? box.top : box.bottom;
+    const under = document.elementFromPoint(x, edge === 'top' ? y + 0.5 : y - 0.5);
     if (!under || !(under === element || element.contains(under))) return null;
-    const over = document.elementFromPoint(x, Math.max(0, box.top - 8));
+    const over = document.elementFromPoint(x, Math.max(0, edge === 'top' ? y - 8 : y + 8));
     if (over?.closest('dialog, [role="dialog"], [aria-modal="true"]')) return null;
   }
   const { left, top, right, bottom, width } = box;
   return { left, top, right, bottom, width, element };
+}
+
+/** A layout box is a perch only where its own border is painted and unobscured. */
+function paintedEdge(element: Element | null, edge: 'top' | 'bottom' = 'top'): Ledge | null {
+  const box = visible(element, edge);
+  if (!element || !box) return null;
+  const style = getComputedStyle(element);
+  const width = parseFloat(style.getPropertyValue(`border-${edge}-width`));
+  const line = style.getPropertyValue(`border-${edge}-style`);
+  const color = style.getPropertyValue(`border-${edge}-color`);
+  const alpha = color.includes('/')
+    ? color.split('/')[1]
+    : color.startsWith('rgba(')
+      ? color.split(',')[3]
+      : '1';
+  if (
+    !(width > 0) ||
+    line === 'none' ||
+    line === 'hidden' ||
+    color === 'transparent' ||
+    !(parseFloat(alpha ?? '1') > 0)
+  )
+    return null;
+  for (let parent: Element | null = element; parent; parent = parent.parentElement) {
+    const paint = getComputedStyle(parent);
+    if (paint.visibility !== 'visible' || Number(paint.opacity) === 0) return null;
+  }
+  // A midpoint hit on a one-pixel line can round into the adjacent child content.
+  const y =
+    edge === 'top' ? box.top + Math.min(width / 2, 0.01) : box.bottom - Math.min(width / 2, 0.01);
+  if (
+    [0.2, 0.5, 0.8].some(
+      (share) => document.elementFromPoint(box.left + box.width * share, y) !== element
+    )
+  )
+    return null;
+  return box;
 }
 
 /** Card edges a creature can stand on: wide enough, fully on screen, below the masthead. */
@@ -90,7 +128,7 @@ function ledges() {
   const bar = document.querySelector('.garden-masthead')?.getBoundingClientRect().bottom ?? 56;
   return [...document.querySelectorAll('[data-perch], .desk-card, .desk-work-card')]
     .filter((element) => !element.closest('dialog'))
-    .map((element) => visible(element))
+    .map((element) => paintedEdge(element))
     .filter((box): box is Ledge =>
       Boolean(box && box.top > bar + 20 && box.width > 140 && box.right <= innerWidth - 8)
     );
@@ -184,18 +222,22 @@ export default function GardenLife() {
      * there. A creature in the air has none. The watch below compares the two, so a creature never
      * goes on standing on an edge that has moved, been covered, or belongs to the page just left.
      */
-    const anchors = new Map<number, { element: Element; edge: 'top' | 'bottom'; at: number }>();
+    const anchors = new Map<
+      number,
+      { element: Element; edge: 'top' | 'bottom'; at: number; border: boolean }
+    >();
     const anchor = (
       id: number,
       element: Element | null | undefined,
-      edge: 'top' | 'bottom' = 'top'
+      edge: 'top' | 'bottom' = 'top',
+      border = true
     ) => {
       if (!element || life(id).cancelled) {
         anchors.delete(id);
         return;
       }
       const box = element.getBoundingClientRect();
-      anchors.set(id, { element, edge, at: edge === 'top' ? box.top : box.bottom });
+      anchors.set(id, { element, edge, at: edge === 'top' ? box.top : box.bottom, border });
     };
     const offset = (actor: Actor) => (actor.clip?.side === 'below' ? actor.clip.line : 0);
     const settle = () => new Promise<void>((done) => requestAnimationFrame(() => done()));
@@ -278,6 +320,7 @@ export default function GardenLife() {
       const own = lives.get(id);
       if (!own || own.cancelled) return;
       own.cancelled = true;
+      const held = anchors.get(id);
       anchors.delete(id);
       const node = nodes.current.get(id);
       const here = where(id);
@@ -287,17 +330,17 @@ export default function GardenLife() {
         remove(id);
         return;
       }
-      state.set(id, { ...actor, x: here.x, y: here.y });
-      if (node) node.style.transform = `translate3d(${here.x}px, ${here.y - offset(actor)}px, 0)`;
+      const clip = held && paintedEdge(held.element, held.edge) ? actor.clip : undefined;
+      const leaving = { ...actor, x: here.x, y: here.y, clip };
+      state.set(id, leaving);
+      commit();
+      if (node) node.style.transform = `translate3d(${here.x}px, ${here.y - offset(leaving)}px, 0)`;
       const height = node?.getBoundingClientRect().height ?? 24;
-      const leave = actor.clip
-        ? travel(
-            id,
-            here.x,
-            actor.clip.side === 'above' ? actor.clip.line + 2 : actor.clip.line - height - 2,
-            220,
-            { easing: 'cubic-bezier(0.5, 0, 0.9, 0.5)', force: true }
-          )
+      const leave = clip
+        ? travel(id, here.x, clip.side === 'above' ? clip.line + 2 : clip.line - height - 2, 220, {
+            easing: 'cubic-bezier(0.5, 0, 0.9, 0.5)',
+            force: true
+          })
         : travel(id, offscreen(here.x < innerWidth / 2), here.y - 60, 450, {
             easing: 'cubic-bezier(0.3, 0, 0.2, 1)',
             force: true
@@ -334,38 +377,20 @@ export default function GardenLife() {
       });
     };
     const narrow = () => innerWidth < 700;
-    const brandBox = () => visible(document.querySelector('.garden-masthead .brand'));
-
-    /** Places a bird or an owl can land: card edges and, on top of the word, the logo. */
-    type Perch = { left: number; right: number; y: number; element: Element };
-    const perches = (height: number, logo: boolean): Perch[] => {
-      const brand = brandBox();
-      return [
-        ...ledges().map((box) => ({
-          left: box.left + 12,
-          right: box.right - 36,
-          y: box.top - height,
-          element: box.element
-        })),
-        ...(logo && brand
-          ? [
-              {
-                left: brand.left,
-                right: brand.right - 18,
-                y: Math.max(2, brand.top - height + 4),
-                element: brand.element
-              }
-            ]
-          : [])
-      ];
-    };
+    /** Birds settle along the painted top borders of cards. */
+    const perches = (height: number) =>
+      ledges().map((box) => ({
+        left: box.left + 12,
+        right: box.right - 36,
+        y: box.top - height,
+        element: box.element
+      }));
 
     const scenes: Record<string, () => Promise<void>> = {
       async birdVisit() {
-        const all = perches(17, true);
+        const all = perches(17);
         if (!all.length) return;
-        const logo = all.at(-1)!;
-        let perch = chance(0.3) && brandBox() ? logo : pick(all)!;
+        let perch = pick(all)!;
         const fromLeft = chance(0.5);
         const id = spawn({
           kind: 'bird',
@@ -410,7 +435,7 @@ export default function GardenLife() {
         };
         await potter(3 + Math.floor(Math.random() * 3));
         // Sometimes on to a second perch before leaving.
-        const others = perches(17, true).filter((other) => Math.abs(other.y - perch.y) > 8);
+        const others = perches(17).filter((other) => Math.abs(other.y - perch.y) > 8);
         if (others.length && chance(0.45)) {
           perch = pick(others)!;
           x = between(perch.left, perch.right);
@@ -432,9 +457,9 @@ export default function GardenLife() {
       },
       async owlVisit() {
         if (!isNight()) return;
-        const all = perches(17, true);
+        const all = perches(17);
         if (!all.length) return;
-        const perch = chance(0.6) && brandBox() ? all.at(-1)! : pick(all)!;
+        const perch = pick(all)!;
         const fromLeft = chance(0.5);
         const id = spawn({
           kind: 'owl',
@@ -492,7 +517,7 @@ export default function GardenLife() {
           });
           // Resting: wings fold and open slowly.
           pose(id, { frames: butterfly.slice(0, 3), fps: 1.5 });
-          anchor(id, target.element);
+          anchor(id, target.element, 'top', !plants.length);
           await wait(between(2500, 5000), own);
           pose(id, { frames: butterfly, fps: 10 });
           anchor(id, null);
@@ -512,9 +537,9 @@ export default function GardenLife() {
       },
       async monkeyTour() {
         const masthead = document.querySelector('.garden-masthead');
-        const bar = masthead?.getBoundingClientRect();
+        const bar = paintedEdge(masthead, 'bottom');
         const cards = ledges();
-        if (!masthead || !bar || !cards.length) return;
+        if (!cards.length) return;
         /*
          * Out from behind one border, a leap or two between card edges, and back behind another -
          * the masthead's lower edge (it climbs up out of sight) or a card's top edge (it sinks).
@@ -528,14 +553,14 @@ export default function GardenLife() {
           clip: { side: 'above', line: box.top },
           box
         });
-        const onBar = (): Spot => ({
-          x: between(innerWidth * 0.3, innerWidth * 0.7),
-          y: bar.bottom - 1,
+        const onBar = (box: Ledge): Spot => ({
+          x: between(box.left + box.width * 0.3, box.left + box.width * 0.7),
+          y: box.bottom - 1,
           hang: true,
-          clip: { side: 'below', line: bar.bottom }
+          clip: { side: 'below', line: box.bottom }
         });
         const hidden = (spot: Spot) => (spot.hang ? spot.y - 30 : spot.y + 26);
-        const start = chance(0.5) ? onBar() : onCard(pick(cards)!);
+        const start = bar && chance(0.5) ? onBar(bar) : onCard(pick(cards)!);
         const hold = (spot: Spot) =>
           spot.hang ? anchor(id, masthead, 'bottom') : anchor(id, spot.box?.element);
         const id = spawn({
@@ -584,7 +609,8 @@ export default function GardenLife() {
           pose(id, { frames: pick([monkey.scratch, monkey.blink, monkey.sit])!, fps: 3 });
           await wait(between(900, 1800), own);
         }
-        const exit = chance(0.4) ? onBar() : here;
+        const exitBar = paintedEdge(masthead, 'bottom');
+        const exit = exitBar && chance(0.4) ? onBar(exitBar) : here;
         if (exit !== here) {
           pose(id, { frames: monkey.jump, clip: undefined });
           anchor(id, null);
@@ -640,7 +666,7 @@ export default function GardenLife() {
       async batVisit() {
         if (!isNight()) return;
         const masthead = document.querySelector('.garden-masthead');
-        const bar = masthead?.getBoundingClientRect();
+        const bar = paintedEdge(masthead, 'bottom');
         const flit = async (id: number, fromLeft: boolean) => {
           let x = at(id).x;
           for (let leg = 0; leg < 3; leg++) {
@@ -863,7 +889,12 @@ export default function GardenLife() {
         if (!held) continue;
         const box = held.element.isConnected ? held.element.getBoundingClientRect() : null;
         const edge = box ? (held.edge === 'top' ? box.top : box.bottom) : Number.NaN;
-        if (!box || !(Math.abs(edge - held.at) <= 2) || !visible(held.element)) evacuate(id);
+        if (
+          !box ||
+          !(Math.abs(edge - held.at) <= 2) ||
+          !(held.border ? paintedEdge(held.element, held.edge) : visible(held.element))
+        )
+          evacuate(id);
       }
     }, 250);
     const active = new Set<string>();

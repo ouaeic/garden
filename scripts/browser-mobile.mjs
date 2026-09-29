@@ -184,6 +184,52 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
     }
     await page.waitForTimeout(800);
     await page.screenshot({ path: resolve(report, 'mobile-creatures.png') });
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 844 });
+      for (const rule of ['border-style: none', 'border-color: transparent', 'opacity: 0']) {
+        await page.reload();
+        await page.locator('.home-projects').waitFor();
+        await page.locator('.life-layer').waitFor({ state: 'attached' });
+        await page.evaluate(() =>
+          dispatchEvent(new CustomEvent('garden:scene', { detail: 'snailCrawl' }))
+        );
+        const snail = page.locator('[data-creature="snail"]');
+        await snail.waitFor({ state: 'attached' });
+        const candidates = page.locator(
+          '[data-perch], .desk-card, .desk-work-card, .garden-masthead'
+        );
+        assert(
+          (await candidates.count()) > 0,
+          'The border visibility check needs real candidate edges'
+        );
+        const hiddenBorders = await page.addStyleTag({
+          content: `[data-perch], .desk-card, .desk-work-card, .garden-masthead { ${rule} !important; }`
+        });
+        await snail.waitFor({ state: 'detached' });
+        await page.evaluate((names) => {
+          for (const name of names)
+            dispatchEvent(new CustomEvent('garden:scene', { detail: name }));
+        }, Object.keys(scenes));
+        await page.waitForTimeout(400);
+        assert.equal(
+          await page
+            .locator(
+              '[data-creature="bird"], [data-creature="monkey"], [data-creature="frog"], [data-creature="ladybird"], [data-creature="snail"]'
+            )
+            .count(),
+          0,
+          `No invisible perches at ${width}px with ${rule}`
+        );
+        await hiddenBorders.evaluate((element) => element.remove());
+        await page.evaluate(() =>
+          dispatchEvent(new CustomEvent('garden:scene', { detail: 'snailCrawl' }))
+        );
+        await snail.waitFor({ state: 'attached' });
+      }
+    }
+    console.log(
+      'Painted-edge checks passed on desktop and mobile: absent, transparent and hidden borders are rejected; returning borders can be used again.'
+    );
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.reload();
     await page.locator('.home-projects').waitFor();
