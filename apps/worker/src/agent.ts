@@ -1155,21 +1155,8 @@ export class AgentWorker {
   }
 
   async #assertProviderConfigured(task: TaskRecord): Promise<void> {
-    const configured =
-      (await this.store.getManagedProviderCredential(task.userId, 'inference')) ??
-      (await this.store.getManagedProviderCredential(task.userId, 'openrouter'));
-    if (
-      !configured &&
-      !this.config.AI_API_KEY &&
-      !this.config.OPENROUTER_API_KEY &&
-      !(this.config.AI_PROVIDER === 'openai-compatible' && this.config.AI_DEFAULT_MODEL)
-    )
+    if (!(await this.#inferenceConnections(task)).size)
       throw new GardenError(
-        // The name three things already listen for. `provider_setup_required` was thrown here and
-        // recognised nowhere: the API's wall table, the title sweep's cooldown and this worker's own
-        // `waiting` test all key on `provider_not_connected`, so the missing-credential wall was
-        // unreachable and every one of them ran its failure branch instead. A code with three
-        // consumers and no producer is a control wired to nothing.
         'provider_not_connected',
         'Add a model provider in Settings before starting agent work',
         503
@@ -2063,13 +2050,9 @@ export class AgentWorker {
     const refreshActivePlan = async (createFallback = false): Promise<boolean> =>
       refreshActivePlan_(this.#window, task, key, state, createFallback);
 
-    // Deliberately not `true` here. The generic three-step plan used to be created before the first
-    // model call on every task, so a request for a haiku arrived with "Inspect the request, inputs,
-    // and current workspace state" already in progress, the model spent a set_plan call rewriting a
-    // plan it never needed, and the user watched a Plan pane fill with boilerplate. The fallback
-    // now waits until the task has actually changed something or run past its second step - the
-    // cases where a visible plan is what the user wants.
-    await refreshActivePlan(state.mutated === true || state.step >= 2);
+    // Repairs and read-only queries need no synthetic plan. The model can plan substantive work
+    // explicitly; changes without a plan still receive a visible verification checklist.
+    await refreshActivePlan(state.mutated === true);
 
     /** @see drainCorrection in `turn-control.ts`, where this moved in Wave 7.2. */
     const drainCorrection = async (): Promise<boolean> =>

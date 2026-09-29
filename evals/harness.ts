@@ -42,6 +42,7 @@ import {
   decryptJson,
   encryptJson,
   generateDataKey,
+  inferenceCredentialAad,
   wrapDataKey
 } from '../packages/core/src/crypto.js';
 import {
@@ -1846,6 +1847,8 @@ const spendDecisionAt = (
 };
 
 export interface Fixture {
+  /** A saved compatible connection, with no environment credential to hide startup regressions. */
+  readonly savedConnection?: { readonly id: string; readonly apiKey?: string };
   readonly id: string;
   readonly shape: FixtureShape;
   /** The owner's words, as they would arrive. */
@@ -2954,7 +2957,10 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
    */
   forgetReads();
   if (fixture.schema) return schemaOutcome(fixture.schema());
-  const model = modelFor(fixture.contextTokens, fixture.live);
+  const model = {
+    ...modelFor(fixture.contextTokens, fixture.live),
+    ...(fixture.savedConnection ? { connectionId: fixture.savedConnection.id } : {})
+  };
   /*
    * The task record the worker is handed, and - under `autoApprove` - the record it is handed AGAIN.
    * A `let` for that reason alone: the stub's `updateTask` reassigns it so that the state the loop
@@ -2964,6 +2970,7 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
    */
   let task = taskFor(fixture.request, fixture.maxCredits ?? 50, fixture.securityMode ?? 'balanced');
   const events: Array<{ kind: string; summary: string; payload: unknown }> = [];
+  const artifacts: Array<Record<string, unknown>> = [];
   // Direction-aware reads see the owner's initial message and the same sealed rows writers append.
   const storedEvents: TaskEventRecord[] = [
     {
@@ -3097,9 +3104,28 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
     listConnectors: async () => [],
     listModels: async () => (fixture.visionSpecialist ? [model, visionRelease] : [model]),
     getManagedProviderCredential: async () => null,
-    // No saved connection: the fixture's provider comes from the environment, which is the shape a
-    // self-hosted box configured through `control.env` has.
-    listManagedProviderCredentials: async () => [],
+    listManagedProviderCredentials: async () =>
+      fixture.savedConnection
+        ? [
+            {
+              provider: `inference:${fixture.savedConnection.id}`,
+              status: 'active',
+              secretCiphertext: encryptJson(
+                {
+                  connectionId: fixture.savedConnection.id,
+                  provider: 'openai-compatible',
+                  baseUrl: PROVIDER_URL,
+                  ...(fixture.savedConnection.apiKey
+                    ? { apiKey: fixture.savedConnection.apiKey }
+                    : {}),
+                  enforceZeroDataRetention: false
+                },
+                masterKey,
+                inferenceCredentialAad(task.userId)
+              )
+            }
+          ]
+        : [],
     rerouteTaskModel: async () => false,
     recordModelThroughputCeiling: async () => undefined,
     modelThroughputCeiling: async () => null,
@@ -3292,10 +3318,22 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
     },
     // A delivered file, so a job that makes something can be measured all the way to the owner
     // rather than stopping at the workspace.
-    createArtifact: async (input: Record<string, unknown>) => ({
-      id: `artifact-${asText(input.storageKey)}`,
-      version: 1
-    }),
+    createArtifact: async (input: Record<string, unknown>) => {
+      const artifact = { ...input, id: `artifact-${asText(input.storageKey)}`, version: 1 };
+      artifacts.push(artifact);
+      return artifact;
+    },
+    listArtifacts: async (owner: string, workspace: string, task: string, limit = 128) =>
+      artifacts
+        .filter(
+          (artifact) =>
+            artifact.userId === owner &&
+            artifact.workspaceId === workspace &&
+            artifact.taskId === task
+        )
+        .slice(0, limit),
+    // No preview service is started by the synthetic runner.
+    listWorkspacePreviews: async () => [],
     mediaSpendForTask: async () => 0,
     // The running spending cap, answering as `Fixture.spend` declares and as `allow` when nothing
     // does. Hardcoded to `allow` for the life of this rig, which is why two of its three arms had
@@ -3843,7 +3881,7 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
         OPENROUTER_BASE_URL: fixture.live?.baseUrl ?? PROVIDER_URL,
         AI_PROVIDER: fixture.live?.provider ?? 'openai-compatible',
         AI_BASE_URL: fixture.live?.baseUrl ?? PROVIDER_URL,
-        AI_API_KEY: fixture.live?.apiKey ?? 'provider-key',
+        AI_API_KEY: fixture.savedConnection ? undefined : (fixture.live?.apiKey ?? 'provider-key'),
         AI_REQUIRE_ZDR: false,
         // Pinned so a search is answered by the workspace's own browser on every fixture. Which
         // host answers a search is a policy decision with its own tests; what these fixtures are

@@ -594,6 +594,30 @@ const longAnswerPart = (part: number, lines = 260): string =>
   ).join('\n');
 
 export const fixtures: readonly Fixture[] = [
+  ...[undefined, 'synthetic-provider-key'].map(
+    (apiKey): Fixture => ({
+      id: `answer-saved-${apiKey ? 'keyed' : 'keyless'}-connection`,
+      shape: 'answer',
+      request: 'Say ready.',
+      why: 'Saved named providers must start without an environment credential, including keyless local inference.',
+      savedConnection: {
+        id: 'openai-compatible:10000000-0000-4000-8000-000000000001',
+        ...(apiKey ? { apiKey } : {})
+      },
+      model: sequence({
+        text: 'Ready.',
+        calls: finishCall('done', { summary: 'Ready.', verification: conversational() })
+      }),
+      expect: {
+        modelCalls: 1,
+        status: 'completed',
+        tools: [],
+        holds: [],
+        fallbackPlan: false,
+        replies: 1
+      }
+    })
+  ),
   /* ------------------------------------------------------ read a document and answer about it */
   {
     id: 'answer-conversational-no-tools',
@@ -2518,10 +2542,10 @@ export const fixtures: readonly Fixture[] = [
     }
   },
   {
-    id: 'small-third-call-writes-a-plan-nobody-asked-for',
+    id: 'small-third-call-keeps-read-only-work-plan-free',
     shape: 'small',
     request: 'Compare the renewal date in the notes with the one in the contract.',
-    why: 'The boilerplate plan waits for the third model call and then writes itself - "Inspect the request, inputs, and current workspace state" - for a task that is two reads and an answer. It costs a model call nothing and the owner a plan panel of nothing, and it then travels in every later prompt. Measured here so the question of whether it should exist can be settled with a number.',
+    why: 'Two reads and an answer need no synthetic plan. A third model call must not create work for the model or a boilerplate plan for the owner.',
     runner: { files: workspaceFiles },
     model: sequence(
       { calls: [{ id: 'call-1', name: 'file_read', args: { path: 'workspace/notes.txt' } }] },
@@ -2540,7 +2564,7 @@ export const fixtures: readonly Fixture[] = [
       modelCalls: 3,
       tools: ['file_read', 'document_read'],
       status: 'completed',
-      fallbackPlan: true,
+      fallbackPlan: false,
       holds: []
     }
   },

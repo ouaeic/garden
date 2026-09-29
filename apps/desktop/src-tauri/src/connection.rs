@@ -518,6 +518,10 @@ pub async fn probe_profile(profile: &ServerProfile) -> Result<ServerProfile, Str
     for endpoint in candidates {
         let client = client.clone();
         probes.push(async move {
+            // Give LAN discovery and direct private addresses a head start over a WAN route.
+            if !is_lan_endpoint(&endpoint) {
+                tokio::time::sleep(Duration::from_millis(400)).await;
+            }
             let result = client
                 .get(format!("{endpoint}/.well-known/garden"))
                 .send()
@@ -559,6 +563,18 @@ pub async fn probe_profile(profile: &ServerProfile) -> Result<ServerProfile, Str
         "No saved address could prove the server identity. {}",
         failures.join("; ")
     ))
+}
+
+fn is_lan_endpoint(endpoint: &str) -> bool {
+    let Ok(url) = Url::parse(endpoint) else {
+        return false;
+    };
+    match url.host() {
+        Some(url::Host::Ipv4(ip)) => ip.is_private(),
+        Some(url::Host::Ipv6(ip)) => (ip.segments()[0] & 0xfe00) == 0xfc00,
+        Some(url::Host::Domain(name)) => name.ends_with(".local"),
+        _ => false,
+    }
 }
 
 fn endpoint_from_ip(address: IpAddr, port: u16) -> Option<String> {
@@ -624,20 +640,51 @@ async fn mdns_candidates(profile: &ServerProfile) -> Result<ServerProfile, Strin
 }
 
 pub async fn connect_profile(profile: &ServerProfile) -> Result<ServerProfile, String> {
-    match probe_profile(profile).await {
-        Ok(connected) => Ok(connected),
-        Err(endpoint_error) => {
-            let discovered = mdns_candidates(profile)
-                .await
-                .map_err(|discovery_error| format!("{endpoint_error} {discovery_error}"))?;
-            probe_profile(&discovered).await
-        }
+    let saved = probe_profile(profile);
+    let lan = async {
+        let discovered = mdns_candidates(profile).await?;
+        probe_profile(&discovered).await
+    };
+    tokio::pin!(saved, lan);
+    // Discovery can find a changed LAN address while saved public routes are still reachable.
+    // Every candidate must prove the same pinned identity before it can carry a credential.
+    tokio::select! {
+        result = &mut lan => match result {
+            Ok(connected) => Ok(connected),
+            Err(lan_error) => saved.await.map_err(|error| format!("{error} {lan_error}")),
+        },
+        result = &mut saved => match result {
+            Ok(connected) => Ok(connected),
+            Err(saved_error) => lan.await.map_err(|error| format!("{saved_error} {error}")),
+        },
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recognizes_private_lan_routes_without_trusting_public_lookalikes() {
+        for endpoint in [
+            "https://192.168.1.42",
+            "https://10.0.0.5",
+            "https://172.16.0.2",
+            "https://[fd00::42]",
+            "https://garden.local",
+        ] {
+            assert!(is_lan_endpoint(endpoint), "{endpoint}");
+        }
+        for endpoint in [
+            "https://192.168.1.42.example.com",
+            "https://172.32.0.1",
+            "https://garden.local.example.com",
+            "https://[2001:db8::1]",
+            "https://example.com",
+        ] {
+            assert!(!is_lan_endpoint(endpoint), "{endpoint}");
+        }
+    }
 
     fn pairing_uri(expires_at: u64) -> String {
         let payload = serde_json::json!({
@@ -817,7 +864,7 @@ mod tests {
             last_endpoint: Some(stale_endpoint.clone()),
             network_preference: NetworkPreference::Unknown,
         };
-        let connected = probe_profile(&profile).await.unwrap();
+        let connected = connect_profile(&profile).await.unwrap();
         assert_eq!(connected.identity, profile.identity);
         assert_ne!(
             connected.last_endpoint.as_deref(),

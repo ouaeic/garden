@@ -60,6 +60,7 @@ interface Provider {
   baseUrl: string;
   modelId: string | null;
   hasApiKey: boolean;
+  localEndpoint?: boolean;
   enforceZeroDataRetention: boolean;
   contextTokens?: number;
   capabilities?: string[];
@@ -109,11 +110,13 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
   const [choice, setChoice] = useState('');
   const [vendorChoice, setVendorChoice] = useState('');
   const [adding, setAdding] = useState(false);
+  const [addingLocal, setAddingLocal] = useState(false);
   const [mediaSelections, setMediaSelections] = useState<Record<string, string>>({});
   const mediaAction = useAction(() => onChange());
   const connections = provider.value?.connections ?? [];
   const selected = choice;
   const saved = connections.find((entry) => (entry.connectionId ?? entry.provider) === selected);
+  const localEndpoint = saved?.localEndpoint ?? addingLocal;
   const selectedProvider =
     saved?.provider ?? (selected.startsWith('openai-compatible:') ? 'openai-compatible' : selected);
   const vendors = provider.value?.vendors ?? [];
@@ -130,13 +133,16 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
   /** Open one connection's settings, or start a new one of the kind picked from the tiles. */
   const open = (value: string) => {
     setAdding(false);
+    setAddingLocal(value === 'local');
     if (value.startsWith('vendor:')) {
       setVendorChoice(value.slice('vendor:'.length));
       setChoice(`openai-compatible:${crypto.randomUUID()}`);
       return;
     }
     setVendorChoice('');
-    setChoice(value === 'custom' ? `openai-compatible:${crypto.randomUUID()}` : value);
+    setChoice(
+      value === 'custom' || value === 'local' ? `openai-compatible:${crypto.randomUUID()}` : value
+    );
   };
   const close = () => {
     setChoice('');
@@ -154,7 +160,9 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
         ? 'Connect OpenRouter'
         : selectedProvider === 'ollama-cloud'
           ? 'Connect Ollama Cloud'
-          : 'Connect an endpoint';
+          : localEndpoint
+            ? 'Connect local models'
+            : 'Connect an endpoint';
   const keyUrl =
     vendor?.keyUrl ??
     (selectedProvider === 'openrouter'
@@ -179,13 +187,22 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
       >
         <input name="modelId" defaultValue={saved?.modelId ?? ''} />
       </Field>
-      <Field label="Context window in tokens">
+      <Field
+        label="Context window in tokens"
+        {...(localEndpoint
+          ? {
+              hint: 'Match the context size configured in your inference server. Garden does not change it. Choose a model with tool calling support.'
+            }
+          : {})}
+      >
         <input
           name="contextTokens"
           type="number"
           min={4096}
           max={10000000}
-          defaultValue={saved?.contextTokens ?? vendor?.contextTokens ?? 128000}
+          defaultValue={
+            saved?.contextTokens ?? vendor?.contextTokens ?? (localEndpoint ? 32768 : 128000)
+          }
           required
         />
       </Field>
@@ -202,7 +219,7 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
           <input
             name="reasoning"
             type="checkbox"
-            defaultChecked={saved?.capabilities?.includes('reasoning') ?? true}
+            defaultChecked={saved?.capabilities?.includes('reasoning') ?? !localEndpoint}
           />
           Supports reasoning
         </label>
@@ -213,7 +230,7 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
     <>
       <Section
         title="Model connections"
-        description="Your own keys, used directly by your computer. Connect as many as you like: every connected provider's models appear together when you choose one."
+        description="Your providers and local model servers, connected directly by your computer. Every connected provider's models appear together when you choose one."
       >
         <ResourceState resource={provider} />
         {connections.length > 0 && (
@@ -290,6 +307,11 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
                   note: KNOWN_AS[entry.id] ?? ''
                 })),
                 { value: 'ollama-cloud', label: 'Ollama Cloud', note: 'open models on a plan' },
+                {
+                  value: 'local',
+                  label: 'Local models',
+                  note: 'Ollama or a compatible local server'
+                },
                 { value: 'custom', label: 'Other endpoint', note: 'any OpenAI-compatible address' }
               ].map((tile, index) => (
                 <button
@@ -326,6 +348,7 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
                   put('/v1/providers', {
                     provider: selectedProvider,
                     connectionId: selected,
+                    localEndpoint,
                     ...(selectedProvider === 'openai-compatible'
                       ? { label: fieldValue(form, 'label') }
                       : {}),
@@ -374,6 +397,14 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
             }}
           >
             <h3>{heading}</h3>
+            {localEndpoint && (
+              <p className="management-note">
+                Run Ollama on your Garden server, or enter the private IP of another computer on its
+                network. The address is reached from the Garden server; localhost means that server.
+                Install a tool-capable model first. No API key is needed for a standard Ollama
+                installation.
+              </p>
+            )}
             {saved && saved.configured !== false && (
               <p className="management-note">
                 {`Connected through ${saved.source === 'server_environment' ? 'server configuration' : 'your saved settings'}. ${saved.hasApiKey ? 'A key is securely stored.' : 'This endpoint uses no saved key.'}`}
@@ -419,7 +450,7 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
                   <input
                     name="label"
                     maxLength={80}
-                    defaultValue={saved?.label ?? ''}
+                    defaultValue={saved?.label ?? (localEndpoint ? 'Local Ollama' : '')}
                     placeholder={vendor?.label ?? 'Work models'}
                   />
                 </Field>
@@ -431,7 +462,9 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
                       required
                       name="baseUrl"
                       type="url"
-                      defaultValue={saved?.baseUrl ?? ''}
+                      defaultValue={
+                        saved?.baseUrl ?? (localEndpoint ? 'http://127.0.0.1:11434/v1' : '')
+                      }
                       placeholder="https://provider.example/v1"
                     />
                   </Field>

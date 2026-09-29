@@ -318,6 +318,7 @@ export interface ConnectionManifest {
  * `modelId` is only meaningful for an endpoint that serves a single model.
  */
 export interface InferenceSecret {
+  localEndpoint?: boolean;
   connectionId?: string;
   label?: string;
   catalogDefaults?: {

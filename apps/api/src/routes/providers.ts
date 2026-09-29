@@ -32,6 +32,7 @@ import type { InferenceSecret } from '../context.js';
 import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 import { recordSecurityEvent } from '../security-events.js';
+import { privateProviderAddress } from '../provider-address.js';
 
 /**
  * The two ceilings a first connection puts in place, from the one number the owner was asked for.
@@ -83,6 +84,7 @@ export const registerProviderRoutes = (context: RouteContext): void => {
       const input = z
         .object({
           provider: z.enum(['openrouter', 'ollama-cloud', 'openai-compatible']),
+          localEndpoint: z.boolean().default(false),
           /**
            * A model company from the preset list. It fixes the address and names the connection;
            * the connection itself is an ordinary named compatible endpoint, so several companies
@@ -129,6 +131,18 @@ export const registerProviderRoutes = (context: RouteContext): void => {
             .optional()
         })
         .superRefine((value, context) => {
+          if (value.localEndpoint && (value.provider !== 'openai-compatible' || value.vendor))
+            context.addIssue({
+              code: 'custom',
+              path: ['localEndpoint'],
+              message: 'Choose a compatible local endpoint'
+            });
+          if (value.localEndpoint && value.contextTokens === undefined)
+            context.addIssue({
+              code: 'custom',
+              path: ['contextTokens'],
+              message: 'Enter the context window configured on the local server'
+            });
           if (value.vendor && value.provider !== 'openai-compatible')
             context.addIssue({
               code: 'custom',
@@ -195,15 +209,17 @@ export const registerProviderRoutes = (context: RouteContext): void => {
           'provider_url_invalid',
           'Provider URLs cannot contain credentials, query parameters, or fragments'
         );
-      const privateHttp =
-        url.protocol === 'http:' &&
-        (url.hostname === 'localhost' ||
-          url.hostname === '127.0.0.1' ||
-          url.hostname === '::1' ||
-          /^10\./.test(url.hostname) ||
-          /^192\.168\./.test(url.hostname) ||
-          /^172\.(?:1[6-9]|2\d|3[01])\./.test(url.hostname));
-      if (url.protocol !== 'https:' && !(config.ALLOW_INSECURE_PROVIDER_URLS && privateHttp))
+      if (input.localEndpoint && !privateProviderAddress(url))
+        throw new GardenError(
+          'provider_url_invalid',
+          'Use localhost or a private LAN IP address for a local endpoint',
+          422
+        );
+      const privateHttp = url.protocol === 'http:' && privateProviderAddress(url);
+      if (
+        url.protocol !== 'https:' &&
+        !((config.ALLOW_INSECURE_PROVIDER_URLS || input.localEndpoint) && privateHttp)
+      )
         throw new GardenError(
           'provider_url_insecure',
           'Use HTTPS, or explicitly allow private HTTP provider URLs on this server'
@@ -327,6 +343,7 @@ export const registerProviderRoutes = (context: RouteContext): void => {
         connectionId,
         ...(connectionLabel ? { label: connectionLabel } : {}),
         provider: input.provider,
+        localEndpoint: input.localEndpoint,
         ...(preset ? { vendor: preset.id } : {}),
         catalogDefaults: {
           contextTokens,

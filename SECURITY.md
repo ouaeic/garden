@@ -115,6 +115,9 @@ The relevant adversaries are:
   when connecting; `CONNECTOR_ALLOWED_HOST_SUFFIXES` narrows which mail and calendar hosts may be
   reached at all, and ships empty, which leaves the owner's own choice standing.
 - No local model server, model weight, or inference GPU is installed by garden.
+- An owner-selected local model connection may use HTTP on loopback or a private LAN IP. This
+  per-connection choice does not grant agent tools additional network access. Such an endpoint
+  is reached by the server and may itself forward requests; it is not proof of local data retention.
 - No secret is committed, baked into an image, or returned after initial token issuance.
 
 ## Native host boundary

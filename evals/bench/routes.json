@@ -44,7 +44,7 @@
     "refusal-git-push-stops-for-the-owner",
     "refusal-approval-defers-the-rest-of-the-batch",
     "small-haiku-writes-no-plan",
-    "small-third-call-writes-a-plan-nobody-asked-for",
+    "small-third-call-keeps-read-only-work-plan-free",
     "small-one-look-and-an-answer",
     "media-logo-set-holds-for-acceptance",
     "media-logo-set-declares-its-own-done",

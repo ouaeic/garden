@@ -79,6 +79,17 @@ export interface Bootstrap {
     cpuPercent: number;
     memoryUsedBytes: number;
     memoryTotalBytes: number;
+    gpu?: {
+      sampledAt: string;
+      devices: Array<{
+        id: string;
+        name: string;
+        utilizationPercent: number | null;
+        memoryUsedBytes: number | null;
+        memoryTotalBytes: number | null;
+        temperatureC: number | null;
+      }>;
+    };
   };
   usage: {
     providerSpend: unknown;

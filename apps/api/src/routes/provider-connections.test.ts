@@ -95,6 +95,67 @@ describe('saved provider connection lifecycle', () => {
       }
     });
 
+  it('discovers a keyless local endpoint and persists the explicit owner choice beside cloud connections', async () => {
+    expect((await connect('ollama-cloud', { apiKey: 'cloud-key' })).statusCode).toBe(200);
+    calls.length = 0;
+    const response = await connect('openai-compatible', {
+      localEndpoint: true,
+      baseUrl: 'http://127.0.0.1:11434/v1',
+      contextTokens: 32768,
+      label: 'Local Ollama'
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(calls.length).toBeGreaterThan(0);
+    expect(
+      calls.every(
+        (call) => call.url.startsWith('http://127.0.0.1:11434/v1/') && call.authorization === null
+      )
+    ).toBe(true);
+    const connections = await support.inferenceConnections(userId);
+    expect(connections.get('openai-compatible')?.secret).toMatchObject({
+      localEndpoint: true,
+      label: 'Local Ollama',
+      catalogDefaults: { contextTokens: 32768 }
+    });
+    expect(connections.get('openai-compatible')?.secret.apiKey).toBeUndefined();
+    expect(connections.has('ollama-cloud')).toBe(true);
+    const settings = (await app.inject({ method: 'GET', url: '/v1/providers' })).json<{
+      connections: Array<{ connectionId: string; localEndpoint: boolean }>;
+    }>();
+    expect(
+      settings.connections.find(
+        (item: { connectionId: string }) => item.connectionId === 'openai-compatible'
+      )?.localEndpoint
+    ).toBe(true);
+  });
+
+  it.each(['http://192.168.1.42:11434/v1', 'http://[fd00::42]:11434/v1', 'http://[::1]:11434/v1'])(
+    'accepts explicitly selected private endpoints: %s',
+    async (baseUrl) => {
+      const response = await connect('openai-compatible', {
+        localEndpoint: true,
+        baseUrl,
+        contextTokens: 32768
+      });
+      expect(response.statusCode, response.body).toBe(200);
+    }
+  );
+
+  it.each([
+    { baseUrl: 'http://127.0.0.1:11434/v1' },
+    { localEndpoint: true, baseUrl: 'http://192.168.example.com/v1', contextTokens: 32768 },
+    { localEndpoint: true, baseUrl: 'http://169.254.169.254/v1', contextTokens: 32768 },
+    { localEndpoint: true, baseUrl: 'http://203.0.113.2/v1', contextTokens: 32768 },
+    { localEndpoint: true, baseUrl: 'http://127.0.0.1:11434/v1' }
+  ])(
+    'rejects unapproved HTTP, public lookalikes, metadata addresses and undeclared local windows',
+    async (input) => {
+      const response = await connect('openai-compatible', input);
+      expect(response.statusCode).toBeGreaterThanOrEqual(400);
+      expect(calls).toHaveLength(0);
+    }
+  );
+
   it('discovers both catalogs, preserves exact model identity and removes only the selected connection', async () => {
     for (const provider of ['ollama-cloud', 'openai-compatible']) {
       const response = await connect(provider, { apiKey: `${provider}-key` });

@@ -642,6 +642,8 @@ export const recordToolResult = async (
    * truncation, so the closing marker cannot be the thing the 24,000-character cut removes.
    */
   const full = toolResultText(modelResult);
+  const reference = completionReference(state, call.id);
+  const outputBudget = Math.max(0, RECENT_TOOL_OUTPUT_CHARS - reference.length);
   /*
    * The bytes the window cannot hold, parked where the model can still go and get them.
    *
@@ -665,25 +667,21 @@ export const recordToolResult = async (
    * of its own window and nothing about the runner.
    */
   const spilled =
-    full.length > RECENT_TOOL_OUTPUT_CHARS
+    full.length > outputBudget
       ? await spillOverflow(task, state, full, untrustedOrigin !== null)
       : null;
   const recovery: TruncationRecovery | undefined = spilled ? spillRecovery(spilled) : undefined;
   const serialised =
-    (call.name === 'delegate' && full.length > RECENT_TOOL_OUTPUT_CHARS
-      ? delegateOutputSummary(
-          modelResult,
-          RECENT_TOOL_OUTPUT_CHARS,
-          spilled ? { path: spilled } : null
-        )
-      : null) ?? boundToolResultText(full, RECENT_TOOL_OUTPUT_CHARS, recovery);
+    (call.name === 'delegate' && full.length > outputBudget
+      ? delegateOutputSummary(modelResult, outputBudget, spilled ? { path: spilled } : null)
+      : null) ?? boundToolResultText(full, outputBudget, recovery);
   const forModel = untrustedOrigin
     ? untrustedEnvelope(untrustedOrigin, sanitiseUntrustedText(serialised))
     : serialised;
   state.messages.push({
     role: 'tool',
     toolCallId: call.id,
-    content: `${completionReference(state, call.id)}${forModel}${provenanceNotice ? `\n\n${provenanceNotice}` : ''}`
+    content: `${reference}${forModel}${provenanceNotice ? `\n\n${provenanceNotice}` : ''}`
   });
   // A snapshot of a challenge page is a successful read, so the wall arrives here rather than in
   // the failure path - and it is the same thing to tell the owner about.

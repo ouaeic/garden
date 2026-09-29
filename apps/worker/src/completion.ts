@@ -394,12 +394,12 @@ export const citableEvidence = (state: AgentState): string => {
     .join('\n');
 };
 
-/** Make protocol IDs visible during completion repair without charging ordinary tool results. */
+/** Providers do not all expose protocol IDs to the model, so evidence names travel in the result. */
 export const completionReference = (state: AgentState, id: string): string => {
   const result = state.turnToolResults?.[id];
-  if (!(state.finishRejections && result?.success && !result.skipped)) return '';
+  if (!(result?.success && !result.skipped)) return '';
   if (AGENT_SPEECH.has(result.name)) return '';
-  return `Result reference: ${id} (${result.name})${result.command ? ` [exit ${result.command.exitCode}]` : ''}. Cite only what this output establishes.\n`;
+  return `Result reference: ${id} (${result.name})${result.command ? ` [exit ${result.command.exitCode}]` : ''}.\n`;
 };
 
 /**

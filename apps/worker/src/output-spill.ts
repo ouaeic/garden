@@ -212,7 +212,10 @@ export const spillPathIn = (content: string): string | null => {
   if (named.size !== 1) return null;
   const [path = ''] = named;
   const quarantined = path.startsWith(`${UNTRUSTED_SPILL_DIRECTORY}/`);
-  return content.startsWith(UNTRUSTED_ENVELOPE_OPENING) === quarantined ? path : null;
+  // Only the outer harness reference may precede the envelope. A reference quoted inside the
+  // fenced body cannot change its trust class.
+  const body = content.replace(/^Result reference: [^\r\n]+\.\n/, '');
+  return body.startsWith(UNTRUSTED_ENVELOPE_OPENING) === quarantined ? path : null;
 };
 
 /**

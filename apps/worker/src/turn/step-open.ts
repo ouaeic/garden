@@ -40,7 +40,7 @@ export const openStep = async (
   // Before the plan is refreshed, so a correction that changes the goal is in the window when
   // the plan is read rather than one step behind it.
   await drainCorrection();
-  await refreshActivePlan(state.mutated === true || state.step >= 2);
+  await refreshActivePlan(state.mutated === true);
   await noteStepBudget(deps.handoff, task, key, state, stepCeiling(deps.handoff, state));
   /*
    * The dormant rules, read against the step the model just produced.

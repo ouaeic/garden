@@ -213,6 +213,32 @@ const project = {
   latestTaskId: task.id
 };
 const bootstrap = {
+  computer: {
+    cpuPercent: 12,
+    memoryUsedBytes: 4294967296,
+    memoryTotalBytes: 17179869184,
+    gpu: {
+      sampledAt: '2026-09-29T12:00:00Z',
+      devices: [
+        {
+          id: 'GPU-fixture',
+          name: 'Fixture GPU',
+          utilizationPercent: 37,
+          memoryUsedBytes: 2147483648,
+          memoryTotalBytes: 8589934592,
+          temperatureC: 54
+        },
+        {
+          id: 'GPU-unknown',
+          name: 'Unavailable GPU',
+          utilizationPercent: null,
+          memoryUsedBytes: null,
+          memoryTotalBytes: null,
+          temperatureC: null
+        }
+      ]
+    }
+  },
   user: { id: '40000000-0000-4000-8000-000000000004', username: 'owner' },
   workspaces: [workspace],
   tasks: [task],
@@ -2144,6 +2170,8 @@ try {
     await page.getByText('Provider charge $0.01', { exact: true }).waitFor();
     assert.deepEqual(recordedReceipt, { providerCharacterId: 'char_recorded', costUsd: 0.0125 });
     await page.getByRole('button', { name: 'Stats', exact: true }).click();
+    await page.getByText(/Fixture GPU · GPU 37%/).waitFor();
+    await page.getByText(/Unavailable GPU · GPU unavailable/).waitFor();
     await page.getByRole('button', { name: 'All computer work', exact: true }).click();
     await page.getByRole('button', { name: 'Jobs', exact: true }).click();
     await page.getByRole('button', { name: 'View execution history', exact: true }).click();
@@ -3128,6 +3156,35 @@ try {
       .click();
     await removeConnection.waitFor({ state: 'detached' });
     assert.deepEqual([...providerConnections.keys()], ['openrouter', 'ollama-cloud']);
+
+    await modelsPage.getByRole('button', { name: 'Add a provider', exact: true }).click();
+    await modelsPage.getByRole('button', { name: 'Local models', exact: true }).click();
+    assert.equal(
+      await modelsPage.getByLabel('Endpoint URL', { exact: true }).inputValue(),
+      'http://127.0.0.1:11434/v1'
+    );
+    await modelsPage.getByLabel('Context window in tokens', { exact: true }).fill('65536');
+    await modelsPage.getByRole('button', { name: 'Verify and save', exact: true }).click();
+    await modelsPage.getByRole('button', { name: 'Local Ollama', exact: true }).waitFor();
+    assert.equal(providerWrites.at(-1).localEndpoint, true);
+    assert.equal(providerWrites.at(-1).apiKey, undefined);
+    assert.equal(providerWrites.at(-1).contextTokens, 65536);
+    await modelsPage.reload();
+    await modelsPage.getByRole('button', { name: 'Local Ollama', exact: true }).click();
+    assert.equal(
+      await modelsPage.getByLabel('Endpoint URL', { exact: true }).inputValue(),
+      'http://127.0.0.1:11434/v1'
+    );
+    assert.equal(
+      await modelsPage.getByLabel('Context window in tokens', { exact: true }).inputValue(),
+      '65536'
+    );
+    assert.equal(await modelsPage.evaluate(() => document.documentElement.scrollWidth), 390);
+    await modelsPage.getByRole('button', { name: 'Remove saved connection', exact: true }).click();
+    await removeConnection
+      .getByRole('button', { name: 'Remove saved connection', exact: true })
+      .click();
+    await removeConnection.waitFor({ state: 'detached' });
 
     const namedConnections = [];
     for (const [label, host] of [

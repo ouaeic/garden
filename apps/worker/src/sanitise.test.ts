@@ -182,9 +182,8 @@ describe('what a hostile page looks like once it is in the turn', () => {
     expect(window.indexOf('UNTRUSTED CONTENT IS NOW IN THIS TURN')).toBeGreaterThan(close);
   });
 
-  it('keeps the fresh completion reference outside untrusted data during repair', async () => {
+  it('provides the first completion reference outside untrusted data', async () => {
     const { deps, state, events } = recording();
-    state.finishRejections = 1;
     await recordToolResult(deps, task, Buffer.from(dataKey), state, call, page);
     const window = windowEntry(state);
     expect(window.startsWith('Result reference: call-1 (parallel_web_read).')).toBe(true);

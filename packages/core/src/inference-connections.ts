@@ -4,6 +4,7 @@ import { decryptJson, inferenceCredentialAad, type EncryptedEnvelope } from './c
 export interface InferenceConnectionSecret {
   connectionId?: string;
   label?: string;
+  localEndpoint?: boolean;
   provider: 'openrouter' | 'ollama-cloud' | 'openai-compatible';
   baseUrl: string;
   apiKey?: string;

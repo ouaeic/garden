@@ -1,7 +1,7 @@
 # Contributing
 
 Contributions are welcome when they preserve garden’s core boundary: self-hosted software, one
-persistent agent computer, user-owned model access, no local model weights, and no mandatory hosted
+persistent agent computer, user-owned model access, no bundled model weights, and no mandatory hosted
 garden service.
 
 `AGENTS.md` in this directory carries the same rules in the shape a coding agent reads them, and is
@@ -287,7 +287,8 @@ it was written for.
 - Strict TypeScript and Zod at every trust boundary.
 - No `any` or non-null assertion at a security boundary.
 - No user content or credentials in logs, metrics, notifications, audit labels, or URLs.
-- No model server, weight downloader, inference GPU deployment, or silent local fallback.
+- No bundled model server, weight downloader, inference GPU deployment, or silent local fallback.
+  Owners may explicitly connect their own local inference endpoints.
 - External side effects must pass the common approval policy.
 - Dynamic tools must be discoverable, bounded, scoped, and attributable.
 - Prefer conflict-checked patches and idempotent mutations.

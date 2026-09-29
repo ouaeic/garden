@@ -79,6 +79,10 @@ export function Field({
     </div>
   );
 }
+// Responsive navigation can leave and re-enter the browser's top layer while child workflows
+// stay open. Preserve their opening order when a parent changes between a page and a modal.
+const openDialogs = new Map<HTMLDialogElement, number>();
+let dialogSequence = 0;
 export function Dialog({
   title,
   children,
@@ -110,12 +114,36 @@ export function Dialog({
     if (!open) return;
     const previous = document.activeElement;
     const dialog = ref.current;
-    if (modal && !page) dialog?.showModal();
-    else dialog?.show();
+    if (!dialog) return;
+    openDialogs.set(dialog, ++dialogSequence);
     return () => {
-      dialog?.close();
+      openDialogs.delete(dialog);
+      dialog.close();
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
     };
+  }, [open]);
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!open || !dialog) return;
+    const focused = document.activeElement;
+    const order = openDialogs.get(dialog) ?? 0;
+    const above = [...openDialogs]
+      .filter(
+        ([other, sequence]) =>
+          other !== dialog &&
+          (sequence > order || dialog.contains(other)) &&
+          other.matches(':modal')
+      )
+      .sort((left, right) => left[1] - right[1])
+      .map(([other]) => other);
+    if (modal && !page) dialog.showModal();
+    else dialog.show();
+    for (const other of above) {
+      other.close();
+      other.showModal();
+    }
+    if (above.length && focused instanceof HTMLElement && focused.isConnected) focused.focus();
+    return () => dialog.close();
   }, [open, modal, page]);
   useEffect(() => {
     const dialog = ref.current;

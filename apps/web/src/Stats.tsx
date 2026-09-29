@@ -176,6 +176,22 @@ function StatsContent({
             </span>
           )}
         </div>
+        {computer?.gpu?.devices.map((gpu) => (
+          <p
+            key={gpu.id}
+            title={`Server GPU · sampled ${new Date(computer.gpu!.sampledAt).toLocaleTimeString()}`}
+          >
+            {gpu.name} · GPU{' '}
+            {gpu.utilizationPercent === null ? 'unavailable' : `${gpu.utilizationPercent}%`}
+            {gpu.memoryUsedBytes !== null &&
+              gpu.memoryTotalBytes !== null &&
+              ` · VRAM ${bytes(gpu.memoryUsedBytes)} / ${bytes(gpu.memoryTotalBytes)}`}
+            {gpu.temperatureC !== null && ` · ${gpu.temperatureC}°C`}
+          </p>
+        ))}
+        {computer?.gpu && !computer.gpu.devices.length && (
+          <p className="muted">GPU metrics unavailable on this server.</p>
+        )}
         {!computer && !disk && <p className="muted">Resource usage unavailable.</p>}
       </section>
       {Boolean(plan?.windows.length) && (

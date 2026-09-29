@@ -77,8 +77,9 @@ and record the measurement beside it:
 Changing any of these is a design decision, not a refactor. Raise it before writing code.
 
 - Self-hosted, one owner, one box. No mandatory hosted garden service.
-- The owner's model credentials, used directly. No model weights, no local inference runtime, no
-  silent fallback to one.
+- The owner's model credentials and explicitly selected endpoints, used directly. Optional local
+  inference connects to an owner-installed runtime; garden bundles no weights or inference runtime
+  and never silently switches between local and cloud models.
 - No second index over the owner's documents: search is lexical and source-linked. Memory bodies are
   sealed before they reach PostgreSQL, which is why there is no embedding channel and why finishing
   one is not a matter of choosing a vendor.

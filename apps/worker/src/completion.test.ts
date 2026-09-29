@@ -637,7 +637,7 @@ describe('finish rejection guidance', () => {
     expect(guidance).toContain('do not run another command just to repair a citation');
   });
 
-  it('shows result IDs and exit status only during recovery, without promoting failed checks', () => {
+  it('shows evidence IDs before the first finish attempt, without promoting failed checks', () => {
     const current: AgentState = {
       messages: [],
       step: 0,
@@ -646,8 +646,6 @@ describe('finish rejection guidance', () => {
         check: { name: 'shell', success: true, command: { fingerprint: 'check', exitCode: 2 } }
       }
     };
-    expect(completionReference(current, 'check')).toBe('');
-    current.finishRejections = 1;
     expect(completionReference(current, 'check')).toContain('check (shell) [exit 2]');
     expect(completionReference(current, 'missing')).toBe('');
     current.turnToolResults!.check!.skipped = true;

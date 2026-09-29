@@ -104,18 +104,18 @@ the whole block on every `pnpm check`. Accept a new baseline and this page fails
 is re-derived, naming the value it should now carry. The instruction is no longer advice.
 
 ```baseline
-fixtures 78
+fixtures 80
 long-a-finished-phase-is-never-declared.modelCalls 38
-long-a-finished-phase-is-never-declared.promptTokens 1208447
+long-a-finished-phase-is-never-declared.promptTokens 1212534
 long-a-finished-phase-is-never-declared.catalogueTokens 271586
 long-a-finished-phase-is-never-declared.cachePrefix 94
 long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.modelCalls 40
-long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.promptTokens 1140514
+long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.promptTokens 1143658
 long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.catalogueTokens 278734
 long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.cachePrefix 92
 long-finished-phases-condense-rather-than-shred.cachePrefix 77
 compaction.extraModelCalls 2
-compaction.tokensSaved 67933
+compaction.tokensSaved 68876
 compaction.cachePointsGivenUp 2
 floorWalk.cachePointsLost 15
 ```

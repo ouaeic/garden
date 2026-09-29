@@ -15,8 +15,10 @@ import { requireUser } from '../http/auth-hook.js';
 import type { RouteContext } from '../http/server-context.js';
 import { currentPeriod, serverLimits } from '../plans.js';
 import { withTaskDeliveryStatus } from '../task-delivery-status.js';
+import { createGpuSampler } from '../gpu-stats.js';
 
 export const registerBootstrapRoutes = (context: RouteContext): void => {
+  const gpuStats = createGpuSampler();
   const {
     app,
     store,
@@ -147,9 +149,6 @@ export const registerBootstrapRoutes = (context: RouteContext): void => {
         providerModelId: model.providerModelId,
         displayName: model.displayName,
         ...(model.connectionLabel ? { connectionLabel: model.connectionLabel } : {}),
-        // Kept although no screen reads it: it is how "this box exposes only hosted routes" is
-        // checked at the surface the client actually receives, and a boundary that can only be
-        // asserted server-side is one nobody notices breaking.
         provider: model.provider,
         recommendationTags: model.recommendationTags,
         availability: model.availability,
@@ -182,7 +181,8 @@ export const registerBootstrapRoutes = (context: RouteContext): void => {
           Math.min(100, Math.round(((loadavg()[0] ?? 0) / Math.max(1, cpus().length)) * 100))
         ),
         memoryUsedBytes: Math.max(0, totalmem() - freemem()),
-        memoryTotalBytes: totalmem()
+        memoryTotalBytes: totalmem(),
+        gpu: await gpuStats()
       },
       legal: {
         applicationLicense: 'AGPL-3.0-only',

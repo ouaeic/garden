@@ -11,7 +11,12 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
       return route.fulfill({
         json: {
           ...bootstrap,
-          computer: { cpuPercent: 17, memoryUsedBytes: 256, memoryTotalBytes: 1024 }
+          computer: {
+            ...bootstrap.computer,
+            cpuPercent: 17,
+            memoryUsedBytes: 256,
+            memoryTotalBytes: 1024
+          }
         }
       });
     const emptyLists = [
@@ -90,6 +95,8 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
       const panel = page.getByRole('region', { name: 'Usage statistics', exact: true });
       await panel.waitFor();
       await panel.getByText('CPU 17%', { exact: true }).waitFor();
+      await panel.getByText(/Fixture GPU · GPU 37%/).waitFor();
+      await panel.getByText(/Unavailable GPU · GPU unavailable/).waitFor();
       await stats.dispatchEvent('pointerup', { pointerType: 'touch' });
       await stats.dispatchEvent('click', { detail: 1 });
       assert(await panel.isVisible(), 'The synthesized click after a hold must not close Stats');

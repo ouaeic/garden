@@ -729,6 +729,7 @@ export const createServerSupport = (context: ServerBase) => {
       baseUrl: secret.baseUrl,
       modelId: secret.modelId ?? null,
       hasApiKey: Boolean(secret.apiKey),
+      localEndpoint: secret.localEndpoint === true,
       enforceZeroDataRetention: secret.enforceZeroDataRetention,
       mediaModels: secret.mediaModels ?? null,
       webSearch: webSearchRoute(secret),

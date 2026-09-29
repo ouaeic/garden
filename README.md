@@ -10,10 +10,13 @@ stays out of the way until the user or agent needs it.
 garden has no hosted account, paid tier, VPS marketplace, telemetry service, model server, or local
 inference fallback. Model access belongs to the owner: use OpenRouter, a key from Anthropic, OpenAI,
 Google, xAI, Mistral, DeepSeek or another listed model company, Ollama Cloud, any other
-OpenAI-compatible endpoint, Codex with a ChatGPT subscription, Claude Code with a Claude
+OpenAI-compatible endpoint including an owner-installed Ollama server, Codex with a ChatGPT subscription, Claude Code with a Claude
 subscription, or OpenCode with a publisher login it officially supports. Any number can be connected
 at once; the model picker groups every connected model by who made it and names the connection it
 travels through.
+
+See [local models and LAN connections](docs/LOCAL_MODELS.md) for Ollama setup, same-network access
+and server GPU statistics.
 
 The app and command are named `garden`. Existing `garden` commands, installation paths,
 and device identities remain supported, so an update preserves the same computer and access.
@@ -86,7 +89,8 @@ the fragment. The installer also prints a connection ticket for the native clien
 
 The identity is independent of an IP address. The native client probes saved addresses concurrently,
 pins the server public key, refreshes the address set from `/.well-known/garden`, retries safe
-requests after an address change, and falls back to `_garden._tcp.local` discovery on the LAN. A
+requests after an address change, and runs `_garden._tcp.local` discovery alongside saved-address
+probes. Private LAN routes get a short head start over public routes. A
 newly discovered address is accepted only after it proves the same pinned identity.
 
 Dynamic addresses work automatically on the same LAN through mDNS and off-site when the host has a
@@ -168,7 +172,8 @@ garden does not silently add a relay, VPN, or tracking directory; see
 - Direct keys from the listed model companies: Claude over Anthropic's own Messages protocol (signed
   thinking, tool use and prompt caching carried across), OpenAI over Responses, and the rest over
   chat completions with the request fields each one refuses left out. Ollama Cloud and generic
-  OpenAI-compatible endpoints work the same way, without local model hosting.
+  OpenAI-compatible endpoints work the same way. Optional local models connect to a runtime the
+  owner installs; garden never downloads weights or silently switches providers.
 - Codex CLI, Claude Code, and OpenCode as bounded coding specialists using the owner’s publisher
   login. Publisher sessions persist in the same backed-up agent home.
 - Integrated writable coding specialists use isolated working copies, bounded allocations and
