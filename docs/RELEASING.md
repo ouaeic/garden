@@ -52,10 +52,11 @@ Do not reuse or move a release tag.
 - Verify `SHA256SUMS` from a separately downloaded copy of every asset.
 - Install each package on a clean supported operating system.
 - Pair against a server whose URL was not compiled into the client.
-- Complete first-owner registration and create a passkey.
-- On mobile, complete system-browser authorization against a hostname with trusted HTTPS; confirm
-  the matching code, fresh passkey ceremony, separate app session, enrollment, recovery, and
-  sensitive-action verification. Refuse an unrelated browser URL and a reused authorization.
+- Complete first-owner password registration and optional passkey enrollment.
+- On mobile, verify password sign-in, remembered device sessions, enrollment, recovery, and
+  sensitive-action verification. For optional system-browser authorization against a hostname
+  with trusted HTTPS, confirm the matching code, fresh passkey ceremony, and separate app session.
+  Refuse an unrelated browser URL and a reused authorization.
 - Restart the client and prove session persistence without retaining the one-time owner code.
 - Change the server's reachable address and prove pinned-identity reconnect.
 - Exercise task streaming, file download, media display, preview, browser/desktop takeover, and a

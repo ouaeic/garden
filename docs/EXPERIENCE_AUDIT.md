@@ -5,7 +5,7 @@
 The default path requires four concepts:
 
 1. install garden on a computer;
-2. create the owner passkey;
+2. create the owner password, with a passkey available as an option;
 3. connect model access;
 4. ask for an outcome.
 

@@ -116,9 +116,10 @@ timer will reissue, rather than replacing a trusted certificate with a self-sign
 
 ## Dynamic DNS
 
-A hostname is not cosmetic. A WebAuthn Relying Party ID must be a registrable domain name, so a
-server reached only by an IP address cannot register or use a passkey in a browser however good its
-TLS is. Dynamic DNS is how a server without a domain gets one.
+A stable hostname lets off-site clients reconnect after a public address changes and enables
+optional browser passkeys. Password sign-in works at an IP address with trusted HTTPS, but a
+WebAuthn Relying Party ID cannot be an IP address literal. Dynamic DNS supplies a stable hostname
+for a server without its own domain.
 
 ```bash
 sudo garden ddns configure

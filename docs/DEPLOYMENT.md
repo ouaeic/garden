@@ -226,19 +226,17 @@ profile, which lasts 160 hours, so the renewal timer runs every six hours and re
 final 72. A server that does have a usable hostname keeps ordinary 90-day certificates and is not
 renewed every few days for nothing; `--include-ips` covers both in one certificate.
 
-**A hostname is required for browser sign-in.** This is a different question from TLS and trusted
-TLS does not answer it. A passkey is scoped to a WebAuthn Relying Party ID, which must be a
-registrable domain name; the specification does not permit an address literal. A server whose origin
-is `https://203.0.113.9` therefore has valid TLS, a service worker, an installable app, and Web
-Push — and still no way to register or use a passkey in a browser. Its owner can sign in from the
-desktop clients only. See **Getting a hostname** below.
+**Password sign-in works at a public IP address with trusted HTTPS.** A hostname is needed for
+optional browser passkeys: a WebAuthn Relying Party ID cannot be an IP address literal. A server at
+`https://203.0.113.9` can use password sign-in, remembered device sessions, a service worker, an
+installable app, and Web Push when its certificate is trusted. See **Getting a hostname** below
+if you want to add passkeys.
 
-**Trusted TLS is also required for browser sign-in, and the hostname does not answer that one
-either.** Browsers disable WebAuthn on any page carrying a certificate error, which is why a server
-with a perfectly good domain name and its own self-signed certificate presents a working sign-in
-screen that nothing can get through. It is not a warning the owner can dismiss and it is not
-reachable with a command-line flag. Both conditions have to hold, so `garden doctor` reports the
-origin as working only when both do, and the installer says which one is missing.
+**Trusted TLS is required for browser sign-in.** A hostname alone does not make a self-signed
+certificate trusted. Browsers also disable WebAuthn on pages carrying a certificate error. For a
+home server using a private certificate, the native client's optional connection ticket pins the
+server identity before password sign-in. `garden doctor` checks password sign-in and optional
+passkey readiness separately.
 
 Renewal also reissues when the served certificate is missing a configured name, not only when it is
 close to expiry. Acquiring a hostname after issuance is the normal case, and no expiry check would
@@ -438,5 +436,5 @@ invalid or dangerously low value fails closed.
 - Public address changed without any discovery signal: local mDNS still works; off-site users need a
   stable hostname or the new address.
 - Lost encryption key: encrypted database content cannot be recovered.
-- Lost only passkey/device: use another paired device or the recovery process; there is no password
-  backdoor.
+- Lost only passkey/device: sign in with the owner password, use another paired device, or use the
+  recovery process.
