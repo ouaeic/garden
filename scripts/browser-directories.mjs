@@ -145,7 +145,9 @@ export async function checkProjectDirectories({
     );
     assert(await fileList.evaluate((element) => element.clientHeight <= window.innerHeight * 0.55));
 
-    await panel.getByRole('button', { name: 'Load more files', exact: true }).click();
+    const loadMore = panel.getByRole('button', { name: 'Load more files', exact: true });
+    await loadMore.focus();
+    await page.keyboard.press('Enter');
     await panel.getByText('later-page-results.bam', { exact: true }).waitFor();
     const endOfFiles = panel.getByRole('button', { name: 'All files loaded', exact: true });
     assert.equal(await endOfFiles.getAttribute('aria-disabled'), 'true');
@@ -252,7 +254,8 @@ export async function checkProjectDirectories({
     await panel.getByRole('button', { name: 'Close file', exact: true }).click();
     assert(fixture.tableReads.some((read) => read.cursor === 'next-table-page'));
     fixture.failRead = true;
-    await panel.getByRole('button', { name: 'Refresh directory', exact: true }).click();
+    await panel.getByRole('button', { name: 'Refresh directory', exact: true }).focus();
+    await page.keyboard.press('Enter');
     await panel
       .getByRole('alert')
       .filter({ hasText: 'Directory temporarily unavailable' })

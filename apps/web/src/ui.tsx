@@ -14,6 +14,11 @@ export function Button({
       className={`button ${className}`}
       {...props}
       disabled={props.disabled || busy}
+      onClick={(event) => {
+        // WebKit leaves pointer-activated buttons unfocused, which loses dialog return focus.
+        event.currentTarget.focus({ preventScroll: true });
+        props.onClick?.(event);
+      }}
     >
       {busy && <LoaderCircle className="spin" size={15} aria-hidden="true" />}
       {children}

@@ -27,6 +27,7 @@ export async function checkUpdates({ context, origin, report }) {
     await notice.getByText('Your garden server can be updated.', { exact: true }).waitFor();
     const editor = page.locator('.desk-start-card textarea');
     await editor.fill('Keep this unsent idea through the update notice.');
+    await page.clock.runFor(100);
     await notice.getByRole('button', { name: 'Dismiss update notice', exact: true }).click();
     assert.equal(await notice.count(), 0);
     assert.equal(await editor.inputValue(), 'Keep this unsent idea through the update notice.');

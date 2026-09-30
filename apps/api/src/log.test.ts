@@ -1,6 +1,9 @@
-import { describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { GardenError } from '@garden/core';
 import { createLogger, errorFields, installProcessGuards, type Logger } from './log.js';
+
+beforeEach(() => vi.stubEnv('JOURNAL_STREAM', undefined));
+afterEach(() => vi.unstubAllEnvs());
 
 const capture = (level: Parameters<typeof createLogger>[0]['level'] = 'info') => {
   const lines: Array<Record<string, unknown>> = [];

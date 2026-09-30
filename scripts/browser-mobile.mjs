@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { checkInterfaceTexture } from './browser-output-appearance.mjs';
 
 export async function checkMobileNavigation({ context, origin, task, bootstrap, report }) {
   const page = await context.newPage();
@@ -111,6 +112,19 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
       for (const name of ['Library', 'Needs you', 'Computer', 'Home']) {
         await bar.getByRole('button', { name, exact: true }).click();
         await fits();
+        if (name === 'Computer') {
+          await page.locator('.computer-file-list').waitFor();
+          for (const theme of ['light', 'dark']) {
+            await page.evaluate((theme) => {
+              document.documentElement.dataset.theme = theme;
+            }, theme);
+            await checkInterfaceTexture(page);
+            await page.screenshot({
+              path: resolve(report, `mobile-computer-files-${theme}-${width}.png`)
+            });
+            await fits();
+          }
+        }
       }
       await page.getByRole('button', { name: 'Settings', exact: true }).click();
       const settings = page.getByRole('region', { name: 'Settings', exact: true });

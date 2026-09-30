@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { Duplex } from 'node:stream';
-import { afterAll, afterEach, describe, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { PREVIEW_IDLE_EXPIRY_DAYS } from '@garden/contracts';
 import {
   buildConversationNameIndex,
@@ -49,9 +49,11 @@ const buildDomainServer: typeof buildServer = async (config, overrides) => {
 };
 
 const disposers: Array<() => Promise<void>> = [];
+beforeEach(() => vi.stubEnv('JOURNAL_STREAM', undefined));
 afterEach(async () => {
   while (disposers.length) await disposers.pop()!();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 /** The native preparation handshake, including its exact task/source/target binding. */
