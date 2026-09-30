@@ -124,7 +124,10 @@ test(
       if (process.platform === 'darwin') {
         const prepared = await withReleaseSwiftTools({ ...environment, CFLAGS: '', CXXFLAGS: '' });
         try {
-          archiveBuild([], prepared.environment);
+          const sdk = execFileSync('/usr/bin/xcrun', ['--sdk', 'macosx', '--show-sdk-path'], {
+            encoding: 'utf8'
+          }).trim();
+          archiveBuild(['-isysroot', sdk], prepared.environment);
           await checkNativeBinaries(directory, environment, 'ios');
         } finally {
           await prepared.dispose();
