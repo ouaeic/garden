@@ -169,6 +169,18 @@ describe('saved provider connection lifecycle', () => {
     expect(
       shared.map((model) => modelConnectionId(model, ['ollama-cloud', 'openai-compatible'])).sort()
     ).toEqual(['ollama-cloud', 'openai-compatible']);
+    const userBeforeRemoval = (await store.getUserById(userId))!;
+    const displayed = await support.modelsForUser(userBeforeRemoval);
+    expect(displayed).toHaveLength(4);
+    expect(displayed.filter((model) => model.connectionId === 'ollama-cloud')).toHaveLength(2);
+    expect(
+      displayed
+        .filter((model) => model.connectionId === 'ollama-cloud')
+        .every(
+          (model) =>
+            model.connectionProvider === 'Ollama Cloud' && model.connectionLabel === 'Ollama Cloud'
+        )
+    ).toBe(true);
     const settings = (await app.inject({ method: 'GET', url: '/v1/providers' })).json<{
       connections: unknown[];
     }>();
@@ -204,6 +216,10 @@ describe('saved provider connection lifecycle', () => {
     expect(shared).toHaveLength(2);
     expect(new Set(shared.map((model) => model.id)).size).toBe(2);
     expect(shared.map((model) => model.connectionLabel).sort()).toEqual(['Research', 'Work']);
+    expect(shared.map((model) => model.connectionProvider).sort()).toEqual([
+      'research.example',
+      'work.example'
+    ]);
     const settings = (await app.inject({ method: 'GET', url: '/v1/providers' })).json<{
       connections: Array<{ connectionId: string; label: string }>;
     }>();

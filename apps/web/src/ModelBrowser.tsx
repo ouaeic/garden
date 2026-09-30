@@ -4,7 +4,7 @@ import { Button, Dialog, ErrorNotice } from './ui.js';
 import type { ModelPickerProps, PickerModel } from './ModelPicker.js';
 import { mediaRouteIsRetired } from './media-state.js';
 import { get } from './client.js';
-import { makerOf, routeOf } from './model-makers.js';
+import { makerOf, providerOf, routeOf } from './model-makers.js';
 import './model-choices.css';
 
 const price = (value: number) =>
@@ -76,17 +76,12 @@ export default function ModelBrowser({
   const search = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const id = useId();
-  const makers = useMemo(() => [...new Set(models.map(makerOf))].sort(), [models]);
+  const providers = useMemo(() => [...new Set(models.map(providerOf))].sort(), [models]);
   const routes = useMemo(() => [...new Set(models.map(routeOf))].sort(), [models]);
   const rows = useMemo(() => {
     const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
     const matches = (text: string) => words.every((word) => text.toLowerCase().includes(word));
-    // The filter holds either a maker or a route, so one control answers both questions.
-    const inFilter = (model: PickerModel) =>
-      !provider ||
-      (provider.startsWith('route:')
-        ? routeOf(model) === provider.slice(6)
-        : makerOf(model) === provider.slice(6));
+    const inFilter = (model: PickerModel) => !provider || providerOf(model) === provider;
     const concrete = models
       .filter(
         (model) =>
@@ -221,22 +216,11 @@ export default function ModelBrowser({
             }}
           >
             <option value="">All providers</option>
-            <optgroup label="Made by">
-              {makers.map((name) => (
-                <option key={name} value={`maker:${name}`}>
-                  {name}
-                </option>
-              ))}
-            </optgroup>
-            {routes.length > 1 && (
-              <optgroup label="Connected through">
-                {routes.map((name) => (
-                  <option key={name} value={`route:${name}`}>
-                    {name}
-                  </option>
-                ))}
-              </optgroup>
-            )}
+            {providers.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
           </select>
         </label>
         <small className="muted" role="status">

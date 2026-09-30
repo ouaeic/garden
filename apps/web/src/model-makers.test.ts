@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { makerOf, routeCount, routeOf } from './model-makers.js';
+import { makerOf, providerOf, routeCount, routeOf } from './model-makers.js';
 
 const custom = (connection: string, model: string, connectionLabel?: string) => ({
   id: `custom/${connection}/${encodeURIComponent(model)}`,
@@ -21,6 +21,24 @@ describe('who made a model and how it arrives', () => {
     expect(models.map(makerOf)).toEqual(['Anthropic', 'Anthropic']);
     expect(models.map(routeOf)).toEqual(['OpenRouter', 'Anthropic']);
     expect(routeCount(models)).toBe(2);
+  });
+
+  it('keeps model makers and account labels out of service identity', () => {
+    const models = [
+      {
+        ...custom('ollama-cloud', 'deepseek-v4.1-flash', 'Research'),
+        connectionProvider: 'Ollama Cloud'
+      },
+      { ...custom('ollama-cloud', 'qwen3', 'Work'), connectionProvider: 'Ollama Cloud' },
+      { id: 'openrouter/deepseek/flash', displayName: 'Flash', provider: 'openrouter' }
+    ];
+    expect(models.map(providerOf)).toEqual(['Ollama Cloud', 'Ollama Cloud', 'OpenRouter']);
+    expect(models.map(routeOf)).toEqual([
+      'Ollama Cloud · Research',
+      'Ollama Cloud · Work',
+      'OpenRouter'
+    ]);
+    expect(models.map(makerOf)).toEqual(['DeepSeek', 'Qwen', 'DeepSeek']);
   });
 
   it('reads the maker from the family name a direct endpoint lists', () => {

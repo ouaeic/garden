@@ -146,8 +146,7 @@ export const createServerSupport = (context: ServerBase) => {
     return usage;
   };
   /** The name a connection goes by on the strip, the same one the settings list shows. */
-  const connectionName = (secret: InferenceSecret) =>
-    secret.label ??
+  const connectionProvider = (secret: InferenceSecret) =>
     vendorPreset(secret.vendor)?.label ??
     vendorForEndpoint(secret.baseUrl)?.label ??
     (secret.provider === 'openrouter'
@@ -155,6 +154,7 @@ export const createServerSupport = (context: ServerBase) => {
       : secret.provider === 'ollama-cloud'
         ? 'Ollama Cloud'
         : new URL(secret.baseUrl).hostname);
+  const connectionName = (secret: InferenceSecret) => secret.label ?? connectionProvider(secret);
   /**
    * What every connected provider's own account endpoint says, read live so the strip beside CPU
    * and RAM is each plan's current state rather than this box's own bookkeeping. With several
@@ -503,7 +503,12 @@ export const createServerSupport = (context: ServerBase) => {
         {
           ...model,
           ...(connectionId ? { connectionId } : {}),
-          ...(connection?.secret.label ? { connectionLabel: connection.secret.label } : {}),
+          ...(connection
+            ? {
+                connectionLabel: connectionName(connection.secret),
+                connectionProvider: connectionProvider(connection.secret)
+              }
+            : {}),
           ...readRoutingMetadata(record)
         }
       ];

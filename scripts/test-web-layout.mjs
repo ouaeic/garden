@@ -403,6 +403,17 @@ const modelCatalog = [
   })),
   {
     ...bootstrap.models[0],
+    id: 'custom/ollama-cloud/deepseek-v4.1-flash',
+    providerModelId: 'deepseek-v4.1-flash',
+    displayName: 'deepseek-v4.1-flash',
+    provider: 'custom',
+    connectionProvider: 'Ollama Cloud',
+    connectionLabel: 'Study account',
+    contextTokens: 128000,
+    capabilities: ['chat', 'tools', 'reasoning']
+  },
+  {
+    ...bootstrap.models[0],
     id: 'retired/model',
     displayName: 'Retired research model',
     contextTokens: 128000,
@@ -2832,13 +2843,37 @@ try {
     const modelSearch = modelsPage.getByRole('combobox', { name: 'Search models', exact: true });
     await modelsPage
       .getByRole('combobox', { name: 'Filter models by provider', exact: true })
-      .selectOption({ label: 'Beta' });
-    // The picker groups by who made a model; filtering to one maker leaves only its models.
+      .selectOption({ label: 'OpenRouter' });
+    // A service filter includes every maker served by that connection.
     assert((await modelsPage.getByRole('option').filter({ hasText: 'beta/model-' }).count()) > 0);
+    assert((await modelsPage.getByRole('option').filter({ hasText: 'alpha/model-' }).count()) > 0);
     assert.equal(
-      await modelsPage.getByRole('option').filter({ hasText: 'alpha/model-' }).count(),
+      await modelsPage
+        .getByRole('combobox', { name: 'Filter models by provider', exact: true })
+        .getByRole('option', { name: 'Beta', exact: true })
+        .count(),
       0
     );
+    const serviceFilter = modelsPage.getByRole('combobox', {
+      name: 'Filter models by provider',
+      exact: true
+    });
+    assert.equal(
+      await serviceFilter.getByRole('option', { name: 'DeepSeek', exact: true }).count(),
+      0
+    );
+    await serviceFilter.selectOption({ label: 'Ollama Cloud' });
+    const ollamaRows = modelsPage.getByRole('listbox').getByRole('option');
+    assert.equal(await ollamaRows.count(), 1);
+    assert.match(
+      await ollamaRows.innerText(),
+      /deepseek-v4\.1-flash.*Ollama Cloud.*Study account/s
+    );
+    assert.equal(
+      await modelsPage.getByRole('option').filter({ hasText: 'beta/model-' }).count(),
+      0
+    );
+    await serviceFilter.selectOption({ label: 'OpenRouter' });
     await modelSearch.fill('model-79');
     await modelsPage.screenshot({ path: resolve(report, 'model-browser-desktop.png') });
     await modelSearch.press('Enter');
