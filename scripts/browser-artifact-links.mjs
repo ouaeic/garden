@@ -1,3 +1,4 @@
+import { captureBrowserErrors } from './browser-errors.mjs';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
@@ -11,7 +12,7 @@ export async function checkArtifactLinks({
   errors
 }) {
   const page = await context.newPage();
-  page.on('pageerror', (error) => errors.push(error.message));
+  await captureBrowserErrors(page, errors);
   const artifact = {
     id: '80000000-0000-4000-8000-000000000008',
     taskId: task.id,

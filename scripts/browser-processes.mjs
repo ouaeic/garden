@@ -1,3 +1,4 @@
+import { captureBrowserErrors } from './browser-errors.mjs';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
@@ -248,7 +249,7 @@ export function processFixture(workspaceId, taskId) {
 export async function checkProjectProcesses({ context, origin, taskId, fixture, report, errors }) {
   fixture.seed();
   const page = await context.newPage();
-  page.on('pageerror', (error) => errors.push(error.message));
+  await captureBrowserErrors(page, errors);
   await page.clock.install({ time: new Date() });
   try {
     await page.goto(`${origin}/?task=${taskId}&panel=tools&tool=processes`);
@@ -547,6 +548,8 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
       'Project process browser checks passed: multi-day clocks, child resources, relaxed polling, responsive controls, checkpoint resume, log replacement, stale/error status and exact-root stop.'
     );
   } finally {
+    await page.clock.setSystemTime(Date.now());
+    await page.clock.resume();
     await page.close();
     fixture.computationSessions = [];
     fixture.rows = [];

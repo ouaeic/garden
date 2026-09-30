@@ -110,6 +110,8 @@ export async function checkBackgroundWork({ context, origin, report, taskId }) {
     await page.clock.runFor(500);
     await page.screenshot({ path: resolve(report, 'background-return-phone.png') });
   } finally {
+    await page.clock.setSystemTime(Date.now());
+    await page.clock.resume();
     await page.close();
   }
 }

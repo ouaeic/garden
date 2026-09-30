@@ -8,6 +8,7 @@ export async function captureBrowserErrors(page, failures) {
       error.stack?.startsWith('Fetch API cannot load ') &&
       error.stack.split('\n')[0].endsWith(' due to access control checks.');
     diagnostics.push({ message: error.message, stack: error.stack, handledFetchDiagnostic });
+    if (handledFetchDiagnostic) console.log(`WebKit fetch diagnostic: ${error.message}`);
     if (!handledFetchDiagnostic) failures.push(error.message);
   });
   page.on('console', (message) => {

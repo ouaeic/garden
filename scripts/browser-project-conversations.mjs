@@ -631,6 +631,16 @@ export async function checkProjectConversations({
     );
   } catch (error) {
     console.error(error);
+    errorDetails.push({
+      type: 'focus-at-failure',
+      state: await page.evaluate(() => ({
+        active: document.activeElement?.outerHTML.slice(0, 600),
+        dialogs: [...document.querySelectorAll('dialog')].map((dialog) => ({
+          open: dialog.open,
+          title: dialog.getAttribute('aria-labelledby')
+        }))
+      }))
+    });
     await page
       .screenshot({ path: resolve(report, 'conversation-failure.png'), timeout: 5000 })
       .catch(() => {});

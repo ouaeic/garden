@@ -1,9 +1,10 @@
+import { captureBrowserErrors } from './browser-errors.mjs';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
 export async function checkPreviewStart({ context, origin, task, presentation, report, errors }) {
   const page = await context.newPage();
-  page.on('pageerror', (error) => errors.push(error.message));
+  await captureBrowserErrors(page, errors);
   const source = presentation.results.find((item) => item.kind === 'preview');
   assert(source);
   let state = 'stopped',

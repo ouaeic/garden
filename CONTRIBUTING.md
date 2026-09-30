@@ -50,14 +50,12 @@ one that costs least to run:
    toolchain, so a document route that has stopped producing bytes fails here rather than in front of
    an owner.
 4. `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`.
-5. `pnpm eval:gate` — the 73-fixture behavioural suite, run for its claims and not for its numbers.
+5. `pnpm eval:gate` — the offline behavioural suite, run for its expectations.
    It fails when a fixture did not really run — a route the harness stub does not model, a warning
    the loop had to survive, a tool that threw — or when a stated expectation broke. It does **not**
    fail when a committed token count or step count moved; those belong to `pnpm eval` below, and
-   putting them here is what would make this the gate everybody bypasses. It takes about nine
-   seconds. It is here because the suite spent two separate waves red at 71 of 73 fixtures with
-   `pnpm check` green beside it, the second time after the first had been written down in
-   `evals/harness.ts` as a comment nobody re-read.
+   keeping those measurements separate makes expectation failures actionable. Current fixture
+   counts and baseline measurements are derived in [docs/EVALUATION.md](docs/EVALUATION.md).
 6. `pnpm eval:rigs` — context quality, prompt injection, the arm comparison, approval cards,
    edit-format conformance, read cost, and independent outcome calibration. The outcome rig
    checks incorrect-result controls and durable form submission recovery; it does not measure

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { captureBrowserErrors } from './browser-errors.mjs';
 import { checkBackgroundWork } from './browser-background.mjs';
 import { checkMemoryLibrary } from './browser-memory.mjs';
 import { checkPreviewStart } from './browser-preview-start.mjs';
@@ -713,6 +714,7 @@ const processUi = processFixture(workspace.id, task.id);
 const directoryUi = directoryFixture(workspace.id);
 try {
   const context = await browser.newContext({
+    locale: 'en-US',
     viewport: { width: 1440, height: 1000 },
     reducedMotion: 'reduce'
   });
@@ -1373,7 +1375,7 @@ try {
       });
     }
     const page = await context.newPage();
-    page.on('pageerror', (error) => errors.push(error.message));
+    await captureBrowserErrors(page, errors);
     await page.goto(`${origin}/?task=${task.id}`);
     assert.equal(
       await page.locator('link[rel="manifest"]').count(),
@@ -3003,23 +3005,38 @@ try {
     // Connected providers are rows; a row opens that connection's settings.
     await modelsPage.getByRole('button', { name: 'Compatible endpoint', exact: true }).click();
     await modelsPage.getByLabel('Endpoint URL', { exact: true }).waitFor();
-    const accessibility = await context.newCDPSession(modelsPage);
-    const tree = await accessibility.send('Accessibility.getFullAXTree');
-    assert(tree.nodes.length > 0, 'The browser must expose an accessibility tree');
-    const restriction = tree.nodes.filter(
-      (node) => node.role?.value === 'textbox' && node.name?.value === 'Restrict to model ID'
-    );
+    const restrictedModel = modelsPage.getByRole('textbox', {
+      name: 'Restrict to model ID',
+      exact: true
+    });
+    assert.equal(await restrictedModel.count(), 1);
     assert.equal(
-      restriction.length,
-      1,
-      'A field must have its concise visible label as its accessible name'
-    );
-    assert.equal(
-      restriction[0].description?.value,
+      await restrictedModel.evaluate((element) =>
+        element
+          .getAttribute('aria-describedby')
+          ?.split(/\s+/)
+          .map((id) => document.getElementById(id)?.textContent)
+          .join(' ')
+      ),
       'Optional. Leave empty to discover every model this endpoint offers.',
-      'Supporting text must be exposed as a description separately from the field name'
+      'Supporting text must be associated separately from the field name'
     );
-    await accessibility.detach();
+    // Chromium exposes computed descriptions through CDP; WebKit has no CDP endpoint.
+    if (engine === 'chromium') {
+      const accessibility = await context.newCDPSession(modelsPage);
+      const tree = await accessibility.send('Accessibility.getFullAXTree');
+      assert(tree.nodes.length > 0, 'The browser must expose an accessibility tree');
+      const restriction = tree.nodes.filter(
+        (node) => node.role?.value === 'textbox' && node.name?.value === 'Restrict to model ID'
+      );
+      assert.equal(restriction.length, 1);
+      assert.equal(
+        restriction[0].description?.value,
+        'Optional. Leave empty to discover every model this endpoint offers.',
+        'Supporting text must be exposed as a description separately from the field name'
+      );
+      await accessibility.detach();
+    }
     await modelsPage.locator('.field > label', { hasText: 'Restrict to model ID' }).click();
     assert(
       await modelsPage

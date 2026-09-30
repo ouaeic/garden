@@ -57,7 +57,11 @@ export default function ModelPicker(props: ModelPickerProps) {
         aria-expanded={open}
         disabled={props.disabled}
         title={selected}
-        onClick={() => setOpen(true)}
+        onClick={(event) => {
+          // WebKit does not focus pointer-activated buttons; the dialog needs its opener.
+          event.currentTarget.focus({ preventScroll: true });
+          setOpen(true);
+        }}
       >
         <span>{props.triggerLabel ?? selected}</span>
         <ChevronDown size={14} aria-hidden="true" />

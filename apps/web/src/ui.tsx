@@ -1,4 +1,4 @@
-import { cloneElement, useEffect, useId, useRef } from 'react';
+import { cloneElement, useEffect, useId, useLayoutEffect, useRef } from 'react';
 import type { ComponentProps, ReactElement, ReactNode } from 'react';
 import { ArrowLeft, X, LoaderCircle } from './icons';
 
@@ -115,9 +115,13 @@ export function Dialog({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const returnFocus = useRef<Element | null>(null);
+  useLayoutEffect(() => {
+    if (open) returnFocus.current = document.activeElement;
+  }, [open]);
   useEffect(() => {
     if (!open) return;
-    const previous = document.activeElement;
+    const previous = returnFocus.current;
     const dialog = ref.current;
     if (!dialog) return;
     openDialogs.set(dialog, ++dialogSequence);
@@ -200,19 +204,21 @@ export function Dialog({
         if (event.key !== 'Tab' || event.defaultPrevented) return;
         const focusable = [
           ...event.currentTarget.querySelectorAll<HTMLElement>(
-            'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])'
+            'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), iframe, summary, [tabindex]:not([tabindex="-1"])'
           )
-        ].filter((element) => element.getClientRects().length && !element.closest('[inert]'));
-        const first = focusable[0];
-        const last = focusable.at(-1);
-        if (!first || !last) return;
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault();
-          last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first.focus();
-        }
+        ].filter(
+          (element) =>
+            element.tabIndex >= 0 &&
+            element.getClientRects().length &&
+            !element.matches(':disabled') &&
+            !element.closest('[inert]')
+        );
+        if (!focusable.length) return;
+        // Native Tab order can skip buttons; explicit cycling keeps all modal controls reachable.
+        const index = focusable.indexOf(document.activeElement as HTMLElement);
+        const next = event.shiftKey ? (index < 0 ? focusable.length : index) - 1 : index + 1;
+        event.preventDefault();
+        focusable[(next + focusable.length) % focusable.length]!.focus();
       }}
       onCancel={(event) => {
         event.preventDefault();

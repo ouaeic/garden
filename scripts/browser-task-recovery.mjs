@@ -1,9 +1,10 @@
+import { captureBrowserErrors } from './browser-errors.mjs';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
 export async function checkTaskRecovery({ context, origin, bootstrap, task, report, errors }) {
   const page = await context.newPage();
-  page.on('pageerror', (error) => errors.push(error.message));
+  await captureBrowserErrors(page, errors);
   let failHistory = true;
   let failPresentation = false;
   let currentTask = { ...task, title: 'New project', status: 'running' };

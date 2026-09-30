@@ -1,3 +1,4 @@
+import { captureBrowserErrors } from './browser-errors.mjs';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
@@ -123,7 +124,7 @@ export async function checkProjectDirectories({
   errors
 }) {
   const page = await context.newPage();
-  page.on('pageerror', (error) => errors.push(error.message));
+  await captureBrowserErrors(page, errors);
   try {
     fixture.longList = true;
     await page.goto(`${origin}/?task=${taskId}&panel=files`);
