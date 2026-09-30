@@ -366,8 +366,6 @@ pub fn run() {
             {
                 window_config.title_bar_style = tauri::TitleBarStyle::Overlay;
                 window_config.hidden_title = true;
-                window_config.traffic_light_position =
-                    Some(tauri::utils::config::LogicalPosition { x: 14.0, y: 10.0 });
             }
             window_config.url = tauri::WebviewUrl::External(origin.parse()?);
             /*
@@ -385,7 +383,9 @@ pub fn run() {
             let record = saved.clone();
             let window = tauri::WebviewWindowBuilder::from_config(app, &window_config)?;
             #[cfg(target_os = "macos")]
-            let window = window.initialization_script(native_theme::window_inset_script());
+            let window = window
+                .traffic_light_position(tauri::LogicalPosition::new(14.0, 10.0))
+                .initialization_script(native_theme::window_inset_script());
             let window = window
                 .on_download(move |_webview, event| match event {
                     tauri::webview::DownloadEvent::Requested { url, destination } => {
