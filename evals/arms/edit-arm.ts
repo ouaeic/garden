@@ -298,25 +298,36 @@ export const encodeCandidate = (task: EditTask): EncodedCall => {
   if (task.changes.length === 1 && task.changes[0]?.kind === 'rename')
     return { tool: 'shell', args: { command: `mv ${task.path} ${task.changes[0].to}` } };
   const rows: string[] = [];
+  const before = toLines(fileText(task.path));
+  const anchor = (at: number): string => {
+    const line = before[at - 1];
+    if (line === undefined) throw new Error(`No line ${at} in ${task.path}`);
+    return `-${line}`;
+  };
   for (const change of task.changes) {
     switch (change.kind) {
       case 'replace':
         rows.push(
           change.from === change.to ? `PUT ${change.from}:` : `PUT ${change.from}.=${change.to}:`
         );
+        rows.push(anchor(change.from));
         rows.push(...change.lines.map((line) => `+${line}`));
         break;
       case 'block':
         rows.push(`PUT ${change.at}*:`);
+        rows.push(anchor(change.at));
         rows.push(...change.lines.map((line) => `+${line}`));
         break;
       case 'insert':
         rows.push(`PUT ${change.side === 'after' ? '>' : '<'}${change.at}:`);
+        rows.push(anchor(change.at));
         rows.push(...change.lines.map((line) => `+${line}`));
         break;
       case 'move':
         rows.push(`CUT ${change.from}.=${change.to} @m`);
+        rows.push(anchor(change.from));
         rows.push(`PUT >${change.after} @m`);
+        rows.push(anchor(change.after));
         break;
       case 'rename':
         // Not in the shipped dialect at all: the worker's runner client has no rename route, so

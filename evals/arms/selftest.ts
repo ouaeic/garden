@@ -221,8 +221,10 @@ if (axis.direction === 'cut') {
 for (const heading of BASE_SYSTEM_PROMPT.match(/^## .+$/gm) ?? [])
   expect(otherContract.includes(heading), `the method axis also moved "${heading}"`);
 // The safety floor is the one section that must never be a casualty of a byte hunt.
+const safetyFloor = BASE_SYSTEM_PROMPT.split('## Safety floor')[1]?.split('\n## ')[0] ?? '';
+expect(safetyFloor.trim().length > 0, 'the shipped safety floor must contain its authority rules');
 expect(
-  otherContract.includes('## Safety floor') && otherContract.includes('Never claim a tool'),
+  otherContract.includes(`## Safety floor${safetyFloor}`),
   'the safety floor must survive every edit this rig can make'
 );
 expect(
@@ -786,7 +788,12 @@ expect(
 const forgiving = new EditWorld('lines');
 forgiving.answer('file_read', { path: 'src/queue.ts' });
 forgiving.answer('file_patch', {
-  patches: [{ path: 'src/queue.ts', edit: '[src/queue.ts#3f9a]\nput 11:\n+    return undefined;' }]
+  patches: [
+    {
+      path: 'src/queue.ts',
+      edit: '[src/queue.ts#3f9a]\nput 11:\n-    return null;\n+    return undefined;'
+    }
+  ]
 });
 expect(
   forgiving.editApplied === 1 && forgiving.editForgiven === 1 && forgiving.unrecovered === 0,
