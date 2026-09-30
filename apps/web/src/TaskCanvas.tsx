@@ -444,14 +444,14 @@ export function TaskOutputs({
                   )}
                 </>
               )}
-              {files[0]?.downloadUrl && files[0].status !== 'unavailable' && (
+              {presentation.sourceBundle && (
                 <a
                   className="button garden-primary-download"
-                  href={files[0].downloadUrl}
-                  download={files[0].title}
+                  href={presentation.sourceBundle.downloadUrl}
+                  download
                 >
                   <Download size={15} />
-                  Download {files.length === 1 ? 'source' : 'file'}
+                  Download project files
                 </a>
               )}
               {preview.detail &&

@@ -181,6 +181,15 @@ export function Dialog({
           event.target.closest('dialog') !== event.currentTarget
         )
           return;
+        if (event.key === 'Escape') {
+          const popover = event.currentTarget.querySelector<HTMLElement>(':popover-open');
+          if (popover) {
+            event.preventDefault();
+            event.stopPropagation();
+            popover.hidePopover();
+            return;
+          }
+        }
         if (!modal || page) {
           if (event.key !== 'Escape' || event.defaultPrevented) return;
           event.preventDefault();

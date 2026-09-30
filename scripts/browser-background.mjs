@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-export async function checkBackgroundWork({ context, origin, report }) {
+export async function checkBackgroundWork({ context, origin, report, taskId }) {
   const page = await context.newPage();
   const requests = [];
   const activeBootstrap = new Set();
@@ -76,14 +76,38 @@ export async function checkBackgroundWork({ context, origin, report }) {
       1,
       'Slow bootstrap reads must never overlap during polling or reconnect'
     );
+    const mediaRead = page.waitForResponse((response) =>
+      new URL(response.url()).pathname.endsWith('/media-batches')
+    );
+    await page.goto(`${origin}/?task=${encodeURIComponent(taskId)}`);
+    await mediaRead;
+    await page.locator('.desk-project').waitFor();
+    await page.clock.runFor(1000);
+    await visibility('hidden');
+    const projectStart = requests.length;
+    await page.clock.runFor(180_000);
+    const projectHiddenRequests = requests.slice(projectStart);
     await writeFile(
       resolve(report, 'background-traffic.json'),
       JSON.stringify(
-        { hiddenDurationMs: 180_000, hiddenRequests, maxBootstrapRequests, requests },
+        {
+          hiddenDurationMs: 180_000,
+          hiddenRequests,
+          projectHiddenRequests,
+          maxBootstrapRequests,
+          requests
+        },
         null,
         2
       ) + '\n'
     );
+    assert.deepEqual(
+      projectHiddenRequests,
+      [],
+      'A hidden project must suspend media and control API polling'
+    );
+    await visibility('visible');
+    await page.clock.runFor(500);
     await page.screenshot({ path: resolve(report, 'background-return-phone.png') });
   } finally {
     await page.close();

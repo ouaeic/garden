@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { writeFile } from 'node:fs/promises';
+import { captureBrowserErrors } from './browser-errors.mjs';
 
 export async function checkProjectConversations({
   context,
@@ -17,7 +18,10 @@ export async function checkProjectConversations({
   errors
 }) {
   const page = await context.newPage();
-  page.on('pageerror', (error) => errors.push(error.message));
+  const errorDetails = await captureBrowserErrors(page, errors);
+  page.on('requestfailed', (request) =>
+    errorDetails.push({ type: 'requestfailed', url: request.url(), failure: request.failure() })
+  );
   const anchor = {
     ...workspace,
     id: randomUUID(),
@@ -628,5 +632,9 @@ export async function checkProjectConversations({
   } finally {
     releaseTask?.();
     await page.close();
+    await writeFile(
+      resolve(report, 'conversation-errors.json'),
+      JSON.stringify(errorDetails, null, 2) + '\n'
+    );
   }
 }

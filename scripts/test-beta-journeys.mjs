@@ -9,6 +9,11 @@ import { resolve } from 'node:path';
 const report = process.env.GARDEN_BETA_REPORT || (await mkdtemp(resolve(tmpdir(), 'garden-beta-')));
 await mkdir(report, { recursive: true });
 const journeys = [
+  {
+    id: 'browser-error-controls',
+    command: ['node', 'scripts/test-browser-errors.mjs'],
+    engine: 'both'
+  },
   { id: 'chromium-complete', command: ['pnpm', 'test:ui'], engine: 'chromium' },
   { id: 'webkit-complete', command: ['node', 'scripts/test-web-layout.mjs'], engine: 'webkit' },
   { id: 'webkit-owner-devices', command: ['pnpm', 'test:auth-ui'], engine: 'webkit' },

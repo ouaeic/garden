@@ -1262,7 +1262,7 @@ try {
     return route.fulfill({ status: 501, json: { error: { message: 'Unspecified UI fixture' } } });
   });
   if (!process.env.GARDEN_UI_FOCUS || process.env.GARDEN_UI_FOCUS === 'background')
-    await checkBackgroundWork({ context, origin, report });
+    await checkBackgroundWork({ context, origin, report, taskId: task.id });
   if (!process.env.GARDEN_UI_FOCUS || process.env.GARDEN_UI_FOCUS === 'desk')
     await checkDesk({ context, origin, task, bootstrap, project, report, directoryUi, processUi });
   if (process.env.GARDEN_UI_FOCUS === 'workspace') {
@@ -1796,10 +1796,16 @@ try {
       'Expanding must preserve the running preview'
     );
     await page.getByRole('button', { name: 'Exit full screen', exact: true }).click();
+    const outputViews = page.getByRole('navigation', { name: 'Output views' });
+    await outputViews.getByRole('button', { name: 'Downloads', exact: true }).click();
     const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('link', { name: 'Download source', exact: true }).click();
+    await page
+      .locator('.garden-output-downloads')
+      .getByRole('link', { name: 'Download', exact: true })
+      .click();
     const download = await downloadPromise;
     assert.equal(await readFile(await download.path(), 'utf8'), previewHtml);
+    await outputViews.getByRole('button', { name: 'Preview', exact: true }).click();
     await page.evaluate(() =>
       Object.defineProperty(Element.prototype, 'requestFullscreen', {
         configurable: true,
