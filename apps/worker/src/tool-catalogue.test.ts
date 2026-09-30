@@ -212,7 +212,7 @@ describe('the size of the catalogue the model is sent', () => {
 
   it('pays once for a machine fact, not once here and once in the contract', () => {
     const paidForInTheContract: ReadonlyArray<readonly [string, RegExp]> = [
-      ['No model weights run on this computer', /\bffmpeg\b|model weights/i],
+      ["owner's chosen endpoints", /owner'?s chosen endpoints/i],
       ['anti-bot challenge', /until the user clears it|carry on with the rest/i]
     ];
     for (const [carried, restated] of paidForInTheContract) {
