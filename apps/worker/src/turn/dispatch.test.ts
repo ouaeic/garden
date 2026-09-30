@@ -547,6 +547,7 @@ describe('plan mode, enforced at dispatch and described nowhere', () => {
  */
 describe('what plan mode permits, derived rather than listed', () => {
   it('permits nothing the harness itself classifies as a change', () => {
+    expect(PLAN_MODE_PERMITTED.size).toBeGreaterThan(0);
     for (const name of PLAN_MODE_PERMITTED)
       expect(isMutatingToolCall(name), `${name} is classified as a change`).toBe(false);
   });
@@ -595,6 +596,7 @@ describe('what plan mode permits, derived rather than listed', () => {
    * is a fact rather than a coincidence nobody is watching.
    */
   it('is a superset of everything a parallel run may contain', () => {
+    expect(PARALLEL_SAFE_TOOLS.size).toBeGreaterThan(0);
     for (const name of PARALLEL_SAFE_TOOLS) expect(PLAN_MODE_PERMITTED.has(name)).toBe(true);
   });
 

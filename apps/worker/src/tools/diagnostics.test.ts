@@ -214,6 +214,7 @@ describe('what a diagnostic refuses to run, and says instead', () => {
 
   it('answers with a sentence naming the missing file, and no command, in a bare directory', () => {
     const offered = catalogueLanguages();
+    expect(offered.length).toBeGreaterThan(0);
     for (const language of offered) {
       const selection = diagnosticsSelection(language, new Set());
       if (needNoProjectFile.includes(language)) {

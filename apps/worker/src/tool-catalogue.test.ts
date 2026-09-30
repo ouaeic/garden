@@ -690,6 +690,7 @@ describe('the wire a box is sent about the services it has actually connected', 
   });
 
   it('never sends a connected box an action list with nothing in it', () => {
+    expect(ConnectorKind.options.length).toBeGreaterThan(0);
     /*
      * The failure the heading table's totality is really guarding, stated where it can be seen.
      *

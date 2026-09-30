@@ -1064,6 +1064,7 @@ describe('which languages an overview can see', () => {
 
   for (const { extension, seen, blind } of languages) {
     it(`sees what a .${extension} file declares`, () => {
+      expect(seen.length).toBeGreaterThan(0);
       for (const [source, name] of seen) {
         expect([source, sweep.test(source)]).toEqual([source, true]);
         // The two readers on one line: ripgrep would have selected it, and this is the name the
@@ -1076,6 +1077,7 @@ describe('which languages an overview can see', () => {
     });
 
     it(`says nothing about what it cannot see in a .${extension} file`, () => {
+      expect(blind.length).toBeGreaterThan(0);
       for (const source of blind) expect([source, sweep.test(source)]).toEqual([source, false]);
     });
   }
