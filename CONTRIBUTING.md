@@ -347,3 +347,10 @@ executable and a C compiler is available. They build a fixture executable and sh
 exercise both archive formats, reproduce the result in a fresh directory, and reject dependency
 or installer drift. The repository gate explicitly reports skipped optional toolchain coverage;
 run installed native acceptance before releasing a change to that recipe.
+
+The beta journey matrix is `pnpm test:beta`. It runs the complete browser workflows, password and
+remembered-device routes, provider setup, memory and update flows in Chromium and WebKit.
+Hidden-page traffic and overlapping refreshes are measured in the browser. Set `GARDEN_BETA_REPORT`
+to retain the journey results, request counts, screenshots and logs. The matrix uses synthetic
+fixtures and disposable authentication databases; live providers and physical device acceptance
+remain separate checks.

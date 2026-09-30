@@ -10,10 +10,12 @@ export function useResource<T>(path: string | null) {
   const [loading, setLoading] = useState(Boolean(path));
   const [error, setError] = useState<unknown>(null);
   const [revision, setRevision] = useState(0);
+  const previousPath = useRef(path);
   const refresh = useCallback(() => setRevision((value) => value + 1), []);
   useEffect(() => {
     const controller = new AbortController();
-    setValue(null);
+    if (previousPath.current !== path || !path) setValue(null);
+    previousPath.current = path;
     setError(null);
     if (!path) {
       setLoading(false);

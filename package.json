@@ -38,7 +38,8 @@
     "diagnostic:replay": "NODE_OPTIONS=--conditions=development tsx packages/core/src/diagnostic-cli.ts",
     "eval:outcomes": "NODE_OPTIONS=--conditions=development tsx evals/outcomes/run.ts",
     "diagnostic:replay-private": "NODE_OPTIONS=--conditions=development tsx apps/worker/src/diagnostic-replay-cli.ts",
-    "test:auth-ui": "NODE_OPTIONS=--conditions=development tsx scripts/test-password-workflows.mjs"
+    "test:auth-ui": "NODE_OPTIONS=--conditions=development tsx scripts/test-password-workflows.mjs",
+    "test:beta": "node scripts/test-beta-journeys.mjs"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",

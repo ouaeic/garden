@@ -15,13 +15,21 @@ export function useAutosizeTextarea(value: string) {
     const input = ref.current;
     if (!input) return;
     let width = input.clientWidth;
+    let frame: number | undefined;
     const observer = new ResizeObserver(() => {
       if (input.clientWidth === width) return;
       width = input.clientWidth;
-      fit(input);
+      if (frame !== undefined) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        frame = undefined;
+        fit(input);
+      });
     });
     observer.observe(input);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (frame !== undefined) cancelAnimationFrame(frame);
+    };
   }, []);
   return ref;
 }

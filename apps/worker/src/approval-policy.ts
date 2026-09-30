@@ -115,7 +115,10 @@ const destinationCard = (
   spent: number
 ): ApprovalRequirement => ({
   sideEffect: 'external_reversible',
-  action: `Allow ${what} to ${verdicts[0]?.host ?? 'an outside host'}`,
+  action:
+    what === 'this page' && verdicts.length === 1 && verdicts[0]?.host === 'file'
+      ? 'Open a local file in the browser'
+      : `Allow ${what} to ${verdicts[0]?.host ?? 'an outside host'}`,
   ...(verdicts.length > 0 &&
   verdicts.every(
     (verdict) => verdict.unfamiliarPublicHost && verdict.noveltyBytes <= MAX_NOVEL_URL_BYTES

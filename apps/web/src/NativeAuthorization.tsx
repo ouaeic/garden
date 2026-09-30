@@ -1,3 +1,4 @@
+import { observeVisiblePoll } from './visible-poll';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { NativeAuthorization } from '@garden/contracts';
 import {
@@ -22,29 +23,19 @@ export default function NativeAuthorizationPortal() {
   const [complete, setComplete] = useState(false);
   useEffect(() => {
     if (!browserRequest || complete) return;
-    const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout>;
-    async function load() {
-      try {
-        const value = await get<NativeAuthorization>(`/v1/auth/native/${browserRequest!.id}`, {
-          signal: controller.signal,
+    return observeVisiblePoll(
+      async (signal) => {
+        const value = await get<NativeAuthorization>(`/v1/auth/native/${browserRequest.id}`, {
+          signal,
           retry: 0
         });
-        if (!controller.signal.aborted) setRequest(value);
-      } catch (cause) {
-        if (
-          !controller.signal.aborted &&
-          !(cause instanceof ApiError && [401, 403].includes(cause.status))
-        )
-          setError(cause);
+        if (!signal.aborted) setRequest(value);
+      },
+      5000,
+      (cause) => {
+        if (!(cause instanceof ApiError && [401, 403].includes(cause.status))) setError(cause);
       }
-      if (!controller.signal.aborted) timer = setTimeout(() => void load(), 5000);
-    }
-    void load();
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
+    );
   }, [browserRequest, complete]);
   async function decide(approve: boolean) {
     if (!request) return;

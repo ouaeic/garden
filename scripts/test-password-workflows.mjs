@@ -23,7 +23,9 @@ const { default: react } = await import(requireWeb.resolve('@vitejs/plugin-react
 const requireRunner = createRequire(
   new URL('../services/workspace-runner/package.json', import.meta.url)
 );
-const { chromium } = requireRunner('playwright-core');
+const { chromium, webkit } = requireRunner('playwright-core');
+const engine = process.env.GARDEN_UI_ENGINE || 'chromium';
+assert(['chromium', 'webkit'].includes(engine));
 const directory = await mkdtemp(path.join(tmpdir(), 'garden-password-ui-'));
 const root = path.resolve(import.meta.dirname, '../apps/web');
 const output = path.join(directory, 'dist');
@@ -142,7 +144,7 @@ try {
   config.PUBLIC_APP_URL = origin;
   config.WEBAUTHN_ORIGIN = origin;
   try {
-    browser = await chromium.launch({ headless: true });
+    browser = await (engine === 'webkit' ? webkit : chromium).launch({ headless: true });
     const first = await browser.newContext({ viewport: { width: 1200, height: 900 } });
     const errors = [];
     const watch = async (context) => {

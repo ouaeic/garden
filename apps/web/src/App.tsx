@@ -1,3 +1,4 @@
+import { observeVisiblePoll } from './visible-poll';
 import { useAuthEntry } from './auth-entry';
 import { usePhoneLayout } from './use-phone-layout';
 import { Keys } from './Keys';
@@ -152,51 +153,66 @@ function WorkspaceApp() {
     }
     if (bloomed) dispatchEvent(new Event('garden:bloom'));
   }, [bootstrap?.tasks]);
-  const refresh = useCallback(async () => {
-    try {
-      const result = await get<Bootstrap>('/v1/bootstrap');
-      let draftError: unknown = null;
-      try {
-        const recovered = await recoverDeviceDrafts(result.user.id);
-        const merged = new Map(
-          result.drafts.map((draft) => [draft.taskId ?? `new:${draft.workspaceId}`, draft])
-        );
-        for (const draft of recovered)
-          merged.set(draft.taskId ?? `new:${draft.workspaceId}`, draft);
-        result.drafts = [...merged.values()];
-      } catch (cause) {
-        draftError = cause;
-      }
-      void taskNotifier.current.update(result.tasks);
-      setBootstrap((current) =>
-        mergeTaskRefresh(current, result, activePaged.current, deletedTasks.current)
-      );
-      setAuthRequired(false);
-      setError(draftError);
-      setWorkspaceId((current) =>
-        result.workspaces.some((workspace) => workspace.id === current)
-          ? current
-          : (result.workspaces[0]?.id ?? '')
-      );
-      setDrafts((current) => {
-        const merged = { ...current };
-        for (const draft of result.drafts) {
-          const key = draft.taskId ?? `new:${draft.workspaceId}`;
-          if (!merged[key]) merged[key] = draft;
-        }
-        return merged;
-      });
-    } catch (err) {
-      if (
-        err instanceof ApiError &&
-        ['authentication_required', 'session_expired', 'invalid_session'].includes(err.code)
-      ) {
-        forgetDraftKey();
-        setAuthRequired(true);
-      } else setError(err);
-    } finally {
-      setLoading(false);
+  const refreshPending = useRef<{ queued: boolean; promise: Promise<void> } | null>(null);
+  const refresh = useCallback((): Promise<void> => {
+    if (refreshPending.current) {
+      refreshPending.current.queued = true;
+      return refreshPending.current.promise;
     }
+    const pending = { queued: false, promise: Promise.resolve() };
+    refreshPending.current = pending;
+    pending.promise = (async () => {
+      do {
+        pending.queued = false;
+        try {
+          const result = await get<Bootstrap>('/v1/bootstrap');
+          let draftError: unknown = null;
+          try {
+            const recovered = await recoverDeviceDrafts(result.user.id);
+            const merged = new Map(
+              result.drafts.map((draft) => [draft.taskId ?? `new:${draft.workspaceId}`, draft])
+            );
+            for (const draft of recovered)
+              merged.set(draft.taskId ?? `new:${draft.workspaceId}`, draft);
+            result.drafts = [...merged.values()];
+          } catch (cause) {
+            draftError = cause;
+          }
+          void taskNotifier.current.update(result.tasks);
+          setBootstrap((current) =>
+            mergeTaskRefresh(current, result, activePaged.current, deletedTasks.current)
+          );
+          setAuthRequired(false);
+          setError(draftError);
+          setWorkspaceId((current) =>
+            result.workspaces.some((workspace) => workspace.id === current)
+              ? current
+              : (result.workspaces[0]?.id ?? '')
+          );
+          setDrafts((current) => {
+            const merged = { ...current };
+            for (const draft of result.drafts) {
+              const key = draft.taskId ?? `new:${draft.workspaceId}`;
+              if (!merged[key]) merged[key] = draft;
+            }
+            return merged;
+          });
+        } catch (err) {
+          if (
+            err instanceof ApiError &&
+            ['authentication_required', 'session_expired', 'invalid_session'].includes(err.code)
+          ) {
+            forgetDraftKey();
+            setAuthRequired(true);
+          } else setError(err);
+        } finally {
+          setLoading(false);
+        }
+      } while (pending.queued && document.visibilityState === 'visible');
+    })().finally(() => {
+      if (refreshPending.current === pending) refreshPending.current = null;
+    });
+    return pending.promise;
   }, []);
   const refreshDecisions = useCallback(async () => {
     try {
@@ -206,7 +222,7 @@ function WorkspaceApp() {
     }
   }, []);
   const requestRefresh = useCallback(() => {
-    if (refreshTimer.current) return;
+    if (document.visibilityState !== 'visible' || refreshTimer.current) return;
     refreshTimer.current = setTimeout(() => {
       refreshTimer.current = null;
       void refresh();
@@ -249,7 +265,7 @@ function WorkspaceApp() {
     };
   }, [refresh]);
   useEffect(() => {
-    if (!bootstrap) return;
+    if (!bootstrap || authRequired) return;
     void refreshDecisions();
     const timer = setInterval(() => {
       if (document.visibilityState === 'visible') {
@@ -258,7 +274,7 @@ function WorkspaceApp() {
       }
     }, 15000);
     return () => clearInterval(timer);
-  }, [Boolean(bootstrap), refresh, refreshDecisions]);
+  }, [Boolean(bootstrap), authRequired, refresh, refreshDecisions]);
   useEffect(() => {
     if (palette === 'field') delete document.documentElement.dataset.palette;
     else document.documentElement.dataset.palette = palette;
@@ -384,12 +400,11 @@ function WorkspaceApp() {
   }, [navigation.taskId, bootstrap?.tasks.some((task) => task.id === navigation.taskId)]);
   useEffect(() => {
     if (!workspaceId || !bootstrap || authRequired) return;
-    const heartbeat = () => {
-      void post(`/v1/workspaces/${workspaceId}/heartbeat`, {}).catch(() => undefined);
-    };
-    heartbeat();
-    const timer = setInterval(heartbeat, 60000);
-    return () => clearInterval(timer);
+    return observeVisiblePoll(
+      (signal) => post(`/v1/workspaces/${workspaceId}/heartbeat`, {}, { signal }),
+      60_000,
+      () => undefined
+    );
   }, [workspaceId, Boolean(bootstrap), authRequired]);
   const sheetTitle = sheetTitles[navigation.view];
   const baseView = sheetTitle

@@ -1,3 +1,4 @@
+import { observeVisiblePoll } from './visible-poll';
 import { useEffect, useRef, useState } from 'react';
 import type { DiagnosticCaptureStatus } from '@garden/contracts';
 import { post, request } from './client';
@@ -30,26 +31,18 @@ export default function PrivateDiagnostics({ taskId }: { taskId: string }) {
   }, []);
   useEffect(() => {
     if (!open || busy) return;
-    const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout>;
-    const read = async () => {
-      try {
-        const result = await request<Status>(endpoint, { signal: controller.signal });
-        if (!controller.signal.aborted) {
+    return observeVisiblePoll(
+      async (signal) => {
+        const result = await request<Status>(endpoint, { signal });
+        if (!signal.aborted) {
           setCapture(result.capture);
           setLoaded(true);
           setError(null);
         }
-      } catch (cause) {
-        if (!controller.signal.aborted) setError(cause);
-      }
-      if (!controller.signal.aborted) timer = setTimeout(() => void read(), 5000);
-    };
-    void read();
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
+      },
+      5000,
+      setError
+    );
   }, [endpoint, open, busy, refresh]);
   const control = async (action: 'start' | 'stop' | 'delete') => {
     if (busy || !loaded) return;

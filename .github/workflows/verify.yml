@@ -27,6 +27,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  beta-journeys:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@d15e628ca66d93ee5f352c71671a7bc6a97af5c9 # v6.0.8
+        with:
+          version: 11.9.0
+          run_install: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - run: sudo apt-get update && sudo apt-get install --yes python3-venv
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @garden/workspace-runner exec playwright-core install --with-deps chromium webkit
+      - name: Exercise disposable beta journeys in both browser engines
+        env:
+          GARDEN_BETA_REPORT: ${{ runner.temp }}/garden-beta-journeys
+        run: pnpm test:beta
+      - name: Retain synthetic journey evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: beta-journeys-${{ github.sha }}
+          if-no-files-found: error
+          path: ${{ runner.temp }}/garden-beta-journeys
+
   application:
     # The nightly trigger exists for the two evaluation jobs at the bottom of this file and for
     # nothing else; every other job here measures a change, and there is no change at 05:17.

@@ -1,0 +1,51 @@
+name: Bug report
+description: Report a reproducible problem with garden.
+title: '[Bug]: '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For security vulnerabilities, use [private reporting](https://github.com/ouaeic/garden/security/advisories/new).
+        Do not include passwords, keys, recovery codes, private prompts, cookies, or unredacted logs.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include what you expected and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How can we reproduce it?
+      description: Use synthetic data and include the steps from a fresh starting state.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Garden version or commit
+      description: Include the server and client versions if they differ.
+    validations:
+      required: true
+  - type: dropdown
+    id: client
+    attributes:
+      label: Client
+      multiple: true
+      options:
+        - Desktop browser
+        - Phone browser or PWA
+        - macOS app
+        - Windows app
+        - Linux app
+        - Android app
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment and safe diagnostic details
+      description: Operating systems, browser, connection type, and provider/model if relevant. Include only redacted errors or a minimal synthetic example.

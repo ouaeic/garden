@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { checkBackgroundWork } from './browser-background.mjs';
 import { checkMemoryLibrary } from './browser-memory.mjs';
 import { checkPreviewStart } from './browser-preview-start.mjs';
 import { checkDesk } from './browser-desk.mjs';
@@ -1260,6 +1261,8 @@ try {
     errors.push(`Unspecified UI fixture: ${route.request().method()} ${path}`);
     return route.fulfill({ status: 501, json: { error: { message: 'Unspecified UI fixture' } } });
   });
+  if (!process.env.GARDEN_UI_FOCUS || process.env.GARDEN_UI_FOCUS === 'background')
+    await checkBackgroundWork({ context, origin, report });
   if (!process.env.GARDEN_UI_FOCUS || process.env.GARDEN_UI_FOCUS === 'desk')
     await checkDesk({ context, origin, task, bootstrap, project, report, directoryUi, processUi });
   if (process.env.GARDEN_UI_FOCUS === 'workspace') {
@@ -1318,6 +1321,7 @@ try {
   }
   if (
     ![
+      'background',
       'memory',
       'desk',
       'drafts',
@@ -2725,6 +2729,7 @@ try {
   }
   if (
     ![
+      'background',
       'memory',
       'desk',
       'drafts',
@@ -3312,6 +3317,7 @@ try {
 
   if (
     ![
+      'background',
       'memory',
       'desk',
       'appearance',

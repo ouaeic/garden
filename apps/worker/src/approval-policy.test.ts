@@ -301,6 +301,23 @@ describe('agent approval policy', () => {
     });
   });
 
+  it.each(['balanced', 'autonomous', 'review'] as const)(
+    'names a local browser file clearly while retaining approval in %s',
+    (mode) => {
+      expect(
+        approvalRequirement(
+          'browser_action',
+          { action: 'navigate', url: 'file:///workspace/dashboard.html' },
+          mode,
+          { taintSources: ['workspace file dashboard.html'], ownerText: '' }
+        )
+      ).toMatchObject({
+        sideEffect: 'external_reversible',
+        action: 'Open a local file in the browser'
+      });
+    }
+  );
+
   it('requires approval for connector writes and stronger approval for deletes', () => {
     expect(
       approvalRequirement('connector_action', {
