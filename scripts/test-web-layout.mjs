@@ -2305,7 +2305,7 @@ try {
     await page.getByText('Python · terminated', { exact: true }).waitFor();
     assert.deepEqual(debugControls, [{ action: 'stop' }]);
     const authorizationPage = await context.newPage();
-    authorizationPage.on('pageerror', (error) => errors.push(error.message));
+    await captureBrowserErrors(authorizationPage, errors);
     await authorizationPage.goto(`${origin}/#native-auth=${nativeAuthorization.id}`);
     const authorizeDialog = authorizationPage.getByRole('dialog', {
       name: 'Authorize your garden app',
@@ -2336,7 +2336,7 @@ try {
     await authorizationPage.screenshot({ path: resolve(report, 'device-authorization.png') });
     await authorizationPage.close();
     const dictationPage = await context.newPage();
-    dictationPage.on('pageerror', (error) => errors.push(error.message));
+    await captureBrowserErrors(dictationPage, errors);
     await dictationPage.addInitScript(() => {
       window.dictationFixture = { requests: 0, stops: 0, deferred: false, release: null };
       Object.defineProperty(navigator, 'mediaDevices', {
@@ -2460,7 +2460,7 @@ try {
     assert.equal(await dictationPage.evaluate(() => window.dictationFixture.requests), 2);
     await dictationPage.close();
     const approvalPage = await context.newPage();
-    approvalPage.on('pageerror', (error) => errors.push(error.message));
+    await captureBrowserErrors(approvalPage, errors);
     await approvalPage.setViewportSize({ width: 390, height: 844 });
     const showApproval = async (index, expired = false, samePage = false) => {
       approvals = [
@@ -2767,6 +2767,7 @@ try {
       }
     };
     const modelsPage = await context.newPage();
+    await captureBrowserErrors(modelsPage, errors);
     await modelsPage.goto(`${origin}/?task=${task.id}`);
     await modelsPage.locator('.garden-task-composer').waitFor();
     if (await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).isVisible())
@@ -3356,6 +3357,7 @@ try {
     ].includes(process.env.GARDEN_UI_FOCUS)
   ) {
     let draftPage = await context.newPage();
+    await captureBrowserErrors(draftPage, errors);
     const openDraft = async () => {
       await draftPage.goto(`${origin}/?task=${task.id}`);
       await openNewProject(draftPage);
@@ -3392,6 +3394,7 @@ try {
     );
     await draftPage.close();
     draftPage = await context.newPage();
+    await captureBrowserErrors(draftPage, errors);
     draftDialog = draftPage.getByRole('dialog', { name: 'Begin something new', exact: true });
     draftInput = draftDialog.getByLabel('Describe what you want to do');
     await openDraft();

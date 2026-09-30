@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { captureBrowserErrors } from './browser-errors.mjs';
 
 export async function checkMemoryLibrary({ context, origin, workspace, project, task, report }) {
   const page = await context.newPage();
+  const errors = [];
+  await captureBrowserErrors(page, errors);
   const requests = [];
   await page.route('**/memory-library?*', (route) => {
     const params = new URL(route.request().url()).searchParams;
@@ -44,7 +47,9 @@ export async function checkMemoryLibrary({ context, origin, workspace, project, 
     .getByRole('navigation', { name: 'Workspace navigation' })
     .getByRole('button', { name: 'Library', exact: true })
     .click();
-  const library = page.getByRole('dialog', { name: 'Library', exact: true });
+  const library = page
+    .getByRole('dialog', { name: 'Library', exact: true })
+    .or(page.getByRole('region', { name: 'Library', exact: true }));
   await library.getByRole('button', { name: 'Memory', exact: true }).click();
   const records = library.getByRole('region', { name: 'Memory records', exact: true });
   await records.getByText('Retained work 0', { exact: true }).waitFor();
@@ -80,6 +85,16 @@ export async function checkMemoryLibrary({ context, origin, workspace, project, 
   ]) {
     await page.setViewportSize({ width, height });
     await library.scrollIntoViewIfNeeded();
+    assert.equal(
+      await page
+        .getByRole(width < 700 ? 'region' : 'dialog', {
+          name: 'Library',
+          exact: true
+        })
+        .count(),
+      1,
+      'Library must become a navigation page on phones'
+    );
     const dimensions = await library.evaluate((el) => ({
       width: el.clientWidth,
       scroll: el.scrollWidth
@@ -87,5 +102,6 @@ export async function checkMemoryLibrary({ context, origin, workspace, project, 
     assert(dimensions.scroll <= dimensions.width + 1, 'Memory must fit the panel width');
     await page.screenshot({ path: resolve(report, `memory-${width}.png`) });
   }
+  assert.deepEqual(errors, [], 'Memory journeys must not leave uncaught browser errors');
   await page.close();
 }

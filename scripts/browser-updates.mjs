@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { captureBrowserErrors } from './browser-errors.mjs';
 
 export async function checkUpdates({ context, origin, report }) {
   const current = JSON.parse(
@@ -8,6 +9,8 @@ export async function checkUpdates({ context, origin, report }) {
   );
   for (const width of [1440, 390, 320]) {
     const page = await context.newPage();
+    const errors = [];
+    await captureBrowserErrors(page, errors);
     await page.setViewportSize({ width, height: 844 });
     await page.clock.install();
     let build = current.id;
@@ -67,6 +70,9 @@ export async function checkUpdates({ context, origin, report }) {
         exact: true
       })
       .waitFor();
+    assert.deepEqual(errors, [], 'Update journeys must not leave uncaught browser errors');
+    await page.clock.setSystemTime(Date.now());
+    await page.clock.resume();
     await page.close();
   }
   console.log(
