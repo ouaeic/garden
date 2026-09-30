@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { writeFile } from 'node:fs/promises';
+import { captureBrowserErrors } from './browser-errors.mjs';
 
 // A fixed workspace must keep its controls reachable while each overflowing card scrolls.
 export async function checkDesk({
@@ -16,12 +17,8 @@ export async function checkDesk({
   const page = await context.newPage();
   page.setDefaultTimeout(12_000);
   const failures = [];
-  const pageErrors = [];
+  const pageErrors = await captureBrowserErrors(page, failures);
   const failedRequests = [];
-  page.on('pageerror', (error) => {
-    failures.push(error.message);
-    pageErrors.push({ message: error.message, stack: error.stack });
-  });
   page.on('requestfailed', (request) =>
     failedRequests.push({ url: request.url(), failure: request.failure() })
   );
