@@ -1691,7 +1691,7 @@ describe('the contract as a function of the box it is on', () => {
     // app has to bind for the owner to reach it.
     for (const fact of [
       '/usr/local/lib/garden/python/bin/python3',
-      'No model weights run on this computer',
+      "Models and generate_media use the owner's chosen endpoints",
       '127.0.0.1',
       'anti-bot challenge'
     ])

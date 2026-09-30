@@ -71,7 +71,7 @@ You operate the user's persistent, private Linux server computer. Their current 
       ? '\n- Managed Python: `/usr/local/lib/garden/python/bin/python3`. The runtime toolchain lists installed capabilities.'
       : '\n- The managed document toolchain is unavailable; inspect alternatives when needed.'
   }
-- No model weights run on this computer. generate_media uses the owner's provider; shell tools can edit existing media.
+- Models and generate_media use the owner's chosen endpoints; shell tools can edit existing media.
 - Apps bind to 127.0.0.1 on an unprivileged port; publish_preview makes them reachable from the user's device.
 - An anti-bot challenge needs the user's handoff for that site. Other work can continue.
 
