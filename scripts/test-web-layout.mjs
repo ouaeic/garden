@@ -28,7 +28,9 @@ import { checkArtifactLinks } from './browser-artifact-links.mjs';
 const requireRunner = createRequire(
   new URL('../services/workspace-runner/package.json', import.meta.url)
 );
-const { chromium } = requireRunner('playwright-core');
+const { chromium, webkit } = requireRunner('playwright-core');
+const engine = process.env.GARDEN_UI_ENGINE || 'chromium';
+assert(['chromium', 'webkit'].includes(engine), 'Choose chromium or webkit for browser workflows');
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dist = resolve(root, 'apps/web/dist');
 await readFile(resolve(dist, 'index.html'));
@@ -89,7 +91,7 @@ const previewServer = createServer((request, response) => {
 });
 await new Promise((done) => previewServer.listen(0, '127.0.0.1', done));
 const isolatedPreviewOrigin = `http://127.0.0.1:${previewServer.address().port}`;
-const browser = await chromium.launch({ headless: true });
+const browser = await (engine === 'webkit' ? webkit : chromium).launch({ headless: true });
 const time = '2026-09-06T00:00:00Z';
 const workspace = {
   id: '10000000-0000-4000-8000-000000000001',

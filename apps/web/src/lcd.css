@@ -90,30 +90,34 @@
   --text: var(--s0);
   color-scheme: dark;
 }
-/* Texture belongs to interface backgrounds so delivered content keeps its own pixels. */
+/* Small tiles keep WebKit rasterization uniform across large interface surfaces. */
 :root {
   --lcd-texture:
     repeating-linear-gradient(
-      0deg,
-      transparent 0 2px,
-      color-mix(in srgb, var(--text) 4%, transparent) 2px 3px
-    ),
+        0deg,
+        transparent 0 2px,
+        color-mix(in srgb, var(--text) 4%, transparent) 2px 3px
+      )
+      0 0 / 3px 3px,
     repeating-linear-gradient(
-      90deg,
-      transparent 0 2px,
-      color-mix(in srgb, var(--text) 4%, transparent) 2px 3px
-    );
+        90deg,
+        transparent 0 2px,
+        color-mix(in srgb, var(--text) 4%, transparent) 2px 3px
+      )
+      0 0 / 3px 3px;
   --lcd-texture-inverse:
     repeating-linear-gradient(
-      0deg,
-      transparent 0 2px,
-      color-mix(in srgb, var(--bg) 4%, transparent) 2px 3px
-    ),
+        0deg,
+        transparent 0 2px,
+        color-mix(in srgb, var(--bg) 4%, transparent) 2px 3px
+      )
+      0 0 / 3px 3px,
     repeating-linear-gradient(
-      90deg,
-      transparent 0 2px,
-      color-mix(in srgb, var(--bg) 4%, transparent) 2px 3px
-    );
+        90deg,
+        transparent 0 2px,
+        color-mix(in srgb, var(--bg) 4%, transparent) 2px 3px
+      )
+      0 0 / 3px 3px;
 }
 /* Opaque neutral backing also keeps the interface grid out of transparent images and frames. */
 :root :is(img, canvas, iframe, video) {

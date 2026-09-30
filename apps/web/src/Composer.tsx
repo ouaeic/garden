@@ -275,7 +275,11 @@ export default function Composer(props: ComposerProps) {
           aria-haspopup="dialog"
           aria-controls={promptSettingsId}
           popoverTarget={supportsPromptPopover ? promptSettingsId : undefined}
-          onClick={supportsPromptPopover ? undefined : () => setPromptSettingsOpen((open) => !open)}
+          onClick={(event) => {
+            // WebKit does not focus buttons on pointer clicks; popovers restore the opening focus.
+            event.currentTarget.focus({ preventScroll: true });
+            if (!supportsPromptPopover) setPromptSettingsOpen((open) => !open);
+          }}
         >
           <SlidersHorizontal size={16} />
           <span className="composer-mode-label">

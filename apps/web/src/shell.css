@@ -213,7 +213,7 @@
 .palette-swatch > i {
   width: 16px;
   height: 16px;
-  background-image: var(--lcd-texture);
+  background: var(--lcd-texture), transparent;
 }
 [data-palette-swatch='field'] .palette-swatch > i:nth-child(1) {
   background-color: #b7c58b;

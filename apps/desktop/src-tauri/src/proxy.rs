@@ -1,7 +1,8 @@
 use crate::connection::{
     clear_pending_pairing, connect_profile, forget_profile, load_pending_pairing, load_profile,
-    parse_pairing_uri, pinned_http_client, pinned_tls_config, save_pending_pairing, save_profile,
-    ImportedConnection, NetworkPreference, PendingPairing, ServerProfile,
+    parse_pairing_uri, pinned_http_client, pinned_tls_config, profile_from_address,
+    save_pending_pairing, save_profile, ImportedConnection, NetworkPreference, PendingPairing,
+    ServerProfile,
 };
 use crate::ssh_install::{self, InstallServerRequest};
 use axum::{
@@ -154,7 +155,7 @@ impl ClientState {
             .read()
             .await
             .clone()
-            .ok_or("Paste the one-time connection ticket from your garden server")?;
+            .ok_or("Enter your garden server address to connect")?;
         match self.activate(profile).await {
             Ok(active) => {
                 *self.last_error.write().await = None;
@@ -183,6 +184,13 @@ impl ClientState {
         .map_err(|_| "The pending pairing-code writer stopped unexpectedly")??;
         *self.pairing_code.write().await = Some(pending);
         Ok(())
+    }
+
+    async fn connect_address(self: &Arc<Self>, raw: &str) -> Result<(), String> {
+        let profile = profile_from_address(raw).await?;
+        let _activation = self.activation.lock().await;
+        self.activate(profile).await?;
+        self.clear_pairing_code().await
     }
 
     async fn clear_pairing_code(&self) -> Result<(), String> {
@@ -309,8 +317,10 @@ fn checked_authorization_browser_url(raw: &str, endpoints: &[String]) -> Result<
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct PairRequest {
-    ticket: String,
+    ticket: Option<String>,
+    address: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -554,13 +564,18 @@ async fn pair(
             Json(serde_json::json!({
                 "error": {
                     "code": "invalid_client_origin",
-                    "message": "Connection tickets are accepted only from the garden client"
+                    "message": "Server connections are accepted only from the garden client"
                 }
             })),
         )
             .into_response();
     }
-    match state.import(&request.ticket).await {
+    let result = match (request.address, request.ticket) {
+        (Some(address), None) => state.connect_address(&address).await,
+        (None, Some(ticket)) => state.import(&ticket).await,
+        _ => Err("Enter a server address or a connection ticket".into()),
+    };
+    match result {
         Ok(()) => (
             StatusCode::OK,
             Json(serde_json::json!({ "connected": true })),
@@ -1472,34 +1487,45 @@ fn offline_page(
   <div class="brand">garden</div>
   <div class="eyebrow">Private server connection</div>
   <h1>Connect your AI computer</h1>
-  <p id="ticket-help">Paste the one-time connection ticket printed after installing garden. The app will pin your server’s permanent identity and follow its address when the IP changes.</p>
+  <p id="address-help">Enter your server address, then sign in with the same password you use in your browser. This device will remember your connection.</p>
+  <form id="address-form">
+    <label for="address">Server address</label>
+    <input id="address" name="address" aria-describedby="address-help error" spellcheck="false" autocomplete="url" autocapitalize="none" placeholder="garden.example.com" required>
+    <button id="connect" type="submit">Continue</button>
+  </form>
+  <div class="error" id="error" role="status" aria-live="polite">{safe_message}</div>
+  <details class="ticket-option">
+  <summary>Use a connection ticket</summary>
+  <p id="ticket-help">For home servers with a self-signed certificate, paste the ticket from your server or a signed-in device. It securely identifies your server without changing certificate settings.</p>
+  <form id="ticket-form">
   <label for="ticket">Connection ticket</label>
   <textarea id="ticket" aria-label="Connection ticket" aria-describedby="ticket-help error" spellcheck="false" autocomplete="off" placeholder="garden://pair/…"></textarea>
-  <button id="connect">Connect securely</button>
-  <div class="error" id="error" role="status" aria-live="polite">{safe_message}</div>
-  <p class="hint">The server’s SSH login, IP address, and TLS warnings are not needed here.</p>
+  <button id="ticket-connect" type="submit" class="primary">Connect with ticket</button>
+  </form>
+  </details>
   <a class="install-link" href="{installer_url}">Install garden on a cloud server</a>
   {network_help}
 </main>
 <script>
-  const button = document.querySelector('#connect');
   const error = document.querySelector('#error');
-  const ticket = document.querySelector('#ticket');
-  button.addEventListener('click', async () => {{
-    button.disabled = true; ticket.removeAttribute('aria-invalid'); error.textContent = 'Verifying server identity…';
+  async function connect(event, field, button) {{
+    event.preventDefault();
+    button.disabled = true; field.removeAttribute('aria-invalid'); error.textContent = 'Verifying server identity…';
     try {{
       const response = await fetch('/__garden/client/pair', {{
         method: 'POST', headers: {{'content-type':'application/json'}},
-        body: JSON.stringify({{ticket: ticket.value.trim()}})
+        body: JSON.stringify({{[field.id]: field.value.trim()}})
       }});
       const body = await response.json();
       if (!response.ok) throw new Error(body.error?.message || 'Connection failed');
       location.replace('/');
     }} catch (cause) {{
       error.textContent = cause.message || 'Connection failed'; button.disabled = false;
-      ticket.setAttribute('aria-invalid', 'true'); ticket.focus();
+      field.setAttribute('aria-invalid', 'true'); field.focus();
     }}
-  }});
+  }}
+  document.querySelector('#address-form').addEventListener('submit', (event) => connect(event, document.querySelector('#address'), document.querySelector('#connect')));
+  document.querySelector('#ticket-form').addEventListener('submit', (event) => connect(event, document.querySelector('#ticket'), document.querySelector('#ticket-connect')));
   document.querySelectorAll('[data-network]').forEach((choice) => {{
     choice.addEventListener('click', async () => {{
       const preference = choice.dataset.network;

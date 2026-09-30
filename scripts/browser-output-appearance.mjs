@@ -20,6 +20,17 @@ export async function checkInterfaceTexture(page) {
     });
     return {
       count: painted.length,
+      untiled: painted
+        .filter((element) => {
+          const style = getComputedStyle(element);
+          const images = style.backgroundImage.split(/, (?=(?:repeating-)?linear-gradient)/);
+          const sizes = style.backgroundSize.split(', ');
+          return images.some(
+            (image, index) =>
+              image.includes('repeating-linear-gradient') && sizes[index] !== '3px 3px'
+          );
+        })
+        .map((element) => element.className),
       missing: painted
         .filter(
           (element) =>
@@ -30,6 +41,7 @@ export async function checkInterfaceTexture(page) {
   });
   assert(coverage.count > 0, 'Check visible painted interface surfaces');
   assert.deepEqual(coverage.missing, [], 'Every opaque interface surface retains the LCD matrix');
+  assert.deepEqual(coverage.untiled, [], 'Interface grids rasterize as bounded pixel tiles');
 }
 
 export async function checkOutputAppearance({ context, origin, task, report }) {

@@ -80,7 +80,10 @@ garden over HTTPS.
 
 Open the address the installer printed in a browser, or scan its QR code with a phone — the code is
 an ordinary `https://` link to the computer, so any camera opens it and the owner code travels in
-the fragment. The installer also prints a connection ticket for the native client, containing:
+the fragment. In the native app, enter that server address and sign in with your usual password.
+A trusted HTTPS certificate verifies the first connection, after which the app pins the server's
+identity and remembers the connection. For a home server with a self-signed certificate, use the
+optional connection ticket instead. The installer prints a ticket containing:
 
 - every useful endpoint detected at install time;
 - the server’s stable cryptographic identity;

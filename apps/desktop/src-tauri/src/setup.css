@@ -115,6 +115,16 @@ button.primary {
   margin-top: 24px;
   text-align: center;
 }
+.ticket-option {
+  margin-top: 16px;
+}
+.ticket-option summary {
+  cursor: pointer;
+  padding: 8px 0;
+}
+#address {
+  margin-bottom: 16px;
+}
 .network-help {
   border-top: 1px solid var(--text);
   margin-top: 24px;

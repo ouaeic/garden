@@ -108,6 +108,77 @@ fn canonical_endpoint(raw: &str) -> Result<String, String> {
     Ok(parsed.origin().ascii_serialization())
 }
 
+fn server_address(raw: &str) -> Result<String, String> {
+    let raw = raw.trim();
+    if raw.is_empty() || raw.len() > 2048 {
+        return Err("Enter your garden server address".into());
+    }
+    let address = if raw.contains("://") {
+        raw.to_owned()
+    } else {
+        format!("https://{raw}")
+    };
+    canonical_endpoint(&address)
+}
+
+fn discovered_profile(
+    endpoint: String,
+    manifest: ConnectionManifest,
+) -> Result<ServerProfile, String> {
+    if manifest.version != 1 {
+        return Err("This server uses an unsupported connection manifest".into());
+    }
+    identity_digest(&manifest.identity)?;
+    validate_discovery(&manifest.discovery)?;
+    let mut endpoints = validated_endpoints(manifest.endpoints)?;
+    endpoints.retain(|value| value != &endpoint);
+    endpoints.insert(0, endpoint.clone());
+    endpoints.truncate(MAX_ENDPOINTS);
+    Ok(ServerProfile {
+        version: 1,
+        identity: manifest.identity,
+        endpoints,
+        discovery: manifest.discovery,
+        last_endpoint: Some(endpoint),
+        network_preference: NetworkPreference::Unknown,
+    })
+}
+
+pub async fn profile_from_address(raw: &str) -> Result<ServerProfile, String> {
+    let endpoint = server_address(raw)?;
+    // A trusted certificate authenticates first contact; subsequent connections pin its key.
+    let client = reqwest::Client::builder()
+        .https_only(true)
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(10))
+        .build()
+        .map_err(|_| "Could not start the secure connection")?;
+    let mut response = client
+        .get(format!("{endpoint}/.well-known/garden"))
+        .send()
+        .await
+        .map_err(|_| "Could not verify this HTTPS address. Check the address and connection. For a home server with a self-signed certificate, use its connection ticket below.")?;
+    if !response.status().is_success() {
+        return Err("This address did not return a garden server connection".into());
+    }
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|_| "Could not read the server connection")?
+    {
+        if bytes.len() + chunk.len() > MAX_TICKET_BYTES {
+            return Err("The server connection manifest is too large".into());
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    let manifest = serde_json::from_slice(&bytes)
+        .map_err(|_| "This address did not return a valid garden server connection")?;
+    let profile = discovered_profile(endpoint, manifest)?;
+    // Do not save or send credentials until the advertised identity proves itself over TLS.
+    probe_profile(&profile).await
+}
+
 fn validated_endpoints(values: Vec<String>) -> Result<Vec<String>, String> {
     if values.is_empty() || values.len() > MAX_ENDPOINTS {
         return Err(format!(
@@ -663,6 +734,70 @@ pub async fn connect_profile(profile: &ServerProfile) -> Result<ServerProfile, S
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn address_connections_accept_https_origins_without_url_credentials() {
+        assert_eq!(
+            server_address(" example.test ").unwrap(),
+            "https://example.test"
+        );
+        assert_eq!(
+            server_address("https://example.test/").unwrap(),
+            "https://example.test"
+        );
+        for address in [
+            "",
+            "http://example.test",
+            "https://user:secret@example.test",
+            "https://example.test/path",
+            "https://example.test?token=secret",
+            "https://example.test#secret",
+            "https://example.test:8443",
+        ] {
+            assert!(server_address(address).is_err(), "{address}");
+        }
+    }
+
+    #[test]
+    fn address_discovery_keeps_the_verified_origin_and_rejects_invalid_manifests() {
+        let manifest = || ConnectionManifest {
+            version: 1,
+            identity: format!("sha256/{}", STANDARD.encode([7_u8; 32])),
+            endpoints: vec!["https://192.168.1.42".into()],
+            discovery: Discovery {
+                mdns_service: "_garden._tcp.local".into(),
+                mdns_port: 443,
+            },
+        };
+        let profile = discovered_profile("https://example.test".into(), manifest()).unwrap();
+        assert_eq!(
+            profile.endpoints,
+            vec!["https://example.test", "https://192.168.1.42"]
+        );
+        assert_eq!(
+            profile.last_endpoint.as_deref(),
+            Some("https://example.test")
+        );
+        let mut invalid = manifest();
+        invalid.identity = "untrusted".into();
+        assert!(discovered_profile("https://example.test".into(), invalid).is_err());
+        let mut invalid = manifest();
+        invalid.endpoints = vec!["http://192.168.1.42".into()];
+        assert!(discovered_profile("https://example.test".into(), invalid).is_err());
+        let mut invalid = manifest();
+        invalid.version = 2;
+        assert!(discovered_profile("https://example.test".into(), invalid).is_err());
+    }
+
+    #[tokio::test]
+    #[ignore = "requires an explicitly selected live HTTPS garden server"]
+    async fn connects_by_address_when_explicitly_requested() {
+        let address = std::env::var("GARDEN_TEST_SERVER_ADDRESS").unwrap();
+        let profile = profile_from_address(&address).await.unwrap();
+        assert!(profile.last_endpoint.is_some());
+        assert!(!profile.endpoints.is_empty());
+        identity_digest(&profile.identity).unwrap();
+    }
 
     #[test]
     fn recognizes_private_lan_routes_without_trusting_public_lookalikes() {
