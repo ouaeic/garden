@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { checkInterfaceTexture } from './browser-output-appearance.mjs';
+import { captureBrowserErrors } from './browser-errors.mjs';
+import { writeFile } from 'node:fs/promises';
 
 export async function checkMobileNavigation({ context, origin, task, bootstrap, report }) {
   const page = await context.newPage();
   const errors = [];
-  page.on('pageerror', (error) => errors.push(error.message));
+  const diagnostics = await captureBrowserErrors(page, errors);
   await page.route('**/v1/**', (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === '/v1/bootstrap')
@@ -369,6 +371,9 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
     await page.screenshot({ path: resolve(report, 'mobile-failure.png') });
     throw error;
   } finally {
+    await page.clock.setSystemTime(Date.now());
+    await page.clock.resume();
     await page.close();
+    await writeFile(resolve(report, 'mobile-errors.json'), JSON.stringify(diagnostics, null, 2));
   }
 }

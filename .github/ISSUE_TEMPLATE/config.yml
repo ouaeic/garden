@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and beta feedback
+    url: https://github.com/ouaeic/garden/discussions
+    about: Ask for help or share feedback on a workflow.
+  - name: Report a security vulnerability privately
+    url: https://github.com/ouaeic/garden/security/advisories/new
+    about: Keep vulnerability details and private data out of public issues.

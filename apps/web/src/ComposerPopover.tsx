@@ -58,7 +58,14 @@ export default function ComposerPopover({
     document.addEventListener('scroll', position, true);
     window.visualViewport?.addEventListener('resize', position);
     window.visualViewport?.addEventListener('scroll', position);
-    const observer = new ResizeObserver(position);
+    let resizeFrame: number | undefined;
+    const observer = new ResizeObserver(() => {
+      if (resizeFrame !== undefined) return;
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = undefined;
+        position();
+      });
+    });
     observer.observe(element);
     return () => {
       element.removeEventListener('toggle', toggle);
@@ -67,6 +74,7 @@ export default function ComposerPopover({
       window.visualViewport?.removeEventListener('resize', position);
       window.visualViewport?.removeEventListener('scroll', position);
       observer.disconnect();
+      if (resizeFrame !== undefined) cancelAnimationFrame(resizeFrame);
     };
   }, [anchor, panel, onOpenChange]);
   if (!supportsPromptPopover)

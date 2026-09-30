@@ -20,11 +20,21 @@ export default function ScrollRegion({
     const region = viewport.current!,
       body = content.current!;
     const measure = () => setOverflow(region.scrollHeight > region.clientHeight + 1);
-    const observer = new ResizeObserver(measure);
+    let frame: number | undefined;
+    const observer = new ResizeObserver(() => {
+      if (frame !== undefined) return;
+      frame = requestAnimationFrame(() => {
+        frame = undefined;
+        measure();
+      });
+    });
     observer.observe(region);
     observer.observe(body);
     measure();
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (frame !== undefined) cancelAnimationFrame(frame);
+    };
   }, []);
   useEffect(() => {
     if (viewport.current) viewport.current.scrollTop = 0;

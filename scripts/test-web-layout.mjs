@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { captureBrowserErrors } from './browser-errors.mjs';
+import { checkBackgroundWork } from './browser-background.mjs';
 import { checkMemoryLibrary } from './browser-memory.mjs';
 import { checkPreviewStart } from './browser-preview-start.mjs';
 import { checkDesk } from './browser-desk.mjs';
@@ -712,6 +714,7 @@ const processUi = processFixture(workspace.id, task.id);
 const directoryUi = directoryFixture(workspace.id);
 try {
   const context = await browser.newContext({
+    locale: 'en-US',
     viewport: { width: 1440, height: 1000 },
     reducedMotion: 'reduce'
   });
@@ -1260,6 +1263,8 @@ try {
     errors.push(`Unspecified UI fixture: ${route.request().method()} ${path}`);
     return route.fulfill({ status: 501, json: { error: { message: 'Unspecified UI fixture' } } });
   });
+  if (!process.env.GARDEN_UI_FOCUS || process.env.GARDEN_UI_FOCUS === 'background')
+    await checkBackgroundWork({ context, origin, report, taskId: task.id });
   if (!process.env.GARDEN_UI_FOCUS || process.env.GARDEN_UI_FOCUS === 'desk')
     await checkDesk({ context, origin, task, bootstrap, project, report, directoryUi, processUi });
   if (process.env.GARDEN_UI_FOCUS === 'workspace') {
@@ -1318,6 +1323,7 @@ try {
   }
   if (
     ![
+      'background',
       'memory',
       'desk',
       'drafts',
@@ -1369,7 +1375,7 @@ try {
       });
     }
     const page = await context.newPage();
-    page.on('pageerror', (error) => errors.push(error.message));
+    await captureBrowserErrors(page, errors);
     await page.goto(`${origin}/?task=${task.id}`);
     assert.equal(
       await page.locator('link[rel="manifest"]').count(),
@@ -1792,10 +1798,16 @@ try {
       'Expanding must preserve the running preview'
     );
     await page.getByRole('button', { name: 'Exit full screen', exact: true }).click();
+    const outputViews = page.getByRole('navigation', { name: 'Output views' });
+    await outputViews.getByRole('button', { name: 'Downloads', exact: true }).click();
     const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('link', { name: 'Download source', exact: true }).click();
+    await page
+      .locator('.garden-output-downloads')
+      .getByRole('link', { name: 'Download', exact: true })
+      .click();
     const download = await downloadPromise;
     assert.equal(await readFile(await download.path(), 'utf8'), previewHtml);
+    await outputViews.getByRole('button', { name: 'Preview', exact: true }).click();
     await page.evaluate(() =>
       Object.defineProperty(Element.prototype, 'requestFullscreen', {
         configurable: true,
@@ -2293,7 +2305,7 @@ try {
     await page.getByText('Python · terminated', { exact: true }).waitFor();
     assert.deepEqual(debugControls, [{ action: 'stop' }]);
     const authorizationPage = await context.newPage();
-    authorizationPage.on('pageerror', (error) => errors.push(error.message));
+    await captureBrowserErrors(authorizationPage, errors);
     await authorizationPage.goto(`${origin}/#native-auth=${nativeAuthorization.id}`);
     const authorizeDialog = authorizationPage.getByRole('dialog', {
       name: 'Authorize your garden app',
@@ -2324,7 +2336,7 @@ try {
     await authorizationPage.screenshot({ path: resolve(report, 'device-authorization.png') });
     await authorizationPage.close();
     const dictationPage = await context.newPage();
-    dictationPage.on('pageerror', (error) => errors.push(error.message));
+    await captureBrowserErrors(dictationPage, errors);
     await dictationPage.addInitScript(() => {
       window.dictationFixture = { requests: 0, stops: 0, deferred: false, release: null };
       Object.defineProperty(navigator, 'mediaDevices', {
@@ -2448,7 +2460,7 @@ try {
     assert.equal(await dictationPage.evaluate(() => window.dictationFixture.requests), 2);
     await dictationPage.close();
     const approvalPage = await context.newPage();
-    approvalPage.on('pageerror', (error) => errors.push(error.message));
+    await captureBrowserErrors(approvalPage, errors);
     await approvalPage.setViewportSize({ width: 390, height: 844 });
     const showApproval = async (index, expired = false, samePage = false) => {
       approvals = [
@@ -2725,6 +2737,7 @@ try {
   }
   if (
     ![
+      'background',
       'memory',
       'desk',
       'drafts',
@@ -2754,6 +2767,7 @@ try {
       }
     };
     const modelsPage = await context.newPage();
+    await captureBrowserErrors(modelsPage, errors);
     await modelsPage.goto(`${origin}/?task=${task.id}`);
     await modelsPage.locator('.garden-task-composer').waitFor();
     if (await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).isVisible())
@@ -2992,23 +3006,38 @@ try {
     // Connected providers are rows; a row opens that connection's settings.
     await modelsPage.getByRole('button', { name: 'Compatible endpoint', exact: true }).click();
     await modelsPage.getByLabel('Endpoint URL', { exact: true }).waitFor();
-    const accessibility = await context.newCDPSession(modelsPage);
-    const tree = await accessibility.send('Accessibility.getFullAXTree');
-    assert(tree.nodes.length > 0, 'The browser must expose an accessibility tree');
-    const restriction = tree.nodes.filter(
-      (node) => node.role?.value === 'textbox' && node.name?.value === 'Restrict to model ID'
-    );
+    const restrictedModel = modelsPage.getByRole('textbox', {
+      name: 'Restrict to model ID',
+      exact: true
+    });
+    assert.equal(await restrictedModel.count(), 1);
     assert.equal(
-      restriction.length,
-      1,
-      'A field must have its concise visible label as its accessible name'
-    );
-    assert.equal(
-      restriction[0].description?.value,
+      await restrictedModel.evaluate((element) =>
+        element
+          .getAttribute('aria-describedby')
+          ?.split(/\s+/)
+          .map((id) => document.getElementById(id)?.textContent)
+          .join(' ')
+      ),
       'Optional. Leave empty to discover every model this endpoint offers.',
-      'Supporting text must be exposed as a description separately from the field name'
+      'Supporting text must be associated separately from the field name'
     );
-    await accessibility.detach();
+    // Chromium exposes computed descriptions through CDP; WebKit has no CDP endpoint.
+    if (engine === 'chromium') {
+      const accessibility = await context.newCDPSession(modelsPage);
+      const tree = await accessibility.send('Accessibility.getFullAXTree');
+      assert(tree.nodes.length > 0, 'The browser must expose an accessibility tree');
+      const restriction = tree.nodes.filter(
+        (node) => node.role?.value === 'textbox' && node.name?.value === 'Restrict to model ID'
+      );
+      assert.equal(restriction.length, 1);
+      assert.equal(
+        restriction[0].description?.value,
+        'Optional. Leave empty to discover every model this endpoint offers.',
+        'Supporting text must be exposed as a description separately from the field name'
+      );
+      await accessibility.detach();
+    }
     await modelsPage.locator('.field > label', { hasText: 'Restrict to model ID' }).click();
     assert(
       await modelsPage
@@ -3312,6 +3341,7 @@ try {
 
   if (
     ![
+      'background',
       'memory',
       'desk',
       'appearance',
@@ -3327,6 +3357,7 @@ try {
     ].includes(process.env.GARDEN_UI_FOCUS)
   ) {
     let draftPage = await context.newPage();
+    await captureBrowserErrors(draftPage, errors);
     const openDraft = async () => {
       await draftPage.goto(`${origin}/?task=${task.id}`);
       await openNewProject(draftPage);
@@ -3363,6 +3394,7 @@ try {
     );
     await draftPage.close();
     draftPage = await context.newPage();
+    await captureBrowserErrors(draftPage, errors);
     draftDialog = draftPage.getByRole('dialog', { name: 'Begin something new', exact: true });
     draftInput = draftDialog.getByLabel('Describe what you want to do');
     await openDraft();

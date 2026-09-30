@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { observeVisiblePoll } from './visible-poll';
 import type { MediaJob, MediaCharacterAsset, MediaBatch } from '@garden/contracts';
 import { Download, Film, RefreshCw } from './icons';
 import { get, patch, post } from './client';
@@ -16,19 +17,17 @@ function TaskMediaJobs({ taskId, onDelivered }: { taskId: string; onDelivered: (
   const [loadError, setLoadError] = useState<unknown>(null);
   const [busy, setBusy] = useState<string | null>(null);
   useEffect(() => {
-    const controller = new AbortController();
     const delivered = new Set<string>();
-    let timer: ReturnType<typeof setTimeout>;
-    async function load() {
-      try {
+    return observeVisiblePoll(
+      async (signal) => {
         const [jobResult, assetResult, batchResult] = await Promise.allSettled([
-          get<MediaJob[]>(`/v1/tasks/${taskId}/media-jobs`, { signal: controller.signal }),
+          get<MediaJob[]>(`/v1/tasks/${taskId}/media-jobs`, { signal }),
           get<MediaCharacterAsset[]>(`/v1/tasks/${taskId}/media-assets`, {
-            signal: controller.signal
+            signal
           }),
-          get<MediaBatch[]>(`/v1/tasks/${taskId}/media-batches`, { signal: controller.signal })
+          get<MediaBatch[]>(`/v1/tasks/${taskId}/media-batches`, { signal })
         ]);
-        if (controller.signal.aborted) return;
+        if (signal.aborted) return;
         if (jobResult.status === 'fulfilled')
           setJobs((previous) => mergeMediaPoll(previous, jobResult.value));
         if (assetResult.status === 'fulfilled')
@@ -49,20 +48,10 @@ function TaskMediaJobs({ taskId, onDelivered }: { taskId: string; onDelivered: (
             delivered.add(job.artifactId);
             onDelivered();
           }
-      } catch (cause) {
-        if (!controller.signal.aborted) setLoadError(cause);
-      }
-      if (!controller.signal.aborted)
-        timer = setTimeout(
-          () => void load(),
-          document.visibilityState === 'visible' ? 5000 : 30000
-        );
-    }
-    void load();
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
+      },
+      5000,
+      setLoadError
+    );
   }, [taskId, onDelivered]);
   if (!jobs.length && !assets.length && !batches.length && !error && !loadError) return null;
   return (

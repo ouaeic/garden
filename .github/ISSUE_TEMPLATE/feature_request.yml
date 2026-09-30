@@ -1,0 +1,21 @@
+name: Feature request
+description: Describe an outcome garden could make easier.
+title: '[Feature]: '
+labels: ['enhancement']
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What are you trying to do?
+      description: Describe the outcome and where the current workflow gets in your way.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Suggested experience
+      description: Describe the smallest useful change. Mockups and synthetic examples are welcome.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Current workaround

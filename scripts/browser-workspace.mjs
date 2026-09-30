@@ -1,3 +1,4 @@
+import { captureBrowserErrors } from './browser-errors.mjs';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
@@ -6,7 +7,7 @@ export async function checkWorkspaceNavigation({ context, origin, task, report }
   const page = await context.newPage();
   const errors = [];
   const reads = [];
-  page.on('pageerror', (error) => errors.push(error.message));
+  await captureBrowserErrors(page, errors);
   page.on('request', (request) => {
     if (request.url().includes('/v1/')) reads.push(new URL(request.url()).pathname);
   });

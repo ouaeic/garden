@@ -188,6 +188,60 @@ describe('event history and reconnection', () => {
     expect(streams).toBe(2);
   });
 
+  it('suspends hidden views and resumes from the last delivered cursor without duplicate events', async () => {
+    vi.useFakeTimers();
+    const visibility = Object.assign(new EventTarget(), { visibilityState: 'hidden' });
+    vi.stubGlobal('document', visibility);
+    const controller = new AbortController();
+    const delivered: number[] = [];
+    const errors: Error[] = [];
+    let streams = 0;
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
+      if (!urlOf(input).includes('/events/stream')) return Response.json(page([]));
+      streams += 1;
+      if (streams > 1) {
+        expect(urlOf(input)).toContain('after=1');
+        expect(new Headers(init?.headers).get('Last-Event-ID')).toBe('1');
+        return textStream(frame(1) + frame(2));
+      }
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          start(stream) {
+            stream.enqueue(new TextEncoder().encode(frame(1)));
+          }
+        })
+      );
+    });
+    vi.stubGlobal('fetch', fetcher);
+    subscribeTaskEvents(taskId, {
+      after: 0,
+      signal: controller.signal,
+      onEvents(events) {
+        delivered.push(...events.map((item) => item.sequence));
+        if (delivered.includes(2)) controller.abort();
+      },
+      onError: (error) => errors.push(error)
+    });
+    await vi.advanceTimersByTimeAsync(180_000);
+    expect(fetcher).not.toHaveBeenCalled();
+    visibility.visibilityState = 'visible';
+    visibility.dispatchEvent(new Event('visibilitychange'));
+    await vi.advanceTimersByTimeAsync(1);
+    expect(delivered).toEqual([1]);
+    visibility.visibilityState = 'hidden';
+    visibility.dispatchEvent(new Event('visibilitychange'));
+    const calls = fetcher.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(180_000);
+    expect(fetcher).toHaveBeenCalledTimes(calls);
+    visibility.visibilityState = 'visible';
+    visibility.dispatchEvent(new Event('visibilitychange'));
+    await vi.advanceTimersByTimeAsync(1);
+    expect(delivered).toEqual([1, 2]);
+    expect(errors).toEqual([]);
+    expect(streams).toBe(2);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('drains every forward page and refuses a cursor that cannot progress', async () => {
     vi.useFakeTimers();
     const controller = new AbortController();

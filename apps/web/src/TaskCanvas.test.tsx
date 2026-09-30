@@ -50,6 +50,31 @@ const presentation: TaskPresentation = {
 };
 
 describe('usable task delivery and recorded progress', () => {
+  it('downloads the declared project bundle beside a preview rather than an unrelated latest file', () => {
+    const withoutBundle = renderToStaticMarkup(
+      <TaskOutputs presentation={presentation} onArtifact={() => undefined} />
+    );
+    expect(withoutBundle).not.toContain('garden-primary-download');
+    const html = renderToStaticMarkup(
+      <TaskOutputs
+        presentation={{
+          ...presentation,
+          sourceBundle: {
+            downloadUrl: '/v1/tasks/recorded-task/bundle',
+            scope: 'recorded_files',
+            directories: [],
+            fileCount: 2
+          }
+        }}
+        onArtifact={() => undefined}
+      />
+    );
+    expect(html).toContain(
+      'class="button garden-primary-download" href="/v1/tasks/recorded-task/bundle"'
+    );
+    expect(html).toContain('Download project files');
+  });
+
   it('summarizes recorded steps and distinct outputs without estimating task completion', () => {
     const html = renderToStaticMarkup(
       <WorkSummaryVisual

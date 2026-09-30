@@ -1,3 +1,4 @@
+import { observeVisiblePoll } from '../visible-poll';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   DesktopHolder,
@@ -74,23 +75,14 @@ export default function Screen({
   } | null>(null);
   useEffect(() => {
     if (!taskId) return;
-    const abort = new AbortController();
-    const refresh = async () => {
-      try {
-        const value = await get<typeof handoff>(`/v1/tasks/${taskId}/intervention`, {
-          signal: abort.signal
-        });
-        if (!abort.signal.aborted) setHandoff(value?.surface === surface ? value : null);
-      } catch (cause) {
-        if (!abort.signal.aborted) setError(message(cause));
-      }
-    };
-    void refresh();
-    const timer = setInterval(() => void refresh(), 10000);
-    return () => {
-      abort.abort();
-      clearInterval(timer);
-    };
+    return observeVisiblePoll(
+      async (signal) => {
+        const value = await get<typeof handoff>(`/v1/tasks/${taskId}/intervention`, { signal });
+        if (!signal.aborted) setHandoff(value?.surface === surface ? value : null);
+      },
+      10_000,
+      (cause) => setError(message(cause))
+    );
   }, [taskId, surface]);
   const [state, setState] = useState<ScreenState>({ holder: 'agent', ...PAGE_VIEWPORT });
   const stateRef = useRef(state);

@@ -1,5 +1,8 @@
 # garden
 
+[![Verify](https://github.com/ouaeic/garden/actions/workflows/verify.yml/badge.svg?branch=main)](https://github.com/ouaeic/garden/actions/workflows/verify.yml)
+[Beta downloads](https://github.com/ouaeic/garden/releases) · [Help](SUPPORT.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
+
 **One private AI computer, available from every device.**
 
 garden is free, open-source software that turns a Linux computer into a persistent AI
@@ -21,7 +24,26 @@ and server GPU statistics.
 The app and command are named `garden`. Existing `garden` commands, installation paths,
 and device identities remain supported, so an update preserves the same computer and access.
 
+## Start with the beta
+
+Use the latest **prerelease** on [Releases](https://github.com/ouaeic/garden/releases) for the
+current desktop and Android downloads and its exact, pinned server installation command.
+Beta downloads require no app-store account. Desktop builds may show operating-system trust
+prompts; [beta client details](docs/BETA_CLIENTS.md) explain signing and notification limits.
+
+Install the server, connect your model access, then open its address in a browser or native app.
+Sign in with your password; passkeys are optional. A native app remembers your server and device
+session. For a home server with a private certificate, the optional connection ticket establishes
+its identity.
+
+Share setup questions and beta feedback in [Discussions](https://github.com/ouaeic/garden/discussions),
+or use the [bug form](https://github.com/ouaeic/garden/issues/new?template=bug_report.yml).
+
 ## Install
+
+The commands below select the tagged release line. For the current beta source revision, use the
+pinned command on its prerelease page or the app's installer. An installed server can move
+forward through `sudo garden update`.
 
 On a fresh Debian, Ubuntu, Fedora, RHEL, Rocky, AlmaLinux, Arch or openSUSE computer:
 
@@ -29,8 +51,8 @@ On a fresh Debian, Ubuntu, Fedora, RHEL, Rocky, AlmaLinux, Arch or openSUSE comp
 curl -fsSL https://raw.githubusercontent.com/ouaeic/garden/v0.2.0/install.sh | sudo env GARDEN_REF=v0.2.0 sh
 ```
 
-The command is pinned to a tag rather than a branch. The install action in the native client goes
-further: it passes the exact commit its own build was made from, and the installer refuses to
+The command is pinned to a tag rather than a branch. The install actions in the web and native clients go
+further: they pass the exact commit their own build was made from, and the installer refuses to
 continue if the source it checked out is not that commit.
 
 That command installs the computer, and native clients pin the server’s own key. For browser

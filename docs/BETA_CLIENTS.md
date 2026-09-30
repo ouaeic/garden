@@ -42,8 +42,9 @@ distribution workflow retains its platform signing and notarization checks.
 For native update discovery, reviewed installers can be attached to a public release tagged
 `v<version>`, or a prerelease tagged `beta-<version>-<full source commit>`. Drafts and releases
 without native packages are excluded from the update catalogue. Advance the package version
-through the existing release checks when publishing an upgrade; client notices compare release
-versions and do not offer a downgrade.
+through the existing release checks when publishing a version upgrade. Client notices exclude
+older versions. For the same beta version, a different published source revision is offered as
+a reviewed build; installation remains the owner's choice.
 
 ## Updates and notifications
 

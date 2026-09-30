@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { writeFile } from 'node:fs/promises';
+import { captureBrowserErrors } from './browser-errors.mjs';
 
 // A fixed workspace must keep its controls reachable while each overflowing card scrolls.
 export async function checkDesk({
@@ -15,7 +17,11 @@ export async function checkDesk({
   const page = await context.newPage();
   page.setDefaultTimeout(12_000);
   const failures = [];
-  page.on('pageerror', (error) => failures.push(error.message));
+  const pageErrors = await captureBrowserErrors(page, failures);
+  const failedRequests = [];
+  page.on('requestfailed', (request) =>
+    failedRequests.push({ url: request.url(), failure: request.failure() })
+  );
   directoryUi.longList = true;
   processUi.seed();
   const rows = processUi.rows;
@@ -362,8 +368,18 @@ export async function checkDesk({
         await voiceDialog.screenshot({ path: resolve(report, `desk-voice-${width}.png`) });
       await page.keyboard.press('Escape');
       await voiceDialog.waitFor({ state: 'detached' });
+      const clearedDraft = page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === '/v1/drafts' &&
+          response.request().method() !== 'GET' &&
+          response.request().postDataJSON()?.body === ''
+      );
       await draft.fill('');
-      await page.waitForTimeout(600);
+      await clearedDraft;
+      await page
+        .locator('.garden-task-composer .intent-editor')
+        .getByRole('status', { name: 'Draft synced', exact: true })
+        .waitFor();
     }
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(origin);
@@ -448,6 +464,10 @@ export async function checkDesk({
     );
     await homePrompt.fill('');
     await cleared;
+    await writeFile(
+      resolve(report, 'desk-errors.json'),
+      JSON.stringify({ pageErrors, failedRequests }, null, 2) + '\n'
+    );
     assert.deepEqual(failures, []);
     console.log(
       'Desk passed: fixed viewport, independent file/process/project scroll, output sections, prompt reachability, retained drafts, conversation, navigation and management views.'

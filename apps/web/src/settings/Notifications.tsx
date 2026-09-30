@@ -105,7 +105,9 @@ export function NotificationSettings() {
       setPairingSeenPending(false);
       return;
     }
-    const timer = setInterval(destinations.refresh, 5000);
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') destinations.refresh();
+    }, 5000);
     return () => clearInterval(timer);
   }, [pairing, pairingSeenPending, phone, destinations.refresh]);
   const togglePush = async () => {

@@ -20,6 +20,17 @@ export const newerVersion = (candidate: string, installed: string): boolean => {
   return false;
 };
 
+export const nativeUpdateAvailable = (
+  release: NonNullable<UpdateReport['client']>,
+  client: Pick<NativeStatus, 'appVersion' | 'appRevision' | 'appChannel'>
+): boolean =>
+  newerVersion(release.version, client.appVersion) ||
+  (client.appChannel === 'beta' &&
+    release.version === client.appVersion &&
+    /^[a-f0-9]{40}$/.test(release.revision ?? '') &&
+    /^[a-f0-9]{40}$/.test(client.appRevision ?? '') &&
+    release.revision !== client.appRevision);
+
 const refreshApp = async () => {
   if (fileNavigationBlocked()) return;
   try {
@@ -80,11 +91,11 @@ export default function UpdateNotice({ onSettings }: { onSettings: () => void })
     };
   }, []);
   const release = report?.client;
-  const clientChanged = release && client && newerVersion(release.version, client.appVersion);
+  const clientChanged = release && client && nativeUpdateAvailable(release, client);
   const kind = webChanged
     ? 'web'
     : clientChanged
-      ? `client:${release.version}`
+      ? `client:${release.version}:${release.revision ?? ''}`
       : report?.server.status === 'available'
         ? `server:${report.server.revision}`
         : '';
@@ -95,7 +106,9 @@ export default function UpdateNotice({ onSettings }: { onSettings: () => void })
         {webChanged
           ? 'A fresh version of garden is ready.'
           : clientChanged
-            ? `garden ${release.version} is available for this app.`
+            ? release.version === client?.appVersion
+              ? 'A reviewed garden beta build is available.'
+              : `garden ${release.version} is available for this app.`
             : 'Your garden server can be updated.'}
       </span>
       {webChanged ? (

@@ -145,9 +145,9 @@ export function subscribeTaskEvents(taskId: string, options: SubscribeOptions): 
   let wake: (() => void) | undefined;
   let activeConnection: AbortController | undefined;
   let reconnectForWake = false;
+  const hidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden';
   const stop = () => controller.abort();
   const onWake = () => {
-    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
     wake?.();
     if (activeConnection) {
       reconnectForWake = true;
@@ -171,6 +171,30 @@ export function subscribeTaskEvents(taskId: string, options: SubscribeOptions): 
       if (signal.aborted) finish();
       else signal.addEventListener('abort', finish, { once: true });
     });
+  const untilVisible = (): Promise<void> =>
+    new Promise((resolve) => {
+      const finish = () => {
+        signal.removeEventListener('abort', finish);
+        wake = undefined;
+        resolve();
+      };
+      wake = finish;
+      if (signal.aborted || !hidden()) finish();
+      else signal.addEventListener('abort', finish, { once: true });
+    });
+  const visibleRead = async <T>(read: (readSignal: AbortSignal) => Promise<T>): Promise<T> => {
+    const connection = new AbortController();
+    activeConnection = connection;
+    const abortConnection = () => connection.abort();
+    signal.addEventListener('abort', abortConnection, { once: true });
+    try {
+      if (signal.aborted || hidden()) connection.abort();
+      return await read(connection.signal);
+    } finally {
+      signal.removeEventListener('abort', abortConnection);
+      if (activeConnection === connection) activeConnection = undefined;
+    }
+  };
   const deliver = (events: TaskEvent[]) => {
     if (signal.aborted) return;
     const fresh = events
@@ -182,9 +206,11 @@ export function subscribeTaskEvents(taskId: string, options: SubscribeOptions): 
     cursor = fresh.at(-1)!.sequence;
   };
   const reconcile = async (): Promise<void> => {
-    while (!signal.aborted) {
+    while (!signal.aborted && !hidden()) {
       const before = cursor;
-      const page = await loadEventPage(taskId, { after: cursor, signal });
+      const page = await visibleRead((readSignal) =>
+        loadEventPage(taskId, { after: cursor, signal: readSignal })
+      );
       deliver(page.events);
       if (!page.hasMore) return;
       if (cursor <= before)
@@ -200,11 +226,19 @@ export function subscribeTaskEvents(taskId: string, options: SubscribeOptions): 
     try {
       while (!signal.aborted) {
         try {
+          if (hidden()) {
+            options.onConnection?.('idle');
+            await untilVisible();
+            if (signal.aborted) return;
+          }
           if (initial) {
-            const page = await loadEventPage(taskId, { signal });
+            const page = await visibleRead((readSignal) =>
+              loadEventPage(taskId, { signal: readSignal })
+            );
             deliver(page.events);
             initial = false;
           }
+          if (hidden()) continue;
           if (terminal) {
             /*
              * The stream closed on a terminal status, but the worker can still write after it -
@@ -218,9 +252,12 @@ export function subscribeTaskEvents(taskId: string, options: SubscribeOptions): 
              * burst; an unfinished one is re-announced and the stream resumed for the rest of it.
              */
             await reconcile();
-            const task = await get<{ status: string }>(`/v1/tasks/${encodeURIComponent(taskId)}`, {
-              signal
-            });
+            if (hidden()) continue;
+            const task = await visibleRead((readSignal) =>
+              get<{ status: string }>(`/v1/tasks/${encodeURIComponent(taskId)}`, {
+                signal: readSignal
+              })
+            );
             if (signal.aborted) return;
             options.onStatus?.(task.status);
             terminal = terminalStatuses.has(task.status);

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { writeFile } from 'node:fs/promises';
+import { captureBrowserErrors } from './browser-errors.mjs';
 
 export async function checkProjectConversations({
   context,
@@ -17,7 +18,10 @@ export async function checkProjectConversations({
   errors
 }) {
   const page = await context.newPage();
-  page.on('pageerror', (error) => errors.push(error.message));
+  const errorDetails = await captureBrowserErrors(page, errors);
+  page.on('requestfailed', (request) =>
+    errorDetails.push({ type: 'requestfailed', url: request.url(), failure: request.failure() })
+  );
   const anchor = {
     ...workspace,
     id: randomUUID(),
@@ -559,6 +563,12 @@ export async function checkProjectConversations({
     await trigger.press('Enter');
     await page.getByRole('dialog', { name: 'Project settings', exact: true }).waitFor();
     await page.keyboard.press('Escape');
+    await page
+      .getByRole('dialog', { name: 'Project settings', exact: true })
+      .waitFor({ state: 'hidden' });
+    await page.waitForFunction(() =>
+      document.activeElement?.matches('button[aria-label="Project settings"]')
+    );
     assert(await trigger.evaluate((el) => document.activeElement === el));
     await page
       .getByRole('navigation', { name: 'Project panels', exact: true })
@@ -621,6 +631,16 @@ export async function checkProjectConversations({
     );
   } catch (error) {
     console.error(error);
+    errorDetails.push({
+      type: 'focus-at-failure',
+      state: await page.evaluate(() => ({
+        active: document.activeElement?.outerHTML.slice(0, 600),
+        dialogs: [...document.querySelectorAll('dialog')].map((dialog) => ({
+          open: dialog.open,
+          title: dialog.getAttribute('aria-labelledby')
+        }))
+      }))
+    });
     await page
       .screenshot({ path: resolve(report, 'conversation-failure.png'), timeout: 5000 })
       .catch(() => {});
@@ -628,5 +648,9 @@ export async function checkProjectConversations({
   } finally {
     releaseTask?.();
     await page.close();
+    await writeFile(
+      resolve(report, 'conversation-errors.json'),
+      JSON.stringify(errorDetails, null, 2) + '\n'
+    );
   }
 }

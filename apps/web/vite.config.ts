@@ -1,4 +1,5 @@
 import { gzipSync } from 'node:zlib';
+import { execFileSync } from 'node:child_process';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { pdfAssets } from './pdf-assets.js';
@@ -176,8 +177,22 @@ const eagerBundleGraph = (): Plugin => ({
 });
 
 const buildId = webBuildId();
+const sourceRevision = (() => {
+  try {
+    const revision = execFileSync('git', ['rev-parse', 'HEAD'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    }).trim();
+    return /^[a-f0-9]{40}$/.test(revision) ? revision : null;
+  } catch {
+    return null;
+  }
+})();
 export default defineConfig({
-  define: { __GARDEN_WEB_BUILD_ID__: JSON.stringify(buildId) },
+  define: {
+    __GARDEN_WEB_BUILD_ID__: JSON.stringify(buildId),
+    __GARDEN_SOURCE_REVISION__: JSON.stringify(sourceRevision)
+  },
   plugins: [react(), eagerBundleGraph(), pdfAssets(), buildIdentity(buildId)],
   server: {
     host: '127.0.0.1',

@@ -7,13 +7,22 @@ import './native.css';
 const INSTALL_COMMAND =
   'curl -fsSL https://raw.githubusercontent.com/ouaeic/garden/v0.2.0/install.sh | sudo env GARDEN_REF=v0.2.0 sh';
 
+export const serverInstallCommand = (revision: unknown): string =>
+  typeof revision === 'string' && /^[a-f0-9]{40}$/.test(revision)
+    ? `curl -fsSL https://raw.githubusercontent.com/ouaeic/garden/${revision}/install.sh | sudo env GARDEN_REF=${revision} GARDEN_EXPECTED_COMMIT=${revision} sh`
+    : INSTALL_COMMAND;
+
+const command = serverInstallCommand(
+  typeof __GARDEN_SOURCE_REVISION__ === 'undefined' ? null : __GARDEN_SOURCE_REVISION__
+);
+
 export default function ServerInstall({ installerUrl }: { installerUrl?: string | null }) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const installer = localInstallerUrl(installerUrl);
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(INSTALL_COMMAND);
+      await navigator.clipboard.writeText(command);
       setCopied(true);
       setError(null);
     } catch (cause) {
@@ -41,15 +50,15 @@ export default function ServerInstall({ installerUrl }: { installerUrl?: string 
       <details open={!installer}>
         <summary>Install from your server’s terminal</summary>
         <pre>
-          <code>{INSTALL_COMMAND}</code>
+          <code>{command}</code>
         </pre>
         <Button onClick={() => void copy()}>
           <Copy size={15} />
           {copied ? 'Copied' : 'Copy command'}
         </Button>
         <p className="muted">
-          Run on a Linux server you control. The installer prints your address and one-time
-          connection ticket when it finishes.
+          Run on a Linux server you control. The installer prints your address and one-time owner
+          code when it finishes.
         </p>
       </details>
       <ErrorNotice error={error} />
