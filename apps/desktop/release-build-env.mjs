@@ -68,9 +68,10 @@ export function withReleaseRustFlags(environment = process.env, platform, host =
       CXXFLAGS: [environment.CXXFLAGS, ...flags].filter(Boolean).join(' ')
     });
   } else {
-    const flags = releasePathMappings(environment).map(({ source, destination }) =>
-      JSON.stringify(`-ffile-prefix-map=${source}=${destination}`)
-    );
+    const flags = releasePathMappings(environment).flatMap(({ source, destination }) => [
+      JSON.stringify(`-ffile-prefix-map=${source}=${destination}`),
+      JSON.stringify(`-fdebug-prefix-map=${source}=${destination}`)
+    ]);
     Object.assign(nativeCompiler, {
       CC_SHELL_ESCAPED_FLAGS: '1',
       CFLAGS: [environment.CFLAGS, ...flags].filter(Boolean).join(' '),

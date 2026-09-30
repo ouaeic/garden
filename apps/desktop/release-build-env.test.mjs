@@ -107,6 +107,29 @@ test(
       execFileSync('cc', [...flags, source, '-o', executable]);
       await checkNativeBinaries(directory, environment, 'desktop');
       assert.equal(execFileSync(executable, { encoding: 'utf8' }).trim(), '/workspace/source.c');
+      const object = join(directory, 'source.o');
+      const archive = join(release, 'libgarden_desktop_lib.a');
+      const debug = process.platform === 'darwin' ? '-gfull' : '-g3';
+      const archiveBuild = (compilerFlags, env = process.env) => {
+        execFileSync('cc', [debug, ...compilerFlags, '-c', source, '-o', object], { env });
+        execFileSync('ar', ['rcs', archive, object]);
+      };
+      archiveBuild([]);
+      await assert.rejects(
+        checkNativeBinaries(directory, environment, 'ios'),
+        /build-machine path/
+      );
+      archiveBuild(flags);
+      await checkNativeBinaries(directory, environment, 'ios');
+      if (process.platform === 'darwin') {
+        const prepared = await withReleaseSwiftTools({ ...environment, CFLAGS: '', CXXFLAGS: '' });
+        try {
+          archiveBuild([], prepared.environment);
+          await checkNativeBinaries(directory, environment, 'ios');
+        } finally {
+          await prepared.dispose();
+        }
+      }
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -276,7 +299,10 @@ test(
     };
     let prepared;
     try {
-      prepared = await withReleaseSwiftTools(environment, compiler);
+      prepared = await withReleaseSwiftTools(environment, compiler, {
+        clang: compiler,
+        'clang++': compiler
+      });
       const wrapper = join(prepared.environment.PATH.split(delimiter)[0], 'swift');
       const original = ['build', '--sdk', '/SDK with spaces', '-Xswiftc', '-existing-option'];
       execFileSync(wrapper, original, { env: prepared.environment });
@@ -306,6 +332,24 @@ test(
         'arm64-apple-ios15.0',
         '-print-target-info'
       ]);
+      const nativeArguments = [
+        '-target',
+        'arm64-apple-ios15.0',
+        '-isysroot',
+        '/SDK with spaces',
+        '-gfull'
+      ];
+      for (const name of ['clang', 'clang++', 'cc', 'c++']) {
+        execFileSync(join(prepared.environment.PATH.split(delimiter)[0], name), nativeArguments, {
+          env: prepared.environment
+        });
+        const captured = JSON.parse(await readFile(receipt, 'utf8'));
+        assert.deepEqual(captured.slice(0, nativeArguments.length), nativeArguments);
+        for (const { source, destination } of mappings) {
+          assert.ok(captured.includes(`-ffile-prefix-map=${source}=${destination}`));
+          assert.ok(captured.includes(`-fdebug-prefix-map=${source}=${destination}`));
+        }
+      }
       await prepared.dispose();
       await prepared.dispose();
       await assert.rejects(access(wrapper), { code: 'ENOENT' });

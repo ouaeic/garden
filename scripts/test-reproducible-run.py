@@ -427,7 +427,7 @@ Path('result.json').write_text(json.dumps({'length': len(sequence), 'counts': co
         self.assertFalse((self.first / "result.json").exists())
 
     def test_sigterm_records_interruption_and_stops_child(self):
-        self.source = "from pathlib import Path; import time; Path('started').write_text('yes'); time.sleep(120)"
+        self.source = "from pathlib import Path; import os, time; Path('started').write_text(str(os.getpid())); time.sleep(120)"
         self.populate(self.first)
         child = subprocess.Popen(
             [
@@ -443,12 +443,19 @@ Path('result.json').write_text(json.dumps({'length': len(sequence), 'counts': co
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
         )
+        pid = None
         try:
             deadline = time.monotonic() + 8
-            while not (self.first / "started").exists() and time.monotonic() < deadline:
+            while time.monotonic() < deadline:
+                if (self.first / "started").exists():
+                    pid = int((self.first / "started").read_text())
+                    # The child can run before the parent's durable PID receipt reaches disk.
+                    if self.read().get("pid") == pid:
+                        break
                 time.sleep(0.01)
             self.assertTrue((self.first / "started").exists())
-            pid = self.read()["pid"]
+            self.assertIsNotNone(pid)
+            self.assertEqual(self.read().get("pid"), pid)
             child.send_signal(signal.SIGTERM)
             child.communicate(timeout=4)
             self.assertNotEqual(child.returncode, 0)
@@ -458,6 +465,11 @@ Path('result.json').write_text(json.dumps({'length': len(sequence), 'counts': co
         finally:
             if child.poll() is None:
                 child.kill()
+                if pid is not None:
+                    try:
+                        os.killpg(pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
                 child.communicate()
 
     def test_links_and_path_escape_are_refused(self):

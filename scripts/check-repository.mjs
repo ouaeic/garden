@@ -146,7 +146,7 @@ for (const drill of ['scripts/test-gui-entry.py', 'infra/native/garden-desktop-b
 }
 say('GUI isolation and native accessibility contracts passed.');
 
-const analysisRuns = spawnSync('python3', ['scripts/test-reproducible-run.py'], {
+const analysisRuns = spawnSync('python3', ['scripts/test-reproducible-run.py', '-v'], {
   cwd: repositoryRoot,
   encoding: 'utf8',
   timeout: 120_000
