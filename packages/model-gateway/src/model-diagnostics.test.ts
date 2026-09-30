@@ -79,7 +79,10 @@ describe('model diagnostic projections', () => {
     };
     await expect(
       withPrivateDiagnostics(failing, () => fixture(async () => completion).chat('test', request))
-    ).resolves.toEqual(completion);
+    ).resolves.toEqual({
+      ...completion,
+      metadata: { ...completion.metadata, requestId: expect.any(String) }
+    });
     expect(failing.fail).toHaveBeenCalled();
   });
   it('records a partial interruption without replaying a paid request', async () => {
