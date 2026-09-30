@@ -563,6 +563,12 @@ export async function checkProjectConversations({
     await trigger.press('Enter');
     await page.getByRole('dialog', { name: 'Project settings', exact: true }).waitFor();
     await page.keyboard.press('Escape');
+    await page
+      .getByRole('dialog', { name: 'Project settings', exact: true })
+      .waitFor({ state: 'hidden' });
+    await page.waitForFunction(() =>
+      document.activeElement?.matches('button[aria-label="Project settings"]')
+    );
     assert(await trigger.evaluate((el) => document.activeElement === el));
     await page
       .getByRole('navigation', { name: 'Project panels', exact: true })

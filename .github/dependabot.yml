@@ -13,6 +13,12 @@ updates:
     groups:
       rust:
         patterns: ['*']
+  - package-ecosystem: pip
+    directory: /infra/native
+    schedule: { interval: weekly }
+    groups:
+      python:
+        patterns: ['*']
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }

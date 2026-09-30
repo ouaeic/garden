@@ -392,6 +392,15 @@ Losing `DATA_MASTER_KEY` makes encrypted records unrecoverable. Rotating or repl
     the operator controls DNS for the relay domain, which a browser cannot defend against.
     [docs/relay.md](docs/relay.md).
 
+## Native dependency advisory
+
+The Linux native client inherits `glib` through Tauri's GTK bindings. Its compatible dependency
+line is covered by [RUSTSEC-2024-0429](https://rustsec.org/advisories/RUSTSEC-2024-0429.html), an
+unsound implementation of `VariantStrIter`. Garden does not directly call that iterator or
+`Variant::array_iter_str`. The patched `glib` release belongs to a different GTK binding family
+and cannot be substituted as an isolated version override. The dependency alert remains open;
+re-evaluate it before a stable Linux native release or when changing native variant handling.
+
 ## Out of scope
 
 Physical access to an unlocked client, deliberate host-root compromise, behavior of third-party

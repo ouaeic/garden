@@ -1,0 +1,2 @@
+# A standard entry point lets dependency updates follow the installer's hash-pinned manifest.
+-r garden-python-requirements.txt

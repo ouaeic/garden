@@ -13,8 +13,8 @@
 # Licences: pypdf is BSD-3-Clause, typing_extensions is PSF-2.0. Both are compatible with
 # distributing garden under AGPL-3.0-or-later.
 
-pypdf==6.14.2 \
-    --hash=sha256:3f07891af76dc002657e04993ab9b4de81de29f9013b9761d0b7968bff12e946
+pypdf==6.16.1 \
+    --hash=sha256:63fec31c4092ae50b6729beedcb469055b60d20c834bde1c402df241f371f644
 
 # python-pptx is here because Ubuntu dropped it: 24.04 packages python3-pptx and 26.04 does not,
 # so a box that installs cleanly today would have had no way to build a slide deck at all. Its
