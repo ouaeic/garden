@@ -220,7 +220,7 @@ test(
       assert.ok(latest);
       latest.terminate();
       await page.getByText('Reconnecting · microphone paused…', { exact: true }).waitFor();
-      assert.equal(await page.evaluate(() => voiceFixture.enabled), false);
+      assert.equal(await page.evaluate(() => window.voiceFixture.enabled), false);
       const end = page.getByRole('button', { name: 'End voice', exact: true });
       await end.focus();
       assert.equal(await end.evaluate((element) => element === document.activeElement), true);
@@ -231,12 +231,12 @@ test(
       if (process.env.GARDEN_VOICE_SCREENSHOT)
         await page.screenshot({ path: process.env.GARDEN_VOICE_SCREENSHOT });
       await page.getByText('Microphone muted', { exact: true }).waitFor();
-      assert.equal(await page.evaluate(() => voiceFixture.enabled), false);
+      assert.equal(await page.evaluate(() => window.voiceFixture.enabled), false);
       assert.equal(starts, 1);
       assert.equal(reconnects, 2);
       assert.equal(connections, 2);
       await end.click();
-      await page.waitForFunction(() => voiceFixture.stops === 1);
+      await page.waitForFunction(() => window.voiceFixture.stops === 1);
       assert.equal(stops, 1);
       assert.deepEqual(errors, []);
     } finally {

@@ -179,7 +179,7 @@ export function projectUpdateFixture(project, tasks) {
   return fixture;
 }
 
-export async function checkProjectUpdates({ page, fixture, project, report }) {
+export async function checkProjectUpdates({ page, fixture, report }) {
   await page.setViewportSize({ width: 1440, height: 1050 });
   const conversations = page.getByRole('region', { name: 'Conversations', exact: true });
   await conversations.scrollIntoViewIfNeeded();

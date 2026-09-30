@@ -353,15 +353,11 @@ export const parseImportableModules = (output: string, requested: readonly strin
 
 const PROBE_TIMEOUT_MS = 8_000;
 
-const runProbe = async (
-  executable: string,
-  args: string[],
-  stdin?: string
-): Promise<string | null> =>
+const runProbe = async (executable: string, args: string[]): Promise<string | null> =>
   new Promise((resolve) => {
     let child: ReturnType<typeof spawn>;
     try {
-      child = spawn(executable, args, { stdio: ['pipe', 'pipe', 'ignore'], shell: false });
+      child = spawn(executable, args, { stdio: ['ignore', 'pipe', 'ignore'], shell: false });
     } catch {
       resolve(null);
       return;
@@ -384,7 +380,6 @@ const runProbe = async (
       clearTimeout(timer);
       resolve(code === 0 ? output : null);
     });
-    child.stdin?.end(stdin ?? '');
   });
 
 /**

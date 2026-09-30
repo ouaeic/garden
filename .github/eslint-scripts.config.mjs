@@ -26,5 +26,23 @@ export default [
       // two-space indent, and `{2}` would say less about what is being looked for.
       'no-regex-spaces': 'off'
     }
+  },
+  {
+    // Browser probes run DOM callbacks inside the page alongside their Node harness.
+    files: [
+      'scripts/browser-*.mjs',
+      'scripts/test-account-connections.mjs',
+      'scripts/test-analysis-*.mjs',
+      'scripts/test-notebook-editor.mjs',
+      'scripts/test-password-workflows.mjs',
+      'scripts/test-pdf-viewer.mjs',
+      'scripts/test-private-diagnostics.mjs',
+      'scripts/test-project-cleanup.mjs',
+      'scripts/test-project-git.mjs',
+      'scripts/test-svg-preview.mjs',
+      'scripts/test-voice-reconnect.mjs',
+      'scripts/test-web-layout.mjs'
+    ],
+    languageOptions: { globals: globals.browser }
   }
 ];
