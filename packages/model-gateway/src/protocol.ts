@@ -271,6 +271,8 @@ export interface ModelResponse {
   metadata: {
     provider: string;
     model: string;
+    /** Local invocation identity, retained with the response when a task resumes. */
+    requestId?: string;
     revision?: string;
     latencyMs: number;
     /**

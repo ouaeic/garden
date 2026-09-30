@@ -8,7 +8,7 @@ import {
 } from './model-diagnostics.js';
 import type { ModelAdapter, ModelRequest, ModelResponse, ProviderModel } from './protocol.js';
 import { defaultRetryPolicy, withRetry, type RetryPolicy } from './retry.js';
-import { interruptedResponseOf } from './interrupted-response.js';
+import { interruptedResponseOf, retainInterruptedResponse } from './interrupted-response.js';
 import type { DecisionAdapter, DecisionRequest, DecisionResponse } from './decisions.js';
 
 export type { RetryPolicy } from './retry.js';
@@ -163,9 +163,11 @@ export class ModelGateway {
       const response = await withRetry(
         async () => {
           attempt++;
+          const requestId = runtimeUUID();
           if (trace) await recordPrivateDiagnostic('model_attempt', { id: trace, attempt });
           try {
-            const response = await adapter.chat(attempted);
+            const received = await adapter.chat(attempted);
+            const response = { ...received, metadata: { ...received.metadata, requestId } };
             if (trace)
               await recordPrivateDiagnostic('model_outcome', () => ({
                 id: trace,
@@ -176,7 +178,14 @@ export class ModelGateway {
             return response;
           } catch (error) {
             const partial = interruptedResponseOf(error);
-            if (partial) streamed = true;
+            if (partial) {
+              streamed = true;
+              if (error instanceof Error)
+                retainInterruptedResponse(error, {
+                  ...partial,
+                  metadata: { ...partial.metadata, requestId }
+                });
+            }
             if (trace)
               await recordPrivateDiagnostic('model_outcome', () => ({
                 id: trace,
