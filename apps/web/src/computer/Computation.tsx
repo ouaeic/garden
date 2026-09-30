@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from 'react';
 import type { ComputationSession } from '@garden/contracts';
-import { Dialog } from '../ui';
+import { Button, Dialog } from '../ui';
 import { bytes } from './format';
 import { useVisibleClock } from '../visible-clock';
 import { computationActive, processDuration, processMemory } from '../process-display';
@@ -136,9 +136,9 @@ export function ComputationCard({
               Interrupt cell
             </button>
           )}
-          <button className="button" disabled={busy} onClick={() => setConfirmStop(true)}>
+          <Button disabled={busy} onClick={() => setConfirmStop(true)}>
             End session…
-          </button>
+          </Button>
         </div>
       )}
       {confirmStop && active && (

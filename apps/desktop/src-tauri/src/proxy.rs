@@ -2117,6 +2117,33 @@ mod tests {
             .unwrap();
         assert_eq!(foreign.status(), reqwest::StatusCode::FORBIDDEN);
 
+        let foreign_connection = client
+            .post(format!("{origin}/__garden/client/pair"))
+            .header(ORIGIN, "https://attacker.test")
+            .json(&serde_json::json!({"address": "https://example.test"}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(foreign_connection.status(), reqwest::StatusCode::FORBIDDEN);
+        for input in [
+            serde_json::json!({"address": "http://example.test"}),
+            serde_json::json!({"address": "https://example.test", "ticket": "invalid"}),
+            serde_json::json!({"ticket": "invalid"}),
+        ] {
+            let invalid = client
+                .post(format!("{origin}/__garden/client/pair"))
+                .header(ORIGIN, &origin)
+                .json(&input)
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(invalid.status(), reqwest::StatusCode::BAD_REQUEST);
+            assert_eq!(
+                load_profile(&directory.join("server-profile.json")).unwrap(),
+                Some(test_profile())
+            );
+        }
+
         std::fs::remove_dir_all(directory).unwrap();
     }
 
