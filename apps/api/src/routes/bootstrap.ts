@@ -149,6 +149,7 @@ export const registerBootstrapRoutes = (context: RouteContext): void => {
         providerModelId: model.providerModelId,
         displayName: model.displayName,
         ...(model.connectionLabel ? { connectionLabel: model.connectionLabel } : {}),
+        ...(model.connectionProvider ? { connectionProvider: model.connectionProvider } : {}),
         provider: model.provider,
         recommendationTags: model.recommendationTags,
         availability: model.availability,

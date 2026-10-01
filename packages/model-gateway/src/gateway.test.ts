@@ -45,6 +45,27 @@ const baseRequest: ModelRequest = {
 };
 
 describe('ModelGateway.chat retries', () => {
+  it('identifies separate requests even when a provider repeats its generation ID', async () => {
+    const returned = {
+      ...completion('same answer'),
+      metadata: { ...completion('').metadata, generationId: 'reused-provider-id' }
+    };
+    const gateway = new ModelGateway().register(
+      'test',
+      stubAdapter(async (input) => {
+        expect(input).toBe(baseRequest);
+        expect(input).not.toHaveProperty('requestId');
+        return returned;
+      })
+    );
+    const first = await gateway.chat('test', baseRequest);
+    const second = await gateway.chat('test', baseRequest);
+    expect(first.metadata.requestId).toBeTruthy();
+    expect(second.metadata.requestId).toBeTruthy();
+    expect(first.metadata.requestId).not.toBe(second.metadata.requestId);
+    expect(first.metadata.generationId).toBe(second.metadata.generationId);
+    expect(returned.metadata).not.toHaveProperty('requestId');
+  });
   it('can submit one reserved attempt without changing retries for later calls', async () => {
     const waits: number[] = [];
     let attempts = 0;
@@ -259,6 +280,7 @@ describe('interrupted usage evidence', () => {
       finishReason: 'error',
       usage: partial.usage
     });
+    expect(interruptedResponseOf(failure)?.metadata.requestId).toBeTruthy();
     expect(JSON.stringify(failure)).not.toContain('echo pending');
     expect(interruptedResponseOf({ response: partial })).toBeUndefined();
   });

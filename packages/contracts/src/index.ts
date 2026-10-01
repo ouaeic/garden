@@ -1109,6 +1109,8 @@ export const ModelRelease = z.object({
   /** The saved connection that serves this exact model route. */
   connectionId: z.string().min(1).optional(),
   connectionLabel: z.string().max(80).optional(),
+  /** The connected service, independent of the account label or model maker. */
+  connectionProvider: z.string().max(253).optional(),
   providerModelId: z.string(),
   displayName: z.string(),
   provider: z.string(),

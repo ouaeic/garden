@@ -50,14 +50,24 @@ const FAMILIES: Array<[RegExp, string]> = [
   [/^minimax/, 'MiniMax']
 ];
 
-/** The route a model is reached through, as the owner named the connection. */
-export const routeOf = (model: PickerModel): string =>
-  model.connectionLabel ||
+/** The service used for inference, independent of who made the model or named the account. */
+export const providerOf = (model: PickerModel): string =>
+  model.connectionProvider ||
   (model.provider === 'openrouter'
     ? 'OpenRouter'
-    : model.provider === 'custom'
-      ? 'Your endpoint'
-      : model.provider);
+    : model.provider === 'ollama-cloud'
+      ? 'Ollama Cloud'
+      : model.provider === 'custom'
+        ? model.connectionLabel || 'Your endpoint'
+        : model.provider);
+
+/** The owner-named account, with its service visible when the names differ. */
+export const routeOf = (model: PickerModel): string => {
+  const provider = providerOf(model);
+  return model.connectionLabel && model.connectionLabel !== provider
+    ? `${provider} · ${model.connectionLabel}`
+    : provider;
+};
 
 export const makerOf = (model: PickerModel): string => {
   const parts = model.id.split('/');

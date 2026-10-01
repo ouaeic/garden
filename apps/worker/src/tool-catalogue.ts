@@ -601,7 +601,7 @@ export const agentTools: ModelTool[] = [
           type: 'array',
           maxItems: 8,
           description:
-            'Declare outputs before building. Apps need a live preview or checked runnable package; directories scope project ZIPs. Omitted outputs persist.',
+            'Declare outputs before building. Only apps use delivery/run: preview or checked package. Directories scope ZIPs. Omitted outputs persist.',
           items: {
             type: 'object',
             additionalProperties: false,
@@ -742,7 +742,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'project_update',
     description:
-      'Integrate parallel work as immutable versions. status shows head, updates, checks and Git setup. prepare captures paths (missing files never delete); checkout copies published paths without overwriting. Full connected-directory checkout prepares an isolated Git branch; poll status until ready. Checks use the combined candidate with no implicit deadline. Publish after checks pass; rebase resets checks. Resolve conflicts in your files, then prepare with resolvedPaths and expectedRevision. Jobs retain inputs. log shows check output; stop ends that check.',
+      'Integrate parallel work as immutable versions. status shows head, updates, checks and Git setup. prepare captures paths (missing files never delete); checkout copies published paths without overwriting. Full connected-directory checkout prepares an isolated Git branch; poll status until ready. Checks run at the combined candidate root: use relative paths. Publish after checks pass; rebase resets checks. Resolve conflicts in your files, then prepare with resolvedPaths and expectedRevision. Jobs retain inputs. log shows check output; stop ends that check.',
     parameters: {
       type: 'object',
       required: ['action'],
@@ -811,7 +811,7 @@ export const agentTools: ModelTool[] = [
         job: {
           type: 'string',
           description:
-            'Name finite background work; retains identity, logs and result across restarts. Success never reruns. Requires background=true, no service.'
+            'Finite work only: active jobs pause completion. Servers use service. Retains logs/result across restarts; success never reruns. Needs background=true.'
         },
         checkpointResumeCommand: {
           type: 'string',

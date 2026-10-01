@@ -24,11 +24,14 @@ export const recordModelStepUsage = async (
 ): Promise<void> => {
   if (response.nativeInputUsageRecorded) return;
   const generationId = response.metadata.generationId;
-  // A provider receipt identifies an incurred charge even when execution resumes at the same step.
+  // Provider IDs can repeat across requests. A retained local invocation distinguishes charges
+  // while a replay of the same response still settles only once.
   const receiptKey =
-    generationId && usage.taskId
-      ? `task:${usage.taskId}:generation:${sha256(`${response.metadata.provider}:${generationId}`)}`
-      : usage.idempotencyKey;
+    response.metadata.requestId && usage.taskId
+      ? `task:${usage.taskId}:request:${sha256(response.metadata.requestId)}`
+      : generationId && usage.taskId
+        ? `task:${usage.taskId}:generation:${sha256(`${response.metadata.provider}:${generationId}`)}`
+        : usage.idempotencyKey;
   await store.recordUsage({ ...usage, idempotencyKey: receiptKey });
 };
 

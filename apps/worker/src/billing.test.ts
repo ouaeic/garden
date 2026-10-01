@@ -3,6 +3,42 @@ import type { ModelResponse } from '@garden/model-gateway';
 import type { DataStore } from '@garden/data';
 import { delegateBudget, recordModelStepUsage } from './billing.js';
 
+it('records separate local invocations with identical provider IDs and usage, replaying each once', async () => {
+  const entries = new Map<string, unknown>();
+  const recordUsage = vi.fn(async (entry: Parameters<DataStore['recordUsage']>[0]) => {
+    entries.set(entry.idempotencyKey, entry);
+  });
+  const usage = {
+    userId: 'owner',
+    taskId: 'task',
+    kind: 'model_inference',
+    resourceClass: 'light',
+    quantity: 100,
+    unit: 'tokens',
+    credits: 0.01,
+    state: 'settled',
+    idempotencyKey: 'task:task:step:7',
+    costUsd: 0.1
+  } as Parameters<DataStore['recordUsage']>[0];
+  const response = (requestId: string) =>
+    ({
+      metadata: {
+        provider: 'custom',
+        model: 'deepseek-v4.1-flash',
+        generationId: 'reused',
+        requestId
+      }
+    }) as ModelResponse;
+  await recordModelStepUsage({ recordUsage }, response('first-request'), usage);
+  await recordModelStepUsage({ recordUsage }, response('second-request'), usage);
+  expect(entries.size).toBe(2);
+  await recordModelStepUsage({ recordUsage }, response('second-request'), {
+    ...usage,
+    idempotencyKey: 'task:task:step:8'
+  });
+  expect(entries.size).toBe(2);
+});
+
 it('records distinct provider generations at a resumed step while replaying one receipt idempotently', async () => {
   const recordUsage = vi.fn();
   const response = (generationId: string) =>
