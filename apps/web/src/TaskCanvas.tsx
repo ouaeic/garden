@@ -236,11 +236,16 @@ export function TaskOutputs({
       : [])
   ];
   const visualResult = preview ?? files.find((file) => file.artifactId === featured?.id);
-  const currentVisual =
+  const fromDirection = (result: TaskResult) =>
     !direction ||
-    visualResult?.evidenceEventIds.some((id) =>
+    result.evidenceEventIds.some((id) =>
       events.some((event) => event.id === id && event.sequence > direction.sequence)
     );
+  const currentVisual = !direction || (visualResult && fromDirection(visualResult));
+  const currentWork =
+    !direction ||
+    presentation.progress.phases.length > 0 ||
+    presentation.results.some(fromDirection);
   const selected =
     sections.find((section) => section.id === selectedSection)?.id ??
     (afterPreview && !preview?.startState && (preferSummary || !currentVisual)
@@ -495,8 +500,8 @@ export function TaskOutputs({
         className="garden-output-section garden-output-answer"
         hidden={fitted && selected !== 'summary'}
       >
-        {afterPreview && <WorkSummaryVisual presentation={presentation} />}
         {afterPreview}
+        {afterPreview && currentWork && <WorkSummaryVisual presentation={presentation} />}
       </div>
       <div
         className="garden-output-section garden-output-downloads"

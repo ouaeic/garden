@@ -75,6 +75,7 @@ export async function checkPreviewStart({ context, origin, task, presentation, r
           eventCursor: directionSequence ? directionSequence + 2 : 4,
           ...(directionSequence
             ? {
+                progress: { ...presentation.progress, phases: [] },
                 surface: {
                   direction: {
                     eventId: `direction-${directionSequence}`,
@@ -173,6 +174,11 @@ export async function checkPreviewStart({ context, origin, task, presentation, r
           .getByRole('button', { name: 'Summary', exact: true })
           .getAttribute('aria-pressed'),
         'true'
+      );
+      assert.equal(
+        await page.getByRole('region', { name: 'Work at a glance' }).count(),
+        0,
+        'A text-only follow-up has no charts of previous work above its answer'
       );
       await page.screenshot({ path: resolve(report, `follow-up-answer-${width}.png`) });
       await views.getByRole('button', { name: 'Preview', exact: true }).click();

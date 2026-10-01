@@ -69,7 +69,11 @@ describe('usable task delivery and recorded progress', () => {
     const render = (sequence: number) =>
       renderToStaticMarkup(
         <TaskOutputs
-          presentation={{ ...presentation, surface }}
+          presentation={{
+            ...presentation,
+            surface,
+            progress: { ...presentation.progress, phases: [] }
+          }}
           events={[
             {
               id: 'published',
@@ -90,6 +94,8 @@ describe('usable task delivery and recorded progress', () => {
     expect(render(6)).toMatch(/aria-pressed="true"[^>]*>Preview</);
     expect(render(4)).toContain('Downloads');
     expect(render(4)).toContain('The latest explanation');
+    expect(render(4)).not.toContain('Work at a glance');
+    expect(render(6)).toContain('Work at a glance');
   });
   it('downloads the declared project bundle beside a preview rather than an unrelated latest file', () => {
     const withoutBundle = renderToStaticMarkup(
