@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GardenError } from '@garden/core';
 import { type ModelToolCall } from '@garden/model-gateway';
 import { countPostEditPaths, executeWorkspaceTool, forgetPostEditChecks } from './workspace.js';
@@ -108,6 +108,40 @@ const patch = async (
 
 const failures = (result: Record<string, unknown>): string[] =>
   ((result.failed ?? []) as Array<{ reason: string }>).map((failure) => failure.reason);
+
+describe('malformed invocation recovery', () => {
+  it.each([{}, { command: 'echo fixture' }, { executable: ' ' }])(
+    'refuses a missing executable before reaching the runner: %j',
+    async (args) => {
+      const call = vi.fn();
+      const context = {
+        task: { id: 'missing-executable', workspaceId: 'fixture' },
+        state: {},
+        runner: { call }
+      } as unknown as ToolContext;
+      await expect(
+        executeWorkspaceTool(context, { id: 'invalid-shell', name: 'shell', arguments: args })
+      ).rejects.toMatchObject({ code: 'shell_invalid' });
+      expect(call).not.toHaveBeenCalled();
+    }
+  );
+
+  it('refuses a flat patch without writing, then accepts the required envelope', async () => {
+    const { run, written } = await turn({ 'workspace/queue.ts': QUEUE }, [
+      { name: 'file_read', args: { path: 'workspace/queue.ts' } }
+    ]);
+    const edit = {
+      path: 'workspace/queue.ts',
+      edit: "PUT 1:\n-import type { Job }\n+import type { Job, Clock } from './types.js';"
+    };
+    await expect(run('file_patch', edit)).rejects.toThrow('patches:[{path,edit}]');
+    expect(written.get(edit.path)).toBe(QUEUE);
+    await run('file_patch', { patches: [edit] });
+    expect(written.get(edit.path)).toBe(
+      QUEUE.replace('import type { Job }', 'import type { Job, Clock }')
+    );
+  });
+});
 
 describe('moving a block instead of retyping it', () => {
   it('cuts the text out and pastes it after the anchor, unchanged and crossing the wire once', async () => {

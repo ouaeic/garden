@@ -830,6 +830,29 @@ describe('the resident cost', () => {
 });
 
 describe('the content anchor', () => {
+  it('diagnoses separator whitespace without silently changing file content', () => {
+    const text = 'order,sku,amount,status\n1,tea,12,paid\n2,tea,24,paid\n';
+    const path = 'orders.csv';
+    recordRead(TASK, path, 1, text);
+    const refused = applyEdit(
+      path,
+      'PUT 3:\n- 2,tea,24,paid\n+ 2,tea,30,paid',
+      text,
+      readsOf(TASK, path)
+    );
+    expect(refused.ok).toBe(false);
+    if (refused.ok) throw new Error('A separator space must not be silently removed');
+    expect(refused.refusal.message).toContain('file content, not separators');
+    expect(refused.refusal.message).toContain('3:2,tea,24,paid');
+    const corrected = applyEdit(
+      path,
+      'PUT 3:\n-2,tea,24,paid\n+2,tea,30,paid',
+      text,
+      readsOf(TASK, path)
+    );
+    expect(corrected).toMatchObject({ ok: true, text: text.replace('24', '30') });
+  });
+
   it('applies where the anchor holds at the addressed line, with no note about it', () => {
     read();
     const result = apply('PUT 3:\n-  if (!job) return null;\n+  if (!job) return undefined;');
