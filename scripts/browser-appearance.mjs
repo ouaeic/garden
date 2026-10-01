@@ -197,6 +197,21 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
       });
       assert.equal(geometry.actual, geometry.width, 'Appearance must fit the viewport');
       assert.equal(geometry.mainOverflow, false, 'Work must not overflow sideways');
+      if (width === 1440) {
+        const readouts = await page
+          .locator('.meter-provider > span, .meter-provider > small')
+          .evaluateAll((nodes) =>
+            nodes.map((node) => ({
+              text: node.textContent,
+              fits: node.scrollWidth <= node.clientWidth
+            }))
+          );
+        assert(readouts.length > 0, 'The computer card must include provider readouts');
+        assert(
+          readouts.every((readout) => readout.fits),
+          `Provider names and usage values must remain readable: ${JSON.stringify(readouts)}`
+        );
+      }
       assert.equal(geometry.separated, true, 'Send controls stay below the prompt');
       const composerBefore = await page.locator('.intent-editor').boundingBox();
       await page.getByRole('button', { name: 'Prompt settings', exact: true }).click();

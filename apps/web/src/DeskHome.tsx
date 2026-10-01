@@ -33,7 +33,8 @@ function Meter({
   value,
   total,
   text,
-  title
+  title,
+  className = ''
 }: {
   label: string;
   value: number;
@@ -41,10 +42,11 @@ function Meter({
   total: number | null;
   text: string;
   title?: string;
+  className?: string;
 }) {
   return (
     <div
-      className="meter"
+      className={`meter ${className}`}
       role="meter"
       aria-label={title ?? label}
       aria-valuenow={value}
@@ -230,13 +232,14 @@ export default function DeskHome({
                   : 'Unavailable';
             const value = window.unit === 'usd' ? (left ?? window.used) : window.used;
             return value === null ? (
-              <span key={index} className="meter" title={label}>
+              <span key={index} className="meter meter-provider" title={label}>
                 <span>{label}</span>
                 <small>{text}</small>
               </span>
             ) : (
               <Meter
                 key={index}
+                className="meter-provider"
                 label={label}
                 value={value}
                 total={window.unit === 'usd' ? window.limit : 1}

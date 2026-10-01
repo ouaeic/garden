@@ -111,6 +111,9 @@
   grid-area: text;
   text-align: right;
 }
+.meter-provider {
+  grid-column: 1 / -1;
+}
 .meter > span:first-child,
 .meter > small {
   color: var(--muted);
