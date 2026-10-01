@@ -14,10 +14,33 @@ export async function checkCreatureExits({ context, origin, report }) {
       ['frogHop', 'frog'],
       ['monkeyTour', 'monkey']
     ]) {
-      for (const frightened of [false, true]) {
+      for (const frightened of [false, true, 'flight']) {
         await page.goto(origin);
         await page.locator('.home-projects').waitFor();
         await page.locator('.life-layer').waitFor({ state: 'attached' });
+        if (frightened === 'flight') {
+          await page.addStyleTag({
+            content: `
+            [data-perch], .desk-card, .desk-work-card, .panel, .phone-bar, .garden-masthead { border: none !important; }
+            .exit-test-perch { position: fixed; width: 150px; height: 80px; z-index: 20;
+              background: var(--bg); border-top: 1px solid var(--text) !important; }
+          `
+          });
+          await page.evaluate(() => {
+            Math.random = () => 0.1;
+            for (const [left, top] of [
+              [20, 140],
+              [210, 440]
+            ]) {
+              const edge = document.createElement('div');
+              edge.className = 'exit-test-perch';
+              edge.dataset.perch = '';
+              edge.style.left = `${left}px`;
+              edge.style.top = `${top}px`;
+              document.body.append(edge);
+            }
+          });
+        }
         await page.evaluate(
           ({ scene, kind }) => {
             window.exitSamples = [];
@@ -32,12 +55,14 @@ export async function checkCreatureExits({ context, origin, report }) {
               const box = node.getBoundingClientRect();
               const clip = node.closest('.life-clip')?.getBoundingClientRect();
               window.exitSamples.push({
+                x: box.left,
                 y: box.top,
-                visible: Math.max(
-                  0,
-                  Math.min(box.bottom, clip?.bottom ?? innerHeight) -
-                    Math.max(box.top, clip?.top ?? 0)
-                ),
+                visible:
+                  Math.max(
+                    0,
+                    Math.min(box.bottom, clip?.bottom ?? innerHeight) -
+                      Math.max(box.top, clip?.top ?? 0)
+                  ) * Math.max(0, Math.min(box.right, innerWidth) - Math.max(box.left, 0)),
                 clipped: Boolean(clip)
               });
               requestAnimationFrame(sample);
@@ -49,10 +74,25 @@ export async function checkCreatureExits({ context, origin, report }) {
         );
         const actor = page.locator(`[data-creature="${kind}"]`);
         await actor.waitFor({ state: 'attached' });
-        await page.waitForFunction((kind) => {
-          const node = document.querySelector(`[data-creature="${kind}"]`);
-          return node?.closest('.life-free') && node.getBoundingClientRect().top > 0;
-        }, kind);
+        await page.waitForFunction(
+          ({ kind, descending, standing }) => {
+            const node = document.querySelector(`[data-creature="${kind}"]`);
+            if (standing && kind === 'monkey') {
+              const clip = node?.closest('.life-clip')?.getBoundingClientRect();
+              return (
+                clip &&
+                node.getBoundingClientRect().top < clip.bottom - 8 &&
+                !node.getAnimations().some((animation) => animation.playState === 'running')
+              );
+            }
+            return (
+              node?.closest('.life-free') &&
+              node.getBoundingClientRect().top > (descending ? 200 : 0)
+            );
+          },
+          { kind, descending: frightened === 'flight', standing: frightened === true }
+        );
+        const exitAt = await page.evaluate(() => window.exitSamples.length);
         if (frightened) {
           const box = await actor.boundingBox();
           assert(box, 'The frightened creature must be visible');
@@ -61,9 +101,26 @@ export async function checkCreatureExits({ context, origin, report }) {
         await actor.waitFor({ state: 'detached', timeout: 25_000 });
         const samples = await page.evaluate(() => window.exitSamples);
         assert(samples.length > 0, 'The exit must have rendered frames');
+        if (frightened === 'flight') {
+          const exit = samples.slice(exitAt);
+          assert(exit.length >= 3, `${kind} must animate its airborne escape`);
+          assert(
+            exit.every((sample) => !sample.clipped),
+            `${kind} must not hide behind a border it has left`
+          );
+          assert(
+            new Set(
+              exit.filter((sample) => sample.visible > 2).map((sample) => Math.round(sample.x))
+            ).size >= 3,
+            `${kind} must stay visible while escaping mid-flight`
+          );
+          assert(exit.at(-1).visible < 2, `${kind} must leave the screen before removal`);
+          continue;
+        }
         const lastFree = samples.findLastIndex((sample) => !sample.clipped);
-        assert(lastFree >= 0, 'The creature must leave its entry border');
-        const exit = samples.slice(lastFree + 1);
+        if (!(frightened === true && kind === 'monkey'))
+          assert(lastFree >= 0, 'The creature must leave its entry border');
+        const exit = samples.slice(frightened ? exitAt : lastFree + 1);
         assert(exit.length >= 3, `${kind} must animate behind its exit border`);
         assert(exit[0].visible > 4, `${kind} must remain visible when it starts leaving`);
         assert(exit.at(-1).visible < 2, `${kind} must cross the border before removal`);
