@@ -82,8 +82,9 @@ impl client::Handler for HostKeyVerifier {
 
     async fn check_server_key(
         &mut self,
-        server_public_key: &russh::keys::ssh_key::PublicKey,
+        server_public_key: &russh::keys::PublicKeyOrCertificate,
     ) -> Result<bool, Self::Error> {
+        let server_public_key = server_public_key.public_key();
         let identity = SshHostIdentity {
             fingerprint: server_public_key.fingerprint(HashAlg::Sha256).to_string(),
             algorithm: server_public_key.algorithm().to_string(),
@@ -405,6 +406,30 @@ pub async fn install(mut request: InstallServerRequest) -> Result<InstallServerR
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn host_key_probe_records_identity_and_install_rejects_a_changed_key() {
+        use russh::{client::Handler, keys::ssh_key::public::Ed25519PublicKey};
+        let key = russh::keys::ssh_key::PublicKey::new(Ed25519PublicKey([1; 32]).into(), "");
+        let fingerprint = key.fingerprint(HashAlg::Sha256).to_string();
+        let observed = Arc::new(Mutex::new(None));
+        let mut verifier = HostKeyVerifier {
+            expected: None,
+            observed: observed.clone(),
+        };
+        assert!(verifier
+            .check_server_key(&key.clone().into())
+            .await
+            .unwrap());
+        assert_eq!(
+            observed.lock().unwrap().as_ref().unwrap().fingerprint,
+            fingerprint
+        );
+        verifier.expected = Some(fingerprint);
+        assert!(verifier.check_server_key(&key.into()).await.unwrap());
+        let changed = russh::keys::ssh_key::PublicKey::new(Ed25519PublicKey([2; 32]).into(), "");
+        assert!(!verifier.check_server_key(&changed.into()).await.unwrap());
+    }
 
     #[test]
     fn validates_targets_and_extracts_only_standalone_tickets() {

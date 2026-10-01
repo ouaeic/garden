@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Leaf, ArrowUpRight, RefreshCw } from './icons';
+import { ArrowUpRight, RefreshCw } from './icons';
+import Brand from './Brand';
 import { nativeBootstrap, nativeStatus, pairNative, previewConnectionTicket } from './native.js';
 import type { NativeBootstrap, NativeStatus, NetworkPreference } from './native.js';
 import { Button, ErrorNotice, Field } from './ui.js';
@@ -72,8 +73,7 @@ export default function NativeSetup({
     <main className="native-setup">
       <header>
         <span className="native-wordmark">
-          garden
-          <Leaf size={22} />
+          <Brand />
         </span>
         <span className="muted">Your computer, anywhere</span>
       </header>

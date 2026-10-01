@@ -251,6 +251,18 @@
 [data-palette-swatch='backlight'] .palette-swatch > i:nth-child(4) {
   background-color: #12302c;
 }
+[data-palette-swatch='amber'] .palette-swatch > i:nth-child(1) {
+  background-color: var(--s0);
+}
+[data-palette-swatch='amber'] .palette-swatch > i:nth-child(2) {
+  background-color: var(--s1);
+}
+[data-palette-swatch='amber'] .palette-swatch > i:nth-child(3) {
+  background-color: var(--s2);
+}
+[data-palette-swatch='amber'] .palette-swatch > i:nth-child(4) {
+  background-color: var(--s3);
+}
 .checkbox-row {
   display: flex;
   align-items: center;
@@ -408,8 +420,8 @@
 /* One cell a screen pixel, so no pixel of the plant falls between two. */
 .brand-plant {
   position: absolute;
-  left: 0;
-  bottom: 0;
+  left: 15px;
+  bottom: 6px;
   width: 80px;
   height: 24px;
   overflow: visible;
@@ -421,7 +433,7 @@
 @media (prefers-reduced-motion: no-preference) {
   .brand-letter {
     animation: brand-wake 1.2s cubic-bezier(0.3, 0, 0.3, 1) both;
-    animation-delay: calc(var(--letter) * 60ms);
+    animation-delay: calc(var(--letter, 0) * 60ms);
   }
 }
 @keyframes brand-wake {

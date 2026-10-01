@@ -83,6 +83,13 @@
   --s2: #1f4a45;
   --s3: #12302c;
 }
+:root[data-palette='amber'],
+[data-palette-swatch='amber'] {
+  --s0: #e5ac62;
+  --s1: #b08245;
+  --s2: #5b3b19;
+  --s3: #281a0e;
+}
 :root[data-theme='dark'] {
   --bg: var(--s3);
   --tint: var(--s2);

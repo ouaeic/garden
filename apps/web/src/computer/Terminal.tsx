@@ -99,7 +99,7 @@ export default function Terminal({
     });
     themeObserver.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['data-theme']
+      attributeFilter: ['data-theme', 'data-palette']
     });
     void document.fonts.load('16px "Pixel Operator Mono"').then(() => {
       if (active) resize();

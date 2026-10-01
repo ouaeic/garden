@@ -9388,7 +9388,13 @@ describe('the machine the run tells the model it is on', () => {
    * cannot describe itself costs the cached tail anything.
    */
   it('is byte-identical to a run with no probe when the runner establishes nothing', async () => {
-    expect(runtimeBlockOf(await turn(''))).toBe(runtimeBlockOf(await turn(null)));
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-01T21:17:59.999Z'));
+    try {
+      expect(runtimeBlockOf(await turn(''))).toBe(runtimeBlockOf(await turn(null)));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
