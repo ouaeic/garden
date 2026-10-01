@@ -709,6 +709,11 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
   const root = `/v1/workspaces/${task.workspaceId}`;
   switch (call.name) {
     case 'shell': {
+      if (typeof call.arguments.executable !== 'string' || !call.arguments.executable.trim())
+        throw new GardenError(
+          'shell_invalid',
+          'shell requires executable. For a script use {executable:"bash",args:["-lc",script]}.'
+        );
       const background = call.arguments.background === true;
       const execution = shellJobExecution(call.arguments);
       // A redirect or a `tee` over a file this turn has read part of is the whole-file write the
@@ -1016,7 +1021,10 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
         ? (call.arguments.patches as Array<Record<string, unknown>>)
         : [];
       if (!patches.length || patches.length > MAX_PATCH_FILES)
-        throw new GardenError('patch_invalid', `Provide between 1 and ${MAX_PATCH_FILES} patches`);
+        throw new GardenError(
+          'patch_invalid',
+          `Use {patches:[{path,edit}]} with between 1 and ${MAX_PATCH_FILES} patches.`
+        );
       const applied: Array<{
         path: string;
         sha256: string;

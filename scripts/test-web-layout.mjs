@@ -1295,7 +1295,7 @@ try {
     ['mobile', 'appearance'].includes(process.env.GARDEN_UI_FOCUS)
   )
     await checkMobileNavigation({ context, origin, task, bootstrap, report });
-  if (process.env.GARDEN_UI_FOCUS === 'previews')
+  if (!process.env.GARDEN_UI_FOCUS || process.env.GARDEN_UI_FOCUS === 'previews')
     await checkPreviewStart({ context, origin, task, presentation, report, errors });
   if (process.env.GARDEN_UI_FOCUS === 'files-jobs') {
     await checkTaskRecovery({ context, origin, bootstrap, task, report, errors });
@@ -2049,6 +2049,11 @@ try {
       exact: true
     });
     await sourceInput.fill('revisedControl()\n');
+    await reviewDialog
+      .getByText('Refresh the review after saving or discarding edits before applying changes.', {
+        exact: true
+      })
+      .waitFor();
     assert.equal(
       await reviewDialog.getByRole('button', { name: 'Apply reviewed changes' }).isDisabled(),
       true

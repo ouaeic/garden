@@ -303,6 +303,23 @@ const placeWithAnchor = (
         };
   if (carries(at)) return placed;
 
+  const recorded = recordedAt(against, at);
+  const standing = live[at - 1];
+  if (
+    /^[ \t]/.test(anchor) &&
+    standing !== undefined &&
+    !/^[ \t]/.test(standing) &&
+    recorded !== undefined &&
+    !/^[ \t]/.test(recorded) &&
+    anchorPrefixes(anchor.trimStart(), standing) &&
+    anchorPrefixes(anchor.trimStart(), recorded)
+  )
+    return {
+      message: `${path}:${at} begins ${JSON.stringify(standing.slice(0, 120))}, but your - row begins with whitespace. Spaces after - and + are file content, not separators. Nothing was written. Copy the file's whitespace exactly:\n\n${numberedWindow(live, placed, CONTEXT_LINES)}`,
+      fix: 'remove the separator space after - and +; preserve any whitespace the file actually has',
+      kind: 'evidence'
+    };
+
   const weak = isWeakAnchor(anchor);
   const rings = weak ? ANCHOR_RINGS.slice(0, 1) : ANCHOR_RINGS;
   const reach = rings[rings.length - 1] as number;

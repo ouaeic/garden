@@ -79,6 +79,17 @@ export async function checkProjectHistory({ context, origin, task, presentation,
   const results = page.locator('.garden-previous-results');
   const response = page.locator('.garden-previous-answer');
   await response.locator('summary').waitFor();
+  await page
+    .locator('.garden-answer')
+    .getByText('The current version is ready.', { exact: true })
+    .waitFor();
+  const views = page.getByRole('navigation', { name: 'Output views' });
+  assert.equal(
+    await views.getByRole('button', { name: 'Summary', exact: true }).getAttribute('aria-pressed'),
+    'true',
+    'An answer-only follow-up opens its latest answer'
+  );
+  await views.getByRole('button', { name: 'Preview', exact: true }).click();
   await page.locator('.garden-preview-frame').waitFor();
   const originalPreview = await page.locator('.garden-preview-frame').elementHandle();
   assert(originalPreview, 'The current app preview must exist before opening history');

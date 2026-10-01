@@ -43,9 +43,15 @@ export function TaskOutputs({
   preferSummary?: boolean;
   afterPreview?: ReactNode;
 }) {
-  const [selectedSection, setSelectedSection] = useState<'preview' | 'summary' | 'files' | null>(
-    null
-  );
+  const direction = presentation.surface?.direction;
+  const sectionScope = `${presentation.taskId}:${direction?.eventId ?? ''}`;
+  const [selection, setSelection] = useState<{
+    scope: string;
+    section: 'preview' | 'summary' | 'files';
+  } | null>(null);
+  const setSelectedSection = (section: 'preview' | 'summary' | 'files') =>
+    setSelection({ scope: sectionScope, section });
+  const selectedSection = selection?.scope === sectionScope ? selection.section : null;
   const [showAll, setShowAll] = useState(false);
   const [opened, setOpened] = useState<{ id: string; url: string } | null>(null);
   const [dismissed, setDismissed] = useState<string | null>(null);
@@ -74,8 +80,8 @@ export function TaskOutputs({
   const viewablePreview =
     preview?.status === 'ready' || (preview?.status === 'unknown' && opened?.id === preview.id);
   useEffect(() => {
-    if (preview?.startState) setSelectedSection('preview');
-  }, [preview?.id, preview?.startState]);
+    if (preview?.startState) setSelection({ scope: sectionScope, section: 'preview' });
+  }, [preview?.id, preview?.startState, sectionScope]);
   const startingPreview =
     preview?.startState === 'starting' ||
     (recovery.requestedId === preview?.id && Boolean(preview));
@@ -229,9 +235,22 @@ export function TaskOutputs({
       ? [{ id: 'files' as const, label: 'Downloads' }]
       : [])
   ];
+  const visualResult = preview ?? files.find((file) => file.artifactId === featured?.id);
+  const fromDirection = (result: TaskResult) =>
+    !direction ||
+    result.evidenceEventIds.some((id) =>
+      events.some((event) => event.id === id && event.sequence > direction.sequence)
+    );
+  const currentVisual = !direction || (visualResult && fromDirection(visualResult));
+  const currentWork =
+    !direction ||
+    presentation.progress.phases.length > 0 ||
+    presentation.results.some(fromDirection);
   const selected =
     sections.find((section) => section.id === selectedSection)?.id ??
-    (preferSummary && afterPreview && !preview?.startState ? 'summary' : sections[0]?.id);
+    (afterPreview && !preview?.startState && (preferSummary || !currentVisual)
+      ? 'summary'
+      : sections[0]?.id);
   return (
     <section
       className={`garden-outputs${fitted ? ' is-fitted' : ''}`}
@@ -481,8 +500,8 @@ export function TaskOutputs({
         className="garden-output-section garden-output-answer"
         hidden={fitted && selected !== 'summary'}
       >
-        {afterPreview && <WorkSummaryVisual presentation={presentation} />}
         {afterPreview}
+        {afterPreview && currentWork && <WorkSummaryVisual presentation={presentation} />}
       </div>
       <div
         className="garden-output-section garden-output-downloads"

@@ -50,6 +50,53 @@ const presentation: TaskPresentation = {
 };
 
 describe('usable task delivery and recorded progress', () => {
+  it('shows a follow-up answer ahead of an older preview, and previews a newly produced result', () => {
+    const surface: NonNullable<TaskPresentation['surface']> = {
+      direction: {
+        eventId: 'follow-up',
+        sequence: 5,
+        text: 'Explain the result.',
+        truncated: false,
+        queued: false
+      },
+      directions: [],
+      report: null,
+      references: [],
+      currentResultIds: ['preview-1'],
+      sources: [],
+      unavailableReferences: 0
+    };
+    const render = (sequence: number) =>
+      renderToStaticMarkup(
+        <TaskOutputs
+          presentation={{
+            ...presentation,
+            surface,
+            progress: { ...presentation.progress, phases: [] }
+          }}
+          events={[
+            {
+              id: 'published',
+              taskId: presentation.taskId,
+              sequence,
+              kind: 'preview',
+              summary: 'Published the app',
+              payload: {},
+              createdAt: '2026-09-06T00:00:00Z'
+            }
+          ]}
+          afterPreview={<p>The latest explanation</p>}
+          fitted
+          onArtifact={() => undefined}
+        />
+      );
+    expect(render(4)).toMatch(/aria-pressed="true"[^>]*>Summary</);
+    expect(render(6)).toMatch(/aria-pressed="true"[^>]*>Preview</);
+    expect(render(4)).toContain('Downloads');
+    expect(render(4)).toContain('The latest explanation');
+    expect(render(4)).not.toContain('Work at a glance');
+    expect(render(6)).toContain('Work at a glance');
+  });
   it('downloads the declared project bundle beside a preview rather than an unrelated latest file', () => {
     const withoutBundle = renderToStaticMarkup(
       <TaskOutputs presentation={presentation} onArtifact={() => undefined} />

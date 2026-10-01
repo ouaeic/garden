@@ -774,7 +774,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'shell',
     description:
-      'Run an executable with literal args; use bash -lc or python3 -c for pipes/globs/redirects. background=true with job runs finite work, service runs servers; process inspects/stops them. System packages require the direct manager: no shell wrapper, PTY or background.',
+      'Run executable with literal args. Scripts use bash -lc: {executable:"bash",args:["-lc",script]}. background=true: job for finite work, service for servers; process inspects/stops them. System packages require the direct manager: no shell wrapper, PTY or background.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -850,7 +850,7 @@ export const agentTools: ModelTool[] = [
            * answer identically. So the description can go back to describing the field.
            */
           description:
-            'Whether this command reaches the network, recorded on the call. It does not change what the command can reach and does not decide what the user is asked about - that is judged from the addresses the command actually names - so answer it accurately and do not weigh it when choosing how to write a command.'
+            'Record whether this command reaches the network. This flag grants no access; approval is judged from the addresses the command names.'
         }
       }
     }
@@ -1115,7 +1115,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'file_patch',
     description:
-      'Edit file_read’s numbered lines. Each range needs a - anchor quoting its first target line, then + replacement rows. Ranges use original read numbers; repeated paths apply together.',
+      'Edit file_read’s lines with patches:[{path,edit}]. Each range needs a - anchor and + replacements. Use original read numbers; repeated paths apply together.',
     parameters: {
       type: 'object',
       additionalProperties: false,
