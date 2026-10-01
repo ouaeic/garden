@@ -263,6 +263,22 @@ export async function checkPreviewStart({ context, origin, task, presentation, r
       await views.getByRole('button', { name: 'Summary', exact: true }).click();
       await views.getByRole('button', { name: 'Preview', exact: true }).click();
       await card.getByRole('button', { name: 'Expand', exact: true }).click();
+      await card.getByRole('button', { name: 'Exit full screen', exact: true }).waitFor();
+      const [expandedCard, expandedFrame, expandedActions] = await Promise.all([
+        card.boundingBox(),
+        card.locator('iframe').boundingBox(),
+        card.locator('.garden-output-actions').boundingBox()
+      ]);
+      assert(expandedCard && expandedFrame && expandedActions);
+      assert(
+        expandedFrame.height > expandedCard.height * 0.6,
+        'The expanded app receives most of the screen rather than the action bar'
+      );
+      assert(expandedFrame.y + expandedFrame.height <= expandedActions.y + 2);
+      assert(
+        expandedActions.y + expandedActions.height <= expandedCard.y + expandedCard.height + 2
+      );
+      await page.screenshot({ path: resolve(report, `expanded-preview-${width}.png`) });
       await card.getByRole('button', { name: 'Exit full screen', exact: true }).click();
       await page.waitForResponse(
         (response) => new URL(response.url()).pathname === `/v1/tasks/${task.id}/presentation`

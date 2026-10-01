@@ -901,7 +901,7 @@
   background: var(--lcd-texture), var(--bg);
   border-radius: 0;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 .garden-output-primary.expanded .garden-preview-frame {
   height: 100%;
