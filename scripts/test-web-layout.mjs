@@ -2049,6 +2049,11 @@ try {
       exact: true
     });
     await sourceInput.fill('revisedControl()\n');
+    await reviewDialog
+      .getByText('Refresh the review after saving or discarding edits before applying changes.', {
+        exact: true
+      })
+      .waitFor();
     assert.equal(
       await reviewDialog.getByRole('button', { name: 'Apply reviewed changes' }).isDisabled(),
       true
