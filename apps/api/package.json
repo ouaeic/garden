@@ -13,18 +13,18 @@
   "dependencies": {
     "@fastify/cookie": "11.1.2",
     "@fastify/cors": "11.3.0",
-    "@fastify/helmet": "13.1.0",
-    "@fastify/websocket": "11.3.0",
+    "@fastify/helmet": "13.1.1",
+    "@fastify/websocket": "11.3.1",
     "@garden/contracts": "workspace:*",
     "@garden/core": "workspace:*",
     "@garden/data": "workspace:*",
     "@garden/model-gateway": "workspace:*",
     "@garden/relay-client": "workspace:*",
     "@garden/worker": "workspace:*",
-    "@simplewebauthn/server": "13.3.2",
-    "fastify": "5.12.2",
-    "ws": "8.21.3",
-    "zod": "4.4.3"
+    "@simplewebauthn/server": "14.0.3",
+    "fastify": "5.12.5",
+    "ws": "8.22.0",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@types/ws": "8.18.1"
