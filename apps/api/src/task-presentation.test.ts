@@ -52,6 +52,85 @@ const input = (over: Partial<PresentationInput> = {}): PresentationInput => ({
 });
 
 describe('task results are concrete owner-accessible outputs', () => {
+  it('refreshes an existing app once completed source edits land, preserving it through polling and explanations', () => {
+    const published = event(1, 'preview', { previewId: preview.id });
+    const edited = [
+      event(2, 'user_message', { markdown: 'Change the default.' }),
+      event(3, 'tool_started', { tool: 'file_patch', toolCallId: 'edit', arguments: {} }),
+      event(4, 'tool_result', {
+        toolCallId: 'edit',
+        result: { filesChanged: [{ path: 'src/ui.js', sha256: 'updated' }], patchCount: 1 }
+      })
+    ];
+    const project = (events: TaskEvent[], over: Partial<PresentationInput> = {}) =>
+      buildTaskPresentation(input({ events, previews: [preview], ...over })).results[0]!;
+    expect(project([published, ...edited]).previewRevision).toBeUndefined();
+    const complete = [...edited, event(5, 'completed', { answer: 'Changed and tested.' })];
+    const updated = project([published, ...complete]);
+    expect(updated.previewRevision).toBe('event-5');
+    expect(updated.evidenceEventIds).toEqual(['event-1', 'event-5']);
+    expect(project([published, ...complete])).toEqual(updated);
+    expect(
+      project([
+        ...complete.slice(0, -1),
+        event(5, 'preview', { previewId: preview.id }),
+        event(6, 'completed', {})
+      ]).previewRevision
+    ).toBeUndefined();
+    const explanation = [
+      event(6, 'user_message', { markdown: 'Explain the result.' }),
+      event(7, 'completed', { answer: 'The default is updated.' })
+    ];
+    expect(project([published, ...complete, ...explanation])).toEqual(updated);
+    const noOp = [
+      event(8, 'tool_started', { tool: 'file_write', toolCallId: 'same', arguments: {} }),
+      event(9, 'tool_result', {
+        toolCallId: 'same',
+        result: { path: 'src/ui.js', sha256: 'updated' }
+      }),
+      event(10, 'completed', {})
+    ];
+    expect(project([published, ...complete, ...explanation, ...noOp])).toEqual(updated);
+    expect(
+      project([published, ...complete], {
+        workspaceId: 'fork',
+        sourceWorkspaceId: workspaceId
+      }).previewRevision
+    ).toBeUndefined();
+  });
+
+  it('does not reload an app for refused writes, reads, artifacts or another task’s edits', () => {
+    const events = [
+      event(1, 'preview', { previewId: preview.id }),
+      event(2, 'tool_started', { tool: 'file_write', toolCallId: 'denied', arguments: {} }),
+      event(3, 'tool_result', {
+        toolCallId: 'denied',
+        result: { skipped: true, path: 'app.js' }
+      }),
+      event(4, 'tool_started', { tool: 'file_patch', toolCallId: 'failed', arguments: {} }),
+      event(5, 'tool_result', {
+        toolCallId: 'failed',
+        result: { filesChanged: [], failures: [{ path: 'app.js', reason: 'No read' }] }
+      }),
+      event(6, 'tool_started', { tool: 'file_read', toolCallId: 'read', arguments: {} }),
+      event(7, 'tool_result', { toolCallId: 'read', result: { path: 'app.js' } }),
+      event(8, 'artifact', { artifactId: 'unrelated', name: 'report.pdf' }),
+      {
+        ...event(9, 'tool_started', { tool: 'file_write', toolCallId: 'foreign' }),
+        taskId: 'other'
+      },
+      {
+        ...event(10, 'tool_result', { toolCallId: 'foreign', result: { path: 'app.js' } }),
+        taskId: 'other'
+      },
+      event(11, 'completed', { answer: 'Explanation.' })
+    ];
+    const built = buildTaskPresentation(input({ events, previews: [preview] }));
+    expect(built.results).toHaveLength(1);
+    expect(built.results[0]?.previewRevision).toBeUndefined();
+    expect(built.results[0]?.evidenceEventIds).toEqual(['event-1']);
+  });
+
   it('keeps published artifact names out of file cards and bundles while retaining real source paths', () => {
     const events = [
       event(1, 'tool_started', {

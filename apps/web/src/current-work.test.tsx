@@ -47,6 +47,39 @@ const presentation = {
   }
 } satisfies TaskPresentation;
 describe('owner-directed work surface', () => {
+  it('keeps the served app mounted while a direction arrives ahead of its projection', () => {
+    const preview = {
+      id: 'app',
+      previewId: 'served',
+      kind: 'preview' as const,
+      title: 'Working app',
+      status: 'ready' as const,
+      url: null,
+      accessPath: '/v1/previews/served/access',
+      downloadUrl: null,
+      evidenceEventIds: ['published']
+    };
+    const before = {
+      ...presentation,
+      results: [preview],
+      surface: { ...surface, currentResultIds: ['app', 'file'] }
+    };
+    const next = currentWork(before, [
+      {
+        id: 'edit',
+        taskId: 'task',
+        sequence: 6,
+        kind: 'user_message',
+        payload: { markdown: 'Change the default.' },
+        summary: 'Edit',
+        createdAt: new Date(0).toISOString()
+      }
+    ])!;
+    expect(next.surface?.currentResultIds).toEqual(['app']);
+    expect(next.results[0]).toBe(preview);
+    expect(next.surface?.report).toBeNull();
+    expect(next.progress.phases).toEqual([]);
+  });
   it('removes obsolete report and plan immediately when steering arrives before an API refresh', () => {
     const next = currentWork(presentation, [
       {

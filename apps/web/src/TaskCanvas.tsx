@@ -103,6 +103,9 @@ export function TaskOutputs({
   const previewStatus = preview?.status;
   const previewId = preview?.id;
   useEffect(() => {
+    setFrameState('loading');
+  }, [preview?.previewRevision]);
+  useEffect(() => {
     if (previewStatus === 'unavailable' && opened?.id === previewId) {
       setOpened(null);
       return;
@@ -218,6 +221,7 @@ export function TaskOutputs({
   }
   const frame = opened && (
     <iframe
+      key={`${opened.id}:${preview?.previewRevision ?? ''}`}
       title={preview?.title ?? 'Task preview'}
       src={opened.url}
       sandbox={`allow-scripts allow-forms allow-downloads allow-modals allow-pointer-lock${previewIsolated(opened.url) ? ' allow-same-origin' : ''}`}

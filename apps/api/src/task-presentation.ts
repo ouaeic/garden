@@ -142,6 +142,43 @@ const actionLabel = (name: string, args: Record<string, unknown>): string => {
 const successful = (result: Record<string, unknown>): boolean =>
   !result.error && !result.skipped && result.ok !== false && result.success !== false;
 
+/** Refresh workspace apps once an edit is finished, rather than during intermediate writes. */
+const completedSourceRevision = (
+  events: readonly TaskEvent[]
+): { completion: TaskEvent; changedSequence: number } | undefined => {
+  const calls = new Map<string, string>();
+  const hashes = new Map<string, string>();
+  let changed: TaskEvent | undefined;
+  let revision: { completion: TaskEvent; changedSequence: number } | undefined;
+  for (const event of events) {
+    const payload = record(event.payload);
+    const tool = text(payload.tool);
+    if (event.kind === 'tool_started' && ['file_write', 'file_patch'].includes(tool))
+      calls.set(text(payload.toolCallId), tool);
+    if (event.kind === 'tool_result') {
+      const name = calls.get(text(payload.toolCallId));
+      const result = record(payload.result);
+      if (name && successful(result)) {
+        const files = name === 'file_patch' ? result.filesChanged : [result];
+        if (Array.isArray(files))
+          for (const value of files) {
+            const file = record(value);
+            const path = deliveryFilePath(file.path);
+            if (!path) continue;
+            const hash = text(file.sha256);
+            if (!hash || hashes.get(path) !== hash) changed = event;
+            if (hash) hashes.set(path, hash);
+          }
+      }
+    }
+    if (event.kind === 'completed') {
+      if (changed) revision = { completion: event, changedSequence: changed.sequence };
+      changed = undefined;
+    }
+  }
+  return revision;
+};
+
 export interface PresentationInput {
   taskId: string;
   workspaceId: string;
@@ -160,6 +197,7 @@ export const buildTaskPresentation = (input: PresentationInput): TaskPresentatio
     ...new Map(input.events.filter((e) => e.taskId === input.taskId).map((e) => [e.id, e])).values()
   ].sort((a, b) => a.sequence - b.sequence || a.id.localeCompare(b.id));
   const previews = taskPreviewIds(events);
+  const sourceRevision = completedSourceRevision(events);
   const results: TaskResult[] = [];
   for (const preview of input.previews) {
     const evidence = previews.get(preview.id);
@@ -173,6 +211,13 @@ export const buildTaskPresentation = (input: PresentationInput): TaskPresentatio
       preview.status === 'active' && !expired
         ? (input.previewAvailability.get(preview.id) ?? 'unknown')
         : 'unavailable';
+    // A fork's edits cannot change the app still served from its source workspace.
+    const revision = preview.workspaceId === input.workspaceId ? sourceRevision : undefined;
+    const publicationSequence = Math.max(
+      ...events.filter((event) => evidence.includes(event.id)).map((event) => event.sequence)
+    );
+    const updated =
+      revision && revision.changedSequence > publicationSequence ? revision.completion : undefined;
     results.push({
       id: `preview:${preview.id}`,
       kind: 'preview',
@@ -185,6 +230,7 @@ export const buildTaskPresentation = (input: PresentationInput): TaskPresentatio
           ? `/v1/previews/${encodeURIComponent(preview.id)}/access`
           : null,
       previewId: preview.id,
+      ...(updated ? { previewRevision: updated.id } : {}),
       ...(preview.status !== 'revoked'
         ? {
             startPath: `/v1/tasks/${encodeURIComponent(input.taskId)}/previews/${encodeURIComponent(preview.id)}/start`,
@@ -193,7 +239,7 @@ export const buildTaskPresentation = (input: PresentationInput): TaskPresentatio
               : {})
           }
         : {}),
-      evidenceEventIds: evidence,
+      evidenceEventIds: updated ? [...evidence, updated.id] : evidence,
       ...(status !== 'ready'
         ? {
             detail:

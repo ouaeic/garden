@@ -15,6 +15,8 @@ export const TaskResult = z.object({
   startPath: z.string().optional(),
   startState: z.enum(['starting', 'attention']).optional(),
   previewId: z.string().optional(),
+  /** Completed source changes in this task; ordinary projection updates leave it unchanged. */
+  previewRevision: z.string().optional(),
   artifactId: z.string().optional(),
   workspaceId: z.string().optional(),
   sha256: z.string().optional(),
