@@ -29,10 +29,10 @@ try {
     const source = await readFile(root + `design/brand/selected-${name}.png`);
     const artwork = await page.evaluate(
       async (uri) => {
-        const image = new Image();
+        const image = new globalThis.Image();
         image.src = uri;
         await image.decode();
-        const canvas = document.createElement('canvas');
+        const canvas = globalThis.document.createElement('canvas');
         canvas.width = image.width;
         canvas.height = image.height;
         const context = canvas.getContext('2d');
@@ -92,10 +92,10 @@ try {
     const render = async (size, fill, background) => {
       const png = await page.evaluate(
         async ({ svg, size, background }) => {
-          const image = new Image();
+          const image = new globalThis.Image();
           image.src = `data:image/svg+xml;base64,${btoa(svg)}`;
           await image.decode();
-          const canvas = document.createElement('canvas');
+          const canvas = globalThis.document.createElement('canvas');
           canvas.width = canvas.height = size;
           const context = canvas.getContext('2d');
           if (background) {
