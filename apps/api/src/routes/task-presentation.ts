@@ -203,6 +203,19 @@ export const registerTaskPresentationRoutes = (context: RouteContext): void => {
         events,
         plan,
         artifacts,
+        artifactSourceKeys: new Map(
+          artifactRows
+            .filter(
+              (artifact) =>
+                typeof artifact.logicalKey === 'string' &&
+                artifact.logicalKey !== 'null' &&
+                artifact.logicalKey.length > 0
+            )
+            .map((artifact) => [
+              String(artifact.id),
+              `${String(artifact.workspaceId)}:${String(artifact.logicalKey)}`
+            ])
+        ),
         previews,
         previewAvailability,
         files

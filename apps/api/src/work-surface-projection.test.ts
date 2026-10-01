@@ -218,59 +218,39 @@ describe('results that outlast the direction that made them', () => {
     expect(projectWorkSurface(events, null, results).currentResultIds).toEqual(['result-one']);
   });
 
-  it('keeps only the latest download for a confirmed source while retaining distinct sources with the same name', () => {
-    const publish = (sequence: number, path: string, id: string) => [
-      event(sequence, 'tool_started', {
-        tool: 'publish_artifact',
-        toolCallId: id,
-        arguments: { path }
-      }),
-      event(sequence + 1, 'tool_result', { toolCallId: id, result: { artifactId: id } }),
-      event(sequence + 2, 'artifact', { artifactId: id, name: 'app.html' })
-    ];
+  it('keeps the highest stored source version current without tool receipts and preserves distinct same-name sources', () => {
     const events = [
-      event(1, 'user_message', { markdown: 'Build the app' }),
-      ...publish(2, 'app.html', 'old'),
-      event(5, 'user_message', { markdown: 'Change its default' }),
-      ...publish(6, 'workspace/app.html', 'current'),
-      ...publish(9, 'other/app.html', 'distinct')
+      event(1, 'artifact', { artifactId: 'old' }),
+      event(2, 'artifact', { artifactId: 'current' }),
+      event(3, 'artifact', { artifactId: 'distinct' }),
+      event(4, 'user_message', { markdown: 'Explain the app' })
     ];
-    const results = ['old', 'current', 'distinct'].map((id, index) =>
+    const results = ['current', 'old', 'distinct', 'legacy'].map((id) =>
       result({
         id,
         kind: 'artifact',
         artifactId: id,
         title: 'app.html',
-        evidenceEventIds: [`event-${[4, 8, 11][index]}`]
+        version: id === 'current' ? 2 : 1,
+        evidenceEventIds: ['event-1']
       })
     );
-    expect(projectWorkSurface(events, null, results).currentResultIds).toEqual([
+    const sources = new Map([
+      ['old', 'workspace:app'],
+      ['current', 'workspace:app'],
+      ['distinct', 'other-workspace:app']
+    ]);
+    expect(projectWorkSurface(events, null, results, sources).currentResultIds).toEqual([
       'current',
       'distinct'
     ]);
-    expect(results.map((item) => item.id)).toEqual(['old', 'current', 'distinct']);
-    const explanation = [...events, event(12, 'user_message', { markdown: 'Explain the result' })];
-    expect(projectWorkSurface(explanation, null, results).currentResultIds).toEqual([
-      'current',
-      'distinct'
-    ]);
-    expect(projectWorkSurface(events.slice(0, 6), null, results).currentResultIds).toContain('old');
-    const refused = [
-      ...events,
-      event(12, 'tool_started', {
-        tool: 'publish_artifact',
-        toolCallId: 'refused',
-        arguments: { path: 'app.html' }
-      }),
-      event(13, 'tool_result', {
-        toolCallId: 'refused',
-        result: { error: 'Publication failed', artifactId: 'distinct' }
-      })
-    ];
-    expect(projectWorkSurface(refused, null, results).currentResultIds).toEqual([
-      'current',
-      'distinct'
-    ]);
+    expect(
+      projectWorkSurface(events, null, [...results].reverse(), sources).currentResultIds
+    ).toEqual(['distinct', 'current']);
+    expect(results).toHaveLength(4);
+    expect(projectWorkSurface(events, null, results).currentResultIds).toContain('old');
+    const legacy = [...events, event(5, 'artifact', { artifactId: 'legacy' })];
+    expect(projectWorkSurface(legacy, null, results, sources).currentResultIds).toContain('legacy');
   });
 
   it('still drops an ordinary result from a previous direction', () => {

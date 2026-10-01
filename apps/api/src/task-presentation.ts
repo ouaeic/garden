@@ -187,6 +187,7 @@ export interface PresentationInput {
   events: readonly TaskEvent[];
   plan: TaskPlan | null;
   artifacts: readonly Artifact[];
+  artifactSourceKeys?: ReadonlyMap<string, string>;
   previews: readonly WorkspacePreview[];
   previewAvailability: ReadonlyMap<string, 'ready' | 'unavailable' | 'unknown'>;
   files: ReadonlyMap<string, { status: 'ready' | 'unavailable' | 'unknown'; sizeBytes?: number }>;
@@ -443,7 +444,7 @@ export const buildTaskPresentation = (input: PresentationInput): TaskPresentatio
       );
     }
   }
-  const surface = projectWorkSurface(events, input.plan, results);
+  const surface = projectWorkSurface(events, input.plan, results, input.artifactSourceKeys);
   /*
    * Timing for a milestone is recovered by walking the plan's own versions rather than stored on
    * the step: each `plan` event is a whole snapshot, so the first version in which a step is
