@@ -138,11 +138,7 @@ export default function DeskHome({
   });
   const busiest = Math.max(1, ...days.map((day) => day.count));
   const computer = bootstrap.computer;
-  // The tightest balance across every connected provider, since that is the one that stops work.
-  const credit = (bootstrap.usage.plan?.windows ?? [])
-    .map((window) => ({ window, left: dollarsLeft(window) }))
-    .filter((entry): entry is { window: typeof entry.window; left: number } => entry.left !== null)
-    .sort((a, b) => a.left - b.left)[0];
+  const providerWindows = bootstrap.usage.plan?.windows ?? [];
   const diskUsed =
     workspace?.hostStorageTotalBytes && workspace.hostStorageAvailableBytes !== undefined
       ? workspace.hostStorageTotalBytes - workspace.hostStorageAvailableBytes
@@ -210,15 +206,45 @@ export default function DeskHome({
               text={`${bytes(workspace.hostStorageAvailableBytes!)} free`}
             />
           )}
-          {credit && (
-            <Meter
-              label="Credit"
-              value={credit.left}
-              total={credit.window.limit}
-              text={`${money(credit.left)} left`}
-              title={`${credit.window.connection ? `${credit.window.connection} ` : ''}${credit.window.label.toLowerCase()}: ${money(credit.left)} left`}
-            />
-          )}
+          {providerWindows.map((window, index) => {
+            const left = dollarsLeft(window);
+            const period = window.label.startsWith('Session')
+              ? 'Session'
+              : window.label.startsWith('Weekly')
+                ? 'Week'
+                : window.label === 'Credit balance'
+                  ? 'Balance'
+                  : window.label === 'Key limit'
+                    ? 'Key'
+                    : window.label;
+            const label = `${window.connection ?? bootstrap.usage.plan!.provider} · ${period}`;
+            const text =
+              window.unit === 'usd'
+                ? left !== null
+                  ? `${money(left)} left`
+                  : window.used !== null
+                    ? `${money(window.used)} used`
+                    : 'Unavailable'
+                : window.used !== null
+                  ? `${Math.round(window.used * 100)}% used`
+                  : 'Unavailable';
+            const value = window.unit === 'usd' ? (left ?? window.used) : window.used;
+            return value === null ? (
+              <span key={index} className="meter" title={label}>
+                <span>{label}</span>
+                <small>{text}</small>
+              </span>
+            ) : (
+              <Meter
+                key={index}
+                label={label}
+                value={value}
+                total={window.unit === 'usd' ? window.limit : 1}
+                text={text}
+                title={`${label}: ${text}${window.resetsAt ? `, resets ${new Date(window.resetsAt).toLocaleString()}` : ''}`}
+              />
+            );
+          })}
         </span>
       </button>
       <nav className="home-switcher" aria-label="Home lists">

@@ -47,7 +47,6 @@ const pick = <T,>(items: readonly T[]) => items[Math.floor(Math.random() * items
 const between = (low: number, high: number) => low + Math.random() * (high - low);
 const chance = (share: number) => Math.random() < share;
 const isNight = (date = new Date()) => date.getHours() >= 20 || date.getHours() < 6;
-const clipKey = (clip?: Clip) => (clip ? `${clip.side}:${Math.round(clip.line)}` : 'free');
 /** Just past the left or right edge of the screen, where a visitor comes from and goes back to. */
 const offscreen = (left: boolean) => (left ? -48 : innerWidth + 48);
 /** How long a flight takes at a creature's own speed, in pixels a millisecond. */
@@ -987,34 +986,24 @@ export default function GardenLife() {
       </span>
     </div>
   );
-  const groups = new Map<string, { clip?: Clip; actors: Actor[] }>();
-  for (const actor of actors) {
-    const key = clipKey(actor.clip);
-    const group = groups.get(key) ?? { ...(actor.clip ? { clip: actor.clip } : {}), actors: [] };
-    group.actors.push(actor);
-    groups.set(key, group);
-  }
   return (
     <div className="life-layer" aria-hidden="true">
-      {[...groups.entries()].map(([key, group]) =>
-        group.clip ? (
-          <div
-            key={key}
-            className="life-clip"
-            style={
-              group.clip.side === 'below'
-                ? { top: group.clip.line, bottom: 0 }
-                : { top: 0, height: group.clip.line }
-            }
-          >
-            {group.actors.map(draw)}
-          </div>
-        ) : (
-          <div key={key} className="life-free">
-            {group.actors.map(draw)}
-          </div>
-        )
-      )}
+      {/* Keep each moving element mounted while its border clipping changes. */}
+      {actors.map((actor) => (
+        <div
+          key={actor.id}
+          className={actor.clip ? 'life-clip' : 'life-free'}
+          style={
+            actor.clip
+              ? actor.clip.side === 'below'
+                ? { top: actor.clip.line, bottom: 0 }
+                : { top: 0, height: actor.clip.line }
+              : undefined
+          }
+        >
+          {draw(actor)}
+        </div>
+      ))}
     </div>
   );
 }

@@ -19,7 +19,49 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
           ...bootstrap.usage,
           plan: {
             provider: 'openrouter',
-            windows: [{ label: 'Credit balance', used: 3, limit: 20, unit: 'usd', resetsAt: null }],
+            windows: [
+              {
+                connection: 'OpenRouter',
+                label: 'Credit balance',
+                used: 3,
+                limit: 20,
+                unit: 'usd',
+                resetsAt: null
+              },
+              {
+                connection: 'Ollama Cloud',
+                label: 'Session',
+                used: 0.25,
+                limit: 1,
+                unit: 'fraction',
+                resetsAt: null
+              },
+              {
+                connection: 'Ollama Cloud',
+                label: 'Weekly',
+                used: 0.6,
+                limit: 1,
+                unit: 'fraction',
+                resetsAt: null
+              },
+              {
+                connection: 'Another provider',
+                label: 'Credit balance',
+                used: null,
+                limit: null,
+                remaining: 8,
+                unit: 'usd',
+                resetsAt: null
+              },
+              {
+                connection: 'Unavailable provider',
+                label: 'Credit balance',
+                used: null,
+                limit: null,
+                unit: 'usd',
+                resetsAt: null
+              }
+            ],
             queriedAt: new Date().toISOString()
           }
         },
@@ -36,6 +78,17 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
   );
   await page.goto(origin);
   await page.locator('.desk-start-card').waitFor();
+  const computerReadout = page.locator('.home-machine-readout');
+  for (const label of [
+    'OpenRouter · Balance',
+    'Ollama Cloud · Session',
+    'Ollama Cloud · Week',
+    'Another provider · Balance',
+    'Unavailable provider · Balance'
+  ])
+    await computerReadout.getByText(label, { exact: true }).waitFor();
+  for (const text of ['$17.00 left', '25% used', '60% used', '$8.00 left', 'Unavailable'])
+    await computerReadout.getByText(text, { exact: true }).waitFor();
   await page.locator('.intent-editor textarea').waitFor();
   await page.evaluate(() => document.fonts.ready);
   assert.equal(await page.evaluate(() => document.fonts.check('16px "Pixel Operator"')), true);
