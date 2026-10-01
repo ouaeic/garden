@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 export async function checkCreatureExits({ context, origin, report }) {
@@ -45,13 +46,8 @@ export async function checkCreatureExits({ context, origin, report }) {
           ({ scene, kind }) => {
             window.exitSamples = [];
             let seen = false;
-            const sample = () => {
-              const node = document.querySelector(`[data-creature="${kind}"]`);
-              if (!node) {
-                if (!seen) requestAnimationFrame(sample);
-                return;
-              }
-              seen = true;
+            const watched = new WeakSet();
+            const record = (node) => {
               const box = node.getBoundingClientRect();
               const clip = node.closest('.life-clip')?.getBoundingClientRect();
               window.exitSamples.push({
@@ -65,6 +61,23 @@ export async function checkCreatureExits({ context, origin, report }) {
                   ) * Math.max(0, Math.min(box.right, innerWidth) - Math.max(box.left, 0)),
                 clipped: Boolean(clip)
               });
+            };
+            const sample = () => {
+              const node = document.querySelector(`[data-creature="${kind}"]`);
+              if (!node) {
+                if (!seen) requestAnimationFrame(sample);
+                return;
+              }
+              seen = true;
+              record(node);
+              for (const animation of node.getAnimations()) {
+                if (watched.has(animation)) continue;
+                watched.add(animation);
+                // A busy renderer may finish and remove the actor between animation frames.
+                void animation.finished
+                  .then(() => node.isConnected && record(node))
+                  .catch(() => {});
+              }
               requestAnimationFrame(sample);
             };
             requestAnimationFrame(sample);
@@ -100,6 +113,10 @@ export async function checkCreatureExits({ context, origin, report }) {
         }
         await actor.waitFor({ state: 'detached', timeout: 25_000 });
         const samples = await page.evaluate(() => window.exitSamples);
+        await writeFile(
+          resolve(report, `${kind}-exit-${width}-${frightened}.json`),
+          JSON.stringify(samples)
+        );
         assert(samples.length > 0, 'The exit must have rendered frames');
         if (frightened === 'flight') {
           const exit = samples.slice(exitAt);
