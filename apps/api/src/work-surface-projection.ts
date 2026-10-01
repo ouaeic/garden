@@ -1,5 +1,4 @@
 import {
-  deliveryFilePath,
   WorkSurfaceReport,
   workEvidenceValue,
   workSurfaceReferences,
@@ -28,7 +27,8 @@ const webUrl = (value: unknown): string | undefined => {
 export function projectWorkSurface(
   events: readonly TaskEvent[],
   plan: TaskPlan | null,
-  results: readonly TaskResult[]
+  results: readonly TaskResult[],
+  artifactSourceKeys: ReadonlyMap<string, string> = new Map()
 ): WorkSurfaceView {
   const consumedMessages = new Map<string, number>();
   for (const event of events) {
@@ -171,20 +171,19 @@ export function projectWorkSurface(
       .map((event) => text(record(event.payload).artifactId))
       .filter(Boolean)
   );
-  const latestArtifacts = new Map<string, string>();
+  const latestArtifacts = new Map<string, { id: string; version: number }>();
   const supersededArtifacts = new Set<string>();
-  // Display names can collide; only a confirmed publication identifies a source's next version.
-  for (const [callId, call] of calls) {
-    const started = record(starts.get(callId)?.payload);
-    if (started.tool !== 'publish_artifact') continue;
-    const path = deliveryFilePath(record(started.arguments).path);
-    const published = record(call.result);
-    if (published.error || published.skipped || published.success === false) continue;
-    const artifactId = text(published.artifactId);
-    if (!path || !liveArtifactIds.has(artifactId)) continue;
-    const previous = latestArtifacts.get(path);
-    if (previous && previous !== artifactId) supersededArtifacts.add(previous);
-    latestArtifacts.set(path, artifactId);
+  // The stored source identity survives missing tool receipts; display names can collide.
+  for (const result of results) {
+    const source = result.artifactId && artifactSourceKeys.get(result.artifactId);
+    if (!source || !result.artifactId || !result.version || !liveArtifactIds.has(result.artifactId))
+      continue;
+    const previous = latestArtifacts.get(source);
+    if (previous && previous.version !== result.version) {
+      supersededArtifacts.add(previous.version > result.version ? result.artifactId : previous.id);
+    }
+    if (!previous || previous.version < result.version)
+      latestArtifacts.set(source, { id: result.artifactId, version: result.version });
   }
   return {
     direction,

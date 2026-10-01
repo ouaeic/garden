@@ -141,6 +141,60 @@ describe('authenticated task presentation from stored execution evidence', () =>
     expect(response.headers['cache-control']).toBe('private, no-store');
   });
 
+  it('shows the latest stored source version without publication tool receipts and keeps older downloads in history', async () => {
+    const task = await store.createTask({
+      userId: ownerId,
+      workspaceId,
+      titleCiphertext: encryptJson({ title: 'Versioned app' }, key, `task-title:${workspaceId}`),
+      promptCiphertext: encryptJson(
+        { prompt: 'Update the app' },
+        key,
+        `task-prompt:${workspaceId}`
+      ),
+      nameIndex: { nameTokens: 'versioned app', openingTokens: 'update' },
+      modelId: 'test/model',
+      privacyRoute: 'provider_zdr',
+      maxComputeCredits: 1
+    });
+    const sourceKey = sha256(randomUUID());
+    const published = [];
+    for (const logicalKey of [sourceKey, sourceKey, sha256(randomUUID())]) {
+      const artifact = await store.createArtifact({
+        userId: ownerId,
+        workspaceId,
+        taskId: task.id,
+        logicalKey,
+        nameCiphertext: encryptJson({ name: 'app.html' }, key, `artifact-name:${workspaceId}`),
+        mimeType: 'application/octet-stream',
+        sizeBytes: 123,
+        sha256: sha256(randomUUID()),
+        storageKey: randomUUID()
+      });
+      await store.appendTaskEvent({
+        taskId: task.id,
+        kind: 'artifact',
+        summary: 'Published app',
+        payloadCiphertext: encryptJson({ artifactId: artifact.id }, key, `task-event:${task.id}`)
+      });
+      published.push(String(artifact.id));
+    }
+    expect(published).toHaveLength(3);
+    const response = await app.inject({
+      method: 'GET',
+      url: `/v1/tasks/${task.id}/presentation`,
+      headers: { 'x-test-owner': 'yes' }
+    });
+    expect(response.statusCode).toBe(200);
+    const body = TaskPresentation.parse(response.json());
+    expect(body.results.filter((result) => result.kind === 'artifact')).toHaveLength(3);
+    expect(body.surface?.currentResultIds).toEqual(
+      expect.arrayContaining(published.slice(1).map((id) => `artifact:${id}`))
+    );
+    expect(body.surface?.currentResultIds).toHaveLength(2);
+    expect(body.surface?.currentResultIds).not.toContain(`artifact:${published[0]}`);
+    expect(response.body).not.toContain(sourceKey);
+  });
+
   it('merges a ready execution with its original sealed artifacts and live source previews', async () => {
     const sourceId = randomUUID(),
       executionId = randomUUID(),
