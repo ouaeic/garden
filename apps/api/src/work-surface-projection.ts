@@ -173,10 +173,11 @@ export function projectWorkSurface(
   );
   const latestArtifacts = new Map<string, { id: string; version: number }>();
   const supersededArtifacts = new Set<string>();
-  // The stored source identity survives missing receipts; display names can collide.
+  // The stored source identity survives missing tool receipts; display names can collide.
   for (const result of results) {
     const source = result.artifactId && artifactSourceKeys.get(result.artifactId);
-    if (!source || !result.artifactId || !result.version) continue;
+    if (!source || !result.artifactId || !result.version || !liveArtifactIds.has(result.artifactId))
+      continue;
     const previous = latestArtifacts.get(source);
     if (previous && previous.version !== result.version) {
       supersededArtifacts.add(previous.version > result.version ? result.artifactId : previous.id);

@@ -218,27 +218,28 @@ describe('results that outlast the direction that made them', () => {
     expect(projectWorkSurface(events, null, results).currentResultIds).toEqual(['result-one']);
   });
 
-  it('keeps the highest stored source version current without tool receipts and preserves distinct same-name sources', () => {
+  it('keeps the highest confirmed source version current without tool receipts and preserves distinct same-name sources', () => {
     const events = [
       event(1, 'artifact', { artifactId: 'old' }),
       event(2, 'artifact', { artifactId: 'current' }),
       event(3, 'artifact', { artifactId: 'distinct' }),
       event(4, 'user_message', { markdown: 'Explain the app' })
     ];
-    const results = ['current', 'old', 'distinct', 'legacy'].map((id) =>
+    const results = ['current', 'old', 'distinct', 'legacy', 'unconfirmed'].map((id) =>
       result({
         id,
         kind: 'artifact',
         artifactId: id,
         title: 'app.html',
-        version: id === 'current' ? 2 : 1,
+        version: id === 'current' ? 2 : id === 'unconfirmed' ? 3 : 1,
         evidenceEventIds: ['event-1']
       })
     );
     const sources = new Map([
       ['old', 'workspace:app'],
       ['current', 'workspace:app'],
-      ['distinct', 'other-workspace:app']
+      ['distinct', 'other-workspace:app'],
+      ['unconfirmed', 'workspace:app']
     ]);
     expect(projectWorkSurface(events, null, results, sources).currentResultIds).toEqual([
       'current',
@@ -247,7 +248,7 @@ describe('results that outlast the direction that made them', () => {
     expect(
       projectWorkSurface(events, null, [...results].reverse(), sources).currentResultIds
     ).toEqual(['distinct', 'current']);
-    expect(results).toHaveLength(4);
+    expect(results).toHaveLength(5);
     expect(projectWorkSurface(events, null, results).currentResultIds).toContain('old');
     const legacy = [...events, event(5, 'artifact', { artifactId: 'legacy' })];
     expect(projectWorkSurface(legacy, null, results, sources).currentResultIds).toContain('legacy');
