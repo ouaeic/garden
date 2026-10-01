@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { chirp } from './life/sound';
+import './wordmark.css';
 
 /*
  * What the word slowly becomes now and then. Each form is drawn on the word's own box (100 by 30,
@@ -262,10 +263,7 @@ export default function Brand({ alive = false }: { alive?: boolean }) {
     const running: Animation[] = [];
     const timing = { duration: LENGTH, fill: 'both' as const };
     const out = GROW + REST;
-    /*
-     * The letters fade in three steps, the way an LCD cell does, from left to right as the plant
-     * reaches them, and come back in the same order.
-     */
+    // The wordmark fades in three LCD steps as the plant opens, then returns as it closes.
     const letters = [...word.current.querySelectorAll<HTMLElement>('.brand-letter')];
     letters.forEach((letter, index) => {
       const at = 0.02 + (index / letters.length) * GROW * 0.8;
@@ -329,11 +327,7 @@ export default function Brand({ alive = false }: { alive?: boolean }) {
     >
       <span className="sr-only">garden</span>
       <span className="brand-word" aria-hidden="true" ref={word}>
-        {[...'garden'].map((letter, index) => (
-          <span key={index} className="brand-letter" style={{ '--letter': index } as CSSProperties}>
-            {letter}
-          </span>
-        ))}
+        <span className="brand-letter garden-wordmark" />
         {growing && (
           <svg
             ref={plant}

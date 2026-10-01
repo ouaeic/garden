@@ -1,4 +1,4 @@
-import { storedDisplayMode } from './appearance';
+import { storedDisplayMode, storedPalette } from './appearance';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import ReactMarkdown from 'react-markdown';
@@ -10,6 +10,7 @@ import { loadShare, loadShareArtifact } from './share-crypto.js';
 import type { OpenedShare } from './share-crypto.js';
 import { shareArtifactDocument } from './share-html.js';
 import './share.css';
+import './wordmark.css';
 
 const friendlyDate = (value: string) =>
   new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
@@ -188,7 +189,7 @@ function ShareViewer() {
     <div className="share-page">
       <header className="share-masthead">
         <a className="share-wordmark" href="/" aria-label="garden home">
-          garden
+          <span className="garden-wordmark" aria-hidden="true" />
         </a>
         <span>Shared work</span>
       </header>
@@ -264,5 +265,6 @@ function ShareViewer() {
 }
 
 document.documentElement.dataset.theme = storedDisplayMode();
+document.documentElement.dataset.palette = storedPalette();
 const root = document.getElementById('root');
 if (root) createRoot(root).render(<ShareViewer />);

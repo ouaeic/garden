@@ -1,6 +1,6 @@
 {
   "default": "garden-logo.png",
-  "bg_color": "#151d19",
+  "bg_color": "#26351f",
   "android_bg": "garden-android-background.svg",
   "android_fg": "garden-monochrome.png",
   "android_fg_scale": 78,

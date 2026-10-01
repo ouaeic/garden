@@ -7,6 +7,8 @@ export async function checkInterfaceTexture(page) {
       if (element.matches('img, canvas, iframe, video, object, embed')) return false;
       const box = element.getBoundingClientRect();
       const style = getComputedStyle(element);
+      // A masked image paints its own silhouette, rather than an opaque interface surface.
+      if (style.maskImage !== 'none') return false;
       return (
         box.width >= 12 &&
         box.height >= 12 &&

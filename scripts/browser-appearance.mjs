@@ -84,6 +84,16 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
       document.documentElement.dataset.theme = value;
     }, theme);
     await page.setViewportSize({ width: 1440, height: 1000 });
+    const wordmark = await page.locator('.garden-masthead .garden-wordmark').evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { ink: style.backgroundColor, text: style.color, image: style.maskImage };
+    });
+    assert.equal(wordmark.ink, wordmark.text, 'The wordmark follows the theme text colour');
+    assert.match(
+      wordmark.image,
+      /data:image\/svg\+xml/,
+      'The wordmark travels with the cached shell'
+    );
     const navigation = page.locator('.desk-navigation button');
     assert((await navigation.count()) > 0, 'Exercise primary navigation interaction states');
     for (const button of await navigation.all()) {
@@ -158,55 +168,74 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     }
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
-  const palette = [];
-  for (const mode of ['light', 'dark']) {
+  for (const screen of ['field', 'amber']) {
     await page.evaluate((value) => {
-      document.documentElement.dataset.theme = value;
-    }, mode);
-    palette.push(
-      await page.evaluate(() => {
-        const root = getComputedStyle(document.documentElement);
-        const muted = getComputedStyle(
-          document.querySelector('.home-row small, .home-quiet')
-        ).color;
-        const luminance = (color) => {
-          const values = color
+      document.documentElement.dataset.palette = value;
+    }, screen);
+    const palette = [];
+    for (const mode of ['light', 'dark']) {
+      await page.evaluate((value) => {
+        document.documentElement.dataset.theme = value;
+      }, mode);
+      palette.push(
+        await page.evaluate(() => {
+          const root = getComputedStyle(document.documentElement);
+          const muted = getComputedStyle(
+            document.querySelector('.home-row small, .home-quiet')
+          ).color;
+          const luminance = (color) => {
+            const values = color
+              .match(/[\d.]+/g)
+              .slice(0, 3)
+              .map(Number)
+              .map((value) => {
+                const c = value / 255;
+                return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+              });
+            return values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722;
+          };
+          const contrast = (a, b) =>
+            (Math.max(luminance(a), luminance(b)) + 0.05) /
+            (Math.min(luminance(a), luminance(b)) + 0.05);
+          return {
+            foreground: root.color,
+            background: root.backgroundColor,
+            contrast: contrast(root.color, root.backgroundColor),
+            secondaryContrast: contrast(muted, root.backgroundColor),
+            overlayContent: getComputedStyle(document.body, '::after').content,
+            texture: getComputedStyle(document.querySelector('.desk-card')).backgroundImage
+          };
+        })
+      );
+    }
+    assert.equal(palette[0].foreground, palette[1].background, 'Modes reverse LCD ink and glass');
+    assert.equal(palette[0].background, palette[1].foreground, 'Modes reverse LCD glass and ink');
+    for (const colors of palette) {
+      assert(colors.contrast >= 4.5, 'Body text must meet normal-text contrast');
+      assert(colors.secondaryContrast >= 4.5, 'Secondary text must meet normal-text contrast');
+      if (screen === 'amber') {
+        for (const ink of [colors.foreground, colors.background]) {
+          const [red, green, blue] = ink
             .match(/[\d.]+/g)
             .slice(0, 3)
-            .map(Number)
-            .map((value) => {
-              const c = value / 255;
-              return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-            });
-          return values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722;
-        };
-        const contrast = (a, b) =>
-          (Math.max(luminance(a), luminance(b)) + 0.05) /
-          (Math.min(luminance(a), luminance(b)) + 0.05);
-        return {
-          foreground: root.color,
-          background: root.backgroundColor,
-          contrast: contrast(root.color, root.backgroundColor),
-          secondaryContrast: contrast(muted, root.backgroundColor),
-          overlayContent: getComputedStyle(document.body, '::after').content,
-          texture: getComputedStyle(document.querySelector('.desk-card')).backgroundImage
-        };
-      })
-    );
+            .map(Number);
+          assert(red > green && green > blue, 'The warm screen uses amber and brown tones');
+        }
+      }
+      assert.equal(
+        colors.overlayContent,
+        'none',
+        'Screen texture must not overlay delivered content'
+      );
+      assert.match(
+        colors.texture,
+        /repeating-linear-gradient/,
+        'Garden cards retain the LCD matrix'
+      );
+    }
+    console.log('LCD contrast:', palette);
   }
-  assert.equal(palette[0].foreground, palette[1].background, 'Modes reverse LCD ink and glass');
-  assert.equal(palette[0].background, palette[1].foreground, 'Modes reverse LCD glass and ink');
-  for (const colors of palette) {
-    assert(colors.contrast >= 4.5, 'Body text must meet normal-text contrast');
-    assert(colors.secondaryContrast >= 4.5, 'Secondary text must meet normal-text contrast');
-    assert.equal(
-      colors.overlayContent,
-      'none',
-      'Screen texture must not overlay delivered content'
-    );
-    assert.match(colors.texture, /repeating-linear-gradient/, 'Garden cards retain the LCD matrix');
-  }
-  console.log('LCD contrast:', palette);
+  await page.evaluate(() => delete document.documentElement.dataset.palette);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   for (const theme of ['dark', 'light']) {
     await page.getByRole('combobox', { name: 'Theme', exact: true }).selectOption(theme);
@@ -221,6 +250,29 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
       await checkInterfaceTexture(page);
       await page.screenshot({ path: resolve(report, `settings-${theme}-${width}.png`) });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
+    }
+  }
+  await page.getByRole('radio', { name: 'Warm amber (low blue light)', exact: true }).check();
+  for (const theme of ['dark', 'light']) {
+    await page.getByRole('combobox', { name: 'Theme', exact: true }).selectOption(theme);
+    await page.reload();
+    const amber = page.getByRole('radio', { name: 'Warm amber (low blue light)', exact: true });
+    await amber.waitFor();
+    assert(await amber.isChecked(), 'The warm palette survives reloads');
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.palette), 'amber');
+    const chrome = await page.evaluate(() => ({
+      colour: getComputedStyle(document.documentElement).backgroundColor,
+      mobile: document.querySelector('meta[name="theme-color"]').content,
+      text: getComputedStyle(document.documentElement).color,
+      logo: getComputedStyle(document.querySelector('.garden-wordmark')).backgroundColor
+    }));
+    assert.equal(chrome.mobile, chrome.colour, 'Mobile chrome follows the warm palette');
+    assert.equal(chrome.logo, chrome.text, 'The botanical wordmark follows the warm ink');
+    for (const width of [1440, 390, 320]) {
+      await page.setViewportSize({ width, height: width > 760 ? 1000 : 844 });
+      await checkInterfaceTexture(page);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
+      await page.screenshot({ path: resolve(report, `settings-amber-${theme}-${width}.png`) });
     }
   }
   await page.goto(origin);
