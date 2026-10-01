@@ -376,7 +376,7 @@ export default function GardenLife() {
         box &&
         box.left >= edge.left &&
         box.right <= edge.right &&
-        (held!.edge === 'top' ? box.top < edge.top : box.bottom > edge.bottom)
+        (held.edge === 'top' ? box.top < edge.top : box.bottom > edge.bottom)
       );
     };
     /** A startled jumper in the air has no border to retreat behind. */
