@@ -1128,7 +1128,8 @@ describe('the model call and the task lease', () => {
     await vi.advanceTimersByTimeAsync(4_000);
     await running;
 
-    const row = billed.find((entry) => entry.idempotencyKey === `task:${taskId}:step:0`);
+    expect(billed).toHaveLength(1);
+    const row = billed[0];
     expect(row, 'the stopped generation left no ledger row at all').toBeDefined();
     expect(Number(row?.costUsd)).toBeGreaterThan(0);
     // And the owner is still told the turn stopped, in the same words, last.
@@ -8209,10 +8210,9 @@ describe('a generation the repetition watch stopped', () => {
     // The turn carried on after the repeat rather than dying on it.
     expect(log.modelRequests.length).toBeGreaterThanOrEqual(2);
 
-    // The provider billed every one of the stopped call's tokens, so the ledger has to carry its
-    // own row for them. The row is keyed by step, which is what makes "the step is missing"
-    // distinguishable from "the step was cheap" - the defect is the former.
-    const row = billed.find((entry) => entry.idempotencyKey === `task:${taskId}:step:0`);
+    // Every incurred generation needs a receipt, including the first one the watch interrupted.
+    expect(billed).toHaveLength(log.modelRequests.length);
+    const row = billed[0];
     expect(row, 'the stopped generation left no ledger row at all').toBeDefined();
     expect(Number(row?.costUsd)).toBeGreaterThan(0);
     expect(Number(row?.credits)).toBeGreaterThan(0);
