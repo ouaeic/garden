@@ -1,4 +1,5 @@
 import {
+  deliveryFilePath,
   WorkSurfaceReport,
   workEvidenceValue,
   workSurfaceReferences,
@@ -170,12 +171,28 @@ export function projectWorkSurface(
       .map((event) => text(record(event.payload).artifactId))
       .filter(Boolean)
   );
+  const latestArtifacts = new Map<string, string>();
+  const supersededArtifacts = new Set<string>();
+  // Display names can collide; only a confirmed publication identifies a source's next version.
+  for (const [callId, call] of calls) {
+    const started = record(starts.get(callId)?.payload);
+    if (started.tool !== 'publish_artifact') continue;
+    const path = deliveryFilePath(record(started.arguments).path);
+    const published = record(call.result);
+    if (published.error || published.skipped || published.success === false) continue;
+    const artifactId = text(published.artifactId);
+    if (!path || !liveArtifactIds.has(artifactId)) continue;
+    const previous = latestArtifacts.get(path);
+    if (previous && previous !== artifactId) supersededArtifacts.add(previous);
+    latestArtifacts.set(path, artifactId);
+  }
   return {
     direction,
     directions: directions.slice(-32),
     report,
     references,
     currentResultIds: results
+      .filter((result) => !result.artifactId || !supersededArtifacts.has(result.artifactId))
       .filter(
         (result) =>
           !direction ||

@@ -12,6 +12,16 @@ export async function checkPreviewStart({ context, origin, task, presentation, r
     reject = false;
   let directionSequence = 0;
   let publishedSequence = 3;
+  let previewRevision;
+  let frameLoads = 0;
+  let tipDefault = '15';
+  await page.route('**/__garden/preview/**', (route) => {
+    frameLoads++;
+    return route.fulfill({
+      contentType: 'text/html',
+      body: `<label>Tip percentage<input value="${tipDefault}"></label>`
+    });
+  });
   const startPath = `/v1/tasks/${task.id}/previews/fixture/start`;
   await page.route('**/v1/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
@@ -25,7 +35,7 @@ export async function checkPreviewStart({ context, origin, task, presentation, r
               sequence: publishedSequence,
               kind: 'preview',
               summary: 'Published app',
-              payload: {},
+              payload: { previewId: 'fixture' },
               createdAt: task.createdAt
             },
             {
@@ -102,7 +112,16 @@ export async function checkPreviewStart({ context, origin, task, presentation, r
           results: [
             {
               ...source,
-              ...(directionSequence ? { evidenceEventIds: ['follow-up-preview'] } : {}),
+              previewId: 'fixture',
+              ...(directionSequence
+                ? {
+                    evidenceEventIds: [
+                      'follow-up-preview',
+                      ...(previewRevision ? ['follow-up-answer'] : [])
+                    ]
+                  }
+                : {}),
+              ...(previewRevision ? { previewRevision } : {}),
               startPath,
               ...(state === 'starting' || state === 'attention' ? { startState: state } : {}),
               status: state === 'ready' ? 'ready' : state === 'unknown' ? 'unknown' : 'unavailable',
@@ -210,6 +229,53 @@ export async function checkPreviewStart({ context, origin, task, presentation, r
         'true',
         'A newly produced app remains the default result'
       );
+      const tip = page.frameLocator('iframe').getByRole('textbox', { name: 'Tip percentage' });
+      await tip.fill('27');
+      const beforeUpdate = frameLoads;
+      directionSequence = 15;
+      await views.getByRole('button', { name: 'Summary', exact: true }).waitFor();
+      await page.waitForFunction(
+        () =>
+          document.querySelector('.desk-output-sections button[aria-pressed="true"]')
+            ?.textContent === 'Summary'
+      );
+      assert.equal(
+        frameLoads,
+        beforeUpdate,
+        'A new direction preserves the existing app until an edit completes'
+      );
+      tipDefault = '10';
+      previewRevision = `source-edit-${width}`;
+      await card.locator('iframe').waitFor({ state: 'visible' });
+      await page.waitForFunction(
+        () =>
+          document.querySelector('.desk-output-sections button[aria-pressed="true"]')
+            ?.textContent === 'Preview'
+      );
+      await tip.waitFor();
+      assert.equal(
+        await tip.inputValue(),
+        '10',
+        'The same preview opens its updated app without republishing or a manual refresh'
+      );
+      assert.equal(frameLoads, beforeUpdate + 1, 'Finished edits reload the app once');
+      await tip.fill('23');
+      await views.getByRole('button', { name: 'Summary', exact: true }).click();
+      await views.getByRole('button', { name: 'Preview', exact: true }).click();
+      await card.getByRole('button', { name: 'Expand', exact: true }).click();
+      await card.getByRole('button', { name: 'Exit full screen', exact: true }).click();
+      await page.waitForResponse(
+        (response) => new URL(response.url()).pathname === `/v1/tasks/${task.id}/presentation`
+      );
+      assert.equal(
+        await tip.inputValue(),
+        '23',
+        'Polling, tab changes and expansion keep the updated app state'
+      );
+      assert.equal(frameLoads, beforeUpdate + 1);
+      await page.screenshot({ path: resolve(report, `follow-up-app-update-${width}.png`) });
+      previewRevision = undefined;
+      tipDefault = '15';
     }
     directionSequence = 0;
     state = 'attention';

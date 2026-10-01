@@ -51,7 +51,14 @@ export function currentWork(
       report: null,
       references: [],
       sources: [],
-      currentResultIds: []
+      currentResultIds: presentation.results
+        .filter(
+          (result) =>
+            result.kind === 'preview' &&
+            result.previewId &&
+            presentation.surface!.currentResultIds.includes(result.id)
+        )
+        .map((result) => result.id)
     },
     progress: { ...presentation.progress, phases: [], current: null, metrics: [], milestones: [] }
   };
