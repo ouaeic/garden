@@ -2825,6 +2825,10 @@ try {
     );
     for (const width of [1440, 390, 320]) {
       await modelsPage.setViewportSize({ width, height: 844 });
+      await modelsPage.waitForFunction(() => {
+        const dialog = document.querySelector('.prompt-model-dialog');
+        return dialog && dialog.getBoundingClientRect().bottom <= innerHeight;
+      });
       const bounds = await advanced.evaluate((element) => ({
         width: element.scrollWidth,
         available: element.clientWidth,
@@ -2835,7 +2839,8 @@ try {
       assert(
         bounds.width <= bounds.available + 1 &&
           bounds.bottom <= bounds.viewport &&
-          bounds.footer <= bounds.bottom + 1
+          bounds.footer <= bounds.bottom + 1,
+        `Continuation model choices must fit the viewport: ${JSON.stringify(bounds)}`
       );
       await modelsPage.screenshot({
         path: resolve(report, `continuation-model-roles-${width}.png`)
