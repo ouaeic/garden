@@ -8,6 +8,7 @@ import { ComputerSettings } from './settings/Computer.js';
 import { NotificationSettings } from './settings/Notifications.js';
 import { AccessSettings } from './settings/Access.js';
 import { InstanceSettings } from './settings/Instance.js';
+import { ResultViewSettings } from './settings/ResultViews.js';
 import { Section } from './management.js';
 import { Button, Field } from './ui.js';
 import { palettes, type Palette } from './appearance';
@@ -151,6 +152,7 @@ export function Settings({
             </div>
           </Section>
         )}
+        {section === 'Appearance' && <ResultViewSettings />}
         {section === 'Models' && <ProviderSettings onChange={onChange} />}
         {section === 'Spending' && <SpendingSettings onChange={onChange} />}
         {section === 'Connections' && <ConnectionsLibrary onChange={onChange} />}

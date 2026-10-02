@@ -66,10 +66,7 @@ export async function checkProjectHistory({ context, origin, task, presentation,
         surface: {
           direction,
           directions: [direction],
-          report: null,
-          references: [],
           sources: [],
-          unavailableReferences: 0,
           currentResultIds: presentation.results.map((result) => result.id)
         }
       }

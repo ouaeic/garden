@@ -101,9 +101,6 @@ const ProjectModels = lazy(() => import('./ProjectModels'));
 const CodingMissions = lazy(() => import('./CodingMissions'));
 const SubagentLanes = lazy(() => import('./SubagentLanes'));
 const SpendBlock = lazy(() => import('./SpendBlock'));
-const WorkDirections = lazy(() =>
-  import('./WorkDirections').then((module) => ({ default: module.WorkDirections }))
-);
 const Share = lazy(() => import('./Sharing'));
 const ResultPreview = lazy(() =>
   import('./computer/ResultPreview').then((module) => ({ default: module.ResultPreview }))
@@ -224,7 +221,6 @@ export default function TaskSurface({
     if (existing) return setEvidence(existing);
     const sequence =
       presentation?.progress.milestones.find((item) => item.id === id)?.sequence ??
-      presentation?.surface?.references.find((item) => item.eventId === id)?.sequence ??
       presentation?.surface?.sources.find((item) => item.eventId === id)?.sequence;
     if (sequence === undefined) return;
     try {
@@ -655,12 +651,21 @@ export default function TaskSurface({
         ) : (
           <div className="garden-task-layout">
             <div className="garden-task-primary">
-              <Thread exchanges={earlier} workspaceId={task.workspaceId} artifacts={artifacts} />
+              <Thread
+                exchanges={earlier}
+                workspaceId={task.workspaceId}
+                artifacts={artifacts}
+                onRevisit={setBranchEvent}
+                {...(onDiscuss
+                  ? { onDiscuss: (eventId: string) => onDiscuss({ taskId: task.id, eventId }) }
+                  : {})}
+              />
               {currentDirection && !task.parentMissionId && (
                 <OwnerLine
                   event={currentDirection}
                   workspaceId={task.workspaceId}
                   artifacts={artifacts}
+                  onRevisit={setBranchEvent}
                 />
               )}
               {task.spendPausedAt && (
@@ -695,9 +700,7 @@ export default function TaskSurface({
                           results: presentation.results.filter((result) =>
                             presentation.surface!.currentResultIds.includes(result.id)
                           ),
-                          ...(!presentation.surface.report &&
-                          directionSequence > 0 &&
-                          !presentation.progress.phases.length
+                          ...(directionSequence > 0 && !presentation.progress.phases.length
                             ? { outputs: [] }
                             : {})
                         }
@@ -793,115 +796,98 @@ export default function TaskSurface({
                 </Button>
               </div>
             </div>
-            {completionEvent && (
-              <section
-                className={`completion-record ${completion.interrupted || verification.status === 'unverified' || verification.status === 'checks_failed' || verification.status === 'checks_did_not_run' || verification.status === 'delivery_incomplete' ? 'needs-review' : ''}`}
-              >
-                <div className="row between">
-                  <span className="eyebrow">
-                    {(lastEvent(events, 'user_message')?.sequence ?? 0) > completionEvent.sequence
-                      ? 'Previous completion'
-                      : 'Completion record'}
-                  </span>
-                  <span className="badge">
-                    {completion.interrupted
-                      ? 'Review needed'
-                      : verification.status === 'delivery_pending'
-                        ? pendingDelivery
-                          ? 'Generation continues'
-                          : deliveryFailed
+            {completionEvent &&
+              (checks.evidence.length > 0 ||
+                acceptance.length > 0 ||
+                completion.interrupted === true ||
+                !['verified', 'not_applicable'].includes(text(verification.status))) && (
+                <section
+                  className={`completion-record ${completion.interrupted || verification.status === 'unverified' || verification.status === 'checks_failed' || verification.status === 'checks_did_not_run' || verification.status === 'delivery_incomplete' ? 'needs-review' : ''}`}
+                >
+                  <div className="row between">
+                    <span className="eyebrow">
+                      {(lastEvent(events, 'user_message')?.sequence ?? 0) > completionEvent.sequence
+                        ? 'Previous completion'
+                        : 'Completion record'}
+                    </span>
+                    <span className="badge">
+                      {completion.interrupted
+                        ? 'Review needed'
+                        : verification.status === 'delivery_pending'
+                          ? pendingDelivery
+                            ? 'Generation continues'
+                            : deliveryFailed
+                              ? 'Delivery needs attention'
+                              : presentation?.delivery?.status === 'ready'
+                                ? 'Delivered'
+                                : 'Checking delivery'
+                          : verification.status === 'delivery_incomplete'
                             ? 'Delivery needs attention'
-                            : presentation?.delivery?.status === 'ready'
-                              ? 'Delivered'
-                              : 'Checking delivery'
-                        : verification.status === 'delivery_incomplete'
-                          ? 'Delivery needs attention'
-                          : verification.status === 'verified'
-                            ? checks.label
-                            : verification.status === 'not_applicable'
-                              ? 'No executable checks needed'
-                              : verification.status === 'checks_failed'
-                                ? 'Checks failed'
-                                : verification.status === 'checks_did_not_run'
-                                  ? 'Checks did not run'
-                                  : verification.status === 'unverified'
-                                    ? 'Verification needs review'
-                                    : 'Verification not recorded'}
-                  </span>
-                </div>
-                {text(completion.summary) &&
-                  text(completion.summary).trim() !== answer.markdown.trim() && (
-                    <p>{text(completion.summary)}</p>
-                  )}
-                {strings(verification.remainingRisks).length > 0 && (
-                  <div className="remaining-risks">
-                    <strong>Still to consider</strong>
-                    <ul>
-                      {strings(verification.remainingRisks).map((risk, index) => (
-                        <li key={index}>{risk}</li>
-                      ))}
-                    </ul>
+                            : verification.status === 'verified'
+                              ? checks.label
+                              : verification.status === 'not_applicable'
+                                ? 'No executable checks needed'
+                                : verification.status === 'checks_failed'
+                                  ? 'Checks failed'
+                                  : verification.status === 'checks_did_not_run'
+                                    ? 'Checks did not run'
+                                    : verification.status === 'unverified'
+                                      ? 'Verification needs review'
+                                      : 'Verification not recorded'}
+                    </span>
                   </div>
-                )}
-                {(checks.evidence.length > 0 || acceptance.length > 0) && (
-                  <details>
-                    <summary>Evidence and checks</summary>
-                    <ul className="evidence-list">
-                      {checks.evidence.map((record, index) => {
-                        const call = text(record.toolCallId);
-                        const source = events.find(
-                          (event) =>
-                            text(data(event.payload).toolCallId) === call &&
-                            event.kind === 'tool_result'
-                        );
-                        return (
-                          <li key={index}>
-                            <span>{text(record.claim)}</span>
-                            <small>{evidenceSource(record.source)}</small>
-                            {source && (
-                              <Button onClick={() => setEvidence(source)}>Inspect evidence</Button>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                    {acceptance.length > 0 && (
-                      <div className="completion-acceptance">
-                        <strong>Check results</strong>
-                        <ul>
-                          {acceptance.map((result, index) => (
-                            <li key={index}>{result}</li>
-                          ))}
-                        </ul>
-                      </div>
+                  {text(completion.summary) &&
+                    text(completion.summary).trim() !== answer.markdown.trim() && (
+                      <p>{text(completion.summary)}</p>
                     )}
-                  </details>
-                )}
-              </section>
-            )}
-            {presentation?.surface && (
-              <details
-                className="garden-task-directions"
-                key={`${task.id}:${isFinished(task)}`}
-                open={!isFinished(task)}
-              >
-                <summary>Your messages</summary>
-                <Suspense fallback={null}>
-                  <WorkDirections
-                    surface={presentation.surface}
-                    {...(onDiscuss
-                      ? {
-                          onDiscuss: (eventId: string) => onDiscuss({ taskId: task.id, eventId })
-                        }
-                      : {})}
-                    onRevisit={(eventId) => {
-                      const event = events.find((item) => item.id === eventId);
-                      if (event) setBranchEvent(event);
-                    }}
-                  />
-                </Suspense>
-              </details>
-            )}
+                  {strings(verification.remainingRisks).length > 0 && (
+                    <div className="remaining-risks">
+                      <strong>Still to consider</strong>
+                      <ul>
+                        {strings(verification.remainingRisks).map((risk, index) => (
+                          <li key={index}>{risk}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {(checks.evidence.length > 0 || acceptance.length > 0) && (
+                    <details open>
+                      <summary>Evidence and checks</summary>
+                      <ul className="evidence-list">
+                        {checks.evidence.map((record, index) => {
+                          const call = text(record.toolCallId);
+                          const source = events.find(
+                            (event) =>
+                              text(data(event.payload).toolCallId) === call &&
+                              event.kind === 'tool_result'
+                          );
+                          return (
+                            <li key={index}>
+                              <span>{text(record.claim)}</span>
+                              <small>{evidenceSource(record.source)}</small>
+                              {source && (
+                                <Button onClick={() => setEvidence(source)}>
+                                  Inspect evidence
+                                </Button>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      {acceptance.length > 0 && (
+                        <div className="completion-acceptance">
+                          <strong>Check results</strong>
+                          <ul>
+                            {acceptance.map((result, index) => (
+                              <li key={index}>{result}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </details>
+                  )}
+                </section>
+              )}
             <SubagentLanes events={events} />
 
             {presentation && (
@@ -909,13 +895,6 @@ export default function TaskSurface({
                 progress={presentation.progress}
                 {...(presentation.surface ? { surface: presentation.surface } : {})}
                 onEvidence={(id) => void inspectEvidence(id)}
-                onResult={(kind, id) => {
-                  if (kind === 'artifact') showArtifact(id);
-                  else
-                    document
-                      .getElementById(`preview-${id}`)
-                      ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                }}
               />
             )}
             <div className="garden-task-aside">

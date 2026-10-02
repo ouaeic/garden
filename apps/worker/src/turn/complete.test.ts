@@ -38,7 +38,6 @@ const rig = (outcomes: boolean[] = []) => {
     store: {
       appendTaskEvent: vi.fn(async () => ({ id: 'event' })),
       listMediaJobs: vi.fn(async () => []),
-      getLatestTaskPlan: vi.fn(async () => null),
       listCodingMissions: vi.fn(async () => [])
     } as unknown as DataStore,
     config: { PREVIEW_BASE_URL: 'https://garden.test/preview', WORKER_ID: 'worker' },

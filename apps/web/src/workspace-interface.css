@@ -165,7 +165,11 @@
 .conversation-activity {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 24px;
+  gap: 16px;
+}
+/* An empty block would still be spaced as if it held something. */
+.conversation-activity > :empty {
+  display: none;
 }
 .conversation-activity h2,
 .project-overview h2,

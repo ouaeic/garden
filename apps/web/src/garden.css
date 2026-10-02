@@ -1116,16 +1116,6 @@
   }
 }
 
-.garden-task-directions > summary {
-  cursor: pointer;
-  color: var(--muted);
-  padding: 8px 0;
-  font-size: 16px;
-}
-.garden-task-directions[open] > summary {
-  margin-bottom: 12px;
-}
-
 .garden-compose-prompt {
   width: 100%;
   justify-content: flex-start;

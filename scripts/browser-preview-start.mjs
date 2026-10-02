@@ -95,11 +95,8 @@ export async function checkPreviewStart({ context, origin, task, presentation, r
                     queued: false
                   },
                   directions: [],
-                  report: null,
-                  references: [],
                   sources: [],
-                  currentResultIds: [source.id],
-                  unavailableReferences: 0
+                  currentResultIds: [source.id]
                 }
               }
             : {}),

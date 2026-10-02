@@ -397,7 +397,7 @@ export async function checkDesk({
       await settings.click();
       await fit();
       const views = page.locator(
-        'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+        'body:has(.project-panel[open]:not(.is-docked)) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open]:not(.is-docked))) .project-workspace-bar .project-view-nav'
       );
       for (const view of ['Files', 'Activity', 'Tools']) {
         await views.getByRole('button', { name: view, exact: true }).click();

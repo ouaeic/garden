@@ -22,7 +22,6 @@ import {
   type CompletionVerification
 } from '../completion.js';
 import { parkCodingMissionWait } from '../coding-missions.js';
-import { declaredTaskOutputs, resolveDelivery } from '../delivery.js';
 import { waitForQuestion } from '../questions.js';
 import type { AgentRunnerClient } from '../runner-client.js';
 import { event } from '../tool-recording.js';
@@ -166,27 +165,24 @@ export const completeAnswer = async (
     }
   }
 
-  const outputs = state.mode === 'plan' ? [] : await declaredTaskOutputs(deps.store, task.id, key);
+  // What this turn wrote, by path: the files the answer delivers.
+  const deliverables = [
+    ...new Set(
+      (state.artifactLedger?.entries ?? []).flatMap((entry) => {
+        const path = deliveryFilePath(entry.path);
+        return path ? [path] : [];
+      })
+    )
+  ];
   const mediaDelivery = mediaDeliveryState(
     await deps.store.listMediaJobs(task.userId, task.id, 100)
   );
-  const delivery = await resolveDelivery(deps, task, key, state, [], {
-    outputs,
-    passedCheckIds: new Set(verifiedCommands.map((check) => check.id)),
-    deferredFiles: new Set(
-      [...mediaDelivery.pending, ...mediaDelivery.failed]
-        .map((job) => deliveryFilePath(job.outputPath))
-        .filter((path): path is string => path !== null)
-    )
-  });
   if (mediaDelivery.failed.length)
-    delivery.unavailable.push('A requested media output failed. Inspect its recorded job status.');
-  if (delivery.unavailable.length)
     verification = {
       ...verification,
       status: 'delivery_incomplete',
       remainingRisks: [
-        ...delivery.unavailable.map((value) => `Unavailable output: ${value}`),
+        'A requested media output failed. Inspect its recorded job status.',
         ...verification.remainingRisks
       ].slice(0, 20)
     };
@@ -210,7 +206,7 @@ export const completeAnswer = async (
     {
       summary: answerSummary(assistantText),
       answer: assistantText,
-      deliverables: delivery.deliverables,
+      deliverables,
       verification,
       ...(acceptance.length ? { acceptance } : {}),
       ...(verifiedCommands.length ? { verifiedCommands } : {})

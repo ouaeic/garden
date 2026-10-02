@@ -133,6 +133,21 @@ concurrent runs that share a profile, while the wrapper uses a throwaway profile
 the bytes are not there. Publishing an Office file attaches a converted PDF review copy for the owner,
 and an acceptance check can render a document and hold its page count and clipping.
 
+## Results as views
+
+When a result is clearer shown than told, the operating contract offers one line: publish a single
+self-contained HTML file. The interface renders a published HTML artifact live, in a frame with
+scripts and no network (`sandbox="allow-scripts"` without same-origin, and a content policy that
+refuses every fetch, socket and remote asset). The frame sizes itself to its content and receives
+the interface's colours and font as CSS variables. A later change is an edit to the same file, so a
+revision costs the lines that changed, not a second page. The owner can turn the offer off in
+Settings, and the line then leaves the contract.
+
+The owner comments on a result by selecting text in the answer or by circling a place in the view.
+Each comment carries what it points at, either the quoted text or the circle's position and the
+text under it. Comments wait in the composer and go with the next message, which may consist of the
+comments alone.
+
 ## Long work
 
 A turn is bounded by steps, compute credits and the owner's spend caps. A long execution yields

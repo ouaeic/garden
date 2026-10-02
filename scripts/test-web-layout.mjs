@@ -423,6 +423,7 @@ const modelCatalog = [
   }
 ];
 let decisionModelsEnabled = true;
+let resultViews = true;
 let failDecisionSave = false;
 const modelSurface = (project) => ({
   decisionModelsEnabled,
@@ -881,9 +882,11 @@ try {
         }
         if (input.model) defaultChoices.main = input.model;
         if (input.modelPurposes) defaultChoices = { ...defaultChoices, ...input.modelPurposes };
+        if (typeof input.resultViews === 'boolean') resultViews = input.resultViews;
       }
       return json({
         preferences: {
+          resultViews,
           model: defaultChoices.main,
           modelPurposes: Object.fromEntries(
             Object.entries(defaultChoices).filter(([purpose]) => purpose !== 'main')
@@ -1427,7 +1430,7 @@ try {
     assert.equal(projectEventRequests[0], null, 'Open the most recent page without a sentinel');
     await page
       .locator(
-        'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+        'body:has(.project-panel[open]:not(.is-docked)) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open]:not(.is-docked))) .project-workspace-bar .project-view-nav'
       )
       .getByRole('button', { name: 'Activity', exact: true })
       .click();
@@ -1884,18 +1887,13 @@ try {
     await page.locator('.garden-answer').getByText('harbor-cobalt-46', { exact: true }).waitFor();
     await page
       .locator(
-        'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+        'body:has(.project-panel[open]:not(.is-docked)) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open]:not(.is-docked))) .project-workspace-bar .project-view-nav'
       )
       .getByRole('button', { name: 'Activity', exact: true })
       .click();
-    await page
-      .locator('.completion-record .badge')
-      .getByText('Completion recorded', { exact: true })
-      .waitFor();
-    await page
-      .locator('.completion-record')
-      .getByText(event.payload.summary, { exact: true })
-      .waitFor();
+    // A plain answer has nothing behind it to show: no record, rather than one that says so.
+    await page.getByRole('button', { name: 'Full activity' }).waitFor();
+    assert.equal(await page.locator('.completion-record').count(), 0);
     assert.equal(
       await page
         .locator('.garden-answer')
@@ -1916,7 +1914,7 @@ try {
     await page.reload();
     const completionRecord = page.locator('.completion-record');
     await completionRecord.getByText('1 check passed', { exact: true }).waitFor();
-    await completionRecord.getByText('Evidence and checks', { exact: true }).click();
+    // Open already: the owner came here for the evidence.
     await completionRecord.getByText('Executed check', { exact: true }).waitFor();
     await completionRecord.getByText('Cited tool result', { exact: true }).waitFor();
     assert.equal(
@@ -2024,7 +2022,7 @@ try {
     assert.equal(await batchCard.getByText('Cancelled', { exact: true }).count(), 0);
     await page
       .locator(
-        'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+        'body:has(.project-panel[open]:not(.is-docked)) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open]:not(.is-docked))) .project-workspace-bar .project-view-nav'
       )
       .getByRole('button', { name: 'Activity', exact: true })
       .click();
@@ -2135,7 +2133,7 @@ try {
       .waitFor({ state: 'detached' });
     await page
       .locator(
-        'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+        'body:has(.project-panel[open]:not(.is-docked)) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open]:not(.is-docked))) .project-workspace-bar .project-view-nav'
       )
       .getByRole('button', { name: 'Tools', exact: true })
       .click();
@@ -3117,6 +3115,23 @@ try {
         .getAttribute('aria-expanded')) !== 'true'
     )
       await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
+    await modelsPage
+      .getByRole('navigation', { name: 'Settings sections' })
+      .getByRole('button', { name: 'Appearance', exact: true })
+      .click();
+    // Live result views are on unless the owner turns them off, and off is saved for the account.
+    const views = modelsPage.getByRole('checkbox', {
+      name: 'Let the agent draw results as live views',
+      exact: true
+    });
+    await views.waitFor();
+    assert.equal(await views.isChecked(), true);
+    await views.uncheck();
+    await modelsPage.getByText('Live views off', { exact: true }).waitFor();
+    assert.equal(resultViews, false);
+    assert.equal(await views.isChecked(), false);
+    await views.check();
+    await modelsPage.getByText('Live views on', { exact: true }).waitFor();
     await modelsPage
       .getByRole('navigation', { name: 'Settings sections' })
       .getByRole('button', { name: 'Models', exact: true })

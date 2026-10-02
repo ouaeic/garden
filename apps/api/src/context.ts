@@ -917,7 +917,6 @@ export const createApiContext = async (config: ApiConfig, overrides: ApiOverride
       steps: TaskPlanStep[];
       branchName?: string;
       outputs?: TaskPlan['outputs'];
-      presentation?: TaskPlan['presentation'];
       directionEventId?: string;
     }>(plan.stepsCiphertext, key);
     return {
@@ -928,7 +927,6 @@ export const createApiContext = async (config: ApiConfig, overrides: ApiOverride
       branchName: content.branchName ?? plan.branchName,
       steps: content.steps,
       ...(content.outputs === undefined ? {} : { outputs: content.outputs }),
-      ...(content.presentation ? { presentation: content.presentation } : {}),
       ...(content.directionEventId ? { directionEventId: content.directionEventId } : {}),
       createdBy: plan.createdBy,
       createdAt: plan.createdAt

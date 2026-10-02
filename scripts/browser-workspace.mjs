@@ -20,7 +20,7 @@ export async function checkWorkspaceNavigation({ context, origin, task, report }
   try {
     await page.goto(`${origin}/?task=${task.id}`);
     const views = page.locator(
-      'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+      'body:has(.project-panel[open]:not(.is-docked)) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open]:not(.is-docked))) .project-workspace-bar .project-view-nav'
     );
     const panel = page.locator('.project-panel[open]');
     const closePanel = async () => {

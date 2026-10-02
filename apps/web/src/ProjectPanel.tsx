@@ -64,6 +64,18 @@ export default function ProjectPanel({ scope, children }: { scope: string; child
     document.addEventListener('close', settle, true);
     return () => document.removeEventListener('close', settle, true);
   }, [dockable, open]);
+  // A docked panel is not modal, so focus is usually outside it; Escape still closes it.
+  useEffect(() => {
+    if (!open || !docked) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      // A modal, a popover or a pending comment takes Escape first.
+      if (document.querySelector('dialog[open]:modal, :popover-open, .note-popover')) return;
+      closeProjectPanel();
+    };
+    document.addEventListener('keydown', close);
+    return () => document.removeEventListener('keydown', close);
+  }, [open, docked]);
   return (
     <Dialog
       title={scope}
@@ -75,7 +87,8 @@ export default function ProjectPanel({ scope, children }: { scope: string; child
       dismissOnBackdrop={!docked}
       onClose={closeProjectPanel}
     >
-      <ProjectPanelLinks inside />
+      {/* Docked, the panel sits beside the bar that already carries these. */}
+      {!docked && <ProjectPanelLinks inside />}
       <div className="project-panel-content" ref={content}>
         {children}
       </div>

@@ -37,15 +37,44 @@ const firstLine = (value: string, limit = 120): string => {
   return line.length > limit ? `${line.slice(0, limit)}…` : line;
 };
 
+/** Go back to a message: rewrite it and continue from there, or take it to its own conversation. */
+function MessageActions({
+  event,
+  onRevisit,
+  onDiscuss
+}: {
+  event: TaskEvent;
+  onRevisit?: ((event: TaskEvent) => void) | undefined;
+  onDiscuss?: ((eventId: string) => void) | undefined;
+}) {
+  if (!onRevisit && !onDiscuss) return null;
+  return (
+    <span className="message-actions">
+      {onRevisit && (
+        <button type="button" className="text-button" onClick={() => onRevisit(event)}>
+          Continue from here
+        </button>
+      )}
+      {onDiscuss && (
+        <button type="button" className="text-button" onClick={() => onDiscuss(event.id)}>
+          Discuss separately
+        </button>
+      )}
+    </span>
+  );
+}
+
 /** What the owner asked, one line, opening to the whole of it. */
 export function OwnerLine({
   event,
   workspaceId,
-  artifacts
+  artifacts,
+  onRevisit
 }: {
   event: TaskEvent;
   workspaceId: string;
   artifacts: Artifact[];
+  onRevisit?: (event: TaskEvent) => void;
 }) {
   const body = eventText(event);
   const long = body.length > 140 || body.includes('\n');
@@ -56,6 +85,11 @@ export function OwnerLine({
       <p className="owner-line">
         <span className="eyebrow">{label}</span>
         <span>{body}</span>
+        {onRevisit && (
+          <button type="button" className="text-button" onClick={() => onRevisit(event)}>
+            Revise
+          </button>
+        )}
       </p>
     );
   return (
@@ -68,6 +102,11 @@ export function OwnerLine({
         <Markdown artifacts={artifacts}>{body}</Markdown>
       </Suspense>
       <MessageAttachmentList workspaceId={workspaceId} paths={attachments} />
+      {onRevisit && (
+        <button type="button" className="text-button" onClick={() => onRevisit(event)}>
+          Revise
+        </button>
+      )}
     </details>
   );
 }
@@ -76,11 +115,15 @@ export function OwnerLine({
 export default function Thread({
   exchanges,
   workspaceId,
-  artifacts
+  artifacts,
+  onRevisit,
+  onDiscuss
 }: {
   exchanges: readonly Exchange[];
   workspaceId: string;
   artifacts: Artifact[];
+  onRevisit?: (event: TaskEvent) => void;
+  onDiscuss?: (eventId: string) => void;
 }) {
   if (!exchanges.length) return null;
   return (
@@ -102,6 +145,7 @@ export default function Thread({
                     workspaceId={workspaceId}
                     paths={data(direction.payload).attachments}
                   />
+                  <MessageActions event={direction} onRevisit={onRevisit} onDiscuss={onDiscuss} />
                 </div>
                 {answer && (
                   <div className="thread-reply">

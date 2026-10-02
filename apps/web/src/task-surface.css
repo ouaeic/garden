@@ -107,9 +107,19 @@ details.owner-line > summary {
 .owner-line .eyebrow {
   flex: none;
 }
-.owner-line > span:last-child,
+.owner-line > span:nth-child(2),
 details.owner-line > summary > span:last-child {
   overflow-wrap: anywhere;
+}
+.owner-line > .text-button {
+  flex: none;
+  margin-left: auto;
+}
+.message-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 6px;
 }
 
 .answer-footer {

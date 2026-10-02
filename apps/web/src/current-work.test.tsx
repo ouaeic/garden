@@ -1,34 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { renderToStaticMarkup } from 'react-dom/server';
 import type { TaskEvent, TaskPresentation, WorkSurfaceView } from '@garden/contracts';
 import { currentWork } from './current-work';
-import { WorkDirections } from './WorkDirections';
-import WorkTrace from './WorkTrace';
 
 const surface: WorkSurfaceView = {
   direction: { eventId: 'first', sequence: 1, text: 'Plan Japan', queued: false, truncated: false },
   directions: [
     { eventId: 'first', sequence: 1, text: 'Plan Japan', queued: false, truncated: false }
   ],
-  report: {
-    directionEventId: 'first',
-    content: {
-      title: 'A quiet week',
-      acknowledgment: 'I will compare the quieter stops.',
-      blocks: [
-        {
-          kind: 'table',
-          title: 'Stops',
-          columns: ['Place', 'Character'],
-          rows: [{ cells: ['Kyoto', 'Temples and gardens'] }]
-        }
-      ]
-    }
-  },
-  references: [],
   currentResultIds: ['file'],
-  sources: [],
-  unavailableReferences: 0
+  sources: []
 };
 const presentation = {
   version: 1,
@@ -77,10 +57,9 @@ describe('owner-directed work surface', () => {
     ])!;
     expect(next.surface?.currentResultIds).toEqual(['app']);
     expect(next.results[0]).toBe(preview);
-    expect(next.surface?.report).toBeNull();
     expect(next.progress.phases).toEqual([]);
   });
-  it('removes obsolete report and plan immediately when steering arrives before an API refresh', () => {
+  it('removes the obsolete plan immediately when steering arrives before an API refresh', () => {
     const next = currentWork(presentation, [
       {
         id: 'next',
@@ -93,7 +72,6 @@ describe('owner-directed work surface', () => {
       }
     ] as TaskEvent[])!;
     expect(next.surface?.direction?.text).toBe('Now build a comparison website');
-    expect(next.surface?.report).toBeNull();
     expect(next.surface?.currentResultIds).toEqual([]);
     expect(next.progress.phases).toEqual([]);
     expect(next.surface?.directions[0]?.text).toBe('Plan Japan');
@@ -131,22 +109,5 @@ describe('owner-directed work surface', () => {
       'Plan Japan',
       'Plan Japan'
     ]);
-  });
-  it('renders meaningful model-composed content and the actual acknowledgment without an empty evidence column', () => {
-    const html = renderToStaticMarkup(
-      <>
-        <WorkDirections surface={surface} onRevisit={() => undefined} />
-        <WorkTrace
-          progress={presentation.progress}
-          surface={surface}
-          onEvidence={() => undefined}
-        />
-      </>
-    );
-    expect(html).toContain('Plan Japan');
-    expect(html).toContain('I will compare the quieter stops.');
-    expect(html).toContain('Temples and gardens');
-    expect(html).not.toContain('<th>Evidence</th>');
-    expect(html).toContain('Edit / revisit');
   });
 });

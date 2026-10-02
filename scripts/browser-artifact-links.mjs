@@ -85,7 +85,7 @@ export async function checkArtifactLinks({
       await link.waitFor();
       await page
         .locator(
-          'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+          'body:has(.project-panel[open]:not(.is-docked)) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open]:not(.is-docked))) .project-workspace-bar .project-view-nav'
         )
         .getByRole('button', { name: 'Activity', exact: true })
         .click();

@@ -7,7 +7,6 @@ export * from './projects.js';
 import { ConversationSource } from './projects.js';
 import { z } from 'zod';
 import { TaskOutputIntents } from './output-intent.js';
-import { WorkSurfaceReport } from './work-surface.js';
 export * from './work-surface.js';
 export * from './output-intent.js';
 export * from './delivery-state.js';
@@ -916,7 +915,6 @@ export const TaskPlan = z.object({
   branchName: z.string().min(1).max(80),
   steps: z.array(TaskPlanStep).min(1).max(30),
   outputs: TaskOutputIntents.optional(),
-  presentation: WorkSurfaceReport.optional(),
   directionEventId: z.string().optional(),
   createdBy: z.enum(['agent', 'user']),
   createdAt: IsoDate
