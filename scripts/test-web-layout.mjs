@@ -8,6 +8,7 @@ import { checkWorkspaceNavigation } from './browser-workspace.mjs';
 import { checkProjectHistory } from './browser-project-history.mjs';
 import { checkAppearance } from './browser-appearance.mjs';
 import { checkMobileNavigation } from './browser-mobile.mjs';
+import { checkCreatureExits } from './browser-creature-exits.mjs';
 import { checkUpdates } from './browser-updates.mjs';
 import { checkPermissionModes } from './browser-permissions.mjs';
 import { checkRunningQuestion } from './browser-questions.mjs';
@@ -1289,6 +1290,8 @@ try {
     await checkMemoryLibrary({ context, origin, workspace, project, task, report });
   if (process.env.GARDEN_UI_FOCUS === 'appearance')
     await checkAppearance({ context, origin, bootstrap, project, task, report });
+  if (!process.env.GARDEN_UI_FOCUS || process.env.GARDEN_UI_FOCUS === 'life')
+    await checkCreatureExits({ context, origin, report });
   if (process.env.GARDEN_UI_FOCUS === 'updates') await checkUpdates({ context, origin, report });
   if (
     !process.env.GARDEN_UI_FOCUS ||
@@ -1340,6 +1343,7 @@ try {
       'drafts',
       'models',
       'appearance',
+      'life',
       'mobile',
       'updates',
       'workspace',
@@ -2758,6 +2762,7 @@ try {
       'desk',
       'drafts',
       'appearance',
+      'life',
       'mobile',
       'updates',
       'workspace',
@@ -3385,6 +3390,7 @@ try {
       'memory',
       'desk',
       'appearance',
+      'life',
       'mobile',
       'updates',
       'workspace',

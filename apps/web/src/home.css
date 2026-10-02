@@ -93,7 +93,7 @@
 }
 .meter {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
     'label text'
     'bar bar';
@@ -110,6 +110,9 @@
 .meter > small {
   grid-area: text;
   text-align: right;
+}
+.meter-provider {
+  grid-column: 1 / -1;
 }
 .meter > span:first-child,
 .meter > small {

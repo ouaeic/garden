@@ -47,7 +47,6 @@ const pick = <T,>(items: readonly T[]) => items[Math.floor(Math.random() * items
 const between = (low: number, high: number) => low + Math.random() * (high - low);
 const chance = (share: number) => Math.random() < share;
 const isNight = (date = new Date()) => date.getHours() >= 20 || date.getHours() < 6;
-const clipKey = (clip?: Clip) => (clip ? `${clip.side}:${Math.round(clip.line)}` : 'free');
 /** Just past the left or right edge of the screen, where a visitor comes from and goes back to. */
 const offscreen = (left: boolean) => (left ? -48 : innerWidth + 48);
 /** How long a flight takes at a creature's own speed, in pixels a millisecond. */
@@ -368,6 +367,29 @@ export default function GardenLife() {
         });
       });
     };
+    const canHide = (id: number) => {
+      const held = anchors.get(id);
+      const edge = held && paintedEdge(held.element, held.edge);
+      const box = nodes.current.get(id)?.getBoundingClientRect();
+      return Boolean(
+        edge &&
+        box &&
+        box.left >= edge.left &&
+        box.right <= edge.right &&
+        (held.edge === 'top' ? box.top < edge.top : box.bottom > edge.bottom)
+      );
+    };
+    /** A startled jumper in the air has no border to retreat behind. */
+    const jumpAway = async (id: number, frames: Frames) => {
+      const here = where(id);
+      if (!here) return;
+      anchor(id, null);
+      pose(id, { frames, fps: 8, clip: undefined }, true);
+      await travel(id, offscreen(here.x < innerWidth / 2), here.y - 40, 450, {
+        arc: 60,
+        force: true
+      });
+    };
     /** Down behind the line it stands on, the way it came. */
     const duck = (id: number, line: () => number, depth: number, ms: number) => {
       escapes.set(id, async () => {
@@ -580,6 +602,7 @@ export default function GardenLife() {
           const spot = where(id);
           if (!spot) return;
           chirp('ook');
+          if (!canHide(id)) return jumpAway(id, monkey.jump);
           pose(id, { clip: here.clip, frames: here.hang ? monkey.hang : monkey.jump }, true);
           await travel(id, spot.x, hidden(here), 240, {
             easing: 'cubic-bezier(0.5, 0, 0.9, 0.5)',
@@ -739,6 +762,8 @@ export default function GardenLife() {
           clip: { side: 'above', line }
         });
         duck(id, () => line, 16, 260);
+        const duckBack = escapes.get(id)!;
+        escapes.set(id, () => (canHide(id) ? duckBack() : jumpAway(id, frog.leap)));
         anchor(id, box.element);
         const own = life(id);
         await travel(id, x, line - 5, 500, { easing: 'ease-out' });
@@ -987,34 +1012,24 @@ export default function GardenLife() {
       </span>
     </div>
   );
-  const groups = new Map<string, { clip?: Clip; actors: Actor[] }>();
-  for (const actor of actors) {
-    const key = clipKey(actor.clip);
-    const group = groups.get(key) ?? { ...(actor.clip ? { clip: actor.clip } : {}), actors: [] };
-    group.actors.push(actor);
-    groups.set(key, group);
-  }
   return (
     <div className="life-layer" aria-hidden="true">
-      {[...groups.entries()].map(([key, group]) =>
-        group.clip ? (
-          <div
-            key={key}
-            className="life-clip"
-            style={
-              group.clip.side === 'below'
-                ? { top: group.clip.line, bottom: 0 }
-                : { top: 0, height: group.clip.line }
-            }
-          >
-            {group.actors.map(draw)}
-          </div>
-        ) : (
-          <div key={key} className="life-free">
-            {group.actors.map(draw)}
-          </div>
-        )
-      )}
+      {/* Keep each moving element mounted while its border clipping changes. */}
+      {actors.map((actor) => (
+        <div
+          key={actor.id}
+          className={actor.clip ? 'life-clip' : 'life-free'}
+          style={
+            actor.clip
+              ? actor.clip.side === 'below'
+                ? { top: actor.clip.line, bottom: 0 }
+                : { top: 0, height: actor.clip.line }
+              : undefined
+          }
+        >
+          {draw(actor)}
+        </div>
+      ))}
     </div>
   );
 }
