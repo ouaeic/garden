@@ -34,6 +34,7 @@ export async function checkDesk({
     }))
   ];
   const originalProjects = bootstrap.projects;
+  const originalUsage = bootstrap.usage;
   bootstrap.projects = Array.from({ length: 25 }, (_, index) => ({
     ...project,
     id: index ? `desk-${index}` : project.id,
@@ -123,6 +124,66 @@ export async function checkDesk({
       }
   };
   try {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(origin);
+    await page.locator('.desk-start-card').waitFor();
+    await page.evaluate(() => document.fonts.ready);
+    const compactPrompt = await page.locator('.desk-start-card').boundingBox();
+    const compactProjects = await page.locator('.home-projects').boundingBox();
+    assert(compactPrompt && compactProjects);
+    bootstrap.usage = {
+      ...originalUsage,
+      plan: {
+        provider: 'openrouter',
+        windows: Array.from({ length: 8 }, (_, index) => ({
+          connection: `Connected provider ${index + 1}`,
+          label: 'Credit balance',
+          used: index,
+          limit: 20,
+          unit: 'usd',
+          resetsAt: null
+        })),
+        queriedAt: new Date().toISOString()
+      }
+    };
+    await page.reload();
+    const readouts = page.getByRole('region', { name: 'Computer readouts', exact: true });
+    await readouts.getByText('Connected provider 8 · Balance', { exact: true }).waitFor();
+    await page.evaluate(() => document.fonts.ready);
+    assert.deepEqual(
+      await page.locator('.desk-start-card').boundingBox(),
+      compactPrompt,
+      'Adding provider readouts must not enlarge or move the home prompt'
+    );
+    assert.deepEqual(
+      await page.locator('.home-projects').boundingBox(),
+      compactProjects,
+      'Provider readouts must not take height away from the projects'
+    );
+    const machine = await page.locator('.home-machine').boundingBox();
+    assert(machine && Math.abs(machine.height - compactPrompt.height) < 1);
+    await readouts.getByText('Connected provider 1 · Balance', { exact: true }).waitFor();
+    await readouts.focus();
+    await page.keyboard.press('End');
+    await page.waitForFunction(() => {
+      const region = document.querySelector('[aria-label="Computer readouts"]');
+      return (
+        region.scrollTop > 0 && region.scrollHeight - region.clientHeight - region.scrollTop < 2
+      );
+    });
+    const lastReadout = await readouts
+      .getByText('Connected provider 8 · Balance', { exact: true })
+      .boundingBox();
+    const readoutBox = await readouts.boundingBox();
+    assert(lastReadout && readoutBox);
+    assert(
+      lastReadout.y >= readoutBox.y &&
+        lastReadout.y + lastReadout.height <= readoutBox.y + readoutBox.height + 1,
+      'Every provider remains reachable by keyboard scrolling inside the computer card'
+    );
+    await page.screenshot({ path: resolve(report, 'desk-provider-readouts.png') });
+    await page.locator('.home-machine-title').click();
+    await page.locator('.view-computer').waitFor();
     for (const [width, height] of [
       [1440, 900],
       [1024, 768],
@@ -484,6 +545,7 @@ export async function checkDesk({
     throw error;
   } finally {
     bootstrap.projects = originalProjects;
+    bootstrap.usage = originalUsage;
     directoryUi.longList = false;
     processUi.rows = rows;
     await page.close();
