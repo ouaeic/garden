@@ -20,8 +20,8 @@ import { iso, json, numericOrNull, optionalText } from './rows.js';
  * record is only ever dropped once the thing it settled has fallen out of consideration entirely.
  *
  * The ledger window is exported because the sweep that applies it, `DataStore.cleanupExpired`, is
- * maintenance rather than notification and did not move here in Wave 6.3. Exporting it keeps the
- * pair under one comment, which is the whole point of the sentence above: separate them and the
+ * maintenance rather than notification and lives elsewhere. Exporting it keeps the pair under one
+ * comment, which is the whole point of the sentence above: separate them and the
  * relation between the two numbers stops being written down anywhere.
  */
 const NOTIFICATION_CANDIDATE_INTERVAL = '14 days';

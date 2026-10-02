@@ -2,11 +2,9 @@ import { registerProjectUpdateRoutes } from './routes/project-updates.js';
 /**
  * One server, assembled.
  *
- * This file was 8,464 lines: every route, every hook and every background sweep declared as a
- * local inside one `buildServer` closure, each reaching straight up into the others. Wave 6 split
- * it along the seams that were already there - `http/` for the plumbing every request crosses,
- * `routes/` for the groups, `maintenance/` for the passes that run without a caller - and what is
- * left is the assembly: build the context, build the helpers, hang the hooks, register the groups,
+ * Routes, hooks and background sweeps live in their own modules - `http/` for the plumbing every
+ * request crosses, `routes/` for the groups, `maintenance/` for the passes that run without a
+ * caller - and this file is the assembly: build the context, build the helpers, hang the hooks, register the groups,
  * and say how the whole thing stops.
  *
  * Two orderings here are load-bearing rather than tidy.
@@ -89,10 +87,9 @@ import { registerWorkspaceRoutes } from './routes/workspaces.js';
 import { startTaskTitler } from './task-titles.js';
 
 /**
- * These four were declared in this file until the Wave 5 decomposition moved them to
- * `./context.js`. They are re-exported here for one release because `server.test.ts` imports two
- * of them from this module and nothing outside this package has been surveyed; the shim goes when
- * those imports name `./context.js` directly.
+ * Re-exported from `./context.js` because `server.test.ts` imports two of them from this module,
+ * and nothing outside this package has been checked for the same imports. The shim goes when those
+ * imports name `./context.js` directly.
  */
 export {
   idempotencyRequestHash,
@@ -108,8 +105,8 @@ export const buildServer = async (
 ): Promise<ApiServices> => {
   /**
    * Everything one server decides once - its stores, keys, caches and response builders - built
-   * in the order it has always been built in. Held as a named object rather than inlined because
-   * it is the argument the route groups Wave 6 splits out of this file each take.
+   * in a fixed order. Held as a named object rather than inlined because it is the argument every
+   * route group takes.
    */
   const context = await createApiContext(config, overrides);
   const {

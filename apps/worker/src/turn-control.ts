@@ -3,13 +3,12 @@ import { appendMemoryOwnerInput } from './memory-owner-input.js';
  * The three questions a turn asks between steps: has the owner said something, is this run still the
  * one in charge, and is the request about to go out the one this turn's own log accounts for?
  *
- * Lifted out of `AgentWorker.run` in Wave 7.2 carrying #140 (rel F10). `honorUserControl` read
- * status alone, so it could see a Stop and could not see a task that had been resumed out from
- * under this worker - and it is called at every step boundary and inside the per-tool-call loop,
- * which is exactly where the gap between two model calls lives. A worker that had lost its lease
- * went on executing the whole tool batch against a workspace another worker was now running; its
- * lease-guarded writes matched no rows, its timeline events are not lease-guarded and did, and the
- * conversation gained a second copy of the batch.
+ * `honorUserControl` asks about ownership as well as status, because status alone sees a Stop and
+ * cannot see a task resumed out from under this worker. It runs at every step boundary and inside
+ * the per-tool-call loop, which is where the gap between two model calls lives. A worker that has
+ * lost its lease and carries on executing a tool batch writes nothing through its lease-guarded
+ * writes, but its timeline events are not lease-guarded, so the conversation would gain a second
+ * copy of the batch.
  */
 import {
   privateDiagnostics,

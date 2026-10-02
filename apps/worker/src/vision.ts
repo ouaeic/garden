@@ -3,10 +3,9 @@ import { runtimeNow } from '@garden/core';
  * Who looks at a picture the lead model cannot see, and what the registry rows that decision is
  * taken against cost to read.
  *
- * Lifted out of the tail of `AgentWorker.#recordToolResult` in Wave 7.2. It was a second model call
- * - its own ranking, its own price ceiling, its own billing and its own refusal sentences - living
- * inside a method whose other job is bookkeeping, and every one of the four defects the ranking
- * carried was invisible because its failure path is a system notice rather than an error.
+ * A second model call - its own ranking, its own price ceiling, its own billing and its own refusal
+ * sentences - kept out of the bookkeeping that records tool results. Its failure path is a system
+ * notice rather than an error, so a defect here is invisible unless something tests it directly.
  */
 import { preferIncumbent, rankModels, requestForWork, selectModel, sha256 } from '@garden/core';
 import type { ModelRelease, PrivacyRoute } from '@garden/contracts';
@@ -168,9 +167,9 @@ export const routeImageObservation = async (
    * The owner's price ceiling, on the fifth and last ranking site - the only one that chooses a
    * model while the owner is asleep.
    *
-   * The four an owner reaches directly carried it from Wave 4 and this one did not, so a box with
-   * a $1/M ceiling would route an image to a $75/M model without asking anybody: the lead cannot
-   * see, this picks a replacement mid-turn, and nothing between the two ever read the ceiling.
+   * Without it, a box with a $1/M ceiling would route an image to a $75/M model without asking
+   * anybody: the lead cannot see, this picks a replacement mid-turn, and nothing between the two
+   * reads the ceiling.
    *
    * Not caught, deliberately, where the two `effectiveSpendLimits` reads above it are. Those two
    * want a time zone and 'UTC' is a fair answer when the store will not say; a ceiling has no fair
@@ -178,9 +177,8 @@ export const routeImageObservation = async (
    * the runs nobody is watching. This method already writes the tool-result event through an
    * uncaught `event()` call, so a store that will not answer ends the turn either way.
    *
-   * The `?? null` pair is the same reconciliation `server.ts`'s `ownerPriceCeiling` makes, written
-   * out rather than shared because that helper is a local const in the API and this wave may not
-   * write there. `SpendLimits` still declares both rates optional while `effectiveSpendLimits` has
+   * The `?? null` pair is the same reconciliation the API's `ownerPriceCeiling` makes, written out
+   * rather than shared because the worker does not import the API. `SpendLimits` still declares both rates optional while `effectiveSpendLimits` has
    * answered with both since the migration that added the columns, and under
    * `exactOptionalPropertyTypes` an explicit `undefined` is not an absent field. When the
    * `.optional()` comes off the contract, both copies of this collapse to a spread.

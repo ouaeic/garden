@@ -205,11 +205,10 @@ every other row — which reads like a finding.
 not that a design decision was made. It survives even `starved`, which is what makes it worth
 reading on the rows in between.
 
-`degenerateConfigurations` refuses a control that has become a copy of `shipped`. This is not
-hypothetical: the noise control was `stride-4` while the tree shipped stride 8, step 3.1 landed
-stride 4, and for a whole wave the control was byte-identical to shipped on all 27 rows and printed
-a reassuring `+0.00` that was an identity rather than a measurement. It is `stride-8` now, and the
-next time the tree moves onto a control's value the run says so instead of reporting agreement.
+`degenerateConfigurations` refuses a control that has become a copy of `shipped`. A control on the
+shipped value is byte-identical to shipped on every row and prints a reassuring `+0.00` that is an
+identity rather than a measurement, so when the tree moves onto a control's value the run says so
+instead of reporting agreement.
 It only reads constants, and it deliberately exempts any row carrying edits, because whether an
 edit still differs from the tree is a question about `context.ts` that only `patch` can answer.
 

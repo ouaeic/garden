@@ -4,15 +4,13 @@ import { evidenceProgressKey } from './progress.js';
  * What a turn writes down about a tool call: the timeline row, the window entry, the provenance it
  * moves forward, and the run of read-only calls that share one lease and one cancellation watch.
  *
- * Lifted out of `AgentWorker` in Wave 7.2. It was five unrelated jobs threaded through one 202-line
- * method plus two of its neighbours, and the thing that made it a file rather than a region is the
- * import graph: `event` is the encrypted timeline writer every other sub-machine needs, and leaving
- * it in `agent.ts` meant every one of them reached back through the class to get it.
+ * A file of its own because of the import graph: `event` is the encrypted timeline writer every
+ * other sub-machine needs, and they import it from here rather than reaching back through the
+ * worker class.
  *
- * The vision handoff that used to close `recordToolResult` is not here. It returns the image
- * instead, and `vision.ts` - which imports `event` from this file - is entered by the caller. That
- * is the only reason the split falls where it does: a `tool-recording -> vision -> tool-recording`
- * cycle is the alternative.
+ * The vision handoff is not here. `recordToolResult` returns the image instead, and `vision.ts` -
+ * which imports `event` from this file - is entered by the caller, because the alternative is a
+ * `tool-recording -> vision -> tool-recording` cycle.
  */
 import type { ModelRelease, TaskEventKind, WebToolPlan } from '@garden/contracts';
 import { ZodError } from 'zod';

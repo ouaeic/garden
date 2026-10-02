@@ -1,9 +1,9 @@
 /**
  * The transcript, as a window and as a live stream.
  *
- * Moved last in Wave 6 and only once `event-stream.test.ts` was green, because the promise this
- * makes is the one a refactor cannot see itself break: a client that reconnects with
- * `Last-Event-ID` gets everything it missed, once each, with no gap. Replay is served from the
+ * The promise this makes is the one a refactor cannot see itself break, so `event-stream.test.ts`
+ * holds it: a client that reconnects with `Last-Event-ID` gets everything it missed, once each,
+ * with no gap. Replay is served from the
  * same page reader the windowed route uses, which is what keeps the two from disagreeing about
  * where the window ends.
  */
@@ -169,8 +169,7 @@ export const registerTaskEventRoutes = (context: RouteContext): void => {
        * quietly turned a stream that ends when the workspace stops being the caller's into one that
        * never asks again. The comment at the call site is about that join, not about the row.
        *
-       * Wave 6 folds this into the store; it is a local query here because the step that needed it
-       * did not own that file.
+       * It belongs in the store, and is a local query here until it moves.
        */
       const streamTaskStatus = async (): Promise<string | null> => {
         const result = await database.query<{ status: string }>(

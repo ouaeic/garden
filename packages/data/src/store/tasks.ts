@@ -385,9 +385,9 @@ export class TaskStore {
   /**
    * Says that this task has changed, to whoever is watching it and wherever they are.
    *
-   * Delivery is `TaskSignals`' business and this is the task domain's word for it, which is the
-   * split Wave 7.3 made: the emitter, the LISTEN connection and its retry are one machine, and the
-   * fifteen writes below that have something to announce are another. `schedules.ts` holds the same
+   * Delivery is `TaskSignals`' business and this is the task domain's word for it: the emitter, the
+   * LISTEN connection and its retry are one machine, and the fifteen writes below that have
+   * something to announce are another. `schedules.ts` holds the same
    * one-line forwarder for the same reason - a materialised run is a task arriving.
    */
   #signal(channel: string, payload: string): void {

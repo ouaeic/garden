@@ -3110,10 +3110,9 @@ export class MemoryStore {
    * deleted. So every bundle that quoted this row or its chunks goes too, and those tasks pay one
    * rebuild on their next turn.
    *
-   * It lived in the delete route until Wave 7.3, which is why it had no test: six statements that
-   * have to agree about what "gone" means, reachable only through HTTP. They are store statements,
-   * they are the counterpart of `retractMemoryItem` beside them, and `store.test.ts` now asserts
-   * all four copies are reached.
+   * Six statements that have to agree about what "gone" means. They are store statements, the
+   * counterpart of `retractMemoryItem` beside them, and `store.test.ts` asserts all four copies are
+   * reached.
    */
   forgetMemoryItem(workspaceId: string, itemId: string): Promise<boolean> {
     return this.database.transaction(async (transaction) => {

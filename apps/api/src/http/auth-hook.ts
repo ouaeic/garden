@@ -5,15 +5,15 @@
  * token into `request.user`, the pre-handler that refuses a path identifier which is not a UUID,
  * and the pre-handler that is the ONLY place a workspace id is checked against its owner.
  *
- * That last one is why the Wave 6 split could not be a plain file move. Fastify snapshots hooks
- * per route at registration time, which makes the order in `server.ts` load-bearing: every
+ * That last one makes registration order load-bearing. Fastify snapshots hooks per route at
+ * registration time, so in `server.ts` every
  * `registerXRoutes` call happens after `registerAuthHooks`, and a group added before it is
  * registered with no workspace check on it at all.
  *
- * That check is defence in depth, and Wave 6 measured that it had no net: disabling it turned
- * nothing red, because every workspace-scoped handler in `routes/` independently resolves the
- * workspace through `store.getWorkspace(user.id, ...)` and refuses on its own, so both boundary
- * tests in `server.test.ts` pass with this hook defeated. They pin the handlers, not the hook.
+ * That check is defence in depth, and the route tests cannot see it: disabling it turns nothing red
+ * in `server.test.ts`, because every workspace-scoped handler in `routes/` independently resolves
+ * the workspace through `store.getWorkspace(user.id, ...)` and refuses on its own, so both boundary
+ * tests there pass with this hook defeated. They pin the handlers, not the hook.
  *
  * `auth-hook.test.ts` is the net that can tell the two layers apart. It registers a route that
  * deliberately does NOT re-scope - which is the route this hook exists for, the one nobody has

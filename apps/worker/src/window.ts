@@ -5,15 +5,8 @@ import { conversationContext } from './conversation-context.js';
  * The window itself: what goes in front of the trajectory, what is refreshed at the tail on every
  * step, and how the owner's plan gets back into it when they republish one.
  *
- * Lifted out of `AgentWorker.run` in Wave 7.2 unchanged. Every line here is about *where* a block
- * sits, because where it sits is what a provider's cache charges for - and the reasoning behind
- * each placement was buried inside a 2,000-line method where nothing could be asked about it in
- * isolation.
- *
- * Wave 3 already fixed the two defects the audit booked against this region in place - the plan
- * splice that cut the plan out of the middle of the window (#77) and the per-turn write at index 1
- * (#82) - so this is a pure move. The comments those fixes left behind are the record of it and are
- * carried across byte for byte.
+ * Every line here is about *where* a block sits, because where it sits is what a provider's cache
+ * charges for: a write in the middle of the window re-bills everything behind it.
  */
 import { createHash } from 'node:crypto';
 import type { TaskPlanStep, WebToolPlan } from '@garden/contracts';

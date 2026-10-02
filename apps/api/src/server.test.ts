@@ -1353,15 +1353,10 @@ describe('API production boundaries', () => {
       .json<Array<{ id: string; kind: string }>>()
       .find((event) => event.kind === 'user_message')!;
     /*
-     * `POST /v1/tasks/:taskId/branch` was exercised here until Wave 6 deleted the route.
-     *
-     * It was one of two ways to fork a conversation and the weaker one: it could only rewind the
-     * transcript, never the computer, and no client has ever called it - the app, the desktop
-     * shell and the contracts package all reach `POST /v1/tasks/:taskId/trajectory` with
-     * `operation: 'branch'`, which does the same fork and can also put the filesystem back. That
-     * route is asserted below and again in "rewinding the computer, not only the conversation", so
-     * what this paragraph proved - a fork carries the parent transcript and stores no plaintext -
-     * is still proved, on the surface that is actually reachable.
+     * Forking is asserted on `POST /v1/tasks/:taskId/trajectory` with `operation: 'branch'`, the
+     * one fork route, which can also put the filesystem back: below, and again in "rewinding the
+     * computer, not only the conversation". A fork carries the parent transcript and stores no
+     * plaintext.
      */
     const edited = await app.inject({
       method: 'POST',
@@ -2049,8 +2044,7 @@ describe('workspace authorization boundaries', () => {
    * The same boundary as the test above, asked of the router instead of a list.
    *
    * The pre-handler in `http/auth-hook.ts` is the ONLY place a `workspaceId` is checked against
-   * its owner, and Wave 6 moved every workspace-scoped route out of `server.ts` and into a
-   * `registerXRoutes` call. Fastify decides a route's hooks when the route is registered, so a
+   * its owner, and every workspace-scoped route is added by a `registerXRoutes` call. Fastify decides a route's hooks when the route is registered, so a
    * group registered above `registerAuthHooks` - or a future group whose registrar someone puts
    * in the wrong place - is readable by anyone signed in, and nothing else in this file would
    * fail.

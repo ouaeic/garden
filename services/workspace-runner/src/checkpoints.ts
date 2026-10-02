@@ -74,10 +74,9 @@ export interface CheckpointConfig {
    * makes it overridable (`execution.ts:181`): so the floor can be exercised without filling a
    * real filesystem.
    *
-   * It is also what makes this file's own suite hermetic. Reading the real disk here meant
-   * sixteen checkpoint tests failed on any machine under two per cent free - Wave 3's gate hit
-   * exactly that at 99 % - and the failure was a sentence about a full disk, indistinguishable
-   * from genuine breakage. A build whose verdict depends on the free space of the machine
+   * It is also what makes this file's own suite hermetic. Reading the real disk here would fail
+   * sixteen checkpoint tests on any machine under two per cent free, with a sentence about a full
+   * disk indistinguishable from genuine breakage. A build whose verdict depends on the free space of the machine
    * running it is not evidence either way.
    */
   hostStorage?: ((root: string) => Promise<HostStorage>) | undefined;

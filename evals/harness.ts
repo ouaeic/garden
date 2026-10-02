@@ -186,17 +186,11 @@ const dataKey = generateDataKey();
 /**
  * The worker this rig is, written once because both halves of the lease have to agree.
  *
- * The fixture task used to be stamped `leaseOwner: 'worker-test'` while the `AgentWorker` under it
- * was configured `WORKER_ID: 'worker-eval'`, so every fixture in this suite described a task held
- * by some other worker. Nothing asked, so nothing noticed. Wave 7.2's #140 arm asks: `haltReason`
- * is now consulted at every step boundary and not only mid-model-call, and it answers `disowned`
- * for a lease that names somebody else - correctly, because a worker that has lost the task must
- * not execute another batch against a workspace someone else is now running. The suite stood down
- * on its first step boundary and reported 53 fixtures at 0 model calls with no error anywhere,
- * because standing down is deliberately silent.
- *
- * So the two are one constant. A rig whose task is owned by a worker other than the one running it
- * is not exercising a scenario worth having; it was a typo with nothing to trip over it.
+ * `haltReason` is consulted at every step boundary and answers `disowned` for a lease that names
+ * somebody else, because a worker that has lost the task must not execute another batch against a
+ * workspace someone else is now running. Standing down is deliberately silent, so a fixture task
+ * leased to any other worker id would stop at its first step boundary with 0 model calls and no
+ * error anywhere. The task's lease owner and the worker's id are therefore one constant.
  */
 const WORKER_ID = 'worker-eval';
 
@@ -1420,11 +1414,9 @@ export type CompactionTrigger =
  * The opening of the deterministic block `prepareModelContext` pushes at the tail of the window
  * once the soft threshold is crossed.
  *
- * It was a literal here - the only one left in this file - because `context.ts` did not publish it.
- * Step 3.1(b) gave that summary a marker constant, moved it out of the leading system run and
- * excluded it from `cacheEligible`, so this is now an import and the fixture below is no longer
- * coupled to prose. Matching an opening rather than the whole sentence, so the wording after it can
- * change without this going quiet.
+ * Imported from `context.ts` rather than written as a literal, so the fixture below is not coupled
+ * to prose. Matching an opening rather than the whole sentence, so the wording after it can change
+ * without this going quiet.
  */
 const SOFT_PASS_MARKER = COMPRESSED_TRAJECTORY_MARKER;
 
@@ -1711,9 +1703,8 @@ export interface Expectation {
  *
  * The block sits in the preamble ahead of the whole trajectory and its header says it is frozen for
  * the run, so what a fixture puts here is under the two cache breakpoints in front of everything
- * else. Two of the four repairs Wave 3 made to that block - anchoring the temporal filter and
- * anchoring the ranking to `task.createdAt` - are only observable against a pool with more than one
- * entry in it and an expiry inside the run.
+ * else. Its temporal filter and its ranking are both anchored to `task.createdAt`, and both are only
+ * observable against a pool with more than one entry in it and an expiry inside the run.
  */
 export interface FixtureKnowledge {
   /** Whose note it is. The block renders the two groups separately. */

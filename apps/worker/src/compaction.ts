@@ -1,9 +1,8 @@
 /**
  * Condensing a turn's window into the durable brief, and the one cheap model call that writes it.
  *
- * Lifted out of `AgentWorker` in Wave 7.2 unchanged. It is a state transition over `state.messages`
- * with its own summariser, its own billing and its own event, and it was reachable only by driving
- * a whole task through the step loop.
+ * A state transition over `state.messages` with its own summariser, its own billing and its own
+ * event, kept apart from the step loop so it can be tested without driving a whole task.
  */
 import type { ModelRelease } from '@garden/contracts';
 import { sha256 } from '@garden/core';

@@ -2,17 +2,14 @@
  * `AgentState` under the two things that actually happen to it: it is sealed and reopened, and it is
  * carried across a turn boundary.
  *
- * Wave 7.1 lifted this type out of `agent.ts` and gave every other module the split produced a test
- * file - except this one, which is the most load-bearing data structure in the worker. It is
- * checkpointed mid-step, encrypted whole under the task's data key, and reopened by whichever worker
- * picks the task up next. Nothing asserted that a field survives that, because nothing could: while
- * the type lived beside `AgentWorker` the only way to observe it was to drive a turn, and a turn
- * exercises the dozen fields its own path happens to read.
+ * It is the most load-bearing data structure in the worker: checkpointed mid-step, encrypted whole
+ * under the task's data key, and reopened by whichever worker picks the task up next. A driven turn
+ * exercises only the dozen fields its own path happens to read, so this file asserts every field.
  *
  * The failure this file exists to catch has no symptom at the moment it happens. A field that does
  * not survive a resume comes back as a default - a counter at zero, a bound reset, a taint gone -
- * and the run carries on looking healthy. It is the shape of defect this program has found more than
- * thirty times, and it is the one shape a resumed turn cannot report on itself.
+ * and the run carries on looking healthy. It is the one shape of defect a resumed turn cannot report
+ * on itself.
  *
  * Two nets, deliberately at two levels:
  *

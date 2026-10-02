@@ -5,8 +5,7 @@ import { runtimeUUID } from '@garden/core';
  * Every tool argument, every tool result and every field of a connector's reply arrives as
  * `unknown`: the model was asked for a shape, not held to one. Nine tool arms and the turn loop
  * each need the same three answers - what is this as text, is this an object at all, and how many
- * times does this string occur - and before Wave 6 put those arms in adjacent files nobody could
- * see that they were being answered three different ways.
+ * times does this string occur - and one place to answer them keeps those answers from diverging.
  *
  * `canonicalJson` is here rather than beside either of its two callers because they are in
  * different modules and both depend on it agreeing with itself: the approval hash and the failing

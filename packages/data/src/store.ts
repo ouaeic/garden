@@ -46,11 +46,10 @@ export { MEMORY_SOURCE_SEARCH_PER_TASK } from './store/sql/memory.js';
 
 /**
  * Re-exported for the same reason and on the same terms. `MAX_APPROVAL_PAGE`,
- * `agentNotificationAad` and `StoredNotificationSettings` moved in Wave 6.3 to the domain files
- * whose statements they belong to, and `@garden/data` publishes this file wholesale - so without
- * these lines the package would silently stop exporting three names it has always exported, and
- * `apps/api` and `apps/worker` would stop compiling. They can go once every importer names
- * `@garden/data`'s new modules directly.
+ * `agentNotificationAad` and `StoredNotificationSettings` live in the domain files whose statements
+ * they belong to, and `@garden/data` publishes this file wholesale, so these lines are what
+ * `apps/api` and `apps/worker` import them through. They can go once every importer names the
+ * domain modules directly.
  */
 export { MAX_APPROVAL_PAGE } from './store/connectors.js';
 export {
@@ -61,10 +60,9 @@ export {
 export type { StoredNotificationSettings } from './store/notifications.js';
 
 /**
- * Re-exported on the same terms as the block above. The five domains Wave 7.3 lifted took their
- * own constants and record shapes with them, and `@garden/data` publishes this file wholesale, so
- * these lines are what keeps the package exporting the names it has always exported. They can go
- * once every importer names the new modules directly.
+ * Re-exported on the same terms as the block above: constants and record shapes that live in their
+ * domain modules and are still imported through the package root. They can go once every importer
+ * names the domain modules directly.
  */
 export {
   LIVE_TASK_STATUSES,

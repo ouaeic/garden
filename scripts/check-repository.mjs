@@ -1317,10 +1317,7 @@ const copiedConstants = [
     // The worker parks a task under one of these codes and stops; the API's sweep is the only
     // thing that ever wakes it. A code the worker parks under and the sweep does not recognise
     // leaves the work in `awaiting_resource` for ever with nothing left to ask again - strictly
-    // worse than failing, which at least tells the owner. The comment on the worker's copy named
-    // the wrong file from the moment the table moved out of `server.ts` in Wave 6 until the wave
-    // that added this entry, so the drift this guards against had already begun in the prose before
-    // it could begin in the values.
+    // worse than failing, which at least tells the owner.
     find: /providerWalls: Record<[^=]*= \{([\s\S]*?)\n\};/,
     findInCopy: /PARKABLE_PROVIDER_WALLS = new Set\(\[([\s\S]*?)\]\)/,
     normalise: keysAtTopLevel

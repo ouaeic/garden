@@ -34,9 +34,8 @@ import type {
   WorkspaceRecord,
   WorkspaceSkillRecord
 } from '../types.js';
-// Type-only, so it is erased and there is no cycle at run time. The memory record shapes are still
-// declared in store.ts beside the rest of the memory domain contract; Wave 6 moves that domain out
-// as a unit and these travel with it, at which point this import points at the new module instead.
+// Type-only, so it is erased and there is no cycle at run time. The memory record shapes are
+// declared in store.ts beside the rest of the memory domain contract.
 import type {
   MemoryCandidateRecord,
   MemoryFactCandidateRecord,

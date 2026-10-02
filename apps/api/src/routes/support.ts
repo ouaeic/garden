@@ -1,8 +1,7 @@
 /**
  * The helpers more than one route group needs, built once on top of `ApiContext`.
  *
- * Everything here was a local inside `buildServer` that two or more of the groups Wave 6 split
- * out reached for: what a model costs and whether the owner will allow it, which provider this
+ * Each of these is reached for by two or more route groups: what a model costs and whether the owner will allow it, which provider this
  * box actually calls, what the media section of Settings says, and how a computer is made. They
  * stay in one closure because they call each other - `providerSettings` is three of the others -
  * and splitting a caller from a callee is how a price ceiling comes loose from the call it is
@@ -879,9 +878,8 @@ export const createServerSupport = (context: ServerBase) => {
    * it decoded five thousand task records, trajectories and all, to discover that none of them was
    * queued. It runs on every recovery point taken, every restore and every filesystem rewind.
    *
-   * The join is the same one `listTasks` carries and is what scopes the answer to this owner.
-   * Wave 6 folds the query into the store; it is local here because the step that needed it did not
-   * own that file.
+   * The join is the same one `listTasks` carries and is what scopes the answer to this owner. It
+   * belongs in the store, beside `listTasks`, and is local here until it moves.
    */
   const assertWorkspaceHasNoActiveWork = async (
     userId: string,

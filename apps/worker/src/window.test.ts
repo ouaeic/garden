@@ -2,13 +2,10 @@ import { MEMORY_PACK_BUDGET_TOKENS } from '@garden/core';
 /**
  * The order of the preamble, asserted as an order.
  *
- * `window.ts` was the largest pure move of Wave 7.2 - 407 lines - and it arrived with no test of its
- * own. `assemblePreamble` was exercised only by driving a whole turn through `agent-run.test.ts`,
- * which reads the *contents* of the window and never its arrangement. That is the wrong half. Every
- * line in this file is about where a block sits, because where it sits is what a provider's cache
- * charges for: Wave 3 measured the ordering here at 74.8% -> 76.1% byte-common prefix and -4.5%
- * billable input, and until now the only thing protecting that number was the eval suite's aggregate
- * token count - a figure that moves for a dozen reasons and names none of them.
+ * `agent-run.test.ts` reads the *contents* of the window and never its arrangement, which is the
+ * wrong half. Every line in `window.ts` is about where a block sits, because where it sits is what a
+ * provider's cache charges for, and the eval suite's aggregate token count - the only other thing
+ * that would notice - moves for a dozen reasons and names none of them.
  *
  * So the assertions here are deliberately about position and identity rather than about text:
  *

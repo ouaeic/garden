@@ -3,18 +3,10 @@ import { runtimeNow } from '@garden/core';
  * Running the acceptance record in the harness: once per state of the workspace, and inside one
  * deadline for the suite rather than one per check.
  *
- * Lifted out of `AgentWorker` in Wave 7.2 carrying two defects the split is what makes fixable.
- *
- * #76 (loop F6): the suite ran twice on a completing turn, because the expensive gate is asked in
- * front of the free one. A turn that changed something and has not spoken declares its checks,
- * calls finish, runs the suite - a build and a test run - and is then held for the one question
- * that costs nothing, whether it said anything to the user. It answers, finishes again, and the
- * same suite runs a second time against a workspace nothing has touched since. Two full builds for
- * one completing turn, and a third whenever a step budget renews.
- *
- * #22 (loop F5 / rel F8), the half that was left: the cancellation watch is here and correct, and
- * nothing bounded the suite as a whole. `MAX_ACCEPTANCE_CHECKS` checks at
- * `ACCEPTANCE_COMMAND_TIMEOUT_SECONDS` each compose to two hours.
+ * A suite is a build and a test run, so two things bound what it costs. A suite that passed is not
+ * run again against a workspace nothing has touched since, however many times the turn asks. And
+ * the suite as a whole has one deadline, because `MAX_ACCEPTANCE_CHECKS` checks at
+ * `ACCEPTANCE_COMMAND_TIMEOUT_SECONDS` each would otherwise compose to two hours.
  */
 import type { DataStore, TaskRecord } from '@garden/data';
 import type { JsonProofResult } from '@garden/contracts';
@@ -124,8 +116,7 @@ export const runAcceptanceChecks = async (
   /**
    * The turn, so one run of the suite can answer a second ask about the same workspace.
    *
-   * Optional only because the baseline run at `set_acceptance` has nothing to memoise against and
-   * must never be answered from a memo: its whole job is to watch the checks fail before the work.
+   * Optional: a run without a turn has nothing to memoise against, so it always runs fresh.
    */
   state?: AgentState
 ): Promise<AcceptanceResult[]> => {
@@ -134,7 +125,7 @@ export const runAcceptanceChecks = async (
    *
    * An acceptance suite is a build and a test run: the two longest things a turn does after the
    * model call, and the only ones the owner is told are running. Without the watch a Stop pressed
-   * during the finish check stopped nothing - the suite ran to the runner's own ceiling on the
+   * during the checks would stop nothing - the suite would run to the runner's own ceiling on the
    * box, still writing files, while the interface said the task had stopped. `#withCancellationWatch`
    * aborts the runner requests, which surface as failed checks and let the loop take the task down
    * cleanly. Around the whole suite rather than around each check, so one Stop reaches all of them.
@@ -151,11 +142,10 @@ export const runAcceptanceChecks = async (
    * Only a suite that passed is remembered.
    *
    * A failing run is the harness telling the model to go and fix something, and the whole point of
-   * the next finish is to find out whether it did - so a failure is re-run every time, and the
-   * "failed, fixed, passed inside one turn" path is untouched by this. What the memo covers is the
-   * other shape: a suite that passed, re-asked after a hold that had nothing to do with acceptance,
-   * with no tool call in between to have changed anything. That is #76 exactly, and it is the only
-   * case where the second run could not have said anything the first did not.
+   * the next answer is to find out whether it did - so a failure is re-run every time, and the
+   * "failed, fixed, passed inside one turn" path is untouched by this. What the memo covers is a
+   * suite that passed, asked again with no tool call in between to have changed anything: the only
+   * case where the second run could not say anything the first did not.
    */
   if (memoKey !== null && state && results.every((result) => result.passed))
     suiteMemo.set(state, { key: memoKey, results });

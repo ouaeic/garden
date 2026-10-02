@@ -867,15 +867,13 @@ describe('the turn wall clock', () => {
   });
 
   /**
-   * Its sibling, which nothing was driving.
+   * Its sibling.
    *
    * The compute-credit ceiling sits two lines below the clock in the same block and ends the turn
-   * the same way, and until this test it had no end-to-end proof at all: the whole of apps/worker
-   * stayed green with the credit arm reporting the step as open after it had already handed the
-   * turn over, which is a turn that carries on spending past the budget the owner set. The hole was
-   * found by attack during the Wave 8 phase decomposition - `return 'closed'` changed to
-   * `return 'open'`, 1,177 tests, none of them red - and it is the reason this file's `openStep`
-   * arm is now driven rather than read.
+   * the same way. Without this test, the credit arm could report the step as open after it had
+   * already handed the turn over - a turn that carries on spending past the budget the owner set -
+   * and nothing else in apps/worker would go red: changing its `return 'closed'` to `return 'open'`
+   * fails this test and no other.
    *
    * The budget is set to a thousandth of a credit because that is `usageCredit`'s own floor, so one
    * step of any size is guaranteed to reach it and the test does not depend on token counts.
@@ -6898,18 +6896,13 @@ describe('a turn that finishes the job rather than the budget', () => {
      * The lease moved while the budget was being spent, and this run stands down without saying a
      * word about it.
      *
-     * This case used to reach the step ceiling and assert the refusal `renewStepBudget` writes
-     * (`Stopping at the step limit: another worker holds the task`). Wave 7.2's #140 arm in
-     * `honorUserControl` gets there first and deliberately gets there in silence: timeline events
-     * carry no lease guard, so the refusal this test used to demand is itself the harm - the
-     * owner's conversation would gain a stray line about a turn ending, from a worker that is no
-     * longer running the task, beside the live output of the one that is. Standing down silently
-     * is the repair, so the assertion moved with it.
+     * The ownership arm in `honorUserControl` reaches this before the step ceiling does, and in
+     * silence: timeline events carry no lease guard, so a refusal written here would itself be the
+     * harm - the owner's conversation would gain a stray line about a turn ending, from a worker
+     * that is no longer running the task, beside the live output of the one that is.
      *
-     * Silence here means about the turn's own ending. The two preamble events this run has already
-     * written by the time the arm fires are written before the loop and before any ownership
-     * question is asked - see the note in 7.2's report, which lists that preamble as a residue of
-     * #140 rather than something this arm was asked to cover.
+     * Silence here means about the turn's own ending. Writes before the first ownership question
+     * are held to nothing by `preamble-ownership.test.ts`.
      *
      * The refusal arm inside `renewStepBudget` is still live and still tested, one level down in
      * `handoff.test.ts` - it guards the narrower window this test can no longer reach, where the
@@ -7884,15 +7877,13 @@ describe('what garden answered itself, and what the computer answered', () => {
 /**
  * The fifth ranking site, and the only one that chooses a model while the owner is asleep.
  *
- * Wave 4 landed the pre-flight price ceiling at the four sites an owner reaches by hand and proved
- * each by negative control. This one - the vision specialist an image is handed to when the lead
- * cannot see - was left open with the reason written down: spreading the ceiling in without a
- * refusal that names it recreates the defect the API's 402 removed, because an emptied pool falls
- * through to a sentence saying no specialist is available, which is true about the wrong setting.
+ * The pre-flight price ceiling applies here as at the four sites an owner reaches by hand, and when
+ * it empties the pool the refusal names the ceiling. Without that, an emptied pool falls through to
+ * a sentence saying no specialist is available, which is true about the wrong setting.
  *
- * Both tests assert **membership** - what was offered - and never ordering. Wave 4 measured that an
- * assertion of the shape "the chosen model is under the ceiling" is green over a dead feature,
- * because `balanced` prefers the cheaper route unaided.
+ * Both tests assert **membership** - what was offered - and never ordering. An assertion of the
+ * shape "the chosen model is under the ceiling" is green over a dead feature, because `balanced`
+ * prefers the cheaper route unaided.
  */
 describe('who reads a picture the lead model cannot', () => {
   /** A lead with no `vision` capability, which is what sends an image to a specialist at all. */
