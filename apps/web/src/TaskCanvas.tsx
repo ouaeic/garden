@@ -400,7 +400,9 @@ export function TaskOutputs({
                           ? 'Embedded preview closed. Open the app or view it here when you are ready.'
                           : frameState === 'failed'
                             ? 'The app could not be opened. Use View here to retry.'
-                            : 'Opening the live app…'}
+                            : !autoPreview && selectedPreview === null
+                              ? 'Ready to view. Open the app or view it here.'
+                              : 'Opening the live app…'}
                 </p>
               </div>
             )}
