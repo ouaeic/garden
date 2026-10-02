@@ -120,7 +120,36 @@ export default function Composer(props: ComposerProps) {
           <DictationSetup onClose={() => setDictationSetup(false)} onStart={startDictation} />
         </Suspense>
       )}
-      {context && (
+      {context?.kind === 'notes' && (
+        <ul className="composer-notes" aria-label="Your comments on the result">
+          {context.notes.map((note, index) => (
+            <li key={index}>
+              <span className="composer-note-anchor">
+                {note.quote
+                  ? `“${note.quote.slice(0, 80)}${note.quote.length > 80 ? '…' : ''}”`
+                  : note.region
+                    ? `○ ${note.on}`
+                    : note.on}
+              </span>
+              <span className="composer-note-text">{note.note || 'Look at this'}</span>
+              {props.onContextChange && (
+                <button
+                  type="button"
+                  aria-label="Remove this comment"
+                  disabled={editingDisabled}
+                  onClick={() => {
+                    const rest = context.notes.filter((_, at) => at !== index);
+                    props.onContextChange?.(rest.length ? { kind: 'notes', notes: rest } : null);
+                  }}
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {context && context.kind !== 'notes' && (
         <section
           className="composer-context"
           aria-label={context.kind === 'analysis' ? 'Selected analysis' : 'Selected context'}
@@ -172,7 +201,13 @@ export default function Composer(props: ComposerProps) {
             void send();
           }
         }}
-        placeholder={task ? 'Add a direction…' : 'Describe what you want to do…'}
+        placeholder={
+          context?.kind === 'notes'
+            ? 'Anything else? Your comments are sent with this.'
+            : task
+              ? 'Reply, or ask for a change…'
+              : 'Describe what you want to do…'
+        }
       />
       {attachments.length > 0 && (
         <div className="attachments">
@@ -299,7 +334,7 @@ export default function Composer(props: ComposerProps) {
             type="submit"
             className="primary"
             disabled={
-              !body.trim() ||
+              !(body.trim() || context?.kind === 'notes') ||
               uploading ||
               voiceBusy ||
               Boolean(pendingTask) ||

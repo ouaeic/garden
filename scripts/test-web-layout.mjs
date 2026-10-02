@@ -26,6 +26,7 @@ import { directoryFixture, checkProjectDirectories } from './browser-directories
 import { checkProjectConversations } from './browser-project-conversations.mjs';
 import { checkTaskRecovery } from './browser-task-recovery.mjs';
 import { checkArtifactLinks } from './browser-artifact-links.mjs';
+import { checkResultView } from './browser-result-view.mjs';
 
 // Local fixtures exercise browser interactions; API and runner suites own authorization and delivery.
 const requireRunner = createRequire(
@@ -1303,6 +1304,7 @@ try {
   if (process.env.GARDEN_UI_FOCUS === 'files-jobs') {
     await checkTaskRecovery({ context, origin, bootstrap, task, report, errors });
     await checkArtifactLinks({ context, origin, task, workspace, presentation, report, errors });
+    await checkResultView({ context, origin, task, workspace, presentation, report, errors });
     await checkProjectDirectories({
       context,
       origin,
@@ -1371,6 +1373,7 @@ try {
       });
       await checkTaskRecovery({ context, origin, bootstrap, task, report, errors });
       await checkArtifactLinks({ context, origin, task, workspace, presentation, report, errors });
+      await checkResultView({ context, origin, task, workspace, presentation, report, errors });
       await checkProjectDirectories({
         context,
         origin,
@@ -1420,7 +1423,6 @@ try {
       ),
       'Project tools must precede the running work'
     );
-    await page.getByRole('button', { name: /^Continue this conversation/ }).click();
     assert(projectEventRequests.length > 0, 'Opening a project must load its event page');
     assert.equal(projectEventRequests[0], null, 'Open the most recent page without a sentinel');
     await page
@@ -1813,8 +1815,6 @@ try {
       'Expanding must preserve the running preview'
     );
     await page.getByRole('button', { name: 'Exit full screen', exact: true }).click();
-    const outputViews = page.getByRole('navigation', { name: 'Output views' });
-    await outputViews.getByRole('button', { name: 'Downloads', exact: true }).click();
     const downloadPromise = page.waitForEvent('download');
     await page
       .locator('.garden-output-downloads')
@@ -1822,7 +1822,6 @@ try {
       .click();
     const download = await downloadPromise;
     assert.equal(await readFile(await download.path(), 'utf8'), previewHtml);
-    await outputViews.getByRole('button', { name: 'Preview', exact: true }).click();
     await page.evaluate(() =>
       Object.defineProperty(Element.prototype, 'requestFullscreen', {
         configurable: true,
@@ -1882,10 +1881,6 @@ try {
       .waitFor({ state: 'detached' });
     recordedReply = 'harbor-cobalt-46';
     await page.reload();
-    await page
-      .getByRole('navigation', { name: 'Output views' })
-      .getByRole('button', { name: 'Summary', exact: true })
-      .click();
     await page.locator('.garden-answer').getByText('harbor-cobalt-46', { exact: true }).waitFor();
     await page
       .locator(
@@ -2387,10 +2382,6 @@ try {
     });
     await dictationPage.goto(`${origin}/?task=${task.id}`);
     await dictationPage.locator('.garden-task-composer').waitFor();
-    if (
-      await dictationPage.getByRole('button', { name: /^Continue this conversation/ }).isVisible()
-    )
-      await dictationPage.getByRole('button', { name: /^Continue this conversation/ }).click();
     await dictationPage.getByRole('button', { name: 'Dictate direction', exact: true }).click();
     let dictationDialog = dictationPage.getByRole('dialog', {
       name: 'Dictate a direction',
@@ -2791,8 +2782,6 @@ try {
     await captureBrowserErrors(modelsPage, errors);
     await modelsPage.goto(`${origin}/?task=${task.id}`);
     await modelsPage.locator('.garden-task-composer').waitFor();
-    if (await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).isVisible())
-      await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).click();
     await revealPromptSettings(modelsPage);
     const approvalsSetting = modelsPage.getByRole('combobox', {
       name: 'Approvals for this prompt',
@@ -2935,9 +2924,6 @@ try {
     await projectModels
       .getByRole('button', { name: 'Close Conversation models', exact: true })
       .click();
-
-    if (await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).isVisible())
-      await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).click();
     await revealPromptSettings(modelsPage);
     await modelsPage.getByRole('button', { name: /^Model for this direction:/ }).click();
     const modelSearch = modelsPage.getByRole('combobox', { name: 'Search models', exact: true });

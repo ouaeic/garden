@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import type { TaskPresentation } from '@garden/contracts';
 import { TaskOutputs, TaskProgress } from './TaskCanvas';
 import WorkTrace from './WorkTrace';
-import WorkSummaryVisual from './WorkSummaryVisual';
 
 const presentation: TaskPresentation = {
   version: 1,
@@ -50,52 +49,19 @@ const presentation: TaskPresentation = {
 };
 
 describe('usable task delivery and recorded progress', () => {
-  it('shows a follow-up answer ahead of an older preview, and previews a newly produced result', () => {
-    const surface: NonNullable<TaskPresentation['surface']> = {
-      direction: {
-        eventId: 'follow-up',
-        sequence: 5,
-        text: 'Explain the result.',
-        truncated: false,
-        queued: false
-      },
-      directions: [],
-      report: null,
-      references: [],
-      currentResultIds: ['preview-1'],
-      sources: [],
-      unavailableReferences: 0
-    };
-    const render = (sequence: number) =>
-      renderToStaticMarkup(
-        <TaskOutputs
-          presentation={{
-            ...presentation,
-            surface,
-            progress: { ...presentation.progress, phases: [] }
-          }}
-          events={[
-            {
-              id: 'published',
-              taskId: presentation.taskId,
-              sequence,
-              kind: 'preview',
-              summary: 'Published the app',
-              payload: {},
-              createdAt: '2026-09-06T00:00:00Z'
-            }
-          ]}
-          afterPreview={<p>The latest explanation</p>}
-          fitted
-          onArtifact={() => undefined}
-        />
-      );
-    expect(render(4)).toMatch(/aria-pressed="true"[^>]*>Summary</);
-    expect(render(6)).toMatch(/aria-pressed="true"[^>]*>Preview</);
-    expect(render(4)).toContain('Downloads');
-    expect(render(4)).toContain('The latest explanation');
-    expect(render(4)).not.toContain('Work at a glance');
-    expect(render(6)).toContain('Work at a glance');
+  it('shows the preview, the answer and the files together, with no tabs between them', () => {
+    const html = renderToStaticMarkup(
+      <TaskOutputs
+        presentation={presentation}
+        afterPreview={<p>The latest explanation</p>}
+        onArtifact={() => undefined}
+      />
+    );
+    expect(html).toContain('Maze game');
+    expect(html).toContain('The latest explanation');
+    expect(html).toContain('index.html');
+    expect(html).not.toContain('aria-pressed');
+    expect(html).not.toContain('at a glance');
   });
   it('downloads the declared project bundle beside a preview rather than an unrelated latest file', () => {
     const withoutBundle = renderToStaticMarkup(
@@ -120,38 +86,6 @@ describe('usable task delivery and recorded progress', () => {
       'class="button garden-primary-download" href="/v1/tasks/recorded-task/bundle"'
     );
     expect(html).toContain('Download project files');
-  });
-
-  it('summarizes recorded steps and distinct outputs without estimating task completion', () => {
-    const html = renderToStaticMarkup(
-      <WorkSummaryVisual
-        presentation={{
-          ...presentation,
-          results: [...presentation.results, presentation.results[1]!],
-          coverage: { scope: 'recent', eventCount: 4, omittedPayloads: 0 }
-        }}
-      />
-    );
-    expect(html).toContain('Recorded plan · 2 steps');
-    expect(html).toContain('1 completed');
-    expect(html).toContain('1 in progress');
-    expect(html).toContain('Recorded outputs · 2');
-    expect(html).toContain('<dt>Apps</dt>');
-    expect(html).toContain('<dt>Files</dt>');
-    expect(html).toContain('Recent recorded work');
-    expect(html).not.toContain('<img');
-    expect(html).not.toContain('50% complete');
-    expect(
-      renderToStaticMarkup(
-        <WorkSummaryVisual
-          presentation={{
-            ...presentation,
-            results: [],
-            progress: { ...presentation.progress, phases: [] }
-          }}
-        />
-      )
-    ).toBe('');
   });
   it('does not show a cached completion while another direction is paused or waiting', () => {
     const outcome = {

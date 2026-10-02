@@ -29,7 +29,7 @@ export async function checkWorkspaceNavigation({ context, origin, task, report }
     };
     await views.getByRole('button', { name: 'Files', exact: true }).waitFor();
     assert.equal(await views.getByRole('button', { name: 'Work', exact: true }).count(), 0);
-    await page.getByRole('button', { name: 'Continue this conversation…', exact: true }).waitFor();
+    await page.locator('.garden-task-composer textarea').waitFor();
     assert.equal(
       reads.some((path) => path.endsWith('/directories')),
       true,
@@ -96,7 +96,6 @@ export async function checkWorkspaceNavigation({ context, origin, task, report }
     await page.getByRole('region', { name: 'Project processes', exact: true }).waitFor();
     assert.deepEqual(await conversations.locator('option').allTextContents(), order);
     await closePanel();
-    await page.getByRole('button', { name: /^Continue this conversation/ }).click();
     const draft = page.locator('.garden-task-composer textarea');
     await draft.fill('Keep this follow-up draft while I inspect the files.');
     await views.getByRole('button', { name: 'Files', exact: true }).click();

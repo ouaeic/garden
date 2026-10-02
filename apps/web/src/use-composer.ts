@@ -404,7 +404,7 @@ export function useComposer({
   async function send() {
     if (
       dictationSetup ||
-      !body.trim() ||
+      !(body.trim() || context?.kind === 'notes') ||
       sending.current ||
       uploadController.current ||
       voiceState.current !== 'idle' ||

@@ -49,11 +49,8 @@ export async function checkInterfaceTexture(page) {
 export async function checkOutputAppearance({ context, origin, task, report }) {
   const page = await context.newPage();
   await page.goto(`${origin}/?task=${task.id}`);
-  await page.getByRole('navigation', { name: 'Output views' }).waitFor();
-  await page.getByRole('button', { name: 'Summary', exact: true }).click();
-  const visual = page.getByRole('region', { name: 'Work at a glance', exact: true });
+  const visual = page.getByRole('region', { name: 'Results and downloads', exact: true });
   await visual.waitFor();
-  assert.equal(await visual.locator('img, iframe, canvas').count(), 0);
   for (const theme of ['light', 'dark']) {
     await page.evaluate((theme) => {
       document.documentElement.dataset.theme = theme;

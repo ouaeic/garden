@@ -1,7 +1,14 @@
 import ScrollRegion from './ScrollRegion';
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowUpRight, Check, Download, FileText, Globe, Maximize2, X } from './icons';
-import type { Artifact, TaskPresentation, TaskResult, TaskEvent } from '@garden/contracts';
+import type {
+  Artifact,
+  ResultNote,
+  TaskPresentation,
+  TaskResult,
+  TaskEvent
+} from '@garden/contracts';
+import { isViewArtifact } from './view-artifact';
 import { isNativeClient, post } from './client';
 import { resultSnapshot } from './result-snapshot';
 import { previewIsolated, previewUrl } from './preview-url';
@@ -9,7 +16,7 @@ import { useExpandedView } from './use-expanded-view';
 import { usePreviewStart } from './use-preview-start';
 import { Button, ErrorNotice, Spinner } from './ui';
 import './presentation.css';
-import WorkSummaryVisual from './WorkSummaryVisual';
+const ResultView = lazy(() => import('./ResultView'));
 const ResultPreview = lazy(() =>
   import('./computer/ResultPreview').then((module) => ({ default: module.ResultPreview }))
 );
@@ -27,9 +34,9 @@ export function TaskOutputs({
   onRemember,
   autoPreview = true,
   compact = true,
-  fitted = false,
-  preferSummary = false,
-  afterPreview
+  afterPreview,
+  notes,
+  onNote
 }: {
   presentation: TaskPresentation;
   events?: TaskEvent[];
@@ -39,19 +46,10 @@ export function TaskOutputs({
   onRemember?: (result: TaskPresentation['results'][number]) => void;
   autoPreview?: boolean;
   compact?: boolean;
-  fitted?: boolean;
-  preferSummary?: boolean;
   afterPreview?: ReactNode;
+  notes?: readonly ResultNote[];
+  onNote?: (note: ResultNote) => void;
 }) {
-  const direction = presentation.surface?.direction;
-  const sectionScope = `${presentation.taskId}:${direction?.eventId ?? ''}`;
-  const [selection, setSelection] = useState<{
-    scope: string;
-    section: 'preview' | 'summary' | 'files';
-  } | null>(null);
-  const setSelectedSection = (section: 'preview' | 'summary' | 'files') =>
-    setSelection({ scope: sectionScope, section });
-  const selectedSection = selection?.scope === sectionScope ? selection.section : null;
   const [showAll, setShowAll] = useState(false);
   const [opened, setOpened] = useState<{ id: string; url: string } | null>(null);
   const [dismissed, setDismissed] = useState<string | null>(null);
@@ -79,9 +77,6 @@ export function TaskOutputs({
   const preview = previews.find((item) => item.id === selectedPreview) ?? previews[0];
   const viewablePreview =
     preview?.status === 'ready' || (preview?.status === 'unknown' && opened?.id === preview.id);
-  useEffect(() => {
-    if (preview?.startState) setSelection({ scope: sectionScope, section: 'preview' });
-  }, [preview?.id, preview?.startState, sectionScope]);
   const startingPreview =
     preview?.startState === 'starting' ||
     (recovery.requestedId === preview?.id && Boolean(preview));
@@ -92,6 +87,16 @@ export function TaskOutputs({
         files.some((file) => file.artifactId === item.id && file.status === 'ready')
       )
     : undefined;
+  // A visual made for an earlier message follows the newer answer rather than covering it.
+  const direction = presentation.surface?.direction;
+  const visual = preview ?? files.find((file) => file.artifactId === featured?.id);
+  const visualIsCurrent =
+    !direction ||
+    !visual ||
+    visual.evidenceEventIds.some((id) =>
+      events.some((event) => event.id === id && event.sequence > direction.sequence)
+    );
+  const answerFirst = Boolean(afterPreview) && !visualIsCurrent;
   useEffect(() => {
     grants.current.clear();
     setOpened(null);
@@ -232,78 +237,29 @@ export function TaskOutputs({
       onError={() => setFrameState('failed')}
     />
   );
-  const sections = [
-    ...(preview || featured ? [{ id: 'preview' as const, label: 'Preview' }] : []),
-    ...(afterPreview ? [{ id: 'summary' as const, label: 'Summary' }] : []),
-    ...(files.length || presentation.sourceBundle
-      ? [{ id: 'files' as const, label: 'Downloads' }]
-      : [])
-  ];
-  const visualResult = preview ?? files.find((file) => file.artifactId === featured?.id);
-  const fromDirection = (result: TaskResult) =>
-    !direction ||
-    result.evidenceEventIds.some((id) =>
-      events.some((event) => event.id === id && event.sequence > direction.sequence)
-    );
-  const currentVisual = !direction || (visualResult && fromDirection(visualResult));
-  const currentWork =
-    !direction ||
-    presentation.progress.phases.length > 0 ||
-    presentation.results.some(fromDirection);
-  const selected =
-    sections.find((section) => section.id === selectedSection)?.id ??
-    (afterPreview && !preview?.startState && (preferSummary || !currentVisual)
-      ? 'summary'
-      : sections[0]?.id);
   return (
-    <section
-      className={`garden-outputs${fitted ? ' is-fitted' : ''}`}
-      aria-label="Results and downloads"
-    >
-      {fitted && sections.length > 1 && (
-        <nav className="desk-output-sections" aria-label="Output views">
-          {sections.map((section) => (
-            <Button
-              key={section.id}
-              aria-pressed={selected === section.id}
-              onClick={() => setSelectedSection(section.id)}
-            >
-              {section.label}
-            </Button>
-          ))}
-        </nav>
-      )}
+    <section className="garden-outputs" aria-label="Results and downloads">
       <ErrorNotice error={error} />
       <ErrorNotice error={recovery.error} />
-      {!presentation.results.length &&
-        !presentation.delivery?.pendingJobs &&
-        presentation.outputs?.some((output) => output.kind !== 'answer') && (
-          <div className="garden-planned-outputs">
-            {presentation.outputs
-              .filter((output) => output.kind !== 'answer')
-              .map((output, index) => (
-                <div key={`${output.kind}-${index}`}>
-                  {output.kind === 'app' ? <Globe size={22} /> : <FileText size={22} />}
-                  <div>
-                    <small>Planned {output.kind === 'app' ? 'app' : output.kind}</small>
-                    <strong>{output.title}</strong>
-                  </div>
-                </div>
-              ))}
-          </div>
+      {answerFirst && (
+        <div className="garden-output-section garden-output-answer">{afterPreview}</div>
+      )}
+      <div className="garden-output-section garden-output-visual">
+        {featured && isViewArtifact(featured) && (
+          <Suspense fallback={<Spinner label="Opening the view…" />}>
+            <ResultView
+              key={featured.id}
+              artifact={featured}
+              {...(notes ? { notes } : {})}
+              {...(onNote ? { onNote } : {})}
+            />
+          </Suspense>
         )}
-      <div
-        className="garden-output-section garden-output-visual"
-        hidden={fitted && selected !== 'preview'}
-      >
-        {featured && (
+        {featured && !isViewArtifact(featured) && (
           <article className="garden-output-primary">
-            <header className="garden-output-header">
-              <div>
-                <span className="eyebrow">Made with this work</span>
-                <h2>{featured.name}</h2>
-              </div>
-              <FileText size={22} />
+            <header className="garden-output-header garden-output-bar">
+              <FileText size={16} aria-hidden="true" />
+              <h2>{featured.name}</h2>
             </header>
             <div className="garden-artifact-view">
               <Suspense fallback={<Spinner label="Opening your result…" />}>
@@ -334,14 +290,88 @@ export function TaskOutputs({
             ref={stage}
             id={`preview-${preview.previewId ?? preview.id}`}
           >
-            <header className="garden-output-header">
-              <div>
-                <span className="eyebrow">
-                  {preview.status === 'ready' ? 'Ready to open' : 'Preview'}
-                </span>
-                <h2>{preview.title}</h2>
+            <header className="garden-output-header garden-output-bar">
+              <Globe size={16} aria-hidden="true" />
+              <h2>{preview.title}</h2>
+              <div className="garden-output-actions">
+                {!viewablePreview &&
+                  preview.startPath &&
+                  (preview.startState === 'attention' ? (
+                    <a
+                      className="button primary"
+                      href={`/?task=${encodeURIComponent(presentation.taskId)}`}
+                    >
+                      Open conversation
+                    </a>
+                  ) : (
+                    <Button
+                      className="primary"
+                      busy={startingPreview}
+                      title="Garden will restart the app using this conversation’s model and settings."
+                      onClick={() => {
+                        setSelectedPreview(preview.id);
+                        setDismissed(null);
+                        grants.current.clear();
+                        void recovery.start(preview);
+                      }}
+                    >
+                      {startingPreview ? 'Starting preview…' : 'Start preview'}
+                    </Button>
+                  ))}
+                {viewablePreview && (
+                  <>
+                    <Button
+                      className="primary"
+                      busy={busy === preview.id}
+                      onClick={() => void open(preview, true)}
+                    >
+                      Open app
+                      <ArrowUpRight size={16} />
+                    </Button>
+                    <Button busy={busy === preview.id} onClick={() => void copyLink(preview)}>
+                      Copy link
+                    </Button>
+                    {!opened ? (
+                      <Button busy={busy === preview.id} onClick={() => void open(preview)}>
+                        View here
+                      </Button>
+                    ) : (
+                      <>
+                        <Button onClick={() => void toggleExpanded().catch(setError)}>
+                          <Maximize2 size={15} />
+                          {expanded ? 'Exit full screen' : 'Expand'}
+                        </Button>
+                        <Button
+                          aria-label="Close embedded preview"
+                          onClick={() => {
+                            void closeExpanded().catch(setError);
+                            setDismissed(previewKey);
+                            setOpened(null);
+                          }}
+                        >
+                          <X size={16} />
+                        </Button>
+                      </>
+                    )}
+                  </>
+                )}
+                {presentation.sourceBundle && (
+                  <a
+                    className="button garden-primary-download"
+                    href={presentation.sourceBundle.downloadUrl}
+                    download
+                  >
+                    <Download size={15} />
+                    Download project files
+                  </a>
+                )}
+                {preview.detail &&
+                  !startingPreview &&
+                  !preview.startState &&
+                  (preview.status === 'ready' || captured) && (
+                    <p className="muted">{preview.detail}</p>
+                  )}
               </div>
-              <Globe size={22} />
             </header>
             {opened?.id === preview.id && viewablePreview ? (
               <div className="garden-preview-live">
@@ -406,86 +436,6 @@ export function TaskOutputs({
                 </p>
               </div>
             )}
-            <div className="garden-output-actions">
-              {!viewablePreview &&
-                preview.startPath &&
-                (preview.startState === 'attention' ? (
-                  <a
-                    className="button primary"
-                    href={`/?task=${encodeURIComponent(presentation.taskId)}`}
-                  >
-                    Open conversation
-                  </a>
-                ) : (
-                  <Button
-                    className="primary"
-                    busy={startingPreview}
-                    title="Garden will restart the app using this conversation’s model and settings."
-                    onClick={() => {
-                      setSelectedSection('preview');
-                      setSelectedPreview(preview.id);
-                      setDismissed(null);
-                      grants.current.clear();
-                      void recovery.start(preview);
-                    }}
-                  >
-                    {startingPreview ? 'Starting preview…' : 'Start preview'}
-                  </Button>
-                ))}
-              {viewablePreview && (
-                <>
-                  <Button
-                    className="primary"
-                    busy={busy === preview.id}
-                    onClick={() => void open(preview, true)}
-                  >
-                    Open app
-                    <ArrowUpRight size={16} />
-                  </Button>
-                  <Button busy={busy === preview.id} onClick={() => void copyLink(preview)}>
-                    Copy link
-                  </Button>
-                  {!opened ? (
-                    <Button busy={busy === preview.id} onClick={() => void open(preview)}>
-                      View here
-                    </Button>
-                  ) : (
-                    <>
-                      <Button onClick={() => void toggleExpanded().catch(setError)}>
-                        <Maximize2 size={15} />
-                        {expanded ? 'Exit full screen' : 'Expand'}
-                      </Button>
-                      <Button
-                        aria-label="Close embedded preview"
-                        onClick={() => {
-                          void closeExpanded().catch(setError);
-                          setDismissed(previewKey);
-                          setOpened(null);
-                        }}
-                      >
-                        <X size={16} />
-                      </Button>
-                    </>
-                  )}
-                </>
-              )}
-              {presentation.sourceBundle && (
-                <a
-                  className="button garden-primary-download"
-                  href={presentation.sourceBundle.downloadUrl}
-                  download
-                >
-                  <Download size={15} />
-                  Download project files
-                </a>
-              )}
-              {preview.detail &&
-                !startingPreview &&
-                !preview.startState &&
-                (preview.status === 'ready' || captured) && (
-                  <p className="muted">{preview.detail}</p>
-                )}
-            </div>
             {sharedLink?.id === preview.id &&
               (sharedLink.copied ? (
                 <p role="status">Link copied.</p>
@@ -502,17 +452,10 @@ export function TaskOutputs({
           </article>
         )}
       </div>
-      <div
-        className="garden-output-section garden-output-answer"
-        hidden={fitted && selected !== 'summary'}
-      >
-        {afterPreview}
-        {afterPreview && currentWork && <WorkSummaryVisual presentation={presentation} />}
-      </div>
-      <div
-        className="garden-output-section garden-output-downloads"
-        hidden={fitted && selected !== 'files'}
-      >
+      {afterPreview && !answerFirst && (
+        <div className="garden-output-section garden-output-answer">{afterPreview}</div>
+      )}
+      <div className="garden-output-section garden-output-downloads">
         {presentation.sourceBundle && presentation.results.length > 0 && (
           <div className="garden-source-bundle">
             <a className="button" href={presentation.sourceBundle.downloadUrl} download>

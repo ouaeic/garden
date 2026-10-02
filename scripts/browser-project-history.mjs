@@ -77,109 +77,47 @@ export async function checkProjectHistory({ context, origin, task, presentation,
   );
   await page.goto(`${origin}/?task=${task.id}`);
   const results = page.locator('.garden-previous-results');
-  const response = page.locator('.garden-previous-answer');
-  await response.locator('summary').waitFor();
   await page
     .locator('.garden-answer')
     .getByText('The current version is ready.', { exact: true })
     .waitFor();
-  const views = page.getByRole('navigation', { name: 'Output views' });
-  assert.equal(
-    await views.getByRole('button', { name: 'Summary', exact: true }).getAttribute('aria-pressed'),
-    'true',
-    'An answer-only follow-up opens its latest answer'
-  );
-  await views.getByRole('button', { name: 'Preview', exact: true }).click();
+  // The conversation reads as a thread: the earlier exchange is one line, what was asked last is
+  // above the answer, and nothing is behind a dialog.
+  const earlier = page.locator('.thread > li > details').first();
+  await earlier.locator('summary').getByText('Make the first version.', { exact: true }).waitFor();
+  await page
+    .locator('.owner-line')
+    .getByText('Improve the next version.', { exact: true })
+    .waitFor();
   await page.locator('.garden-preview-frame').waitFor();
   const originalPreview = await page.locator('.garden-preview-frame').elementHandle();
   assert(originalPreview, 'The current app preview must exist before opening history');
-  assert.equal(await response.locator('summary').textContent(), 'Previous response');
+  const scroller = page.locator('.garden-task-scroll');
   for (const { width, height } of [
     { width: 1440, height: 1000 },
     { width: 390, height: 844 },
     { width: 320, height: 568 }
   ]) {
     await page.setViewportSize({ width, height });
-    for (const [name, section] of [
-      ['results', results],
-      ['response', response]
-    ]) {
-      const heading = section.locator(':scope > summary');
-      await heading.click();
-      await section
-        .locator(name === 'results' ? '.garden-delivery' : '.markdown p')
-        .last()
-        .waitFor({ state: 'attached' });
-      assert(
-        await section.evaluate((element) => element.scrollHeight > element.clientHeight + 100),
-        'Long history must scroll within its own card'
-      );
-      const scroller = page.locator('.garden-task-scroll');
-      const outerScroll = await scroller.evaluate((element) => element.scrollTop);
-      const bounds = await section.boundingBox();
-      const header = await heading.boundingBox();
-      await page.mouse.move(bounds.x + 12, header.y + header.height + 18);
-      await page.mouse.wheel(0, 400);
-      await page.waitForFunction(
-        (name) =>
-          document.querySelector(`.garden-previous-${name === 'results' ? 'results' : 'answer'}`)
-            .scrollTop > 0,
-        name
-      );
-      await heading.press('PageDown');
-      await section.evaluate((element) => {
-        element.scrollTop = element.scrollHeight;
-      });
-      assert(
-        await heading.evaluate((element) => {
-          const bounds = element.getBoundingClientRect();
-          const card = element.parentElement.getBoundingClientRect();
-          return (
-            bounds.top >= card.top - 1 &&
-            bounds.bottom <= card.bottom &&
-            bounds.bottom <= innerHeight &&
-            document
-              .elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
-              ?.closest('summary') === element
-          );
-        }),
-        'The collapse control must stay visible and clickable at the end of the history'
-      );
-      assert.equal(
-        await scroller.evaluate((element) => element.scrollTop),
-        outerScroll,
-        'History scrolling must not move the project output'
-      );
-      if (name === 'results') {
-        assert.equal(await section.locator('.garden-delivery').count(), olderFiles.length);
-        assert(
-          await section
-            .locator('.scroll-region')
-            .evaluate((element) => element.scrollHeight <= element.clientHeight + 1),
-          'The file list must not add a second scrollbar'
-        );
-      } else {
-        await section
-          .getByText('Garden’s last written response before your latest message.', { exact: true })
-          .waitFor({ state: 'attached' });
-      }
-      await page.screenshot({ path: resolve(report, `history-${name}-${width}.png`) });
-      await heading.click();
-      assert.equal(await section.getAttribute('open'), null);
-      assert(
-        await originalPreview.evaluate((element) => element.isConnected),
-        'Closing history must preserve the running preview'
-      );
-      await page.locator('.garden-preview-frame').waitFor({ state: 'visible' });
-    }
+    await earlier.locator('summary').click();
+    await earlier
+      .getByText('Previous response paragraph 80.', { exact: false })
+      .waitFor({ state: 'attached' });
+    // One card scrolls - the conversation - and the history inside it adds no second scrollbar.
+    assert(await earlier.evaluate((element) => element.scrollHeight <= element.clientHeight + 1));
+    assert(await scroller.evaluate((element) => element.scrollHeight > element.clientHeight));
+    await page.screenshot({ path: resolve(report, `history-response-${width}.png`) });
+    await earlier.locator('summary').click();
+    assert.equal(await earlier.getAttribute('open'), null);
     await results.locator('summary').click();
-    await response.locator('summary').click();
-    assert.equal(
-      await results.getAttribute('open'),
-      null,
-      'Opening another history section preserves room for the current output'
+    assert.equal(await results.locator('.garden-delivery').count(), olderFiles.length);
+    await page.screenshot({ path: resolve(report, `history-results-${width}.png`) });
+    await results.locator('summary').click();
+    assert.equal(await results.getAttribute('open'), null);
+    assert(
+      await originalPreview.evaluate((element) => element.isConnected),
+      'Opening history must preserve the running preview'
     );
-    await response.locator('summary').click();
   }
   await page.close();
 }

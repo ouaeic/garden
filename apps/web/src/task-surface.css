@@ -1,0 +1,217 @@
+/* The conversation reads top to bottom in one scrolling card: earlier exchanges, what was asked,
+   the result, then its files. Nothing inside it scrolls on its own except a live preview. */
+.desk-shell .garden-task-primary > .garden-answer,
+.desk-shell .garden-task-primary > .garden-outputs .garden-answer {
+  padding: 16px 22px 12px;
+  overflow: visible;
+}
+.desk-shell .garden-task-primary > details {
+  max-height: none;
+  overflow: visible;
+}
+.desk-shell .garden-task-primary > .garden-outputs {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.garden-outputs > .garden-output-section {
+  display: contents;
+}
+.garden-outputs .result-view,
+.garden-outputs .garden-output-primary {
+  margin: 12px 16px 0;
+}
+.desk-shell .garden-task > .garden-task-scroll {
+  container-type: size;
+}
+/* A live app gets the visible height of the conversation card, less its own bar. */
+.desk-shell .garden-task-primary .garden-preview-live {
+  height: max(160px, min(calc(100cqh - 64px), 72cqh, 640px));
+}
+.desk-shell .garden-task-primary .garden-preview-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.garden-outputs .garden-output-downloads {
+  display: block;
+  padding: 0 16px 16px;
+}
+.garden-outputs .garden-output-downloads > .scroll-region {
+  max-height: none;
+  border: 0;
+  overflow: visible;
+}
+
+.thread {
+  margin: 0;
+  padding: 8px 16px 0;
+  list-style: none;
+  display: grid;
+  gap: 2px;
+}
+.thread details > summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: baseline;
+  padding: 4px 8px;
+  cursor: pointer;
+  list-style: none;
+}
+.thread details > summary::-webkit-details-marker {
+  display: none;
+}
+.thread details > summary:hover,
+.thread details[open] > summary {
+  background: var(--lcd-texture), var(--tint);
+}
+.thread-ask,
+.thread-answer {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.thread-answer,
+.thread time {
+  color: var(--muted);
+}
+.thread-body {
+  display: grid;
+  gap: 8px;
+  padding: 8px 8px 16px;
+  border-left: 2px solid var(--line);
+  margin-left: 8px;
+}
+.thread-direction {
+  color: var(--muted);
+}
+
+.owner-line {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  margin: 12px 16px 0;
+  padding: 6px 10px;
+  border-left: 2px solid var(--line-strong);
+}
+details.owner-line {
+  display: block;
+}
+details.owner-line > summary {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  cursor: pointer;
+}
+.owner-line .eyebrow {
+  flex: none;
+}
+.owner-line > span:last-child,
+details.owner-line > summary > span:last-child {
+  overflow-wrap: anywhere;
+}
+
+.answer-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+  color: var(--muted);
+}
+.answer-footer .text-button {
+  margin-right: auto;
+}
+.answer-risks {
+  margin: 8px 0 0;
+  padding: 8px 8px 8px 24px;
+  border: 1px dashed var(--line-strong);
+}
+.desk-shell .garden-task-primary > .garden-working-note,
+.garden-working-note {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  margin: 16px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.garden-output-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.garden-output-bar > h2 {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font: inherit;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.garden-output-bar .garden-output-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0;
+  margin: 0;
+}
+.garden-output-bar .garden-output-actions .button {
+  min-height: 28px;
+  padding: 3px 8px;
+}
+.garden-output-bar .garden-output-actions p {
+  margin: 0;
+}
+
+/* One bar for the project: back, its name (the way to the overview), its conversations, its
+   panels and its two actions. Two stacked rows spent a line of the screen on nothing. */
+@media (min-width: 960px) and (min-height: 540px) {
+  .desk-shell .desk-project .project-topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    margin: 0 0 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .desk-shell .desk-project .project-topbar > .project-space-header {
+    display: contents;
+  }
+  .desk-shell .desk-project .project-topbar .project-back {
+    order: 0;
+  }
+  .desk-shell .desk-project .project-topbar .project-space-title {
+    order: 1;
+    flex: 0 1 auto;
+    max-width: 30%;
+  }
+  .desk-shell .desk-project .project-topbar .project-space-title h1 {
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .desk-shell .desk-project .project-topbar > .project-workspace-bar {
+    order: 2;
+    flex: 1 1 auto;
+    margin: 0;
+    border-bottom: 0;
+  }
+  .desk-shell .desk-project .project-topbar .project-space-header > .row {
+    order: 3;
+  }
+}
+.desk-shell .garden-task-primary .garden-output-primary.expanded {
+  margin: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.desk-shell .garden-task-primary .garden-output-primary.expanded .garden-preview-live {
+  height: auto;
+  min-height: 0;
+}

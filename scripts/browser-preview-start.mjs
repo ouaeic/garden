@@ -213,36 +213,12 @@ export async function checkPreviewStart({ context, origin, task, presentation, r
       publishedSequence = 3;
       await page.setViewportSize({ width, height: 900 });
       await page.reload();
-      const views = page.getByRole('navigation', { name: 'Output views' });
       await page
         .locator('.garden-answer')
         .getByText('This is the latest explanation.', { exact: true })
         .waitFor();
-      assert.equal(
-        await views
-          .getByRole('button', { name: 'Summary', exact: true })
-          .getAttribute('aria-pressed'),
-        'true'
-      );
-      assert.equal(
-        await page.getByRole('region', { name: 'Work at a glance' }).count(),
-        0,
-        'A text-only follow-up has no charts of previous work above its answer'
-      );
       await page.screenshot({ path: resolve(report, `follow-up-answer-${width}.png`) });
-      await views.getByRole('button', { name: 'Preview', exact: true }).click();
       await card.locator('iframe').waitFor({ state: 'visible' });
-      const refreshed = page.waitForResponse(
-        (response) => new URL(response.url()).pathname === `/v1/tasks/${task.id}/presentation`
-      );
-      await refreshed;
-      assert.equal(
-        await views
-          .getByRole('button', { name: 'Preview', exact: true })
-          .getAttribute('aria-pressed'),
-        'true',
-        'A refresh preserves the owner’s selected view within a direction'
-      );
       directionSequence = 10;
       await page.reload();
       await page
@@ -252,23 +228,11 @@ export async function checkPreviewStart({ context, origin, task, presentation, r
       publishedSequence = 11;
       await page.reload();
       await card.locator('iframe').waitFor({ state: 'visible' });
-      assert.equal(
-        await views
-          .getByRole('button', { name: 'Preview', exact: true })
-          .getAttribute('aria-pressed'),
-        'true',
-        'A newly produced app remains the default result'
-      );
       const tip = page.frameLocator('iframe').getByRole('textbox', { name: 'Tip percentage' });
       await tip.fill('27');
       const beforeUpdate = frameLoads;
       directionSequence = 15;
-      await views.getByRole('button', { name: 'Summary', exact: true }).waitFor();
-      await page.waitForFunction(
-        () =>
-          document.querySelector('.desk-output-sections button[aria-pressed="true"]')
-            ?.textContent === 'Summary'
-      );
+      await page.waitForTimeout(250);
       assert.equal(
         frameLoads,
         beforeUpdate,
@@ -276,13 +240,13 @@ export async function checkPreviewStart({ context, origin, task, presentation, r
       );
       tipDefault = '10';
       previewRevision = `source-edit-${width}`;
+      // The frame stays on screen through the edit and reloads once when the next poll sees it.
+      for (let wait = 0; wait < 200 && frameLoads === beforeUpdate; wait += 1)
+        await page.waitForTimeout(50);
       await card.locator('iframe').waitFor({ state: 'visible' });
-      await page.waitForFunction(
-        () =>
-          document.querySelector('.desk-output-sections button[aria-pressed="true"]')
-            ?.textContent === 'Preview'
-      );
       await tip.waitFor();
+      for (let wait = 0; wait < 100 && (await tip.inputValue().catch(() => '')) !== '10'; wait += 1)
+        await page.waitForTimeout(50);
       assert.equal(
         await tip.inputValue(),
         '10',
@@ -290,8 +254,6 @@ export async function checkPreviewStart({ context, origin, task, presentation, r
       );
       assert.equal(frameLoads, beforeUpdate + 1, 'Finished edits reload the app once');
       await tip.fill('23');
-      await views.getByRole('button', { name: 'Summary', exact: true }).click();
-      await views.getByRole('button', { name: 'Preview', exact: true }).click();
       await card.getByRole('button', { name: 'Expand', exact: true }).click();
       await card.getByRole('button', { name: 'Exit full screen', exact: true }).waitFor();
       const [expandedCard, expandedFrame, expandedActions] = await Promise.all([
@@ -304,10 +266,9 @@ export async function checkPreviewStart({ context, origin, task, presentation, r
         expandedFrame.height > expandedCard.height * 0.6,
         'The expanded app receives most of the screen rather than the action bar'
       );
-      assert(expandedFrame.y + expandedFrame.height <= expandedActions.y + 2);
-      assert(
-        expandedActions.y + expandedActions.height <= expandedCard.y + expandedCard.height + 2
-      );
+      // The actions sit in the bar above the app, never over it.
+      assert(expandedActions.y + expandedActions.height <= expandedFrame.y + 2);
+      assert(expandedActions.y >= expandedCard.y - 2);
       await page.screenshot({ path: resolve(report, `expanded-preview-${width}.png`) });
       await card.getByRole('button', { name: 'Exit full screen', exact: true }).click();
       await page.waitForResponse(
