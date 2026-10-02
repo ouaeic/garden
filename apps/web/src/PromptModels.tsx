@@ -25,6 +25,7 @@ export default function PromptModelChoices({
         disabled={props.disabled ?? false}
         onChange={(next, previous) => {
           if (JSON.stringify(next.main) !== JSON.stringify(previous.main)) props.onChange({});
+          props.onClose();
         }}
       />
     );

@@ -2884,7 +2884,7 @@ try {
       /Research model 79/
     );
     await advanced.getByRole('button', { name: 'Save conversation choices', exact: true }).click();
-    await advanced.getByText('Conversation model choices saved', { exact: true }).waitFor();
+    await advanced.waitFor({ state: 'detached' });
     assert.equal(projectChoices.coding.modelId, 'openrouter/beta/model-79');
     assert.deepEqual(projectChoices.specialist, {
       automatic: true,
@@ -2892,7 +2892,6 @@ try {
       preference: 'fast'
     });
     await modelsPage.screenshot({ path: resolve(report, 'models-project-desktop.png') });
-    await advanced.getByRole('button', { name: 'Close Model choices', exact: true }).click();
     await modelsPage
       .getByRole('button', { name: 'Model for this direction: Research model 78', exact: true })
       .waitFor();
@@ -2900,8 +2899,7 @@ try {
     await modelsPage.getByRole('button', { name: 'Model roles', exact: true }).click();
     await pick(advanced, 'Main agent', 'openrouter/beta/model-79');
     await advanced.getByRole('button', { name: 'Save conversation choices', exact: true }).click();
-    await advanced.getByText('Conversation model choices saved', { exact: true }).waitFor();
-    await advanced.getByRole('button', { name: 'Close Model choices', exact: true }).click();
+    await advanced.waitFor({ state: 'detached' });
     await modelsPage
       .getByRole('button', { name: /^Model for this direction:/ })
       .filter({ hasText: 'Research model 79' })
