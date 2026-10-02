@@ -2794,13 +2794,59 @@ try {
     if (await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).isVisible())
       await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).click();
     await revealPromptSettings(modelsPage);
+    const approvalsSetting = modelsPage.getByRole('combobox', {
+      name: 'Approvals for this prompt',
+      exact: true
+    });
+    await approvalsSetting.selectOption('review');
+    assert.equal(
+      await approvalsSetting.inputValue(),
+      'review',
+      'Continuation approvals must be editable'
+    );
+    await approvalsSetting.selectOption('autonomous');
     await modelsPage
-      .getByRole('button', { name: 'Model choices for this direction', exact: true })
-      .click();
+      .getByRole('combobox', { name: 'Model reasoning effort', exact: true })
+      .selectOption('high');
+    await modelsPage.getByRole('button', { name: 'Close prompt settings', exact: true }).click();
+    await modelsPage.getByRole('button', { name: /^Model for this direction:/ }).click();
+    await modelsPage.getByRole('combobox', { name: 'Search models', exact: true }).fill('model-78');
+    await modelsPage.getByRole('option', { name: /^Research model 78\s/ }).click();
+    await modelsPage.getByRole('button', { name: /^Model for this direction:/ }).click();
+    await modelsPage.getByRole('button', { name: 'Model roles', exact: true }).click();
     const advanced = modelsPage.getByRole('dialog', { name: 'Model choices', exact: true });
-    await advanced.getByText('Advanced model choices', { exact: true }).click();
-    await advanced.getByRole('region', { name: 'Coding agents', exact: true }).waitFor();
-    assert.equal(await advanced.locator('.model-choice-card').count(), 10);
+    for (const group of ['Work', 'Media', 'Background tasks'])
+      await advanced.getByRole('region', { name: `${group} model roles`, exact: true }).waitFor();
+    const roles = advanced.locator('.prompt-model-row > button');
+    assert.equal(
+      await roles.count(),
+      9,
+      'Every active model role must be available in the continuation composer'
+    );
+    for (const width of [1440, 390, 320]) {
+      await modelsPage.setViewportSize({ width, height: 844 });
+      await modelsPage.waitForFunction(() => {
+        const dialog = document.querySelector('.prompt-model-dialog');
+        return dialog && dialog.getBoundingClientRect().bottom <= innerHeight;
+      });
+      const bounds = await advanced.evaluate((element) => ({
+        width: element.scrollWidth,
+        available: element.clientWidth,
+        bottom: element.getBoundingClientRect().bottom,
+        footer: element.querySelector('.prompt-model-footer').getBoundingClientRect().bottom,
+        viewport: innerHeight
+      }));
+      assert(
+        bounds.width <= bounds.available + 1 &&
+          bounds.bottom <= bounds.viewport &&
+          bounds.footer <= bounds.bottom + 1,
+        `Continuation model choices must fit the viewport: ${JSON.stringify(bounds)}`
+      );
+      await modelsPage.screenshot({
+        path: resolve(report, `continuation-model-roles-${width}.png`)
+      });
+    }
+    await modelsPage.setViewportSize({ width: 1440, height: 1000 });
     const pick = async (surface, label, modelId) => {
       const advancedOptions = surface.locator('details.advanced-model-choices');
       if (
@@ -2814,7 +2860,18 @@ try {
       await search.fill(modelId);
       await search.press('Enter');
     };
+    const roleDialogCount = await modelsPage.locator('dialog[open]').count();
     await pick(advanced, 'Coding agents', 'openrouter/beta/model-79');
+    assert.equal(
+      await modelsPage.locator('dialog[open]').count(),
+      roleDialogCount,
+      'Continuation role selection must stay in the same dialog'
+    );
+    await advanced.getByRole('button', { name: /^Research specialists:/ }).click();
+    await advanced.getByRole('option', { name: /^Automatic\s/ }).click();
+    await advanced
+      .getByRole('combobox', { name: 'Research specialists preference' })
+      .selectOption('fast');
     failModelSave = true;
     await advanced.getByRole('button', { name: 'Save conversation choices', exact: true }).click();
     await advanced
@@ -2823,14 +2880,47 @@ try {
       .waitFor();
     assert.equal(projectChoices.coding, undefined, 'A failed save must not change saved choices');
     assert.match(
-      await advanced.getByRole('region', { name: 'Coding agents', exact: true }).textContent(),
+      await advanced.getByRole('button', { name: /^Coding agents:/ }).textContent(),
       /Research model 79/
     );
     await advanced.getByRole('button', { name: 'Save conversation choices', exact: true }).click();
-    await advanced.getByText('Conversation model choices saved', { exact: true }).waitFor();
+    await advanced.waitFor({ state: 'detached' });
     assert.equal(projectChoices.coding.modelId, 'openrouter/beta/model-79');
+    assert.deepEqual(projectChoices.specialist, {
+      automatic: true,
+      modelId: '',
+      preference: 'fast'
+    });
     await modelsPage.screenshot({ path: resolve(report, 'models-project-desktop.png') });
-    await advanced.getByRole('button', { name: 'Close Model choices', exact: true }).click();
+    await modelsPage
+      .getByRole('button', { name: 'Model for this direction: Research model 78', exact: true })
+      .waitFor();
+    await modelsPage.getByRole('button', { name: /^Model for this direction:/ }).click();
+    await modelsPage.getByRole('button', { name: 'Model roles', exact: true }).click();
+    await pick(advanced, 'Main agent', 'openrouter/beta/model-79');
+    await advanced.getByRole('button', { name: 'Save conversation choices', exact: true }).click();
+    await advanced.waitFor({ state: 'detached' });
+    await modelsPage
+      .getByRole('button', { name: /^Model for this direction:/ })
+      .filter({ hasText: 'Research model 79' })
+      .waitFor();
+    await revealPromptSettings(modelsPage);
+    assert.equal(
+      await modelsPage
+        .getByRole('combobox', { name: 'Model reasoning effort', exact: true })
+        .inputValue(),
+      'auto'
+    );
+    await modelsPage.getByRole('button', { name: 'Close prompt settings', exact: true }).click();
+    await modelsPage
+      .locator('.garden-task-composer')
+      .getByRole('status', { name: 'Draft synced', exact: true })
+      .waitFor();
+    assert.equal(
+      modelDrafts.get(task.id).controls.modelId,
+      '',
+      'Saving the main role must clear a stale prompt model override'
+    );
     await modelsPage.reload();
     await modelsPage.getByRole('button', { name: 'Work options', exact: true }).click();
     await modelsPage.getByRole('button', { name: 'Models', exact: true }).click();
@@ -2898,7 +2988,7 @@ try {
     );
     await revealPromptSettings(modelsPage);
     await modelsPage.getByRole('button', { name: /^Model for this direction:/ }).click();
-    await modelsPage.getByRole('option', { name: 'Fixture reasoning model', exact: true }).click();
+    await modelsPage.getByRole('option', { name: /^Fixture reasoning model(?:\s|$)/ }).click();
     await modelsPage
       .getByRole('button', {
         name: 'Model for this direction: Fixture reasoning model',
