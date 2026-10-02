@@ -75,6 +75,7 @@ import { displayablePrefix, type DisplayBudget } from '../services/workspace-run
 // `MACHINE_REPORT`, which states the box's measured figures and lets these two derive the rest.
 import { defaultMemoryLimitBytes } from '../services/workspace-runner/src/limits.js';
 import { machineSummary } from '../services/workspace-runner/src/machine.js';
+import { summariseToolchain } from '../services/workspace-runner/src/toolchain.js';
 import { memoryItemAad, memorySourceAad } from '../apps/worker/src/memory-runtime.js';
 import { builtinSkillLibrary } from '../apps/worker/src/skills.js';
 
@@ -271,10 +272,7 @@ export interface ScriptContext {
    * Whether this is a delegated specialist's own request rather than a step of the turn.
    *
    * Recognised by the catalogue rather than by the mission text: a specialist is offered the
-   * read-only set and never `finish`, because `finish` is how a turn ends and a specialist does not
-   * end one. Nothing else in the loop withdraws it - the closing handoff is deliberately handed the
-   * same array every other step sent - so "no `finish` on offer" is the one structural statement
-   * that separates a specialist's window from the lead's.
+   * read-only set, which never includes `shell`, and every lead request does.
    *
    * It matters beyond letting a script answer the right model. A specialist's window is its own:
    * its request shares nothing with the lead's but the catalogue, so counting it as the next link
@@ -1326,7 +1324,16 @@ const runnerResponse = (
       })),
       ready: [...TOOLCHAIN_CAPABILITIES],
       missing: [],
-      summary: `Available on this computer: ${TOOLCHAIN_CAPABILITIES.join(', ')}.`
+      summary: summariseToolchain(
+        TOOLCHAIN_CAPABILITIES.map((id) => ({
+          id,
+          purpose: id,
+          ready: true,
+          missingBinaries: [],
+          missingPythonModules: [],
+          missingFonts: []
+        }))
+      )
     });
   /*
    * What machine this is, in the three numbers that decide how a job is sized. Read once at the
@@ -3151,6 +3158,7 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
     // nothing for it to move. A fixture that wants a stale skill declares one.
     curateWorkspaceSkills: async () => undefined,
     listWorkspaceSkills: async () => skillRows,
+    markWorkspaceSkillUsed: async () => undefined,
     listMediaJobs: async () => [],
     getLatestTaskPlan: async () => plan,
     listTaskEvents: async (
@@ -3707,9 +3715,9 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
       // before either is scripted; see ScriptContext.vision.
       const vision = !catalogue.length && asText(body.model) !== model.providerModelId;
       const summarising = !catalogue.length && !vision;
-      // A specialist's request carries a catalogue and no `finish`; see ScriptContext.delegated.
+      // A specialist's request carries a catalogue and no `shell`; see ScriptContext.delegated.
       const delegated =
-        catalogue.length > 0 && !catalogue.some((tool) => asText(tool.function?.name) === 'finish');
+        catalogue.length > 0 && !catalogue.some((tool) => asText(tool.function?.name) === 'shell');
       /*
        * The whole trajectory, request by request, when somebody has asked for it.
        *
@@ -4315,15 +4323,3 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
     error
   };
 };
-
-export const evidence = (id: string, claim: string): Record<string, unknown> => ({
-  status: 'verified',
-  evidence: [{ claim, source: 'tool_result', toolCallId: id }],
-  remainingRisks: []
-});
-
-export const conversational = (): Record<string, unknown> => ({
-  status: 'not_applicable',
-  evidence: [],
-  remainingRisks: []
-});

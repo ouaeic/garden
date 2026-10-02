@@ -1,3 +1,4 @@
+import { OwnerPreferences } from '@garden/contracts';
 import {
   runtimeClearTimer,
   runtimeDate,
@@ -90,7 +91,6 @@ import {
 import { providerWebSearch, type WebSearchAnswer } from './provider-search.js';
 import { WEB_SEARCH_MAX_OUTPUT_TOKENS, WEB_SEARCH_REQUEST_TIMEOUT_MS, routeTo } from './routing.js';
 import { executeToolCall } from './tool-dispatch.js';
-import { agentToolsFor } from './tool-catalogue.js';
 import { AgentRunnerClient, withRunnerAbort } from './runner-client.js';
 import { buildIdentity } from './build-identity.js';
 import {
@@ -141,7 +141,7 @@ import { closeTurnAtCeiling, type TurnCloseContext } from './turn/close.js';
 import { claimTurn, type TurnClaimDeps } from './turn/claim.js';
 import { type AcceptanceDeclarationDeps } from './turn/acceptance-declaration.js';
 import { resolveAnswerHolds } from './turn/answer-holds.js';
-import type { TurnFinishDeps } from './turn/finish.js';
+import type { TurnCompleteDeps } from './turn/complete.js';
 import { resumeParkedTurn, type TurnResumeDeps } from './turn/resume.js';
 import { enforceStepBounds, type StepBoundsDeps } from './turn/step-bounds.js';
 import { dispatchToolCalls, type TurnDispatchDeps } from './turn/dispatch.js';
@@ -288,8 +288,8 @@ export class AgentWorker {
   /** @see resumeParkedTurn in `turn/resume.ts`. */
   readonly #resume: TurnResumeDeps;
 
-  /** @see handleFinishCall in `turn/finish.ts`. */
-  readonly #finish: TurnFinishDeps;
+  /** @see completeAnswer in `turn/complete.ts`. */
+  readonly #finish: TurnCompleteDeps;
 
   /** @see declareAcceptance in `turn/acceptance-declaration.ts`. */
   readonly #acceptance: AcceptanceDeclarationDeps;
@@ -496,7 +496,6 @@ export class AgentWorker {
     this.#dispatch = {
       store,
       config,
-      finish: this.#finish,
       acceptance: this.#acceptance,
       resume: this.#resume,
       approvalForCallOnce: (memo, task, call, state) =>
@@ -1677,7 +1676,7 @@ export class AgentWorker {
     key: Uint8Array,
     record: AcceptanceRecord,
     options: {
-      purpose: 'finish' | 'baseline' | 'continuation';
+      purpose: 'finish' | 'continuation';
       observed?: ReadonlyMap<string, number>;
     } = { purpose: 'finish' },
     state?: AgentState
@@ -1930,12 +1929,12 @@ export class AgentWorker {
     // state on every step until something drops it.
     dropLegacyGuidance(state.messages);
     delete (state as { playbooks?: unknown }).playbooks;
-    // The contract describes supported capabilities, including groups that can be loaded later.
     const { removedDuplicates } = ensureBasePrompt(state.messages, {
-      tools: agentToolsFor('lead', run.surfaces, run.connectorKinds)
-        .filter((tool) => !run.withdrawnTools.has(tool.name))
-        .map((tool) => tool.name),
-      toolchainSummary
+      toolchainSummary,
+      views: await this.store
+        .getUserById(task.userId)
+        .then((user) => OwnerPreferences.parse(user?.preferences ?? {}).resultViews !== false)
+        .catch(() => true)
     });
     if (removedDuplicates)
       // Worth saying out loud: this ran for as long as the marker was stale, and every duplicate
@@ -2197,12 +2196,8 @@ export class AgentWorker {
       const assistantText = await recordAssistantStep(this.#recordStep, task, key, state, response);
       if (await honorUserControl()) return;
 
-      /*
-       * The step produced words. Is the answer finished, cut off, or simply never going to call
-       * `finish`? @see resolveAnswerHolds in `turn/answer-holds.ts`, where the three holds that
-       * answer that - and the hundred and fifty-three lines they took - now live.
-       */
-      const hold = await resolveAnswerHolds(this.#stepBounds, task, key, state, {
+      // A step without tool calls is the answer, a reply cut off, or a continuation.
+      const hold = await resolveAnswerHolds(this.#finish, task, key, state, {
         response,
         assistantText
       });
@@ -2230,7 +2225,6 @@ export class AgentWorker {
           key,
           state,
           response,
-          assistantText,
           run,
           budget,
           control

@@ -335,7 +335,7 @@ export const resumeParkedTurn = async (
       return true;
     }
   }
-  if (state.question && (!state.question.continueWith || state.question.waiting)) {
+  if (state.question) {
     const asked = state.question;
     let waiting = await deps.store.getNextQueuedTaskMessage(task.id);
     // A refusal explains a decision; it does not consume the answer to a separate question.

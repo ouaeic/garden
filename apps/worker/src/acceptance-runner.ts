@@ -25,7 +25,6 @@ import {
   type AcceptanceRecord,
   type AcceptanceResult
 } from './acceptance.js';
-import { ACCEPTANCE_BASELINE_TIMEOUT_SECONDS } from './turn-bounds.js';
 import type { AgentState, ExecObservation } from './agent-state.js';
 import { evidenceFloor } from './completion.js';
 import type { AgentRunnerClient } from './runner-client.js';
@@ -75,23 +74,20 @@ const suiteMemo = new WeakMap<AgentState, { key: string; results: AcceptanceResu
  * throws the memo away, which covers the case where a non-mutating command changes what
  * `observedCommands` can answer without moving the floor.
  *
- * `purpose` is in the key because the three purposes ask different questions with different
- * timeouts, and a baseline never reaches here at all.
+ * `purpose` is in the key because the two purposes ask different questions.
  */
 const acceptanceMemoKey = (
   record: AcceptanceRecord,
   state: AgentState,
-  options: { purpose: 'finish' | 'baseline' | 'continuation' }
-): string | null =>
-  options.purpose === 'baseline'
-    ? null
-    : [
-        options.purpose,
-        record.revisions,
-        record.declaredAtStep,
-        evidenceFloor(state).lastMutation,
-        Object.keys(state.turnToolResults ?? {}).length
-      ].join(':');
+  options: { purpose: 'finish' | 'continuation' }
+): string =>
+  [
+    options.purpose,
+    record.revisions,
+    record.declaredAtStep,
+    evidenceFloor(state).lastMutation,
+    Object.keys(state.turnToolResults ?? {}).length
+  ].join(':');
 
 /**
  * Runs the acceptance record the model declared, in the harness, at the moment it says it is done.
@@ -117,7 +113,7 @@ export const runAcceptanceChecks = async (
    * to decide whether to keep working is not the same event as one run to decide whether to stop.
    */
   options: {
-    purpose: 'finish' | 'baseline' | 'continuation';
+    purpose: 'finish' | 'continuation';
     /**
      * Commands garden already ran this turn, after the last change. Never passed for a baseline:
      * that run's whole job is to watch the checks fail before the work, which is a question no
@@ -172,7 +168,7 @@ export const acceptanceChecks = async (
   key: Uint8Array,
   record: AcceptanceRecord,
   options: {
-    purpose: 'finish' | 'baseline' | 'continuation';
+    purpose: 'finish' | 'continuation';
     observed?: ReadonlyMap<string, number>;
   }
 ): Promise<AcceptanceResult[]> => {
@@ -246,9 +242,7 @@ export const acceptanceChecks = async (
       }
       if (check.kind === 'command') {
         const timeoutSeconds = Math.min(
-          options.purpose === 'baseline'
-            ? Math.min(check.timeoutSeconds, ACCEPTANCE_BASELINE_TIMEOUT_SECONDS)
-            : check.timeoutSeconds,
+          check.timeoutSeconds,
           // Never longer than the suite has left, so the last check to start cannot outlive the
           // deadline it started inside.
           remainingSeconds
@@ -362,12 +356,10 @@ export const acceptanceChecks = async (
     task,
     key,
     'status',
-    options.purpose === 'baseline'
-      ? `Acceptance baseline: ${passed} of ${results.length} already pass before the work`
-      : options.purpose === 'continuation'
-        ? `Acceptance checks at the step ceiling: ${passed} of ${results.length} passed`
-        : `Acceptance checks: ${passed} of ${results.length} passed`,
-    { acceptance: results, ...(options.purpose === 'baseline' ? { baseline: true } : {}) }
+    options.purpose === 'continuation'
+      ? `Acceptance checks at the step ceiling: ${passed} of ${results.length} passed`
+      : `Acceptance checks: ${passed} of ${results.length} passed`,
+    { acceptance: results }
   ).catch(() => undefined);
   return results;
 };

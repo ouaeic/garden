@@ -672,30 +672,6 @@ export const terminalBenchOracleModel = (task: TerminalBenchTask): ModelScript =
           }
         ]
       };
-    return {
-      text: ran,
-      calls: [
-        {
-          id: 'call-finish',
-          name: 'finish',
-          args: {
-            summary: ran,
-            verification: {
-              status: 'verified',
-              evidence: [
-                {
-                  claim: "The benchmark's own solution script ran to completion in the box",
-                  source: 'tool_result',
-                  toolCallId: 'call-oracle'
-                }
-              ],
-              remainingRisks: [
-                'This turn was handed the answer. It measures the environment and the verifier, never an agent.'
-              ]
-            }
-          }
-        }
-      ]
-    };
+    return { text: ran };
   };
 };

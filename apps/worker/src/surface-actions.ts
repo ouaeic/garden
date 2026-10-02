@@ -34,12 +34,11 @@ import { textValue } from './values.js';
 
 const selector = {
   type: 'string',
-  description:
-    'A selector from the most recent browser_snapshot or read_elements; a frame selector works the same. With scroll or wait_for it names the container or element to act on instead of the page.'
+  description: 'From browser_snapshot or read_elements; frame selectors work too.'
 };
 const tabId = {
   type: 'string',
-  description: 'Tab id from browser_snapshot. Omit to act on the active tab.'
+  description: 'Omit for the active tab.'
 };
 
 const browserActionEnum = [
@@ -101,14 +100,14 @@ export const browserActionProperties: Record<string, unknown> = {
      * went from 125 bytes to 120, measured, so the catalogue moved 55,673 -> 55,668.
      */
     description:
-      'Which action, and the fields it takes beyond the optional tabId every one of them accepts. navigate url. click, double_click, hover selector. type selector, text and mode - fill sets the value at once, keys sends real keystrokes, which is what wakes a typeahead or a keydown validator. select_option selector, values - every chosen value for a multiple-select. upload selector, paths. text_input text, into whatever has focus. press key, for example Enter, Tab or Escape. scroll deltaY, optional deltaX and selector. wait_for optional selector with state, or text, or urlIncludes, and timeoutMs; name one of those three, or it waits on the page alone, which a single-page application can satisfy while still empty. back. reload. new_tab optional url and activate. select_tab, close_tab and inspect_tab tabId - inspect_tab reads that tab in place and leaves the active one alone. click_at x, y - coordinate action governed by the selected permission mode; use a selector when the page exposes one. dialog response, optional promptText, to answer a native alert, confirm or prompt reported by browser_snapshot. screenshot path - writes a PNG of the page to that workspace path. batch actions.'
+      'Fields per action: navigate url. click, double_click, hover selector. type selector, text, mode (keys sends real keystrokes for typeaheads and validators). select_option selector, values. upload selector, paths. text_input text. press key. scroll deltaY, deltaX?, selector?. wait_for selector+state, text or urlIncludes, timeoutMs. new_tab url?, activate?. select_tab, close_tab, inspect_tab tabId. click_at x, y. dialog response, promptText?. screenshot path. batch actions.'
   },
   url: { type: 'string' },
   selector,
   text: {
     type: 'string',
     maxLength: 20_000,
-    description: 'The text to type, or with wait_for the text to wait for on the page.'
+    description: 'Text to type, or for wait_for the text to wait for.'
   },
   mode: { type: 'string', enum: ['auto', 'fill', 'keys'], default: 'auto' },
   values: { type: 'array', minItems: 1, maxItems: 50, items: { type: 'string' } },
@@ -117,7 +116,7 @@ export const browserActionProperties: Record<string, unknown> = {
     minItems: 1,
     maxItems: 10,
     items: { type: 'string' },
-    description: 'Workspace-relative files to attach. Workspace-relative paths only.'
+    description: 'Workspace files to attach.'
   },
   key: { type: 'string' },
   deltaX: { type: 'number', minimum: -5_000, maximum: 5_000, default: 0 },
@@ -143,14 +142,10 @@ export const browserActionProperties: Record<string, unknown> = {
     // Repeating the other nineteen shapes here doubled the size of the largest tool in the
     // catalogue, and the catalogue opens the prompt prefix on every request. The runner validates
     // each entry against the same union either way.
-    items: {
-      type: 'object',
-      description: 'One step: its own action plus that action’s fields. Never another batch.'
-    },
-    description:
-      'For batch: up to 24 actions run in order in one round trip, stopping at the first failure. Use it to fill a whole form. The result is steps:[{index,type,ok,url?,error?}] plus completed, so a partial run says exactly how far it got.'
+    items: { type: 'object' },
+    description: 'For batch: steps run in order, stopping at the first failure.'
   },
-  purpose: { type: 'string', description: 'What this action will do for the user.' }
+  purpose: { type: 'string', description: 'What this does for the user.' }
 };
 
 export const desktopActionProperties: Record<string, unknown> = {
@@ -169,12 +164,12 @@ export const desktopActionProperties: Record<string, unknown> = {
       'wait'
     ],
     description:
-      'Which action, and the fields it takes. invoke nodeId, optional actionIndex - activates a control through its accessibility action: press a button, open a menu item. focus nodeId. set_text nodeId, text - replaces the whole text of an editable control. text_input text, into whatever has focus. zoom x, y, width, height - one rectangle of the screen at its own size rather than the whole screen shrunk to fit; it changes nothing and needs no approval. press key, one key or chord, for example Return or ctrl+s. scroll direction, optional amount, over the focused window. click_at x, y, optional button and clicks - coordinate action governed by the selected permission mode; use a nodeId when the app exposes one. drag fromX, fromY, toX, toY, optional durationMs. wait milliseconds, to let the application settle.'
+      'Fields per action: invoke nodeId, actionIndex?. focus nodeId. set_text nodeId, text (replaces it). text_input text. zoom x, y, width, height (full-resolution crop, changes nothing). press key or chord. scroll direction, amount?. click_at x, y, button?, clicks?. drag fromX, fromY, toX, toY, durationMs?. wait milliseconds.'
   },
   nodeId: {
     type: 'string',
     maxLength: 512,
-    description: 'Accessibility node id from the most recent desktop_observe.'
+    description: 'From the latest desktop_observe.'
   },
   actionIndex: { type: 'integer', minimum: 0, maximum: 100, default: 0 },
   text: { type: 'string', maxLength: 200_000 },
@@ -193,7 +188,7 @@ export const desktopActionProperties: Record<string, unknown> = {
   toY: { type: 'number', minimum: 0, maximum: 900 },
   durationMs: { type: 'integer', minimum: 50, maximum: 10_000, default: 500 },
   milliseconds: { type: 'integer', minimum: 50, maximum: 30_000 },
-  purpose: { type: 'string', description: 'What this GUI action will do for the user.' }
+  purpose: { type: 'string', description: 'What this does for the user.' }
 };
 
 /** Everything a surface action call carries except the discriminator and the model's own sentence. */

@@ -19,7 +19,6 @@ import type { TaskPlanStep } from '@garden/contracts';
 import { GardenError } from '@garden/core';
 import type { ModelMessage } from '@garden/model-gateway';
 import { UNICODE_TAG_CHARACTERS } from './sanitise.js';
-import { SKILL_BODY_HEADINGS } from './skills.js';
 
 /**
  * A scalar a model or a runner wrote, read as text - and the only function in this package that
@@ -162,11 +161,7 @@ export const skillDocument = (
   const name = skillName(input.name);
   const description = boundedKnowledge(input.description, 240).replace(/\s+/g, ' ');
   const content = boundedKnowledge(input.content, 24_000);
-  const missing = SKILL_BODY_HEADINGS.filter(
-    (heading) => !new RegExp(`^#{1,3}\\s+${heading}\\s*$`, 'im').test(content)
-  );
-  if (missing.length)
-    throw new GardenError('skill_structure_invalid', `Skill is missing: ${missing.join(', ')}`);
+  if (!content.trim()) throw new GardenError('skill_structure_invalid', 'A skill needs content.');
   return { name, description, content };
 };
 

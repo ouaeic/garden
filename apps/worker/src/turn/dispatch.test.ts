@@ -70,7 +70,6 @@ it('answers invalid project-update arguments and continues the turn without exec
       key,
       state,
       { toolCalls: [invalid, next] } as unknown as ModelResponse,
-      '',
       { model: {}, catalog: [], webPlan: {} } as unknown as TurnRun,
       { maxOutputTokens: 1024, turn: 3 },
       { honorUserControl: async () => false, refreshActivePlan: async () => false }
@@ -113,7 +112,6 @@ it('answers an unverified Autonomous read without running it, parking the owner 
       key,
       state,
       { toolCalls: [call] } as unknown as ModelResponse,
-      '',
       { model: {}, catalog: [], webPlan: {} } as unknown as TurnRun,
       { maxOutputTokens: 1024, turn: 3 },
       { honorUserControl: async () => false, refreshActivePlan: async () => false }
@@ -154,11 +152,10 @@ const dispatch = async (
 ): Promise<Seen> => {
   const seen: Seen = { checkpoint: undefined, order: [] };
   const state = { messages: [], turn: 3, toolsStarted: 0 } as unknown as AgentState;
-  const exempt = new Set(['files_list', 'file_read', 'finish', 'notify']);
+  const exempt = new Set(['files_list', 'file_read', 'notify']);
   const deps = {
     store: {} as TurnDispatchDeps['store'],
     config: {} as TurnDispatchDeps['config'],
-    finish: {} as TurnDispatchDeps['finish'],
     acceptance: {} as TurnDispatchDeps['acceptance'],
     resume: {
       ensureTurnUndoPoint: async (
@@ -198,7 +195,6 @@ const dispatch = async (
     key,
     state,
     { toolCalls: calls } as ModelResponse,
-    '',
     { model: {} as ModelRelease, catalog: [], webPlan: {} as WebToolPlan } as unknown as TurnRun,
     { maxOutputTokens: 1024, turn: 3 },
     { honorUserControl: async () => false, refreshActivePlan: async () => false }
@@ -293,15 +289,8 @@ const planDispatch = async (
   else state.mode = mode;
   const deps = {
     // Enough store for the timeline writes the harness-answered calls make on their way through.
-    // `finish` in particular has to be driven for real: it is the one permitted call that could end
-    // the turn, and a test that skipped it would be skipping the interesting one.
     store: { appendTaskEvent: async () => undefined } as unknown as TurnDispatchDeps['store'],
     config: {} as TurnDispatchDeps['config'],
-    finish: {
-      store: { appendTaskEvent: async () => undefined },
-      config: {},
-      outstandingPlanSteps: async () => []
-    } as unknown as TurnDispatchDeps['finish'],
     acceptance: {} as TurnDispatchDeps['acceptance'],
     resume: {
       ensureTurnUndoPoint: async () => undefined
@@ -347,7 +336,6 @@ const planDispatch = async (
     key,
     state,
     { toolCalls: calls } as ModelResponse,
-    '',
     { model: {} as ModelRelease, catalog: [], webPlan: {} as WebToolPlan } as unknown as TurnRun,
     { maxOutputTokens: 1024, turn: 3 },
     { honorUserControl: async () => false, refreshActivePlan: async () => false }

@@ -153,27 +153,7 @@ const sumModel: ModelScript = (context) => {
     };
 
   const finish = {
-    text: `The total is ${String(EXPECTED_TOTAL)}, written to workspace/total.txt.`,
-    calls: [
-      {
-        id: 'call-finish',
-        name: 'finish',
-        args: {
-          summary: 'Summed the integers into workspace/total.txt.',
-          verification: {
-            status: 'verified',
-            evidence: [
-              {
-                claim: 'The file was read back after the write and holds the total',
-                source: 'tool_result',
-                toolCallId: 'call-read'
-              }
-            ],
-            remainingRisks: []
-          }
-        }
-      }
-    ]
+    text: `The total is ${String(EXPECTED_TOTAL)}, written to workspace/total.txt.`
   };
 
   switch (context.step) {

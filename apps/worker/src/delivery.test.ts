@@ -1,11 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { encryptJson } from '@garden/core';
 import type { DataStore, TaskRecord } from '@garden/data';
-import type { ModelToolCall } from '@garden/model-gateway';
 import { declaredTaskOutputs, resolveDelivery } from './delivery.js';
 import type { AgentState } from './agent-state.js';
 import { AgentRunnerClient } from './runner-client.js';
-import { handleFinishCall, type TurnFinishDeps } from './turn/finish.js';
+import { completeAnswer, type TurnCompleteDeps } from './turn/complete.js';
 
 const key = new Uint8Array(32).fill(9);
 const task = { id: 'task', workspaceId: 'workspace', userId: 'owner' } as TaskRecord;
@@ -324,84 +323,16 @@ describe('finish holds missing outputs once and reports the unresolved result ho
       )
     } as never);
     state.turnToolResults = { video: { name: 'generate_media', success: true } };
-    const completeTurn = vi.fn<TurnFinishDeps['completeTurn']>(async () => undefined);
+    const completeTurn = vi.fn<TurnCompleteDeps['completeTurn']>(async () => undefined);
     const finishDeps = {
       ...deps,
       outstandingPlanSteps: async () => [],
       completeTurn
-    } as unknown as TurnFinishDeps;
-    const outcome = await handleFinishCall(
-      finishDeps,
-      task,
-      key,
-      state,
-      {
-        id: 'finish',
-        name: 'finish',
-        arguments: {
-          summary: 'The video is generating.',
-          deliverables: ['video.mp4'],
-          verification: {
-            status: 'verified',
-            evidence: [
-              {
-                claim: 'The provider job was submitted',
-                source: 'tool_result',
-                toolCallId: 'video'
-              }
-            ]
-          }
-        }
-      },
-      { turn: 1, assistantText: 'The video is generating.' }
-    );
+    } as unknown as TurnCompleteDeps;
+    const outcome = await completeAnswer(finishDeps, task, key, state, 'The video is generating.');
     expect(outcome).toBe('completed');
     expect(completeTurn).toHaveBeenCalledTimes(1);
     expect(completeTurn.mock.calls[0]?.[3].verification.status).toBe('delivery_pending');
     expect(runner.call).not.toHaveBeenCalled();
-    expect(state.deliveryNagged).not.toBe(true);
-  });
-  it('survives a persisted resume and cannot mark a missing download verified', async () => {
-    const { deps, runner, state } = fixture();
-    runner.call.mockRejectedValue(new Error('missing'));
-    const completeTurn = vi.fn<TurnFinishDeps['completeTurn']>(async () => undefined);
-    state.turnToolResults = { check: { name: 'shell', success: true } };
-    const finishDeps = {
-      ...deps,
-      outstandingPlanSteps: async () => [],
-      completeTurn
-    } as unknown as TurnFinishDeps;
-    const call: ModelToolCall = {
-      id: 'finish',
-      name: 'finish',
-      arguments: {
-        summary: 'The report is ready.',
-        deliverables: ['report.pdf'],
-        verification: {
-          status: 'verified',
-          evidence: [{ claim: 'The command completed', source: 'tool_result', toolCallId: 'check' }]
-        }
-      }
-    };
-    expect(
-      await handleFinishCall(finishDeps, task, key, state, call, { turn: 1, assistantText: 'Done' })
-    ).toBe('held');
-    expect(completeTurn).not.toHaveBeenCalled();
-    const resumed = JSON.parse(JSON.stringify(state)) as AgentState;
-    expect(
-      await handleFinishCall(finishDeps, task, key, resumed, call, {
-        turn: 1,
-        assistantText: 'Done'
-      })
-    ).toBe('completed');
-    expect(completeTurn).toHaveBeenCalledTimes(1);
-    expect(completeTurn.mock.calls[0]?.[3]).toMatchObject({
-      verification: {
-        status: 'delivery_incomplete'
-      }
-    });
-    expect(completeTurn.mock.calls[0]?.[3].verification.remainingRisks).toContain(
-      'Unavailable output: report.pdf'
-    );
   });
 });

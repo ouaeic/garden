@@ -41,179 +41,97 @@ only reads that file is not tainted by it. Taint is what raises the approval car
 Each request carries, in this order:
 
 1. the operating contract and the safety floor, gated on what this box can do;
-2. the curated knowledge block: active memory entries ranked against the request the task opened
-   with, the index of skills saved for this workspace, and the index of the vetted built-in library;
+2. the curated knowledge block when there is anything in it: the owner's memory entries and the
+   index of skills saved for this workspace or kept in the owner's own skill folders;
 3. a bounded recalled-memory preview, reused while its evidence, validity and model budget remain unchanged;
 4. the workspace brief when the owner keeps one — `GARDEN.md` first, then the shared conventions
-   the surrounding tooling writes, so a workspace that already carries one is read without the owner
-   having to rename anything;
+   the surrounding tooling writes;
 5. the user’s original request, then the running brief of anything already condensed, then the
    verbatim recent trajectory;
 6. the newest live plan, re-pushed at the tail as it changes;
-7. a runtime block, last: computer name, the current time in the owner’s own time zone, the working
-   root, what the document toolchain on this machine can actually do, the security mode, and the
-   preview gateway.
+7. a runtime block, last: computer name, the current time in the owner’s own time zone, the
+   commands and Python modules installed for documents and data, the machine's limits, the security
+   mode, and the preview gateway.
 
-Only skill _names_ and one-line catalog entries are resident. A full procedure loads when the model
-opens it, and the binaries that procedure assumes are probed on the machine and reported with it, so
-a step the computer cannot support is known before it is attempted rather than after.
+The contract states facts about this machine and the rules of authority, and nothing else. How to
+write code, structure a document or research a question is the model's own competence; restating it
+on every request costs tokens and steers a capable model toward the harness's habits instead of the
+user's request. There is no built-in skill library for the same reason: the facts a procedure used to
+carry — which binaries are installed, which helper converts an Office file — are in the runtime
+block, and anything else is something the model can find out with one command.
 
-Nothing in that list is the only place knowledge can live, and the tier that matters most is the one
-that appears in it nowhere. Everything the harness knows about _how_ used to be either a contract
-line — paid on every request of every task for ever — or a skill body, free until opened and then a
-few thousand tokens at once. The tier in between is a **rule**: a matcher over what the model just
+Between the contract and an opened skill sits a **rule**: a matcher over what the model just
 produced, and a correction appended to the next request if it fires. Until it fires it contributes
-zero bytes — no schema, no contract line, no index entry — and `rules.test.ts` asserts that by
-comparing the whole assembled window byte for byte with the rules loaded and none of them matching.
+zero bytes. One rule remains, for the cost a model cannot see by trying: a shell that sleeps spends
+the turn's wall-clock ceiling.
 
-Three boundaries on it, each a decision rather than a default. It never interrupts: the correction
-lands on the following request and the generation in flight is left alone. It observes the recorded
-step rather than the token stream, so it survives a worker handover, an approval pause and a resume,
-and it can never split an assistant's tool calls from their results. And a rule that fires on almost
-every turn is a contract line paid late plus a matcher, which is worse than a contract line — so the
-firing counter exists from the first commit, and the honest response to a high rate is to promote the
-rule back into the contract deliberately.
-
-That gives four places for anything the harness knows, and the order to try them in: **enforced in
-code**, which costs nothing and cannot be got wrong; **triggered on content**, which costs nothing
-until it fires; **opened on demand**, which costs nothing while it is closed; and **resident**, which
-is paid on every request for the life of the product. Only the last is a decision that has to be
-justified, and the tool catalogue is where almost all of it is.
-
-Every position in that list is a cache decision, and three of them were measured rather than
-reasoned about.
-
-The runtime block is **last**, not second. It is the one block that changes during a task — the
-clock moves, the toolchain report can change, the security mode can be switched — and at index 1 it
-ended the shared prefix in front of everything behind it, so the whole window was re-billed at the
-write premium on every step. A measured 84% cache rate is exactly what a cache that works only
-within a turn produces. Moved to the tail and re-pushed at every step boundary it costs its own
-bytes and nothing else. It is re-pushed at a step boundary specifically because every tool call has
-been answered there, so refreshing it can never split a call from its result.
-
-The knowledge block is ranked against the request the task opened with, not against the recent
-turns. Its own header calls it frozen for this run, and with a sliding window of user messages that
-was false: the ranking shifted by one on every follow-up and re-ordered a block that sits ahead of
-the entire trajectory. The clock the ranking reads is anchored to the task’s creation instant for
-the same reason — a recency term scored against the wall clock lets two close entries swap over
-mid-run. What a follow-up turn actually needs from memory is `memory_recall`, which lands after the
-last cache breakpoint and pays for its own answer.
-
-The workspace brief goes behind both memory blocks, because it is the one of the three a running
-agent commonly rewrites — the agent keeping its own journal in `GARDEN.md` is the usual writer. In
-front, one appended line moved the divergence point to the second message of the request.
-
-The runtime block deliberately carries no live counters — a changing digit would end the prefix at
-that point on every step. The clock is rounded to the minute for the same reason, and disk capacity
-is a `df -h` the model is told to run rather than a number interpolated here.
+Every position in the list above is a cache decision. The runtime block is last because it is the
+one block that changes during a task; the knowledge block is ranked against the request the task
+opened with so a follow-up does not re-order it; the workspace brief sits behind both memory blocks
+because a running agent commonly rewrites it. The clock is rounded to the minute and spend is
+quantised so the tail does not change on every step.
 
 ## Tools
 
-Tool definitions are selected from measured browser/desktop availability, connected service kinds
-and the lead or specialist role. Unknown capability state retains definitions; a known missing
-capability removes them. The selected definitions keep stable order within an execution so the
-provider can reuse its cached prefix. The serialized catalogue and description ceilings are enforced
-by `tool-catalogue.test.ts`.
+A small core is sent on every request — plan, acceptance, shell, process, files, reading, writing,
+exact-text replacement, web search, asking the user and publishing a result. Everything else is in a
+group the model loads with `load_tools` when it needs it: code, documents and research, memory,
+automation, browser, desktop, media, publishing and connections. A loaded group stays loaded for the
+conversation, and calling a tool from a group loads that group too. A scheduled run starts with
+automation loaded, because notify is the only way it reaches the owner, and a workspace with saved
+skills starts with memory loaded. The core and the full catalogue each have a byte ceiling in
+`tool-groups.test.ts` and `tool-catalogue.test.ts`.
 
-`pnpm eval` reports estimated serialized input and catalogue tokens. These are offline accounting
-measurements, not provider-tokenizer counts or actual charges. The context-quality rig checks what
-facts survive window changes; changing residency also requires verifying capability discovery and
-end-to-end outcomes.
+Definitions are selected from measured browser and desktop availability, connected service kinds and
+the lead or specialist role. Unknown capability state keeps definitions; a known missing capability
+removes them. Order is fixed for the life of a task because the tool block opens the prompt prefix.
 
-The catalogue covers plans, the acceptance record that defines what would prove the job done, shell
-commands, background processes and services the computer keeps running, files, conflict-detecting
-patches, repository search and diagnostics, subscription coding specialists, private document
-extraction and lexical search, encrypted task search, web search, browser and desktop control,
-parallel source reading, PDF capture, media generation, connected services and MCP, schedules,
-reviewed memory and a mid-task lookup in it, skills, read-only delegation, a notice the agent may
-raise to the owner and a question it may stop and put to them, artifact and preview publication,
-and completion.
-
-Order is fixed for the life of a task rather than assembled per step, because the tool block opens
-the prompt prefix: a definition that moves position ends the shared prefix at that point.
+`file_patch` replaces exact text: each `oldText` must occur once in the current file, or the call
+sets `replaceAll`. A quote copied with the `N:` line numbers `file_read` shows, or without a line's
+trailing spaces, is matched to the file's own spelling. Every replacement for one path applies to one
+read and lands as one compare-and-swap write; a lost acknowledgement is reconciled by reading the
+file back rather than writing again.
 
 `repo_overview` parses TypeScript, JavaScript, Python, R and C/C++ with bundled text-only grammars.
 Its bounded map ranks definitions by the supplied query and candidate call sites, retaining source
 locations and file hashes. Caller links are syntactic candidates, not proof of dynamic dispatch or
-type resolution. Parse failures, skipped files and truncated scans are reported; lexical symbols
-remain available for unsupported or partially parsed files. The in-memory parse cache is keyed by
-language and current file content, with no persistent index or execution of project configuration.
-Workspace writes, commands that may have partially failed, and background-job observations clear
-the turn's duplicate-read cache so subsequent verification can read the changed source.
+type resolution.
 
-The model must finish with verification evidence, and the evidence must post-date its last change. A
-plain assistant message does not mark a task complete.
+## How a turn ends
 
-## The definition of done
+A reply with no tool calls is the answer, and it ends the turn. Text written beside tool calls is
+progress. There is no completion tool and no evidence the model must cite: a model's account of its
+own evidence is one more thing the model says about itself, and the harness has better evidence of
+its own.
 
-Evidence that post-dates the last change is a check on ordering, not on the work. It is satisfied by
-reading back a file you just wrote, which is how “the service starts and serves /health” came to be
-accepted on the strength of a `file_read`. So the model also declares, in its own words and before
-it starts, what would prove the job is done — and the harness runs that itself for code and artifact
-work. Browser interaction instead needs fresh surface evidence of its outcome; it does not require
-creating a file or inventing a build check. Saving a browser capture remains artifact work.
+That evidence is the **acceptance record**. `set_acceptance` takes up to eight checks: a command
+(an executable, arguments, the exit code and output it must produce) or an artifact (a workspace path
+with a minimum size, JSON assertions by pointer, or a rendered page count for a PDF or Office file).
+When a turn that changed something answers, the harness runs the record itself. A failure goes back
+to the model with the exit code and the first lines of output, and the model fixes the work or the
+check; after the fourth failure the answer stands with the failures stated beside it. The completion
+records `verified`, `checks_failed`, `checks_did_not_run` or `not_applicable`, and the commands that
+passed are kept as procedures in memory.
 
-`set_acceptance` takes up to eight checks of two kinds: a **command**, which is an executable, its
-arguments, and the exit code and stdout substring it must produce; and an **artifact**, which is a
-workspace path that must exist and not be under a size. A check is a check rather than a second
-chance to act, so the harness refuses the ones that reach the network or destroy data — `rm`, `mv`,
-`curl`, `ssh`, `systemctl`, `apt`, `git push` and their neighbours — by the shape of the command
-rather than by a blocklist that would grow forever.
+The harness refuses checks that reach the network or destroy data by the shape of the command.
+Declaring a record is not passing it, and revising one shows the owner both versions.
 
-Four properties make it mean something:
-
-- **A definition of done that already passes is refused.** Declared before the turn has changed
-  anything, the checks are run against the job as it then stands. If every one of them passes at
-  that moment the record is rejected and the model is asked for one that fails now. That is what
-  stops `true`, `echo ok` and an artifact check on a file already sitting there, as a property of
-  the shape rather than a list of names to ban. An already-passing check is welcome alongside a
-  failing one, because that is a regression guard.
-- **Declaring is not passing.** `set_acceptance` succeeds by being well-formed, which would
-  otherwise make it the cheapest successful call in any turn that declared one, so the declaration
-  cannot be cited as the evidence that it was kept.
-- **An inherited record does not prove a later turn.** A record from an earlier turn is kept — a
-  follow-up must not be able to break what the previous turn was held to — but it was green before
-  this turn began, so finishing is held until this turn says what would prove its own work.
-- **A weaker tick says so where the owner reads it.** Two caveats attach to the completion itself
-  rather than only to the timeline entry for the step that declared the record: checks that were
-  already passing before this job started, and checks inherited from an earlier turn. Both are facts
-  about the checks, which is what makes them worth printing. A third caveat, saying the checks had
-  been written after the work rather than before it, was deliberately removed: it was a description
-  of the order this box runs its own steps in rather than a fact about the checks, and because the
-  hold on `finish` is the only thing that ever asks for a record — and fires precisely because
-  something has already changed — it printed on very nearly every completed task. Revising a record
-  shows the owner both versions, because weakening your own test is a different act from passing it.
-
-A finish is refused while any check fails, with the harness’s own observation — the exit code, the
-first lines of stderr — returned as that call’s result so the model can act on it. Like every other
-refusal in the loop it is bounded: past the fourth attempt the turn ends honestly, with the failures
-carried into the completion’s remaining risks rather than spending the rest of the budget on the
-same failure.
+Three other things end a turn without an answer: a question to the owner parks it until they reply;
+running coding specialists park it until they stop; and a step, credit or time ceiling hands the
+last call to a short handoff, where only `set_plan` runs and the reply says what is done, what is not,
+and what to send back to carry on. A reply cut off at the model's output limit is continued up to the
+limit and then completed as it stands, marked interrupted.
 
 ## Documents
 
-Which route produces which deliverable is decided once, in the contract, rather than left to the
-model to pick per task:
-
-- something the owner will edit — a report, a deck, a workbook — is a real `.docx`, `.pptx` or
-  `.xlsx`, built through the file’s own styles, layouts and live formulas;
-- a PDF whose pagination matters — a CV, a letter, an invoice, a one-pager — is typeset with `typst`
-  from a `.typ` source kept beside the PDF, because converting a word-processor file surrenders
-  control of where the pages break;
-- `print_pdf` captures a page the browser is showing — a posting, a receipt, a statement — and is not
-  an authoring route.
-
-Before publishing, a document is proved: converted with `garden-office-convert IN OUT`, rendered to
-page images with `pdftoppm`, and looked at with `image_read`. Overflowing text boxes, a CV that
-spills onto a second page and `#REF!` cells are invisible in the source and obvious in a render.
-Publishing an Office file also attaches a converted PDF review copy for the owner.
-
-The conversion goes through that wrapper rather than through LibreOffice directly, and the skill
-library names only the wrapper. Bare `libreoffice --headless --convert-to` exits 0 having written
-nothing, decides the output name itself from the input stem, and corrupts concurrent runs that
-share one user profile. The wrapper gives each run a throwaway profile, writes where the caller
-asked, and fails loudly when the bytes are not there — so a non-zero exit genuinely means the
-document did not convert.
+The model chooses how to produce a document; the computer supplies the tools. The runtime block lists
+what is installed — the managed Python with python-docx, python-pptx, openpyxl, pandas and pypdf;
+typst; LibreOffice behind `garden-office-convert`; poppler, qpdf, ocrmypdf and `garden-pdf-tables` —
+so a model knows before it starts what this box can do. `garden-office-convert IN OUT` is the one
+route from an Office file to a PDF: bare LibreOffice exits 0 having written nothing and corrupts
+concurrent runs that share a profile, while the wrapper uses a throwaway profile and fails loudly when
+the bytes are not there. Publishing an Office file attaches a converted PDF review copy for the owner,
+and an acceptance check can render a document and hold its page count and clipping.
 
 ## Long work
 
@@ -253,10 +171,10 @@ bind first.
 
 The budget is visible to the model. Once most of it is spent the turn is told how many steps remain
 and asked to judge whether the rest of the job fits; in the last few it is told to stop starting new
-work, save what is unfinished, and finish with an honest account of what remains.
+work, save what is unfinished, and reply with an honest account of what remains.
 
 A turn that reaches the ceiling anyway does not die on it. It spends one more model call on a
-restricted handoff turn where only `set_plan` and `finish` are available, and lands `completed`:
+restricted handoff turn where only `set_plan` runs and the reply is the handoff, and lands `completed`:
 the plan is preserved rather than closed, the outstanding steps become the turn's caveats, and the
 completion is explicitly not marked verified, because a handoff asserts the opposite of a verified
 result. A note is written into the saved window telling the next turn that the previous one was cut
@@ -669,21 +587,12 @@ which is built before the agent has said anything, so the gap survives: the comm
 carries a probe that misses for exactly this reason and asserts that it still misses, which keeps
 the price of the encryption measured rather than talked out of existence.
 
-Skills are reviewed, versioned procedures with an index description, status, use count, pin state,
-and full Markdown body loaded only when relevant. Two tiers reach the model by name: the vetted
-built-in library that ships in the repository, and the procedures saved for this workspace. Built-in
-skills are read-only; reusing a built-in name is reviewed as an explicit owner override that shadows
-it for this workspace rather than replacing it.
-
-A skill body carries what is true of this machine and not what is true of the craft. A procedure that
-tells a capable model how to think about a task is method, and method is not worth the thousands of
-tokens it costs when it is opened; a formula set some other renderer will not evaluate, a prefix a
-file format requires, a tool that has to be run twice to be correct, are facts nothing else on the
-box will tell it. A skill that is method end to end does not belong in the library at all, however
-well written: the resident contract already asks for the same discipline in a sentence, and a
-procedure the model can derive is a bill with no purchase. `pnpm eval:context` is what settles
-whether a cut cost anything. `scripts/garden-skill-check` lints the library and reports its size;
-that is the number to read rather than one written here.
+Skills are procedures the owner chose to keep: saved for a workspace through the `skill` tool, which
+shows the owner the full text for approval, or kept as `SKILL.md` folders in the owner's own skill
+roots. Only their names and one-line descriptions are resident; a body loads when the model opens it,
+and a body still readable in the window is answered with a stub rather than sent twice. garden ships
+no procedures of its own: what a capable model needs from this machine is its facts, which the
+runtime block carries, not instructions in a craft it already has.
 
 ## Files as knowledge
 

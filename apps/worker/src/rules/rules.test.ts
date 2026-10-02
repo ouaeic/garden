@@ -6,18 +6,11 @@ import {
   DORMANT_RULES,
   RULE_CORRECTION_MARKER,
   applyDormantRules,
-  correctionMessage,
   resetRuleFiringCounts,
   ruleFiringCounts,
   toolsRunThisTurn,
   type DormantRule
 } from './index.js';
-
-const rule = (id: string): DormantRule => {
-  const found = DORMANT_RULES.find((candidate) => candidate.id === id);
-  if (!found) throw new Error(`no rule ${id}`);
-  return found;
-};
 
 /** A window in the shape a step boundary actually leaves behind: contract, goal, step, results. */
 const window = (
@@ -73,106 +66,6 @@ describe('dormant rules cost nothing until they fire', () => {
       expect(wire).not.toContain(RULE_CORRECTION_MARKER);
     }
   });
-
-  /*
-   * The same fixture with and without the offending thing, so the assertion is about the trigger
-   * rather than about the rule happening to be quiet. This is the pair the brief asks for: the
-   * model emits the forbidden thing and gets the correction; it emits everything else about the
-   * same step and gets a prompt that has not moved.
-   */
-  it('separates the offending step from its innocent twin', () => {
-    const innocent = window({
-      toolCalls: [call('shell', { executable: 'python3', args: ['build_report.py'] })]
-    });
-    const guilty = window({
-      toolCalls: [
-        call('shell', { executable: 'python3', args: ['build_report.py', '--out', 'report.docx'] })
-      ]
-    });
-    const innocentBefore = JSON.stringify(innocent);
-    expect(applyDormantRules(innocent, new Set(['shell']))).toEqual([]);
-    expect(JSON.stringify(innocent)).toBe(innocentBefore);
-    expect(applyDormantRules(guilty, new Set(['shell']))).toEqual(['office-render-proof']);
-    expect(guilty.at(-1)?.content).toBe(correctionMessage(rule('office-render-proof')));
-  });
-});
-
-describe('the render-proof rule', () => {
-  it('fires on an Office file this turn has never looked at', () => {
-    const messages = window({
-      toolCalls: [call('file_write', { path: 'workspace/quarterly.pptx', content: '...' })]
-    });
-    expect(applyDormantRules(messages, new Set(['file_write']))).toEqual(['office-render-proof']);
-    expect(messages.at(-1)?.content).toContain('garden-office-convert');
-  });
-
-  it('stays quiet once the turn has actually rendered and looked', () => {
-    const messages = window({
-      toolCalls: [call('publish_artifact', { path: 'workspace/quarterly.pptx' })]
-    });
-    expect(applyDormantRules(messages, new Set(['publish_artifact', 'image_read']))).toEqual([]);
-  });
-
-  /*
-   * The false fire this rule was written to avoid: a model two calls into the proof is doing the
-   * right thing, and `image_read` has not happened yet because it is the call after next.
-   */
-  it('does not correct the step that is already proving the document', () => {
-    const messages = window({
-      toolCalls: [
-        call('shell', {
-          executable: 'garden-office-convert',
-          args: ['workspace/q.docx', 'workspace/q.pdf']
-        })
-      ]
-    });
-    expect(applyDormantRules(messages, new Set(['shell']))).toEqual([]);
-  });
-
-  it('ignores an Office extension inside a tool that produces nothing', () => {
-    const messages = window({ toolCalls: [call('files_list', { path: 'workspace' })] });
-    expect(applyDormantRules(messages, new Set(['files_list']))).toEqual([]);
-  });
-});
-
-describe('the snippet-citation rule', () => {
-  const answer =
-    'The council approved the scheme on 12 March. The budget rose from 4.2 to 5.1 million, the ' +
-    'opening slipped to the autumn, and two of the three objections were withdrawn before the ' +
-    'vote. The remaining objection is about the access road and is listed for a separate hearing.';
-
-  it('fires when a long answer rests entirely on search hits', () => {
-    const messages = window({ text: answer });
-    expect(applyDormantRules(messages, new Set(['web_search']))).toEqual(['snippet-citation']);
-    expect(messages.at(-1)?.content).toContain('parallel_web_read');
-  });
-
-  it('stays quiet once a primary source has been opened', () => {
-    const messages = window({ text: answer });
-    expect(applyDormantRules(messages, new Set(['web_search', 'parallel_web_read']))).toEqual([]);
-  });
-
-  it('stays quiet when the answer carries the address it read', () => {
-    const messages = window({ text: `${answer} Source: https://example.gov/minutes/2026-03-12` });
-    expect(applyDormantRules(messages, new Set(['web_search']))).toEqual([]);
-  });
-
-  it('stays quiet on the step that is on its way to open the source', () => {
-    const messages = window({
-      text: answer,
-      toolCalls: [call('parallel_web_read', { urls: ['https://example.gov/minutes'] })]
-    });
-    expect(applyDormantRules(messages, new Set(['web_search']))).toEqual([]);
-  });
-
-  /*
-   * A short line between two tool calls is not an answer, and a matcher that treats it as one fires
-   * on most research turns - at which point this is a contract line paid late plus a regex.
-   */
-  it('stays quiet on a short remark between calls', () => {
-    const messages = window({ text: 'Searching for the council minutes now.' });
-    expect(applyDormantRules(messages, new Set(['web_search']))).toEqual([]);
-  });
 });
 
 describe('the sleep-poll rule', () => {
@@ -226,13 +119,13 @@ describe('the sleep-poll rule', () => {
 describe('a rule is corrected once, not every step', () => {
   it('does not append a second copy while the first is still in the window', () => {
     const messages = window({
-      toolCalls: [call('file_write', { path: 'workspace/q.xlsx', content: '' })]
+      toolCalls: [call('shell', { executable: 'sleep', args: ['30'] })]
     });
-    expect(applyDormantRules(messages, new Set(['file_write']))).toEqual(['office-render-proof']);
+    expect(applyDormantRules(messages, new Set(['shell']))).toEqual(['sleep-poll']);
     const after = JSON.stringify(messages);
-    expect(applyDormantRules(messages, new Set(['file_write']))).toEqual([]);
+    expect(applyDormantRules(messages, new Set(['shell']))).toEqual([]);
     expect(JSON.stringify(messages)).toBe(after);
-    expect(ruleFiringCounts().get('office-render-proof')).toBe(1);
+    expect(ruleFiringCounts().get('sleep-poll')).toBe(1);
   });
 
   /*
@@ -244,9 +137,9 @@ describe('a rule is corrected once, not every step', () => {
    */
   it('becomes live again once a compaction has condensed the correction away', () => {
     const messages = window({
-      toolCalls: [call('file_write', { path: 'workspace/q.xlsx', content: '' })]
+      toolCalls: [call('shell', { executable: 'sleep', args: ['30'] })]
     });
-    applyDormantRules(messages, new Set(['file_write']));
+    applyDormantRules(messages, new Set(['shell']));
     const condensed = messages.filter(
       (message) => !message.content.startsWith(RULE_CORRECTION_MARKER)
     );
@@ -255,9 +148,9 @@ describe('a rule is corrected once, not every step', () => {
     condensed[condensed.length - 2] = {
       role: 'assistant',
       content: '',
-      toolCalls: [call('file_write', { path: 'workspace/q.xlsx', content: '' })]
+      toolCalls: [call('shell', { executable: 'sleep', args: ['30'] })]
     };
-    expect(applyDormantRules(condensed, new Set(['file_write']))).toEqual(['office-render-proof']);
+    expect(applyDormantRules(condensed, new Set(['shell']))).toEqual(['sleep-poll']);
   });
 });
 

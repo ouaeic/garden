@@ -29,7 +29,7 @@ import {
   refreshArtifactLedger,
   type ArtifactLedger
 } from './context.js';
-import { forgetReads, forgetRefusals, recordRead } from './edit/index.js';
+import { forgetReads, recordRead } from './edit/index.js';
 import { executeWorkspaceTool } from './tools/workspace.js';
 import type { AgentState } from './agent-state.js';
 import type { ToolContext } from './tool-dispatch.js';
@@ -97,7 +97,6 @@ const run = async (
   // Every case here is `task-1`, and the repeated-patch bound remembers refusals per task and
   // path across cases: without this a case that resends a patch an earlier case was refused gets
   // the bounded sentence instead of the refusal it is asserting on.
-  forgetRefusals();
   const written = new Map<string, string>(Object.entries(options.files ?? {}));
   for (const path of options.seen ?? []) recordRead('task-1', path, 1, written.get(path) ?? '');
   for (const [path, text] of Object.entries(options.shown ?? {}))
@@ -168,7 +167,8 @@ describe('what reaches the ledger is what the workspace confirmed', () => {
           patches: [
             {
               path: 'workspace/queue.ts',
-              edit: 'PUT 1:\n-import type\n+import type { Job } from "./j";\n'
+              oldText: 'import type',
+              newText: 'import type /* from ./j */'
             }
           ]
         }
@@ -177,7 +177,12 @@ describe('what reaches the ledger is what the workspace confirmed', () => {
     );
 
     expect(state.artifactLedger?.entries).toEqual([
-      { path: 'workspace/queue.ts', mode: 'edited', bytes: 159, step: 7 }
+      {
+        path: 'workspace/queue.ts',
+        mode: 'edited',
+        bytes: Buffer.byteLength(QUEUE.replace('import type', 'import type /* from ./j */')),
+        step: 7
+      }
     ]);
   });
 
@@ -234,9 +239,10 @@ describe('what reaches the ledger is what the workspace confirmed', () => {
           patches: [
             {
               path: 'workspace/queue.ts',
-              edit: 'PUT 1:\n-import type\n+import type { Job } from "./j";\n'
+              oldText: 'import type',
+              newText: 'import type /* from ./j */'
             },
-            { path: 'workspace/missing.ts', edit: 'PUT 1:\n+nothing\n' }
+            { path: 'workspace/missing.ts', oldText: 'x', newText: 'nothing' }
           ]
         }
       },
@@ -272,11 +278,13 @@ describe('what reaches the ledger is what the workspace confirmed', () => {
           patches: [
             {
               path: 'workspace/queue.ts',
-              edit: 'PUT 1:\n-import type\n+import type { Job } from "./j";\n'
+              oldText: 'import type',
+              newText: 'import type /* from ./j */'
             },
             {
               path: 'workspace/config.ts',
-              edit: 'PUT 2:\n-export const timeoutMs = 5_000;\n+export const timeoutMs = 9_000;\n'
+              oldText: 'export const timeoutMs = 5_000;',
+              newText: 'export const timeoutMs = 9_000;'
             }
           ]
         }
@@ -288,7 +296,7 @@ describe('what reaches the ledger is what the workspace confirmed', () => {
       }
     );
 
-    expect(refusals(result)).toEqual([expect.stringContaining('has changed since you read it')]);
+    expect(refusals(result)).toEqual([expect.stringContaining('oldText was not found')]);
     expect(written.get('workspace/config.ts')).toBe(CONFIG_NOW);
     expect(state.artifactLedger?.entries.map((entry) => entry.path)).toEqual([
       'workspace/queue.ts'
@@ -307,7 +315,8 @@ describe('what reaches the ledger is what the workspace confirmed', () => {
           patches: [
             {
               path: 'workspace/config.ts',
-              edit: 'PUT 2:\n-export const timeoutMs = 5_000;\n+export const timeoutMs = 9_000;\n'
+              oldText: 'export const timeoutMs = 5_000;',
+              newText: 'export const timeoutMs = 9_000;'
             }
           ]
         }
@@ -318,7 +327,7 @@ describe('what reaches the ledger is what the workspace confirmed', () => {
       }
     );
 
-    expect(failure).toContain('has changed since you read it');
+    expect(failure).toContain('oldText was not found');
     expect(written.get('workspace/config.ts')).toBe(CONFIG_NOW);
     expect(state.artifactLedger).toBeUndefined();
     expect(artifactLedgerBlock(state.artifactLedger)).toBeNull();

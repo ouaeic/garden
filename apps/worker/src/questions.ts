@@ -6,7 +6,6 @@ import type { DataStore, TaskRecord } from '@garden/data';
 import type { ModelToolCall } from '@garden/model-gateway';
 import type { AgentState } from './agent-state.js';
 import { askOutcome } from './completion.js';
-import { textValue } from './values.js';
 import { sealUnansweredToolCalls } from './turn-lifecycle.js';
 import { agentNotificationAad } from '@garden/data';
 
@@ -52,18 +51,20 @@ export async function waitForQuestion(
   task: TaskRecord,
   key: Uint8Array,
   state: AgentState,
-  call: ModelToolCall
+  call?: ModelToolCall
 ): Promise<boolean> {
   if (!state.question) return false;
   state.question.waiting = true;
-  state.messages.push({
-    role: 'tool',
-    toolCallId: call.id,
-    content: `Waiting for question ${state.question.id ?? ''}: ${state.question.question}. The user's answer will resume this work; do not infer it from elapsed time.`
-  });
+  if (call) {
+    state.messages.push({
+      role: 'tool',
+      toolCallId: call.id,
+      content: `Waiting for the answer to: ${state.question.question}`
+    });
+    state.turnToolResults ??= {};
+    state.turnToolResults[call.id] = { name: call.name, success: true };
+  }
   sealUnansweredToolCalls(state.messages, 'waiting for the user’s answer');
-  state.turnToolResults ??= {};
-  state.turnToolResults[call.id] = { name: call.name, success: true };
   await saveQuestion(deps, task, key, state, true);
   return true;
 }
@@ -75,66 +76,37 @@ export async function askUser(
   state: AgentState,
   call: ModelToolCall
 ): Promise<boolean> {
-  const waitFor = textValue(call.arguments.waitFor);
   state.turnToolResults ??= {};
   const refuse = (reason: string) => {
     state.messages.push({ role: 'tool', toolCallId: call.id, content: `Refused: ${reason}` });
     state.turnToolResults![call.id] = { name: call.name, success: false };
     return false;
   };
-  if (waitFor) {
-    if (waitFor !== state.question?.id)
-      return refuse('That question is not waiting for an answer.');
-    return waitForQuestion(deps, task, key, state, call);
-  }
-  if (state.question)
-    return refuse(
-      `A question is already pending (${state.question.id ?? state.question.question}). Continue only independent work, or call ask with waitFor to pause.`
-    );
+  if (state.question) return refuse('A question is already waiting for an answer.');
   const outcome = askOutcome(state, call.arguments);
   if (!outcome.ok) return refuse(outcome.refusal.replace(/^Refused: /, ''));
   const { question, options, why } = outcome;
-  const continueWith = textValue(call.arguments.continueWith)
-    .trim()
-    .replace(/\s+/g, ' ')
-    .slice(0, 400);
   const id = runtimeUUID();
   state.questionsAsked = (state.questionsAsked ?? 0) + 1;
   state.question = {
     id,
     question,
-    why,
+    ...(why ? { why } : {}),
     askedAtStep: state.step,
-    ...(continueWith ? { continueWith } : { waiting: true })
+    waiting: true
   };
   state.messages.push({
     role: 'tool',
     toolCallId: call.id,
-    content: JSON.stringify({
-      questionId: id,
-      question,
-      options,
-      blockedWork: why,
-      ...(continueWith
-        ? {
-            continueWith,
-            instruction:
-              'Continue only this independent work. Do not guess the answer or do dependent work. The reply arrives during the task. Call ask with waitFor when no independent work remains.'
-          }
-        : {
-            waiting: true,
-            instruction: 'The task is waiting for the user. Their reply resumes this turn.'
-          })
-    })
+    content: 'Sent to the user. Their answer resumes this turn.'
   });
   state.turnToolResults[call.id] = { name: call.name, success: true };
-  if (!continueWith) sealUnansweredToolCalls(state.messages, 'waiting for the user’s answer');
-  await saveQuestion(deps, task, key, state, !continueWith, {
+  sealUnansweredToolCalls(state.messages, 'waiting for the user’s answer');
+  await saveQuestion(deps, task, key, state, true, {
     question,
-    why,
+    ...(why ? { why } : {}),
     questionId: id,
     ...(options.length ? { options } : {}),
-    ...(continueWith ? { continueWith } : {}),
     unattended: state.unattended === true
   });
   await deps.store
@@ -145,7 +117,7 @@ export async function askUser(
       messageCiphertext: encryptJson({ message: question }, key, agentNotificationAad(task.id))
     })
     .catch(() => undefined);
-  return !continueWith;
+  return true;
 }
 
 /** Keep a detected human challenge durable without replacing an unanswered direction. */

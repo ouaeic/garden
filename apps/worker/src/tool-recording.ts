@@ -26,7 +26,7 @@ import type { DataStore, TaskRecord } from '@garden/data';
 import type { ModelToolCall } from '@garden/model-gateway';
 import type { AgentState, AgentWorkerConfig } from './agent-state.js';
 import { callDestinations } from './command-classification.js';
-import { completionReference, shellObservation, processObservation } from './completion.js';
+import { shellObservation } from './completion.js';
 import {
   boundToolResultText,
   RECENT_TOOL_OUTPUT_CHARS,
@@ -615,8 +615,7 @@ export const recordToolResult = async (
     // contract reads this, because only there does "the last change" mean the work being proved.
     ...(writesOnlyDurableInstructions(call.name, call.arguments) ? { briefOnly: true } : {}),
     ...(writesOnlyProse(call.name, call.arguments) ? { proseOnly: true } : {}),
-    ...(shellObservation(call, result) ?? {}),
-    ...(!skipped ? (processObservation(task, call, result) ?? {}) : {})
+    ...(shellObservation(call, result) ?? {})
   };
   if (
     !skipped &&
@@ -642,8 +641,7 @@ export const recordToolResult = async (
    * truncation, so the closing marker cannot be the thing the 24,000-character cut removes.
    */
   const full = toolResultText(modelResult);
-  const reference = completionReference(state, call.id);
-  const outputBudget = Math.max(0, RECENT_TOOL_OUTPUT_CHARS - reference.length);
+  const outputBudget = RECENT_TOOL_OUTPUT_CHARS;
   /*
    * The bytes the window cannot hold, parked where the model can still go and get them.
    *
@@ -681,7 +679,7 @@ export const recordToolResult = async (
   state.messages.push({
     role: 'tool',
     toolCallId: call.id,
-    content: `${reference}${forModel}${provenanceNotice ? `\n\n${provenanceNotice}` : ''}`
+    content: `${forModel}${provenanceNotice ? `\n\n${provenanceNotice}` : ''}`
   });
   // A snapshot of a challenge page is a successful read, so the wall arrives here rather than in
   // the failure path - and it is the same thing to tell the owner about.

@@ -94,12 +94,14 @@ describe('document toolchain report', () => {
         ...nothing,
         binaries: new Set(['python3', 'fc-list']),
         pythonModules: new Set(['pptx', 'docx'])
-      })
+      }),
+      [deck, fonts]
     );
-    expect(summary).toContain('Available on this computer: office-authoring.');
-    expect(summary).toContain('Not installed: document-fonts');
+    // What is installed, in the names the agent will type.
+    expect(summary).toMatch(/^python3; Python modules pptx, docx\./);
+    expect(summary).toContain('Missing: document-fonts');
     expect(summary).toContain('fonts-crosextra-caladea');
-    expect(summary).toContain('do not follow a procedure that depends on one of these');
+    expect(summary).toContain('ask before installing');
   });
 
   it('says so plainly when the box has none of it', () => {
@@ -108,7 +110,7 @@ describe('document toolchain report', () => {
     );
   });
 
-  it('covers every job the built-in document skills prescribe', () => {
+  it('covers every document and data job the agent is likely to need', () => {
     const ids = DOCUMENT_TOOLCHAIN.map((capability) => capability.id);
     expect(ids).toContain('office-authoring');
     expect(ids).toContain('office-conversion');

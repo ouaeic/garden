@@ -6,7 +6,6 @@ import { COMPACT_CONTEXT_TOOL } from './context.js';
 import { approvalRequirement } from './approval-policy.js';
 import { isMutatingToolCall } from './write-classification.js';
 import { PLAN_MODE_PERMITTED } from './turn/dispatch.js';
-import { completionVerification } from './completion.js';
 import type { AgentState } from './agent-state.js';
 import { requestToolsFor } from './request-tools.js';
 
@@ -19,8 +18,8 @@ it('partitions all advanced capabilities into discoverable groups without duplic
   expect([...core.map((tool) => tool.name), ...grouped].sort()).toEqual(
     full.map((tool) => tool.name).sort()
   );
-  // Keep the resident core within its serialized byte ceiling.
-  expect(Buffer.byteLength(JSON.stringify([...core, COMPACT_CONTEXT_TOOL]))).toBeLessThan(28_000);
+  // The resident core, sent on every request: 9,705 bytes measured.
+  expect(Buffer.byteLength(JSON.stringify([...core, COMPACT_CONTEXT_TOOL]))).toBeLessThan(9_800);
 });
 
 it('adds chosen groups in activation order while preserving the entire existing prefix', () => {
@@ -64,22 +63,13 @@ it('continues to filter unavailable hardware and only describes configured conne
   expect(JSON.stringify(action)).not.toContain('github.create_issue');
 });
 
-it('loads definitions without granting authority, changing files or supplying verification evidence', () => {
+it('loads definitions without granting authority or changing files', () => {
   const state = { messages: [], step: 1, credits: 0 } as AgentState;
   enableToolGroups(state, { groups: ['browser', 'publishing'] });
   expect(isMutatingToolCall('load_tools')).toBe(false);
   expect(PLAN_MODE_PERMITTED.has('load_tools')).toBe(true);
   for (const mode of ['review', 'balanced', 'autonomous'] as const)
     expect(approvalRequirement('load_tools', { groups: ['publishing'] }, mode)).toBeNull();
-  state.turnToolResults = {
-    loaded: { name: 'load_tools', success: true }
-  };
-  expect(
-    completionVerification(state, {
-      status: 'verified',
-      evidence: [{ claim: 'Published site', source: 'tool_result', toolCallId: 'loaded' }]
-    }).ok
-  ).toBe(false);
   expect(state).not.toHaveProperty('approvalGrants');
 });
 

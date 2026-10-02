@@ -23,9 +23,10 @@ export const withTaskApproval = (
   permission: TaskApprovalScope['permissions'][number]
 ): ApprovalRequirement => {
   if (requirement.sideEffect === 'external_consequential') return requirement;
-  if (permission === 'commands' && args.network !== false) return requirement;
   if (tool === 'shell' && reachesAnUnreadableFarEnd(args)) return requirement;
   const addresses = callDestinations(tool, args);
+  // A command grant covers commands that name no network destination.
+  if (permission === 'commands' && addresses.length) return requirement;
   const origins: string[] = [];
   for (const address of addresses) {
     try {

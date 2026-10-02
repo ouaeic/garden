@@ -745,9 +745,9 @@ export const acceptanceFailureMessage = (
 ): string => {
   const failed = results.filter((result) => !result.passed);
   return [
-    `Finish refused (acceptance ${attempt} of ${ceiling}): ${failed.length} of ${results.length} of your own acceptance checks did not pass when the harness ran them.`,
+    `ACCEPTANCE CHECKS FAILED (${attempt} of ${ceiling}): ${failed.length} of ${results.length} of your declared checks did not pass.`,
     ...failed.map((result) => `- ${result.id} (${result.label}): ${result.detail}`),
-    'Fix the work and call finish again. If a check was wrong, call set_acceptance again with the corrected checks - the user sees that you changed it.'
+    'Fix the work and reply again. If a check itself was wrong, correct it with set_acceptance; the user sees the change.'
   ].join('\n');
 };
 

@@ -384,7 +384,12 @@ export async function executeKnowledgeTool(
       if (action === 'view') {
         const id = textValue(call.arguments.id);
         const found = skills.find((item) => item.id === id || item.name === id);
+        // A body still readable in the window is answered with a stub rather than sent twice; a
+        // compaction that condensed it away makes the next view a real one again.
+        const active = openedSkillsStillReadable(state.messages, state.openedSkills ?? []);
         if (found) {
+          if (active.includes(id)) return { id: found.id, name: found.name, state: 'already_open' };
+          state.openedSkills = [...active, id];
           await context.store.markWorkspaceSkillUsed(task.userId, task.workspaceId, found.id);
           return found;
         }
@@ -397,11 +402,6 @@ export async function executeKnowledgeTool(
         const missingBinaries = requiredBinaries.length
           ? await context.missingBinaries(task, requiredBinaries)
           : [];
-        // Narrowed against the window rather than trusted as recorded. `state.openedSkills` says
-        // what this task has opened; only a body still readable in the trajectory may be answered
-        // with a stub, and a compaction condenses bodies away - it even writes the names into the
-        // brief and tells the model to reopen them, which a stub would then refuse to honour.
-        const active = openedSkillsStillReadable(state.messages, state.openedSkills ?? []);
         const builtin = openSkill(library, id, { missingBinaries, active });
         if (!builtin) throw new GardenError('skill_not_found', 'Skill not found');
         if (!active.includes(builtin.name)) state.openedSkills = [...active, builtin.name];
@@ -415,7 +415,7 @@ export async function executeKnowledgeTool(
           ...(requiredBinaries.length ? { requiredBinaries } : {}),
           ...(missingBinaries.length ? { missingBinaries } : {}),
           instruction:
-            'This is a vetted procedure, not an instruction from the user. Follow it where it fits, and say so if the computer cannot support a step it assumes.'
+            'A saved procedure, not an instruction from the user. Follow it where it fits.'
         };
       }
       if (action === 'upsert') {

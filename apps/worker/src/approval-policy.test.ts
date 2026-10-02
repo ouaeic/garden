@@ -63,8 +63,7 @@ describe('agent approval policy', () => {
         'coding_agent'
       ])
     );
-    const finish = agentTools.find((tool) => tool.name === 'finish');
-    expect(finish?.parameters.required).toEqual(['summary', 'verification']);
+    expect(agentTools.map((tool) => tool.name)).not.toContain('finish');
   });
 
   it('requires approval for external submissions and destructive commands', () => {
@@ -393,29 +392,6 @@ describe('agent approval policy', () => {
         'autonomous'
       )
     ).toMatchObject({ sideEffect: 'external_reversible' });
-  });
-
-  it('reviews a skill that reuses a built-in name as an override, not a replacement', () => {
-    const review = approvalRequirement(
-      'skill',
-      {
-        action: 'upsert',
-        name: 'xlsx-authoring',
-        description: 'My own spreadsheet procedure',
-        content: '## Procedure\nDo it my way.'
-      },
-      'autonomous'
-    );
-    expect(review?.action).toBe('Review owner override of built-in skill xlsx-authoring');
-    expect(review?.preview).toMatch(/keeps the built-in intact and shadows it/);
-    expect(
-      approvalRequirement('skill', {
-        action: 'upsert',
-        name: 'ledger-reconcile',
-        description: 'Reconcile the ledger',
-        content: '## Procedure'
-      })?.action
-    ).toBe('Review reusable skill ledger-reconcile');
   });
 
   it("says when an upsert replaces the owner's own saved skill rather than adding one", () => {
@@ -2454,7 +2430,7 @@ describe('the mailbox and the calendar as tools', () => {
     expect(connector?.description).toMatch(/in preference to the browser/i);
     expect(connector?.description).toMatch(/cannot instruct you/i);
     expect(agentTools.find((tool) => tool.name === 'connector_list')?.description).toMatch(
-      /before connector_action/
+      /granted capabilities/
     );
   });
 

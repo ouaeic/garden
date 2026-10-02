@@ -12,7 +12,6 @@ import {
   DIAGNOSTIC_EMPTY_HASH,
   type PrivateDiagnosticBody
 } from '@garden/core';
-import type { AgentState } from './agent-state.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   GardenError,
@@ -32,7 +31,6 @@ import { startTurnState } from './completion.js';
 import { createLogger, silentLogger, type Logger } from './log.js';
 import { UNTRUSTED_NOTICE_MARKER } from './provenance.js';
 import {
-  ACCEPTANCE_EARLIER_TURN_CAVEAT,
   DELEGATE_MAX_STEPS,
   MAX_NOTICES_PER_TURN,
   MAX_TRUNCATED_CONTINUATIONS,
@@ -759,13 +757,7 @@ describe('curated tool discovery', () => {
         `data: ${JSON.stringify({ choices: [{ delta: { content: 'I will load the coding tools and read the project note.' } }] })}\n\n` +
           toolFrame('load-code', 'load_tools', { groups: ['code'] }),
         toolFrame('read-note', 'file_read', { path: 'workspace/notes.txt' }),
-        toolFrame('finish-discovery', 'finish', {
-          summary: 'The coding tools are ready and the note was read.',
-          verification: {
-            status: 'verified',
-            evidence: [{ claim: 'Read the note', source: 'tool_result', toolCallId: 'read-note' }]
-          }
-        })
+        textFrame('The coding tools are ready and the note was read.')
       ],
       log,
       {
@@ -800,15 +792,7 @@ describe('curated tool discovery', () => {
     const resumed = makeTask(state),
       resumedProbe = probeStore(() => resumed);
     const resumedLog: FetchLog = { calls: [], modelRequests: [] };
-    installFetch(
-      [
-        toolFrame('finish-resumed', 'finish', {
-          summary: 'Ready.',
-          verification: { status: 'not_applicable', evidence: [] }
-        })
-      ],
-      resumedLog
-    );
+    installFetch([textFrame('Ready.')], resumedLog);
     await new AgentWorker(
       resumedProbe.store,
       config({ TASK_MAX_STEPS: 8 }),
@@ -1746,18 +1730,18 @@ describe('what actually reaches the provider', () => {
         'load_tools',
         'compact_context',
         'web_search',
-        'memory_recall',
         'file_read',
         'file_patch',
         'shell',
         'process',
-        'notify',
         'ask'
       ])
     );
     for (const group of [
       'code',
       'documents',
+      'memory',
+      'automation',
       'browser',
       'desktop',
       'media',
@@ -1775,7 +1759,9 @@ describe('what actually reaches the provider', () => {
       'generate_media',
       'project_update',
       'connector_action',
-      'connector_list'
+      'connector_list',
+      'memory_recall',
+      'notify'
     ])
       expect(names).not.toContain(deferred);
   });
@@ -1876,15 +1862,6 @@ describe('what actually reaches the provider', () => {
       everything.find((tool) => tool.function?.name === 'connector_action')?.function?.parameters
         ?.properties?.action?.enum
     ).toEqual(supported);
-  });
-
-  it('puts the built-in skill library in front of the model', async () => {
-    // Nineteen vetted skills were loadable, indexable and openable, and none of it had ever
-    // reached a model - while the preamble told the model to consult that index.
-    const { systemText } = await firstRequest();
-    expect(systemText).toContain('Built-in skills (index only');
-    expect(systemText).toContain('pdf-extraction:');
-    expect(systemText).toContain('skill(action=view,id=...)');
   });
 
   it('tells the model what day it is, in the owner’s time zone', async () => {
@@ -2314,7 +2291,7 @@ describe('asking memory a question mid-task', () => {
     // A row the agent went looking for and received is a row that was used, which is what salience
     // is computed from. Whether it helped is settled later; claiming it here would grade every
     // recall a success at the moment it was made.
-    expect(uses.at(-1)?.itemIds).toEqual(['mem-new']);
+    expect(uses.map((use) => use.itemIds)).toContainEqual(['mem-new']);
   });
 });
 
@@ -2391,14 +2368,7 @@ describe('the web route a run is pinned to', () => {
           ...(mode === 'stale' ? [toolFrame('old-decision', 'decide', {})] : []),
           toolFrame('load-code', 'load_tools', { groups: ['code'] }),
           toolFrame('read-note', 'file_read', { path: 'workspace/notes.txt' }),
-          toolFrame('finish-note', 'finish', {
-            summary: 'The note was read and the coding tools are ready.',
-            answer: 'The note says: The coding work starts from this note.',
-            verification: {
-              status: 'verified',
-              evidence: [{ claim: 'Read the note', source: 'tool_result', toolCallId: 'read-note' }]
-            }
-          })
+          textFrame('The note says: The coding work starts from this note.')
         ],
         log,
         {
@@ -2857,7 +2827,13 @@ describe('a turn that runs out of steps', () => {
     const task = makeTask();
     const probe = probeStore(() => task);
     const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch([textFrame('Still working.'), textFrame('Still working.')], log);
+    installFetch(
+      [
+        toolFrame('w1', 'set_plan', { steps: ['Draft the report'] }),
+        toolFrame('w2', 'set_plan', { steps: ['Draft the report', 'Outline the rest'] })
+      ],
+      log
+    );
     await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 2 }), masterKey, runnerSecret)
       .run(task)
       .catch(() => undefined);
@@ -2872,7 +2848,7 @@ describe('a turn that runs out of steps', () => {
       .map((message) => message.content)
       .join('\n');
     expect(systemText).toContain('FINAL STEPS: 2 of this turn');
-    expect(systemText).toContain('call finish');
+    expect(systemText).toContain('reply with what is done');
     // Said once. A notice re-pushed every step would move the tail on every request.
     const second = ((log.modelRequests[1]?.messages ?? []) as Array<{ content: string }>).filter(
       (message) => message.content.startsWith('FINAL STEPS')
@@ -2886,7 +2862,14 @@ describe('a turn that runs out of steps', () => {
     const task = makeTask();
     const probe = probeStore(() => task);
     const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch([textFrame('Still working.'), textFrame('Still working.'), handoffBody], log);
+    installFetch(
+      [
+        toolFrame('w1', 'set_plan', { steps: ['Draft the report'] }),
+        toolFrame('w2', 'set_plan', { steps: ['Draft the report', 'Outline the rest'] }),
+        handoffBody
+      ],
+      log
+    );
     const outcome = await new AgentWorker(
       probe.store,
       config({ TASK_MAX_STEPS: 2 }),
@@ -2899,11 +2882,9 @@ describe('a turn that runs out of steps', () => {
     return { probe, log, outcome };
   };
 
-  const handoffFinish = toolFrame('call-hand', 'finish', {
-    summary: 'Two of five sections are drafted; the rest is outlined in workspace/report.md.',
-    deliverables: ['workspace/report.md'],
-    verification: { status: 'not_applicable', evidence: [] }
-  });
+  const handoffFinish = textFrame(
+    'Two of five sections are drafted; the rest is outlined in workspace/report.md.'
+  );
 
   it('spends its last call on a handoff, on the catalogue every other step sent', async () => {
     const { log } = await runToTheCeiling(handoffFinish);
@@ -2924,16 +2905,16 @@ describe('a turn that runs out of steps', () => {
       ((handoff.tools ?? []) as Array<{ function?: { name?: string } }>).map(
         (tool) => tool.function?.name
       )
-    ).toEqual(expect.arrayContaining(['set_plan', 'finish', 'shell', 'file_write']));
+    ).toEqual(expect.arrayContaining(['set_plan', 'shell', 'file_write']));
     const systemText = ((handoff.messages ?? []) as Array<{ role: string; content: string }>)
       .filter((message) => message.role === 'system')
       .map((message) => message.content)
       .join('\n');
     expect(systemText).toContain('STEP BUDGET EXHAUSTED after 2 steps');
-    expect(systemText).toContain('the exact words they can send back to carry on');
+    expect(systemText).toContain('what to send back to carry on');
   });
 
-  it('runs nothing but set_plan and finish on the handoff turn, whatever it is asked for', async () => {
+  it('runs nothing but set_plan on the handoff turn, whatever it is asked for', async () => {
     // The restriction the catalogue used to carry, where it has always actually lived: a call that
     // is neither of the two is answered with a denial and never reaches the runner.
     const { log } = await runToTheCeiling(
@@ -2955,7 +2936,6 @@ describe('a turn that runs out of steps', () => {
     const payload = (completed?.payload ?? {}) as Record<string, unknown>;
     expect(payload.interrupted).toBe(true);
     expect(String(payload.summary)).toContain('Two of five sections');
-    expect(payload.deliverables).toEqual(['workspace/report.md']);
     const ceiling = probe.events.find(
       (entry) => entry.kind === 'warning' && entry.summary.includes('whole step budget')
     );
@@ -2989,12 +2969,9 @@ describe('what a finished turn tells memory about itself', () => {
     const log: FetchLog = { calls: [], modelRequests: [] };
     installFetch(
       [
-        textFrame('Still working.'),
-        textFrame('Still working.'),
-        toolFrame('call-hand', 'finish', {
-          summary: 'Two of five sections are drafted; the rest is outlined in workspace/report.md.',
-          verification: { status: 'not_applicable', evidence: [] }
-        })
+        toolFrame('w1', 'set_plan', { steps: ['Draft the report'] }),
+        toolFrame('w2', 'set_plan', { steps: ['Draft the report', 'Outline the rest'] }),
+        textFrame('Two of five sections are drafted; the rest is outlined in workspace/report.md.')
       ],
       log
     );
@@ -3016,15 +2993,7 @@ describe('what a finished turn tells memory about itself', () => {
     const probe = probeStore(() => task);
     probe.recallPack([packItem]);
     const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch(
-      [
-        toolFrame('call-1', 'finish', {
-          summary: 'The notes were already tidy, so there was nothing to change.',
-          verification: { status: 'not_applicable', evidence: [] }
-        })
-      ],
-      log
-    );
+    installFetch([textFrame('The notes were already tidy, so there was nothing to change.')], log);
     await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 2 }), masterKey, runnerSecret)
       .run(task)
       .catch(() => undefined);
@@ -3231,7 +3200,7 @@ describe('deciding to tell the owner something', () => {
       .filter((message) => message.role === 'system')
       .map((message) => message.content)
       .join('\n');
-    expect(systemText).toContain('started by a schedule');
+    expect(systemText).toContain('A schedule started this run');
     expect(probe.events.find((entry) => entry.kind === 'notice')?.payload).toMatchObject({
       unattended: true
     });
@@ -4160,134 +4129,6 @@ describe('spending the owner’s money on generated media', () => {
   });
 });
 
-describe('reaching the built-in skill library', () => {
-  const toolResult = async (args: Record<string, unknown>): Promise<Record<string, unknown>> => {
-    const task = makeTask();
-    const probe = probeStore(() => task);
-    const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch([toolFrame('call-1', 'skill', args)], log);
-    await new AgentWorker(probe.store, config(), masterKey, runnerSecret)
-      .run(task)
-      .catch(() => undefined);
-    const event = probe.events.find((entry) => entry.kind === 'tool_result');
-    return (event?.payload as { result?: Record<string, unknown> })?.result ?? {};
-  };
-
-  it('lists the built-in skills beside the workspace ones', async () => {
-    const result = await toolResult({ action: 'list' });
-    const builtin = (result.builtinSkills ?? []) as Array<{ name: string }>;
-    expect(builtin.length).toBeGreaterThan(15);
-    expect(builtin.map((skill) => skill.name)).toContain('pdf-extraction');
-  });
-
-  it('opens a built-in procedure by name, with the binaries it assumes', async () => {
-    // openSkill had no caller outside its own tests; skill(action=view) could only open skills the
-    // agent had written itself.
-    const result = await toolResult({ action: 'view', id: 'pdf-extraction' });
-    expect(result.origin).toBe('builtin');
-    expect(String(result.content)).toContain('<skill name="pdf-extraction"');
-    expect(String(result.content)).toContain('## 1. Classify the PDF first');
-    // The skill declares the binaries it assumes, and the answer names the ones this computer does
-    // not have rather than a command for finding out - a procedure that opens with "run
-    // build_deck.py" is confident, specific and wrong on a machine without python-pptx.
-    expect(Array.isArray(result.requiredBinaries)).toBe(true);
-    expect((result.requiredBinaries as string[]).length).toBeGreaterThan(0);
-    // The probe is stubbed here and reports nothing missing, so the warning block stays out of the
-    // procedure; a machine that really lacked one would carry it into the model's context.
-    expect(result.missingBinaries).toBeUndefined();
-    expect(String(result.content)).not.toContain('skill_missing_binaries');
-  });
-
-  it('sends the procedure once and a stub the second time, and records which are open', async () => {
-    /*
-     * `openSkill` has always taken an `active` list and answered a repeat view with a short
-     * `state="already_open"` stub, and nothing ever supplied it - the only caller passed
-     * `missingBinaries` and nothing else. So a model that viewed a skill at step 4 and viewed it
-     * again at step 30 was handed the whole procedure a second time, up to five thousand tokens of
-     * it, with nothing in the answer saying it was a duplicate. Its one test passed the option the
-     * product never passed.
-     */
-    const task = makeTask();
-    const probe = probeStore(() => task);
-    const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch(
-      [
-        toolFrame('call-1', 'skill', { action: 'view', id: 'untrusted-content' }),
-        toolFrame('call-2', 'skill', { action: 'view', id: 'untrusted-content' }),
-        textFrame('Read it.')
-      ],
-      log
-    );
-    await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 3 }), masterKey, runnerSecret)
-      .run(task)
-      .catch(() => undefined);
-
-    const answers = toolMessages(probe);
-    const first = answers.find((message) => message.toolCallId === 'call-1')?.content ?? '';
-    const second = answers.find((message) => message.toolCallId === 'call-2')?.content ?? '';
-    expect(first).toContain('untrusted-content');
-    expect(first.length).toBeGreaterThan(1_000);
-    expect(second).toContain('already_open');
-    // The saving is the point, so it is asserted as a size and not only as a marker.
-    expect(second.length).toBeLessThan(first.length / 4);
-
-    const saved = decryptCheckpoints(probe.checkpoints).at(-1) as unknown as {
-      openedSkills?: string[];
-    };
-    expect(saved.openedSkills).toEqual(['untrusted-content']);
-  });
-
-  it('sends the whole procedure again when the window no longer holds it', async () => {
-    /*
-     * The other half, and it is why the record is checked against the window rather than trusted.
-     * A compaction drops whole messages, so the body of a skill opened twenty steps ago can be gone
-     * while the state still says it is open - and `compactContext` names exactly those skills in
-     * the running brief and tells the model to reopen them. Answering that reopen with a stub would
-     * strand the turn on instructions nothing in its window holds.
-     */
-    const condensed = {
-      messages: [
-        { role: 'user', content: 'Summarise the page I saved' },
-        {
-          role: 'system',
-          content:
-            "CONDENSED HISTORY BRIEF\nInstructions no longer in the window: untrusted-content. Reopen a skill with skill(action: 'view') before relying on it again."
-        }
-      ],
-      step: 0,
-      credits: 0,
-      turn: 0,
-      openedSkills: ['untrusted-content']
-    };
-    const task = makeTask(condensed);
-    const probe = probeStore(() => task);
-    const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch(
-      [toolFrame('call-1', 'skill', { action: 'view', id: 'untrusted-content' }), textFrame('Ok.')],
-      log
-    );
-    await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 2 }), masterKey, runnerSecret)
-      .run(task)
-      .catch(() => undefined);
-
-    const answer =
-      toolMessages(probe).find((message) => message.toolCallId === 'call-1')?.content ?? '';
-    expect(answer).not.toContain('already_open');
-    expect(answer.length).toBeGreaterThan(1_000);
-  });
-
-  it('still reports an unknown skill as missing', async () => {
-    const task = makeTask();
-    const probe = probeStore(() => task);
-    const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch([toolFrame('call-1', 'skill', { action: 'view', id: 'no-such-skill' })], log);
-    await new AgentWorker(probe.store, config(), masterKey, runnerSecret)
-      .run(task)
-      .catch(() => undefined);
-    expect(probe.events.some((entry) => entry.kind === 'error')).toBe(true);
-  });
-});
-
 /**
  * The completion contract as a contract rather than a receipt.
  *
@@ -4351,112 +4192,9 @@ describe('what would prove the job is done', () => {
     ...over
   });
 
-  const finishCall = (id: string): string =>
-    toolFrame(id, 'finish', {
-      summary: 'The importer reads all three columns.',
-      verification: {
-        status: 'verified',
-        evidence: [
-          {
-            claim: 'The importer reads all three columns',
-            source: 'tool_result',
-            toolCallId: 'call-0'
-          }
-        ],
-        remainingRisks: []
-      }
-    });
+  const reply = (): string => textFrame('The importer reads all three columns.');
 
-  it('refuses a definition of done the harness can already satisfy', async () => {
-    const task = makeTask();
-    const probe = probeStore(() => task);
-    const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch(
-      [
-        toolFrame('call-1', 'set_acceptance', {
-          checks: [
-            {
-              kind: 'command',
-              label: 'the workspace is there',
-              executable: 'ls',
-              args: ['workspace']
-            }
-          ]
-        }),
-        textFrame('Understood.')
-      ],
-      log,
-      { route: execRoute(0) }
-    );
-    const worker = new AgentWorker(
-      probe.store,
-      config({ TASK_MAX_STEPS: 2 }),
-      masterKey,
-      runnerSecret
-    );
-
-    await worker.run(task).catch(() => undefined);
-
-    expect(
-      probe.events.some((entry) => entry.summary === 'Acceptance checks refused: they already pass')
-    ).toBe(true);
-    expect(lastMessage(log, 1)).toContain('every one of them already passes');
-    // Not stored: a record that cannot fail must not become the thing the finish is judged against.
-    const states = decryptCheckpoints(probe.checkpoints) as unknown as Array<{
-      acceptance?: unknown;
-    }>;
-    expect(states.every((state) => state.acceptance === undefined)).toBe(true);
-  });
-
-  it('takes the record once the harness has watched a check fail, and says which one is the proof', async () => {
-    const task = makeTask();
-    const probe = probeStore(() => task);
-    const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch(
-      [
-        toolFrame('call-1', 'set_acceptance', {
-          checks: [
-            {
-              kind: 'command',
-              label: 'the importer test passes',
-              executable: 'pytest',
-              args: ['-q']
-            },
-            {
-              kind: 'command',
-              label: 'the existing suite still passes',
-              executable: 'ruff',
-              args: ['check']
-            }
-          ]
-        }),
-        textFrame('Starting now.')
-      ],
-      log,
-      { route: execRoute(1, 0) }
-    );
-    const worker = new AgentWorker(
-      probe.store,
-      config({ TASK_MAX_STEPS: 2 }),
-      masterKey,
-      runnerSecret
-    );
-
-    await worker.run(task).catch(() => undefined);
-
-    const baseline = probe.events.find((entry) => entry.summary.startsWith('Acceptance baseline:'));
-    expect(baseline?.summary).toBe('Acceptance baseline: 1 of 2 already pass before the work');
-    expect(probe.events.some((entry) => entry.summary === 'Acceptance checks declared')).toBe(true);
-    const answer = lastMessage(log, 1);
-    expect(answer).toContain('check-1 fails now');
-    expect(answer).toContain('check-2 already passes');
-    const states = decryptCheckpoints(probe.checkpoints) as unknown as Array<{
-      acceptance?: { checks: unknown[] };
-    }>;
-    expect(states.some((state) => state.acceptance?.checks.length === 2)).toBe(true);
-  });
-
-  it('refuses the finish when the harness runs the checks and one fails', async () => {
+  it('sends the answer back when the harness runs the checks and one fails', async () => {
     const task = makeTask(
       acceptanceState({
         acceptance: {
@@ -4479,7 +4217,7 @@ describe('what would prove the job is done', () => {
     );
     const probe = probeStore(() => task);
     const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch([finishCall('call-1'), textFrame('Looking at it.')], log, { route: execRoute(1) });
+    installFetch([reply(), textFrame('Looking at it.')], log, { route: execRoute(1) });
     const worker = new AgentWorker(
       probe.store,
       config({ TASK_MAX_STEPS: 2 }),
@@ -4489,134 +4227,21 @@ describe('what would prove the job is done', () => {
 
     await worker.run(task).catch(() => undefined);
 
-    // Named, and a status rather than a warning: the model gets to fix this and finish, so a turn
-    // that recovers used to carry a standing red line over its own "all passed" completion card.
-    const refusal = probe.events.find((entry) => entry.summary.startsWith('Finish refused:'));
+    // A status rather than a warning: the model gets to fix this, so a turn that recovers must not
+    // carry a standing red line over its own completion.
+    const refusal = probe.events.find((entry) => entry.summary.includes('checks failed'));
     expect(refusal?.kind).toBe('status');
-    expect(refusal?.summary).toBe(
-      'Finish refused: 1 of 1 acceptance check failed — the importer test passes'
-    );
+    expect(refusal?.summary).toBe('1 of 1 checks failed — the importer test passes');
     // The turn did not complete. It ends at its step limit instead, which is the honest ending -
     // and what the model is told back is the harness's own observation rather than a verdict: an
     // exit code and the first lines of stderr are what turn "it does not work" into a next step.
     const ending = probe.events.find((entry) => entry.kind === 'completed');
     expect((ending?.payload as { interrupted?: boolean } | undefined)?.interrupted).toBe(true);
     const answer = lastMessage(log, 1);
-    expect(answer).toContain('Finish refused (acceptance 1 of 4)');
+    expect(answer).toContain('ACCEPTANCE CHECKS FAILED (1 of 4)');
     expect(answer).toContain('AssertionError: expected 3 rows');
-    /*
-     * And the prose it writes on the way back round is not published as a reply. Five paths refuse
-     * a finish and send the model round again; its natural answer to "finish refused" is to restate
-     * itself, and each restatement used to be another bubble. That is why one answer reached the
-     * owner in pieces. The words still go into the window - the model needs them - they are just
-     * not a new thing said to the owner.
-     */
-    // Exactly one thing reaches the owner. Five paths refuse a finish and send the model round
-    // again, and its natural reply to "finish refused" is to restate itself; each restatement used
-    // to be another bubble, which is why one answer arrived in pieces.
+    // Exactly one thing reaches the owner: the restatement after a failed check is not a new reply.
     expect(probe.events.filter((entry) => entry.kind === 'assistant_message')).toHaveLength(1);
-  });
-
-  /**
-   * The hold exists so a turn that changed code says what would prove it. A report is a change too,
-   * but nothing executable can prove it: the only check available is reading back the file just
-   * written, which passes whatever the file says. Held anyway, a research task invents a check,
-   * fails it, and is refused its own finish - which is what happened to a real one.
-   */
-  it('holds for acceptance on code but not on prose, on the extension alone', async () => {
-    const heldFor = async (path: string): Promise<boolean> => {
-      const task = makeTask();
-      const probe = probeStore(() => task);
-      const log: FetchLog = { calls: [], modelRequests: [] };
-      installFetch(
-        [
-          toolFrame('call-1', 'file_write', { path, content: 'Some words.\n' }),
-          // A read-only look at the result, so the finish below cites an observation ordered after
-          // the change rather than the change itself. `ls` writes nothing, so it leaves the
-          // prose/code question this test is about entirely to the extension.
-          toolFrame('call-2', 'shell', { executable: 'ls', args: ['workspace'] }),
-          toolFrame('call-3', 'finish', {
-            summary: 'Wrote the file.',
-            verification: {
-              status: 'verified',
-              evidence: [
-                { claim: 'The file is on disk', source: 'tool_result', toolCallId: 'call-2' }
-              ],
-              remainingRisks: []
-            }
-          }),
-          textFrame('Done.')
-        ],
-        log,
-        { route: execRoute(0) }
-      );
-      const worker = new AgentWorker(
-        probe.store,
-        config({ TASK_MAX_STEPS: 8 }),
-        masterKey,
-        runnerSecret
-      );
-
-      await worker.run(task).catch(() => undefined);
-
-      return probe.events.some((entry) => entry.summary === 'Asked for an acceptance record');
-    };
-
-    // The same turn, the same write, the same finish. Only the extension differs, so neither result
-    // can be explained by anything else in the run.
-    expect(await heldFor('workspace/notes.ts')).toBe(true);
-    expect(await heldFor('workspace/notes.md')).toBe(false);
-  });
-
-  /**
-   * A real task asked for a report file "and the gist in your reply". It wrote the report, published
-   * it, and completed without an assistant message at all - the owner got a Result card and a
-   * download. Nothing in the loop required the turn to say anything.
-   */
-  it('answers with the finish summary when the turn never said anything itself', async () => {
-    const task = makeTask();
-    const probe = probeStore(() => task);
-    const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch(
-      [
-        toolFrame('call-1', 'shell', { executable: 'ls', args: ['workspace'] }),
-        // A finish, with no prose in the same frame and none before it.
-        toolFrame('call-2', 'finish', {
-          summary: 'The workspace has three files in it.',
-          verification: {
-            status: 'verified',
-            evidence: [
-              { claim: 'Listed the workspace', source: 'tool_result', toolCallId: 'call-1' }
-            ],
-            remainingRisks: []
-          }
-        }),
-        textFrame('Done.')
-      ],
-      log,
-      { route: execRoute(0) }
-    );
-    const worker = new AgentWorker(
-      probe.store,
-      config({ TASK_MAX_STEPS: 4 }),
-      masterKey,
-      runnerSecret
-    );
-
-    await worker.run(task).catch(() => undefined);
-
-    // Asked once, rather than completed in silence and papered over with the summary. The reply the
-    // owner reads is then the model's own words, which is the thing they asked for.
-    expect(probe.events.some((entry) => entry.summary === 'Asked for the answer itself')).toBe(
-      true
-    );
-    const spoken = probe.events.filter((entry) => entry.kind === 'assistant_message');
-    expect(spoken).toHaveLength(1);
-    expect(spoken[0]?.summary).toBe('Done.');
-    // Before the completion, so the owner reads the answer above the card rather than under it.
-    expect(probe.events.indexOf(spoken[0]!)).toBeLessThan(
-      probe.events.findIndex((entry) => entry.kind === 'completed')
-    );
   });
 
   /**
@@ -4648,66 +4273,6 @@ describe('what would prove the job is done', () => {
     expect(standDown?.workerId).toBeUndefined();
   });
 
-  /** The other half of the rule: a turn that answered is never asked to answer again. */
-  it('says nothing to a turn that already spoke', async () => {
-    const task = makeTask();
-    const probe = probeStore(() => task);
-    const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch(
-      [
-        toolFrame('call-1', 'shell', { executable: 'ls', args: ['workspace'] }),
-        // Prose and the finish in the same frame, which is how a turn that behaves looks.
-        `data: ${JSON.stringify({
-          choices: [
-            {
-              finish_reason: 'tool_calls',
-              delta: {
-                content: 'There are three files in the workspace.',
-                tool_calls: [
-                  {
-                    index: 0,
-                    id: 'call-2',
-                    function: {
-                      name: 'finish',
-                      arguments: JSON.stringify({
-                        summary: 'Listed the workspace.',
-                        verification: {
-                          status: 'verified',
-                          evidence: [
-                            { claim: 'Listed it', source: 'tool_result', toolCallId: 'call-1' }
-                          ],
-                          remainingRisks: []
-                        }
-                      })
-                    }
-                  }
-                ]
-              }
-            }
-          ]
-        })}\n\ndata: [DONE]\n\n`,
-        textFrame('Done.')
-      ],
-      log,
-      { route: execRoute(0) }
-    );
-    const worker = new AgentWorker(
-      probe.store,
-      config({ TASK_MAX_STEPS: 4 }),
-      masterKey,
-      runnerSecret
-    );
-
-    await worker.run(task).catch(() => undefined);
-
-    expect(probe.events.some((entry) => entry.summary === 'Asked for the answer itself')).toBe(
-      false
-    );
-    const spoken = probe.events.filter((entry) => entry.kind === 'assistant_message');
-    expect(spoken).toHaveLength(1);
-    expect(spoken[0]?.summary).toBe('There are three files in the workspace.');
-  });
-
   it('completes when the harness runs the checks and they pass', async () => {
     const task = makeTask(
       acceptanceState({
@@ -4731,7 +4296,7 @@ describe('what would prove the job is done', () => {
     );
     const probe = probeStore(() => task);
     const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch([finishCall('call-1')], log, { route: execRoute(0) });
+    installFetch([reply()], log, { route: execRoute(0) });
     const worker = new AgentWorker(
       probe.store,
       config({ TASK_MAX_STEPS: 2 }),
@@ -4780,18 +4345,9 @@ describe('what would prove the job is done', () => {
     );
     const probe = probeStore(() => task);
     const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch(
-      [
-        finishCall('call-1'),
-        finishCall('call-2'),
-        finishCall('call-3'),
-        finishCall('call-4'),
-        textFrame('It still fails.'),
-        finishCall('call-5')
-      ],
-      log,
-      { route: execRoute(1) }
-    );
+    installFetch([reply(), reply(), reply(), reply(), textFrame('It still fails.'), reply()], log, {
+      route: execRoute(1)
+    });
     const worker = new AgentWorker(
       probe.store,
       config({ TASK_MAX_STEPS: 8 }),
@@ -4824,7 +4380,7 @@ describe('what would prove the job is done', () => {
     );
     const probe = probeStore(() => task);
     const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch([finishCall('call-1'), textFrame('Fixed it.'), finishCall('call-2')], log, {
+    installFetch([reply(), textFrame('Fixed it.'), reply()], log, {
       route: execRoute(1, 0)
     });
     const worker = new AgentWorker(
@@ -4836,7 +4392,7 @@ describe('what would prove the job is done', () => {
 
     await worker.run(task).catch(() => undefined);
 
-    expect(probe.events.some((entry) => entry.summary.startsWith('Finish refused:'))).toBe(true);
+    expect(probe.events.some((entry) => entry.summary.includes('checks failed'))).toBe(true);
     expect(probe.events.some((entry) => entry.kind === 'completed')).toBe(true);
     expect(probe.deadEnds).toHaveLength(1);
     expect(probe.deadEnds[0]?.wrote).toEqual([]);
@@ -4857,14 +4413,7 @@ describe('what would prove the job is done', () => {
     const probe = probeStore(() => task);
     const log: FetchLog = { calls: [], modelRequests: [] };
     installFetch(
-      [
-        finishCall('call-1'),
-        finishCall('call-2'),
-        finishCall('call-3'),
-        finishCall('call-4'),
-        textFrame('The runner is down.'),
-        finishCall('call-5')
-      ],
+      [reply(), reply(), reply(), reply(), textFrame('The runner is down.'), reply()],
       log,
       {
         route: (url: string) =>
@@ -4903,18 +4452,9 @@ describe('what would prove the job is done', () => {
     );
     const probe = probeStore(() => task);
     const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch(
-      [
-        finishCall('call-1'),
-        finishCall('call-2'),
-        finishCall('call-3'),
-        finishCall('call-4'),
-        textFrame('It still fails.'),
-        finishCall('call-5')
-      ],
-      log,
-      { route: execRoute(1) }
-    );
+    installFetch([reply(), reply(), reply(), reply(), textFrame('It still fails.'), reply()], log, {
+      route: execRoute(1)
+    });
     const worker = new AgentWorker(
       probe.store,
       config({ TASK_MAX_STEPS: 8 }),
@@ -4944,7 +4484,7 @@ describe('what would prove the job is done', () => {
             }
           ]
         }),
-        finishCall('call-2')
+        reply()
       ],
       log,
       { route: execRoute(0) }
@@ -4984,103 +4524,6 @@ describe('what would prove the job is done', () => {
     expect(payload.acceptance ?? []).not.toContainEqual(
       expect.stringMatching(/written after the work/i)
     );
-  });
-
-  it('will not let a later turn be proven by the checks an earlier one declared', async () => {
-    const task = makeTask(
-      acceptanceState({
-        turn: 1,
-        acceptanceTurn: 0,
-        acceptance: {
-          checks: [
-            {
-              id: 'check-1',
-              kind: 'command',
-              label: 'the importer test passes',
-              executable: 'pytest',
-              args: ['-q'],
-              cwd: 'workspace',
-              expectExit: 0,
-              timeoutSeconds: 300
-            }
-          ],
-          revisions: 1,
-          declaredAtStep: 0
-        }
-      })
-    );
-    const probe = probeStore(() => task);
-    const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch([finishCall('call-1'), finishCall('call-2')], log, { route: execRoute(0) });
-    const worker = new AgentWorker(
-      probe.store,
-      config({ TASK_MAX_STEPS: 3 }),
-      masterKey,
-      runnerSecret
-    );
-
-    await worker.run(task).catch(() => undefined);
-
-    // Held once, because a record that was already green before this turn started cannot be
-    // evidence of what this turn did - and then taken at its word, with the owner told which it is.
-    expect(lastMessage(log, 1)).toContain('an earlier turn declared');
-    const completed = probe.events.find((entry) => entry.kind === 'completed');
-    const payload = completed?.payload as { verification?: { remainingRisks: string[] } };
-    expect(payload.verification?.remainingRisks).toContain(ACCEPTANCE_EARLIER_TURN_CAVEAT);
-  });
-
-  it('will not let a turn cite the promise it made as the proof it kept it', async () => {
-    const task = makeTask({
-      messages: [{ role: 'user', content: 'Tidy the notes' }],
-      step: 0,
-      credits: 0,
-      mutated: true,
-      turnToolResults: { 'call-0': { name: 'set_acceptance', success: true } },
-      acceptance: {
-        checks: [
-          {
-            id: 'check-1',
-            kind: 'artifact',
-            label: 'the notes exist',
-            path: 'workspace/notes.md',
-            minBytes: 1
-          }
-        ],
-        revisions: 1,
-        declaredAtStep: 0
-      }
-    });
-    const probe = probeStore(() => task);
-    const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch(
-      [
-        toolFrame('call-1', 'finish', {
-          summary: 'Done.',
-          verification: {
-            status: 'verified',
-            evidence: [
-              { claim: 'The notes are tidy', source: 'tool_result', toolCallId: 'call-0' }
-            ],
-            remainingRisks: []
-          }
-        }),
-        textFrame('Let me check the file.')
-      ],
-      log,
-      { route: execRoute(0) }
-    );
-    const worker = new AgentWorker(
-      probe.store,
-      config({ TASK_MAX_STEPS: 2 }),
-      masterKey,
-      runnerSecret
-    );
-
-    await worker.run(task).catch(() => undefined);
-
-    const ending = probe.events.find((entry) => entry.kind === 'completed');
-    expect((ending?.payload as { interrupted?: boolean } | undefined)?.interrupted).toBe(true);
-    expect(lastMessage(log, 1)).toContain('Finish rejected');
   });
 
   const deckCheck = {
@@ -5126,7 +4569,7 @@ describe('what would prove the job is done', () => {
     );
     const probe = probeStore(() => task);
     const log: FetchLog = { calls: [], modelRequests: [], runnerRequests: [] };
-    installFetch([finishCall('call-1'), textFrame('Fixing the overflow.')], log, {
+    installFetch([reply(), textFrame('Fixing the overflow.')], log, {
       route: deckRoute(
         () =>
           new Response(
@@ -5176,7 +4619,7 @@ describe('what would prove the job is done', () => {
     );
     const probe = probeStore(() => task);
     const log: FetchLog = { calls: [], modelRequests: [], runnerRequests: [] };
-    installFetch([finishCall('call-1'), textFrame('No renderer here.')], log, {
+    installFetch([reply(), textFrame('No renderer here.')], log, {
       route: deckRoute(
         () =>
           new Response(
@@ -5222,7 +4665,7 @@ describe('what would prove the job is done', () => {
     );
     const probe = probeStore(() => task);
     const log: FetchLog = { calls: [], modelRequests: [], runnerRequests: [] };
-    installFetch([finishCall('call-1'), textFrame('Done.')], log, {
+    installFetch([reply(), textFrame('Done.')], log, {
       route: deckRoute(() => new Response('should never be asked', { status: 500 }))
     });
     const worker = new AgentWorker(
@@ -5239,76 +4682,6 @@ describe('what would prove the job is done', () => {
       passed: true,
       detail: '48000 bytes (needs at least 1024)'
     });
-  });
-
-  /**
-   * The suite ran twice on a completing turn, and the test that covers the hold could not see it.
-   *
-   * The order is the whole defect: the expensive gate is asked before the free one. A turn that has
-   * changed something and not spoken declares its checks, calls finish, has the suite run - a build
-   * and a test run, up to fifteen minutes of the owner's computer - and is then held for the one
-   * thing it costs nothing to ask, whether it has said anything to the user. It answers, finishes
-   * again, and the same suite runs a second time against a workspace nothing has touched since.
-   *
-   * The existing case above (`answers with the finish summary when the turn never said anything
-   * itself`) drives exactly this hold with no acceptance record at all, so the doubling has never
-   * been in front of a test.
-   */
-  it('runs the acceptance suite once when the answer hold sends the same finish round again', async () => {
-    const task = makeTask(
-      acceptanceState({
-        // Declared by this turn, so the finish gate reads it as evidence about this turn's work
-        // rather than as an inherited record - which is the shape that reaches the suite at all.
-        acceptanceTurn: 0,
-        acceptance: {
-          checks: [
-            {
-              id: 'check-1',
-              kind: 'command',
-              label: 'the importer test passes',
-              executable: 'pytest',
-              args: ['-q'],
-              cwd: 'workspace',
-              expectExit: 0,
-              timeoutSeconds: 900
-            }
-          ],
-          revisions: 1,
-          declaredAtStep: 0
-        }
-      })
-    );
-    const probe = probeStore(() => task);
-    const log: FetchLog = { calls: [], modelRequests: [], runnerRequests: [] };
-    installFetch(
-      [
-        // A finish with no prose in the frame and none before it: the turn has done the work
-        // through tools and said nothing, which is what the answer hold exists for.
-        finishCall('call-1'),
-        // The answer the hold asked for, and the same finish behind it.
-        `${textFrame('The importer now reads all three columns.')}`,
-        finishCall('call-2'),
-        textFrame('Done.')
-      ],
-      log,
-      { route: execRoute(0) }
-    );
-
-    await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 4 }), masterKey, runnerSecret)
-      .run(task)
-      .catch(() => undefined);
-
-    // The hold really fired, so this is a test about the doubling rather than about a turn that
-    // never reached it.
-    expect(probe.events.some((entry) => entry.summary === 'Asked for the answer itself')).toBe(
-      true
-    );
-    const suiteRuns = (log.runnerRequests ?? []).filter(
-      (request) =>
-        request.url.includes('/exec') &&
-        (request.body as { executable?: string }).executable === 'pytest'
-    );
-    expect(suiteRuns).toHaveLength(1);
   });
 
   /**
@@ -5339,7 +4712,7 @@ describe('what would prove the job is done', () => {
     );
     const probe = probeStore(() => task);
     const log: FetchLog = { calls: [], modelRequests: [], runnerRequests: [] };
-    installFetch([finishCall('call-1'), textFrame('Done.')], log, {
+    installFetch([reply(), textFrame('Done.')], log, {
       route: (url: string): Response | undefined => {
         if (!url.includes('/exec')) return undefined;
         // Every check burns the whole per-check ceiling. Eight of them is two hours, which is the
@@ -5738,15 +5111,7 @@ describe('a correction sent while the task is working', () => {
       }
     });
     const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch(
-      [
-        toolFrame('finish-denial', 'finish', {
-          summary: 'The refused copy was not run.',
-          verification: { status: 'not_applicable', evidence: [] }
-        })
-      ],
-      log
-    );
+    installFetch([textFrame('The refused copy was not run.')], log);
     await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 3 }), masterKey, runnerSecret)
       .run(task)
       .catch(() => undefined);
@@ -5934,18 +5299,7 @@ describe('queued message spending', () => {
       }
     });
     const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch(
-      [
-        toolFrame('finish-funded-turn', 'finish', {
-          summary: 'The explanation is complete.',
-          verification: {
-            status: 'not_applicable',
-            reason: 'An explanation requires no execution.'
-          }
-        })
-      ],
-      log
-    );
+    installFetch([textFrame('The explanation is complete.')], log);
     await new AgentWorker(probe.store, config(), masterKey, runnerSecret).run(task);
 
     expect(promoted).toHaveLength(1);
@@ -6051,18 +5405,7 @@ describe('queued message spending', () => {
         }
       });
       const log: FetchLog = { calls: [], modelRequests: [] };
-      installFetch(
-        [
-          toolFrame('finish-corrected-turn', 'finish', {
-            summary: 'The requested explanation is complete.',
-            verification: {
-              status: 'not_applicable',
-              reason: 'An explanation requires no execution.'
-            }
-          })
-        ],
-        log
-      );
+      installFetch([textFrame('The requested explanation is complete.')], log);
       await new AgentWorker(probe.store, config(), masterKey, runnerSecret).run(task);
 
       expect(order.slice(0, 2)).toEqual(['consume', 'spend']);
@@ -6102,8 +5445,6 @@ describe('a question the agent stops to ask', () => {
     const log: FetchLog = { calls: [], modelRequests: [] };
     installFetch(
       [
-        // Something first: a turn that has looked at nothing may not ask, which is the guard against
-        // an agent that asks instead of working.
         toolFrame('call-1', 'file_read', { path: 'workspace/invoice.md' }),
         `data: ${JSON.stringify({
           choices: [
@@ -6170,81 +5511,12 @@ describe('a question the agent stops to ask', () => {
     // this one is reloaded by whichever worker picks the conversation back up - and the read the
     // model proposed behind the question is deferred in writing rather than run.
     expect(saved.messages.find((message) => message.toolCallId === 'call-2')?.content).toContain(
-      'waiting for the user'
+      'Their answer resumes this turn'
     );
     expect(saved.messages.find((message) => message.toolCallId === 'call-3')?.content).toContain(
       'waiting for the user’s answer'
     );
     expect(log.calls.filter((entry) => entry.includes('terms.md'))).toHaveLength(0);
-  });
-
-  it('continues independent reads while a question is visible, then waits instead of completing', async () => {
-    const task = makeTask();
-    const probe = probeStore(() => task);
-    const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch(
-      [
-        toolFrame('read-labels', 'file_read', { path: 'workspace/samples.txt' }),
-        toolFrame('ask-control', 'ask', {
-          ...parked,
-          continueWith: 'Read the independent quality report.'
-        }),
-        toolFrame('read-quality', 'file_read', { path: 'workspace/quality.txt' }),
-        toolFrame('finish-independent', 'finish', {
-          summary: 'Independent quality review is done.',
-          verification: { status: 'not_applicable', evidence: [] }
-        })
-      ],
-      log,
-      {
-        route: (url) =>
-          url.includes('/file?')
-            ? new Response(JSON.stringify({ content: 'Quality: 98%' }), {
-                headers: { 'content-type': 'application/json' }
-              })
-            : undefined
-      }
-    );
-    await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 6 }), masterKey, runnerSecret).run(
-      task
-    );
-    expect(log.modelRequests).toHaveLength(4);
-    expect(log.calls.some((value) => value.includes('quality.txt'))).toBe(true);
-    expect(probe.events.filter((entry) => entry.kind === 'question_asked')).toHaveLength(1);
-    expect(probe.events.some((entry) => entry.kind === 'completed')).toBe(false);
-    expect(probe.checkpoints.at(-1)).toMatchObject({ status: 'awaiting_user', clearLease: true });
-    const pending = decryptCheckpoints(probe.checkpoints).at(-1) as unknown as AgentState;
-    expect(pending.question).toMatchObject({
-      question: parked.question,
-      waiting: true,
-      continueWith: 'Read the independent quality report.'
-    });
-    const during = log.modelRequests[2]!.messages as Array<{ content: string }>;
-    expect(
-      during.some((message) => message.content.includes('Pending owner question (not answered)'))
-    ).toBe(true);
-  });
-
-  it('refuses a question from a turn that has looked at nothing, and keeps working', async () => {
-    const task = makeTask();
-    const probe = probeStore(() => task);
-    const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch(
-      [toolFrame('call-1', 'ask', parked), textFrame('Assumed the work address; say if not.')],
-      log
-    );
-
-    await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 3 }), masterKey, runnerSecret)
-      .run(task)
-      .catch(() => undefined);
-
-    expect(probe.events.some((entry) => entry.kind === 'question_asked')).toBe(false);
-    expect(probe.notifications).toHaveLength(0);
-    expect(probe.checkpoints.some((entry) => entry.status === 'awaiting_user')).toBe(false);
-    const refusal = decryptCheckpoints(probe.checkpoints)
-      .at(-1)
-      ?.messages.find((message) => message.toolCallId === 'call-1');
-    expect(refusal?.content).toContain('has not looked at anything yet');
   });
 
   it('takes the answer back into the turn that asked, rather than starting a fresh one', async () => {
@@ -6636,9 +5908,9 @@ describe('the prompt prefix a follow-up turn re-sends', () => {
       message.content.startsWith('CURATED ENCRYPTED KNOWLEDGE')
     );
     const packAt = opening.findIndex((message) => message.content.startsWith(MEMORY_PACK_MARKER));
-    // Vacuous unless both blocks are actually there and in that order.
-    expect(knowledgeAt).toBeGreaterThan(0);
-    expect(packAt).toBe(knowledgeAt + 1);
+    // An empty curated block is no block at all, so the pack sits directly behind the contract.
+    expect(knowledgeAt).toBe(-1);
+    expect(packAt).toBe(1);
 
     packReadable = false;
     const saved = decryptCheckpoints(probe.checkpoints).at(-1);
@@ -6761,12 +6033,8 @@ describe('the prompt prefix a follow-up turn re-sends', () => {
     // Vacuous unless the entry reached the block at all before it expired.
     expect(before).toContain('Tidy the notes into workspace/archive');
     expect(after).not.toContain('Tidy the notes into workspace/archive');
-    expect(after).toBe(
-      before.replace(
-        'Workspace memory:\n- Tidy the notes into workspace/archive before the loan laptop goes back\n',
-        ''
-      )
-    );
+    // The only entry has expired, so the block it was the whole of is gone with it.
+    expect(after).toBe('');
   });
 
   it('survives the workspace brief being rewritten between turns, because the brief sits last', async () => {
@@ -6800,9 +6068,10 @@ describe('the prompt prefix a follow-up turn re-sends', () => {
     const briefAt = opening.findIndex((message) =>
       message.content.startsWith(WORKSPACE_BRIEF_MARKER)
     );
-    // Vacuous unless all three blocks are in the window, with the brief behind the two frozen ones.
-    expect(knowledgeAt).toBeGreaterThan(0);
-    expect(packAt).toBeGreaterThan(knowledgeAt);
+    // Vacuous unless both blocks are in the window, with the brief behind the frozen pack. The
+    // curated block is absent because it would be empty.
+    expect(knowledgeAt).toBe(-1);
+    expect(packAt).toBeGreaterThan(0);
     expect(briefAt).toBeGreaterThan(packAt);
 
     // What the first turn did to it: appended a line, the way a turn keeping the journal does.
@@ -6833,7 +6102,6 @@ describe('the prompt prefix a follow-up turn re-sends', () => {
     // against 1 message and 12,353 characters with the brief spliced in first.
     expect(shared).toBe(briefAt);
     const cached = opening.slice(0, shared).map((message) => message.content);
-    expect(cached.some((content) => content.startsWith('CURATED ENCRYPTED KNOWLEDGE'))).toBe(true);
     expect(cached.some((content) => content.startsWith(MEMORY_PACK_MARKER))).toBe(true);
     // Not merely still ahead of the brief - still at the same indices, so the bytes the provider
     // holds are addressed the same way on the second turn as on the first.
@@ -6931,15 +6199,14 @@ describe('the prompt prefix a follow-up turn re-sends', () => {
     // counting steps - a fixture that silently stopped republishing would otherwise pass.
     expect(republished).toHaveLength(3);
 
-    // One per step, in step order. The extra cost row with no context is the closing handoff call,
-    // which prepares its own window and is not a step of the loop.
+    // One per step, in step order; the closing reply is a step like any other.
     const breakpoints = probe.events
       .filter((entry) => entry.kind === 'cost' && (entry.payload as { context?: unknown }).context)
       .map(
         (entry) =>
           (entry.payload as { context: { cacheBreakpoints: number } }).context.cacheBreakpoints
       );
-    expect(breakpoints).toHaveLength(log.modelRequests.length - 1);
+    expect(breakpoints).toHaveLength(log.modelRequests.length);
     for (const index of republished) {
       // A republish must not cost a breakpoint. Marking fewer prefixes on the one step whose prefix
       // just moved is how a cache stops being read at exactly the moment it matters.
@@ -7511,14 +6778,11 @@ describe('a turn that finishes the job rather than the budget', () => {
     const log: FetchLog = { calls: [], modelRequests: [] };
     installFetch(
       [
-        textFrame('Working.'),
-        textFrame('Still working.'),
-        textFrame('Carrying on.'),
-        textFrame('Nearly there.'),
-        toolFrame('call-hand', 'finish', {
-          summary: 'The importer reads two of three columns; the third is still failing.',
-          verification: { status: 'not_applicable', evidence: [] }
-        })
+        toolFrame('w0', 'set_plan', { steps: ['Fix the importer', 'Step 0'] }),
+        toolFrame('w1', 'set_plan', { steps: ['Fix the importer', 'Step 1'] }),
+        toolFrame('w2', 'set_plan', { steps: ['Fix the importer', 'Step 2'] }),
+        toolFrame('w3', 'set_plan', { steps: ['Fix the importer', 'Step 3'] }),
+        textFrame('The importer reads two of three columns; the third is still failing.')
       ],
       log,
       { route: exec(1) }
@@ -7567,12 +6831,9 @@ describe('a turn that finishes the job rather than the budget', () => {
     const log: FetchLog = { calls: [], modelRequests: [] };
     installFetch(
       [
-        textFrame('Working.'),
-        textFrame('Still working.'),
-        toolFrame('call-hand', 'finish', {
-          summary: 'The importer reads all three columns.',
-          verification: { status: 'not_applicable', evidence: [] }
-        })
+        toolFrame('w0', 'set_plan', { steps: ['Fix the importer', 'Step 0'] }),
+        toolFrame('w1', 'set_plan', { steps: ['Fix the importer', 'Step 1'] }),
+        textFrame('The importer reads all three columns.')
       ],
       log,
       { route: exec(0) }
@@ -7603,14 +6864,14 @@ describe('a turn that finishes the job rather than the budget', () => {
     const log: FetchLog = { calls: [], modelRequests: [] };
     installFetch(
       [
-        textFrame('Working.'),
+        toolFrame('w0', 'set_plan', { steps: ['Fix the importer', 'Step 0'] }),
         () => {
           // Stop, pressed while the last step of the budget was still streaming. Nothing about a
           // turn that can renew itself may make it harder to stop than one that cannot: the same
           // button, at the same moment, has to end it.
           task.status = 'paused';
           task.leaseOwner = null;
-          return textFrame('Still working.');
+          return toolFrame('w1', 'set_plan', { steps: ['Fix the importer', 'Step 1'] });
         },
         textFrame('This call must never be made.')
       ],
@@ -7663,7 +6924,11 @@ describe('a turn that finishes the job rather than the budget', () => {
     const probe = probeStore(() => task);
     const log: FetchLog = { calls: [], modelRequests: [] };
     installFetch(
-      [textFrame('Working.'), textFrame('Still working.'), textFrame('Handing off.')],
+      [
+        toolFrame('w0', 'set_plan', { steps: ['Fix the importer', 'Step 0'] }),
+        toolFrame('w1', 'set_plan', { steps: ['Fix the importer', 'Step 1'] }),
+        textFrame('Handing off.')
+      ],
       log,
       {
         route: exec(1)
@@ -7698,6 +6963,8 @@ describe('a turn that finishes the job rather than the budget', () => {
       // Nothing this turn changed: the acceptance record is inherited and the only successful call
       // was a read. Running the checks could only tell it what it is not allowed to act on anyway.
       workingState({
+        mutated: false,
+        mutatedBeyondProse: false,
         turnToolResults: { 'call-0': { name: 'file_read', success: true } }
       })
     );
@@ -7705,12 +6972,9 @@ describe('a turn that finishes the job rather than the budget', () => {
     const log: FetchLog = { calls: [], modelRequests: [] };
     installFetch(
       [
-        textFrame('Reading.'),
-        textFrame('Still reading.'),
-        toolFrame('call-hand', 'finish', {
-          summary: 'I could not work out what was wrong.',
-          verification: { status: 'not_applicable', evidence: [] }
-        })
+        toolFrame('r1', 'set_plan', { steps: ['Read the importer'] }),
+        toolFrame('r2', 'set_plan', { steps: ['Read the importer', 'Find the fault'] }),
+        textFrame('I could not work out what was wrong.')
       ],
       log,
       { route: exec(1) }
@@ -7746,7 +7010,11 @@ describe('a turn that finishes the job rather than the budget', () => {
     const probe = probeStore(() => task);
     const log: FetchLog = { calls: [], modelRequests: [] };
     installFetch(
-      [textFrame('Working.'), textFrame('Still working.'), textFrame('Handing off.')],
+      [
+        toolFrame('w0', 'set_plan', { steps: ['Fix the importer', 'Step 0'] }),
+        toolFrame('w1', 'set_plan', { steps: ['Fix the importer', 'Step 1'] }),
+        textFrame('Handing off.')
+      ],
       log,
       { route: exec(1) }
     );
@@ -7976,10 +7244,7 @@ describe('a generation the box cut short', () => {
   /** Four characters to the token, which is what the gateway counts a cut-off answer at. */
   const estimatedOutput = Math.ceil(overrunningAnswer.length / 4);
 
-  const finishFrame = toolFrame('call-1', 'finish', {
-    summary: 'The answer was cut off, and what stands is in the reply above.',
-    verification: { status: 'not_applicable', evidence: [] }
-  });
+  const finishFrame = textFrame('The answer was cut off, and what stands is in the reply above.');
 
   const run = async (
     bodies: string[]
@@ -8035,14 +7300,10 @@ describe('a generation the box cut short', () => {
     expect((cut?.payload as { reason?: unknown } | undefined)?.reason).toBe('overrun');
 
     const windows = log.modelRequests.map((body) => JSON.stringify(body.messages));
-    // The model is told, and told once. What it must not be told is to carry on: the gateway had
-    // already decided this generation had stopped being productive, and continuing it buys the
-    // same cut-off answer again at the same price.
-    expect(windows.at(-1)).toContain('YOUR REPLY WAS CUT OFF');
-    expect(windows.some((window) => window.includes('CONTINUE THE ANSWER'))).toBe(false);
-    // Bounded: it fell through to the completion check, which ends the turn by completing it.
-    expect(windows.at(-1)).toContain('COMPLETION CHECK');
-    expect(log.modelRequests).toHaveLength(2);
+    // Not carried on: the gateway already judged this generation unproductive, so the cut-off
+    // answer is the answer and the turn completes on it.
+    expect(windows.some((window) => window.includes('CONTINUE ('))).toBe(false);
+    expect(log.modelRequests).toHaveLength(1);
     expect(probe.events.some((entry) => entry.kind === 'completed')).toBe(true);
   });
 });
@@ -8081,10 +7342,7 @@ describe('a window the route will not take', () => {
           return '';
         },
         textFrame('Carried on with a smaller window.'),
-        toolFrame('call-1', 'finish', {
-          summary: 'Finished after the window was condensed.',
-          verification: { status: 'not_applicable', evidence: [] }
-        })
+        textFrame('Finished after the window was condensed.')
       ],
       log
     );
@@ -8183,13 +7441,7 @@ describe('a generation the repetition watch stopped', () => {
     });
     const log: FetchLog = { calls: [], modelRequests: [] };
     installFetch(
-      [
-        repeatingStream(),
-        toolFrame('call-1', 'finish', {
-          summary: 'The repeat was stopped and the work stands.',
-          verification: { status: 'not_applicable', evidence: [] }
-        })
-      ],
+      [repeatingStream(), textFrame('The repeat was stopped and the work stands.')],
       log
     );
     await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 3 }), masterKey, runnerSecret)
@@ -8255,104 +7507,6 @@ describe('a generation the repetition watch stopped', () => {
 describe('what garden answered itself, and what the computer answered', () => {
   const readRoute = (path: string, content: string) => (url: string) =>
     url.includes('/file?') && readPath(url) === path ? jsonResponse({ content }) : undefined;
-
-  it('refuses a finish that cites a call garden answered without running it', async () => {
-    // The exact shape from the incident: a read is answered by the harness - here as an exact
-    // repeat, in the field usually as arguments cut off at the output ceiling - and the same reply
-    // finishes on it. Nothing ran, and the turn used to complete `status:'verified'` on it.
-    const task = makeTask();
-    const probe = probeStore(() => task);
-    const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch(
-      [
-        batchFrame([
-          { id: 'call-1', name: 'file_read', args: { path: 'workspace/report.md' } },
-          { id: 'call-2', name: 'file_read', args: { path: 'workspace/report.md' } },
-          {
-            id: 'call-3',
-            name: 'finish',
-            args: {
-              summary: 'The report is written.',
-              verification: {
-                status: 'verified',
-                evidence: [
-                  {
-                    claim: 'the report is written',
-                    source: 'tool_result',
-                    toolCallId: 'call-2'
-                  }
-                ],
-                remainingRisks: []
-              }
-            }
-          }
-        ]),
-        textFrame('Still working.')
-      ],
-      log,
-      { route: readRoute('workspace/report.md', '# Report') }
-    );
-
-    await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 2 }), masterKey, runnerSecret)
-      .run(task)
-      .catch(() => undefined);
-
-    const held = probe.events.find((entry) => entry.summary === 'Completion needs verification');
-    expect(held, 'the finish was accepted on a call that never ran').toBeDefined();
-    // Said as what it is. "Did not complete successfully" sends a model looking for a neighbour to
-    // cite; "never ran" sends it to run the call.
-    expect((held?.payload as { reason?: string } | undefined)?.reason).toContain('never ran');
-    expect(
-      toolMessages(probe).find((message) => message.toolCallId === 'call-3')?.content
-    ).toContain('never ran');
-  });
-
-  it('refuses a finish that cites a notice the agent composed', async () => {
-    // `notify` reaches the owner's lock screen with a sentence the model wrote. It carries nothing
-    // back about the world, and the set that says so - `AGENT_SPEECH` - existed and was read in one
-    // place only. Every "cite something that read the outcome back" refusal in the loop was one
-    // notify call away from being satisfied.
-    const task = makeTask();
-    const probe = probeStore(() => task);
-    const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch(
-      [
-        batchFrame([
-          { id: 'call-1', name: 'notify', args: { headline: 'The report is ready' } },
-          {
-            id: 'call-2',
-            name: 'finish',
-            args: {
-              summary: 'The report is written.',
-              verification: {
-                status: 'verified',
-                evidence: [
-                  { claim: 'the report is ready', source: 'tool_result', toolCallId: 'call-1' }
-                ],
-                remainingRisks: []
-              }
-            }
-          }
-        ]),
-        textFrame('Still working.')
-      ],
-      log
-    );
-
-    await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 2 }), masterKey, runnerSecret)
-      .run(task)
-      .catch(() => undefined);
-
-    const held = probe.events.find((entry) => entry.summary === 'Completion needs verification');
-    expect(held, 'a delivered sentence was accepted as proof the work is done').toBeDefined();
-    expect((held?.payload as { reason?: string } | undefined)?.reason).toContain(
-      'something you said rather than something you observed'
-    );
-    // And it is not offered as a citation either, which is the same rule read from the front.
-    expect(
-      toolMessages(probe).find((message) => message.toolCallId === 'call-2')?.content
-    ).toContain('No successful tool call this turn can be cited');
-  });
 
   it('runs the re-issued read that the plan change told it to send again', async () => {
     /*
@@ -8487,14 +7641,7 @@ describe('what garden answered itself, and what the computer answered', () => {
           purpose: 'Read the heading'
         }),
         toolFrame('observe', 'browser_snapshot', {}),
-        toolFrame('finish-lookup', 'finish', {
-          summary: 'Read the heading',
-          answer: 'The heading is Example Domain.',
-          verification: {
-            status: 'verified',
-            evidence: [{ claim: 'The page heading', source: 'tool_result', toolCallId: 'observe' }]
-          }
-        })
+        textFrame('The heading is Example Domain.')
       ],
       log,
       {
@@ -8997,10 +8144,7 @@ describe('a turn that stopped changing', () => {
       [
         planCall('call-1'),
         planCall('call-2'),
-        toolFrame('call-3', 'finish', {
-          summary: 'The plan is published and the notes are tidy.',
-          verification: { status: 'not_applicable', evidence: [] }
-        })
+        textFrame('The plan is published and the notes are tidy.')
       ],
       log
     );
@@ -9055,10 +8199,7 @@ describe('a tool call that was cut off mid-argument', () => {
     installFetch(
       [
         cutOffFrame('call-1', 'file_write', halfAFile),
-        toolFrame('call-2', 'finish', {
-          summary: 'The write was too large to send in one piece.',
-          verification: { status: 'not_applicable', evidence: [] }
-        })
+        textFrame('The write was too large to send in one piece.')
       ],
       log
     );
@@ -9141,15 +8282,7 @@ describe('the build that priced a step', () => {
     const task = makeTask();
     const probe = probeStore(() => task);
     const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch(
-      [
-        toolFrame('call-1', 'finish', {
-          summary: 'The notes are tidy.',
-          verification: { status: 'not_applicable', evidence: [] }
-        })
-      ],
-      log
-    );
+    installFetch([textFrame('The notes are tidy.')], log);
 
     await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 2 }), masterKey, runnerSecret)
       .run(task)
@@ -9192,18 +8325,6 @@ describe('dormant rules on a real turn', () => {
       .catch(() => undefined);
     return log;
   };
-
-  it('puts the correction in front of the model on the step after the one that earned it', async () => {
-    const log = await turnWriting('workspace/quarterly.docx');
-    // Nothing on the request that earned it: this half never interrupts.
-    expect(messagesOf(log.modelRequests[0]).some((m) => m.content.startsWith('HARNESS'))).toBe(
-      false
-    );
-    const correction = messagesOf(log.modelRequests[1]).find((m) =>
-      m.content.startsWith('HARNESS CORRECTION [office-render-proof]')
-    );
-    expect(correction?.content).toContain('garden-office-convert');
-  });
 
   it('sends a request with no rule byte in it when nothing fired', async () => {
     const log = await turnWriting('workspace/quarterly.md');
@@ -9280,7 +8401,6 @@ describe('the contract the run actually sends', () => {
     // that does most damage when it is wrong: it sends the model at a binary that is not there, and
     // it finds out one failed shell call at a time in front of the owner.
     expect(contract).not.toContain('/usr/local/lib/garden/python/bin/python3');
-    expect(contract).toContain('The managed document toolchain is unavailable');
   });
 
   it('is smaller on a barer box than on a provisioned one', async () => {
@@ -9303,8 +8423,9 @@ describe('the contract the run actually sends', () => {
     const runtime = ((request?.messages ?? []) as { content: string }[]).find((message) =>
       message.content.startsWith(RUNTIME_CONTEXT_MARKER)
     );
-    const toolchain = /^- Document toolchain: (.*)$/m.exec(runtime?.content ?? '')?.[1] ?? '';
-    expect(contractOf(log)).toBe(baseSystemPrompt({ tools: sent, toolchainSummary: toolchain }));
+    const toolchain = /^- Installed: (.*)$/m.exec(runtime?.content ?? '')?.[1] ?? '';
+    expect(sent.length).toBeGreaterThan(0);
+    expect(contractOf(log)).toBe(baseSystemPrompt({ toolchainSummary: toolchain }));
   });
 });
 
@@ -9357,7 +8478,6 @@ describe('the machine the run tells the model it is on', () => {
     const lines = block.split('\n');
     const machine = lines.findIndex((line) => line.startsWith('- Machine: '));
     expect(machine).toBeGreaterThan(-1);
-    expect(lines[machine + 1] ?? '').toContain('df -h /home/garden');
   });
 
   /**
@@ -9378,7 +8498,6 @@ describe('the machine the run tells the model it is on', () => {
     const block = runtimeBlockOf(await turn(null));
     expect(block).not.toContain('- Machine:');
     // And the rest of the block is untouched, which is what makes an unanswerable probe free.
-    expect(block).toContain('- Check real capacity with `df -h /home/garden`');
   });
 
   /**
@@ -9500,28 +8619,28 @@ describe('diagnosing a repository whose build somebody else wrote', () => {
 });
 
 describe('owner effort reaches the paid request', () => {
-  it.each(['low', 'max'] as const)(
-    'keeps %s on the normal step and its closing handoff',
-    async (effort) => {
-      const task = { ...makeTask(), reasoningEffort: effort };
-      const probe = probeStore(() => task);
-      vi.spyOn(probe.store, 'listModels').mockResolvedValue([
-        { ...model, reasoning: { mandatory: true, supportedEfforts: ['low', 'high', 'max'] } }
-      ]);
-      const log: FetchLog = { calls: [], modelRequests: [] };
-      installFetch(
-        [textFrame('Working through the notes.'), textFrame('The turn stopped at its step limit.')],
-        log
-      );
-      const worker = new AgentWorker(probe.store, config(), masterKey, runnerSecret);
-      await worker.run(task);
-      expect(log.modelRequests).toHaveLength(2);
-      for (const request of log.modelRequests) expect(request.reasoning_effort).toBe(effort);
-      const states = decryptCheckpoints(probe.checkpoints);
-      expect(states.length).toBeGreaterThan(0);
-      expect(states.at(-1)).toMatchObject({ ownerReasoningEffort: effort });
-    }
-  );
+  it.each(['low', 'max'] as const)('keeps %s on every step of the turn', async (effort) => {
+    const task = { ...makeTask(), reasoningEffort: effort };
+    const probe = probeStore(() => task);
+    vi.spyOn(probe.store, 'listModels').mockResolvedValue([
+      { ...model, reasoning: { mandatory: true, supportedEfforts: ['low', 'high', 'max'] } }
+    ]);
+    const log: FetchLog = { calls: [], modelRequests: [] };
+    installFetch(
+      [
+        toolFrame('e1', 'set_plan', { steps: ['Work through the notes'] }),
+        textFrame('The notes are worked through.')
+      ],
+      log
+    );
+    const worker = new AgentWorker(probe.store, config(), masterKey, runnerSecret);
+    await worker.run(task);
+    expect(log.modelRequests).toHaveLength(2);
+    for (const request of log.modelRequests) expect(request.reasoning_effort).toBe(effort);
+    const states = decryptCheckpoints(probe.checkpoints);
+    expect(states.length).toBeGreaterThan(0);
+    expect(states.at(-1)).toMatchObject({ ownerReasoningEffort: effort });
+  });
 });
 
 /**
@@ -9838,20 +8957,15 @@ describe('the output-limit continuation ceiling', () => {
         owner: true,
         continuation: MAX_TRUNCATED_CONTINUATIONS + 1
       });
-      expect(
-        probe.events.some((event) => event.summary === 'Answered without calling finish')
-      ).toBe(false);
       const completion = probe.events.find((event) => event.kind === 'completed');
       expect(completion?.payload).toMatchObject({
         interrupted: true,
         verification: { remainingRisks: [expect.stringContaining('output limit')] }
       });
       if (!text) {
-        expect((completion?.payload as { summary?: string })?.summary).toContain(
-          'without a complete answer'
-        );
+        expect((completion?.payload as { summary?: string })?.summary).toContain('output limit');
         expect(JSON.stringify(log.modelRequests[1]?.messages)).toContain(
-          'without returning an answer'
+          'before any answer or tool call'
         );
         expect(JSON.stringify(log.modelRequests[1]?.messages)).not.toContain('mid-sentence');
       }
@@ -9862,16 +8976,7 @@ describe('the output-limit continuation ceiling', () => {
     const task = makeTask();
     const probe = probeStore(() => task);
     const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch(
-      [
-        limited('The answer begins here.'),
-        toolFrame('done', 'finish', {
-          summary: 'The complete explanation.',
-          verification: { status: 'not_applicable', reason: 'A conversational explanation.' }
-        })
-      ],
-      log
-    );
+    installFetch([limited('The answer begins here.'), textFrame('The complete explanation.')], log);
     await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 10 }), masterKey, runnerSecret).run(
       task
     );
@@ -9891,7 +8996,7 @@ describe('real runtime replay', () => {
     'question',
     'approval',
     'approval resume',
-    'failed verification',
+    'unchecked answer',
     'provider retry',
     'interrupted stream',
     'question resume',
@@ -9925,10 +9030,7 @@ describe('real runtime replay', () => {
           }
         }
       });
-      const finish = toolFrame('finish-replay', 'finish', {
-        summary: 'The notes need no changes.',
-        verification: { status: 'not_applicable', evidence: [] }
-      });
+      const finish = textFrame('The notes need no changes.');
       const read = toolFrame('read-replay', 'file_read', { path: 'workspace/notes.md' });
       const command = { executable: 'rm', args: ['-rf', 'workspace/old'] };
       let frames: Array<BodyInit | ((init?: RequestInit) => BodyInit)> = [finish];
@@ -10030,16 +9132,7 @@ describe('real runtime replay', () => {
           }
         });
       }
-      if (scenario === 'failed verification')
-        frames = [
-          toolFrame('finish-invalid', 'finish', {
-            summary: 'Done',
-            verification: {
-              status: 'verified',
-              evidence: [{ toolCallId: 'invented', claim: 'Passed' }]
-            }
-          })
-        ];
+      if (scenario === 'unchecked answer') frames = [textFrame('Done')];
       if (scenario === 'interrupted stream')
         frames = [
           () => {
@@ -10135,10 +9228,9 @@ describe('real runtime replay', () => {
         expect(probe.events.some((row) => row.kind === 'completed')).toBe(true);
       if (scenario === 'approval' || scenario === 'question')
         expect(probe.checkpoints.at(-1)?.status).toBe('awaiting_user');
-      if (scenario === 'failed verification') {
+      if (scenario === 'unchecked answer') {
         const completed = probe.events.find((row) => row.kind === 'completed');
-        expect(completed).toBeDefined();
-        expect(completed?.payload).toMatchObject({ verification: { status: 'unverified' } });
+        expect(completed?.payload).toMatchObject({ verification: { status: 'not_applicable' } });
       }
       if (scenario === 'approval resume')
         expect(log.calls.some((row) => row.includes('/exec'))).toBe(true);

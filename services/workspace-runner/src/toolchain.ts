@@ -310,25 +310,34 @@ export const reportToolchain = (
   });
 
 /**
- * One line the agent can be shown before it commits to a plan. It deliberately leads with what
- * works: an agent told only what is broken picks a worse route than one told which route is open.
+ * One line naming what is installed, in the names the agent will type: commands and Python modules
+ * rather than capability labels, followed by what is missing and how it would be installed.
  */
-export const summariseToolchain = (reports: readonly ToolchainCapabilityReport[]): string => {
+export const summariseToolchain = (
+  reports: readonly ToolchainCapabilityReport[],
+  capabilities: readonly ToolchainCapability[] = DOCUMENT_TOOLCHAIN
+): string => {
   const ready = reports.filter((report) => report.ready);
   const missing = reports.filter((report) => !report.ready);
+  const declared = (report: ToolchainCapabilityReport) =>
+    capabilities.find((capability) => capability.id === report.id);
+  const binaries = [
+    ...new Set(
+      ready.flatMap((report) => declared(report)?.binaries ?? []).filter((b) => b !== GARDEN_PYTHON)
+    )
+  ];
+  const modules = [...new Set(ready.flatMap((report) => declared(report)?.pythonModules ?? []))];
   const parts: string[] = [];
   parts.push(
     ready.length
-      ? `Available on this computer: ${ready.map((report) => report.id).join(', ')}.`
+      ? `${[binaries.join(', '), modules.length ? `Python modules ${modules.join(', ')}` : '']
+          .filter(Boolean)
+          .join('; ')}.`
       : 'No document toolchain is installed on this computer.'
   );
   if (missing.length)
     parts.push(
-      `Not installed: ${missing
-        .map((report) => `${report.id} (needs ${report.install})`)
-        .join(
-          '; '
-        )}. Ask before installing, and do not follow a procedure that depends on one of these until it is there.`
+      `Missing: ${missing.map((report) => `${report.id} (${report.install})`).join('; ')}; ask before installing.`
     );
   return parts.join(' ');
 };

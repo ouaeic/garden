@@ -2188,6 +2188,8 @@ export type ProviderRouting = z.infer<typeof ProviderRouting>;
 
 export const OwnerPreferences = z.object({
   decisionModelsEnabled: z.boolean().optional(),
+  /** Whether the agent may publish an HTML view of a result; absent means it may. */
+  resultViews: z.boolean().optional(),
   /** @see ProviderRouting - absent means the defaults, which is the owner's rule unchanged. */
   providerRouting: ProviderRouting.optional(),
   modelPurposes: z

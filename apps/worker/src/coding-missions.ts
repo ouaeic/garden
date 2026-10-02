@@ -42,7 +42,6 @@ export const CODING_CHILD_TOOLS: ReadonlySet<string> = new Set([
   'session_search',
   'memory_recall',
   'delegate',
-  'finish',
   'compact_context',
   'set_acceptance',
   'notify',
@@ -305,8 +304,8 @@ export async function parkCodingMissionWait(
   task: TaskRecord,
   key: Uint8Array,
   state: AgentState,
-  call: ModelToolCall,
-  deferred: readonly ModelToolCall[]
+  call?: ModelToolCall,
+  deferred: readonly ModelToolCall[] = []
 ): Promise<boolean> {
   if (!task.hasCodingFamily || task.parentMissionId) return false;
   const missions = await deps.store.listCodingMissions(task.userId, task.id);
@@ -321,12 +320,13 @@ export async function parkCodingMissionWait(
   )
     return false;
   const before = state.messages.length;
-  state.messages.push({
-    role: 'tool',
-    toolCallId: call.id,
-    content:
-      'Waiting for active coding specialists. Execution will resume when their work stops; no model polling is needed.'
-  });
+  const waiting =
+    'Waiting for active coding specialists. Execution resumes when their work stops; no polling is needed.';
+  state.messages.push(
+    call
+      ? { role: 'tool', toolCallId: call.id, content: waiting }
+      : { role: 'system', content: waiting }
+  );
   for (const later of deferred)
     state.messages.push({
       role: 'tool',

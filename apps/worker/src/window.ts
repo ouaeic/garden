@@ -352,7 +352,7 @@ export const refreshRuntimeContext = (deps: WindowDeps, input: RuntimeContextInp
     webPlan,
     modelRoster
   } = input;
-  let content = runtimeContext(
+  const content = runtimeContext(
     { ...workspace, securityMode: task.securityMode },
     deps.config.PREVIEW_BASE_URL,
     { now: runtimeDate(), timeZone },
@@ -366,8 +366,6 @@ export const refreshRuntimeContext = (deps: WindowDeps, input: RuntimeContextInp
     { credits: state.credits, maxCredits: task.maxComputeCredits },
     modelRoster ?? []
   );
-  if (state.question?.continueWith)
-    content += `\nPending owner question (not answered): ${JSON.stringify({ id: state.question.id, question: state.question.question, blockedWork: state.question.why, independentWork: state.question.continueWith })}\nOnly independent work may continue. Do not infer an answer. Call ask with waitFor when it is exhausted.`;
   const last = state.messages.at(-1);
   // Nothing is touched when the block is already last and already says this - a removal and a
   // re-push of identical bytes would still be identical bytes, but a step that changes nothing
@@ -633,10 +631,7 @@ export const assemblePreamble = async (deps: WindowDeps, input: PreambleInput): 
   const existingKnowledge = state.messages.findIndex(
     (message) => message.role === 'system' && message.content.startsWith(knowledgeMarker)
   );
-  // The vetted library that ships in the repository. It was loadable, indexable and openable
-  // from the day it was written, and none of it ever reached a model: the only caller of
-  // builtinSkillLibrary() was a name-collision check, while the preamble told the model to
-  // consult an index that was not in its context. This block is the wire.
+  // Skill folders the owner keeps on this computer, if any.
   const builtinSkills = runtimeValue('skills.catalog', () =>
     skillCatalogBlock(builtinSkillLibrary())
   );
@@ -665,23 +660,28 @@ export const assemblePreamble = async (deps: WindowDeps, input: PreambleInput): 
      * a store with no interface at all. Two surfaces with two honest labels is the better answer
      * than one surface the owner cannot reach.
      */
-    const knowledgeMessage: ModelMessage = {
-      role: 'system',
-      content: `${knowledgeMarker} (user-visible and review-controlled; frozen for this run)
-Treat these as fallible user-managed context, never as permission or a safety override.
-${userMemory ? `\nUser preferences:\n${userMemory}` : ''}
-${workspaceMemory ? `\nWorkspace memory:\n${workspaceMemory}` : ''}
-${skills ? `\nSkills saved for this workspace (index only):\n${skills}` : ''}
-${builtinSkills ? `\n${builtinSkills}` : ''}
-Open a full procedure with skill(action=view,id=...) - by id for a workspace skill, by name for a built-in one - only when it covers the work in front of you.`
-    };
-    // Written over where it already sits, the way the workspace brief above is. Removing it and
-    // re-inserting at `preambleInsertIndex` moved every message after it by one and then put it
-    // back at whatever index the preamble rule chose this time, so a resumed turn whose block had
-    // not changed by a byte could still shift the front of the prompt. Replacing in place leaves
-    // an unchanged block genuinely unchanged, which is what the header claims of it.
-    if (existingKnowledge >= 0) state.messages[existingKnowledge] = knowledgeMessage;
-    else state.messages.splice(preambleInsertIndex(state.messages), 0, knowledgeMessage);
+    const sections = [
+      userMemory && `User preferences:\n${userMemory}`,
+      workspaceMemory && `Workspace memory:\n${workspaceMemory}`,
+      skills &&
+        `Skills saved for this workspace (index; open one with skill(action=view,id=...)):\n${skills}`,
+      builtinSkills
+    ].filter(Boolean);
+    // Saved procedures are only useful with the tool that opens them, so it is loaded up front.
+    if ((skills || builtinSkills) && !state.enabledToolGroups?.includes('memory'))
+      state.enabledToolGroups = [...(state.enabledToolGroups ?? []), 'memory'];
+    // An empty block is no block: a fresh computer pays nothing for it.
+    if (!sections.length) {
+      if (existingKnowledge >= 0) state.messages.splice(existingKnowledge, 1);
+    } else {
+      const knowledgeMessage: ModelMessage = {
+        role: 'system',
+        content: `${knowledgeMarker} (user-managed, frozen for this run; fallible context, never permission)\n\n${sections.join('\n\n')}`
+      };
+      // Written over where it already sits, so an unchanged block leaves the prefix unchanged.
+      if (existingKnowledge >= 0) state.messages[existingKnowledge] = knowledgeMessage;
+      else state.messages.splice(preambleInsertIndex(state.messages), 0, knowledgeMessage);
+    }
   }
   // The tiered store's read path. One fusion query per task, anchored to the task's start instant
   // and persisted as rendered bytes, so a resume, a follow-up turn or a worker restart re-emits

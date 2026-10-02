@@ -2,8 +2,7 @@
 
 `garden-run` records a declared scientific command inside its existing project execution boundary.
 It is installed on the owner machine and available through the ordinary shell and durable-job
-tools. It grants no permissions of its own. `scientific-computing` contains the specification
-example and model-facing procedure.
+tools. It grants no permissions of its own, and `garden-run --help` documents the specification.
 
 A specification declares the argument vector, source files, input files with optional expected
 checksums and source URLs, output files, dependency locks and deterministic tool-version probes.

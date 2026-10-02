@@ -57,13 +57,9 @@ const FIELDS: ReadonlyArray<keyof AgentState> = [
   'mutatedBeyondProse',
   'answered',
   'repairStep',
-  'answerNagged',
   'turnToolResults',
-  'finishRejections',
-  'deliveryNagged',
   'ownerReasoningEffort',
   'preparedInputTokens',
-  'completionNags',
   'approvalRecovery',
   'toolsStarted',
   'idleSteps',
@@ -74,6 +70,7 @@ const FIELDS: ReadonlyArray<keyof AgentState> = [
   'seenCalls',
   'carriedArtifacts',
   'truncatedReplies',
+  'continuedAnswer',
   'frameLossNoted',
   'contextOverflowRepairs',
   'notices',
@@ -90,13 +87,9 @@ const FIELDS: ReadonlyArray<keyof AgentState> = [
   'inFlight',
   'acceptance',
   'acceptanceFailures',
-  'acceptanceNagged',
-  'acceptanceBaselineRefusals',
   'acceptanceTurn',
-  'acceptanceCaveat',
   'selfContinuations',
   'continuationMark',
-  'planCoverageNagged',
   'planIsFallback',
   'taint',
   'turnNoveltyBytes',
@@ -222,7 +215,6 @@ const FULL: Required<AgentState> = {
   mutatedBeyondProse: true,
   answered: true,
   repairStep: true,
-  answerNagged: true,
   turnToolResults: {
     'call-1': {
       name: 'shell',
@@ -235,11 +227,8 @@ const FULL: Required<AgentState> = {
     },
     'call-2': { name: 'file_write', success: true, mutating: true, proseOnly: true }
   },
-  finishRejections: 2,
-  deliveryNagged: true,
   ownerReasoningEffort: 'low',
   preparedInputTokens: 91_400,
-  completionNags: 1,
   approvalRecovery: { turn: 7, attempts: 1 },
   toolsStarted: 9,
   idleSteps: 1,
@@ -250,6 +239,7 @@ const FULL: Required<AgentState> = {
   seenCalls: { 'file_read:workspace/importer.py': 'call-1' },
   carriedArtifacts: ['workspace/importer.py', 'pytest -q'],
   truncatedReplies: 1,
+  continuedAnswer: 'The first half of',
   frameLossNoted: true,
   contextOverflowRepairs: 1,
   notices: 2,
@@ -294,13 +284,9 @@ const FULL: Required<AgentState> = {
     declaredAtStep: 5
   },
   acceptanceFailures: 1,
-  acceptanceNagged: true,
-  acceptanceBaselineRefusals: 1,
   acceptanceTurn: 3,
-  acceptanceCaveat: 'declared after the work had already started',
   selfContinuations: 1,
   continuationMark: { atStep: 14, writes: 3 },
-  planCoverageNagged: true,
   planIsFallback: true,
   taint: { level: 'untrusted', sources: ['https://example.com/page'], sinceStep: 8 },
   turnNoveltyBytes: 412,
@@ -387,6 +373,7 @@ describe('what a new turn inherits', () => {
     );
 
     expect(dropped).toEqual([
+      'continuedAnswer',
       'frameLossNoted',
       'pending',
       'question',
@@ -416,11 +403,7 @@ describe('what a new turn inherits', () => {
       'mutatedBeyondProse',
       'answered',
       'repairStep',
-      'answerNagged',
       'turnToolResults',
-      'finishRejections',
-      'deliveryNagged',
-      'completionNags',
       'toolsStarted',
       'idleSteps',
       'repeatedFailures',
@@ -430,10 +413,7 @@ describe('what a new turn inherits', () => {
       'notices',
       'questionsAsked',
       'acceptanceFailures',
-      'acceptanceNagged',
-      'acceptanceBaselineRefusals',
       'selfContinuations',
-      'planCoverageNagged',
       'planIsFallback',
       'turnNoveltyBytes',
       // Per turn like the egress budget above it, and for the same reason: the refusal says "this
@@ -467,7 +447,6 @@ describe('what a new turn inherits', () => {
       'inFlight',
       'acceptance',
       'acceptanceTurn',
-      'acceptanceCaveat',
       'taint',
       'webToolMode',
       'knownOrigins',
@@ -493,7 +472,6 @@ describe('what a new turn inherits', () => {
     expect(next.webToolMode).toBe('in_house');
     expect(next.toolOutputFloor).toBe(1_200);
     expect(next.acceptance).toEqual(FULL.acceptance);
-    expect(next.acceptanceCaveat).toBe(FULL.acceptanceCaveat);
   });
 
   it('opens the new turn on the owner message with none of the last turn bookkeeping', () => {

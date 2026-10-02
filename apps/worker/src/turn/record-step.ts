@@ -76,26 +76,14 @@ export const recordAssistantStep = async (
     ...(response.nativeContinuation ? { nativeContinuation: response.nativeContinuation } : {}),
     ...(response.toolCalls.length ? { toolCalls: response.toolCalls } : {})
   });
-  /*
-   * A step the harness asked for is not a new answer to the owner.
-   *
-   * Five paths refuse a finish and send the model round again - the finish rejection, the plan
-   * hold, the acceptance hold, an acceptance check that failed, and the completion nag. Its
-   * natural reply to "finish rejected, cite something newer" is to restate the answer with an
-   * apology, and every one of those restatements used to become another bubble. That is why one
-   * answer arrived in pieces, and eleven of those rounds in the worst case is most of where a
-   * small task's tokens went. The prose still goes into the window - the model needs its own
-   * words back - it simply is not published as a fresh reply.
-   */
+  // A reply to a failed acceptance check restates the answer; it is not a new bubble.
   if (assistantText && !state.repairStep) {
     state.answered = true;
     await event(deps.store, task, key, 'assistant_message', assistantText.slice(0, 500), {
       markdown: assistantText
     });
   }
-  // Cleared as soon as the model does something other than ask to finish again, so an ordinary
-  // step following a repair speaks normally.
-  if (state.repairStep && response.toolCalls.some((call) => call.name !== 'finish'))
-    state.repairStep = false;
+  // A repair lasts until the model acts again, so the step after it speaks normally.
+  if (state.repairStep && response.toolCalls.length) state.repairStep = false;
   return assistantText;
 };

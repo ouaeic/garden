@@ -124,8 +124,7 @@ const toolCategory = (name: unknown): z.infer<typeof category> => {
   if (name.startsWith('file') || name === 'image_read') return 'files';
   if (['web_search', 'parallel_web_read', 'session_search'].includes(name)) return 'research';
   if (name === 'connector_action') return 'communication';
-  if (['ask', 'finish', 'set_plan', 'set_acceptance', 'delegate'].includes(name))
-    return 'coordination';
+  if (['ask', 'set_plan', 'set_acceptance', 'delegate'].includes(name)) return 'coordination';
   return 'other';
 };
 

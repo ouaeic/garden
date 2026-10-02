@@ -37,7 +37,7 @@
  * stayed green over it because not one of them owns a file big enough for the difference to show.
  * `a-file-past-the-display-bound-shows-only-what-the-bound-allows` is the row that found it.
  */
-import { evidence, type Fixture, type ModelTurn, type ScriptedCall } from '../harness.js';
+import { type Fixture, type ModelTurn, type ScriptedCall } from '../harness.js';
 
 /* ------------------------------------------------------------------------------- the workspace */
 
@@ -72,10 +72,11 @@ const ledgerSource = (): string =>
  */
 export const COUNTER_LINES = 9_000;
 
+// Line 400 is the wrong one, and being wrong is what makes it quotable on its own.
 const counterFile = (): string =>
-  Array.from({ length: COUNTER_LINES }, (_, index) => String(index % 90).padStart(2, '0')).join(
-    '\n'
-  );
+  Array.from({ length: COUNTER_LINES }, (_, index) =>
+    index === 399 ? '??' : String(index % 90).padStart(2, '0')
+  ).join('\n');
 
 export const FILES: Readonly<Record<string, string>> = {
   'workspace/ledger.ts': ledgerSource(),
@@ -277,12 +278,12 @@ const callFor = (step: Step, id: string): ScriptedCall => {
     id,
     name: 'file_patch',
     args: {
-      // `PUT n.=n:` with a single `+` body row: the canonical spelling of a one-line replacement in
-      // `apps/worker/src/edit/parse.ts`. One line out, one line in, so no later number moves.
+      // One whole line out, one line in, so no later number moves.
       patches: [
         {
           path: step.path,
-          edit: `PUT ${step.at}.=${step.at}:\n-${FILES[step.path]!.split('\n')[step.at - 1]}\n+${step.text}`
+          oldText: FILES[step.path]!.split('\n')[step.at - 1]!,
+          newText: step.text
         }
       ]
     }
@@ -323,27 +324,11 @@ const CHECK: ScriptedCall = {
  */
 export const fixtureFor = (trajectory: Trajectory): Fixture => {
   const steps = trajectory.steps;
-  const changes = steps.some((step) => step.kind !== 'read');
   const turns: ModelTurn[] = [
     ...(trajectory.acceptance ? [{ calls: [ACCEPTANCE] }] : []),
     ...steps.map((step, index) => ({ calls: [callFor(step, `call-${index + 1}`)] })),
     ...(trajectory.acceptance ? [{ calls: [CHECK] }] : []),
-    {
-      text: 'Done.',
-      calls: [
-        {
-          id: 'call-finish',
-          name: 'finish',
-          args: {
-            summary: 'Read what was needed and changed what was asked for.',
-            verification: evidence(
-              trajectory.acceptance ? CHECK.id : `call-${steps.length}`,
-              changes ? 'The change is on disk' : 'The file says so at that line'
-            )
-          }
-        }
-      ]
-    }
+    { text: 'Done.' }
   ];
   return {
     id: trajectory.id,

@@ -26,7 +26,6 @@ import {
 } from './acceptance-runner.js';
 import type { AgentState } from './agent-state.js';
 import type { AgentRunnerClient } from './runner-client.js';
-import { ACCEPTANCE_BASELINE_TIMEOUT_SECONDS } from './turn-bounds.js';
 
 const key = new Uint8Array(32).fill(7);
 const task = {
@@ -207,27 +206,6 @@ describe('the acceptance suite deadline', () => {
   });
 
   /**
-   * The baseline ceiling and the suite clamp are two different bounds and both apply.
-   *
-   * A baseline runs before the work with its own, much shorter, per-check ceiling; the suite clock
-   * still runs. Whichever is smaller is the one the runner is told about.
-   */
-  it('takes the smaller of the baseline ceiling and what the suite has left', async () => {
-    vi.useFakeTimers();
-    const probed = probe();
-
-    await acceptanceChecks(probed.deps, task, key, record(command('a')), { purpose: 'baseline' });
-    expect(timeouts(probed)).toEqual([ACCEPTANCE_BASELINE_TIMEOUT_SECONDS]);
-
-    const late = probe();
-    late.spend = ACCEPTANCE_SUITE_DEADLINE_SECONDS - 5;
-    await acceptanceChecks(late.deps, task, key, record(command('a'), command('b')), {
-      purpose: 'baseline'
-    });
-    expect(timeouts(late)).toEqual([ACCEPTANCE_BASELINE_TIMEOUT_SECONDS, 5]);
-  });
-
-  /**
    * The other half of #22, held here beside the half it composes with.
    *
    * `agent-run.test.ts` proves this through a whole turn, which is the right place to prove that
@@ -401,34 +379,6 @@ describe('one run of the suite per state of the workspace', () => {
       key,
       record(command('a')),
       { purpose: 'finish' },
-      turn
-    );
-
-    expect(timeouts(probed)).toHaveLength(2);
-  });
-
-  /**
-   * The baseline is the one run that must never be answered from a memo: its whole job is to watch
-   * the checks fail before the work, and a memo is a statement about a workspace it never looked at.
-   */
-  it('never answers a baseline from a memo', async () => {
-    const probed = probe();
-    const turn = state();
-
-    await runAcceptanceChecks(
-      probed.deps,
-      task,
-      key,
-      record(command('a')),
-      { purpose: 'baseline' },
-      turn
-    );
-    await runAcceptanceChecks(
-      probed.deps,
-      task,
-      key,
-      record(command('a')),
-      { purpose: 'baseline' },
       turn
     );
 

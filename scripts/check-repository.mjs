@@ -258,16 +258,6 @@ say(
   `Shipped programs: ${byInterpreter.shell.length} shell, ${byInterpreter.python.length} Python, ${byInterpreter.node.length} Node parse.`
 );
 
-// --- the skill library ------------------------------------------------------------------------
-
-const skills = spawnSync('/bin/sh', ['scripts/garden-skill-check', 'skills'], {
-  cwd: repositoryRoot,
-  encoding: 'utf8'
-});
-if (skills.status !== 0)
-  fail(`the skill library does not lint:\n${(skills.stderr || skills.stdout).trim()}`);
-say(`Skill library: ${(skills.stdout || '').trim() || 'checked'}`);
-
 // --- the ImageMagick 6 compatibility command ----------------------------------------------------
 
 /**

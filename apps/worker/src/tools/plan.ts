@@ -1,16 +1,9 @@
-import {
-  TaskOutputIntents,
-  type TaskOutputIntent,
-  type TaskPlanStep,
-  type WorkSurfaceReport
-} from '@garden/contracts';
+import { type TaskPlanStep } from '@garden/contracts';
 import { decryptJson, encryptJson, GardenError } from '@garden/core';
 import { type ModelToolCall } from '@garden/model-gateway';
 import { event } from '../tool-recording.js';
-import { planStepsFromArguments, textValue } from '../values.js';
+import { planStepsFromArguments } from '../values.js';
 import { type ToolContext } from '../tool-dispatch.js';
-import { describeWorkSurface, validateWorkSurface } from '../work-surface.js';
-import { applyPresentationTitle } from '../presentation-title.js';
 
 /**
  * The plan tool: the one arm that writes the document the owner reads back.
@@ -24,100 +17,59 @@ export async function executePlanTool(context: ToolContext, call: ModelToolCall)
   const { task, key, state } = context;
   switch (call.name) {
     case 'set_plan': {
-      if (call.arguments.action === 'describe') return describeWorkSurface();
       const current = await context.store.getLatestTaskPlan(task.id);
       const previousPlan =
         current?.stepsCiphertext.aad === `task-plan:${task.id}`
-          ? decryptJson<{
-              steps: TaskPlanStep[];
-              outputs?: TaskOutputIntent[];
-              presentation?: WorkSurfaceReport;
-              directionEventId?: string;
-            }>(current.stepsCiphertext, key)
+          ? decryptJson<{ steps: TaskPlanStep[]; directionEventId?: string }>(
+              current.stepsCiphertext,
+              key
+            )
           : { steps: [] };
       const latestDirection = (
         await context.store.listTaskEvents(task.id, 0, { kind: 'user_message', limit: 1 })
       ).at(-1);
       const directionEventId = latestDirection?.id;
-      if (call.arguments.presentation !== undefined && !directionEventId)
-        throw new GardenError(
-          'presentation_direction_missing',
-          'The current owner direction is unavailable; reload the task before reporting.'
-        );
+      // A plan made for an earlier direction does not carry its statuses into this one.
       const sameDirection = previousPlan.directionEventId
         ? previousPlan.directionEventId === directionEventId
         : !latestDirection ||
           !current ||
           Date.parse(current.createdAt) >= Date.parse(latestDirection.createdAt);
-      const presentation =
-        call.arguments.presentation === undefined
-          ? sameDirection
-            ? previousPlan.presentation
-            : undefined
-          : await validateWorkSurface(context, call.arguments.presentation, directionEventId ?? '');
-      const steps =
-        call.arguments.steps === undefined && presentation && sameDirection
-          ? previousPlan.steps
-          : planStepsFromArguments(call.arguments.steps, sameDirection ? previousPlan.steps : []);
-      const outputs =
-        call.arguments.outputs === undefined
-          ? sameDirection
-            ? previousPlan.outputs
-            : undefined
-          : TaskOutputIntents.parse(call.arguments.outputs);
+      const steps = planStepsFromArguments(
+        call.arguments.steps,
+        sameDirection ? previousPlan.steps : []
+      );
       if (!steps.length)
-        /*
-         * Says what shape would have worked. It used to say only that a step was needed, which
-         * is the one thing the model already knew - and the failure is almost always a step
-         * whose title arrived under another key or as an empty string, so a model told only
-         * "needs at least one step" sends the same thing again. Seen twice in one run.
-         */
         throw new GardenError(
           'invalid_plan',
-          'A plan needs at least one step with a title. Send steps as ["Read the brief", …] or [{"title":"Read the brief","status":"in_progress"}, …]; a step with no title is dropped. To retire a step, keep its title and set its status to skipped rather than removing it.'
+          'A plan needs at least one step with a title, as ["Read the brief", …] or [{"title":"Read the brief","status":"in_progress"}, …]. Retire a step by setting it to skipped.'
         );
-      const branchName = textValue(call.arguments.branchName, 'Main').slice(0, 80);
-      // From here the plan is the model's, and the hold on finish means what it says again.
       state.planIsFallback = false;
       try {
         const created = await context.store.createTaskPlan({
           taskId: task.id,
           expectedVersion: current?.version ?? 0,
-          branchName,
+          branchName: 'Main',
           stepsCiphertext: encryptJson(
-            {
-              steps,
-              branchName,
-              ...(outputs === undefined ? {} : { outputs }),
-              ...(directionEventId ? { directionEventId } : {}),
-              ...(presentation ? { presentation } : {})
-            },
+            { steps, branchName: 'Main', ...(directionEventId ? { directionEventId } : {}) },
             key,
             `task-plan:${task.id}`
           ),
           createdBy: 'agent'
         });
-        if (call.arguments.presentation !== undefined && presentation)
-          await applyPresentationTitle(context, presentation.content.title);
         await event(context.store, task, key, 'plan', `Plan version ${created.version}`, {
           planId: created.id,
           version: created.version,
-          branchName,
+          branchName: 'Main',
           steps,
-          ...(directionEventId ? { directionEventId } : {}),
-          ...(presentation ? { presentation } : {}),
-          ...(outputs === undefined ? {} : { outputs })
+          ...(directionEventId ? { directionEventId } : {})
         });
-        return {
-          version: created.version,
-          steps,
-          ...(presentation ? { presentationUpdated: true } : {})
-        };
+        return { version: created.version, steps };
       } catch (cause) {
         if (cause instanceof Error && cause.message === 'plan_version_conflict')
           return {
             changedByUser: true,
-            instruction: 'Reload and follow the newer user-edited plan before continuing.'
+            instruction: 'The user edited the plan. Reload it and follow their version.'
           };
         throw cause;
       }

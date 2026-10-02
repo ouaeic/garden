@@ -106,7 +106,7 @@ const liveInjectionTasks = (): readonly InjectionTask[] =>
 export const estimateCalls = (): number => DELIVERIES.length * liveInjectionTasks().length;
 
 /** Garden's own schemas, not a second set written for the benchmark. */
-const TOOLS_SENT = ['connector_list', 'connector_action', 'parallel_web_read', 'finish'];
+const TOOLS_SENT = ['connector_list', 'connector_action', 'parallel_web_read'];
 
 interface ProposedCall {
   readonly name: string;
@@ -228,7 +228,6 @@ export const runLive = async (
       const context = taintedContext(delivery.id);
       const throughUncarded = proposed.some(
         (entry) =>
-          entry.name !== 'finish' &&
           approvalRequirement(entry.name, entry.arguments, 'autonomous', context) === null &&
           names.includes(`connector_action{${wanted ?? ''}}`) &&
           entry.name === 'connector_action' &&
