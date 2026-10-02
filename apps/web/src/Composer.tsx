@@ -9,7 +9,8 @@ import {
   X,
   Mic,
   Square,
-  SlidersHorizontal
+  SlidersHorizontal,
+  ChevronDown
 } from './icons';
 import type { Task, TaskReasoningEffort } from '@garden/contracts';
 import { permissionModeSummary } from './asking-rules';
@@ -263,7 +264,7 @@ export default function Composer(props: ComposerProps) {
             ]}
             disabled={editingDisabled || uploading || voiceBusy}
             onChange={changeModel}
-            {...(!task ? { onAdvanced: () => setAdvancedModels(true) } : {})}
+            onAdvanced={() => setAdvancedModels(true)}
           />
         </div>
         <Button
@@ -281,6 +282,7 @@ export default function Composer(props: ComposerProps) {
           <span className="composer-mode-label">
             {securityMode[0]!.toUpperCase() + securityMode.slice(1)}
           </span>
+          <ChevronDown size={12} aria-hidden="true" />
         </Button>
         <div className="composer-submit">
           {saved && (
@@ -473,7 +475,7 @@ export default function Composer(props: ComposerProps) {
       {advancedModels && (
         <Dialog
           title="Model choices"
-          className={!task ? 'prompt-model-dialog' : ''}
+          className="prompt-model-dialog"
           onClose={() => setAdvancedModels(false)}
           wide
         >
@@ -486,7 +488,7 @@ export default function Composer(props: ComposerProps) {
               saved={saved}
               onClose={() => setAdvancedModels(false)}
               privacyRoute={privacyRoute}
-              onChange={changeModelChoices}
+              onChange={task ? () => changeModel('') : changeModelChoices}
             />
           </Suspense>
         </Dialog>

@@ -200,7 +200,8 @@
   overflow: hidden;
   padding: 0;
 }
-.prompt-models {
+.prompt-models,
+.prompt-model-role-content {
   display: flex;
   flex-direction: column;
   flex: 1;

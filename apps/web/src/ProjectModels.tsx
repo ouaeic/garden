@@ -4,17 +4,20 @@ import { put } from './client.js';
 import { ActionFeedback, ResourceState, useAction, useResource } from './management.js';
 import { Button } from './ui.js';
 import ModelChoiceFields from './ModelChoiceFields.js';
+import ModelRoleChoices from './ModelRoleChoices.js';
 
 export default function ProjectModels({
   taskId,
   projectId,
   onChange,
-  disabled
+  disabled,
+  compact = false
 }: {
   taskId?: string;
   projectId?: string;
-  onChange?: () => void;
+  onChange?: (choices: ProjectModelChoices, previous: ProjectModelChoices) => void;
   disabled?: boolean;
+  compact?: boolean;
 }) {
   const scopeId = projectId ?? taskId!;
   const endpoint = projectId
@@ -45,40 +48,58 @@ export default function ProjectModels({
         resource.setValue(saved);
         setDraft(null);
         window.dispatchEvent(new CustomEvent('garden-model-preferences', { detail: saved }));
-        onChange?.();
+        onChange?.(saved.choices, current.choices);
       },
       projectId ? 'Project model choices saved' : 'Conversation model choices saved'
     );
   };
+  const changeChoices = (next: ProjectModelChoices) => {
+    if (!current) return;
+    setDraft({ taskId: scopeId, revision: editing?.revision ?? current.revision, choices: next });
+  };
   return (
-    <section className="stack" aria-label={projectId ? 'Project models' : 'Conversation models'}>
-      <p className="muted">
-        {projectId
-          ? 'Project defaults apply to conversations that follow them. Each purpose can follow your Settings or use its own model.'
-          : 'These choices apply to this conversation from its next turn. Each purpose can follow the project default or use its own model.'}
-      </p>
+    <section
+      className={compact ? 'prompt-models' : 'stack'}
+      aria-label={projectId ? 'Project models' : 'Conversation models'}
+    >
+      {!compact && (
+        <p className="muted">
+          {projectId
+            ? 'Project defaults apply to conversations that follow them. Each purpose can follow your Settings or use its own model.'
+            : 'These choices apply to this conversation from its next turn. Each purpose can follow the project default or use its own model.'}
+        </p>
+      )}
       <ResourceState resource={resource} />
       {current && (
         <>
-          <ModelChoiceFields
-            purposes={current.purposes}
-            inheritLabel={projectId ? 'Use global choice' : 'Use project choice'}
-            inheritDetail={
-              projectId
-                ? 'Follow your defaults in Settings.'
-                : 'Follow the defaults in project settings.'
+          {compact ? (
+            <ModelRoleChoices
+              purposes={current.purposes}
+              choices={choices}
+              disabled={disabled || action.busy}
+              inheritLabel="Use project default"
+              scope="These choices apply to this conversation from its next turn. Other conversations keep their own choices."
+              onChange={changeChoices}
+            />
+          ) : (
+            <ModelChoiceFields
+              purposes={current.purposes}
+              inheritLabel={projectId ? 'Use global choice' : 'Use project choice'}
+              inheritDetail={
+                projectId
+                  ? 'Follow your defaults in Settings.'
+                  : 'Follow the defaults in project settings.'
+              }
+              choices={choices}
+              disabled={disabled || action.busy}
+              onChange={changeChoices}
+            />
+          )}
+          <div
+            className={
+              compact ? 'prompt-model-footer model-choice-actions' : 'model-choice-actions'
             }
-            choices={choices}
-            disabled={disabled || action.busy}
-            onChange={(next) =>
-              setDraft({
-                taskId: scopeId,
-                revision: editing?.revision ?? current.revision,
-                choices: next
-              })
-            }
-          />
-          <div className="model-choice-actions">
+          >
             <Button
               className="primary"
               busy={action.busy}
