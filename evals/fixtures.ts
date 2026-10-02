@@ -758,9 +758,8 @@ export const fixtures: readonly Fixture[] = [
       tools: ['file_write'],
       status: 'completed',
       verification: 'not_applicable',
-      // One write is enough: the step after anything mutates writes the boilerplate plan, so even
-      // this two-call turn ends with a plan panel the owner never asked for.
-      fallbackPlan: true,
+      // A write is not a request for a plan: nothing puts one on screen the model did not declare.
+      fallbackPlan: false,
       holds: []
     }
   },

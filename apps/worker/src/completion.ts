@@ -77,11 +77,10 @@ export interface CompletionVerification {
  * Extracted because there are two doors into a new turn and only one of them was doing this. The
  * worker's door handles a message that arrived while the agent was still running; the API's door
  * handles the ordinary case - the owner replying to a task that has finished - and it reset four
- * fields where this resets eleven and deletes three. So the common path carried the last turn's
- * tool results forward as citable evidence for work they predate, carried its nag counters so a
- * turn could fail on its first refusal, carried `mutated` so a fresh turn believed it had already
- * changed something, and carried the notice count so a monitor that had spoken three times last
- * turn was silent for the rest of the conversation.
+ * fields where this resets the rest. So the common path carried the last turn's tool results
+ * forward, carried `mutatedBeyondProse` so a fresh turn was held to checks for code it never
+ * touched, and carried the notice count so a monitor that had spoken three times last turn was
+ * silent for the rest of the conversation.
  *
  * What is deliberately NOT reset is as load-bearing as what is:
  *
@@ -152,8 +151,7 @@ export const startTurnState = <T extends Record<string, unknown>>(
      * carries with everything else above.
      */
     memoryReaches: 0,
-    // A new turn has changed nothing yet, so its evidence ordering and its plan both start over.
-    mutated: false,
+    // A new turn has changed nothing yet.
     mutatedBeyondProse: false,
     answered: false,
     repairStep: false,
@@ -162,7 +160,6 @@ export const startTurnState = <T extends Record<string, unknown>>(
     // starts a turn, so a conversation where they keep replying is a conversation they are watching
     // - it is the turn nobody replied to that is allowed to renew itself.
     selfContinuations: 0,
-    planIsFallback: false,
     // Per turn, like the counters above: the workspace may well have changed between turns, so a
     // read that was uninformative to repeat inside one turn is an ordinary read in the next.
     seenCalls: {},

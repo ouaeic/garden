@@ -2046,12 +2046,10 @@ export class AgentWorker {
     const budget: TurnStepBudget = { maxOutputTokens, turn };
 
     /** @see refreshActivePlan in `window.ts`, where this moved in Wave 7.2. */
-    const refreshActivePlan = async (createFallback = false): Promise<boolean> =>
-      refreshActivePlan_(this.#window, task, key, state, createFallback);
+    const refreshActivePlan = async (): Promise<boolean> =>
+      refreshActivePlan_(this.#window, task, key, state);
 
-    // Repairs and read-only queries need no synthetic plan. The model can plan substantive work
-    // explicitly; changes without a plan still receive a visible verification checklist.
-    await refreshActivePlan(state.mutated === true);
+    await refreshActivePlan();
 
     /** @see drainCorrection in `turn-control.ts`, where this moved in Wave 7.2. */
     const drainCorrection = async (): Promise<boolean> =>

@@ -555,17 +555,6 @@ export const handOffAtStepLimit = async (
   for (const call of response.toolCalls) {
     if (call.name === 'set_plan') {
       try {
-        /*
-         * With the turn's state, which this call did not use to have.
-         *
-         * `set_plan` clears `planIsFallback` - the flag that tells the finish hold the plan on
-         * screen is the model's rather than the harness's opening guess - and it can only clear
-         * it on a state it was given. The handoff is the one call in the loop that ran without
-         * one, so the closing plan a step-limited or credit-limited turn writes, the plan the
-         * owner is actually left looking at, was the only plan in the product that could not
-         * retire that flag. The turn then finished against a hold arguing about a fallback that
-         * had been replaced two lines earlier.
-         */
         const result = await deps.execute(task, call, key, false, context.webPlan, state);
         await deps.recordToolResult(task, key, state, call, result, model, catalog);
       } catch (error) {

@@ -861,10 +861,9 @@ describe('the active plan', () => {
    * Pushed at the tail rather than written in place, and the file argues the measurement: a
    * republish diverges at the tail as it stood a few steps ago instead of just behind the goal.
    */
-  it('replaces a persisted generic scaffold with the owner plan at the tail', async () => {
+  it('replaces an earlier plan with the owner plan at the tail', async () => {
     const probed = probe();
     const state = freshState();
-    state.planIsFallback = true;
     state.messages.push({ role: 'system', content: `${PLAN_MARKER} v1 (Main).\n1. [pending] old` });
     state.messages.push({ role: 'assistant', content: 'working' });
     probed.plan = {
@@ -888,7 +887,6 @@ describe('the active plan', () => {
     expect(shape(state.messages)).toEqual(['base', 'user', 'assistant', 'plan']);
     expect(state.messages.at(-1)?.content).toContain('Rewrite the importer');
     expect(state.planVersion).toBe(2);
-    expect(state.planIsFallback).toBe(false);
   });
 
   it('writes nothing when the window already holds this version', async () => {
@@ -933,17 +931,13 @@ describe('the active plan', () => {
     );
   });
 
-  /** With nothing published and no fallback asked for, the window stays as it was. */
-  it('does not invent a plan unless it is asked to', async () => {
+  /** A turn that declared no plan has none: the harness does not write one for it. */
+  it('does not invent a plan', async () => {
     const probed = probe();
     const state = freshState();
 
     expect(await refreshActivePlan(probed.deps, task, key, state)).toBe(false);
     expect(shape(state.messages)).toEqual(['base', 'user']);
-
-    expect(await refreshActivePlan(probed.deps, task, key, state, true)).toBe(true);
-    expect(state.planIsFallback).toBe(true);
-    expect(shape(state.messages)).toEqual(['base', 'user', 'plan']);
   });
 });
 

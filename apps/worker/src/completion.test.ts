@@ -33,7 +33,6 @@ describe('what a new turn keeps and what it drops', () => {
     truncatedReplies: 4,
     notices: 3,
     turnNoveltyBytes: 900,
-    mutated: true,
     mutatedBeyondProse: true,
     answered: true,
     acceptanceFailures: 1,
@@ -60,8 +59,6 @@ describe('what a new turn keeps and what it drops', () => {
     expect(next.truncatedReplies).toBe(0);
     // A monitor that spoke three times last turn was told it had used its whole allowance.
     expect(next.notices).toBe(0);
-    // A fresh turn believing it had already changed something reorders its own evidence rules.
-    expect(next.mutated).toBe(false);
     // Carried forward, this is the one that would hold a pure-answer turn to an acceptance record
     // on the strength of code the turn before it touched.
     expect(next.mutatedBeyondProse).toBe(false);

@@ -19,10 +19,10 @@ const issue = 'Python assertion on line 1 always passes';
 describe('unfalsifiable acceptance commands', () => {
   it.each([false, true])(
     'rejects the declaration before running checks, including after mutation: %s',
-    async (mutated) => {
+    async (mutatedBeyondProse) => {
       const run = vi.fn();
       const call = vi.fn(async () => ({ inspected: 1, issues: [issue] }));
-      const state = { messages: [], step: 3, mutated } as unknown as AgentState;
+      const state = { messages: [], step: 3, mutatedBeyondProse } as unknown as AgentState;
       const deps = {
         runner: { call },
         store: {},

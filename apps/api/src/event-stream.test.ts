@@ -234,30 +234,7 @@ const start = async (
           );
         frames.push(
           `data: ${JSON.stringify({
-            choices: [
-              {
-                finish_reason: 'tool_calls',
-                delta: {
-                  tool_calls: [
-                    {
-                      index: 0,
-                      id: 'call-finish',
-                      function: {
-                        name: 'finish',
-                        arguments: JSON.stringify({
-                          summary: 'Answered.',
-                          verification: {
-                            status: 'not_applicable',
-                            evidence: [],
-                            remainingRisks: []
-                          }
-                        })
-                      }
-                    }
-                  ]
-                }
-              }
-            ],
+            choices: [{ finish_reason: 'stop', delta: {} }],
             usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120, cost: 0.0001 }
           })}\n\n`
         );

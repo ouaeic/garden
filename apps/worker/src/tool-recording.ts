@@ -301,10 +301,11 @@ export const runToolCallsTogether = async (
     // both are called anyway, so that the set gaining a member can never quietly cost the owner
     // their undo point or leave a change out of the plan the interface draws.
     await deps.ensureTurnUndoPoint(task, key, state, call.name);
-    if (isMutatingToolCall(call.name, call.arguments)) {
-      state.mutated = true;
-      if (requiresAcceptanceChecks(call.name, call.arguments)) state.mutatedBeyondProse = true;
-    }
+    if (
+      isMutatingToolCall(call.name, call.arguments) &&
+      requiresAcceptanceChecks(call.name, call.arguments)
+    )
+      state.mutatedBeyondProse = true;
     state.toolsStarted = (state.toolsStarted ?? 0) + 1;
     await event(deps.store, task, key, 'tool_started', `Running ${call.name}`, {
       toolCallId: call.id,
@@ -610,8 +611,8 @@ export const recordToolResult = async (
     ...(recorded?.id ? { eventId: recorded.id } : {}),
     ...(skipped ? { skipped: true } : {}),
     mutating: isMutatingToolCall(call.name, call.arguments),
-    // Recorded, not subtracted from `mutating`: the approval card, the checkpoint set and
-    // `state.mutated` all still treat a brief write as the change it is. Only the completion
+    // Recorded, not subtracted from `mutating`: the approval card and the checkpoint set still
+    // treat a brief write as the change it is. Only the completion
     // contract reads this, because only there does "the last change" mean the work being proved.
     ...(writesOnlyDurableInstructions(call.name, call.arguments) ? { briefOnly: true } : {}),
     ...(writesOnlyProse(call.name, call.arguments) ? { proseOnly: true } : {}),

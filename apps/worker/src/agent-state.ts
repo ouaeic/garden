@@ -71,12 +71,6 @@ export interface AgentState {
   toolOutputFloor?: number;
   openedSkills?: string[];
   /**
-   * Whether this turn has already changed something. It gates the fallback plan - a request that
-   * only needs an answer should not arrive with three boilerplate steps already running - and it is
-   * what `completionVerification` checks evidence ordering against.
-   */
-  mutated?: boolean;
-  /**
    * Whether any of those changes was something other than prose. A report, a README or a CSV is a
    * change, but there is nothing executable that could prove it: the only check available is reading
    * back the file just written, which passes whatever the file says. Demanding one anyway is how a
@@ -325,8 +319,6 @@ export interface AgentState {
    */
   selfContinuations?: number;
   continuationMark?: { atStep: number; writes: number; evidence?: number };
-  /** True while the only plan on record is the boilerplate one the harness wrote for itself. */
-  planIsFallback?: boolean;
   /**
    * Where untrusted content entered this turn, and when.
    *

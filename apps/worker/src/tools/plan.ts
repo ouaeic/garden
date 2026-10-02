@@ -14,7 +14,7 @@ import { type ToolContext } from '../tool-dispatch.js';
  * correction rather than a result.
  */
 export async function executePlanTool(context: ToolContext, call: ModelToolCall): Promise<unknown> {
-  const { task, key, state } = context;
+  const { task, key } = context;
   switch (call.name) {
     case 'set_plan': {
       const current = await context.store.getLatestTaskPlan(task.id);
@@ -44,7 +44,6 @@ export async function executePlanTool(context: ToolContext, call: ModelToolCall)
           'invalid_plan',
           'A plan needs at least one step with a title, as ["Read the brief", …] or [{"title":"Read the brief","status":"in_progress"}, …]. Retire a step by setting it to skipped.'
         );
-      state.planIsFallback = false;
       try {
         const created = await context.store.createTaskPlan({
           taskId: task.id,

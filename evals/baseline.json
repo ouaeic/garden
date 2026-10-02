@@ -1,9 +1,9 @@
 {
   "$stamp": {
-    "acceptedAt": "2026-10-02T20:16:14.737Z",
+    "acceptedAt": "2026-10-02T21:22:38.237Z",
     "version": "0.2.0",
-    "commit": "4a874c1",
-    "harness": "6ead6e32bd48"
+    "commit": "d13b532",
+    "harness": "65c0ec8203d2"
   },
   "ambiguous-a-real-blocker-parks-the-conversation": {
     "modelCalls": 2,
@@ -98,16 +98,16 @@
   },
   "files-code-declares-acceptance-first": {
     "modelCalls": 5,
-    "promptTokens": 18962,
+    "promptTokens": 18678,
     "catalogueTokens": 12555,
     "cachePrefix": 88,
     "displayedLines": 3
   },
   "files-helper-script-then-run": {
     "modelCalls": 3,
-    "promptTokens": 10942,
+    "promptTokens": 10656,
     "catalogueTokens": 7533,
-    "cachePrefix": 87,
+    "cachePrefix": 88,
     "displayedLines": 0
   },
   "files-parallel-reads-cost-one-call": {
@@ -126,9 +126,9 @@
   },
   "files-prose-write-needs-no-acceptance": {
     "modelCalls": 2,
-    "promptTokens": 7082,
+    "promptTokens": 6940,
     "catalogueTokens": 5022,
-    "cachePrefix": 85,
+    "cachePrefix": 89,
     "displayedLines": 0
   },
   "files-relocated-instructions-cannot-authorise-memory": {
@@ -196,16 +196,16 @@
   },
   "media-logo-set-declares-its-own-done": {
     "modelCalls": 7,
-    "promptTokens": 31564,
+    "promptTokens": 30850,
     "catalogueTokens": 20182,
     "cachePrefix": 84,
     "displayedLines": 0
   },
   "media-one-generation-is-not-re-rolled": {
     "modelCalls": 3,
-    "promptTokens": 11446,
+    "promptTokens": 11303,
     "catalogueTokens": 8054,
-    "cachePrefix": 72,
+    "cachePrefix": 73,
     "displayedLines": 2
   },
   "refusal-approval-defers-the-rest-of-the-batch": {
@@ -224,9 +224,9 @@
   },
   "refusal-git-push-stops-for-the-owner": {
     "modelCalls": 2,
-    "promptTokens": 7055,
+    "promptTokens": 6912,
     "catalogueTokens": 5022,
-    "cachePrefix": 85,
+    "cachePrefix": 89,
     "displayedLines": 0
   },
   "refusal-public-publish-stops-for-the-owner": {
@@ -420,9 +420,9 @@
   },
   "small-the-same-call-failing-the-same-way-is-stopped": {
     "modelCalls": 6,
-    "promptTokens": 23720,
+    "promptTokens": 23009,
     "catalogueTokens": 15066,
-    "cachePrefix": 87,
+    "cachePrefix": 88,
     "displayedLines": 0
   },
   "small-third-call-keeps-read-only-work-plan-free": {
@@ -434,7 +434,7 @@
   },
   "verify-failed-check-refuses-the-finish": {
     "modelCalls": 6,
-    "promptTokens": 22703,
+    "promptTokens": 22132,
     "catalogueTokens": 15066,
     "cachePrefix": 89,
     "displayedLines": 0
@@ -455,9 +455,9 @@
   },
   "verify-shell-observes-its-own-change": {
     "modelCalls": 3,
-    "promptTokens": 10764,
+    "promptTokens": 10621,
     "catalogueTokens": 7533,
-    "cachePrefix": 87,
+    "cachePrefix": 89,
     "displayedLines": 0
   },
   "verify-step-ceiling-hands-off": {

@@ -4183,10 +4183,7 @@ describe('what would prove the job is done', () => {
     ],
     step: 0,
     credits: 0,
-    // A turn that has already changed something, with one earlier result available to cite: the
-    // state a real finish arrives in. It is fixing an importer, so the change is code - which is
-    // what puts it in front of the acceptance gate at all.
-    mutated: true,
+    // A turn that has already changed code, which is what puts it in front of the acceptance gate.
     mutatedBeyondProse: true,
     turnToolResults: { 'call-0': { name: 'file_read', success: true } },
     ...over
@@ -6750,7 +6747,6 @@ describe('a turn that finishes the job rather than the budget', () => {
     ],
     step: 0,
     credits: 0,
-    mutated: true,
     mutatedBeyondProse: true,
     turnToolResults: { 'call-0': { name: 'file_write', success: true, mutating: true } },
     acceptance: failingCheck,
@@ -6963,7 +6959,6 @@ describe('a turn that finishes the job rather than the budget', () => {
       // Nothing this turn changed: the acceptance record is inherited and the only successful call
       // was a read. Running the checks could only tell it what it is not allowed to act on anyway.
       workingState({
-        mutated: false,
         mutatedBeyondProse: false,
         turnToolResults: { 'call-0': { name: 'file_read', success: true } }
       })

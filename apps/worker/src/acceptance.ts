@@ -339,13 +339,8 @@ const expandedBeforeItRan = (executable: string, args: readonly string[]): boole
 /**
  * A check that no state of this computer can fail, refused at the moment it is declared.
  *
- * The red baseline in `declareAcceptance` is the only thing in garden that ever falsifies a check -
- * it runs the record against the job before the work and refuses one where nothing fails - and it
- * is asked only `if (!state.mutated)`. The hold that demands a record at all fires on
- * `state.mutatedBeyondProse`. So on the ordinary coding turn, where the model writes the code and is
- * then held for a definition of done, the record is declared after the change and no baseline runs
- * against it: `echo` was refused when declared first and accepted in silence when declared second.
- * This asks the same question the baseline asks without running anything, so it reaches both paths.
+ * Nothing runs a check before the work, so nothing else can see that a check would pass whatever
+ * the workspace holds. This asks that question without running anything.
  *
  * It is the declaration-side half of the SWE-bench 5.0.0 grading fix, which the standing research
  * records as "a patch can no longer pass by printing its own PASSED lines"

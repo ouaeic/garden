@@ -1,5 +1,5 @@
 import { runtimeValue } from '@garden/core';
-import { runtimeDate, runtimeUUID } from '@garden/core';
+import { runtimeDate } from '@garden/core';
 import { conversationContext } from './conversation-context.js';
 /**
  * The window itself: what goes in front of the trajectory, what is refreshed at the tail on every
@@ -23,7 +23,6 @@ import {
   GardenError,
   decryptBytes,
   decryptJson,
-  encryptJson,
   memoryTemporalStatus,
   OWNER_MEMORY_MAX_CHARS,
   OWNER_MEMORY_MAX_ROWS,
@@ -776,48 +775,9 @@ export const refreshActivePlan = async (
   deps: WindowDeps,
   task: TaskRecord,
   key: Uint8Array,
-  state: AgentState,
-  createFallback = false
+  state: AgentState
 ): Promise<boolean> => {
-  let plan = await deps.store.getLatestTaskPlan(task.id);
-  if (!plan && createFallback) {
-    const steps: TaskPlanStep[] = [
-      {
-        id: runtimeUUID(),
-        title: 'Inspect the request, inputs, and current workspace state',
-        status: 'in_progress'
-      },
-      {
-        id: runtimeUUID(),
-        title: 'Complete the requested work and preserve useful intermediate results',
-        status: 'pending'
-      },
-      {
-        id: runtimeUUID(),
-        title: 'Verify the outcome and publish every finished deliverable',
-        status: 'pending'
-      }
-    ];
-    try {
-      plan = await deps.store.createTaskPlan({
-        taskId: task.id,
-        expectedVersion: 0,
-        branchName: 'Main',
-        stepsCiphertext: encryptJson({ steps, branchName: 'Main' }, key, `task-plan:${task.id}`),
-        createdBy: 'agent'
-      });
-      state.planIsFallback = true;
-      await event(deps.store, task, key, 'plan', 'Initial execution plan', {
-        planId: plan.id,
-        version: plan.version,
-        branchName: 'Main',
-        steps
-      });
-    } catch (cause) {
-      if (!(cause instanceof Error) || cause.message !== 'plan_version_conflict') throw cause;
-      plan = await deps.store.getLatestTaskPlan(task.id);
-    }
-  }
+  const plan = await deps.store.getLatestTaskPlan(task.id);
   if (!plan || plan.version === state.planVersion) return false;
   if (plan.stepsCiphertext.aad !== `task-plan:${task.id}`)
     throw new GardenError('encrypted_plan_context', 'Task plan encryption context is invalid');
@@ -825,8 +785,6 @@ export const refreshActivePlan = async (
     plan.stepsCiphertext,
     key
   );
-  // An owner revision is an explicit commitment, even when it replaces generic scaffolding.
-  if (plan.createdBy === 'user') state.planIsFallback = false;
   const planMessage: ModelMessage = {
     role: 'system',
     content: `ACTIVE USER-VISIBLE PLAN v${plan.version} (${content.branchName ?? plan.branchName}). Follow this newest version and do not execute stale work. The user watches these statuses live, so call set_plan again whenever one changes: send every step with its status (pending, in_progress, completed or skipped) and keep the step you are working on marked in_progress.\n${content.steps

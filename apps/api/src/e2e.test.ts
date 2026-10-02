@@ -2,7 +2,7 @@
  * End-to-end tests for the whole task loop.
  *
  * The unit suites cover pieces in isolation; nothing until now exercised the path a real user takes
- * - sign in, create a workspace, send a prompt, watch the agent call tools and finish - against a
+ * - sign in, create a workspace, send a prompt, watch the agent call tools and answer - against a
  * real database, the real API, the real embedded worker and the real agent loop. Only the provider
  * and the workspace runner are scripted, because those are the two things a test cannot own.
  *
@@ -34,8 +34,8 @@ interface TaskEventRow {
   readonly summary?: string;
   readonly sequence: number;
   readonly payload?: {
+    answer?: string;
     verification?: { status?: string; remainingRisks?: unknown[] };
-    attempts?: number;
   };
 }
 
@@ -65,19 +65,6 @@ const toolCall = (id: string, name: string, args: Record<string, unknown>) => ({
   name,
   arguments: args
 });
-
-/** A finish whose evidence cites a successful tool call from the same turn, as the loop requires. */
-const groundedFinish = (summary: string, cite: string | null) =>
-  toolCall('call-finish', 'finish', {
-    summary,
-    verification: cite
-      ? {
-          status: 'verified',
-          evidence: [{ claim: summary, source: 'tool_result', toolCallId: cite }],
-          remainingRisks: []
-        }
-      : { status: 'not_applicable', evidence: [], remainingRisks: [] }
-  });
 
 const start = async (
   script: ScriptedTurn[],
@@ -220,8 +207,7 @@ const start = async (
         if (turn.delayMs) await new Promise((resolve) => setTimeout(resolve, turn.delayMs));
         if (turn.status) return json({ error: { message: 'upstream fault' } }, turn.status);
         // The worker always streams, so a scripted turn has to arrive as server-sent events. A
-        // plain JSON body parses as a reply with no tool calls, which the loop reads as "the model
-        // never finished" - the failure mode this suite exists to catch, not one to reproduce.
+        // plain JSON body parses as an empty reply rather than the turn the script describes.
         const frames: string[] = [];
         const text = turn.content ?? '';
         for (let index = 0; index < text.length; index += 24) {
@@ -408,7 +394,7 @@ const start = async (
  * one, which is worse than useless.
  */
 describe('a task from prompt to completion', () => {
-  test('plans, calls a tool, and finishes with grounded evidence', async () => {
+  test('plans, calls a tool, and answers', async () => {
     const harness = await start([
       {
         toolCalls: [
@@ -418,18 +404,7 @@ describe('a task from prompt to completion', () => {
         ]
       },
       { toolCalls: [toolCall('call-2', 'shell', { executable: 'echo', args: ['hello'] })] },
-      {
-        content: 'Done.',
-        // Closing the plan in the same turn as the finish, which is what a well-behaved agent does:
-        // the harness refuses a finish that leaves steps open rather than marking them done itself,
-        // so the plan the owner watched stays true.
-        toolCalls: [
-          toolCall('call-3', 'set_plan', {
-            steps: [{ title: 'Do the work', status: 'completed' }]
-          }),
-          groundedFinish('Ran the command and read its output.', 'call-2')
-        ]
-      }
+      { content: 'Ran the command and read its output: hello.' }
     ]);
 
     const taskId = await harness.createTask('Say hello');
@@ -441,119 +416,31 @@ describe('a task from prompt to completion', () => {
     // This catalogue has no published prices, so auxiliary naming cannot buy an unbounded call.
     expect(harness.titleCompletions()).toBe(0);
     expect(harness.runnerCalls().some((path) => path.includes('/exec'))).toBe(true);
+    const completed = (await harness.events(taskId)).find((event) => event.kind === 'completed');
+    expect(completed?.payload?.answer).toBe('Ran the command and read its output: hello.');
   }, 30_000);
 
-  test('will not let a finish quietly abandon the plan the owner is watching', async () => {
-    // The harness used to mark every outstanding step completed on the way out, so a plan that was
-    // never finished reported itself finished. It now spends one turn asking for the truth instead.
-    const harness = await start([
-      {
-        toolCalls: [
-          toolCall('call-1', 'set_plan', {
-            steps: [
-              { title: 'Do the work', status: 'in_progress' },
-              { title: 'Check it', status: 'pending' }
-            ]
-          })
-        ]
-      },
-      { toolCalls: [toolCall('call-2', 'shell', { executable: 'echo', args: ['hello'] })] },
-      { content: 'Done.', toolCalls: [groundedFinish('Ran the command.', 'call-2')] }
-    ]);
-    const taskId = await harness.createTask('Do two things');
-    expect(await harness.settle(taskId)).toBe('completed');
-    const summaries = (await harness.events(taskId)).map((event) => event.summary ?? '');
-    expect(summaries).toContain('Plan steps are still open');
-  }, 30_000);
-
-  test('does not hold a finish against the plan the harness wrote for itself', async () => {
-    /*
-     * When no plan is declared the harness writes one - three boilerplate lines beginning "Inspect
-     * the request, inputs, and current workspace state" - and it used to hold the finish against
-     * its own boilerplate. Measured on one research task: the answer was written, and six of the
-     * ten model turns came after it, this hold among them. The hold above still applies to a plan
-     * somebody chose to write, which is the one the owner is actually watching.
-     */
-    // `mkdir` rather than `echo`: the fallback plan is only written once the turn has changed
-    // something, and a command that changes nothing never reaches the case this covers.
+  test('writes no plan for a turn that did not declare one', async () => {
+    // `mkdir` rather than `echo`: a turn that changed something is the one a boilerplate plan
+    // would have been written for.
     const harness = await start([
       { toolCalls: [toolCall('call-1', 'shell', { executable: 'mkdir', args: ['-p', 'out'] })] },
-      { content: 'Done.', toolCalls: [groundedFinish('Made the directory.', 'call-1')] }
+      { content: 'Made the directory.' }
     ]);
     const taskId = await harness.createTask('Just do the thing');
     expect(await harness.settle(taskId)).toBe('completed');
-    const summaries = (await harness.events(taskId)).map((event) => event.summary ?? '');
-    // The harness did write itself a plan - that is the precondition this test is about.
-    expect(summaries).toContain('Initial execution plan');
-    expect(summaries).not.toContain('Plan steps are still open');
+    const events = await harness.events(taskId);
+    expect(events.some((event) => event.kind === 'completed')).toBe(true);
+    expect(events.filter((event) => event.kind === 'plan')).toEqual([]);
   }, 30_000);
 
-  test('a conversational answer with no tools completes without inventing evidence', async () => {
-    const harness = await start([
-      {
-        content: 'Fibonacci is a sequence.',
-        toolCalls: [groundedFinish('Answered from knowledge.', null)]
-      }
-    ]);
+  test('a conversational answer with no tools completes in one call', async () => {
+    const harness = await start([{ content: 'Fibonacci is a sequence.' }]);
     const taskId = await harness.createTask('Explain fibonacci');
     expect(await harness.settle(taskId)).toBe('completed');
     expect(harness.completions()).toBe(1);
-  }, 30_000);
-});
-
-describe('a completion that cannot be grounded', () => {
-  test('finishes with the doubt recorded rather than throwing the work away', async () => {
-    // Verification has its own retry bound: exhausting it must preserve the work and its
-    // uncertainty without spending the entire task budget on the same malformed evidence.
-    const harness = await start(
-      [
-        { toolCalls: [toolCall('call-1', 'shell', { executable: 'echo', args: ['work'] })] },
-        {
-          content: 'Done.',
-          toolCalls: [
-            toolCall('call-finish', 'finish', {
-              summary: 'All done.',
-              verification: { status: 'verified', evidence: [{ claim: 'I did it' }] }
-            })
-          ]
-        }
-      ],
-      { maxSteps: 40 }
-    );
-
-    const taskId = await harness.createTask('Do some work');
-    expect(await harness.settle(taskId)).toBe('completed');
-    // Subsequent plan and acceptance holds must also settle within a bounded number of calls.
-    expect(harness.completions()).toBeLessThanOrEqual(10);
-
-    const events = await harness.events(taskId);
-    const warnings = events.filter((event) => event.kind === 'warning');
-    const completed = events.filter((event) => event.kind === 'completed');
-    expect(warnings).toHaveLength(1);
-    expect(completed).toHaveLength(1);
-    expect(warnings[0]!.payload?.attempts).toBeGreaterThan(0);
-    expect(warnings[0]!.sequence).toBeLessThan(completed[0]!.sequence);
-    expect(completed[0]!.payload?.verification?.status).toBe('unverified');
-    expect((completed[0]!.payload?.verification?.remainingRisks ?? []).length).toBeGreaterThan(0);
-  }, 30_000);
-});
-
-describe('a task the model never completes', () => {
-  test('keeps the answer when the model never calls finish, and says it did not', async () => {
-    // The model answers, forever, and never calls finish. Nagging used to consume every remaining
-    // step - one billed call each - so the bound stays. What changed is the ending: it used to be
-    // FAILED, and that threw away work that was often correct. Asked what the top story on a news
-    // site was, the agent searched, opened the page and wrote the right headline with its address
-    // five times over - a reply cut off at the output limit is continued, and each continuation is
-    // another answer without a finish - and all five were binned.
-    const harness = await start([{ content: 'Here is my answer, but I will never call finish.' }], {
-      maxSteps: 40
-    });
-    const taskId = await harness.createTask('Answer something');
-    expect(await harness.settle(taskId)).toBe('completed');
-    expect(harness.completions()).toBeLessThanOrEqual(8);
-    const summaries = (await harness.events(taskId)).map((event) => event.summary ?? '');
-    expect(summaries.some((line) => line.includes('without calling finish'))).toBe(true);
+    const completed = (await harness.events(taskId)).find((event) => event.kind === 'completed');
+    expect(completed?.payload?.verification?.status).toBe('not_applicable');
   }, 30_000);
 });
 
@@ -567,7 +454,7 @@ describe('money', () => {
         { toolCalls: [toolCall('call-1', 'shell', { executable: 'echo', args: ['work'] })] },
         { toolCalls: [toolCall('call-2', 'shell', { executable: 'echo', args: ['more'] })] },
         { toolCalls: [toolCall('call-3', 'shell', { executable: 'echo', args: ['still more'] })] },
-        { content: 'Done.', toolCalls: [groundedFinish('Ran the commands.', 'call-1')] }
+        { content: 'Ran the commands.' }
       ],
       { maxSteps: 40, taskSpendCapUsd: 0.0003 }
     );
@@ -586,7 +473,7 @@ describe('provider faults', () => {
     const harness = await start([
       { toolCalls: [toolCall('call-1', 'shell', { executable: 'echo', args: ['work'] })] },
       { status: 500 },
-      { content: 'Done.', toolCalls: [groundedFinish('Ran the command.', 'call-1')] }
+      { content: 'Ran the command.' }
     ]);
     const taskId = await harness.createTask('Do some work');
     expect(await harness.settle(taskId)).toBe('completed');
@@ -605,7 +492,7 @@ describe('user control', () => {
           toolCall('call-3', 'shell', { executable: 'echo', args: ['third'] })
         ]
       },
-      { content: 'Done.', toolCalls: [groundedFinish('Ran the commands.', 'call-1')] }
+      { content: 'Ran the commands.' }
     ]);
 
     const taskId = await harness.createTask('Run three things');
@@ -634,7 +521,7 @@ describe('stopping and picking the same conversation back up', () => {
         delayMs: 3_000,
         toolCalls: [toolCall('call-2', 'shell', { executable: 'echo', args: ['second'] })]
       },
-      { content: 'Done.', toolCalls: [groundedFinish('Ran the command.', 'call-1')] }
+      { content: 'Ran the command.' }
     ]);
 
     const taskId = await harness.createTask('Start something long');
