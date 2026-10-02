@@ -9,8 +9,6 @@
  * decision is about mail, not about files: a filename chosen by whoever sent the message is
  * untrusted input, and the destination it resolves to is the only thing standing between that name
  * and the rest of the workspace.
- *
- * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
 import { GardenError, isMailConnectorKind, sha256, type AnyConnectorKind } from '@garden/core';
 import { labelledConnectorResult } from './provenance.js';

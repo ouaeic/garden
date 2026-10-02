@@ -9,8 +9,6 @@
  * They are together rather than beside their call sites because they are read against each other:
  * `IDLE_STEPS_BEFORE_STOP` is twice `MAX_IDLE_STEPS` and `REPEATED_FAILURES_BEFORE_STOP` is twice
  * `MAX_REPEATED_FAILURES`, and that relation is only legible when both halves are on screen.
- *
- * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
 import { GardenError, sha256, spendHalt, spendWarning } from '@garden/core';
 

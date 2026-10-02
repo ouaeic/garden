@@ -11,8 +11,6 @@ import { runtimeUUID } from '@garden/core';
  * `canonicalJson` is here rather than beside either of its two callers because they are in
  * different modules and both depend on it agreeing with itself: the approval hash and the failing
  * call key both key on this exact serialisation, and two copies would be two keys.
- *
- * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
 
 import type { TaskPlanStep } from '@garden/contracts';

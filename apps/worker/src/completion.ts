@@ -10,8 +10,6 @@ import { appendMemoryOwnerInput } from './memory-owner-input.js';
  * `startTurnState` is here because it is the other half of the same question: what a new turn is
  * allowed to inherit from the last one is exactly what the completion check will later be entitled
  * to count as evidence. `apps/api` imports it through `@garden/worker` to seed a resumed turn.
- *
- * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
 import { ownerMessageContent, type OwnerMessage } from '@garden/core';
 import type { ModelToolCall } from '@garden/model-gateway';

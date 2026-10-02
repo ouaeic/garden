@@ -1273,7 +1273,7 @@ export class AgentWorker {
       .catch(() => undefined);
   }
 
-  /** @see recordToolFailure in `tool-recording.ts`, where this moved in Wave 7.2. */
+  /** @see recordToolFailure in `tool-recording.ts`. */
   async #recordToolFailure(
     task: TaskRecord,
     key: Uint8Array,
@@ -1284,7 +1284,7 @@ export class AgentWorker {
     await recordToolFailure(this.#toolRecording, task, key, state, call, error);
   }
 
-  /** @see runToolCallsTogether in `tool-recording.ts`, where this moved in Wave 7.2. */
+  /** @see runToolCallsTogether in `tool-recording.ts`. */
   async #runToolCallsTogether(
     task: TaskRecord,
     key: Uint8Array,
@@ -1309,12 +1309,12 @@ export class AgentWorker {
       .map((step) => step.title);
   }
 
-  /** @see stepCeiling in `handoff.ts`, where this moved in Wave 7.2. */
+  /** @see stepCeiling in `handoff.ts`. */
   #stepCeiling(state: AgentState): number {
     return stepCeiling(this.#handoff, state);
   }
 
-  /** @see renewStepBudget in `handoff.ts`, where this moved in Wave 7.2. */
+  /** @see renewStepBudget in `handoff.ts`. */
   async #renewStepBudget(task: TaskRecord, key: Uint8Array, state: AgentState): Promise<boolean> {
     return renewStepBudget(this.#handoff, task, key, state);
   }
@@ -1629,7 +1629,7 @@ export class AgentWorker {
 
   /**
    * One evaluation per call per state of the world. @see approvalForCallOnce in
-   * `approval-floor.ts`, where the floor and its memo moved in Wave 7.2.
+   * `approval-floor.ts`.
    *
    * Every site in the loop asks through here rather than through `approvalForCall` directly, which
    * is what #80's repair amounts to: the first call of a candidate parallel run used to be put to
@@ -1647,7 +1647,7 @@ export class AgentWorker {
     return approvalForCallOnce(this.#approvalFloor, memo, task, call, state);
   }
 
-  /** @see compactTurnContext in `compaction.ts`, where this moved in Wave 7.2. */
+  /** @see compactTurnContext in `compaction.ts`. */
   async #compactContext(
     task: TaskRecord,
     key: Uint8Array,
@@ -1684,7 +1684,7 @@ export class AgentWorker {
     return runAcceptanceChecks(this.#acceptanceRunner, task, key, record, options, state);
   }
 
-  /** @see raiseTaint in `tool-recording.ts`, where this moved in Wave 7.2. */
+  /** @see raiseTaint in `tool-recording.ts`. */
   async #raiseTaint(
     task: TaskRecord,
     key: Uint8Array,
@@ -1715,7 +1715,7 @@ export class AgentWorker {
     await routeImageObservation(this.#vision, task, key, state, call, image, leadModel, catalog);
   }
 
-  /** @see captureMemory in `memory-capture.ts`, where this moved in Wave 7.2. */
+  /** @see captureMemory in `memory-capture.ts`. */
   async #captureMemory(
     task: TaskRecord,
     key: Uint8Array,
@@ -2045,13 +2045,13 @@ export class AgentWorker {
      */
     const budget: TurnStepBudget = { maxOutputTokens, turn };
 
-    /** @see refreshActivePlan in `window.ts`, where this moved in Wave 7.2. */
+    /** @see refreshActivePlan in `window.ts`. */
     const refreshActivePlan = async (): Promise<boolean> =>
       refreshActivePlan_(this.#window, task, key, state);
 
     await refreshActivePlan();
 
-    /** @see drainCorrection in `turn-control.ts`, where this moved in Wave 7.2. */
+    /** @see drainCorrection in `turn-control.ts`. */
     const drainCorrection = async (): Promise<boolean> =>
       drainCorrection_(this.#turnControl, task, key, state);
 

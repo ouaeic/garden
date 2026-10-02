@@ -10,8 +10,6 @@ import { runtimeNow } from '@garden/core';
  * The assistant-text normalisation is here for the same reason as the flushers: it is the last
  * thing that touches text on its way out of the provider, and the control tokens it strips are an
  * artefact of the transport rather than anything the model meant to say.
- *
- * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
 
 /**

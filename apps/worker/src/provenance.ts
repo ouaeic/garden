@@ -8,8 +8,6 @@
  *
  * The bot-wall helpers sit here because a wall is the same question asked of a page rather than of
  * a result: this fetch did not reach the site, it reached something standing in front of it.
- *
- * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
 import type { ServerToolUse, WebCitation } from '@garden/contracts';
 import {

@@ -5,8 +5,6 @@ import { runtimeNow, runtimeValue } from '@garden/core';
  * An approval card is raised in one turn and answered in another, possibly after a restart, so the
  * arguments the owner saw have to be pinned to the call that eventually runs. The hash is that pin,
  * and it is compared with a timing-safe equality because it is keyed on a secret.
- *
- * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { canonicalJson, textValue } from './values.js';
