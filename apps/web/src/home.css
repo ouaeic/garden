@@ -37,10 +37,13 @@
 /* The computer: what it is doing and how full it is, in the corner beside the prompt. */
 .home-machine {
   grid-area: machine;
+  /* The prompt sets the row height; extra readouts scroll inside the computer card. */
+  contain: size;
   display: grid;
-  align-content: center;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 8px;
   min-width: 0;
+  min-height: 0;
   padding: 12px 16px;
   border: 1px solid var(--line);
   background: var(--lcd-texture), var(--bg);
@@ -49,7 +52,7 @@
   text-align: left;
 }
 .home-machine:hover,
-.home-machine:focus-visible {
+.home-machine:focus-within {
   border-color: var(--text);
 }
 .home-machine-title {
@@ -57,10 +60,21 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   font-weight: 400;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+.home-machine > .scroll-region {
+  max-block-size: none;
+  padding: 0;
+  border: 0;
 }
 /* A single cell that blinks like a cursor while work runs, and rests solid when it does not. */
 .home-pulse {

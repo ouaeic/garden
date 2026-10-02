@@ -172,84 +172,86 @@ export default function DeskHome({
         {notice}
         {composer}
       </section>
-      <button type="button" className="home-machine" onClick={onComputer} data-perch>
-        <strong className="home-machine-title">
+      <section className="home-machine" aria-label="Your computer" data-perch>
+        <button type="button" className="home-machine-title" onClick={onComputer}>
           <i
             className={growing.length ? 'home-pulse is-working' : 'home-pulse'}
             aria-hidden="true"
           />
           {workspace?.name ?? 'Your computer'} ·{' '}
           {growing.length ? `working on ${growing.length}` : (workspace?.status ?? 'idle')}
-        </strong>
-        <span className="home-machine-readout">
-          {computer ? (
-            <>
-              <Meter
-                label="CPU"
-                value={computer.cpuPercent}
-                total={100}
-                text={`${computer.cpuPercent}%`}
-              />
-              <Meter
-                label="RAM"
-                value={computer.memoryUsedBytes}
-                total={computer.memoryTotalBytes}
-                text={bytes(computer.memoryUsedBytes)}
-              />
-            </>
-          ) : (
-            <small>Load unavailable</small>
-          )}
-          {diskUsed !== null && workspace?.hostStorageTotalBytes && (
-            <Meter
-              label="Disk"
-              value={diskUsed}
-              total={workspace.hostStorageTotalBytes}
-              text={`${bytes(workspace.hostStorageAvailableBytes!)} free`}
-            />
-          )}
-          {providerWindows.map((window, index) => {
-            const left = dollarsLeft(window);
-            const period = window.label.startsWith('Session')
-              ? 'Session'
-              : window.label.startsWith('Weekly')
-                ? 'Week'
-                : window.label === 'Credit balance'
-                  ? 'Balance'
-                  : window.label === 'Key limit'
-                    ? 'Key'
-                    : window.label;
-            const label = `${window.connection ?? bootstrap.usage.plan!.provider} · ${period}`;
-            const text =
-              window.unit === 'usd'
-                ? left !== null
-                  ? `${money(left)} left`
-                  : window.used !== null
-                    ? `${money(window.used)} used`
-                    : 'Unavailable'
-                : window.used !== null
-                  ? `${Math.round(window.used * 100)}% used`
-                  : 'Unavailable';
-            const value = window.unit === 'usd' ? (left ?? window.used) : window.used;
-            return value === null ? (
-              <span key={index} className="meter meter-provider" title={label}>
-                <span>{label}</span>
-                <small>{text}</small>
-              </span>
+        </button>
+        <ScrollRegion label="Computer readouts">
+          <span className="home-machine-readout">
+            {computer ? (
+              <>
+                <Meter
+                  label="CPU"
+                  value={computer.cpuPercent}
+                  total={100}
+                  text={`${computer.cpuPercent}%`}
+                />
+                <Meter
+                  label="RAM"
+                  value={computer.memoryUsedBytes}
+                  total={computer.memoryTotalBytes}
+                  text={bytes(computer.memoryUsedBytes)}
+                />
+              </>
             ) : (
+              <small>Load unavailable</small>
+            )}
+            {diskUsed !== null && workspace?.hostStorageTotalBytes && (
               <Meter
-                key={index}
-                className="meter-provider"
-                label={label}
-                value={value}
-                total={window.unit === 'usd' ? window.limit : 1}
-                text={text}
-                title={`${label}: ${text}${window.resetsAt ? `, resets ${new Date(window.resetsAt).toLocaleString()}` : ''}`}
+                label="Disk"
+                value={diskUsed}
+                total={workspace.hostStorageTotalBytes}
+                text={`${bytes(workspace.hostStorageAvailableBytes!)} free`}
               />
-            );
-          })}
-        </span>
-      </button>
+            )}
+            {providerWindows.map((window, index) => {
+              const left = dollarsLeft(window);
+              const period = window.label.startsWith('Session')
+                ? 'Session'
+                : window.label.startsWith('Weekly')
+                  ? 'Week'
+                  : window.label === 'Credit balance'
+                    ? 'Balance'
+                    : window.label === 'Key limit'
+                      ? 'Key'
+                      : window.label;
+              const label = `${window.connection ?? bootstrap.usage.plan!.provider} · ${period}`;
+              const text =
+                window.unit === 'usd'
+                  ? left !== null
+                    ? `${money(left)} left`
+                    : window.used !== null
+                      ? `${money(window.used)} used`
+                      : 'Unavailable'
+                  : window.used !== null
+                    ? `${Math.round(window.used * 100)}% used`
+                    : 'Unavailable';
+              const value = window.unit === 'usd' ? (left ?? window.used) : window.used;
+              return value === null ? (
+                <span key={index} className="meter meter-provider" title={label}>
+                  <span>{label}</span>
+                  <small>{text}</small>
+                </span>
+              ) : (
+                <Meter
+                  key={index}
+                  className="meter-provider"
+                  label={label}
+                  value={value}
+                  total={window.unit === 'usd' ? window.limit : 1}
+                  text={text}
+                  title={`${label}: ${text}${window.resetsAt ? `, resets ${new Date(window.resetsAt).toLocaleString()}` : ''}`}
+                />
+              );
+            })}
+          </span>
+        </ScrollRegion>
+      </section>
       <nav className="home-switcher" aria-label="Home lists">
         {(
           [
