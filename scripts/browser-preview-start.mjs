@@ -138,6 +138,36 @@ export async function checkPreviewStart({ context, origin, task, presentation, r
   const card = page.locator('.garden-output-primary').first();
   try {
     for (const width of [1440, 360]) {
+      state = 'ready';
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(`${origin}/?project=${task.projectId}`);
+      await card
+        .getByText('Ready to view. Open the app or view it here.', { exact: true })
+        .waitFor();
+      assert.equal(
+        await card.locator('iframe').count(),
+        0,
+        'Overview apps wait for the owner to open them'
+      );
+      assert(!(await card.innerText()).includes('Opening the live app'));
+      const beforeView = frameLoads;
+      const beforeStart = starts;
+      await page.screenshot({ path: resolve(report, `preview-idle-${width}.png`) });
+      await card.getByRole('button', { name: 'View here', exact: true }).click();
+      await page
+        .frameLocator('.garden-preview-frame')
+        .getByRole('textbox', { name: 'Tip percentage' })
+        .waitFor();
+      assert.equal(frameLoads, beforeView + 1, 'View here loads one embedded app');
+      assert.equal(starts, beforeStart, 'A ready preview must not start another model run');
+      await page.screenshot({ path: resolve(report, `preview-opened-${width}.png`) });
+      await card.getByRole('button', { name: 'Close embedded preview', exact: true }).click();
+      await card
+        .getByText('Embedded preview closed. Open the app or view it here when you are ready.', {
+          exact: true
+        })
+        .waitFor();
+      assert.equal(await card.locator('iframe').count(), 0);
       state = 'stopped';
       reject = false;
       await page.setViewportSize({ width, height: 900 });
