@@ -26,7 +26,7 @@ import { directoryFixture, checkProjectDirectories } from './browser-directories
 import { checkProjectConversations } from './browser-project-conversations.mjs';
 import { checkTaskRecovery } from './browser-task-recovery.mjs';
 import { checkArtifactLinks } from './browser-artifact-links.mjs';
-import { checkResultView } from './browser-result-view.mjs';
+import { checkAppComments, checkResultView } from './browser-result-view.mjs';
 
 // Local fixtures exercise browser interactions; API and runner suites own authorization and delivery.
 const requireRunner = createRequire(
@@ -1336,6 +1336,7 @@ try {
     await checkTaskRecovery({ context, origin, bootstrap, task, report, errors });
     await checkArtifactLinks({ context, origin, task, workspace, presentation, report, errors });
     await checkResultView({ context, origin, task, workspace, presentation, report, errors });
+    await checkAppComments({ context, errors });
     await checkProjectDirectories({
       context,
       origin,
@@ -1405,6 +1406,7 @@ try {
       await checkTaskRecovery({ context, origin, bootstrap, task, report, errors });
       await checkArtifactLinks({ context, origin, task, workspace, presentation, report, errors });
       await checkResultView({ context, origin, task, workspace, presentation, report, errors });
+      await checkAppComments({ context, errors });
       await checkProjectDirectories({
         context,
         origin,
@@ -1843,24 +1845,23 @@ try {
       'Expanding must preserve the running preview'
     );
     await page.getByRole('button', { name: 'Exit full screen', exact: true }).click();
-    // Point at the live app itself: circle a place and say what is wanted there.
+    // Point at the live app itself. This app is served without the gateway's bridge, so the
+    // comment is a place on the frame, which is what an app the bridge never reached gets.
     const liveApp = page.locator('.garden-output-primary:has(.garden-preview-live)');
-    await liveApp.getByRole('button', { name: 'Mark', exact: true }).click();
-    const appBox = await liveApp.locator('.mark-layer').boundingBox();
-    assert(appBox, 'Marking covers the live app');
-    await page.mouse.move(appBox.x + 60, appBox.y + 60);
-    await page.mouse.down();
-    await page.mouse.move(appBox.x + 90, appBox.y + 80);
-    await page.mouse.up();
+    await liveApp.getByRole('button', { name: 'Comment', exact: true }).click();
+    const appBox = await liveApp.locator('.comment-catch').boundingBox();
+    assert(appBox, 'Commenting covers an app that has no bridge');
+    await page.mouse.click(appBox.x + 60, appBox.y + 60);
     await page.locator('.note-popover textarea').fill('Make the counter larger');
     await page.locator('.note-popover').getByRole('button', { name: 'Add', exact: true }).click();
     const appNotes = page.getByRole('list', { name: 'Your comments on the result' });
     await appNotes.getByText('Make the counter larger', { exact: true }).waitFor();
-    await liveApp.getByRole('button', { name: 'Done marking', exact: true }).click();
+    assert.equal(await liveApp.locator('.comment-pin').textContent(), '1');
+    await liveApp.getByRole('button', { name: 'Done', exact: true }).click();
     assert.equal(
       await page.frameLocator('.garden-preview-frame').getByRole('button').textContent(),
       '1',
-      'Marking an app must leave it running'
+      'Commenting on an app must leave it running'
     );
     await appNotes.getByRole('button', { name: 'Remove this comment' }).click();
     const downloadPromise = page.waitForEvent('download');

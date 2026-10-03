@@ -23,6 +23,8 @@ import { ConfirmButton } from './management';
 import { Button, Dialog, ErrorNotice } from './ui';
 import { MAX_TASK_SPEND_USD } from './usage-model.js';
 import { useComposer } from './use-composer';
+import { focusComment } from './comment-focus';
+import { anchorSummary } from './direction-context';
 import type { ComposerProps } from './composer-types';
 import './composer-context.css';
 import './composer-controls.css';
@@ -123,14 +125,22 @@ export default function Composer(props: ComposerProps) {
       {context?.kind === 'notes' && (
         <ul className="composer-notes" aria-label="Your comments on the result">
           {context.notes.map((note, index) => (
-            <li key={index}>
-              <span className="composer-note-anchor">
-                {note.quote
-                  ? `“${note.quote.slice(0, 80)}${note.quote.length > 80 ? '…' : ''}”`
-                  : note.region
-                    ? `○ ${note.on}`
-                    : note.on}
-              </span>
+            <li
+              key={index}
+              onMouseEnter={() => focusComment(index + 1)}
+              onMouseLeave={() => focusComment(0)}
+            >
+              <button
+                type="button"
+                className="composer-note-anchor"
+                title="Show where this comment is"
+                onFocus={() => focusComment(index + 1)}
+                onBlur={() => focusComment(0)}
+                onClick={() => focusComment(index + 1, true)}
+              >
+                <b>{index + 1}</b>
+                {anchorSummary(note)}
+              </button>
               <span className="composer-note-text">{note.note || 'Look at this'}</span>
               {props.onContextChange && (
                 <button

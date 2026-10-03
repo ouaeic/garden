@@ -52,26 +52,51 @@ describe('directions with retained references', () => {
 });
 
 describe('comments on a result', () => {
-  it('names what each comment points at, and sends without typed text', () => {
+  it('says where each comment points in the content’s own words, numbered as pinned', () => {
     const prompt = directionPrompt(
       '',
       {
         kind: 'notes',
         notes: [
-          { on: 'the answer', quote: 'Aster  lasts\nlongest', note: 'By how much?' },
+          {
+            on: 'the answer',
+            anchor: { kind: 'text', quote: 'Aster  lasts\nlongest' },
+            note: 'By how much?'
+          },
           {
             on: 'comparison.html',
-            region: { x: 0.304, y: 0.25, radius: 0.05, text: 'Brook' },
+            anchor: {
+              kind: 'point',
+              path: 'div.bar:nth-of-type(2)',
+              label: 'Brook 64%',
+              context: 'Three laptops compared',
+              x: 0.3,
+              y: 0.5
+            },
             note: ''
-          }
+          },
+          {
+            on: 'results.csv',
+            anchor: { kind: 'cell', row: 11, column: 'p_value', value: '0.03' },
+            note: 'Is this corrected?'
+          },
+          {
+            on: 'report.pdf',
+            anchor: { kind: 'page', page: 3, x: 0.5, y: 0.25, text: 'Figure 2' },
+            note: 'Bigger'
+          },
+          { on: 'old.html', quote: 'legacy', note: 'still reads' }
         ]
       },
       selected.workspaceId
     );
     expect(prompt).toBe(
-      'My comments on the result:\n' +
-        '1. the answer on "Aster lasts longest": By how much?\n' +
-        '2. comparison.html on the circled area around "Brook" (30% across, 25% down): (see this)'
+      'My comments, numbered as I pinned them:\n' +
+        '1. the answer on “Aster lasts longest”: By how much?\n' +
+        '2. comparison.html at “Brook 64%” under “Three laptops compared” (div.bar:nth-of-type(2)): (look at this)\n' +
+        '3. results.csv at row 12, column “p_value” (“0.03”): Is this corrected?\n' +
+        '4. report.pdf on page 3 near “Figure 2” (50% across, 25% down): Bigger\n' +
+        '5. old.html on “legacy”: still reads'
     );
   });
 });

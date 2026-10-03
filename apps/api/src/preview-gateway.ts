@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
 import cookie from '@fastify/cookie';
@@ -108,6 +109,39 @@ const websocketProtocols = (request: FastifyRequest): string[] =>
     .map((value) => value.trim())
     .filter((value) => value && value !== 'garden-capability') ?? [];
 
+/**
+ * The comment bridge, the same file the interface anchors its own comments with. Inside garden's
+ * frame an app's page carries it, so a comment pinned to the app is anchored to the app's own
+ * elements and its pin scrolls with them. Read from the web package as the share viewer is; absent,
+ * apps are served untouched and comments fall back to places on the frame.
+ */
+const commentBridgeFile = new URL('../../web/src/marks-bridge.js', import.meta.url);
+
+/** An app's page with the bridge added, or null when this response is not one to add it to. */
+export const withCommentBridge = async (
+  bridge: string,
+  request: FastifyRequest,
+  response: Response
+): Promise<string | null> => {
+  const length = Number(response.headers.get('content-length') ?? 0);
+  if (
+    !bridge ||
+    request.method !== 'GET' ||
+    response.status !== 200 ||
+    request.headers['sec-fetch-dest'] !== 'iframe' ||
+    !/^text\/html\b/i.test(response.headers.get('content-type') ?? '') ||
+    length > 4 * 1024 * 1024
+  )
+    return null;
+  const page = await response.text();
+  const script = `<script>window.__gardenFrame='app'</script><script type="module">${bridge}</script>`;
+  const head =
+    /<head\b[^>]*>/i.exec(page) ?? /<html\b[^>]*>/i.exec(page) ?? /<!doctype[^>]*>/i.exec(page);
+  return head
+    ? `${page.slice(0, head.index + head[0].length)}${script}${page.slice(head.index + head[0].length)}`
+    : `${script}${page}`;
+};
+
 const cleanSetCookie = (value: string): string | null => {
   if (gardenCookieNames.has(cookieName(value.split(';', 1)[0] ?? ''))) return null;
   return value.replace(/;\s*domain=[^;]*/gi, '').replace(/;\s*samesite=none/gi, '; SameSite=Lax');
@@ -126,6 +160,10 @@ export const buildPreviewGateway = async (
   const appOrigin = new URL(config.PUBLIC_APP_URL).origin;
   const secure = previewBase.protocol === 'https:';
   const accessCookie = secure ? productionAccessCookie : developmentAccessCookie;
+  const bridge = await readFile(commentBridgeFile, 'utf8').then(
+    (source) => (source.includes('</script') ? '' : source),
+    () => ''
+  );
   /**
    * Checked here as well as where a preview is created, because this is the only place every
    * preview request passes through: the agent writes preview rows through the store rather than
@@ -354,6 +392,16 @@ export const buildPreviewGateway = async (
     if (preview.visibility === 'private') reply.header('cache-control', 'private, no-store');
     await store.touchWorkspacePreview(preview.id);
     if (request.method === 'HEAD' || !response.body) return reply.send();
+    const framed = await withCommentBridge(bridge, request, response);
+    if (framed !== null) {
+      // The body is the decoded text now, and differs from what the app sent outside the frame.
+      reply.removeHeader('content-encoding');
+      reply.removeHeader('etag');
+      const vary = reply.getHeader('vary');
+      return reply
+        .header('vary', vary ? `${String(vary)}, sec-fetch-dest` : 'sec-fetch-dest')
+        .send(framed);
+    }
     return reply.send(Readable.fromWeb(response.body as unknown as NodeReadableStream));
   };
 

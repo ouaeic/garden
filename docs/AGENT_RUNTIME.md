@@ -143,10 +143,15 @@ the interface's colours and font as CSS variables. A later change is an edit to 
 revision costs the lines that changed, not a second page. The owner can turn the offer off in
 Settings, and the line then leaves the contract.
 
-The owner comments on a result by selecting text in the answer or by circling a place in the view.
-Each comment carries what it points at, either the quoted text or the circle's position and the
-text under it. Comments wait in the composer and go with the next message, which may consist of the
-comments alone.
+The owner comments on a result by highlighting words, or by pinning a comment to anything in it:
+the answer, a file, a table, a document's pages, a drawn view or a live app. A comment is anchored
+to the content rather than the screen, and reaches the model in words: the quoted passage; the
+element's own label, the heading it sits under and a selector for it; the row and column of a
+cell; the page and the text near the pin; or, on a picture, the place within it. No image is sent.
+The same anchoring code runs inside a view's frame and inside a live app, where the preview gateway
+adds it to pages that garden itself frames, so each pin is drawn by the content it points at and
+stays on it through scrolling, resizing and re-rendering. Comments are numbered as their pins are,
+wait in the composer, and go with the next message, which may consist of the comments alone.
 
 ## Long work
 

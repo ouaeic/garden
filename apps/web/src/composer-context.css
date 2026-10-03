@@ -50,12 +50,27 @@
   border: 1px solid var(--line-strong);
   background: var(--lcd-texture), var(--bg);
 }
-.composer-note-anchor {
+.composer-notes .composer-note-anchor {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
   color: var(--muted);
+  font: inherit;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 220px;
+}
+.composer-note-anchor b {
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 8px 8px 8px 0;
+  color: var(--bg);
+  background: var(--text);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+  text-shadow: none;
 }
 .composer-note-text {
   overflow-wrap: anywhere;

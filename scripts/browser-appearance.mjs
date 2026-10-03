@@ -152,11 +152,13 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     for (const button of await navigation.all()) {
       await button.hover();
       await checkInterfaceTexture(page);
-      assert.match(
-        await button.evaluate((element) => getComputedStyle(element).backgroundImage),
-        /repeating-linear-gradient/,
-        'Hovered navigation retains its matrix'
-      );
+      // Navigation sits on the case, not the screen: lit when hovered, with no matrix of its own.
+      const hovered = await button.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { image: style.backgroundImage, color: style.backgroundColor };
+      });
+      assert.equal(hovered.image, 'none', 'Hovered navigation is a case control');
+      assert.notEqual(hovered.color, 'rgba(0, 0, 0, 0)', 'Hovered navigation lights up');
     }
     const heading = page.locator('.home-projects .desk-card-heading h2');
     await heading.evaluate((element) => {
@@ -328,14 +330,24 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     await amber.waitFor();
     assert(await amber.isChecked(), 'The warm palette survives reloads');
     assert.equal(await page.evaluate(() => document.documentElement.dataset.palette), 'amber');
-    const chrome = await page.evaluate(() => ({
-      colour: getComputedStyle(document.documentElement).backgroundColor,
-      mobile: document.querySelector('meta[name="theme-color"]').content,
-      text: getComputedStyle(document.documentElement).color,
-      logo: getComputedStyle(document.querySelector('.garden-wordmark')).backgroundColor
-    }));
-    assert.equal(chrome.mobile, chrome.colour, 'Mobile chrome follows the warm palette');
-    assert.equal(chrome.logo, chrome.text, 'The botanical wordmark follows the warm ink');
+    const chrome = await page.evaluate(() => {
+      const paint = (value) => {
+        const probe = document.createElement('i');
+        probe.style.background = value;
+        document.body.append(probe);
+        const colour = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return colour;
+      };
+      return {
+        case: getComputedStyle(document.body).backgroundColor,
+        mobile: paint(document.querySelector('meta[name="theme-color"]').content),
+        lit: paint('var(--s0)'),
+        logo: getComputedStyle(document.querySelector('.garden-wordmark')).backgroundColor
+      };
+    });
+    assert.equal(chrome.mobile, chrome.case, 'Mobile chrome continues the case');
+    assert.equal(chrome.logo, chrome.lit, 'The wordmark is printed in the warm screen’s lit shade');
     for (const width of [1440, 390, 320]) {
       await page.setViewportSize({ width, height: width > 760 ? 1000 : 844 });
       await checkInterfaceTexture(page);

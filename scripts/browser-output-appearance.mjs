@@ -3,10 +3,17 @@ import { resolve } from 'node:path';
 
 export async function checkInterfaceTexture(page) {
   const coverage = await page.evaluate(() => {
+    // The case the screen is set into is plastic, not glass, and carries no matrix.
+    const probe = document.createElement('i');
+    probe.style.background = 'var(--bezel)';
+    document.body.append(probe);
+    const bezel = getComputedStyle(probe).backgroundColor;
+    probe.remove();
     const painted = [...document.querySelectorAll('*')].filter((element) => {
       if (element.matches('img, canvas, iframe, video, object, embed')) return false;
       const box = element.getBoundingClientRect();
       const style = getComputedStyle(element);
+      if (style.backgroundColor === bezel) return false;
       // A masked image paints its own silhouette, rather than an opaque interface surface.
       if (style.maskImage !== 'none') return false;
       return (
