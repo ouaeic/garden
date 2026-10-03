@@ -437,10 +437,11 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
             element.clientHeight <= innerHeight * 0.55
         )
     );
-    await panel
-      .getByRole('article', { name: 'python3 analysis-0.py', exact: true })
-      .getByRole('button', { name: 'Read output', exact: true })
-      .click();
+    // Ten runs read as ten lines; a run opens to its controls.
+    const listed = panel.getByRole('article', { name: 'python3 analysis-0.py', exact: true });
+    assert.equal(await listed.locator('.process-row').evaluate((row) => row.open), false);
+    await listed.locator('.process-row > summary').click();
+    await listed.getByRole('button', { name: 'Read output', exact: true }).click();
     await panel.getByRole('textbox', { name: 'Output from python3 analysis-0.py' }).waitFor();
     await panel.getByRole('button', { name: /^Current / }).click();
     assert.equal(await panel.getByRole('article').count(), 0);

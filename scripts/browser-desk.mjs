@@ -452,6 +452,10 @@ export async function checkDesk({
         .first()
         .waitFor();
       await fit();
+      if (view === 'computer') {
+        await page.locator('.computer-runs').waitFor();
+        await page.screenshot({ path: resolve(report, 'desk-computer-runs-1440.png') });
+      }
     }
     await page.setViewportSize({ width: 320, height: 568 });
     await page.goto(`${origin}/?task=${task.id}`);

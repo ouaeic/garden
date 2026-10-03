@@ -1,7 +1,7 @@
 import ScrollRegion from './ScrollRegion';
 import { WorkflowProgress } from './WorkflowProgress';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { Activity, ArrowUpRight, MessageSquare, RefreshCw, Square } from './icons';
+import { Activity, MessageSquare, RefreshCw, Square } from './icons';
 import type { ComputationSession, ManagedProcess, ProcessList } from '@garden/contracts';
 import { get, post } from './client';
 import { Button, Dialog, ErrorNotice, Spinner } from './ui';
@@ -16,6 +16,7 @@ import {
   processNeedsAttention,
   processState
 } from './process-display';
+import { runSummary } from './runs';
 import './processes.css';
 const SavedProcessHistory = lazy(() => import('./SavedProcessHistory'));
 const ProjectComputations = lazy(() => import('./ProjectComputations'));
@@ -24,17 +25,13 @@ export default function ProcessPanel({
   workspaceId,
   taskId,
   projectId,
-  compact = false,
   visible = true,
-  onOpen,
   onAsk
 }: {
   workspaceId: string;
   taskId?: string;
   projectId?: string;
-  compact?: boolean;
   visible?: boolean;
-  onOpen?: () => void;
   /** Hands a run to the conversation as something to talk about. */
   onAsk?: (process: ManagedProcess) => void;
 }) {
@@ -169,15 +166,15 @@ export default function ProcessPanel({
   };
   return (
     <section
-      className={`project-processes${compact ? ' desk-card desk-processes' : ''}`}
+      className="project-processes"
       aria-label={
-        compact ? 'Jobs card' : taskId || projectId ? 'Project processes' : 'Computer processes'
+        taskId || projectId ? 'Project processes' : 'Computer processes'
       }
     >
       <header className="process-panel-heading">
         <div>
           <h2>
-            <Activity size={19} aria-hidden="true" /> {compact ? 'Processes' : 'Jobs'}{' '}
+            <Activity size={19} aria-hidden="true" /> Runs{' '}
             {list && <span className="process-count">{active.length + kernelCount} active</span>}
           </h2>
           <p>
@@ -186,11 +183,6 @@ export default function ProcessPanel({
               : 'Jobs, services and analysis sessions on this computer.'}
           </p>
         </div>
-        {compact && onOpen && (
-          <Button onClick={onOpen} aria-label="Open all project processes">
-            All <ArrowUpRight size={14} />
-          </Button>
-        )}
         <Button aria-label="Refresh processes" busy={loading} onClick={() => void refresh()}>
           <RefreshCw size={15} aria-hidden="true" />
           <span>Refresh</span>
@@ -304,137 +296,149 @@ export default function ProcessPanel({
                 );
                 return (
                   <article className="process-card" key={id} aria-label={processName(process)}>
-                    <div className="process-card-heading">
-                      <h3>{processName(process)}</h3>
-                      <span
-                        className={`process-status ${processActive(process) ? 'is-active' : ''}`}
-                      >
-                        {state.replaceAll('_', ' ')}
-                      </span>
-                    </div>
-                    {process.workflow && <WorkflowProgress run={process.workflow} />}
-                    {prominent && metrics}
-                    <p className="process-timing">
-                      {!prominent && `${processDuration(process.ranForMs)} · `}
-                      Started{' '}
-                      <time dateTime={process.startedAt}>
-                        {new Date(process.startedAt).toLocaleString()}
-                      </time>
-                      {process.deadlineAt
-                        ? ` · Deadline ${new Date(process.deadlineAt).toLocaleString()}`
-                        : process.lifetime === 'job'
-                          ? ' · No time limit'
-                          : ''}
-                      {process.exitCode != null ? ` · Exit ${process.exitCode}` : ''}
-                    </p>
-                    {processActive(process) && (
-                      <p className="process-sample-age">
-                        {sample
-                          ? `Resources sampled ${processDuration(age)} ago${sample.cpuPercent === null ? ' · CPU available after the next sample' : ` · ${processDuration(sample.intervalMs ?? 0)} average`}`
-                          : list.resourcesAvailable === false ||
-                              process.resourceState === 'unavailable'
-                            ? 'Resource sampling is unavailable on this computer.'
-                            : 'Waiting for a resource sample.'}
+                    {/* One line per run, so many runs can be read at a glance; a few, or one that
+                        needs a look, start open. */}
+                    <details
+                      className="process-row"
+                      open={rows.length <= 2 || processNeedsAttention(process)}
+                    >
+                      <summary className="process-card-heading">
+                        <h3>{processName(process)}</h3>
+                        <small className="process-row-summary">
+                          {runSummary(process, list.observedAt, clock)}
+                        </small>
+                        <span
+                          className={`process-status ${processActive(process) ? 'is-active' : ''}`}
+                        >
+                          {state.replaceAll('_', ' ')}
+                        </span>
+                      </summary>
+                      {process.workflow && <WorkflowProgress run={process.workflow} />}
+                      {prominent && metrics}
+                      <p className="process-timing">
+                        {!prominent && `${processDuration(process.ranForMs)} · `}
+                        Started{' '}
+                        <time dateTime={process.startedAt}>
+                          {new Date(process.startedAt).toLocaleString()}
+                        </time>
+                        {process.deadlineAt
+                          ? ` · Deadline ${new Date(process.deadlineAt).toLocaleString()}`
+                          : process.lifetime === 'job'
+                            ? ' · No time limit'
+                            : ''}
+                        {process.exitCode != null ? ` · Exit ${process.exitCode}` : ''}
                       </p>
-                    )}
-                    <details className="process-details">
-                      <summary>Command & details</summary>
-                      {!prominent && metrics}
-                      <pre>
-                        {Array.isArray(process.command)
-                          ? process.command
-                              .map((part) => (/\s/.test(part) ? JSON.stringify(part) : part))
-                              .join(' ')
-                          : process.command}
-                      </pre>
-                      <p>
-                        {process.lifetime === 'job'
-                          ? 'Finite job. Completion never triggers a rerun.'
-                          : process.service
-                            ? 'Persistent service. Stopping also disables automatic restart.'
-                            : 'Task background process.'}{' '}
-                        Output: {processMemory(process.outputBytes)}.
-                      </p>
-                      {process.job && (
-                        <p>
-                          {process.job.checkpointResumable
-                            ? 'Can recover through its declared checkpoint command.'
-                            : 'An interrupted run needs attention; saved files remain available.'}{' '}
-                          Restarts: {process.job.restarts}.
+                      {processActive(process) && (
+                        <p className="process-sample-age">
+                          {sample
+                            ? `Resources sampled ${processDuration(age)} ago${sample.cpuPercent === null ? ' · CPU available after the next sample' : ` · ${processDuration(sample.intervalMs ?? 0)} average`}`
+                            : list.resourcesAvailable === false ||
+                                process.resourceState === 'unavailable'
+                              ? 'Resource sampling is unavailable on this computer.'
+                              : 'Waiting for a resource sample.'}
                         </p>
                       )}
-                      {process.terminal && (
+                      <details className="process-details">
+                        <summary>Command & details</summary>
+                        {!prominent && metrics}
+                        <pre>
+                          {Array.isArray(process.command)
+                            ? process.command
+                                .map((part) => (/\s/.test(part) ? JSON.stringify(part) : part))
+                                .join(' ')
+                            : process.command}
+                        </pre>
                         <p>
-                          Interactive terminal · {process.terminal.columns} ×{' '}
-                          {process.terminal.rows}. Standard output and errors share one stream.
+                          {process.lifetime === 'job'
+                            ? 'Finite job. Completion never triggers a rerun.'
+                            : process.service
+                              ? 'Persistent service. Stopping also disables automatic restart.'
+                              : 'Task background process.'}{' '}
+                          Output: {processMemory(process.outputBytes)}.
                         </p>
-                      )}
-                      {process.job?.lastExit?.reason && <p>{process.job.lastExit.reason}</p>}
-                      {sample?.children.length ? (
-                        <ul className="process-children">
-                          {sample.children.map((child) => (
-                            <li key={child.pid}>
-                              <code>{child.pid}</code>
-                              <span>
-                                {child.name} · {child.state}
-                                {child.ranForMs !== undefined
-                                  ? ` · ${processDuration(child.ranForMs)}`
-                                  : ''}
-                              </span>
-                              <span>{processMemory(child.residentBytes)}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </details>
-                    <div className="process-actions">
-                      {onAsk && (
-                        <Button onClick={() => onAsk(process)}>
-                          <MessageSquare size={14} aria-hidden="true" /> Ask about this
+                        {process.job && (
+                          <p>
+                            {process.job.checkpointResumable
+                              ? 'Can recover through its declared checkpoint command.'
+                              : 'An interrupted run needs attention; saved files remain available.'}{' '}
+                            Restarts: {process.job.restarts}.
+                          </p>
+                        )}
+                        {process.terminal && (
+                          <p>
+                            Interactive terminal · {process.terminal.columns} ×{' '}
+                            {process.terminal.rows}. Standard output and errors share one stream.
+                          </p>
+                        )}
+                        {process.job?.lastExit?.reason && <p>{process.job.lastExit.reason}</p>}
+                        {sample?.children.length ? (
+                          <ul className="process-children">
+                            {sample.children.map((child) => (
+                              <li key={child.pid}>
+                                <code>{child.pid}</code>
+                                <span>
+                                  {child.name} · {child.state}
+                                  {child.ranForMs !== undefined
+                                    ? ` · ${processDuration(child.ranForMs)}`
+                                    : ''}
+                                </span>
+                                <span>{processMemory(child.residentBytes)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </details>
+                      <div className="process-actions">
+                        {onAsk && (
+                          <Button onClick={() => onAsk(process)}>
+                            <MessageSquare size={14} aria-hidden="true" /> Ask about this
+                          </Button>
+                        )}
+                        <Button disabled={busy !== null} onClick={() => void act(process, 'log')}>
+                          Read output
                         </Button>
-                      )}
-                      <Button disabled={busy !== null} onClick={() => void act(process, 'log')}>
-                        Read output
-                      </Button>
-                      {!process.workflow &&
-                        process.job?.state === 'interrupted' &&
-                        process.job.checkpointResumable && (
+                        {!process.workflow &&
+                          process.job?.state === 'interrupted' &&
+                          process.job.checkpointResumable && (
+                            <Button
+                              disabled={busy !== null}
+                              onClick={() => void act(process, 'resume')}
+                            >
+                              Resume checkpoint
+                            </Button>
+                          )}
+                        {process.workflow?.canResume && (
                           <Button
                             disabled={busy !== null}
                             onClick={() => void act(process, 'resume')}
                           >
-                            Resume checkpoint
+                            {process.workflow.state === 'completed'
+                              ? 'Rerun using cache'
+                              : 'Resume workflow'}
                           </Button>
                         )}
-                      {process.workflow?.canResume && (
-                        <Button
-                          disabled={busy !== null}
-                          onClick={() => void act(process, 'resume')}
-                        >
-                          {process.workflow.state === 'completed'
-                            ? 'Rerun using cache'
-                            : 'Resume workflow'}
-                        </Button>
+                        {['running', 'restarting', 'crash_looped', 'interrupted'].includes(
+                          state
+                        ) && (
+                          <Button
+                            className="process-stop"
+                            disabled={busy !== null}
+                            onClick={() => setConfirm(process)}
+                          >
+                            <Square size={13} aria-hidden="true" /> Stop
+                          </Button>
+                        )}
+                      </div>
+                      {logs[id] !== undefined && (
+                        <textarea
+                          className="process-output"
+                          readOnly
+                          rows={Math.min(12, Math.max(2, (logs[id] ?? '').split('\n').length))}
+                          aria-label={`Output from ${processName(process)}`}
+                          value={logs[id] || 'No captured output.'}
+                        />
                       )}
-                      {['running', 'restarting', 'crash_looped', 'interrupted'].includes(state) && (
-                        <Button
-                          className="process-stop"
-                          disabled={busy !== null}
-                          onClick={() => setConfirm(process)}
-                        >
-                          <Square size={13} aria-hidden="true" /> Stop
-                        </Button>
-                      )}
-                    </div>
-                    {logs[id] !== undefined && (
-                      <textarea
-                        className="process-output"
-                        readOnly
-                        rows={Math.min(12, Math.max(2, (logs[id] ?? '').split('\n').length))}
-                        aria-label={`Output from ${processName(process)}`}
-                        value={logs[id] || 'No captured output.'}
-                      />
-                    )}
+                    </details>
                   </article>
                 );
               })}
