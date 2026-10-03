@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Gauge, HardDrive, MemoryStick } from './icons';
-import { CaseKey } from './CaseKey';
 import type { Workspace } from '@garden/contracts';
 import type { Bootstrap } from './model';
 import { bytes, dollarsLeft, money } from './model';
@@ -72,8 +71,7 @@ export default function Stats({
         }
       }}
     >
-      <CaseKey
-        label="Stats"
+      <Button
         ref={trigger}
         className="garden-stats-trigger"
         aria-label="Stats"
@@ -107,7 +105,10 @@ export default function Stats({
           pinned.current = !pinned.current;
           setOpen(pinned.current);
         }}
-      />
+      >
+        <Gauge size={14} />
+        <span>Stats</span>
+      </Button>
       {open && (
         <div className="garden-health-popover" id={id} role="region" aria-label="Usage statistics">
           <div className="garden-health-panel">

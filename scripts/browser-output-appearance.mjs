@@ -2,14 +2,12 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
 /**
- * The screen's glass: one layer over the screen carrying the dot matrix at the display's own pixel
- * size, under everything garden draws and behind everything the owner was given.
+ * The screen's glass: one layer over the whole window carrying the dot matrix at the display's own
+ * pixel size, over everything garden draws and behind everything the owner was given.
  */
 export async function checkScreenGlass(page) {
   const glass = await page.evaluate(() => {
-    const screen =
-      document.querySelector('.desk-shell .navigation-page[open]') ??
-      document.querySelector('.desk-shell .garden-main:not([hidden])');
+    const screen = document.querySelector('.garden-shell.desk-shell');
     if (!screen) return null;
     const style = getComputedStyle(screen, '::after');
     const ratio = devicePixelRatio;

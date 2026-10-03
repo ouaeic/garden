@@ -299,7 +299,7 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
     const barTop = await page
       .locator('.phone-bar')
       .evaluate((bar) => bar.getBoundingClientRect().top);
-    assert(barTop >= floor, `The floor is the screen’s, above the case (${floor} vs ${barTop})`);
+    assert(barTop >= floor, `The floor is the work area’s, above the bar (${floor} vs ${barTop})`);
     await page.screenshot({ path: resolve(report, 'mobile-library-border-creature.png') });
     await onlyBar.evaluate((element) => element.remove());
     // A normal page may contain usable borders; only actual modal dialogs exclude them.
@@ -374,7 +374,7 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
         .locator('.life-clip:has([data-creature="bat"])')
         .evaluate((clip) => clip.getBoundingClientRect().top),
       (await screenInside()).top,
-      'Bats hang from the top of the screen on phones, not from the case'
+      'Bats hang from the top of the work area on phones'
     );
     await page.clock.setFixedTime(new Date('2026-09-29T12:00:00'));
     await page.reload();

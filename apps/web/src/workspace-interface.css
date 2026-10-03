@@ -340,14 +340,25 @@
     margin-left: auto;
     gap: 3px;
   }
-
+  .garden-shell .garden-masthead-end .global-search {
+    display: inline-flex;
+  }
   .garden-shell .garden-health {
     margin-left: auto;
   }
   .garden-masthead .brand-button {
     margin-right: 0;
   }
-
+  .garden-shell .garden-stats-trigger {
+    min-width: 40px;
+    padding: 8px;
+    font-size: 16px;
+    gap: 4px;
+  }
+  .garden-shell .garden-stats-trigger svg {
+    width: 18px;
+    height: 18px;
+  }
   .garden-shell .garden-health-popover {
     position: fixed;
     top: calc(60px + env(safe-area-inset-top, 0px));

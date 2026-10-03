@@ -85,10 +85,7 @@ function visible(element: Element | null, edge: 'top' | 'bottom' = 'top'): Ledge
   return { left, top, right, bottom, width, element };
 }
 
-/**
- * The screen creatures live on: the work area, or on a phone the page that has replaced it. They
- * are pixels of it, so nothing of them is drawn on the case around it.
- */
+/** The work area, or on a phone the page that has replaced it: the screen below its bars. */
 function screen(): Element | null {
   return (
     document.querySelector('.desk-shell .navigation-page[open]') ??
@@ -96,7 +93,7 @@ function screen(): Element | null {
   );
 }
 
-/** The inside of the screen, within its lens. */
+/** The work area's own box, inside any border it has. */
 function glass(element: Element | null = screen()) {
   if (!element) return null;
   const box = element.getBoundingClientRect();
@@ -206,8 +203,7 @@ const CROWD = 2;
 
 /**
  * The creatures that live on the screen. They visit now and then, never while you are typing or
- * reading a dialog, and never where they could take a click: the whole layer ignores the pointer,
- * and it is cut to the screen inside its lens, so nothing of them is ever drawn on the case.
+ * reading a dialog, and never where they could take a click: the whole layer ignores the pointer.
  * Every one arrives from beyond the edge of the screen or from behind a border and
  * leaves the same way, frightened or not - nothing blinks into or out of existence. They move on
  * the compositor through the Web Animations API, so a leap is a smooth arc at the display's own
@@ -220,24 +216,6 @@ export default function GardenLife() {
   const nextId = useRef(1);
   const lastInput = useRef(0);
   const reduced = useRef(matchMedia('(prefers-reduced-motion: reduce)').matches);
-  const layer = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    let last = '';
-    const cut = () => {
-      const inside = glass();
-      const clip = inside
-        ? `inset(${inside.top}px ${innerWidth - inside.right}px ${innerHeight - inside.bottom}px ${inside.left}px)`
-        : 'inset(50%)';
-      if (clip !== last && layer.current) layer.current.style.clipPath = last = clip;
-    };
-    cut();
-    const timer = setInterval(cut, 400);
-    addEventListener('resize', cut);
-    return () => {
-      clearInterval(timer);
-      removeEventListener('resize', cut);
-    };
-  }, []);
 
   useEffect(() => onLifeModeChange(setMode), []);
   useEffect(() => {
@@ -1079,7 +1057,7 @@ export default function GardenLife() {
     </div>
   );
   return (
-    <div className="life-layer" ref={layer} aria-hidden="true">
+    <div className="life-layer" aria-hidden="true">
       {/* Keep each moving element mounted while its border clipping changes. */}
       {actors.map((actor) => (
         <div

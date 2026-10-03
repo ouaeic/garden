@@ -152,15 +152,12 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     for (const button of await navigation.all()) {
       await button.hover();
       await checkScreenGlass(page);
-      // Navigation is a key on the case: printed, not drawn, and brighter under the pointer.
+      // Everything is the screen: navigation is drawn in its pixels, in its ink.
       const key = await button.evaluate((element) => ({
-        printed: getComputedStyle(element).fontFamily,
-        icons: element.querySelectorAll('svg').length,
-        ink: getComputedStyle(element).color,
-        bezel: getComputedStyle(document.documentElement).getPropertyValue('--bezel-ink')
+        face: getComputedStyle(element).fontFamily,
+        ink: getComputedStyle(element).color
       }));
-      assert.doesNotMatch(key.printed, /Pixel Operator/, 'A key on the case has no pixels');
-      assert.equal(key.icons, 0, 'A key on the case carries no screen icon');
+      assert.match(key.face, /Pixel Operator/, 'Navigation is drawn on the screen');
       assert.notEqual(key.ink, 'rgba(0, 0, 0, 0)');
     }
     const heading = page.locator('.home-projects .desk-card-heading h2');
@@ -276,14 +273,25 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
             contrast: contrast(root.color, root.backgroundColor),
             secondaryContrast: contrast(muted, root.backgroundColor),
             overlayContent: getComputedStyle(document.body, '::after').content,
-            texture: getComputedStyle(document.querySelector('.garden-main'), '::after')
+            texture: getComputedStyle(document.querySelector('.garden-shell'), '::after')
               .backgroundImage
           };
         })
       );
     }
     assert.equal(palette[0].foreground, palette[1].background, 'Modes reverse LCD ink and glass');
-    assert.equal(palette[0].background, palette[1].foreground, 'Modes reverse LCD glass and ink');
+    // Dark ink is the glass seen through undriven dots, a little shaded by the driven field.
+    const channels = (colour) =>
+      colour
+        .match(/[\d.]+/g)
+        .slice(0, 3)
+        .map((value) => Number(value) * (colour.startsWith('color(') ? 255 : 1));
+    const glass = channels(palette[0].background);
+    const lit = channels(palette[1].foreground);
+    assert(
+      lit.every((value, index) => value <= glass[index] && value >= glass[index] * 0.8),
+      `Dark ink is the shaded glass (${palette[1].foreground} from ${palette[0].background})`
+    );
     for (const colors of palette) {
       assert(colors.contrast >= 4.5, 'Body text must meet normal-text contrast');
       assert(colors.secondaryContrast >= 4.5, 'Secondary text must meet normal-text contrast');
@@ -330,24 +338,14 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     await amber.waitFor();
     assert(await amber.isChecked(), 'The warm palette survives reloads');
     assert.equal(await page.evaluate(() => document.documentElement.dataset.palette), 'amber');
-    const chrome = await page.evaluate(() => {
-      const paint = (value) => {
-        const probe = document.createElement('i');
-        probe.style.background = value;
-        document.body.append(probe);
-        const colour = getComputedStyle(probe).backgroundColor;
-        probe.remove();
-        return colour;
-      };
-      return {
-        case: getComputedStyle(document.body).backgroundColor,
-        mobile: paint(document.querySelector('meta[name="theme-color"]').content),
-        lit: paint('var(--s0)'),
-        logo: getComputedStyle(document.querySelector('.garden-wordmark')).backgroundColor
-      };
-    });
-    assert.equal(chrome.mobile, chrome.case, 'Mobile chrome continues the case');
-    assert.equal(chrome.logo, chrome.lit, 'The wordmark is printed in the warm screen’s lit shade');
+    const chrome = await page.evaluate(() => ({
+      colour: getComputedStyle(document.documentElement).backgroundColor,
+      mobile: document.querySelector('meta[name="theme-color"]').content,
+      text: getComputedStyle(document.documentElement).color,
+      logo: getComputedStyle(document.querySelector('.garden-wordmark')).backgroundColor
+    }));
+    assert.equal(chrome.mobile, chrome.colour, 'Mobile chrome follows the warm palette');
+    assert.equal(chrome.logo, chrome.text, 'The botanical wordmark follows the warm ink');
     for (const width of [1440, 390, 320]) {
       await page.setViewportSize({ width, height: width > 760 ? 1000 : 844 });
       await checkScreenGlass(page);

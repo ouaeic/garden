@@ -420,7 +420,11 @@ canvas {
   background: none;
   padding: 0;
 }
-
+.global-search kbd {
+  font: 16px/1 var(--font-mono);
+  color: var(--muted);
+  margin-left: 20px;
+}
 .notification-count {
   font: 16px var(--font-mono);
   background: var(--paper);
@@ -1174,6 +1178,10 @@ canvas {
   }
 }
 @media (max-width: 1100px) {
+  .global-search > span,
+  .global-search kbd {
+    display: none;
+  }
   .decision-card,
   .question-card {
     padding: 23px;

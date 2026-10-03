@@ -3,7 +3,14 @@
   position: relative;
   margin-left: auto;
 }
-
+.garden-health .garden-stats-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  color: var(--muted);
+  cursor: pointer;
+}
 .garden-health-popover {
   position: absolute;
   top: 100%;

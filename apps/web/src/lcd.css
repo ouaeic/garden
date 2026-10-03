@@ -39,28 +39,15 @@
    * Light mode reads dark ink on a lit field; dark mode inverts the ramp. A fifth tone is never
    * mixed: it is dithered from two neighbours, which is how the hardware did it.
    */
-  /* Yellow-green where the reflector shows, darkening towards blue-green, as the panel does. */
-  --s0: #aabb5c;
-  --s1: #7d9752;
-  --s2: #2e4833;
-  --s3: #11271b;
-  /* The case the screen sits in, its lens, its rubber keys and its two lamps. */
-  --bezel: #393a46;
-  --bezel-edge: #2b2c35;
-  --bezel-ink: #c3c5d0;
-  --bezel-muted: #8c8e9c;
-  --lens: #22232a;
-  --key: #4a4c5c;
-  --key-top: #5b5d6f;
-  --key-shade: #24252d;
-  --lamp: #e2384e;
-  --lamp-alert: #f0a43a;
-  /* Printed on the case, not drawn on the screen. */
-  --font-case: Futura, 'Avenir Next', 'Century Gothic', 'Trebuchet MS', system-ui, sans-serif;
+  /* Lime where the reflector shows, deepening to dark green where the crystal is driven. */
+  --s0: #a8bc1c;
+  --s1: #7c9a20;
+  --s2: #24451e;
+  --s3: #0d2607;
+  /* The light shade under the driven field's shadow, which is how dark mode's ink is lit. */
+  --s0-shaded: #95aa19;
   /* The matrix, drawn by lcd-glass.ts at the display's own pixel size. */
   --lcd-grid: none;
-  /* The name printed on the case, in the screen's lit shade. */
-  --bezel-brand: var(--s0);
   --bg: var(--s0);
   --tint: var(--s1);
   --muted: var(--s2);
@@ -96,10 +83,15 @@
   --font-mono: 'Pixel Operator Mono', ui-monospace, monospace;
   /* What is read rather than glanced at: crisp at any size, still a machine's typeface. */
   --font-read: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  /* A driven pixel casts a soft shadow onto the reflector behind it, a pixel down and right. */
-  --shadow-ink: color-mix(in srgb, var(--s3) 30%, transparent);
-  --ink-shadow: 1px 1px 1px var(--shadow-ink);
-  --ink-drop: 1px 1px 1px var(--shadow-ink);
+  /*
+   * A driven pixel casts its shadow onto the reflector behind it, down and to the right. Kept
+   * nearly sharp, so a hairline stroke casts one as plainly as a heavy one does.
+   */
+  --shadow-ink: color-mix(in srgb, var(--s3) 50%, transparent);
+  /* Driven crystal blooms a little past its dot, so ink is soft-edged. */
+  --ink-bloom: color-mix(in srgb, currentColor 45%, transparent);
+  --ink-shadow: 0 0 0.6px var(--ink-bloom), 1px 1px 0.5px var(--shadow-ink);
+  --ink-drop: 1px 1px 0.5px var(--shadow-ink);
   font: 16px/1.5 var(--font-sans);
   font-synthesis: none;
   text-rendering: geometricPrecision;
@@ -108,21 +100,13 @@
   background: var(--bg);
   color-scheme: light;
 }
-/* The pocket model's grey glass, in its silver case. */
+/* The pocket model's grey glass. */
 :root[data-palette='pocket'] {
   --s0: #c5c7b8;
   --s1: #9a9c8c;
   --s2: #46483e;
   --s3: #2a2b25;
-  --bezel: #8d8f95;
-  --bezel-edge: #74767c;
-  --bezel-ink: #1f2024;
-  --bezel-muted: #3e4046;
-  --bezel-brand: var(--bezel-ink);
-  --lens: #4e5057;
-  --key: #4a4c55;
-  --key-top: #5a5c66;
-  --key-shade: #34363d;
+  --s0-shaded: #b2b4a6;
 }
 /* The lit screen of the backlit model, seen in a dark room. */
 :root[data-palette='backlight'] {
@@ -130,6 +114,7 @@
   --s1: #5fa89a;
   --s2: #1f4a45;
   --s3: #12302c;
+  --s0-shaded: #80bfb1;
 }
 :root[data-palette='amber'],
 [data-palette-swatch='amber'] {
@@ -137,13 +122,21 @@
   --s1: #b08245;
   --s2: #5b3b19;
   --s3: #281a0e;
+  --s0-shaded: #ce9a58;
 }
 :root[data-theme='dark'] {
+  /*
+   * The same panel, mostly driven. What is lit is the reflector seen through undriven dots, and
+   * the driven crystal around it shades it: its strokes are dimmed where that shadow falls, from
+   * the top and left, and stay fully lit along their lower right edge.
+   */
   --bg: var(--s3);
   --tint: var(--s2);
   --muted: var(--s1);
-  --text: var(--s0);
-  --shadow-ink: color-mix(in srgb, black 50%, transparent);
+  --text: var(--s0-shaded);
+  --shadow-ink: color-mix(in srgb, var(--s0) 60%, transparent);
+  --ink-shadow: 1px 1px 0.6px var(--shadow-ink), 0 0 0.6px var(--ink-bloom);
+  --ink-drop: 1px 1px 0.6px var(--shadow-ink);
   color-scheme: dark;
 }
 /* Delivered images and frames get a neutral backing, not the screen's colour. */

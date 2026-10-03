@@ -28,11 +28,21 @@ body:has(.desk-shell),
   gap: 4px;
   align-items: center;
 }
-
+.desk-navigation .button {
+  font-size: 16px;
+  color: var(--muted);
+}
+.desk-navigation .button[aria-expanded='true'] {
+  color: var(--text);
+  background: var(--raised-fill);
+}
 .desk-shell .garden-masthead-end {
   gap: 5px;
 }
-
+.desk-shell .global-search > span,
+.desk-shell .global-search kbd {
+  display: none;
+}
 .garden-shell.desk-shell .garden-main {
   padding: 0;
   border-radius: 0;
@@ -895,7 +905,13 @@ body:has(.desk-shell),
   .desk-navigation {
     gap: 0;
   }
-
+  .desk-navigation .button span {
+    display: none;
+  }
+  .desk-shell .garden-masthead .garden-stats-trigger {
+    font-size: 0;
+    gap: 0;
+  }
   .desk-shell .garden-health,
   .desk-shell .garden-masthead-end {
     margin-left: 0;
@@ -903,7 +919,9 @@ body:has(.desk-shell),
   .desk-shell .garden-health {
     margin-left: auto;
   }
-
+  .desk-shell .garden-masthead .global-search {
+    margin-right: 0;
+  }
   .desk-shell .garden-masthead .button {
     min-width: 32px;
     min-height: 36px;

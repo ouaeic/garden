@@ -9,7 +9,8 @@
  * device pixel to a CSS pixel gets three-pixel dots, so its gap is still the narrower part.
  *
  * As on the panel, the matrix shows everywhere. An undriven dot is a shade darker than the
- * reflector between dots, so blank glass is finely gridded, and the gaps stay pale over ink. Their
+ * reflector between dots, so blank glass is finely gridded, and the gaps stay pale over ink. Dark
+ * mode is the same panel mostly driven, so its whole field carries the pale lattice. Their
  * strength is set so they lighten ink by about the same amount at any density, which keeps text
  * contrast where the palettes put it.
  */
@@ -17,9 +18,9 @@
 /** Lightening of ink averaged over a dot, whatever the density. */
 const GAP_WEIGHT = 0.17;
 /** How much darker an undriven dot is than the reflector around it. */
-const DOT_ALPHA = 0.08;
+const DOT_ALPHA = 0.04;
 /** How much brighter the reflector shows between dots than through them. */
-const REFLECTOR = 0.16;
+const REFLECTOR = 0.07;
 /** The pitch, in CSS pixels. */
 const PITCH = 2;
 
@@ -43,15 +44,16 @@ export function glassTile(
   // Never a dot narrower than three device pixels, so a gap is never more than a third of it.
   const pitch = Math.max(3, Math.round(PITCH * ratio));
   const share = (2 * pitch - 1) / pitch ** 2;
-  // An inverted screen shows the matrix more than its ink can spare.
-  const strength = Math.min(0.7, (GAP_WEIGHT * (lit ? 1 : 0.65)) / share);
-  const undriven = DOT_ALPHA * (lit ? 1 : 0.4);
+  // A mostly driven screen shows its gaps across the whole field, so they are drawn finer there.
+  const strength = Math.min(0.7, (GAP_WEIGHT * (lit ? 1 : 0.42)) / share);
+  const undriven = lit ? DOT_ALPHA : 0;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = pitch;
   const context = canvas.getContext('2d')!;
   const image = context.createImageData(pitch, pitch);
-  // A lit screen's reflector is the bright layer; an inverted one shows dark between its dots.
-  const gap = channels(background).map((value) =>
+  // Between dots the reflector shows: brighter than the undriven field, and the very colour of
+  // lit ink when the screen is mostly driven.
+  const gap = (lit ? channels(background) : channels(ink)).map((value) =>
     lit ? Math.round(value + (255 - value) * REFLECTOR) : value
   ) as [number, number, number];
   const dot = channels(ink);
@@ -82,7 +84,10 @@ export function paintGlass(): void {
   root.style.setProperty('--lcd-grid', `url(${url}) 0 0 / ${size}px ${size}px`);
 }
 
-/** Repaints when the window moves to a display with a different pixel density. */
+/**
+ * Paints now, and again whenever the display's pixel density or the screen's theme or palette
+ * changes, however it changes.
+ */
 export function watchGlass(): () => void {
   let query: MediaQueryList | null = null;
   const listen = () => {
@@ -94,7 +99,15 @@ export function watchGlass(): () => void {
     paintGlass();
     listen();
   };
+  const looks = new MutationObserver(paintGlass);
+  looks.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme', 'data-palette']
+  });
   paintGlass();
   listen();
-  return () => query?.removeEventListener('change', repaint);
+  return () => {
+    looks.disconnect();
+    query?.removeEventListener('change', repaint);
+  };
 }

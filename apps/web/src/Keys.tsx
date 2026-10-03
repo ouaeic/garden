@@ -9,7 +9,7 @@ const glyphs = {
 } as const;
 const names = { mod: 'Command', enter: 'Return' } as const;
 
-export const isMac = () =>
+const isMac = () =>
   typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform);
 
 /** A shortcut as keys, where `mod` is Command on a Mac and Ctrl everywhere else. */
