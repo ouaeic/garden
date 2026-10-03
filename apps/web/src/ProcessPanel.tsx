@@ -167,9 +167,7 @@ export default function ProcessPanel({
   return (
     <section
       className="project-processes"
-      aria-label={
-        taskId || projectId ? 'Project processes' : 'Computer processes'
-      }
+      aria-label={taskId || projectId ? 'Project processes' : 'Computer processes'}
     >
       <header className="process-panel-heading">
         <div>
