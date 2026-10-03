@@ -3,7 +3,8 @@ import { BrowserAction, WebFetchRequest } from './index.js';
 
 describe('browser action contract', () => {
   it('accepts the id the runner gives a tab the owner opened', () => {
-    // The runner names every tab after the first `tab-<uuid>`; closing one used to be refused here.
+    // The runner names every tab after the first `tab-<uuid>`, so closing one must be accepted
+    // here.
     const tabId = `tab-${crypto.randomUUID()}`;
     expect(BrowserAction.parse({ type: 'close_tab', tabId })).toEqual({ type: 'close_tab', tabId });
     expect(BrowserAction.parse({ type: 'select_tab', tabId })).toEqual({

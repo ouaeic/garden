@@ -4,14 +4,14 @@ import { createDatabase, type Database } from './database.js';
 /**
  * Every test in this repository runs on pglite and every installed box runs on postgres, so any
  * behaviour the two drivers do not share is a behaviour the suite can prove and the product does
- * not have. Nesting was one of those. `EmbeddedDatabase.transaction` used to hand the callback the
- * database itself, so a nested call issued a second BEGIN - which PostgreSQL answers with a warning
- * and ignores - and the nested COMMIT then committed the *outer* transaction for real. By the time
- * the outer rollback ran there was no transaction left to undo, and both writes had landed.
+ * not have. Nesting is one of those. A transaction callback handed the database itself would issue
+ * a second BEGIN on a nested call - which PostgreSQL answers with a warning and ignores - and the
+ * nested COMMIT would then commit the *outer* transaction for real. By the time the outer rollback
+ * ran there would be no transaction left to undo, and both writes would have landed.
  *
- * `PostgresDatabase` has always flattened nesting onto the one transaction it opened, so a test
- * asserting atomicity across a nested write was proving something true of the test driver only.
- * These cases pin the flattened behaviour, which is what both drivers do now.
+ * Both drivers flatten nesting onto the one transaction the outermost call opened, and these cases
+ * pin that, so a test asserting atomicity across a nested write proves something true of the
+ * product and not only of the test driver.
  */
 describe('transaction nesting', () => {
   let database: Database;

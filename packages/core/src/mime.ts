@@ -481,9 +481,9 @@ export const extractPart = (raw: Buffer, partId: string): MimePart | null => {
     contentType: `${contentType.type}/${contentType.subtype}`,
     // Sanitised on the way out of *this* function too, not only in parseMessage's inventory. This
     // is the call that arrives carrying the bytes, so it is the name the caller is most likely to
-    // write to disk - and until this line the two paths disagreed: an attachment listed as
-    // ".._.._.ssh_authorized_keys" came back from the download as "../../.ssh/authorized_keys",
-    // with embedded NULs and unbounded length surviving as well.
+    // write to disk - and without this line the two paths would disagree: an attachment listed as
+    // ".._.._.ssh_authorized_keys" would come back from the download as
+    // "../../.ssh/authorized_keys", with embedded NULs and unbounded length surviving as well.
     filename: declaredFilename === null ? null : safeFilename(declaredFilename) || 'attachment',
     content: decodeBody(body, headerValue(headers, 'content-transfer-encoding'))
   };

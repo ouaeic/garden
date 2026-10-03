@@ -731,12 +731,12 @@ describe('file organisation and toolchain routes', () => {
     const { app, id, root, token } = await harness();
     /*
      * Resolved against the HOST list, and not against the agent's, because that is what the route
-     * now does. This case used to symlink the host's ffmpeg into the agent tool directory - index 0
-     * of `agentSearchPath` - and that stopped working the day `prepareAudio` moved onto
-     * `hostSearchPath` so an agent-written file could not decide which binary the runner spawns as
-     * itself. The symlink was the test standing in the place the fix exists to close.
+     * does: `prepareAudio` resolves on `hostSearchPath` so an agent-written file cannot decide
+     * which binary the runner spawns as itself. Symlinking the host's ffmpeg into the agent tool
+     * directory - index 0 of `agentSearchPath` - would put the test in the very place that rule
+     * exists to close.
      *
-     * The consequence, stated because it is a real loss: this case now skips on a machine whose
+     * The consequence, stated because it is a real loss: this case skips on a machine whose
      * ffmpeg is outside the six system directories - a Homebrew laptop - and runs on a provisioned
      * Linux box, where the installer puts it in /usr/bin.
      */
@@ -779,15 +779,15 @@ describe('file organisation and toolchain routes', () => {
   /*
    * THE SECOND SLOT, through the routes rather than through the functions under them.
    *
-   * Two tasks share a workspace, and the runner's record of what has been shown used to be keyed by
-   * resolved path - so it answered a question about task B with task A's reading, and B's whole-file
-   * write changed a line only A had seen. What tells them apart is `sub` on the capability, which
-   * the worker stamps with the task it is running: nothing new crosses the wire, and the code inside
-   * a task cannot choose it because the token is signed over it.
+   * Two tasks share a workspace, and a record of what has been shown keyed by resolved path alone
+   * would answer a question about task B with task A's reading, and let B's whole-file write change
+   * a line only A had seen. What tells them apart is `sub` on the capability, which the worker
+   * stamps with the task it is running: nothing new crosses the wire, and the code inside a task
+   * cannot choose it because the token is signed over it.
    *
    * This case exists at the route because the route is where the reader is derived. Everything below
    * it can be correct while the server hands the write the wrong task, or no task at all, and that
-   * is precisely the shape of the defect being closed.
+   * is precisely the shape of the defect this guards against.
    */
   it("holds the second task in a workspace to its own reads and not to the first task's", async () => {
     const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-slot-route-'));
@@ -795,10 +795,10 @@ describe('file organisation and toolchain routes', () => {
     const secret = 'runner-slot-route-secret-at-least-32-characters';
     /*
      * The disk this case writes to is stated rather than measured. A PUT passes the host storage
-     * floor, and measuring the real one made this the only case in the file whose answer depended
-     * on how full the machine happened to be: on its own it was the 428 below, and inside the whole
-     * package - 35 files writing temporary trees at once - it came back 507. `checkpoints.test.ts`
-     * carries the rest of the reasoning.
+     * floor, and measuring the real one would make this case's answer depend on how full the
+     * machine happens to be: the 428 below on its own, and 507 inside the whole package, with every
+     * file writing temporary trees at once. `checkpoints.test.ts` carries the rest of the
+     * reasoning.
      */
     const app = await buildServer(runnerConfig(workspaceRoot, secret), {
       hostStorage: async () => ({
@@ -1085,11 +1085,10 @@ describe('taking the machine over on one surface', () => {
  * The ladder, reported rather than assumed.
  *
  * `/healthz` is the one place an operator, and the control plane that tells the owner their shell
- * is confined, can read what this box actually does - and until this wave `agentSandbox` had no
- * production reader at all. What it must never do is answer from the setting: a box with
- * CONFINE_AGENT_FILESYSTEM on and no helper to apply a ruleset with is a box running every command
- * unconfined, and a health endpoint that reported otherwise would be worse than one that said
- * nothing.
+ * is confined, can read what this box actually does. What it must never do is answer from the
+ * setting: a box with CONFINE_AGENT_FILESYSTEM on and no helper to apply a ruleset with is a box
+ * running every command unconfined, and a health endpoint that reported otherwise would be worse
+ * than one that said nothing.
  */
 describe('what the runner says about its own boundaries', () => {
   const disposers: Array<() => Promise<void>> = [];
@@ -1267,13 +1266,11 @@ describe('what the runner says about its own boundaries', () => {
 /**
  * The staleness refusal, over the routes that actually carry it.
  *
- * `DesktopControl.authorize` has refused a coordinate computed from a superseded observation since
- * it was written, and until now the only caller that ever named a generation was a test passing a
- * sixth argument by hand: `POST /desktop/action` passes five and the stream socket four, and
- * `DesktopAction` has no field for the model to echo. That is the shape this programme keeps
- * finding - a mechanism, its unit test, and no production caller - so this case refuses to touch
- * `act` at all and drives the HTTP routes the worker's `desktop_observe` and `desktop_action` tools
- * post to.
+ * `DesktopControl.authorize` refuses a coordinate computed from a superseded observation, and that
+ * refusal is only real if a production caller names a generation: a test passing a sixth argument
+ * by hand proves the mechanism and nothing about the routes. A mechanism, its unit test, and no
+ * production caller is the shape to guard against, so this case refuses to touch `act` at all and
+ * drives the HTTP routes the worker's `desktop_observe` and `desktop_action` tools post to.
  *
  * The desktop itself is the one seam stood in for: there is no X server on the machine running
  * this, and none is needed to prove which observation the runner is holding the agent to.

@@ -12,16 +12,16 @@
  * permitted set, and dispatch.test.ts holds every specialist tool inside it - so neither needs a
  * gate of its own.
  *
- * Plan mode is that one. A plan-mode turn CAN park on a card, which the first draft of this file
- * said it could not: `parallel_web_read` is permitted and `approvalRequirement` cards it on a novel
- * destination once the turn has read untrusted content, in all three security modes. What it cannot
- * park on is a card this branch would refuse, because the gate answers a refused tool long before
- * the floor is asked. So what walks in here is the owner approving a card and then putting the
- * conversation into plan mode. Both orders end here, at a branch that used to run the call.
+ * Plan mode is that one. A plan-mode turn CAN park on a card: `parallel_web_read` is permitted and
+ * `approvalRequirement` cards it on a novel destination once the turn has read untrusted content,
+ * in all three security modes. What it cannot park on is a card this branch would refuse, because
+ * the gate answers a refused tool long before the floor is asked. So what walks in here is the
+ * owner approving a card and then putting the conversation into plan mode. Both orders end here, at
+ * a branch that must not run the call.
  *
  * Driven through the real `resumeParkedTurn` with a real approval hash, because the whole point is
  * that the approval genuinely covers the call: an approval that did not match would be refused two
- * lines above by a rule that already existed, and a test built on one would prove nothing.
+ * lines above by a rule of its own, and a test built on one would prove nothing.
  */
 import { describe, expect, it } from 'vitest';
 import type { ModelRelease, WebToolPlan } from '@garden/contracts';

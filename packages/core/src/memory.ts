@@ -227,7 +227,7 @@ export type MemoryTrust = 'stated' | 'derived';
 
 /**
  * The five states a remembered row can be in. All five are written or read on a live path, and this
- * list says where, because two of them were once proposed for deletion as unreachable members:
+ * list says where, so that none of them reads as an unreachable member:
  *
  * - `active` - the column default; everything recall returns by default.
  * - `superseded` - written by `recordMemoryFact` when a functional predicate gets a second current
@@ -241,11 +241,11 @@ export type MemoryTrust = 'stated' | 'derived';
  *   stops being recalled and the audit trail survives, which is the difference between "stop
  *   believing this" and `DELETE`.
  *
- * The gap that used to be worth writing down here - the `disputed` *writer* having no production
- * caller, so the review queue could clear a dispute nothing was able to raise - is closed:
- * `consolidateMemory`'s contradiction pass raises one whenever a subject holds two current values
- * of a predicate the registry declares one-valued. What remains open is narrower and is recorded on
- * `resolveMemoryContradiction` below: no pass yet buys a verdict for pairs under a `many` predicate.
+ * The `disputed` writer has a production caller, so the review queue clears disputes something can
+ * raise: `consolidateMemory`'s contradiction pass raises one whenever a subject holds two current
+ * values of a predicate the registry declares one-valued. What remains open is narrower and is
+ * recorded on `resolveMemoryContradiction` below: no pass yet buys a verdict for pairs under a
+ * `many` predicate.
  */
 export type MemoryStatus = 'active' | 'superseded' | 'disputed' | 'archived' | 'retracted';
 
@@ -1059,11 +1059,10 @@ const TEMPORAL_INTENT =
 /**
  * Sanity bounds, not selection.
  *
- * These used to be 24 apiece, applied as `.sort().slice(24)` over the *keyed* tokens - and an HMAC
- * output sorts as noise, so which two dozen of a request's terms reached the database was
- * pseudorandom with respect to meaning. On a realistic opening request that discarded `dovecot`,
- * `imap_idle_notify_interval`, `connector` and `reboot` while keeping `morn`, `week`, `which` and
- * `if`. Selection belongs to the database: it is the only party that knows document frequency, and
+ * A tight cap applied as `.sort().slice(n)` over the *keyed* tokens would select by accident: an
+ * HMAC output sorts as noise, so which of a request's terms reached the database would be
+ * pseudorandom with respect to meaning, and a rare identifier would be dropped as readily as `if`.
+ * Selection belongs to the database: it is the only party that knows document frequency, and
  * `MEMORY_RECALL_SQL`'s `terms` CTE already orders by it. These caps exist only so a pathological
  * request cannot hand PostgreSQL an unbounded array.
  */
@@ -1461,13 +1460,13 @@ export interface MemoryContradictionSide {
  * previous value of a `cardinality: 'one'` predicate without a model call, which is `supersede`
  * reached by a different and cheaper route.
  *
- * *Path B* - the nightly pass - now exists for the half of it that needs no model.
+ * *Path B* - the nightly pass - exists for the half of it that needs no model.
  * `consolidateMemory` pairs the current facts a subject holds under one predicate and, where the
  * registry declares that predicate `cardinality: 'one'`, hands this function the verdict the
  * registry has already given: two different current values of a one-valued predicate contradict,
- * by definition. Those pairs are real and were unreachable by any other route - a release that
- * narrows a cardinality leaves them behind deliberately (see `#backfillPredicateFunctional`, whose
- * own comment promises they will be resolved "the ordinary way", which until now nothing did).
+ * by definition. Those pairs are real and reachable by no other route - a release that narrows a
+ * cardinality leaves them behind deliberately (see `#backfillPredicateFunctional`, whose own
+ * comment promises they will be resolved "the ordinary way", which is this pass).
  *
  * What is still absent is a verdict over pairs under a `many` predicate, where "do these two
  * disagree" is a question about meaning rather than about the schema. That pass calls this same
@@ -1517,10 +1516,10 @@ export interface RenderedMemoryPack {
 /**
  * What the open end of a validity interval is rendered as.
  *
- * It used to be nothing at all - `valid=2026-07-01T00:00:00.000Z/` - and the block's own header
- * explains what an entry whose validity has *ended* means while saying nothing about the empty
- * side. A trailing separator with nothing after it is the one shape a reader has to guess at: it
- * reads equally as "no end recorded", "the end was lost" and "the string was truncated", and the
+ * Rendering nothing - `valid=2026-07-01T00:00:00.000Z/` - would leave the empty side unexplained,
+ * since the block's own header explains only what an entry whose validity has *ended* means. A
+ * trailing separator with nothing after it is the one shape a reader has to guess at: it reads
+ * equally as "no end recorded", "the end was lost" and "the string was truncated", and the
  * third reading is the dangerous one because it invites the model to discount a current fact. One
  * word settles it, costs three tokens on entries that are by definition the live ones, and is a
  * word rather than an instant because there is no instant to write: the interval is open, and
@@ -1593,12 +1592,11 @@ export const renderMemoryPack = (entries: readonly MemoryPackEntry[]): RenderedM
  *
  * `mem.item.cited_count` is one of four terms of the salience formula that decides what survives
  * consolidation - `0.20 *` the standardised citation count, in `packages/data/src/store/memory.ts`
- * - and until this wave nothing anywhere wrote it. `recordMemoryUse` is its only writer, behind a
- * `cited` parameter, and both production callers left it out, so the column was zero for every
- * item in every workspace that had ever run and a fifth of the score was a constant. What was
- * missing was not the column or the formula but an answer to "which of the twelve entries in the
- * block did this turn actually use", and that answer has to come from the finished work rather
- * than from the moment of injection, which is why the recall path deliberately cannot supply it.
+ * - and `recordMemoryUse` is its only writer, behind a `cited` parameter. A caller that leaves it
+ * out leaves the column at zero, and a fifth of the score becomes a constant. What a caller needs
+ * is an answer to "which of the twelve entries in the block did this turn actually use", and that
+ * answer has to come from the finished work rather than from the moment of injection, which is why
+ * the recall path deliberately cannot supply it.
  *
  * Two channels produce it, and they are deliberately different in kind:
  *

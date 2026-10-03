@@ -254,7 +254,7 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
   /**
    * Two keys, and the rule for which row opens under which.
    *
-   * A memory list is no longer one scope. The workspace tier is sealed under the workspace data
+   * A memory list spans two scopes. The workspace tier is sealed under the workspace data
    * key with `workspace-memory:${workspaceId}`; the owner tier is sealed under a key derived from
    * the master key and the user, with its own AAD domain. `keyScope` is in the clear precisely so
    * this choice can be made before anything is decrypted rather than by trying one key and
@@ -620,9 +620,9 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
    * The whole of one row, which is the half of the promise the excerpt cannot keep.
    *
    * Both lists clamp at 200 characters and both say on screen that they are showing an opening.
-   * That is honest and it is not "read the whole of what was remembered about you": the rest sat on
-   * the owner's own disk, under a key this request already derives, with nothing anywhere to ask
-   * for it. One row at a time and never in the list, deliberately — a review queue of fifty rows
+   * That is honest and it is not "read the whole of what was remembered about you": the rest is on
+   * the owner's own disk, under a key this request already derives, and this is where to ask for
+   * it. One row at a time and never in the list, deliberately — a review queue of fifty rows
    * with every body inlined is a megabyte of ciphertext decrypted to answer a question about one of
    * them, and the screen shows two lines until the owner opens something.
    *
@@ -664,21 +664,19 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
   );
 
   /**
-   * What the agent has written down for itself, which until now had no route at all.
+   * What the agent has written down for itself.
    *
    * Every turn that finishes files what was asked and what came of it, so this grows on its own and
    * has no natural end: newest first and capped, with the owner asking for more when they want it.
    * Every status is served, including the retired ones - a line the agent has stopped believing is
-   * still a line about the owner, still on their disk, and hiding it here is the defect this route
-   * exists to fix.
+   * still a line about the owner, still on their disk, and is not hidden here.
    *
-   * `trust` and `origin` are the second half of that defect, and they were the half still open. The
-   * five fields this route used to return could not tell a rule the owner typed from a rule a model
-   * wrote for them: both arrive as one line of text with a kind and a date, and a model's sentence
-   * that has cleared the corroboration gate is pinned into every later task in the workspace. A
-   * memory system whose rows are obeyed and whose provenance is invisible is one nobody can audit,
-   * so the field the review queue has always projected is now on the list the owner actually
-   * browses, beside the three-way answer `trust` alone cannot give.
+   * `trust` and `origin` are served too. Without them the list could not tell a rule the owner
+   * typed from a rule a model wrote for them: both arrive as one line of text with a kind and a
+   * date, and a model's sentence that has cleared the corroboration gate is pinned into every later
+   * task in the workspace. A memory system whose rows are obeyed and whose provenance is invisible
+   * is one nobody can audit, so the field the review queue projects is on the list the owner
+   * actually browses, beside the three-way answer `trust` alone cannot give.
    */
   app.get<{ Params: { workspaceId: string }; Querystring: Record<string, string> }>(
     '/v1/workspaces/:workspaceId/memory-library',
@@ -775,12 +773,12 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
   );
 
   /**
-   * The memory review queue, which three documents promise and nothing has ever served.
+   * The memory review queue, which three documents promise.
    *
-   * It was built at three layers and reached nobody: the store computes which procedures have gone
-   * stale or started failing, the consolidation pass calls it and keeps the ids, and no route
-   * existed - so "verify or delete" was a thing this computer decided about the owner's own notes
-   * and never asked them about. Two lists, because they are two different questions:
+   * The store computes which procedures have gone stale or started failing and the consolidation
+   * pass keeps the ids; this route is what makes "verify or delete" a question put to the owner
+   * about their own notes rather than one decided for them. Two lists, because they are two
+   * different questions:
    *
    * `procedures` is "this remembered command may no longer work" - either nobody has confirmed it
    * in a season (`unverified`), or it lost more of its last five uses than it won (`failing`), and
@@ -792,8 +790,8 @@ export const registerKnowledgeRoutes = (context: RouteContext): void => {
    *
    * The projection is wider than `/memory-items`: which conversation wrote this, when it was last
    * confirmed, what it has been worth. Those are the fields a "keep it or delete it" decision rests
-   * on and the narrower list has no use for. `trust` and `origin` are no longer among them - the
-   * browsable list carries both now, because provenance is not a fact about a decision, it is a
+   * on and the narrower list has no use for. `trust` and `origin` are not among them - the
+   * browsable list carries both, because provenance is not a fact about a decision, it is a
    * fact about the row.
    */
   const memoryReviewFields = (record: MemoryItemRecord, key: Buffer) => ({

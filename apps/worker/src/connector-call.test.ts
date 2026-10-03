@@ -54,13 +54,13 @@ describe('reaching a connected service', () => {
     ).toBe('external_calendar');
     /*
      * A result the connector layer already wrapped is re-labelled rather than wrapped twice - and
-     * re-labelled rather than passed through, which is what it used to be.
+     * re-labelled rather than passed through.
      *
-     * The pass-through trusted `trust:'untrusted'` on a value the far end wrote. That is safe for
-     * the case it was written for, because `mail-connectors.ts` wraps its own reads and the field
-     * is this build's; it was not safe for MCP, where the whole payload is a remote server's and a
-     * server answering with an envelope of its own had its `origin` string carried verbatim into
-     * the once-per-turn notice and onto the owner's timeline. Recognition is now the pair - the
+     * A pass-through would trust `trust:'untrusted'` on a value the far end wrote. That is safe
+     * for mail, because `mail-connectors.ts` wraps its own reads and the field is this build's; it
+     * is not safe for MCP, where the whole payload is a remote server's and a server answering with
+     * an envelope of its own would have its `origin` string carried verbatim into the
+     * once-per-turn notice and onto the owner's timeline. Recognition is the pair - the
      * trust word *and* the provenance string this kind would have produced - so the mail shape
      * still comes back out identical in content while anything else is nested where it belongs.
      */
@@ -100,9 +100,9 @@ describe('reaching a connected service', () => {
   });
 
   it('labels every connector a read can come back from, not only the two it started with', () => {
-    // The guard used to be `if (!isMailConnectorKind(kind)) return result`, so a GitHub issue body,
-    // a pull request description, a WebDAV file and every MCP tool result came back with no
-    // envelope at all - and those are the two most heavily exploited indirect-injection channels
+    // A guard of `if (!isMailConnectorKind(kind)) return result` would leave a GitHub issue body,
+    // a pull request description, a WebDAV file and every MCP tool result with no envelope at
+    // all - and those are the two most heavily exploited indirect-injection channels
     // in the public record. An MCP tool *description* is model-visible context too, which is why
     // listing them is labelled as well as calling one.
     for (const [kind, action, origin] of [

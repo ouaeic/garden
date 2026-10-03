@@ -98,13 +98,12 @@ export const taskNameTokens = (nameIndex: ConversationNameIndex): [string, strin
  * The two figures a conversation carries that are not columns on `tasks`: how many follow-ups are
  * waiting behind it, and what it has cost in real money.
  *
- * They live here as one fragment because three statements that hand a task straight back to the
- * owner used to answer them with `0 AS queued_message_count` and no spend column at all, which
- * `mapTask` turns into "nothing queued, nothing spent". The client writes the returned record into
- * the sidebar row, so pinning a running conversation cleared its "2 queued" pill and reset its
- * spend to $0.00 until the next full reload - and renaming one, and writing again to a finished
- * one, did the same. Every statement that returns a task now reads from the same definition, so
- * the next one cannot half-fill the record either.
+ * They live here as one fragment because every statement that hands a task straight back to the
+ * owner has to answer them. `0 AS queued_message_count` and no spend column is what `mapTask` turns
+ * into "nothing queued, nothing spent", and the client writes the returned record into the sidebar
+ * row - so a pin, a rename or a follow-up to a finished conversation answered that way would clear
+ * its "2 queued" pill and reset its spend to $0.00 until the next full reload. Every statement that
+ * returns a task reads from the same definition, so none of them can half-fill the record.
  *
  * The alias is `t` in all of them, which is why it is baked in rather than passed.
  *

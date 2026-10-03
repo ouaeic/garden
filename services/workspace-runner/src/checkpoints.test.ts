@@ -260,11 +260,11 @@ describe('turn checkpoints', () => {
   it('records the size and mtime of the bytes it hashed, not of an earlier instant', async () => {
     // The walk stats the tree and a second pass hashes what changed, and between the two the
     // workspace is still running: a checkpoint create does not stop the services, because a turn
-    // cannot afford to pause a watch build. A build that rewrote a file in that window used to
-    // leave the manifest carrying the *old* size and mtime against the *new* content's hash. A
-    // restore then wrote back bytes produced after the moment the owner asked to return to, and
-    // set the mtime to the older stamp - so the next checkpoint saw the file as unchanged and the
-    // wrong content was pinned for good.
+    // cannot afford to pause a watch build. If a build rewrote a file in that window and the
+    // manifest carried the *old* size and mtime against the *new* content's hash, a restore would
+    // write back bytes produced after the moment the owner asked to return to, and set the mtime
+    // to the older stamp - so the next checkpoint would see the file as unchanged and the wrong
+    // content would be pinned for good.
     const { workspaceRoot, root } = await workspace();
     const checkpoints = new WorkspaceCheckpoints(config(workspaceRoot));
     const target = path.join(root, 'workspace', 'app.js');
@@ -291,12 +291,12 @@ describe('turn checkpoints', () => {
   });
 
   it('refuses a restore whose stored content has gone, before it deletes anything', async () => {
-    // A restore used to unlink everything made since the checkpoint and only then start cloning
-    // content back, and the blob store can be short an object - a collection that skipped a
-    // manifest it could not read, an interrupted delete between the manifest and the metadata.
-    // The clone threw ENOENT into a tree that had already lost the work of the last turn, the
-    // route answered a bare failure, and the only way back was a recovery point the owner was
-    // never told about. Nothing is destroyed now until every blob the restore will read is there.
+    // The blob store can be short an object - a collection that skipped a manifest it could not
+    // read, an interrupted delete between the manifest and the metadata. A restore that unlinked
+    // everything made since the checkpoint before cloning content back would throw ENOENT into a
+    // tree that had already lost the work of the last turn, and the only way back would be a
+    // recovery point the owner was never told about. Nothing is destroyed until every blob the
+    // restore will read is there.
     const { workspaceRoot, root } = await workspace();
     const checkpoints = new WorkspaceCheckpoints(config(workspaceRoot));
     await writeFile(path.join(root, 'workspace', 'report.md'), 'first draft\n');
@@ -322,10 +322,10 @@ describe('turn checkpoints', () => {
 
   it('survives a turn whose new files hold identical content, which share one blob', async () => {
     // The copies run in parallel and a blob is named by its content, so duplicates that are new in
-    // the same turn all reach for the one destination at once. They used to share a scratch name
-    // too: the second writer deleted the first one's finished copy, the first one's rename failed,
-    // and the turn ran with no undo point because the workspace happened to contain two identical
-    // files. Sixteen of them, which is the width of the copy pass.
+    // the same turn all reach for the one destination at once. If they shared a scratch name too,
+    // the second writer would delete the first one's finished copy, the first one's rename would
+    // fail, and the turn would run with no undo point because the workspace happened to contain
+    // two identical files. Sixteen of them, which is the width of the copy pass.
     const { workspaceRoot, root } = await workspace();
     const checkpoints = new WorkspaceCheckpoints(config(workspaceRoot));
     const body = randomBytes(64 * 1024);
@@ -473,11 +473,11 @@ describe('turn checkpoints', () => {
   });
 
   it('leaves blobs alone when a manifest cannot be read, rather than deleting what it cannot see', async () => {
-    // The silent loss this locks out: an unreadable manifest used to be skipped, which said "this
-    // checkpoint names no content", and the sweep then deleted every blob only it was holding. Its
-    // .json survived, so the checkpoint stayed in the list and was still offered - and the owner
-    // found out when the restore they were relying on could not find its content. Keeping
-    // unreferenced blobs costs disk. Deleting referenced ones costs them the undo.
+    // The silent loss this locks out: skipping an unreadable manifest says "this checkpoint names
+    // no content", and the sweep would then delete every blob only it was holding. Its .json
+    // survives, so the checkpoint stays in the list and is still offered - and the owner finds out
+    // when the restore they were relying on cannot find its content. Keeping unreferenced blobs
+    // costs disk. Deleting referenced ones costs them the undo.
     const { workspaceRoot, root } = await workspace();
     const checkpoints = new WorkspaceCheckpoints(config(workspaceRoot, { retainTurns: 2 }));
     const directory = path.join(workspaceRoot, '.garden-checkpoints', WORKSPACE_ID);
@@ -678,12 +678,11 @@ describe('turn checkpoints', () => {
    * something other than a person can read.
    *
    * `apps/worker/src/agent.ts ownerFixableCheckpointFailure` decides whether a turn that lost its
-   * undo point says so in the conversation or only in the work log. It used to decide it by running
-   * a regular expression over the runner's prose, which matched the disk sentence and never matched
-   * this one - so a workspace over the file ceiling (two `node_modules` trees is enough) lost every
-   * automatic checkpoint from then on, silently, and the rewind dialog told the owner the turn
-   * "changed nothing on the computer". It now keys on these codes, and this is the end of the wire
-   * that produces them; `agent-run.test.ts` holds the other end.
+   * undo point says so in the conversation or only in the work log. It keys on these codes rather
+   * than the runner's prose, because a pattern over the prose can match one refusal and miss the
+   * other - and a workspace over the file ceiling (two `node_modules` trees is enough) would then
+   * lose every automatic checkpoint silently. This is the end of the wire that produces the codes;
+   * `agent-run.test.ts` holds the other end.
    *
    * The ceiling is reached with `maxFiles: 2` rather than by writing a thousand files. A thousand
    * writes to a temporary directory to prove a comparison bought nothing but seconds on every run,

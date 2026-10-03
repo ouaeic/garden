@@ -235,7 +235,7 @@ describe('OpenRouter live catalog', () => {
     const alias = result.find((model) => model.providerModelId === '~anthropic/claude-opus-latest');
     expect(alias?.intelligenceQuality).toBe(1);
     expect(alias?.intelligenceIndex).toBe(60.7);
-    // ...and the tilde no longer hides an explicit-cache route from the breakpoint logic.
+    // ...and the tilde does not hide an explicit-cache route from the breakpoint logic.
     expect(alias?.promptCacheStyle).toBe('explicit');
   });
 
@@ -338,7 +338,7 @@ describe('OpenRouter live catalog', () => {
       previous
     });
 
-    // One 401 used to reject the whole Promise.all and blank the catalogue back to seeds.
+    // One 401 must not reject the whole Promise.all and blank the catalogue back to seeds.
     const opus = result.find((model) => model.providerModelId === 'anthropic/claude-opus-5');
     expect(opus?.inputUsdPerMillionTokens).toBe(5);
     expect(opus?.intelligenceQuality).toBe(1);
@@ -412,11 +412,10 @@ describe('OpenRouter live catalog', () => {
   /*
    * Strict scope's fail-closed contract, tested on a condition that can actually occur.
    *
-   * This used to read the clock forward to a review's `reviewExpiresAt` and assert the model went
-   * to `review` on that day. Reviews no longer expire - a published licence is a fact about a
-   * published artefact, not a subscription - so what remains is the disagreement the review exists
-   * to catch: the catalogue declaring one licence while the manifest reviewed another. That is what
-   * a relicensing upstream looks like from here, and unlike a date it is a real event.
+   * Reviews do not expire - a published licence is a fact about a published artefact, not a
+   * subscription - so what is tested is the disagreement the review exists to catch: the catalogue
+   * declaring one licence while the manifest reviewed another. That is what a relicensing upstream
+   * looks like from here, and unlike a date it is a real event.
    */
   it('fails closed in strict scope when the catalogue declares a licence the review does not confirm', async () => {
     const relicensed = seedModels().map((model) =>
@@ -541,15 +540,15 @@ describe('OpenRouter live catalog', () => {
   });
 
   /*
-   * Two columns describing one fact, and they used to disagree.
+   * Two columns describing one fact, and they must agree.
    *
-   * `privacyRoute` was the literal `'provider_zdr'` on every live entry, written three lines below
-   * the honest per-model answer the endpoint feed had just produced. So a model the provider serves
-   * from no zero-retention endpoint at all was stored as `zeroDataRetentionAvailable: false` *and*
-   * `privacyRoute: 'provider_zdr'`, and `privacyRoute` is the routing input - it is what
-   * `isPrivacyRouteEligible` matches on and what the worker's delegate picker compares a task
-   * against. That picker reads the catalogue raw and checks the route alone, so on a zero-retention
-   * task the strongest specialist available was chosen from models with no private route.
+   * `privacyRoute` is the routing input - it is what `isPrivacyRouteEligible` matches on and what
+   * the worker's delegate picker compares a task against. Set to the literal `'provider_zdr'` on
+   * every live entry regardless of the per-model answer the endpoint feed produces, a model the
+   * provider serves from no zero-retention endpoint at all would be stored as
+   * `zeroDataRetentionAvailable: false` *and* `privacyRoute: 'provider_zdr'`. That picker reads the
+   * catalogue raw and checks the route alone, so on a zero-retention task the strongest specialist
+   * available would be chosen from models with no private route.
    */
   it('offers a model on the zero-retention route only where the endpoint feed found one', async () => {
     const result = await refreshOpenRouterCatalog(seedModels(NOW), {
@@ -761,14 +760,13 @@ describe('benchmark populations', () => {
 });
 
 /*
- * Nothing arriving from the provider used to be bounded on the way in.
+ * Everything arriving from the provider is bounded on the way in.
  *
- * `contextTokens` was `context_length` or a 128,000 default, `maxOutputTokens` was whatever
- * `top_provider.max_completion_tokens` said, and `perMillion` refused only negatives and
- * non-finites. Every one of those numbers is read by something that acts on it: the context builder
- * packs a window to `contextTokens` and subtracts `maxOutputTokens` from it, and a price decides
- * both the model's usage class and whether the owner's spending ceiling lets it be picked at all.
- * A single mistyped figure in a feed nobody here controls therefore reached the arithmetic intact.
+ * `contextTokens`, `maxOutputTokens` and every price are read by something that acts on them: the
+ * context builder packs a window to `contextTokens` and subtracts `maxOutputTokens` from it, and a
+ * price decides both the model's usage class and whether the owner's spending ceiling lets it be
+ * picked at all. Unbounded, a single mistyped figure in a feed nobody here controls would reach the
+ * arithmetic intact.
  */
 describe('bounds on what the feed is allowed to say', () => {
   /** One entry per way the feed can state a number that cannot be true. */
@@ -879,7 +877,7 @@ describe('bounds on what the feed is allowed to say', () => {
     // A hundred million tokens is not a window; the context builder would pack against it.
     expect(byId.get('vendor/impossible-window')?.contextTokens).toBe(MAX_CREDIBLE_CONTEXT_TOKENS);
     // Zero is not a window either, and the contract refuses it: `contextTokens` is a positive int,
-    // so this row used to be dropped by the parse at the API boundary rather than corrected here.
+    // so without the fallback this row would be dropped by the parse at the API boundary.
     expect(byId.get('vendor/no-window')?.contextTokens).toBe(128_000);
   });
 
@@ -1012,12 +1010,11 @@ describe('the media catalogue the chat refresh throws away', () => {
   });
 
   /**
-   * The pricing block this path used to throw away, and what reading it settles.
+   * The pricing block in the media feed, and what reading it settles.
    *
-   * The importer had never looked at it, and tagged every live entry "Price not published" on the
-   * strength of not having looked. It is there, and it is per-token on both fields the importer
-   * parses - which converts to dollars per minute for nothing. So no price is set, and the two
-   * facts the old tag ran together are now told apart.
+   * It is there, and it is per-token on both fields the importer parses - which converts to dollars
+   * per minute for nothing. So no price is set, and "no price published" is told apart from "a
+   * price published in units that do not convert".
    */
   const pricedInTokens = {
     data: [
@@ -1401,13 +1398,13 @@ describe('shapes the feed is allowed to grow', () => {
 });
 
 /*
- * The one drop in this file that used to happen in complete silence.
+ * A drop that must not happen in silence.
  *
  * A model whose output is neither text nor one of the three kinds the media catalogue offers is
  * skipped by the chat refresh for not emitting text and skipped by the media refresh for emitting
  * nothing it can carry, so it exists nowhere - which is exactly how a new output modality would
- * arrive. An absurd price has always been journalled; this was not, and an owner asking why their
- * provider's new release never appeared had nothing anywhere to read.
+ * arrive. Like an absurd price, it is journalled; otherwise an owner asking why their provider's
+ * new release never appeared would have nothing anywhere to read.
  */
 describe('a model this build has no route for at all', () => {
   const feed = (rows: unknown[]) =>

@@ -11,24 +11,19 @@
 /**
  * The action shapes for the browser and the desktop, declared rather than described.
  *
- * Both used to be a bare `{type:'object'}` with every field name buried in one paragraph of the
- * tool description - which is exactly where a model guesses `value` for `text`, or `element` for
- * `selector`, and burns a round trip finding out. So every field is declared and typed, and it
- * still is.
+ * Every field is declared and typed. A field name buried in one paragraph of the tool description
+ * is exactly where a model guesses `value` for `text`, or `element` for `selector`, and burns a
+ * round trip finding out.
  *
- * What changed is the encoding. Declaring them as a twenty-variant `oneOf` spent about five
- * kilobytes of every request on scaffolding rather than on capability: each variant repeated
- * `{"type":"object","additionalProperties":false,"description":…,"required":[…],"properties":
- * {"type":{"const":…}}}`, and the selector and tabId definitions were written out six and
- * seventeen times. Measured on browser_action, the union serialised to 8.3 kB of which only
- * 1.5 kB was variant description. `$defs`/`$ref` was measured too and came out *worse* at this
- * repetition count. A flat property bag discriminated by a sibling `action` enum came out at
- * about a third, and it is the shape `connector_action` below already ships. Only the per-action
- * *required set* moved into prose; nothing became untyped and nothing was withheld.
+ * The encoding is a flat property bag discriminated by a sibling `action` enum, the shape
+ * `connector_action` below also has. A twenty-variant `oneOf` would cost about three times the
+ * bytes, spent on scaffolding rather than on capability: each variant repeats the object
+ * boilerplate, and the selector and tabId definitions would be written out six and seventeen
+ * times. `$defs`/`$ref` comes out *worse* at this repetition count. Only the per-action *required
+ * set* is in prose; nothing is untyped and nothing is withheld.
  *
- * The runner still validates against the BrowserAction and DesktopAction discriminated unions in
- * @garden/contracts, which did not move - `surfaceActionRequest` below is the single place the
- * two spellings meet.
+ * The runner validates against the BrowserAction and DesktopAction discriminated unions in
+ * @garden/contracts - `surfaceActionRequest` below is the single place the two spellings meet.
  */
 import { textValue } from './values.js';
 
@@ -70,34 +65,11 @@ export const browserActionProperties: Record<string, unknown> = {
     type: 'string',
     enum: browserActionEnum,
     /*
-     * The `wait_for` clause used to recommend network quiescence, and it recommended it for the
-     * one case docs/design/browser-automation.md bans it for BY NAME, twice - once in its list of
-     * what to ban from the codebase ("`waitForLoadState('networkidle')` (deprecated and wrong on
-     * SPAs with long-polling/websockets)") and once in its pitfalls ("`networkidle` is deprecated
-     * and never fires on SPAs with websockets or long-polling"). Quoted rather than cited by line,
-     * because the two line numbers this comment first carried were already stale when it shipped:
-     * the same wave that wrote them edited that document. The old sentence read "with none of those three it waits
-     * for the network to go idle, which is what a single-page application needs after navigate" -
-     * the exact inversion of the design, pointed at the exact page shape the design excludes. The
-     * bare form is still what `#waitFor` in services/workspace-runner/src/browser.ts falls through
-     * to, so this was the catalogue telling the model to prefer the arm's worst branch.
-     *
-     * The replacement steers to the three conditions and says what the bare form is worth, WITHOUT
-     * naming the mechanism, because the mechanism is being replaced underneath it in this same
-     * wave and a description that named one would be stale on arrival. "Waits on the page alone"
-     * is true of both: of the `waitForLoadState('networkidle')` this was written against, and of
-     * the `waitForLoadState('load')`-plus-settle protocol replacing it in
-     * services/workspace-runner/src/browser.ts - read from that lane's working tree rather than
-     * assumed. Neither knows a condition inside the application, which is the whole point.
-     * "Can satisfy while still empty" is the failure the runner's own `#waitFor` comment already
-     * records - "a snapshot taken straight after `navigate` on a single-page application returns
-     * the empty shell" - and the replacement arm now says the same thing back in its own result
-     * string, "wait on a selector or on text to wait for something in particular". The wire and
-     * the arm agree without either quoting the other.
-     *
-     * It does NOT say what to do when all three conditions are unknowable; there is no fourth
-     * branch in the arm to point at. Byte-neutral was the brief and it came in under: the clause
-     * went from 125 bytes to 120, measured, so the catalogue moved 55,673 -> 55,668.
+     * The `wait_for` entry names its three conditions and no mechanism. A bare wait falls through
+     * to waiting on the page alone in `#waitFor` in services/workspace-runner/src/browser.ts, and
+     * that can be satisfied by a single-page application's empty shell;
+     * docs/design/browser-automation.md bans network quiescence for the same page shape. Naming no
+     * mechanism keeps the description true whichever one the runner uses underneath it.
      */
     description:
       'Fields per action: navigate url. click, double_click, hover selector. type selector, text, mode (keys sends real keystrokes for typeaheads and validators). select_option selector, values. upload selector, paths. text_input text. press key. scroll deltaY, deltaX?, selector?. wait_for selector+state, text or urlIncludes, timeoutMs. new_tab url?, activate?. select_tab, close_tab, inspect_tab tabId. click_at x, y. dialog response, promptText?. screenshot path. batch actions.'

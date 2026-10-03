@@ -50,8 +50,8 @@ export const parseXml = (input: string): XmlNode => {
   // Opens that were refused a place on the stack because the document is deeper than we will
   // follow. Their closing tags have to be swallowed here rather than popping a real ancestor:
   // popping one closes an element that is still open, and every element after it reattaches to
-  // the wrong parent. Measured on a 30-deep document, a top-level sibling of the deep subtree
-  // ended up inside it, and a <response>'s calendar-data came back empty.
+  // the wrong parent: a top-level sibling of the deep subtree ends up inside it, and a
+  // <response>'s calendar-data comes back empty.
   let suppressed = 0;
   let nodes = 0;
   let index = 0;
@@ -307,10 +307,10 @@ export interface CalDavObject {
 
 const objectsFrom = (context: CalDavContext, document: XmlNode, limit: number): CalDavObject[] =>
   findAll(document, 'response')
-    // Everything a response has to have is checked before the limit is applied. It used to be
-    // checked after, so a multistatus whose first entries carry no VCALENDAR - a 404 propstat,
-    // a collection listed alongside its members - spent the caller's budget on rows that were
-    // then dropped, and a range that did contain `limit` events came back short.
+    // Everything a response has to have is checked before the limit is applied. Checked after,
+    // a multistatus whose first entries carry no VCALENDAR - a 404 propstat, a collection listed
+    // alongside its members - would spend the caller's budget on rows that are then dropped, and
+    // a range that does contain `limit` events would come back short.
     .filter((entry) => {
       const data = findFirst(entry, 'calendar-data')?.text;
       return Boolean(responseHref(entry) && data && data.includes('BEGIN:VCALENDAR'));

@@ -128,9 +128,8 @@ describe('the conversion a photograph gets', () => {
   });
 
   /*
-   * The branch a phone photograph actually takes, and the one that used to not exist. A JPEG needs
-   * no conversion to be accepted, so it was answered with the bytes off the disk - and a JPEG is
-   * what a camera roll, a message and a download all produce, with where it was taken,
+   * The branch a phone photograph actually takes. A JPEG needs no conversion to be accepted, but a
+   * JPEG is what a camera roll, a message and a download all produce, with where it was taken,
    * when, and on which body still written into it. The strip is on this pass and on no other, so
    * the format most likely to be carrying all three has to take it.
    */

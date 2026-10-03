@@ -638,10 +638,10 @@ describe('calendar connector', () => {
   });
 
   /**
-   * The incident this guards: "move my Tuesday standup to 10 am". The update used to rebuild the
-   * VEVENT from six scalar fields, so the repeat, the reminder, the zone and every accepted RSVP
-   * were replaced by a one-off UTC event that re-invited everybody. A PUT with If-Match over a
-   * CalDAV server is not covered by any checkpoint, so there is nothing to restore from.
+   * "Move my Tuesday standup to 10 am" must keep the repeat, the reminder, the zone and every
+   * accepted RSVP. An update that rebuilt the VEVENT from six scalar fields would replace them with
+   * a one-off UTC event that re-invites everybody. A PUT with If-Match over a CalDAV server is not
+   * covered by any checkpoint, so there is nothing to restore from.
    */
   const updateStandup = async (action: Record<string, unknown>) => {
     const calls: ConnectorRequestInput[] = [];
@@ -1158,8 +1158,8 @@ describe('caldav transport bounds', () => {
   });
 
   it('keeps the rest of a document that is deeper than the reader will follow', () => {
-    // Over the depth limit the reader used to append the node but not push it, so the node's own
-    // closing tag popped a still-open ancestor and everything after it reattached one level up.
+    // A node over the depth limit is not pushed, so its own closing tag must not pop a still-open
+    // ancestor; if it did, everything after it would reattach one level up.
     const deep = (depth: number, inner: string): string => {
       let out = inner;
       for (let level = depth; level > 0; level -= 1) out = `<d:n${level}>${out}</d:n${level}>`;

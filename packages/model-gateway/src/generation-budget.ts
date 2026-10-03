@@ -27,9 +27,9 @@
  * asks for is bounded by the request's own `maxTokens`, which on this box is at most 16,384; the
  * caller's fifteen-minute deadline therefore already demands about eighteen tokens a second of any
  * route writing a full-length answer, and this asks for twenty-seven. That is a small tightening of
- * a floor the owner's box has always had, and it comes with a large loosening of the consequence:
- * passing this deadline no longer throws away the turn. What was generated comes back marked, and
- * the caller decides. A genuine long answer that trips it loses one step, not the task.
+ * the floor, and passing it costs little: this deadline does not throw away the turn. What was
+ * generated comes back marked, and the caller decides. A genuine long answer that trips it loses
+ * one step, not the task.
  */
 export const DEFAULT_GENERATION_TIMEOUT_MS = 600_000;
 
@@ -52,9 +52,9 @@ export const DEFAULT_GENERATION_MAX_CHARS = 400_000;
  *
  * `cancelled` is the caller's own signal rather than a clock: the repetition watch aborting a model
  * that has stopped saying anything new, or the owner pressing Stop. It is here because those tokens
- * were generated and billed exactly like the other three - the abort used to escape as an exception
- * and take the whole step's billing with it, so the one generation the box stops on purpose was the
- * one generation nobody ever paid for on paper.
+ * were generated and billed exactly like the other three. An abort that escaped as an exception
+ * would take the whole step's billing with it, and the one generation the box stops on purpose
+ * would be the one generation nobody ever paid for on paper.
  */
 export type GenerationCutoff = 'stalled' | 'timeout' | 'overrun' | 'cancelled' | 'framing';
 

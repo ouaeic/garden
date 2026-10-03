@@ -1597,18 +1597,16 @@ export const migrations = [
   {
     version: 42,
     name: 'previews_expire_from_disuse',
-    // expires_at used to be a countdown started at creation, capped at 24 hours, on the private
-    // link to an app running on the owner's own computer. The owner's phone could not open it the
-    // next morning, and the only thing that did not expire was publishing to the public internet.
-    //
-    // The column stays, and now measures the opposite thing: how long the link has left if nobody
-    // opens it. Every request through the preview gateway pushes it back out, so a preview in use
-    // never lapses, and one nobody has touched for a month closes rather than leaving a bearer
-    // token live in a chat history forever.
+    // expires_at on the private link to an app running on the owner's own computer measures how
+    // long the link has left if nobody opens it. A countdown started at creation and capped at 24
+    // hours would leave the owner's phone unable to open it the next morning, with publishing to
+    // the public internet the only thing that did not expire. Every request through the preview
+    // gateway pushes it back out, so a preview in use never lapses, and one nobody has touched for
+    // a month closes rather than leaving a bearer token live in a chat history forever.
     //
     // Live private previews are given the full idle window here rather than being left on whatever
-    // was left of their old countdown, which for most of them is minutes. Ones that had already
-    // lapsed stay lapsed: this restores nothing the owner has already lost.
+    // remains of a countdown from creation, which for most of them is minutes. Ones that had
+    // already lapsed stay lapsed: this restores nothing the owner has already lost.
     sql: `
       UPDATE workspace_previews SET expires_at = NOW() + INTERVAL '30 days', updated_at = NOW()
        WHERE status = 'active' AND visibility = 'private'
@@ -2035,7 +2033,8 @@ export const migrations = [
     // so it survives the deletion of the one that happened to observe it.
     //
     // Existing orphans are removed rather than detached. A row whose task no longer exists is
-    // memory of a conversation the owner has already deleted, and keeping it was the defect.
+    // memory of a conversation the owner has already deleted, and keeping it would defeat the
+    // deletion.
     sql: `
       DELETE FROM mem.source WHERE task_id IS NOT NULL
         AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.id = mem.source.task_id);
@@ -2566,16 +2565,15 @@ export const migrations = [
   {
     version: 71,
     name: 'a_proposal_is_not_a_promotion',
-    // Three columns, and each of them exists because something that used to be a property of one
-    // turn now has to survive that turn and be read by a pass which runs a day later.
+    // Three columns, and each of them exists because something that is a property of one turn has
+    // to survive that turn and be read by a pass which runs a day later.
     //
     // `mem.item.tainted` is the one that matters. "A turn that read somebody else's words settles
-    // nothing durable" was enforced entirely in the worker, at the moment the episode was written:
-    // `recordTurnEpisode` skipped its observations and its promotions and recorded nothing about
-    // WHY. The verbatim owner text of that turn still went into `mem.source`, because sources are
-    // written unconditionally - so any later reader of `mem.source` walks straight past a gate that
-    // has no representation in the database at all. A nightly pass that reads yesterday's turns is
-    // exactly such a reader.
+    // nothing durable", enforced only in the worker at the moment the episode is written, records
+    // nothing about WHY. The verbatim owner text of that turn still goes into `mem.source`, because
+    // sources are written unconditionally - so any later reader of `mem.source` would walk straight
+    // past a gate that had no representation in the database at all. A nightly pass that reads
+    // yesterday's turns is exactly such a reader.
     //
     // Deliberately NULLABLE with no default, which is the whole design of the column. Rows written
     // before today have no answer to "did that turn read somebody else's words", and the only
@@ -2818,10 +2816,9 @@ export const migrations = [
      * `consolidateMemory` deletes `mem.item_use` rows past `useRetentionDays` (180). That bound is
      * real - the table takes one row per packed item per turn and is the only table here that
      * grows with usage rather than with content - but a sum over EVERY prior use cannot be taken
-     * against a table that forgets. Removing the 90-day window without this would have moved the
-     * cliff to day 180 and called it fixed.
+     * against a table that forgets. Without this, the cliff would only move to day 180.
      *
-     * So the retention statement no longer deletes; it FOLDS. What leaves `mem.item_use` arrives
+     * So the retention statement does not delete; it FOLDS. What leaves `mem.item_use` arrives
      * here as a count and a span, and the activation of the folded block is recovered from the
      * closed form of the same power law, which for `n` uses spread over `[a, b]` is
      *
@@ -2839,23 +2836,22 @@ export const migrations = [
      *
      * `mem.prior` — the salience factor stops being one-sided.
      *
-     * It read `1.0 + 0.15 * ln(1 + greatest(salience, 0))`, and `greatest(salience, 0)` is the
-     * reason negative reinforcement could not have reached the ranking even once its term was
-     * fixed: every negative salience mapped to exactly the factor of an unused row. `asinh` is the
-     * signed log - `ln(x + sqrt(x*x+1))`, odd, smooth, exactly 0 at 0, logarithmic in both tails -
-     * and wrapping it in `exp` keeps the factor strictly positive for every finite salience, which
-     * a bare `1 + c * asinh(s)` does not: salience is a weighted sum of z-scores, a z-score in a
-     * workspace of `n` rows can reach sqrt(n-1), and at large negative salience the old shape
-     * would have crossed zero and inverted the ranking it multiplies.
+     * A one-sided factor, `1.0 + 0.15 * ln(1 + greatest(salience, 0))`, keeps negative
+     * reinforcement from ever reaching the ranking: every negative salience maps to exactly the
+     * factor of an unused row. `asinh` is the signed log - `ln(x + sqrt(x*x+1))`, odd, smooth,
+     * exactly 0 at 0, logarithmic in both tails - and wrapping it in `exp` keeps the factor
+     * strictly positive for every finite salience, which a bare `1 + c * asinh(s)` does not:
+     * salience is a weighted sum of z-scores, a z-score in a workspace of `n` rows can reach
+     * sqrt(n-1), and at large negative salience that shape would cross zero and invert the ranking
+     * it multiplies.
      *
-     * `exp(0.15 * asinh(s))` is `1 + 0.15*s + O(s^2)` at the origin, which is what
-     * `1 + 0.15 * ln(1+s)` was, so nothing near zero moves. `0.15` is unchanged and deliberately
-     * so: the salience definition is what this migration is changing, and moving the coefficient
-     * in the same pass would leave neither measurable. It is a chosen number and the audit's
-     * finding against it stands - across this owner's measured salience range it is worth a factor
-     * of 0.94x to 1.25x, against 2.86x for the recency term beside it. What would change it: a
-     * measurement of how far the usage tier SHOULD be able to move a rank, which nothing in this
-     * repository has yet made.
+     * `exp(0.15 * asinh(s))` is `1 + 0.15*s + O(s^2)` at the origin, as is `1 + 0.15 * ln(1+s)`, so
+     * nothing near zero moves. `0.15` is unchanged and deliberately so: the salience definition is
+     * what this migration is changing, and moving the coefficient in the same pass would leave
+     * neither measurable. It is a chosen number - across this owner's measured salience range it is
+     * worth a factor of 0.94x to 1.25x, against 2.86x for the recency term beside it. What would
+     * change it: a measurement of how far the usage tier SHOULD be able to move a rank, which
+     * nothing in this repository has yet made.
      *
      * One new table, inline constraints, one CREATE OR REPLACE over a function body. Nothing
      * rewrites a row: no entry in `REWRITING_MIGRATIONS`. No index - every read of the new table
@@ -3007,20 +3003,20 @@ export const migrations = [
     /*
      * `mem.item_use_fold.oks` - the half of the folded block that a use actually earned.
      *
-     * The live half of the usage score partitions `mem.item_use` on `outcome`, and the fold has
-     * only ever held two of the three counts it needs: `uses` (all of them), `cites` and `fails`.
-     * The salience statement recovered the positive block as `uses - fails`, which is every use the
-     * harness did not watch fail - and `unknown` is not a use the harness watched at all. It is the
-     * row `recallMemory` writes for something it merely returned and the row `recordMemoryPackOutcome`
-     * writes for a packed entry the finished turn never touched.
+     * The live half of the usage score partitions `mem.item_use` on `outcome`, and without this the
+     * fold holds two of the three counts it needs: `uses` (all of them), `cites` and `fails`.
+     * Recovering the positive block as `uses - fails` counts every use the harness did not watch
+     * fail - and `unknown` is not a use the harness watched at all. It is the row `recallMemory`
+     * writes for something it merely returned and the row `recordMemoryPackOutcome` writes for a
+     * packed entry the finished turn never touched.
      *
-     * With the live half of the score no longer crediting an ungraded use (see the salience
-     * recompute in `packages/data/src/store/memory.ts`), the fold has to be able to say the same
-     * thing about the tail, or the discipline would expire at the retention horizon and 181-day-old
+     * The live half of the score does not credit an ungraded use (see the salience recompute in
+     * `packages/data/src/store/memory.ts`), so the fold has to be able to say the same thing about
+     * the tail, or the discipline would expire at the retention horizon and 181-day-old
      * self-agreement would count as success while yesterday's does not. That is the same class of
-     * cliff migration 75 removed from the count, arriving through the outcome instead.
+     * cliff the fold exists to keep out of the count, arriving through the outcome instead.
      *
-     * THE BACKFILL IS DELIBERATELY THE OLD MEANING, not the new one. A folded block has already
+     * THE BACKFILL IS DELIBERATELY `uses - fails`, not the graded count. A folded block has already
      * thrown its per-use rows away, so which of its uses were graded is unrecoverable from anything
      * this database holds - any value here is a guess, and `uses - fails` is the guess that leaves
      * every already-folded block scoring exactly what it scored the day before this applied. The

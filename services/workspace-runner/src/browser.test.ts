@@ -442,11 +442,10 @@ describe('frame-qualified element refs', () => {
   });
 
   /**
-   * A ref used to be an index into whatever the last scan happened to look at. The scan cleared
-   * every ref in the whole document and re-stamped from zero inside its scope, so a scoped
-   * read_elements - the cheap re-read the form-filling procedure teaches - silently re-pointed
-   * every ref the agent was holding: oc-0-3 had been Submit and became Postcode, and the next
-   * click landed on a different control with nothing reporting that anything had changed.
+   * A ref must keep naming the element it was handed out for. If a scan cleared every ref in the
+   * document and re-stamped from zero inside its scope, a scoped read_elements - the cheap re-read
+   * the form-filling procedure teaches - would silently re-point every ref the agent was holding,
+   * and the next click would land on a different control with nothing reporting the change.
    */
   const frameWith = (counts: Record<string, number>) =>
     ({
@@ -565,9 +564,9 @@ describe('parallel research URL policy', () => {
 });
 
 describe('session browser address policy', () => {
-  // The browser the agent drives used to be the one outbound path with no address policy at all,
-  // so an instruction inside a page or an email could send it at the cloud metadata endpoint or a
-  // service listening on loopback and read the answer back out of a snapshot.
+  // Without an address policy on the browser the agent drives, an instruction inside a page or an
+  // email could send it at the cloud metadata endpoint or a service listening on loopback and read
+  // the answer back out of a snapshot.
   const offLimits = [
     'http://127.0.0.1:4300/healthz',
     'http://localhost:5432/',
@@ -1405,10 +1404,10 @@ describe('search route', () => {
   });
 
   /**
-   * The defect this route was rebuilt for. A search used to run in the session browser, which meant
-   * it required the agent to be holding it: while the owner used their own Chromium - which garden
-   * tells them they may do at any time - every search failed with "browser control is held by user"
-   * and every research task stopped. Nothing here goes near that browser.
+   * A search run in the session browser would require the agent to be holding it: while the owner
+   * used their own Chromium - which garden tells them they may do at any time - every search would
+   * fail with "browser control is held by user" and every research task would stop. Nothing here
+   * goes near that browser.
    */
   it('searches while the owner is holding their own browser, and never opens the session one', async () => {
     const isolated = isolatedSearchBrowser({
@@ -1431,11 +1430,10 @@ describe('search route', () => {
   });
 
   /**
-   * The other half of it. A challenge used to close the engine for the whole session, so the first
-   * one took every later search off the task - and the tool's own advice, carry on elsewhere, had
-   * no elsewhere to point at. It now costs one search, and it says so: the browser wording would
-   * claim a stopped tab and a closed site, neither of which is true here, and the agent acts on
-   * that sentence.
+   * A challenge costs one search, not the engine for the whole session - otherwise the first one
+   * would take every later search off the task, and the tool's own advice, carry on elsewhere,
+   * would have no elsewhere to point at. It says so: the browser wording would claim a stopped tab
+   * and a closed site, neither of which is true here, and the agent acts on that sentence.
    */
   it('reports a search challenge as costing the search rather than the web', async () => {
     const challenged = isolatedSearchBrowser({
@@ -1465,12 +1463,11 @@ describe('search route', () => {
   });
 
   /**
-   * The sentence used to end with a prognosis it had no way to make: searching would be available
-   * again in about a minute, so search again shortly. That was the backoff timer read out as if it
-   * were a forecast. On the deployment garden is built for it was worse than vague - a server's
-   * address is what most engines are refusing, so the next attempt meets the same challenge and the
-   * one after that, and every retry the sentence invited cost the owner a turn and a bill to be
-   * refused again. The agent acts on this sentence, so it now says only what is known.
+   * The backoff timer is not a forecast, and the sentence must not read it out as one. On the
+   * deployment garden is built for, a server's address is what most engines are refusing, so the
+   * next attempt meets the same challenge and the one after that, and every retry a promise invited
+   * would cost the owner a turn and a bill to be refused again. The agent acts on this sentence, so
+   * it says only what is known.
    */
   it('does not promise the agent that the same search will work again in a minute', () => {
     const message = searchWallMessage({

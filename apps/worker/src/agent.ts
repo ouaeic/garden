@@ -786,10 +786,10 @@ export class AgentWorker {
        * A cap that has been reached is not an agent message.
        *
        * The pause raises `spend_paused`, which is its own notification kind with its own switch in
-       * Settings, and this used to raise an `agent_message` beside it for the same event. That made
-       * both switches lie: turning agent messages off silenced spend-cap alerts, and the spending
-       * switch governed nothing the owner could see. The warning at eighty per cent keeps this
-       * channel because there is no pause behind it - nothing else would say anything at all.
+       * Settings. An `agent_message` beside it for the same event would make both switches lie:
+       * turning agent messages off would silence spend-cap alerts, and the spending switch would
+       * govern nothing the owner could see. The warning at eighty per cent keeps this channel
+       * because there is no pause behind it - nothing else would say anything at all.
        */
       if (level === 'exceeded') continue;
       const headline = `Spending has passed the warning point of your ${name} cap: $${window.spentUsd.toFixed(2)} of $${window.capUsd.toFixed(2)}.`;
@@ -807,11 +807,10 @@ export class AgentWorker {
   /**
    * What one model call cost, on the ledger, in the credit total and on the timeline.
    *
-   * Lifted out of the step loop because three paths through that loop need it and only one of them
-   * used to reach it. A generation aborted for looping took a `continue` from above the block and a
-   * generation the owner stopped returned from above it, so the two calls the box ends on purpose -
-   * the two most expensive things a runaway model does - were the two nobody was ever charged for.
-   * The block itself is unchanged; what changed is how many ways there are to arrive at it.
+   * Out of the step loop because three paths through that loop need it. A generation aborted for
+   * looping takes a `continue` and a generation the owner stopped returns, both from above where an
+   * inline block would sit, so inline the two calls the box ends on purpose - the two most
+   * expensive things a runaway model does - would be the two nobody is charged for.
    */
   async #billModelStep(
     task: TaskRecord,
@@ -874,10 +873,10 @@ export class AgentWorker {
       );
     state.credits += credit;
     // Added to rather than replaced. A step is not one model call: a vision handoff, a compaction
-    // summary and a provider search all bill inside the same step, and each of them used to
-    // overwrite this - so the guard that prices the next step from it was quoted whichever of them
-    // happened to run last, which on an image-heavy turn is a light specialist standing in for a
-    // full-window lead call. The loop clears it once, before the call the step is named for.
+    // summary and a provider search all bill inside the same step, and if each overwrote this the
+    // guard that prices the next step from it would be quoted whichever of them happened to run
+    // last, which on an image-heavy turn is a light specialist standing in for a full-window lead
+    // call. The loop clears it once, before the call the step is named for.
     state.lastStepUsd = (state.lastStepUsd ?? 0) + costUsd;
     await recordModelStepUsage(this.store, response, {
       userId: task.userId,
@@ -928,10 +927,10 @@ export class AgentWorker {
         usage: response.usage,
         metadata: response.metadata,
         // Which garden priced this. A cost line is the most-compared number the product emits - a
-        // baseline read back a year later, a regression argued from two transcripts - and until now
-        // nothing on it said which build produced it, so two figures that disagree could not be told
-        // apart from two builds that disagree. `buildIdentity()` is derived once from the checkout and
-        // is a constant for the process, so it costs the row a few bytes and no work.
+        // baseline read back a year later, a regression argued from two transcripts - and without
+        // the build that produced it, two figures that disagree cannot be told apart from two
+        // builds that disagree. `buildIdentity()` is derived once from the checkout and is a
+        // constant for the process, so it costs the row a few bytes and no work.
         build: buildIdentity(),
         reasoningEffort,
         context: {
@@ -986,8 +985,8 @@ export class AgentWorker {
     /*
      * A brake that cannot answer stops the car.
      *
-     * This used to swallow the failure and return "do not halt", so one transient database error
-     * removed the owner's daily ceiling for that step, silently and with nothing written anywhere.
+     * Swallowing the failure and returning "do not halt" would let one transient database error
+     * remove the owner's daily ceiling for that step, silently and with nothing written anywhere.
      * The cap exists precisely so an unattended run cannot get away from the person who is asleep,
      * and the only thing left underneath it is the compute-credit backstop, which sits far above
      * where anyone sets a daily limit. Pausing costs a resumable task; failing open costs money
@@ -1048,7 +1047,7 @@ export class AgentWorker {
       status: 'paused',
       actualComputeCredits: state.credits,
       // The column that tells a pause the owner asked for from one the ceiling imposed. Everything
-      // downstream of `spend_paused` reads it and nothing used to write it.
+      // downstream of `spend_paused` reads it, so it is written here.
       spendPausedAt: runtimeDate(),
       agentStateCiphertext: encryptJson(state, key, `task-state:${task.id}`),
       clearLease: true
@@ -1069,15 +1068,15 @@ export class AgentWorker {
     /*
      * The two columns this asks about, and not the whole row.
      *
-     * `getTask` returns the task with its encrypted trajectory attached, so a poll every three
-     * seconds for the life of a ten-minute tool call read about 190 MB to look at one string -
-     * and the cost rises with the length of the conversation, so the longest turns, the ones this
-     * watch exists to protect, paid the most. `taskClaim` is the narrow read written for exactly
-     * this, and the model call's own stop watch beside it already used it.
+     * `getTask` returns the task with its encrypted trajectory attached, so polling it every three
+     * seconds for the life of a ten-minute tool call would read about 190 MB to look at one
+     * string - and the cost rises with the length of the conversation, so the longest turns, the
+     * ones this watch exists to protect, would pay the most. `taskClaim` is the narrow read written
+     * for exactly this, and the model call's own stop watch beside it uses it too.
      *
-     * Read through `haltReason` as that watch is, which also closes the case this poll could not
-     * see: a task re-queued or re-leased under a running tool call is no longer this run's to
-     * finish, and carrying on with it means writing over whoever holds it now.
+     * Read through `haltReason` as that watch is, which also covers a task re-queued or re-leased
+     * under a running tool call: it is no longer this run's to finish, and carrying on with it
+     * means writing over whoever holds it now.
      */
     const poll = runtimeSetInterval(() => {
       void this.store
@@ -1623,12 +1622,11 @@ export class AgentWorker {
    * One evaluation per call per state of the world. @see approvalForCallOnce in
    * `approval-floor.ts`.
    *
-   * Every site in the loop asks through here rather than through `approvalForCall` directly, which
-   * is what #80's repair amounts to: the first call of a candidate parallel run used to be put to
-   * the floor twice - once while deciding whether the batch could run together and once while
-   * running it - and a floor that reads the task's spend and the turn's taint is not free to ask
-   * twice. `approvalForCall` is still exported for the sibling that owns it and for its own tests;
-   * nothing in this class reaches it any more, so the class no longer keeps a wrapper for it.
+   * Every site in the loop asks through here rather than through `approvalForCall` directly, or the
+   * first call of a candidate parallel run is put to the floor twice - once while deciding whether
+   * the batch can run together and once while running it - and a floor that reads the task's spend
+   * and the turn's taint is not free to ask twice. `approvalForCall` is still exported for the
+   * sibling that owns it and for its own tests; nothing in this class reaches it.
    */
   async #approvalForCallOnce(
     memo: ApprovalFloorMemo,
@@ -1942,20 +1940,19 @@ export class AgentWorker {
      * The one block in the window that is meant to change, moved to the one place where changing
      * it is free.
      *
-     * It used to sit at index 1, immediately behind the operating contract and ahead of the entire
-     * trajectory, and it carries the clock. Turns are minutes apart, so the first byte that
-     * differed between two consecutive turns' requests was inside this message - and every cache
-     * breakpoint the request carries sits behind it. The cached prefix across turns was therefore
-     * not merely degraded but zero: a measured 84% cache rate is exactly what a cache that works
-     * only within a turn produces. Re-billing one whole window per turn at the 1.25x write tier
-     * instead of the 0.1x read tier is roughly half the input bill of a long conversation.
+     * It carries the clock. Turns are minutes apart, so at index 1, immediately behind the
+     * operating contract and ahead of the entire trajectory, the first byte that differs between
+     * two consecutive turns' requests would be inside this message - and every cache breakpoint the
+     * request carries sits behind it. The cached prefix across turns would be not merely degraded
+     * but zero. Re-billing one whole window per turn at the 1.25x write tier instead of the 0.1x
+     * read tier is roughly half the input bill of a long conversation.
      *
      * At the tail it costs nothing, because the tail is rewritten by the next step anyway - which
      * is why the active plan and the step-budget notice are already pushed here. It has to be
      * re-pushed every STEP, not once per turn: pushed once per turn it would be buried under that
      * turn's tool results, and removing it on the next turn would rewrite everything behind it -
      * the same disease at a new address. Recency also makes it more salient, not less, so the
-     * clock can now be fresher than it was and still free.
+     * clock can be fresh and still free.
      */
     /*
      * Resolved once for the turn, not once per step.
@@ -2015,8 +2012,8 @@ export class AgentWorker {
     /**
      * What a closing handoff is built from, fixed for the life of the run.
      *
-     * @see closeTurnAtCeiling in `turn/close.ts`, which is the whole of what the wall-clock, the
-     * credit and the step ceilings each used to write out for themselves.
+     * @see closeTurnAtCeiling in `turn/close.ts`, the one handoff the wall-clock, the credit and
+     * the step ceilings share rather than each writing out its own.
      */
     const closeContext: TurnCloseContext = {
       gateway,
@@ -2535,10 +2532,10 @@ export class AgentWorker {
     /*
      * A message the owner sent while this turn was running outlives the turn.
      *
-     * Nothing here used to look at the queue at all. A correction typed into a turn that was going
-     * wrong - which is the moment the queue exists for - was answered with "the agent picks it up
-     * at its next step", and if the turn then died there was no next step, ever: the row stayed
-     * queued on a task nothing would lease again, and the header went on counting it.
+     * A correction typed into a turn that is going wrong - which is the moment the queue exists
+     * for - is answered with "the agent picks it up at its next step", and if the turn then dies
+     * without looking at the queue there is no next step, ever: the row stays queued on a task
+     * nothing will lease again, and the header goes on counting it.
      *
      * `awaiting_resource` is deliberately not in here. A provider wall is already resumed by the
      * sweep in the API, on a widening interval and with a line of its own when it gives up asking,

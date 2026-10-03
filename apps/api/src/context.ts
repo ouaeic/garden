@@ -242,11 +242,10 @@ export const maxEventStreamsPerUser = 5;
 /**
  * How often an open stream re-asks whether the bearer token that opened it is still good.
  *
- * It used to ask on every batch of frames, which is once per timeline write: a streamed reply
- * writes `assistant_delta` in the hundreds, and each of those questions is a query. The window a
- * revoked token keeps reading for goes from one frame to half a minute, against the hours it kept
- * reading for before this connection re-checked at all - the stream is opened once and then lives
- * as long as the task does, so before the check existed, cutting a token off did nothing to the
+ * Asking on every batch of frames would be once per timeline write: a streamed reply writes
+ * `assistant_delta` in the hundreds, and each of those questions is a query. A revoked token keeps
+ * reading for at most half a minute. The check has to happen at all because the stream is opened
+ * once and then lives as long as the task does: without it, cutting a token off does nothing to the
  * connections already using it.
  */
 const execFileAsync = promisify(execFile);
@@ -583,7 +582,7 @@ export const timerState = async (unit: string): Promise<'on' | 'off' | 'unknown'
 /**
  * Build one server's context.
  *
- * The order is the order `buildServer` used to run in and must stay that way: the database is
+ * The order must stay as it is: the database is
  * migrated before the master key is checked against it, the key is resolved before the two service
  * secrets are derived from it, and the relay reads its saved settings before anything can ask what
  * they are.
@@ -952,12 +951,11 @@ export const createApiContext = async (config: ApiConfig, overrides: ApiOverride
     preview: WorkspacePreviewRecord,
     accessToken?: string
   ): WorkspacePreview => {
-    // Always the slug. A preview used to be able to report a custom domain as its address once a
-    // TXT record verified, but nothing ever routed such a host here: there is one nginx server
-    // block, it matches any name, and only the preview path regex reaches the gateway - so the
-    // owner was handed a link that answered with a certificate warning and then with garden's own
-    // sign-in page. The feature is gone rather than half-present; the columns behind it are left in
-    // place for now so a rollback to the previous release still reads its own rows.
+    // Always the slug. Nothing routes a custom domain here: there is one nginx server block, it
+    // matches any name, and only the preview path regex reaches the gateway - so a custom-domain
+    // link would answer with a certificate warning and then with garden's own sign-in page. The
+    // custom-domain columns stay in the schema so a rollback to the previous release still reads
+    // its own rows.
     const url = new URL(workspacePreviewUrl(preview.slug));
     /*
      * The entry path rides on every address handed out, not only on the one minted at publish

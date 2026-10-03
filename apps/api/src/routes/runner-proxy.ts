@@ -169,8 +169,8 @@ export const registerRunnerProxyRoutes = (context: RouteContext): void => {
         /*
          * Three routes, because the pane spends this credential three ways: it opens the frame
          * stream, it sends private keystrokes straight to the runner rather than through here, and
-         * it moves the holder when the owner takes over. It used to name none of them, which meant
-         * `browser.read` also bought `browser/read-many` - a fetch of any address the caller likes,
+         * it moves the holder when the owner takes over. Naming none of them would let
+         * `browser.read` also buy `browser/read-many` - a fetch of any address the caller likes,
          * from the workspace's own browser - and `browser/search`. Neither is anything this pane
          * does.
          */
@@ -300,16 +300,16 @@ export const registerRunnerProxyRoutes = (context: RouteContext): void => {
   /**
    * What this computer is running right now.
    *
-   * The runner has always kept this list and has always served it; nothing on this side ever asked
-   * for it, so the only account the owner had of their own machine's background work was whatever
-   * the transcript happened to mention. The token is audience-bound to this one GET, so the `exec`
-   * scope it carries cannot be turned round and used to start a process.
+   * The runner keeps this list and serves it; without this route the only account the owner has of
+   * their own machine's background work is whatever the transcript happens to mention. The token is
+   * audience-bound to this one GET, so the `exec` scope it carries cannot be turned round and used
+   * to start a process.
    *
    * The runner answers whatever the workspace's status here says, because the status is not evidence
    * about what is running. Services are built to outlive a snapshot, a checkpoint restore and a
    * runner restart, and the runner brings every one it finds on disk back up when it boots - so a box
-   * this side calls hibernated can be serving, and a panel that short-circuited on the status told
-   * the owner their machine was idle while it was not. Reading this cannot start anything: the
+   * this side calls hibernated can be serving, and a panel that short-circuited on the status would
+   * tell the owner their machine was idle while it was not. Reading this cannot start anything: the
    * runner's route reads an in-memory table and returns an empty list for a workspace it holds
    * nothing for.
    */
@@ -343,10 +343,10 @@ export const registerRunnerProxyRoutes = (context: RouteContext): void => {
   /**
    * Stop one of them.
    *
-   * The runner was widened for exactly this - `ProcessManager.action` takes a null owner so the
-   * person who owns the box is not held to the task subject an agent capability carries - and
-   * nothing on this side ever called it, so a service, which outlives the task that declared it and
-   * comes back after every restart, could be seen in the panel and stopped from nowhere. The
+   * `ProcessManager.action` takes a null owner for exactly this, so the person who owns the box is
+   * not held to the task subject an agent capability carries. Without this route a service, which
+   * outlives the task that declared it and comes back after every restart, could be seen in the
+   * panel and stopped from nowhere. The
    * capability is audience-bound to this one path, so the `exec` scope it carries cannot be turned
    * round and used to start something.
    *

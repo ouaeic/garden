@@ -9,11 +9,11 @@
  * box searches on the provider instead. This is the half that then has to do it.
  *
  * The provider's search is not a function tool. It has no `function.name`, so no model can call it
- * by name; it is a name the provider recognises on a request and acts on itself. It used to be sent
- * in the agent's own tools array with `web_search` withdrawn to make room, which left the model
- * being told to start with a search, finding no search tool, and holding no name for what had
- * replaced it. Asked to research something and cite its sources, it made no tool call at all and
- * answered from memory with fabricated projects and fabricated addresses.
+ * by name; it is a name the provider recognises on a request and acts on itself. Sent in the
+ * agent's own tools array with `web_search` withdrawn to make room, it would leave the model told
+ * to start with a search, finding no search tool, and holding no name for what had replaced it -
+ * and a model in that position, asked to research something and cite its sources, can make no tool
+ * call at all and answer from memory with fabricated projects and fabricated addresses.
  *
  * So `web_search` stays a named function tool on both routes and this answers it: one request whose
  * only job is to run that query, built by garden, carrying the provider's tool and no function

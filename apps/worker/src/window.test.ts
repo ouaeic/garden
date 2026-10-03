@@ -607,8 +607,9 @@ describe('the preamble', () => {
   /**
    * The skill index is ordered by something reading a skill cannot change.
    *
-   * The store returns skills most-recently-updated first and viewing one stamps that column, so the
-   * owner's own browsing used to reorder the front of the prompt. Ids are assigned once.
+   * The store returns skills most-recently-updated first and viewing one stamps that column, so
+   * ordering by it would let the owner's own browsing reorder the front of the prompt. Ids are
+   * assigned once.
    */
   it('orders the skill index by id, not by what the store happened to return', async () => {
     const probed = probe();

@@ -148,8 +148,8 @@ export const SAFE_ENV_KEYS =
  */
 /**
  * Where the agent's `$HOME` is: `.home` at the container root, beside `workspace/` and not inside
- * it. It used to be the container root itself, which is why every dotfile a toolchain wrote landed
- * in the same directory as `workspace/` and `.garden`.
+ * it. Not the container root itself, or every dotfile a toolchain writes would land in the same
+ * directory as `workspace/` and `.garden`.
  *
  * IT IS NOT INSIDE THE UNDO POINT, and nothing here claims it is. `CHECKPOINT_CONTENT` is
  * `['workspace', '.garden/artifacts']` (checkpoints.ts), so a rewind puts the project tree back
@@ -227,12 +227,12 @@ export const HOST_DISK_FLOOR_NOTE =
   '[stopped: this command was using the last of the host disk, which the database and the rest of the computer also need]';
 
 /**
- * The same sentence, for the other stop that was mute.
+ * The same sentence, for the stop that would otherwise be mute.
  *
- * Four things can end an agent command here, and until this existed only two of them said so. The
- * disk floor and the owner's cancel each append their reason to the command's own stderr; a
- * timeout appended nothing, so a six-hour job killed at its deadline came back as `timedOut: true`
- * beside an empty stderr and an exit code of null - which names neither the bound that was hit,
+ * The disk floor and the owner's cancel each append their reason to the command's own stderr, and
+ * a timeout has to as well. Without this a six-hour job killed at its deadline comes back as
+ * `timedOut: true` beside an empty stderr and an exit code of null - which names neither the bound
+ * that was hit,
  * nor the number it was set to, nor the fact that a longer run has somewhere else to go. A model
  * reading that has no way to tell a deadline from a crash, and the cheapest wrong move is to start
  * the whole thing again.
@@ -483,9 +483,9 @@ const PACKAGE_OPERATIONS: Record<string, { update: string; install: string; asse
 /**
  * How to say "install these" to this host's package manager, for advice an agent can run.
  *
- * The toolchain report used to name `apt-get install -y` whatever the host was, so on a Fedora,
- * Rocky, Arch or openSUSE box the one sentence telling an agent how to close a gap named a binary
- * that host has never had. It is built from the table above rather than beside it, so the command
+ * Spelled for this host rather than as `apt-get install -y` everywhere: on a Fedora, Rocky, Arch or
+ * openSUSE box that would make the one sentence telling an agent how to close a gap name a binary
+ * the host has never had. It is built from the table above rather than beside it, so the command
  * the report suggests and the command this file will accept are the same fact.
  */
 export const packageInstallCommandLine = (
@@ -754,9 +754,9 @@ export const prepareInvocation = async (
   // relative name cannot present a basename the checks below do not recognise.
   const resolved = await resolveExecutable(request.executable, searchPath, cwd);
   const asResolved = resolved ? { executable: resolved, args: request.args } : request;
-  // Both paths contribute the package helper, because both refuse a command that names it. This
-  // list used to be built from the rewriting arm alone, which left the background path holding
-  // only the sandbox's elevator - and nothing at all on a host with AGENT_SANDBOX_HELPER unset,
+  // Both paths contribute the package helper, because both refuse a command that names it. Built
+  // from the rewriting arm alone, this list would leave the background path holding only the
+  // sandbox's elevator - and nothing at all on a host with AGENT_SANDBOX_HELPER unset,
   // a configuration config.ts documents as supported. The helper reaches root through NOPASSWD
   // sudo, so on that host a background start could name it directly and get there.
   const privilegedHelpers = [policy.systemPackages.helper, policy.sandbox?.helper];

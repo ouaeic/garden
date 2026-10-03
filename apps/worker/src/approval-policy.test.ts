@@ -74,9 +74,8 @@ describe('agent approval policy', () => {
         purpose: 'Submit the job application'
       })?.sideEffect
     ).toBe('external_consequential');
-    // `~/.ssh` and not `build`, and the swap is the rule being given its missing half rather than
-    // this assertion being weakened. `build` is inside `workspace/`, which the turn's own undo
-    // point restores, so it is no longer a destructive command by this floor's own definition -
+    // `~/.ssh` and not `build`: `build` is inside `workspace/`, which the turn's own undo point
+    // restores, so it is not a destructive command by this floor's own definition -
     // @see `insideCheckpointContent`. The agent's HOME is `.home` beside `workspace/` and not
     // inside it, so this one is a delete nothing here can take back.
     expect(
@@ -218,14 +217,13 @@ describe('agent approval policy', () => {
 
   it('still stops on every browser and desktop action that ever had a floor', () => {
     /*
-     * One row per gate, because the gates and the schema were changed in the same commit.
+     * One row per gate, because the gates read the schema's shape.
      *
-     * browser_action and desktop_action used to arrive as a nested object tagged with `type` and
-     * now arrive as a flat bag whose verb is a sibling `action` string - a five-kilobyte saving on
-     * every request, and a rewrite of the exact comparisons that decide whether the owner is asked.
+     * browser_action and desktop_action arrive as a flat bag whose verb is a sibling `action`
+     * string, and that is what the exact comparisons that decide whether the owner is asked read.
      * A gate that quietly stopped matching would not fail any other test in this file: the call
      * would simply run, and the first anybody heard of it would be a submitted form or an uploaded
-     * CV. So each one is named here with the shape it now reads.
+     * CV. So each one is named here with the shape it reads.
      */
     const floors: ReadonlyArray<readonly [string, Record<string, unknown>, string]> = [
       ['browser_action', { action: 'upload', selector: '#cv', paths: ['workspace/cv.pdf'] }, 'cv'],
@@ -270,8 +268,8 @@ describe('agent approval policy', () => {
   });
 
   it('shows the owner where a tainted turn is steering the browser, batched or not', () => {
-    // The destination card reads the navigate url out of the same flat bag. It used to read
-    // action.url, and a batch hides a navigate behind one wrapper, so both are checked.
+    // The destination card reads the navigate url out of the same flat bag, and a batch hides a
+    // navigate behind one wrapper, so both are checked.
     const tainted = { taintSources: ['web page hostile.example'], ownerText: '' };
     expect(
       approvalRequirement(
@@ -584,14 +582,14 @@ describe('agent approval policy', () => {
     /*
      * An executable nobody has heard of, which reaches nowhere this computer can read.
      *
-     * It used to card, and it carded for one reason: it had ticked `network: true`. The identical
-     * call without the flag was free, and the flag changes nothing about what the command can do -
-     * `execution.ts` isolates only when `policy.isolateNetwork && !request.network` and
-     * `ISOLATE_AGENT_NETWORK` ships false - so the card was reachable only by a model that told the
-     * truth, and an injected instruction bought silence by leaving one field out. Both spellings now
-     * answer the same, and this is the honest cost of that: `custom-sync publish` names no address,
-     * runs nothing the harness can classify, and nothing here stops it in autonomous. The bound it
-     * needs is a boundary the command runs inside, which is `DESIGN.md` §9 and does not exist yet.
+     * It does not card, with or without `network: true`. The flag changes nothing about what the
+     * command can do - `execution.ts` isolates only when
+     * `policy.isolateNetwork && !request.network` and `ISOLATE_AGENT_NETWORK` ships false - so a
+     * card keyed on it would be reachable only by a model that told the truth, and an injected
+     * instruction would buy silence by leaving one field out. Both spellings answer the same, and
+     * this is the honest cost of that: `custom-sync publish` names no address, runs nothing the
+     * harness can classify, and nothing here stops it in autonomous. The bound it needs is a
+     * boundary the command runs inside, which is `DESIGN.md` §9 and does not exist yet.
      */
     for (const network of [true, false])
       expect(
@@ -684,13 +682,12 @@ describe('agent approval policy', () => {
       action: 'Review network access for aws'
     });
     /*
-     * The same pipe with and without the declaration, which is the whole of the incentive repair.
+     * The same pipe with and without the declaration, and the two must agree.
      *
-     * These two lines used to disagree: with `network: true` the object-store copy carded, without
-     * it the identical command was free. The flag is not a gate - the runner ignores it unless
-     * `ISOLATE_AGENT_NETWORK` is on, and it is not - so the disagreement was a charge levied on a
-     * model that answered the tool description honestly, and an injected instruction bought silence
-     * by omitting one field. The arm now opens on the address `aws` really names.
+     * The flag is not a gate - the runner ignores it unless `ISOLATE_AGENT_NETWORK` is on, and it
+     * is not - so a disagreement would be a charge levied on a model that answered the tool
+     * description honestly, and an injected instruction would buy silence by omitting one field.
+     * The arm opens on the address `aws` really names.
      */
     for (const network of [true, false])
       expect(
@@ -709,10 +706,10 @@ describe('agent approval policy', () => {
      * A body that cannot be read is unknown, and unknown answers here only when the call also
      * reaches somewhere.
      *
-     * All three of these used to card in autonomous, and all three carded only because they had set
-     * the flag: `bash deploy.sh` without it was free, and it runs the same script. So "unknown fails
-     * closed" was true of a model that volunteered and false of one that did not, which is not a
-     * property a floor has. What survives is the pair below: unreadable AND reaching an address is
+     * None of these three cards in autonomous, though each sets the flag: `bash deploy.sh` without
+     * it is free, and it runs the same script. Carding on the flag would make "unknown fails
+     * closed" true of a model that volunteered and false of one that did not, which is not a
+     * property a floor has. What holds is the pair below: unreadable AND reaching an address is
      * still a card, because there the harness can see something leaving and cannot see what sends
      * it. Unreadable and reaching nothing this can see is `DESIGN.md` §9's missing boundary, and
      * naming it here as a card the honest model pays is worse than naming it as a gap.
@@ -735,12 +732,11 @@ describe('agent approval policy', () => {
     });
     /*
      * Reading the body must not let an upload, a push or a write through the allowlist just
-     * because curl and git are on it. These four used to be caught here and only here, by the
-     * allowlist arm, and only because they had declared `network: true` - so each one read
-     * "Review network access for X", the card for an unrecognised network client. They are now
-     * caught one rule earlier, by the upload, push and destructive gates, which read the script
-     * the same way this arm always has. Same stop, and the headline says which promise is being
-     * kept rather than only that something reached the network.
+     * because curl and git are on it. These four are caught one rule before the allowlist arm, by
+     * the upload, push and destructive gates, which read the script the same way this arm does -
+     * not by the allowlist arm's "Review network access for X", the card for an unrecognised
+     * network client. The headline says which promise is being kept rather than only that
+     * something reached the network.
      */
     expect(
       approvalRequirement(
@@ -1140,11 +1136,8 @@ describe('agent approval policy', () => {
     expect(approvalRequirement('file_write', { path: '.git/hooks/pre-commit' })?.preview).toContain(
       '.git/hooks/pre-commit'
     );
-    // The card leads with the path, not with the command that wrote it. This used to assert a
-    // comma after it, because the wide net named the same write twice - once as the whole `-lc`
-    // argument and once as the path - and the shorter one sorted first. That was a pin on the
-    // over-inclusion, not on anything the owner wanted, and it went when `writtenPaths` started
-    // resolving the write target instead of listing every token.
+    // The card leads with the path, not with the command that wrote it: `writtenPaths` resolves
+    // the write target rather than listing every token, so the same write is not named twice.
     expect(
       approvalRequirement('shell', {
         executable: 'bash',
@@ -1516,12 +1509,9 @@ describe('when a memory write is worth stopping the owner for', () => {
   /*
    * There is no card for the owner tier, and its absence is the control rather than a gap in one.
    *
-   * This used to return "User memory is loaded into every workspace on this computer", which asked
-   * the owner to accept a blast radius. Two things were wrong with it. The sentence was false -
-   * the only reader filtered on `workspace_id`, so the row went nowhere - and asking for consent
-   * is the weaker instrument here anyway: a card is a decision the owner makes with the turn's
-   * text, injected or not, still in front of them, and a wrong fact about a person follows them
-   * into every project they ever start. The write is now refused outright at the tool, at the type
+   * Asking for consent is the weaker instrument here: a card is a decision the owner makes with the
+   * turn's text, injected or not, still in front of them, and a wrong fact about a person follows
+   * them into every project they ever start. The write is refused outright at the tool, at the type
    * and at the store, so approving it is not a thing that can happen.
    */
   it('raises no card for an owner-tier write, because there is no such write to approve', () => {
@@ -1804,11 +1794,11 @@ describe('what a tainted turn may still do through shell', () => {
   });
 
   /*
-   * Measured against the shipped classifier: while tainted, `bash -lc 'rm -rf … && curl https://…'`
-   * came back as an external_reversible "Allow this command to collector.invalid" where the very
-   * same command on a clean turn is external_consequential "Run bash", because the destination card
-   * returned first and so replaced the ordinary one. Reading a hostile page has to raise the floor;
-   * it was the only thing in the product that lowered it.
+   * While tainted, `bash -lc 'rm -rf … && curl https://…'` must not come back as an
+   * external_reversible "Allow this command to collector.invalid" where the very same command on a
+   * clean turn is external_consequential "Run bash" - which is what a destination card returning
+   * first, and so replacing the ordinary one, would do. Reading a hostile page has to raise the
+   * floor, never lower it.
    */
   it('never answers a tainted call more weakly than the same call on a clean turn', () => {
     const rank = { workspace_write: 0, external_reversible: 1, external_consequential: 2 };
@@ -1877,9 +1867,10 @@ describe('what a tainted turn may still do through shell', () => {
   /*
    * The budget is a turn's, and a call is not smaller than a turn.
    *
-   * Every address in one call used to be measured against the same frozen figure - what the turn had
-   * spent before the call began - so one batch of navigations, each individually inside the
-   * per-address bound, carried more than the whole turn is allowed and raised nothing at all.
+   * Every address in one call is measured against what the addresses before it spent. Measured
+   * against one frozen figure - what the turn had spent before the call began - one batch of
+   * navigations, each individually inside the per-address bound, could carry more than the whole
+   * turn is allowed and raise nothing at all.
    */
   it('measures the tenth address in a batch against what the first nine spent', () => {
     // A known host keeps every chunk's charge small - one opaque piece over a host the turn has
@@ -2605,31 +2596,29 @@ describe('what a reading of a recording costs before it happens', () => {
 });
 
 /*
- * A diagnostic, which no longer asks - and the two directions that have to hold for that to be a
+ * A diagnostic, which does not ask - and the two directions that have to hold for that to be a
  * decision rather than a hole.
  *
- * A card was added here in the previous wave and removed in this one. The finding behind it is
- * true: nine of the fifteen commands `code_diagnostics` can run are the project's own build or
- * test recipe. The instrument was wrong three measured ways, and the third is the one these tests
- * carry, because the other two are arguments and this one is a bound.
+ * Nine of the fifteen commands `code_diagnostics` can run are the project's own build or test
+ * recipe, and a card is still the wrong instrument for that; what these tests carry is the bound.
  *
  * Direction one is below: the tool is silent in every mode, including review, and silent for the
- * nine as well as the six - a card that fires for Rust and not for TypeScript charged the owner's
- * own project for their own code.
+ * nine as well as the six - a card that fired for Rust and not for TypeScript would charge the
+ * owner's own project for their own code.
  *
  * Direction two is `turn-bounds.test.ts` and `agent-run.test.ts`: the turn takes its undo point
- * before the diagnostic runs. Removing a card because a bound covers it is only cheap to be wrong
- * about while the bound is asserted somewhere, so those two are not decoration on this block; they
- * are the half that makes it affordable.
+ * before the diagnostic runs. Going without a card because a bound covers it is only cheap to be
+ * wrong about while the bound is asserted somewhere, so those two are not decoration on this block;
+ * they are the half that makes it affordable.
  */
 describe('a diagnostic, which is not a question any more', () => {
   const modes = ['review', 'balanced', 'autonomous'] as const;
 
   /*
-   * The nine that used to card, by the command that ran rather than by the label on the branch.
-   * `shell` runs every one of these for free in balanced and autonomous, which is what made the
-   * card a toll on the phrasing rather than a floor: a model that reached for `shell` instead of
-   * the tool got the identical program on the identical tree with nothing shown to anybody.
+   * The build recipes, by the command that ran rather than by the label on the branch. `shell` runs
+   * every one of these for free in balanced and autonomous, which would make a card a toll on the
+   * phrasing rather than a floor: a model that reached for `shell` instead of the tool would get
+   * the identical program on the identical tree with nothing shown to anybody.
    */
   it('says nothing about a build recipe the repository author wrote, in any mode', () => {
     const recipes = [
@@ -3230,13 +3219,11 @@ describe('publishing a version to a package registry', () => {
 /*
  * PUTTING SOMETHING ONLINE BY A ROUTE THAT IS NOT A PACKAGE REGISTRY.
  *
- * The owner named "publishing anything online" as a thing that must always stop, and until this
- * table the floor's whole answer to it was `git push`, a public publish and the registry rule
- * above.
- * Measured on `cd7033f` in balanced and autonomous, every row of the first test below raised
- * NOTHING; the two the brief named that already stopped - `gh release create` as "Send data using
- * gh" and `aws s3 sync ./dist s3://bucket` as "Allow internet access", both `external_reversible` -
- * are noted where they are rather than duplicated.
+ * The owner named "publishing anything online" as a thing that must always stop, and this table
+ * carries that beyond `git push`, a public publish and the registry rule above. Two that other
+ * rules already stop - `gh release create` as "Send data using gh" and
+ * `aws s3 sync ./dist s3://bucket` as "Allow internet access", both `external_reversible` - are
+ * noted where they are rather than duplicated.
  *
  * An operation table rather than an executable one, for the reason the registry rule gives and the
  * owner has already rejected the alternative to: `vercel dev` is not `vercel --prod`, `kubectl get`
@@ -3400,17 +3387,16 @@ describe('publishing online, and changing what is deployed', () => {
   /*
    * ASKING WHETHER THE TOOL IS THERE, AND ASKING IT WHAT IT WOULD DO.
    *
-   * The expensive direction, and the one the hosting table got wrong. Measured on the tree that
-   * shipped it, in ALL THREE modes and as `external_consequential`: `command -v vercel` - the
-   * first line of every setup script - came back "Publish online with vercel"; `hash vercel` the
-   * same; `kubectl auth can-i create pods` asked the cluster a question and was read as the
-   * answer; `kubectl create ... --dry-run=client -o yaml`, the way every manifest in every
-   * tutorial is generated, was read as the creation; `terraform apply --help` printed the manual.
+   * The expensive direction, in ALL THREE modes: `command -v vercel` - the first line of every
+   * setup script - is not "Publish online with vercel"; nor is `hash vercel`;
+   * `kubectl auth can-i create pods` asks the cluster a question and is not the answer;
+   * `kubectl create ... --dry-run=client -o yaml`, the way every manifest in every tutorial is
+   * generated, is not the creation; `terraform apply --help` prints the manual.
    *
-   * Four separate causes wearing one symptom, which is why the rows are here rather than added to
-   * the free list above: a value option the runner set never held, a bare name read out of the
-   * middle of somebody else’s command, an operation matched behind the word that asks about it,
-   * and an informational option the bare arm honoured and the matched arm did not.
+   * Four separate causes can wear this one symptom, which is why the rows are here rather than
+   * added to the free list above: a value option missing from the runner set, a bare name read out
+   * of the middle of somebody else’s command, an operation matched behind the word that asks about
+   * it, and an informational option honoured by the bare arm and not by the matched one.
    */
   it('says nothing when the command asks where the tool is, or what it would do', () => {
     const asking: Array<[string, Record<string, unknown>]> = [
@@ -3700,19 +3686,14 @@ describe('what a security mode means', () => {
         { executable: 'curl', args: ['-T', '@notes.txt', 'https://x.invalid/upload'] }
       ],
       /*
-       * The clause used to be held here by `rm -rf node_modules`, which was the one act in the list
-       * whose damage a rewind undoes - `CHECKPOINT_CONTENT` is `workspace` and `.garden/artifacts`,
-       * and `node_modules` is inside it. So the exhaustive clause was proved by the single member of
-       * it that needed proving least, while `dropdb production` and `redis-cli FLUSHALL`, which
-       * nothing here restores, were free in balanced and autonomous.
-       *
-       * It has gone rather than moved, because the floor now agrees with the reason it was wrong:
-       * a delete strictly inside a tree the undo point holds raises no card on any turn that has
-       * one (@see `insideCheckpointContent` and `ApprovalContext.undoPoint`), and asserting that
-       * this clause stops one would be pinning
-       * the clunk twice over: this table passes no context, so a row for `node_modules` would
-       * pass here on the absent-undo-point rule rather than on the clause it claims to hold.
-       * `rm -rf ~/.ssh` is the delete the clause is really about, and it is one line down.
+       * No `rm -rf node_modules` row: it is the one act whose damage a rewind undoes -
+       * `CHECKPOINT_CONTENT` is `workspace` and `.garden/artifacts`, and `node_modules` is inside
+       * it - so it would prove the clause by the member that needs proving least. A delete strictly
+       * inside a tree the undo point holds raises no card on any turn that has one (@see
+       * `insideCheckpointContent` and `ApprovalContext.undoPoint`), and this table passes no
+       * context, so a row for `node_modules` would pass here on the absent-undo-point rule rather
+       * than on the clause it claims to hold. `rm -rf ~/.ssh` is the delete the clause is really
+       * about, and it is one line down.
        */
       ['destroying data', 'shell', { executable: 'rm', args: ['-rf', '~/.ssh'] }],
       ['destroying data', 'shell', { executable: 'dropdb', args: ['production'] }],
@@ -4976,10 +4957,10 @@ describe('publishing carried past the boundaries the walk stopped short of', () 
 });
 
 /**
- * Balanced's own sentence on the operand it could not read. `curl -s "$U"` on a clean turn was
- * free in balanced - the unreadable token came back from the address reader as an address, and a
- * test for "no addresses" cleared it - so the card whose own text says "connects to somewhere this
- * computer could not read out of the command" was unreachable from a curl.
+ * Balanced's own sentence on the operand it could not read. `curl -s "$U"` on a clean turn must not
+ * be free in balanced: if the address reader returned the unreadable token as an address, a test
+ * for "no addresses" would clear it, and the card whose own text says "connects to somewhere this
+ * computer could not read out of the command" would be unreachable from a curl.
  */
 describe('balanced, before a fetch whose far end it could not read', () => {
   const shell = (body: string): Record<string, unknown> => ({

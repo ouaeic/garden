@@ -166,10 +166,10 @@ describe('where a tainted turn may send a request', () => {
 });
 
 /*
- * Executing the shipped classifier, `https://<32 hex characters>.docs.example.com/` came back
- * `{sink: false, noveltyBytes: 0}` on a turn that had read docs.example.com: the tokeniser measured
- * the path, the query and the fragment, and the one part of an address that needs no cooperation
- * from the destination was the part nothing looked at.
+ * `https://<32 hex characters>.docs.example.com/` must not come back `{sink: false, noveltyBytes:
+ * 0}` on a turn that had read docs.example.com. A tokeniser that measured only the path, the query
+ * and the fragment would never look at the one part of an address that needs no cooperation from
+ * the destination.
  */
 describe('what the name itself carries', () => {
   it('refuses a payload wearing a subdomain of a host the turn has read', () => {
@@ -507,7 +507,7 @@ describe('a recorded research turn', () => {
 
   /*
    * A real 301-character NHS disclosure-log URL that a search had just returned. Under a 256-byte
-   * memory of what the turn was handed it came back truncated, lost its credit, and was charged 94
+   * memory of what the turn was handed it would be truncated, lose its credit, and be charged 94
    * of the 96 a single address may carry - two bytes from asking the owner to approve reading a page
    * their own search had put in front of them.
    */

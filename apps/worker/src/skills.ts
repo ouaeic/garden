@@ -10,25 +10,16 @@ import { fileURLToPath } from 'node:url';
  * skill is written only through `skill(action=upsert)`, which shows the owner the whole proposed
  * body and saves nothing until they approve it.
  *
- * This file used to carry a second, larger half: an induction, evaluation and retirement lifecycle
- * for agent-authored skills - proposal review against trace attestation, reliability scoring,
- * probation and archival. None of it was ever reachable. The `skill` tool takes a name, a
- * description and a body and nothing else, so there were no episodes to attest against, no trials
- * to score and no caller anywhere in the worker, the API or the web client. It has been removed
- * rather than left looking like a control that runs, and `skills/skill-authoring` now describes the
- * gate that does exist. The design it implemented is still written up in docs/design/skill-library.md.
+ * There is no induction, evaluation or retirement lifecycle for agent-authored skills: the `skill`
+ * tool takes a name, a description and a body and nothing else, so there are no episodes to attest
+ * against and no trials to score. `skills/skill-authoring` describes the gate that does exist, and
+ * the store's `curateWorkspaceSkills` marks a skill stale at thirty days unused and archived at
+ * ninety, with a pinned one exempt.
  *
- * Its last survivor was a `SKILL_LIFECYCLE` table of promotion, probation and retirement thresholds
- * that nothing read. A tuned-looking constant is the most convincing thing a dead control can leave
- * behind, so it is gone too. What is real is in the store: `curateWorkspaceSkills` marks a skill
- * stale at thirty days unused and archived at ninety, and a pinned one is exempt.
- *
- * A `searchSkills` BM25 ranker over name, description and the sidecar's positive trigger phrases
- * went the same way, and for the same reason: the `skill` tool offers list, view, upsert and remove,
- * so no model could ever call it. Selection is the resident catalog plus the instruction to open a
- * skill before doing the work it covers, which is the only mechanism that was ever wired. The
- * `triggers` block went out of the sidecars with it rather than being left one layer down, where a
- * skill author would reasonably read it as the thing that decides when their skill is chosen.
+ * Selection is the resident catalog plus the instruction to open a skill before doing the work it
+ * covers. The `skill` tool offers list, view, upsert and remove, and no ranker sits behind it.
+ * Sidecars carry no `triggers` block, because a skill author would reasonably read one as the thing
+ * that decides when their skill is chosen.
  */
 
 // ---------------------------------------------------------------------------
@@ -951,9 +942,8 @@ const grantList = (skill: LoadedSkill): string[] =>
 /**
  * The activation half of progressive disclosure.
  *
- * The block is a tool result like any other, and compaction condenses it like any other - this
- * comment used to claim the wrapper was what protected it, which was never true and is why the
- * loss went unnoticed. What actually happens now is in `openedSkillsIn` (context.ts): the
+ * The block is a tool result like any other, and compaction condenses it like any other; the
+ * wrapper does not protect it. What actually happens is in `openedSkillsIn` (context.ts): the
  * compaction is keyed on the `skill(action: 'view')` call, and a brief that drops one of these
  * names the skill so the agent knows to reopen it rather than carrying on without it.
  */

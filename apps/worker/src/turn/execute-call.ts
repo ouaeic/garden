@@ -5,23 +5,21 @@ import { runtimeDate } from '@garden/core';
  * Everything here is ordered by what a worker that dies mid-call would leave behind, which is the
  * only reason it is not four straight lines:
  *
- *   - the **undo point** used to be taken here, first, and is now taken one gate earlier, in
- *     `turn/dispatch.ts` in front of the approval floor. The floor's destructive rule reads whether
- *     this turn has a rewind, so taking it after the floor was asked meant a turn whose first
- *     non-exempt call was a recoverable delete paid a card that the identical delete two calls
- *     later did not. It is still at most once a turn and still never at all for a turn that only
- *     reads; it is simply taken before the decision that spends it rather than after;
+ *   - the **undo point** is not taken here but one gate earlier, in `turn/dispatch.ts` in front of
+ *     the approval floor. The floor's destructive rule reads whether this turn has a rewind, so
+ *     taking it after the floor was asked would mean a turn whose first non-exempt call was a
+ *     recoverable delete paid a card that the identical delete two calls later did not. It is at
+ *     most once a turn and never at all for a turn that only reads; it is simply taken before the
+ *     decision that spends it rather than after;
  *   - **intent** is written before the **action**, so a worker killed between sending an email and
  *     recording that it sent one resumes saying "this was running" instead of silently sending it
- *     again. State used to be written once per step, after the whole batch;
+ *     again;
  *   - the call is watched by both the lease renewal and the cancellation watch, so a long call
  *     neither loses its lease nor outlives the owner pressing Stop;
  *   - `publish_artifact` is the one success in the loop that does not go through `recordToolResult`,
  *     which is why it has to zero the repeated-failure count for itself. Without that, a publish
  *     that fails, works, and fails the same way again carries its old count forward, and a call the
  *     turn is genuinely completing can reach a bound meant for one that never completes.
- *
- * Lifted out of `AgentWorker.run()`'s batch loop unchanged.
  */
 import type { ModelRelease, WebToolPlan } from '@garden/contracts';
 import type { TaskRecord } from '@garden/data';
@@ -66,9 +64,9 @@ export const executeApprovedCall = async (
     tool: call.name,
     arguments: call.arguments
   });
-  // Intent first, action second. State used to be written once per step, after the whole
-  // batch, so a worker killed between sending an email and recording that it had sent one
-  // resumed from before the batch and sent it again. The record below is what lets the resume
+  // Intent first, action second. Written once per step, after the whole batch, state would let a
+  // worker killed between sending an email and recording that it had sent one resume from before
+  // the batch and send it again. The record below is what lets the resume
   // say "this was running" instead of silently repeating it.
   const repeatable = REPEATABLE_TOOLS.has(call.name);
   if (!repeatable) {

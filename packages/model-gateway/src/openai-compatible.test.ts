@@ -737,12 +737,13 @@ describe('OpenAICompatibleAdapter', () => {
   });
 
   /*
-   * `stream: true` is a request, not a guarantee, and the four shapes below are what came back from
-   * a route that did not honour it. Every one of them used to return `{text: '', toolCalls: [],
-   * finishReason: 'stop', usage: {0, 0, 0}}` as a success, because the SSE reader discards every
-   * line that does not begin with `data:` and then synthesises a `choices` array whatever it read.
-   * An owner behind a buffering proxy got a completed task with no answer in it and a ledger
-   * reading $0.00 for every call the provider billed, and nothing anywhere was an error.
+   * `stream: true` is a request, not a guarantee, and the four shapes below are what comes back
+   * from a route that does not honour it. None of them may return `{text: '', toolCalls: [],
+   * finishReason: 'stop', usage: {0, 0, 0}}` as a success, which is what the SSE reader makes of
+   * them unchecked: it discards every line that does not begin with `data:` and then synthesises a
+   * `choices` array whatever it read. An owner behind a buffering proxy would get a completed task
+   * with no answer in it and a ledger reading $0.00 for every call the provider billed, and nothing
+   * anywhere would be an error.
    */
   const unstreamedAdapter = (body: BodyInit, contentType: string): OpenAICompatibleAdapter =>
     new OpenAICompatibleAdapter({
@@ -924,9 +925,9 @@ describe('OpenAICompatibleAdapter', () => {
 
   /*
    * The largest thing this product generates is not prose - it is the content of a file, and that
-   * travels inside a tool call's arguments. Those characters were once counted by nothing: the
-   * ceiling could not see them, so a route writing a runaway file ran to the clock, and the answer
-   * came back billed at zero for twenty-four thousand characters of generation.
+   * travels inside a tool call's arguments. Those characters must count: if the ceiling could not
+   * see them, a route writing a runaway file would run to the clock, and the answer would come back
+   * billed at zero however much it wrote.
    */
   it('counts what a runaway tool call writes, and bills for it', async () => {
     const deltas: string[] = [];
@@ -1405,14 +1406,14 @@ describe('OpenAICompatibleAdapter', () => {
   });
 
   /**
-   * This used to be a refusal, and the refusal was the bug.
+   * Not a refusal.
    *
    * Zero-retention enforcement covers inference routing and says in terms that it does not cover
    * tools - so a search query sits outside that guarantee whether the tools are sent or withheld,
-   * and withholding them protected nothing. What it did do was take search off every box configured
-   * the shipped way, because the flag ships on, and this adapter is the last code before the wire:
-   * an owner who reached this point had already been told by the plan and by the settings page that
-   * their searches would be answered by the provider, and then got an error instead.
+   * and withholding them would protect nothing. What it would do is take search off every box
+   * configured the shipped way, because the flag ships on, and this adapter is the last code before
+   * the wire: an owner who reaches this point has already been told by the plan and by the settings
+   * page that their searches will be answered by the provider, and would get an error instead.
    *
    * So the connection carries both, and both halves are asserted here: the provider block that
    * makes the inference request zero-retention, and the search tools it never covered.
@@ -1570,9 +1571,9 @@ describe('OpenAICompatibleAdapter', () => {
     expect((capture.body as { tools: unknown[] }).tools).toEqual([]);
   });
   /*
-   * A response cut off at the output cap ends mid-JSON. The arguments used to be swallowed into an
-   * empty object and the call run anyway, so `file_write` arrived with no path and no content and
-   * failed on a validation error that named neither the truncation nor the way out of it.
+   * A response cut off at the output cap ends mid-JSON. Swallowing the arguments into an empty
+   * object and running the call anyway would deliver `file_write` with no path and no content, to
+   * fail on a validation error that names neither the truncation nor the way out of it.
    */
   it.each([
     ['whole', false],
@@ -1944,10 +1945,9 @@ describe('OpenAICompatibleAdapter', () => {
   /*
    * Reasoning fields, on the endpoint family this adapter names by name.
    *
-   * The recorded incident is a turn that streamed 1,015 `assistant_delta` frames and made no tool
-   * call, where the model's deliberation was published as the answer and its own operating contract
-   * came back into the reading column. A route that puts its thinking somewhere this file does not
-   * read is that defect's supply line: `reasoning_content` is what DeepSeek's own API and vLLM's
+   * A route that puts its thinking somewhere this file does not read gets the model's deliberation
+   * published as the answer, its own operating contract included, in the reading column:
+   * `reasoning_content` is what DeepSeek's own API and vLLM's
    * reasoning parsers send, and a `<think>` span inline in `content` is what every unparsed
    * self-hosted R1-family route sends.
    */

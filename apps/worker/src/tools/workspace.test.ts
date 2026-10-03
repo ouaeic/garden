@@ -42,7 +42,7 @@ import { type ToolContext } from '../tool-dispatch.js';
 /*
  * The armed post-edit checks are module state keyed by task id, and every helper below drives the
  * same task id, so without this a check left armed by one test would attach its `diagnostics` to
- * an unrelated patch result in the next one. It was harmless only by accident until now - the
+ * an unrelated patch result in the next one. Without it, isolation would rest on accident - the
  * older helpers hand the runner a stub that makes the arm's directory walk throw, and the tests
  * that do arm sit last in the file - and both of those accidents are one fixture change or one
  * `sequence.shuffle` away from not holding. Reads are NOT cleared here: the helpers clear those
@@ -146,8 +146,8 @@ const turn = async (
        * The display read as the runner performs it: the prefix that fits, the whole file's hash, and
        * how much of what came back arrived whole. The arm cannot show what it was not sent, which is
        * the property this fake has to preserve to be worth testing against - a fake that handed back
-       * the file and let the arm choose would be testing the arrangement that had the two ledgers
-       * disagreeing in the first place.
+       * the file and let the arm choose would be testing an arrangement in which the two ledgers
+       * disagree.
        */
       readFileForDisplay: async (
         _w: string,
@@ -175,13 +175,12 @@ const turn = async (
        * to `services/workspace-runner/src/files.test.ts`, where the real reader is: standing a
        * second implementation of it up here would be two things to keep in agreement rather than one.
        *
-       * `truncated` and `partialLine` are still both reported, and honestly, because THE DIFFERENCE
-       * BETWEEN THEM IS WHAT THIS FAKE GOT WRONG. It used to answer `truncated: false` to every
-       * window, including the ones the byte budget ended - so the arm's record of what it had shown
-       * was derived from a flag that was never set here, and a defect that cost a line per window
-       * was invisible to all thirty cases below while `services/workspace-runner` and this file
-       * both stayed green. A window this reader ends between two lines is truncated and carries no
-       * half-line; only the real reader produces the other combination.
+       * `truncated` and `partialLine` are both reported, and honestly, because THE ARM'S RECORD OF
+       * WHAT IT HAS SHOWN IS DERIVED FROM THE DIFFERENCE BETWEEN THEM. A fake that answered
+       * `truncated: false` to every window, including the ones the byte budget ended, would hide a
+       * defect that costs a line per window from every case below while `services/workspace-runner`
+       * and this file both stayed green. A window this reader ends between two lines is truncated
+       * and carries no half-line; only the real reader produces the other combination.
        */
       readFileLines: async (
         _w: string,
@@ -235,8 +234,8 @@ describe('reading a file bigger than one result can hold', () => {
       { name: 'file_read', args: { path: 'workspace/big.ts' } }
     ]);
 
-    // The claim the unbounded read used to make on this file was `truncated: false, totalLines:
-    // 8332` while 5.95% of it reached the model. Every field below is now about what arrived.
+    // `truncated: false, totalLines: 8332` would be a false claim here, with 5.95% of the file
+    // reaching the model. Every field below is about what arrived.
     expect(result.truncated).toBe(true);
     expect(result.totalLines).toBe(8_332);
     expect(result.startLine).toBe(1);
@@ -294,10 +293,10 @@ describe('reading a file bigger than one result can hold', () => {
 
   /*
    * A file with no newlines in it, which is not an exemption from the bound but the case that shows
-   * what the bound is about. `apps/desktop/src-tauri/gen/schemas/acl-manifests.json` is 76,478 bytes
-   * on one line: measured through this arm against the real runner, it used to answer
-   * `truncated: false, totalLines: 1`, hand the whole 76,480-character result to a layer that cuts
-   * at 24,000, record nothing, and let the following whole-file write destroy 76,476 bytes.
+   * what the bound is about. `apps/desktop/src-tauri/gen/schemas/acl-manifests.json` is 76,478
+   * bytes on one line: answered `truncated: false, totalLines: 1`, its whole 76,480-character
+   * result would go to a layer that cuts at 24,000, nothing would be recorded, and a following
+   * whole-file write could destroy 76,476 bytes.
    *
    * `truncated` is a claim about bytes delivered, so it is true here, and the line is not counted as
    * shown, so nothing rests on it.
@@ -464,11 +463,10 @@ describe('what a read that showed part of a file lets you do to the rest of it',
 
   it('holds a window to the same budget as a read with no window at all', async () => {
     /*
-     * A window used to be fetched under a 400,000-byte budget and recorded whole, while
-     * `recordToolResult` cut the result to 24,000 characters two layers downstream - so asking for
-     * lines 1 to 8,332 vouched for 8,332 lines and showed 5.95% of them. That is the same defect the
-     * unwindowed bound was shipped to close, and it also made the refusal above walkable in one
-     * call: one wide window and the record claimed the file had been seen.
+     * `recordToolResult` cuts the result to 24,000 characters two layers downstream, so a window
+     * fetched under a larger budget and recorded whole would vouch for 8,332 lines and show 5.95%
+     * of them. It would also make the refusal above walkable in one call: one wide window and the
+     * record would claim the file had been seen.
      */
     const { result, state } = await turn({ 'workspace/big.ts': tall(8_332) }, [
       { name: 'file_read', args: { path: 'workspace/big.ts', startLine: 1, endLine: 8_332 } }
@@ -502,14 +500,12 @@ describe('what a read that showed part of a file lets you do to the rest of it',
   });
 
   /*
-   * THE ONE A PATCH USED TO OPEN, and it was open on every file, always.
+   * A PATCH DOES NOT RELEASE THE HOLD, on any file.
    *
-   * This case asserted the opposite until now - that a patch stops the file being held - on the
-   * reasoning that the text on disk is text the turn authored. It is not: a line-addressed patch
-   * authors a span and leaves the rest of the file exactly where it was. Measured through this arm
-   * on an 8,332-line file, one `PUT 12:` after a bounded read cleared the outstanding length AND
-   * recorded all 8,332 lines as shown, so the whole-file write below was accepted and destroyed
-   * 576,512 bytes of a file the model had seen 258 lines of.
+   * The text on disk after a patch is not text the turn authored: a line-addressed patch authors a
+   * span and leaves the rest of the file exactly where it was. If one `PUT 12:` after a bounded
+   * read cleared the outstanding length and recorded all 8,332 lines as shown, the whole-file write
+   * below would be accepted and destroy 576,512 bytes of a file the model had seen 258 lines of.
    */
   it('still holds a file against its unread remainder after a patch has changed one line', async () => {
     const { run, written } = await turn({ 'workspace/big.ts': tall(8_332) }, [
@@ -942,11 +938,11 @@ describe('the check may not refuse work, and may not claim health', () => {
    * The byte bound, on the block the count bound cannot reach: ONE diagnostic.
    *
    * The renderer admits its first line whatever the length, so that a block is never a header with
-   * nothing under it, and that exemption is where the byte bound leaked. `tsc --noEmit --pretty
+   * nothing under it, and that exemption is where the byte bound would leak. `tsc --noEmit --pretty
    * false` prints the inferred type inline, so a single mismatch between two large object types is
-   * one line of several kilobytes; driven through this arm at 60,000 bytes of type text, the block
-   * came back 60,198 bytes long against its declared 1,600 - past `RECENT_TOOL_OUTPUT_CHARS`
-   * entirely, so an uninvited block would have evicted the result the model asked for.
+   * one line of several kilobytes; at 60,000 bytes of type text an uncut block would be 60,198
+   * bytes long against its declared 1,600 - past `RECENT_TOOL_OUTPUT_CHARS` entirely, so an
+   * uninvited block would evict the result the model asked for.
    *
    * Pinned in bytes rather than by looking for the cut marker, because a marker is a string a
    * future edit can keep while the length runs away underneath it.
@@ -1107,7 +1103,7 @@ describe('the check may not refuse work, and may not claim health', () => {
 
   /**
    * The one shape in which POST_EDIT_MIN_DIAGNOSTIC is load-bearing rather than a matter of taste,
-   * and until this case existed nothing pinned it: setting it to 0 left all 56 tests green.
+   * and the only case that pins it: with it set to 0, every other test stays green.
    *
    * `clipDiagnostic` spends the 68-byte cut marker FROM its budget, but only down to zero - below
    * the marker's own length the `Math.max` hands back the marker alone, which is longer than the
@@ -1257,14 +1253,14 @@ describe('a check is only worth reporting while it is still about this tree', ()
   });
 
   /**
-   * The ledger going while the report is in hand, which is the one shape that reached the second
+   * The ledger going while the report is in hand, which is the one shape that reaches the second
    * read with nothing to date the answer against.
    *
    * The drain reads the landed checks BEFORE the tool runs and asks again after it, and the second
-   * read used to return every captured check unfiltered when the ledger had gone - the opposite
-   * direction from every other guard here. Reachable in the product when 64 other tasks arm during
-   * one awaited tool call, which is why it is constructed rather than argued: the eviction is
-   * driven from inside the call itself, which is exactly where it would happen.
+   * read must return nothing when the ledger has gone, in the same direction as every other guard
+   * here, rather than every captured check unfiltered. Reachable in the product when 64 other tasks
+   * arm during one awaited tool call, which is why it is constructed rather than argued: the
+   * eviction is driven from inside the call itself, which is exactly where it would happen.
    *
    * Both directions in one case. Without the eviction the same rig delivers the report, so a
    * renderer that had simply gone silent would fail the first half.

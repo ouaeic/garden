@@ -689,17 +689,17 @@ export class WorkspaceStore {
   /**
    * Ages a workspace skill out of the index once its trigger has stopped coming up.
    *
-   * The clock is `last_used_at` and nothing else. It used to be `COALESCE(last_used_at,updated_at)`
-   * while the same statement wrote `updated_at`, so for a skill that had never been used the anchor
-   * was the column the transition overwrote: on day 31 it went stale and reset its own clock, on
-   * day 61 it went stale again, and it could never reach 'archived' - it simply blinked out of the
-   * index and back every thirty days for the life of the workspace.
+   * The clock is `last_used_at` and nothing else. This statement writes `updated_at`, so
+   * `COALESCE(last_used_at,updated_at)` would anchor a never-used skill on the column its own
+   * transition overwrites: on day 31 it would go stale and reset its own clock, on day 61 go stale
+   * again, and never reach 'archived' - it would simply blink out of the index and back every
+   * thirty days for the life of the workspace.
    *
-   * A skill that has never been used is now left alone rather than given a different anchor. Every
+   * A skill that has never been used is left alone rather than given a different anchor. Every
    * workspace skill was shown to this owner in full and approved by them, and demoting one because
    * its occasion has not arisen yet is the wrong answer for a single-owner computer - they already
    * have pinning, enabling and deletion as direct controls. The guard also makes this statement a
-   * true no-op in the steady state, so the per-turn call stops rewriting the whole table.
+   * true no-op in the steady state, so the per-turn call does not rewrite the whole table.
    */
   async curateWorkspaceSkills(workspaceId: string): Promise<void> {
     await this.database.query(
@@ -1036,10 +1036,10 @@ export class WorkspaceStore {
    * re-published and no ceiling has to be chosen. A published site has no deadline to move, so the
    * CASE leaves its NULL alone rather than accidentally giving it one.
    *
-   * `idle_interval` and not the constant, because renewing by the constant is how a short-lived
-   * page became a long-lived one. A `brief` conversation's preview is created with a twenty-four
-   * hour deadline and the first visit used to push it to thirty days - so the lifetime the owner
-   * chose survived exactly until somebody opened the page it produced. A row with no window of its
+   * `idle_interval` and not the constant, because renewing by the constant would turn a short-lived
+   * page into a long-lived one. A `brief` conversation's preview is created with a twenty-four hour
+   * deadline, and a first visit that pushed it to thirty days would let the lifetime the owner
+   * chose survive exactly until somebody opened the page it produced. A row with no window of its
    * own falls back to the ordinary one, which is every preview that existed before this column.
    */
   async touchWorkspacePreview(id: string): Promise<void> {

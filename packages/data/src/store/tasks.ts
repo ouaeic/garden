@@ -227,10 +227,10 @@ export interface TaskNameHit {
  *
  * The timestamp is carried as the database's own text for it rather than as a JavaScript date,
  * because a position has to be able to express the ordering exactly. PostgreSQL keeps microseconds
- * and `Date` keeps milliseconds, so a cursor built from the mapped record rounded the last row of
- * the page up - and every conversation that shared its millisecond then sorted "after" the cursor
- * and was skipped by the next page. Nothing about that was visible: the page simply came back
- * short, and the conversation was still there, unreachable except through search.
+ * and `Date` keeps milliseconds, so a cursor built from the mapped record would round the last row
+ * of the page up - and every conversation that shared its millisecond would then sort "after" the
+ * cursor and be skipped by the next page. Nothing about that would be visible: the page simply
+ * comes back short, and the conversation is still there, unreachable except through search.
  */
 const encodeTaskCursor = (row: Record<string, unknown>): string =>
   Buffer.from(
@@ -2024,10 +2024,9 @@ export class TaskStore {
     ];
     // A parked or finished task holding a live lease is the one shape the one-writer rule cannot
     // survive: the queue will never hand that task to a worker again, and its lease goes on
-    // excluding everything else in the workspace until it times out. It used to be eight callers
-    // each remembering to say so. Now the status decides - only a status the queue would lease can
-    // keep a lease - and `clearLease` ($5) is left to the callers that let go while staying
-    // leasable.
+    // excluding everything else in the workspace until it times out. So no caller has to remember
+    // to say so: the status decides - only a status the queue would lease can keep a lease - and
+    // `clearLease` ($5) is left to the callers that let go while staying leasable.
     const letGo = `($5 OR $2 NOT IN ${COMMITTED_TASK_STATUSES})`;
     const result = await this.database.query(
       `UPDATE tasks SET

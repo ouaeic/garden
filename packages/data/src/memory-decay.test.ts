@@ -315,9 +315,10 @@ describe('the usage term', () => {
   });
 
   it('keeps the activation across the retention horizon, where a bare delete lost it', async () => {
-    // `consolidateMemory` used to DELETE `mem.item_use` past `useRetentionDays`. A sum over every
-    // prior use cannot be taken against a table that forgets, so the rows are folded into
-    // `mem.item_use_fold` and their contribution recovered from the span in closed form.
+    // A sum over every prior use cannot be taken against a table that forgets, so
+    // `consolidateMemory` does not delete `mem.item_use` past `useRetentionDays`: the rows are
+    // folded into `mem.item_use_fold` and their contribution recovered from the span in closed
+    // form.
     const long = await add('lima', 'a hundred uses across two years');
     const short = await add('mike', 'ten recent uses');
     for (let i = 0; i < 100; i += 1) await use(long, 730 - i * 7, { cited: i % 3 === 0 });
@@ -735,7 +736,7 @@ describe('an ungraded use', () => {
     expect(fold.get(graded)!.uses).toBe(40);
     expect(fold.get(echo)!.oks).toBe(0);
     expect(fold.get(graded)!.oks).toBe(fold.get(graded)!.uses);
-    // `uses - fails` is what the score used to read, and it cannot tell the two blocks apart.
+    // A score that read `uses - fails` could not tell the two blocks apart.
     expect(fold.get(echo)!.uses - fold.get(echo)!.fails).toBe(
       fold.get(graded)!.uses - fold.get(graded)!.fails
     );

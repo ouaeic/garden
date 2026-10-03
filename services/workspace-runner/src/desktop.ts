@@ -671,13 +671,11 @@ export const nodeUnderPoint = (
  * The actions whose meaning is a place on a picture, and which therefore go stale.
  *
  * `DesktopSnapshot.generation` is stamped on every snapshot, every still and every frame, and
- * `DesktopControl.authorize` has refused work naming a generation that is no longer current since
- * the day it was written. Nothing supplied one: `/desktop/action` called `act` with five
- * arguments, the stream route with four, and `DesktopAction` carries no `generation` on any of its
- * ten variants - so the whole mechanism was reachable only from a test, while the field it is
- * stamped on went on saying in writing that a stale coordinate was refused. The owner closes a dialog, the
- * `click_at(820, 410)` the agent computed from the screen before it lands on whatever is under
- * those pixels now, and nothing refuses.
+ * `DesktopControl.authorize` refuses work naming a generation that is no longer current. That
+ * refusal only fires if something supplies a generation, and `DesktopAction` carries none on any
+ * of its ten variants. Without a supplier the owner closes a dialog, the `click_at(820, 410)` the
+ * agent computed from the screen before it lands on whatever is under those pixels now, and
+ * nothing refuses.
  *
  * The supplier is the runner, not the model: `snapshot` records which generation it served the
  * agent and `act` names that one. A field on the contract would have cost bytes on every request
@@ -1145,13 +1143,12 @@ export class DesktopManager {
             if (session) this.#publish(session, frame);
           },
           /**
-           * An encoder that cannot run is the pane going still, and it used to be silent.
+           * An encoder that cannot run is the pane going still, and this is what says so.
            *
-           * `onFailure` was declared, documented and never supplied, so a host with no
-           * `/usr/bin/ffmpeg` restarted the child every half second for as long as anybody watched,
-           * wrote nothing to the journal, and left the owner looking at a frozen screenshot with a
-           * healthy socket. The encoder now backs off, and this is the line that says why - which is
-           * the whole difference between "the Computer pane is broken" and "install ffmpeg".
+           * Without it a host with no `/usr/bin/ffmpeg` writes nothing to the journal and leaves
+           * the owner looking at a frozen screenshot with a healthy socket. The encoder backs off,
+           * and this is the line that says why - which is the whole difference between "the
+           * Computer pane is broken" and "install ffmpeg".
            */
           onFailure: (cause) => {
             runnerLogger.warn('desktop.encoder_failed', {
@@ -1628,10 +1625,10 @@ export class DesktopManager {
   /**
    * What this action would do, judged against the tree as it is now.
    *
-   * Split out of `preflight` so `act` can reach it with the session it already has. `act` used to
-   * call the public `preflight`, which resolved the workspace a second time, took the control
-   * authorization a second time, and left the judgement and the action holding two different
-   * views of the machine between them. One session, one lookup, and the node id the lookup
+   * Split out of `preflight` so `act` can reach it with the session it already has. Calling the
+   * public `preflight` would resolve the workspace a second time, take the control authorization a
+   * second time, and leave the judgement and the action holding two different views of the
+   * machine between them. One session, one lookup, and the node id the lookup
    * returned is the one the bridge then verifies before it acts - which is what makes the card
    * and the action refer to the same widget.
    */
@@ -1977,7 +1974,7 @@ export class DesktopManager {
       // a generation that is no longer current. Without it the first JPEG-era frames would be run
       // through `encodeVideoAccessUnit`, or the reverse.
       //
-      // It is now also what `act` holds the agent's coordinates to, and this is the one bumper of
+      // It is also what `act` holds the agent's coordinates to, and this is the one bumper of
       // the three that does not move a single pixel: the display is the same size and the holder
       // is the same, so an agent refused here has lost nothing but one observation. Paid rather
       // than fixed with a second counter, because two answers to "is this observation current" is

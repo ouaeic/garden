@@ -128,14 +128,14 @@ describe('which calls count as changing something', () => {
 });
 
 /**
- * The two shell channels the taint model could not see.
+ * The two shell channels the taint model has to see.
  *
- * `network: true` used to be the whole test for whether a command's output was somebody else's
+ * `network: true` cannot be the whole test for whether a command's output is somebody else's
  * words. It is a declaration and not a gate - the installer ships the per-command namespace off, so
- * the flag changes what the owner is asked and not what the command can reach - which made "curl
- * the page without ticking the box" a clean way into a window the floor still called clean. And a
- * shell read of the download directory was not labelled at all, while the three file readers had
- * always treated the same bytes as quarantine.
+ * the flag changes what the owner is asked and not what the command can reach - and trusting it
+ * would make "curl the page without ticking the box" a clean way into a window the floor still
+ * called clean. And a shell read of the download directory has to be labelled as the three file
+ * readers label the same bytes: as quarantine.
  */
 describe('what a shell command brings back from outside', () => {
   it('judges the command rather than the flag the model chose to set', () => {

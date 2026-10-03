@@ -915,10 +915,10 @@ describe('what the lead is told not to rely on', () => {
 /**
  * What the harness knows and the lead's trajectory does not, reaching a specialist.
  *
- * A specialist is cold on purpose, and until now "cold" was doing two jobs. What it is a bound on
- * is the lead's trajectory - pages fetched, inboxes opened, files downloaded, and the prose the
- * lead composed out of them - which is the channel `leadContext` fences and the cases above this
- * one guard. It was never a bound on what the harness itself knows: the clock is handed over, the
+ * A specialist is cold on purpose, and "cold" is not one job but two. What it is a bound on is
+ * the lead's trajectory - pages fetched, inboxes opened, files downloaded, and the prose the lead
+ * composed out of them - which is the channel `leadContext` fences and the cases above this one
+ * guard. It is not a bound on what the harness itself knows: the clock is handed over, the
  * working root is handed over, the web route is handed over.
  *
  * The owner's own block is on the harness's side of that line and cannot be moved to the other

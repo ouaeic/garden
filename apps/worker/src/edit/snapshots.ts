@@ -86,8 +86,8 @@ interface Marked {
  * a still-in-flight edit could name matter. Four is two round trips of headroom; beyond that the
  * anchor is old enough that refusing with the file's current text is the right answer anyway.
  *
- * It is a bound on TEXT HELD IN MEMORY, which is why it is small, and it is no longer also the
- * bound on how much of a file may count as read - see the coverage record below.
+ * It is a bound on TEXT HELD IN MEMORY, which is why it is small, and it is not also the bound on
+ * how much of a file may count as read - see the coverage record below.
  */
 export const SNAPSHOTS_PER_PATH = 4;
 

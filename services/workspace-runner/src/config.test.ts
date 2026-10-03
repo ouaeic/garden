@@ -73,9 +73,9 @@ describe('runner configuration', () => {
   });
 
   it('takes a background ceiling raised past a day, which is the point of the setting', () => {
-    // Forty hours, for the forty-hour assembly this box exists to run. The request schema in
-    // processes.ts used to carry its own `.max(86_400)`, so setting this did nothing above a day
-    // and the refusal named a constant instead of this box.
+    // Forty hours, for the forty-hour assembly this box exists to run. A cap of its own in the
+    // request schema in processes.ts would make this setting do nothing above a day, and the
+    // refusal would name a constant instead of this box.
     baseEnvironment();
     process.env.MAX_BACKGROUND_SECONDS = '144000';
     expect(loadConfig().MAX_BACKGROUND_SECONDS).toBe(144_000);

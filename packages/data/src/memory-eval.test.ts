@@ -259,11 +259,11 @@ describe('memory retrieval eval', () => {
   });
 
   it('ranks a fact by the words of the question, not by which fact is newest', () => {
-    // The regression this corpus caught: the structural channel admitted every fact about a
-    // matched subject, ranked them by recency and fused them at the heaviest weight of any
-    // channel, so for `owner` - the subject of every stated preference - the nine facts came back
-    // in date order and the per-subject cap kept the newest four. The row titled "working
-    // languages" was eighth, and unreachable at any k.
+    // A structural channel that admitted every fact about a matched subject, ranked them by
+    // recency and fused them at the heaviest weight of any channel would return the nine facts
+    // about `owner` - the subject of every stated preference - in date order, and the per-subject
+    // cap would keep the newest four. The row titled "working languages" would be eighth, and
+    // unreachable at any k.
     const probe = packRun.probes.find((entry) => entry.id === 'owner-language');
     expect(probe?.missed).toEqual([]);
     expect(probe?.rank ?? Infinity).toBeLessThanOrEqual(4);
@@ -824,15 +824,15 @@ describe('memory retrieval eval with a use history', () => {
     expect(folded.rows[0]!.uses).toBe(10);
     // And none of the ten was graded. `shell-retired` is the heaviest history in this corpus and
     // it is a retired value that must never come back, so it carries no citations at all - which
-    // under the production writer's own rules makes every one of its uses `unknown`. The fold now
-    // records that, and the score reads it: this is the row whose lead the old formula would have
-    // kept paying for out of nothing but the fact that it had once been packed.
+    // under the production writer's own rules makes every one of its uses `unknown`. The fold
+    // records that, and the score reads it: this is the row whose lead a score blind to the outcome
+    // would keep paying for out of nothing but the fact that it had once been packed.
     expect(folded.rows[0]!.oks).toBe(0);
 
-    // THE CORPUS WRITES ALL THREE OUTCOMES, BECAUSE THE PRODUCTION WRITER DOES. It used to write
-    // two - every use that was not cited and did not fail was graded a success - and a fixture
-    // that never produces `unknown` cannot see what the score does with it. If this ever goes back
-    // to two, the arm below is measuring a store that no turn on this computer can produce.
+    // THE CORPUS WRITES ALL THREE OUTCOMES, BECAUSE THE PRODUCTION WRITER DOES. A fixture that
+    // grades every use that was not cited and did not fail a success never produces `unknown`,
+    // and cannot see what the score does with it. If this ever writes only two, the arm below is
+    // measuring a store that no turn on this computer can produce.
     const outcomes = await database.query<{ outcome: string; n: string }>(
       `SELECT outcome, count(*)::int AS n FROM mem.item_use WHERE workspace_id=$1
        GROUP BY outcome ORDER BY outcome`,
@@ -855,9 +855,8 @@ describe('memory retrieval eval with a use history', () => {
   });
 
   it('moves when a salience constant moves, which is the whole point of the arm', async () => {
-    // The falsification. Flatten salience to the value the corpus used to carry and the ranking
-    // has to change - if it does not, this block is measuring the same thing as the one above it
-    // and the usage tier is invisible again.
+    // The falsification. Flatten salience to zero and the ranking has to change - if it does not,
+    // this block is measuring the same thing as the one above it and the usage tier is invisible.
     const before = packRun.mrr;
     await database.query('UPDATE mem.item SET salience = 0 WHERE workspace_id=$1', [workspaceId]);
     const flattened = await runMemoryRecallEval({ store, workspaceId, key, now, seed });

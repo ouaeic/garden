@@ -70,31 +70,30 @@ const scheduleErrorMessage = (code: string): string =>
  * How many runs in a row a schedule may lose to a model that is no longer there before it stops
  * trying.
  *
- * CHOSEN at 3. Nothing here counted at all: a schedule pinned to a route the provider withdrew took
- * the `model_unavailable` arm, advanced `next_run_at`, and did it again on the next occurrence -
- * weekly, forever, with no escalation anywhere in this directory. Three is the smallest number that
- * cannot be reached by a single bad moment. A model is `unavailable` for reasons that pass on their
- * own: the registry's hourly refresh flattening the catalogue - which `repairFlattenedCatalog` in
- * `routes/support.ts` exists to undo - a ZDR endpoint feed that did not answer, a provider key
- * being re-saved. Pausing on the first of those would be worse than the failing-forever it
- * replaces, because a paused schedule needs a human to start it again and a failing one does not.
- * Raising it costs the owner more silent runs before anything says so; lowering it risks pausing a
- * watcher over an outage that had already ended.
+ * CHOSEN at 3. Without a count, a schedule pinned to a route the provider withdrew takes the
+ * `model_unavailable` arm, advances `next_run_at`, and does it again on the next occurrence -
+ * weekly, forever. Three is the smallest number that cannot be reached by a single bad moment. A
+ * model is `unavailable` for reasons that pass on their own: the registry's hourly refresh
+ * flattening the catalogue - which `repairFlattenedCatalog` in `routes/support.ts` exists to undo -
+ * a ZDR endpoint feed that did not answer, a provider key being re-saved. Pausing on the first of
+ * those would be worse than failing forever, because a paused schedule needs a human to start it
+ * again and a failing one does not. Raising it costs the owner more silent runs before anything
+ * says so; lowering it risks pausing a watcher over an outage that had already ended.
  *
  * Counted in runs rather than in time, so the wall-clock patience varies with the spec: three weeks
  * on a weekly watcher, forty-five minutes on the fifteen-minute interval that is the shortest this
- * software offers. There is no upper bound on that any more. The count used to be derived from
- * `task_schedule_runs`, which `cleanupExpired` prunes at thirty days, so a monthly cron spec could
- * never reach three - about sixty-two days of evidence, of which the oldest row was already deleted
- * - and failed forever, which is the behaviour this threshold exists to end. It is a column on the
- * schedule now (`consecutive_failures`, migration 77) and no retention policy erases it.
+ * software offers. There is no upper bound on that. The count is a column on the schedule
+ * (`consecutive_failures`) that no retention policy erases. Derived from `task_schedule_runs`,
+ * which `cleanupExpired` prunes at thirty days, a monthly cron spec could never reach three - about
+ * sixty-two days of evidence, of which the oldest row is already deleted - and would fail forever,
+ * which is the behaviour this threshold exists to end.
  *
  * The count is a streak that ends at the newest run, not a lifetime total: `materializeTaskSchedule`
  * resets it to zero on a queued run and on a failure with any other code, and
  * `setTaskScheduleEnabled` resets it when an owner turns the schedule back on - without that, the
- * three failures that paused a schedule were still on the row after a resume and the very next
- * failure re-paused it, which made this threshold one rather than three for exactly the owner who
- * had just decided to try again.
+ * three failures that paused a schedule would still be on the row after a resume and the very next
+ * failure would re-pause it, which would make this threshold one rather than three for exactly the
+ * owner who had just decided to try again.
  */
 const MODEL_UNAVAILABLE_PAUSE_AFTER = 3;
 
@@ -347,13 +346,13 @@ export const createScheduleDispatch = (context: SupportedContext) => {
   /**
    * How many due schedules one poll will carry.
    *
-   * A tick used to lease exactly one, which made the real dispatch rate `1 / SCHEDULER_POLL_MS` -
+   * Leasing exactly one per tick would make the real dispatch rate `1 / SCHEDULER_POLL_MS` -
    * fifteen seconds - against a `serverLimits.maxSchedules` of a thousand that `plans.ts` calls
-   * "deliberately generous". Forty watchers set for nine in the morning meant the fortieth started
-   * at 09:09:45, and nothing said so, because `next_run_at` has already advanced by then and the
-   * schedule reads as on time. The budget is here rather than absent so that a box waking to a
-   * long backlog still yields the event loop to the requests the owner is making, instead of
-   * holding it for a thousand consecutive dispatches.
+   * "deliberately generous". Forty watchers set for nine in the morning would start the fortieth at
+   * 09:09:45, and nothing would say so, because `next_run_at` has already advanced by then and the
+   * schedule reads as on time. The budget is here rather than absent so that a box waking to a long
+   * backlog still yields the event loop to the requests the owner is making, instead of holding it
+   * for a thousand consecutive dispatches.
    */
   const SCHEDULE_DISPATCH_BUDGET = 25;
   /** Leases and dispatches one due schedule. False means there was nothing due left to take. */

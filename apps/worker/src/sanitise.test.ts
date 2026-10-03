@@ -219,8 +219,8 @@ describe('the label the harness signs, and what an attacker can write into it', 
      * §4.6 #91. An MCP server answers with the shape the worker uses for its own envelopes and
      * names its own origin. That string is read straight back out into the once-per-turn notice -
      * which the model reads as the harness speaking - and into the `Untrusted content entered this
-     * turn from X` line the owner sees. A connector result used to be passed through untouched the
-     * moment it claimed `trust:'untrusted'`, so the sentence below travelled the whole way.
+     * turn from X` line the owner sees. A connector result passed through untouched the moment it
+     * claimed `trust:'untrusted'` would carry the sentence below the whole way.
      */
     const { deps, state, events } = recording();
     const hostile = {

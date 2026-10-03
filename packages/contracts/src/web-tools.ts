@@ -9,7 +9,7 @@ import { z } from 'zod';
  * model structured results with citations - faster, cheaper, and reachable from an address a search
  * engine will not serve directly.
  *
- * That last clause is why this file reads the way it does now. The in-house route is a browser
+ * That last clause is why this file reads the way it does. The in-house route is a browser
  * making an ordinary request from wherever garden is installed, and garden is built to be
  * installed on a server. Search engines challenge datacenter address ranges as a matter of course,
  * so on the deployment this product is designed for the in-house route does not degrade, it fails:
@@ -18,20 +18,20 @@ import { z } from 'zod';
  * work around a challenge. So a box whose only route is the in-house one is a box that cannot
  * search at all, and it finds that out one abandoned research task at a time.
  *
- * This module used to let zero data retention decide that, and it decided it twice. It read the
- * owner's stored credential enforcing zero retention, and it read the conversation's own privacy
- * route, and refused the provider on either. Those are not two facts: the credential's setting is
- * what labels every model in the catalogue `provider_zdr`, and a task may only run on a model whose
- * route matches its own, so a task's privacy route is a copy of the credential flag rather than
- * anything a conversation ever chose. The flag ships on. The result was that the shipped default
- * bought a promise about inference by spending the entire web, on every box, without saying so.
+ * Zero data retention does not decide that. The owner's stored credential enforcing zero
+ * retention and the conversation's own privacy route look like two reasons to refuse the provider,
+ * but they are not two facts: the credential's setting is what labels every model in the catalogue
+ * `provider_zdr`, and a task may only run on a model whose route matches its own, so a task's
+ * privacy route is a copy of the credential flag rather than anything a conversation ever chose.
+ * The flag ships on, so refusing on it would make the shipped default buy a promise about inference
+ * by spending the entire web, on every box, without saying so.
  *
- * The promise it was spending that on was never garden's to make. Zero-data-retention enforcement
- * is documented as covering inference routing only: "It does not apply to plugins and tools you
- * choose to enable, such as web search." A search query is frequently the most revealing sentence
- * in a conversation - more revealing than the answer - and it falls outside that guarantee whichever
- * way this file resolves. So reading the retention flag as a refusal never kept a query private. It
- * only kept the search from happening, and left the owner believing otherwise.
+ * That promise is not garden's to make. Zero-data-retention enforcement is documented as covering
+ * inference routing only: "It does not apply to plugins and tools you choose to enable, such as web
+ * search." A search query is frequently the most revealing sentence in a conversation - more
+ * revealing than the answer - and it falls outside that guarantee whichever way this file resolves.
+ * So reading the retention flag as a refusal would never keep a query private. It would only keep
+ * the search from happening, and leave the owner believing otherwise.
  *
  * What the owner is actually owed is the truth about where their queries go, in the place they
  * type them and in the model's own runtime context. That is what `WEB_TOOL_DISCLOSURE` is, and it
@@ -42,8 +42,8 @@ import { z } from 'zod';
  * may keep of an inference request is the credential's business, and reaches the wire as the
  * provider block on the request. Whether a search query may be sent to a search service at all is
  * `AI_FORCE_INHOUSE_WEB`, which was built for exactly this question, says so where it is declared,
- * and restores every previous refusal in one line of environment - no credential edit, and so no
- * passkey step-up, for an owner who wants the old behaviour back.
+ * and refuses the provider in one line of environment - no credential edit, and so no passkey
+ * step-up, for an owner who wants no query sent to a search service.
  *
  * What the two modes disclose, stated exactly rather than approximately. Provider search discloses
  * the query string, any domain filters, and an approximate location if one is configured, to
@@ -62,22 +62,21 @@ import { z } from 'zod';
  * next step, because withholding a privacy fact that has just become true to protect a cache prefix
  * is the wrong trade every time.
  *
- * What the mode does not decide, and used to, is which tools the model is offered. That was the
- * mistake this revision repairs. A provider-side tool has no `function.name`: it is a name the
- * provider recognises on a request, not a name a model can call. It nevertheless travelled in the
- * same tools array as the function tools, with `web_search` and `parallel_web_read` withdrawn to
- * make room for it - so on the route this product ships on, the model was told by its operating
- * contract to start with a search, went looking for the search tool, found nothing by that name,
- * and had no name for what had replaced it. Asked to research something and cite sources, it made
- * no tool call at all and answered out of memory with invented projects, invented dates and
- * invented addresses. The catalogue was not degraded on that route; it was lying, and four other
- * tool descriptions still pointed at the two tools that had been taken away.
+ * What the mode does not decide is which tools the model is offered. A provider-side tool has no
+ * `function.name`: it is a name the provider recognises on a request, not a name a model can call.
+ * Swapped into the agent's tools array in place of `web_search` and `parallel_web_read`, it leaves
+ * a model that its operating contract tells to start with a search looking for the search tool,
+ * finding nothing by that name, and having no name for what replaced it. Asked to research
+ * something and cite sources, such a model makes no tool call at all and answers out of memory
+ * with invented projects, invented dates and invented addresses - and other tool descriptions still
+ * point at the two tools that were taken away. The catalogue on that route would not be degraded;
+ * it would be lying.
  *
  * So the catalogue is the same on both routes, and the mode decides only who answers a call. The
  * model calls `web_search` under one name, with one description, wherever it is running; in house
  * that call is answered by the workspace's own browser, and on the provider's route it is answered
  * by a request garden builds for the tool below and nothing else. The provider tool is an
- * implementation of a capability now, rather than a substitute for the name of one.
+ * implementation of a capability, rather than a substitute for the name of one.
  */
 
 export const WebToolMode = z.enum(['in_house', 'server']);
@@ -186,15 +185,15 @@ export interface ServerWebTool {
 /**
  * Ceilings, pinned rather than left null.
  *
- * These bound one request, and the request they bound is now the one garden builds to answer a
- * single `web_search` call rather than the agent's own step. That is what moved the use ceiling from
- * eight to two: eight was sized against a whole turn's research loop, where the runaway was the
- * expensive failure, and this request has one query to run. Two rather than one so that a provider
- * that reformulates a query it got nothing back from may do so once, which is the same second
- * attempt the tool's own description tells the model to make.
+ * These bound one request, and the request they bound is the one garden builds to answer a single
+ * `web_search` call rather than the agent's own step. A use ceiling sized against a whole turn's
+ * research loop, where the runaway is the expensive failure, is far too generous for a request
+ * that has one query to run. Two rather than one so that a provider that reformulates a query it
+ * got nothing back from may do so once, which is the same second attempt the tool's own description
+ * tells the model to make.
  *
- * Ten results is what one page of results has always been on the in-house route, so a search returns
- * the same amount of material to judge whichever route answered it.
+ * Ten results is one page of results on the in-house route, so a search returns the same amount of
+ * material to judge whichever route answered it.
  */
 export const SERVER_WEB_SEARCH_MAX_USES = 2;
 export const SERVER_WEB_SEARCH_MAX_RESULTS = 10;
@@ -204,7 +203,7 @@ export const SERVER_WEB_SEARCH_MAX_RESULTS = 10;
  * answers.
  *
  * The pairing lives in the same structure as the tool rather than in a list beside it because the
- * two can never be allowed to disagree. It no longer means a withdrawal - the in-house name stays in
+ * two can never be allowed to disagree. It does not mean a withdrawal - the in-house name stays in
  * the model's catalogue on every route - it means a request carrying this tool must not also offer
  * the model a function tool of that name, because such a request would be asking the provider to
  * search while telling the model to search for itself, and the answer would depend on which of the
@@ -212,9 +211,9 @@ export const SERVER_WEB_SEARCH_MAX_RESULTS = 10;
  * way out. Only the tool half is ever serialised - `supersedes` is garden's own bookkeeping and has
  * no business on the wire.
  *
- * The provider's `web_fetch` used to stand here beside its search, and it is deliberately gone. It
- * was never callable by name either, so all it ever bought was pages the provider decided on its own
- * to fetch - and it cost `parallel_web_read`, withdrawn to make room for it, which is the tool three
+ * The provider's `web_fetch` is deliberately not here beside its search. It is not callable by name
+ * either, so all it would buy is pages the provider decided on its own to fetch - and it would cost
+ * `parallel_web_read`, which a request carrying it could not also offer, and which is the tool
  * other descriptions send the model to for the second half of a research pass. Reading a page whose
  * address is already known is not what a datacenter address gets refused for; a search engine
  * challenging the box is. So the in-house reader answers reads on every route, the browser is still
@@ -254,11 +253,11 @@ const SERVER_WEB_TOOLS: readonly ServerWebTool[] = Object.freeze(
  * own tools beside it: the model is offered `web_search` by name on both routes, so a request that
  * carried both would be asking the same question twice, of two different answerers, in one breath.
  *
- * Nothing is withdrawn from the model's catalogue any more, which is why there is no longer a list
- * of withdrawals here. The browser tools in particular were always kept - they are the half of the
- * web nothing else reaches, everything behind a session, a login, a paywall or a form - and now
- * `web_search` and `parallel_web_read` are kept for the stronger reason that a tool the model cannot
- * name is a tool the model does not have.
+ * Nothing is withdrawn from the model's catalogue, which is why there is no list of withdrawals
+ * here. The browser tools are kept because they are the half of the web nothing else reaches,
+ * everything behind a session, a login, a paywall or a form - and `web_search` and
+ * `parallel_web_read` are kept for the stronger reason that a tool the model cannot name is a tool
+ * the model does not have.
  */
 export interface WebToolPlan extends WebToolRoute {
   readonly serverTools: readonly ServerWebTool[];

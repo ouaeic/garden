@@ -228,10 +228,9 @@ describe('documents this computer produces, measured', () => {
         .join('; ')}. Set GARDEN_DOCUMENT_PYTHON to an environment with document libraries.`
     ).toBeGreaterThan(0);
     // On a laptop "something" is the honest floor: LibreOffice is a gigabyte nobody should have to
-    // install to fix a typo. On the runner the floor is everything. This assertion used to read
-    // `> 0` there too, and three of the six jobs - cv, report, tables - skipped themselves on
-    // every CI run this repository has had, because .github/workflows/verify.yml installed no
-    // packages at all. The job that installs them is the reason this can be an equality now.
+    // install to fix a typo. On the runner the floor is everything: `> 0` there would let three
+    // of the six jobs - cv, report, tables - skip themselves on every CI run unnoticed. The job in
+    // .github/workflows/verify.yml that installs their packages is what lets this be an equality.
     if (process.env.GITHUB_ACTIONS)
       expect(
         report.skipped,

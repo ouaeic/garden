@@ -1132,7 +1132,7 @@ describe('a zoom that asks for more pixels than a screenshot carries', () => {
   it('crops the region and reduces it into the box the full still is bounded to', async () => {
     const harness = await buildHarness();
     // The whole screen, in the agent's own coordinates. 1440x900 of image is the whole of a
-    // 2560x1600 display - 4.1 megapixels, which is what came back before this was bounded - less
+    // 2560x1600 display - 4.1 megapixels, which is what an unbounded zoom would send - less
     // the one pixel `imageToDisplayPoint` keeps every coordinate inside the far edge by.
     const result = await act(
       harness,

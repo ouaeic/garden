@@ -528,13 +528,10 @@ describe('agent-initiated recall', () => {
   });
 
   it('spends a fixed budget and holds the item count inside the bound the schema states', async () => {
-    // The budget is not negotiable and no longer pretends to be. It used to be a `budgetTokens`
-    // input clamped between 256 and a 4,000 ceiling in `packages/core`, and the tool schema is
-    // `additionalProperties: false` and never declared the field - so the clamp's own test was the
-    // only caller that had ever reached it, and every recall the product has answered was answered
-    // at MEMORY_RECALL_BUDGET_TOKENS. Both the input and the ceiling are gone (ATH-164); what the
-    // model does control is `maxItems`, and these are the bounds the schema now interpolates from
-    // the same constants this asserts against.
+    // The budget is not negotiable. The tool schema is `additionalProperties: false` and declares
+    // no budget field, so no model could ever reach a clamped budget input. What the model does
+    // control is `maxItems`, and these are the bounds the schema interpolates from the same
+    // constants this asserts against.
     const probe = recallStore(() => []);
     await recallMemory({
       store: probe.store,
@@ -808,9 +805,9 @@ describe('owner fact observations', () => {
 
   it('says the same thing twice once, and two different things twice', () => {
     // The de-duplication key joins subject, predicate and object on a byte none of them can hold.
-    // It used to be a literal NUL in the source, which made the whole module arrive as binary -
-    // grep skipped it and git refused to diff it - so it is an escape now, and this is what proves
-    // the separator is still a separator rather than something a subject could contain.
+    // It is an escape rather than a literal NUL, which would make the whole module arrive as
+    // binary - grep would skip it and git would refuse to diff it - and this is what proves the
+    // separator is still a separator rather than something a subject could contain.
     expect(observedMemoryFacts('my shell is fish, and my shell is fish')).toEqual([
       { subject: 'owner', predicate: 'default_shell', object: 'fish' }
     ]);
@@ -894,8 +891,8 @@ describe('owner standing orders', () => {
   });
 
   it('refuses a sentence carried by nothing but its own function words', () => {
-    // The full stop used to make this one pass: `it.` tokenised as its own word rather than as the
-    // stopword `it`, so a four-word fragment with two content words looked like it had three.
+    // The full stop must not make this one pass: if `it.` tokenised as its own word rather than as
+    // the stopword `it`, a four-word fragment with two content words would look like it had three.
     expect(observedStandingOrders('always better without it.')).toEqual([]);
     expect(observedStandingOrders('always better without the grain overlay.')).toHaveLength(1);
   });
@@ -1199,11 +1196,11 @@ describe('turn capture write path', () => {
 
   it('nominates nothing at all on a turn that read somebody else’s words', async () => {
     /*
-     * The taint gate used to sit on promotion alone, and the comment above it said that stopped a
-     * page talking its way in by being read twice. It did not. `mem.fact_candidate` has no taint
-     * column, and `listPromotableMemoryFactCandidates` selects on workspace, count and gap - so a
-     * tainted turn wrote its sighting, a second tainted turn wrote the corroborating one, and the
-     * next ordinary turn about anything at all promoted the pair.
+     * A taint gate on promotion alone does not stop a page talking its way in by being read twice.
+     * `mem.fact_candidate` has no taint column, and `listPromotableMemoryFactCandidates` selects on
+     * workspace, count and gap - so a tainted turn would write its sighting, a second tainted turn
+     * the corroborating one, and the next ordinary turn about anything at all would promote the
+     * pair.
      *
      * Asserted at the candidate write, which is the only place the difference exists: a case that
      * only checked `promotedFacts` on the tainted turn passes with the gate in either position.
@@ -1600,13 +1597,13 @@ describe('pack outcome and consolidation cadence', () => {
   });
 
   /**
-   * The producer for the control that read a column nothing wrote.
+   * The producer for the column the salience score reads.
    *
    * `mem.item.cited_count` is `0.20` of the salience score that decides what survives
-   * consolidation; `recordMemoryUse` is its only writer, behind `cited`; and until this wave both
-   * production callers left it out, so the column was zero on every box and the term was a
-   * constant for every row in the pool. These cases pin the two halves of the repair: which
-   * entries a finished turn can be shown to have used, and the grade the rest are left with.
+   * consolidation, and `recordMemoryUse` is its only writer, behind `cited`. A production caller
+   * that leaves it out keeps the column at zero on every box and makes the term a constant for
+   * every row in the pool. These cases pin both halves: which entries a finished turn can be shown
+   * to have used, and the grade the rest are left with.
    */
   describe('citing the entries the finished turn used', () => {
     const rateId = 'aaaaaaaa-0000-4000-8000-00000000000a';
@@ -2028,8 +2025,8 @@ describe('against the real store', () => {
     expect(pack.reused).toBe(false);
     expect(pack.itemIds).toContain(captured!.episodeId);
     expect(pack.body).toContain('Goal: reload nginx on the preview gateway');
-    // The verbatim layer came back too: replacing text with extracted artifacts measurably loses
-    // accuracy, so both tiers have to be reachable from one query.
+    // The verbatim layer is in the pack too: replacing text with extracted artifacts measurably
+    // loses accuracy, so both tiers have to be reachable from one query.
     expect(pack.body).toContain('## Verbatim');
   });
 
@@ -2127,13 +2124,12 @@ describe('against the real store', () => {
     expect(result?.promotedFacts).toBe(0);
     await expect(store.listMemoryItems(realWorkspaceId, { kind: 'fact' })).resolves.toEqual([]);
     /*
-     * Nothing corroborated, and this is the assertion that changed.
+     * Nothing corroborated.
      *
-     * It used to read `episodeCount: 2` with a comment saying the sighting was kept because the
-     * next clean turn would settle it. That is the hole rather than the feature: the candidate
-     * table carries no taint, so a sighting written on a tainted turn is indistinguishable from
-     * one the owner offered on a clean one, and two tainted turns a day apart therefore left a
-     * fully corroborated row for the next ordinary turn - about anything at all - to mint. The
+     * Keeping a tainted sighting for the next clean turn to settle would be a hole: the candidate
+     * table carries no taint, so a sighting written on a tainted turn is indistinguishable from one
+     * the owner offered on a clean one, and two tainted turns a day apart would leave a fully
+     * corroborated row for the next ordinary turn - about anything at all - to mint. The
      * one clean sighting from the turn above is still here, which is what keeps this case from
      * passing for the trivial reason that nothing was ever observed.
      */
@@ -2519,15 +2515,14 @@ describe('against the real store', () => {
   });
 
   /**
-   * The nightly half of §4.3, which had never had a caller.
+   * The nightly half of §4.3.
    *
-   * `resolveMemoryContradiction` is the resolution table and nothing in the product could reach it;
-   * `markMemoryFactsDisputed` writes the status the review queue serves and nothing in the product
-   * could reach that either, so the queue could clear a dispute nothing was able to raise. Both are
-   * closed by one pass, and this is the state that reaches it: a predicate that used to permit many
-   * values, narrowed to one by a release, over a subject that had already accumulated two - the
-   * case `#backfillPredicateFunctional` deliberately leaves standing and promises will be "resolved
-   * the ordinary way".
+   * `resolveMemoryContradiction` is the resolution table, and `markMemoryFactsDisputed` writes the
+   * status the review queue serves; without a caller for the second, the queue could clear a
+   * dispute nothing was able to raise. One pass reaches both, and this is the state that reaches
+   * it: a predicate that used to permit many values, narrowed to one by a release, over a subject
+   * that had already accumulated two - the case `#backfillPredicateFunctional` deliberately leaves
+   * standing and promises will be "resolved the ordinary way".
    */
   describe('the contradiction pass inside consolidation', () => {
     const statedFact = async (
@@ -3071,16 +3066,16 @@ describe('against the real store', () => {
   });
 
   /**
-   * TWO YEARS OLD, AND STILL REACHABLE - the one place the owner's rule was still broken.
+   * TWO YEARS OLD, AND STILL REACHABLE.
    *
-   * "No memory should ever be totally gone, just further away, or more steps to get to." The
-   * nightly pass used to run `UPDATE mem.source SET indexed=FALSE, body_tokens=''` past its
-   * archive horizon, and the second half of that statement is what broke the rule. `body_tokens`
-   * is the ONLY searchable representation this database has: the lexemes are HMACs computed in the
-   * worker under a key the server never sees, so nothing on the server can rebuild them, and
-   * nothing anywhere in this tree rebuilds them from the ciphertext either. A conversation
-   * straddling the horizon survived through a neighbour that had not crossed it yet; one entirely
-   * older than two years had no route in from any query at all.
+   * "No memory should ever be totally gone, just further away, or more steps to get to." A nightly
+   * pass that ran `UPDATE mem.source SET indexed=FALSE, body_tokens=''` past its archive horizon
+   * would break the rule with the second half of that statement. `body_tokens` is the ONLY
+   * searchable representation this database has: the lexemes are HMACs computed in the worker
+   * under a key the server never sees, so nothing on the server can rebuild them, and nothing
+   * anywhere in this tree rebuilds them from the ciphertext either. A conversation straddling the
+   * horizon would survive through a neighbour that had not crossed it yet; one entirely older than
+   * two years would have no route in from any query at all.
    *
    * Every case below is driven through the two functions production calls - `recordTurnEpisode`
    * writes the rows, `consolidateMemory` is the nightly pass `memory-capture.ts` runs - and read
@@ -3283,8 +3278,8 @@ describe('against the real store', () => {
      * `createMemorySource` writes `body_tokens=''` whenever the caller passes `indexed: false` -
      * a body with nothing to index, or one a gate refuses to expose - and that is a different
      * decision about a different row. The pass only ever moves rows that WERE indexed, so it can
-     * never hand tokens to one the writer withheld them from. Asserted because the two states now
-     * look alike in the column that used to tell them apart.
+     * never hand tokens to one the writer withheld them from. Asserted because the two states both
+     * read `indexed = FALSE`.
      */
     it('does not make a row searchable that was written unsearchable', async () => {
       const index = buildMemoryItemIndex(
@@ -3688,12 +3683,12 @@ describe('against the real store', () => {
     });
 
     /*
-     * Whose sentence a promoted rule is, and the queue that no longer has a writer.
+     * Whose sentence a promoted rule is, and the queue that has no production writer.
      *
      * `origin` decides two things: a promotion from `proposed` is minted at `derived` rather than
-     * `stated`, and only `proposed` rows are offered to the owner as proposals. With the nightly
-     * proposer deleted, nothing in this program writes that origin - so this is the assertion that
-     * the deletion is complete at the call site, rather than a constant having been removed.
+     * `stated`, and only `proposed` rows are offered to the owner as proposals. Nothing in this
+     * program writes that origin - so this asserts it at the call site, rather than by a constant
+     * being absent.
      *
      * The second half is what makes the first half mean something. An empty proposal queue would
      * read exactly the same against a query that had stopped working, so the case fills it by hand
@@ -4193,9 +4188,9 @@ describe('every phrasing a carve-out arrives in', () => {
   });
 
   /*
-   * Character-identical, now on the seams that were being rewritten: a comma the composer had
-   * turned into a full stop on the strength of a capital letter, a bracket that carried its own
-   * full stop and got a second, and a dash that came back as a comma.
+   * Character-identical on the seams a composer could rewrite: a comma turned into a full stop on
+   * the strength of a capital letter, a bracket that carries its own full stop and gets a second,
+   * and a dash that comes back as a comma.
    */
   it('puts the sentence back with the owner’s own seam, whatever it was', () => {
     for (const sentence of [
@@ -4523,14 +4518,12 @@ describe('reaching from a memory to the material it was made from', () => {
 
   it('hands a search hit the id that reaches the tool results behind it', async () => {
     /*
-     * The half-usable pointer, closed.
-     *
      * A `mem.source` id reaches the turn's own words and nothing else - `mem.cited_call` hangs off
-     * the episode - so a search that found the right conversation was handing back an id for half
-     * of what is behind it and no id at all for the other half, which is the 80% of the record this
-     * arm exists for. Measured over 146 probes whose answer is only in a tool result
-     * (`docs/design/reach/RIG.md`): reaching from the id the search used to return answers 25.3%,
-     * and from this one 86.3%.
+     * the episode - so a search that handed back only that id would give an id for half of what is
+     * behind it and no id at all for the other half, which is the 80% of the record this arm exists
+     * for. Measured over 146 probes whose answer is only in a tool result
+     * (`docs/design/reach/RIG.md`): reaching from the source id answers 25.3%, and from the episode
+     * id 86.3%.
      */
     const event = await recordedToolResult('call-1', `renewed: ${SERIAL}`);
     const episodeId = await capture({

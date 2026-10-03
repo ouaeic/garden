@@ -852,12 +852,12 @@ describe('the owner preference on an unattended pick', () => {
   });
 
   /**
-   * The half the first version of the ceiling guard got wrong, and the reason `selectModel` now
-   * reports which exclusion it is instead of one sentence for both.
+   * An absent rate keeps the pin, which is why `selectModel` reports which exclusion it is instead
+   * of one sentence for both.
    *
-   * That guard dropped the pin whenever the `requestedId` arm came back with a message, and
    * `priceCeilingBreach` emits its one sentence for a route with no published rate as well as for
-   * one over the ceiling. So an owner who set a ceiling lost their standing pin on every unpriced
+   * one over the ceiling, so a guard that dropped the pin whenever the `requestedId` arm came back
+   * with a message would cost an owner who set a ceiling their standing pin on every unpriced
    * route, free ones included. The ruling: a published rate over the ceiling loses the pin (the
    * test above), an absent rate does not, because the ceiling has no verdict to enforce.
    *
@@ -882,20 +882,20 @@ describe('the owner preference on an unattended pick', () => {
   });
 
   /**
-   * The hole the first version of this ruling left, measured at the same door.
+   * A route priced on one side only, at the same door.
    *
-   * `priceCeilingBreachReason` tested `input === null` before it compared any published rate, so a
-   * route priced on the output side and not the input side came back `no_published_price` - and
-   * this guard honours that kind. A pin on a $900-per-million-output route therefore ran unattended
-   * under a $15 output ceiling: measured through POST /v1/schedules, the pin was returned rather
-   * than MIDDLE. The catalogue had published a rate; nothing looked at it.
+   * `priceCeilingBreachReason` compares every published rate before it tests `input === null`.
+   * The other way round, a route priced on the output side and not the input side would come back
+   * `no_published_price` - and this guard honours that kind - so a pin on a
+   * $900-per-million-output route would run unattended under a $15 output ceiling. The catalogue
+   * has published a rate, and the guard has to look at it.
    *
    * Both halves are asserted in one run, because a fix that simply dropped every partly-priced pin
    * would pass the first assertion and break the ruling: a rate the ceiling admits on the side that
    * is published leaves the ceiling with nothing to enforce, so that pin still stands. Under 'best'
    * with this ceiling the ranking answers MIDDLE, so HALF_CHEAP can only have come from the pin.
    *
-   * Put the `input === null` test back in front of the comparisons and the first assertion goes red
+   * Move the `input === null` test in front of the comparisons and the first assertion goes red
    * at HALF_DEAR while every other pin test in this file stays green.
    */
   test('drops a pin whose published rate breaches the ceiling on the side the catalogue priced', async () => {

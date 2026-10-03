@@ -174,13 +174,13 @@ describe('a check no state of the workspace can fail', () => {
   });
 
   /*
-   * The case the refusal used to get wrong, and the two quoted spellings it must still get right.
+   * A glob the refusal must accept, and the two quoted spellings it must still refuse.
    *
    * `echo workspace/out/*.png` prints the file names when the thumbnails are there and the literal
    * pattern when they are not: the shell read the workspace before echo ran, so the check can fail
-   * and can pass, and refusing it told the model something untrue about why. The wordier equivalent
-   * `for f in workspace/*.jpg; do echo "$f"; done` is pinned as accepted in the row below, so the
-   * two were the same check in two spellings.
+   * and can pass, and refusing it would tell the model something untrue about why. The wordier
+   * equivalent `for f in workspace/*.jpg; do echo "$f"; done` is pinned as accepted in the row
+   * below, so the two are the same check in two spellings.
    *
    * Two things keep this from being a blanket hole, and both are pinned below. Quoting: the tokens
    * keep their quotes, so a `*` inside them is text and the check is still refused. And a shell:
@@ -322,10 +322,9 @@ describe('a check that could not run, told apart from one that failed', () => {
   });
 
   /**
-   * The half that would be silently wrong under the older rule. `turn/finish.ts` used to ask
-   * `detail.startsWith('exit ')` and an artifact check never writes an exit code, so that rule read
-   * every missing deliverable as a check the harness had not run - which is the same folding this
-   * function exists to prevent, pointed the other way.
+   * The half `detail.startsWith('exit ')` would get silently wrong. An artifact check never writes
+   * an exit code, so that rule reads every missing deliverable as a check the harness had not run -
+   * which is the same folding this function exists to prevent, pointed the other way.
    */
   it('does not read a missing exit code as a check that never ran', () => {
     expect(acceptanceObservation(result(false, 'workspace/report.pdf does not exist'))).not.toBe(

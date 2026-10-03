@@ -203,9 +203,9 @@ class PerformManager extends BrowserManager {
  * The CDP session the screencast rides on.
  *
  * `#startStream` attaches a `Page.screencastFrame` listener and acks each frame; this records the
- * order of everything it sends, because the order is the defect: the ack used to sit in a
- * `finally` behind an awaited `page.title()`, and Chromium sends no further frame until the
- * previous one is acked.
+ * order of everything it sends, because the order is the contract: Chromium sends no further frame
+ * until the previous one is acked, so an ack waiting in a `finally` behind an awaited
+ * `page.title()` caps the stream at the page's round trip.
  */
 class FakeCdp {
   readonly sent: string[] = [];
@@ -447,10 +447,10 @@ const buildHarness = (): Harness => {
 /**
  * Takes the browser the way the Computer pane's Take over button does.
  *
- * These cases used to assign to `session.holder`. There is no such field any more - the holder is
- * the control object the desktop shares - so they drive the shipped route instead, which is the
- * better test in any case. The handover lifts the keyboard and the mouse on its way through, and
- * that is asserted where it is the subject; everything else is measuring the action that follows.
+ * The holder is the control object the desktop shares, so these cases drive the shipped route
+ * rather than reaching into the session. The handover lifts the keyboard and the mouse on its way
+ * through, and that is asserted where it is the subject; everything else is measuring the action
+ * that follows.
  */
 const hold = async (harness: Harness, holder: 'agent' | 'user' | 'secure_input'): Promise<void> => {
   await harness.manager.setHolder('workspace-1', WORKSPACE_ROOT, holder);
@@ -644,10 +644,10 @@ describe('every browser action, performed', () => {
 
   it('waits on the page without asking the network to go quiet, and does not throw when it does not settle', async () => {
     /*
-     * The bare `wait_for` used to be `waitForLoadState('networkidle')`, which
-     * `docs/design/browser-automation.md` bans by name at :302 and :526. Measured against a real
-     * Chromium on a page holding one unanswered request: `networkidle` took 15,004 ms and threw,
-     * where `load` plus a 500 ms in-page settle took 504 ms on the same page.
+     * The bare `wait_for` is not `waitForLoadState('networkidle')`, which
+     * `docs/design/browser-automation.md` bans by name at :302 and :526: on a page holding one
+     * unanswered request `networkidle` runs out its whole timeout and throws, where `load` plus a
+     * 500 ms in-page settle returns in about half a second.
      */
     const harness = buildHarness();
     const settled = stepResult(await act(harness, { type: 'wait_for' }, 'agent'));

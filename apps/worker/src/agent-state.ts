@@ -25,11 +25,9 @@ export interface AgentState {
   /**
    * The providers this task has already been walled by, so a re-route does not return to one.
    *
-   * A rate limit or an outage used to park the whole task behind the provider that raised it, for
-   * up to a day, even when the owner had another provider connected that could have answered
-   * immediately - which was the only possible behaviour while an account could hold one credential.
-   * Now that it can hold several, a wall is a reason to try the next one, and this is what stops
-   * that walking in a circle between two providers that are both having a bad afternoon.
+   * A rate limit or an outage is a reason to try the next connected provider rather than park the
+   * whole task behind the one that raised it, and this is what stops that walking in a circle
+   * between two providers that are both having a bad afternoon.
    */
   walledProviders?: string[];
   /**

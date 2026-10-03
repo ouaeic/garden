@@ -27,9 +27,8 @@ export const registerDeviceRoutes = (context: RouteContext): void => {
    * travels in. The endpoint set and the pinned identity go with the grant, which is what lets the
    * new device verify it is talking to this server rather than to whoever answered that address.
    *
-   * It carried its own spelling until now - version 1, the code under a name of its own, no
-   * expiry - and the client rejects unknown fields, so the ticket the settings screen has been
-   * drawing as a QR code could not be imported by anything. The expiry is the grant's, in whole
+   * The client rejects unknown fields, so a ticket in any other spelling drawn as a QR code by the
+   * settings screen could not be imported by anything. The expiry is the grant's, in whole
    * seconds since the epoch, so a client can say "this link has expired" instead of failing at the
    * server.
    */

@@ -76,9 +76,9 @@ export const modelLicenseManifest = new Map(
  * These records say what licence a model was published under, with the upstream revision the
  * reading was made against. That is a fact about a published artefact, not a subscription: MIT
  * stays MIT, and a revision that was Apache-2.0 does not stop being Apache-2.0 because ninety days
- * passed. The manifest carried a `reviewExpiresAt` and the suite asserted against it, so a checkout
- * nobody had touched went red on a calendar date - and in `reviewed_open_weight` scope that turns a
- * working catalogue into an unselectable one on an unattended server. garden is installed from a
+ * passed. An expiry date on a review would turn a checkout nobody had touched red on a calendar
+ * date - and in `reviewed_open_weight` scope that turns a working catalogue into an unselectable
+ * one on an unattended server. garden is installed from a
  * tag and left to run; a build that breaks on a date its owner did not choose is a defect, not a
  * safeguard.
  *

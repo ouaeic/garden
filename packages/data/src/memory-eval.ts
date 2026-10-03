@@ -21,15 +21,15 @@ import type { DataStore, RecallMemoryInput } from './store.js';
  * Retrieval eval
  *
  * Every claim the memory code makes about itself - that the fuzzy channel adds recall, that quotas
- * beat top-k, that the verbatim slot earns a fifth of the budget - was unfalsifiable until this
- * existed. There was no fixture, no gold set and no number a change could move, so a tokenizer
- * edit could halve recall and every test would still pass.
+ * beat top-k, that the verbatim slot earns a fifth of the budget - is unfalsifiable without this.
+ * With no fixture, no gold set and no number a change could move, a tokenizer edit could halve
+ * recall and every test would still pass.
  *
  * The corpus is a small workspace's memory as it would actually look after a few months of use:
  * facts about named services, the owner's stated preferences, procedures, episodes recording what
  * was learned, and raw conversation turns. The probes are the questions someone would ask it,
  * written the way people write them rather than the way the entries are worded - which is the
- * entire difficulty, and the reason three of these had hard-zero recall before this wave.
+ * entire difficulty.
  *
  * Two numbers come out, and they fail differently:
  *
@@ -1432,13 +1432,11 @@ export const seedMemoryEvalCorpus = async (input: {
         usedAt: daysBefore(input.now, daysAgo),
         cited: index < cited,
         /*
-         * THREE OUTCOMES, BECAUSE THE SCORE PARTITIONS ON THREE. This read
-         * `index >= ordered.length - failed ? 'fail' : 'ok'`, so every use that was not cited and
-         * did not fail was graded a success - and `recordMemoryPackOutcome` writes exactly the
-         * opposite for that case: an entry the finished turn never touched is written `unknown`,
-         * ungraded in both directions, and only a cited entry carries the turn's grade. A fixture
-         * that never produces `unknown` cannot see what the score does with it, and what the score
-         * used to do with it was count it as a success.
+         * THREE OUTCOMES, BECAUSE THE SCORE PARTITIONS ON THREE. `recordMemoryPackOutcome`
+         * writes an entry the finished turn never touched as `unknown`, ungraded in both
+         * directions, and only a cited entry carries the turn's grade. Grading every use that was
+         * not cited and did not fail as a success would write exactly the opposite for that case,
+         * and a fixture that never produces `unknown` cannot see what the score does with it.
          *
          * WHAT THIS FIXTURE STILL DOES NOT MATCH IS `fail`. The only caller of
          * `recordMemoryPackOutcome` in the product passes the literal `outcome: 'ok'`, so no turn
@@ -1446,10 +1444,7 @@ export const seedMemoryEvalCorpus = async (input: {
          * exercise a partition production cannot currently reach. They are kept because the
          * negative weight is real SQL that something has to measure; they are not evidence that it
          * fires. The two outcomes production does write are `ok` and `unknown`, and those are the
-         * two this now gets right.
-         *
-         * Changing this moved none of the committed numbers on the build it was written against,
-         * because `unknown` and `ok` scored identically there; it is what makes them move now.
+         * two this gets right.
          */
         outcome: index >= ordered.length - failed ? 'fail' : index < cited ? 'ok' : 'unknown'
       });
@@ -2215,13 +2210,14 @@ export const runMemorySessionSearchEval = async (input: {
 };
 
 /**
- * The path this replaced, kept so the delta stays measured rather than remembered.
+ * A substring baseline, kept so the delta against the lexical search stays measured rather than
+ * remembered.
  *
- * `session_search` used to decrypt the workspace's whole task history in the worker and rank it by
- * counting substring occurrences: eight points if the entire question appeared verbatim, one per
- * whitespace-separated word of it found anywhere in the text. No stemming, so "restarted" cannot
- * find "restart"; no document frequency, so the word "the" is worth exactly as much as "dovecot";
- * no length normalisation, so the longest transcript wins nearly every query.
+ * It decrypts the workspace's whole task history in the worker and ranks it by counting substring
+ * occurrences: eight points if the entire question appears verbatim, one per whitespace-separated
+ * word of it found anywhere in the text. No stemming, so "restarted" cannot find "restart"; no
+ * document frequency, so the word "the" is worth exactly as much as "dovecot"; no length
+ * normalisation, so the longest transcript wins nearly every query.
  *
  * The corpus is the same turns either way. Only the retrieval differs, which is what makes the two
  * numbers comparable - and what stops the committed one being a claim about a bigger corpus.

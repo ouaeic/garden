@@ -604,12 +604,12 @@ export class ScheduleStore {
      * `awaiting_resource` with a prompt already naming
      * `workspace/downloads/inbound/<scheduleId>/<deliveryId>.<ext>`, and the files themselves are
      * written afterwards, outside this transaction, because that write is an HTTP round-trip to a
-     * workspace that may be asleep. A restart in that window used to leave the recovery sweep with
-     * a task and no way to learn which deliveries its prompt had promised - it re-queued the run
-     * with the files missing, and the model was told to read something that was not there. Stamping
-     * `task_id` here means the recovery reads exactly the rows this prompt named
-     * (`WHERE task_id=$1 AND delivered_at IS NULL`) rather than whatever is pending for the
-     * schedule now, which is a superset the moment a new delivery arrives in between.
+     * workspace that may be asleep. Without the claim, a restart in that window would leave the
+     * recovery sweep with a task and no way to learn which deliveries its prompt had promised - it
+     * would re-queue the run with the files missing, and the model would be told to read something
+     * that was not there. Stamping `task_id` here means the recovery reads exactly the rows this
+     * prompt named (`WHERE task_id=$1 AND delivered_at IS NULL`) rather than whatever is pending
+     * for the schedule now, which is a superset the moment a new delivery arrives in between.
      *
      * Only on a queued outcome. A run refused by the spend cap never writes anything, so its
      * deliveries stay unclaimed and the next occurrence picks them up.

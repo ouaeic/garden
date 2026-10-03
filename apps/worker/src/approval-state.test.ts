@@ -35,9 +35,9 @@ describe('approved arguments', () => {
   });
 
   /**
-   * The pin the hash did not carry. `file_write` and `file_patch` both take a `path`; `coding_agent`
-   * and `process` both take an `{action}`. An approval granted for one used to cover a call to the
-   * other, because the hash saw only the arguments.
+   * The tool name, pinned in the hash. `file_write` and `file_patch` both take a `path`;
+   * `coding_agent` and `process` both take an `{action}`. A hash that saw only the arguments would
+   * let an approval granted for one cover a call to the other.
    */
   it('refuses the same arguments presented under a different tool', () => {
     const approved = approvalPreviewHash(key, 'file_write', { path: 'workspace/report.md' });

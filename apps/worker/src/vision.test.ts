@@ -143,15 +143,15 @@ describe('who reads a picture the lead cannot see', () => {
    * The box was migrated from one provider to another, so the catalogue still carries the old
    * provider's rows - and one of them outranks everything on the provider this box actually holds
    * a credential for. `#gateway` throws `provider_model_mismatch` for any model that is not on the
-   * configured provider, and the picker used to take `[0]` of a list it had not filtered, so the
-   * same doomed candidate was chosen for every image for the life of the box.
+   * configured provider, so a picker that took `[0]` of a list it had not filtered would choose the
+   * same doomed candidate for every image for the life of the box.
    */
   it('never offers the image to a model on a provider this box has no credential for', async () => {
     const migrated = seer({
       id: 'stranded',
       displayName: 'Stranded',
       provider: 'openrouter',
-      // Ranked first on merit, which is what made it the permanent choice.
+      // Ranked first on merit, which would make it the permanent choice.
       measuredQuality: 0.99
     });
     const reachable = seer({ id: 'reachable', displayName: 'Reachable', measuredQuality: 0.6 });
@@ -234,8 +234,8 @@ describe('who reads a picture the lead cannot see', () => {
  * Sticky selection for the length of a turn.
  *
  * The registry is refreshed under a run that can last hours, and `MODEL_CATALOG_CACHE_MS` is
- * deliberately a minute so a mid-run outage is routed around. The cost of that, until this, was
- * that the specialist was re-ranked from scratch on every image: a browsing turn reads a picture on
+ * deliberately a minute so a mid-run outage is routed around. Re-ranking the specialist from
+ * scratch on every image would cost this: a browsing turn reads a picture on
  * nearly every step, so a catalogue that moves at all hands the second half of the turn to a
  * different describer than the first, on a shared `sessionId` whose whole purpose is that the
  * provider recognises the prefix. One turn's pictures should be read by one pair of eyes.
@@ -325,8 +325,8 @@ describe('what the registry read costs', () => {
     try {
       await routeImageObservation(p.deps, task, dataKey, p.state, call, image, lead, [lead]);
       await routeImageObservation(p.deps, task, dataKey, p.state, call, image, lead, [lead]);
-      // A browsing turn reads a picture on nearly every step, and each one used to be a whole-table
-      // read of `model_releases` to follow a registry that refreshes hourly.
+      // A browsing turn reads a picture on nearly every step, and each one must not be a
+      // whole-table read of `model_releases` to follow a registry that refreshes hourly.
       expect(p.listModels()).toBe(1);
 
       vi.setSystemTime(Date.now() + MODEL_CATALOG_CACHE_MS + 1);

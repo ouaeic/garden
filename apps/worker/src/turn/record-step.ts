@@ -12,12 +12,10 @@
  * paths refuse a finish and send the model round again - the finish rejection, the plan hold, the
  * acceptance hold, an acceptance check that failed, and the completion nag - and its natural reply
  * to "finish rejected, cite something newer" is to restate the answer with an apology. Every one of
- * those restatements used to become another bubble, which is why one answer arrived in pieces, and
- * eleven of those rounds in the worst case is most of where a small task's tokens went. The prose
+ * those restatements published as another bubble would make one answer arrive in pieces, and
+ * eleven of those rounds in the worst case is most of where a small task's tokens go. The prose
  * still goes into the window, because the model needs its own words back; it simply is not
  * published as a fresh reply.
- *
- * Lifted out of `AgentWorker.run()` unchanged.
  */
 import type { DataStore, TaskRecord } from '@garden/data';
 import type { ModelResponse } from '@garden/model-gateway';

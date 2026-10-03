@@ -51,8 +51,9 @@ const AUDIO_REQUEST_TIMEOUT_MS = 960_000;
 const CHECKPOINT_REQUEST_TIMEOUT_MS = 600_000;
 
 /**
- * A restart of the workspace service is a two-second window, and every request that lands in it used
- * to reach the model and the owner as the bare string `fetch failed` - which distinguishes neither
+ * A restart of the workspace service is a two-second window, and without a retry every request that
+ * lands in it would reach the model and the owner as the bare string `fetch failed` - which
+ * distinguishes neither
  * "the workspace briefly went away" from "this command is wrong", nor tells anyone what to do.
  * Connection refused is the one failure that is provably safe to replay: the request never left this
  * process, so nothing can have run twice.
@@ -291,15 +292,12 @@ export class AgentRunnerClient {
       CHECKPOINT_REQUEST_TIMEOUT_MS
     );
     /*
-     * The tenth of ten, brought in line with the other nine.
-     *
-     * This route alone used to hand-roll `Checkpoint failed (<status>): <body>`, flattening the
-     * runner's `{error:{code,message}}` envelope into a sentence - so the machine-readable code was
-     * on the wire, thrown away here, and then dug back out of the sentence by
-     * `agent.ts`'s `checkpointRefusalCode` with a JSON parse over a prefix. `runnerFailure` returns
-     * an `GardenError` carrying the code as a field, which is what decides whether a lost undo
-     * point is raised to the owner or filed quietly, and `checkpointRefusalCode` stays as the
-     * fallback for a runner one release behind this worker.
+     * The same failure path as every other route. A hand-rolled `Checkpoint failed (<status>):
+     * <body>` would flatten the runner's `{error:{code,message}}` envelope into a sentence and
+     * throw the machine-readable code away. `runnerFailure` returns a `GardenError` carrying the
+     * code as a field, which is what decides whether a lost undo point is raised to the owner or
+     * filed quietly, and `agent.ts`'s `checkpointRefusalCode` stays as the fallback for a runner
+     * one release behind this worker.
      */
     if (!response.ok) throw await runnerFailure(response);
     const summary = (await response.json()) as Awaited<
@@ -390,12 +388,11 @@ export class AgentRunnerClient {
   /**
    * The same read again, said out loud to be a DISPLAY - which is what makes it count as one.
    *
-   * `readFileWithHash` above and this are the same route and were, until this existed, the same
-   * request: an unbounded `file_read` putting lines in front of the model, and the read `file_patch`
-   * makes to match against, which puts nothing in front of anybody. The runner cannot tell them
-   * apart, so it recorded neither - and its seen-line guard, which is what stands between a blind
-   * anchor and the disk, therefore had nothing to say about the most ordinary read in the harness.
-   * Editing a line an unwindowed read HAD shown was refused, by name, for that reason.
+   * `readFileWithHash` above and this are the same route but not the same request: an unbounded
+   * `file_read` puts lines in front of the model, and the read `file_patch` makes to match against
+   * puts nothing in front of anybody. A runner that could not tell them apart could record neither
+   * - and its seen-line guard, which is what stands between a blind anchor and the disk, would have
+   * nothing to say about the most ordinary read in the harness.
    *
    * The budget travels with the request rather than the answer coming back whole and being cut here,
    * because a caller cannot display what it was never sent. What arrives is what the runner recorded
@@ -758,7 +755,7 @@ export class AgentRunnerClient {
     if (!response.ok) throw await runnerFailure(response);
     // The absent header has to be told apart from the zero, because the runner leaves the duration
     // out precisely when ffprobe could not measure the track - and `Number(null)` is 0, which is
-    // finite, so the missing measurement used to arrive as a recording of no length at all sitting
+    // finite, so the missing measurement would arrive as a recording of no length at all sitting
     // next to the ninety minutes that were just read out of it.
     const header = (name: string): number | null => {
       const raw = response.headers.get(name);

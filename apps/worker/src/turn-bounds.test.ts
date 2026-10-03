@@ -389,11 +389,10 @@ describe('how hard the model thinks about a step', () => {
   });
 
   it('does not spend less on the step that has to interpret what it just read', () => {
-    // This is the inversion the effort rule used to have. `REPEATABLE_TOOLS` is a replay-safety
-    // set - tools whose second run after a restart cannot surprise anyone - and effort was taken
-    // from it, so the step after a file_read, an image_read or a parallel_web_read ran at 'low':
-    // the cheapest thinking in the task landed on the step holding the material it had just
-    // fetched.
+    // `REPEATABLE_TOOLS` is a replay-safety set - tools whose second run after a restart cannot
+    // surprise anyone - and effort must not be taken from it, or the step after a file_read, an
+    // image_read or a parallel_web_read runs at 'low': the cheapest thinking in the task would land
+    // on the step holding the material it had just fetched.
     expect(step({ messages: after('code_search') })).toBe('medium');
     expect(step({ messages: after('file_read') })).toBe('medium');
     expect(step({ messages: after('parallel_web_read') })).toBe('medium');

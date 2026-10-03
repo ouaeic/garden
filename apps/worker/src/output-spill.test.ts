@@ -259,8 +259,7 @@ describe('what is claimed when the spill could not happen', () => {
     expect(window).not.toContain(SPILL_DIRECTORY);
     expect(window).not.toContain('cut begins at character');
     // What it does say instead is pinned below, in "what a cut result says when nothing was kept".
-    // It used to say nothing: this assertion read `'... tool output …]'` and passed on a marker
-    // that ended right there.
+    // An assertion on `'... tool output …]'` alone would pass on a marker that ended right there.
     expect(window).toContain(CUT_TOOL_OUTPUT_ADVICE);
   });
 

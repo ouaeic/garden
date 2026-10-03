@@ -298,12 +298,12 @@ describe('a schedule pinned to a withdrawn model', () => {
   });
 
   /**
-   * The resume, which is the case the derived streak got wrong and nothing here could see.
+   * The resume, which a streak derived from the run rows would get wrong.
    *
-   * The count used to be read out of `task_schedule_runs`, and `setTaskScheduleEnabled` does not
-   * touch that table, so the three failures that paused the schedule were still its three newest
-   * rows the moment the owner turned it back on. Measured before the counter existed: paused after
-   * three, resumed, then re-paused by ONE further failure. That is the same threshold reading as one
+   * `setTaskScheduleEnabled` does not touch `task_schedule_runs`, so a count read out of that table
+   * would still see the three failures that paused the schedule as its three newest rows the moment
+   * the owner turned it back on, and ONE further failure would re-pause it. That is the same
+   * threshold reading as one
    * for exactly the owner who has just decided to try again, in exactly the minutes when the
    * transients `MODEL_UNAVAILABLE_PAUSE_AFTER` names are most likely to still be going.
    *

@@ -24,11 +24,10 @@ import {
  *
  * The `__Host-` prefix requires `Path=/` exactly, and the browser rejects any cookie carrying it
  * that says otherwise - silently, as a malformed cookie rather than as an error. This one is set
- * with `Path=/__garden/preview/<slug>/` on purpose, so no browser ever stored it: the gateway
- * answered the tokenised link with a 303 and a Set-Cookie, the redirect came back with nothing
- * attached, and the owner was told to "open this preview from your authenticated garden
- * workspace" - which is what they had just done. Every private preview garden has ever published
- * was unopenable, including the link at the end of "build me something and give me a link".
+ * with `Path=/__garden/preview/<slug>/` on purpose, so under that prefix no browser would store
+ * it: the gateway would answer the tokenised link with a 303 and a Set-Cookie, the redirect would
+ * arrive with nothing attached, and the owner would be told to "open this preview from your
+ * authenticated garden workspace" - which is what they had just done.
  *
  * `__Secure-` carries the half of the guarantee that applies here - it may only be set over HTTPS -
  * and leaves the path alone, which is what keeps one preview's token off another preview's
@@ -186,10 +185,7 @@ export const buildPreviewGateway = async (
     if (!workspace) throw new Error('preview_unavailable');
     /*
      * A live preview is a promise the owner made to whoever holds the link, so a sleeping computer
-     * is woken rather than reported. This used to depend on a stored hosting mode, and it read the
-     * wrong way round: the mode advertised as "always on" was the only one that answered 503 to a
-     * visitor whenever the owner had put the box to sleep. There is one behaviour now, and it is
-     * the one the link implies.
+     * is woken rather than reported.
      */
     if (workspace.status === 'hibernated') {
       await runner.request({

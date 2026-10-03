@@ -98,9 +98,9 @@ let leaseHealthy = true;
 const reportLeaseHealth = (healthy: boolean, error?: unknown): void => {
   if (healthy === leaseHealthy) return;
   leaseHealthy = healthy;
-  // The thrown message used to be on this line. A driver quotes back whatever it was handed, so a
-  // connection that dropped mid-statement published a piece of it - the code and the frames say the
-  // same thing about the box without ever being about the owner.
+  // The thrown message is not on this line. A driver quotes back whatever it was handed, so a
+  // connection that dropped mid-statement would publish a piece of it - the code and the frames say
+  // the same thing about the box without ever being about the owner.
   if (healthy) workerLogger.info('worker.lease_recovered');
   else workerLogger.error('worker.lease_failed', failureFields(error));
 };

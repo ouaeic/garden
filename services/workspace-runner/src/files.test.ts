@@ -118,9 +118,9 @@ describe('workspace files', () => {
 
   /*
    * Commands run in `workspace/`, so a bare name has to mean there and not in the container above
-   * it. It used to mean the container, which is unwritable, and the agent was told only that the
-   * path was wrong - so it burned turns guessing prefixes. The refusals above are the other half:
-   * a name that reaches for the container's own directories is still answered, not redirected.
+   * it. The container is unwritable, and an agent told only that the path was wrong burns turns
+   * guessing prefixes. The refusals above are the other half: a name that reaches for the
+   * container's own directories is still answered, not redirected.
    */
   it('reads a bare name from the directory commands actually run in', () => {
     expect(assertUserDataPath(root, 'machine.md')).toBe(path.join('workspace', 'machine.md'));
@@ -402,10 +402,10 @@ describe('reading a window of a file', () => {
   afterEach(async () => rm(root, { recursive: true, force: true }));
 
   /*
-   * `file_read` asks for a few hundred lines. It used to be answered by reading the whole file:
-   * against the 2 GiB ceiling the installer sets, one look at a database dump buffered a gigabyte
-   * inside a service the unit caps at 80% of host memory, and the OOM killer takes the runner down
-   * with every other tool running on it. What a read costs must follow what was asked for.
+   * `file_read` asks for a few hundred lines. Answering it by reading the whole file would, against
+   * the 2 GiB ceiling the installer sets, buffer a gigabyte for one look at a database dump inside
+   * a service the unit caps at 80% of host memory, and the OOM killer takes the runner down with
+   * every other tool running on it. What a read costs must follow what was asked for.
    */
   it('reads a window without pulling the rest of the file into memory', async () => {
     const line = `${'x'.repeat(999)}\n`;
@@ -585,12 +585,12 @@ describe('reading a window of a file', () => {
 /*
  * A read that says it is a display, which is the only kind that counts as having shown anything.
  *
- * The route answers two callers that used to be identical on the wire: an unbounded `file_read`,
- * which puts lines in front of a model, and the read `file_patch` makes to match against, which puts
- * nothing in front of anybody. Recording neither of them made the guard below refuse edits to lines
- * the model HAD been shown; recording both would make it inert for the tool it exists to guard. So a
- * caller that is about to display what it gets says so by naming the budget it will display within,
- * and gets back that much of the file and no more.
+ * The route answers two callers that would otherwise be identical on the wire: an unbounded
+ * `file_read`, which puts lines in front of a model, and the read `file_patch` makes to match
+ * against, which puts nothing in front of anybody. Recording neither of them would make the guard
+ * below refuse edits to lines the model HAD been shown; recording both would make it inert for the
+ * tool it exists to guard. So a caller that is about to display what it gets says so by naming the
+ * budget it will display within, and gets back that much of the file and no more.
  */
 describe('a read that carries a display budget', () => {
   let root: string;
@@ -1299,8 +1299,8 @@ describe('who the seen-line record is about', () => {
    * This is her sequence, and it is the shipped one: the pane pages a file through the WINDOWED
    * read - `apps/api` forwards `startLine`, `endLine` and `maxBytes` on the same route the agent
    * uses, and `apps/web` asks for a window whenever a file is past its preview limit - and then she
-   * presses Replace, which claims a hash. That windowed read used to file a record unconditionally,
-   * under the path, for anyone at all to be answered with.
+   * presses Replace, which claims a hash. That windowed read must not file a record under the
+   * path for anyone at all to be answered with.
    *
    * She is not a reader, so she files nothing and is held to nothing. Making her one instead is the
    * tempting symmetry, and it puts her saves inside a guard built for a model editing from a window:

@@ -45,8 +45,8 @@ describe('public internet addresses', () => {
 
 describe('IPv6 that is spelled like the internet and is not', () => {
   /*
-   * The check used to be `startsWith('2') || startsWith('3')`, which is a test on text rather than
-   * on the address. Two ways that is wrong, and one of them is the thing this file exists to stop.
+   * A check like `startsWith('2') || startsWith('3')` is a test on text rather than on the
+   * address. Two ways that is wrong, and one of them is the thing this file exists to stop.
    */
   it('refuses transition addresses that carry an IPv4 address inside them', () => {
     // 2002:a9fe:a9fe:: IS 169.254.169.254 - the cloud metadata service - written as 6to4. A relay
@@ -133,12 +133,12 @@ describe('public HTTP URLs', () => {
 });
 
 /*
- * Three answers where there were two, and the middle one is the whole of what was missing.
+ * Three answers, and the middle one is the one two answers cannot give.
  *
- * Every caller that wanted "is this somewhere data can go" or "is this somebody else's machine" was
- * reading `isPublicHttpUrl`, which answers neither: it is false for loopback and equally false for
- * the entire estate. So the owner's NAS and this process talking to itself came back with one
- * verdict, and the egress budget charged both of them nothing.
+ * A caller that wants "is this somewhere data can go" or "is this somebody else's machine" cannot
+ * read `isPublicHttpUrl`, which answers neither: it is false for loopback and equally false for the
+ * entire estate. Read that way, the owner's NAS and this process talking to itself get one verdict,
+ * and the egress budget charges both of them nothing.
  */
 describe('where an address is, relative to this computer', () => {
   it('calls loopback this computer, in every spelling that reaches it', () => {
@@ -235,9 +235,9 @@ describe('which suffix a host sits under', () => {
 /*
  * The inbound half, which is not the outbound half backwards.
  *
- * The measured defect: a service was declared `--bind 0.0.0.0`, the only reach vocabulary in the
- * tree was `reachOfHttpUrl`, and 0.0.0.0/8 is reserved - so the one address that means EVERY
- * interface came back `estate`, the middle answer, on a box whose interfaces include a public one.
+ * A service declared `--bind 0.0.0.0` cannot be judged with `reachOfHttpUrl`: 0.0.0.0/8 is
+ * reserved, so the one address that means EVERY interface would come back `estate`, the middle
+ * answer, on a box whose interfaces include a public one.
  */
 describe('reachOfBindAddress', () => {
   it('calls every spelling of the unspecified address the internet', () => {

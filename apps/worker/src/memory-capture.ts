@@ -148,10 +148,10 @@ export const captureMemory = async (
     /*
      * What the source cap refused, said out loud.
      *
-     * The cap itself is right and is unchanged: eight rows of six kilobytes per part, keeping the
-     * head. What was wrong is that a 400 KB brief was stored as its first 48 KB with no event of
-     * any kind, so the owner could later search memory for a constraint they had definitely
-     * written and be told, truthfully and uselessly, that nothing matched.
+     * The cap itself is right: eight rows of six kilobytes per part, keeping the head. Without an
+     * event, a 400 KB brief would be stored as its first 48 KB with nothing said, and the owner
+     * could later search memory for a constraint they had definitely written and be told,
+     * truthfully and uselessly, that nothing matched.
      *
      * HOW OFTEN IT FIRES ON THIS MACHINE: never, so far. Measured over the owner's real corpus -
      * 675 turns, 233,064 characters, 11 projects, 49 active days, filtered as `type: user`,
@@ -159,10 +159,9 @@ export const captureMemory = async (
      * `sourceToolUseID`, no slash-command or compaction-continuation block, deduped by uuid, with
      * `origin.kind: "task-notification"` stripped - the largest single turn is 14,625 characters
      * against a cap of 48,000 bytes per part. It fires 0 times and 100.0% of what the owner typed
-     * reaches a source row. The 197-of-3,950 and 57.7% this comment used to state were measured on
-     * a corpus that counted machine-written text as the owner's, and are void.
+     * reaches a source row.
      *
-     * The event stays, and so does the cap. A number that has never fired is not a number that
+     * The event is kept, and so is the cap. A number that has never fired is not a number that
      * cannot: one 400 KB paste is one turn away, and the whole point of the line below is that the
      * owner finds out on the day it happens rather than a month later from a search that misses.
      *

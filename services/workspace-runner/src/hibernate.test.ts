@@ -80,7 +80,7 @@ describe('hibernating the computer and waking it again', () => {
     const secret = 'runner-hibernate-test-secret-at-least-32-chars';
     const app = await buildServer(runnerConfig(workspaceRoot, secret), {
       // Stated, not measured. Writing `.garden/services.json` passes the host disk floor, so on
-      // any machine under two per cent free this test used to answer 507 where it expects 200 -
+      // any machine under two per cent free this test would answer 507 where it expects 200 -
       // a failure about the build machine wearing the costume of a failure about the code.
       // `checkpoints.test.ts` says the rest of it.
       hostStorage: async () => ({

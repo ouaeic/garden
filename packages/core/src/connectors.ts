@@ -214,10 +214,9 @@ export const connectorActionSupportsKind = (
  *
  * It lives beside the catalogue, and it is a total map rather than a lookup with a fallback, so a
  * connector cannot be added to `ConnectorKind` without this file failing to compile until somebody
- * has said what reading through it means. That is the property worth having: the previous version
- * of this rule lived as a chain of ternaries next to the code that used it, covered mail and
- * calendar, and returned the raw enum for everything else — which is how GitHub, WebDAV and MCP
- * results came back with no provenance at all for as long as they did.
+ * has said what reading through it means. That is the property worth having: a lookup that names
+ * only some kinds and falls back to the raw enum leaves every other connector's results with no
+ * provenance at all.
  */
 export const connectorContentOrigins = {
   github: 'github',
