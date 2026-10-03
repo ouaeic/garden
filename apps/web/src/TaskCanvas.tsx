@@ -9,6 +9,7 @@ import type {
   TaskEvent
 } from '@garden/contracts';
 import { isViewArtifact } from './view-artifact';
+import { Markable, MarkButton } from './result-notes';
 import { isNativeClient, post } from './client';
 import { resultSnapshot } from './result-snapshot';
 import { previewIsolated, previewUrl } from './preview-url';
@@ -51,6 +52,23 @@ export function TaskOutputs({
   onNote?: (note: ResultNote) => void;
 }) {
   const [showAll, setShowAll] = useState(false);
+  /** Which result the pointer is marking, if any. */
+  const [marking, setMarking] = useState<string | null>(null);
+  const markToggle = (id: string) =>
+    onNote ? (
+      <MarkButton
+        marking={marking === id}
+        onToggle={() => setMarking((current) => (current === id ? null : id))}
+      />
+    ) : null;
+  const markable = (id: string, on: string, content: ReactNode) =>
+    onNote ? (
+      <Markable on={on} notes={notes ?? []} onNote={onNote} marking={marking === id}>
+        {content}
+      </Markable>
+    ) : (
+      content
+    );
   const [opened, setOpened] = useState<{ id: string; url: string } | null>(null);
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [frameState, setFrameState] = useState<'loading' | 'loaded' | 'slow' | 'failed'>('loading');
@@ -260,11 +278,16 @@ export function TaskOutputs({
             <header className="garden-output-header garden-output-bar">
               <FileText size={16} aria-hidden="true" />
               <h2>{featured.name}</h2>
+              <div className="garden-output-actions">{markToggle(featured.id)}</div>
             </header>
             <div className="garden-artifact-view">
-              <Suspense fallback={<Spinner label="Opening your result…" />}>
-                <ResultPreview artifact={featured} />
-              </Suspense>
+              {markable(
+                featured.id,
+                featured.name,
+                <Suspense fallback={<Spinner label="Opening your result…" />}>
+                  <ResultPreview artifact={featured} />
+                </Suspense>
+              )}
             </div>
           </article>
         )}
@@ -331,6 +354,7 @@ export function TaskOutputs({
                     <Button busy={busy === preview.id} onClick={() => void copyLink(preview)}>
                       Copy link
                     </Button>
+                    {opened && markToggle(preview.id)}
                     {!opened ? (
                       <Button busy={busy === preview.id} onClick={() => void open(preview)}>
                         View here
@@ -375,7 +399,7 @@ export function TaskOutputs({
             </header>
             {opened?.id === preview.id && viewablePreview ? (
               <div className="garden-preview-live">
-                {frame}
+                {markable(preview.id, preview.title, frame)}
                 {frameState !== 'loaded' && (
                   <div className="garden-preview-state" role="status">
                     {frameState === 'failed'

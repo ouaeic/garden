@@ -1,7 +1,7 @@
 import ScrollRegion from './ScrollRegion';
 import { WorkflowProgress } from './WorkflowProgress';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { Activity, ArrowUpRight, RefreshCw, Square } from './icons';
+import { Activity, ArrowUpRight, MessageSquare, RefreshCw, Square } from './icons';
 import type { ComputationSession, ManagedProcess, ProcessList } from '@garden/contracts';
 import { get, post } from './client';
 import { Button, Dialog, ErrorNotice, Spinner } from './ui';
@@ -26,7 +26,8 @@ export default function ProcessPanel({
   projectId,
   compact = false,
   visible = true,
-  onOpen
+  onOpen,
+  onAsk
 }: {
   workspaceId: string;
   taskId?: string;
@@ -34,6 +35,8 @@ export default function ProcessPanel({
   compact?: boolean;
   visible?: boolean;
   onOpen?: () => void;
+  /** Hands a run to the conversation as something to talk about. */
+  onAsk?: (process: ManagedProcess) => void;
 }) {
   const endpoint = projectId
     ? `/v1/projects/${projectId}/processes`
@@ -385,6 +388,11 @@ export default function ProcessPanel({
                       ) : null}
                     </details>
                     <div className="process-actions">
+                      {onAsk && (
+                        <Button onClick={() => onAsk(process)}>
+                          <MessageSquare size={14} aria-hidden="true" /> Ask about this
+                        </Button>
+                      )}
                       <Button disabled={busy !== null} onClick={() => void act(process, 'log')}>
                         Read output
                       </Button>

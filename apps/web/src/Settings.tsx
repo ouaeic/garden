@@ -1,16 +1,23 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useSurfaceLocation } from './surface-location';
 import { ConnectionsLibrary } from './library/Connections';
-import type { Workspace } from '@garden/contracts';
+import type { Project, Workspace } from '@garden/contracts';
+const ReviewLevelSettings = lazy(() =>
+  import('./settings/Computer.js').then((module) => ({ default: module.ReviewLevelSettings }))
+);
+const MemoryLibrary = lazy(() =>
+  import('./library/Memory.js').then((module) => ({ default: module.MemoryLibrary }))
+);
+const SkillsLibrary = lazy(() =>
+  import('./library/Skills.js').then((module) => ({ default: module.SkillsLibrary }))
+);
 import { ProviderSettings } from './settings/Providers.js';
 import { SpendingSettings } from './settings/Spending.js';
-import { ComputerSettings } from './settings/Computer.js';
 import { NotificationSettings } from './settings/Notifications.js';
 import { AccessSettings } from './settings/Access.js';
-import { InstanceSettings } from './settings/Instance.js';
 import { ResultViewSettings } from './settings/ResultViews.js';
 import { Section } from './management.js';
-import { Button, Field } from './ui.js';
+import { Field } from './ui.js';
 import { palettes, type Palette } from './appearance';
 import {
   lifeMode,
@@ -30,42 +37,41 @@ export interface SettingsProps {
   onThemeChange: (theme: 'dark' | 'light') => void;
   palette: Palette;
   onPaletteChange: (palette: Palette) => void;
-  onComputer: () => void;
+  projects: Project[];
+  onOpenTask: (id: string) => void;
 }
 const sections = [
   'Appearance',
   'Models',
+  'Knowledge',
   'Connections',
-  'Spending',
+  'Autonomy',
   'Notifications',
-  'Account',
-  'Computer'
+  'Account'
 ] as const;
 // Section names that older links and deep links still carry.
 const aliases: Record<string, (typeof sections)[number]> = {
   General: 'Appearance',
-  'Computer & maintenance': 'Computer',
-  Instance: 'Computer',
+  Memory: 'Knowledge',
+  Spending: 'Autonomy',
+  Skills: 'Knowledge',
   'Account & devices': 'Account',
   Access: 'Account'
 };
 export function Settings({
   workspace,
-  onComputer,
+  projects,
+  onOpenTask,
   onChange,
   theme,
   onThemeChange,
   palette,
   onPaletteChange
 }: SettingsProps) {
-  const [maintenanceOpened, setMaintenanceOpened] = useState(false);
   const [life, setLife] = useState<LifeMode>(lifeMode);
   const [sound, setSoundState] = useState(soundOn);
   useEffect(() => onLifeModeChange(setLife), []);
   const [locationSection, setSection] = useSurfaceLocation('section', 'Appearance');
-  useEffect(() => {
-    if (locationSection === 'Instance') setMaintenanceOpened(true);
-  }, [locationSection]);
   const section = sections.includes(locationSection as (typeof sections)[number])
     ? locationSection
     : (aliases[locationSection] ?? 'Appearance');
@@ -154,28 +160,20 @@ export function Settings({
         )}
         {section === 'Appearance' && <ResultViewSettings />}
         {section === 'Models' && <ProviderSettings onChange={onChange} />}
-        {section === 'Spending' && <SpendingSettings onChange={onChange} />}
-        {section === 'Connections' && <ConnectionsLibrary onChange={onChange} />}
-        {section === 'Computer' && (
+        {section === 'Autonomy' && (
           <>
-            <Section
-              title="Your computer"
-              description="Project tools are available inside each project. Manage the whole computer here."
-            >
-              <Button onClick={onComputer}>All computer work</Button>
-            </Section>
-            <ComputerSettings workspace={workspace} onChange={onChange} />
-            <details
-              className="settings-disclosure"
-              open={locationSection === 'Instance' ? true : undefined}
-              onToggle={(event) => {
-                if (event.currentTarget.open) setMaintenanceOpened(true);
-              }}
-            >
-              <summary>Installation and maintenance</summary>
-              {maintenanceOpened && <InstanceSettings />}
-            </details>
+            <Suspense fallback={null}>
+              <ReviewLevelSettings workspace={workspace} onChange={onChange} />
+            </Suspense>
+            <SpendingSettings onChange={onChange} />
           </>
+        )}
+        {section === 'Connections' && <ConnectionsLibrary onChange={onChange} />}
+        {section === 'Knowledge' && (
+          <Suspense fallback={null}>
+            <MemoryLibrary workspace={workspace} projects={projects} onOpenTask={onOpenTask} />
+            <SkillsLibrary workspace={workspace} />
+          </Suspense>
         )}
         {section === 'Notifications' && <NotificationSettings />}
         {section === 'Account' && <AccessSettings onChange={onChange} />}

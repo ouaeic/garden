@@ -57,10 +57,14 @@ export async function checkUpdates({ context, origin, report }) {
     await notice.getByRole('button', { name: 'View update', exact: true }).click();
     await page.getByText('An update is available for your server.', { exact: true }).waitFor();
     await page.getByText('sudo garden update', { exact: true }).waitFor();
-    const disclosure = page.locator('.settings-disclosure');
-    assert(
-      await disclosure.evaluate((node) => node.open),
-      'View update must open the maintenance section'
+    // Maintenance is the Computer page's Machine tab, open as soon as the notice is followed.
+    assert.equal(
+      await page
+        .getByRole('navigation', { name: 'Computer tools', exact: true })
+        .getByRole('button', { name: 'Machine', exact: true })
+        .getAttribute('aria-pressed'),
+      'true',
+      'View update must open the machine tab'
     );
     await page.screenshot({ path: resolve(report, `server-update-${width}.png`) });
     serverStatus = 'unknown';

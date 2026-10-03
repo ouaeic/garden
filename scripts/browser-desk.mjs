@@ -285,8 +285,10 @@ export async function checkDesk({
           before,
           'Scrolling files must not move the prompt'
         );
-        const processes = page.locator('.desk-processes .scroll-region').first();
-        assert(await processes.evaluate((element) => element.scrollHeight > element.clientHeight));
+        // A conversation's own runs sit in its flow, a few rows and then one line for the rest.
+        const runs = page.locator('.conversation-runs');
+        await runs.waitFor();
+        assert((await runs.locator('.run-row').count()) <= 4);
       }
       await page
         .frameLocator('.garden-preview-frame')
@@ -316,26 +318,25 @@ export async function checkDesk({
         'Prompt controls must be outside the text area'
       );
       const workUrl = page.url();
-      // Wide screens carry the doors in the masthead; phones carry them in the button row.
-      const libraryTrigger = page
-        .getByRole('navigation', { name: /^(Workspace navigation|Sections)$/ })
-        .getByRole('button', { name: 'Library', exact: true });
-      await libraryTrigger.click();
-      const library = page.getByRole(width <= 700 ? 'region' : 'dialog', {
-        name: 'Library',
+      // Settings opens over the project and closing it puts the project back exactly.
+      await page.getByRole('button', { name: 'Settings', exact: true }).click();
+      const settingsPage = page.getByRole(width <= 700 ? 'region' : 'dialog', {
+        name: 'Settings',
         exact: true
       });
-      await library.waitFor();
-      await inWindow(library);
-      await library.getByRole('button', { name: 'Memory', exact: true }).click();
-      await library.getByRole('button', { name: 'Skills', exact: true }).click();
-      await library
+      await settingsPage.waitFor();
+      await inWindow(settingsPage);
+      await settingsPage
+        .getByRole('navigation', { name: 'Settings sections' })
+        .getByRole('button', { name: 'Knowledge', exact: true })
+        .click();
+      await settingsPage
         .getByRole('button', {
-          name: width <= 700 ? 'Back from Library' : 'Close Library',
+          name: width <= 700 ? 'Back from Settings' : 'Close Settings',
           exact: true
         })
         .click();
-      await library.waitFor({ state: 'detached' });
+      await settingsPage.waitFor({ state: 'detached' });
       assert.equal(page.url(), workUrl, 'Closing a panel must restore the exact project location');
       await page.keyboard.press('Escape');
       await page.locator('.project-panel[open]').waitFor({ state: 'hidden' });
@@ -344,14 +345,14 @@ export async function checkDesk({
         .frameLocator('.garden-preview-frame')
         .getByRole('button', { name: '1', exact: true })
         .waitFor();
-      await libraryTrigger.click();
-      await library.waitFor();
+      await page.getByRole('button', { name: 'Settings', exact: true }).click();
+      await settingsPage.waitFor();
       await page.goBack();
-      await library.waitFor({ state: 'detached' });
+      await settingsPage.waitFor({ state: 'detached' });
       await page.goForward();
-      await library.waitFor();
+      await settingsPage.waitFor();
       await page.keyboard.press('Escape');
-      await library.waitFor({ state: 'detached' });
+      await settingsPage.waitFor({ state: 'detached' });
 
       if (width === 390) {
         await page.evaluate(() => {
@@ -436,10 +437,7 @@ export async function checkDesk({
     }
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(origin);
-    await page
-      .getByRole('navigation', { name: 'Workspace navigation', exact: true })
-      .getByRole('button', { name: 'Projects', exact: true })
-      .click();
+    await page.getByRole('button', { name: 'All projects', exact: true }).click();
     await page.getByRole('dialog', { name: 'Projects', exact: true }).waitFor();
     assert.equal(await page.locator('.garden-sidebar').count(), 0);
     await page.locator('.desk-project-index').waitFor();

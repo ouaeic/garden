@@ -387,8 +387,23 @@ body:has(.desk-shell),
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.85fr);
+  /* Files takes the column; a Runs card shares it only while something is running. */
+  grid-auto-rows: minmax(0, 1fr);
   gap: 14px;
+}
+.desk-file-changes {
+  margin: 0;
+  padding: 0 16px;
+  color: var(--muted);
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 1px;
+}
+.desk-file-changes:not(:empty) {
+  padding-block: 4px;
+  border-bottom: 1px solid var(--line);
 }
 .desk-shell .desk-support .project-processes {
   gap: 0;
@@ -626,13 +641,10 @@ body:has(.desk-shell),
   padding: 0;
 }
 @media (max-height: 700px) {
-  .desk-shell
-    .garden-task:not(.has-attention)
-    .garden-task-primary:has(> .garden-history[open])
-    > .garden-outputs {
+  .desk-shell .garden-task .garden-task-primary:has(> .garden-history[open]) > .garden-outputs {
     display: none;
   }
-  .desk-shell .garden-task:not(.has-attention) .garden-task-primary > .garden-history[open] {
+  .desk-shell .garden-task .garden-task-primary > .garden-history[open] {
     flex: 1 1 0;
     max-height: none;
     min-height: 0;
@@ -793,13 +805,6 @@ body:has(.desk-shell),
 .desk-shell .garden-output-downloads > .garden-source-bundle,
 .desk-shell .garden-output-downloads > .button {
   flex: 0 0 auto;
-}
-.desk-shell .garden-task.has-attention .garden-task-scroll {
-  display: block;
-}
-.desk-shell .garden-task.has-attention .garden-task-layout {
-  display: block;
-  padding: 16px;
 }
 .desk-shell .work-attention {
   margin: 0;

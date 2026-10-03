@@ -2,6 +2,22 @@
   --raised-fill: var(--lcd-texture), var(--tint);
   min-width: 0;
 }
+.computer-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.computer-heading h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 500;
+}
+.computer-runs,
+.computer-machine {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
 .computer-tabs {
   display: flex;
   gap: 0.35rem;

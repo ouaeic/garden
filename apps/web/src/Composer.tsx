@@ -185,7 +185,11 @@ export default function Composer(props: ComposerProps) {
         </section>
       )}
       <label className="sr-only" htmlFor={`intent-${task?.id ?? 'new'}`}>
-        {task ? 'Add direction to this work' : 'Describe what you want to do'}
+        {props.answer
+          ? 'Your answer'
+          : task
+            ? 'Add direction to this work'
+            : 'Describe what you want to do'}
       </label>
       <textarea
         id={`intent-${task?.id ?? 'new'}`}
@@ -202,11 +206,13 @@ export default function Composer(props: ComposerProps) {
           }
         }}
         placeholder={
-          context?.kind === 'notes'
-            ? 'Anything else? Your comments are sent with this.'
-            : task
-              ? 'Reply, or ask for a change…'
-              : 'Describe what you want to do…'
+          props.answer
+            ? 'Type your answer…'
+            : context?.kind === 'notes'
+              ? 'Anything else? Your comments are sent with this.'
+              : task
+                ? 'Reply, or ask for a change…'
+                : 'Describe what you want to do…'
         }
       />
       {attachments.length > 0 && (
@@ -238,15 +244,17 @@ export default function Composer(props: ComposerProps) {
             aria-label="Attach files"
             onChange={(event) => upload(event.target.files)}
           />
-          <Button
-            aria-label="Attach files"
-            title="Attach files"
-            onClick={() => fileInput.current?.click()}
-            disabled={editingDisabled || uploading || voiceBusy}
-          >
-            <Paperclip size={18} />
-          </Button>
-          {isNativeClient() && (
+          {!props.answer && (
+            <Button
+              aria-label="Attach files"
+              title="Attach files"
+              onClick={() => fileInput.current?.click()}
+              disabled={editingDisabled || uploading || voiceBusy}
+            >
+              <Paperclip size={18} />
+            </Button>
+          )}
+          {isNativeClient() && !props.answer && (
             <Suspense fallback={null}>
               <LocalFolderAttachments
                 disabled={editingDisabled || uploading || voiceBusy}
@@ -268,60 +276,72 @@ export default function Composer(props: ComposerProps) {
           )}
           {toolbarExtra}
         </div>
-        <div className="composer-model-picker">
-          <ModelPicker
-            label="Model for this direction"
-            triggerLabel={
-              !task && modelChoices.main?.automatic
-                ? 'Automatic'
-                : (selectedModel?.displayName ??
-                  (modelId ||
-                    (props.project
-                      ? 'Project default'
-                      : task
-                        ? 'Conversation model'
-                        : 'Default model')))
+        {!props.answer && (
+          <div className="composer-model-picker">
+            <ModelPicker
+              label="Model for this direction"
+              triggerLabel={
+                !task && modelChoices.main?.automatic
+                  ? 'Automatic'
+                  : (selectedModel?.displayName ??
+                    (modelId ||
+                      (props.project
+                        ? 'Project default'
+                        : task
+                          ? 'Conversation model'
+                          : 'Default model')))
+              }
+              loadDetails
+              privacyRoute={privacyRoute}
+              value={!task && modelChoices.main?.automatic ? '__automatic' : modelId}
+              models={models}
+              shortcuts={[
+                {
+                  value: '',
+                  label: task
+                    ? (projectModel?.displayName ?? 'Current conversation model')
+                    : props.project
+                      ? 'Use project default'
+                      : 'Use global default'
+                },
+                ...(!task ? [{ value: '__automatic', label: 'Automatic for this project' }] : [])
+              ]}
+              disabled={editingDisabled || uploading || voiceBusy}
+              onChange={changeModel}
+              onAdvanced={() => setAdvancedModels(true)}
+            />
+          </div>
+        )}
+        {!props.answer && (
+          <Button
+            ref={promptSettingsTrigger}
+            className="compact-prompt-settings"
+            aria-label="Prompt settings"
+            title={`${securityMode[0]!.toUpperCase() + securityMode.slice(1)} approvals · ${effortLabel(reasoningEffort)} effort${cap ? ` · $${cap} ${task ? 'extra limit' : 'limit'}` : ''}`}
+            aria-expanded={promptSettingsOpen}
+            aria-haspopup="dialog"
+            aria-controls={promptSettingsId}
+            popoverTarget={supportsPromptPopover ? promptSettingsId : undefined}
+            onClick={
+              supportsPromptPopover ? undefined : () => setPromptSettingsOpen((open) => !open)
             }
-            loadDetails
-            privacyRoute={privacyRoute}
-            value={!task && modelChoices.main?.automatic ? '__automatic' : modelId}
-            models={models}
-            shortcuts={[
-              {
-                value: '',
-                label: task
-                  ? (projectModel?.displayName ?? 'Current conversation model')
-                  : props.project
-                    ? 'Use project default'
-                    : 'Use global default'
-              },
-              ...(!task ? [{ value: '__automatic', label: 'Automatic for this project' }] : [])
-            ]}
-            disabled={editingDisabled || uploading || voiceBusy}
-            onChange={changeModel}
-            onAdvanced={() => setAdvancedModels(true)}
-          />
-        </div>
-        <Button
-          ref={promptSettingsTrigger}
-          className="compact-prompt-settings"
-          aria-label="Prompt settings"
-          title={`${securityMode[0]!.toUpperCase() + securityMode.slice(1)} approvals · ${effortLabel(reasoningEffort)} effort${cap ? ` · $${cap} ${task ? 'extra limit' : 'limit'}` : ''}`}
-          aria-expanded={promptSettingsOpen}
-          aria-haspopup="dialog"
-          aria-controls={promptSettingsId}
-          popoverTarget={supportsPromptPopover ? promptSettingsId : undefined}
-          onClick={supportsPromptPopover ? undefined : () => setPromptSettingsOpen((open) => !open)}
-        >
-          <SlidersHorizontal size={16} />
-          <span className="composer-mode-label">
-            {securityMode[0]!.toUpperCase() + securityMode.slice(1)}
-          </span>
-          <ChevronDown size={12} aria-hidden="true" />
-        </Button>
+          >
+            <SlidersHorizontal size={16} />
+            <span className="composer-mode-label">
+              {securityMode[0]!.toUpperCase() + securityMode.slice(1)}
+            </span>
+            <ChevronDown size={12} aria-hidden="true" />
+          </Button>
+        )}
         <div className="composer-submit">
           {saved && (
-            <small className="draft-status" role="status" aria-label={saved} title={saved}>
+            // A synced draft is the normal state and says nothing; only trouble is shown.
+            <small
+              className={`draft-status${saved === 'Draft synced' || saved === 'Saving draft…' ? ' sr-only' : ''}`}
+              role="status"
+              aria-label={saved}
+              title={saved}
+            >
               <DraftIcon
                 size={13}
                 className={saved === 'Saving draft…' ? 'spin' : ''}
@@ -346,15 +366,17 @@ export default function Composer(props: ComposerProps) {
               ? pendingTask
                 ? 'Opening…'
                 : 'Sending…'
-              : pendingSend
-                ? 'Retry send'
-                : task
-                  ? isWorking(task)
-                    ? interrupt
-                      ? 'Update run'
-                      : 'Queue next'
-                    : 'Send'
-                  : 'Start'}
+              : props.answer
+                ? 'Answer'
+                : pendingSend
+                  ? 'Retry send'
+                  : task
+                    ? isWorking(task)
+                      ? interrupt
+                        ? 'Update run'
+                        : 'Queue next'
+                      : 'Send'
+                    : 'Start'}
             {!busy && <ArrowUpRight size={18} />}
           </Button>
         </div>

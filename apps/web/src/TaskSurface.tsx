@@ -1,7 +1,8 @@
 import ProjectPanel from './ProjectPanel';
 import { setSurfaceLocation, useProjectView, useProjectTool } from './surface-location';
-import type { ComputerTool } from './Computer';
-import { readQuestionDraft, writeQuestionDraft } from './draft-storage';
+import { computerTool, type ComputerTool } from './computer-tools';
+import { RunRows, useRuns } from './runs';
+import { processName } from './process-display';
 import { useVisibleClock } from './visible-clock';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
@@ -49,7 +50,7 @@ import {
 import { post } from './client';
 import { loadEventPage, type StreamConnection } from './stream';
 import { useTaskRecord } from './useTaskRecord';
-import { Button, Dialog, ErrorNotice, Field, Spinner } from './ui';
+import { Button, Dialog, ErrorNotice, Spinner } from './ui';
 import { DecisionCard } from './DecisionQueue';
 import { createQuestionAnswerSender } from './task-actions';
 import { TaskOutputs, TaskProgress } from './TaskCanvas';
@@ -117,9 +118,7 @@ export interface TaskSurfaceProps {
   onBack: () => void;
   onDiscuss?: (source: ConversationSource) => void;
   onOpenTask: (id: string) => void;
-  onComputer: (
-    tool: 'files' | 'terminal' | 'browser' | 'desktop' | 'previews' | 'processes' | 'checkpoints'
-  ) => void;
+  onComputer: (tool: ComputerTool) => void;
 }
 export default function TaskSurface({
   task,
@@ -169,13 +168,7 @@ export default function TaskSurface({
     if (view === 'files') setFilesOpened(true);
     if (view === 'tools') setToolsOpened(true);
   }, [view]);
-  const tool = (
-    ['terminal', 'browser', 'desktop', 'previews', 'processes', 'checkpoints'].includes(
-      selectedTool
-    )
-      ? selectedTool
-      : 'browser'
-  ) as ComputerTool;
+  const tool = selectedTool === 'files' ? 'browser' : computerTool(selectedTool);
 
   const [historyPage, setHistoryPage] = useState<TaskEvent[]>([]);
   useEffect(() => {
@@ -187,7 +180,6 @@ export default function TaskSurface({
   const [directionContext, setDirectionContext] = useState<DirectionContext | null>(
     draft?.controls?.context ?? null
   );
-  const [questionAnswer, setQuestionAnswer] = useState('');
   const [deliverAnswer] = useState(createQuestionAnswerSender);
   const [noteSource, setNoteSource] = useState<ConversationSource | null>(null);
   const [branchEvent, setBranchEvent] = useState<TaskEvent | null>(null);
@@ -199,6 +191,8 @@ export default function TaskSurface({
     );
   };
   const notes = directionContext?.kind === 'notes' ? directionContext.notes : [];
+  // This conversation's own jobs, live in the flow of the conversation; an open panel reads them itself.
+  const runs = useRuns(view === 'work' ? `/v1/tasks/${task.id}/processes` : null);
   /*
    * The run summary's elapsed figure is a live clock, not a snapshot. Re-rendering on a half
    * minute keeps it honest while a task runs; a finished task's duration is fixed and the tick
@@ -276,35 +270,6 @@ export default function TaskSurface({
         : undefined
     );
   const question = activeQuestion(events, task);
-  const questionDraftKey = question ? `garden:question:${task.id}:${question.id}` : null;
-  const questionDraftWrites = useRef(Promise.resolve());
-  const questionDraftRevision = useRef(0);
-  useEffect(() => {
-    let active = true;
-    const revision = ++questionDraftRevision.current;
-    setQuestionAnswer('');
-    if (questionDraftKey) {
-      questionDraftWrites.current = questionDraftWrites.current
-        .then(async () => {
-          const value = await readQuestionDraft(bootstrap.user.id, questionDraftKey);
-          if (active && revision === questionDraftRevision.current) setQuestionAnswer(value);
-        })
-        .catch((cause) => {
-          if (active) setError(cause);
-        });
-    }
-    return () => {
-      active = false;
-    };
-  }, [questionDraftKey, bootstrap.user.id]);
-  function saveQuestionAnswer(value: string) {
-    ++questionDraftRevision.current;
-    setQuestionAnswer(value);
-    if (questionDraftKey)
-      questionDraftWrites.current = questionDraftWrites.current
-        .then(() => writeQuestionDraft(bootstrap.user.id, questionDraftKey, value))
-        .catch(setError);
-  }
 
   const questionData = data(question?.payload);
   const taskDecisions = decisions.filter((decision) => decision.taskId === task.id);
@@ -315,19 +280,6 @@ export default function TaskSurface({
         event.kind
       )
     );
-  const [attentionVisible, setAttentionVisible] = useState(false);
-  const hasAttention = taskDecisions.length > 0 || Boolean(question);
-  useEffect(() => {
-    // The jump to a request is only worth showing while the request itself is out of view.
-    if (!hasAttention) return;
-    const target = document.getElementById(`attention-${task.id}`);
-    if (!target) return;
-    const observer = new IntersectionObserver(([entry]) =>
-      setAttentionVisible(Boolean(entry?.isIntersecting))
-    );
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, [hasAttention, task.id, loading]);
   const previousStatus = useRef(task.status);
   const [justFinished, setJustFinished] = useState(false);
   useEffect(() => {
@@ -360,13 +312,18 @@ export default function TaskSurface({
     setError(null);
     try {
       onTask(await deliverAnswer(task.id, question.id, value));
-      saveQuestionAnswer('');
       onRefresh();
     } catch (err) {
       setError(err);
     } finally {
       setBusy(false);
     }
+  }
+  /** The composer's answer path: it reports a failure itself and keeps what was typed. */
+  async function answerFromComposer(value: string) {
+    if (!question) return;
+    onTask(await deliverAnswer(task.id, question.id, value));
+    onRefresh();
   }
   async function older() {
     setBusy(true);
@@ -381,6 +338,11 @@ export default function TaskSurface({
       setBusy(false);
     }
   }
+  // While the agent waits on a plain question, the composer is where it is answered.
+  const answering =
+    question && taskDecisions.length === 0 && data(questionData.handoff).kind !== 'challenge'
+      ? { question: text(questionData.question, question.summary), onAnswer: answerFromComposer }
+      : null;
   const attentionPanel =
     taskDecisions.length > 0 || question ? (
       <aside className="work-attention" id={`attention-${task.id}`}>
@@ -406,12 +368,15 @@ export default function TaskSurface({
             {text(questionData.continueWith) && task.status === 'running' && (
               <p className="muted">Working meanwhile: {text(questionData.continueWith)}</p>
             )}
+            {data(questionData.handoff).kind !== 'challenge' && (
+              <p className="muted question-hint">Answer below, or pick one.</p>
+            )}
             {data(questionData.handoff).kind === 'challenge' && (
               <Button className="primary" onClick={() => onComputer('browser')}>
                 Open browser verification
               </Button>
             )}
-            <div className="stack">
+            <div className="answer-choices">
               {strings(questionData.options).map((option) => (
                 <Button
                   key={option}
@@ -423,31 +388,6 @@ export default function TaskSurface({
                 </Button>
               ))}
             </div>
-            {data(questionData.handoff).kind !== 'challenge' && (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void answerQuestion(questionAnswer);
-                }}
-              >
-                <Field label="Your answer">
-                  <textarea
-                    value={questionAnswer}
-                    onChange={(event) => saveQuestionAnswer(event.target.value)}
-                    rows={3}
-                  />
-                </Field>
-                <Button
-                  type="submit"
-                  className="primary"
-                  disabled={!questionAnswer.trim()}
-                  busy={busy}
-                >
-                  {task.status === 'running' ? 'Send answer' : 'Answer and continue'}
-                  <ArrowUpRight size={16} />
-                </Button>
-              </form>
-            )}
           </article>
         )}
       </aside>
@@ -511,7 +451,7 @@ export default function TaskSurface({
     </p>
   );
   return (
-    <section className={`garden-task workspace-view-work${attentionPanel ? ' has-attention' : ''}`}>
+    <section className="garden-task workspace-view-work">
       <div className="run-summary">
         <h2 className="sr-only">{task.title}</h2>
         <div
@@ -528,17 +468,15 @@ export default function TaskSurface({
           {task.queuedMessageCount > 0 && (
             <span className="badge">{task.queuedMessageCount} queued</span>
           )}
+          <span className="muted run-cost">
+            <span title="Settled provider cost for this conversation">
+              {money(task.spentUsd)}
+              {task.maxSpendUsd !== null && ` of ${money(task.maxSpendUsd)}`}
+            </span>
+            {elapsed && ` · ${elapsed}`}
+          </span>
         </div>
         <div className="row">
-          <Button
-            className="run-tool"
-            aria-label="Live voice"
-            title="Live voice"
-            onClick={() => setPanel('voice')}
-          >
-            <AudioLines size={17} />
-            <span>Voice</span>
-          </Button>
           {/* Only a connection that is not live is worth a word; a live one is the default. */}
           {connection !== 'connected' && connection !== 'idle' && (
             <span
@@ -552,19 +490,11 @@ export default function TaskSurface({
           <Button
             className="run-tool"
             aria-label="Work options"
-            title="Work options"
+            title="Share, models, autonomy and branching"
             onClick={() => setPanel('settings')}
           >
             <MoreHorizontal size={19} />
-            <span>More</span>
           </Button>
-          <span className="muted run-cost">
-            <span title="Settled provider cost for this project">
-              {money(task.spentUsd)} spent
-              {task.maxSpendUsd !== null && ` of ${money(task.maxSpendUsd)}`}
-            </span>
-            {elapsed && ` · ${elapsed}${isFinished(task) ? '' : ' so far'}`}
-          </span>
           {!isFinished(task) && (
             <>
               <Button
@@ -628,7 +558,6 @@ export default function TaskSurface({
             </Button>
           )}
         </div>
-        {attentionPanel}
         {waitingReason && (
           <aside className="resource-wait-note" role="status" aria-label="Why this work is waiting">
             <strong>{waitingReason.label}</strong>
@@ -667,6 +596,19 @@ export default function TaskSurface({
                   artifacts={artifacts}
                   onRevisit={setBranchEvent}
                 />
+              )}
+              {runs.active.length > 0 && (
+                <section className="conversation-runs" aria-label="Running for this conversation">
+                  <RunRows
+                    processes={runs.active}
+                    observedAt={runs.list?.observedAt}
+                    limit={3}
+                    onOpen={() => {
+                      selectView('tools');
+                      setSurfaceLocation({ tool: 'runs' });
+                    }}
+                  />
+                </section>
               )}
               {task.spendPausedAt && (
                 <Suspense fallback={null}>
@@ -949,6 +891,13 @@ export default function TaskSurface({
                 initialTool={tool}
                 embedded
                 visible={view === 'tools'}
+                onAskAboutRun={(process) => {
+                  selectView('work');
+                  addNote({
+                    on: `the run “${processName(process)}” (session ${process.sessionId})`,
+                    note: ''
+                  });
+                }}
                 onToolChange={(next) => setSurfaceLocation({ tool: next })}
                 onChange={reload}
               />
@@ -990,21 +939,9 @@ export default function TaskSurface({
         </Dialog>
       )}
       <div className="garden-task-composer">
-        {attentionPanel && !attentionVisible && (
-          <Button
-            className="primary garden-attention-jump"
-            onClick={() =>
-              document
-                .getElementById(`attention-${task.id}`)
-                ?.scrollIntoView({ block: 'start', behavior: 'smooth' })
-            }
-          >
-            Needs you · View request
-            <ArrowUpRight size={16} />
-          </Button>
-        )}
-        <div hidden={Boolean(attentionPanel)}>
-          {task.parentMissionId ? (
+        {attentionPanel}
+        <div>
+          {task.parentMissionId && !answering ? (
             <div className="selected-context garden-mission-context">
               <p>This specialist uses the model and budget assigned by its parent work.</p>
               <small className="muted">
@@ -1013,17 +950,6 @@ export default function TaskSurface({
                 {' · '}Effort {effortLabel(task.reasoningEffort ?? 'auto')}
               </small>
               <div className="row">
-                {question && taskDecisions.length === 0 && (
-                  <Button
-                    onClick={() => {
-                      const card = document.getElementById(`question-${task.id}`);
-                      card?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                      card?.querySelector('textarea')?.focus({ preventScroll: true });
-                    }}
-                  >
-                    Reply to the question
-                  </Button>
-                )}
                 {task.parentTaskId && (
                   <Button onClick={() => onOpenTask(task.parentTaskId!)}>
                     Continue in parent work
@@ -1048,6 +974,16 @@ export default function TaskSurface({
                     setDirectionContext(null);
                     onRefresh();
                   }}
+                  {...(answering ? { answer: answering } : {})}
+                  toolbarExtra={
+                    <Button
+                      aria-label="Live voice"
+                      title="Talk with the agent live"
+                      onClick={() => setPanel('voice')}
+                    >
+                      <AudioLines size={18} />
+                    </Button>
+                  }
                 />
               </Suspense>
             </>
@@ -1158,11 +1094,6 @@ export default function TaskSurface({
       )}
       {panel === 'settings' && (
         <Dialog title="Work options" onClose={() => setPanel(null)}>
-          <p className="muted">
-            {money(task.spentUsd)} spent
-            {task.maxSpendUsd !== null && ` of ${money(task.maxSpendUsd)}`}
-            {elapsed && ` · ${elapsed}`}
-          </p>
           <div className="row">
             <Button onClick={() => setPanel('share')} aria-label="Share this work">
               <Share2 size={15} /> Share

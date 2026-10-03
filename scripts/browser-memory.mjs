@@ -43,14 +43,14 @@ export async function checkMemoryLibrary({ context, origin, workspace, project, 
     })
   );
   await page.goto(origin);
-  await page
-    .getByRole('navigation', { name: 'Workspace navigation' })
-    .getByRole('button', { name: 'Library', exact: true })
-    .click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const library = page
-    .getByRole('dialog', { name: 'Library', exact: true })
-    .or(page.getByRole('region', { name: 'Library', exact: true }));
-  await library.getByRole('button', { name: 'Memory', exact: true }).click();
+    .getByRole('dialog', { name: 'Settings', exact: true })
+    .or(page.getByRole('region', { name: 'Settings', exact: true }));
+  await library
+    .getByRole('navigation', { name: 'Settings sections' })
+    .getByRole('button', { name: 'Knowledge', exact: true })
+    .click();
   const records = library.getByRole('region', { name: 'Memory records', exact: true });
   await records.getByText('Retained work 0', { exact: true }).waitFor();
   assert.equal(await records.locator('article').count(), 40);
@@ -88,12 +88,12 @@ export async function checkMemoryLibrary({ context, origin, workspace, project, 
     assert.equal(
       await page
         .getByRole(width < 700 ? 'region' : 'dialog', {
-          name: 'Library',
+          name: 'Settings',
           exact: true
         })
         .count(),
       1,
-      'Library must become a navigation page on phones'
+      'Settings must become a navigation page on phones'
     );
     const dimensions = await library.evaluate((el) => ({
       width: el.clientWidth,

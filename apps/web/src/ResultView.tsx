@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Artifact, ResultNote } from '@garden/contracts';
 import { responseError } from './client.js';
 import { message } from './computer/format.js';
-import { Maximize2, MessageSquare, X } from './icons';
+import { Maximize2, X } from './icons';
 import { useExpandedView } from './use-expanded-view';
-import { NotePopover } from './result-notes';
+import { Markable, MarkButton } from './result-notes';
 import { Button } from './ui';
 import './result-view.css';
 
@@ -63,10 +63,7 @@ export default function ResultView({
   const [error, setError] = useState('');
   const [height, setHeight] = useState(360);
   const [marking, setMarking] = useState(false);
-  const [drawing, setDrawing] = useState<Circle | null>(null);
-  const [pending, setPending] = useState<Circle | null>(null);
   const frame = useRef<HTMLIFrameElement>(null);
-  const layer = useRef<HTMLDivElement>(null);
   const probes = useRef(new Map<string, (text: string) => void>());
   const { ref: stage, expanded, toggle } = useExpandedView<HTMLElement>();
 
@@ -105,7 +102,6 @@ export default function ResultView({
   }, []);
 
   const srcDoc = useMemo(() => (html === null ? '' : viewDocument(html, themeStyle())), [html]);
-  const mine = notes.filter((note) => note.on === artifact.name && note.region);
 
   /** What the view shows under a point, asked of the view itself and never waited on for long. */
   const probe = (circle: Circle): Promise<string> =>
@@ -121,16 +117,6 @@ export default function ResultView({
       }, 400);
     });
 
-  const point = (event: React.PointerEvent) => {
-    const box = layer.current!.getBoundingClientRect();
-    return {
-      x: Math.min(1, Math.max(0, (event.clientX - box.left) / box.width)),
-      y: Math.min(1, Math.max(0, (event.clientY - box.top) / box.height)),
-      width: box.width,
-      height: box.height
-    };
-  };
-
   if (error)
     return (
       <p className="error" role="alert">
@@ -143,14 +129,7 @@ export default function ResultView({
         <span className="eyebrow">{artifact.name.replace(/\.html?$/i, '')}</span>
         <div className="row">
           {onNote && (
-            <Button
-              aria-pressed={marking}
-              title="Circle a place in the view and comment on it"
-              onClick={() => setMarking((value) => !value)}
-            >
-              <MessageSquare size={15} />
-              {marking ? 'Done marking' : 'Mark'}
-            </Button>
+            <MarkButton marking={marking} onToggle={() => setMarking((value) => !value)} />
           )}
           <Button
             onClick={() => void toggle()}
@@ -164,80 +143,22 @@ export default function ResultView({
         <p className="muted result-view-loading">Opening the view…</p>
       ) : (
         <div className="result-view-stage" style={expanded ? undefined : { height }}>
-          <iframe
-            ref={frame}
-            title={artifact.name}
-            srcDoc={srcDoc}
-            sandbox="allow-scripts"
-            referrerPolicy="no-referrer"
-            className="result-view-frame"
-          />
-          {(marking || mine.length > 0 || pending) && (
-            <div
-              ref={layer}
-              className={`result-view-marks${marking ? ' is-marking' : ''}`}
-              onPointerDown={(event) => {
-                if (!marking || pending) return;
-                event.currentTarget.setPointerCapture(event.pointerId);
-                const at = point(event);
-                setDrawing({ x: at.x, y: at.y, radius: 0 });
-              }}
-              onPointerMove={(event) => {
-                if (!drawing) return;
-                const at = point(event);
-                const dx = (at.x - drawing.x) * at.width;
-                const dy = (at.y - drawing.y) * at.height;
-                setDrawing({ ...drawing, radius: Math.hypot(dx, dy) / at.width });
-              }}
-              onPointerUp={(event) => {
-                if (!drawing) return;
-                const at = point(event);
-                setPending({ ...drawing, radius: Math.max(drawing.radius, 18 / at.width) });
-                setDrawing(null);
-              }}
-            >
-              {[
-                ...mine.map((note) => note.region!),
-                ...(drawing ? [drawing] : []),
-                ...(pending ? [pending] : [])
-              ].map((circle, index) => (
-                <span
-                  key={index}
-                  className="result-view-circle"
-                  style={{
-                    left: `${circle.x * 100}%`,
-                    top: `${circle.y * 100}%`,
-                    width: `${circle.radius * 200}%`,
-                    aspectRatio: '1'
-                  }}
-                />
-              ))}
-              {pending && (
-                <NotePopover
-                  at={{
-                    left: Math.min(
-                      Math.max(0, pending.x * (layer.current?.clientWidth ?? 0) - 120),
-                      Math.max(0, (layer.current?.clientWidth ?? 280) - 280)
-                    ),
-                    top: (pending.y + pending.radius) * (layer.current?.clientHeight ?? 0) + 8
-                  }}
-                  label="On the circled area"
-                  onCancel={() => setPending(null)}
-                  onSave={(note) => {
-                    const circle = pending;
-                    setPending(null);
-                    void probe(circle).then((text) =>
-                      onNote?.({
-                        on: artifact.name,
-                        region: { ...circle, ...(text ? { text } : {}) },
-                        note
-                      })
-                    );
-                  }}
-                />
-              )}
-            </div>
-          )}
+          <Markable
+            on={artifact.name}
+            notes={notes}
+            onNote={onNote ?? (() => undefined)}
+            marking={marking}
+            probe={probe}
+          >
+            <iframe
+              ref={frame}
+              title={artifact.name}
+              srcDoc={srcDoc}
+              sandbox="allow-scripts"
+              referrerPolicy="no-referrer"
+              className="result-view-frame"
+            />
+          </Markable>
         </div>
       )}
     </article>

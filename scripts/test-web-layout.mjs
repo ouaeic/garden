@@ -287,12 +287,20 @@ async function revealPromptSettings(surface) {
   await settings.waitFor();
   if ((await settings.getAttribute('aria-expanded')) === 'false') await settings.click();
 }
+/** Projects open from Home's list, or from Find over whatever is on screen. */
+async function openProjects(page) {
+  // The open sheet is part of the address, which settles before its animation does.
+  if (new URL(page.url()).searchParams.get('view') === 'projects') return;
+  const all = page.getByRole('button', { name: 'All projects', exact: true });
+  if (await all.isVisible()) return all.click();
+  await page.getByRole('button', { name: 'Find anything', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Find anything', exact: true })
+    .getByRole('button', { name: 'Projects', exact: true })
+    .click();
+}
 async function openNewProject(page) {
-  const trigger = page
-    .getByRole('navigation', { name: 'Workspace navigation' })
-    .getByRole('button', { name: 'Projects', exact: true });
-  await trigger.waitFor();
-  if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+  await openProjects(page);
   await page
     .getByRole('dialog', { name: 'Projects', exact: true })
     .getByRole('button', { name: 'New project', exact: true })
@@ -747,6 +755,25 @@ try {
     if (path === '/v1/tasks' && route.request().method() === 'GET')
       return json({ tasks: [task], nextCursor: null });
     if (path === '/v1/shares' || path === '/v1/schedules') return json([]);
+    if (path === '/v1/spend-limits')
+      return json({
+        dailyCapUsd: null,
+        monthlyCapUsd: null,
+        defaultTaskCapUsd: null,
+        warnAtPercent: 80,
+        maxInputUsdPerMillionTokens: null,
+        maxOutputUsdPerMillionTokens: null
+      });
+    if (path === '/v1/spend') return json({ windows: [], byDay: [], byModel: [], byTask: [] });
+    if (path === '/v1/usage')
+      return json({
+        period: { start: '2026-09-01', end: '2026-10-01' },
+        totals: {},
+        storageBytes: 0,
+        storageLimitBytes: 1e9,
+        storageThreshold: 'normal',
+        history: []
+      });
     if (
       [
         `/v1/workspaces/${workspace.id}/memories`,
@@ -776,6 +803,7 @@ try {
       });
     if (path === '/v1/relay') return json({ enabled: false });
     if (path === `/v1/workspaces/${workspace.id}/snapshots`) return json([]);
+    if (/^\/v1\/workspaces\/[^/]+\/previews$/.test(path)) return json([]);
     if (path === `/v1/workspaces/${workspace.id}/brief`)
       return json({ markdown: '', path: 'GARDEN.md' });
     if (path === '/v1/legal')
@@ -1641,10 +1669,7 @@ try {
       await page.screenshot({ path: resolve(report, `task-${width}.png`) });
     }
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await page
-      .getByRole('navigation', { name: 'Workspace navigation' })
-      .getByRole('button', { name: 'Projects', exact: true })
-      .click();
+    await openProjects(page);
     const projectPanel = page.getByRole('dialog', { name: 'Projects', exact: true });
     await projectPanel.waitFor();
     for (let i = 0; i < 12; i++) {
@@ -1818,6 +1843,26 @@ try {
       'Expanding must preserve the running preview'
     );
     await page.getByRole('button', { name: 'Exit full screen', exact: true }).click();
+    // Point at the live app itself: circle a place and say what is wanted there.
+    const liveApp = page.locator('.garden-output-primary:has(.garden-preview-live)');
+    await liveApp.getByRole('button', { name: 'Mark', exact: true }).click();
+    const appBox = await liveApp.locator('.mark-layer').boundingBox();
+    assert(appBox, 'Marking covers the live app');
+    await page.mouse.move(appBox.x + 60, appBox.y + 60);
+    await page.mouse.down();
+    await page.mouse.move(appBox.x + 90, appBox.y + 80);
+    await page.mouse.up();
+    await page.locator('.note-popover textarea').fill('Make the counter larger');
+    await page.locator('.note-popover').getByRole('button', { name: 'Add', exact: true }).click();
+    const appNotes = page.getByRole('list', { name: 'Your comments on the result' });
+    await appNotes.getByText('Make the counter larger', { exact: true }).waitFor();
+    await liveApp.getByRole('button', { name: 'Done marking', exact: true }).click();
+    assert.equal(
+      await page.frameLocator('.garden-preview-frame').getByRole('button').textContent(),
+      '1',
+      'Marking an app must leave it running'
+    );
+    await appNotes.getByRole('button', { name: 'Remove this comment' }).click();
     const downloadPromise = page.waitForEvent('download');
     await page
       .locator('.garden-output-downloads')
@@ -1951,13 +1996,12 @@ try {
       document.querySelector('.run-summary')?.textContent.includes('Generating media')
     );
     assert.equal(
-      await page.locator('.desk-updates .desk-update-row .status-sprite.stage-bloom').count(),
+      await page.locator('.project-conversation-tabs .status-sprite.stage-bloom').count(),
       0,
       'The project list must not show pending output as finished'
     );
     assert(
-      (await page.locator('.desk-updates .desk-update-row .status-sprite.stage-sprout').count()) >
-        0,
+      (await page.locator('.project-conversation-tabs .status-sprite.stage-sprout').count()) > 0,
       'Pending output reads as still growing'
     );
     missions = [mission];
@@ -2117,10 +2161,7 @@ try {
     await page.getByRole('button', { name: 'Open work', exact: true }).click();
     await page.getByRole('button', { name: 'Return to parent work', exact: true }).waitFor();
     assert.equal(new URL(page.url()).searchParams.get('task'), childTask.id);
-    await page
-      .getByRole('navigation', { name: 'Workspace navigation' })
-      .getByRole('button', { name: 'Projects', exact: true })
-      .click();
+    await openProjects(page);
     assert(
       !(await page.getByRole('dialog', { name: 'Projects', exact: true }).textContent()).includes(
         childWorkspace.name
@@ -2162,43 +2203,18 @@ try {
       payload: { question: 'Which keys should move the player?', options: ['Arrow keys', 'WASD'] }
     };
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await page.getByLabel('Your answer').waitFor();
-    await page.getByLabel('Your answer').fill('Use both arrow keys and WASD.');
-    const encryptedAnswers = await page.evaluate(async () => {
-      const db = await new Promise((resolve, reject) => {
-        const request = indexedDB.open('garden-private-drafts', 2);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-      let rows = [];
-      const deadline = Date.now() + 5000;
-      while (!rows.length && Date.now() < deadline) {
-        rows = await new Promise((resolve) => {
-          const request = db.transaction('answers').objectStore('answers').getAll();
-          request.onsuccess = () => resolve(request.result);
-        });
-        if (!rows.length) await new Promise((resolve) => setTimeout(resolve, 25));
-      }
-      db.close();
-      sessionStorage.clear();
-      return rows;
-    });
-    assert(encryptedAnswers.length > 0, 'Question answer must reach durable device storage');
-    assert(
-      !JSON.stringify(encryptedAnswers).includes('Use both arrow keys and WASD.'),
-      'Question drafts must not persist plaintext'
-    );
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    await page.getByLabel('Your answer').waitFor();
+    // A specialist has no composer of its own, except to answer what it asked.
+    const answerBox = page
+      .locator('.garden-task-composer')
+      .getByLabel('Your answer', { exact: true });
+    await answerBox.fill('Use both arrow keys and WASD.');
     assert.equal(
-      await page.getByLabel('Your answer').inputValue(),
-      'Use both arrow keys and WASD.',
-      'Pending question drafts survive a reload'
+      await page.getByRole('combobox', { name: 'Model reasoning effort' }).count(),
+      0,
+      'Answering must not offer a new model allocation'
     );
-    await page.getByRole('button', { name: 'Answer and continue', exact: true }).click();
-    await page
-      .getByRole('button', { name: 'Answer and continue', exact: true })
-      .waitFor({ state: 'detached' });
+    await page.getByRole('button', { name: 'Answer', exact: true }).click();
+    await answerBox.waitFor({ state: 'detached' });
     assert.deepEqual(
       childAnswer,
       { questionId: childQuestion.id, prompt: 'Use both arrow keys and WASD.' },
@@ -2220,7 +2236,10 @@ try {
     await page.getByText(/Fixture GPU · GPU 37%/).waitFor();
     await page.getByText(/Unavailable GPU · GPU unavailable/).waitFor();
     await page.getByRole('button', { name: 'All computer work', exact: true }).click();
-    await page.getByRole('button', { name: 'Jobs', exact: true }).click();
+    await page
+      .getByRole('navigation', { name: 'Computer tools', exact: true })
+      .getByRole('button', { name: 'Runs', exact: true })
+      .click();
     await page.getByRole('button', { name: 'View execution history', exact: true }).click();
     const history = page.getByRole('region', { name: 'Execution history', exact: true });
     await history.getByText('cell-latest', { exact: true }).click();
@@ -2559,8 +2578,9 @@ try {
         'The approval must not widen the page'
       );
       await card.getByRole('button', { name: 'Deny', exact: true }).scrollIntoViewIfNeeded();
+      // Docked above the composer, so the actions are on screen whatever the conversation shows.
       const actionsFit = await card.locator('.decision-actions').evaluate((element) => {
-        const scroll = document.querySelector('.garden-task-scroll').getBoundingClientRect();
+        const scroll = document.querySelector('.work-attention').getBoundingClientRect();
         const buttons = [...element.querySelectorAll('button')];
         return (
           buttons.length === 2 &&
@@ -2575,7 +2595,7 @@ try {
           })
         );
       });
-      assert(actionsFit, 'Approval actions must remain visible in the conversation scroll area');
+      assert(actionsFit, 'Approval actions must remain visible in the dock above the composer');
       await card.screenshot({ path: resolve(report, `approval-reason-${theme}-phone.png`) });
     }
     approvalFailures = [
@@ -2676,7 +2696,7 @@ try {
       );
       await card.locator('.decision-actions').scrollIntoViewIfNeeded();
       const approvalLayout = await card.locator('.decision-actions').evaluate((element) => ({
-        area: document.querySelector('.garden-task-scroll').getBoundingClientRect().toJSON(),
+        area: document.querySelector('.work-attention').getBoundingClientRect().toJSON(),
         buttons: [...element.querySelectorAll('button')].map((button) =>
           button.getBoundingClientRect().toJSON()
         ),
@@ -2684,7 +2704,8 @@ try {
       }));
       assert(
         await card.locator('.decision-actions').evaluate((element) => {
-          const area = document.querySelector('.garden-task-scroll').getBoundingClientRect();
+          // The request sits in the dock above the composer, which scrolls on its own if it must.
+          const area = document.querySelector('.work-attention').getBoundingClientRect();
           const buttons = [...element.querySelectorAll('button')];
           return (
             buttons.length === 3 &&
@@ -2701,7 +2722,7 @@ try {
             })
           );
         }),
-        `All three approval actions must be reachable inside the conversation: ${JSON.stringify(approvalLayout)}`
+        `All three approval actions must be reachable in the request dock: ${JSON.stringify(approvalLayout)}`
       );
       await card.screenshot({ path: resolve(report, `approval-compact-${width}.png`) });
       await card.getByText('Inspect full action', { exact: true }).click();

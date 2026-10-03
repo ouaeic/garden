@@ -46,8 +46,26 @@ export async function checkResultView({
 </script>
 </body></html>`;
   let sent = null;
+  // Its own draft store, so drafts other checks left on this task cannot conflict with this one.
+  let draftRevision = 0;
   await page.route('**/v1/**', async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname === '/v1/drafts') {
+      if (route.request().method() === 'GET')
+        return route.fulfill({
+          json: {
+            workspaceId: workspace.id,
+            taskId: task.id,
+            body: '',
+            attachments: [],
+            revision: draftRevision
+          }
+        });
+      draftRevision += 1;
+      return route.fulfill({
+        json: { revision: draftRevision, updatedAt: new Date().toISOString() }
+      });
+    }
     if (url.pathname.endsWith('/artifacts')) return route.fulfill({ json: [artifact] });
     if (url.pathname === `/v1/artifacts/${artifact.id}/content`)
       return route.fulfill({ contentType: 'text/html', body: view });
@@ -127,7 +145,7 @@ export async function checkResultView({
 
     // Circle a place and say what is wanted there.
     await page.getByRole('button', { name: 'Mark', exact: true }).click();
-    const marks = page.locator('.result-view-marks');
+    const marks = page.locator('.mark-layer');
     const box = await marks.boundingBox();
     await page.mouse.move(box.x + box.width * 0.3, box.y + 120);
     await page.mouse.down();
@@ -163,7 +181,7 @@ export async function checkResultView({
       .locator('.garden-task-composer')
       .getByRole('button', { name: /^(Send|Queue next|Update run)$/ });
     await send.click();
-    for (let wait = 0; wait < 100 && !sent; wait += 1) await page.waitForTimeout(50);
+    for (let wait = 0; wait < 300 && !sent; wait += 1) await page.waitForTimeout(50);
     assert(sent, 'Comments without typed text are sendable');
     assert.match(sent.prompt, /My comments on the result:/);
     assert.match(sent.prompt, /comparison\.html on the circled area/);

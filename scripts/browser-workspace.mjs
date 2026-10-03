@@ -83,7 +83,7 @@ export async function checkWorkspaceNavigation({ context, origin, task, report }
     await views.getByRole('button', { name: 'Tools', exact: true }).click();
     await page
       .getByRole('navigation', { name: 'Computer tools', exact: true })
-      .getByRole('button', { name: 'Jobs', exact: true })
+      .getByRole('button', { name: 'Runs', exact: true })
       .click();
     await page.getByRole('region', { name: 'Project processes', exact: true }).waitFor();
     assert.equal(
@@ -91,7 +91,7 @@ export async function checkWorkspaceNavigation({ context, origin, task, report }
       null,
       'Project tools retain the project shell'
     );
-    assert.equal(new URL(page.url()).searchParams.get('tool'), 'processes');
+    assert.equal(new URL(page.url()).searchParams.get('tool'), 'runs');
     await page.reload();
     await page.getByRole('region', { name: 'Project processes', exact: true }).waitFor();
     assert.deepEqual(await conversations.locator('option').allTextContents(), order);

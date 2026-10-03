@@ -60,13 +60,10 @@ export async function checkRunningQuestion({ context, origin, bootstrap, task, r
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
       await page.screenshot({ path: resolve(report, `running-question-${width}.png`) });
     }
-    await card.getByLabel('Your answer').fill('Sample B is the control.');
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    await card.getByLabel('Your answer').waitFor();
-    await page.waitForFunction(
-      () => document.querySelector('.question-card textarea')?.value === 'Sample B is the control.'
-    );
-    await card.getByRole('button', { name: 'Send answer', exact: true }).click();
+    // The composer is the answer box: one place to type, whatever the agent is waiting on.
+    const composer = page.locator('.garden-task-composer');
+    await composer.getByLabel('Your answer', { exact: true }).fill('Sample B is the control.');
+    await composer.getByRole('button', { name: 'Answer', exact: true }).click();
     await card.waitFor({ state: 'detached' });
     assert.deepEqual(answer, { questionId: question.id, prompt: 'Sample B is the control.' });
   } finally {

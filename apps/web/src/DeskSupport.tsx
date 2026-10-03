@@ -1,18 +1,23 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { ArrowUpRight, File, Folder, RefreshCw } from './icons';
-import type { DirectoryPage, Project, ProjectDirectory, Task } from '@garden/contracts';
+import { useEffect, useRef, useState } from 'react';
+import { Activity, ArrowUpRight, File, Folder, RefreshCw } from './icons';
+import type { DirectoryPage, Project, ProjectDirectory } from '@garden/contracts';
+import { RunRows, useRuns } from './runs';
 import { get } from './client';
-import { Button, ErrorNotice, Spinner } from './ui';
+import { Button, ErrorNotice } from './ui';
 import ScrollRegion from './ScrollRegion';
 import { setSurfaceLocation, useProjectView } from './surface-location';
 import { processMemory } from './process-display';
-import { taskStatusLabel } from './model';
 import { changeSummary, useProjectChanges } from './use-project-changes';
-import StatusSprite, { stageOf } from './life/StatusSprite';
 
-const ProcessPanel = lazy(() => import('./ProcessPanel'));
-
-function DeskFiles({ projectId, taskId }: { projectId: string; taskId?: string }) {
+function DeskFiles({
+  projectId,
+  taskId,
+  changed
+}: {
+  projectId: string;
+  taskId?: string;
+  changed: string | null;
+}) {
   const [data, setData] = useState<{ root: ProjectDirectory; page: DirectoryPage } | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [loaded, setLoaded] = useState(false);
@@ -67,6 +72,7 @@ function DeskFiles({ projectId, taskId }: { projectId: string; taskId?: string }
           <Folder size={16} />
           Files
         </h2>
+
         <div className="row">
           <Button aria-label="Refresh file card" onClick={() => setRevision((value) => value + 1)}>
             <RefreshCw size={14} />
@@ -76,6 +82,10 @@ function DeskFiles({ projectId, taskId }: { projectId: string; taskId?: string }
           </Button>
         </div>
       </header>
+      {/* Always present, so the change reader can see it before there is anything to say. */}
+      <p className="desk-file-changes" data-task-id={taskId}>
+        {changed}
+      </p>
       <ScrollRegion
         label="Project file shortcuts"
         className="desk-card-scroll"
@@ -131,82 +141,50 @@ function DeskFiles({ projectId, taskId }: { projectId: string; taskId?: string }
   );
 }
 
+/**
+ * Beside the conversation: the project's files, with what this conversation changed, and whatever
+ * is running for the project - only while something is.
+ */
 export default function DeskSupport({
   project,
   taskId,
-  tasks,
-  onTask,
   onProcesses
 }: {
   project: Project;
   taskId?: string;
-  tasks: Task[];
-  onTask: (id: string) => void;
   onProcesses: () => void;
 }) {
-  const container = useRef<HTMLDivElement>(null);
+  const marker = useRef<HTMLDivElement>(null);
+  const changes = useProjectChanges(project.id, marker, Boolean(taskId), taskId ?? '');
+  const changed = taskId ? changeSummary(changes[taskId]) : null;
+  // An open panel shows these runs itself; one reader per screen is enough.
   const [view] = useProjectView();
-  const recent = [...tasks].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 8);
-  const changes = useProjectChanges(project.id, container, true, taskId ?? '');
+  const runs = useRuns(view === 'work' ? `/v1/projects/${project.id}/processes` : null);
+  // This conversation's own runs are shown in the conversation; these are the others'.
+  const elsewhere = runs.active.filter((process) => !taskId || process.ownerTaskId !== taskId);
   return (
-    <aside className="desk-support" aria-label="Project cards">
-      <DeskFiles projectId={project.id} {...(taskId ? { taskId } : {})} />
-      <Suspense
-        fallback={
-          <div className="desk-card">
-            <Spinner label="Opening processes" />
-          </div>
-        }
-      >
-        <ProcessPanel
-          workspaceId={project.workspaceId}
-          projectId={project.id}
-          compact
-          visible={view === 'work'}
-          onOpen={onProcesses}
-        />
-      </Suspense>
-      <section className="desk-card desk-updates" aria-label="Updates card">
-        <header className="desk-card-heading">
-          <h2>Latest updates</h2>
-          <Button onClick={() => setSurfaceLocation({ panel: 'activity' })}>
-            All <ArrowUpRight size={14} />
-          </Button>
-        </header>
-        <ScrollRegion label="Project update summaries" className="desk-card-scroll">
-          <div ref={container}>
-            {recent.map((task) => (
-              <button
-                className="desk-update-row"
-                key={task.id}
-                data-task-id={task.id === taskId ? task.id : undefined}
-                onClick={() => {
-                  onTask(task.id);
-                  setSurfaceLocation({ panel: 'activity' }, true);
-                }}
-              >
-                <StatusSprite stage={stageOf(task)} />
-                <span>
-                  <strong>{task.title}</strong>
-                  <small>{task.activity?.latest ?? taskStatusLabel(task)}</small>
-                  {task.id === taskId && changeSummary(changes[task.id]) && (
-                    <small>{changeSummary(changes[task.id])}</small>
-                  )}
-                  <time dateTime={task.updatedAt}>
-                    {new Date(task.updatedAt).toLocaleTimeString(undefined, {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </time>
-                </span>
-              </button>
-            ))}
-            {!recent.length && (
-              <p className="desk-empty-state muted">Recorded progress will appear here.</p>
-            )}
-          </div>
-        </ScrollRegion>
-      </section>
+    <aside className="desk-support" aria-label="Project cards" ref={marker}>
+      <DeskFiles projectId={project.id} changed={changed} {...(taskId ? { taskId } : {})} />
+      {elsewhere.length > 0 && (
+        <section className="desk-card desk-runs" aria-label="Runs card">
+          <header className="desk-card-heading">
+            <h2>
+              <Activity size={16} />
+              {taskId ? 'Also running' : 'Running'} · {elsewhere.length}
+            </h2>
+            <Button onClick={onProcesses}>
+              All <ArrowUpRight size={14} />
+            </Button>
+          </header>
+          <ScrollRegion label="Project runs" className="desk-card-scroll">
+            <RunRows
+              processes={elsewhere}
+              observedAt={runs.list?.observedAt}
+              onOpen={onProcesses}
+            />
+          </ScrollRegion>
+        </section>
+      )}
     </aside>
   );
 }

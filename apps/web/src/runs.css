@@ -1,0 +1,58 @@
+/* One line per run wherever runs are listed: what, then how long and how hard it is working. */
+.run-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.run-row:last-child {
+  border-bottom: 0;
+}
+.run-row:hover,
+.run-row:focus-visible {
+  background: var(--raised-fill, var(--tint));
+}
+.run-row > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.run-row strong,
+.run-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 400;
+}
+.run-row small {
+  color: var(--muted);
+}
+.run-row.needs-look strong {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* In a conversation a run is one line, so the work it serves stays in view. */
+.conversation-runs .run-row {
+  min-height: 0;
+  padding: 4px 12px;
+}
+.conversation-runs .run-row > span {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.conversation-runs .run-row strong {
+  flex: 0 1 auto;
+}
+.conversation-runs .run-row small {
+  flex: 1 1 0;
+}

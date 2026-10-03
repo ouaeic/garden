@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type {
+  ManagedProcess,
   Task,
   TaskRewindPreview,
   Workspace,
@@ -17,12 +18,14 @@ export function Operations({
   workspace,
   task,
   tool,
-  onChange
+  onChange,
+  onAsk
 }: {
   workspace: Workspace;
   task: Task | null;
   tool: 'previews' | 'processes' | 'checkpoints';
   onChange: () => void;
+  onAsk?: (process: ManagedProcess) => void;
 }) {
   const base = `/v1/workspaces/${workspace.id}`;
   const [previews, setPreviews] = useState<WorkspacePreview[]>([]);
@@ -338,6 +341,7 @@ export function Operations({
             key={workspace.id}
             workspaceId={workspace.id}
             {...(task?.projectId ? { projectId: task.projectId } : task ? { taskId: task.id } : {})}
+            {...(onAsk ? { onAsk } : {})}
           />
           <details
             className="job-debugging"

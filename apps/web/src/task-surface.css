@@ -225,3 +225,10 @@ details.owner-line > summary > span:last-child {
   height: auto;
   min-height: 0;
 }
+
+.conversation-runs {
+  display: grid;
+  margin: 8px 16px 0;
+  border: 1px solid var(--line);
+  background: var(--lcd-texture), var(--panel);
+}
