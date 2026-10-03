@@ -263,7 +263,7 @@ createRoot(document.getElementById('root')).render(React.createElement(Proof));`
       assert.equal(sent[0].payload.privacyRoute, 'provider_zdr');
       assert.ok(sent[0].payload.prompt.startsWith('Use a minimum sequence length of 20.'));
       assert.deepEqual(
-        JSON.parse(sent[0].payload.prompt.split('Selected analysis reference: ')[1]),
+        JSON.parse(sent[0].payload.prompt.split('as a separate run that keeps the original: ')[1]),
         {
           kind: 'analysis',
           workspaceId: workspace.id,
