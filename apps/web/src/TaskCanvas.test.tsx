@@ -2,7 +2,6 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { TaskPresentation } from '@garden/contracts';
 import { TaskOutputs, TaskProgress } from './TaskCanvas';
-import WorkTrace from './WorkTrace';
 
 const presentation: TaskPresentation = {
   version: 1,
@@ -137,7 +136,7 @@ describe('usable task delivery and recorded progress', () => {
     expect(html).toContain('Project files');
     expect(html).not.toContain('0 recorded output files');
   });
-  it('makes the latest recorded action legible in the work trace without inventing work', () => {
+  it('lists what the work did once, newest first, each one inspectable', () => {
     const milestones = ['Edited maze.ts', 'Checked keyboard controls'].map((title, index) => ({
       id: `event-${index}`,
       sequence: index + 1,
@@ -147,16 +146,15 @@ describe('usable task delivery and recorded progress', () => {
       createdAt: '2026-09-06T00:00:00Z'
     }));
     const html = renderToStaticMarkup(
-      <WorkTrace progress={{ ...presentation.progress, milestones }} onEvidence={() => undefined} />
+      <TaskProgress
+        presentation={{ ...presentation, progress: { ...presentation.progress, milestones } }}
+        onEvidence={() => undefined}
+        onPlan={() => undefined}
+      />
     );
-    expect(html).toContain('Checked keyboard controls</strong>');
-    expect(html).toContain('latest 2 actions');
-    expect(html).toContain('Inspect');
-    expect(
-      renderToStaticMarkup(
-        <WorkTrace progress={presentation.progress} onEvidence={() => undefined} />
-      )
-    ).toBe('');
+    expect(html).toContain('What it did');
+    expect(html.indexOf('Checked keyboard controls')).toBeLessThan(html.indexOf('Edited maze.ts'));
+    expect(html).toContain('<span class="garden-milestone-kind">check</span>');
   });
   it('puts browser and source actions on the result, while the private iframe awaits its owner grant', () => {
     const html = renderToStaticMarkup(

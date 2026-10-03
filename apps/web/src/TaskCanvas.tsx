@@ -703,7 +703,7 @@ export function TaskProgress({
   return (
     <aside className="garden-progress" aria-label="Recorded progress">
       <header>
-        <span className="eyebrow">The work, as it happens</span>
+        <span className="eyebrow">Plan</span>
         {phases.length > 0 && (
           <button
             className="garden-phase-count"
@@ -766,7 +766,7 @@ export function TaskProgress({
       )}
       <details className="garden-milestone-disclosure" open>
         <summary>
-          Changes & evidence <span>{progress.milestones.length}</span>
+          What it did <span>{progress.milestones.length}</span>
         </summary>
         <ol className="garden-milestones">
           {progress.milestones

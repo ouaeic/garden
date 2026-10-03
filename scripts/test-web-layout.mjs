@@ -1979,12 +1979,11 @@ try {
     recordedReply = null;
     presentation.results = [];
     await page.reload();
-    await page.getByText('Recorded activity · latest 2 actions', { exact: true }).click();
-    assert.equal(await page.locator('.garden-recorded-actions strong').count(), 2);
-    assert.equal(
-      await page.locator('.garden-recorded-actions strong').first().textContent(),
-      'Created maze/index.html'
-    );
+    // What the work did is listed once, newest first, each entry opening its evidence.
+    const did = page.locator('.garden-milestone-disclosure');
+    await did.getByText('What it did', { exact: false }).waitFor();
+    assert.equal(await did.locator('.garden-milestones strong').count(), 2);
+    assert.equal(await page.getByText('Recorded activity', { exact: false }).count(), 0);
     await page.screenshot({ path: resolve(report, 'recorded-trace.png') });
     await page.locator('.project-panel[open] > .dialog-heading > button').click();
     await page.locator('.project-panel[open]').waitFor({ state: 'hidden' });
