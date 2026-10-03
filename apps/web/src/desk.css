@@ -392,14 +392,18 @@ body:has(.desk-shell),
   gap: 14px;
 }
 .desk-file-changes {
-  margin-left: auto;
+  margin: 0;
+  padding: 0 16px;
   color: var(--muted);
   font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 1px;
   min-height: 1px;
+}
+.desk-file-changes:not(:empty) {
+  padding-block: 4px;
+  border-bottom: 1px solid var(--line);
 }
 .desk-shell .desk-support .project-processes {
   gap: 0;

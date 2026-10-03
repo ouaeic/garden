@@ -389,7 +389,8 @@ export default function ProjectSpace({
             ))}
             {cursor && <Button onClick={() => selectView('activity')}>All conversations</Button>}
           </nav>
-          {!wide && (
+          {/* In a conversation its own runs are in its flow; the shortcut is for the overview. */}
+          {!wide && !taskId && (
             <Suspense fallback={null}>
               <ProjectJobsLink projectId={projectId} onOpen={openProcesses} />
             </Suspense>

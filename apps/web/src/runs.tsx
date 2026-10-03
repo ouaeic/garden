@@ -12,6 +12,7 @@ import {
 } from './process-display';
 import { useVisibleClock } from './visible-clock';
 import { observeVisiblePoll } from './visible-poll';
+import './runs.css';
 
 /**
  * What is executing on the computer, read while the view is visible and at the runner's own pace:
@@ -81,7 +82,7 @@ export function RunRows({
       {shown.map((process) => (
         <button
           type="button"
-          className={`home-row cursor-row run-row${processNeedsAttention(process) ? ' needs-look' : ''}`}
+          className={`run-row${processNeedsAttention(process) ? ' needs-look' : ''}`}
           key={process.sessionId}
           onClick={() => onOpen(process)}
         >
@@ -95,7 +96,7 @@ export function RunRows({
       {rest.length > 0 && (
         <button
           type="button"
-          className="home-row cursor-row run-row run-more"
+          className="run-row run-more"
           onClick={onMore ?? (() => onOpen(rest[0]!))}
         >
           <Activity size={16} aria-hidden="true" />

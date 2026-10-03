@@ -72,10 +72,7 @@ function DeskFiles({
           <Folder size={16} />
           Files
         </h2>
-        {/* Always present, so the change reader can see it before there is anything to say. */}
-        <small className="desk-file-changes" data-task-id={taskId}>
-          {changed}
-        </small>
+
         <div className="row">
           <Button aria-label="Refresh file card" onClick={() => setRevision((value) => value + 1)}>
             <RefreshCw size={14} />
@@ -85,6 +82,10 @@ function DeskFiles({
           </Button>
         </div>
       </header>
+      {/* Always present, so the change reader can see it before there is anything to say. */}
+      <p className="desk-file-changes" data-task-id={taskId}>
+        {changed}
+      </p>
       <ScrollRegion
         label="Project file shortcuts"
         className="desk-card-scroll"
