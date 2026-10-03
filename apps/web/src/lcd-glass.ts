@@ -2,21 +2,26 @@
  * The dot matrix, drawn as one tile at the display's own pixel size so every gap is exactly one
  * device pixel and nothing is resampled.
  *
- * A dot is one CSS pixel wherever the display has two or more device pixels to give it, which is
- * the size the screen's pixel face is drawn at, so each pixel of a letter sits in a dot of its own.
- * Coarser displays get a coarser matrix rather than none. As on the panel, the matrix shows
- * everywhere: an undriven dot is a shade darker than the reflector between dots, so blank glass
- * is finely gridded, and on ink the gaps stay pale, so a letter reads as separate dots. The gaps'
- * strength is set so they lighten ink by about the same amount at any pitch, which keeps text
+ * Measured from a photograph of a running DMG: dots are fat squares and the gaps between them are
+ * hairlines, about a fifth of the pitch; and a dot is 0.29 mm seen from about 30 cm. At a desk,
+ * the same apparent size is about two CSS pixels, so that is the pitch, with a one-device-pixel
+ * gap: a quarter of the pitch on a laptop's display, a sixth on a phone's. A display with one
+ * device pixel to a CSS pixel gets three-pixel dots, so its gap is still the narrower part.
+ *
+ * As on the panel, the matrix shows everywhere. An undriven dot is a shade darker than the
+ * reflector between dots, so blank glass is finely gridded, and the gaps stay pale over ink. Their
+ * strength is set so they lighten ink by about the same amount at any density, which keeps text
  * contrast where the palettes put it.
  */
 
-/** Lightening of ink averaged over a dot, whatever the pitch. */
-const GAP_WEIGHT = 0.21;
+/** Lightening of ink averaged over a dot, whatever the density. */
+const GAP_WEIGHT = 0.17;
 /** How much darker an undriven dot is than the reflector around it. */
-const DOT_ALPHA = 0.09;
+const DOT_ALPHA = 0.08;
 /** How much brighter the reflector shows between dots than through them. */
 const REFLECTOR = 0.16;
+/** The pitch, in CSS pixels. */
+const PITCH = 2;
 
 const channels = (colour: string): [number, number, number] => {
   const probe = document.createElement('canvas').getContext('2d')!;
@@ -35,14 +40,11 @@ export function glassTile(
   ink: string,
   lit = true
 ): { url: string; size: number } {
-  const pitch = ratio >= 1.75 ? Math.round(ratio) : 3;
-  // The panel's gaps are hairlines, a fifth of a dot or so. Where a dot is only two device
-  // pixels, a hairline is half of one, drawn as half its strength, as a scaled-down photo shows it.
-  const width = pitch === 2 ? 0.5 : 1;
-  const share = (2 * width) / pitch - (width / pitch) ** 2;
-  // An inverted screen and a coarse display each show the matrix more than ink can spare.
-  const weight = GAP_WEIGHT * (lit ? 1 : 0.65) * (ratio >= 1.75 ? 1 : 0.6);
-  const strength = Math.min(0.6, weight / share);
+  // Never a dot narrower than three device pixels, so a gap is never more than a third of it.
+  const pitch = Math.max(3, Math.round(PITCH * ratio));
+  const share = (2 * pitch - 1) / pitch ** 2;
+  // An inverted screen shows the matrix more than its ink can spare.
+  const strength = Math.min(0.7, (GAP_WEIGHT * (lit ? 1 : 0.65)) / share);
   const undriven = DOT_ALPHA * (lit ? 1 : 0.4);
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = pitch;
@@ -56,9 +58,7 @@ export function glassTile(
   for (let y = 0; y < pitch; y++)
     for (let x = 0; x < pitch; x++) {
       const at = (y * pitch + x) * 4;
-      const across = x === 0 ? width : 0;
-      const down = y === 0 ? width : 0;
-      const covered = across + down - across * down;
+      const covered = x === 0 || y === 0 ? 1 : 0;
       const [r, g, b] = covered ? gap : dot;
       image.data[at] = r;
       image.data[at + 1] = g;
