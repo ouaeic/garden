@@ -1,13 +1,12 @@
-import type { TaskPresentation, WorkSurfaceView } from '@garden/contracts';
+import type { WorkSurfaceView } from '@garden/contracts';
 import { Button } from './ui';
 import './presentation.css';
 
-export default function WorkTrace({
-  progress,
+/** The pages the work found and read, each one inspectable. */
+export default function Sources({
   surface,
   onEvidence
 }: {
-  progress: TaskPresentation['progress'];
   surface?: WorkSurfaceView;
   onEvidence: (id: string) => void;
 }) {
@@ -34,20 +33,5 @@ export default function WorkTrace({
         </ul>
       </details>
     ) : null;
-  const milestones = progress.milestones.slice(-6);
-  if (milestones.length < 2) return sources;
-  return (
-    <>
-      <details className="garden-recorded-actions">
-        <summary>Recorded activity · latest {milestones.length} actions</summary>
-        {milestones.map((item) => (
-          <div key={item.id}>
-            <strong>{item.title}</strong>
-            <Button onClick={() => onEvidence(item.id)}>Inspect</Button>
-          </div>
-        ))}
-      </details>
-      {sources}
-    </>
-  );
+  return sources;
 }

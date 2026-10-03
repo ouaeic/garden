@@ -442,3 +442,24 @@ button.computer-file-row:hover {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+/* The Computer page is the frame; its sections are separated, not boxed again. */
+.computer .project-processes,
+.computer .management-section {
+  margin: 0;
+  padding: 16px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: none;
+}
+.view-computer .computer.panel {
+  border: 0;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+/* On the Computer page the list is the page; it does not scroll inside another scroll. */
+.view-computer .project-processes .scroll-region {
+  max-height: none;
+  overflow: visible;
+}

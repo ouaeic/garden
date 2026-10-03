@@ -52,6 +52,12 @@ export function TaskOutputs({
   onNote?: (note: ResultNote) => void;
 }) {
   const [showAll, setShowAll] = useState(false);
+  // A file result opens to the whole screen the same way an app or a drawn view does.
+  const {
+    ref: fileStage,
+    expanded: fileExpanded,
+    toggle: toggleFileExpanded
+  } = useExpandedView<HTMLElement>();
   /** Which result the pointer is marking, if any. */
   const [marking, setMarking] = useState<string | null>(null);
   const markToggle = (id: string) =>
@@ -274,11 +280,20 @@ export function TaskOutputs({
           </Suspense>
         )}
         {featured && !isViewArtifact(featured) && (
-          <article className="garden-output-primary">
+          <article
+            className={`garden-output-primary${fileExpanded ? ' expanded' : ''}`}
+            ref={fileStage}
+          >
             <header className="garden-output-header garden-output-bar">
               <FileText size={16} aria-hidden="true" />
               <h2>{featured.name}</h2>
-              <div className="garden-output-actions">{markToggle(featured.id)}</div>
+              <div className="garden-output-actions">
+                {markToggle(featured.id)}
+                <Button onClick={() => void toggleFileExpanded().catch(setError)}>
+                  <Maximize2 size={15} />
+                  {fileExpanded ? 'Exit full screen' : 'Expand'}
+                </Button>
+              </div>
             </header>
             <div className="garden-artifact-view">
               {markable(
@@ -703,7 +718,7 @@ export function TaskProgress({
   return (
     <aside className="garden-progress" aria-label="Recorded progress">
       <header>
-        <span className="eyebrow">The work, as it happens</span>
+        <span className="eyebrow">Plan</span>
         {phases.length > 0 && (
           <button
             className="garden-phase-count"
@@ -766,7 +781,7 @@ export function TaskProgress({
       )}
       <details className="garden-milestone-disclosure" open>
         <summary>
-          Changes & evidence <span>{progress.milestones.length}</span>
+          What it did <span>{progress.milestones.length}</span>
         </summary>
         <ol className="garden-milestones">
           {progress.milestones

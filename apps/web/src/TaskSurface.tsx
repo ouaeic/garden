@@ -54,7 +54,7 @@ import { Button, Dialog, ErrorNotice, Spinner } from './ui';
 import { DecisionCard } from './DecisionQueue';
 import { createQuestionAnswerSender } from './task-actions';
 import { TaskOutputs, TaskProgress } from './TaskCanvas';
-import WorkTrace from './WorkTrace';
+import Sources from './Sources';
 import Thread, { exchangesOf, OwnerLine } from './Thread';
 import { Commentable, withNote } from './result-notes';
 import { currentWork } from './current-work';
@@ -830,28 +830,25 @@ export default function TaskSurface({
                   )}
                 </section>
               )}
-            <SubagentLanes events={events} />
-
+            {/* The plan and what was done, then who helped, then what was read. */}
             {presentation && (
-              <WorkTrace
-                progress={presentation.progress}
-                {...(presentation.surface ? { surface: presentation.surface } : {})}
+              <TaskProgress
+                presentation={{ ...presentation, taskStatus: task.status }}
+                showOutcome={!completionEvent}
+                onPlan={() => setPanel('plan')}
                 onEvidence={(id) => void inspectEvidence(id)}
               />
             )}
-            <div className="garden-task-aside">
-              <Suspense fallback={null}>
-                <CodingMissions taskId={task.id} onOpenTask={onOpenTask} onChange={reload} />
-              </Suspense>
-              {presentation && (
-                <TaskProgress
-                  presentation={{ ...presentation, taskStatus: task.status }}
-                  showOutcome={!completionEvent}
-                  onPlan={() => setPanel('plan')}
-                  onEvidence={(id) => void inspectEvidence(id)}
-                />
-              )}
-            </div>
+            <Suspense fallback={null}>
+              <CodingMissions taskId={task.id} onOpenTask={onOpenTask} onChange={reload} />
+            </Suspense>
+            <SubagentLanes events={events} />
+            {presentation?.surface && (
+              <Sources
+                surface={presentation.surface}
+                onEvidence={(id) => void inspectEvidence(id)}
+              />
+            )}
           </section>
         )}
         {filesOpened && (

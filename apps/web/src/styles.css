@@ -343,19 +343,25 @@ canvas {
 .error span {
   min-width: 0;
 }
+/* Nothing to show is one line, not a room: the watering can says it, the sentence explains it. */
 .empty {
-  text-align: center;
-  padding: 55px 25px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  text-align: left;
+  padding: 10px 14px;
   border: 1px dashed var(--line-strong);
   border-radius: 0;
   color: var(--muted);
 }
 .empty h3 {
+  margin: 0;
+  font-size: 16px;
   color: var(--text);
 }
 .empty p {
-  max-width: 510px;
-  margin: 0 auto;
+  margin: 0;
 }
 .loading {
   display: flex;

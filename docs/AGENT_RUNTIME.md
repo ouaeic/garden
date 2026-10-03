@@ -343,6 +343,14 @@ jobs. Declaring recovery is a safeguard against interruption, not permission to 
 work. [Operations](OPERATIONS.md#what-an-update-stops-and-what-comes-back) describes the update gate
 and the explicit operator override.
 
+## Projects
+
+A project is a folder on the computer, and its conversations work in it: they see the same files,
+and nothing needs publishing or checking out between them. A conversation can instead start on a
+separate copy, for a parallel attempt that must not touch the project's files. Its changes reach
+the project as a checked update through `project_update`, and the project's versions panel opens
+once there is something in it.
+
 ## Recoverable project history
 
 Published version files can be archived from project history after the owner reviews an exact

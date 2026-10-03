@@ -37,13 +37,6 @@
 .garden-preview-live > .garden-preview-state {
   border-top: 1px solid currentColor;
 }
-.garden-recorded-actions > div {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.5rem 0;
-}
 .garden-surface-sources ul {
   padding: 0;
   list-style: none;
