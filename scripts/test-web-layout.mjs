@@ -738,6 +738,8 @@ try {
   const context = await browser.newContext({
     locale: 'en-US',
     viewport: { width: 1440, height: 1000 },
+    // A display's pixel density decides the screen's dot matrix; 2 is a laptop's own display.
+    deviceScaleFactor: Number(process.env.GARDEN_UI_SCALE ?? 1),
     reducedMotion: 'reduce'
   });
   await context.route('**/*', async (route) => {

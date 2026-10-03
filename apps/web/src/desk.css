@@ -28,30 +28,18 @@ body:has(.desk-shell),
   gap: 4px;
   align-items: center;
 }
-.desk-navigation .button {
-  font-size: 16px;
-  color: var(--muted);
-}
-.desk-navigation .button[aria-expanded='true'] {
-  color: var(--text);
-  background: var(--raised-fill);
-}
+
 .desk-shell .garden-masthead-end {
   gap: 5px;
 }
-.desk-shell .global-search > span,
-.desk-shell .global-search kbd {
-  display: none;
-}
+
 .garden-shell.desk-shell .garden-main {
   padding: 0;
   border-radius: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background:
-    var(--lcd-texture), radial-gradient(ellipse at 60% 0%, var(--canvas-glow), transparent 65%),
-    var(--bg);
+  background: radial-gradient(ellipse at 60% 0%, var(--canvas-glow), transparent 65%), var(--bg);
 }
 .desk-shell .garden-main > .error {
   max-height: 25%;
@@ -63,7 +51,7 @@ body:has(.desk-shell),
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 0;
   box-shadow: var(--surface-shadow);
@@ -333,7 +321,7 @@ body:has(.desk-shell),
   color: var(--muted);
 }
 .desk-shell .project-view-nav .button[aria-current] {
-  background: var(--lcd-texture-inverse), var(--paper);
+  background: var(--paper);
   color: var(--ink);
   --muted: var(--ink);
   --dim: var(--ink);
@@ -371,7 +359,7 @@ body:has(.desk-shell),
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 0;
 }
@@ -444,7 +432,7 @@ body:has(.desk-shell),
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 0;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   box-shadow: var(--surface-shadow);
   overflow: auto;
   overscroll-behavior: contain;
@@ -509,7 +497,7 @@ body:has(.desk-shell),
   z-index: 2;
   margin: 0 -16px;
   padding: 10px 16px;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   border-bottom: 1px solid transparent;
 }
 .garden-history[open] > summary {
@@ -566,7 +554,7 @@ body:has(.desk-shell),
   background: transparent;
 }
 .desk-output-sections .button[aria-pressed='true'] {
-  background: var(--lcd-texture-inverse), var(--paper);
+  background: var(--paper);
   color: var(--ink);
   --muted: var(--ink);
   --dim: var(--ink);
@@ -744,7 +732,7 @@ body:has(.desk-shell),
   padding: 11px 14px;
   font-size: 16px;
   justify-content: flex-start;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
 }
 .desk-conversation-history {
   display: grid;
@@ -801,7 +789,7 @@ body:has(.desk-shell),
   display: flex;
   flex-direction: column;
   flex: 1;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 0;
   padding: 12px 18px;
@@ -878,7 +866,7 @@ body:has(.desk-shell),
   scrollbar-width: thin;
   padding: 20px;
   border: 1px solid var(--line);
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   border-radius: 0;
 }
 .desk-sheet-attention > .dialog-body > section,
@@ -891,7 +879,7 @@ body:has(.desk-shell),
   scrollbar-width: thin;
   margin: 20px 26px;
   padding: 20px;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 0;
 }
@@ -907,13 +895,7 @@ body:has(.desk-shell),
   .desk-navigation {
     gap: 0;
   }
-  .desk-navigation .button span {
-    display: none;
-  }
-  .desk-shell .garden-masthead .garden-stats-trigger {
-    font-size: 0;
-    gap: 0;
-  }
+
   .desk-shell .garden-health,
   .desk-shell .garden-masthead-end {
     margin-left: 0;
@@ -921,9 +903,7 @@ body:has(.desk-shell),
   .desk-shell .garden-health {
     margin-left: auto;
   }
-  .desk-shell .garden-masthead .global-search {
-    margin-right: 0;
-  }
+
   .desk-shell .garden-masthead .button {
     min-width: 32px;
     min-height: 36px;
@@ -1106,7 +1086,7 @@ html[data-workspace-short='true'] .desk-shell .management-heading p {
   border-radius: 0;
   overflow: hidden;
   border-color: var(--line-strong);
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   box-shadow: var(--surface-shadow);
 }
 .desk-shell .desk-sheet-projects[open] {
@@ -1217,7 +1197,7 @@ html[data-workspace-short='true'] .desk-shell .management-heading p {
   flex-wrap: wrap;
   gap: 6px 12px;
   border-bottom: 1px solid var(--line);
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
   padding: 6px 0;
 }
 .update-notice > span {

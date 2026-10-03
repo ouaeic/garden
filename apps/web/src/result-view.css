@@ -2,7 +2,7 @@
   display: grid;
   gap: 0;
   border: 1px solid var(--line-strong);
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
 }
 .result-view.expanded {
   position: fixed;
@@ -41,6 +41,8 @@
 .comment-surface {
   position: relative;
 }
+/* Pins, the pen and the comment form are garden's own marks over what the owner was given, so
+   they sit in front of delivered content, which itself sits in front of the screen's glass. */
 .comment-content {
   display: contents;
 }
@@ -51,7 +53,7 @@
 /* A pin hangs from its bottom-left corner, which sits on what it is about. */
 .comment-pin {
   position: absolute;
-  z-index: 4;
+  z-index: 43;
   transform: translate(-1px, -100%);
   min-width: 18px;
   height: 18px;
@@ -78,7 +80,7 @@
 .comment-catch {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  z-index: 42;
   width: 100%;
   border: 0;
   padding: 0;
@@ -90,19 +92,19 @@
 }
 .note-offer {
   position: absolute;
-  z-index: 5;
+  z-index: 44;
   gap: 4px;
   box-shadow: var(--surface-shadow);
 }
 .note-popover {
   position: absolute;
-  z-index: 6;
+  z-index: 45;
   display: grid;
   gap: 8px;
   width: min(280px, 90vw);
   padding: 8px;
   border: 1px solid var(--text);
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
   box-shadow: var(--surface-shadow);
   pointer-events: auto;
 }

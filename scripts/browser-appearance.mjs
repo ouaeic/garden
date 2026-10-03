@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { checkInterfaceTexture, checkOutputAppearance } from './browser-output-appearance.mjs';
+import { checkScreenGlass, checkOutputAppearance } from './browser-output-appearance.mjs';
 
 export async function checkAppearance({ context, origin, bootstrap, project, task, report }) {
   const page = await context.newPage();
@@ -151,14 +151,17 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     assert((await navigation.count()) > 0, 'Exercise primary navigation interaction states');
     for (const button of await navigation.all()) {
       await button.hover();
-      await checkInterfaceTexture(page);
-      // Navigation sits on the case, not the screen: lit when hovered, with no matrix of its own.
-      const hovered = await button.evaluate((element) => {
-        const style = getComputedStyle(element);
-        return { image: style.backgroundImage, color: style.backgroundColor };
-      });
-      assert.equal(hovered.image, 'none', 'Hovered navigation is a case control');
-      assert.notEqual(hovered.color, 'rgba(0, 0, 0, 0)', 'Hovered navigation lights up');
+      await checkScreenGlass(page);
+      // Navigation is a key on the case: printed, not drawn, and brighter under the pointer.
+      const key = await button.evaluate((element) => ({
+        printed: getComputedStyle(element).fontFamily,
+        icons: element.querySelectorAll('svg').length,
+        ink: getComputedStyle(element).color,
+        bezel: getComputedStyle(document.documentElement).getPropertyValue('--bezel-ink')
+      }));
+      assert.doesNotMatch(key.printed, /Pixel Operator/, 'A key on the case has no pixels');
+      assert.equal(key.icons, 0, 'A key on the case carries no screen icon');
+      assert.notEqual(key.ink, 'rgba(0, 0, 0, 0)');
     }
     const heading = page.locator('.home-projects .desk-card-heading h2');
     await heading.evaluate((element) => {
@@ -232,7 +235,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
         composerBefore,
         'Settings must not resize or move the prompt'
       );
-      await checkInterfaceTexture(page);
+      await checkScreenGlass(page);
       await page.screenshot({ path: resolve(report, `prompt-settings-${theme}-${width}.png`) });
       await page.keyboard.press('Escape');
     }
@@ -273,7 +276,8 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
             contrast: contrast(root.color, root.backgroundColor),
             secondaryContrast: contrast(muted, root.backgroundColor),
             overlayContent: getComputedStyle(document.body, '::after').content,
-            texture: getComputedStyle(document.querySelector('.desk-card')).backgroundImage
+            texture: getComputedStyle(document.querySelector('.garden-main'), '::after')
+              .backgroundImage
           };
         })
       );
@@ -297,11 +301,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
         'none',
         'Screen texture must not overlay delivered content'
       );
-      assert.match(
-        colors.texture,
-        /repeating-linear-gradient/,
-        'Garden cards retain the LCD matrix'
-      );
+      assert.match(colors.texture, /^url\("data:image\/png/, 'The screen carries the LCD matrix');
     }
     console.log('LCD contrast:', palette);
   }
@@ -317,7 +317,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     );
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: width > 760 ? 1000 : 844 });
-      await checkInterfaceTexture(page);
+      await checkScreenGlass(page);
       await page.screenshot({ path: resolve(report, `settings-${theme}-${width}.png`) });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
     }
@@ -350,7 +350,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
     assert.equal(chrome.logo, chrome.lit, 'The wordmark is printed in the warm screen’s lit shade');
     for (const width of [1440, 390, 320]) {
       await page.setViewportSize({ width, height: width > 760 ? 1000 : 844 });
-      await checkInterfaceTexture(page);
+      await checkScreenGlass(page);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
       await page.screenshot({ path: resolve(report, `settings-amber-${theme}-${width}.png`) });
     }
@@ -372,7 +372,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
       });
       await page.getByRole('button', { name: 'Prompt settings', exact: true }).click();
       await page.getByRole('dialog', { name: 'Prompt settings', exact: true }).waitFor();
-      await checkInterfaceTexture(page);
+      await checkScreenGlass(page);
       await page.screenshot({
         path: resolve(report, `conversation-settings-${theme}-${width}.png`)
       });

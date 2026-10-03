@@ -118,7 +118,6 @@ html select:not([multiple]) {
     linear-gradient(var(--text), var(--text)) right 16px top calc(50% - 2px) / 10px 2px no-repeat,
     linear-gradient(var(--text), var(--text)) right 18px top 50% / 6px 2px no-repeat,
     linear-gradient(var(--text), var(--text)) right 20px top calc(50% + 2px) / 2px 2px no-repeat,
-    var(--lcd-texture),
     var(--bg);
 }
 select option {
@@ -137,12 +136,12 @@ input[type='range'] {
 input[type='range']::-webkit-slider-runnable-track {
   height: 8px;
   border: 1px solid var(--text);
-  background: var(--lcd-texture), var(--dither), var(--bg);
+  background: var(--dither), var(--bg);
 }
 input[type='range']::-moz-range-track {
   height: 8px;
   border: 1px solid var(--text);
-  background: var(--lcd-texture), var(--dither), var(--bg);
+  background: var(--dither), var(--bg);
 }
 input[type='range']::-webkit-slider-thumb {
   appearance: none;
@@ -151,7 +150,7 @@ input[type='range']::-webkit-slider-thumb {
   margin-top: -7px;
   border: 2px solid var(--text);
   border-radius: 0;
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
   box-shadow:
     inset 0 0 0 2px var(--bg),
     inset 0 0 0 6px var(--text);
@@ -169,10 +168,10 @@ progress {
   appearance: none;
   height: 12px;
   border: 1px solid var(--text);
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
 }
 progress::-webkit-progress-bar {
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
 }
 progress::-webkit-progress-value {
   background: repeating-linear-gradient(90deg, var(--text) 0 6px, transparent 6px 8px);
@@ -233,7 +232,7 @@ progress::-moz-progress-bar {
   width: 8px;
   height: 8px;
   border: 1px solid var(--text);
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
 }
 .power-lamp.is-live > i {
   background: var(--text);

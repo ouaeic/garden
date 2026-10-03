@@ -19,7 +19,7 @@
   padding: 0 24px;
   padding-top: env(safe-area-inset-top, 0px);
   border-bottom: 1px solid var(--line);
-  background: var(--lcd-texture), var(--chrome);
+  background: var(--chrome);
   z-index: 20;
 }
 .garden-masthead .button {
@@ -71,12 +71,7 @@
 .garden-masthead-end > .button {
   position: relative;
 }
-.garden-masthead-end .global-search {
-  margin-right: 12px;
-  gap: 10px;
-  color: var(--muted);
-  font-size: 16px;
-}
+
 .garden-project-title {
   display: block;
   min-width: 0;
@@ -109,7 +104,7 @@
   min-height: 0;
   overflow-y: auto;
   padding: 32px clamp(22px, 3vw, 48px);
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
   border-radius: 0;
   scroll-padding-bottom: 24px;
   scrollbar-width: thin;
@@ -189,7 +184,7 @@
 .garden-working-note {
   padding: 26px 28px;
   border-radius: 0;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   border: 1px solid var(--line);
 }
 .garden-working-note h2 {
@@ -231,14 +226,14 @@
   overflow-y: auto;
   padding: 12px clamp(22px, 3vw, 44px) calc(14px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--line);
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
 }
 .garden-task-composer .intent-editor {
   margin: 0;
   padding: 12px 15px 8px;
   border: 1px solid var(--line-strong);
   border-radius: 0;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   box-shadow: var(--surface-shadow);
 }
 .garden-task-composer .intent-editor > textarea {
@@ -270,7 +265,7 @@
   min-width: 0;
   border: 1px solid var(--line);
   border-radius: 0;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   overflow: hidden;
 }
 .garden-output-header {
@@ -475,7 +470,7 @@
   width: 4px;
   height: 4px;
   border-radius: 0;
-  background: var(--lcd-texture-inverse), var(--line-strong);
+  background: var(--line-strong);
 }
 /* A risk is not decoration on a finished run; it is the reason to read the card. The palette
    carries no accent by design, so the emphasis is weight and contrast rather than a colour. */
@@ -484,7 +479,7 @@
   font-weight: 500;
 }
 .garden-outcome-risks > li:before {
-  background: var(--lcd-texture-inverse), var(--text);
+  background: var(--text);
 }
 .garden-phases {
   list-style: none;
@@ -499,7 +494,7 @@
   content: '';
   position: absolute;
   width: 1px;
-  background: var(--lcd-texture-inverse), var(--line-strong);
+  background: var(--line-strong);
   top: 25px;
   bottom: 0;
   left: 11px;
@@ -679,10 +674,7 @@
   .garden-shell {
     grid-template-columns: 206px minmax(0, 1fr);
   }
-  .garden-masthead-end .global-search > span,
-  .garden-masthead-end .global-search kbd {
-    display: none;
-  }
+
   .garden-task-layout {
     grid-template-columns: minmax(0, 1fr) 235px;
     gap: 22px;
@@ -737,7 +729,6 @@
   .garden-masthead-end {
     margin-left: 0;
   }
-  .garden-masthead-end .global-search,
   .garden-masthead-end > .button[aria-label^='Switch'] {
     display: none;
   }
@@ -827,7 +818,7 @@
   padding: 10px 12px;
   border: 1px solid var(--line-strong);
   border-radius: 0;
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
   text-align: left;
   font-size: 16px;
 }
@@ -851,7 +842,7 @@
   border: 1px solid var(--line);
   border-radius: 0;
   padding: 22px;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
 }
 .garden-media-job h3 {
   font-size: 24px;
@@ -898,7 +889,7 @@
   z-index: 90;
   width: 100%;
   height: 100dvh;
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
   border-radius: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -912,7 +903,7 @@
 }
 .garden-captured-result {
   margin: 0;
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
 }
 .garden-captured-result img {
   width: 100%;
@@ -927,7 +918,7 @@
   padding: 9px 15px;
   color: var(--dim);
   font-size: 16px;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
 }
 @media (max-width: 760px) {
   .garden-captured-result figcaption {
@@ -983,7 +974,7 @@
   padding: 20px;
   border: 1px solid var(--line);
   border-radius: 0;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
 }
 .garden-planned-outputs svg {
   color: var(--accent);
@@ -1012,7 +1003,7 @@
   display: grid;
   gap: 0.6rem;
   padding: 1rem;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 0;
   min-width: 0;
@@ -1030,7 +1021,7 @@
   font-size: 16px;
   line-height: 1.6;
   padding: 1rem;
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 0;
   tab-size: 2;

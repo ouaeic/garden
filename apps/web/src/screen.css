@@ -1,14 +1,38 @@
 /*
- * The handheld: a dark case with a lit screen set into it. The masthead and the phone bar are
- * the case; everything that changes is on the screen. Loaded after every other stylesheet.
+ * The handheld. A plastic case with keys and lamps on it, and set into the case a reflective LCD
+ * under a dark lens. Everything that changes is on the screen; the case only says what state
+ * things are in and takes presses. Loaded after every other stylesheet.
+ *
+ * The screen follows the panel it imitates. Driven pixels cast a soft shadow a pixel down and to
+ * the right onto the reflector behind them. Between pixels the reflector shows through, so the dot
+ * matrix is pale gaps: invisible on blank glass and plainest on dark ink. The glass sits below the
+ * lens, which shades its top and left edges. The matrix, the shade and the lens's sheen are one
+ * static layer over the screen, drawn once at the display's own pixel size (see `lcd-glass.ts`),
+ * so scrolling costs a blend and no repaint.
  */
 
-/* Ink on an LCD casts a faint shadow onto the reflector, a pixel down and to the right. */
+/* Ink, and its shadow on the reflector. */
 body {
   text-shadow: var(--ink-shadow);
 }
 :is(img, canvas, iframe, video, svg) {
   text-shadow: none;
+}
+.pixel-icon,
+.life-sprite,
+.status-sprite {
+  filter: drop-shadow(var(--ink-drop));
+}
+:where(.garden-main, .dialog)
+  :where(.button, input:not([type='checkbox'], [type='radio'], [type='range']), textarea, select) {
+  box-shadow: var(--ink-drop);
+}
+/* Liquid crystal is slow to settle; a change of state fades rather than snapping. */
+:where(.garden-main, .dialog) :where(button, .button, a, summary) {
+  transition:
+    color 90ms ease-out,
+    background-color 90ms ease-out,
+    border-color 90ms ease-out;
 }
 
 /* Reading surfaces use the crisp face; the pixel face stays on the controls it was drawn for. */
@@ -57,91 +81,256 @@ body:has(.desk-shell) {
 }
 .desk-shell .garden-masthead {
   background: none;
-  /* The seam above the screen; bats hang from it. */
-  border-bottom: 1px solid var(--bezel-edge);
+  border-bottom: 0;
   color: var(--bezel-ink);
   text-shadow: none;
 }
-.desk-shell .garden-masthead :is(.button, .brand, .brand-button, kbd) {
+.desk-shell .garden-masthead :is(.brand, .brand-button) {
   color: var(--bezel-ink);
   text-shadow: none;
 }
 .desk-shell .garden-masthead .garden-wordmark {
   color: var(--bezel-brand);
 }
-.desk-shell .garden-masthead .button {
+.desk-shell .garden-masthead-end,
+.desk-navigation {
+  gap: 2px;
+}
+
+/*
+ * A key: rubber, with its name printed on the case beneath it. Pressed, it sits lower; the key for
+ * the place on screen stays pressed, as a latched key does.
+ */
+.case-key {
+  display: inline-grid;
+  justify-items: center;
+  align-content: center;
+  gap: 5px;
+  min-width: 44px;
+  min-height: 40px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
   background: none;
-  border-color: transparent;
-}
-.desk-shell .garden-masthead .button:hover,
-.desk-shell .desk-navigation .button:is([aria-expanded='true'], [aria-current='page']) {
-  color: var(--bezel-ink);
-  background: color-mix(in srgb, var(--bezel-ink) 12%, transparent);
-  border-color: color-mix(in srgb, var(--bezel-ink) 45%, transparent);
-}
-.desk-shell .desk-navigation .button {
   color: var(--bezel-muted);
+  font: italic 700 10px/1 var(--font-case);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-shadow: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
-.desk-shell .garden-masthead .global-search kbd {
-  border-color: var(--bezel-muted);
+.case-key-cap {
+  width: 34px;
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(var(--key-top), var(--key));
+  box-shadow:
+    0 1px 0 var(--key-shade),
+    0 2px 3px color-mix(in srgb, black 35%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 14%, transparent);
+  transition:
+    transform 60ms ease-out,
+    box-shadow 60ms ease-out;
+}
+.case-key:hover {
+  color: var(--bezel-ink);
+}
+.case-key:active .case-key-cap,
+.case-key:is([aria-current='page'], [aria-expanded='true']) .case-key-cap {
+  transform: translateY(1px);
+  box-shadow:
+    0 0 0 var(--key-shade),
+    inset 0 1px 2px color-mix(in srgb, black 55%, transparent);
+}
+.case-key:is([aria-current='page'], [aria-expanded='true']) {
+  color: var(--bezel-ink);
+}
+.case-key:focus-visible {
+  outline: 2px solid var(--bezel-ink);
+  outline-offset: 0;
+}
+.case-key-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.case-key-hint,
+.case-key-count {
+  font: 600 10px/1 var(--font-case);
+  letter-spacing: 0.04em;
+}
+.case-key-hint {
+  opacity: 0.75;
 }
 
-/* The power lamp: lit while the computer runs, dark while it sleeps. */
-.power-lamp-led {
-  width: 8px;
-  height: 8px;
-  margin-right: 10px;
+/*
+ * A lamp: an LED behind the case, dark until it has something to say. The computer's is lit while
+ * the computer is on and flickers while it works, as a drive light does; it blinks while the
+ * computer starts and fast when it has failed. The alerts lamp is lit while something waits.
+ */
+.case-lamp {
+  --led: var(--lamp);
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--lamp) 25%, var(--bezel-edge));
-  flex: none;
+  background: color-mix(in srgb, var(--led) 22%, var(--bezel-edge));
+  box-shadow: inset 0 1px 1px color-mix(in srgb, black 50%, transparent);
 }
-.power-lamp-led[data-on='true'] {
-  background: var(--lamp);
+.alerts-key .case-lamp {
+  --led: var(--lamp-alert);
+}
+.case-lamp:not([data-lamp='off']) {
+  background: var(--led);
   box-shadow:
-    0 0 6px color-mix(in srgb, var(--lamp) 70%, transparent),
-    0 0 1px var(--lamp);
+    0 0 5px color-mix(in srgb, var(--led) 70%, transparent),
+    0 0 1px var(--led);
+}
+.case-lamp[data-lamp='busy'] {
+  animation: lamp-flicker 1.3s steps(1, end) infinite;
+}
+.case-lamp[data-lamp='starting'] {
+  animation: lamp-blink 1.2s steps(1, end) infinite;
+}
+.case-lamp[data-lamp='fault'] {
+  animation: lamp-blink 0.4s steps(1, end) infinite;
+}
+@keyframes lamp-flicker {
+  0%,
+  31%,
+  47%,
+  78% {
+    opacity: 1;
+  }
+  23%,
+  40%,
+  71%,
+  90% {
+    opacity: 0.35;
+  }
+}
+@keyframes lamp-blink {
+  50% {
+    opacity: 0.2;
+  }
 }
 
-/* The screen, set into the case: recessed, square-cornered, the case rounder at one corner. */
-.desk-shell .garden-main {
-  border-radius: 3px;
-  box-shadow:
-    inset 3px 3px 0 color-mix(in srgb, black 30%, transparent),
-    inset 0 0 28px color-mix(in srgb, black 16%, transparent),
-    0 0 0 1px var(--bezel-edge);
+/* The screen, under its lens. */
+.desk-shell .garden-main,
+.desk-shell .navigation-page[open] {
+  position: relative;
+  box-sizing: border-box;
+  border: 6px solid var(--lens);
+  border-radius: 4px 4px 22px 4px;
+  box-shadow: 0 0 0 1px var(--bezel-edge);
 }
-@media (min-width: 701px) {
-  .garden-shell.desk-shell {
-    border-bottom-right-radius: 44px;
-  }
-  .desk-shell .garden-main {
-    border-bottom-right-radius: 3px 3px;
-  }
+/* A page sheet sits in the screen's place; a floating sheet's offsets do not apply to it. */
+.desk-shell .navigation-page[open]:not(.project-panel) {
+  inset: auto;
+}
+.desk-shell .garden-main::after,
+.desk-shell .navigation-page[open]::after,
+.dialog[open]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    var(--lcd-grid),
+    /* The lens shades the top of the panel most, and light pools towards the bottom. */
+    linear-gradient(
+        to bottom,
+        color-mix(in srgb, black 14%, transparent),
+        transparent 9%,
+        transparent 70%,
+        color-mix(in srgb, #fff3c0 5%, transparent)
+      ),
+    radial-gradient(
+      ellipse 120% 100% at 50% 45%,
+      transparent 60%,
+      color-mix(in srgb, black 10%, transparent)
+    );
+  image-rendering: pixelated;
+  box-shadow:
+    inset 0 8px 10px -6px color-mix(in srgb, black 40%, transparent),
+    inset 6px 0 8px -6px color-mix(in srgb, black 30%, transparent),
+    inset -1px -1px 0 color-mix(in srgb, white 5%, transparent);
+}
+/* A sheet keeps its glass still by scrolling its body rather than itself. */
+.dialog[open] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dialog[open] > .dialog-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+/*
+ * What the owner was given rather than what garden draws - an app, a page, a photograph, a
+ * document - is shown as it is, in front of the glass.
+ */
+:is(
+  .result-view-frame,
+  .garden-preview-frame,
+  .computer-preview,
+  .computer-result-image,
+  .computer-result-media,
+  .garden-captured-result img,
+  .pdf-page canvas,
+  .markdown img
+) {
+  position: relative;
+  z-index: 41;
 }
 
-/* On a phone the bar below the screen is part of the case too. */
 @media (max-width: 700px) {
   .garden-shell.desk-shell {
     padding: 0 6px;
   }
+  .desk-shell .garden-main,
+  .desk-shell .navigation-page[open] {
+    border-width: 4px;
+    border-radius: 3px 3px 14px 3px;
+  }
+  .desk-shell .garden-masthead .masthead-bell {
+    display: none;
+  }
+  .case-key-hint {
+    display: none;
+  }
   .desk-shell .phone-bar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     background: var(--bezel);
-    /* The seam where the screen meets the case; creatures still walk along it. */
-    border-top: 1px solid var(--bezel-edge);
-    color: var(--bezel-muted);
+    border-top: 0;
     text-shadow: none;
   }
-  .desk-shell .phone-bar button {
-    color: var(--bezel-muted);
+  .phone-bar .case-key {
+    min-height: 52px;
   }
-  .desk-shell .phone-bar button[aria-current='page'] {
-    color: var(--bezel-ink);
-    background: color-mix(in srgb, var(--bezel-ink) 12%, transparent);
+  .phone-bar .case-key-cap {
+    width: 38px;
+    height: 10px;
   }
 }
 
 @media (prefers-contrast: more), (forced-colors: active), print {
   body {
     text-shadow: none;
+  }
+  .desk-shell .garden-main::after,
+  .desk-shell .navigation-page[open]::after,
+  .dialog[open]::after {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .case-lamp {
+    animation: none !important;
   }
 }

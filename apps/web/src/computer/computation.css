@@ -38,7 +38,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.25rem 0.75rem;
   padding: 0.6rem;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 0;
 }

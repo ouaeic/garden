@@ -45,7 +45,7 @@
 .project-conversation-tabs button[aria-current],
 .project-open[aria-current],
 .project-conversation-links button[aria-current] {
-  background: var(--lcd-texture-inverse), var(--paper);
+  background: var(--paper);
   border-color: var(--line);
   color: var(--ink);
   --muted: var(--ink);
@@ -104,7 +104,7 @@
   border-radius: 0;
   padding: 1.45rem;
   min-width: 0;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   box-shadow: var(--surface-shadow);
 }
 .project-conversation-grid > button {

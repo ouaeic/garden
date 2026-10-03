@@ -7,22 +7,23 @@ import { setLifeMode } from './life/settings';
 import { recoverDeviceDrafts, forgetDraftKey } from './draft-storage';
 import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ArrowUpRight, Bell, Cog, House, Monitor, Sparkles, Plus, Search } from './icons';
+import { ArrowUpRight, Sparkles, Plus, Search } from './icons';
 import type { Task, Workspace, Project, ConversationSource } from '@garden/contracts';
 import { get, ApiError, post, isNativeClient } from './client';
 import type { NativeStatus } from './native';
 import { createTaskNotifier } from './native-notices';
 import { subscribeWorkerNavigation } from './worker-navigation';
 import Brand from './Brand';
-import { Sprite } from './life/Sprite';
-import { bellBird } from './life/growth';
+import { CaseKey, type Lamp } from './CaseKey';
+import { paintGlass, watchGlass } from './lcd-glass';
+import { isMac } from './Keys';
 import Stats from './Stats';
 import './living-interface.css';
 import { fileNavigationBlocked } from './file-navigation';
 import { initialComputerTool, initialNavigation } from './navigation';
 import type { View } from './navigation';
 import type { Bootstrap, Decision, Draft } from './model';
-import { needsAttention, shortDate, taskStatusLabel, mergeTaskRefresh } from './model';
+import { isWorking, needsAttention, shortDate, taskStatusLabel, mergeTaskRefresh } from './model';
 import { Button, Dialog, Empty, ErrorNotice, Spinner } from './ui';
 import DecisionQueue from './DecisionQueue';
 import ProjectCollection from './ProjectCollection';
@@ -71,6 +72,19 @@ class Boundary extends Component<{ children: ReactNode }, { error: Error | null 
     );
   }
 }
+/** The computer key's lamp: whether the computer is on, and whether it is working. */
+const lampFor = (workspace: Workspace | null, working: boolean): { lamp: Lamp; title: string } => {
+  const status = workspace?.status;
+  if (status === 'running')
+    return working
+      ? { lamp: 'busy', title: 'Computer on · working' }
+      : { lamp: 'on', title: 'Computer on' };
+  if (status === 'provisioning' || status === 'resizing')
+    return { lamp: 'starting', title: `Computer ${status}` };
+  if (status === 'failed') return { lamp: 'fault', title: 'Computer needs a look' };
+  return { lamp: 'off', title: status === 'hibernated' ? 'Computer asleep' : 'Computer off' };
+};
+
 /** The browser's own bar continues the case the screen sits in. */
 const caseColour = () =>
   getComputedStyle(document.documentElement).getPropertyValue('--bezel').trim();
@@ -262,9 +276,11 @@ function WorkspaceApp() {
     }, 15000);
     return () => clearInterval(timer);
   }, [Boolean(bootstrap), authRequired, refresh, refreshDecisions]);
+  useEffect(watchGlass, []);
   useEffect(() => {
     if (palette === 'field') delete document.documentElement.dataset.palette;
     else document.documentElement.dataset.palette = palette;
+    paintGlass();
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', caseColour());
     try {
       localStorage.setItem('garden-palette', palette);
@@ -275,6 +291,7 @@ function WorkspaceApp() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
+    paintGlass();
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', caseColour());
     try {
       localStorage.setItem('garden-theme', theme);
@@ -549,6 +566,7 @@ function WorkspaceApp() {
     ...decisions.map((decision) => decision.taskId),
     ...attentionTasks.map((item) => item.id)
   ]).size;
+  const computerLamp = lampFor(workspace, bootstrap.tasks.some(isWorking));
   return (
     <div
       className={`garden-shell desk-shell ${task && baseView === 'work' ? 'task-open' : ''} ${activeProjectId && baseView === 'work' ? 'has-project' : ''}`}
@@ -557,12 +575,6 @@ function WorkspaceApp() {
         Skip to work
       </a>
       <header className="garden-masthead">
-        <i
-          className="power-lamp-led"
-          data-on={workspace?.status === 'running' ? 'true' : 'false'}
-          title={workspace ? `${workspace.name} · ${workspace.status}` : undefined}
-          aria-hidden="true"
-        />
         <button
           className="brand-button"
           onClick={() => navigate('work')}
@@ -571,63 +583,50 @@ function WorkspaceApp() {
           <Brand alive />
         </button>
         <nav className="desk-navigation" aria-label="Workspace navigation">
-          {(
-            [
-              ['work', 'Home', House],
-              ['computer', 'Computer', Monitor]
-            ] as const
-          ).map(([view, label, Icon]) => (
-            <Button
-              key={view}
-              aria-label={label}
-              aria-current={
-                (view === 'work' ? baseView === 'work' && !activeProjectId : baseView === view)
-                  ? 'page'
-                  : undefined
-              }
-              onClick={() => navigate(view)}
-            >
-              <Icon size={17} />
-              <span>{label}</span>
-            </Button>
-          ))}
+          <CaseKey
+            label="Home"
+            aria-label="Home"
+            aria-current={baseView === 'work' && !activeProjectId ? 'page' : undefined}
+            onClick={() => navigate('work')}
+          />
+          <CaseKey
+            label="Computer"
+            aria-label="Computer"
+            title={computerLamp.title}
+            lamp={computerLamp.lamp}
+            aria-current={baseView === 'computer' ? 'page' : undefined}
+            onClick={() => navigate('computer')}
+          />
         </nav>
         <div className="garden-masthead-end">
-          <Button
+          <CaseKey
             className="global-search"
-            onClick={() => setSearchOpen(true)}
+            label="Find"
+            hint={isMac() ? '⌘K' : 'Ctrl K'}
             aria-label="Find anything"
-          >
-            <Search size={17} />
-            <span>Find</span>
-            <Keys keys={['mod', 'K']} />
-          </Button>
+            onClick={() => setSearchOpen(true)}
+          />
           <Stats
             bootstrap={bootstrap}
             workspace={workspace}
             onComputer={() => navigate('computer')}
           />
-          <Button
-            className={`masthead-bell ${navigation.view === 'attention' ? 'selected' : ''}`}
-            data-perch-bell
-            onClick={() => navigate('attention')}
+          <CaseKey
+            className="masthead-bell alerts-key"
+            label="Alerts"
+            lamp={attentionCount > 0 ? 'on' : 'off'}
+            count={attentionCount}
             aria-label={`${attentionCount} work items need attention`}
-          >
-            {attentionCount > 0 ? (
-              <Sprite frames={bellBird} fps={0.6} className="bell-bird" />
-            ) : (
-              <Bell size={18} />
-            )}
-            {attentionCount > 0 && <span className="notification-count">{attentionCount}</span>}
-          </Button>
-          <Button
+            aria-current={navigation.view === 'attention' ? 'page' : undefined}
+            onClick={() => navigate('attention')}
+          />
+          <CaseKey
+            label="Settings"
             aria-label="Settings"
             aria-haspopup={phone ? undefined : 'dialog'}
             aria-expanded={navigation.view === 'settings'}
             onClick={() => navigate('settings')}
-          >
-            <Cog size={18} />
-          </Button>
+          />
         </div>
       </header>
       <div className="shell-notices">
@@ -834,14 +833,14 @@ function WorkspaceApp() {
       <nav className="phone-bar" aria-label="Sections">
         {(
           [
-            ['work', 'Home', House],
-            ['attention', 'Needs you', Bell],
-            ['computer', 'Computer', Monitor]
+            ['work', 'Home'],
+            ['attention', 'Needs you'],
+            ['computer', 'Computer']
           ] as const
-        ).map(([view, label, Icon]) => (
-          <button
-            type="button"
+        ).map(([view, label]) => (
+          <CaseKey
             key={view}
+            label={label}
             aria-label={label}
             aria-current={
               (
@@ -852,15 +851,17 @@ function WorkspaceApp() {
                 ? 'page'
                 : undefined
             }
+            {...(view === 'attention'
+              ? {
+                  className: 'alerts-key',
+                  lamp: attentionCount > 0 ? 'on' : 'off',
+                  count: attentionCount
+                }
+              : view === 'computer'
+                ? { lamp: computerLamp.lamp, title: computerLamp.title }
+                : {})}
             onClick={() => navigate(view)}
-            {...(view === 'attention' ? { 'data-perch-bell': true } : {})}
-          >
-            <Icon size={20} />
-            <span>{label}</span>
-            {view === 'attention' && attentionCount > 0 && (
-              <span className="notification-count">{attentionCount}</span>
-            )}
-          </button>
+          />
         ))}
       </nav>
       <Suspense fallback={null}>

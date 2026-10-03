@@ -13,51 +13,22 @@
   gap: 0;
   align-items: flex-end;
 }
-.desk-navigation .button {
-  gap: 8px;
-  color: var(--muted);
-}
-.desk-navigation .button:is([aria-expanded='true'], [aria-current='page']) {
-  color: var(--text);
-  border-color: var(--text);
-  background: var(--raised-fill);
-}
+
 .desk-shell .garden-masthead-end {
   margin-left: auto;
   display: flex;
   align-items: center;
   gap: 4px;
 }
-.desk-shell .garden-masthead .global-search > span {
-  display: inline;
-}
-.desk-shell .garden-masthead .global-search kbd {
-  display: inline-flex;
-  height: 20px;
-  margin-left: 8px;
-  padding: 0 4px;
-  border: 1px solid var(--tint);
-}
+
 .desk-shell .garden-health {
   margin-left: 0;
 }
-.masthead-bell {
-  position: relative;
-}
+
 .phone-bar {
   display: none;
 }
-@media (max-width: 1180px) {
-  .desk-shell .garden-masthead .global-search > span,
-  .desk-shell .garden-masthead .global-search kbd {
-    display: none;
-  }
-}
-@media (max-width: 1000px) {
-  .desk-navigation .button span {
-    display: none;
-  }
-}
+
 @media (max-width: 700px) {
   .garden-shell.desk-shell {
     --desk-bar-height: calc(44px + env(safe-area-inset-top, 0px));
@@ -67,8 +38,7 @@
   .desk-shell .garden-masthead .brand {
     font-size: 24px;
   }
-  .desk-navigation,
-  .desk-shell .masthead-bell {
+  .desk-navigation {
     display: none;
   }
   .phone-bar {
@@ -77,52 +47,22 @@
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     border-top: 2px solid var(--text);
-    background: var(--lcd-texture), var(--bg);
+    background: var(--bg);
     padding-bottom: env(safe-area-inset-bottom, 0px);
     z-index: 20;
   }
-  .phone-bar > button {
-    position: relative;
-    display: grid;
-    justify-items: center;
-    gap: 2px;
-    min-height: 52px;
-    padding: 6px 2px 4px;
-    border: 0;
-    background: transparent;
-    color: var(--muted);
-    font-size: 16px;
-    line-height: 1;
-  }
-  .phone-bar > button > span:not(.notification-count) {
-    white-space: nowrap;
-  }
-  .phone-bar > button[aria-current='page'] {
-    color: var(--ink);
-    background: var(--lcd-texture-inverse), var(--paper);
-  }
-  .phone-bar .notification-count {
-    top: 4px;
-    left: calc(50% + 6px);
-    right: auto;
-  }
+
   .desk-shell .garden-health {
     display: block;
   }
-  .desk-shell .garden-stats-trigger > span {
-    display: none;
-  }
+
   .desk-shell .garden-health-popover {
     top: var(--desk-bar-height);
     max-height: calc(var(--garden-viewport-height, 100dvh) - var(--desk-bar-height) - 64px);
     overflow-y: auto;
     z-index: 40;
   }
-  .garden-stats-trigger {
-    touch-action: manipulation;
-    user-select: none;
-    -webkit-touch-callout: none;
-  }
+
   .desk-shell > .garden-main[hidden] {
     display: none;
   }
@@ -175,18 +115,6 @@
   .garden-shell.desk-shell {
     --phone-bar-height: calc(44px + env(safe-area-inset-bottom, 0px));
   }
-  .phone-bar > button {
-    min-height: 44px;
-    align-content: center;
-  }
-  .phone-bar > button > span:not(.notification-count) {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
 }
 
 /* Palette swatches in Settings: four blocks per screen, painted in that screen's shades. */
@@ -213,7 +141,7 @@
 .palette-swatch > i {
   width: 16px;
   height: 16px;
-  background: var(--lcd-texture), transparent;
+  background: transparent;
 }
 [data-palette-swatch='field'] .palette-swatch > i:nth-child(1) {
   background-color: #b7c58b;

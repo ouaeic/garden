@@ -57,7 +57,7 @@
   padding: 16px 18px;
   border: 1px solid var(--line);
   border-radius: 0;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   overflow-wrap: anywhere;
   font-size: 16px;
 }
@@ -95,7 +95,7 @@
   padding: 18px 20px;
   border-bottom: 1px solid var(--line);
   color: var(--text);
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
 }
 .work-summary-visual > header {
   display: flex;
@@ -137,17 +137,16 @@
   border: 1px solid var(--text);
 }
 .work-summary-visual [data-state='completed'] {
-  background: var(--lcd-texture-inverse), var(--text);
+  background: var(--text);
 }
 .work-summary-visual [data-state='in_progress'] {
-  background: var(--lcd-texture-inverse), var(--muted);
+  background: var(--muted);
 }
 .work-summary-visual [data-state='pending'] {
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
 }
 .work-summary-visual [data-state='skipped'] {
-  background:
-    var(--lcd-texture), repeating-linear-gradient(135deg, var(--text) 0 1px, var(--bg) 1px 4px);
+  background: repeating-linear-gradient(135deg, var(--text) 0 1px, var(--bg) 1px 4px);
 }
 .work-summary-legend {
   display: flex;
@@ -188,7 +187,7 @@
 .work-summary-bar i {
   display: block;
   height: 8px;
-  background: var(--lcd-texture-inverse), var(--text);
+  background: var(--text);
 }
 .summary-image-link {
   display: inline-block;

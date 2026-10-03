@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as art from './sprites';
-import { bellBird, growth } from './growth';
+import { growth } from './growth';
 import type { Frames } from './growth';
 
 /** Every sprite in the garden, flattened to named frame lists. */
@@ -14,7 +14,7 @@ function catalogue() {
     }
     named.push([name, (typeof value[0] === 'string' ? [value] : value) as Frames]);
   };
-  for (const [name, value] of Object.entries({ ...art, growth, bellBird })) visit(name, value);
+  for (const [name, value] of Object.entries({ ...art, growth })) visit(name, value);
   return named;
 }
 

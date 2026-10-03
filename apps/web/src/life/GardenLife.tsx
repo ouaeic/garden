@@ -18,9 +18,9 @@ import { lifeMode, onLifeModeChange, type LifeMode } from './settings';
 import './life.css';
 
 /**
- * A border a creature is tucked behind. `below` shows it only under the line (the masthead's lower
- * edge, which it hangs from); `above` shows it only over the line (a card's top edge, which it peeks
- * over). Crossing back past the line is how it leaves.
+ * A border a creature is tucked behind. `below` shows it only under the line (the top of the
+ * screen, which it hangs from); `above` shows it only over the line (a card's top edge, which it
+ * peeks over). Crossing back past the line is how it leaves.
  */
 type Clip = { side: 'below' | 'above'; line: number };
 
@@ -85,8 +85,49 @@ function visible(element: Element | null, edge: 'top' | 'bottom' = 'top'): Ledge
   return { left, top, right, bottom, width, element };
 }
 
+/**
+ * The screen creatures live on: the work area, or on a phone the page that has replaced it. They
+ * are pixels of it, so nothing of them is drawn on the case around it.
+ */
+function screen(): Element | null {
+  return (
+    document.querySelector('.desk-shell .navigation-page[open]') ??
+    document.querySelector('.desk-shell .garden-main:not([hidden])')
+  );
+}
+
+/** The inside of the screen, within its lens. */
+function glass(element: Element | null = screen()) {
+  if (!element) return null;
+  const box = element.getBoundingClientRect();
+  const style = getComputedStyle(element);
+  const top = box.top + parseFloat(style.borderTopWidth);
+  const bottom = box.bottom - parseFloat(style.borderBottomWidth);
+  const left = box.left + parseFloat(style.borderLeftWidth);
+  const right = box.right - parseFloat(style.borderRightWidth);
+  return { top, bottom, left, right };
+}
+
+/** The screen's own top or bottom edge, as a line to hang from or walk along. */
+function screenEdge(edge: 'top' | 'bottom'): Ledge | null {
+  const element = screen();
+  const inside = glass(element);
+  // A sheet over the screen covers its edges as it covers a card's.
+  if (
+    !element ||
+    !inside ||
+    inside.right - inside.left < 1 ||
+    document.querySelector('dialog:modal')
+  )
+    return null;
+  const y = edge === 'top' ? inside.top : inside.bottom;
+  const { left, right } = inside;
+  return { left, right, top: y, bottom: y, width: right - left, element };
+}
+
 /** A layout box is a perch only where its own border is painted and unobscured. */
 function paintedEdge(element: Element | null, edge: 'top' | 'bottom' = 'top'): Ledge | null {
+  if (element && element === screen()) return screenEdge(edge);
   const box = visible(element, edge);
   if (!element || !box) return null;
   const style = getComputedStyle(element);
@@ -122,19 +163,25 @@ function paintedEdge(element: Element | null, edge: 'top' | 'bottom' = 'top'): L
   return box;
 }
 
-/** Card edges a creature can stand on: wide enough, fully on screen, below the masthead. */
+/** Edges a creature can stand on: card tops and the screen's floor, wide and wholly on screen. */
 function ledges() {
-  const bar = document.querySelector('.garden-masthead')?.getBoundingClientRect().bottom ?? 56;
+  const inside = glass();
+  if (!inside) return [];
   return [
-    ...document.querySelectorAll('[data-perch], .desk-card, .desk-work-card, .panel, .phone-bar')
-  ]
-    .filter((element) => !element.closest('dialog:modal, [role="dialog"], [aria-modal="true"]'))
-    .map((element) => paintedEdge(element))
-    .filter((box): box is Ledge =>
-      Boolean(
-        box && box.top > bar + 20 && box.width > 140 && box.left >= 0 && box.right <= innerWidth
-      )
-    );
+    ...[...document.querySelectorAll('[data-perch], .desk-card, .desk-work-card, .panel')]
+      .filter((element) => !element.closest('dialog:modal, [role="dialog"], [aria-modal="true"]'))
+      .map((element) => paintedEdge(element)),
+    screenEdge('bottom')
+  ].filter((box): box is Ledge =>
+    Boolean(
+      box &&
+      box.top > inside.top + 20 &&
+      box.top <= inside.bottom &&
+      box.width > 140 &&
+      box.left >= inside.left &&
+      box.right <= inside.right
+    )
+  );
 }
 
 /**
@@ -158,9 +205,10 @@ const COOLDOWN = 45_000;
 const CROWD = 2;
 
 /**
- * The creatures that live around the interface. They visit now and then, never while you are
- * typing or reading a dialog, and never where they could take a click: the whole layer ignores
- * the pointer. Every one arrives from beyond the edge of the screen or from behind a border and
+ * The creatures that live on the screen. They visit now and then, never while you are typing or
+ * reading a dialog, and never where they could take a click: the whole layer ignores the pointer,
+ * and it is cut to the screen inside its lens, so nothing of them is ever drawn on the case.
+ * Every one arrives from beyond the edge of the screen or from behind a border and
  * leaves the same way, frightened or not - nothing blinks into or out of existence. They move on
  * the compositor through the Web Animations API, so a leap is a smooth arc at the display's own
  * rate; only their sprite frames step.
@@ -172,6 +220,24 @@ export default function GardenLife() {
   const nextId = useRef(1);
   const lastInput = useRef(0);
   const reduced = useRef(matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const layer = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    let last = '';
+    const cut = () => {
+      const inside = glass();
+      const clip = inside
+        ? `inset(${inside.top}px ${innerWidth - inside.right}px ${innerHeight - inside.bottom}px ${inside.left}px)`
+        : 'inset(50%)';
+      if (clip !== last && layer.current) layer.current.style.clipPath = last = clip;
+    };
+    cut();
+    const timer = setInterval(cut, 400);
+    addEventListener('resize', cut);
+    return () => {
+      clearInterval(timer);
+      removeEventListener('resize', cut);
+    };
+  }, []);
 
   useEffect(() => onLifeModeChange(setMode), []);
   useEffect(() => {
@@ -561,13 +627,13 @@ export default function GardenLife() {
         remove(id);
       },
       async monkeyTour() {
-        const masthead = document.querySelector('.garden-masthead');
-        const bar = paintedEdge(masthead, 'bottom');
+        const top = screen();
+        const bar = screenEdge('top');
         const cards = ledges();
         if (!cards.length) return;
         /*
          * Out from behind one border, a leap or two between card edges, and back behind another -
-         * the masthead's lower edge (it climbs up out of sight) or a card's top edge (it sinks).
+         * the top of the screen (it climbs up out of sight) or a card's top edge (it sinks).
          * Frightened, it takes the nearest of those at once.
          */
         type Spot = { x: number; y: number; hang: boolean; clip: Clip; box?: Ledge };
@@ -587,7 +653,7 @@ export default function GardenLife() {
         const hidden = (spot: Spot) => (spot.hang ? spot.y - 30 : spot.y + 26);
         const start = bar && chance(0.5) ? onBar(bar) : onCard(pick(cards)!);
         const hold = (spot: Spot) =>
-          spot.hang ? anchor(id, masthead, 'bottom') : anchor(id, spot.box?.element);
+          spot.hang ? anchor(id, top, 'top') : anchor(id, spot.box?.element);
         const id = spawn({
           kind: 'monkey',
           frames: start.hang ? monkey.hang : monkey.sit,
@@ -635,7 +701,7 @@ export default function GardenLife() {
           pose(id, { frames: pick([monkey.scratch, monkey.blink, monkey.sit])!, fps: 3 });
           await wait(between(900, 1800), own);
         }
-        const exitBar = paintedEdge(masthead, 'bottom');
+        const exitBar = screenEdge('top');
         const exit = exitBar && chance(0.4) ? onBar(exitBar) : here;
         if (exit !== here) {
           pose(id, { frames: monkey.jump, clip: undefined });
@@ -691,8 +757,8 @@ export default function GardenLife() {
       },
       async batVisit() {
         if (!isNight()) return;
-        const masthead = document.querySelector('.garden-masthead');
-        const bar = paintedEdge(masthead, 'bottom');
+        const top = screen();
+        const bar = screenEdge('top');
         const flit = async (id: number, fromLeft: boolean) => {
           let x = at(id).x;
           for (let leg = 0; leg < 3; leg++) {
@@ -706,7 +772,7 @@ export default function GardenLife() {
           await travel(id, offscreen(!fromLeft), between(40, 160), 900, { arc: 30 });
         };
         if (bar && chance(0.5)) {
-          // Down from behind the masthead to hang by its feet a while, then off into the night.
+          // Down from the top of the screen to hang by its feet a while, then off into the night.
           const line = bar.bottom;
           const x = between(innerWidth * 0.2, innerWidth * 0.8);
           const id = spawn({
@@ -722,7 +788,7 @@ export default function GardenLife() {
             pose(id, { clip: { side: 'below', line }, frames: batHanging }, true);
             await travel(id, x, line - 16, 260, { easing: 'ease-in', force: true });
           });
-          anchor(id, masthead, 'bottom');
+          anchor(id, top, 'top');
           await travel(id, x, line - 1, 900, { easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)' });
           await wait(between(4000, 9000), own);
           pose(id, { frames: bat, fps: 10, clip: undefined });
@@ -1013,7 +1079,7 @@ export default function GardenLife() {
     </div>
   );
   return (
-    <div className="life-layer" aria-hidden="true">
+    <div className="life-layer" ref={layer} aria-hidden="true">
       {/* Keep each moving element mounted while its border clipping changes. */}
       {actors.map((actor) => (
         <div
