@@ -458,3 +458,8 @@ button.computer-file-row:hover {
   background: none;
   box-shadow: none;
 }
+/* On the Computer page the list is the page; it does not scroll inside another scroll. */
+.view-computer .project-processes .scroll-region {
+  max-height: none;
+  overflow: visible;
+}

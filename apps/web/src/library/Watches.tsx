@@ -48,8 +48,8 @@ export function WatchesLibrary({
   return (
     <>
       <Section
-        title="Things in motion"
-        description="Standing instructions that run while you are away."
+        title="Scheduled"
+        description="Work that starts on its own, on a schedule or when something changes."
       >
         <Button disabled={!workspace} onClick={() => setEditing('new')}>
           New automation

@@ -454,7 +454,12 @@ export async function checkDesk({
       await fit();
       if (view === 'computer') {
         await page.locator('.computer-runs').waitFor();
+        await page.getByRole('heading', { name: 'Scheduled', exact: true }).waitFor();
         await page.screenshot({ path: resolve(report, 'desk-computer-runs-1440.png') });
+        await page
+          .getByRole('heading', { name: 'Scheduled', exact: true })
+          .scrollIntoViewIfNeeded();
+        await page.screenshot({ path: resolve(report, 'desk-computer-runs-lower.png') });
       }
     }
     await page.setViewportSize({ width: 320, height: 568 });

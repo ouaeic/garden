@@ -178,56 +178,60 @@ export function Operations({
       )}
       {tool === 'previews' && (
         <>
-          <form
-            className="computer-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void run(async () => {
-                setOpened(
-                  await post<WorkspacePreview>(`${base}/previews`, {
-                    label: name,
-                    port: Number(port),
-                    entryPath: path
-                  })
-                );
-                setName('');
-              });
-            }}
-          >
-            <label>
-              Name
-              <input
-                className="field"
-                required
-                maxLength={80}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="My app"
-              />
-            </label>
-            <label>
-              Port
-              <input
-                className="field"
-                required
-                type="number"
-                min={1024}
-                max={65535}
-                value={port}
-                onChange={(e) => setPort(e.target.value)}
-              />
-            </label>
-            <label>
-              Start path
-              <input className="field" value={path} onChange={(e) => setPath(e.target.value)} />
-            </label>
-            <button className="button primary" disabled={busy}>
-              Create private preview
-            </button>
-          </form>
-          <p className="muted">
-            Start the app on your computer, then open its listening port here.
-          </p>
+          {/* The agent serves apps itself; opening a port by hand is the exception. */}
+          <details className="computer-manual-preview">
+            <summary>Open an app by its port</summary>
+            <form
+              className="computer-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void run(async () => {
+                  setOpened(
+                    await post<WorkspacePreview>(`${base}/previews`, {
+                      label: name,
+                      port: Number(port),
+                      entryPath: path
+                    })
+                  );
+                  setName('');
+                });
+              }}
+            >
+              <label>
+                Name
+                <input
+                  className="field"
+                  required
+                  maxLength={80}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="My app"
+                />
+              </label>
+              <label>
+                Port
+                <input
+                  className="field"
+                  required
+                  type="number"
+                  min={1024}
+                  max={65535}
+                  value={port}
+                  onChange={(e) => setPort(e.target.value)}
+                />
+              </label>
+              <label>
+                Start path
+                <input className="field" value={path} onChange={(e) => setPath(e.target.value)} />
+              </label>
+              <button className="button primary" disabled={busy}>
+                Create private preview
+              </button>
+            </form>
+            <p className="muted">
+              Start the app on your computer, then open its listening port here.
+            </p>
+          </details>
           {previews.length ? (
             previews.map((preview) => (
               <article className="computer-item" key={preview.id}>
