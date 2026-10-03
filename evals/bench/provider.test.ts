@@ -521,7 +521,6 @@ describe('the whole seam, against the real runFixture', () => {
     // The release prefix is stripped and the benchmark's model is what the route is asked for,
     // rather than the fixture's fictional release.
     expect(first.model).toBe('z-ai/glm-5.3-flash');
-    expect(first.tools?.map((tool) => tool.function?.name)).toContain('finish');
     expect(first.tools?.map((tool) => tool.function?.name)).toContain('shell');
     // Roles too, which `ScriptContext` also drops: a window with no system preamble is a different
     // prompt from the one garden priced.

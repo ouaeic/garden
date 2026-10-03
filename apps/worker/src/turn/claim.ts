@@ -154,9 +154,7 @@ export const claimTurn = async (
       : appendMemoryOwnerInput(undefined, prompt.prompt),
     step: 0,
     credits: 0,
-    turnToolResults: {},
-    finishRejections: 0,
-    completionNags: 0
+    turnToolResults: {}
   };
   await applyProjectMainModel(deps, task, state, catalog, key, deps.config.WORKER_ID);
   const model = catalog.find((entry) => entry.id === task.modelId);
@@ -174,6 +172,9 @@ export const claimTurn = async (
   // a task that ran before this field existed pays one indexed row read, once, and then persists.
   const unattended = savedState?.unattended ?? (await deps.startedBySchedule(task, key));
   if (!savedState && unattended) state.memoryOwnerRequest = '';
+  // A scheduled run reaches the owner only through notify, so it starts with that group loaded.
+  if (unattended && !state.enabledToolGroups?.includes('automation'))
+    state.enabledToolGroups = [...(state.enabledToolGroups ?? []), 'automation'];
   /**
    * Where this run's web searches go, decided once and then pinned.
    *

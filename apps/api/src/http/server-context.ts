@@ -1,11 +1,10 @@
 /**
  * The one argument every route group and every maintenance pass takes.
  *
- * `server.ts` was a single eight-thousand-line closure, and every route in it reached straight up
- * into locals `buildServer` had declared. Splitting the file in Wave 6 meant naming that reach:
- * `ApiContext` is what one server decides once (Wave 5), `ServerSupport` is the helpers built on
- * top of it that more than one group needs, and `RouteContext` adds the three things only a request
- * handler wants - the step-up guard, the idempotency wrapper, and the sweep the provider save route
+ * A route group reaches into what its server has built, and that reach is named in three layers:
+ * `ApiContext` is what one server decides once, `ServerSupport` is the helpers built on top of it
+ * that more than one group needs, and `RouteContext` adds the three things only a request handler
+ * wants - the step-up guard, the idempotency wrapper, and the sweep the provider save route
  * runs to clear a wall.
  *
  * Derived from the factories rather than declared beside them, deliberately: a helper that changes

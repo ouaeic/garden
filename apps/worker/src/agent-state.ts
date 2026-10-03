@@ -71,12 +71,6 @@ export interface AgentState {
   toolOutputFloor?: number;
   openedSkills?: string[];
   /**
-   * Whether this turn has already changed something. It gates the fallback plan - a request that
-   * only needs an answer should not arrive with three boilerplate steps already running - and it is
-   * what `completionVerification` checks evidence ordering against.
-   */
-  mutated?: boolean;
-  /**
    * Whether any of those changes was something other than prose. A report, a README or a CSV is a
    * change, but there is nothing executable that could prove it: the only check available is reading
    * back the file just written, which passes whatever the file says. Demanding one anyway is how a
@@ -95,8 +89,6 @@ export interface AgentState {
    * - and whatever prose it carries is a restatement of an answer the owner already has.
    */
   repairStep?: boolean;
-  /** Whether this turn has already been asked, once, to say something to the owner. */
-  answerNagged?: boolean;
   turnToolResults?: Record<
     string,
     {
@@ -151,14 +143,6 @@ export interface AgentState {
    * producing it did.
    */
   memoryReaches?: number;
-  /**
-   * Consecutive rejected `finish` calls this turn. Persisted rather than kept in the loop frame so a
-   * pause, an approval, or a worker handover cannot reset it - otherwise a model that cannot ground
-   * its completion resumes into the same loop and spends the whole step budget on it.
-   */
-  finishRejections?: number;
-  /** A missing output gets one repair hold per turn, including across worker restarts. */
-  deliveryNagged?: boolean;
   /** The owner selection survives checkpoints and is replaced when their next message starts. */
   ownerReasoningEffort?: TaskReasoningEffort;
   /**
@@ -174,8 +158,6 @@ export interface AgentState {
    * squeeze has hit its floor and the trajectory genuinely will not fit.
    */
   preparedInputTokens?: number;
-  /** Consecutive replies this turn that carried no tool call at all. Persisted for the same reason. */
-  completionNags?: number;
   /** Counts rejected proposals, not executed actions; survives worker restarts. */
   approvalRecovery?: {
     turn: number;
@@ -227,6 +209,8 @@ export interface AgentState {
   carriedArtifacts?: string[];
   /** Consecutive replies cut off at the model's output limit, so continuing them stays bounded. */
   truncatedReplies?: number;
+  /** The reply so far while an output-limited answer is being continued. */
+  continuedAnswer?: string;
   /**
    * Whether this turn has already said that some of the streamed reply never reached the
    * transcript. Said once: a channel that has started failing usually keeps failing, and a warning
@@ -301,7 +285,6 @@ export interface AgentState {
     question: string;
     askedAtStep: number;
     why?: string;
-    continueWith?: string;
     waiting?: boolean;
     handoff?: { kind: 'challenge'; surface: 'browser'; tabId?: string; url: string };
   };
@@ -322,19 +305,8 @@ export interface AgentState {
   acceptance?: AcceptanceRecord;
   /** Consecutive finishes refused because the harness ran the checks and they failed. */
   acceptanceFailures?: number;
-  /** Whether this turn has already been asked once to state what would prove the job is done. */
-  acceptanceNagged?: boolean;
-  /** Declarations sent back this turn because the harness found every check already passing. */
-  acceptanceBaselineRefusals?: number;
   /** The turn that declared the record, so a later turn is not proven by a check it inherited. */
   acceptanceTurn?: number;
-  /**
-   * Why this record's checks are weaker evidence than a check the harness watched fail, when they
-   * are. Absent means the record was run against the unfinished job and at least one of it failed,
-   * which is the only case where passing it at finish is proof of anything. It travels with the
-   * record rather than with the turn - a record carried into the next turn carries how it was made.
-   */
-  acceptanceCaveat?: string;
   /**
    * How many times this turn has handed itself another step budget rather than stopping for a reply,
    * and what the harness had counted the last time it did.
@@ -347,10 +319,6 @@ export interface AgentState {
    */
   selfContinuations?: number;
   continuationMark?: { atStep: number; writes: number; evidence?: number };
-  /** Whether this turn has already been sent back once for a plan whose steps were left open. */
-  planCoverageNagged?: boolean;
-  /** True while the only plan on record is the boilerplate one the harness wrote for itself. */
-  planIsFallback?: boolean;
   /**
    * Where untrusted content entered this turn, and when.
    *

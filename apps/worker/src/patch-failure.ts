@@ -5,8 +5,6 @@
  * is told the right thing: not "no match", but where the nearest candidates were and how the file
  * really reads there. Everything in this file is about producing that answer inside a bounded
  * number of characters, because the explanation goes into the window and a whole file would not.
- *
- * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
 import { countOccurrences } from './values.js';
 

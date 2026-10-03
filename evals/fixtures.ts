@@ -28,23 +28,13 @@ import { COMPACT_CONTEXT_TOOL } from '../apps/worker/src/context.js';
 import { requestToolsFor } from '../apps/worker/src/request-tools.js';
 import { UNKNOWN_SURFACES } from '../packages/contracts/src/index.js';
 import { agentToolsFor } from '../apps/worker/src/tool-catalogue.js';
-import {
-  conversational,
-  evidence,
-  type Fixture,
-  type ModelTurn,
-  type ScriptedCall
-} from './harness.js';
+import { type Fixture, type ModelTurn } from './harness.js';
 
 /** A script that reads from a list and repeats its last turn, for the runs that need no reaction. */
 const sequence =
   (...turns: readonly ModelTurn[]) =>
   ({ index }: { index: number }): ModelTurn =>
     turns[Math.min(index, turns.length - 1)] ?? {};
-
-const finishCall = (id: string, args: Record<string, unknown>): readonly ScriptedCall[] => [
-  { id, name: 'finish', args }
-];
 
 /**
  * One batch of log lines, at the size a real one comes back: larger than the window will keep whole,
@@ -179,6 +169,27 @@ const proofMoves = (declaresTheFinishedPhase: boolean): readonly ProofMove[] => 
   }))
 ];
 
+/** A saved procedure of realistic length, so opening one costs what opening one costs. */
+const procedureBody = (title: string): string =>
+  [
+    `# ${title}`,
+    ...Array.from(
+      { length: 60 },
+      (_, step) =>
+        `${step + 1}. ${title}: check the next page, record what it shows, and compare it with the previous one before moving on.`
+    )
+  ].join('\n');
+const RENDER_PROOF_SKILL = {
+  name: 'render-proof',
+  description: 'Render a document to page images and check it.',
+  body: procedureBody('Render proof')
+};
+const CITATION_SKILL = {
+  name: 'citation-discipline',
+  description: 'Give every claim a source and a verbatim quote.',
+  body: procedureBody('Citation discipline')
+};
+
 /**
  * The proof job, done twice: once saying when the first document is finished and once never
  * saying it.
@@ -207,14 +218,7 @@ const proofRun =
     const move = proofMoves(options.declaresTheFinishedPhase)[step - 1];
     if (move === undefined)
       return {
-        text: 'Both documents render and every font in them is embedded, so they are safe to send.',
-        calls: finishCall('call-finish', {
-          summary: 'Rendered both documents and read back every font table.',
-          verification: evidence(
-            `call-insert-${PROOF_INSERT_PAGES}`,
-            'The last font table reports every face embedded'
-          )
-        })
+        text: 'Both documents render and every font in them is embedded, so they are safe to send.'
       };
     if (move === 'phase-done')
       return {
@@ -371,19 +375,6 @@ const SURVEY_PAGES = Object.fromEntries(
  *   5 (blank)                              10 };
  *                                          11 (the trailing newline)
  */
-const queueSource = [
-  'export const drain = (jobs) => {',
-  '  const done = [];',
-  '  return done;',
-  '};',
-  '',
-  'export const retry = (job) => job.attempts < 3;',
-  '',
-  'const log = (message) => {',
-  '  console.log(message);',
-  '};',
-  ''
-].join('\n');
 
 /** A workspace with a couple of ordinary things in it, which most fixtures can share. */
 const workspaceFiles = {
@@ -605,8 +596,7 @@ export const fixtures: readonly Fixture[] = [
         ...(apiKey ? { apiKey } : {})
       },
       model: sequence({
-        text: 'Ready.',
-        calls: finishCall('done', { summary: 'Ready.', verification: conversational() })
+        text: 'Ready.'
       }),
       expect: {
         modelCalls: 1,
@@ -625,8 +615,7 @@ export const fixtures: readonly Fixture[] = [
     request: 'What is the difference between a mutex and a semaphore?',
     why: 'A question that needs nothing from the computer must cost exactly one model call. Every hold in the loop has to keep its hands off a turn that changed nothing.',
     model: sequence({
-      text: 'A mutex has an owner and a semaphore has a count.',
-      calls: finishCall('call-1', { summary: 'Answered in chat.', verification: conversational() })
+      text: 'A mutex has an owner and a semaphore has a count.'
     }),
     expect: {
       modelCalls: 1,
@@ -650,18 +639,14 @@ export const fixtures: readonly Fixture[] = [
         calls: [{ id: 'call-2', name: 'document_read', args: { path: 'workspace/contract.pdf' } }]
       },
       {
-        text: 'Either party can terminate with 60 days written notice, under clause 7.',
-        calls: finishCall('call-3', {
-          summary: 'Answered from clause 7 of the contract.',
-          verification: evidence('call-2', 'Clause 7 sets a 60-day notice period')
-        })
+        text: 'Either party can terminate with 60 days written notice, under clause 7.'
       }
     ),
     expect: {
       modelCalls: 3,
       tools: ['document_search', 'document_read'],
       status: 'completed',
-      verification: 'verified',
+      verification: 'not_applicable',
       holds: [],
       replies: 1
     }
@@ -691,18 +676,14 @@ export const fixtures: readonly Fixture[] = [
         calls: [{ id: 'call-2', name: 'document_read', args: { path: 'workspace/contract.pdf' } }]
       },
       {
-        text: 'The renewal is at 4.25 per cent, and nothing is holding it up - the freeze runs to the end of the quarter and the notice period is 60 days.',
-        calls: finishCall('call-3', {
-          summary: 'Answered the rate and what is outstanding.',
-          verification: evidence('call-2', 'Clause 7 sets the notice period the answer cites')
-        })
+        text: 'The renewal is at 4.25 per cent, and nothing is holding it up - the freeze runs to the end of the quarter and the notice period is 60 days.'
       }
     ),
     expect: {
       modelCalls: 3,
       tools: ['file_read', 'document_read'],
       status: 'completed',
-      verification: 'verified',
+      verification: 'not_applicable',
       holds: [],
       /*
        * The four claims about the front of the window.
@@ -725,36 +706,6 @@ export const fixtures: readonly Fixture[] = [
     }
   },
   {
-    id: 'answer-not-applicable-after-tools-is-refused',
-    shape: 'answer',
-    request: 'Have a look at workspace/notes.txt and tell me when the renewal is.',
-    why: 'A turn that used tools and then finished as if it were conversation is the confident false completion the gate exists for. It should cost one extra call to correct, not four.',
-    runner: { files: workspaceFiles },
-    model: sequence(
-      { calls: [{ id: 'call-1', name: 'file_read', args: { path: 'workspace/notes.txt' } }] },
-      {
-        text: 'The renewal is on 14 March 2027.',
-        calls: finishCall('call-2', {
-          summary: 'Renewal is 14 March 2027.',
-          verification: conversational()
-        })
-      },
-      {
-        calls: finishCall('call-3', {
-          summary: 'Renewal is 14 March 2027.',
-          verification: evidence('call-1', 'The note gives the renewal date')
-        })
-      }
-    ),
-    expect: {
-      modelCalls: 3,
-      tools: ['file_read'],
-      status: 'completed',
-      verification: 'verified',
-      holds: ['finish_rejected']
-    }
-  },
-  {
     id: 'answer-missing-file-is-not-a-dead-turn',
     shape: 'answer',
     request: 'What did I write in workspace/renewal.txt?',
@@ -765,11 +716,7 @@ export const fixtures: readonly Fixture[] = [
       { calls: [{ id: 'call-2', name: 'files_list', args: { path: 'workspace' } }] },
       { calls: [{ id: 'call-3', name: 'file_read', args: { path: 'workspace/notes.txt' } }] },
       {
-        text: 'There is no renewal.txt; notes.txt has the renewal date, 14 March 2027.',
-        calls: finishCall('call-4', {
-          summary: 'Answered from notes.txt instead.',
-          verification: evidence('call-3', 'notes.txt holds the renewal date')
-        })
+        text: 'There is no renewal.txt; notes.txt has the renewal date, 14 March 2027.'
       }
     ),
     expect: {
@@ -780,7 +727,7 @@ export const fixtures: readonly Fixture[] = [
       // died on it, so without this line the whole subject of the fixture is unstated.
       noFailedTools: false,
       status: 'completed',
-      verification: 'verified',
+      verification: 'not_applicable',
       holds: []
     }
   },
@@ -803,94 +750,17 @@ export const fixtures: readonly Fixture[] = [
         ]
       },
       {
-        text: 'Written to workspace/summary.md.',
-        calls: finishCall('call-2', {
-          summary: 'Wrote workspace/summary.md.',
-          verification: evidence('call-1', 'The summary is on disk')
-        })
+        text: 'Written to workspace/summary.md.'
       }
     ),
     expect: {
       modelCalls: 2,
       tools: ['file_write'],
       status: 'completed',
-      verification: 'verified',
-      // One write is enough: the step after anything mutates writes the boilerplate plan, so even
-      // this two-call turn ends with a plan panel the owner never asked for.
-      fallbackPlan: true,
+      verification: 'not_applicable',
+      // A write is not a request for a plan: nothing puts one on screen the model did not declare.
+      fallbackPlan: false,
       holds: []
-    }
-  },
-  {
-    id: 'files-code-holds-for-acceptance',
-    shape: 'files',
-    request: 'Fix workspace/importer.py so it reads all three columns.',
-    why: 'The measured price of the acceptance hold when the model does the natural thing and declares nothing up front. Read this against files-code-declares-acceptance-first: same work, same tools, one more model call - and one fewer command run, because a record declared after the change is never watched failing on the unfinished job. The work itself is a read and a one-line patch, which is what fixing a file costs in the shipped editor; it used to be a whole-file `file_write` of the file’s own existing bytes, so both halves of this pair reported a fixed importer while writing it back unchanged, and the hold was being priced around a change that never happened.',
-    runner: { files: workspaceFiles, exec: [0, 0] },
-    model: sequence(
-      {
-        calls: [{ id: 'call-1', name: 'file_read', args: { path: 'workspace/importer.py' } }]
-      },
-      {
-        calls: [
-          {
-            id: 'call-2',
-            name: 'file_patch',
-            args: {
-              patches: [
-                {
-                  path: 'workspace/importer.py',
-                  edit: 'PUT 2:\n-    return rows\n+    return [(a, b, c) for a, b, c in rows]'
-                }
-              ]
-            }
-          }
-        ]
-      },
-      { calls: [{ id: 'call-3', name: 'shell', args: { executable: 'ls', args: ['workspace'] } }] },
-      {
-        text: 'The importer now reads all three columns.',
-        calls: finishCall('call-4', {
-          summary: 'Fixed the importer.',
-          verification: evidence('call-3', 'The workspace listing shows the change landed')
-        })
-      },
-      {
-        calls: [
-          {
-            id: 'call-5',
-            name: 'set_acceptance',
-            args: {
-              checks: [
-                {
-                  kind: 'command',
-                  label: 'the importer test passes',
-                  executable: 'pytest',
-                  args: ['-q']
-                }
-              ]
-            }
-          }
-        ]
-      },
-      {
-        calls: finishCall('call-6', {
-          summary: 'Fixed the importer.',
-          verification: evidence('call-3', 'The workspace listing shows the change landed')
-        })
-      }
-    ),
-    expect: {
-      modelCalls: 6,
-      tools: ['file_read', 'file_patch', 'shell'],
-      status: 'completed',
-      verification: 'verified',
-      commandsRun: 2,
-      landedEdits: 1,
-      filesAfter: {
-        'workspace/importer.py': 'def load(rows):\n    return [(a, b, c) for a, b, c in rows]\n'
-      },
-      holds: ['acceptance_hold']
     }
   },
   {
@@ -930,7 +800,8 @@ export const fixtures: readonly Fixture[] = [
               patches: [
                 {
                   path: 'workspace/importer.py',
-                  edit: 'PUT 2:\n-    return rows\n+    return [(a, b, c) for a, b, c in rows]'
+                  oldText: '    return rows',
+                  newText: '    return [(a, b, c) for a, b, c in rows]'
                 }
               ]
             }
@@ -941,11 +812,7 @@ export const fixtures: readonly Fixture[] = [
         calls: [{ id: 'call-4', name: 'shell', args: { executable: 'pytest', args: ['-q'] } }]
       },
       {
-        text: 'The importer now reads all three columns and the test passes.',
-        calls: finishCall('call-5', {
-          summary: 'Fixed the importer.',
-          verification: evidence('call-4', 'The test passes')
-        })
+        text: 'The importer now reads all three columns and the test passes.'
       }
     ),
     expect: {
@@ -963,346 +830,6 @@ export const fixtures: readonly Fixture[] = [
       holds: []
     }
   },
-  /* --------------------------------------------------- the line-addressed editor, end to end */
-
-  /**
-   * Three rows, and between them they are the only place in this rig where the shipped editor is
-   * asked to do anything. The measurement that made them necessary is in
-   * `docs/design/read/FIXTURES.md`: before them the suite contained eleven `file_patch` calls over
-   * two rows, every one of them in the oldText/newText dialect `apps/worker/src/tools/workspace.ts`
-   * refuses outright, and every one of them refused `patch_invalid` - "Every patch requires a path
-   * and a non-empty edit" - before the applier was reached at all, on every run since the format
-   * changed, while both rows reported green.
-   *
-   * Each one pins `filesAfter`, and that is the whole point of them. `tools` is written before a
-   * call runs and `noFailedTools` is declarable, so the file on disk is the only assertion here
-   * that a broken applier cannot satisfy.
-   *
-   * All three declare their acceptance check first and cite the run of it that follows the change,
-   * which is not decoration: a finish citing the `file_patch` itself is refused by name - "Every
-   * cited result predates file_patch" - because the call that made a change cannot be the evidence
-   * the change worked. Two model calls of the five or six each row costs are that contract, and they
-   * are the same two `files-code-declares-acceptance-first` pays.
-   */
-  {
-    id: 'files-a-move-crosses-the-wire-once',
-    shape: 'files',
-    request: 'Move the log helper in workspace/queue.ts up above drain.',
-    why: 'The operation the whole format was bought for, and the one nothing else here executes. A move in a quoted editor costs the block twice - once to say what is going and once to say what arrives - and `docs/design/edit/DECIDE.md` prices that shape at 397 characters of arguments against 71, the widest single row in its comparison. (The 777-against-57 figure still circulating in four documents predates the quoted editor gaining `moveAfter`; DECIDE.md §3 retired it, and this row does not carry it forward.) `CUT 8.=11 @log` then `PUT <1 @log` is the shape, and it exercises four separate mechanisms in one call: the register is filled from the live file before anything moves, so the CUT and the PUT can be written in either order; both ranges name the numbers of the read rather than the numbers the other operation would leave; and the splices are applied from the end of the file backwards so that stays true. The CUT deliberately takes line 11, the empty line the file’s final newline makes, so the helper carries its own terminator with it and the file still ends in exactly one newline - a fixture that stopped at line 10 would pass with a file that had quietly grown a blank line, which is the failure this format is most likely to have and the hardest to see in an echo.',
-    runner: {
-      files: { ...workspaceFiles, 'workspace/queue.ts': queueSource },
-      exec: [1, 0, 0]
-    },
-    model: sequence(
-      {
-        calls: [
-          {
-            id: 'call-1',
-            name: 'set_acceptance',
-            args: {
-              checks: [
-                {
-                  kind: 'command',
-                  label: 'the queue module still parses',
-                  executable: 'node',
-                  args: ['--check', 'workspace/queue.ts']
-                }
-              ]
-            }
-          }
-        ]
-      },
-      { calls: [{ id: 'call-2', name: 'file_read', args: { path: 'workspace/queue.ts' } }] },
-      {
-        calls: [
-          {
-            id: 'call-3',
-            name: 'file_patch',
-            args: {
-              patches: [
-                {
-                  path: 'workspace/queue.ts',
-                  edit: 'CUT 8.=11 @log\n-const log = (message) => {\nPUT <1 @log\n-export const drain = (jobs) => {'
-                }
-              ]
-            }
-          }
-        ]
-      },
-      {
-        calls: [
-          {
-            id: 'call-4',
-            name: 'shell',
-            args: { executable: 'node', args: ['--check', 'workspace/queue.ts'] }
-          }
-        ]
-      },
-      {
-        text: 'The log helper is now above drain in workspace/queue.ts.',
-        calls: finishCall('call-5', {
-          summary: 'Moved the log helper above drain.',
-          verification: evidence('call-4', 'The module still parses after the move')
-        })
-      }
-    ),
-    expect: {
-      modelCalls: 5,
-      tools: ['file_read', 'file_patch', 'shell'],
-      status: 'completed',
-      verification: 'verified',
-      commandsRun: 2,
-      landedEdits: 1,
-      /*
-       * The whole file, and not a line of it left to chance.
-       *
-       * Every mutation this row is meant to catch produces a file that still contains both
-       * functions: a register that never pasted loses the helper, a CUT that removes nothing
-       * duplicates it, an anchor off by one takes the blank line instead of the closing brace. A
-       * substring check would be green for all three.
-       */
-      filesAfter: {
-        'workspace/queue.ts': [
-          'const log = (message) => {',
-          '  console.log(message);',
-          '};',
-          '',
-          'export const drain = (jobs) => {',
-          '  const done = [];',
-          '  return done;',
-          '};',
-          '',
-          'export const retry = (job) => job.attempts < 3;',
-          ''
-        ].join('\n')
-      },
-      holds: []
-    }
-  },
-  {
-    id: 'files-an-edit-outside-what-the-read-showed-is-refused',
-    shape: 'files',
-    request: 'In workspace/queue.ts, have drain drop the jobs that came back empty.',
-    why: 'The guard the whole format rests on, proved in both directions in one turn. A line number carries no evidence of its own - `PUT 9:` is as well-formed against a file nobody has opened as against one just read - so `snapshots.ts` keeps the evidence instead, and `apply.ts` refuses a range no read displayed. The turn reads a window of lines 1-4, addresses line 9, and is refused with the file’s real text at that anchor; then addresses line 3, which the window did show, and lands. Both halves are load-bearing and neither is worth anything alone: a guard that refuses everything passes the first half, and a guard wired to nothing passes the second. The refusal also has to cost exactly one generation, which is why the message carries the lines rather than telling the model to go and read them - `noFailedTools: false` below is the record that one call in this turn threw, and `filesAfter` is the record that it wrote nothing on its way out.',
-    runner: {
-      files: { ...workspaceFiles, 'workspace/queue.ts': queueSource },
-      exec: [1, 0, 0]
-    },
-    model: sequence(
-      {
-        calls: [
-          {
-            id: 'call-1',
-            name: 'set_acceptance',
-            args: {
-              checks: [
-                {
-                  kind: 'command',
-                  label: 'the queue module still parses',
-                  executable: 'node',
-                  args: ['--check', 'workspace/queue.ts']
-                }
-              ]
-            }
-          }
-        ]
-      },
-      {
-        calls: [
-          {
-            id: 'call-2',
-            name: 'file_read',
-            args: { path: 'workspace/queue.ts', startLine: 1, endLine: 4 }
-          }
-        ]
-      },
-      {
-        // Line 9 is inside the log helper, five lines past the end of the window above.
-        calls: [
-          {
-            id: 'call-3',
-            name: 'file_patch',
-            args: {
-              patches: [
-                {
-                  path: 'workspace/queue.ts',
-                  edit: 'PUT 9:\n+  if (!QUIET) console.log(message);'
-                }
-              ]
-            }
-          }
-        ]
-      },
-      {
-        // Line 3 was on screen, and this is the edit the owner asked for.
-        calls: [
-          {
-            id: 'call-4',
-            name: 'file_patch',
-            args: {
-              patches: [
-                {
-                  path: 'workspace/queue.ts',
-                  edit: 'PUT 3:\n-  return done;\n+  return done.filter(Boolean);'
-                }
-              ]
-            }
-          }
-        ]
-      },
-      {
-        calls: [
-          {
-            id: 'call-5',
-            name: 'shell',
-            args: { executable: 'node', args: ['--check', 'workspace/queue.ts'] }
-          }
-        ]
-      },
-      {
-        text: 'drain now drops the empty jobs.',
-        calls: finishCall('call-6', {
-          summary: 'Filtered the empty jobs out of drain.',
-          verification: evidence('call-5', 'The module still parses after the change')
-        })
-      }
-    ),
-    expect: {
-      modelCalls: 6,
-      tools: ['file_read', 'file_patch', 'file_patch', 'shell'],
-      status: 'completed',
-      verification: 'verified',
-      commandsRun: 2,
-      // The first patch threw, which is the subject of the first half of this row - and it threw
-      // for the reason the row is about rather than for any of the six other reasons `apply.ts`
-      // refuses a patch for, which is a different claim and the one worth making.
-      noFailedTools: false,
-      toolFailures: ['patch_conflict:No read has shown you workspace/queue.ts at 9'],
-      // And the second landed, which is the subject of the second half. One, not two.
-      landedEdits: 1,
-      filesAfter: {
-        'workspace/queue.ts': [
-          'export const drain = (jobs) => {',
-          '  const done = [];',
-          '  return done.filter(Boolean);',
-          '};',
-          '',
-          'export const retry = (job) => job.attempts < 3;',
-          '',
-          'const log = (message) => {',
-          '  console.log(message);',
-          '};',
-          ''
-        ].join('\n')
-      },
-      holds: []
-    }
-  },
-  {
-    id: 'files-one-patch-addresses-the-numbers-that-were-read',
-    shape: 'files',
-    request:
-      'Add a size helper to workspace/queue.ts, raise the retry limit to five, and make the logger respect QUIET.',
-    why: 'The sentence in the resident spec that costs the most if it is untrue: ranges name the numbers you read, never the numbers your own earlier operations would leave. Three operations in one patch, deliberately in ascending order so that a front-to-back applier is wrong on the second and the third - the insert after line 4 moves everything below it down by two, so an applier that did not run backwards would replace the new helper instead of the retry limit and take the wrong three lines for the block. It is also the only execution of `PUT N*:` through a tool call - `apps/worker/src/edit/edit.test.ts` covers the block operation against `applyEdit` directly - and the block is the one place the harness has to find an end the model never counted to: `blockAt` walks bracket depth from line 8 to line 10 and the model names one number. All three land or none do, and `filesAfter` is the only thing here that can tell that apart from two of three.',
-    runner: {
-      files: { ...workspaceFiles, 'workspace/queue.ts': queueSource },
-      exec: [1, 0, 0]
-    },
-    model: sequence(
-      {
-        calls: [
-          {
-            id: 'call-1',
-            name: 'set_acceptance',
-            args: {
-              checks: [
-                {
-                  kind: 'command',
-                  label: 'the queue module still parses',
-                  executable: 'node',
-                  args: ['--check', 'workspace/queue.ts']
-                }
-              ]
-            }
-          }
-        ]
-      },
-      { calls: [{ id: 'call-2', name: 'file_read', args: { path: 'workspace/queue.ts' } }] },
-      {
-        calls: [
-          {
-            id: 'call-3',
-            name: 'file_patch',
-            args: {
-              patches: [
-                {
-                  path: 'workspace/queue.ts',
-                  edit: [
-                    'PUT >4:',
-                    '-};',
-                    '+',
-                    '+export const size = (jobs) => jobs.length;',
-                    'PUT 6:',
-                    '-export const retry = (job) => job.attempts < 3;',
-                    '+export const retry = (job) => job.attempts < 5;',
-                    'PUT 8*:',
-                    '-const log = (message) => {',
-                    '+const log = (message) => {',
-                    '+  if (QUIET) return;',
-                    '+  console.log(message);',
-                    '+};'
-                  ].join('\n')
-                }
-              ]
-            }
-          }
-        ]
-      },
-      {
-        calls: [
-          {
-            id: 'call-4',
-            name: 'shell',
-            args: { executable: 'node', args: ['--check', 'workspace/queue.ts'] }
-          }
-        ]
-      },
-      {
-        text: 'queue.ts has a size helper, a retry limit of five, and a logger that respects QUIET.',
-        calls: finishCall('call-5', {
-          summary: 'Added size, raised the retry limit and made the logger quiet-aware.',
-          verification: evidence('call-4', 'The module still parses after all three edits')
-        })
-      }
-    ),
-    expect: {
-      modelCalls: 5,
-      tools: ['file_read', 'file_patch', 'shell'],
-      status: 'completed',
-      verification: 'verified',
-      commandsRun: 2,
-      landedEdits: 1,
-      filesAfter: {
-        'workspace/queue.ts': [
-          'export const drain = (jobs) => {',
-          '  const done = [];',
-          '  return done;',
-          '};',
-          '',
-          'export const size = (jobs) => jobs.length;',
-          '',
-          'export const retry = (job) => job.attempts < 5;',
-          '',
-          'const log = (message) => {',
-          '  if (QUIET) return;',
-          '  console.log(message);',
-          '};',
-          ''
-        ].join('\n')
-      },
-      holds: []
-    }
-  },
   {
     id: 'answer-a-procedure-opened-twice-is-sent-once',
     shape: 'answer',
@@ -1310,6 +837,7 @@ export const fixtures: readonly Fixture[] = [
       'Read the contract and the note and tell me the renewal date and the notice period, with the clause each comes from.',
     why: 'A model that opens a procedure, works for a few steps and opens it again is doing the ordinary thing - it has lost track of what is still in its window, and asking is cheaper than guessing. What it used to cost was the whole procedure a second time: `openSkill` has always taken an `active` list and answered a repeat with a short stub, and nothing anywhere supplied one, so every re-view put a five-thousand-character body back into a window that already held it. The second copy is not merely wasted - it lands at the tail of a prompt whose front is cached, so it is billed at the write premium, and it pushes the recency boundaries forward, which re-cuts every older result behind them. This fixture opens the same procedure twice with two reads in between and pins the largest request the turn may build. The guard on the other side is why the bound is a ceiling rather than an equality: a compaction that condensed the first body away makes the next view a real one again, because a stub is not a body and answering a reopen with one would strand the turn on instructions it can no longer read.',
     runner: { files: workspaceFiles },
+    skills: [CITATION_SKILL],
     model: ({ step }) => {
       if (step === 0)
         return {
@@ -1333,11 +861,7 @@ export const fixtures: readonly Fixture[] = [
           ]
         };
       return {
-        text: 'Renewal is 14 March 2027, and clause 7 gives either side 60 days written notice.',
-        calls: finishCall('call-5', {
-          summary: 'Answered the renewal date and the notice period, with their clauses.',
-          verification: evidence('call-2', 'Clause 7 sets a 60-day notice period')
-        })
+        text: 'Renewal is 14 March 2027, and clause 7 gives either side 60 days written notice.'
       };
     },
     expect: {
@@ -1346,7 +870,7 @@ export const fixtures: readonly Fixture[] = [
       // where the second view never happened, which is the opposite measurement.
       tools: ['skill', 'document_read', 'file_read', 'skill'],
       status: 'completed',
-      verification: 'verified',
+      verification: 'not_applicable',
       holds: [],
       /*
        * The ceiling, which is where the whole claim is, and the three numbers it sits between.
@@ -1365,136 +889,6 @@ export const fixtures: readonly Fixture[] = [
       anchorHeld: true,
       // File provenance enters with the read; anchorHeld still protects the stable prefix.
       maxFreshLeadCharacters: 80_000
-    }
-  },
-  {
-    id: 'files-stale-evidence-is-refused',
-    shape: 'files',
-    request: 'Summarise workspace/notes.txt into workspace/summary.md.',
-    why: 'Evidence gathered before the last change cannot show that the change worked. Without this, citing whatever succeeded most recently is the cheapest way past the gate.',
-    runner: { files: workspaceFiles },
-    model: sequence(
-      { calls: [{ id: 'call-1', name: 'file_read', args: { path: 'workspace/notes.txt' } }] },
-      {
-        calls: [
-          {
-            id: 'call-2',
-            name: 'file_write',
-            args: { path: 'workspace/summary.md', content: 'Renewal: 14 March 2027.\n' }
-          }
-        ]
-      },
-      {
-        text: 'Summarised into workspace/summary.md: renewal 14 March 2027.',
-        calls: finishCall('call-3', {
-          summary: 'Wrote the summary.',
-          verification: evidence('call-1', 'I read the notes')
-        })
-      },
-      {
-        calls: finishCall('call-4', {
-          summary: 'Wrote the summary.',
-          verification: evidence('call-2', 'The summary file was written')
-        })
-      }
-    ),
-    expect: {
-      modelCalls: 4,
-      tools: ['file_read', 'file_write'],
-      status: 'completed',
-      verification: 'verified',
-      holds: ['finish_rejected']
-    }
-  },
-  {
-    id: 'files-open-plan-steps-hold-the-finish',
-    shape: 'files',
-    request: 'Plan out the tidy-up of my notes and then do it.',
-    why: 'A turn that published nine steps, did four and gave up used to leave the owner looking at nine of nine. The plan is the one thing they watch while long work runs, so a finish against open steps is asked about once - and it costs one model call.',
-    runner: { files: workspaceFiles },
-    model: sequence(
-      {
-        calls: [
-          {
-            id: 'call-1',
-            name: 'set_plan',
-            args: {
-              branchName: 'Main',
-              steps: [
-                { title: 'Read the notes', status: 'in_progress' },
-                { title: 'Write the summary', status: 'pending' },
-                { title: 'File the originals', status: 'pending' }
-              ]
-            }
-          }
-        ]
-      },
-      {
-        calls: [
-          {
-            id: 'call-2',
-            name: 'file_write',
-            args: { path: 'workspace/summary.md', content: 'Renewal: 14 March 2027.\n' }
-          }
-        ]
-      },
-      {
-        text: 'Summary written; the originals are still where they were.',
-        calls: finishCall('call-3', {
-          summary: 'Wrote the summary.',
-          verification: evidence('call-2', 'The summary is on disk')
-        })
-      },
-      {
-        calls: finishCall('call-4', {
-          summary: 'Wrote the summary; filing the originals is still open.',
-          verification: evidence('call-2', 'The summary is on disk')
-        })
-      }
-    ),
-    expect: {
-      modelCalls: 4,
-      tools: ['set_plan', 'file_write'],
-      status: 'completed',
-      holds: ['plan_hold']
-    }
-  },
-  {
-    id: 'files-a-silent-turn-is-asked-to-speak',
-    shape: 'files',
-    request: 'Check what notes.txt says about the renewal and write it up for me.',
-    why: 'A real turn wrote the file, published it, and completed without an assistant message at all - the owner got a card and a download in reply to a question. The model can do everything through tools and never write a word, and nothing used to check.',
-    runner: { files: workspaceFiles },
-    model: sequence(
-      {
-        calls: [
-          {
-            id: 'call-1',
-            name: 'file_write',
-            args: { path: 'workspace/renewal.md', content: 'Renewal: 14 March 2027.\n' }
-          }
-        ]
-      },
-      {
-        calls: finishCall('call-2', {
-          summary: 'Wrote workspace/renewal.md.',
-          verification: evidence('call-1', 'The write-up is on disk')
-        })
-      },
-      {
-        text: 'The renewal is 14 March 2027; the write-up is in workspace/renewal.md.',
-        calls: finishCall('call-3', {
-          summary: 'Wrote workspace/renewal.md.',
-          verification: evidence('call-1', 'The write-up is on disk')
-        })
-      }
-    ),
-    expect: {
-      modelCalls: 3,
-      tools: ['file_write'],
-      status: 'completed',
-      holds: ['silence_hold'],
-      replies: 1
     }
   },
   {
@@ -1519,11 +913,7 @@ export const fixtures: readonly Fixture[] = [
         }))
       },
       {
-        text: 'workspace/d.txt has the renewal date.',
-        calls: finishCall('call-5', {
-          summary: 'Read all four files.',
-          verification: evidence('call-4', 'd.txt names the renewal')
-        })
+        text: 'workspace/d.txt has the renewal date.'
       }
     ),
     expect: {
@@ -1565,11 +955,7 @@ export const fixtures: readonly Fixture[] = [
         ]
       },
       {
-        text: 'Bumped to 1.1 and it still imports.',
-        calls: finishCall('call-3', {
-          summary: 'Bumped the version.',
-          verification: evidence('call-2', 'The command exited zero after the edit')
-        })
+        text: 'Bumped to 1.1 and it still imports.'
       }
     ),
     expect: {
@@ -1584,8 +970,8 @@ export const fixtures: readonly Fixture[] = [
     id: 'verify-failed-check-refuses-the-finish',
     shape: 'verify',
     request: 'Make the importer test pass.',
-    why: 'The one gate that runs something rather than asking the model to grade itself. It has to refuse a finish while the declared check fails, and it has to let the recovery through. The model checks a narrower thing than it declared - one file, not the suite - which is how this actually happens; it used to check with the identical command and the fixture only worked because the stub answered the same command two different ways.',
-    runner: { exec: [1, 0, 1, 0, 0] },
+    why: 'The one gate that runs something rather than asking the model to grade itself. It has to send the answer back while the declared check fails, and it has to let the recovery through. The model checks a narrower thing than it declared - one file, not the suite - which is how this actually happens; it used to check with the identical command and the fixture only worked because the stub answered the same command two different ways.',
+    runner: { exec: [0, 1, 0, 0] },
     model: sequence(
       {
         calls: [
@@ -1619,11 +1005,7 @@ export const fixtures: readonly Fixture[] = [
         ]
       },
       {
-        text: 'The test passes now.',
-        calls: finishCall('call-4', {
-          summary: 'Made the test pass.',
-          verification: evidence('call-3', 'The test run exited zero')
-        })
+        text: 'The test passes now.'
       },
       {
         calls: [
@@ -1635,11 +1017,7 @@ export const fixtures: readonly Fixture[] = [
         ]
       },
       {
-        text: 'The test passes now.',
-        calls: finishCall('call-6', {
-          summary: 'Made the test pass.',
-          verification: evidence('call-5', 'The test run exited zero')
-        })
+        text: 'The test passes now.'
       }
     ),
     expect: {
@@ -1647,74 +1025,6 @@ export const fixtures: readonly Fixture[] = [
       status: 'completed',
       holds: ['acceptance_failed'],
       toolsInclude: ['shell']
-    }
-  },
-  {
-    id: 'verify-checks-that-already-pass-are-refused',
-    shape: 'verify',
-    request: 'Add a retry to the fetch helper and prove it works.',
-    why: 'A definition of done the harness can already satisfy cannot tell the finished job from the one nobody started. Without this refusal the acceptance record is decoration.',
-    runner: { exec: [0, 1, 0, 0] },
-    model: sequence(
-      {
-        calls: [
-          {
-            id: 'call-1',
-            name: 'set_acceptance',
-            args: {
-              checks: [
-                {
-                  kind: 'command',
-                  label: 'the workspace is there',
-                  executable: 'ls',
-                  args: ['workspace']
-                }
-              ]
-            }
-          }
-        ]
-      },
-      {
-        calls: [
-          {
-            id: 'call-2',
-            name: 'set_acceptance',
-            args: {
-              checks: [
-                {
-                  kind: 'command',
-                  label: 'the retry test passes',
-                  executable: 'pytest',
-                  args: ['-q', 'test_retry.py']
-                }
-              ]
-            }
-          }
-        ]
-      },
-      {
-        calls: [
-          {
-            id: 'call-3',
-            name: 'file_write',
-            args: { path: 'workspace/fetch.py', content: 'def fetch():\n    pass\n' }
-          }
-        ]
-      },
-      { calls: [{ id: 'call-4', name: 'shell', args: { executable: 'pytest', args: ['-q'] } }] },
-      {
-        text: 'The retry is in and the test passes.',
-        calls: finishCall('call-5', {
-          summary: 'Added the retry.',
-          verification: evidence('call-4', 'The test run exited zero')
-        })
-      }
-    ),
-    expect: {
-      modelCalls: 5,
-      status: 'completed',
-      holds: ['baseline_refused'],
-      toolsInclude: ['file_write', 'shell']
     }
   },
   {
@@ -1728,11 +1038,7 @@ export const fixtures: readonly Fixture[] = [
       { calls: [{ id: 'call-1', name: 'files_list', args: { path: 'workspace' } }] },
       { calls: [{ id: 'call-2', name: 'files_list', args: { path: 'workspace/sub' } }] },
       {
-        text: 'I listed the workspace; the tidying is not done.',
-        calls: finishCall('call-3', {
-          summary: 'Stopped at the step limit with the listing done.',
-          verification: evidence('call-2', 'The listing came back')
-        })
+        text: 'I listed the workspace; the tidying is not done.'
       }
     ),
     expect: {
@@ -1751,11 +1057,7 @@ export const fixtures: readonly Fixture[] = [
     model: sequence(
       { text: 'The importer first checks the header, and then it', truncated: true },
       {
-        text: ' validates each row before loading it.',
-        calls: finishCall('call-1', {
-          summary: 'Explained the malformed-row path.',
-          verification: conversational()
-        })
+        text: ' validates each row before loading it.'
       }
     ),
     expect: {
@@ -1819,18 +1121,14 @@ export const fixtures: readonly Fixture[] = [
         ]
       },
       {
-        text: 'The rate was held at 4.25 per cent, per the regulator’s own notice.',
-        calls: finishCall('call-3', {
-          summary: 'Answered from the regulator’s notice.',
-          verification: evidence('call-2', 'The notice states the rate was held')
-        })
+        text: 'The rate was held at 4.25 per cent, per the regulator’s own notice.'
       }
     ),
     expect: {
       modelCalls: 3,
       tools: ['web_search', 'parallel_web_read'],
       status: 'completed',
-      verification: 'verified',
+      verification: 'not_applicable',
       untrusted: true,
       // Named hosts, not the words "web pages". The name is only available if the read came back
       // in the shape the runner actually speaks, so this line is where the fixture stops taking a
@@ -1870,11 +1168,7 @@ export const fixtures: readonly Fixture[] = [
         ]
       },
       {
-        text: 'Appeals are heard within 30 days, per the regulator’s guidance.',
-        calls: finishCall('call-4', {
-          summary: 'Answered from the appeals guidance.',
-          verification: evidence('call-3', 'The guidance sets a 30-day window')
-        })
+        text: 'Appeals are heard within 30 days, per the regulator’s guidance.'
       }
     ),
     expect: {
@@ -1898,17 +1192,13 @@ export const fixtures: readonly Fixture[] = [
       { calls: [{ id: 'call-1', name: 'file_read', args: { path: 'workspace/notes.txt' } }] },
       { calls: [{ id: 'call-2', name: 'file_read', args: { path: 'workspace/notes.txt' } }] },
       {
-        text: 'Still 14 March 2027 - the second look read the same file.',
-        calls: finishCall('call-3', {
-          summary: 'Confirmed the renewal date.',
-          verification: evidence('call-1', 'The note gives the renewal date')
-        })
+        text: 'Still 14 March 2027 - the second look read the same file.'
       }
     ),
     expect: {
       modelCalls: 3,
       tools: ['file_read'],
-      proposed: ['file_read', 'file_read', 'finish'],
+      proposed: ['file_read', 'file_read'],
       status: 'completed',
       holds: []
     }
@@ -2134,21 +1424,17 @@ export const fixtures: readonly Fixture[] = [
             ]
           }
         : {
-            text: 'They disagree on both counts: vendor A refunds in 14 days less a 5 per cent handling charge, vendor B in 30 days with none. Neither page dates itself.',
-            calls: finishCall('call-2', {
-              summary: 'Compared the two refund pages through delegated readers.',
-              verification: evidence('call-1', 'The specialists reported both refund windows')
-            })
+            text: 'They disagree on both counts: vendor A refunds in 14 days less a 5 per cent handling charge, vendor B in 30 days with none. Neither page dates itself.'
           };
     },
     expect: {
       modelCalls: 6,
       delegatedCalls: 4,
       tools: ['delegate'],
-      proposed: ['delegate', 'finish'],
+      proposed: ['delegate'],
       commandsRun: 0,
       status: 'completed',
-      verification: 'verified',
+      verification: 'not_applicable',
       untrusted: true,
       // The taint crosses the delegation boundary named by what the specialists actually touched,
       // which is the whole first floor above stated as bytes: a report whose hosts had been lost on
@@ -2236,16 +1522,12 @@ export const fixtures: readonly Fixture[] = [
           ]
         };
       return {
-        text: 'Registry 9 keeps records longest, at up to 1,080 days on some classes.',
-        calls: finishCall('call-2', {
-          summary: 'Surveyed the ten registry retention policies.',
-          verification: evidence('call-1', 'The specialist read every registry policy page')
-        })
+        text: 'Registry 9 keeps records longest, at up to 1,080 days on some classes.'
       };
     },
     expect: {
       status: 'completed',
-      verification: 'verified',
+      verification: 'not_applicable',
       holds: [],
       // Two steps of the turn, and eleven model calls inside the one mission behind the first of
       // them - ten reads and the report. Read the two numbers against each other: this is what an
@@ -2288,11 +1570,7 @@ export const fixtures: readonly Fixture[] = [
     request: 'Sort out the invoices.',
     why: 'The cheap correct shape: say what is unclear, finish as conversation, one model call. This is what the expensive fixture below should cost and does not.',
     model: sequence({
-      text: 'Two things could be meant here. Do you want them filed by date, or reconciled against the bank export?',
-      calls: finishCall('call-1', {
-        summary: 'Asked which of the two readings was meant.',
-        verification: conversational()
-      })
+      text: 'Two things could be meant here. Do you want them filed by date, or reconciled against the bank export?'
     }),
     expect: {
       modelCalls: 1,
@@ -2300,24 +1578,6 @@ export const fixtures: readonly Fixture[] = [
       status: 'completed',
       verification: 'not_applicable',
       holds: [],
-      replies: 1
-    }
-  },
-  {
-    id: 'ambiguous-question-without-finish-is-nagged',
-    shape: 'ambiguous',
-    request: 'Sort out the invoices.',
-    why: 'The measured price of the completion nag on the shape most likely to trip it. The model answers correctly and stops, and five model calls are billed for one sentence. The answer still reaches the owner exactly once, which is the part worth keeping.',
-    model: sequence({
-      text: 'Do you want the invoices filed by date, or reconciled against the bank export?'
-    }),
-    expect: {
-      modelCalls: 5,
-      tools: [],
-      status: 'completed',
-      verification: 'not_applicable',
-      holds: ['completion_nag', 'completion_nag', 'completion_nag', 'completion_nag'],
-      warnings: ['Answered without calling finish'],
       replies: 1
     }
   },
@@ -2330,24 +1590,17 @@ export const fixtures: readonly Fixture[] = [
     model: sequence(
       { calls: [{ id: 'call-1', name: 'files_list', args: { path: 'workspace' } }] },
       {
-        text: 'There are three documents in there. File them by date, or reconcile them first?',
-        calls: finishCall('call-2', {
-          summary: 'Asked which of the two readings was meant.',
-          verification: conversational()
-        })
+        text: 'There are three documents in there. File them by date, or reconcile them first?'
       },
       {
-        calls: finishCall('call-3', {
-          summary: 'Asked which of the two readings was meant.',
-          verification: evidence('call-1', 'The folder holds three unfiled documents')
-        })
+        text: 'Asked which of the two readings was meant.'
       }
     ),
     expect: {
-      modelCalls: 3,
+      modelCalls: 2,
       tools: ['files_list'],
       status: 'completed',
-      holds: ['finish_rejected']
+      holds: []
     }
   },
   {
@@ -2383,41 +1636,6 @@ export const fixtures: readonly Fixture[] = [
       holds: []
     }
   },
-  {
-    id: 'ambiguous-a-question-before-looking-is-refused',
-    shape: 'ambiguous',
-    request: 'Send the March invoice to the client.',
-    why: 'The failure the tool creates, priced. A turn whose first act is a question has not earned one - a computer that can go and read the file is not entitled to ask what is in it - so the refusal has to send it back to work rather than park anything. One model call, no park, no device rung, and the same answer arrives.',
-    runner: { files: workspaceFiles },
-    model: sequence(
-      {
-        calls: [
-          {
-            id: 'call-1',
-            name: 'ask',
-            args: { question: 'Which mailbox?', why: 'Two are connected.' }
-          }
-        ]
-      },
-      { calls: [{ id: 'call-2', name: 'file_read', args: { path: 'workspace/notes.txt' } }] },
-      {
-        text: 'Sent from the work address, which is the one the March notes use. Say if you want billing@ instead.',
-        calls: finishCall('call-3', {
-          summary: 'Sent it and stated the assumption.',
-          verification: evidence('call-2', 'The notes name the address the invoice was sent from')
-        })
-      }
-    ),
-    expect: {
-      modelCalls: 3,
-      tools: ['file_read'],
-      proposed: ['ask', 'file_read', 'finish'],
-      status: 'completed',
-      verification: 'verified',
-      askedOwner: false,
-      holds: []
-    }
-  },
 
   /* --------------------------------------------------------------- a request that must be refused */
   {
@@ -2426,11 +1644,7 @@ export const fixtures: readonly Fixture[] = [
     request: 'Buy me the espresso machine I looked at last week, whatever it costs.',
     why: 'A refusal is a conversational answer. It must not cost more than one model call, and nothing may run.',
     model: sequence({
-      text: 'I cannot make a purchase. I can find it, price it, and put the checkout page in front of you.',
-      calls: finishCall('call-1', {
-        summary: 'Declined the purchase and offered the next step.',
-        verification: conversational()
-      })
+      text: 'I cannot make a purchase. I can find it, price it, and put the checkout page in front of you.'
     }),
     expect: {
       modelCalls: 1,
@@ -2526,11 +1740,7 @@ export const fixtures: readonly Fixture[] = [
     request: 'Write me a haiku about a cold morning.',
     why: 'The boilerplate three-step plan used to be created before the first model call on every task, so a haiku arrived with "Inspect the request, inputs, and current workspace state" already in progress. Nothing may put a plan in front of a request like this.',
     model: sequence({
-      text: 'Frost on the window\nthe kettle finds its own voice\nlight arrives later',
-      calls: finishCall('call-1', {
-        summary: 'Wrote the haiku in the reply.',
-        verification: conversational()
-      })
+      text: 'Frost on the window\nthe kettle finds its own voice\nlight arrives later'
     }),
     expect: {
       modelCalls: 1,
@@ -2553,11 +1763,7 @@ export const fixtures: readonly Fixture[] = [
         calls: [{ id: 'call-2', name: 'document_read', args: { path: 'workspace/contract.pdf' } }]
       },
       {
-        text: 'The notes say 14 March 2027; the contract says nothing about a renewal date.',
-        calls: finishCall('call-3', {
-          summary: 'Compared the two.',
-          verification: evidence('call-2', 'The contract text has no renewal date')
-        })
+        text: 'The notes say 14 March 2027; the contract says nothing about a renewal date.'
       }
     ),
     expect: {
@@ -2577,145 +1783,17 @@ export const fixtures: readonly Fixture[] = [
     model: sequence(
       { calls: [{ id: 'call-1', name: 'files_list', args: { path: 'workspace' } }] },
       {
-        text: 'Three.',
-        calls: finishCall('call-2', {
-          summary: 'Counted the workspace.',
-          verification: evidence('call-1', 'The listing returned three files')
-        })
+        text: 'Three.'
       }
     ),
     expect: {
       modelCalls: 2,
       tools: ['files_list'],
       status: 'completed',
-      verification: 'verified',
+      verification: 'not_applicable',
       fallbackPlan: false,
       holds: [],
       replies: 1
-    }
-  },
-  /* ------------------------------------------------- make something, then work on what was made */
-  {
-    id: 'media-logo-set-holds-for-acceptance',
-    shape: 'media',
-    request:
-      'Make me a logo for Harrow Lane Coffee, cut the background out, give me 512, 256 and 64 pixel versions, and a contact sheet of the lot.',
-    why: 'The owner’s own job, and the one they said felt slow. One generation, one cut-out, three resizes asked for together, one contact sheet - and the loop asked for a definition of done afterwards, because the picture already existed by then. Answered in one step, as the hold now says to, it costs the same seven model calls as declaring the checks up front: what is lost is the baseline, not the owner’s money.',
-    runner: { exec: [0], media: {} },
-    model: sequence(
-      {
-        calls: [
-          {
-            id: 'call-1',
-            name: 'generate_media',
-            args: {
-              kind: 'image',
-              prompt: 'A roasted coffee bean inside a rounded square, flat vector, single colour.',
-              path: 'workspace/brand/logo.png',
-              width: 1024,
-              height: 1024
-            }
-          }
-        ]
-      },
-      // The generation's own result says to look at it before publishing, and looking is the only
-      // thing in this job that can tell a logo from a smear. Counted here rather than argued about.
-      { calls: [{ id: 'call-2', name: 'image_read', args: { path: 'workspace/brand/logo.png' } }] },
-      {
-        calls: [
-          {
-            id: 'call-3',
-            name: 'shell',
-            args: {
-              executable: 'magick',
-              args: [
-                'workspace/brand/logo.png',
-                '-fuzz',
-                '10%',
-                '-transparent',
-                'white',
-                'workspace/brand/logo-cut.png'
-              ]
-            }
-          }
-        ]
-      },
-      {
-        calls: [512, 256, 64].map((size, index) => ({
-          id: `call-${index + 4}`,
-          name: 'shell',
-          args: {
-            executable: 'magick',
-            args: [
-              'workspace/brand/logo-cut.png',
-              '-resize',
-              `${size}x${size}`,
-              `workspace/brand/logo-${size}.png`
-            ]
-          }
-        }))
-      },
-      {
-        calls: [
-          {
-            id: 'call-7',
-            name: 'shell',
-            args: {
-              executable: 'montage',
-              args: [
-                'workspace/brand/logo-512.png',
-                'workspace/brand/logo-256.png',
-                'workspace/brand/logo-64.png',
-                'workspace/brand/contact-sheet.png'
-              ]
-            }
-          }
-        ]
-      },
-      {
-        text: 'Logo, transparent cut-out, three sizes and a contact sheet are in workspace/brand.',
-        calls: finishCall('call-8', {
-          summary: 'Made the logo set.',
-          verification: evidence('call-7', 'The contact sheet was written from the three sizes')
-        })
-      },
-      // The hold is answered in one step, which is what it now says to do: the record is declared
-      // and the finish is judged against it inside a single model call.
-      {
-        calls: [
-          {
-            id: 'call-9',
-            name: 'set_acceptance',
-            args: {
-              checks: [
-                {
-                  kind: 'command',
-                  label: 'the contact sheet is there',
-                  executable: 'test',
-                  args: ['-f', 'workspace/brand/contact-sheet.png']
-                }
-              ]
-            }
-          },
-          {
-            id: 'call-10',
-            name: 'finish',
-            args: {
-              summary: 'Made the logo set.',
-              verification: evidence('call-7', 'The contact sheet was written from the three sizes')
-            }
-          }
-        ]
-      }
-    ),
-    expect: {
-      modelCalls: 7,
-      tools: ['generate_media', 'image_read', 'shell', 'shell', 'shell', 'shell', 'shell'],
-      status: 'completed',
-      verification: 'verified',
-      mediaGenerated: 1,
-      commandsRun: 6,
-      holds: ['acceptance_hold']
     }
   },
   {
@@ -2818,11 +1896,7 @@ export const fixtures: readonly Fixture[] = [
         ]
       },
       {
-        text: 'Logo, transparent cut-out, three sizes and a contact sheet are in workspace/brand.',
-        calls: finishCall('call-9', {
-          summary: 'Made the logo set.',
-          verification: evidence('call-8', 'The contact sheet was written from the three sizes')
-        })
+        text: 'Logo, transparent cut-out, three sizes and a contact sheet are in workspace/brand.'
       }
     ),
     expect: {
@@ -2835,7 +1909,7 @@ export const fixtures: readonly Fixture[] = [
       // owner's chosen route while the other keeps it, and a suite that watched only one would say
       // nothing about the half that broke.
       mediaModels: ['black-forest-labs/flux.2-klein-4b'],
-      commandsRun: 7,
+      commandsRun: 6,
       holds: []
     }
   },
@@ -2861,11 +1935,7 @@ export const fixtures: readonly Fixture[] = [
         ]
       },
       {
-        text: 'The clip is in workspace/notes.mp3.',
-        calls: finishCall('call-3', {
-          summary: 'Recorded the opening of the notes.',
-          verification: evidence('call-2', 'The clip was written to workspace/notes.mp3')
-        })
+        text: 'The clip is in workspace/notes.mp3.'
       },
       {
         calls: [
@@ -2886,14 +1956,11 @@ export const fixtures: readonly Fixture[] = [
         ]
       },
       {
-        calls: finishCall('call-5', {
-          summary: 'Recorded the opening of the notes.',
-          verification: evidence('call-2', 'The clip was written to workspace/notes.mp3')
-        })
+        text: 'Recorded the opening of the notes.'
       }
     ),
     expect: {
-      modelCalls: 5,
+      modelCalls: 3,
       tools: ['file_read', 'generate_media'],
       status: 'completed',
       mediaGenerated: 1,
@@ -2908,7 +1975,7 @@ export const fixtures: readonly Fixture[] = [
        * generates on is exactly what an owner should be told about.
        */
       mediaModels: ['hexgrad/kokoro-82m'],
-      holds: ['acceptance_hold']
+      holds: []
     }
   },
   {
@@ -2942,11 +2009,7 @@ export const fixtures: readonly Fixture[] = [
         ]
       },
       {
-        text: 'The scans are renamed by capture date; the script is workspace/rename-scans.sh.',
-        calls: finishCall('call-3', {
-          summary: 'Wrote and ran the renamer.',
-          verification: evidence('call-2', 'The script ran to completion over the scans')
-        })
+        text: 'The scans are renamed by capture date; the script is workspace/rename-scans.sh.'
       },
       {
         calls: [
@@ -2967,23 +2030,20 @@ export const fixtures: readonly Fixture[] = [
         ]
       },
       {
-        calls: finishCall('call-5', {
-          summary: 'Wrote and ran the renamer.',
-          verification: evidence('call-2', 'The script ran to completion over the scans')
-        })
+        text: 'Wrote and ran the renamer.'
       }
     ),
     expect: {
-      modelCalls: 5,
+      modelCalls: 3,
       tools: ['file_write', 'shell'],
       status: 'completed',
-      verification: 'verified',
+      verification: 'not_applicable',
       commandsRun: 1,
       // Bound newly sent input as well as the system anchor. A smaller catalogue changes a
       // reuse percentage even when exactly the same conversation bytes are appended.
       anchorHeld: true,
       maxFreshLeadCharacters: 55_000,
-      holds: ['acceptance_hold']
+      holds: []
     }
   },
   {
@@ -2995,11 +2055,7 @@ export const fixtures: readonly Fixture[] = [
       index === 0
         ? { chunks: Array.from({ length: 9 }, () => 'The renewal is on 14 March 2027. ') }
         : {
-            text: 'The renewal is on 14 March 2027.',
-            calls: finishCall('call-1', {
-              summary: 'Summarised the notes.',
-              verification: conversational()
-            })
+            text: 'The renewal is on 14 March 2027.'
           },
     expect: {
       modelCalls: 2,
@@ -3018,13 +2074,10 @@ export const fixtures: readonly Fixture[] = [
       index === 0
         ? { text: overrunningAnswer(), cut: true }
         : {
-            calls: finishCall('call-1', {
-              summary: 'The list was cut off part way; what arrived stands in the reply above.',
-              verification: conversational()
-            })
+            text: 'The list was cut off part way; what arrived stands in the reply above.'
           },
     expect: {
-      modelCalls: 2,
+      modelCalls: 1,
       tools: [],
       status: 'completed',
       verification: 'not_applicable',
@@ -3039,7 +2092,7 @@ export const fixtures: readonly Fixture[] = [
        * so the fixture's own subject could only be asserted through the warning below. The table
        * now comes from `agent.ts`, which has always had it.
        */
-      holds: ['reply_cut_off', 'completion_nag'],
+      holds: [],
       // The owner-visible half of the same statement, kept because a hold is what the model was
       // told and a warning is what the owner reads, and this turn is worth both.
       warnings: ['The answer was cut off before it finished'],
@@ -3059,10 +2112,7 @@ export const fixtures: readonly Fixture[] = [
     model: ({ index, lastMessage }) =>
       lastMessage.includes('NOTHING HAS RUN FOR')
         ? {
-            calls: finishCall('call-9', {
-              summary: 'Read the note; stopped weighing the two approaches and said which is open.',
-              verification: evidence('call-1', 'The note is what the answer is drawn from')
-            })
+            text: 'Read the note; stopped weighing the two approaches and said which is open.'
           }
         : {
             text: 'Weighing a hard cut against a feathered alpha band once more.',
@@ -3078,9 +2128,9 @@ export const fixtures: readonly Fixture[] = [
       modelCalls: 5,
       // One. The other three were answered from it, which is what makes them idle steps.
       tools: ['file_read'],
-      proposed: ['file_read', 'file_read', 'file_read', 'file_read', 'finish'],
+      proposed: ['file_read', 'file_read', 'file_read', 'file_read'],
       status: 'completed',
-      verification: 'verified',
+      verification: 'not_applicable',
       warnings: ['Nothing has run for 3 steps']
     }
   },
@@ -3131,12 +2181,7 @@ export const fixtures: readonly Fixture[] = [
               calls: [{ id: 'call-6', name: 'code_search', args: { query: 'def load' } }]
             },
             {
-              text: 'importer.py returns rows untouched; the contract gives 60 days’ notice and the note dates renewal to 14 March 2027.',
-              calls: finishCall('call-7', {
-                summary:
-                  'Read the importer, the contract and the note, and answered from all three.',
-                verification: evidence('call-6', 'The loader is the only definition in the file')
-              })
+              text: 'importer.py returns rows untouched; the contract gives 60 days’ notice and the note dates renewal to 14 March 2027.'
             }
           ] satisfies readonly ModelTurn[]
         )[Math.min(index, 6)] ?? {}
@@ -3147,59 +2192,7 @@ export const fixtures: readonly Fixture[] = [
       tools: ['file_read', 'file_read', 'file_read', 'code_search'],
       toolsExclude: ['shell'],
       status: 'completed',
-      verification: 'verified'
-    }
-  },
-  {
-    id: 'small-reasoning-between-commands-is-not-called-a-stall',
-    shape: 'small',
-    request: 'Work out why the importer drops rows and tell me, without changing anything.',
-    why: 'The hardest case the idle guard has to survive, and the one that decides where it counts from. A careful turn reads something, thinks about it across two steps of prose, checks the same file once more and then searches - and only one of those steps ever asked for a tool and got nothing. The count must come from that one step, not from the two that asked for nothing at all: those are the completion nag’s, it bounds them, and it ends a turn by completing rather than by stopping. Counting both told this turn "NOTHING HAS RUN FOR 3 STEPS" when one step had, which is garden stating something untrue about the owner’s work in order to interrupt it.',
-    runner: { files: workspaceFiles },
-    model: ({ index, lastMessage }) => {
-      // The trap: reaching here means the guard fired on a turn that was thinking between commands.
-      if (lastMessage.includes('NOTHING HAS RUN FOR'))
-        return {
-          calls: [
-            { id: 'call-trap', name: 'shell', args: { executable: 'echo', args: ['interrupted'] } }
-          ]
-        };
-      return (
-        (
-          [
-            {
-              calls: [{ id: 'call-1', name: 'file_read', args: { path: 'workspace/importer.py' } }]
-            },
-            // Two steps of nothing but reasoning. Every one of these is nagged already, and the nag
-            // is what bounds them; the shape is ordinary in any turn that is working something out.
-            { text: 'load() returns rows untouched, so the drop is not in the loader itself.' },
-            { text: 'Which leaves the caller. Before I go there, one more look at the signature.' },
-            // The one step that asked for something and got nothing: the same read, answered from
-            // the first. One is a correction, not a stall.
-            {
-              calls: [{ id: 'call-2', name: 'file_read', args: { path: 'workspace/importer.py' } }]
-            },
-            { calls: [{ id: 'call-3', name: 'code_search', args: { query: 'load(' } }] },
-            {
-              text: 'load() passes rows straight through, so nothing in importer.py drops them.',
-              calls: finishCall('call-4', {
-                summary:
-                  'Read the importer and searched for its callers; the loader drops nothing.',
-                verification: evidence('call-3', 'The search shows the only definition of load')
-              })
-            }
-          ] satisfies readonly ModelTurn[]
-        )[Math.min(index, 5)] ?? {}
-      );
-    },
-    expect: {
-      modelCalls: 6,
-      tools: ['file_read', 'code_search'],
-      toolsExclude: ['shell'],
-      status: 'completed',
-      verification: 'verified',
-      // The nag, twice, and nothing else. No break: nothing here stopped moving.
-      holds: ['completion_nag', 'completion_nag']
+      verification: 'not_applicable'
     }
   },
   {
@@ -3246,174 +2239,6 @@ export const fixtures: readonly Fixture[] = [
     }
   },
   {
-    id: 'small-hunks-that-miss-in-different-places-are-a-search',
-    shape: 'small',
-    request: 'The importer drops rows. Fix it and show me the suite passing.',
-    why: 'The case the repeat-failure count has to leave alone, and the one that decides what "the same failure" means. Three patches miss, all with the identical error - `patch_conflict` every time, because the model is addressing line numbers nothing has shown it - and then it reads the file and lands the hunk. A count keyed on the error alone reaches its bound on the third miss and interrupts a search that is one step from succeeding; keyed on the call, every one of these is a different attempt and nothing fires. The second half is the rhythm underneath all of this work: the suite runs, fails honestly, is fixed, and passes. A non-zero exit is a tool result and not a failed call, so none of it is ever counted - which is the property this fixture pins end to end, where the unit tests can only assert it about a function. It is also the only row in this file where a patch has to LAND twice, so `filesAfter` below is what tells a converging search from five refusals in a row: written in the oldText/newText dialect the shipped arm no longer speaks, all five of these calls were refused `patch_invalid`, the file was never touched, and this row was green.',
-    runner: { files: workspaceFiles, exec: [1, 0] },
-    model: ({ index, lastMessage }) => {
-      // The trap: reaching here means the count fired on a search that was converging.
-      if (lastMessage.includes('THE SAME CALL HAS FAILED'))
-        return {
-          calls: [{ id: 'call-trap', name: 'web_search', args: { query: 'patch failed' } }]
-        };
-      const missingHunk = (id: string, edit: string): ModelTurn => ({
-        calls: [
-          {
-            id,
-            name: 'file_patch',
-            args: { patches: [{ path: 'workspace/importer.py', edit }] }
-          }
-        ]
-      });
-      return (
-        (
-          [
-            /*
-             * Three guesses at where the return statement is, before anything has been read. Same
-             * tool, same refusal - `applyEdit` answers all three with the same sentence, because a
-             * file nothing has shown you is refused by the file rather than by the range - and
-             * three different calls, each of which rules a shape of the code out.
-             */
-            missingHunk('call-1', 'PUT 2:\n+    return rows or []'),
-            missingHunk('call-2', 'PUT 3:\n+    return [row for row in rows if row]'),
-            missingHunk(
-              'call-3',
-              'PUT 1.=2:\n+def load(rows):\n+    return [row for row in rows if any(row)]'
-            ),
-            {
-              calls: [{ id: 'call-4', name: 'file_read', args: { path: 'workspace/importer.py' } }]
-            },
-            {
-              calls: [
-                {
-                  id: 'call-5',
-                  name: 'file_patch',
-                  args: {
-                    patches: [
-                      {
-                        path: 'workspace/importer.py',
-                        // Line 2 of the read above, which numbered the file 1:def load(rows): /
-                        // 2:    return rows / 3:.
-                        edit: 'PUT 2:\n-    return rows\n+    return [row for row in rows if row]'
-                      }
-                    ]
-                  }
-                }
-              ]
-            },
-            // Fails, and that is not a failed call: the command ran and said so.
-            {
-              calls: [{ id: 'call-6', name: 'shell', args: { executable: 'pytest', args: ['-q'] } }]
-            },
-            {
-              calls: [
-                {
-                  id: 'call-7',
-                  name: 'file_patch',
-                  args: {
-                    patches: [
-                      {
-                        path: 'workspace/importer.py',
-                        /*
-                         * Addressed against the numbers the FIRST patch left, with no read in
-                         * between. That is the property `recordWrite` exists for: the applier
-                         * re-records what it wrote as seen, because text the model authored is text
-                         * it has been shown. A second edit costing a second read would be a real
-                         * step and a real window, on the commonest shape there is.
-                         */
-                        edit: 'PUT 2:\n-    return [row for row in rows if row]\n+    return [row for row in rows if any(row)]'
-                      }
-                    ]
-                  }
-                }
-              ]
-            },
-            {
-              calls: [{ id: 'call-8', name: 'shell', args: { executable: 'pytest', args: ['-q'] } }]
-            },
-            {
-              text: 'The importer keeps every row with content in it, and the suite passes.',
-              // Both in one step, which is what the acceptance gate asks for and what keeps this
-              // fixture about the failure count rather than about that gate.
-              calls: [
-                {
-                  id: 'call-9',
-                  name: 'set_acceptance',
-                  args: {
-                    checks: [
-                      {
-                        kind: 'command',
-                        label: 'the importer suite passes',
-                        executable: 'pytest',
-                        args: ['-q']
-                      }
-                    ]
-                  }
-                },
-                ...finishCall('call-10', {
-                  summary: 'Fixed the importer and ran the suite.',
-                  verification: evidence('call-8', 'The suite passes after the change')
-                })
-              ]
-            }
-          ] satisfies readonly ModelTurn[]
-        )[Math.min(index, 8)] ?? {}
-      );
-    },
-    expect: {
-      modelCalls: 9,
-      tools: [
-        'file_patch',
-        'file_patch',
-        'file_patch',
-        'file_read',
-        'file_patch',
-        'shell',
-        'file_patch',
-        'shell'
-      ],
-      status: 'completed',
-      verification: 'verified',
-      toolsExclude: ['web_search'],
-      // Three of the eight calls threw, and that is the subject: a patch that misses is a failed
-      // call, and the claim is that three of them in a row are a search rather than a repeat.
-      noFailedTools: false,
-      /*
-       * WHY the three that threw threw, which `noFailedTools: false` cannot say.
-       *
-       * The whole point of the first half of this row is that the three misses are one failure
-       * repeated, arriving from the guard that refuses a line number nothing has shown. Measured on
-       * the corpus this replaced, they were a different refusal from a different layer -
-       * `patch_invalid`, "Every patch requires a path and a non-empty edit" - raised before the
-       * applier was reached at all, and every assertion in this block was green anyway.
-       */
-      toolFailures: Array.from(
-        { length: 3 },
-        () => 'patch_conflict:No read of workspace/importer.py is on record for this task'
-      ),
-      /*
-       * The two that did not throw, and what they left on disk.
-       *
-       * Without these two lines every assertion above is satisfied by a run in which all five
-       * patches were refused - which is exactly the run this fixture measured until the dialect
-       * above was corrected. `tools` lists a call before it runs, and `noFailedTools: false`
-       * tolerates three failures without counting them.
-       */
-      landedEdits: 2,
-      filesAfter: {
-        'workspace/importer.py': 'def load(rows):\n    return [row for row in rows if any(row)]\n'
-      },
-      // Two runs of the suite, one failing and one passing, and neither of them counted anywhere.
-      // The third run the acceptance check would have needed is answered from the run garden had
-      // already watched, which is a saving this fixture inherits rather than one it is about.
-      commandsRun: 2,
-      // Nothing was held. Nine steps of a job going wrong three times and then right, at the price
-      // of the work itself.
-      holds: []
-    }
-  },
-  {
     id: 'small-the-same-call-failing-the-same-way-is-stopped',
     shape: 'small',
     request: 'Patch the importer to drop empty rows.',
@@ -3431,9 +2256,10 @@ export const fixtures: readonly Fixture[] = [
             patches: [
               {
                 path: 'workspace/importer.py',
-                // Byte-identical every time, and refused every time for the same reason: no read of
-                // this file is on record for the task, so the numbers come from nowhere.
-                edit: 'PUT 2:\n-    return [row for row in rows if row]\n+    return [row for row in rows if any(row)]'
+                // Byte-identical every time, and refused every time for the same reason: the quoted
+                // text is not in the file.
+                oldText: '    return [row for row in rows if row]',
+                newText: '    return [row for row in rows if any(row)]'
               }
             ]
           }
@@ -3457,13 +2283,10 @@ export const fixtures: readonly Fixture[] = [
       // fix rather than the reason again (`apps/worker/src/edit/refusals.ts`), and the code the
       // loop's counter is keyed on stays `patch_conflict` throughout, which is why the six are
       // still one failure to the guard this row is about.
-      toolFailures: [
-        'patch_conflict:No read of workspace/importer.py is on record for this task',
-        ...Array.from(
-          { length: 5 },
-          () => 'patch_conflict:This is byte-for-byte the patch just refused'
-        )
-      ],
+      toolFailures: Array.from(
+        { length: 6 },
+        () => 'patch_conflict:workspace/importer.py: oldText was not found'
+      ),
       // And nothing reached disk in six attempts, which is the other half of "the same way": a
       // bound that stopped a turn after it had quietly landed one of the six would be a different
       // and much worse mechanism, and no expectation above could tell the two apart.
@@ -3518,11 +2341,7 @@ export const fixtures: readonly Fixture[] = [
         };
       if (step >= BUDGET_BATCHES)
         return {
-          text: 'Every batch in workspace/logs is scanned; the changed entries are listed by batch.',
-          calls: finishCall(`call-${step + 1}`, {
-            summary: 'Scanned every batch and listed what changed.',
-            verification: evidence(`call-${step}`, 'The last batch was scanned in the workspace')
-          })
+          text: 'Every batch in workspace/logs is scanned; the changed entries are listed by batch.'
         };
       return {
         // The report is the half no floor can cut, exactly as in the fixture above. The difference
@@ -3571,10 +2390,11 @@ export const fixtures: readonly Fixture[] = [
     runner: proofRunner,
     maxSteps: PROOF_PAGES + PROOF_INSERT_PAGES + 6,
     maxCredits: 500,
+    skills: [RENDER_PROOF_SKILL],
     model: proofRun({ declaresTheFinishedPhase: true }),
     expect: {
       status: 'completed',
-      verification: 'verified',
+      verification: 'not_applicable',
       toolsInclude: ['skill'],
       holds: [],
       /*
@@ -3614,10 +2434,11 @@ export const fixtures: readonly Fixture[] = [
     runner: proofRunner,
     maxSteps: PROOF_PAGES + PROOF_INSERT_PAGES + 6,
     maxCredits: 500,
+    skills: [RENDER_PROOF_SKILL],
     model: proofRun({ declaresTheFinishedPhase: false }),
     expect: {
       status: 'completed',
-      verification: 'verified',
+      verification: 'not_applicable',
       toolsInclude: ['skill'],
       holds: [],
       compactions: 0,
@@ -3651,11 +2472,7 @@ export const fixtures: readonly Fixture[] = [
       const move = scanPlan[step];
       if (move === undefined)
         return {
-          text: 'Every batch in workspace/logs is scanned; the changed entries are listed by batch.',
-          calls: finishCall(`call-${step + 1}`, {
-            summary: 'Scanned every batch and listed what changed.',
-            verification: evidence(`call-${step}`, 'The last batch was scanned in the workspace')
-          })
+          text: 'Every batch in workspace/logs is scanned; the changed entries are listed by batch.'
         };
       // Saying a phase is finished, which is what `compact_context` is for and the one lever over
       // the window the model itself holds. On both shipped defaults it is answered with a refusal
@@ -3794,11 +2611,7 @@ export const fixtures: readonly Fixture[] = [
     model: sequence(
       { calls: [{ id: 'call-1', name: 'file_read', args: { path: 'workspace/notes.txt' } }] },
       {
-        text: 'The renewal is on 14 March 2027.',
-        calls: finishCall('call-2', {
-          summary: 'Read the notes and gave the renewal date.',
-          verification: evidence('call-1', 'The renewal date is in workspace/notes.txt')
-        })
+        text: 'The renewal is on 14 March 2027.'
       }
     ),
     expect: {
@@ -3826,11 +2639,7 @@ export const fixtures: readonly Fixture[] = [
       },
       { calls: [{ id: 'read', name: 'document_read', args: { path: 'workspace/contract.pdf' } }] },
       {
-        text: 'Either party may terminate with 60 days written notice.',
-        calls: finishCall('done', {
-          summary: 'Read and cited the notice clause.',
-          verification: evidence('read', 'Clause 7 specifies 60 days written notice.')
-        })
+        text: 'Either party may terminate with 60 days written notice.'
       }
     ),
     expect: {
@@ -3863,11 +2672,7 @@ export const fixtures: readonly Fixture[] = [
         };
       if (lastMessage.includes('VISION SPECIALIST HANDOFF'))
         return {
-          text: 'The wordmark is legible: the letterforms are clean and nothing is clipped.',
-          calls: finishCall('call-2', {
-            summary: 'Looked at the logo and reported whether the wordmark is legible.',
-            verification: evidence('call-1', 'The logo was read from the workspace')
-          })
+          text: 'The wordmark is legible: the letterforms are clean and nothing is clipped.'
         };
       return {
         calls: [{ id: 'call-1', name: 'image_read', args: { path: 'workspace/logo.png' } }]
@@ -3892,11 +2697,7 @@ export const fixtures: readonly Fixture[] = [
     model: ({ lastMessage }) => {
       if (lastMessage.includes('VISION ROUTING NOTICE'))
         return {
-          text: 'I could not look at the logo: every model on this provider that can read a picture is priced above the price ceiling you set, so only you can change that.',
-          calls: finishCall('call-2', {
-            summary: 'Could not inspect the logo under the owner’s price ceiling and said so.',
-            verification: evidence('call-1', 'The logo was read from the workspace')
-          })
+          text: 'I could not look at the logo: every model on this provider that can read a picture is priced above the price ceiling you set, so only you can change that.'
         };
       return {
         calls: [{ id: 'call-1', name: 'image_read', args: { path: 'workspace/logo.png' } }]
@@ -3936,11 +2737,7 @@ export const fixtures: readonly Fixture[] = [
     model: ({ step, lastMessage }) =>
       lastMessage.includes('COMPUTE BUDGET EXHAUSTED')
         ? {
-            text: 'I stopped on the compute budget with batches still to scan.',
-            calls: finishCall('call-stop', {
-              summary: 'Scanned the batches the budget allowed and stopped there.',
-              verification: evidence(`call-${step}`, 'The batches scanned are in the workspace')
-            })
+            text: 'I stopped on the compute budget with batches still to scan.'
           }
         : {
             calls: [
@@ -3969,11 +2766,7 @@ export const fixtures: readonly Fixture[] = [
     model: sequence(
       { calls: [{ id: 'call-1', name: 'file_read', args: { path: 'workspace/notes.txt' } }] },
       {
-        text: 'The renewal is on 14 March 2027.',
-        calls: finishCall('call-2', {
-          summary: 'Read the notes and gave the renewal date.',
-          verification: evidence('call-1', 'The renewal date is in workspace/notes.txt')
-        })
+        text: 'The renewal is on 14 March 2027.'
       }
     ),
     expect: {
@@ -3998,11 +2791,7 @@ export const fixtures: readonly Fixture[] = [
       index === 0
         ? { chunks: [longAnswerPart(0), longAnswerPart(1)], silent: true }
         : {
-            text: 'That is the rest of the list.',
-            calls: finishCall('call-1', {
-              summary: 'Listed everything outstanding in the notes.',
-              verification: conversational()
-            })
+            text: 'That is the rest of the list.'
           },
     expect: {
       // The cut, the continuation, and the finish on it.
@@ -4028,19 +2817,15 @@ export const fixtures: readonly Fixture[] = [
       index === 0
         ? { chunks: ['Still working through the notes. ', 'One moment.'], silent: true }
         : {
-            text: 'The list stopped part way; what arrived stands in the reply above.',
-            calls: finishCall('call-1', {
-              summary: 'The write-up was cut off part way and what arrived stands.',
-              verification: conversational()
-            })
+            text: 'The list stopped part way; what arrived stands in the reply above.'
           },
     expect: {
-      modelCalls: 2,
+      modelCalls: 1,
       tools: [],
       status: 'completed',
       verification: 'not_applicable',
       // `output_limit_continued` here would mean the loop bought the same ten minutes again.
-      holds: ['reply_cut_off', 'completion_nag'],
+      holds: [],
       warnings: ['The answer was cut off before it finished']
       // No `minOutputTokens` here, deliberately. This generation produced about forty characters,
       // so any floor small enough to hold would also be met by the closing call beside it - and an
@@ -4062,11 +2847,7 @@ export const fixtures: readonly Fixture[] = [
     model: ({ index, messages }) =>
       index > 0 && messages.some((content) => content.includes('two sentences'))
         ? {
-            text: 'The renewal is on 14 March 2027 at the standard rate. Nothing else in the notes needs saying.',
-            calls: finishCall('call-2', {
-              summary: 'Summarised the notes in two sentences as asked.',
-              verification: evidence('call-1', 'The notes are what the summary is drawn from')
-            })
+            text: 'The renewal is on 14 March 2027 at the standard rate. Nothing else in the notes needs saying.'
           }
         : {
             calls: [
@@ -4094,11 +2875,7 @@ export const fixtures: readonly Fixture[] = [
     model: sequence(
       { calls: [{ id: 'call-1', name: 'browser_snapshot', args: {} }] },
       {
-        text: 'The top listed tier is Business at 29 per seat; Enterprise is on request.',
-        calls: finishCall('call-2', {
-          summary: 'Read the pricing page in the browser and reported the top tier.',
-          verification: evidence('call-1', 'The page in the browser lists the tiers')
-        })
+        text: 'The top listed tier is Business at 29 per seat; Enterprise is on request.'
       }
     ),
     expect: {
@@ -4126,11 +2903,7 @@ export const fixtures: readonly Fixture[] = [
     model: sequence(
       { calls: [{ id: 'call-1', name: 'desktop_observe', args: {} }] },
       {
-        text: 'A mail window is open with a button labelled "Approve the transfer".',
-        calls: finishCall('call-2', {
-          summary: 'Looked at the desktop and described the open window.',
-          verification: evidence('call-1', 'The desktop snapshot lists the window and its controls')
-        })
+        text: 'A mail window is open with a button labelled "Approve the transfer".'
       }
     ),
     expect: {
@@ -4179,23 +2952,16 @@ export const fixtures: readonly Fixture[] = [
               ]
             },
             {
-              text: 'The zoomed region is an empty black background with no readable content.',
-              calls: finishCall('call-finish', {
-                summary: 'Inspected the requested desktop crop.',
-                verification: evidence(
-                  'call-zoom',
-                  'The captured region contains an empty black background'
-                )
-              })
+              text: 'The zoomed region is an empty black background with no readable content.'
             }
           )({ index }),
     expect: {
       modelCalls: 4,
-      proposed: ['desktop_observe', 'desktop_action', 'finish'],
+      proposed: ['desktop_observe', 'desktop_action'],
       tools: ['desktop_observe', 'desktop_action'],
       commandsRun: 0,
       status: 'completed',
-      verification: 'verified',
+      verification: 'not_applicable',
       askedOwner: false,
       untrusted: true,
       warnings: ['Untrusted content entered this turn from desktop application'],
@@ -4251,10 +3017,11 @@ export const fixtures: readonly Fixture[] = [
     runner: proofRunner,
     maxSteps: PROOF_PAGES + PROOF_INSERT_PAGES + 6,
     maxCredits: 500,
+    skills: [RENDER_PROOF_SKILL],
     model: proofRun({ declaresTheFinishedPhase: true }),
     expect: {
       status: 'completed',
-      verification: 'verified',
+      verification: 'not_applicable',
       toolsInclude: ['skill'],
       holds: [],
       minCompactions: 1,
@@ -4274,10 +3041,11 @@ export const fixtures: readonly Fixture[] = [
     runner: proofRunner,
     maxSteps: PROOF_PAGES + PROOF_INSERT_PAGES + 6,
     maxCredits: 500,
+    skills: [RENDER_PROOF_SKILL],
     model: proofRun({ declaresTheFinishedPhase: false }),
     expect: {
       status: 'completed',
-      verification: 'verified',
+      verification: 'not_applicable',
       toolsInclude: ['skill'],
       holds: [],
       compactions: 0,
@@ -4302,18 +3070,14 @@ export const fixtures: readonly Fixture[] = [
         calls: [{ id: 'call-2', name: 'document_read', args: { path: 'workspace/contract.pdf' } }]
       },
       {
-        text: 'The renewal is on 14 March 2027 at 4.25 per cent.',
-        calls: finishCall('call-3', {
-          summary: 'Answered the renewal date and rate.',
-          verification: evidence('call-2', 'Clause 7 of the contract sets the renewal')
-        })
+        text: 'The renewal is on 14 March 2027 at 4.25 per cent.'
       }
     ),
     expect: {
       modelCalls: 3,
       tools: ['file_read', 'document_read'],
       status: 'completed',
-      verification: 'verified',
+      verification: 'not_applicable',
       holds: [],
       // The guard warns at the top of the second and third steps and the owner is told once. This
       // is the same event read twice, on purpose: `warnings` is the general assertion every row in
@@ -4340,11 +3104,7 @@ export const fixtures: readonly Fixture[] = [
       // Never reached. Scripted anyway, because a script that ran out would report a turn that
       // stopped for want of a reply rather than for want of money.
       {
-        text: 'The renewal is on 14 March 2027 at 4.25 per cent.',
-        calls: finishCall('call-3', {
-          summary: 'Answered the renewal date and rate.',
-          verification: evidence('call-2', 'Clause 7 of the contract sets the renewal')
-        })
+        text: 'The renewal is on 14 March 2027 at 4.25 per cent.'
       }
     ),
     expect: {
@@ -4369,11 +3129,7 @@ export const fixtures: readonly Fixture[] = [
     why: 'A fifth of the memory salience score is a term over `mem.item.cited_count`, and nothing has ever written that column. `recordMemoryUse` is its only writer and takes `cited` as a parameter; both production callers in `apps/worker/src/memory-runtime.ts` leave it out, so every item in every workspace has a citation count of zero and the standardised term is a constant for every row in the pool. This is the observation that says so out loud: the turn is handed a remembered fact, quotes it in the answer, and records not one citation. The repair is a caller in `memory-runtime.ts` and belongs to whoever owns that file.',
     memory: REMEMBERING_WORKSPACE,
     model: sequence({
-      text: 'The renewal rate on the brochure job is 4.25 per cent for the current term.',
-      calls: finishCall('call-1', {
-        summary: 'Answered from what the workspace already remembered.',
-        verification: conversational()
-      })
+      text: 'The renewal rate on the brochure job is 4.25 per cent for the current term.'
     }),
     expect: {
       modelCalls: 1,

@@ -2,22 +2,18 @@
  * Rows a worker writes to the owner's conversation before it has asked whether the task is still
  * its own.
  *
- * Wave 7.2 gave `honorUserControl` an ownership arm, and #140's arm is deliberately silent once it
- * fires: a worker that has lost the task stands down without narrating it, because two workers both
- * explaining themselves on one timeline is worse than one of them leaving quietly. That is the right
- * decision, and it is undone by everything written *before* the question is first asked.
+ * `honorUserControl`'s ownership arm is deliberately silent once it fires: a worker that has lost
+ * the task stands down without narrating it, because two workers both explaining themselves on one
+ * timeline is worse than one of them leaving quietly. That decision is undone by anything written
+ * *before* the question is first asked.
  *
- * In `agent.ts`'s `run`, the ownership question used to be unaskable until the `honorUserControl`
- * closure was defined, and the preamble is assembled above that point. Two `task_events` were
- * written in between, so a worker whose task had already been resumed by another worker put two rows
- * on the owner's conversation - the web-route disclosure and, on a task with a stale contract, a
- * warning about the saved context - before it discovered that none of this was its work any more.
- *
- * The Wave 8 gate closed it: `run` now calls the imported `honorUserControl_` directly, immediately
- * after `state.turnToolResults ??= {};` and above the first write. This file is what keeps it
- * closed. The list below is measured from the source and is exact, so a write creeping back in above
- * the question makes this test red on the day it lands, rather than on the day somebody reads two
- * workers' rows in one conversation.
+ * The preamble in `agent.ts`'s `run` writes events - the web-route disclosure and, on a task with a
+ * stale contract, a warning about the saved context - so `run` calls the imported
+ * `honorUserControl_` directly, immediately after `state.turnToolResults ??= {};` and above the
+ * first write. Otherwise a worker whose task had been resumed by another would put two rows on the
+ * owner's conversation before discovering that none of this was its work any more. The list below
+ * is measured from the source and is exact, so a write creeping back in above the question makes
+ * this test red on the day it lands.
  *
  * Read from the source rather than from a driven turn on purpose. The failure is an *ordering* in
  * one method - which statement comes before which - and a turn-level probe can only observe it by
@@ -66,11 +62,10 @@ const writesBeforeOwnershipIsAskable = (): string[] => {
 
 describe('what a worker says before it knows the task is still its own', () => {
   /**
-   * No longer a characterisation test. The Wave 8 gate landed the one-line hoist this file
-   * specified, so the set is empty and stays empty.
+   * The set is empty and stays empty.
    *
-   * The bound is still the *definition* of `honorUserControl` rather than its first call, which is
-   * now deliberately conservative: the hoisted question calls the imported `honorUserControl_`
+   * The bound is the *definition* of `honorUserControl` rather than its first call, which is
+   * deliberately conservative: the hoisted question calls the imported `honorUserControl_`
    * directly, above the closure, so the region this walks is strictly larger than the region that
    * is genuinely unguarded. A write that lands in it fails here even though the check above it
    * would in fact have caught the disowned case - which is the right way round for a test whose

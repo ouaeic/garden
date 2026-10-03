@@ -65,10 +65,10 @@ describe('the turn wall clock', () => {
 /**
  * The ownership refusal inside the renewal, at the only level that can still reach it.
  *
- * Wave 7.2 gave `honorUserControl` an arm for #140, and that arm stands a disowned run down at the
- * step boundary in silence. It runs first, so the whole-loop case in `agent-run.test.ts` - a turn
- * whose lease was foreign before it ever started - no longer arrives at the step ceiling, and the
- * refusal this describes stopped being reachable from there.
+ * `honorUserControl`'s ownership arm stands a disowned run down at the step boundary in silence.
+ * It runs first, so the whole-loop case in `agent-run.test.ts` - a turn whose lease was foreign
+ * before it ever started - never arrives at the step ceiling, and the refusal this describes is not
+ * reachable from there.
  *
  * It is not dead. `renewStepBudget` is evaluated at the top of the loop condition, and the last
  * `honorUserControl` before it is a whole model call and a whole tool batch earlier: a lease lost

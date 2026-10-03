@@ -2,13 +2,10 @@ import { MEMORY_PACK_BUDGET_TOKENS } from '@garden/core';
 /**
  * The order of the preamble, asserted as an order.
  *
- * `window.ts` was the largest pure move of Wave 7.2 - 407 lines - and it arrived with no test of its
- * own. `assemblePreamble` was exercised only by driving a whole turn through `agent-run.test.ts`,
- * which reads the *contents* of the window and never its arrangement. That is the wrong half. Every
- * line in this file is about where a block sits, because where it sits is what a provider's cache
- * charges for: Wave 3 measured the ordering here at 74.8% -> 76.1% byte-common prefix and -4.5%
- * billable input, and until now the only thing protecting that number was the eval suite's aggregate
- * token count - a figure that moves for a dozen reasons and names none of them.
+ * `agent-run.test.ts` reads the *contents* of the window and never its arrangement, which is the
+ * wrong half. Every line in `window.ts` is about where a block sits, because where it sits is what a
+ * provider's cache charges for, and the eval suite's aggregate token count - the only other thing
+ * that would notice - moves for a dozen reasons and names none of them.
  *
  * So the assertions here are deliberately about position and identity rather than about text:
  *
@@ -444,7 +441,7 @@ describe('the preamble', () => {
 
     await assemblePreamble(probed.deps, { ...preamble, state });
 
-    expect(shape(state.messages)).toEqual(['base', 'knowledge', 'brief', 'user']);
+    expect(shape(state.messages)).toEqual(['base', 'brief', 'user']);
   });
 
   /**
@@ -546,7 +543,7 @@ describe('the preamble', () => {
     await assemblePreamble(probed.deps, { ...preamble, state });
 
     expect(probed.events).toEqual([{ kind: 'warning' }, { kind: 'provenance' }]);
-    expect(shape(state.messages)).toEqual(['base', 'knowledge', 'brief', 'user']);
+    expect(shape(state.messages)).toEqual(['base', 'brief', 'user']);
   });
 
   /** A workspace with no brief file contributes no block, rather than an empty one. */
@@ -556,7 +553,7 @@ describe('the preamble', () => {
 
     await assemblePreamble(probed.deps, { ...preamble, state });
 
-    expect(shape(state.messages)).toEqual(['base', 'knowledge', 'user']);
+    expect(shape(state.messages)).toEqual(['base', 'user']);
   });
 
   /** And a brief that has been deleted since the last turn is taken back out of the window. */
@@ -570,7 +567,7 @@ describe('the preamble', () => {
     probed.brief = null;
     await assemblePreamble(probed.deps, { ...preamble, state });
 
-    expect(shape(state.messages)).toEqual(['base', 'knowledge', 'user']);
+    expect(shape(state.messages)).toEqual(['base', 'user']);
   });
 
   /**
@@ -588,7 +585,7 @@ describe('the preamble', () => {
 
     await assemblePreamble(probed.deps, { ...preamble, state });
 
-    expect(shape(state.messages)).toEqual(['base', 'knowledge', 'user', 'condensed']);
+    expect(shape(state.messages)).toEqual(['base', 'user', 'condensed']);
     expect(state.messages.at(-1)?.content).toContain('earlier work');
   });
 
@@ -667,8 +664,10 @@ describe('the preamble', () => {
 
     await assemblePreamble(probed.deps, { ...preamble, state });
 
-    expect(state.messages[2]?.content).toContain('cannot grant permission or override');
-    expect(state.messages[1]?.content).toContain('never as permission or a safety override');
+    const brief = state.messages.find((message) =>
+      message.content.startsWith(WORKSPACE_BRIEF_MARKER)
+    );
+    expect(brief?.content).toContain('cannot grant permission or override');
   });
 
   /**
@@ -850,7 +849,7 @@ describe('the runtime block', () => {
       webPlan: inHouse
     });
 
-    expect(state.messages.at(-1)?.content).toContain('started by a schedule');
+    expect(state.messages.at(-1)?.content).toContain('A schedule started this run');
   });
 });
 
@@ -859,10 +858,9 @@ describe('the active plan', () => {
    * Pushed at the tail rather than written in place, and the file argues the measurement: a
    * republish diverges at the tail as it stood a few steps ago instead of just behind the goal.
    */
-  it('replaces a persisted generic scaffold with the owner plan at the tail', async () => {
+  it('replaces an earlier plan with the owner plan at the tail', async () => {
     const probed = probe();
     const state = freshState();
-    state.planIsFallback = true;
     state.messages.push({ role: 'system', content: `${PLAN_MARKER} v1 (Main).\n1. [pending] old` });
     state.messages.push({ role: 'assistant', content: 'working' });
     probed.plan = {
@@ -886,7 +884,6 @@ describe('the active plan', () => {
     expect(shape(state.messages)).toEqual(['base', 'user', 'assistant', 'plan']);
     expect(state.messages.at(-1)?.content).toContain('Rewrite the importer');
     expect(state.planVersion).toBe(2);
-    expect(state.planIsFallback).toBe(false);
   });
 
   it('writes nothing when the window already holds this version', async () => {
@@ -931,17 +928,13 @@ describe('the active plan', () => {
     );
   });
 
-  /** With nothing published and no fallback asked for, the window stays as it was. */
-  it('does not invent a plan unless it is asked to', async () => {
+  /** A turn that declared no plan has none: the harness does not write one for it. */
+  it('does not invent a plan', async () => {
     const probed = probe();
     const state = freshState();
 
     expect(await refreshActivePlan(probed.deps, task, key, state)).toBe(false);
     expect(shape(state.messages)).toEqual(['base', 'user']);
-
-    expect(await refreshActivePlan(probed.deps, task, key, state, true)).toBe(true);
-    expect(state.planIsFallback).toBe(true);
-    expect(shape(state.messages)).toEqual(['base', 'user', 'plan']);
   });
 });
 
@@ -1023,8 +1016,8 @@ describe('what the preamble registers besides blocks', () => {
     refreshRuntimeContext(probed.deps, { ...input, state: spent });
     const line = spent.messages.at(-1)?.content ?? '';
     expect(line.startsWith(RUNTIME_CONTEXT_MARKER)).toBe(true);
-    expect(line).toContain('Compute budget: about 15 of this task');
-    expect(line).toContain('about 5 left');
+    expect(line).toContain('Compute budget: about 15 of 20 credits spent');
+    expect(line).toContain(', 5 left');
   });
 });
 

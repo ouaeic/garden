@@ -2,26 +2,15 @@ import type { ModelRelease } from '@garden/contracts';
 /**
  * The API server's context: everything a route needs that is not the route.
  *
- * `server.ts` was one 9,200-line function whose every helper was a closure, which meant a route
- * could not be moved out of it without dragging the whole file along. This module is the seam that
- * makes that move possible: `createApiContext` builds the stores, keys, caches and response
- * builders exactly once, in exactly the order `buildServer` used to build them, and hands back one
- * object. A route group is then a function of that object and nothing else.
+ * `createApiContext` builds the stores, keys, caches and response builders once, in a fixed order,
+ * and hands back one object. A route group is a function of that object and nothing else.
  *
- * Two rules keep it honest, and both are why the Wave 5 decomposition was allowed to touch this
- * file at all:
- *
- * - Every body here is the one it replaced, moved and not rewritten. Three edits ride along and
- *   there are no others: the `export` keyword, the three diagnostics helpers taking the state path
- *   they used to close over instead of reading it off the config, and the event-stream counter
- *   becoming a function so it can cross a return boundary. Prettier then rewrapped five lines that
- *   the shallower indentation or the added keyword changed the width of.
- * - Nothing in here decides anything. Policy - who may call, what is refused, what is charged -
- *   stays in the routes, so a reader looking for a rule never has to look here first.
+ * Nothing in here decides anything. Policy - who may call, what is refused, what is charged - stays
+ * in the routes, so a reader looking for a rule never has to look here first.
  *
  * The whole surface travels as `ApiContext`, derived from the factory rather than declared beside
- * it. A hand-written interface is a second place to state the same thirty signatures, and this
- * repository has spent four waves removing pairs of facts that drifted apart.
+ * it: a hand-written interface would be a second place to state the same thirty signatures, free to
+ * drift from the first.
  */
 import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
@@ -917,7 +906,6 @@ export const createApiContext = async (config: ApiConfig, overrides: ApiOverride
       steps: TaskPlanStep[];
       branchName?: string;
       outputs?: TaskPlan['outputs'];
-      presentation?: TaskPlan['presentation'];
       directionEventId?: string;
     }>(plan.stepsCiphertext, key);
     return {
@@ -928,7 +916,6 @@ export const createApiContext = async (config: ApiConfig, overrides: ApiOverride
       branchName: content.branchName ?? plan.branchName,
       steps: content.steps,
       ...(content.outputs === undefined ? {} : { outputs: content.outputs }),
-      ...(content.presentation ? { presentation: content.presentation } : {}),
       ...(content.directionEventId ? { directionEventId: content.directionEventId } : {}),
       createdBy: plan.createdBy,
       createdAt: plan.createdAt
@@ -1121,8 +1108,5 @@ export const createApiContext = async (config: ApiConfig, overrides: ApiOverride
   };
 };
 
-/**
- * What a route group receives. Derived from the factory so the two cannot drift; Wave 6 may narrow
- * it per route group once the groups exist and their real needs are visible.
- */
+/** What a route group receives. Derived from the factory so the two cannot drift. */
 export type ApiContext = Awaited<ReturnType<typeof createApiContext>>;

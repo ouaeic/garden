@@ -259,12 +259,15 @@ export async function checkDesk({
       await fit();
       await page.screenshot({ path: resolve(report, `desk-home-${width}-${height}.png`) });
       await page.goto(`${origin}/?task=${task.id}`);
-      const composer = page.getByRole('button', {
-        name: 'Continue this conversation…',
-        exact: true
-      });
+      // The reply box is always there: no click stands between a result and the next message.
+      const composer = page.locator('.garden-task-composer textarea');
       await composer.waitFor();
-      await page.locator('.garden-outputs.is-fitted').waitFor();
+      await page.locator('.garden-outputs').waitFor();
+      assert.equal(
+        await page.getByRole('navigation', { name: 'Output views' }).count(),
+        0,
+        'The result, its preview and its files share one view'
+      );
       await fit();
       await inWindow(composer);
       if (width >= 960 && height >= 540) {
@@ -290,36 +293,28 @@ export async function checkDesk({
         .getByRole('button', { name: '0', exact: true })
         .click();
       await inWindow(page.locator('.garden-preview-frame'));
-      const output = page.getByRole('navigation', { name: 'Output views' });
-      await output.getByRole('button', { name: 'Summary', exact: true }).click();
       await page
         .getByText('The maze is ready to open. Use the arrow keys to play.', { exact: true })
         .waitFor();
-      await output.getByRole('button', { name: 'Downloads', exact: true }).click();
       await page.getByRole('link', { name: 'Download', exact: true }).waitFor();
-      await output.getByRole('button', { name: 'Preview', exact: true }).click();
       await page
         .frameLocator('.garden-preview-frame')
         .getByRole('button', { name: '1', exact: true })
         .waitFor();
       await page.screenshot({ path: resolve(report, `desk-project-${width}-${height}.png`) });
       await composer.click();
-      const draft = page.locator('.garden-task-composer textarea');
+      const draft = composer;
       await draft.fill('Keep this direction while I inspect my work.');
       await checkComposer(page.locator('.garden-task-composer .intent-editor'));
       await page.screenshot({ path: resolve(report, `desk-composer-${width}-${height}.png`) });
       await inWindow(draft);
       const inputBox = await draft.boundingBox();
       const controlsBox = await page.locator('.garden-task-composer .intent-toolbar').boundingBox();
-      const collapseBox = await page
-        .getByRole('button', { name: 'Collapse composer', exact: true })
-        .boundingBox();
-      assert(inputBox && controlsBox && collapseBox);
+      assert(inputBox && controlsBox);
       assert(
         inputBox.y + inputBox.height <= controlsBox.y + 1,
         'Prompt controls must be outside the text area'
       );
-      assert(inputBox.y + inputBox.height <= collapseBox.y, 'Collapse must not cover typing');
       const workUrl = page.url();
       // Wide screens carry the doors in the masthead; phones carry them in the button row.
       const libraryTrigger = page
@@ -379,9 +374,9 @@ export async function checkDesk({
           'Send must stay above the keyboard'
         );
         await page.screenshot({ path: resolve(report, 'desk-keyboard.png') });
-        await page.getByRole('button', { name: 'Open conversation', exact: true }).click();
+        await page.getByRole('button', { name: 'Work options', exact: true }).click();
         const dialogBox = await page
-          .getByRole('dialog', { name: 'Conversation', exact: true })
+          .getByRole('dialog', { name: 'Work options', exact: true })
           .boundingBox();
         assert(
           dialogBox && dialogBox.y >= 0 && dialogBox.y + dialogBox.height <= 350,
@@ -402,7 +397,7 @@ export async function checkDesk({
       await settings.click();
       await fit();
       const views = page.locator(
-        'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+        'body:has(.project-panel[open]:not(.is-docked)) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open]:not(.is-docked))) .project-workspace-bar .project-view-nav'
       );
       for (const view of ['Files', 'Activity', 'Tools']) {
         await views.getByRole('button', { name: view, exact: true }).click();
@@ -411,9 +406,6 @@ export async function checkDesk({
       await page.keyboard.press('Escape');
       await page.locator('.project-panel[open]').waitFor({ state: 'hidden' });
       assert.equal(await draft.inputValue(), 'Keep this direction while I inspect my work.');
-      await page.getByRole('button', { name: 'Open conversation', exact: true }).click();
-      await page.getByRole('dialog', { name: 'Conversation', exact: true }).waitFor();
-      await page.keyboard.press('Escape');
       const voice = page.getByRole('button', { name: 'Live voice', exact: true });
       await inWindow(voice);
       await voice.click();
@@ -465,7 +457,6 @@ export async function checkDesk({
     }
     await page.setViewportSize({ width: 320, height: 568 });
     await page.goto(`${origin}/?task=${task.id}`);
-    await page.getByRole('button', { name: 'Continue this conversation…', exact: true }).click();
     const sendingEditor = page.locator('.garden-task-composer .intent-editor');
     await sendingEditor
       .locator('textarea')

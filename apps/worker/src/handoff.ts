@@ -29,7 +29,6 @@ import { createStreamFlusher, normalizeAssistantText } from './streaming.js';
 import { event } from './tool-recording.js';
 import {
   MAX_ACCEPTANCE_FAILURES,
-  MAX_FINISH_REJECTIONS,
   reasoningEffortForStep,
   spendHalt,
   STEP_BUDGET_MARKER,
@@ -38,7 +37,6 @@ import {
   stepLimitCarryOver
 } from './turn-bounds.js';
 import { withRequestDeadline } from './turn-lifecycle.js';
-import { textValue } from './values.js';
 import { turnRoutingTaskId } from './window.js';
 
 export const TURN_WALL_CLOCK_MS = 2 * 60 * 60 * 1_000;
@@ -56,7 +54,7 @@ export interface HandoffDeps {
     key: Uint8Array,
     record: AcceptanceRecord,
     options?: {
-      purpose: 'finish' | 'baseline' | 'continuation';
+      purpose: 'finish' | 'continuation';
       observed?: ReadonlyMap<string, number>;
     },
     state?: AgentState
@@ -87,7 +85,7 @@ export interface HandoffDeps {
     state: AgentState,
     completion: {
       summary: string;
-      deliverables: unknown[];
+      answer?: string;
       verification: CompletionVerification;
       interrupted?: boolean;
       outstanding?: string[];
@@ -174,12 +172,8 @@ export const renewStepBudget = async (
     mark: state.continuationMark,
     credits: state.credits,
     maxCredits: task.maxComputeCredits,
-    // The two ceilings that mean the harness has already given up on this turn. A model that
-    // cannot ground a finish, or cannot pass its own checks, four times running is not one budget
-    // short of passing them - it is stuck, and another budget is the runaway rather than the fix.
-    refusalsExhausted:
-      (state.acceptanceFailures ?? 0) >= MAX_ACCEPTANCE_FAILURES ||
-      (state.finishRejections ?? 0) >= MAX_FINISH_REJECTIONS,
+    // A turn that cannot pass its own checks after the full allowance is stuck, not short of steps.
+    refusalsExhausted: (state.acceptanceFailures ?? 0) >= MAX_ACCEPTANCE_FAILURES,
     awaitingApproval: Boolean(state.pending)
   });
   // Silent when the feature is off: an operator who set the ceiling to zero does not want a line
@@ -348,11 +342,7 @@ export const handOffAtStepLimit = async (
   ).catch(() => undefined);
   state.messages.push({
     role: 'system',
-    content: `${exhausted} EXHAUSTED after ${state.step} steps. This is your last call of this turn and no other tool is available to you: only set_plan and finish. Do not attempt any further work.
-
-Spend it on the handoff. First, if the plan no longer matches reality, publish a corrected one with set_plan so the open steps say exactly where the work stopped. Then write your reply - it is what the user reads - covering what is now done and where it is, what is not done and how far it got, anything they need to decide, and the exact words they can send back to carry on. Be concrete: name files, URLs, the field you had reached, the command that was still running. Finally call finish with a summary of the same thing.
-
-Nothing you produced was rolled back and none of it is lost. This same task continues on this same computer, with a fresh budget, the moment the user replies.`
+    content: `${exhausted} EXHAUSTED after ${state.step} steps. This is the last call of this turn: only set_plan runs, then your reply ends the turn. If the plan no longer matches reality, correct it with set_plan. Then reply to the user with what is done, what is not and how far it got, anything they must decide, and what to send back to carry on. Be concrete: files, URLs, where the work stopped. Nothing is lost; this task continues with a fresh budget when they reply.`
   });
   // The catalogue is counted here for the same reason the step loop counts it: it is part of the
   // request and the budget is what is left after it. Omitting the two figures told this call it
@@ -562,22 +552,9 @@ Nothing you produced was rolled back and none of it is lost. This same task cont
     });
   }
 
-  let summary = '';
-  let deliverables: unknown[] = [];
   for (const call of response.toolCalls) {
     if (call.name === 'set_plan') {
       try {
-        /*
-         * With the turn's state, which this call did not use to have.
-         *
-         * `set_plan` clears `planIsFallback` - the flag that tells the finish hold the plan on
-         * screen is the model's rather than the harness's opening guess - and it can only clear
-         * it on a state it was given. The handoff is the one call in the loop that ran without
-         * one, so the closing plan a step-limited or credit-limited turn writes, the plan the
-         * owner is actually left looking at, was the only plan in the product that could not
-         * retire that flag. The turn then finished against a hold arguing about a fallback that
-         * had been replaced two lines earlier.
-         */
         const result = await deps.execute(task, call, key, false, context.webPlan, state);
         await deps.recordToolResult(task, key, state, call, result, model, catalog);
       } catch (error) {
@@ -589,20 +566,10 @@ Nothing you produced was rolled back and none of it is lost. This same task cont
       }
       continue;
     }
-    if (call.name === 'finish') {
-      summary = textValue(call.arguments.summary);
-      deliverables = Array.isArray(call.arguments.deliverables) ? call.arguments.deliverables : [];
-      state.messages.push({
-        role: 'tool',
-        toolCallId: call.id,
-        content: JSON.stringify({ handedOff: true })
-      });
-      continue;
-    }
     state.messages.push({
       role: 'tool',
       toolCallId: call.id,
-      content: 'Denied: only set_plan and finish are available on a handoff turn.'
+      content: 'Denied: only set_plan runs on a handoff turn.'
     });
   }
   // Re-read after the handoff turn's own set_plan, so the note the next turn reads describes the
@@ -615,10 +582,9 @@ Nothing you produced was rolled back and none of it is lost. This same task cont
     state,
     {
       summary:
-        summary ||
         assistantText.slice(0, 400) ||
         `Stopped after ${state.step} steps with work outstanding. Everything produced so far is saved - reply to carry on from here.`,
-      deliverables,
+      ...(assistantText ? { answer: assistantText } : {}),
       // Deliberately not `verified`. A handoff asserts the opposite of a verified completion: it
       // says the requested outcome was not reached, and the caveats below are the honest record
       // of what is missing. Grounding rules exist to stop an unfinished turn claiming success,

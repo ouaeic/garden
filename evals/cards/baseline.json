@@ -1,37 +1,37 @@
 {
   "$stamp": {
-    "acceptedAt": "2026-09-29T14:55:49.470Z",
+    "acceptedAt": "2026-10-02T20:07:29.343Z",
     "version": "0.2.0",
-    "commit": "d7c62d8",
-    "rig": "f39fd7170863"
+    "commit": "4a874c1",
+    "rig": "f92027f9b719"
   },
   "A-calendar/review": {
-    "calls": 4,
+    "calls": 3,
     "clean": 0,
     "tainted": 0
   },
   "A-calendar/balanced": {
-    "calls": 4,
+    "calls": 3,
     "clean": 0,
     "tainted": 0
   },
   "A-calendar/autonomous": {
-    "calls": 4,
+    "calls": 3,
     "clean": 0,
     "tainted": 0
   },
   "B-mail-reply/review": {
-    "calls": 6,
+    "calls": 5,
     "clean": 1,
     "tainted": 1
   },
   "B-mail-reply/balanced": {
-    "calls": 6,
+    "calls": 5,
     "clean": 1,
     "tainted": 1
   },
   "B-mail-reply/autonomous": {
-    "calls": 6,
+    "calls": 5,
     "clean": 0,
     "tainted": 0
   },
@@ -51,17 +51,17 @@
     "tainted": 1
   },
   "D-build-and-publish/review": {
-    "calls": 9,
+    "calls": 8,
     "clean": 5,
     "tainted": 5
   },
   "D-build-and-publish/balanced": {
-    "calls": 9,
+    "calls": 8,
     "clean": 1,
     "tainted": 2
   },
   "D-build-and-publish/autonomous": {
-    "calls": 9,
+    "calls": 8,
     "clean": 1,
     "tainted": 2
   },
@@ -96,17 +96,17 @@
     "tainted": 1
   },
   "G-research-and-write/review": {
-    "calls": 8,
+    "calls": 7,
     "clean": 3,
     "tainted": 3
   },
   "G-research-and-write/balanced": {
-    "calls": 8,
+    "calls": 7,
     "clean": 0,
     "tainted": 0
   },
   "G-research-and-write/autonomous": {
-    "calls": 8,
+    "calls": 7,
     "clean": 0,
     "tainted": 0
   },
@@ -126,17 +126,17 @@
     "tainted": 0
   },
   "I-weekly-digest/review": {
-    "calls": 4,
+    "calls": 3,
     "clean": 1,
     "tainted": 2
   },
   "I-weekly-digest/balanced": {
-    "calls": 4,
+    "calls": 3,
     "clean": 1,
     "tainted": 2
   },
   "I-weekly-digest/autonomous": {
-    "calls": 4,
+    "calls": 3,
     "clean": 1,
     "tainted": 2
   },
@@ -156,62 +156,62 @@
     "tainted": 2
   },
   "K-one-shot-app/review": {
-    "calls": 47,
+    "calls": 46,
     "clean": 38,
     "tainted": 38
   },
   "K-one-shot-app/balanced": {
-    "calls": 47,
+    "calls": 46,
     "clean": 4,
     "tainted": 5
   },
   "K-one-shot-app/autonomous": {
-    "calls": 47,
+    "calls": 46,
     "clean": 1,
     "tainted": 2
   },
   "L-no-research-build/review": {
-    "calls": 35,
+    "calls": 34,
     "clean": 31,
     "tainted": 31
   },
   "L-no-research-build/balanced": {
-    "calls": 35,
+    "calls": 34,
     "clean": 3,
     "tainted": 4
   },
   "L-no-research-build/autonomous": {
-    "calls": 35,
+    "calls": 34,
     "clean": 1,
     "tainted": 2
   },
   "M-same-build-typescript/review": {
-    "calls": 15,
+    "calls": 14,
     "clean": 8,
     "tainted": 8
   },
   "M-same-build-typescript/balanced": {
-    "calls": 15,
+    "calls": 14,
     "clean": 0,
     "tainted": 0
   },
   "M-same-build-typescript/autonomous": {
-    "calls": 15,
+    "calls": 14,
     "clean": 0,
     "tainted": 0
   },
   "M-same-build-rust/review": {
-    "calls": 15,
+    "calls": 14,
     "clean": 8,
     "tainted": 8
   },
   "M-same-build-rust/balanced": {
-    "calls": 15,
+    "calls": 14,
     "clean": 0,
     "tainted": 0
   },
   "M-same-build-rust/autonomous": {
-    "calls": 15,
+    "calls": 14,
     "clean": 0,
     "tainted": 0
   }

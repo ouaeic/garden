@@ -3,7 +3,9 @@ import { z } from 'zod';
 
 export const TOOL_GROUPS = {
   code: ['code_search', 'repo_overview', 'code_diagnostics', 'coding_agent', 'project_update'],
-  documents: ['document_read', 'document_search', 'parallel_web_read'],
+  documents: ['document_read', 'document_search', 'parallel_web_read', 'delegate'],
+  memory: ['memory_recall', 'session_search', 'memory', 'skill'],
+  automation: ['notify', 'schedule'],
   browser: ['browser_snapshot', 'read_elements', 'browser_action', 'print_pdf'],
   desktop: ['desktop_observe', 'desktop_launch', 'desktop_action'],
   media: ['image_read', 'audio_read', 'generate_media'],
@@ -24,7 +26,7 @@ const Selection = z
 export const LOAD_TOOLS: ModelTool = {
   name: 'load_tools',
   description:
-    'Enable built-in tool groups when needed; their full definitions appear on the next step and remain available in this conversation. code: repository search, language intelligence, coding specialists and project versions. documents: document reading/search and parallel web reads. browser: isolated tabs, forms, snapshots and PDF. desktop: applications and computer control. media: images, audio and generation. publishing: private previews and public sites. connections: configured mail, calendar, files and services. This changes tool visibility only, never permissions. Core file editing, shell, processes and web search are already available.',
+    'Load tool groups; their tools appear on the next step and stay for this conversation. code: code search, diagnostics, coding specialists, project versions. documents: read and search documents, read many web pages, research specialists. memory: recall earlier work, search past conversations, edit memory and skills. automation: notifications and schedules. browser: server browser, forms, PDF capture. desktop: GUI applications. media: images, audio, generation. publishing: app previews and sites. connections: connected mail, calendar, files and services.',
   parameters: {
     type: 'object',
     additionalProperties: false,

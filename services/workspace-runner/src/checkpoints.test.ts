@@ -71,13 +71,10 @@ const workspace = async (): Promise<{ workspaceRoot: string; root: string }> => 
 /**
  * A host with room on it, stated rather than measured.
  *
- * Every case in this file used to read the real disk of whatever machine ran it, because
- * `#create` called the module-level `hostStorage(root)` directly. Wave 3's gate exited 1 on
- * sixteen of them for one reason: the laptop was at 99 % and the floor is
- * `min(20 GiB, max(2 GiB, total x 0.02))`, so the refusal fired and the failure read exactly
- * like broken code. A build whose result depends on the free space of the machine running it
- * cannot be trusted in either direction, so the probe is injected here and the number below is
- * the only disk these tests ever see.
+ * The floor is `min(20 GiB, max(2 GiB, total x 0.02))`, so on a nearly full laptop the refusal
+ * fires and the failure reads exactly like broken code. A build whose result depends on the free
+ * space of the machine running it cannot be trusted in either direction, so the probe is injected
+ * here and the number below is the only disk these tests ever see.
  */
 const ROOMY_HOST = async () => ({
   hostStorageTotalBytes: 100 * 1024 ** 3,

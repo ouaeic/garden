@@ -56,16 +56,14 @@ one that costs least to run:
    fail when a committed token count or step count moved; those belong to `pnpm eval` below, and
    keeping those measurements separate makes expectation failures actionable. Current fixture
    counts and baseline measurements are derived in [docs/EVALUATION.md](docs/EVALUATION.md).
-6. `pnpm eval:rigs` — context quality, prompt injection, the arm comparison, approval cards,
-   edit-format conformance, read cost, and independent outcome calibration. The outcome rig
+6. `pnpm eval:rigs` — context quality, prompt injection, approval cards, read cost, and
+   independent outcome calibration. The outcome rig
    checks incorrect-result controls and durable form submission recovery; it does not measure
    model quality or spend provider credits. They are
    offline, need no key, and finish in about fourteen seconds between them. They are here rather than
    nightly because each one answers "did this change cross a floor", and a floor that quietly stops
    firing is not a drift to argue with in the morning — the cards rig in particular pins that reading
-   untrusted content still costs the owner no approvals at all, and the edit rig pins what each way
-   of mis-emitting a patch costs in round trips, so a change to the editor that makes a recovery
-   into a refusal fails here rather than being discovered as a bill. Each of them commits only rows
+   untrusted content still costs the owner no approvals at all. Each of them commits only rows
    it constructs itself: the read rig runs the whole fixture corpus and deliberately leaves it out
    of its baseline, because those rows belong to `pnpm eval` and gating them here would move that
    suite's numbers into `pnpm check` without anybody deciding to.

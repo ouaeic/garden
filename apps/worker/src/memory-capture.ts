@@ -3,9 +3,9 @@ import { runtimeDate, runtimeNow } from '@garden/core';
  * What a finished turn deposits in the tiered store: the episode, and the cautions the harness
  * earned by watching an acceptance command fail.
  *
- * Lifted out of `AgentWorker` in Wave 7.2 unchanged. Both halves are write paths with their own
- * failure discipline - one reports, one swallows, and the comments say why they differ - and both
- * were reachable only through a completed turn.
+ * Both halves are write paths with their own failure discipline - one reports, one swallows, and
+ * the comments say why they differ - kept apart from the turn so they can be tested without
+ * completing one.
  */
 import {
   deadEndFromCheck,

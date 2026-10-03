@@ -31,3 +31,40 @@
 .composer-context > button {
   flex-shrink: 0;
 }
+.composer-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.composer-notes li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: 100%;
+  padding: 2px 4px 2px 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--lcd-texture), var(--bg);
+}
+.composer-note-anchor {
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+.composer-note-text {
+  overflow-wrap: anywhere;
+}
+.composer-notes button {
+  align-self: center;
+  border: 0;
+  background: none;
+  color: inherit;
+  padding: 2px;
+  cursor: pointer;
+}

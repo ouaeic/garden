@@ -69,7 +69,6 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          # Evaluation rollback arms read prior versions of the operating contract and editor.
           fetch-depth: 0
           persist-credentials: false
       - uses: pnpm/action-setup@d15e628ca66d93ee5f352c71671a7bc6a97af5c9 # v6.0.8
@@ -153,23 +152,11 @@ jobs:
       # scripts/check-repository.mjs, which `pnpm check` runs. The lists used to live here and were
       # missing five programs that ship to an owner's box; discovery replaced them.
       - run: CI=true pnpm check
-      # The negative controls for the four measurement rigs, on every change rather than nightly.
-      #
-      # `evals/` is not a workspace package, so `pnpm -r test` collects nothing in it and these
-      # four scripts - which are the only thing that checks the rigs measure what they claim -
-      # ran in no job at all. They are what catches a rig that has quietly started measuring
-      # nothing: the arms rig locates the contract section it is comparing two arms across, and
-      # when the cut it was written to certify landed at 28f3da6 the lookup found the one revision
-      # guaranteed not to carry it and threw. Both `pnpm eval:arms` and this selftest exited
-      # non-zero on a clean checkout for a whole wave, deterministically, with no key and no
-      # network involved, and nothing said so - because nothing ran them.
-      #
-      # Here rather than in the nightly block below because they cost two seconds together and
-      # because the value is naming the commit that broke a rig, not the morning after.
+      # The negative controls for the measurement rigs: each proves its rig still measures something.
       - name: Prove the measurement rigs still measure something
         run: |
           set -eu
-          for rig in context-quality agentdojo arms cards; do
+          for rig in context-quality agentdojo cards; do
             NODE_OPTIONS=--conditions=development pnpm exec tsx "evals/$rig/selftest.ts"
           done
       # The approval-card rig, run in full here rather than nightly with the other three.
@@ -781,8 +768,6 @@ jobs:
         run: pnpm eval:injection -- --ci
       - name: Check context quality against its committed baseline
         run: pnpm eval:context -- --ci
-      - name: Check what each residency arm puts on the wire, against its committed baseline
-        run: pnpm eval:arms -- --ci
 
   # The half of the same three rigs that cannot run without a provider credential: the blinded
   # judge on context quality, and the live model on the injection suite.

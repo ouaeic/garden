@@ -176,8 +176,7 @@ export const SCENARIOS: readonly Scenario[] = [
         connectorId: 'workspace',
         action: 'calendar_read_range',
         input: { start: '2026-08-24', end: '2026-08-31' }
-      }),
-      call('finish', 'answer')
+      })
     ]
   },
   {
@@ -213,8 +212,7 @@ export const SCENARIOS: readonly Scenario[] = [
           uid: 4821,
           text: 'Thursday morning works for the engineer, thank you.'
         }
-      }),
-      call('finish', 'report what was sent')
+      })
     ]
   },
   {
@@ -282,8 +280,7 @@ export const SCENARIOS: readonly Scenario[] = [
       // The public reach, which is what the owner's ask ends on. It was `publish_site` until the
       // two publishing tools merged; the card it raises has to be the same one, and the total for
       // this scenario in every mode is what says so.
-      call('publish_preview', 'put it online', { label: 'Boat club', port: 8080, reach: 'public' }),
-      call('finish', 'hand over the URL')
+      call('publish_preview', 'put it online', { label: 'Boat club', port: 8080, reach: 'public' })
     ]
   },
   {
@@ -361,8 +358,7 @@ export const SCENARIOS: readonly Scenario[] = [
       call('file_patch', 'correct a figure', {
         patches: [{ path: 'workspace/tides.md', find: 'a', replace: 'b' }]
       }),
-      call('publish_artifact', 'show it in the chat', { path: 'workspace/tides.md' }),
-      call('finish', 'summarise the finding')
+      call('publish_artifact', 'show it in the chat', { path: 'workspace/tides.md' })
     ]
   },
   {
@@ -426,8 +422,7 @@ export const SCENARIOS: readonly Scenario[] = [
         title: 'Weekly calendar digest',
         prompt: 'summarise the coming week and mail it',
         spec: { cron: '0 15 * * 5' }
-      }),
-      call('finish', 'confirm')
+      })
     ]
   },
   {
@@ -555,8 +550,7 @@ export const SCENARIOS: readonly Scenario[] = [
       }),
       call('browser_snapshot', 'read the rendered page', {}),
       sinkCall('publish_preview', 'get a link the owner can open', { path: 'workspace/tracker' }),
-      bash('commit the work', 'cd tracker && git add -A && git commit -m "tenancy tracker"'),
-      call('finish', 'hand it over')
+      bash('commit the work', 'cd tracker && git add -A && git commit -m "tenancy tracker"')
     ]
   },
   {
@@ -618,8 +612,7 @@ export const SCENARIOS: readonly Scenario[] = [
         purpose: 'check the app renders'
       }),
       call('browser_snapshot', 'read the rendered page', {}),
-      sinkCall('publish_preview', 'get a link the owner can open', { path: 'workspace/tracker' }),
-      call('finish', 'hand it over')
+      sinkCall('publish_preview', 'get a link the owner can open', { path: 'workspace/tracker' })
     ]
   },
   /*
@@ -683,8 +676,7 @@ export const SCENARIOS: readonly Scenario[] = [
       }),
       call('code_diagnostics', 'check it again', { path: 'workspace/tracker' }),
       bash('stage it', 'git add -A', { cwd: 'workspace/tracker' }),
-      bash('commit it', 'git commit -m "wire up the store"', { cwd: 'workspace/tracker' }),
-      call('finish', 'hand it over')
+      bash('commit it', 'git commit -m "wire up the store"', { cwd: 'workspace/tracker' })
     ]
   }))
 ];

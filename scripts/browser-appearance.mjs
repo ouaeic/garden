@@ -347,8 +347,7 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
   await page.locator('.desk-home').waitFor();
   await page.setViewportSize({ width: 390, height: 500 });
   await page.goto(`${origin}/?task=${task.id}`);
-  await page.locator('.garden-task-composer').waitFor();
-  await page.getByRole('button', { name: /^Continue this conversation/ }).click();
+  await page.locator('.garden-task-composer textarea').waitFor();
   for (const theme of ['dark', 'light']) {
     await page.evaluate((value) => {
       document.documentElement.dataset.theme = value;

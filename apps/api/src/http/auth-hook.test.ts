@@ -13,8 +13,8 @@ import type { ServerBase } from './server-context.js';
 /**
  * The hooks on their own, with routes written to defeat the layer underneath them.
  *
- * Wave 6 measured that the workspace pre-handler could be deleted and every test in the repository
- * would stay green: `server.test.ts` drives real routes, and every workspace-scoped route in
+ * The workspace pre-handler can be deleted and every route-level test stays green:
+ * `server.test.ts` drives real routes, and every workspace-scoped route in
  * `routes/` re-resolves the workspace through `store.getWorkspace(user.id, ...)` and refuses on its
  * own. So both boundary tests there pass with the hook defeated - they are pinning the handlers,
  * not the hook, and no route that exists today can tell the two layers apart.
@@ -341,7 +341,7 @@ describe('workspace pre-handler', () => {
     expect(harness.handlerRuns()).toBe(2);
   });
   /**
-   * The net Wave 6 said did not exist. Delete the `workspaceBelongsToUser` check in
+   * The hook's own net. Delete the `workspaceBelongsToUser` check in
    * `registerAuthHooks` and this is the assertion that goes red - the handler below has no opinion
    * about who is asking, so a 200 here is a stranger reading someone else's workspace name.
    */

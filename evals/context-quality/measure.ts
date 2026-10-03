@@ -2,19 +2,17 @@
  * Drives one trajectory through garden's production context path at one configuration, and comes
  * back with both axes: what the prompt cache got, and what the model lost.
  *
- * The loop below is the step loop `agent.ts:9249-9337` runs, in its order: the runtime block is
+ * The loop below is the step loop `agent.ts` runs, in its order: the runtime block is
  * removed and re-pushed at the tail, a declared phase or an over-budget window is compacted first,
  * `prepareModelContext` is given the previous step's older-result floor, and it is the PREPARED
  * size - not the raw window - that the compaction trigger is measured against. Getting that order
  * wrong is how a rig reports automatic compaction firing on a run where production would not fire
  * it once, which is the state the plan's own numbers were quoted from.
  *
- * Both axes come off the same run, deliberately. Wave 0 priced the cache side and this step was
- * briefed to price the quality side, and two numbers measured on two different fixtures cannot be
- * put in one table honestly - the shred fixture's 20 kB-uniform results are why the plan's tool
- * boundary looked like the dominant one and the detail boundary turned out to be. So the cache
- * measurement here is Wave 0's, reproduced against this fixture, and a row's cache gain and its
- * quality cost are always the same sixty requests.
+ * Both axes come off the same run, deliberately: two numbers measured on two different fixtures
+ * cannot be put in one table honestly. A fixture with uniform 20 kB results makes the tool boundary
+ * look dominant when the detail boundary is, so a row's cache gain and its quality cost are always
+ * the same sixty requests.
  *
  * ── tokens per task, which is the number that decides anything ────────────────────────────────
  *

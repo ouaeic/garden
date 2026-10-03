@@ -21,8 +21,8 @@ import { ZodError } from 'zod';
  *   5. **arguments that would not parse**, told apart from arguments cut off at the output cap,
  *      because what to do about it differs and they used to be told apart by guesswork;
  *   6. **a plan the owner moved** under a call that was already proposed;
- *   7. the four tools the harness answers itself - `finish`, `compact_context`, `notify`, `ask` -
- *      plus `set_acceptance`;
+ *   7. the tools the harness answers itself - `compact_context`, `notify`, `ask` - plus
+ *      `set_acceptance`;
  *   8. **the approval floor**, memoised per model response;
  *   9. and then the call runs.
  *
@@ -58,7 +58,6 @@ import { parkForApproval } from './approval-park.js';
 import { recoverApprovalProposal } from './approval-recovery.js';
 import type { TurnRun } from './claim.js';
 import { executeApprovedCall } from './execute-call.js';
-import { handleFinishCall, type TurnFinishDeps } from './finish.js';
 import type { CompactContext, TurnLoopControl, TurnStepBudget } from './loop-context.js';
 import type { TurnResumeDeps } from './resume.js';
 
@@ -159,14 +158,12 @@ export const PLAN_MODE_PERMITTED: ReadonlySet<string> = new Set([
  * outside will not try the one of them that is not a hard stop.
  */
 const planModeRefusal = (tool: string): string =>
-  `Plan mode: ${tool} was not run and nothing changed. The user has this conversation in plan mode, so only reading, searching and delegated research run - no commands, no writes, no browser or desktop actions, nothing that reaches out of this computer except reading the web and messaging the user. Work the whole approach out from what you can read, put it on the record with set_plan, and finish with the plan and with anything you would need from the user before starting. You cannot leave plan mode; only the user can, and they do it from the conversation.`;
+  `Plan mode: ${tool} was not run and nothing changed. The user has this conversation in plan mode, so only reading, searching and delegated research run - no commands, no writes, no browser or desktop actions, nothing that reaches out of this computer except reading the web and messaging the user. Work the approach out from what you can read, record it with set_plan, and reply with the plan and anything you need from the user before starting. You cannot leave plan mode; only the user can, and they do it from the conversation.`;
 
 /** What dispatching a batch needs from the worker that owns it. */
 export interface TurnDispatchDeps {
   readonly store: DataStore;
   readonly config: AgentWorkerConfig;
-  /** @see handleFinishCall in `turn/finish.ts`. */
-  readonly finish: TurnFinishDeps;
   /** @see declareAcceptance in `turn/acceptance-declaration.ts`. */
   readonly acceptance: AcceptanceDeclarationDeps;
   /** @see executeApprovedCall in `turn/execute-call.ts`, which asks for exactly this set. */
@@ -231,11 +228,6 @@ export const dispatchToolCalls = async (
   state: AgentState,
   response: ModelResponse,
   /**
-   * What the step said, already normalised and already published. `finish` is the only gate that
-   * reads it: a completion has to be able to quote the words that came with it.
-   */
-  assistantText: string,
-  /**
    * Named `turnRun` rather than `run` because the batch loop below binds `run` to the parallel
    * read run it is assembling, and that name is the one the loop has always read it by.
    */
@@ -271,10 +263,9 @@ export const dispatchToolCalls = async (
     // so the transcript stays answerable if the task is later resumed.
     if (await honorUserControl()) return 'returned';
     if (
-      (call.name === 'finish' ||
-        (call.name === 'coding_agent' &&
-          call.arguments.agent === 'garden' &&
-          call.arguments.action === 'wait')) &&
+      call.name === 'coding_agent' &&
+      call.arguments.agent === 'garden' &&
+      call.arguments.action === 'wait' &&
       (await parkCodingMissionWait(
         deps,
         task,
@@ -431,7 +422,7 @@ export const dispatchToolCalls = async (
            */
           reason: cutOff
             ? truncations >= MAX_ARGUMENT_TRUNCATIONS
-              ? `The arguments for ${call.name} were cut off at the model's output limit for the ${truncations}th time, so it was not run. Stop retrying this call: do the work in smaller pieces, or finish and say what could not be written.`
+              ? `The arguments for ${call.name} were cut off at the model's output limit for the ${truncations}th time, so it was not run. Stop retrying this call: do the work in smaller pieces, or reply and say what could not be written.`
               : `The arguments for ${call.name} were cut off at the model's output limit, so it was not run and nothing changed. Re-issue it with a smaller payload - write the file in parts with file_write then file_patch, or shorten the content.`
             : `The arguments for ${call.name} were not valid JSON, so it was not run and nothing changed. Send the call again with well-formed arguments - the payload was ${call.rawArguments?.length ?? 0} characters, so length was not the problem.`
         },
@@ -479,23 +470,6 @@ export const dispatchToolCalls = async (
         ...(state.seenCalls ?? {}),
         [idempotentCallKey(call)]: call.id
       };
-    if (call.name === 'finish') {
-      /*
-       * Five holds and then the turn completes. @see handleFinishCall in `turn/finish.ts`,
-       * where the three hundred and four lines that ran here - at nesting depth eleven, inside
-       * the batch loop inside the step loop - now live. `held` is the model being sent round
-       * once for one named reason; every one of the five is bounded, and past its ceiling the
-       * turn ends honestly rather than being thrown away.
-       */
-      if (
-        (await handleFinishCall(deps.finish, task, key, state, call, {
-          turn,
-          assistantText
-        })) === 'held'
-      )
-        continue;
-      return 'returned';
-    }
     if (call.name === 'compact_context') {
       // Compaction runs while this call is still unanswered, which is precisely what keeps the
       // assistant message that made it - and every result already pushed for its batch - out of

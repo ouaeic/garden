@@ -89,7 +89,7 @@ describe('agent chat output', () => {
   it('leaves the count alone for the tools the loop answers itself', () => {
     // Each of these has its own bound, and two bounds counting the same step race each other: a
     // third rejected finish would otherwise trip this as well as MAX_FINISH_REJECTIONS.
-    for (const name of ['finish', 'compact_context', 'notify', 'ask', 'set_acceptance'])
+    for (const name of ['compact_context', 'notify', 'ask', 'set_acceptance'])
       expect(idleStepsAfter(2, { proposed: [name], started: 0 })).toBeUndefined();
     /*
      * A reply with no tool call at all is the completion nag's, which ends the turn by completing

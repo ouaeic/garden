@@ -121,19 +121,16 @@ describe('reusable approval scope', () => {
       approvalRequirement('file_write', { path: '/etc/profile', content: 'x' }, 'review')?.taskGrant
     ).toBeUndefined();
     expect(
-      approvalRequirement(
-        'shell',
-        { executable: 'python3', args: ['script.py'], network: false },
-        'review'
-      )?.taskGrant?.permissions
+      approvalRequirement('shell', { executable: 'python3', args: ['script.py'] }, 'review')
+        ?.taskGrant?.permissions
     ).toEqual(['commands']);
     expect(
       approvalRequirement(
         'shell',
-        { executable: 'python3', args: ['script.py'], network: true },
+        { executable: 'curl', args: ['-fsS', 'https://example.com/data.json'] },
         'review'
-      )?.taskGrant
-    ).toBeUndefined();
+      )?.taskGrant?.permissions
+    ).not.toEqual(['commands']);
   });
   it('consults durable authority for each new call and does not inherit it into a child or stronger effect', async () => {
     const key = Buffer.alloc(32, 7),

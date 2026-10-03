@@ -4,15 +4,13 @@ import { evidenceProgressKey } from './progress.js';
  * What a turn writes down about a tool call: the timeline row, the window entry, the provenance it
  * moves forward, and the run of read-only calls that share one lease and one cancellation watch.
  *
- * Lifted out of `AgentWorker` in Wave 7.2. It was five unrelated jobs threaded through one 202-line
- * method plus two of its neighbours, and the thing that made it a file rather than a region is the
- * import graph: `event` is the encrypted timeline writer every other sub-machine needs, and leaving
- * it in `agent.ts` meant every one of them reached back through the class to get it.
+ * A file of its own because of the import graph: `event` is the encrypted timeline writer every
+ * other sub-machine needs, and they import it from here rather than reaching back through the
+ * worker class.
  *
- * The vision handoff that used to close `recordToolResult` is not here. It returns the image
- * instead, and `vision.ts` - which imports `event` from this file - is entered by the caller. That
- * is the only reason the split falls where it does: a `tool-recording -> vision -> tool-recording`
- * cycle is the alternative.
+ * The vision handoff is not here. `recordToolResult` returns the image instead, and `vision.ts` -
+ * which imports `event` from this file - is entered by the caller, because the alternative is a
+ * `tool-recording -> vision -> tool-recording` cycle.
  */
 import type { ModelRelease, TaskEventKind, WebToolPlan } from '@garden/contracts';
 import { ZodError } from 'zod';
@@ -26,7 +24,7 @@ import type { DataStore, TaskRecord } from '@garden/data';
 import type { ModelToolCall } from '@garden/model-gateway';
 import type { AgentState, AgentWorkerConfig } from './agent-state.js';
 import { callDestinations } from './command-classification.js';
-import { completionReference, shellObservation, processObservation } from './completion.js';
+import { shellObservation } from './completion.js';
 import {
   boundToolResultText,
   RECENT_TOOL_OUTPUT_CHARS,
@@ -301,10 +299,11 @@ export const runToolCallsTogether = async (
     // both are called anyway, so that the set gaining a member can never quietly cost the owner
     // their undo point or leave a change out of the plan the interface draws.
     await deps.ensureTurnUndoPoint(task, key, state, call.name);
-    if (isMutatingToolCall(call.name, call.arguments)) {
-      state.mutated = true;
-      if (requiresAcceptanceChecks(call.name, call.arguments)) state.mutatedBeyondProse = true;
-    }
+    if (
+      isMutatingToolCall(call.name, call.arguments) &&
+      requiresAcceptanceChecks(call.name, call.arguments)
+    )
+      state.mutatedBeyondProse = true;
     state.toolsStarted = (state.toolsStarted ?? 0) + 1;
     await event(deps.store, task, key, 'tool_started', `Running ${call.name}`, {
       toolCallId: call.id,
@@ -610,13 +609,12 @@ export const recordToolResult = async (
     ...(recorded?.id ? { eventId: recorded.id } : {}),
     ...(skipped ? { skipped: true } : {}),
     mutating: isMutatingToolCall(call.name, call.arguments),
-    // Recorded, not subtracted from `mutating`: the approval card, the checkpoint set and
-    // `state.mutated` all still treat a brief write as the change it is. Only the completion
+    // Recorded, not subtracted from `mutating`: the approval card and the checkpoint set still
+    // treat a brief write as the change it is. Only the completion
     // contract reads this, because only there does "the last change" mean the work being proved.
     ...(writesOnlyDurableInstructions(call.name, call.arguments) ? { briefOnly: true } : {}),
     ...(writesOnlyProse(call.name, call.arguments) ? { proseOnly: true } : {}),
-    ...(shellObservation(call, result) ?? {}),
-    ...(!skipped ? (processObservation(task, call, result) ?? {}) : {})
+    ...(shellObservation(call, result) ?? {})
   };
   if (
     !skipped &&
@@ -642,8 +640,7 @@ export const recordToolResult = async (
    * truncation, so the closing marker cannot be the thing the 24,000-character cut removes.
    */
   const full = toolResultText(modelResult);
-  const reference = completionReference(state, call.id);
-  const outputBudget = Math.max(0, RECENT_TOOL_OUTPUT_CHARS - reference.length);
+  const outputBudget = RECENT_TOOL_OUTPUT_CHARS;
   /*
    * The bytes the window cannot hold, parked where the model can still go and get them.
    *
@@ -681,7 +678,7 @@ export const recordToolResult = async (
   state.messages.push({
     role: 'tool',
     toolCallId: call.id,
-    content: `${reference}${forModel}${provenanceNotice ? `\n\n${provenanceNotice}` : ''}`
+    content: `${forModel}${provenanceNotice ? `\n\n${provenanceNotice}` : ''}`
   });
   // A snapshot of a challenge page is a successful read, so the wall arrives here rather than in
   // the failure path - and it is the same thing to tell the owner about.

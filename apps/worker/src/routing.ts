@@ -6,8 +6,6 @@
  * the right capability for a transcription or a delegated mission. This file holds those choices
  * and the timeouts that go with them, so the rules can be read against each other rather than
  * found one call site at a time.
- *
- * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
 import type { MediaModelOption, ModelRelease } from '@garden/contracts';
 import { readRoutingMetadata, type RoutingMetadata } from '@garden/core';

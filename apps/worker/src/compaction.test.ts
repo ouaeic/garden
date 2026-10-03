@@ -1,11 +1,8 @@
 /**
  * What one compaction sends, and what it is structurally unable to send.
  *
- * `compactTurnContext` had no test at all: it was reachable only by driving a whole task through
- * the step loop, which is the reason Wave 7.2 lifted it out of `AgentWorker` in the first place.
  * The two facts pinned here are the two an argument about compaction turns on - what the
- * summarising model is shown, and how many model calls a compaction costs - and both were
- * previously assertable only by reading the source.
+ * summarising model is shown, and how many model calls a compaction costs.
  *
  * ── The asymmetry these tests exist to hold still ──────────────────────────────────────────────
  *
@@ -13,12 +10,10 @@
  * two cases below are the two sides of that.
  *
  * `transcriptLine` in `context.ts` - the transcript handed to the summarising model - CARRIES it.
- * It used not to, and that was the defect: the summariser is asked for "decisions taken and the
- * reason for them, including approaches that were tried and rejected", while garden's own preamble
- * tells the model that "Working out - options weighed, what to try next, talking yourself through
- * it - goes in the reasoning channel, or nowhere". A transcript built from content and tool calls
- * alone withheld the one channel the harness had asked the model to put the answer in, and then
- * asked for the answer. A summariser cannot summarise what it was never shown.
+ * The summariser is asked for "decisions taken and the reason for them, including approaches that
+ * were tried and rejected", and that working-out lives in the reasoning channel. A transcript built
+ * from content and tool calls alone would withhold the one channel the answer is in, and then ask
+ * for the answer.
  *
  * `trajectorySummary` - the deterministic brief used when the summariser call fails - DOES NOT
  * carry it, and that is decided rather than left over. Its output goes straight into the window

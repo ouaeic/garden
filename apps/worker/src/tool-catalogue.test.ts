@@ -39,7 +39,6 @@ import { BASE_SYSTEM_PROMPT, COMPACT_CONTEXT_TOOL } from './context.js';
 import { MEMORY_SESSION_SEARCH_MAX_RESULTS } from './memory-runtime.js';
 import { resolvedMediaModel } from './media.js';
 import { CODE_SEARCH_COLLAPSE_LINES, CODE_SEARCH_FILE_CEILING } from './tools/repository.js';
-import { EDIT_FORMAT_SPEC } from './edit/index.js';
 
 /** A stored media route, as the API seals one into the credential this worker decrypts. */
 const mediaOption = (
@@ -79,11 +78,6 @@ describe('plan tool schema', () => {
       'skipped'
     ]);
   });
-
-  it('tells the model when to update status, since nothing else will', () => {
-    expect(setPlan?.description).toMatch(/in_progress/);
-    expect(setPlan?.description).toMatch(/completed/);
-  });
 });
 
 describe('the size of the catalogue the model is sent', () => {
@@ -100,9 +94,9 @@ describe('the size of the catalogue the model is sent', () => {
   });
 
   it('stays inside the wire budget the whole prefix is cached against', () => {
-    // Conditional calendar changes measure 64,096 bytes for the complete catalogue.
-    // The resident core has a separate ceiling in tool-groups.test.ts.
-    expect(bytes).toBeLessThan(64_150);
+    // The complete catalogue measures 41,373 bytes; the resident core has its own ceiling in
+    // tool-groups.test.ts.
+    expect(bytes).toBeLessThan(41_500);
     // Each tool and nested parameter description is bounded separately.
     for (const tool of sent)
       expect(Buffer.byteLength(tool.description), `${tool.name} description`).toBeLessThan(1_400);
@@ -132,77 +126,6 @@ describe('the size of the catalogue the model is sent', () => {
     }
   });
 
-  it('declares the line-addressed edit shape, and only that shape', () => {
-    /*
-     * The half of the editor that lives on the wire, pinned separately from the half that lives in
-     * the arm, because each is useless without the other and they fail in opposite directions. An
-     * arm that accepts a shape the catalogue does not declare is a capability nothing can reach -
-     * the exact gate this programme has shipped wired to nothing twice - and a catalogue that
-     * declares a shape the arm cannot apply is a round trip the model cannot avoid.
-     *
-     * `oldText`, `newText` and `moveAfter` are asserted ABSENT, not merely unmentioned. The quoted
-     * editor was replaced rather than joined: two ways to do one thing doubles what the model has
-     * to learn and pays for both entries on every request of every turn, which is what turns a
-     * measured saving into a net loss on the wire.
-     */
-    const patch = sent.find((tool) => tool.name === 'file_patch');
-    const item = (
-      patch?.parameters.properties as { patches?: { items?: Record<string, unknown> } } | undefined
-    )?.patches?.items as
-      | { required?: string[]; properties?: Record<string, { description?: string }> }
-      | undefined;
-    expect(Object.keys(item?.properties ?? {})).toEqual(['path', 'edit']);
-    expect(item?.required).toEqual(['path', 'edit']);
-    for (const gone of ['oldText', 'newText', 'moveAfter'])
-      expect(JSON.stringify(patch), gone).not.toContain(gone);
-    /*
-     * `path` is a field of its own rather than a header inside `edit`, and that is a safety
-     * decision before it is an encoding one: `write-classification.ts` reads the files a call
-     * writes out of exactly here, and a path buried in free text is a path the durable-instruction
-     * rule and the approval card would both miss.
-     */
-    expect(item?.properties?.path).toBeTruthy();
-    // The dialect itself, which is the only resident part of this vertical.
-    expect(item?.properties?.edit?.description).toBe(EDIT_FORMAT_SPEC);
-  });
-
-  it('keeps the dialect under the size its saving pays for', () => {
-    /*
-     * THE BYTE LEDGER, measured rather than asserted in prose, because this is the number the whole
-     * format had to be argued against - it is resident in the cached prefix of every request of
-     * every turn, whether or not the turn edits anything.
-     *
-     *   model-facing spec, as written      1,090 bytes
-     *   new file_patch entry, on the wire  1,694 bytes
-     *   the quoted entry it replaces      -1,112 bytes
-     *   NET ON THE CATALOGUE                +582 bytes
-     *
-     * The catalogue measured 54,949 before the format and 55,458 after it; the ceiling above moved
-     * by exactly that 509, for exactly the capability named there, and the bare-box ceiling below
-     * moved by the same 509 for the same reason. The previous costing of this same format put it
-     * at +1,306, and almost all of the difference is one decision - the dialect it was measured
-     * from makes the model copy a per-file version tag into every patch and spends three resident
-     * paragraphs on what to do when it does not match, and `apps/worker/src/edit/snapshots.ts`
-     * needs no tag because it remembers what each read displayed. A tag the model cannot miscopy
-     * is a tag nobody has to describe.
-     *
-     * The spec then went from 1,020 to 1,090 bytes for ONE sentence and one example row: the
-     * `-` row that anchors a line number to the text the model read at it. It is the one taught
-     * forgiveness, because it closes the format's one hole - an off-by-one with nothing in the
-     * patch saying what the model believed was at the line - and it was paid for out of the same
-     * paragraph: five tightenings of prose already there gave back 79 of the 149 bytes it cost.
-     * On the wire the entry measures 1,694, 73 more than without it.
-     *
-     * 1,100 is the spec with room for a few words and not for a paragraph, which is the same
-     * distinction the ceiling above draws. The far side of the trade is measured offline over
-     * fifteen tasks on this repository's own corpus: 4,086 characters of arguments become 1,589,
-     * a 61% saving, winning fourteen of the fourteen rows where both formats do what was asked.
-     */
-    expect(Buffer.byteLength(EDIT_FORMAT_SPEC)).toBeLessThan(1_100);
-    const patch = sent.find((tool) => tool.name === 'file_patch');
-    expect(Buffer.byteLength(JSON.stringify(patch))).toBeLessThan(1_700);
-  });
-
   it('has no tool whose own description says it unlocks nothing', () => {
     // tool_search ranked definitions already in the window, billed a full pass over that window to
     // do it, and said so in its own description.
@@ -210,10 +133,25 @@ describe('the size of the catalogue the model is sent', () => {
     expect(sent.map((tool) => tool.name)).not.toContain('tool_search');
   });
 
+  it('declares the exact-text replacement shape, and only that shape', () => {
+    const patch = sent.find((tool) => tool.name === 'file_patch');
+    const item = (
+      patch?.parameters.properties as { patches?: { items?: Record<string, unknown> } } | undefined
+    )?.patches?.items as { required?: string[]; properties?: Record<string, unknown> } | undefined;
+    expect(Object.keys(item?.properties ?? {})).toEqual([
+      'path',
+      'oldText',
+      'newText',
+      'replaceAll'
+    ]);
+    expect(item?.required).toEqual(['path', 'oldText', 'newText']);
+    expect(Buffer.byteLength(JSON.stringify(patch))).toBeLessThan(700);
+  });
+
   it('pays once for a machine fact, not once here and once in the contract', () => {
     const paidForInTheContract: ReadonlyArray<readonly [string, RegExp]> = [
-      ["owner's chosen endpoints", /owner'?s chosen endpoints/i],
-      ['anti-bot challenge', /until the user clears it|carry on with the rest/i]
+      ['Anti-bot challenges', /until the user clears it|carry on with the rest/i],
+      ['publish_preview', /bind (it|the server) to 127\.0\.0\.1/i]
     ];
     for (const [carried, restated] of paidForInTheContract) {
       expect(BASE_SYSTEM_PROMPT, `the contract stopped carrying "${carried}"`).toContain(carried);
@@ -380,46 +318,12 @@ describe('the wire a box without a browser or a screen is sent', () => {
   });
 
   it('holds the bare-box wire under a ceiling of its own', () => {
-    /*
-     * Measured at 42,940 bytes / 34 tools against a provisioned 54,632 / 41: 11,692 bytes, 21.4%,
-     * off every request of every turn on a box that has neither surface - and off the head of the
-     * cached prefix, which is the most expensive place in the request to be carrying anything.
-     *
-     * 43,000 was that measurement with 60 bytes of headroom, which is a ceiling and not a licence,
-     * and it is the number to lower again if anything else leaves this wire. It is a *ceiling* and
-     * not an equality on purpose: a tool added to the catalogue that a bare box can genuinely
-     * honour should land here, and be paid for here, exactly as it is above.
-     *
-     * Which is exactly what then happened. file_patch's `move` operation is 317 bytes and a bare
-     * box honours it in full - there is nothing about moving a block that wants a browser or a
-     * screen - so it is paid for on this wire too, and the number is 43,300 against a measured
-     * 43,257. The gap to the provisioned wire is unchanged at 11,692, because the same 317 bytes
-     * landed on both.
-     *
-     * And again for the line-addressed editor that replaced the quoted one, on the same terms: it
-     * is 509 bytes, a bare box honours every operation in it - editing by line number wants neither
-     * a browser nor a screen - so it is paid for here too. 43,800 against a measured 43,766. The
-     * gap to the provisioned wire is still exactly 11,692, because the same 509 bytes landed on
-     * both, which is the property that keeps this number honest: it moves for what a bare box
-     * gained, never for what a provisioned box was spared.
-     *
-     * And again for the reach, on exactly those terms: `session_search`'s `id` is 160 bytes, a bare
-     * box honours it in full - dereferencing a stored result wants neither a browser nor a screen -
-     * so it is paid for here too. 43,950 against a measured 43,908, up from 43,748. The gap to the
-     * provisioned wire is still exactly 11,692, because the same 160 bytes landed on both.
-     */
-    /*
-     * And again for long work, on exactly those terms: the two `shell` fields are 73 bytes, a bare
-     * box honours both in full - a six-hour background job wants neither a browser nor a screen -
-     * so they are paid for here too. 44,000 against a measured 43,981, up from 43,908. The gap to
-     * the provisioned wire is still exactly 11,692, because the same 73 bytes landed on both.
-     */
-    // Conditional calendar changes measure 52,062 bytes without computer surfaces.
-    expect(Buffer.byteLength(JSON.stringify(bare))).toBeLessThan(52_100);
-    // The other direction, and the one that fails silently. A gate wired to nothing returns the
-    // unconditional constant on every box; this is the assertion that would go red if it did.
+    // A ceiling, not an equality: a capability a bare box can honour is paid for here as well.
+    // Measured at 34,057 bytes without either surface.
+    expect(Buffer.byteLength(JSON.stringify(bare))).toBeLessThan(34_100);
+    // The direction that fails silently: a gate wired to nothing returns the full catalogue.
     expect(Buffer.byteLength(JSON.stringify(bare))).toBeLessThan(
-      Buffer.byteLength(JSON.stringify(provisioned)) - 11_000
+      Buffer.byteLength(JSON.stringify(provisioned)) - 6_000
     );
   });
 
@@ -775,22 +679,18 @@ describe('the wire surface each audience is sent', () => {
   });
 
   it('costs the specialist a ninth of what the lead pays, and did not move when it moved', () => {
-    // The ceiling for the smaller audience, on the same terms as the one above: it moves for a
-    // capability and not for prose. 7,431 measured, and the headroom is deliberately thin because
-    // nine read-only tools is what this agent is.
-    expect(Buffer.byteLength(JSON.stringify(specialist))).toBeLessThan(7_600);
-    // Byte-identical to the array delegate.ts used to build for itself: the same nine entries in
-    // the same order, so the refactor cannot have moved a cached prefix. Order is the point - core
-    // set first, then declaration order, exactly as the lead's is.
+    // The ceiling for the smaller audience: 4,949 bytes measured for nine read-only tools.
+    expect(Buffer.byteLength(JSON.stringify(specialist))).toBeLessThan(5_000);
+    // Core set first, then declaration order, exactly as the lead's is.
     expect(specialistNames).toEqual([
       'files_list',
       'file_read',
-      'session_search',
       'web_search',
       'document_read',
       'document_search',
       'code_search',
       'repo_overview',
+      'session_search',
       'parallel_web_read'
     ]);
   });
@@ -832,7 +732,7 @@ describe('the catalogue as the model reads it', () => {
     for (const tool of agentTools) {
       expect(tool.name, tool.name).toMatch(/^[a-z][a-z0-9_]*$/);
       // Short enough to skim, long enough to say what the tool is for and where its edge is.
-      expect(tool.description.length, tool.name).toBeGreaterThan(80);
+      expect(tool.description.length, tool.name).toBeGreaterThan(40);
       expect(tool.description.length, tool.name).toBeLessThan(3_000);
     }
   });
@@ -883,7 +783,7 @@ describe('the catalogue as the model reads it', () => {
     expect(search.properties).toHaveProperty('id');
     expect(schemaOf('session_search')).not.toHaveProperty('required');
     const promise = agentTools.find((tool) => tool.name === 'session_search')?.description ?? '';
-    expect(promise).toContain('set id to');
+    expect(promise).toMatch(/set id to/i);
     // Which id, not just that there is one: the two a match carries reach different halves.
     expect(promise).toContain('episodeId');
     expect(promise).not.toMatch(/optionally inspect/);
@@ -915,7 +815,7 @@ describe('the catalogue as the model reads it', () => {
      * different number than the stated one is worse than no sentence at all.
      */
     const description = agentTools.find((tool) => tool.name === 'code_search')?.description ?? '';
-    expect(description).toContain(`Past ${CODE_SEARCH_FILE_CEILING} matching files`);
+    expect(description).toContain(`past ${CODE_SEARCH_FILE_CEILING} files it is refused`);
     /*
      * The collapse threshold is stated as "a few dozen" rather than as a figure, on purpose: it is
      * a harness bound the model has no reason to tune against, and a model that knows the exact
@@ -923,7 +823,7 @@ describe('the catalogue as the model reads it', () => {
      * Vague prose still has to be true, though, which is all this asserts - a threshold moved to
      * two hundred makes the sentence a lie, and this is where that is noticed.
      */
-    expect(description).toContain('more than a few dozen lines');
+    expect(description).toContain('many files and lines');
     expect(CODE_SEARCH_COLLAPSE_LINES).toBeGreaterThanOrEqual(24);
     expect(CODE_SEARCH_COLLAPSE_LINES).toBeLessThan(60);
     /*
@@ -936,7 +836,7 @@ describe('the catalogue as the model reads it', () => {
         properties: Record<string, { description?: string }>;
       }
     ).properties.summary;
-    expect(summary?.description).toMatch(/^Return the per-file rows even for/);
+    expect(summary?.description).toMatch(/^Per-file rows even for/);
     expect(String(summary?.description)).not.toMatch(/instead of|rather than|turn off|disable/i);
   });
 
@@ -1101,83 +1001,6 @@ describe('the catalogue as the model reads it', () => {
     expect(prose).not.toMatch(/platform approval|machine hours|included active/i);
   });
 
-  it('says where the edge is between each pair a model would otherwise confuse', () => {
-    // Each of these is a real pair: two tools whose jobs overlap in one word, where a model with
-    // only one of the descriptions in front of it would pick either. The arbitration clause has to
-    // exist, and it has to be phrased "use <other>": that is the form a model reads as an
-    // arbitration rule rather than as a claim about this tool.
-    const description = (name: string): string =>
-      agentTools.find((tool) => tool.name === name)?.description ?? '';
-    const known = new Set(agentTools.map((tool) => tool.name));
-    const clauseNaming = (tool: string, other: string): string | undefined =>
-      description(tool)
-        .split(/(?<=[.;])\s+/)
-        .find((sentence) => new RegExp(`\\b${other}\\b`).test(sentence));
-
-    const instead: ReadonlyArray<readonly [string, string]> = [
-      ['file_read', 'document_read'],
-      ['file_write', 'file_patch'],
-      ['document_search', 'code_search'],
-      ['document_search', 'session_search'],
-      ['session_search', 'web_search'],
-      // The pair a model is most likely to get wrong now: two tools with "memory" in the name over
-      // two different stores - the short reviewed list already in context, and the retrieval store
-      // the pack was drawn from.
-      ['memory', 'memory_recall'],
-      ['memory_recall', 'session_search'],
-      ['memory_recall', 'document_search'],
-      ['browser_snapshot', 'web_search'],
-      ['browser_snapshot', 'read_elements'],
-      ['web_search', 'document_search'],
-      ['parallel_web_read', 'browser_action'],
-      ['files_list', 'code_search'],
-      ['files_list', 'repo_overview'],
-      ['repo_overview', 'files_list'],
-      ['file_write', 'publish_artifact'],
-      ['desktop_observe', 'browser_snapshot'],
-      ['desktop_action', 'browser_action'],
-      ['delegate', 'coding_agent'],
-      ['coding_agent', 'file_patch'],
-      ['image_read', 'generate_media'],
-      ['image_read', 'document_read']
-    ];
-    for (const [tool, other] of instead) {
-      const clause = clauseNaming(tool, other);
-      expect(clause, `${tool} never says when to use ${other} instead`).toBeDefined();
-      // The scorer's own rule, applied here: a sentence that sends the reader to another tool is
-      // dropped from this tool's score. One "use <tool>" is enough for the whole sentence, which
-      // is why a single clause may go on to list three alternatives.
-      const arbitrates = [...known].some(
-        (name) => name !== tool && new RegExp(`\\buse\\s+${name}\\b`, 'i').test(clause ?? '')
-      );
-      expect(
-        arbitrates,
-        `${tool} points at ${other} in a sentence the scorer still counts for ${tool}: "${clause}"`
-      ).toBe(true);
-    }
-
-    // The other relationship: not "instead of" but "and then". These name a step rather than an
-    // alternative, so they belong in the referring tool's own score and only have to be there.
-    /*
-     * `['print_pdf', 'typst']` was the third pair here and it is deleted with the clause it
-     * pinned, rather than kept as evidence the clause should have survived.
-     *
-     * What it protected - that a PDF whose pagination matters is typeset rather than captured from
-     * a browser - has a better home and already occupies it: the operating contract states it, and
-     * states it *gated* on this box actually having a document toolchain, pinned in both
-     * directions in context.test.ts ("typeset with typst" present when provisioned, absent when
-     * bare). The catalogue's copy was unconditional, so a box with no typst read in one request
-     * that it has no document toolchain and that typst is the route for a PDF that matters. A pin
-     * that holds an unconditional duplicate in place against a gated original is a ratchet.
-     */
-    const thenPairs: ReadonlyArray<readonly [string, string]> = [
-      ['web_search', 'parallel_web_read'],
-      ['shell', 'process']
-    ];
-    for (const [tool, other] of thenPairs)
-      expect(clauseNaming(tool, other), `${tool} never mentions ${other}`).toBeDefined();
-  });
-
   it('names only result fields the runner really ships, for the two surfaces that omit things', () => {
     /*
      * THE DEFECT THIS PROGRAMME HAS SHIPPED FIVE TIMES, caught from the description side.
@@ -1262,13 +1085,6 @@ describe('the search route and the notice', () => {
     expect(search?.description).toMatch(/parallel_web_read/);
   });
 
-  it('tells the notice what it is for, and what it is not for', () => {
-    const notify = tool('notify');
-    expect(notify?.parameters.required).toEqual(['headline']);
-    expect(notify?.description).toMatch(/unattended run says nothing at all unless you call this/);
-    expect(notify?.description).toMatch(/do not call it to announce that a task finished/);
-  });
-
   it('states both limits the box enforces, in the numbers it enforces them at', () => {
     // The description promised a per-turn limit that the counter never reset, so it was really per
     // conversation and an agent went permanently silent after three notices while being told the
@@ -1278,9 +1094,7 @@ describe('the search route and the notice', () => {
     expect(MAX_NOTICES_PER_TURN).toBe(3);
     expect(MAX_AGENT_NOTIFICATIONS_PER_TASK).toBe(10);
     const notify = tool('notify')?.description ?? '';
-    expect(notify).toMatch(/three in a turn/);
-    expect(notify).toMatch(/counted again from zero on the turn after they reply/);
-    expect(notify).toMatch(/ten notifications in the whole conversation/);
+    expect(notify).toMatch(/At most 3 per turn and 10 per conversation/);
   });
 });
 
@@ -1561,7 +1375,7 @@ describe('declared action shapes', () => {
       >
     ).spec;
     expect(spec?.properties?.kind?.enum).toEqual(['once', 'interval', 'daily', 'weekly', 'cron']);
-    expect(spec?.description).toMatch(/daily: timeZone and localTime/);
+    expect(spec?.description).toMatch(/daily: timeZone, localTime/);
     expect(Object.keys(spec?.properties ?? {})).toEqual(
       expect.arrayContaining([
         'runAt',
@@ -1736,18 +1550,10 @@ describe('the reach each publishing call has, and the card the floor raises for 
 });
 
 describe('the contract each answer is written to', () => {
-  it('says where the answer goes and how long the card is', () => {
-    const finish = agentTools.find((tool) => tool.name === 'finish');
-    const properties = finish?.parameters.properties as Record<string, { description?: string }>;
-    expect(properties.answer?.description).toMatch(/user-facing answer/);
-    expect(properties.summary?.description).toMatch(/answer is omitted/);
-    expect(properties.deliverables?.description).toMatch(/can now open/);
-  });
-
   it('keeps memory governance on the memory tool, where it is read at the moment of use', () => {
     const memory = agentTools.find((tool) => tool.name === 'memory');
-    expect(memory?.description).toMatch(/validUntil/);
-    expect(memory?.description).toMatch(/never transient task state/);
+    expect(memory?.description).toMatch(/never credentials or transient state/);
+    expect(JSON.stringify(memory?.parameters)).toMatch(/validUntil/);
   });
 });
 
@@ -1770,8 +1576,8 @@ describe('which frame a path is read in', () => {
 
   it('tells the shell that the command already runs inside workspace/', () => {
     const cwd = properties('shell').cwd?.description ?? '';
-    expect(cwd).toMatch(/already runs inside workspace\//);
-    expect(cwd).toMatch(/never workspace\/probe\/x/);
+    expect(cwd).toMatch(/Relative to workspace\//);
+    expect(cwd).toMatch(/not workspace\/probe\/x/);
   });
 
   it('tells file_write that the bare name and the prefixed name are one file', () => {

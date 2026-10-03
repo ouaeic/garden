@@ -16,9 +16,9 @@
  * cannot fail. Emptying `connectorCatalog`, every connectable service the product offers, broke one
  * test out of 249 in `packages/core`.
  *
- * The class regenerates on every wave, because a loop-only assertion is the cheapest way to write a
- * test that can never fail, and it looks exactly like a thorough one. So the fix is a check rather
- * than twenty-four edits: the edits are Wave 1F's, and without this they would come back.
+ * The class regenerates, because a loop-only assertion is the cheapest way to write a test that can
+ * never fail, and it looks exactly like a thorough one. So the guard is a check rather than a round
+ * of edits, which would only hold until the next such test was written.
  *
  * The repository had already written the cure once, in `skills.test.ts`, and never generalised it:
  *

@@ -80,9 +80,9 @@ const contextSource = path.join(repositoryRoot, 'apps/worker/src/context.ts');
  * The value a constant currently holds in the shipped source.
  *
  * Read rather than written down, because `configuration-fidelity` has to stay equal to `shipped`
- * across the very change this rig exists to argue about. Hard-coding 8 here would turn the day
- * step 3.1 lands `RECENT_DETAIL_MESSAGES = 2` into a fidelity failure that says the loader is
- * broken when what actually happened is that the tree moved.
+ * across the very change this rig exists to argue about. Hard-coding a value here would turn the
+ * day the tree changes it into a fidelity failure that says the loader is broken when what actually
+ * happened is that the tree moved.
  */
 export const shippedConstant = (name: string): number => {
   const match = new RegExp(`const ${name} = (\\d[\\d_]*);`).exec(
@@ -111,13 +111,13 @@ export const CONFIGURATIONS: readonly ContextConfiguration[] = [
   {
     id: 'detail-2',
     label: 'RECENT_DETAIL_MESSAGES 8 -> 2',
-    why: "Step 3.1's candidate (a). Wave 0 priced it at cache-read 75.8 -> 86.4% on the large window.",
+    why: 'Keeps detail for the two most recent messages only.',
     constants: { RECENT_DETAIL_MESSAGES: 2 }
   },
   {
     id: 'tool-2',
     label: 'RECENT_TOOL_OUTPUT_MESSAGES 8 -> 2',
-    why: "Step 3.1's candidate (b), and the plan's original headline. Wave 0 priced it at +0.1 points.",
+    why: 'Keeps full tool output for the two most recent messages only.',
     constants: { RECENT_TOOL_OUTPUT_MESSAGES: 2 }
   },
   {
@@ -155,26 +155,24 @@ export const CONFIGURATIONS: readonly ContextConfiguration[] = [
   {
     id: 'both-2',
     label: 'both windows 8 -> 2',
-    why: 'Landing (a) and (b) together, which is what a wave that takes both recommendations ships.',
+    why: 'Both windows at two together, which is what taking both reductions would ship.',
     constants: { RECENT_DETAIL_MESSAGES: 2, RECENT_TOOL_OUTPUT_MESSAGES: 2 }
   },
   {
     /**
-     * The noise control, and the incident that moved it.
+     * The noise control.
      *
-     * A control has to be a configuration the tree does NOT ship. This row was `stride-4` while the
-     * tree shipped stride 8; step 3.1 then landed stride 4, and the control silently became a copy
-     * of `shipped` - byte-identical on all 27 rows, reporting a reassuring `+0.00` that was an
-     * identity rather than a measurement. Wave 3's gate caught it (WAVE-3-GATE.md section 7, Q-1).
-     * It now names 8, the value the tree shipped until 3.1, so the arm is a genuinely different
-     * configuration again and its quality delta is once more a statement about noise in the rig.
+     * A control has to be a configuration the tree does NOT ship, or it becomes a copy of `shipped`
+     * - byte-identical on every row, reporting a reassuring `+0.00` that is an identity rather than
+     * a measurement. The tree ships stride 4, so this names 8, and its quality delta is a statement
+     * about noise in the rig.
      *
-     * `degenerateConfigurations` below is the part that means this cannot happen a third time
-     * quietly: the next time the tree moves onto a control's value, the run says so and fails.
+     * `degenerateConfigurations` below keeps that true: if the tree moves onto a control's value,
+     * the run says so and fails.
      */
     id: 'stride-8',
     label: 'CACHE_CHECKPOINT_STRIDE 4 -> 8',
-    why: 'The stride the tree shipped before step 3.1 halved it. Content-neutral, so this row is the control: any quality movement here is noise in the rig.',
+    why: 'Twice the shipped stride. Content-neutral, so this row is the control: any quality movement here is noise in the rig.',
     constants: { CACHE_CHECKPOINT_STRIDE: 8 }
   },
   {
@@ -381,9 +379,8 @@ export const CONFIGURATIONS: readonly ContextConfiguration[] = [
  *
  * A row whose constants all name the values the tree already ships is byte-identical to `shipped`
  * on every measurement, and its delta is `+0.00` by construction rather than by measurement. That
- * is not a null result, it is an identity, and it reads exactly like a reassuring one - which is
- * what happened to `stride-4` when step 3.1 landed stride 4 and nothing in this directory noticed
- * for a whole wave. `configuration-fidelity` is exempt because being that copy is its entire job.
+ * is not a null result, it is an identity, and it reads exactly like a reassuring one.
+ * `configuration-fidelity` is exempt because being that copy is its entire job.
  *
  * THIS FUNCTION ONLY CHECKS CONSTANTS. It cannot see the same drift in a row carrying edits, and it
  * is not the guard that catches one. An edit row goes stale the way `reasoning-in-transcript` did

@@ -71,7 +71,9 @@ export async function checkTaskRecovery({ context, origin, bootstrap, task, repo
     failHistory = false;
     await alert.getByRole('button', { name: 'Try again', exact: true }).click();
     await alert.waitFor({ state: 'detached' });
-    await page.getByText('Live', { exact: true }).waitFor();
+    // A live connection is the default and says nothing; only a lost one is named.
+    await page.getByText('Disconnected', { exact: true }).waitFor({ state: 'detached' });
+    for (let wait = 0; wait < 100 && streamRequests === 0; wait += 1) await page.waitForTimeout(50);
     assert(streamRequests > 0, 'Try again must start the activity connection after a failed load');
     assert.deepEqual(actions, [], 'Retrying a display read must not restart paid work');
 

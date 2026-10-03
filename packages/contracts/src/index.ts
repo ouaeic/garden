@@ -7,7 +7,6 @@ export * from './projects.js';
 import { ConversationSource } from './projects.js';
 import { z } from 'zod';
 import { TaskOutputIntents } from './output-intent.js';
-import { WorkSurfaceReport } from './work-surface.js';
 export * from './work-surface.js';
 export * from './output-intent.js';
 export * from './delivery-state.js';
@@ -916,7 +915,6 @@ export const TaskPlan = z.object({
   branchName: z.string().min(1).max(80),
   steps: z.array(TaskPlanStep).min(1).max(30),
   outputs: TaskOutputIntents.optional(),
-  presentation: WorkSurfaceReport.optional(),
   directionEventId: z.string().optional(),
   createdBy: z.enum(['agent', 'user']),
   createdAt: IsoDate
@@ -2188,6 +2186,8 @@ export type ProviderRouting = z.infer<typeof ProviderRouting>;
 
 export const OwnerPreferences = z.object({
   decisionModelsEnabled: z.boolean().optional(),
+  /** Whether the agent may publish an HTML view of a result; absent means it may. */
+  resultViews: z.boolean().optional(),
   /** @see ProviderRouting - absent means the defaults, which is the owner's rule unchanged. */
   providerRouting: ProviderRouting.optional(),
   modelPurposes: z
@@ -2240,8 +2240,27 @@ export const OwnerPreferences = z.object({
 });
 export type OwnerPreferences = z.infer<typeof OwnerPreferences>;
 
+/** One comment on a result: on quoted text, on a circled region of a view, or on the whole of it. */
+export const ResultNote = z.object({
+  /** What it is about: "the answer", or the name of the view or file. */
+  on: z.string().min(1).max(200),
+  quote: z.string().max(4_000).optional(),
+  /** A circled region, as fractions of the view's width and height, and the text found under it. */
+  region: z
+    .object({
+      x: z.number().min(0).max(1),
+      y: z.number().min(0).max(1),
+      radius: z.number().min(0).max(1),
+      text: z.string().max(1_000).optional()
+    })
+    .optional(),
+  note: z.string().max(4_000)
+});
+export type ResultNote = z.infer<typeof ResultNote>;
+
 export const DirectionContext = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('selection'), text: z.string().min(1).max(12_000) }),
+  z.object({ kind: z.literal('notes'), notes: z.array(ResultNote).min(1).max(30) }),
   z.object({
     kind: z.literal('analysis'),
     workspaceId: Id,

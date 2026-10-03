@@ -5,21 +5,17 @@ import { runtimeUUID } from '@garden/core';
  * Every tool argument, every tool result and every field of a connector's reply arrives as
  * `unknown`: the model was asked for a shape, not held to one. Nine tool arms and the turn loop
  * each need the same three answers - what is this as text, is this an object at all, and how many
- * times does this string occur - and before Wave 6 put those arms in adjacent files nobody could
- * see that they were being answered three different ways.
+ * times does this string occur - and one place to answer them keeps those answers from diverging.
  *
  * `canonicalJson` is here rather than beside either of its two callers because they are in
  * different modules and both depend on it agreeing with itself: the approval hash and the failing
  * call key both key on this exact serialisation, and two copies would be two keys.
- *
- * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
 
 import type { TaskPlanStep } from '@garden/contracts';
 import { GardenError } from '@garden/core';
 import type { ModelMessage } from '@garden/model-gateway';
 import { UNICODE_TAG_CHARACTERS } from './sanitise.js';
-import { SKILL_BODY_HEADINGS } from './skills.js';
 
 /**
  * A scalar a model or a runner wrote, read as text - and the only function in this package that
@@ -162,11 +158,7 @@ export const skillDocument = (
   const name = skillName(input.name);
   const description = boundedKnowledge(input.description, 240).replace(/\s+/g, ' ');
   const content = boundedKnowledge(input.content, 24_000);
-  const missing = SKILL_BODY_HEADINGS.filter(
-    (heading) => !new RegExp(`^#{1,3}\\s+${heading}\\s*$`, 'im').test(content)
-  );
-  if (missing.length)
-    throw new GardenError('skill_structure_invalid', `Skill is missing: ${missing.join(', ')}`);
+  if (!content.trim()) throw new GardenError('skill_structure_invalid', 'A skill needs content.');
   return { name, description, content };
 };
 

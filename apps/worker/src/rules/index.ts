@@ -81,20 +81,8 @@ export interface DormantRule {
 }
 
 /** Serialised arguments of one call, for matchers that look for a path or a command inside them. */
-const argumentText = (call: RuleObservation['toolCalls'][number]): string => {
-  try {
-    return JSON.stringify(call.arguments);
-  } catch {
-    // A bag that will not serialise is a bag with a cycle in it, which no provider produces. It is
-    // caught rather than thrown because a rule failing to match is a missed correction, and a rule
-    // throwing is a dead turn.
-    return '';
-  }
-};
 
 /** Office formats whose defects are invisible in the source that produced them. */
-const OFFICE_DOCUMENT = /\.(?:docx|pptx|xlsx)\b/i;
-
 /**
  * The commands that *are* the proof, so the step that starts proving is not told to start proving.
  *
@@ -103,15 +91,7 @@ const OFFICE_DOCUMENT = /\.(?:docx|pptx|xlsx)\b/i;
  * calls away. One wasted correction is cheap, but it is also avoidable by naming the three binaries
  * the proof is made of.
  */
-const RENDER_PROOF_COMMAND = /garden-office-convert|pdftoppm|libreoffice|soffice/i;
-
 /** Everything that puts a page from the outside in front of the model as a page rather than a hit. */
-const PRIMARY_SOURCE_READERS = [
-  'parallel_web_read',
-  'browser_snapshot',
-  'print_pdf',
-  'read_elements'
-];
 
 /**
  * A shell that waits by the clock: `sleep 5`, `while ...; do sleep 2; done`, `&& sleep 10`.
@@ -153,49 +133,6 @@ const commandLine = (call: RuleObservation['toolCalls'][number]): string => {
  * twice, plus a matcher.
  */
 export const DORMANT_RULES: readonly DormantRule[] = [
-  {
-    /**
-     * The defect nothing reports.
-     *
-     * A deck whose text overflows its box, a CV that runs onto a second page, a workbook of #REF!
-     * - none of these fail. The script exits zero, the file is written, the model reads back a
-     * valid archive, and the first thing that observes the defect is the owner opening it. Every
-     * other class of mistake this harness has is announced by something; this class is announced by
-     * nobody, which is exactly why it cannot be left to the model to discover by trying.
-     */
-    id: 'office-render-proof',
-    matches: ({ toolCalls, ran }) =>
-      !ran.has('image_read') &&
-      toolCalls.some(
-        (call) =>
-          ['shell', 'file_write', 'publish_artifact'].includes(call.name) &&
-          OFFICE_DOCUMENT.test(argumentText(call)) &&
-          !RENDER_PROOF_COMMAND.test(argumentText(call))
-      ),
-    correction:
-      'You have produced an Office document. Nothing in its source shows text overflowing its box, a page breaking in the wrong place, or a sheet full of #REF!, and the first thing that will observe those is the user opening the file. Before you publish it: convert it with `garden-office-convert IN OUT`, render the pages with `pdftoppm`, and look at them with image_read. The render-proof skill carries the full procedure.'
-  },
-  {
-    /**
-     * An answer built entirely out of search hits.
-     *
-     * The contract already says a snippet is a pointer and never a citation, and that line stays
-     * where it is - what it cannot do is notice. This can: the turn ran a search, opened nothing
-     * behind it, and the model has now written the user several hundred characters of answer with
-     * no address in it. The bar is deliberately on length and on the absence of any URL rather than
-     * on judging the prose, because a matcher that tries to decide what counts as a factual claim
-     * is a matcher that fires on everything.
-     */
-    id: 'snippet-citation',
-    matches: ({ text, toolCalls, ran }) =>
-      ran.has('web_search') &&
-      !PRIMARY_SOURCE_READERS.some((tool) => ran.has(tool)) &&
-      !toolCalls.some((call) => PRIMARY_SOURCE_READERS.includes(call.name)) &&
-      text.length >= 240 &&
-      !/https?:\/\//i.test(text),
-    correction:
-      'Everything you have just told the user came out of search hits: this turn ran web_search and has opened none of the pages behind it. Read the sources you are relying on - parallel_web_read takes up to twelve at once - check each claim against the page itself, and give the address you actually read. Any claim you cannot relocate in a source says so in the answer.'
-  },
   {
     /**
      * Waiting by the clock, on a turn that is bounded by the clock.

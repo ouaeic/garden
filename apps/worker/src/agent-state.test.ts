@@ -2,17 +2,14 @@
  * `AgentState` under the two things that actually happen to it: it is sealed and reopened, and it is
  * carried across a turn boundary.
  *
- * Wave 7.1 lifted this type out of `agent.ts` and gave every other module the split produced a test
- * file - except this one, which is the most load-bearing data structure in the worker. It is
- * checkpointed mid-step, encrypted whole under the task's data key, and reopened by whichever worker
- * picks the task up next. Nothing asserted that a field survives that, because nothing could: while
- * the type lived beside `AgentWorker` the only way to observe it was to drive a turn, and a turn
- * exercises the dozen fields its own path happens to read.
+ * It is the most load-bearing data structure in the worker: checkpointed mid-step, encrypted whole
+ * under the task's data key, and reopened by whichever worker picks the task up next. A driven turn
+ * exercises only the dozen fields its own path happens to read, so this file asserts every field.
  *
  * The failure this file exists to catch has no symptom at the moment it happens. A field that does
  * not survive a resume comes back as a default - a counter at zero, a bound reset, a taint gone -
- * and the run carries on looking healthy. It is the shape of defect this program has found more than
- * thirty times, and it is the one shape a resumed turn cannot report on itself.
+ * and the run carries on looking healthy. It is the one shape of defect a resumed turn cannot report
+ * on itself.
  *
  * Two nets, deliberately at two levels:
  *
@@ -53,17 +50,12 @@ const FIELDS: ReadonlyArray<keyof AgentState> = [
   'transcriptionRates',
   'toolOutputFloor',
   'openedSkills',
-  'mutated',
   'mutatedBeyondProse',
   'answered',
   'repairStep',
-  'answerNagged',
   'turnToolResults',
-  'finishRejections',
-  'deliveryNagged',
   'ownerReasoningEffort',
   'preparedInputTokens',
-  'completionNags',
   'approvalRecovery',
   'toolsStarted',
   'idleSteps',
@@ -74,6 +66,7 @@ const FIELDS: ReadonlyArray<keyof AgentState> = [
   'seenCalls',
   'carriedArtifacts',
   'truncatedReplies',
+  'continuedAnswer',
   'frameLossNoted',
   'contextOverflowRepairs',
   'notices',
@@ -90,14 +83,9 @@ const FIELDS: ReadonlyArray<keyof AgentState> = [
   'inFlight',
   'acceptance',
   'acceptanceFailures',
-  'acceptanceNagged',
-  'acceptanceBaselineRefusals',
   'acceptanceTurn',
-  'acceptanceCaveat',
   'selfContinuations',
   'continuationMark',
-  'planCoverageNagged',
-  'planIsFallback',
   'taint',
   'turnNoveltyBytes',
   'memoryReaches',
@@ -218,11 +206,9 @@ const FULL: Required<AgentState> = {
   transcriptionRates: { 'openai/whisper-1': 0.006 },
   toolOutputFloor: 1_200,
   openedSkills: ['code-change', 'deployment'],
-  mutated: true,
   mutatedBeyondProse: true,
   answered: true,
   repairStep: true,
-  answerNagged: true,
   turnToolResults: {
     'call-1': {
       name: 'shell',
@@ -235,11 +221,8 @@ const FULL: Required<AgentState> = {
     },
     'call-2': { name: 'file_write', success: true, mutating: true, proseOnly: true }
   },
-  finishRejections: 2,
-  deliveryNagged: true,
   ownerReasoningEffort: 'low',
   preparedInputTokens: 91_400,
-  completionNags: 1,
   approvalRecovery: { turn: 7, attempts: 1 },
   toolsStarted: 9,
   idleSteps: 1,
@@ -250,6 +233,7 @@ const FULL: Required<AgentState> = {
   seenCalls: { 'file_read:workspace/importer.py': 'call-1' },
   carriedArtifacts: ['workspace/importer.py', 'pytest -q'],
   truncatedReplies: 1,
+  continuedAnswer: 'The first half of',
   frameLossNoted: true,
   contextOverflowRepairs: 1,
   notices: 2,
@@ -294,14 +278,9 @@ const FULL: Required<AgentState> = {
     declaredAtStep: 5
   },
   acceptanceFailures: 1,
-  acceptanceNagged: true,
-  acceptanceBaselineRefusals: 1,
   acceptanceTurn: 3,
-  acceptanceCaveat: 'declared after the work had already started',
   selfContinuations: 1,
   continuationMark: { atStep: 14, writes: 3 },
-  planCoverageNagged: true,
-  planIsFallback: true,
   taint: { level: 'untrusted', sources: ['https://example.com/page'], sinceStep: 8 },
   turnNoveltyBytes: 412,
   memoryReaches: 2,
@@ -387,6 +366,7 @@ describe('what a new turn inherits', () => {
     );
 
     expect(dropped).toEqual([
+      'continuedAnswer',
       'frameLossNoted',
       'pending',
       'question',
@@ -412,15 +392,10 @@ describe('what a new turn inherits', () => {
       'step',
       'turn',
       'reservationKey',
-      'mutated',
       'mutatedBeyondProse',
       'answered',
       'repairStep',
-      'answerNagged',
       'turnToolResults',
-      'finishRejections',
-      'deliveryNagged',
-      'completionNags',
       'toolsStarted',
       'idleSteps',
       'repeatedFailures',
@@ -430,11 +405,7 @@ describe('what a new turn inherits', () => {
       'notices',
       'questionsAsked',
       'acceptanceFailures',
-      'acceptanceNagged',
-      'acceptanceBaselineRefusals',
       'selfContinuations',
-      'planCoverageNagged',
-      'planIsFallback',
       'turnNoveltyBytes',
       // Per turn like the egress budget above it, and for the same reason: the refusal says "this
       // turn", so a counter that carried would refuse the first reach of every turn afterwards.
@@ -467,7 +438,6 @@ describe('what a new turn inherits', () => {
       'inFlight',
       'acceptance',
       'acceptanceTurn',
-      'acceptanceCaveat',
       'taint',
       'webToolMode',
       'knownOrigins',
@@ -493,7 +463,6 @@ describe('what a new turn inherits', () => {
     expect(next.webToolMode).toBe('in_house');
     expect(next.toolOutputFloor).toBe(1_200);
     expect(next.acceptance).toEqual(FULL.acceptance);
-    expect(next.acceptanceCaveat).toBe(FULL.acceptanceCaveat);
   });
 
   it('opens the new turn on the owner message with none of the last turn bookkeeping', () => {

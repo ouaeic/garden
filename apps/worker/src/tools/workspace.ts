@@ -1,17 +1,14 @@
 import { executeWorkflowTool } from './workflow.js';
 import { recordPatchReceipt, type PatchReceipt } from '../edit/receipts.js';
+import { applyReplacements, type TextReplacement } from '../edit/replace.js';
 import { executeDebuggerTool } from './debugger.js';
 import { sha256, GardenError } from '@garden/core';
 import { type ModelToolCall } from '@garden/model-gateway';
 import {
-  applyEdit,
-  boundRepeatedRefusal,
   checkSyntax,
   displayedRanges,
   firstUnshownLine,
-  forgetRefusal,
   numberedWindow,
-  readsOf,
   recordRead,
   recordWrite,
   renderNumbered,
@@ -33,22 +30,6 @@ import { withWorkspacePrefixNote } from './shell-frame.js';
 import { refuseShellReplacementOfUnread } from './shell-writes.js';
 import { executeComputationTool } from './computation.js';
 import { shellJobExecution } from '../shell-job.js';
-
-/**
- * How much of what a patch just wrote comes back in the result.
- *
- * The one failure a line-addressed format cannot detect on the way in is an off-by-one with no
- * evidence attached: `PUT 40.=42:` where the model meant 41, and nothing in the patch says what it
- * thought was at 40. `apply.ts` explains why guessing is not available there. This is the other half
- * of that decision - the model is shown the head and the tail of every region it wrote, with the
- * line above and below, so a miscount is visible on the same turn instead of at test time.
- *
- * Bounded, because it is input tokens on every successful edit and the whole point of the format is
- * not spending tokens. Four rows per region is the first line, the last line and one line of context
- * on each side, which is exactly enough to see that an edit landed one line high.
- */
-const ECHO_ROWS_PER_REGION = 2;
-const ECHO_MAX_ROWS = 24;
 
 /**
  * What the file weighs now, taken from the workspace's own answer to the write.
@@ -994,9 +975,7 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
         path,
         complete ? undefined : read.totalLines
       );
-      // Only what was displayed whole is recorded as displayed. This is the whole point of the
-      // bound: `readsOf` is the evidence `file_patch` rests a line number on, and before this it
-      // vouched for every line of the file after a read that had put a fraction of them on screen.
+      // Only what was displayed whole is recorded as displayed.
       if (whole.length) recordRead(reader, path, 1, whole.join('\n'));
       return {
         path,
@@ -1023,50 +1002,41 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
       if (!patches.length || patches.length > MAX_PATCH_FILES)
         throw new GardenError(
           'patch_invalid',
-          `Use {patches:[{path,edit}]} with between 1 and ${MAX_PATCH_FILES} patches.`
+          `Use {patches:[{path,oldText,newText}]} with between 1 and ${MAX_PATCH_FILES} entries.`
         );
-      const applied: Array<{
-        path: string;
-        sha256: string;
-        lines: number;
-        wrote: string;
-        renumbered: readonly string[];
-        notes: readonly string[];
-      }> = [];
+      const applied: Array<{ path: string; sha256: string; lines: number; notes: string[] }> = [];
       const failures: Array<{ path: string; reason: string }> = [];
       const uncertain: Array<{ path: string; reason: string; expectedSha256: string }> = [];
       const warnings: string[] = [];
-      const grouped = new Map<string, { path: string; edit: string }>();
-      // All operations for one exact path share the original read and one atomic file write.
-      // Validate the entire envelope first; aliases cannot change which read ledger applies.
+      const grouped = new Map<string, { path: string; replacements: TextReplacement[] }>();
+      // Every replacement for one file applies to one read and lands as one atomic write.
       for (const patch of patches) {
         const path = textValue(patch?.path);
-        const edit = textValue(patch?.edit);
-        if (!path || !edit)
+        if (!path || typeof patch.oldText !== 'string' || typeof patch.newText !== 'string')
           throw new GardenError(
             'patch_invalid',
-            'Every patch requires a path and a non-empty edit.'
+            'Every entry needs path, oldText and newText strings.'
+          );
+        if (path.includes('\0') || path.split('/').includes('..'))
+          throw new GardenError(
+            'patch_invalid',
+            'Patch paths must not contain traversal or null bytes.'
           );
         const identity = path
           .replace(/^workspace\//, '')
           .split('/')
           .filter((part) => part !== '.' && part !== '')
           .join('/');
-        if (path.includes('\0') || path.split('/').includes('..'))
-          throw new GardenError(
-            'patch_invalid',
-            'Patch paths must not contain traversal or null bytes.'
-          );
+        const replacement: TextReplacement = {
+          oldText: patch.oldText,
+          newText: patch.newText,
+          ...(patch.replaceAll === true ? { replaceAll: true } : {})
+        };
         const previous = grouped.get(identity);
-        if (previous && previous.path !== path)
-          throw new GardenError(
-            'patch_invalid',
-            `${path} and ${previous.path} address the same file. Use one exact path for its operations.`
-          );
-        if (previous) previous.edit += `\n${edit}`;
-        else grouped.set(identity, { path, edit });
+        if (previous) previous.replacements.push(replacement);
+        else grouped.set(identity, { path, replacements: [replacement] });
       }
-      for (const { path, edit } of grouped.values()) {
+      for (const { path, replacements } of grouped.values()) {
         let readHash: string | undefined;
         let before: string;
         try {
@@ -1076,30 +1046,15 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
         } catch (cause) {
           failures.push({
             path,
-            reason: `${path} could not be read: ${cause instanceof Error ? cause.message : 'read failed'}. Check the path with files_list before patching it.`
+            reason: `${path} could not be read: ${cause instanceof Error ? cause.message : 'read failed'}.`
           });
           continue;
         }
-        const result = applyEdit(path, edit, before, readsOf(reader, path));
+        const result = applyReplacements(path, replacements, before);
         if (!result.ok) {
-          /*
-           * The same bytes refused twice get the fix and not the reason a second time. The applier
-           * has said why once; a model that sent the identical patch back has read the reason and
-           * not acted on it, and `edit/refusals.ts` is the bound on how many times that is said.
-           */
-          const lines = toLines(before);
-          const bounded = boundRepeatedRefusal(
-            task.id,
-            path,
-            edit,
-            result.refusal,
-            lines,
-            firstUnshown(reader, path, lines.length) === undefined
-          );
-          failures.push({ path, reason: bounded.message });
+          failures.push({ path, reason: result.reason });
           continue;
         }
-        forgetRefusal(task.id, path);
         const receipt: PatchReceipt = {
           path,
           expectedSha256: sha256(result.text),
@@ -1131,9 +1086,7 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
             const observed = await context.runner.readFileWithHash(task.workspaceId, task.id, path);
             if (observed.content === result.text) {
               written = { sha256: sha256(result.text) };
-              warnings.push(
-                `${path}: write response was lost; the resulting bytes were verified by rereading.`
-              );
+              warnings.push(`${path}: the write response was lost; the bytes were verified.`);
             } else if (observed.content === before) {
               failures.push({ path, reason });
               await recordPatchReceipt(context.store, task.id, context.key, call.id, {
@@ -1163,88 +1116,42 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
           ...receipt,
           status: 'applied'
         }).catch(() => {
-          warnings.push(
-            `${path}: acknowledgement storage was unavailable; the durable intent can be reconciled by hash.`
-          );
+          warnings.push(`${path}: the edit receipt could not be stored; it reconciles by hash.`);
         });
         const hash = (written as { sha256?: unknown })?.sha256;
-        /*
-         * What is on disk now is what this patch just wrote, in both ledgers.
-         *
-         * The hash, so a `file_write` later in the same turn claims the version this produced rather
-         * than the one the read produced - without it the runner answered 409 naming the very tool
-         * that had caused the change. And the snapshot, so a SECOND edit to this file needs no read
-         * between them: the lines are text the model authored, which is text it has been shown by
-         * definition, and the numbers in the echo below are the numbers of this recording.
-         */
         if (typeof hash === 'string')
           state.readFileHashes = { ...(state.readFileHashes ?? {}), [path]: hash };
         const after = toLines(result.text);
-        /*
-         * What this patch changed, and what it did NOT.
-         *
-         * Both of these used to say the file had been read in full - the floor was deleted and the
-         * whole new text was recorded as shown - on the reasoning that the version the read was
-         * about no longer exists. One successful patch therefore disarmed both layers of the guard
-         * for the rest of the turn, on every file, always: measured on the shipped arm, a windowed
-         * read of lines 1-200 then one `PUT 10:` left `PUT 8000:` landing silently at a line
-         * nothing had displayed, and a whole-file write destroying 576,512 bytes accepted. What a
-         * patch authorises is the span it wrote; the rest of the file is exactly as unread as it
-         * was, one line-count shorter or longer.
-         */
+        // A replacement authorises the span it wrote; the rest of the file is as unread as it was.
         state.partialReads = shiftPartialRead(
           state.partialReads,
           path,
           after.length - toLines(before).length
         );
         recordWrite(reader, path, result.text, result.changed);
-        // The ledger row, written where the write landed rather than where it was asked for: a
-        // patch that was refused above has already `continue`d into `failures` and never reaches
-        // here, so a path in the block is a path the workspace confirmed. @see ARTIFACT_LEDGER_MARKER.
         state.artifactLedger = recordArtifactWrite(state.artifactLedger, {
           path,
           mode: 'edited',
           bytes: landedBytes(written, result.text),
           step: state.step
         });
-        /*
-         * The fast syntax gate, on what is now on disk, as a note and never a refusal. The
-         * deferred checker armed below still runs and still lands on a later call; this is the
-         * one question it cannot answer on this turn - does the file still parse - and the
-         * numbered line beside the answer is what makes the fix one more edit rather than a read.
-         */
-        const fault = await checkSyntax(path, result.text).catch(() => {
-          warnings.push(`${path}: syntax verification could not run; the edit is already applied.`);
-          return null;
-        });
-        const notes = fault
-          ? [
-              ...result.notes,
-              `syntax ${path} line ${fault.line}: ${fault.message}\n${numberedWindow(after, { from: fault.line, to: fault.line }, 1)}`
-            ]
-          : result.notes;
+        // A parse failure is a note, never a refusal: a multi-step change may pass through one.
+        const fault = await checkSyntax(path, result.text).catch(() => null);
         applied.push({
           path,
           sha256: sha256(result.text),
           lines: after.length,
-          wrote: result.wrote
-            .slice(0, Math.ceil(ECHO_MAX_ROWS / (ECHO_ROWS_PER_REGION + 2)))
-            .map((region) =>
-              region.to - region.from + 1 <= ECHO_ROWS_PER_REGION + 2
-                ? numberedWindow(after, region, 1)
-                : `${numberedWindow(after, { from: region.from, to: region.from }, 1)}\n...\n${numberedWindow(after, { from: region.to, to: region.to }, 1)}`
-            )
-            // A blank line between regions: two ranges of numbers run together read as one range
-            // with a gap in it, which is the one thing this echo exists to make unambiguous.
-            .join('\n\n'),
-          renumbered: result.renumbered,
-          notes
+          notes: fault
+            ? [
+                `syntax ${path} line ${fault.line}: ${fault.message}\n${numberedWindow(after, { from: fault.line, to: fault.line }, 1)}`
+              ]
+            : []
         });
       }
       if (!applied.length && !uncertain.length)
         throw new GardenError(
           'patch_conflict',
-          failures.map((failure) => failure.reason).join('\n\n') || 'No patch could be applied'
+          failures.map((failure) => failure.reason).join('\n') || 'No replacement could be applied'
         );
       try {
         const usage = await context.runner.call<{ storageBytes: number }>(
@@ -1257,19 +1164,7 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
       } catch {
         warnings.push('Storage accounting could not refresh; the file receipts below still apply.');
       }
-      /*
-       * The trigger, on the paths the workspace confirmed rather than on the paths that were asked
-       * for: a patch that failed has already `continue`d into `failures` and is not in `applied`,
-       * and running a checker over a file that was not written would report the tree as it was.
-       *
-       * Detached on purpose - see `armPostEditChecks`. It is armed here rather than anywhere
-       * earlier because this is the last line at which the patch is known to have succeeded, and
-       * it is armed inside `file_patch` rather than around it because that is what puts it after
-       * the turn's undo point: `file_patch` is not in `CHECKPOINT_EXEMPT_TOOLS`, so a checkpoint
-       * exists before this arm ran and anything the checker writes - a `.tsbuildinfo` under
-       * `incremental`, a `__pycache__` - is inside it. `turn-bounds.ts` records why that set is
-       * the bound that replaced an approval card.
-       */
+      // Detached checks run after the turn's undo point; see `armPostEditChecks`.
       armPostEditChecks(
         context,
         applied.map(({ path }) => path)
@@ -1280,30 +1175,12 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
           sha256: digest,
           lines
         })),
-        patchCount: applied.length,
         ...(uncertain.length ? { uncertain } : {}),
         ...(warnings.length ? { warnings } : {}),
-        // The numbers the file now has, so the next edit to it addresses this and not the read.
-        wrote: applied.map(({ path, wrote }) => `${path}\n${wrote}`).join('\n\n'),
-        // And how the numbers of the read map onto them, so the rest of the file can be addressed
-        // without a read: the ledger has moved by exactly these amounts.
-        ...(applied.some(({ renumbered }) => renumbered.length)
-          ? {
-              renumbered: applied
-                .filter(({ renumbered }) => renumbered.length)
-                .map(({ path, renumbered }) => `${path}: ${renumbered.join('; ')}`)
-            }
-          : {}),
         ...(applied.some(({ notes }) => notes.length)
           ? { notes: applied.flatMap(({ notes }) => notes) }
           : {}),
-        ...(failures.length
-          ? {
-              failed: failures,
-              instruction:
-                'filesChanged are confirmed on disk. failed were not applied. Reconcile any uncertain entries by reading; never replay the whole batch.'
-            }
-          : {})
+        ...(failures.length ? { failed: failures } : {})
       };
     }
     case 'image_read':

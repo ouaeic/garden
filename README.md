@@ -160,17 +160,16 @@ garden does not silently add a relay, VPN, or tracking directory; see
 - Review, Balanced, and Autonomous security modes with a non-bypassable safety floor.
 - Encrypted task history plus reviewed, compact durable memory with provenance and validity windows,
   so superseded or time-sensitive facts do not silently remain active forever.
-- Reviewed, versioned skills: the vetted built-in library and the procedures saved for this
-  computer are both resident as one indexed line each, and a full procedure is loaded when the
-  agent opens it.
+- Saved skills: procedures the owner approves are resident as one indexed line each, and a full
+  procedure is loaded when the agent opens it.
 - One-time, interval, daily, weekly, and advanced five-field cron schedules with IANA time zones.
   Schedules can be edited, paused, resumed, run now, or removed and keep working while clients are
   offline.
 - A request assembled for the cache as much as for the model: the operating contract, then the
-  active memory entries and the index of saved and built-in skills, then the recalled memory pack,
+  active memory entries and the index of saved skills, then the recalled memory pack,
   then the workspace brief, then the request and the trajectory, then the current plan — and last of
   all a hidden runtime block naming this computer, the time in the owner’s own time zone, the
-  working root, what the document toolchain on this machine can do, the security mode, and the
+  working root, the commands and modules installed for documents and data, the security mode, and the
   preview gateway. The runtime block is last because it is the only part that changes during a task,
   and anything that changes early re-bills everything behind it.
 - Capability-aware model routing: a lead model without vision receives bounded observations from the

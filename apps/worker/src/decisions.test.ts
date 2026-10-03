@@ -206,9 +206,7 @@ async function fixture() {
     ],
     step: 0,
     credits: 0,
-    turnToolResults: {},
-    finishRejections: 0,
-    completionNags: 0
+    turnToolResults: {}
   };
   const decide = vi.fn<(request: DecisionRequest) => Promise<DecisionResponse>>(
     async (request) => ({

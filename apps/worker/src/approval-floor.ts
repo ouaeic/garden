@@ -9,11 +9,10 @@ import { prepareNativeInputApproval } from './native-input.js';
  * The approval floor: what a tool call has to be asked about before it runs, and the three lookups
  * a card needs before it can name what it is asking about.
  *
- * Lifted out of `AgentWorker` in Wave 7.2, carrying defect #80 (loop F12) - the floor was evaluated
- * twice for the first call of every candidate parallel run. Each evaluation builds the destination
- * context, which joins up to forty thousand characters of the owner's own words and copies two
- * origin arrays, and it can reach the store three times besides. `approvalForCallOnce` is where the
- * second evaluation went.
+ * An evaluation is not cheap: it builds the destination context, which joins up to forty thousand
+ * characters of the owner's own words and copies two origin arrays, and it can reach the store
+ * three times besides. The first call of a candidate parallel run is asked about twice, so
+ * `approvalForCallOnce` answers the second time from the first.
  */
 import { createHmac } from 'node:crypto';
 import { ZodError } from 'zod';

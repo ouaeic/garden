@@ -29,12 +29,9 @@ import { executeWorkspaceTool } from './tools/workspace.js';
  * the runner for is unchanged, which `tool-dispatch.test.ts` asserts on the wire for all of them.
  *
  * `webPlan` and `state` are **required** here, where the method's parameters had them optional.
- * That optionality was not a convenience, it was two live defects: a `set_plan` issued on a handoff
- * turn reached this code with no state and so could not clear `planIsFallback`, leaving the finish
- * hold arguing against a plan the model had just written; and a delegated specialist's provider-side
- * web search reached it with no state either, so the credits it spent were written to the ledger and
- * charged to nothing the turn could see. Both close by making the two facts arrive rather than by
- * remembering to pass them, which is what a required parameter is for.
+ * Without state, a delegated specialist's provider-side web search would write its credits to the
+ * ledger and charge them to nothing the turn could see; a required parameter makes the fact arrive
+ * rather than relying on someone remembering to pass it.
  */
 export interface ToolContext {
   readonly store: DataStore;

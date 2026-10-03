@@ -559,13 +559,11 @@ export class BillingStore {
    * table because the ledger is where the provider's own figure lands.
    *
    * `state='settled' AND cost_usd>0` is the same subset `taskSpend`, `spendTotalIn`, `spendByDay`,
-   * `spendByModel` and `spendByTask` read, and this reader carried no state filter at all until
-   * Wave 7 - which is the argument the comment above was already making without acting on it. The
-   * ledger is append-only and four-valued: a `reserved` row is money nobody has taken yet, a
-   * `released` one is a reservation the work never spent, and a `credited` one is money that came
-   * back. Counting all four meant one refunded generation shortened the media budget for the whole
-   * life of the task, and a reservation that never settled did the same. It failed safe, which is
-   * why nothing reported it. The predicate is also exactly `usage_entries_task_spend_idx`, so
+   * `spendByModel` and `spendByTask` read. The ledger is append-only and four-valued: a `reserved`
+   * row is money nobody has taken yet, a `released` one is a reservation the work never spent, and
+   * a `credited` one is money that came back. Counting all four would let one refunded generation
+   * shorten the media budget for the whole life of the task, and a reservation that never settled
+   * would do the same - and it would fail safe, so nothing would report it. The predicate is also exactly `usage_entries_task_spend_idx`, so
    * matching the neighbours is what puts this query on the partial index they already use.
    */
   async mediaSpendForTask(taskId: string): Promise<number> {

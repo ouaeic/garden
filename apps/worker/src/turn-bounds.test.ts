@@ -6,8 +6,6 @@ import {
   HOST_DISK_FULL_CHECKPOINT_CODE,
   IDLE_STEPS_BEFORE_STOP,
   LATE_STEP_EFFORT_FLOOR,
-  MAX_COMPLETION_NAGS,
-  MAX_FINISH_REJECTIONS,
   MAX_IDLE_STEPS,
   MAX_NOTICES_PER_TURN,
   MAX_PARALLEL_TOOL_CALLS,
@@ -25,8 +23,6 @@ import {
   STEP_BUDGET_MARKER,
   STEP_HANDOFF_MARKER,
   WORKSPACE_TOO_LARGE_CHECKPOINT_CODE,
-  acceptanceBaselineNote,
-  acceptanceBaselineRefusal,
   approvalOrigin,
   cancelConfirmation,
   effortFloorEarned,
@@ -225,7 +221,7 @@ describe('knowing how far through a long turn it is', () => {
 
   it('tells a turn that is out of steps that the work carries over rather than ending', () => {
     const notice = stepBudgetNotice(59, 60) ?? '';
-    expect(notice).toContain('call finish');
+    expect(notice).toContain('reply with what is done');
     expect(notice).toContain('fresh budget');
   });
 
@@ -233,15 +229,6 @@ describe('knowing how far through a long turn it is', () => {
     const marks = notices(STEP_BUDGET_HANDOFF_STEPS).map(([, marker]) => marker);
     expect(marks).not.toContain(STEP_BUDGET_MARKER);
     expect(marks).toContain(STEP_HANDOFF_MARKER);
-  });
-});
-
-describe('a task the model never completes', () => {
-  it('bounds prose-only replies well inside the step budget', () => {
-    // A model that answers and never calls finish used to be nagged once per step until the step
-    // limit, spending the whole budget on the same exchange and then failing with an error that
-    // named nothing.
-    expect(MAX_COMPLETION_NAGS).toBeLessThanOrEqual(5);
   });
 });
 
@@ -385,9 +372,7 @@ describe('how hard the model thinks about a step', () => {
 
   it('lets evidence about the work itself pin the floor', () => {
     for (const hard of [
-      { finishRejections: 1 },
       { acceptanceFailures: 1 },
-      { completionNags: 1 },
       { step: LATE_STEP_EFFORT_FLOOR },
       { compactedAtStep: 3 },
       { estimatedInputTokens: 900, inputBudgetTokens: 1000 }
@@ -400,9 +385,7 @@ describe('how hard the model thinks about a step', () => {
 
   it('spends it again when the last step went wrong', () => {
     expect(step({ messages: after('shell', 'Tool failed: no such file') })).toBe('high');
-    expect(step({ messages: after('finish', 'Finish rejected (attempt 1 of 3)') })).toBe('high');
-    expect(step({ finishRejections: 1, messages: after('code_search') })).toBe('high');
-    expect(step({ completionNags: 1, messages: after('code_search') })).toBe('high');
+    expect(step({ acceptanceFailures: 1, messages: after('code_search') })).toBe('high');
   });
 
   it('does not spend less on the step that has to interpret what it just read', () => {
@@ -481,43 +464,6 @@ describe('how hard the model thinks about a step', () => {
     expect(changes).toHaveLength(1);
     expect(efforts[0]).toBe('high');
     expect(efforts.filter((effort) => effort === 'medium')).toHaveLength(trajectory.length - 1);
-  });
-});
-
-describe('a check the harness could never watch fail', () => {
-  const result = (id: string, label: string, passed: boolean, detail: string) => ({
-    id,
-    label,
-    passed,
-    detail
-  });
-
-  it('sends back a record that already passes, with what the harness saw', () => {
-    const refusal = acceptanceBaselineRefusal(
-      [
-        result('check-1', 'the report exists', true, '18 bytes (needs at least 1)'),
-        result('check-2', 'the notes are there', true, 'exit 0')
-      ],
-      1,
-      2
-    );
-    expect(refusal).toContain('all 2 of these');
-    expect(refusal).toContain('before the work');
-    // The correction has to be actionable: which check, what the harness observed, and what a
-    // check that means something would look like instead.
-    expect(refusal).toContain('check-1 (the report exists): 18 bytes');
-    expect(refusal).toContain('fails right now');
-    expect(refusal).toContain('guards against breaking something');
-  });
-
-  it('names which check is the proof and which one only guards what already works', () => {
-    const note = acceptanceBaselineNote([
-      result('check-1', 'the new endpoint answers', false, 'exit 7: connection refused'),
-      result('check-2', 'the existing suite still passes', true, 'exit 0')
-    ]);
-    expect(note).toContain('check-1 fails now');
-    expect(note).toContain('check-2 already passes');
-    expect(note).toContain('guards what already works');
   });
 });
 
@@ -1110,11 +1056,10 @@ describe('a turn that stopped changing', () => {
   it('leaves the tools that already have a ceiling of their own to those ceilings', () => {
     expect(BOOKKEEPING_TOOLS.has('set_plan')).toBe(true);
     expect(BOOKKEEPING_TOOLS.has('set_acceptance')).toBe(true);
-    for (const owned of ['finish', 'ask', 'notify'])
-      expect(BOOKKEEPING_TOOLS.has(owned)).toBe(false);
-    expect(
-      Math.min(MAX_FINISH_REJECTIONS, MAX_QUESTIONS_PER_TURN, MAX_NOTICES_PER_TURN)
-    ).toBeLessThan(MAX_STATIONARY_STEPS);
+    for (const owned of ['ask', 'notify']) expect(BOOKKEEPING_TOOLS.has(owned)).toBe(false);
+    expect(Math.min(MAX_QUESTIONS_PER_TURN, MAX_NOTICES_PER_TURN)).toBeLessThan(
+      MAX_STATIONARY_STEPS
+    );
   });
 });
 

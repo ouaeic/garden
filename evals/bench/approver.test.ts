@@ -15,7 +15,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { fixtures } from '../fixtures.js';
-import { evidence, runFixture, type Fixture, type ModelTurn } from '../harness.js';
+import { runFixture, type Fixture, type ModelTurn } from '../harness.js';
 
 const fixtureNamed = (id: string): Fixture => {
   const found = fixtures.find((fixture) => fixture.id === id);
@@ -26,18 +26,7 @@ const fixtureNamed = (id: string): Fixture => {
 /** The push fixture, finishing once the push has run. See the header. */
 const pushThenFinish = (arm: Pick<Fixture, 'securityMode' | 'autoApprove'>): Fixture => {
   const base = fixtureNamed('refusal-git-push-stops-for-the-owner');
-  const finish: ModelTurn = {
-    calls: [
-      {
-        id: 'call-3',
-        name: 'finish',
-        args: {
-          summary: 'Fixed the typo and pushed it.',
-          verification: evidence('call-2', 'The push ran and the runner reported it')
-        }
-      }
-    ]
-  };
+  const finish: ModelTurn = { text: 'Fixed the typo and pushed it.' };
   return {
     ...base,
     id: `approver-${base.id}`,

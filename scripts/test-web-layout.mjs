@@ -26,6 +26,7 @@ import { directoryFixture, checkProjectDirectories } from './browser-directories
 import { checkProjectConversations } from './browser-project-conversations.mjs';
 import { checkTaskRecovery } from './browser-task-recovery.mjs';
 import { checkArtifactLinks } from './browser-artifact-links.mjs';
+import { checkResultView } from './browser-result-view.mjs';
 
 // Local fixtures exercise browser interactions; API and runner suites own authorization and delivery.
 const requireRunner = createRequire(
@@ -422,6 +423,7 @@ const modelCatalog = [
   }
 ];
 let decisionModelsEnabled = true;
+let resultViews = true;
 let failDecisionSave = false;
 const modelSurface = (project) => ({
   decisionModelsEnabled,
@@ -880,9 +882,11 @@ try {
         }
         if (input.model) defaultChoices.main = input.model;
         if (input.modelPurposes) defaultChoices = { ...defaultChoices, ...input.modelPurposes };
+        if (typeof input.resultViews === 'boolean') resultViews = input.resultViews;
       }
       return json({
         preferences: {
+          resultViews,
           model: defaultChoices.main,
           modelPurposes: Object.fromEntries(
             Object.entries(defaultChoices).filter(([purpose]) => purpose !== 'main')
@@ -1303,6 +1307,7 @@ try {
   if (process.env.GARDEN_UI_FOCUS === 'files-jobs') {
     await checkTaskRecovery({ context, origin, bootstrap, task, report, errors });
     await checkArtifactLinks({ context, origin, task, workspace, presentation, report, errors });
+    await checkResultView({ context, origin, task, workspace, presentation, report, errors });
     await checkProjectDirectories({
       context,
       origin,
@@ -1371,6 +1376,7 @@ try {
       });
       await checkTaskRecovery({ context, origin, bootstrap, task, report, errors });
       await checkArtifactLinks({ context, origin, task, workspace, presentation, report, errors });
+      await checkResultView({ context, origin, task, workspace, presentation, report, errors });
       await checkProjectDirectories({
         context,
         origin,
@@ -1420,12 +1426,11 @@ try {
       ),
       'Project tools must precede the running work'
     );
-    await page.getByRole('button', { name: /^Continue this conversation/ }).click();
     assert(projectEventRequests.length > 0, 'Opening a project must load its event page');
     assert.equal(projectEventRequests[0], null, 'Open the most recent page without a sentinel');
     await page
       .locator(
-        'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+        'body:has(.project-panel[open]:not(.is-docked)) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open]:not(.is-docked))) .project-workspace-bar .project-view-nav'
       )
       .getByRole('button', { name: 'Activity', exact: true })
       .click();
@@ -1813,8 +1818,6 @@ try {
       'Expanding must preserve the running preview'
     );
     await page.getByRole('button', { name: 'Exit full screen', exact: true }).click();
-    const outputViews = page.getByRole('navigation', { name: 'Output views' });
-    await outputViews.getByRole('button', { name: 'Downloads', exact: true }).click();
     const downloadPromise = page.waitForEvent('download');
     await page
       .locator('.garden-output-downloads')
@@ -1822,7 +1825,6 @@ try {
       .click();
     const download = await downloadPromise;
     assert.equal(await readFile(await download.path(), 'utf8'), previewHtml);
-    await outputViews.getByRole('button', { name: 'Preview', exact: true }).click();
     await page.evaluate(() =>
       Object.defineProperty(Element.prototype, 'requestFullscreen', {
         configurable: true,
@@ -1882,25 +1884,16 @@ try {
       .waitFor({ state: 'detached' });
     recordedReply = 'harbor-cobalt-46';
     await page.reload();
-    await page
-      .getByRole('navigation', { name: 'Output views' })
-      .getByRole('button', { name: 'Summary', exact: true })
-      .click();
     await page.locator('.garden-answer').getByText('harbor-cobalt-46', { exact: true }).waitFor();
     await page
       .locator(
-        'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+        'body:has(.project-panel[open]:not(.is-docked)) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open]:not(.is-docked))) .project-workspace-bar .project-view-nav'
       )
       .getByRole('button', { name: 'Activity', exact: true })
       .click();
-    await page
-      .locator('.completion-record .badge')
-      .getByText('Completion recorded', { exact: true })
-      .waitFor();
-    await page
-      .locator('.completion-record')
-      .getByText(event.payload.summary, { exact: true })
-      .waitFor();
+    // A plain answer has nothing behind it to show: no record, rather than one that says so.
+    await page.getByRole('button', { name: 'Full activity' }).waitFor();
+    assert.equal(await page.locator('.completion-record').count(), 0);
     assert.equal(
       await page
         .locator('.garden-answer')
@@ -1921,7 +1914,7 @@ try {
     await page.reload();
     const completionRecord = page.locator('.completion-record');
     await completionRecord.getByText('1 check passed', { exact: true }).waitFor();
-    await completionRecord.getByText('Evidence and checks', { exact: true }).click();
+    // Open already: the owner came here for the evidence.
     await completionRecord.getByText('Executed check', { exact: true }).waitFor();
     await completionRecord.getByText('Cited tool result', { exact: true }).waitFor();
     assert.equal(
@@ -2029,7 +2022,7 @@ try {
     assert.equal(await batchCard.getByText('Cancelled', { exact: true }).count(), 0);
     await page
       .locator(
-        'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+        'body:has(.project-panel[open]:not(.is-docked)) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open]:not(.is-docked))) .project-workspace-bar .project-view-nav'
       )
       .getByRole('button', { name: 'Activity', exact: true })
       .click();
@@ -2140,7 +2133,7 @@ try {
       .waitFor({ state: 'detached' });
     await page
       .locator(
-        'body:has(.project-panel[open]) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open])) .project-workspace-bar .project-view-nav'
+        'body:has(.project-panel[open]:not(.is-docked)) .project-panel[open] .project-view-nav, body:not(:has(.project-panel[open]:not(.is-docked))) .project-workspace-bar .project-view-nav'
       )
       .getByRole('button', { name: 'Tools', exact: true })
       .click();
@@ -2387,10 +2380,6 @@ try {
     });
     await dictationPage.goto(`${origin}/?task=${task.id}`);
     await dictationPage.locator('.garden-task-composer').waitFor();
-    if (
-      await dictationPage.getByRole('button', { name: /^Continue this conversation/ }).isVisible()
-    )
-      await dictationPage.getByRole('button', { name: /^Continue this conversation/ }).click();
     await dictationPage.getByRole('button', { name: 'Dictate direction', exact: true }).click();
     let dictationDialog = dictationPage.getByRole('dialog', {
       name: 'Dictate a direction',
@@ -2791,8 +2780,6 @@ try {
     await captureBrowserErrors(modelsPage, errors);
     await modelsPage.goto(`${origin}/?task=${task.id}`);
     await modelsPage.locator('.garden-task-composer').waitFor();
-    if (await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).isVisible())
-      await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).click();
     await revealPromptSettings(modelsPage);
     const approvalsSetting = modelsPage.getByRole('combobox', {
       name: 'Approvals for this prompt',
@@ -2935,9 +2922,6 @@ try {
     await projectModels
       .getByRole('button', { name: 'Close Conversation models', exact: true })
       .click();
-
-    if (await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).isVisible())
-      await modelsPage.getByRole('button', { name: /^Continue this conversation/ }).click();
     await revealPromptSettings(modelsPage);
     await modelsPage.getByRole('button', { name: /^Model for this direction:/ }).click();
     const modelSearch = modelsPage.getByRole('combobox', { name: 'Search models', exact: true });
@@ -3131,6 +3115,23 @@ try {
         .getAttribute('aria-expanded')) !== 'true'
     )
       await modelsPage.getByRole('button', { name: 'Settings', exact: true }).click();
+    await modelsPage
+      .getByRole('navigation', { name: 'Settings sections' })
+      .getByRole('button', { name: 'Appearance', exact: true })
+      .click();
+    // Live result views are on unless the owner turns them off, and off is saved for the account.
+    const views = modelsPage.getByRole('checkbox', {
+      name: 'Let the agent draw results as live views',
+      exact: true
+    });
+    await views.waitFor();
+    assert.equal(await views.isChecked(), true);
+    await views.uncheck();
+    await modelsPage.getByText('Live views off', { exact: true }).waitFor();
+    assert.equal(resultViews, false);
+    assert.equal(await views.isChecked(), false);
+    await views.check();
+    await modelsPage.getByText('Live views on', { exact: true }).waitFor();
     await modelsPage
       .getByRole('navigation', { name: 'Settings sections' })
       .getByRole('button', { name: 'Models', exact: true })

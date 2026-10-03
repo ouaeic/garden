@@ -10,8 +10,6 @@ import { appendMemoryOwnerInput } from './memory-owner-input.js';
  * `startTurnState` is here because it is the other half of the same question: what a new turn is
  * allowed to inherit from the last one is exactly what the completion check will later be entitled
  * to count as evidence. `apps/api` imports it through `@garden/worker` to seed a resumed turn.
- *
- * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
 import { ownerMessageContent, type OwnerMessage } from '@garden/core';
 import type { ModelToolCall } from '@garden/model-gateway';
@@ -24,24 +22,6 @@ import {
 import type { AgentState } from './agent-state.js';
 import { MAX_QUESTIONS_PER_TURN } from './turn-bounds.js';
 import { asRecord, textValue } from './values.js';
-
-/**
- * The only two statuses the MODEL may write, and the list the validator below is held to.
- *
- * A constant rather than a literal in one `if`, because the type has since grown values the model
- * must never be able to send and the difference between "what this field may hold" and "what a
- * finish call may contain" is now load-bearing in two directions:
- *
- * - The wire. `tool-catalogue.ts` publishes `enum: ['verified','not_applicable']` on the finish
- *   schema, and the catalogue has 27 bytes of headroom against the ceiling
- *   `tool-catalogue.test.ts` enforces. A third enum value costs real bytes on every request of
- *   every turn; a value only the harness ever writes costs nothing at all, because it is never in
- *   anything the model is sent or the model returns.
- * - The claim. A downgrade the model could declare is a downgrade the model could decline to
- *   declare, and then it is not evidence about the checks - it is one more thing the model says
- *   about itself, which is what this whole file exists not to believe.
- */
-export const MODEL_DECLARED_VERIFICATION_STATUSES = ['verified', 'not_applicable'] as const;
 
 /**
  * What garden is willing to say about a completion.
@@ -64,7 +44,8 @@ export const MODEL_DECLARED_VERIFICATION_STATUSES = ['verified', 'not_applicable
  * travel in the risks. What changes is only the word in the field an owner or a script reads first.
  */
 export type CompletionVerificationStatus =
-  | (typeof MODEL_DECLARED_VERIFICATION_STATUSES)[number]
+  | 'verified'
+  | 'not_applicable'
   | 'unverified'
   | 'checks_failed'
   | 'checks_did_not_run'
@@ -88,41 +69,16 @@ export interface CompletionVerification {
 }
 
 /**
- * Calls that say what the turn intends rather than what it observed.
- *
- * Neither can be evidence for anything: publishing a plan and declaring what would prove the job
- * done are both the model speaking, and citing one as the result that verifies a claim is the
- * completion contract closing a loop on itself. `set_acceptance` in particular succeeds by being
- * well-formed, so without this the cheapest citation in any turn would be the promise it made.
- */
-const DECLARATION_TOOLS = new Set([
-  'load_tools',
-  'set_plan',
-  'set_acceptance',
-  // Asking is the same kind of act: it is something the model said, not something it observed, and
-  // a finish that cited its own question as the result verifying a claim would be the loop above
-  // closed one step wider. It also keeps a turn whose only successful call was a question eligible
-  // for a not_applicable verification, which is exactly what such a turn is.
-  'ask'
-]);
-
-/**
- * Names the tool calls a finish is actually allowed to cite. Without this a rejected finish only
- * learns that its evidence was wrong, not what would have been right, so it tends to re-send the
- * same shape - which is how one bad completion turned into a full step budget of retries.
- */
-/**
  * The state a new turn starts from, which is the previous turn's minus everything that was about
  * the previous turn.
  *
  * Extracted because there are two doors into a new turn and only one of them was doing this. The
  * worker's door handles a message that arrived while the agent was still running; the API's door
  * handles the ordinary case - the owner replying to a task that has finished - and it reset four
- * fields where this resets eleven and deletes three. So the common path carried the last turn's
- * tool results forward as citable evidence for work they predate, carried its nag counters so a
- * turn could fail on its first refusal, carried `mutated` so a fresh turn believed it had already
- * changed something, and carried the notice count so a monitor that had spoken three times last
- * turn was silent for the rest of the conversation.
+ * fields where this resets the rest. So the common path carried the last turn's tool results
+ * forward, carried `mutatedBeyondProse` so a fresh turn was held to checks for code it never
+ * touched, and carried the notice count so a monitor that had spoken three times last turn was
+ * silent for the rest of the conversation.
  *
  * What is deliberately NOT reset is as load-bearing as what is:
  *
@@ -150,9 +106,6 @@ export const startTurnState = <T extends Record<string, unknown>>(
     turn: input.turn,
     reservationKey: input.reservationKey,
     turnToolResults: {},
-    finishRejections: 0,
-    deliveryNagged: false,
-    completionNags: 0,
     truncatedReplies: 0,
     // Both per turn, like every counter around them: what the last turn started is not evidence
     // that this one has, and a turn that opens by thinking must not inherit a stalled count.
@@ -196,22 +149,15 @@ export const startTurnState = <T extends Record<string, unknown>>(
      * carries with everything else above.
      */
     memoryReaches: 0,
-    // A new turn has changed nothing yet, so its evidence ordering and its plan both start over.
-    mutated: false,
+    // A new turn has changed nothing yet.
     mutatedBeyondProse: false,
     answered: false,
     repairStep: false,
-    answerNagged: false,
-    // The effort ladder and the two finish gates are per turn, like the counters above.
     acceptanceFailures: 0,
-    acceptanceNagged: false,
-    acceptanceBaselineRefusals: 0,
     // The self-continuation bound, per turn like the rest. The owner replying is the thing that
     // starts a turn, so a conversation where they keep replying is a conversation they are watching
     // - it is the turn nobody replied to that is allowed to renew itself.
     selfContinuations: 0,
-    planCoverageNagged: false,
-    planIsFallback: false,
     // Per turn, like the counters above: the workspace may well have changed between turns, so a
     // read that was uninformative to repeat inside one turn is an ordinary read in the next.
     seenCalls: {},
@@ -222,6 +168,7 @@ export const startTurnState = <T extends Record<string, unknown>>(
   } as unknown as T & {
     reasoningFloor?: unknown;
     frameLossNoted?: unknown;
+    continuedAnswer?: unknown;
     compactedAtStep?: unknown;
     pending?: unknown;
     question?: unknown;
@@ -255,6 +202,7 @@ export const startTurnState = <T extends Record<string, unknown>>(
   // streaming says nothing about this one, and left behind it would silence the first turn that
   // genuinely started losing frames.
   delete next.frameLossNoted;
+  delete next.continuedAnswer;
   delete next.pending;
   delete next.question;
   delete next.browserHandoff;
@@ -278,42 +226,7 @@ export const startTurnState = <T extends Record<string, unknown>>(
  */
 export const ACCEPTANCE_MARKER = 'ACTIVE ACCEPTANCE CHECKS';
 
-/**
- * Every tool whose successful result is the agent talking rather than the agent looking.
- *
- * `DECLARATION_TOOLS` plus `notify`, and deliberately a second set rather than an addition to that
- * one: `DECLARATION_TOOLS` is what a *plan* is made of and is read in several places that have
- * nothing to do with evidence. This set is the question "has anything been observed", and by that
- * question a notice is exactly what a plan is - something the model composed, carrying nothing back
- * about the world. Without it, `notify` then `ask` cleared the first-act guard below on two calls
- * that between them observed nothing at all.
- *
- * It is also what a finish may not cite. That was written the other way round, on
- * `DECLARATION_TOOLS`, with a comment saying the reason was that widening it "changes a shipped
- * gate and has a price the fixtures in `evals/` would move" - a price, not a reason. The gate it
- * left open was a real one: `file_write` then `notify` then a finish citing the notify passed
- * `completionVerification` on the strength of garden having delivered a sentence the model wrote.
- * Every "cite something that read the outcome back" refusal in this file was one `notify` call away
- * from being satisfied.
- */
-const AGENT_SPEECH = new Set([...DECLARATION_TOOLS, 'notify']);
-
-/**
- * What a question has to be before the conversation is parked on it.
- *
- * Pure, and separate from the method that parks, because every clause here is a judgement about the
- * failure this tool creates rather than about plumbing: an agent that asks instead of working. Two
- * of the four are that judgement made mechanical.
- *
- * The one worth explaining is the last. `finish` already lets a turn that used no tools complete
- * conversationally, and the completion nag already bounds a turn that keeps replying without acting
- * - both are garden deciding what to do about a turn that did nothing. A question asked before the
- * turn has observed anything is the same shape from the front: the computer exists to go and look,
- * and the choice between "which of these two files" and "I read both and they differ like this,
- * which do you want" is the whole difference between a machine and a form. So the first act of a
- * turn may not be a question - it has to have looked at something first, and nothing the agent
- * itself said counts as looking, which is what `AGENT_SPEECH` above is.
- */
+/** What a question has to be before the conversation is parked on it. */
 export const askOutcome = (
   state: Pick<AgentState, 'turnToolResults' | 'questionsAsked'>,
   args: Record<string, unknown>
@@ -331,26 +244,11 @@ export const askOutcome = (
       ok: false,
       refusal: 'Refused: a question needs one line the user can answer from a lock screen.'
     };
-  if (!why)
-    return {
-      ok: false,
-      refusal:
-        'Refused: say in why what you cannot do until this is answered. If you can say what you would do either way, do that instead and state the assumption in your reply.'
-    };
   if (options.length === 1)
     return {
       ok: false,
       refusal:
         'Refused: one option is not a choice. Send at least two, or leave options out and take any reply.'
-    };
-  const observed = Object.values(state.turnToolResults ?? {}).some(
-    (result) => result.success && !AGENT_SPEECH.has(result.name)
-  );
-  if (!observed)
-    return {
-      ok: false,
-      refusal:
-        'Refused: this turn has not looked at anything yet, so it has not earned a question. Go and find out - read the files, list what is connected, try the thing - and ask only about what is still genuinely undecidable afterwards.'
     };
   if ((state.questionsAsked ?? 0) >= MAX_QUESTIONS_PER_TURN)
     return {
@@ -358,48 +256,6 @@ export const askOutcome = (
       refusal: `Refused: this turn has already asked ${MAX_QUESTIONS_PER_TURN} questions, which is the limit. Make the most reasonable assumption, carry on, and say plainly in your reply what you assumed and what would change it.`
     };
   return { ok: true, question, options, why };
-};
-
-export const citableEvidence = (state: AgentState): string => {
-  const { floor } = evidenceFloor(state);
-  const citable = Object.entries(state.turnToolResults ?? {})
-    .map(([id, result], index) => ({ id, result, current: index >= floor || result.proseOnly }))
-    .filter(({ result }) => result.success && !result.skipped && !AGENT_SPEECH.has(result.name))
-    .reverse();
-  if (!citable.length)
-    return 'No successful tool call this turn can be cited. If the answer came from your own reasoning alone, use {"status":"not_applicable","evidence":[]}.';
-  const current = citable.filter((item) => item.current);
-  const earlier = citable.filter((item) => !item.current);
-  // Bound repair context while keeping the observations that can prove the current state first.
-  const shown = [...current, ...earlier].slice(0, 16);
-  const list = (fresh: boolean) =>
-    shown
-      .filter((item) => Boolean(item.current) === fresh)
-      .map(
-        ({ id, result }) =>
-          `${id} (${result.name})${result.command ? ` [exit ${result.command.exitCode}]` : ''}`
-      )
-      .join(', ');
-  return [
-    current.length
-      ? `Current-state toolCallIds, newest first: ${list(true)}.`
-      : 'No result yet establishes the state after the last change; check that outcome before finishing.',
-    list(false) ? `Earlier toolCallIds (supporting evidence only): ${list(false)}.` : '',
-    shown.length < citable.length
-      ? 'Older successful results remain citable when relevant; only the most recent references are listed here.'
-      : '',
-    'Cite only claims the actual output supports. If the work is already checked, correct the references and call finish directly; do not run another command just to repair a citation.'
-  ]
-    .filter(Boolean)
-    .join('\n');
-};
-
-/** Providers do not all expose protocol IDs to the model, so evidence names travel in the result. */
-export const completionReference = (state: AgentState, id: string): string => {
-  const result = state.turnToolResults?.[id];
-  if (!(result?.success && !result.skipped)) return '';
-  if (AGENT_SPEECH.has(result.name)) return '';
-  return `Result reference: ${id} (${result.name})${result.command ? ` [exit ${result.command.exitCode}]` : ''}.\n`;
 };
 
 /**
@@ -519,234 +375,6 @@ export const observedCommands = (
     if (command) observed.set(command.fingerprint, command.exitCode);
   }
   return observed;
-};
-
-/** A process reference is citable only through its latest successful completion observation. */
-const evidenceCallId = (state: AgentState, reference: string): string => {
-  if (state.turnToolResults?.[reference]) return reference;
-  const latest = Object.entries(state.turnToolResults ?? {})
-    .reverse()
-    .find(([, result]) => result.process?.id === reference);
-  return latest?.[1].success && !latest[1].skipped && latest[1].process?.completed
-    ? latest[0]
-    : reference;
-};
-
-export const processObservation = (
-  task: { id: string; workspaceId: string },
-  call: ModelToolCall,
-  result: unknown
-): { process: { id: string; completed: boolean } } | null => {
-  if (call.name !== 'shell' && call.name !== 'process') return null;
-  const row = asRecord(result);
-  if (
-    !row ||
-    row.ownerTaskId !== task.id ||
-    row.workspaceId !== task.workspaceId ||
-    typeof row.sessionId !== 'string' ||
-    !/^job_[a-f0-9]{64}$/.test(row.sessionId)
-  )
-    return null;
-  return {
-    process: {
-      id: row.sessionId,
-      completed: row.status === 'completed' && row.exitCode === 0 && row.timedOut !== true
-    }
-  };
-};
-
-export const completionVerification = (
-  state: AgentState,
-  value: unknown
-): { ok: true; verification: CompletionVerification } | { ok: false; reason: string } => {
-  if (!value || typeof value !== 'object')
-    return { ok: false, reason: 'Finish requires a verification object.' };
-  const input = value as Record<string, unknown>;
-  // The model's two, and only the model's two. A finish that tries to declare one of the harness's
-  // own downgrades is refused here exactly as `{"status":"done"}` is: those values are what the
-  // harness concluded about the checks, and a model that could write them could write `verified`
-  // over a failure by choosing not to.
-  if (
-    !(MODEL_DECLARED_VERIFICATION_STATUSES as readonly string[]).includes(textValue(input.status))
-  )
-    return { ok: false, reason: 'Verification status must be verified or not_applicable.' };
-  const status = textValue(input.status) as CompletionVerification['status'];
-  const rawEvidence = Array.isArray(input.evidence) ? input.evidence : [];
-  /*
-   * An id on its own is enough, and a full item is still accepted.
-   *
-   * This asked for three levels of nesting at the end of a long turn - a status enum, an array of
-   * objects each needing a claim and an enum of its own, and a second array - while every other
-   * tool in the catalogue takes flat scalars. A small fast model fumbles it: measured on one
-   * research task, the agent wrote a correct answer and then spent about ten more turns being
-   * refused for unparseable arguments and answering in prose instead. Nothing about the guarantee
-   * needed that shape. The id is the part that carries it; the claim is a line for the card, and
-   * defaults to the summary when the model did not write one; the source is inferable from the id.
-   */
-  const evidence = rawEvidence.flatMap((item) => {
-    if (typeof item === 'string') {
-      const toolCallId = evidenceCallId(state, item.trim());
-      return toolCallId ? [{ claim: '', source: 'tool_result' as const, toolCallId }] : [];
-    }
-    if (!item || typeof item !== 'object') return [];
-    const record = item as Record<string, unknown>;
-    const claim = textValue(record.claim).trim().slice(0, 2_000);
-    const toolCallId = evidenceCallId(state, textValue(record.toolCallId).trim());
-    // Named when the model named it; otherwise read off what it cited, which is the only thing
-    // these three values were ever distinguishing.
-    const declared = textValue(record.source);
-    /*
-     * Inferred only towards the strict reading. `user_visible_result` is the one source that skips
-     * the ordering check, so it is never guessed at: an item that cites a call is a tool result,
-     * and an item that cites nothing is invalid unless the model said user_visible_result itself.
-     * Guessing it here would have turned `{claim:"I did it"}` into a passing verification, which is
-     * the confident false completion this whole mechanism exists to refuse.
-     */
-    const source = ['tool_result', 'published_artifact', 'user_visible_result'].includes(declared)
-      ? (declared as CompletionVerification['evidence'][number]['source'])
-      : toolCallId
-        ? ('tool_result' as const)
-        : undefined;
-    if (!source) return [];
-    return [{ claim, source, ...(toolCallId ? { toolCallId } : {}) }];
-  });
-  if (evidence.length !== rawEvidence.length)
-    return {
-      ok: false,
-      reason:
-        'Every verification item needs either the id of a tool call from this turn, or a claim saying what the user can see.'
-    };
-  const successful = Object.entries(state.turnToolResults ?? {}).filter(
-    ([, result]) => result.success && !AGENT_SPEECH.has(result.name)
-  );
-  if (status === 'not_applicable' && successful.length)
-    return {
-      ok: false,
-      reason:
-        'This turn used tools, so finish with verified evidence from a successful tool result.'
-    };
-  if (status === 'verified' && !evidence.length)
-    return { ok: false, reason: 'Verified completion needs at least one evidence item.' };
-  for (const item of evidence) {
-    if (item.source === 'user_visible_result') {
-      /*
-       * The exemption this source carries is from the ordering rule, not from the existence one.
-       *
-       * `user_visible_result` is the one item that may stand on a claim alone - "the user can see
-       * the answer in the reply" cites no call because no call produced it - and it was written as
-       * a bare `continue`, so an item of this source skipped every check in this loop including
-       * the ones about the call it did cite. A finish could therefore name a call garden answered
-       * without running, or one the computer failed, and have it rendered beside the tick as
-       * something the user can see. That is §4.5 #73's shape exactly: evidence that was claimed
-       * and never produced, counted as satisfied.
-       *
-       * Deliberately narrow. Citing nothing is still allowed, because that is what the source is
-       * for; citing a `notify` is still allowed, because a delivered notice genuinely is something
-       * the user can see even though it is not an observation; and the ordering rule is still
-       * skipped. Only a call that produced nothing at all is refused, and for a call that produced
-       * nothing there is nothing to see.
-       */
-      const cited = item.toolCallId ? state.turnToolResults?.[item.toolCallId] : undefined;
-      if (cited && (cited.skipped || !cited.success))
-        return {
-          ok: false,
-          reason: `Verification cites ${item.toolCallId} as something the user can see, but that ${cited.name} ${
-            cited.skipped
-              ? 'never ran - garden answered it without starting it'
-              : 'did not complete successfully this turn'
-          }, so it produced nothing to see. Cite the call that did produce it, or describe what the user can see without citing a call.`
-        };
-      continue;
-    }
-    if (!item.toolCallId)
-      return {
-        ok: false,
-        reason: `${item.source} evidence must cite its toolCallId.`
-      };
-    const result = state.turnToolResults?.[item.toolCallId];
-    // Said apart from the failure below, because they are different facts about the world and the
-    // way out of them is different: a call that failed was attempted and the computer answered, a
-    // call garden answered itself was never attempted at all. Told it "did not complete
-    // successfully", a model re-cites a neighbour; told nothing ran, it runs the call.
-    if (result?.skipped)
-      return {
-        ok: false,
-        reason: `Verification cites ${item.toolCallId}, but that ${result.name} never ran - garden answered it without starting it. Run it, then cite the result.`
-      };
-    if (!result?.success)
-      return {
-        ok: false,
-        reason: `Verification cites ${item.toolCallId}, but that tool did not complete successfully this turn.`
-      };
-    if (AGENT_SPEECH.has(result.name))
-      return {
-        ok: false,
-        reason: `Verification cites ${item.toolCallId}, which is ${result.name} - something you said rather than something you observed. Cite the call that read the outcome back.`
-      };
-    if (item.source === 'published_artifact' && result.name !== 'publish_artifact')
-      return {
-        ok: false,
-        reason: `Published artifact evidence must cite a successful publish_artifact call.`
-      };
-  }
-  const citableIds = new Set(successful.map(([id]) => id));
-  if (
-    successful.length &&
-    !evidence.some((item) => item.toolCallId && citableIds.has(item.toolCallId))
-  )
-    return {
-      ok: false,
-      reason: 'Verification must cite at least one successful tool result from this turn.'
-    };
-  // Evidence has to come from after the last change, not before it.
-  //
-  // Every rule above tests identity: that the cited id exists, succeeded, and is of the right
-  // kind. None of them tested ordering, so a turn that ran code_search, wrote a file and then
-  // claimed "the tests now pass" citing the search was accepted - which made citing whatever
-  // succeeded most recently the cheapest way to satisfy the gate. turnToolResults is
-  // insertion-ordered, so the ordering this needs is already recorded.
-  const { order, lastMutation, floor, observedItsOwnChange } = evidenceFloor(state);
-  if (status === 'verified' && lastMutation >= 0) {
-    /*
-     * A written report stays citable wherever it sits in the turn.
-     *
-     * `lastMutation` is the last mutating call in order, so a turn that wrote the report and then
-     * ran one command - `df -h` through a shell, say - moved the floor past the report and refused
-     * every finish that cited it. The owner's turn hit exactly that: "every cited result predates
-     * the last shell call", about the file it had been asked to produce. Prose is its own evidence
-     * by the reasoning just above; that does not stop being true because something read-only ran
-     * afterwards.
-     */
-    const grounded = evidence.some((item) => {
-      if (!item.toolCallId) return false;
-      const index = order.indexOf(item.toolCallId);
-      if (index < 0) return false;
-      return index >= floor || state.turnToolResults?.[item.toolCallId]?.proseOnly === true;
-    });
-    if (!grounded) {
-      const mutation = order[lastMutation] ?? '';
-      const name = state.turnToolResults?.[mutation]?.name ?? 'the last change';
-      return {
-        ok: false,
-        reason: observedItsOwnChange
-          ? `Every cited result predates ${name} (${mutation}), so none of it can show that change worked. Cite ${mutation} itself if its output shows the outcome, or check the result - read the file back, run the tests, re-observe the page - and cite that call.`
-          : `Every cited result predates ${name} (${mutation}), so none of it can show that change worked. Check the result - read the file back, run the tests, re-observe the page - and cite that call instead.`
-      };
-    }
-  }
-  return {
-    ok: true,
-    verification: {
-      status,
-      evidence,
-      remainingRisks: Array.isArray(input.remainingRisks)
-        ? input.remainingRisks
-            .map((risk) => textValue(risk).trim())
-            .filter(Boolean)
-            .slice(0, 20)
-        : []
-    }
-  };
 };
 
 /**

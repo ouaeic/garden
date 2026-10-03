@@ -48,8 +48,6 @@ export function currentWork(
         ),
         direction
       ].slice(-32),
-      report: null,
-      references: [],
       sources: [],
       currentResultIds: presentation.results
         .filter(

@@ -1,3 +1,4 @@
+import { OwnerPreferences } from '@garden/contracts';
 import {
   runtimeClearTimer,
   runtimeDate,
@@ -90,7 +91,6 @@ import {
 import { providerWebSearch, type WebSearchAnswer } from './provider-search.js';
 import { WEB_SEARCH_MAX_OUTPUT_TOKENS, WEB_SEARCH_REQUEST_TIMEOUT_MS, routeTo } from './routing.js';
 import { executeToolCall } from './tool-dispatch.js';
-import { agentToolsFor } from './tool-catalogue.js';
 import { AgentRunnerClient, withRunnerAbort } from './runner-client.js';
 import { buildIdentity } from './build-identity.js';
 import {
@@ -141,7 +141,7 @@ import { closeTurnAtCeiling, type TurnCloseContext } from './turn/close.js';
 import { claimTurn, type TurnClaimDeps } from './turn/claim.js';
 import { type AcceptanceDeclarationDeps } from './turn/acceptance-declaration.js';
 import { resolveAnswerHolds } from './turn/answer-holds.js';
-import type { TurnFinishDeps } from './turn/finish.js';
+import type { TurnCompleteDeps } from './turn/complete.js';
 import { resumeParkedTurn, type TurnResumeDeps } from './turn/resume.js';
 import { enforceStepBounds, type StepBoundsDeps } from './turn/step-bounds.js';
 import { dispatchToolCalls, type TurnDispatchDeps } from './turn/dispatch.js';
@@ -171,10 +171,8 @@ import {
  * `isProviderWall` is the wider question, asked first; this is the narrower one about what recovery
  * exists.
  *
- * The file reference above read `apps/api/src/server.ts` and had been wrong since Wave 6 moved the
- * table; `server.ts` is 297 lines and has not held it since. Both halves of that are now closed:
- * the path is right, and this pair is the ninth entry in `scripts/check-repository.mjs`'s copied-
- * constant table, so the two lists agree because something checks rather than because somebody did.
+ * `scripts/check-repository.mjs` holds this pair in its copied-constant table, so the two lists
+ * agree because something checks rather than because somebody did.
  */
 const PARKABLE_PROVIDER_WALLS = new Set([
   'provider_quota_exhausted',
@@ -189,14 +187,9 @@ const PARKABLE_PROVIDER_WALLS = new Set([
  * package needs has to be re-exported here or it cannot be imported at all. That is the whole
  * justification for this block, and it is the only one.
  *
- * It used to carry 154 names. Two decompositions (Wave 5's three leaves, Wave 7.1's twelve
- * siblings) each re-exported their entire moved surface from here so that no importer had to move
- * on the same commit, and both blocks said in their own comments that they went once the importers
- * named the sibling directly. Ninety-nine of the 154 had no importer anywhere by the time anyone
- * counted, and the fifty-five that did were mostly `apps/worker`'s own files reaching sideways
- * through the package root - which is what made this file the sole cause of a twelve-module runtime
- * import cycle: every `tools/*.ts` arm and `delegate.ts` imported `agent.js`, and `agent.ts`
- * imports the dispatcher that imports them back.
+ * A file inside the package that imports a sibling through here closes an import cycle: `agent.ts`
+ * imports the dispatcher, which imports every `tools/*.ts` arm, so an arm reaching for `agent.js`
+ * imports itself back.
  *
  * The rule that keeps it from growing again: **a name goes in this block only when a file outside
  * `apps/worker/src` imports it.** Anything inside the package names its sibling. `scripts/
@@ -254,11 +247,10 @@ export class AgentWorker {
   readonly #catalogCache: { current: CatalogCache | null } = { current: null };
 
   /**
-   * What the sub-machines lifted in Wave 7.2 are handed instead of `this`.
+   * What the sub-machines are handed instead of `this`.
    *
    * Built once in the constructor and frozen by construction - every member is either a store, a
-   * config or a bound method - so the cost of the split is one object per worker rather than one
-   * per call. Methods are wrapped in arrow functions rather than passed by reference because a
+   * config or a bound method - so it costs one object per worker rather than one per call. Methods are wrapped in arrow functions rather than passed by reference because a
    * private method detached from its receiver cannot reach `#` fields.
    */
   readonly #toolRecording: ToolRecordingDeps;
@@ -288,8 +280,8 @@ export class AgentWorker {
   /** @see resumeParkedTurn in `turn/resume.ts`. */
   readonly #resume: TurnResumeDeps;
 
-  /** @see handleFinishCall in `turn/finish.ts`. */
-  readonly #finish: TurnFinishDeps;
+  /** @see completeAnswer in `turn/complete.ts`. */
+  readonly #finish: TurnCompleteDeps;
 
   /** @see declareAcceptance in `turn/acceptance-declaration.ts`. */
   readonly #acceptance: AcceptanceDeclarationDeps;
@@ -496,7 +488,6 @@ export class AgentWorker {
     this.#dispatch = {
       store,
       config,
-      finish: this.#finish,
       acceptance: this.#acceptance,
       resume: this.#resume,
       approvalForCallOnce: (memo, task, call, state) =>
@@ -1105,9 +1096,9 @@ export class AgentWorker {
   }
 
   /**
-   * @see currentCatalog in `vision.ts`, where this moved in Wave 7.2 and gained the memo. It was a
-   * whole-table read of `model_releases` per image-bearing tool result - one per step on a browsing
-   * turn - to follow a registry that refreshes hourly.
+   * @see currentCatalog in `vision.ts`. Memoised, because without it this is a whole-table read of
+   * `model_releases` per image-bearing tool result - one per step on a browsing turn - to follow a
+   * registry that refreshes hourly.
    */
   async #currentCatalog(fallback: ModelRelease[]): Promise<ModelRelease[]> {
     return currentCatalog(this.#vision, fallback);
@@ -1274,7 +1265,7 @@ export class AgentWorker {
       .catch(() => undefined);
   }
 
-  /** @see recordToolFailure in `tool-recording.ts`, where this moved in Wave 7.2. */
+  /** @see recordToolFailure in `tool-recording.ts`. */
   async #recordToolFailure(
     task: TaskRecord,
     key: Uint8Array,
@@ -1285,7 +1276,7 @@ export class AgentWorker {
     await recordToolFailure(this.#toolRecording, task, key, state, call, error);
   }
 
-  /** @see runToolCallsTogether in `tool-recording.ts`, where this moved in Wave 7.2. */
+  /** @see runToolCallsTogether in `tool-recording.ts`. */
   async #runToolCallsTogether(
     task: TaskRecord,
     key: Uint8Array,
@@ -1310,12 +1301,12 @@ export class AgentWorker {
       .map((step) => step.title);
   }
 
-  /** @see stepCeiling in `handoff.ts`, where this moved in Wave 7.2. */
+  /** @see stepCeiling in `handoff.ts`. */
   #stepCeiling(state: AgentState): number {
     return stepCeiling(this.#handoff, state);
   }
 
-  /** @see renewStepBudget in `handoff.ts`, where this moved in Wave 7.2. */
+  /** @see renewStepBudget in `handoff.ts`. */
   async #renewStepBudget(task: TaskRecord, key: Uint8Array, state: AgentState): Promise<boolean> {
     return renewStepBudget(this.#handoff, task, key, state);
   }
@@ -1630,7 +1621,7 @@ export class AgentWorker {
 
   /**
    * One evaluation per call per state of the world. @see approvalForCallOnce in
-   * `approval-floor.ts`, where the floor and its memo moved in Wave 7.2.
+   * `approval-floor.ts`.
    *
    * Every site in the loop asks through here rather than through `approvalForCall` directly, which
    * is what #80's repair amounts to: the first call of a candidate parallel run used to be put to
@@ -1648,7 +1639,7 @@ export class AgentWorker {
     return approvalForCallOnce(this.#approvalFloor, memo, task, call, state);
   }
 
-  /** @see compactTurnContext in `compaction.ts`, where this moved in Wave 7.2. */
+  /** @see compactTurnContext in `compaction.ts`. */
   async #compactContext(
     task: TaskRecord,
     key: Uint8Array,
@@ -1668,16 +1659,15 @@ export class AgentWorker {
   }
 
   /**
-   * @see runAcceptanceChecks in `acceptance-runner.ts`, where this moved in Wave 7.2 with the
-   * memo that stops the suite running twice on a completing turn and the deadline that stops eight
-   * checks composing into two hours.
+   * @see runAcceptanceChecks in `acceptance-runner.ts`, with the memo that stops a passing suite
+   * running twice and the deadline that stops eight checks composing into two hours.
    */
   async #runAcceptanceChecks(
     task: TaskRecord,
     key: Uint8Array,
     record: AcceptanceRecord,
     options: {
-      purpose: 'finish' | 'baseline' | 'continuation';
+      purpose: 'finish' | 'continuation';
       observed?: ReadonlyMap<string, number>;
     } = { purpose: 'finish' },
     state?: AgentState
@@ -1685,7 +1675,7 @@ export class AgentWorker {
     return runAcceptanceChecks(this.#acceptanceRunner, task, key, record, options, state);
   }
 
-  /** @see raiseTaint in `tool-recording.ts`, where this moved in Wave 7.2. */
+  /** @see raiseTaint in `tool-recording.ts`. */
   async #raiseTaint(
     task: TaskRecord,
     key: Uint8Array,
@@ -1699,8 +1689,8 @@ export class AgentWorker {
   /**
    * Recording and, when the result carried a picture, the routing that decides who reads it.
    *
-   * Both halves moved out in Wave 7.2 and are sequenced here rather than nested, so `vision.ts` can
-   * import `event` from `tool-recording.ts` without the two files importing each other.
+   * The two halves are sequenced here rather than nested, so `vision.ts` can import `event` from
+   * `tool-recording.ts` without the two files importing each other.
    */
   async #recordToolResult(
     task: TaskRecord,
@@ -1716,7 +1706,7 @@ export class AgentWorker {
     await routeImageObservation(this.#vision, task, key, state, call, image, leadModel, catalog);
   }
 
-  /** @see captureMemory in `memory-capture.ts`, where this moved in Wave 7.2. */
+  /** @see captureMemory in `memory-capture.ts`. */
   async #captureMemory(
     task: TaskRecord,
     key: Uint8Array,
@@ -1930,12 +1920,12 @@ export class AgentWorker {
     // state on every step until something drops it.
     dropLegacyGuidance(state.messages);
     delete (state as { playbooks?: unknown }).playbooks;
-    // The contract describes supported capabilities, including groups that can be loaded later.
     const { removedDuplicates } = ensureBasePrompt(state.messages, {
-      tools: agentToolsFor('lead', run.surfaces, run.connectorKinds)
-        .filter((tool) => !run.withdrawnTools.has(tool.name))
-        .map((tool) => tool.name),
-      toolchainSummary
+      toolchainSummary,
+      views: await this.store
+        .getUserById(task.userId)
+        .then((user) => OwnerPreferences.parse(user?.preferences ?? {}).resultViews !== false)
+        .catch(() => true)
     });
     if (removedDuplicates)
       // Worth saying out loud: this ran for as long as the marker was stale, and every duplicate
@@ -2046,22 +2036,19 @@ export class AgentWorker {
      */
     const budget: TurnStepBudget = { maxOutputTokens, turn };
 
-    /** @see refreshActivePlan in `window.ts`, where this moved in Wave 7.2. */
-    const refreshActivePlan = async (createFallback = false): Promise<boolean> =>
-      refreshActivePlan_(this.#window, task, key, state, createFallback);
+    /** @see refreshActivePlan in `window.ts`. */
+    const refreshActivePlan = async (): Promise<boolean> =>
+      refreshActivePlan_(this.#window, task, key, state);
 
-    // Repairs and read-only queries need no synthetic plan. The model can plan substantive work
-    // explicitly; changes without a plan still receive a visible verification checklist.
-    await refreshActivePlan(state.mutated === true);
+    await refreshActivePlan();
 
-    /** @see drainCorrection in `turn-control.ts`, where this moved in Wave 7.2. */
+    /** @see drainCorrection in `turn-control.ts`. */
     const drainCorrection = async (): Promise<boolean> =>
       drainCorrection_(this.#turnControl, task, key, state);
 
     /**
-     * @see honorUserControl in `turn-control.ts`, where this moved in Wave 7.2 and gained the
-     * ownership arm: it can now see a task that was resumed out from under this worker, which is
-     * the half of the question that only `haltReason` was asking.
+     * @see honorUserControl in `turn-control.ts`. It asks about ownership as well as status, so it
+     * sees a task that was resumed out from under this worker.
      */
     const honorUserControl = async (): Promise<boolean> =>
       honorUserControl_(this.#turnControl, task, key, state);
@@ -2197,12 +2184,8 @@ export class AgentWorker {
       const assistantText = await recordAssistantStep(this.#recordStep, task, key, state, response);
       if (await honorUserControl()) return;
 
-      /*
-       * The step produced words. Is the answer finished, cut off, or simply never going to call
-       * `finish`? @see resolveAnswerHolds in `turn/answer-holds.ts`, where the three holds that
-       * answer that - and the hundred and fifty-three lines they took - now live.
-       */
-      const hold = await resolveAnswerHolds(this.#stepBounds, task, key, state, {
+      // A step without tool calls is the answer, a reply cut off, or a continuation.
+      const hold = await resolveAnswerHolds(this.#finish, task, key, state, {
         response,
         assistantText
       });
@@ -2230,7 +2213,6 @@ export class AgentWorker {
           key,
           state,
           response,
-          assistantText,
           run,
           budget,
           control

@@ -2,14 +2,12 @@
 
 ## Why it exists
 
-Every consequential decision in the agent loop is defended by a comment citing one remembered
-incident. That is how the loop came to hold six independent gates on `finish` — a verification
-rejection, a plan hold, an acceptance hold, a silence hold, an acceptance-check refusal and a
-completion nag — plus a fallback plan, a baseline refusal, a repetition watch and a truncation
-continuer. Each of them was right about the failure it saw. None of them can be removed, because
-nobody could say what removing one would cost.
+A loop accumulates gates, each defended by one remembered incident, and none of them can be removed
+while nobody can say what removing one would cost. This suite is how the six gates that once stood
+in front of a completion tool were priced and then removed with that tool: a turn now ends when the
+model replies without a tool call, and the declared acceptance checks are the one gate left.
 
-`evals/` answers that. Owner-shaped requests — the count is in the table below — run against the real
+`evals/` answers that question for every change. Owner-shaped requests — the count is in the table below — run against the real
 agent loop with a stubbed model, a stubbed workspace runner and a stubbed media provider, and every
 one reports what it cost: how many model calls, how many prompt tokens, how much of each request
 repeated the one before it byte for byte, how many commands the workspace ran, how many generations
@@ -24,8 +22,8 @@ a compaction makes to write its brief, and every step a delegated specialist tak
 window. Both are billed, so both are in the model-call count; neither is a link in the chain the
 cached share is measured along, and neither is asked for by the model whose `proposed` list a
 fixture asserts on. They are told apart structurally rather than by their wording - a compaction's
-request carries no tool catalogue at all, and a specialist's carries one without `finish`, which is
-the tool that ends a turn and the one thing no run withdraws from the lead. `delegatedCalls` splits
+request carries no tool catalogue at all, and a specialist's carries one without `shell`, which
+every lead request carries. `delegatedCalls` splits
 the specialists back out, because the same total is reached by a turn that thought for six steps and
 by a turn that thought for two and sent two missions.
 
@@ -41,14 +39,12 @@ pnpm eval --accept            # rewrite evals/baseline.json from this run
 pnpm eval:context             # the context-quality matrix, deterministic half
 pnpm eval:context --judge     # also the graded half; needs OPENROUTER_API_KEY
 pnpm eval:injection           # the injection floor, against a published benchmark
-pnpm eval:arms                # two configurations, the same work, one difference
 ```
 
-Four rigs, and they answer four different questions. This one prices the loop. `eval:context` asks
+Three rigs, and they answer three different questions. This one prices the loop. `eval:context` asks
 whether narrowing the window cost the agent anything it needed. `eval:injection` replays a published
-untrusted-content benchmark against the floor. `eval:arms` holds two configurations of garden
-against the same sample, which is the only honest way to settle an argument about what should be
-resident. Each has a `--ci` or offline arm that needs no provider key.
+untrusted-content benchmark against the floor. Each has a `--ci` or offline arm that needs no
+provider key.
 
 The flag was called `--update` until the baseline became a gate rather than a printout. Rewriting a
 committed baseline is an acceptance, so it is spelled like one; the old name exits 2 and names the
@@ -104,20 +100,20 @@ the whole block on every `pnpm check`. Accept a new baseline and this page fails
 is re-derived, naming the value it should now carry. The instruction is no longer advice.
 
 ```baseline
-fixtures 80
-long-a-finished-phase-is-never-declared.modelCalls 38
-long-a-finished-phase-is-never-declared.promptTokens 1212420
-long-a-finished-phase-is-never-declared.catalogueTokens 271472
-long-a-finished-phase-is-never-declared.cachePrefix 94
-long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.modelCalls 40
-long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.promptTokens 1143541
-long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.catalogueTokens 278617
-long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.cachePrefix 92
-long-finished-phases-condense-rather-than-shred.cachePrefix 77
-compaction.extraModelCalls 2
-compaction.tokensSaved 68879
-compaction.cachePointsGivenUp 2
-floorWalk.cachePointsLost 15
+fixtures  66
+long-a-finished-phase-is-never-declared.modelCalls  38
+long-a-finished-phase-is-never-declared.promptTokens  982,552
+long-a-finished-phase-is-never-declared.catalogueTokens  124,906
+long-a-finished-phase-is-never-declared.cachePrefix  92
+long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.modelCalls  40
+long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.promptTokens  907,068
+long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.catalogueTokens  128,194
+long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.cachePrefix  90
+long-finished-phases-condense-rather-than-shred.cachePrefix  75
+compaction.extraModelCalls  2
+compaction.tokensSaved  75,484
+compaction.cachePointsGivenUp  2
+floorWalk.cachePointsLost  15
 ```
 
 The last four are derived rather than stored, and the check does the subtraction itself:

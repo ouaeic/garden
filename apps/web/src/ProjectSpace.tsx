@@ -304,99 +304,97 @@ export default function ProjectSpace({
     <section
       className={`project-space desk-project project-view-work${taskId ? ' has-conversation' : ''}${docked && view !== 'work' ? ' has-docked-panel' : ''}`}
     >
-      <header className="project-space-header">
-        <Button className="project-back" aria-label="All projects" onClick={onAllProjects}>
-          <ArrowLeft size={15} />
-        </Button>
-        <div className="project-space-title">
-          <div className="eyebrow">Project</div>
-          <h1 aria-label={project.title}>
-            <button
-              className="project-overview-link"
-              title={project.title}
-              aria-label={`${project.title} · Project overview`}
-              aria-current={!taskId ? 'page' : undefined}
-              onClick={() => {
-                if (!fileNavigationBlocked()) onOverview();
-              }}
-            >
-              {project.title}
-            </button>
-          </h1>
-          <p>
-            {projectStatus(project)} <span>· {money(project.spentUsd)} spent</span>
-          </p>
-          <label className="project-conversation-switcher">
-            <span className="sr-only">Current conversation</span>
-            <select
-              aria-label="Current conversation"
-              value={taskId ?? ''}
-              onChange={(event) => {
-                if (fileNavigationBlocked()) return;
-                if (event.target.value) onTask(event.target.value);
-              }}
-            >
-              <option value="" disabled>
-                Open a conversation…
-              </option>
-              {conversations.map((task) => (
-                <option key={task.id} value={task.id}>
-                  {task.title === project.title ? 'Main conversation' : task.title}
+      <div className="project-topbar">
+        <header className="project-space-header">
+          <Button className="project-back" aria-label="All projects" onClick={onAllProjects}>
+            <ArrowLeft size={15} />
+          </Button>
+          <div className="project-space-title">
+            <div className="eyebrow">Project</div>
+            <h1 aria-label={project.title}>
+              <button
+                className="project-overview-link"
+                title={project.title}
+                aria-label={`${project.title} · Project overview`}
+                aria-current={!taskId ? 'page' : undefined}
+                onClick={() => {
+                  if (!fileNavigationBlocked()) onOverview();
+                }}
+              >
+                {project.title}
+              </button>
+            </h1>
+            <p>
+              {projectStatus(project)} <span>· {money(project.spentUsd)} spent</span>
+            </p>
+            <label className="project-conversation-switcher">
+              <span className="sr-only">Current conversation</span>
+              <select
+                aria-label="Current conversation"
+                value={taskId ?? ''}
+                onChange={(event) => {
+                  if (fileNavigationBlocked()) return;
+                  if (event.target.value) onTask(event.target.value);
+                }}
+              >
+                <option value="" disabled>
+                  Open a conversation…
                 </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <div className="row">
-          <Button
-            className="project-new-conversation"
-            aria-label="New conversation"
-            onClick={() => onNewConversation(project)}
-          >
-            <MessageSquarePlus size={16} />
-            <span className="project-new-label">New conversation</span>
-          </Button>
-          <Button
-            aria-label="Project settings"
-            onClick={() => {
-              setDraft({ title: project.title, brief: project.brief, revision: project.revision });
-              setSettings(true);
-            }}
-          >
-            <Settings2 size={17} />
-          </Button>
-        </div>
-      </header>
-      <div className="project-workspace-bar">
-        <nav className="project-conversation-tabs" aria-label="Project conversations">
-          <Button
-            aria-current={!taskId ? 'page' : undefined}
-            onClick={() => {
-              if (!fileNavigationBlocked()) onOverview();
-            }}
-          >
-            Overview
-          </Button>
-          {conversations.map((conversation) => (
+                {conversations.map((task) => (
+                  <option key={task.id} value={task.id}>
+                    {task.title === project.title ? 'Main conversation' : task.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="row">
             <Button
-              key={conversation.id}
-              aria-current={taskId === conversation.id ? 'page' : undefined}
-              title={conversation.title}
+              className="project-new-conversation"
+              aria-label="New conversation"
+              onClick={() => onNewConversation(project)}
+            >
+              <MessageSquarePlus size={16} />
+              <span className="project-new-label">New conversation</span>
+            </Button>
+            <Button
+              aria-label="Project settings"
               onClick={() => {
-                if (!fileNavigationBlocked()) onTask(conversation.id);
+                setDraft({
+                  title: project.title,
+                  brief: project.brief,
+                  revision: project.revision
+                });
+                setSettings(true);
               }}
             >
-              {conversation.title === project.title ? 'Main conversation' : conversation.title}
+              <Settings2 size={17} />
             </Button>
-          ))}
-          {cursor && <Button onClick={() => selectView('activity')}>All conversations</Button>}
-        </nav>
-        {!wide && (
-          <Suspense fallback={null}>
-            <ProjectJobsLink projectId={projectId} onOpen={openProcesses} />
-          </Suspense>
-        )}
-        <ProjectPanelLinks />
+          </div>
+        </header>
+        <div className="project-workspace-bar">
+          <nav className="project-conversation-tabs" aria-label="Project conversations">
+            {conversations.map((conversation) => (
+              <Button
+                key={conversation.id}
+                aria-current={taskId === conversation.id ? 'page' : undefined}
+                title={conversation.title}
+                onClick={() => {
+                  if (!fileNavigationBlocked()) onTask(conversation.id);
+                }}
+              >
+                {conversation.title === project.title ? 'Main conversation' : conversation.title}
+              </Button>
+            ))}
+            {cursor && <Button onClick={() => selectView('activity')}>All conversations</Button>}
+          </nav>
+          {!wide && (
+            <Suspense fallback={null}>
+              <ProjectJobsLink projectId={projectId} onOpen={openProcesses} />
+            </Suspense>
+          )}
+          <ProjectPanelLinks />
+        </div>
       </div>
       <ErrorNotice context="Could not refresh this project." error={error} />
       <div className={`project-view-content${wide ? ' desk-with-support' : ''}`}>

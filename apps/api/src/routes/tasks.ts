@@ -651,9 +651,6 @@ export const registerTaskRoutes = (context: RouteContext): void => {
             steps,
             branchName: input.branchName,
             ...(outputs === undefined ? {} : { outputs }),
-            ...(previousContent?.presentation
-              ? { presentation: previousContent.presentation }
-              : {}),
             ...(previousContent?.directionEventId
               ? { directionEventId: previousContent.directionEventId }
               : {})

@@ -9,8 +9,6 @@
  * They are together rather than beside their call sites because they are read against each other:
  * `IDLE_STEPS_BEFORE_STOP` is twice `MAX_IDLE_STEPS` and `REPEATED_FAILURES_BEFORE_STOP` is twice
  * `MAX_REPEATED_FAILURES`, and that relation is only legible when both halves are on screen.
- *
- * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
 import { GardenError, sha256, spendHalt, spendWarning } from '@garden/core';
 
@@ -22,7 +20,6 @@ import { GardenError, sha256, spendHalt, spendWarning } from '@garden/core';
  */
 export { spendHalt, spendWarning };
 import type { ModelMessage, ModelToolCall } from '@garden/model-gateway';
-import type { AcceptanceResult } from './acceptance.js';
 import type { AgentState } from './agent-state.js';
 import { canonicalJson } from './values.js';
 
@@ -338,157 +335,27 @@ export const ownerFixableCheckpointFailure = (
   /disk is too full|no space left|ENOSPC|storage is full|quota exceeded/i.test(message);
 
 /**
- * A rejected finish is worth retrying: models usually cite the wrong id or omit `source`, and the
- * corrected call lands on the next attempt. Retrying without bound is not - each attempt is a
- * billed model call against a full context, so an ungroundable completion used to burn the entire
- * step budget and then fail with a generic step-limit error that told the user nothing.
- */
-export const MAX_FINISH_REJECTIONS = 3;
-
-/**
- * How many times the harness refuses a finish because the model's own acceptance checks failed.
- *
- * Bounded for the same reason the rejection above is: each attempt is a billed model call against a
- * full window, and a task that cannot pass its own definition of done four times running is not one
- * step from passing it. Past the ceiling the turn ends and the failing checks are carried out as
- * remaining risks, in the completion the owner reads - which is a truthful unfinished job rather
- * than an endless loop or a false success.
+ * How many times failing acceptance checks send the answer back. Past it the turn completes with the
+ * failures stated, which is a truthful unfinished job rather than an endless loop.
  */
 export const MAX_ACCEPTANCE_FAILURES = 4;
 
-/**
- * How many all-passing declarations a turn may make before the harness stops arguing: at two, the
- * first is sent back and the second is taken with a caveat.
- *
- * The harness runs the checks the moment they are declared, against the job as it stands. A record
- * whose every check passes at that point says nothing about the work: `echo done`, `ls`, a file that
- * is already there - each of them is the model asserting its own success in a form the harness can
- * execute, which is the one thing this whole mechanism exists to refuse. Sent back with what the
- * harness saw, so the correction is a check that can fail rather than a rewording.
- *
- * Bounded like every other refusal in this loop. Past the ceiling the record is taken anyway and
- * the completion the owner reads says the checks never failed - a caveat they can act on, rather
- * than a turn that spends its budget arguing about its own test.
- */
-export const MAX_ACCEPTANCE_BASELINE_REFUSALS = 2;
-
-/**
- * The ceiling on one check while the harness is only asking whether it already passes.
- *
- * The finish-time run gets the full fifteen minutes because a real suite takes that long and its
- * answer decides whether the turn completes. The baseline is asking a much smaller question, before
- * any work exists to be proven, and a check still running after two minutes has not answered it
- * "yes" - so it counts as failing now, which is the permissive reading and the honest one.
- *
- * It is also what bounds the price of asking: eight checks at this ceiling is the worst a single
- * declaration can cost, and in practice the check that proves new work fails in the first second
- * because the thing it names does not exist yet.
- */
-export const ACCEPTANCE_BASELINE_TIMEOUT_SECONDS = 120;
-
-/** What the window is told when the harness ran the checks first and they cannot fail. */
-export const acceptanceBaselineRefusal = (
-  results: readonly AcceptanceResult[],
-  attempt: number,
-  ceiling: number
-): string =>
-  [
-    `Acceptance record refused (${attempt} of ${ceiling}): the harness ran all ${results.length} of these against the job as it stands right now, before the work, and every one of them already passes.`,
-    ...results.map((result) => `- ${result.id} (${result.label}): ${result.detail}`),
-    'A check that passes on the unfinished job cannot tell it apart from the finished one. Name at least one that fails right now and will pass when the work is right: the test that does not exist yet, the file that is not there, the figure that does not reconcile. Keep an already-passing check alongside it when it guards against breaking something that works.'
-  ].join('\n');
-
-/** What the window is told when the baseline did its job, so the model knows which check is the proof. */
-export const acceptanceBaselineNote = (results: readonly AcceptanceResult[]): string => {
-  const failing = results.filter((result) => !result.passed);
-  const passing = results.filter((result) => result.passed);
-  return [
-    `Baseline, run by the harness before the work: ${failing.map((result) => result.id).join(', ')} ${failing.length === 1 ? 'fails' : 'fail'} now, which is what will make passing at finish mean something.`,
-    passing.length
-      ? `${passing.map((result) => result.id).join(', ')} already ${passing.length === 1 ? 'passes' : 'pass'}, so ${passing.length === 1 ? 'it guards' : 'they guard'} what already works rather than proving the new work.`
-      : ''
-  ]
-    .filter(Boolean)
-    .join(' ');
-};
-
-/**
- * Why passing the checks proves less than it looks, in the two cases where it does.
- *
- * Both of these are facts about the checks: they were green before anybody started, or they belong
- * to work an earlier turn did. The owner can act on either one by reading the tick differently.
- *
- * A third line stood here saying the checks had been written after the work rather than before it,
- * and it went. It was not a fact about the checks but a description of the order this box runs its
- * own steps in - the hold on finish is the only thing that ever asks for a record, and that hold
- * fires because something has already changed, so the sentence was printed on very nearly every
- * completed task. The owner read it at the end of a finished job and asked what it meant, which is
- * the answer: it was the machinery talking about itself in the one place that should say only what
- * was done.
- */
-export const ACCEPTANCE_ALREADY_PASSED_CAVEAT =
-  'These checks were already passing before this job started, so passing them says nothing about it.';
-export const ACCEPTANCE_EARLIER_TURN_CAVEAT =
-  'These checks come from earlier work: they show nothing broke, not that this is right.';
-
-/**
- * The two sentences an owner reads when the turn ended past `MAX_ACCEPTANCE_FAILURES` above.
- *
- * They are here rather than in `turn/finish.ts` for this file's own stated reason: the ceiling and
- * the wording an owner is given when it is reached belong on one screen, or the number gets raised
- * without anyone rereading the sentence.
- *
- * Two of them, not one, because a check that failed and a check that could not be run are different
- * news and the owner's next move differs. "Your test says no" sends them to the failure. "garden
- * never got to run your test" sends them to the runner, the network or the disk, and telling them
- * the first when the second happened is garden claiming an observation it did not make.
- *
- * Both begin with what garden did rather than with a verdict, and both say plainly what is NOT
- * being claimed - the second in as many words, because "unchecked" is routinely read as "failed".
- */
+/** What the owner reads when the checks failed, and when they could not run at all. */
 export const ACCEPTANCE_FAILED_CAVEAT =
   'garden ran the checks this turn declared and they did not pass, so nothing here is verified - read the failures below before relying on it.';
 export const ACCEPTANCE_COULD_NOT_RUN_CAVEAT =
   'garden could not run the checks this turn declared, so this result is unchecked - neither proved nor disproved.';
 
 /**
- * The caveats that belong beside the tick rather than behind the disclosure.
- *
- * Everything else about how the checks were made is detail for the owner who opens the receipt.
- * These are different in kind: each of them, left inside the disclosure, leaves a reader who never
- * opens it believing something untrue. "All passed" over checks that were passing before anybody
- * started says the opposite of what happened; a card headed "Result" with a tick on it, over checks
- * that failed or that never ran, says the same. The rest qualify the evidence; these correct it.
- *
- * The mechanism is `turn/finish.ts` writing the identical line into both the acceptance list and
- * `remainingRisks`, which is the protocol `apps/web/src/completion-card.ts` reads to decide where a
- * line is shown. Membership here is what tells that file the line was meant to travel both ways.
- */
-export const CAVEAT_BESIDE_THE_TICK: ReadonlySet<string> = new Set([
-  ACCEPTANCE_ALREADY_PASSED_CAVEAT,
-  ACCEPTANCE_FAILED_CAVEAT,
-  ACCEPTANCE_COULD_NOT_RUN_CAVEAT
-]);
-
-/**
- * How many prose-only replies to accept before giving up on the model calling finish. Slightly more
- * generous than the rejection bound because a model that has genuinely more work to do sometimes
- * narrates a step before acting, and cutting that off at three would end real work early.
- */
-export const MAX_COMPLETION_NAGS = 5;
-
-/**
  * Tools the loop answers out of its own state, ahead of the line that records a tool as started.
  *
  * None of these reaches the workspace, the network or the model provider, so none of them is
  * evidence that a step did anything - and every one of them already carries its own bound:
- * `finish` has `MAX_FINISH_REJECTIONS`, `notify` has `MAX_NOTICES_PER_TURN`, `ask` parks the turn,
- * `set_acceptance` has `acceptanceBaselineRefusals`, `compact_context` rewrites the window it is
- * called from. A step whose whole output is one of these is therefore left alone by the guard
+ * `notify` has `MAX_NOTICES_PER_TURN`, `ask` parks the turn, `compact_context` rewrites the window
+ * it is called from. A step whose whole output is one of these is therefore left alone by the guard
  * below rather than counted twice by two bounds that would then race each other.
  */
 const LOOP_ANSWERED_TOOLS: ReadonlySet<string> = new Set([
-  'finish',
   'compact_context',
   'notify',
   'ask',
@@ -1137,16 +1004,9 @@ export const WORKSPACE_BRIEF_MARKER = 'WORKSPACE BRIEF (user-visible persistent 
 
 /** Every message this loop pushes back for the model to act on, by name. */
 export type PushbackName =
-  | 'finish_rejected'
-  | 'plan_hold'
-  | 'acceptance_hold'
-  | 'silence_hold'
   | 'acceptance_failed'
-  | 'completion_nag'
-  | 'baseline_refused'
   | 'repetition_stopped'
   | 'output_limit_continued'
-  | 'reply_cut_off'
   | 'step_budget'
   | 'compute_budget'
   | 'idle_break'
@@ -1163,29 +1023,14 @@ export type PushbackName =
  * hold that silently stopped being observed. Published here so the wording and the watch cannot
  * drift: change a sentence below and the row that matches it is the same edit.
  *
- * Five of them were never watched at all, and they are the five outside the finish and step-budget
- * families: the compute ceiling (which on the measured formula is the ceiling a frontier model
- * actually reaches, far short of the step one), both halves of the output limit, the vision
- * specialist's handoff, and the note a turn resuming a step-limited one opens with.
- *
- * Two entries share an opening - `plan_hold` is a prefix of `acceptance_hold` and `silence_hold` -
- * so a matcher must try the longest marker first. `holdsIn` in the harness sorts by length for
- * exactly this reason; anything else reading this table has to do the same.
+ * A matcher must try the longest marker first; `holdsIn` in the harness sorts by length.
  */
 export const PUSHBACK_MARKERS: ReadonlyArray<readonly [PushbackName, string]> = [
-  // The completion contract, in `#runTurn`'s finish branch.
-  ['finish_rejected', 'Finish rejected (attempt'],
-  ['plan_hold', 'Finish held: '],
-  ['acceptance_hold', 'Finish held: this turn changed'],
-  ['silence_hold', 'Finish held: this turn has not said'],
-  // `acceptanceFailureMessage` and `acceptanceBaselineRefusal`, in acceptance.ts.
-  ['acceptance_failed', 'Finish refused (acceptance '],
-  ['baseline_refused', 'every one of them already passes'],
-  ['completion_nag', 'COMPLETION CHECK ('],
+  // `acceptanceFailureMessage`, in acceptance.ts.
+  ['acceptance_failed', 'ACCEPTANCE CHECKS FAILED ('],
   // Generation repairs that send another request: repetition abort and output-limit continuation.
   ['repetition_stopped', 'began repeating'],
-  ['output_limit_continued', 'CONTINUE THE ANSWER ('],
-  ['reply_cut_off', 'YOUR REPLY WAS CUT OFF'],
+  ['output_limit_continued', 'CONTINUE ('],
   // The two ceilings, from the same template in `#runHandoffCall`, and `stepLimitCarryOver`.
   ['step_budget', 'STEP BUDGET EXHAUSTED'],
   ['compute_budget', 'COMPUTE BUDGET EXHAUSTED'],
@@ -1215,9 +1060,9 @@ export const stepBudgetNotice = (step: number, maxSteps: number): string | null 
   const remaining = maxSteps - step;
   // A budget too small for two distinct notices gets the one that matters.
   if (remaining <= STEP_BUDGET_HANDOFF_STEPS)
-    return `${STEP_HANDOFF_MARKER}: ${remaining} of this turn's ${maxSteps} steps remain, and a step is one model call however many tools it uses. Stop starting new work. Save anything unfinished to a workspace file, publish what is finished, mark the plan honestly, and call finish describing what is done and what is not. Work left after that is not lost - the user can reply and you continue on this same computer with a fresh budget.`;
+    return `${STEP_HANDOFF_MARKER}: ${remaining} of this turn's ${maxSteps} steps remain (a step is one model call). Stop starting new work: save what is unfinished, publish what is finished, keep the plan honest, and reply with what is done and what is not. Nothing is lost; the user's reply continues the work with a fresh budget.`;
   if (remaining === maxSteps - Math.floor(maxSteps * STEP_BUDGET_NOTICE_SHARE))
-    return `${STEP_BUDGET_MARKER}: ${step} of this turn's ${maxSteps} steps are used and ${remaining} remain. Judge whether the rest of the job fits. If it does not, finish the most valuable part properly rather than leaving several things half-done, keep the plan's statuses true, and say plainly in your reply what remains.`;
+    return `${STEP_BUDGET_MARKER}: ${step} of this turn's ${maxSteps} steps are used and ${remaining} remain. If the rest does not fit, finish the most valuable part properly and say what remains.`;
   return null;
 };
 
@@ -1247,7 +1092,7 @@ export const CONTEXT_EFFORT_FLOOR_SHARE = 0.5;
  * It now ratchets in one direction only. A turn opens at 'high' because that is where the request
  * is read and the approach chosen, settles to 'medium' for ordinary progress, and rises back to
  * 'high' - permanently, for the rest of the turn - on any evidence that this turn has become hard:
- * something failed, a finish was refused, the window was just compacted, the trajectory is long, or
+ * something failed, a check failed, the window was just compacted, the trajectory is long, or
  * the context is over half the input budget. Two consequences, both wanted. The model thinks most
  * where the measured failures are. And `reasoning` becomes a nearly byte-stable request field
  * instead of flipping ten times in twenty-three steps, each flip discarding the provider's cached
@@ -1257,8 +1102,6 @@ interface EffortState {
   step: number;
   messages: ModelMessage[];
   planVersion?: number;
-  finishRejections?: number;
-  completionNags?: number;
   acceptanceFailures?: number;
   reasoningFloor?: 'medium' | 'high';
   compactedAtStep?: number;
@@ -1281,7 +1124,7 @@ interface EffortState {
  * of its own work, the turn has run long, or the context is over half the input budget.
  */
 export const effortFloorEarned = (state: EffortState): boolean =>
-  Boolean(state.finishRejections || state.completionNags || state.acceptanceFailures) ||
+  Boolean(state.acceptanceFailures) ||
   state.step >= LATE_STEP_EFFORT_FLOOR ||
   // The step immediately after a compaction is the one most likely to make a wrong call: the model
   // has just lost the detail it was working from and is holding a summary of its own work instead.

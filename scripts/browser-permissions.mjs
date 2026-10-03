@@ -57,11 +57,7 @@ export async function checkPermissionModes({
   await page.addInitScript(() => indexedDB.deleteDatabase('garden-private-drafts'));
   try {
     await page.goto(`${origin}/?task=${task.id}`);
-    // An earlier check can leave this conversation with an unsent draft, which opens the prompt.
-    const compose = page.getByRole('button', { name: /^Continue this conversation/ });
     const settings = page.getByRole('button', { name: 'Prompt settings', exact: true });
-    await compose.or(settings).first().waitFor();
-    if (await compose.isVisible()) await compose.click();
     await settings.click();
     const descriptions = new Map();
     const prompt = page.getByRole('combobox', { name: 'Approvals for this prompt', exact: true });

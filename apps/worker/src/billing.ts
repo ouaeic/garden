@@ -8,8 +8,6 @@
  * The idempotency keys are in this file rather than beside the ledger writer because a key is the
  * whole of what stops a retried step from being billed twice - it is a money decision written as a
  * string, and it belongs where the money decisions are.
- *
- * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
 import type { ModelRelease } from '@garden/contracts';
 import { pricesAtPromptSize, readRoutingMetadata, sha256 } from '@garden/core';

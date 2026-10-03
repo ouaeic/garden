@@ -14,10 +14,9 @@ describe('directions with retained references', () => {
   it('keeps the owner request and selected run identity without embedding recorded commands', () => {
     const prompt = directionPrompt('Use a minimum length of 20.', selected, selected.workspaceId);
     expect(prompt.startsWith('Use a minimum length of 20.')).toBe(true);
-    const reference = prompt.split('Selected analysis reference: ')[1];
+    const reference = prompt.split('as a separate run that keeps the original: ')[1];
     expect(reference).toBeDefined();
     expect(JSON.parse(reference!)).toEqual(selected);
-    expect(prompt).toContain('Preserve the original scripts, inputs and outputs');
   });
   it('refuses references from another execution directory and oversized combined messages', () => {
     expect(() => directionPrompt('Run it', selected, 'other')).toThrow(
@@ -47,7 +46,32 @@ describe('directions with retained references', () => {
       expect(DirectionContext.safeParse({ ...selected, manifestPath }).success).toBe(false);
     const selection = { kind: 'selection' as const, text: JSON.stringify(selected) };
     expect(directionPrompt('Explain', selection, selected.workspaceId)).not.toContain(
-      'Rerun the selected analysis'
+      'Rerun this recorded analysis'
+    );
+  });
+});
+
+describe('comments on a result', () => {
+  it('names what each comment points at, and sends without typed text', () => {
+    const prompt = directionPrompt(
+      '',
+      {
+        kind: 'notes',
+        notes: [
+          { on: 'the answer', quote: 'Aster  lasts\nlongest', note: 'By how much?' },
+          {
+            on: 'comparison.html',
+            region: { x: 0.304, y: 0.25, radius: 0.05, text: 'Brook' },
+            note: ''
+          }
+        ]
+      },
+      selected.workspaceId
+    );
+    expect(prompt).toBe(
+      'My comments on the result:\n' +
+        '1. the answer on "Aster lasts longest": By how much?\n' +
+        '2. comparison.html on the circled area around "Brook" (30% across, 25% down): (see this)'
     );
   });
 });

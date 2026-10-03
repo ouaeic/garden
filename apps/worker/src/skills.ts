@@ -447,21 +447,6 @@ export interface SkillLibrary {
   readonly diagnostics: readonly SkillDiagnostic[];
 }
 
-/**
- * The sections a workspace skill body must carry, in the spelling the upsert checks for.
- *
- * Declared here rather than inside the tool handler because the `skill-authoring` procedure has to
- * teach the same four names: it shipped for two waves telling the model to write Routing, Workflow,
- * Semantics, Attachments and Gotchas, none of which this accepts, so every skill the model tried to
- * save was rejected outright. The library test holds the shipped procedure against this list.
- */
-export const SKILL_BODY_HEADINGS = [
-  'When to use',
-  'Procedure',
-  'Pitfalls',
-  'Verification'
-] as const;
-
 export const SKILL_BUDGET = {
   maxBodyLines: 500,
   maxBodyTokens: 5_000,
@@ -938,17 +923,7 @@ export const skillCatalogBlock = (library: SkillLibrary): string => {
   const lines = skillCatalogEntries(library).map(
     (entry) => `- ${entry.name}: ${entry.catalogLine}`
   );
-  /*
-   * The heading names what the list actually is, and on a box with no owner folders that is
-   * byte-for-byte the sentence it has always been.
-   *
-   * Deliberately conditional rather than reworded outright. This block sits ahead of the cache
-   * anchor in every window, so changing its first line on every box would move the cached prefix
-   * for every task on every installation to describe a folder almost none of them have.
-   */
-  const heading = library.skills.some((skill) => skill.origin === 'owner')
-    ? 'Skills on this computer, garden’s own and your own (index only; open one before doing the work it covers)'
-    : 'Built-in skills (index only; open one before doing the work it covers)';
+  const heading = 'Skills on this computer (index; open one by name with skill(action=view))';
   return `${heading}:\n${lines.join('\n')}`;
 };
 

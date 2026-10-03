@@ -75,6 +75,7 @@ import { displayablePrefix, type DisplayBudget } from '../services/workspace-run
 // `MACHINE_REPORT`, which states the box's measured figures and lets these two derive the rest.
 import { defaultMemoryLimitBytes } from '../services/workspace-runner/src/limits.js';
 import { machineSummary } from '../services/workspace-runner/src/machine.js';
+import { summariseToolchain } from '../services/workspace-runner/src/toolchain.js';
 import { memoryItemAad, memorySourceAad } from '../apps/worker/src/memory-runtime.js';
 import { builtinSkillLibrary } from '../apps/worker/src/skills.js';
 
@@ -185,17 +186,11 @@ const dataKey = generateDataKey();
 /**
  * The worker this rig is, written once because both halves of the lease have to agree.
  *
- * The fixture task used to be stamped `leaseOwner: 'worker-test'` while the `AgentWorker` under it
- * was configured `WORKER_ID: 'worker-eval'`, so every fixture in this suite described a task held
- * by some other worker. Nothing asked, so nothing noticed. Wave 7.2's #140 arm asks: `haltReason`
- * is now consulted at every step boundary and not only mid-model-call, and it answers `disowned`
- * for a lease that names somebody else - correctly, because a worker that has lost the task must
- * not execute another batch against a workspace someone else is now running. The suite stood down
- * on its first step boundary and reported 53 fixtures at 0 model calls with no error anywhere,
- * because standing down is deliberately silent.
- *
- * So the two are one constant. A rig whose task is owned by a worker other than the one running it
- * is not exercising a scenario worth having; it was a typo with nothing to trip over it.
+ * `haltReason` is consulted at every step boundary and answers `disowned` for a lease that names
+ * somebody else, because a worker that has lost the task must not execute another batch against a
+ * workspace someone else is now running. Standing down is deliberately silent, so a fixture task
+ * leased to any other worker id would stop at its first step boundary with 0 model calls and no
+ * error anywhere. The task's lease owner and the worker's id are therefore one constant.
  */
 const WORKER_ID = 'worker-eval';
 
@@ -271,10 +266,7 @@ export interface ScriptContext {
    * Whether this is a delegated specialist's own request rather than a step of the turn.
    *
    * Recognised by the catalogue rather than by the mission text: a specialist is offered the
-   * read-only set and never `finish`, because `finish` is how a turn ends and a specialist does not
-   * end one. Nothing else in the loop withdraws it - the closing handoff is deliberately handed the
-   * same array every other step sent - so "no `finish` on offer" is the one structural statement
-   * that separates a specialist's window from the lead's.
+   * read-only set, which never includes `shell`, and every lead request does.
    *
    * It matters beyond letting a script answer the right model. A specialist's window is its own:
    * its request shares nothing with the lead's but the catalogue, so counting it as the next link
@@ -1326,7 +1318,16 @@ const runnerResponse = (
       })),
       ready: [...TOOLCHAIN_CAPABILITIES],
       missing: [],
-      summary: `Available on this computer: ${TOOLCHAIN_CAPABILITIES.join(', ')}.`
+      summary: summariseToolchain(
+        TOOLCHAIN_CAPABILITIES.map((id) => ({
+          id,
+          purpose: id,
+          ready: true,
+          missingBinaries: [],
+          missingPythonModules: [],
+          missingFonts: []
+        }))
+      )
     });
   /*
    * What machine this is, in the three numbers that decide how a job is sized. Read once at the
@@ -1413,11 +1414,9 @@ export type CompactionTrigger =
  * The opening of the deterministic block `prepareModelContext` pushes at the tail of the window
  * once the soft threshold is crossed.
  *
- * It was a literal here - the only one left in this file - because `context.ts` did not publish it.
- * Step 3.1(b) gave that summary a marker constant, moved it out of the leading system run and
- * excluded it from `cacheEligible`, so this is now an import and the fixture below is no longer
- * coupled to prose. Matching an opening rather than the whole sentence, so the wording after it can
- * change without this going quiet.
+ * Imported from `context.ts` rather than written as a literal, so the fixture below is not coupled
+ * to prose. Matching an opening rather than the whole sentence, so the wording after it can change
+ * without this going quiet.
  */
 const SOFT_PASS_MARKER = COMPRESSED_TRAJECTORY_MARKER;
 
@@ -1704,9 +1703,8 @@ export interface Expectation {
  *
  * The block sits in the preamble ahead of the whole trajectory and its header says it is frozen for
  * the run, so what a fixture puts here is under the two cache breakpoints in front of everything
- * else. Two of the four repairs Wave 3 made to that block - anchoring the temporal filter and
- * anchoring the ranking to `task.createdAt` - are only observable against a pool with more than one
- * entry in it and an expiry inside the run.
+ * else. Its temporal filter and its ranking are both anchored to `task.createdAt`, and both are only
+ * observable against a pool with more than one entry in it and an expiry inside the run.
  */
 export interface FixtureKnowledge {
   /** Whose note it is. The block renders the two groups separately. */
@@ -3151,6 +3149,7 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
     // nothing for it to move. A fixture that wants a stale skill declares one.
     curateWorkspaceSkills: async () => undefined,
     listWorkspaceSkills: async () => skillRows,
+    markWorkspaceSkillUsed: async () => undefined,
     listMediaJobs: async () => [],
     getLatestTaskPlan: async () => plan,
     listTaskEvents: async (
@@ -3707,9 +3706,9 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
       // before either is scripted; see ScriptContext.vision.
       const vision = !catalogue.length && asText(body.model) !== model.providerModelId;
       const summarising = !catalogue.length && !vision;
-      // A specialist's request carries a catalogue and no `finish`; see ScriptContext.delegated.
+      // A specialist's request carries a catalogue and no `shell`; see ScriptContext.delegated.
       const delegated =
-        catalogue.length > 0 && !catalogue.some((tool) => asText(tool.function?.name) === 'finish');
+        catalogue.length > 0 && !catalogue.some((tool) => asText(tool.function?.name) === 'shell');
       /*
        * The whole trajectory, request by request, when somebody has asked for it.
        *
@@ -4315,15 +4314,3 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
     error
   };
 };
-
-export const evidence = (id: string, claim: string): Record<string, unknown> => ({
-  status: 'verified',
-  evidence: [{ claim, source: 'tool_result', toolCallId: id }],
-  remainingRisks: []
-});
-
-export const conversational = (): Record<string, unknown> => ({
-  status: 'not_applicable',
-  evidence: [],
-  remainingRisks: []
-});

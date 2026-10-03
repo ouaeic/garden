@@ -18,8 +18,6 @@ import { runtimeValue } from '@garden/core';
  * the middle of a conversation is indistinguishable from the harness's own words unless something
  * says where it starts and stops. The markers carry a per-result random token, so the marker the
  * model is told to trust is not a string an attacker who has read this file can write into a page.
- *
- * Written for Wave 1 lane 1E: §4.6 #99 and #100.
  */
 import { randomBytes } from 'node:crypto';
 

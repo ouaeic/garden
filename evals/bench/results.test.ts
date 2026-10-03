@@ -77,7 +77,7 @@ const recordOf = (
   verifierExit: resolved ? 0 : 1,
   verifierStderr: '',
   commandsRun: 3,
-  catalogue: ['shell', 'finish'],
+  catalogue: ['shell', 'file_read'],
   holds: [],
   pushback: [],
   error: null,

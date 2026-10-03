@@ -1,8 +1,6 @@
 /*
- * What is left here after Wave 7.1 split this file to match the modules it tests: the three Wave 5
- * leaves that still reach their names through `agent.js`, and the two cases whose subject is the
- * assembled window rather than any one decision. Every other `describe` moved whole - the block, its
- * title and its cases unchanged - so no test's full name changed and the count is the same by name.
+ * What reaches its names through `agent.js`, and the two cases whose subject is the assembled
+ * window rather than any one decision. Everything else is tested beside the module it covers.
  */
 import { readFileSync } from 'node:fs';
 import { buildLabel } from '@garden/contracts';

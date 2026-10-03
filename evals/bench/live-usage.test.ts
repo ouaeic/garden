@@ -20,7 +20,7 @@ import type { AddressInfo } from 'node:net';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { evidence, runFixture, usageFrameOf, type Fixture } from '../harness.js';
+import { runFixture, usageFrameOf, type Fixture } from '../harness.js';
 
 interface Answer {
   readonly text?: string;
@@ -121,7 +121,7 @@ const fakeProvider = async (
         tools?: Array<{ function?: { name?: string } }>;
       };
       const names = (body.tools ?? []).map((tool) => tool.function?.name ?? '');
-      const kind = names.includes('finish') ? 'lead' : names.length ? 'specialist' : 'summariser';
+      const kind = names.includes('shell') ? 'lead' : names.length ? 'specialist' : 'summariser';
       requests.push(kind);
       let answer: Answer;
       if (kind === 'lead') {
@@ -144,19 +144,7 @@ const fakeProvider = async (
                   }
                 ]
               }
-            : {
-                text: 'Done.',
-                calls: [
-                  {
-                    id: 'call-2',
-                    name: 'finish',
-                    args: {
-                      summary: 'The specialist reported.',
-                      verification: evidence('call-1', 'The specialist answered')
-                    }
-                  }
-                ]
-              };
+            : { text: 'Done.' };
       } else {
         answer = { text: 'The notes are a one-line placeholder.' };
       }

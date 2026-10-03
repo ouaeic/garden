@@ -444,7 +444,7 @@ export const buildTaskPresentation = (input: PresentationInput): TaskPresentatio
       );
     }
   }
-  const surface = projectWorkSurface(events, input.plan, results, input.artifactSourceKeys);
+  const surface = projectWorkSurface(events, results, input.artifactSourceKeys);
   /*
    * Timing for a milestone is recovered by walking the plan's own versions rather than stored on
    * the step: each `plan` event is a whole snapshot, so the first version in which a step is

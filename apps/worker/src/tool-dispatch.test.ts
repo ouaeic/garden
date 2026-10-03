@@ -15,7 +15,6 @@ import { AgentWorker, approvalPreviewHash } from './agent.js';
 import { fixtureMediaRouting } from './media-fixture.js';
 import type { WorkerConfig } from './config.js';
 import type { InferenceCredential } from './agent-state.js';
-import { forgetReads, recordRead } from './edit/index.js';
 
 /**
  * The dispatch table, arm by arm: what each tool asks the workspace runner for.
@@ -802,7 +801,7 @@ describe('the plan arm', () => {
     const executed = await dispatch(
       {
         name: 'set_plan',
-        arguments: { steps: ['Read the brief', 'Write the notes'], branchName: 'Notes' }
+        arguments: { steps: ['Read the brief', 'Write the notes'] }
       },
       {
         store: {
@@ -815,7 +814,7 @@ describe('the plan arm', () => {
     );
 
     expect(executed.calls).toEqual([]);
-    expect(created[0]).toMatchObject({ taskId, expectedVersion: 0, branchName: 'Notes' });
+    expect(created[0]).toMatchObject({ taskId, expectedVersion: 0, branchName: 'Main' });
     expect(
       decryptJson<{ steps: Array<{ title: string }>; branchName: string }>(
         created[0]?.stepsCiphertext as Parameters<typeof decryptJson>[0],
@@ -827,7 +826,7 @@ describe('the plan arm', () => {
     expect(executed.events.find((entry) => entry.kind === 'plan')?.payload).toMatchObject({
       directionEventId: '44444444-4444-4444-8444-000000000001',
       version: 4,
-      branchName: 'Notes'
+      branchName: 'Main'
     });
   });
 
@@ -838,7 +837,7 @@ describe('the plan arm', () => {
 
     expect(executed.result).toEqual({
       changedByUser: true,
-      instruction: 'Reload and follow the newer user-edited plan before continuing.'
+      instruction: 'The user edited the plan. Reload it and follow their version.'
     });
   });
 
@@ -1128,15 +1127,15 @@ describe('the workspace arms', () => {
   });
 
   it('reads the patched file once, writes what it composed, and re-reads the size', async () => {
-    // Two operations in ONE patch, because a second patch on the same path is refused outright:
-    // both would address the numbers of the same read while the first had already moved them.
-    forgetReads();
-    recordRead(taskId, 'workspace/a.md', 1, 'one\ntwo\n');
+    // Two replacements for one path land as one read and one write.
     const executed = await dispatch(
       {
         name: 'file_patch',
         arguments: {
-          patches: [{ path: 'workspace/a.md', edit: 'PUT 1:\n-one\n+ONE\nPUT 2:\n-two\n+TWO\n' }]
+          patches: [
+            { path: 'workspace/a.md', oldText: 'one', newText: 'ONE' },
+            { path: 'workspace/a.md', oldText: 'two', newText: 'TWO' }
+          ]
         }
       },
       {
@@ -1163,25 +1162,18 @@ describe('the workspace arms', () => {
       { method: 'GET', path: `${root}/usage`, scopes: ['files.read'], body: undefined }
     ]);
     expect(executed.result).toMatchObject({
-      patchCount: 1,
       filesChanged: [{ path: 'workspace/a.md', lines: 3 }]
     });
-    // The numbers the file has NOW, so the next edit in this turn needs no read between them.
-    expect(String((executed.result as { wrote: unknown }).wrote)).toContain('1:ONE');
   });
 
   it('applies the patches that match and reports the ones that did not', async () => {
-    // `a.md` was read this turn and `b.md` was not, so the second patch is addressed at numbers
-    // nothing has shown - the one failure a line-addressed dialect has that a quoted one does not.
-    forgetReads();
-    recordRead(taskId, 'workspace/a.md', 1, 'one\ntwo\n');
     const executed = await dispatch(
       {
         name: 'file_patch',
         arguments: {
           patches: [
-            { path: 'workspace/a.md', edit: 'PUT 1:\n-one\n+ONE\n' },
-            { path: 'workspace/b.md', edit: 'PUT 1:\n+x\n' }
+            { path: 'workspace/a.md', oldText: 'one', newText: 'ONE' },
+            { path: 'workspace/b.md', oldText: 'three', newText: 'x' }
           ]
         }
       },
@@ -1194,14 +1186,12 @@ describe('the workspace arms', () => {
     );
 
     const result = executed.result as {
-      patchCount: number;
+      filesChanged: unknown[];
       failed: Array<{ path: string; reason: string }>;
     };
-    expect(result.patchCount).toBe(1);
+    expect(result.filesChanged).toHaveLength(1);
     expect(result.failed.map((failure) => failure.path)).toEqual(['workspace/b.md']);
-    // The refusal carries the file's own numbered text, so the retry is a re-emit and not a read.
-    // That is the property the whole format is bought on; asserting the path alone would not see it.
-    expect(result.failed[0]?.reason).toMatch(/1:one/);
+    expect(result.failed[0]?.reason).toMatch(/oldText was not found/);
   });
 
   it('reads a picture through the image route rather than the file one', async () => {
@@ -1987,41 +1977,6 @@ describe('the knowledge arms', () => {
     expect(executed.failure?.code).toBe('memory_not_found');
   });
 
-  it("lists skills as the workspace's own plus the built-in library behind them", async () => {
-    const executed = await dispatch({ name: 'skill', arguments: { action: 'list' } });
-
-    expect(executed.calls).toEqual([]);
-    expect(executed.asked('curateWorkspaceSkills')).toEqual([workspaceId]);
-    const result = executed.result as { skills: unknown[]; builtinSkills: Array<{ name: string }> };
-    expect(result.skills).toEqual([]);
-    expect(result.builtinSkills.map((entry) => entry.name)).toContain('pdf-extraction');
-  });
-
-  it('probes the binaries a built-in skill declares before handing over the procedure', async () => {
-    const executed = await dispatch(
-      { name: 'skill', arguments: { action: 'view', id: 'pdf-extraction' } },
-      {
-        route: (url) =>
-          url.endsWith(`${root}/toolchain/probe`)
-            ? json({ present: ['pdftotext'], missing: ['ocrmypdf'] })
-            : undefined
-      }
-    );
-
-    expect(executed.calls).toHaveLength(1);
-    expect(executed.calls[0]).toMatchObject({
-      method: 'POST',
-      path: `${root}/toolchain/probe`,
-      scopes: ['exec']
-    });
-    expect((executed.calls[0]?.body as { binaries: string[] }).binaries).toContain('ocrmypdf');
-    expect(executed.result).toMatchObject({
-      id: 'pdf-extraction',
-      origin: 'builtin',
-      missingBinaries: ['ocrmypdf']
-    });
-  });
-
   it('removes a workspace skill by name as readily as by id, and says which one went', async () => {
     const saved = {
       id: 'skill-1',
@@ -2053,23 +2008,6 @@ describe('the knowledge arms', () => {
     const executed = await dispatch({ name: 'skill', arguments: { action: 'publish' } });
 
     expect(executed.failure?.code).toBe('skill_action_invalid');
-  });
-
-  it('refuses to save a procedure with none of the headings that make it followable', async () => {
-    const executed = await dispatch(
-      {
-        name: 'skill',
-        arguments: {
-          action: 'upsert',
-          name: 'weekly-report',
-          description: 'How the weekly report is assembled',
-          content: '# Weekly report\n\nDo the thing.'
-        }
-      },
-      { approved: true }
-    );
-
-    expect(executed.failure?.code).toBe('skill_structure_invalid');
   });
 
   it('refuses to open a skill that is in neither the workspace nor the library', async () => {

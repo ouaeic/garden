@@ -8,7 +8,7 @@ down gets mistaken for an oversight — or for a promise.
 
 garden is built for one owner and one computer. It covers chat, a persistent Linux machine,
 terminal, browser, web search, GUI applications, human takeover, files, rich artifacts, durable
-history, reviewed memory, skills, schedules, model selection, coding-specialist handoff, previews,
+history, reviewed memory, saved skills, schedules, model selection, coding-specialist handoff, previews,
 device clients, the owner's own mailbox and calendar over open protocols, MCP, and a single approval
 model.
 
@@ -88,18 +88,11 @@ this reason and asserts that it still does.
 
 ### A definition of done the harness can run
 
-Completion used to be checked for provenance: that a cited tool call existed, succeeded, and came
-after the last change. Every one of those is a check on identity and ordering, none of them reads
-the result, and the harness executed nothing of its own — so reading back a file you had just
-written satisfied it, and "the service starts and serves /health" was accepted on the strength of a
-`file_read`.
-
-The model now declares what would prove the job done, before it does the work, and the harness runs
-those checks itself and refuses the finish while any fails. The division of labour is the whole
-design and is what keeps it from becoming a task mould: the model writes the checks, in its own
-words, for whatever the job turns out to be; the harness only insists that "done" means something it
-can execute, and executes it. A definition of done that already passes before the work starts is
-refused, which is a property of the shape rather than a list of banned commands.
+A turn ends when the model replies without a tool call. When the turn changed something and the model
+declared what would prove the job done, the harness runs those checks itself and sends the answer
+back while any fails; past the fourth failure the answer stands with the failures stated beside it.
+The model writes the checks, in its own words, for whatever the job turns out to be; the harness only
+insists that "done" means something it can execute, and executes it.
 
 ### Files are the knowledge source
 
@@ -138,9 +131,9 @@ support consistently across supported distributions. Both land in the one pinned
 packages above rather than a second environment competing with them. Editing the table is therefore
 the right move for an operating-system package and the wrong one for these pinned Python dependencies.
 
-The data-analysis skill names Parquet, and `pandas.read_parquet` needs a reader. PyArrow therefore
+Parquet is a common data format, and `pandas.read_parquet` needs a reader. PyArrow therefore
 comes from verified wheels because its OS package is absent on some supported releases. A package
-earns a place here when a skill already claims what it provides, or when its
+earns a place here when its
 absence makes the first hour of a workload the product is sold on fail. Nothing earns one by being
 generally useful.
 
@@ -155,8 +148,7 @@ These are therefore absent on purpose, and the absence is a decision rather than
   cannot be guessed in advance - so guessing a subset would be resident weight bought for a guess.
 - **A compiler.** gcc, cc, g++ and make are not installed. That is why a `pip install` of a package
   publishing no wheel for the pinned interpreter fails on a missing compiler rather than on a missing
-  library, and the `scientific-computing` skill says so, so the failure is recognised in one step
-  rather than at the end of a build log. A compiler is an ordinary approved system-package install.
+  library. A compiler is an ordinary approved system-package install.
 
 The installer and release-carried update steps apply the host package table. An update runs those
 steps before restarting the services; failed installation is a failed update. Runtime toolchain
@@ -211,7 +203,7 @@ including `ls`, because the write classifier deliberately reads an unrecognised 
 check and that asymmetry runs the wrong way here. It refuses every browser action including
 navigation, because the harmless verbs are separated by the approval floor and a second copy of that
 list would drift from it. It refuses the compiler, because compilers were measured writing. It lets
-the agent finish, and does not run the acceptance checks while it does: those checks are your own
+the agent answer, and does not run the acceptance checks when it does: those checks are your own
 build and test commands, executed on your computer, and a record declared on an earlier turn is
 still on the trajectory when you switch the conversation over. Nothing is lost by not running them,
 because a plan-mode turn changed nothing for them to be evidence about. And it

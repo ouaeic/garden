@@ -53,12 +53,13 @@ export const executeApprovedCall = async (
   refreshActivePlan: () => Promise<boolean>
 ): Promise<void> => {
   const { model, catalog, webPlan } = run;
-  // Recorded on intent rather than on success, because a write that failed is still a turn
-  // doing material work, and that is what the user-visible plan is for.
-  if (isMutatingToolCall(call.name, call.arguments)) {
-    state.mutated = true;
-    if (requiresAcceptanceChecks(call.name, call.arguments)) state.mutatedBeyondProse = true;
-  }
+  // Recorded on intent rather than on success: a write that failed still means the work being
+  // checked is code, commands or config.
+  if (
+    isMutatingToolCall(call.name, call.arguments) &&
+    requiresAcceptanceChecks(call.name, call.arguments)
+  )
+    state.mutatedBeyondProse = true;
   state.toolsStarted = (state.toolsStarted ?? 0) + 1;
   await event(deps.store, task, key, 'tool_started', `Running ${call.name}`, {
     toolCallId: call.id,

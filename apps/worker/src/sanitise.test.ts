@@ -182,27 +182,6 @@ describe('what a hostile page looks like once it is in the turn', () => {
     expect(window.indexOf('UNTRUSTED CONTENT IS NOW IN THIS TURN')).toBeGreaterThan(close);
   });
 
-  it('provides the first completion reference outside untrusted data', async () => {
-    const { deps, state, events } = recording();
-    await recordToolResult(deps, task, Buffer.from(dataKey), state, call, page);
-    const window = windowEntry(state);
-    expect(window.startsWith('Result reference: call-1 (parallel_web_read).')).toBe(true);
-    expect(window.indexOf('Result reference:')).toBeLessThan(window.indexOf('[untrusted-data '));
-    expect(events.length).toBeGreaterThan(0);
-    expect(JSON.stringify(events)).not.toContain('Result reference:');
-    expect(state.turnToolResults?.['call-1']?.eventId).toBeDefined();
-  });
-
-  it('does not give a completion reference to a tool that never ran', async () => {
-    const { deps, state } = recording();
-    state.finishRejections = 1;
-    await recordToolResult(deps, task, Buffer.from(dataKey), state, call, {
-      skipped: true,
-      reason: 'Already read; use the original receipt.'
-    });
-    expect(windowEntry(state)).not.toContain('Result reference:');
-  });
-
   it('does not fence the harness’s own answer to a call that never ran', async () => {
     // A repeat the turn already answered, a plan republished mid-flight, arguments cut off
     // mid-JSON: nothing was fetched and what the model is holding is this build's own sentence.

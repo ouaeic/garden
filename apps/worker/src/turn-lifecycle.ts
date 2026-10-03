@@ -10,8 +10,6 @@ import { runtimeClearTimer, runtimeSetInterval, runtimeSetTimeout } from '@garde
  * The unanswered-tool-call pair is part of the same lifecycle. A turn that stops between issuing a
  * call and answering it leaves the window in a shape no provider will accept, so whatever resumes
  * that turn has to seal the gap before the next request.
- *
- * Lifted out of `agent.ts` unchanged by Wave 7.1.
  */
 import { GardenError } from '@garden/core';
 import type { ModelMessage } from '@garden/model-gateway';

@@ -9,9 +9,8 @@ import { iso, json, mapApiToken, mapUser, optionalText } from './rows.js';
  * that prove it, the sessions and device enrolments a passkey opens, the API tokens a client holds
  * instead of a session, and the idempotency ledger that stops a retried write happening twice.
  *
- * Lifted out of `store.ts` whole in Wave 6.3, method text unchanged - so every statement here is
- * the statement that was there. `DataStore` holds one of these and forwards to it under the same
- * public names, which is why nothing outside this package moved.
+ * `DataStore` holds one of these and forwards to it under the same public names, so nothing
+ * outside this package addresses it directly.
  */
 export class IdentityStore {
   constructor(private readonly database: Database) {}

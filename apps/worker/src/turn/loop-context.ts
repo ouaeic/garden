@@ -55,7 +55,7 @@ export interface TurnLoopControl {
   /** A message the owner sent mid-turn, moved into the window. `true` when one arrived. */
   drainCorrection(): Promise<boolean>;
   /** Republishes the active plan; `true` when the version moved under this turn. */
-  refreshActivePlan(createFallback?: boolean): Promise<boolean>;
+  refreshActivePlan(): Promise<boolean>;
   /** Refreshes the owner's decision opt-out and the tail block that carries the clock. */
   refreshRuntimeContext(): void | Promise<void>;
 }
