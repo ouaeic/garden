@@ -1,14 +1,23 @@
 /*
- * The handheld: a dark case with a lit screen set into it. The masthead and the phone bar are
- * the case; everything that changes is on the screen. Loaded after every other stylesheet.
+ * The whole window is one reflective LCD. Loaded after every other stylesheet.
+ *
+ * Two layers make the panel, both set up by `lcd-glass.ts`. The screen is filtered once: its own
+ * darkness, moved down and right and softened, is multiplied back over it, which is the shadow
+ * driven crystal casts on the reflector - around ink on light glass, inside lit strokes and
+ * pictures on a dark field, from everything alike. Over that lies the glass: the dot matrix at
+ * the display's own pixel size, and the lens's shading. Neither layer knows about any element.
  */
-
-/* Ink on an LCD casts a faint shadow onto the reflector, a pixel down and to the right. */
-body {
-  text-shadow: var(--ink-shadow);
+.garden-shell.desk-shell,
+.dialog[open] {
+  background-color: var(--bg);
+  filter: url(#lcd-shadow);
 }
-:is(img, canvas, iframe, video, svg) {
-  text-shadow: none;
+/* Liquid crystal is slow to settle; a change of state fades rather than snapping. */
+:where(button, .button, a, summary) {
+  transition:
+    color 90ms ease-out,
+    background-color 90ms ease-out,
+    border-color 90ms ease-out;
 }
 
 /* Reading surfaces use the crisp face; the pixel face stays on the controls it was drawn for. */
@@ -46,102 +55,102 @@ body {
   font-size-adjust: none;
 }
 
-/* The case. */
-body:has(.desk-shell) {
-  background: var(--bezel);
-}
-.garden-shell.desk-shell {
-  background: var(--bezel);
-  padding: 0 12px 12px;
-  color-scheme: dark;
-}
-.desk-shell .garden-masthead {
-  background: none;
-  /* The seam above the screen; bats hang from it. */
-  border-bottom: 1px solid var(--bezel-edge);
-  color: var(--bezel-ink);
-  text-shadow: none;
-}
-.desk-shell .garden-masthead :is(.button, .brand, .brand-button, kbd) {
-  color: var(--bezel-ink);
-  text-shadow: none;
-}
-.desk-shell .garden-masthead .garden-wordmark {
-  color: var(--bezel-brand);
-}
-.desk-shell .garden-masthead .button {
-  background: none;
-  border-color: transparent;
-}
-.desk-shell .garden-masthead .button:hover,
-.desk-shell .desk-navigation .button:is([aria-expanded='true'], [aria-current='page']) {
-  color: var(--bezel-ink);
-  background: color-mix(in srgb, var(--bezel-ink) 12%, transparent);
-  border-color: color-mix(in srgb, var(--bezel-ink) 45%, transparent);
-}
-.desk-shell .desk-navigation .button {
-  color: var(--bezel-muted);
-}
-.desk-shell .garden-masthead .global-search kbd {
-  border-color: var(--bezel-muted);
-}
-
-/* The power lamp: lit while the computer runs, dark while it sleeps. */
-.power-lamp-led {
-  width: 8px;
-  height: 8px;
-  margin-right: 10px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--lamp) 25%, var(--bezel-edge));
+/*
+ * A lamp drawn on the screen: a block of pixels that says how the computer is. Lit while it is
+ * on, flickering while it works, blinking while it starts and fast when it has failed, hollow
+ * while it is off or asleep.
+ */
+.screen-lamp {
+  display: inline-block;
   flex: none;
+  width: 6px;
+  height: 6px;
+  margin-left: 2px;
+  border: 1px solid currentColor;
+  background: transparent;
 }
-.power-lamp-led[data-on='true'] {
-  background: var(--lamp);
-  box-shadow:
-    0 0 6px color-mix(in srgb, var(--lamp) 70%, transparent),
-    0 0 1px var(--lamp);
+.screen-lamp:not([data-lamp='off']) {
+  background: currentColor;
 }
-
-/* The screen, set into the case: recessed, square-cornered, the case rounder at one corner. */
-.desk-shell .garden-main {
-  border-radius: 3px;
-  box-shadow:
-    inset 3px 3px 0 color-mix(in srgb, black 30%, transparent),
-    inset 0 0 28px color-mix(in srgb, black 16%, transparent),
-    0 0 0 1px var(--bezel-edge);
+.screen-lamp[data-lamp='busy'] {
+  animation: lamp-flicker 1.3s steps(1, end) infinite;
 }
-@media (min-width: 701px) {
-  .garden-shell.desk-shell {
-    border-bottom-right-radius: 44px;
+.screen-lamp[data-lamp='starting'] {
+  animation: lamp-blink 1.2s steps(1, end) infinite;
+}
+.screen-lamp[data-lamp='fault'] {
+  animation: lamp-blink 0.4s steps(1, end) infinite;
+}
+@keyframes lamp-flicker {
+  0%,
+  31%,
+  47%,
+  78% {
+    background: currentColor;
   }
-  .desk-shell .garden-main {
-    border-bottom-right-radius: 3px 3px;
+  23%,
+  40%,
+  71%,
+  90% {
+    background: transparent;
   }
 }
-
-/* On a phone the bar below the screen is part of the case too. */
-@media (max-width: 700px) {
-  .garden-shell.desk-shell {
-    padding: 0 6px;
+@keyframes lamp-blink {
+  50% {
+    background: transparent;
   }
-  .desk-shell .phone-bar {
-    background: var(--bezel);
-    /* The seam where the screen meets the case; creatures still walk along it. */
-    border-top: 1px solid var(--bezel-edge);
-    color: var(--bezel-muted);
-    text-shadow: none;
-  }
-  .desk-shell .phone-bar button {
-    color: var(--bezel-muted);
-  }
-  .desk-shell .phone-bar button[aria-current='page'] {
-    color: var(--bezel-ink);
-    background: color-mix(in srgb, var(--bezel-ink) 12%, transparent);
-  }
+}
+.phone-bar .screen-lamp {
+  position: absolute;
+  top: 8px;
+  left: calc(50% + 10px);
 }
 
+/* The glass over the screen, and over each sheet raised above it. */
+#root:has(> .desk-shell)::after,
+.dialog[open]::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  background:
+    var(--lcd-grid),
+    /* Light pools towards the bottom of the panel, away from the lens's upper edge. */
+    linear-gradient(to bottom, transparent 72%, color-mix(in srgb, #fff3c0 5%, transparent)),
+    radial-gradient(
+      ellipse 120% 100% at 50% 45%,
+      transparent 62%,
+      color-mix(in srgb, black 9%, transparent)
+    );
+  image-rendering: pixelated;
+}
+.dialog[open]::after {
+  position: absolute;
+}
+/* A sheet keeps its glass still by scrolling its body rather than itself. */
+.dialog[open] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dialog[open] > .dialog-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
 @media (prefers-contrast: more), (forced-colors: active), print {
-  body {
-    text-shadow: none;
+  .garden-shell.desk-shell,
+  .dialog[open] {
+    filter: none;
+  }
+  #root:has(> .desk-shell)::after,
+  .dialog[open]::after {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen-lamp {
+    animation: none !important;
   }
 }

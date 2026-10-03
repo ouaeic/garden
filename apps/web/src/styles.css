@@ -6,7 +6,7 @@
 body {
   margin: 0;
   min-width: 320px;
-  background: var(--lcd-texture), var(--chrome);
+  background: var(--chrome);
 }
 button,
 input,
@@ -34,7 +34,7 @@ select,
 textarea {
   border: 1px solid var(--line-strong);
   border-radius: 0;
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
   padding: 11px 13px;
   min-width: 0;
   max-width: 100%;
@@ -114,7 +114,7 @@ pre {
   font: 16px/1.6 var(--font-mono);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 0;
   padding: 16px;
@@ -183,7 +183,7 @@ canvas {
   left: 20px;
   top: -80px;
   z-index: 100;
-  background: var(--lcd-texture-inverse), var(--paper);
+  background: var(--paper);
   color: var(--ink);
   padding: 14px 24px;
   border-radius: 0;
@@ -211,12 +211,12 @@ canvas {
 }
 .button.primary,
 .primary {
-  background: var(--lcd-texture-inverse), var(--paper);
+  background: var(--paper);
   color: var(--ink);
   border-color: var(--text);
 }
 .button.primary:hover:not(:disabled) {
-  background: var(--lcd-texture-inverse), var(--paper);
+  background: var(--paper);
   filter: brightness(0.95);
 }
 .quiet-button {
@@ -234,7 +234,7 @@ canvas {
   text-align: left;
 }
 .selected {
-  background: var(--lcd-texture-inverse), var(--paper) !important;
+  background: var(--paper) !important;
   border-color: var(--line-strong) !important;
   color: var(--ink) !important;
   --muted: var(--ink);
@@ -271,7 +271,7 @@ canvas {
   padding: 26px;
   border: 1px solid var(--line);
   border-radius: 0;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   min-width: 0;
 }
 .section-heading {
@@ -427,7 +427,7 @@ canvas {
 }
 .notification-count {
   font: 16px var(--font-mono);
-  background: var(--lcd-texture-inverse), var(--paper);
+  background: var(--paper);
   color: var(--ink);
   border-radius: 0;
   min-width: 16px;
@@ -445,7 +445,7 @@ canvas {
   width: 6px;
   height: 6px;
   border-radius: 0;
-  background: var(--lcd-texture-inverse), currentColor;
+  background: currentColor;
 }
 .status-line {
   display: inline-flex;
@@ -461,7 +461,7 @@ canvas {
 .offline-banner {
   padding: 12px 25px;
   text-align: center;
-  background: var(--lcd-texture-inverse), var(--paper);
+  background: var(--paper);
   color: var(--ink);
   font-size: 16px;
 }
@@ -470,7 +470,7 @@ canvas {
   align-items: center;
   gap: 22px;
   padding: 24px;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   border: 1px solid var(--line-strong);
   border-radius: 0;
   margin: 20px 0 30px;
@@ -511,7 +511,7 @@ canvas {
   color: var(--muted);
 }
 .segmented button[aria-pressed='true'] {
-  background: var(--lcd-texture-inverse), var(--paper);
+  background: var(--paper);
   color: var(--ink);
   --muted: var(--ink);
   --dim: var(--ink);
@@ -601,7 +601,7 @@ canvas {
   overflow: auto;
   max-height: 650px;
   color: var(--text);
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
   border: 0;
   padding: 20px;
   border-radius: 0;
@@ -717,7 +717,7 @@ canvas {
   border-radius: 0;
   position: relative;
   text-decoration: none;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   overflow-wrap: anywhere;
 }
 .artifact-tile:hover {
@@ -820,7 +820,7 @@ canvas {
 .decision-card,
 .question-card {
   padding: 28px;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   color: var(--text);
   border: 1px solid var(--line-strong);
   border-radius: 0;
@@ -869,7 +869,7 @@ canvas {
   font-size: 16px;
   margin: 18px 0;
   max-height: 220px;
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
 }
 .decision-note {
   margin-top: 16px;
@@ -903,7 +903,7 @@ canvas {
   justify-content: space-between;
   gap: 20px;
   text-align: left;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 0;
   padding: 24px;
@@ -924,7 +924,7 @@ canvas {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   border: 1px solid var(--line-strong);
   border-radius: 0;
   padding: 16px 18px 12px;
@@ -964,7 +964,7 @@ canvas {
   align-items: center;
   gap: 8px;
   font-size: 16px;
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
   border: 1px solid var(--line);
   padding: 5px 7px;
   border-radius: 0;
@@ -978,10 +978,9 @@ canvas {
 }
 .dialog {
   color: var(--text);
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   border: 1px solid var(--line-strong);
   border-radius: 0;
-  box-shadow: var(--surface-shadow);
   width: min(640px, calc(100vw - 40px));
   max-height: calc(100svh - 60px);
   padding: 0;
@@ -1006,7 +1005,7 @@ canvas {
   border-bottom: 1px solid var(--line);
   position: sticky;
   top: 0;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   z-index: 3;
 }
 .dialog-heading h2 {
@@ -1077,7 +1076,7 @@ canvas {
   position: relative;
   overflow: hidden;
   padding: 38px clamp(25px, 7vw, 110px);
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
 }
 .welcome-top {
   display: flex;
@@ -1139,7 +1138,7 @@ canvas {
   max-width: 500px;
   padding: 26px;
   border: 1px solid var(--line-strong);
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   border-radius: 0;
   margin-top: 30px;
   display: flex;
@@ -1149,7 +1148,7 @@ canvas {
 .recovery-record code {
   display: block;
   overflow-wrap: anywhere;
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
   padding: 15px;
 }
 .recovery-record h2,

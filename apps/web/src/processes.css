@@ -3,7 +3,7 @@
   border-radius: 0;
   padding: 22px;
   margin-block: 20px;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   min-width: 0;
 }
 .process-panel-heading,

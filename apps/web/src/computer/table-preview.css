@@ -52,7 +52,7 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
 }
 .table-preview th small {
   display: block;

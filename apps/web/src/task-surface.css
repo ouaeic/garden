@@ -64,7 +64,7 @@
 }
 .thread details > summary:hover,
 .thread details[open] > summary {
-  background: var(--lcd-texture), var(--tint);
+  background: var(--tint);
 }
 .thread-ask,
 .thread-answer {
@@ -230,5 +230,5 @@ details.owner-line > summary > span:last-child {
   display: grid;
   margin: 8px 16px 0;
   border: 1px solid var(--line);
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
 }

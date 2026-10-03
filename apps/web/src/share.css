@@ -24,7 +24,7 @@ button {
   cursor: pointer;
 }
 button:hover {
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
 }
 button:disabled {
   color: var(--muted);
@@ -99,7 +99,7 @@ p {
   text-wrap: balance;
 }
 .share-brief {
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   padding: 17px 22px;
   border-radius: 0;
   margin-bottom: 32px;
@@ -154,7 +154,7 @@ details[open] > summary {
 }
 .shared-prose pre,
 .shared-file-preview pre {
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 0;
   padding: 19px;
@@ -168,7 +168,7 @@ details[open] > summary {
   font-size: 16px;
 }
 .shared-prose :not(pre) > code {
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   padding: 0.15em 0.35em;
   border-radius: 0;
 }
@@ -405,7 +405,7 @@ details[open] > summary {
     --ink: #111;
     --muted: #555;
     color: var(--text);
-    background: var(--lcd-texture), var(--bg);
+    background: var(--bg);
   }
   .share-page {
     max-width: none;

@@ -19,7 +19,7 @@
   grid-area: prompt;
   position: relative;
   border: 1px solid var(--text);
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
   box-shadow: 4px 4px 0 var(--tint);
   padding: 8px;
 }
@@ -46,8 +46,7 @@
   min-height: 0;
   padding: 12px 16px;
   border: 1px solid var(--line);
-  background: var(--lcd-texture), var(--bg);
-  box-shadow: var(--surface-shadow);
+  background: var(--bg);
   color: var(--text);
   text-align: left;
 }
@@ -193,7 +192,7 @@
   min-height: 96px;
   padding: 12px;
   border: 1px solid var(--line);
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
   color: var(--text);
   text-align: left;
 }
@@ -329,7 +328,7 @@
   }
   .home-switcher > button[aria-pressed='true'] {
     color: var(--ink);
-    background: var(--lcd-texture-inverse), var(--paper);
+    background: var(--paper);
   }
   .home-projects,
   .home-today {

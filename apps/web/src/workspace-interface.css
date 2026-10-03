@@ -54,7 +54,7 @@
   padding: 8px 14px;
 }
 .project-view-nav .button[aria-current] {
-  background: var(--lcd-texture-inverse), var(--paper);
+  background: var(--paper);
   color: var(--ink);
   --muted: var(--ink);
   --dim: var(--ink);
@@ -541,7 +541,7 @@
   border-color: transparent;
 }
 .job-view-nav .button[aria-pressed='true'] {
-  background: var(--lcd-texture-inverse), var(--paper);
+  background: var(--paper);
   border-color: var(--line);
   color: var(--ink);
   --muted: var(--ink);

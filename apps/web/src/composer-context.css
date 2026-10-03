@@ -48,7 +48,7 @@
   max-width: 100%;
   padding: 2px 4px 2px 8px;
   border: 1px solid var(--line-strong);
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
 }
 .composer-notes .composer-note-anchor {
   display: inline-flex;
