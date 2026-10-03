@@ -15,6 +15,6 @@
     "@garden/core": "workspace:*",
     "@garden/data": "workspace:*",
     "@garden/model-gateway": "workspace:*",
-    "zod": "4.4.3"
+    "zod": "4.6.5"
   }
 }
