@@ -332,6 +332,22 @@ it('shares bounded source-linked context and corrections without importing other
   expect(result).not.toContain('Superseded assembly claim');
   expect(result).not.toContain('Unrelated private work');
   expect(result.length).toBeLessThan(24000);
+  // Where the conversation works decides what it is told about the project's files.
+  const project = await store.getProject(f.user.id, f.task.projectId!);
+  const inFolder = await conversationContext(
+    { ...f.context, runner },
+    { ...child, workspaceId: project!.workspaceId },
+    key
+  );
+  expect(inFolder).toContain("You work in the project's folder");
+  expect(inFolder).not.toContain('project_update');
+  const onCopy = await conversationContext(
+    { ...f.context, runner },
+    { ...child, workspaceId: randomUUID() },
+    key
+  );
+  expect(onCopy).toContain('You work on a separate copy of the project.');
+  expect(onCopy).toContain('project_update');
   expect(
     await conversationContext(
       { ...f.context, runner },

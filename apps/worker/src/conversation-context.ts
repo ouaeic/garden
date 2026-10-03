@@ -29,14 +29,24 @@ export async function conversationContext(
   ]);
   if (!record) return '';
   const project = projectResponse(record, deps.masterKey);
+  // A conversation in the project's own folder shares its files; one on a separate copy publishes back.
+  const separate = task.workspaceId !== project.workspaceId;
   const lines = [
     `Project ${project.id}: ${project.title}`,
     `Shared brief:\n${excerpt(project.brief, 8000)}`,
     'Each conversation has its own direction, history and approvals. Search related conversations with session_search; an empty search is not proof that work did not happen.',
-    'Write in your own working area. Other conversations can run concurrently. Use project_update to capture selected files, test the combined candidate and publish it. A conversation finishing does not publish its files or finish its jobs. Pin long-running inputs to immutable version paths; never follow a moving latest link. Checkout only the published files you need to edit; read large datasets in place. Use named process jobs for long-running work.',
-    versions.head
-      ? `Published version ${versions.head.number}: ${versions.head.id}; digest ${versions.head.digest}; immutable files ${versions.head.path}`
-      : 'No published version yet. Prepare an initial update from your files or a sourceTaskId; each candidate has an immutable input path once ready.',
+    separate
+      ? 'You work on a separate copy of the project. Other conversations can run concurrently. Use project_update to capture selected files, test the combined candidate and publish it. A conversation finishing does not publish its files or finish its jobs. Pin long-running inputs to immutable version paths; never follow a moving latest link. Checkout only the published files you need to edit; read large datasets in place.'
+      : "You work in the project's folder, which its other conversations share and may be changing at the same time.",
+    ...(versions.head
+      ? [
+          `Published version ${versions.head.number}: ${versions.head.id}; digest ${versions.head.digest}; immutable files ${versions.head.path}`
+        ]
+      : separate
+        ? [
+            'No published version yet. Prepare an initial update from your files or a sourceTaskId; each candidate has an immutable input path once ready.'
+          ]
+        : []),
     ...versions.updates
       .slice(0, 8)
       .map(
