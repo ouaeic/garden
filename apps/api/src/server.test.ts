@@ -10285,7 +10285,7 @@ describe('an account with more than one provider connected', () => {
   }, 30_000);
 });
 
-test('creates independent conversations with project defaults, selected context and owner-only membership', async () => {
+test('creates shared and independent conversations with project defaults, selected context and owner-only membership', async () => {
   stubProviderFetch();
   const directory = await mkdtemp(join(tmpdir(), 'garden-conversations-'));
   disposers.push(() => rm(directory, { recursive: true, force: true }));
@@ -10341,6 +10341,15 @@ test('creates independent conversations with project defaults, selected context 
   expect(child.workspaceId).not.toBe(initial.workspaceId);
   expect(child.securityMode).toBe('autonomous');
   expect((await app.inject(request)).json<{ id: string }>().id).toBe(child.id);
+  // Without a separate copy, a conversation works in the project's own folder.
+  const shared = await app.inject({
+    ...request,
+    headers: { cookie, 'idempotency-key': randomUUID() },
+    payload: { ...request.payload, prompt: 'Tidy the figures', execution: 'shared' }
+  });
+  expect(shared.statusCode, shared.body).toBe(200);
+  const sharedChild = shared.json<{ id: string; workspaceId: string }>();
+  expect(sharedChild.workspaceId).toBe(initial.workspaceId);
   const conversations = (
     await app.inject({
       method: 'GET',
@@ -10348,7 +10357,9 @@ test('creates independent conversations with project defaults, selected context 
       headers
     })
   ).json<{ tasks: Array<{ id: string }> }>();
-  expect(new Set(conversations.tasks.map((task) => task.id))).toEqual(new Set([taskId, child.id]));
+  expect(new Set(conversations.tasks.map((task) => task.id))).toEqual(
+    new Set([taskId, child.id, sharedChild.id])
+  );
   const stranger = sessionCookie(
     await app.inject({
       method: 'POST',

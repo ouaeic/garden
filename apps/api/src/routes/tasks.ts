@@ -364,11 +364,12 @@ export const registerTaskRoutes = (context: RouteContext): void => {
           });
         return {
           task: titled,
+          // A project conversation works in the project's folder unless it asked for its own copy.
           execution: await beginProjectExecution(
             context,
             titled,
             input.attachments ?? [],
-            Boolean(project)
+            Boolean(project) && input.execution !== 'shared'
           )
         };
       });

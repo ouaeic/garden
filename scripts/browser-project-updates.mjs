@@ -186,6 +186,11 @@ export async function checkProjectUpdates({ page, fixture, report }) {
   await conversations
     .getByText('+23 −4 lines · 2 changed files · 1 unmeasured', { exact: true })
     .waitFor();
+  // Unused, the versions panel is one line; it opens for the first separate copy or repository.
+  const unused = page.locator('.project-updates-unused');
+  await unused.waitFor();
+  assert.equal(await unused.evaluate((node) => node.open), false);
+  await unused.getByText('Versions and repositories', { exact: true }).click();
   const panel = page.getByRole('region', { name: 'Project updates and checks', exact: true });
   await panel.getByText('No saved project version yet', { exact: true }).waitFor();
   await panel.getByRole('button', { name: 'Prepare update', exact: true }).click();

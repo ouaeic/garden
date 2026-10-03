@@ -289,12 +289,12 @@ export async function checkProjectConversations({
       await dialog.getByRole('combobox', { name: 'Approvals for this prompt' }).inputValue(),
       'autonomous'
     );
-    assert.equal(await dialog.getByRole('radio', { name: 'Shared project files' }).count(), 0);
+    // A new conversation works in the project folder unless a separate copy is asked for.
     await page.waitForResponse(
       (response) =>
         new URL(response.url()).pathname === '/v1/drafts' &&
         response.request().method() === 'PUT' &&
-        response.request().postDataJSON().controls?.conversation?.execution === 'independent'
+        response.request().postDataJSON().controls?.conversation?.execution === 'shared'
     );
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({ path: resolve(report, 'new-conversation-settings-phone.png') });
@@ -315,6 +315,7 @@ export async function checkProjectConversations({
     dialog = page.getByRole('dialog', { name: 'New conversation', exact: true });
     input = dialog.getByPlaceholder('Describe what you want to do…');
     assert.equal(await input.inputValue(), 'Review quality without changing the assembly.');
+    await dialog.getByRole('checkbox', { name: 'Work on a separate copy', exact: true }).check();
     await dialog.getByRole('button', { name: 'Start', exact: true }).click();
     await dialog.waitFor({ state: 'detached' });
     await page.getByRole('heading', { name: 'QC conversation', exact: true }).waitFor();

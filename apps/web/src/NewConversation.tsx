@@ -24,6 +24,8 @@ export default function NewConversation({
 }) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null),
     [error, setError] = useState<unknown>(null);
+  // In the project's own folder unless the owner wants a parallel attempt kept apart from it.
+  const [separate, setSeparate] = useState(false);
   const selectedSource =
     source ??
     (draft?.controls?.conversation?.projectId === project.id
@@ -56,9 +58,18 @@ export default function NewConversation({
             )}
           </p>
         )}
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={separate}
+            onChange={(event) => setSeparate(event.target.checked)}
+          />
+          Work on a separate copy
+        </label>
         <p className="muted">
-          Each conversation works in its own directory. Tested updates can be combined into a
-          published project version without interrupting other work.
+          {separate
+            ? 'For a parallel attempt: it starts from the project’s files and changes them only when its update passes its checks.'
+            : 'Works in the project folder, with the same files as its other conversations.'}
         </p>
         <ErrorNotice error={error} />
         {workspace ? (
@@ -67,7 +78,7 @@ export default function NewConversation({
               workspace={workspace}
               bootstrap={bootstrap}
               project={project}
-              execution="independent"
+              execution={separate ? 'independent' : 'shared'}
               {...(selectedSource ? { source: selectedSource } : {})}
               {...(draft ? { initialDraft: draft } : {})}
               onDraft={onDraft}

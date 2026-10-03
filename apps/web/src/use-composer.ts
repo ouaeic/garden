@@ -180,7 +180,7 @@ export function useComposer({
     !task && project
       ? {
           projectId: project.id,
-          execution: execution ?? 'independent',
+          execution: execution ?? 'shared',
           ...(source ? { source } : {})
         }
       : undefined;
@@ -460,7 +460,7 @@ export function useComposer({
       ...(!task && project
         ? {
             projectId: project.id,
-            execution: execution ?? 'independent',
+            execution: execution ?? 'shared',
             ...(source ? { source } : {})
           }
         : {})

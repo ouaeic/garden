@@ -225,7 +225,7 @@ export default function ProjectUpdates({
           ? Math.max(0, clock - Date.parse(data.observedAt))
           : 0)
     );
-  return (
+  const section = (
     <section className="project-updates" aria-label="Project updates and checks">
       <div className="project-section-heading">
         <div>
@@ -1050,5 +1050,21 @@ export default function ProjectUpdates({
         />
       )}
     </section>
+  );
+  // A project whose conversations all work in its folder has no versions to show; the controls
+  // stay one click away for the first separate copy or repository.
+  const unused =
+    data &&
+    !data.head &&
+    !data.updates.length &&
+    !data.revisions.length &&
+    !data.workingCopies?.length;
+  return unused ? (
+    <details className="project-updates-unused">
+      <summary>Versions and repositories</summary>
+      {section}
+    </details>
+  ) : (
+    section
   );
 }
