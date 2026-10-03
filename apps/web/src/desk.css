@@ -64,7 +64,6 @@ body:has(.desk-shell),
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 0;
-  box-shadow: var(--surface-shadow);
   overflow: hidden;
 }
 .desk-card-heading {
@@ -443,7 +442,6 @@ body:has(.desk-shell),
   border: 1px solid var(--line);
   border-radius: 0;
   background: var(--panel);
-  box-shadow: var(--surface-shadow);
   overflow: auto;
   overscroll-behavior: contain;
   display: flex;
@@ -728,7 +726,6 @@ body:has(.desk-shell),
   padding: 9px 13px;
   border-color: var(--line);
   border-radius: 0;
-  box-shadow: var(--surface-shadow);
 }
 .desk-shell .garden-task-composer .intent-editor > textarea {
   min-height: 36px;
@@ -1105,7 +1102,6 @@ html[data-workspace-short='true'] .desk-shell .management-heading p {
   overflow: hidden;
   border-color: var(--line-strong);
   background: var(--panel);
-  box-shadow: var(--surface-shadow);
 }
 .desk-shell .desk-sheet-projects[open] {
   width: min(600px, calc(100vw - 36px));

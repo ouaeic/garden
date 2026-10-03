@@ -94,7 +94,6 @@
   position: absolute;
   z-index: 44;
   gap: 4px;
-  box-shadow: var(--surface-shadow);
 }
 .note-popover {
   position: absolute;
@@ -105,7 +104,6 @@
   padding: 8px;
   border: 1px solid var(--text);
   background: var(--bg);
-  box-shadow: var(--surface-shadow);
   pointer-events: auto;
 }
 .note-popover textarea {

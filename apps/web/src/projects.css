@@ -105,7 +105,6 @@
   padding: 1.45rem;
   min-width: 0;
   background: var(--panel);
-  box-shadow: var(--surface-shadow);
 }
 .project-conversation-grid > button {
   display: flex;

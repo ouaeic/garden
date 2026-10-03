@@ -981,7 +981,6 @@ canvas {
   background: var(--panel);
   border: 1px solid var(--line-strong);
   border-radius: 0;
-  box-shadow: var(--surface-shadow);
   width: min(640px, calc(100vw - 40px));
   max-height: calc(100svh - 60px);
   padding: 0;

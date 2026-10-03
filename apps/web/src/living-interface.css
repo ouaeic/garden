@@ -24,7 +24,6 @@
   border: 1px solid var(--line-strong);
   border-radius: 0;
   background: var(--panel);
-  box-shadow: var(--surface-shadow);
 }
 .garden-health-panel p {
   margin: 5px 0 16px;
@@ -77,7 +76,6 @@
 }
 .garden-shell .garden-output-primary {
   border-radius: 0;
-  box-shadow: var(--surface-shadow);
 }
 .garden-shell .garden-task .run-summary {
   padding-top: 12px;

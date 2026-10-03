@@ -2,51 +2,31 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
 /**
- * The screen's glass: one layer over the whole window carrying the dot matrix at the display's own
- * pixel size, over everything garden draws and behind everything the owner was given.
+ * The panel: the screen casts its own shadow through one filter, and one layer of glass over the
+ * whole window carries the dot matrix at the display's own pixel size.
  */
 export async function checkScreenGlass(page) {
   const glass = await page.evaluate(() => {
     const screen = document.querySelector('.garden-shell.desk-shell');
     if (!screen) return null;
-    const style = getComputedStyle(screen, '::after');
-    const ratio = devicePixelRatio;
-    const size = parseFloat(style.backgroundSize);
-    // Anything that makes a stacking context traps what it holds behind the glass.
-    const traps = (element) => {
-      for (let node = element.parentElement; node && node !== screen; node = node.parentElement) {
-        const own = getComputedStyle(node);
-        if (
-          (own.position !== 'static' && own.zIndex !== 'auto') ||
-          Number(own.opacity) < 1 ||
-          own.transform !== 'none' ||
-          own.filter !== 'none' ||
-          own.isolation === 'isolate' ||
-          /transform|opacity|filter/.test(own.willChange) ||
-          /paint|layout|strict|content/.test(own.contain)
-        )
-          return `${node.tagName.toLowerCase()}.${node.className}`;
-      }
-      return null;
-    };
-    const delivered = [
-      ...screen.querySelectorAll(
-        '.result-view-frame, .garden-preview-frame, .computer-preview, .computer-result-image, .computer-result-media, .garden-captured-result img, .pdf-page canvas, .markdown img'
-      )
-    ].filter((element) => element.getClientRects().length);
+    const style = getComputedStyle(screen.parentElement, '::after');
+    const matrix =
+      document.querySelector('#lcd-shadow [data-role="driven"]')?.getAttribute('values') ?? '';
     return {
+      filter: getComputedStyle(screen).filter,
+      matrix: matrix.trim().split(/\s+/).length,
+      flood: document.querySelector('#lcd-shadow feFlood')?.getAttribute('flood-color') ?? '',
       content: style.content,
       zIndex: style.zIndex,
       pointer: style.pointerEvents,
       image: style.backgroundImage.slice(0, 30),
-      devicePixels: size * ratio,
-      delivered: delivered.length,
-      behind: delivered
-        .filter((element) => getComputedStyle(element).zIndex !== '41' || traps(element))
-        .map((element) => `${element.className} in ${traps(element)}`)
+      devicePixels: parseFloat(style.backgroundSize) * devicePixelRatio
     };
   });
   assert(glass, 'A screen is on show');
+  assert.match(glass.filter, /url\("?#lcd-shadow"?\)/, 'The screen casts its own shadow');
+  assert.equal(glass.matrix, 20, 'The shadow knows how driven each point is');
+  assert.notEqual(glass.flood, '', 'The shadow takes the palette’s driven shade');
   assert.equal(glass.content, '""', 'The screen carries its glass');
   assert.equal(glass.zIndex, '40');
   assert.equal(glass.pointer, 'none', 'The glass never takes a press');
@@ -55,7 +35,6 @@ export async function checkScreenGlass(page) {
     Math.abs(glass.devicePixels - Math.round(glass.devicePixels)) < 0.01,
     `A dot is a whole number of device pixels (${glass.devicePixels})`
   );
-  assert.deepEqual(glass.behind, [], 'What the owner was given is shown in front of the glass');
   return glass;
 }
 

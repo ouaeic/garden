@@ -47,7 +47,6 @@
   padding: 12px 16px;
   border: 1px solid var(--line);
   background: var(--bg);
-  box-shadow: var(--surface-shadow);
   color: var(--text);
   text-align: left;
 }

@@ -41,11 +41,9 @@
    */
   /* Lime where the reflector shows, deepening to dark green where the crystal is driven. */
   --s0: #a8bc1c;
-  --s1: #7c9a20;
+  --s1: #88a624;
   --s2: #24451e;
-  --s3: #0d2607;
-  /* The light shade under the driven field's shadow, which is how dark mode's ink is lit. */
-  --s0-shaded: #95aa19;
+  --s3: #183810;
   /* The matrix, drawn by lcd-glass.ts at the display's own pixel size. */
   --lcd-grid: none;
   --bg: var(--s0);
@@ -63,8 +61,6 @@
   --accent: var(--text);
   --danger: var(--text);
   --surface-glint: transparent;
-  /* A raised surface's outline casts its shadow outward and onto its own floor. */
-  --surface-shadow: var(--ink-drop), inset var(--ink-drop);
   --canvas-glow: transparent;
   --radius: 0;
   /* A one-pixel checkerboard of the tint over whatever lies beneath: the in-between tone. */
@@ -83,15 +79,6 @@
   --font-mono: 'Pixel Operator Mono', ui-monospace, monospace;
   /* What is read rather than glanced at: crisp at any size, still a machine's typeface. */
   --font-read: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  /*
-   * A driven pixel casts its shadow onto the reflector behind it, down and to the right. Kept
-   * nearly sharp, so a hairline stroke casts one as plainly as a heavy one does.
-   */
-  --shadow-ink: color-mix(in srgb, var(--s3) 50%, transparent);
-  /* Driven crystal blooms a little past its dot, so ink is soft-edged. */
-  --ink-bloom: color-mix(in srgb, currentColor 45%, transparent);
-  --ink-shadow: 0 0 0.6px var(--ink-bloom), 1px 1px 0.5px var(--shadow-ink);
-  --ink-drop: 1px 1px 0.5px var(--shadow-ink);
   font: 16px/1.5 var(--font-sans);
   font-synthesis: none;
   text-rendering: geometricPrecision;
@@ -106,7 +93,6 @@
   --s1: #9a9c8c;
   --s2: #46483e;
   --s3: #2a2b25;
-  --s0-shaded: #b2b4a6;
 }
 /* The lit screen of the backlit model, seen in a dark room. */
 :root[data-palette='backlight'] {
@@ -114,7 +100,6 @@
   --s1: #5fa89a;
   --s2: #1f4a45;
   --s3: #12302c;
-  --s0-shaded: #80bfb1;
 }
 :root[data-palette='amber'],
 [data-palette-swatch='amber'] {
@@ -122,21 +107,13 @@
   --s1: #b08245;
   --s2: #5b3b19;
   --s3: #281a0e;
-  --s0-shaded: #ce9a58;
 }
 :root[data-theme='dark'] {
-  /*
-   * The same panel, mostly driven. What is lit is the reflector seen through undriven dots, and
-   * the driven crystal around it shades it: its strokes are dimmed where that shadow falls, from
-   * the top and left, and stay fully lit along their lower right edge.
-   */
+  /* The same panel, mostly driven: lit where the reflector shows through undriven dots. */
   --bg: var(--s3);
   --tint: var(--s2);
   --muted: var(--s1);
-  --text: var(--s0-shaded);
-  --shadow-ink: color-mix(in srgb, var(--s0) 60%, transparent);
-  --ink-shadow: 1px 1px 0.6px var(--shadow-ink), 0 0 0.6px var(--ink-bloom);
-  --ink-drop: 1px 1px 0.6px var(--shadow-ink);
+  --text: var(--s0);
   color-scheme: dark;
 }
 /* Delivered images and frames get a neutral backing, not the screen's colour. */

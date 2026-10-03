@@ -1,87 +1,139 @@
 /*
- * The dot matrix, drawn as one tile at the display's own pixel size so every gap is exactly one
- * device pixel and nothing is resampled.
+ * The panel: its dot matrix, and the shadow its driven crystal casts on the reflector behind it.
  *
- * Measured from a photograph of a running DMG: dots are fat squares and the gaps between them are
- * hairlines, about a fifth of the pitch; and a dot is 0.29 mm seen from about 30 cm. At a desk,
- * the same apparent size is about two CSS pixels, so that is the pitch, with a one-device-pixel
- * gap: a quarter of the pitch on a laptop's display, a sixth on a phone's. A display with one
- * device pixel to a CSS pixel gets three-pixel dots, so its gap is still the narrower part.
+ * One physical model serves both themes. The panel has two colours that matter: the reflector,
+ * which is the palette's lightest shade, and fully driven crystal, its darkest. Light mode shows
+ * mostly reflector and dark mode mostly driven crystal; nothing below knows which.
  *
- * As on the panel, the matrix shows everywhere. An undriven dot is a shade darker than the
- * reflector between dots, so blank glass is finely gridded, and the gaps stay pale over ink. Dark
- * mode is the same panel mostly driven, so its whole field carries the pale lattice. Their
- * strength is set so they lighten ink by about the same amount at any density, which keeps text
- * contrast where the palettes put it.
+ * The matrix is one tile at the display's own pixel size, so every gap is exactly one device pixel
+ * and nothing is resampled. Measured from a photograph of a running DMG, dots are fat squares and
+ * the gaps between them are hairlines; and a dot is 0.29 mm seen from about 30 cm, which at a desk
+ * is about two CSS pixels. Between dots the reflector shows, slightly brighter than an undriven
+ * dot, so blank glass is faintly gridded and driven areas carry a pale lattice.
+ *
+ * The shadow is the screen's own darkness, moved down and to the right, softened, and multiplied
+ * back over the screen. Wherever something driven sits beside something that is not, the shadow
+ * falls on the undriven side: around ink on light glass, and inside lit strokes and pictures on a
+ * dark field. Everything on the screen casts it the same way - text, lines, icons, sprites - so no
+ * element needs a rule of its own. It is one SVG filter, which the compositor runs.
  */
 
-/** Lightening of ink averaged over a dot, whatever the density. */
-const GAP_WEIGHT = 0.17;
+/** Lightening of driven crystal averaged over a dot, whatever the density. */
+const GAP_WEIGHT = 0.06;
 /** How much darker an undriven dot is than the reflector around it. */
-const DOT_ALPHA = 0.04;
+const DOT_ALPHA = 0.025;
 /** How much brighter the reflector shows between dots than through them. */
-const REFLECTOR = 0.07;
+const REFLECTOR = 0.04;
 /** The pitch, in CSS pixels. */
 const PITCH = 2;
+/**
+ * How far the shadow falls, and how soft it is, in CSS pixels: half a dot down and right, and
+ * softened by about a quarter of one, as in a photograph of the panel.
+ */
+const SHADOW_FALL = 1;
+const SHADOW_SOFTNESS = 0.5;
+/** How dark the shadow of fully driven crystal is on the reflector. */
+const SHADOW_DEPTH = 0.5;
 
-const channels = (colour: string): [number, number, number] => {
+type Rgb = [number, number, number];
+
+const channels = (colour: string): Rgb => {
   const probe = document.createElement('canvas').getContext('2d')!;
   probe.fillStyle = colour;
   const hex = probe.fillStyle;
-  if (hex.startsWith('#'))
-    return [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16)) as [number, number, number];
+  if (hex.startsWith('#')) return [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16)) as Rgb;
   const [r = 0, g = 0, b = 0] = hex.match(/[\d.]+/g)?.map(Number) ?? [];
   return [r, g, b];
 };
+const luma = ([r, g, b]: Rgb) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 
-/** The tile for a display, as a data URL and its size in CSS pixels. */
+/** The matrix tile for a display, as a data URL and its size in CSS pixels. */
 export function glassTile(
   ratio: number,
-  background: string,
-  ink: string,
-  lit = true
+  reflector: string,
+  driven: string
 ): { url: string; size: number } {
   // Never a dot narrower than three device pixels, so a gap is never more than a third of it.
   const pitch = Math.max(3, Math.round(PITCH * ratio));
   const share = (2 * pitch - 1) / pitch ** 2;
-  // A mostly driven screen shows its gaps across the whole field, so they are drawn finer there.
-  const strength = Math.min(0.7, (GAP_WEIGHT * (lit ? 1 : 0.42)) / share);
-  const undriven = lit ? DOT_ALPHA : 0;
+  const strength = Math.min(0.5, GAP_WEIGHT / share);
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = pitch;
   const context = canvas.getContext('2d')!;
   const image = context.createImageData(pitch, pitch);
-  // Between dots the reflector shows: brighter than the undriven field, and the very colour of
-  // lit ink when the screen is mostly driven.
-  const gap = (lit ? channels(background) : channels(ink)).map((value) =>
-    lit ? Math.round(value + (255 - value) * REFLECTOR) : value
-  ) as [number, number, number];
-  const dot = channels(ink);
+  const gap = channels(reflector).map((value) =>
+    Math.round(value + (255 - value) * REFLECTOR)
+  ) as Rgb;
+  const dot = channels(driven);
   for (let y = 0; y < pitch; y++)
     for (let x = 0; x < pitch; x++) {
       const at = (y * pitch + x) * 4;
-      const covered = x === 0 || y === 0 ? 1 : 0;
-      const [r, g, b] = covered ? gap : dot;
+      const between = x === 0 || y === 0;
+      const [r, g, b] = between ? gap : dot;
       image.data[at] = r;
       image.data[at + 1] = g;
       image.data[at + 2] = b;
-      image.data[at + 3] = Math.round(255 * (covered ? covered * strength : undriven));
+      image.data[at + 3] = Math.round(255 * (between ? strength : DOT_ALPHA));
     }
   context.putImageData(image, 0, 0);
   return { url: canvas.toDataURL('image/png'), size: pitch / ratio };
 }
 
-/** Paints the matrix for the current display and colours; call again when either changes. */
+const SVG = 'http://www.w3.org/2000/svg';
+/** The shadow filter, made once and retuned whenever the palette changes. */
+function shadowFilter(): SVGFilterElement {
+  const existing = document.getElementById('lcd-shadow');
+  if (existing instanceof SVGFilterElement) return existing;
+  const svg = document.createElementNS(SVG, 'svg');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('width', '0');
+  svg.setAttribute('height', '0');
+  svg.style.position = 'absolute';
+  // The shadow is the screen's driven parts moved and softened, landing only where the reflector
+  // shows: crystal that is itself driven sits above its own shadow.
+  svg.innerHTML = `<filter id="lcd-shadow" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+<feColorMatrix in="SourceGraphic" type="matrix" data-role="driven" result="driven"/>
+<feColorMatrix in="SourceGraphic" type="matrix" data-role="lit" result="lit"/>
+<feOffset in="driven" dx="${SHADOW_FALL}" dy="${SHADOW_FALL}"/>
+<feGaussianBlur stdDeviation="${SHADOW_SOFTNESS}"/>
+<feComposite in2="lit" operator="arithmetic" k1="1" result="landing"/>
+<feFlood flood-opacity="${SHADOW_DEPTH}"/>
+<feComposite in2="landing" operator="in" result="shadow"/>
+<feBlend in="shadow" in2="SourceGraphic" mode="multiply"/>
+</filter>`;
+  document.body.append(svg);
+  return svg.querySelector('filter')!;
+}
+
+/**
+ * How driven each point of the screen is, from its brightness - none at the reflector's, fully at
+ * driven crystal's - as the alpha of an otherwise empty image; or, inverted, how lit it is.
+ */
+const drivenMatrix = (reflector: Rgb, driven: Rgb, inverted = false): string => {
+  const light = luma(reflector);
+  const dark = luma(driven);
+  const span = Math.max(0.05, light - dark);
+  const sign = inverted ? 1 : -1;
+  const weight = [0.2126, 0.7152, 0.0722].map((w) => ((sign * w) / span).toFixed(4));
+  const offset = inverted ? -dark / span : light / span;
+  return `0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  ${weight.join(' ')} 0 ${offset.toFixed(4)}`;
+};
+
+/** Paints the matrix and tunes the shadow for the current display and palette. */
 export function paintGlass(): void {
   const root = document.documentElement;
   const style = getComputedStyle(root);
-  const { url, size } = glassTile(
-    window.devicePixelRatio || 1,
-    style.getPropertyValue('--bg').trim(),
-    style.getPropertyValue('--text').trim(),
-    root.dataset.theme !== 'dark'
-  );
+  const reflector = style.getPropertyValue('--s0').trim();
+  const driven = style.getPropertyValue('--s3').trim();
+  const { url, size } = glassTile(window.devicePixelRatio || 1, reflector, driven);
   root.style.setProperty('--lcd-grid', `url(${url}) 0 0 / ${size}px ${size}px`);
+  const filter = shadowFilter();
+  const [light, dark] = [channels(reflector), channels(driven)];
+  filter.querySelector('[data-role="driven"]')!.setAttribute('values', drivenMatrix(light, dark));
+  filter
+    .querySelector('[data-role="lit"]')!
+    .setAttribute('values', drivenMatrix(light, dark, true));
+  filter.querySelector('feFlood')!.setAttribute('flood-color', driven);
 }
 
 /**

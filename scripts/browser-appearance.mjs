@@ -273,25 +273,16 @@ export async function checkAppearance({ context, origin, bootstrap, project, tas
             contrast: contrast(root.color, root.backgroundColor),
             secondaryContrast: contrast(muted, root.backgroundColor),
             overlayContent: getComputedStyle(document.body, '::after').content,
-            texture: getComputedStyle(document.querySelector('.garden-shell'), '::after')
-              .backgroundImage
+            texture: getComputedStyle(
+              document.querySelector('.garden-shell').parentElement,
+              '::after'
+            ).backgroundImage
           };
         })
       );
     }
     assert.equal(palette[0].foreground, palette[1].background, 'Modes reverse LCD ink and glass');
-    // Dark ink is the glass seen through undriven dots, a little shaded by the driven field.
-    const channels = (colour) =>
-      colour
-        .match(/[\d.]+/g)
-        .slice(0, 3)
-        .map((value) => Number(value) * (colour.startsWith('color(') ? 255 : 1));
-    const glass = channels(palette[0].background);
-    const lit = channels(palette[1].foreground);
-    assert(
-      lit.every((value, index) => value <= glass[index] && value >= glass[index] * 0.8),
-      `Dark ink is the shaded glass (${palette[1].foreground} from ${palette[0].background})`
-    );
+    assert.equal(palette[0].background, palette[1].foreground, 'Modes reverse LCD glass and ink');
     for (const colors of palette) {
       assert(colors.contrast >= 4.5, 'Body text must meet normal-text contrast');
       assert(colors.secondaryContrast >= 4.5, 'Secondary text must meet normal-text contrast');

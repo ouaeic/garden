@@ -1,31 +1,16 @@
 /*
  * The whole window is one reflective LCD. Loaded after every other stylesheet.
  *
- * The screen follows the panel it imitates. Driven pixels cast a soft shadow down and to the right
- * onto the reflector behind them. Between dots the reflector shows through, so the dot matrix is
- * pale hairlines: faint on blank glass and plain on ink. The lens shades the panel's top and left.
- * The matrix and the shading are one static layer over the screen, drawn once at the display's
- * own pixel size (see `lcd-glass.ts`), so scrolling costs a blend and no repaint.
+ * Two layers make the panel, both set up by `lcd-glass.ts`. The screen is filtered once: its own
+ * darkness, moved down and right and softened, is multiplied back over it, which is the shadow
+ * driven crystal casts on the reflector - around ink on light glass, inside lit strokes and
+ * pictures on a dark field, from everything alike. Over that lies the glass: the dot matrix at
+ * the display's own pixel size, and the lens's shading. Neither layer knows about any element.
  */
-
-/* Ink, and its shadow on the reflector. */
-body {
-  text-shadow: var(--ink-shadow);
-}
-/* Browsers clear the shadow on their own controls; on the screen a control's ink is ink. */
-:where(button, input, select, textarea) {
-  text-shadow: inherit;
-}
-:is(img, canvas, iframe, video, svg) {
-  text-shadow: none;
-}
-.pixel-icon,
-.life-sprite,
-.status-sprite {
-  filter: drop-shadow(var(--ink-drop));
-}
-:where(.button, input:not([type='checkbox'], [type='radio'], [type='range']), textarea, select) {
-  box-shadow: var(--ink-drop);
+.garden-shell.desk-shell,
+.dialog[open] {
+  background-color: var(--bg);
+  filter: url(#lcd-shadow);
 }
 /* Liquid crystal is slow to settle; a change of state fades rather than snapping. */
 :where(button, .button, a, summary) {
@@ -121,8 +106,8 @@ body {
   left: calc(50% + 10px);
 }
 
-/* The glass over the screen, and over each sheet raised on it. */
-.garden-shell.desk-shell::after,
+/* The glass over the screen, and over each sheet raised above it. */
+#root:has(> .desk-shell)::after,
 .dialog[open]::after {
   content: '';
   position: fixed;
@@ -131,27 +116,17 @@ body {
   pointer-events: none;
   background:
     var(--lcd-grid),
-    /* The lens shades the top of the panel most, and light pools towards the bottom. */
-    linear-gradient(
-        to bottom,
-        color-mix(in srgb, black 12%, transparent),
-        transparent 7%,
-        transparent 72%,
-        color-mix(in srgb, #fff3c0 5%, transparent)
-      ),
+    /* Light pools towards the bottom of the panel, away from the lens's upper edge. */
+    linear-gradient(to bottom, transparent 72%, color-mix(in srgb, #fff3c0 5%, transparent)),
     radial-gradient(
       ellipse 120% 100% at 50% 45%,
       transparent 62%,
       color-mix(in srgb, black 9%, transparent)
     );
   image-rendering: pixelated;
-  box-shadow:
-    inset 0 8px 10px -6px color-mix(in srgb, black 34%, transparent),
-    inset 6px 0 8px -6px color-mix(in srgb, black 24%, transparent);
 }
 .dialog[open]::after {
   position: absolute;
-  box-shadow: none;
 }
 /* A sheet keeps its glass still by scrolling its body rather than itself. */
 .dialog[open] {
@@ -164,29 +139,12 @@ body {
   min-height: 0;
   overflow: auto;
 }
-/*
- * What the owner was given rather than what garden draws - an app, a page, a photograph, a
- * document - is shown as it is, in front of the glass.
- */
-:is(
-  .result-view-frame,
-  .garden-preview-frame,
-  .computer-preview,
-  .computer-result-image,
-  .computer-result-media,
-  .garden-captured-result img,
-  .pdf-page canvas,
-  .markdown img
-) {
-  position: relative;
-  z-index: 41;
-}
-
 @media (prefers-contrast: more), (forced-colors: active), print {
-  body {
-    text-shadow: none;
+  .garden-shell.desk-shell,
+  .dialog[open] {
+    filter: none;
   }
-  .garden-shell.desk-shell::after,
+  #root:has(> .desk-shell)::after,
   .dialog[open]::after {
     display: none;
   }
