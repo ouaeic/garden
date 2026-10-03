@@ -6,8 +6,8 @@
  *
  * ── What stops a cloned repository's build recipe, and what does not ───────────────────────────
  *
- * Stated here plainly because it used to be answered by an approval card, and a stated limit is
- * worth more than a card that asks about one of two doors.
+ * Stated here plainly rather than asked on an approval card, because a stated limit is worth more
+ * than a card that asks about one of two doors.
  *
  * Nine of these fifteen commands are the project's own build or test recipe, so what executes is a
  * file whoever wrote the repository chose: `cargo check` compiles and runs `build.rs` and the
@@ -19,9 +19,9 @@
  * launches the provider plugins under `.terraform`. The other six - TypeScript, Python, Julia,
  * Ruby, PHP, Dart - name a fixed parser or type-checker over files the repository supplies as data.
  *
- * WHAT STOPS IT: nothing in the approval floor, and that is deliberate. A card was tried here and
- * removed. `shell` runs the identical nine commands with no card in balanced or autonomous, so the
- * card asked about a shape the model reaches unasked one line over; `npm install` makes every
+ * WHAT STOPS IT: nothing in the approval floor, and that is deliberate. `shell` runs the identical
+ * nine commands with no card in balanced or autonomous, so a card would ask about a shape the model
+ * reaches unasked one line over; `npm install` makes every
  * project's dependency tree foreign and the build then runs it, so a rule honest enough to call
  * `node_modules` a stranger's would card every build there is. Running someone else's code is the
  * job here, not the exception.
@@ -29,7 +29,7 @@
  * WHAT DOES STOP IT: two bounds and one limit, none of them a question.
  *   1. The turn takes an undo point first. `code_diagnostics` is subtracted from
  *      `CHECKPOINT_EXEMPT_TOOLS` (`turn-bounds.ts`) by name, in every language, so the writes
- *      measured below are rewindable. This is the repair the card was standing in for.
+ *      measured below are rewindable. This is the repair a card would only stand in for.
  *   2. It runs under a bounded timeout - `clampNumber(timeoutSeconds, 10..1800, 300)` in the
  *      dispatch arm - and under `cwd: path`, whose default is `workspace`. Say what that confinement
  *      is and is not, because the difference decides whether bound 1 reaches: the runner's
@@ -39,42 +39,37 @@
  *      naming `.garden/browser` would not be, since the roots pick that up only when
  *      `CHECKPOINT_INCLUDE_BROWSER_PROFILE` is on and it ships off - though on a box that reports
  *      Landlock the command cannot write there at all. Where the command writes once it has
- *      started is a separate question and no longer an unanswered one; it is rung 3.
- *   3. And the limit, which is now a boundary with a hole in it rather than no boundary at all.
+ *      started is a separate question; it is rung 3.
+ *   3. And the limit, which is a boundary with a hole in it.
  *      The sandbox is an identity boundary AND, where the kernel can apply one, a filesystem one.
  *      `scripts/garden-sandbox run ... confine $ROOT` is `setpriv --reuid --regid --clear-groups
  *      --no-new-privs` plus a Landlock ruleset: read and execute over the system hierarchies
  *      (/usr /bin /lib /lib64 /sbin /opt /etc /var /srv /run /proc /sys), write over
  *      `$ROOT/workspace`, `$ROOT/.home`, /tmp, /var/tmp and /dev/shm, and a device list over /dev.
  *      /home is granted nowhere, which is the whole boundary: every workspace on the box is mode
- *      2770 with the agent account's group, so a build recipe run for this task could previously
+ *      2770 with the agent account's group, so without it a build recipe run for this task could
  *      read and rewrite every other task's tree, and `$ROOT/.garden` - the checkpoints, the
- *      browser profile, the artifacts - sat one level above the only directory it needed.
+ *      browser profile, the artifacts - sits one level above the only directory it needs.
  *      Traversal is not restricted by Landlock, so the command still reaches its own
  *      `$ROOT/workspace` through a `$ROOT` it may not read, list, write or rename.
  *
  *      IT IS REPORTED RATHER THAN ASSUMED, and `filesystem=none` is a real answer on a real box.
  *      `garden-sandbox check` applies the shipped read rules to `/bin/sh -c :` and prints
- *      `filesystem=landlock` or `filesystem=none`. The probe program is a shell and not
- *      `/bin/true`, which is what this sentence said for one wave after the helper had stopped
- *      doing it: POSIX pins a shell at `/bin/sh` and pins nothing at `/bin/true`, so on a host
- *      carrying it only at `/usr/bin/true` the probe answered about its own missing binary rather
- *      than about the kernel. Re-read the helper before restating this line rather than carrying
- *      it across. The installer writes `CONFINE_AGENT_FILESYSTEM`
- *      from that line, and `sandboxedInvocation` asks the helper for `open` when it is off, so a
- *      kernel or a util-linux without Landlock runs these commands with the identity boundary
- *      only - the state this paragraph used to describe as the only one there is. A box with no
- *      helper configured at all has neither boundary. Read what the box answered before relying on
- *      either.
+ *      `filesystem=landlock` or `filesystem=none`. The probe program is a shell and not `/bin/true`
+ *      because POSIX pins a shell at `/bin/sh` and pins nothing at `/bin/true`: on a host carrying
+ *      it only at `/usr/bin/true` the probe would answer about its own missing binary rather than
+ *      about the kernel. The installer writes `CONFINE_AGENT_FILESYSTEM` from that line, and
+ *      `sandboxedInvocation` asks the helper for `open` when it is off, so a kernel or a util-linux
+ *      without Landlock runs these commands with the identity boundary only. A box with no helper
+ *      configured at all has neither boundary. Read what the box answered before relying on either.
  *
- *      WHAT BOUND 1 STILL CANNOT REWIND IS UNCHANGED. `execution.ts` sets `HOME` to `$ROOT/.home`
- *      at the container root, and the ruleset grants it write precisely because pip, cargo, npm and
- *      the coding CLIs have to write there. `CHECKPOINT_CONTENT` is `['workspace',
- *      '.garden/artifacts']`, so a recipe that writes `$HOME/.cargo` or `$HOME/.gradle` writes
- *      where a rewind will not reach it, and that is chosen rather than overlooked: a home inside
- *      the checkpoint would be walked and hashed every turn against `CHECKPOINT_MAX_FILES` of
- *      250,000, and a Rust toolchain alone is 88,021 files - crossing it throws and the turn loses
- *      the undo point that bound 1 is.
+ *      WHAT BOUND 1 CANNOT REWIND. `execution.ts` sets `HOME` to `$ROOT/.home` at the container
+ *      root, and the ruleset grants it write precisely because pip, cargo, npm and the coding CLIs
+ *      have to write there. `CHECKPOINT_CONTENT` is `['workspace', '.garden/artifacts']`, so a
+ *      recipe that writes `$HOME/.cargo` or `$HOME/.gradle` writes where a rewind will not reach
+ *      it, and that is chosen rather than overlooked: a home inside the checkpoint would be walked
+ *      and hashed every turn against `CHECKPOINT_MAX_FILES` of 250,000, and a Rust toolchain alone
+ *      is 88,021 files - crossing it throws and the turn loses the undo point that bound 1 is.
  *
  *      Two things the ruleset deliberately does not cover. The owner's own interactive terminal
  *      goes through the helper's `shell` mode, which has no confine word and never will: that is
@@ -87,7 +82,7 @@
  * a crate with a writing `build.rs` left 50 new paths and on a crate with NO `build.rs` at all
  * still left 16; and two of the six "parse only" languages write too - `python3 -I -m compileall`
  * leaves `__pycache__`, `tsc --noEmit` under `incremental` leaves a `.tsbuildinfo`. The nine/six
- * split is a fact about whose program runs. It was never the write/no-write split, and no bound
+ * split is a fact about whose program runs. It is not the write/no-write split, and no bound
  * should be keyed to it.
  *
  * ── Why this is its own module ────────────────────────────────────────────────────────────────
@@ -308,9 +303,8 @@ const missingProjectFile = (language: string, names: ReadonlySet<string>): strin
  * Two different absences and two different sentences, because they are two different answers and
  * collapsing them would have been the same evasion as the help text. Nothing recognisable at all
  * is "no marker"; a marker whose command has no project to read is named by the file it wanted.
- * Neither is a question: an unrunnable command is not a decision for the owner to take, and the
- * card this tool used to raise was removed for reasons `docs/design/floor/DIAGNOSTICS.md` records
- * in full.
+ * Neither is a question: an unrunnable command is not a decision for the owner to take, and
+ * `docs/design/floor/DIAGNOSTICS.md` records in full why this tool raises no card.
  */
 export const diagnosticsSelection = (
   language: string,

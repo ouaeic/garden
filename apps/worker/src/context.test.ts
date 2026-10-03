@@ -187,18 +187,16 @@ describe('agent context preparation', () => {
     const prepared = prepareModelContext(messages, 32_000, 4_000);
     expect(prepared.compacted).toBe(true);
     /*
-     * The summary is at the TAIL, and this assertion is the whole review point of that move.
+     * The summary is at the TAIL, not inside the leading run of system messages.
      *
-     * It used to be asserted at index 1, which is inside the leading run of system messages - and
-     * the anchor breakpoint is placed at the end of that run, so every step that crossed the soft
-     * threshold rewrote the bytes the largest cached block in the prompt is anchored to. The eval
-     * row `long-a-full-window-condenses-rather-than-stubbing-itself` reads 44% of each request
-     * repeating the last with the summary at the head.
+     * The anchor breakpoint is placed at the end of that run, so a summary there would make every
+     * step that crossed the soft threshold rewrite the bytes the largest cached block in the prompt
+     * is anchored to.
      *
-     * What is given up by moving it: the model reads the stubs before it reads the account of what
-     * they replaced, where before it read the account first. The stub text now says where to look.
-     * What is kept, and is the reason this is a fair trade rather than a preference, is asserted
-     * below - the preamble and the owner's goal are untouched, and the summary is complete.
+     * What is given up at the tail: the model reads the stubs before it reads the account of what
+     * they replaced, so the stub text says where to look. What is kept, and is the reason this is a
+     * fair trade rather than a preference, is asserted below - the preamble and the owner's goal
+     * are untouched, and the summary is complete.
      */
     const summary = lastTrajectoryMessage(prepared.messages);
     expect(summary?.role).toBe('system');
@@ -272,13 +270,14 @@ describe('agent context preparation', () => {
 
   it('never paraphrases an owner correction away, at either deterministic threshold', () => {
     /*
-     * The steering channel, held at the two tiers that used to erase it.
+     * The steering channel, held at both deterministic tiers.
      *
-     * `planCompaction` has always refused to summarise what the owner said. The two passes in
-     * `prepareModelContext` did the opposite: both filtered on `role !== 'system' && index !==
-     * firstUser`, so every correction after the opening goal became `[Earlier user content
-     * represented in the compressed trajectory...]` - at 0.9x and 1.0x of budget, which is exactly
-     * where compaction had already failed to save the window and the corrections matter most.
+     * `planCompaction` refuses to summarise what the owner said, and the two passes in
+     * `prepareModelContext` must hold to the same rule: filtering on `role !== 'system' &&
+     * index !== firstUser` would turn every correction after the opening goal into `[Earlier user
+     * content represented in the compressed trajectory...]` - at 0.9x and 1.0x of budget, which is
+     * exactly where compaction has already failed to save the window and the corrections matter
+     * most.
      *
      * Driven past 1.0x deliberately, so BOTH passes run: a case that only crosses the soft
      * threshold would be green over a hard pass that still erased them.
@@ -1144,8 +1143,8 @@ describe('compaction and prompt caching', () => {
     const window = trajectory(24, 6_000);
     // Uncompacted, this window is past the soft threshold, so preparing it rewrites message bodies
     // and appends a summary - a cache miss on every single step, from wherever the rewriting
-    // starts. The summary itself is at the tail rather than ahead of the goal: it used to go in at
-    // index 2, which put a block rebuilt on every step inside the run the anchor breakpoint closes.
+    // starts. The summary itself is at the tail rather than ahead of the goal: ahead of it, a block
+    // rebuilt on every step would sit inside the run the anchor breakpoint closes.
     const uncompacted = prepareModelContext(window, 32_000, 4_000);
     expect(lastTrajectoryMessage(uncompacted.messages)?.content).toContain(
       COMPRESSED_TRAJECTORY_MARKER
@@ -1486,8 +1485,8 @@ describe('the operating contract in the window', () => {
   });
 
   it('collapses copies a stale marker already accumulated', () => {
-    // Each resumed turn used to unshift another copy at index 0, which moved the bytes of the
-    // entire cached prefix behind it, every turn, for the life of the task.
+    // A saved window can carry several copies at index 0, and every extra copy moves the bytes of
+    // the entire cached prefix behind it, for the life of the task.
     const messages: ModelMessage[] = [
       { role: 'system', content: BASE_SYSTEM_PROMPT },
       { role: 'system', content: BASE_SYSTEM_PROMPT },
@@ -1675,14 +1674,13 @@ describe('the contract as a function of the box it is on', () => {
     ])
       expect(BASE_SYSTEM_PROMPT).toContain(fact);
     /*
-     * The bind address, pinned in BOTH directions, because this assertion held the wrong value for
-     * as long as it existed and passed the whole time.
+     * The bind address, pinned in BOTH directions, because asserting only the presence of a string
+     * lets the test agree with a prompt that is wrong.
      *
-     * The contract used to say an app "binds to 0.0.0.0", and this row asserted that string - so the
-     * test agreed with the prompt and both were wrong. `publish_preview` proxies to 127.0.0.1 and
-     * nothing else (services/workspace-runner/src/preview.ts), and 0.0.0.0 is every interface this
-     * box has, which on a self-hosted install includes a public one. A turn took that instruction
-     * and served a workspace directory to the internet after the owner had declined to publish it.
+     * `publish_preview` proxies to 127.0.0.1 and nothing else (services/workspace-runner/src/
+     * preview.ts), and 0.0.0.0 is every interface this box has, which on a self-hosted install
+     * includes a public one. A turn told to bind to 0.0.0.0 serves a workspace directory to the
+     * internet even after the owner has declined to publish it.
      */
     expect(BASE_SYSTEM_PROMPT).not.toContain('0.0.0.0');
     // The contract sent every document proof to a bare `libreoffice --headless --convert-to pdf`,
@@ -1693,15 +1691,14 @@ describe('the contract as a function of the box it is on', () => {
 
   it('carries no method a frontier model would have done unprompted', () => {
     /*
-     * The substitution and discovery tests, as assertions. Every phrase here was resident on every
-     * request until this wave, and every one of them is either what the model does without being
-     * told or one call away from being discovered - and eight of them summarised a skill that is
-     * already opened on demand.
+     * The substitution and discovery tests, as assertions. Every phrase here is either what the
+     * model does without being told or one call away from being discovered - and eight of them
+     * summarise a skill that is already opened on demand.
      *
-     * The desktop paragraph is the clearest case and it went whole: "prefer accessibility-node
-     * actions", "observe again after anything material" and "a web page is not a desktop
-     * application" are all in `desktop_observe` and `desktop_action`'s own descriptions, so the
-     * model was billed for them twice on every request and read them once.
+     * The desktop phrases are the clearest case: "prefer accessibility-node actions", "observe
+     * again after anything material" and "a web page is not a desktop application" are all in
+     * `desktop_observe` and `desktop_action`'s own descriptions, so carrying them here would bill
+     * the model for them twice on every request.
      */
     for (const method of [
       'Begin with repo_overview',
@@ -1719,7 +1716,7 @@ describe('the contract as a function of the box it is on', () => {
       'State the assumptions you made'
     ])
       expect(BASE_SYSTEM_PROMPT).not.toContain(method);
-    // And the heading they lived under, so a later wave cannot quietly refill it.
+    // And the heading such method would live under, so nothing can quietly refill it.
     expect(BASE_SYSTEM_PROMPT).not.toContain('## Doing the work well');
   });
 
@@ -1845,7 +1842,7 @@ describe('how much tool output survives the window', () => {
     const half = olderToolOutputChars(budget * 0.8, budget);
     expect(half).toBeLessThan(24_000);
     expect(half).toBeGreaterThan(4_000);
-    // The end of the CURVE, which is no longer the same number as the hard floor: the terminal pass
+    // The end of the CURVE, which is not the same number as the hard floor: the terminal pass
     // at the end of prepareModelContext still cuts to 2,000 when the prepared window will not fit,
     // and that pass is the safety property. This is a policy about how much older evidence to keep
     // while there is still room, and 2,000 characters of a 24,000-character result is a stub.
@@ -1948,10 +1945,10 @@ describe('a result that is a list of parts rather than one document', () => {
     );
 
   it('brings back every part asked for instead of the first part whole and the rest missing', () => {
-    // Measured on the allowance parallel_web_read used to send: twelve pages at 20,000 characters
-    // is 214,670 characters against a 24,000-character result cut from the middle, and what came
-    // back was page zero and an unattributed fragment - the other eleven URLs were not even named,
-    // so the model could not tell it had lost them, let alone ask for them again.
+    // Twelve pages at 20,000 characters is 214,670 characters against a 24,000-character result cut
+    // from the middle, and what survives is page zero and an unattributed fragment - the other
+    // eleven URLs are not even named, so the model cannot tell it has lost them, let alone ask for
+    // them again.
     const whole = serializeToolResultForModel(read(12, 20_000));
     expect(surviving(whole, 12, 'START')).toEqual([0]);
 
@@ -2022,15 +2019,15 @@ describe('what the summariser is told and what the brief carries', () => {
 });
 
 /**
- * The one pointer that makes an over-long result recoverable, and the two places it used to go.
+ * The one pointer that makes an over-long result recoverable, and the two passes that can drop it.
  *
  * `output-spill.ts` writes the whole of a result past the recent bound to a file named by the
  * sha256 OF THAT RESULT, and names the file inside the tool message. That name cannot be
  * recomputed once the result has left the window, and no tool lists the directory - so the marker
- * is the only route to the file, and every pass that cuts or drops the message it lives in was
- * quietly taking the file with it. Two such passes, measured on the shipped functions at a
- * 131,072-token window: the older-output floor took it at step 37, on its first descent from
- * 24,000 to 18,000; compaction took it at every span above 36 messages, and real spans are 47-343.
+ * is the only route to the file, and a pass that cuts or drops the message it lives in without
+ * carrying the pointer quietly takes the file with it. Two such passes, at a 131,072-token window:
+ * the older-output floor reaches it at step 37, on its first descent from 24,000 to 18,000;
+ * compaction reaches it at every span above 36 messages, and real spans are 47-343.
  */
 describe('the pointer to a parked result, through the passes that used to drop it', () => {
   const spilled = (
@@ -2106,9 +2103,9 @@ describe('the pointer to a parked result, through the passes that used to drop i
       window.push(...noise(8, 100 + step * 8, 1_200));
     }
     // The descent really happened and moved more than once, or the assertions above were made
-    // against a message nothing had cut. This is the pass that used to take the pointer first:
-    // driven from an empty window at 131,072 tokens it went on the floor's first move, from
-    // 24,000 to 18,000 at step 37, thirty steps before compaction would have fired at all.
+    // against a message nothing had cut. This is the pass that reaches the pointer first: driven
+    // from an empty window at 131,072 tokens the floor first moves, from 24,000 to 18,000, at step
+    // 37, thirty steps before compaction would fire at all.
     expect(Math.min(...floors)).toBeLessThan(RECENT_TOOL_OUTPUT_CHARS);
     expect(new Set(floors).size).toBeGreaterThan(1);
   });
@@ -2157,7 +2154,7 @@ describe('the pointer to a parked result, through the passes that used to drop i
   });
 
   /**
-   * The three deterministic tiers below the floor, each of which used to take the pointer.
+   * The three deterministic tiers below the floor, each of which can take the pointer.
    *
    * They are reached in a fixed order and only when compaction was unavailable or could not free
    * enough room - which is to say on the steps where the parked file is most likely to be the only
@@ -2380,9 +2377,8 @@ describe('the pointer to a parked result, through the passes that used to drop i
 
 describe('what a truncated tool result tells the model', () => {
   it('names a recovery the model can actually perform', () => {
-    // The marker used to end "full content remains in the encrypted task event or workspace file".
-    // True, and useless: there is no tool that reads a task event, so the only recovery it named
-    // was one the model could not perform, and the omitted span was unrecoverable in practice.
+    // There is no tool that reads a task event, so a marker that points there names a recovery the
+    // model cannot perform and leaves the omitted span unrecoverable in practice.
     const prepared = prepareModelContext(
       [
         { role: 'system', content: 'contract' },
@@ -2403,7 +2399,7 @@ describe('what a truncated tool result tells the model', () => {
     expect(cut).toContain('characters omitted from earlier tool output');
     // What it says to do instead, all of which the tools actually support.
     expect(cut).toContain('run the tool again for just the part you need');
-    // And no longer points at somewhere the model cannot look.
+    // And it does not point at somewhere the model cannot look.
     expect(cut).not.toContain('encrypted task event');
   });
 });
@@ -3364,20 +3360,20 @@ describe('sixty steps of one task, measured on the bytes that leave the machine'
      *
      * The reason is threaded above: the trigger is measured against the size AFTER the older-result
      * floor has squeezed the window, so on tool-heavy work the floor holds the prepared size under
-     * the trigger indefinitely. Two of the three things that could be done about that were tried,
-     * and what they measured is recorded here rather than argued about again:
+     * the trigger indefinitely. Two of the three things that could be done about that, and what
+     * they measure:
      *
      * - Ending the squeeze's curve higher does raise the prepared size into the trigger - at 6,000
      *   characters this window peaks at 66,434 and condenses once on its own account. It also
      *   pushes the window into the HARD pass, which replaces whole messages rather than the middles
      *   of results, and `evals/context-quality` scores that at 1.00 on the artifact probe against
-     *   5.00 at 4,000, with 43,003 characters of rework where there had been none. So the curve
-     *   ends at 4,000 and this case still reads zero.
+     *   5.00 at 4,000, with 43,003 characters of rework. So the curve ends at 4,000 and this case
+     *   still reads zero.
      * - Separating the deterministic soft pass from the trigger DOES reach it, on a window whose
      *   results are large enough to cross the soft threshold. It is invisible here because this
      *   fixture never crosses that threshold at all; it is visible on
-     *   `long-a-full-window-condenses-rather-than-stubbing-itself`, which condensed once on the
-     *   budget and now condenses twice, having previously shredded itself three times instead.
+     *   `long-a-full-window-condenses-rather-than-stubbing-itself`, which condenses twice on the
+     *   budget rather than shredding itself.
      *
      * What is left is the third, and it is not this file's to change: the trigger reads the
      * prepared size while the compaction target is measured against the untrimmed window, so the
@@ -3394,7 +3390,7 @@ describe('sixty steps of one task, measured on the bytes that leave the machine'
 
   it('bills fewer full-price bytes per step than the head it replaced, in bytes rather than in a share', async () => {
     /*
-     * NUMBER FIVE, and the one that had to be added before this wave's cut could be judged at all.
+     * NUMBER FIVE, and the one without which a cut to the head cannot be judged at all.
      *
      * `prefixShare` and `cacheReadShare` are ratios over the whole request, and the operating
      * contract is a constant that sits inside BOTH halves of every one of them. Adding cached
@@ -3402,16 +3398,16 @@ describe('sixty steps of one task, measured on the bytes that leave the machine'
      * smaller reports a WORSE cache-read share while costing the owner strictly less - and a
      * reviewer reading the share alone concludes the opposite of the truth.
      *
-     * Measured on this tree by padding the head back to its old size and sweeping, one tree, one
-     * driver, nothing else changed. Mean full-price bytes per step, 60 steps:
+     * Measured on this tree by padding the head and sweeping, one tree, one driver, nothing else
+     * changed. Mean full-price bytes per step, 60 steps:
      *
      *   head bytes     131k window        1M window
-     *   8,274 (now)      57,133            57,293
+     *   8,274            57,133            57,293
      *   8,774            59,015            57,293
      *   9,274            59,015            56,699
      *  10,274            59,015            56,699
      *  11,274            59,214            56,706
-     *  12,353 (was)      58,706            56,706
+     *  12,353            58,706            56,706
      *  13,274            58,706            56,706
      *  14,274            58,655            56,706
      *
@@ -3419,15 +3415,15 @@ describe('sixty steps of one task, measured on the bytes that leave the machine'
      * with one 594-byte tread. That is the checkpoint grid quantising: the breakpoints are laid on
      * a stride and the divergence point is not, so which side of a stride the divergence lands on
      * moves the deepest readable mark by a whole message. It is worth about 600 bytes a step in
-     * either direction and it swamps the systematic effect of a four-kilobyte head cut on the
-     * cache accounting - while the four kilobytes themselves come off every request regardless.
+     * either direction and it swamps the systematic effect of a four-kilobyte change to the head on
+     * the cache accounting - while the four kilobytes themselves land on every request regardless.
      *
      * So this case asserts what is left once the grid noise is accounted for: full-price bytes per
      * step, in bytes, under a ceiling set above the whole sweep above. It deliberately does NOT
      * try to catch a four-kilobyte contract refill - the sweep proves it could not, because the
      * grid moves this number further than the refill does. The size of the resident contract is
      * bounded where it can be bounded exactly, in `the contract as a function of the box it is
-     * on`; what this catches is the window starting to rewrite something it used to leave alone,
+     * on`; what this catches is the window starting to rewrite something it should leave alone,
      * which is the failure the share metrics report as a fraction of a point and nothing else.
      */
     const FULL_PRICE_CEILING = 60_000;
@@ -3753,16 +3749,15 @@ describe('the bound on what the owner has accumulated', () => {
   });
 
   /**
-   * The bound, from both ends, at the counts that used to escape it, and with the assertion proved
-   * capable of failing before it is believed.
+   * The bound, from both ends, at counts where cutting alone escapes it, and with the assertion
+   * proved capable of failing before it is believed.
    *
-   * TWO ASSERTIONS THIS REPLACES, both of which passed while permitting the escape. The first was
-   * `carried <= max(maximum, candidates * 240)` over shapes that ALL landed on the second term, so
-   * it allowed sixty times the budget. The second named that term as an equality and asserted it -
-   * which is honest about the arithmetic and still asserts that the class is unbounded, because
-   * `candidates * 240` is linear in a count nothing bounds. Both passed. Neither could fail.
+   * A predicate with a second term passes while permitting the escape: `carried <= max(maximum,
+   * candidates * 240)` over shapes that all land on the second term allows sixty times the budget,
+   * and asserting that term as an equality still asserts that the class is unbounded, because
+   * `candidates * 240` is linear in a count nothing bounds. Neither can fail.
    *
-   * So the predicate is one line now - resident <= maximum, no second term - and the case below
+   * So the predicate is one line - resident <= maximum, no second term - and the case below
    * SHOWS it failing on the shape it is supposed to catch before showing it holding on the shape
    * the file produces. A predicate never seen red is not evidence.
    */
@@ -3838,8 +3833,8 @@ describe('the bound on what the owner has accumulated', () => {
   });
 
   /**
-   * The floor is not lowered to pay for any of this, and the clamp that used to be the escape is
-   * unreachable from the production path rather than merely unlikely.
+   * The floor is not lowered to pay for any of this, and the clamp, where the bound would escape,
+   * is unreachable from the production path rather than merely unlikely.
    */
   it('never reaches the clamp that used to be the escape', () => {
     for (const [count, size] of [
@@ -4002,10 +3997,10 @@ describe('the bound on what the owner has accumulated', () => {
    * The marker's number is about what the owner wrote, so the same message is never cut twice.
    *
    * `truncateMiddle` counts what it removed from the string in front of it. Applied to a string it
-   * has already cut, that number is true of the string and false about the message: driven through
-   * `compactContext` with a shrinking tail, a 120,000-character owner message came back claiming
-   * 23,940 characters were omitted while 112,117 were actually gone. A model reads that number and
-   * decides whether to ask.
+   * has already cut, that number is true of the string and false about the message: a
+   * 120,000-character owner message cut twice under a shrinking tail can claim 23,940 characters
+   * were omitted while 112,117 are actually gone. A model reads that number and decides whether to
+   * ask.
    */
   it('never cuts the same owner message twice, so the marker keeps telling the truth', async () => {
     const original = typed(120_000, 'ratchet');
@@ -4056,10 +4051,8 @@ describe('the bound on what the owner has accumulated', () => {
      * cut to. Two things this bound may do and one it may not: it may leave the message alone, and
      * it may give the message up and say so - but it may NOT cut it a second time, because
      * `truncateMiddle` counts what IT removed and the number would then be true of the string in
-     * front of it and false about what the owner wrote. Driven with a shrinking tail before that
-     * rule existed, this message came back claiming 23,940 characters were omitted with 112,117
-     * actually gone, and a model reads that number and decides not to ask. So the claim never
-     * changes, whatever else happens to the message.
+     * front of it and false about what the owner wrote - an understatement a model reads and
+     * decides not to ask about. So the claim never changes, whatever else happens to the message.
      */
     for (const smaller of [budget - 156, Math.floor(budget / 2), OWNER_WINDOW_FLOOR_CHARS, 1]) {
       const squeezed = boundOwnerWindow(outcome.messages, smaller);
@@ -4170,8 +4163,7 @@ describe('the bound on what the owner has accumulated', () => {
    * This is the same move the brief gets in `compactionHeadTokens` and it is here for a sharper
    * reason. A message this bound has already cut sits at EXACTLY the cap it was cut to and cannot
    * be cut again, so a budget that shrinks by the width of one line is a message that no longer
-   * fits. Measured before the reservation: the budget moved 73,576 -> 73,424 -> 73,420 over 600
-   * driven steps and 117 messages of about 10,500 characters each were given up to it.
+   * fits.
    */
   it('does not move the budget when the record appears or grows', () => {
     const messages = accumulated(4, 400);
@@ -4288,11 +4280,11 @@ describe('the bound on what the owner has accumulated', () => {
    * The whole task, driven, at the lengths that break it - and the bound checked on every
    * compaction rather than once at the end.
    *
-   * Sixty steps is where this used to stop, and sixty steps is inside the region where nothing has
-   * gone wrong yet: the first refusal on this shape lands at step 70. Driven to six thousand with
-   * the same owner text, `planCompaction` returned null on 3,953 of 5,937 attempts and the
-   * deterministic soft pass stood in for it on 5,715 of the 6,000 steps, which is the mechanism
-   * being replaced by its own floor for 95% of a task.
+   * Sixty steps alone is inside the region where nothing has gone wrong yet: the first refusal on
+   * this shape lands at step 70. Driven to thousands of steps with the same owner text, an
+   * unbounded owner class leaves `planCompaction` returning null on most attempts and the
+   * deterministic soft pass standing in for it on nearly every step, which is the mechanism
+   * replaced by its own floor for almost all of a task.
    */
   const driveTask = async (
     steps: number
@@ -4383,10 +4375,10 @@ describe('the bound on what the owner has accumulated', () => {
     it(`keeps compaction working for ${steps} steps of a task, not one step of it`, async () => {
       const run = await driveTask(steps);
       expect(run.attempts).toBeGreaterThan(0);
-      // Not one refusal, where six thousand steps used to refuse 3,953 of 5,937.
+      // Not one refusal, at any length.
       expect(run.refusals).toBe(0);
       // Nothing had to be replaced by a stub: the deterministic passes are the floor, not the
-      // mechanism, and on this shape they used to be doing all the work.
+      // mechanism, and on this shape without the bound they would be doing all the work.
       expect(run.softPassSteps).toBe(0);
       // And the class was inside its budget at every one of those compactions.
       expect(run.overBudget).toBe(0);
@@ -4665,7 +4657,7 @@ describe('the owner block', () => {
   });
 
   /**
-   * The same sentences, ranked instead of resident - which is what the tier beside it did.
+   * The same sentences, ranked instead of resident.
    *
    * `recallMemories` is the production ranker and these are the production options, taken from
    * `window.ts`. A matching workspace row scores about 16.6 (`overlap 5 * 2.5 + coverage .833 * 4 +
@@ -4680,10 +4672,10 @@ describe('the owner block', () => {
    * three assertions below are those two boundaries and the total, so a scoring change that moved
    * either end fails here rather than reading differently.
    *
-   * This is the measurement the block exists because of, and it is also the measurement the tier's
-   * reserve was built from: `window.ts` no longer puts the two tiers in one pool, so the sixteen
-   * rows survive there now, and `window.test.ts` holds that. What is asserted here is the RANKER,
-   * unchanged, so that anyone who proposes ranking this block again reads the number first.
+   * This is why the block is resident rather than ranked, and why the tier has its own reserve:
+   * `window.ts` does not put the two tiers in one pool, so the sixteen rows survive there, and
+   * `window.test.ts` holds that. What is asserted here is the RANKER, so that anyone who proposes
+   * ranking this block reads the number first.
    */
   it('would be evicted if it were ranked, which is why it is not', () => {
     const goal = 'fix the flaky importer retry in the ingest pipeline';

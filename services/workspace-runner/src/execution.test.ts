@@ -428,8 +428,8 @@ describe('agent sandbox', () => {
     expect(result.exitCode).toBe(0);
     // `.home` at the container root: beside `workspace/` rather than inside it, so a toolchain's
     // caches are not walked by the checkpoint, and named in the Landlock write grant of its own
-    // accord. It used to be the container root itself. server.test.ts is where the location is
-    // pinned; this asserts only that the command is given the home the runner made.
+    // accord. server.test.ts is where the location is pinned; this asserts only that the command
+    // is given the home the runner made.
     expect(result.stdout).toBe(agentHome(root));
     const elevated = await readFile(record, 'utf8');
     expect(elevated).toContain(`-n ${helper} run network open -`);
@@ -1034,9 +1034,9 @@ describe('cancellation', () => {
 
 describe('a service declared without a background', () => {
   /*
-   * `shell(service: 'dev server')` without `background: true` used to run in the foreground for
-   * five minutes and return an ordinary exec result. The key was not in the schema, so it was
-   * stripped: no error, no service, no record, and a model that believed it had declared one.
+   * `shell(service: 'dev server')` without `background: true` is refused. Run as an ordinary
+   * command it would sit in the foreground for five minutes and return an exec result: no error,
+   * no service, no record, and a model that believed it had declared one.
    */
   it('is refused rather than run as an ordinary command', async () => {
     const root = await workspaceRoot();
@@ -1051,21 +1051,20 @@ describe('a service declared without a background', () => {
 });
 
 /**
- * The wall clock, which was the bound that stopped the work this computer is for.
+ * The wall clock, which is the bound most able to stop the work this computer is for.
  *
  * Two ceilings rather than one, because the two paths cost different things: a foreground command
  * holds the turn and an HTTP request in the worker open for its whole run, and a background one
- * holds neither. The hour they used to share was a property of the first written onto the second.
+ * holds neither. One shared ceiling would be a property of the first written onto the second.
  */
 describe('the foreground time ceiling', () => {
   it('says which bound stopped the command, on the command’s own stderr', async () => {
     /*
-     * It said nothing. A run killed at its deadline came back as `timedOut: true` beside an empty
-     * stderr and a null exit code, which names neither the bound nor its size nor the fact that a
-     * longer run has somewhere else to go - so a model reading it cannot tell a deadline from a
-     * crash, and the cheapest wrong move is to start the whole six hours again. The disk floor and
-     * the owner's cancel have always said their piece here; this is the same sentence for the stop
-     * that had none.
+     * A run killed at its deadline says so. `timedOut: true` beside an empty stderr and a null
+     * exit code names neither the bound nor its size nor the fact that a longer run has somewhere
+     * else to go - so a model reading it cannot tell a deadline from a crash, and the cheapest
+     * wrong move is to start the whole six hours again. The disk floor and the owner's cancel say
+     * their piece here; this is the same sentence for the deadline.
      */
     const root = await workspaceRoot();
     const result = await execute(

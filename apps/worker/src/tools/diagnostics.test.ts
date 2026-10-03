@@ -28,21 +28,20 @@ describe('what a diagnostic actually runs', () => {
   });
 
   /**
-   * The bound that replaced the approval card, asserted where the fifteen commands are written
-   * down, because that is the only place a sixteenth will be added.
+   * The bound on this tool, asserted where the fifteen commands are written down, because that is
+   * the only place a sixteenth will be added.
    *
-   * This tool used to be exempt from the turn's undo point, on the reading that a tool safe to
-   * replay is a tool that changed nothing. Measured on this machine, every command in the table
-   * below can write: `make -s` wrote its target's file; `cargo check` left 50 new paths on a crate
-   * with a writing `build.rs` and still left 16 - `Cargo.lock` and `target/` - on a crate with no
-   * `build.rs` at all; `python3 -I -m compileall` leaves `__pycache__`; `tsc --noEmit` under
-   * `incremental` leaves a `.tsbuildinfo`. Two of those four are languages the removed card called
-   * safe, which is why the bound is the tool and not a list of languages.
+   * A tool safe to replay is not a tool that changed nothing. Measured on this machine, every
+   * command in the table below can write: `make -s` wrote its target's file; `cargo check` left 50
+   * new paths on a crate with a writing `build.rs` and still left 16 - `Cargo.lock` and `target/` -
+   * on a crate with no `build.rs` at all; `python3 -I -m compileall` leaves `__pycache__`;
+   * `tsc --noEmit` under `incremental` leaves a `.tsbuildinfo`. Two of those four are languages
+   * that only parse, which is why the bound is the tool and not a list of languages.
    *
-   * Both halves are asserted. Still repeatable - a second `make -s` tells the owner nothing new,
-   * which is what keeps this tool batchable and replayable - and no longer exempt, so a turn of
-   * nothing but diagnostics has something to rewind to. A language added to the catalogue inherits
-   * the bound with no further decision, which is the point of keying it to the tool.
+   * Both halves are asserted. Repeatable - a second `make -s` tells the owner nothing new, which is
+   * what keeps this tool batchable and replayable - and not exempt from the undo point, so a turn
+   * of nothing but diagnostics has something to rewind to. A language added to the catalogue
+   * inherits the bound with no further decision, which is the point of keying it to the tool.
    */
   it('takes the turn’s undo point, in every language, because every one of them can write', () => {
     const offered = catalogueLanguages();
@@ -53,8 +52,8 @@ describe('what a diagnostic actually runs', () => {
 
   /**
    * The nine whose command is the project's own build or test recipe, each named by the command
-   * rather than by a label. Nothing keys a card to this list any more - `shell` runs the identical
-   * nine for free, so the card was a toll on the phrasing - but the commands themselves are the
+   * rather than by a label. Nothing keys a card to this list - `shell` runs the identical nine for
+   * free, so a card would be a toll on the phrasing - but the commands themselves are the
    * product's promise about what a diagnostic does, and a silent change to one of them would change
    * what runs on a stranger's tree.
    */
@@ -146,15 +145,15 @@ describe('what a diagnostic actually runs', () => {
 });
 
 /**
- * A command that fails for want of a project file is not a diagnostic, and the tool used to return
+ * A command that fails for want of a project file is not a diagnostic, and the tool must not return
  * one as though it were.
  *
  * Measured on this machine, 2026-09-01. `pnpm exec tsc --noEmit --pretty false` at this
  * repository's own root - a `package.json`, no `tsconfig.json`, which is the shape the ladder
  * recognises as TypeScript and the shape the default `path` of `workspace` names - **exits 1 with
  * 4,994 bytes on stdout and 0 on stderr**, and the 4,994 bytes are the compiler's usage page:
- * "COMMON COMMANDS", the option list, `tsc --init`. It reached the model as `passed: false` with
- * output, which is what a wall of type errors looks like.
+ * "COMMON COMMANDS", the option list, `tsc --init`. Passed through, it would reach the model as
+ * `passed: false` with output, which is what a wall of type errors looks like.
  *
  * The same shape, driven the same way in a `mktemp -d` holding only the marker named:
  *

@@ -125,8 +125,8 @@ export const enforceStepBounds = async (
    * The step is over; did anything happen in it.
    *
    * The one inversion of the silence hold, which holds a turn that did the work and never said
-   * anything. This is a turn that says everything and does nothing, and until now the loop had
-   * no bound on it that a proposal could not reset. Asked here rather than at the top of the
+   * anything. This is a turn that says everything and does nothing, and this is the loop's
+   * bound on it that a proposal cannot reset. Asked here rather than at the top of the
    * next step so the sentence lands in the same window the step it describes was billed for.
    */
   const idle = idleStepsAfter(state.idleSteps ?? 0, {

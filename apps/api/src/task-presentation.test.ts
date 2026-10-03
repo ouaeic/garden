@@ -632,12 +632,12 @@ describe('failed tool calls are counted, not only listed', () => {
 });
 
 /**
- * The list a follow-up used to delete.
+ * A follow-up must not delete the list.
  *
  * A direction opens a new plan, and `phases` shows only the plan of the direction being worked - so
- * between the owner sending a follow-up and the model writing its next plan, the panel showed
- * nothing at all, and everything the project had already done went off the screen with it. It was
- * never lost from the record, only from the view. These keep it in the view.
+ * between the owner sending a follow-up and the model writing its next plan, the panel would show
+ * nothing at all, and everything the project had already done would go off the screen with it.
+ * It stays in the record either way; these keep it in the view.
  */
 describe('the trajectory a project keeps across its directions', () => {
   const plan = (
@@ -656,7 +656,7 @@ describe('the trajectory a project keeps across its directions', () => {
         ]
       })
     );
-    // Nothing is being worked to yet, which is exactly the moment the list used to vanish.
+    // Nothing is being worked to yet, which is exactly the moment the list could vanish.
     expect(built.progress.phases).toEqual([]);
     expect(built.progress.history).toHaveLength(1);
     expect(built.progress.history[0]?.phases.map((phase) => phase.title)).toEqual(['Draw the map']);

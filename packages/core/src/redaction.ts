@@ -4,10 +4,9 @@
  * surfaces carry identifiers and codes only, and this catches the cases where a value turns out to
  * have been something else.
  *
- * What it catches matters more than it used to. Security events are written on every taint
- * transition and every refused destination, and those records carry addresses the agent chose while
- * reading somebody else's page - so this net is now on the path of exactly the values an attacker
- * is trying to move.
+ * What it catches matters. Security events are written on every taint transition and every refused
+ * destination, and those records carry addresses the agent chose while reading somebody else's
+ * page - so this net is on the path of exactly the values an attacker is trying to move.
  */
 const SENSITIVE_KEYS = new Set([
   'authorization',
@@ -29,10 +28,10 @@ const SENSITIVE_KEYS = new Set([
 /**
  * Credential shapes, each one a prefix a person can recognise in the output.
  *
- * `Bearer` used to sit in the same alternation as the prefixes, followed by a character class with
- * no space in it - so `Authorization: Bearer eyJhbGci…`, the way the header is actually written,
- * matched nothing at all and the branch only ever fired on the malformed no-space form. Schemes are
- * separated out here for that reason: what follows them is a delimiter, not more of the same token.
+ * Schemes are separated out from the prefixes. In the same alternation, followed by a character
+ * class with no space in it, `Bearer` would match nothing in `Authorization: Bearer eyJhbGci…`, the
+ * way the header is actually written, and fire only on the malformed no-space form. What follows a
+ * scheme is a delimiter, not more of the same token.
  */
 const SECRET_PATTERNS: RegExp[] = [
   // First, so that `Bearer sk-live-…` collapses to one marker rather than to `Bearer [REDACTED]`.

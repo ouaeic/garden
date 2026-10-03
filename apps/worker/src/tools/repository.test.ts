@@ -86,8 +86,8 @@ describe('what a code search answers with', () => {
   });
 
   it('collapses a wide result to one row per file with its match count', async () => {
-    // Thirty files, six matches each: 180 lines of source, which is what the model used to be sent
-    // and read to learn thirty paths.
+    // Thirty files, six matches each: 180 lines of source, which the model would otherwise read to
+    // learn thirty paths.
     const result = await search({ query: 'handler' }, spread(30, 6));
 
     expect(result.summarised).toBe(true);

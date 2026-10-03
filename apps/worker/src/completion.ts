@@ -302,16 +302,17 @@ export const evidenceFloor = (
   state: Pick<AgentState, 'turnToolResults'>
 ): { order: string[]; lastMutation: number; floor: number; observedItsOwnChange: boolean } => {
   const order = Object.keys(state.turnToolResults ?? {});
-  // Writing the running brief is bookkeeping, not the work being proved. An agent that finished,
-  // cited what it had observed and then recorded the outcome in workspace/GARDEN.md had made a new
-  // last change, so its own record-keeping invalidated evidence it had already gathered - and the
-  // way out was to read the brief back, which proves only that a file it just wrote says what it
-  // wrote. It stays `mutating` everywhere else; it is only not the change the evidence is about.
+  // Writing the running brief is bookkeeping, not the work being proved. Counted, an agent that
+  // cited what it had observed and then recorded the outcome in workspace/GARDEN.md would have made
+  // a new last change, so its own record-keeping would invalidate evidence it had already gathered,
+  // and the way out would be to read the brief back, which proves only that a file it just wrote
+  // says what it wrote. It stays `mutating` everywhere else; it is only not the change the evidence
+  // is about.
   //
   // `skipped` is read here rather than `success`, because this reduce is the one consumer that asks
   // about `mutating` without asking whether the call ran: a `file_write` the harness answered
-  // without running is still classified as a write by its arguments, and it used to move the floor
-  // past evidence the turn had honestly gathered.
+  // without running is still classified as a write by its arguments, and counted it would move the
+  // floor past evidence the turn had honestly gathered.
   const lastMutation = order.reduce(
     (found, id, index) =>
       state.turnToolResults?.[id]?.mutating &&
@@ -418,8 +419,8 @@ export const harnessVerificationStatus = (
  * ran and saw pass, with the command beside the label.
  *
  * `verification.evidence` is the field a script reads first - the headless outcome copies it whole
- * - and until this it held only the model's own claims, so an owner reading "54 data rows (30
- * months x 3 products)" there had no way to tell which half the computer tested. The line is the
+ * - and holding only the model's own claims, it would leave an owner reading "54 data rows (30
+ * months x 3 products)" there no way to tell which half the computer tested. The line is the
  * same one the completion's `acceptance` list carries, under a source the model cannot write, and
  * only for a pass: a failure is already a remaining risk, and a check that did not run proved
  * nothing. Artifact checks carry no command and are left to that list.
@@ -495,7 +496,7 @@ const SPAN_DASHES = /[\u2010-\u2015\u2212]/g;
  * - **Nothing is stemmed, reordered or truncated.** This is a substring test on the whole span.
  *
  * So the failure it can still produce is a specialist that paraphrased rather than copied, which is
- * a report the lead should be told about, and the failure it can no longer produce is a specialist
+ * a report the lead should be told about, and the failure it cannot produce is a specialist
  * that copied exactly and had its typography straightened on the way.
  */
 export const normalisedSpan = (value: string): string =>

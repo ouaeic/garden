@@ -122,7 +122,7 @@ const ORIGIN_PHRASES: readonly string[] = [
  * token is dropped and the phrase is kept, because the phrase is still true: a specialist did read
  * a web page, and the taint has to be raised whatever the rest of the string turned out to be.
  *
- * Two callers now, and the second is why this is no longer named for the first. A specialist's
+ * Two callers, which is why this is not named for either of them. A specialist's
  * report hands back the origins its own reads produced; a reach into stored evidence hands back
  * the origin the turn it is replaying recorded at the time. Both are strings this file did not
  * write as literals, both have to be checked against the closed list before being quoted in the
@@ -215,31 +215,30 @@ export const takeoverNotice = (wall: BotWall): string =>
  * Marks what came from outside as having come from outside.
  *
  * Doing it here rather than trusting each result to be wrapped means the label is a property of
- * crossing the boundary, not of one function having remembered to add it - which is what the
- * comment on the old mail-only version claimed and the code did not do. The envelope stays small:
- * an origin and a trust word. The sixty-word notice mail used to carry is paid on every read and
- * earns nothing the always-on contract does not already say once.
+ * crossing the boundary, not of one function having remembered to add it. The envelope stays
+ * small: an origin and a trust word. A longer notice would be paid on every read and earn nothing
+ * the always-on contract does not already say once.
  *
  * The word itself comes from `connectorContentOrigins` in `@garden/core`, which is a total map
  * over `AnyConnectorKind` - a kind cannot be added without that file failing to compile until
- * somebody has said what reading through it means. This file used to keep a second copy as a chain
- * of ternaries, so the guarantee held over a table nothing on this path read.
+ * somebody has said what reading through it means. A second copy here would let the guarantee hold
+ * over a table nothing on this path read.
  *
- * Mail carries `origin` as well as its `provenance`, and that is a repair rather than a tidy-up:
- * `untrustedFromOutside` sets no `origin`, so `untrustedOriginOfResult` fell through to the
- * provenance string and the owner was told a read came from `external_mailbox` while every other
- * connector was named in the plain words of the table.
+ * Mail carries `origin` as well as its `provenance`: `untrustedFromOutside` sets no `origin`, so
+ * without it `untrustedOriginOfResult` would fall through to the provenance string and tell the
+ * owner a read came from `external_mailbox` while every other connector is named in the plain
+ * words of the table.
  *
  * A result that arrives already wearing `trust:'untrusted'` is re-labelled rather than let through.
- * It used to be returned untouched, which was right about the *mail* case that motivated it - the
- * mail connector wraps its own reads with `untrustedFromOutside`, four call sites in
- * `mail-connectors.ts`, so passing through is what keeps a message from being wrapped twice - and
- * wrong about every other kind, because the field it was trusting is a field the far end writes. An
- * MCP server answering `{trust:'untrusted', origin:'<a sentence>'}` had that sentence carried
- * verbatim into the once-per-turn notice and onto the owner's timeline, in the harness's own voice,
- * by a check that existed to be careful. Unwrapping and re-wrapping is idempotent on the mail
- * shape - the same object comes back out - and total on every other: whatever the far end claimed
- * about itself ends up under `content`, where the rest of this file reads it as what it is.
+ * Passing it through untouched would be right about the *mail* case - the mail connector wraps its
+ * own reads with `untrustedFromOutside`, four call sites in `mail-connectors.ts`, so passing
+ * through would keep a message from being wrapped twice - and wrong about every other kind, because
+ * the field it would be trusting is a field the far end writes. An MCP server answering
+ * `{trust:'untrusted', origin:'<a sentence>'}` would have that sentence carried verbatim into the
+ * once-per-turn notice and onto the owner's timeline, in the harness's own voice. Unwrapping and
+ * re-wrapping is idempotent on the mail shape - the same object comes back out - and total on every
+ * other: whatever the far end claimed about itself ends up under `content`, where the rest of this
+ * file reads it as what it is.
  */
 export const labelledConnectorResult = (
   kind: AnyConnectorKind,
@@ -317,20 +316,20 @@ const unboundedOriginOfResult = (call: ModelToolCall, result: unknown): string |
     const named = textValue(record.origin);
     if (CONNECTOR_ORIGINS.has(named)) return named;
     /*
-     * `harnessOrigin` rather than `originDetail`, which accepted a bare token and nothing else.
+     * `harnessOrigin` rather than `originDetail`, which accepts a bare token and nothing else.
      *
      * Every phrase this build writes carries a space - `web page a.test`, `a downloaded file` -
-     * so a result labelled with one was falling through to `connected service` and the owner's
-     * timeline named the wrong thing. It did not matter while the only producers of this shape
-     * were connectors, whose kinds are single tokens covered by the line above; it matters now
-     * that a reach into stored evidence hands back the origin the original read recorded, which
-     * is exactly one of those phrases. Strictly wider than what it replaces: `harnessOrigin`
-     * falls through to `originDetail` for anything the closed list does not recognise.
+     * so under `originDetail` a result labelled with one would fall through to `connected
+     * service` and the owner's timeline would name the wrong thing. Connector kinds are single
+     * tokens covered by the line above, but a reach into stored evidence hands back the origin
+     * the original read recorded, which is exactly one of those phrases. Strictly wider than
+     * `originDetail`: `harnessOrigin` falls through to it for anything the closed list does not
+     * recognise.
      *
      * What the widening costs, said rather than left to be discovered. This branch also reads
-     * `origin` off a connector or MCP result, which the far end writes - so a remote server can now
-     * get the timeline to say `web page a.test` where it used to say `connected service`. That is
-     * the same permission the delegate arm below has always given a specialist's report, bounded by
+     * `origin` off a connector or MCP result, which the far end writes - so a remote server can
+     * get the timeline to say `web page a.test` rather than `connected service`. That is the same
+     * permission the delegate arm below gives a specialist's report, bounded by
      * the same closed list and the same token shape: the phrase is one of this file's own, and
      * anything after it must be a comma-separated list of tokens or the phrase alone is kept. A
      * label chosen outside this build still cannot become a second sentence, which is the property
@@ -469,13 +468,12 @@ export const originsFromResult = (call: ModelToolCall, result: unknown): string[
 /**
  * The same two questions asked of web content that arrived without a tool result behind it.
  *
- * This was written for the arrangement where the provider ran the search inside the agent's own
- * request: nothing came back through `#execute`, so `untrustedOriginOfResult` never saw it, and a
- * route change would have taken the whole taint model off the web - the model holding
+ * When the provider runs a search inside the agent's own request, nothing comes back through
+ * `#execute`, so `untrustedOriginOfResult` never sees it, and without this the model would hold
  * attacker-written pages while the floor still reported the turn as clean.
  *
- * The agent's requests no longer carry provider-side tools, so on the ordinary path there is now a
- * tool result and the classifier does see it. This stays because the hole it closes is not really
+ * The agent's requests carry no provider-side tools, so on the ordinary path there is a tool
+ * result and the classifier does see it. This stays because the hole it closes is not really
  * about which tools were sent: any response that arrives with pages attached to it is a response the
  * model has already read, and a provider that starts grounding answers on its own initiative would
  * otherwise put the web into a turn that nothing labelled. It is cheap, and it is the difference
@@ -507,8 +505,8 @@ export const UNTRUSTED_NOTICE_MARKER = 'UNTRUSTED CONTENT IS NOW IN THIS TURN';
 /**
  * What the model is told the first time untrusted content enters a turn.
  *
- * The guidance for handling hostile content used to live only in a skill the model had to choose to
- * open - after reading the hostile page. This arrives at the moment it becomes true, costs nothing
+ * Guidance for handling hostile content that lived only in a skill would be opened by choice -
+ * after reading the hostile page. This arrives at the moment it becomes true, costs nothing
  * on the tasks that never read anything external, and carries only what the model cannot work out
  * from the tool schema.
  */

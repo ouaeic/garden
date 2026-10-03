@@ -132,9 +132,9 @@ export const buildServer = async (
   await seedModelCatalog(base);
   let embeddedWorkerRunning = false;
   /**
-   * Shutdown used to set the loop's flag and immediately close the database, so a turn that was
-   * mid-write - appending an event, settling usage, saving agent state - lost its connection under
-   * it and the task was left leased and half-recorded. Closing now waits for the turn to land.
+   * Closing waits for the turn to land. Setting the loop's flag and immediately closing the
+   * database would pull the connection from under a turn that was mid-write - appending an event,
+   * settling usage, saving agent state - and leave the task leased and half-recorded.
    *
    * `stopEmbeddedWorker` is the other half: without it the loop would sit out its whole poll
    * interval before noticing the flag, and every restart would pay that on an idle box.

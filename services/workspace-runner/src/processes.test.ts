@@ -46,10 +46,10 @@ const TEST_TIMEOUT_MS = 20_000;
  * to reach the assertion is the pipe actually closing, and the only way to fail is a hang, which
  * the timeout reports as one.
  *
- * This test used to run against the shipped 1s bound with a fixture that slept 200ms, which made
- * it a race between the machine's fork latency and a production constant rather than a statement
- * about the manager. It lost that race under a full parallel run, and reported it as an empty log
- * rather than as the timing accident it was.
+ * Against the shipped 1s bound with a fixture that slept 200ms, this test would be a race between
+ * the machine's fork latency and a production constant rather than a statement about the manager,
+ * and losing that race under a full parallel run reads as an empty log rather than as the timing
+ * accident it is.
  */
 const UNREACHABLE_FLUSH_GRACE_MS = TEST_TIMEOUT_MS * 10;
 
@@ -983,12 +983,11 @@ describe('watching a long background job', () => {
     'answers a poll with something that has moved since the last one',
     async () => {
       /*
-       * Every other field a poll returns is fixed for the life of the session, so polling a job
-       * that is quietly working - an alignment, a build, anything writing to a file rather than to
-       * a terminal - used to return a byte-identical answer every time. The turn guard reads
-       * repeated identical results as a model going in circles: measured against the production
-       * expression, pushback at the fourth poll and the turn stopped at the eighth. The agent was
-       * stopped for supervising a long job correctly, which is the one thing this primitive is for.
+       * Every other field a poll returns is fixed for the life of the session, so without one that
+       * moves, polling a job that is quietly working - an alignment, a build, anything writing to a
+       * file rather than to a terminal - would return a byte-identical answer every time. The turn
+       * guard reads repeated identical results as a model going in circles, and would stop the
+       * agent for supervising a long job correctly, which is the one thing this primitive is for.
        */
       const root = await managerRoot();
       const manager = new ProcessManager();

@@ -13,13 +13,12 @@ import type { SupportedContext } from '../http/server-context.js';
 export const createApprovalSweep = (context: SupportedContext) => {
   const { log, database, store, masterKey } = context;
   /**
-   * `cleanupExpired` marks a lapsed approval 'expired' and stops there, which is where the task
-   * used to be abandoned: nothing re-leases `awaiting_user`, so it waited forever, held its credit
-   * reservation against the monthly allowance, and lost the approval card that was the only way to
-   * answer it. Releasing the reservation comes first - a crash in between then leaves the row
-   * still `awaiting_user` for the next sweep, where the opposite order would strand the credits
-   * for good. `paused` is the destination because it is the one waiting state every client already
-   * offers a way out of.
+   * `cleanupExpired` marks a lapsed approval 'expired' and stops there, and nothing re-leases
+   * `awaiting_user`: left alone, the task would wait forever, hold its credit reservation against
+   * the monthly allowance, and lose the approval card that was the only way to answer it. Releasing
+   * the reservation comes first - a crash in between then leaves the row still `awaiting_user` for
+   * the next sweep, where the opposite order would strand the credits for good. `paused` is the
+   * destination because it is the one waiting state every client already offers a way out of.
    */
   const sweepExpiredApprovals = async (): Promise<number> => {
     const stranded = await database.query<{

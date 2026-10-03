@@ -620,13 +620,13 @@ describe('the run an inbound delivery starts', () => {
      * And that the comparison NORMALISES, which is the half a prefix list cannot carry on its own.
      *
      * The path this box writes is already normalised - two ids it generated, under a directory it
-     * chose - so the spelling that matters is not the one written but the one the MODEL uses to read
-     * it back. `quarantineRelative` used to be a bare `replace(/^\.?\//, '')`, under which
-     * `workspace/./downloads/inbound/a/b.json` and `workspace//downloads/inbound/a/b.json` were not
-     * quarantined while the runner resolved all three spellings to the same file: same bytes, no
-     * taint. That was fixed in the worker with `posix.normalize`, and this asserts the fix is still
-     * there, because without it every claim this file makes about the payload being untrusted is
-     * about a path the model can simply respell.
+     * chose - so the spelling that matters is not the one written but the one the MODEL uses to
+     * read it back. Under a bare `replace(/^\.?\//, '')`, `workspace/./downloads/inbound/a/b.json`
+     * and `workspace//downloads/inbound/a/b.json` would not be quarantined while the runner
+     * resolves all three spellings to the same file: same bytes, no taint. The worker normalises
+     * with `posix.normalize`, and this asserts that is still there, because without it every claim
+     * this file makes about the payload being untrusted is about a path the model can simply
+     * respell.
      *
      * Still a text-level guard across a package boundary, and still not the worker running: closing
      * that needs a case in `apps/worker` calling `isQuarantinedDownloadPath` on those spellings.
@@ -714,9 +714,9 @@ describe('the run an inbound delivery starts', () => {
    * `workspace/downloads/inbound/<scheduleId>/<deliveryId>.<ext>`, and the files themselves are
    * written afterwards by `promoteScheduledTask` - the only thing in the tree that writes them -
    * because that write is an HTTP round-trip to a workspace that may be asleep. A restart in
-   * between is exactly what `recoverStrandedScheduledTasks` exists for, and it used to promote the
-   * task with no deliveries at all: the run went to `queued` with an owner-facing instruction
-   * naming files that were never written, and the model was told to read them.
+   * between is exactly what `recoverStrandedScheduledTasks` exists for, and it has to promote the
+   * task with its deliveries: without them the run goes to `queued` with an owner-facing
+   * instruction naming files that were never written, and the model is told to read them.
    *
    * Delete `deliveries` from the recovery's `promoteScheduledTask` call and this goes red on the
    * write count while the prompt still names the path - which is the defect exactly.
@@ -894,11 +894,12 @@ describe('which doors show the owner their own trigger', () => {
   });
 
   /**
-   * The refusal the create route already gives, on the way in it did not cover.
+   * The refusal the create route gives, on the other way in.
    *
    * Creation refuses a trigger beside a `once` spec because a one-time schedule disables itself
-   * after its single run and the URL becomes a door that accepts deliveries and does nothing. PATCH
-   * had no counterpart, so two calls reached the same dead URL that one call was refused. The
+   * after its single run and the URL becomes a door that accepts deliveries and does nothing.
+   * Without the same refusal on PATCH, two calls would reach the same dead URL that one call is
+   * refused. The
    * counter-direction is in the same test: a repeating spec still edits, so this is a guard on the
    * one shape rather than a schedule that can no longer be retimed.
    */

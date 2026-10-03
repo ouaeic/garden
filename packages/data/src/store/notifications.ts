@@ -375,7 +375,7 @@ export class NotificationStore {
   ): Promise<PendingNotificationRecord[]> {
     // The candidate horizon is stated inside the branches that would otherwise scan every finished
     // conversation and every notice the agent ever raised, as well as once more where the page is
-    // picked: the branches used to be bounded by the join to a subscription, and are not any longer.
+    // picked: no join to a subscription bounds those branches.
     const result = await this.database.query(
       `WITH events AS (
          SELECT a.user_id, 'approval_required'::text AS kind, a.id AS resource_id, a.task_id,

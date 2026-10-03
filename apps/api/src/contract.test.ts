@@ -2,9 +2,9 @@
  * What the API promises the things around it.
  *
  * `packages/contracts` is the only written agreement between this server and every client that
- * talks to it, and until now nothing checked that the server actually produces those shapes - the
- * schemas were imported by the clients and never by the code that answers them, so a field renamed
- * here and a field read there could disagree indefinitely and nothing would fail.
+ * talks to it, and this suite checks that the server actually produces those shapes. The clients
+ * import the schemas; without a check on the code that answers them, a field renamed here and a
+ * field read there could disagree indefinitely and nothing would fail.
  *
  * The other two suites are about the edges of the same agreement: an identifier that cannot name a
  * record, and the process shutting down while the worker inside it is still holding one.
@@ -279,10 +279,9 @@ describe('the shapes the clients are promised', () => {
     // Let the embedded worker take the task and turn away from the absent provider, so the event
     // list under test carries real encrypted payloads rather than being empty.
     //
-    // `awaiting_resource` is where a box with no provider connected now lands, and that is the
-    // point of the change that put it there: the wall has a notice, a Settings switch and a sweep
-    // that resumes everything parked behind it the moment a key is saved. It used to be `failed`,
-    // because the worker threw a code the wall table had never heard of.
+    // `awaiting_resource` is where a box with no provider connected lands: the wall has a notice, a
+    // Settings switch and a sweep that resumes everything parked behind it the moment a key is
+    // saved.
     const deadline = Date.now() + 20_000;
     for (;;) {
       const current = await get(`/v1/tasks/${taskId}`);
@@ -334,8 +333,8 @@ describe('the shapes the clients are promised', () => {
      *
      * `TaskSchedule.array()` over an empty list conforms to anything, which is how a schema and the
      * route that answers it can disagree indefinitely - the exact failure this whole suite exists to
-     * catch. It matters now because `TaskSchedule` gained a required `prompt`: the standing
-     * instruction the box acts on unattended, which the owner previously could not read at all.
+     * catch. It matters because `TaskSchedule` carries a required `prompt`: the standing
+     * instruction the box acts on unattended, which the owner has to be able to read.
      */
     const schedule = await app.inject({
       method: 'POST',
@@ -367,8 +366,8 @@ describe('the shapes the clients are promised', () => {
     const { app, cookie } = await start();
     /**
      * Every path identifier is a UUID column, and PostgreSQL answers a malformed one by raising
-     * 22P02 rather than returning nothing - which used to leave the route throwing an unrecognised
-     * error, so a stale link produced a 500 and "The request could not be completed".
+     * 22P02 rather than returning nothing. Left unrecognised, that error turns a stale link into a
+     * 500 and "The request could not be completed".
      */
     const cases = [
       { url: '/v1/tasks/not-a-task', code: 'task_not_found' },
@@ -439,7 +438,7 @@ describe('the embedded worker and the process it lives in', () => {
       closed = true;
     });
     await new Promise((resolve) => setTimeout(resolve, 400));
-    // Shutdown used to return here, and `database.close()` landed on a turn that was still writing.
+    // Were shutdown to return here, `database.close()` would land on a turn that was still writing.
     expect(closed).toBe(false);
 
     releaseModel();

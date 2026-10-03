@@ -73,9 +73,9 @@ describe('capability routing', () => {
   });
 
   /*
-   * Audio used to be the one modality that never asked. A recording is the owner speaking, and the
-   * transcription model is picked from whatever the provider happens to list, so a private task
-   * could send a voice to an endpoint no reviewed row on the box vouches for.
+   * Audio asks too. A recording is the owner speaking, and the transcription model is picked from
+   * whatever the provider happens to list, so without the check a private task could send a voice
+   * to an endpoint no reviewed row on the box vouches for.
    */
   describe('the model a recording is read by', () => {
     const route = (overrides: Partial<MediaModelOption> = {}): MediaModelOption => ({

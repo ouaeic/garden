@@ -542,14 +542,14 @@ const connectorActionTool = (reachable: readonly ConnectorAction[]): ModelTool =
           // which is why this is one object with the required set named per action instead of a
           // oneOf that has nothing to key on.
           //
-          // The per-field lengths and per-field prose that used to sit here were a second, weaker
-          // copy of the Zod schemas in @garden/core - connectors.ts and mail-connectors.ts - which
-          // parse every one of these before a credential is opened, in places more tightly than
-          // this could say (partId is a dotted-numeral regex there, mail_search text is capped at
-          // 500 rather than 200,000). A duplicate that cannot be enforced is a duplicate that goes
-          // stale, and it was costing about two kilobytes of every request. What is left is what
-          // the server cannot tell the model in time: a field whose meaning changes with the
-          // action, and the one constraint below with nothing behind it.
+          // No per-field lengths or per-field prose: they would be a second, weaker copy of the
+          // Zod schemas in @garden/core - connectors.ts and mail-connectors.ts - which parse every
+          // one of these before a credential is opened, in places more tightly than this could say
+          // (partId is a dotted-numeral regex there, mail_search text is capped at 500 rather than
+          // 200,000). A duplicate that cannot be enforced is a duplicate that goes stale, and it
+          // would cost about two kilobytes of every request. What is here is what the server
+          // cannot tell the model in time: a field whose meaning changes with the action, and the
+          // one constraint below with nothing behind it.
           description: `Parameters for the chosen action. ${sections.join('. ')}. Every date and time is ISO 8601, or a plain date when allDay. Never include credentials.`,
           properties: Object.fromEntries(
             Object.entries(CONNECTOR_INPUT_PROPERTIES).filter(([name]) => fields.has(name))
@@ -883,10 +883,9 @@ export const agentTools: ModelTool[] = [
      *
      * Two of the three sentences below are the return shape, not a pitch, and they are the two a
      * model cannot find out without spending a billed call to find out: that a wide result arrives
-     * as one row per file rather than as lines, and that a very wide one is refused outright. The
-     * per-field prose that used to sit on `literal` and `wholeWord` is gone into this sentence
-     * instead - it said the same two things twice, once where the model chooses the tool and once
-     * where it fills the field, and paid the wire twice for it.
+     * as one row per file rather than as lines, and that a very wide one is refused outright.
+     * `literal` and `wholeWord` carry no prose of their own because this sentence says it: saying
+     * it again where the model fills the field would pay the wire twice for one fact.
      */
     description:
       'Search code and text files with ripgrep for path:line matches. The query is a regular expression unless literal is set; wholeWord matches a name. Across many files and lines it returns one row per file with a match count, so narrow with path or glob; past 100 files it is refused.',
@@ -1049,13 +1048,10 @@ export const agentTools: ModelTool[] = [
   {
     name: 'session_search',
     /*
-     * The second sentence is the arm, and it is the first time this description has been true.
-     *
-     * It used to promise "then optionally inspect matching messages around a result" while every
-     * id the tool returned was accepted by nothing - the same shape as the "or browse" claim two
-     * fields below, which ATH-165 removed. The clause was already paid for on the wire; what it
-     * cost to make it true is the sentence naming what `id` takes and what comes back, because
-     * neither is discoverable without spending a billed call to find out.
+     * The second sentence is the arm: it names what `id` takes and what comes back, because neither
+     * is discoverable without spending a billed call to find out. A promise to inspect matches with
+     * no field that accepts a returned id would be the same shape as the "or browse" claim two
+     * fields below.
      *
      * It names WHICH id, and that is 32 of the bytes rather than a flourish. A match carries two -
      * its own row id, which reaches that turn's words, and the `episodeId` of the memory the turn
@@ -1063,8 +1059,8 @@ export const agentTools: ModelTool[] = [
      * `mem.cited_call` hangs off the episode. Measured over 146 probes whose answer is only in a
      * tool result (`docs/design/reach/RIG.md`, another lane's rig): the search locates the right
      * turn on 100.0% of them, and reaching from the row id answers 25.3% against 86.3% from the
-     * episode id. A sentence that left the model to guess between them would have been paying for
-     * the whole arm and then losing sixty points of it at the last step.
+     * episode id. A sentence that left the model to guess between them would pay for the whole arm
+     * and then lose sixty points of it at the last step.
      */
     description:
       "Search the user's past conversations with you. Set id to a match's id to read that turn, or to an episodeId for the raw tool output it cited.",
@@ -1072,9 +1068,9 @@ export const agentTools: ModelTool[] = [
       type: 'object',
       additionalProperties: false,
       /*
-       * No `required`, because either field is now enough on its own and `['query']` would be the
-       * same kind of false statement the description used to make. A call carrying neither is
-       * still refused - by `searchMemorySessions`, in words, rather than by a schema.
+       * No `required`, because either field is enough on its own and `['query']` would be a false
+       * statement about the tool. A call carrying neither is still refused - by
+       * `searchMemorySessions`, in words, rather than by a schema.
        */
       properties: {
         query: { type: 'string' },
@@ -1166,10 +1162,10 @@ export const agentTools: ModelTool[] = [
   {
     name: 'web_search',
     /**
-     * The first move of a research job, a comparison, a job hunt or a price check, and until now
-     * there was no tool for it: the model was told to drive a headed browser at "a search engine",
-     * which spends a navigate, a snapshot and a page of markup on a query, and lands on the pages
-     * most likely to raise an anti-bot challenge - which then costs the rest of the task.
+     * The first move of a research job, a comparison, a job hunt or a price check. Without it the
+     * model would drive a headed browser at "a search engine", which spends a navigate, a snapshot
+     * and a page of markup on a query, and lands on the pages most likely to raise an anti-bot
+     * challenge - which then costs the rest of the task.
      */
     description:
       'Search the web for one page of ranked results: title, url, site and snippet. Snippets are pointers, not sources: read the pages you rely on with parallel_web_read. Operators such as site: and quoted phrases work.',
@@ -1265,17 +1261,16 @@ export const agentTools: ModelTool[] = [
         },
         /*
          * When it runs: a flat property bag discriminated by the sibling `kind`, which is the
-         * encoding browser_action and desktop_action were re-stated in for the same reason.
+         * encoding browser_action and desktop_action use for the same reason.
          *
-         * It was a five-variant `oneOf` costing 1,727 bytes, and about two thirds of that was
-         * frame rather than capability: each variant repeated
+         * Not a five-variant `oneOf`, because about two thirds of that would be frame rather than
+         * capability: each variant would repeat
          * {"type":"object","additionalProperties":false,"required":[…],"description":…,
-         * "properties":{"kind":{"const":…}}}, `timeZone` was written out three times and
-         * `localTime` twice with its pattern. Flat, with the per-kind required set stated in the
-         * one description the five variants used to state theirs in, it costs 1,028 - 699 bytes
-         * back off every request. Nothing became untyped and no kind was withheld - every field
-         * keeps its type, its bounds and its pattern, and `TaskScheduleSpec` in @garden/contracts
-         * is still the discriminated union that decides what is accepted. Its members are ordinary
+         * "properties":{"kind":{"const":…}}}, with `timeZone` written out three times and
+         * `localTime` twice with its pattern. Flat, the per-kind required set is stated once in
+         * the description. Nothing is untyped and no kind is withheld - every field keeps its
+         * type, its bounds and its pattern, and `TaskScheduleSpec` in @garden/contracts is still
+         * the discriminated union that decides what is accepted. Its members are ordinary
          * `z.object`s, so a field belonging to another kind is stripped rather than fatal, which
          * is what makes the flat bag safe here: the wire says less than the union, and the union
          * still runs.
@@ -1556,8 +1551,8 @@ export const agentTools: ModelTool[] = [
   {
     name: 'browser_snapshot',
     /*
-     * The botWall clause used to restate the whole anti-bot rule - what closes, for how long, what
-     * to do instead, what to tell the owner - and the operating contract states exactly that,
+     * The botWall clause does not restate the whole anti-bot rule - what closes, for how long, what
+     * to do instead, what to tell the owner - because the operating contract states exactly that,
      * unconditionally, in the same request: "closes that one tab and that one site until the user
      * clears it: say which page needs them, and carry on with the rest of the work everywhere
      * else". What the contract cannot say is the name of the field a snapshot carries it in, and
@@ -1636,15 +1631,12 @@ export const agentTools: ModelTool[] = [
   {
     name: 'print_pdf',
     description:
-      // The authoring alternative used to be spelled out here - "typeset it with typst instead,
-      // which is the only route that controls where the pages break" - and it was both a duplicate
-      // and, on some boxes, a lie. The operating contract states it already, and states it *gated*
-      // on the document toolchain actually being installed; this copy was unconditional, so a box
-      // with no typst was told in the same request that it has no document toolchain and that
-      // typst is the route for a PDF that matters. The contract's own sentence carries the
-      // disambiguation too - "print_pdf captures a page the browser is showing, not a document you
-      // are authoring" - so nothing is lost where typst exists, and a wrong instruction goes where
-      // it does not.
+      // The authoring alternative - typeset it with typst - is not spelled out here. The operating
+      // contract states it already, *gated* on the document toolchain actually being installed; an
+      // unconditional copy here would tell a box with no typst, in the same request, that it has
+      // no document toolchain and that typst is the route for a PDF that matters. The contract's
+      // own sentence carries the disambiguation too - "print_pdf captures a page the browser is
+      // showing, not a document you are authoring" - so nothing is lost where typst exists.
       'Save the page shown in the browser (or tabId) as a PDF in the workspace.',
     parameters: {
       type: 'object',

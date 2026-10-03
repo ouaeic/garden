@@ -128,12 +128,10 @@ const withPartialRead = (
  * Moves that floor by what an edit changed the file's length by, because the file it is a floor on
  * is now one line-count longer or shorter.
  *
- * A patch used to DELETE the entry outright, on the reasoning that the version the read was about
- * no longer exists. The version does not; the unread remainder does. Measured on the shipped arm:
- * `file_read` of lines 1-200 of an 8,332-line file, then one `PUT 10:`, and the outstanding floor
- * went from 201 to nothing - after which a whole-file `file_write` destroyed 576,512 bytes without
- * being asked a question. An edit to line 10 says nothing about line 8,000, and clearing the floor
- * claimed it did.
+ * A patch does not delete the entry. The version the read was about no longer exists; the unread
+ * remainder does. An edit to line 10 says nothing about line 8,000, and clearing the floor would
+ * claim it did - after `file_read` of lines 1-200 and one `PUT 10:`, a whole-file `file_write`
+ * would then destroy the unread remainder without being asked a question.
  *
  * "At least N lines" survives the shift exactly: a file that had at least N lines and gained
  * `delta` of them has at least N + delta, and the floor stays a floor whichever way the edit went.
@@ -416,11 +414,10 @@ const renderPostEditCheck = (check: PostEditCheck, budget: number): string | und
     ...found.filter((one) => written.has(one.path)),
     ...found.filter((one) => !written.has(one.path))
   ];
-  // Room held back for the remainder line, which is written after the loop and used to be counted
-  // by nobody. Reserved at the largest count that can reach it - every diagnostic unshown - so the
-  // reservation cannot be smaller than the line it pays for. A block with one diagnostic in it
-  // reserves nothing, because the loop admits the first whatever its length and there is then no
-  // remainder to name.
+  // Room held back for the remainder line, which is written after the loop. Reserved at the
+  // largest count that can reach it - every diagnostic unshown - so the reservation cannot be
+  // smaller than the line it pays for. A block with one diagnostic in it reserves nothing, because
+  // the loop admits the first whatever its length and there is then no remainder to name.
   const room = budget - (ordered.length > 1 ? moreDiagnosticsLine(ordered.length).length + 1 : 0);
   // The header is spent from the budget rather than added on top of it, and a header with no room
   // for a usable line under it is not written at all: a block that says a checker ran and says
@@ -430,7 +427,7 @@ const renderPostEditCheck = (check: PostEditCheck, budget: number): string | und
   let bytes = header.length;
   for (const one of ordered) {
     if (shown.length >= POST_EDIT_MAX_DIAGNOSTICS) break;
-    // `+ 1` for the newline that joins it on, which is the third thing that was outside the count.
+    // `+ 1` for the newline that joins it on.
     if (bytes + 1 + one.text.length > room && shown.length) break;
     const text = clipDiagnostic(one.text, room - bytes - 1);
     shown.push(text);
@@ -462,10 +459,10 @@ const POST_EDIT_TAIL_BYTES = droppedProjectsLine(MAX_ARMED_CHECKS).length + 2;
  * the diagnostics inside a block are: a short list a reader believes is the whole list is worse
  * than a short list that says what it left out. The recovery named is one the model can perform.
  *
- * EVERY BYTE DELIVERED IS INSIDE THE BUDGET, including the two the joins add and the tail line,
- * which used to sit outside it and made the real worst case about 1,790 against a cap that reads
- * 1,600. A budget with things outside it stops being a budget, so the separator is spent with the
- * block it precedes and the tail is reserved before the first block is measured.
+ * EVERY BYTE DELIVERED IS INSIDE THE BUDGET, including the two the joins add and the tail line;
+ * left outside it, they would make the real worst case about 1,790 against a cap that reads 1,600.
+ * A budget with things outside it stops being a budget, so the separator is spent with the block
+ * it precedes and the tail is reserved before the first block is measured.
  *
  * The reservation is taken only when more than one check landed, and that is exact rather than
  * thrifty: the tail is written only when a block was emitted AND another was refused, which needs
@@ -508,27 +505,27 @@ const readyPostEditChecks = (taskId: string): readonly PostEditCheck[] => {
  * The same question asked a second time, after the arm has run, because the arm may have been the
  * write that invalidated the answer.
  *
- * Reading the drain BEFORE the arm is what stops a patch being handed its own check, and it was
- * also a hole: a check that had already landed was fresh at the moment it was read and stale by
- * the time it was rendered, because the call it was about to ride on was another patch of the same
- * file. Measured through the shipped arm - patch, let the checker land, patch the same path again,
- * and the second patch's result carried the first run's error about a line that no longer existed.
- * That is the exact shape the version counter is for, "patch, read the echo, notice the typo,
- * patch again", and it is worse in this form than in the one the counter already caught: the
- * report rides on the result of the very write that repaired it.
+ * Reading the drain BEFORE the arm is what stops a patch being handed its own check, and on its own
+ * it leaves a hole: a check that has already landed is fresh at the moment it is read and stale by
+ * the time it is rendered when the call it is about to ride on is another patch of the same file -
+ * patch, let the checker land, patch the same path again, and the second patch's result would
+ * carry the first run's error about a line that no longer exists. That is the exact shape the
+ * version counter is for, "patch, read the echo, notice the typo, patch again", and it is worse in
+ * this form than in the one the counter catches before the arm: the report rides on the result of
+ * the very write that repaired it.
  *
  * The dead ones are still consumed by the caller rather than left armed. There is nothing to wait
  * for - a newer run for the same path is already in flight, and holding this one would only offer
  * it to the call after next, by which time it is no less wrong.
  *
- * A LEDGER THAT HAS GONE RETURNS NOTHING, which is the same direction `superseded` chooses and the
- * opposite of what this line did: it returned every captured check unfiltered, so the one shape
- * that empties the store between the two reads - 64 other tasks arming inside the awaited tool
- * call, or a test clearing it - delivered a block nothing could date. An answer nobody can date is
+ * A LEDGER THAT HAS GONE RETURNS NOTHING, which is the same direction `superseded` chooses.
+ * Returning every captured check unfiltered would mean the one shape that empties the store
+ * between the two reads - 64 other tasks arming inside the awaited tool call, or a test clearing
+ * it - delivers a block nothing could date. An answer nobody can date is
  * an answer that does not go in front of the model, and the stamps are only comparable inside the
  * ledger that issued them, so a ledger that has been evicted and recreated cannot date them
- * either. The cost of the refusal is a report nobody was promised; the cost of the old line was a
- * stale block rendered as fresh, which is the one thing this feature may not do.
+ * either. The cost of the refusal is a report nobody was promised; the cost of the alternative is
+ * a stale block rendered as fresh, which is the one thing this feature may not do.
  */
 const stillAboutTheTree = (
   taskId: string,
@@ -717,13 +714,12 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
        * authority on which manager and which verb it can carry out, and it refuses anything else
        * by name.
        *
-       * This gate used to name apt and apt-get and the verbs `install` and `update`, which is one
+       * A gate that named only apt and apt-get and the verbs `install` and `update` would cover one
        * of the four families this box runs on and one of the spellings those families use. On
-       * Fedora, Rocky, Arch, Alpine and openSUSE the capability was never requested, so `dnf
-       * install` reached the runner without it and was refused with "an approved system-packages
-       * capability is required" - a message about a permission, for a command that would have
-       * been allowed. The runner-side repair for the other families landed and could not be
-       * reached from here.
+       * Fedora, Rocky, Arch, Alpine and openSUSE the capability would never be requested, so `dnf
+       * install` would reach the runner without it and be refused with "an approved
+       * system-packages capability is required" - a message about a permission, for a command that
+       * would have been allowed.
        *
        * Deliberately a superset of what the helper carries out rather than a copy of it. A gate
        * narrower than the parse behind it is exactly the defect above; a gate wider than it costs
@@ -821,19 +817,18 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
       /*
        * A window is read as a window.
        *
-       * Asking for lines 900-920 used to pull the entire file across the runner boundary and into
-       * this process, decode it, split it, and throw all but twenty lines away. On a log or a
-       * dataset that is the difference between a small request and one that can exhaust the
-       * worker - and the runner has always had a ranged reader, which nothing called.
+       * Answering lines 900-920 by pulling the entire file across the runner boundary and into
+       * this process, decoding it, splitting it and throwing all but twenty lines away would, on a
+       * log or a dataset, be the difference between a small request and one that can exhaust the
+       * worker - so a window goes to the runner's ranged reader.
        *
        * The whole-file path stays for the unbounded case, because it is the only one that
        * returns the hash `file_write` needs: a whole-file write does not fail on a concurrent
        * change, it silently discards it, and this tree has at least three other writers - the
        * agent's own shell, a second worker slot, and the owner in the file browser.
        */
-      // The second of the three clamps that already defended against `NaN`, and the defence was
-      // the implicit one: `NaN > 0` is false, so an unreadable line number fell through to the
-      // whole-file read. Said out loud now, in the words the other arms use.
+      // An unreadable line number falls through to the whole-file read, said out loud in the words
+      // the other arms use rather than left to `NaN > 0` being false.
       const requestedStart = finiteNumber(call.arguments.startLine) ?? 0;
       const requestedEnd = finiteNumber(call.arguments.endLine) ?? 0;
       const windowed = requestedStart > 0 || requestedEnd > 0;
@@ -844,13 +839,13 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
          * The same two budgets the unwindowed arm below is held to, and for the same reason rather
          * than for symmetry.
          *
-         * This arm used to fetch 400,000 bytes and record every line of them as displayed, while
-         * `recordToolResult` cut the result to 24,000 characters two layers downstream. On this
-         * repository's largest test file `file_read {startLine: 1, endLine: 8332}` delivered all
-         * 354,014 bytes, vouched for all 8,332 lines, and put 5.95% of them in front of the model -
-         * the identical defect the unwindowed bound was shipped to close, still open on the arm that
-         * is 47.4% of the read traffic on this machine. It also made the write guard below trivially
-         * walkable: one wide window and the record claimed the whole file had been seen.
+         * `recordToolResult` cuts the result to 24,000 characters two layers downstream, so an arm
+         * that fetched more and recorded every line of it as displayed would vouch for lines the
+         * model never saw: on this repository's largest test file, `file_read {startLine: 1,
+         * endLine: 8332}` would vouch for all 8,332 lines and put 5.95% of them in front of the
+         * model. It would also make the write guard below trivially walkable: one wide window and
+         * the record would claim the whole file had been seen. This arm is 47.4% of the read
+         * traffic on this machine.
          *
          * It binds on very little real traffic. Across 12,347 windowed reads measured on this
          * machine p90 displayed is 360 lines, and 360 lines of this repository's average 43.4
@@ -883,10 +878,9 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
         /*
          * What this window leaves outstanding, so the whole-file write below can be asked about it.
          *
-         * Nothing did this before, and that was the severe hole: a window read set no length and
-         * claimed no hash, so the worker's guard had nothing to consult and the runner's ran behind
-         * a hash this arm cannot produce. Measured through the shipped tool, `file_read` of lines
-         * 1-200 followed by a whole-file `file_write` was accepted and destroyed 8,132 lines.
+         * A window read sets no length and claims no hash, so without this the worker's guard would
+         * have nothing to consult and the runner's would run behind a hash this arm cannot produce:
+         * `file_read` of lines 1-200 followed by a whole-file `file_write` would be accepted.
          *
          * `totalLines` only arrives when the reader actually reached the end of the file; when it
          * did not, all that is known is that the file goes further than what came back whole, and
@@ -901,8 +895,8 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
          * further, because the reader stopped only when it found another line to start. Carrying
          * the mid-line answer into the between-lines case understates the floor by one, and that
          * one line is the difference between refusing a whole-file write after a single window of a
-         * 901-line file and accepting it: measured with the record fixed and this left alone, the
-         * worker's floor stopped firing and only the runner's own guard still refused.
+         * 901-line file and accepting it: the worker's floor would stop firing and only the
+         * runner's own guard would still refuse.
          */
         const reachTo =
           read.totalLines ??
@@ -932,12 +926,10 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
       /*
        * The budget travels with the request, and what comes back is what was recorded as shown.
        *
-       * This arm used to fetch the whole file and cut it here. The cut was right and the place was
-       * wrong: the runner is where the seen-line ledger lives, so a prefix chosen after the fact was
-       * a prefix that ledger never heard about, and the two records of what the model had been shown
-       * disagreed. Measured on a 659-line file, an unwindowed read displaying lines 1-397 followed
-       * by a window over the remainder left the runner holding 398-659 only - and a patch to line
-       * 50, a line the model HAD been shown, was refused by name. Asking for the prefix instead of
+       * The runner is where the seen-line ledger lives, so a prefix cut here after the fact would
+       * be a prefix that ledger never heard about, and the two records of what the model had been
+       * shown would disagree - a patch to a line the model HAD been shown could be refused by
+       * name. Asking for the prefix instead of
        * making one means the arm cannot display what it was not sent, so the two ledgers hold the
        * same lines by construction.
        */
@@ -1197,15 +1189,10 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
        * concurrency check passes because the file really has not changed, and 1,585 lines are
        * destroyed by a call that looked entirely well-formed.
        *
-       * This comment used to claim the WINDOWED read was the safe one - that the same write after a
-       * window "is refused by name one layer down". It was not. Measured through this arm against
-       * the real runner on an 8,332-line file: after `file_read {startLine: 1, endLine: 200}` the
-       * whole-file write was ACCEPTED and destroyed 8,330 of 8,332 lines, 354,002 of 354,014 bytes.
-       * The runner's guard is correct and fires by name when it runs; it simply never ran, because
-       * the windowed arm claims no hash and the guard was opened only for callers that do. Both
-       * ends of that are now closed - every read arm records what it left outstanding here, and the
-       * runner holds an agent's write to its record whether or not a hash came with it - and the
-       * lesson is the one this repository already has a rule about: a comment is not a measurement.
+       * The windowed read is not safe by default: it claims no hash, so a runner guard opened only
+       * for callers that hold one would never run after a window. So every read arm records here
+       * what it left outstanding, and the runner holds an agent's write to its record whether or
+       * not a hash came with it.
        *
        * It is a coverage question, not a freshness one, so it is asked of the read record rather
        * than of the hash - and it lifts the moment the record covers the file, which is what makes

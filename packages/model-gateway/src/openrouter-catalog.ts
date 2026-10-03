@@ -130,11 +130,11 @@ const checkedJson = async <T>(response: Response, label: string): Promise<T> => 
 /**
  * The bounds this refresh puts on numbers it did not produce.
  *
- * Nothing from the feed used to be checked on the way in, and every one of these figures is read by
- * something that immediately acts on it: the context builder packs a request up to `contextTokens`
- * and subtracts `maxOutputTokens` from it, and a price sets the model's usage class and decides
- * whether the owner's spending ceiling admits the model at all. One mistyped field in a catalogue
- * this software does not control therefore reached the arithmetic intact.
+ * Every one of these figures is read by something that immediately acts on it: the context builder
+ * packs a request up to `contextTokens` and subtracts `maxOutputTokens` from it, and a price sets
+ * the model's usage class and decides whether the owner's spending ceiling admits the model at
+ * all. Unchecked, one mistyped field in a catalogue this software does not control would reach the
+ * arithmetic intact.
  *
  * These are ceilings on belief, not statements about what exists. Each sits an order of magnitude
  * above anything a provider has published, so a real release passes through untouched and only a
@@ -182,9 +182,9 @@ const journalSafeId = (id: string): string => {
 };
 /**
  * What `refreshOpenRouterMediaCatalog` below can actually offer. A model that emits none of these
- * and no text has no route anywhere in this build, which is the one drop the chat refresh used to
- * make without a word - see `journalDrops`. Adding a kind here is not enough to serve it; this list
- * exists so the journal stays true to what the media catalogue does, not to widen it.
+ * and no text has no route anywhere in this build, and the chat refresh journals that drop rather
+ * than making it without a word - see `journalDrops`. Adding a kind here is not enough to serve it;
+ * this list exists so the journal stays true to what the media catalogue does, not to widen it.
  */
 const MEDIA_OUTPUT_MODALITIES = ['image', 'audio', 'transcription'];
 
@@ -408,10 +408,9 @@ export const verifyOpenRouterKey = async (options: {
  * defaults and the rest of the provider's chat models are offered alongside them.
  *
  * Two requests, settled independently. The model list carries prices, context, capabilities and
- * benchmarks; the endpoint list carries zero-retention routes and uptime. They used to sit in one
- * `Promise.all`, so a failure on either - and the third, undocumented, user-scoped benchmarks call
- * that is now gone - silently blanked the entire catalogue back to seeds, on an unattended server,
- * for months.
+ * benchmarks; the endpoint list carries zero-retention routes and uptime. In one `Promise.all`, a
+ * failure on either would silently blank the entire catalogue back to seeds, on an unattended
+ * server, until somebody noticed.
  */
 export const refreshOpenRouterCatalog = async (
   allowlist: ModelRelease[],
@@ -438,8 +437,8 @@ export const refreshOpenRouterCatalog = async (
    * The feed is read once, here, and everything below this line works on the narrowed rows.
    *
    * `checkedJson` asks only whether the response was ok, so what it hands back is a document, not a
-   * catalogue. Four reshapes of that document each used to throw a raw TypeError out of this whole
-   * function - see openrouter-shape.ts, which names them - and a reshaped field now costs its own
+   * catalogue. Read raw, four reshapes of that document would each throw a TypeError out of this
+   * whole function - see openrouter-shape.ts, which names them - so a reshaped field costs its own
    * row that field rather than costing the owner the refresh.
    */
   const { models: listed, malformed } = readOpenRouterModels(modelsResult.value);
@@ -637,12 +636,11 @@ export const refreshOpenRouterCatalog = async (
    * endpoint - and a line per dropped route would bury the rest of the unit's log the first time a
    * provider shipped a broken price column across a vendor's whole range.
    *
-   * Three clauses, because there are three ways to lose a route here and only one of them used to
-   * be said out loud. An absurd price was journalled from the start; a row too reshaped to read and
-   * a model emitting something this build has no route for were both dropped in silence, and the
-   * second of those is how a new output modality would arrive - dropped from the chat catalogue for
-   * not emitting text and from the media catalogue for not emitting one of the three kinds it
-   * offers, with nothing anywhere to say the provider had shipped it.
+   * Three clauses, because there are three ways to lose a route here: an absurd price, a row too
+   * reshaped to read, and a model emitting something this build has no route for. The last is how a
+   * new output modality would arrive - dropped from the chat catalogue for not emitting text and
+   * from the media catalogue for not emitting one of the three kinds it offers - and without a
+   * clause nothing anywhere would say the provider had shipped it.
    *
    * It is written from both of this function's exits rather than only from the last one, because a
    * `reviewed_open_weight` refresh returns before the loop below and reads the same feed: the rows

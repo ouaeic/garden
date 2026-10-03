@@ -18,9 +18,8 @@ const Config = z.object({
   /**
    * Two values, because two behaviours exist: `development` turns on the insecure local sign-in
    * and stands the production checks down, and `production` is everything else. A third value
-   * `selfhost` used to sit between them and was byte-for-byte identical to `production` - which is
-   * the kind of setting an operator eventually assumes means something. The installer has only
-   * ever written `production`.
+   * that behaved exactly like `production` would be the kind of setting an operator eventually
+   * assumes means something. The installer writes `production`.
    */
   DEPLOYMENT_MODE: z.enum(['development', 'production']).default('development'),
   REGISTRATION_BOOTSTRAP_TOKEN: z.preprocess(
@@ -115,9 +114,9 @@ const Config = z.object({
    * Where the box writes down what went wrong with the parts of itself the API does not run.
    *
    * The certificate helper and the dynamic DNS helper both record a failure here, world-readable,
-   * and until now nothing read them: renewal begins about thirty days before expiry, so a failing
-   * certificate had a month in which the app was perfectly reachable and said nothing, and the
-   * first the owner heard of it was every device refusing to connect at once.
+   * and the API reads them: renewal begins about thirty days before expiry, so unread, a failing
+   * certificate would have a month in which the app was perfectly reachable and said nothing, and
+   * the first the owner heard of it would be every device refusing to connect at once.
    */
   GARDEN_STATE_PATH: z.string().default('/var/lib/garden'),
   /**

@@ -41,9 +41,9 @@ import {
 /**
  * How long a streamed response may go without a single byte before the provider counts as stalled.
  * The caller's own deadline is a total budget, so on its own it cannot tell a turn that is still
- * producing tokens from one that died silently: a stall used to hold this worker's only slot until
- * the whole budget ran out. Two minutes is far longer than any gap between tokens - including the
- * quiet stretch while a reasoning model thinks, which still arrives as keep-alive bytes.
+ * producing tokens from one that died silently, and a stall would hold this worker's only slot
+ * until the whole budget ran out. Two minutes is far longer than any gap between tokens - including
+ * the quiet stretch while a reasoning model thinks, which still arrives as keep-alive bytes.
  */
 export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 120_000;
 
@@ -457,13 +457,13 @@ const providerFault = (
 /**
  * One name for a walled provider.
  *
- * Every non-429 refusal used to leave here as `provider_request_failed`, whatever the status. The
- * retry loop still read the status and retried the 5xx four times, which was right; what escaped
- * afterwards was a code nothing above recognised as a wall, so a 503 "no instance available" - a
- * routine, minutes-long gateway condition - failed the task outright, released its reservation and
- * stranded the follow-up message, while *connection refused* - the same outage one layer lower -
- * came back `provider_unavailable`, parked the task and was retried for a day. Two expressions of
- * one fault with opposite outcomes, and the harder-failing one is the commoner.
+ * The retry loop reads the status and retries the 5xx four times; what escapes afterwards has to be
+ * a code the layers above recognise as a wall. Left as `provider_request_failed`, a 503 "no
+ * instance available" - a routine, minutes-long gateway condition - would fail the task outright,
+ * release its reservation and strand the follow-up message, while *connection refused* - the same
+ * outage one layer lower - is `provider_unavailable`, parks the task and is retried for a day. Two
+ * expressions of one fault would have opposite outcomes, and the harder-failing one is the
+ * commoner.
  *
  * 400s keep the terminal name. A rejected prompt, an unknown model or a malformed tool schema fails
  * identically however often it is asked, and calling that a wall would park a task behind a
@@ -885,14 +885,13 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
    * nothing downstream would ever report it; it would surface as a model that sometimes searches one
    * way and sometimes the other, which is the shape of failure nobody traces back to a tools array.
    *
-   * A second refusal used to stand beside it: server tools on a connection that enforces zero data
-   * retention. It was reasoning from the true half of a fact. Zero-retention enforcement covers
-   * inference routing and explicitly does not cover tools - which means a search query is outside
-   * that guarantee however this request is built, so refusing to send the tools never protected the
-   * query. It only ensured that a box configured the shipped way could not search, since the flag
-   * ships on. Where a query may go is now settled once, by the plan in @garden/contracts, and
-   * disclosed to the owner in the words that plan hands back; a request arriving here with both is
-   * the ordinary case on a zero-retention box, not a caller's bug.
+   * Server tools on a connection that enforces zero data retention are not refused. Zero-retention
+   * enforcement covers inference routing and explicitly does not cover tools - which means a search
+   * query is outside that guarantee however this request is built, so refusing to send the tools
+   * would never protect the query. It would only ensure that a box configured the shipped way could
+   * not search, since the flag ships on. Where a query may go is settled once, by the plan in
+   * @garden/contracts, and disclosed to the owner in the words that plan hands back; a request
+   * arriving here with both is the ordinary case on a zero-retention box, not a caller's bug.
    */
   #serverToolPayload(input: ModelRequest): Array<Record<string, unknown>> {
     const serverTools = input.serverTools ?? [];
@@ -925,7 +924,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
 
   /**
    * The one recovery attempt on a reply to a streamed request that was not a stream. A completion
-   * is kept and used; anything else is a fault rather than the silent empty turn it used to be.
+   * is kept and used; anything else is a fault rather than a silent empty turn.
    * `502` because the request was accepted and the thing that answered it is not what was asked
    * for - a different instance, or the same one without the proxy in front of it, may well work.
    */
@@ -1250,18 +1249,16 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
     /*
      * One generation budget, started here, for whichever way the answer arrives.
      *
-     * It used to live inside the stream reader, so five of this product's seven model call sites -
-     * the delegate step, the provider web search, the compaction summariser, the vision specialist
-     * and the API titler, none of which stream - had no idle clock, no generation deadline, no
-     * character ceiling, no `truncated` marking and no estimated usage. A specialist mission is
-     * sixteen model calls, each able to hold a worker for the caller's whole fifteen minutes
-     * against a provider that has gone quiet, inside one unanswered tool call of a lead whose own
-     * step is bounded to ten. Every bound written for the fifteen-minute incident applied to the
-     * cheap path only.
+     * It lives here rather than inside the stream reader because five of this product's seven model
+     * call sites - the delegate step, the provider web search, the compaction summariser, the
+     * vision specialist and the API titler - do not stream, and would otherwise have no idle clock,
+     * no generation deadline, no character ceiling, no `truncated` marking and no estimated usage.
+     * A specialist mission is sixteen model calls, each able to hold a worker for the caller's
+     * whole fifteen minutes against a provider that has gone quiet, inside one unanswered tool call
+     * of a lead whose own step is bounded to ten.
      *
-     * Started from the response headers rather than from the request, which is what the comment on
-     * the constant has always said: a route that is slow to accept the connection is not charged
-     * for the waiting.
+     * Started from the response headers rather than from the request, as the comment on the
+     * constant says: a route that is slow to accept the connection is not charged for the waiting.
      */
     const budget = startGenerationBudget({
       timeoutMs: this.#generationTimeoutMs,
@@ -1303,12 +1300,11 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
      *
      * A buffering proxy - LiteLLM, a corporate egress gateway - answers it with an ordinary JSON
      * completion, and the SSE reader discards every line of it because none begins with `data:`.
-     * Since the reader synthesises a `choices` array whatever it read, that came back as a
-     * *success* carrying no text, no tool calls and no usage: the turn completed with nothing in
-     * it, the loop's completion nag fired its three times, and the ledger recorded $0.00 for every
-     * call the provider billed. The catalogue path has carried a defence against this exact shape
-     * since `provider_catalog_empty` - an empty list is an outage wearing a 200 - and the inference
-     * path had none.
+     * Since the reader synthesises a `choices` array whatever it read, that would come back as a
+     * *success* carrying no text, no tool calls and no usage: the turn would complete with nothing
+     * in it, the loop's completion nag would fire its three times, and the ledger would record
+     * $0.00 for every call the provider billed. The catalogue path defends against the same shape
+     * with `provider_catalog_empty` - an empty list is an outage wearing a 200.
      *
      * A reply that declares itself JSON is read as JSON. Anything else, including a reply that
      * declares nothing, is still read as a stream, because that is what every honouring route sends
@@ -1341,21 +1337,21 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
     } else {
       body = (await withinBudget(() => response.json())) as CompletionBody;
     }
-    // Hoisted above `choices`, which used to gate it: `#streamCompletion` returns a `choices` array
-    // of length one however the stream went, so on the streamed path this guard was unreachable -
+    // Above `choices` rather than gated by it: `#streamCompletion` returns a `choices` array of
+    // length one however the stream went, so on the streamed path a gated guard is unreachable -
     // and the streamed path is where a 200 carrying only an `error` object most often arrives.
     const fault = this.#fault(body.error, 'in its response');
     if (fault) throw fault;
     const choice = body.choices?.[0];
-    // A failed parse used to become `{}` and run anyway: `file_write` cut off mid-JSON was
-    // dispatched with no path and no content, failed on a validation error that named neither the
-    // truncation nor the remedy, and the turn spent its remaining steps rewriting the same file.
-    // The call is marked instead, and the loop refuses it with an explanation.
+    // A failed parse must not become `{}` and run anyway: `file_write` cut off mid-JSON would be
+    // dispatched with no path and no content, fail on a validation error that names neither the
+    // truncation nor the remedy, and the turn would spend its remaining steps rewriting the same
+    // file. The call is marked instead, and the loop refuses it with an explanation.
     /*
-     * Two different failures wore one name. A call whose arguments will not parse was always
-     * reported as having been cut off at the output limit, and a smaller model writing malformed
-     * JSON - which it does far more often - was told to send a shorter payload, which is no help at
-     * all. The provider says which it was: `length` is the only finish reason that means truncation.
+     * Two different failures, two names. A call whose arguments will not parse is not necessarily
+     * cut off at the output limit, and a smaller model writing malformed JSON - which it does far
+     * more often - gains nothing from being told to send a shorter payload. The provider says which
+     * it was: `length` is the only finish reason that means truncation.
      */
     const stoppedAtLimit = choice?.finish_reason === 'length';
     const toolCalls = (choice?.message?.tool_calls ?? []).map((call) => {
@@ -1379,11 +1375,11 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
     /*
      * A streamed request asks for usage and the route sends it in one frame at the end, so a stream
      * that was cut off - or one from a route that simply never sends the frame - leaves this side
-     * with nothing to bill. It used to record zero, which is how a quarter of an hour of generation
-     * came to sit on the timeline under a price that never moved while the owner watched it. The
-     * characters were counted on the way past; four to the token is the same rough conversion the
-     * window is estimated with, and it travels marked as an estimate so nothing downstream mistakes
-     * it for the provider's own number. The prompt is not estimated: this side never saw it.
+     * with nothing to bill. Recording zero would leave a long generation on the timeline under a
+     * price that never moves while the owner watches it. The characters were counted on the way
+     * past; four to the token is the same rough conversion the window is estimated with, and it
+     * travels marked as an estimate so nothing downstream mistakes it for the provider's own
+     * number. The prompt is not estimated: this side never saw it.
      */
     const reportedOutputTokens = body.usage?.completion_tokens;
     const countedOutputTokens = streamed ? estimatedOutputTokens(streamed.generatedChars) : 0;

@@ -66,13 +66,13 @@ export const createStreamChannel = (
    * One lost frame is not a lost turn.
    *
    * `await streamEvents` sits above the billing block, so a single failed insert among several
-   * hundred delta rows - pglite under contention, a Postgres failover - used to reject there
-   * and kill a turn the owner had already watched succeed on screen, taking the ledger row for
-   * a model call the provider had already charged for with it. The frames are the least
+   * hundred delta rows - pglite under contention, a Postgres failover - would otherwise reject
+   * there and kill a turn the owner had already watched succeed on screen, taking the ledger row
+   * for a model call the provider had already charged for with it. The frames are the least
    * durable thing in this file by design: they are superseded by the assistant message that
    * closes the turn, so losing one costs a fragment of a paragraph that is about to be written
-   * again in full. The reasoning channel beside this has been swallowing its own failures for
-   * exactly this reason; the answer channel was the one that did not.
+   * again in full. The reasoning channel beside this swallows its own failures for exactly this
+   * reason.
    *
    * It is not silent. `droppedFrames` is counted and said once per turn, because a frame
    * channel that has started failing is worth knowing about even though it is not worth
@@ -158,9 +158,9 @@ export const createStreamChannel = (
    * The reasoning, on its own channel and on its own flusher.
    *
    * A high-effort step on a full window routinely thinks for the better part of a minute before
-   * the first word of the answer, and the owner was shown a spinner for all of it. The route
-   * already produces this and the stream parser already read it; it was accumulated and thrown
-   * into the response, arriving all at once after the fact when it was no longer of use.
+   * the first word of the answer, and without this the owner would watch a spinner for all of it.
+   * Accumulated into the response instead, the reasoning would arrive all at once after the fact,
+   * when it is no longer of use.
    *
    * Its own flusher because the two arrive interleaved and sharing one would splice the thinking
    * into the answer.

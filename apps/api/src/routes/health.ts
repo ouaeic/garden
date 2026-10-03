@@ -23,15 +23,13 @@ export const registerHealthRoutes = (context: RouteContext): void => {
    * What this program is and where its source is, which is all a licence notice on an AGPL box
    * amounts to.
    *
-   * It used to carry a document version and an "acceptance required" flag as well. Nothing ever
-   * served a document to accept and nothing could record an acceptance after registration, so the
-   * flag was a constant `false` and the version a constant null - a gate reported to every client
-   * that could never close. A machine the owner installed does not present its owner with terms.
+   * There is no document version or "acceptance required" flag: a machine the owner installed does
+   * not present its owner with terms.
    */
   app.get('/v1/legal', async () => {
     // Counted once. This route is public, is not rate limited, and the sign-in screen calls it on
-    // every load, so the two identical queries it used to run were two per hit on the one path a
-    // box that cannot answer them has no other way to explain itself.
+    // every load, so a second identical query would be two per hit on the one path a box that
+    // cannot answer them has no other way to explain itself.
     const users = await store.countUsers();
     return {
       applicationLicense: 'AGPL-3.0-only' as const,

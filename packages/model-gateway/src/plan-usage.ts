@@ -29,10 +29,10 @@ export const PlanUsage = z.object({
       /*
        * Which unit `used` and `limit` are in, stated rather than guessed.
        *
-       * The strip used to infer it from `limit === 1`, which is true of Ollama Cloud's fractions
-       * and of nothing else - so OpenRouter's dollars were rendered as a percentage of a plan and
-       * $12.34 of spend read as "1234%". The two providers do not measure the same thing and the
-       * record has to say which one it carries.
+       * Inferring it from `limit === 1`, which is true of Ollama Cloud's fractions and of nothing
+       * else, would render OpenRouter's dollars as a percentage of a plan, and $12.34 of spend
+       * would read as "1234%". The two providers do not measure the same thing and the record has
+       * to say which one it carries.
        */
       unit: z.enum(['fraction', 'usd']),
       /**

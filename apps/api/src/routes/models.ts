@@ -104,9 +104,9 @@ export const registerModelRoutes = (context: RouteContext): void => {
       privacyRoute?: 'provider_zdr' | 'external';
       preference?: 'fast' | 'balanced' | 'best';
       /**
-       * The full router vocabulary, not the three coarse kinds this used to admit. Five profiles -
-       * vision, long context, reasoning, bulk summarisation, conversation - were written, weighted
-       * and tested, and were unreachable from the only HTTP entry point that ranks anything.
+       * The full router vocabulary, not three coarse kinds: every weighted profile - vision, long
+       * context, reasoning, bulk summarisation, conversation - has to be reachable from the only
+       * HTTP entry point that ranks anything.
        */
       taskKind?: ModelTaskKind;
     };

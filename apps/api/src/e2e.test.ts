@@ -1,7 +1,7 @@
 /**
  * End-to-end tests for the whole task loop.
  *
- * The unit suites cover pieces in isolation; nothing until now exercised the path a real user takes
+ * The unit suites cover pieces in isolation; this one exercises the path a real user takes
  * - sign in, create a workspace, send a prompt, watch the agent call tools and answer - against a
  * real database, the real API, the real embedded worker and the real agent loop. Only the provider
  * and the workspace runner are scripted, because those are the two things a test cannot own.

@@ -116,8 +116,8 @@ describe('which browser answers a search', () => {
     expect(plan({ sessionHolder: null })).toEqual(['isolated']);
   });
 
-  // A challenge standing in the session browser used to refuse every later search for the session.
-  // It now removes the second attempt and nothing else.
+  // A challenge standing in the session browser removes the second attempt and nothing else; it
+  // must not refuse every later search for the session.
   it('drops the session attempt when a challenge already stands there, and searches anyway', () => {
     expect(plan({ sessionHostClosed: true })).toEqual(['isolated']);
   });

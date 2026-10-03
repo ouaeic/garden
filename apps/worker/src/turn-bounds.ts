@@ -54,14 +54,14 @@ export const REPEATABLE_TOOLS = new Set([
 /**
  * The members of the set above that are safe to run twice and still leave something behind.
  *
- * Two properties were being read off one list, and only one of them is what that list says. A tool
+ * Two properties can be read off one list, and only one of them is what that list says. A tool
  * whose second run cannot surprise anyone is a tool that is safe to REPLAY; it is not necessarily a
  * tool that changed nothing. `code_diagnostics` is exactly that gap and it is the only member: a
  * repeated `make -s` tells the owner nothing new, which is what earns it a place above, and it
  * writes to the tree while doing it, which is what takes it out of the two sets derived below.
  *
  * Measured on this machine rather than argued, and measured on both halves of the tool - because the
- * point is that the split the removed approval card drew is not this one:
+ * point is that no split between safe and unsafe languages holds:
  *
  *   - `make -s` on a Makefile whose default target writes a file wrote it. 1 new file, exit 0.
  *   - `cargo check --message-format short` on a crate with a `build.rs` that writes a file left 50
@@ -69,13 +69,12 @@ export const REPEATABLE_TOOLS = new Set([
  *   - `cargo check` on a crate with NO `build.rs` at all still left 16: `Cargo.lock` and 15 under
  *     `target/`. Nothing a stranger wrote had to run for that.
  *   - `python3 -I -m compileall -q .` wrote `__pycache__/app.cpython-310.pyc`, and `tsc --noEmit`
- *     under `incremental: true` wrote `tsconfig.tsbuildinfo`. Those are two of the SIX languages the
- *     old card called safe.
+ *     under `incremental: true` wrote `tsconfig.tsbuildinfo`. Those are two of the languages a
+ *     per-language split would call safe.
  *
- * So the whole tool writes, not nine fifteenths of it, and the bound is unconditional. That is also
- * why this is a set of tool names and not a per-language question: the only thing that could answer
- * per language is a directory listing taken before the call, which is the runner round trip the
- * approval floor was doing and no longer does.
+ * So the whole tool writes, and the bound is unconditional. That is also why this is a set of tool
+ * names and not a per-language question: the only thing that could answer per language is a
+ * directory listing taken before the call, which is a runner round trip in front of every call.
  *
  * The ordinary call lands under `workspace`, which is `CHECKPOINT_CONTENT[0]`, so the undo point
  * below covers what these commands write. It is a default and not a guarantee - the runner's
@@ -303,14 +302,11 @@ const OWNER_FIXABLE_CHECKPOINT_CODES = new Set([
 /**
  * The runner's code, dug out of the sentence it was flattened into.
  *
- * `AgentRunnerClient.checkpoint` used to be the one runner call in this package that did not build
- * its error through `runnerFailure` - it threw `Checkpoint failed (<status>): <body>` with the
- * runner's own `{error:{code,message,…}}` envelope flattened into the sentence, so the code was
- * present on the wire and thrown away by the client rather than by the runner. That half is now
- * fixed and the code arrives as an `GardenError` field.
- *
- * This stays as the fallback, for the same reason the prose regex below does: a worker is routinely
- * a release ahead of the box it talks to, and a runner that still flattens is still readable.
+ * `AgentRunnerClient.checkpoint` builds its error through `runnerFailure`, so the code normally
+ * arrives as a `GardenError` field. This stays as the fallback, for the same reason the prose regex
+ * below does: a worker is routinely a release apart from the box it talks to, and a refusal that
+ * arrives as `Checkpoint failed (<status>): <body>`, with the runner's own
+ * `{error:{code,message,…}}` envelope flattened into the sentence, is still readable.
  */
 const checkpointRefusalCode = (message: string): string | undefined => {
   const start = message.indexOf('{');
@@ -367,11 +363,10 @@ const LOOP_ANSWERED_TOOLS: ReadonlySet<string> = new Set([
  *
  * The completion nag above is the same failure seen from one side only: it counts replies that
  * carried *no tool call at all*, and it is reset by any call in the response - including the ones
- * the loop answers instead of running. That reset is the hole. Measured on the owner's box: a
- * fourteen-minute, twelve-call turn on a cheap route that produced a thousand streamed frames, five
- * consolidated replies and no progress, re-deciding one question in fresh words each time. The
- * repetition watch could not see it, because nothing was repeated verbatim; the nag could not see
- * it, because every second step proposed something and zeroed the counter.
+ * the loop answers instead of running. That reset is the hole: a turn can stream for many minutes
+ * and make no progress, re-deciding one question in fresh words each step. The repetition watch
+ * cannot see it, because nothing is repeated verbatim; the nag cannot see it, because every second
+ * step proposes something and zeroes the counter.
  *
  * So the count here is of steps that *started* something, which is the only fact in the loop that
  * cannot be produced by talking. Three. Two consecutive steps with nothing running is an ordinary
@@ -381,8 +376,8 @@ const LOOP_ANSWERED_TOOLS: ReadonlySet<string> = new Set([
  * What it must never do is interrupt a turn that is thinking hard and still moving. It cannot: a
  * single tool starting anywhere in a step resets it to zero, so the length of the reasoning, the
  * effort level, the size of the window and the number of steps are all irrelevant to it. Nor does a
- * step that asked for nothing move it - that is the nag's, and counting it here as well made two
- * steps of ordinary reasoning into two thirds of a break. See the branch that used to.
+ * step that asked for nothing move it - that is the nag's, and counting it here as well would make
+ * two steps of ordinary reasoning into two thirds of a break.
  */
 export const MAX_IDLE_STEPS = 3;
 
@@ -824,11 +819,11 @@ export const MAX_ARGUMENT_TRUNCATIONS = 3;
  *
  * The malformed turn is *answered* in the real history - a tool call with no tool result is a
  * malformed window the provider refuses on the next step, so the call cannot simply be dropped -
- * and until this existed the bytes that would not parse were answered and then kept. What is kept
+ * and without this the bytes that would not parse are answered and then kept. What would be kept
  * is the whole of `rawArguments`: a `file_write` cut off at a 16,384-token output cap carries tens
  * of kilobytes of half-written file, on the assistant message, for the rest of the conversation.
  *
- * Three things that costs, and only the first is the one the floor names:
+ * Three things keeping it would cost, and only the first is the one the floor names:
  *
  * - The record says the model called a tool with arguments nobody can read, so every later step is
  *   reasoning from a turn that never happened. The remedy is a tombstone: the call stands, its
@@ -837,19 +832,19 @@ export const MAX_ARGUMENT_TRUNCATIONS = 3;
  * - The window is *measured* from it. `estimatedTokens` in context.ts sizes an assistant message
  *   with `JSON.stringify(message.toolCalls).length`, and that walks `rawArguments`. The adapter
  *   sends none of it - `openai-compatible.ts` serialises `id`, `name` and `JSON.stringify(arguments)`
- *   and `arguments` is `{}` on this path - so a truncated write charged the turn several thousand
- *   tokens of window that no provider would ever see, and the compaction trigger reads that number.
- *   A cut-off call therefore made the turn condense away real history to make room for bytes that do
- *   not exist.
+ *   and `arguments` is `{}` on this path - so a truncated write would charge the turn several
+ *   thousand tokens of window that no provider would ever see, and the compaction trigger reads
+ *   that number. A cut-off call would therefore make the turn condense away real history to make
+ *   room for bytes that do not exist.
  * - It is persisted. `state.messages` is encrypted into the task row on every step and carried into
  *   every later turn of the conversation, so the garbage outlives the turn that produced it.
  *
- * The declared type is already right, and that is the sharpest way to say what went wrong here.
+ * The declared type is already right, and that is why the compiler cannot catch this.
  * `ModelMessage.toolCalls` in `protocol.ts` is `{id, name, arguments}` and nothing else - a stored
  * tool call is those three fields by definition. The object actually pushed onto `state.messages` is
  * the adapter's `ModelToolCall`, which carries three more, and nothing between the push and the
- * encrypted write ever parses the message back through the schema that would have dropped them. So
- * the extra fields were invisible to the compiler and present in every byte the box wrote to disk.
+ * encrypted write ever parses the message back through the schema that would drop them. So the
+ * extra fields are invisible to the compiler and present in every byte the box writes to disk.
  *
  * Returns how many bytes were taken out, for the warning event that already reports the truncation:
  * a number is the only part of that payload it is safe to publish, and it is what makes this
@@ -1081,22 +1076,22 @@ export const CONTEXT_EFFORT_FLOOR_SHARE = 0.5;
 /**
  * How hard the model should think about this particular step.
  *
- * This used to key off `REPEATABLE_TOOLS`, and that set is documented in its own comment as a
- * replay-safety set: tools whose second run after a restart cannot surprise anyone. Replay safety
- * and cognitive difficulty are unrelated, and for the read tools they are close to inverted. The
- * set contains file_read, document_read, image_read, parallel_web_read, web_search, code_search
- * and repo_overview - every one of which returns material the model then has to reason hard about,
- * and every one of which dropped the next step to 'low'. The step after an 18,000-character CSV
- * landed in the window was the cheapest step in the task.
+ * Not keyed off `REPEATABLE_TOOLS`, which is documented in its own comment as a replay-safety set:
+ * tools whose second run after a restart cannot surprise anyone. Replay safety and cognitive
+ * difficulty are unrelated, and for the read tools they are close to inverted. The set contains
+ * file_read, document_read, image_read, parallel_web_read, web_search, code_search and
+ * repo_overview - every one of which returns material the model then has to reason hard about.
+ * Keyed off it, the step after an 18,000-character CSV landed in the window would be the cheapest
+ * step in the task.
  *
- * It now ratchets in one direction only. A turn opens at 'high' because that is where the request
+ * It ratchets in one direction only. A turn opens at 'high' because that is where the request
  * is read and the approach chosen, settles to 'medium' for ordinary progress, and rises back to
  * 'high' - permanently, for the rest of the turn - on any evidence that this turn has become hard:
  * something failed, a check failed, the window was just compacted, the trajectory is long, or
  * the context is over half the input budget. Two consequences, both wanted. The model thinks most
  * where the measured failures are. And `reasoning` becomes a nearly byte-stable request field
- * instead of flipping ten times in twenty-three steps, each flip discarding the provider's cached
- * trajectory below the system prefix.
+ * instead of flipping from step to step, each flip discarding the provider's cached trajectory
+ * below the system prefix.
  */
 interface EffortState {
   step: number;
@@ -1112,12 +1107,12 @@ interface EffortState {
 /**
  * Whether this step's `high` is evidence about the *work* rather than about one call going wrong.
  *
- * Only these conditions may pin the floor for the rest of the turn. The distinction was missing and
- * it is expensive: `Tool failed:` is written when a tool *threw* - the runner briefly unreachable,
- * a socket closed - and on a measured run one such shell call on step 4 pinned every one of the
- * sixteen remaining steps to maximum reasoning on a task whose entire output was two lines of
- * verse. That is a fact about the network. The step after it is still worth thinking about, and it
- * still gets `high` below; what it no longer does is decide that the turn is hard for ever.
+ * Only these conditions may pin the floor for the rest of the turn, and the distinction is
+ * expensive to miss: `Tool failed:` is written when a tool *threw* - the runner briefly
+ * unreachable, a socket closed - and one such shell call early in a turn would pin every remaining
+ * step to maximum reasoning, whatever the task. That is a fact about the network. The step after it
+ * is still worth thinking about, and it still gets `high` below; what it does not do is decide that
+ * the turn is hard for ever.
  *
  * The conditions kept here are all statements about the turn itself: the harness refused a finish,
  * an acceptance check failed, the window was just compacted and the model is working from a summary

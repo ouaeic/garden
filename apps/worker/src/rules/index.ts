@@ -123,8 +123,8 @@ const commandLine = (call: RuleObservation['toolCalls'][number]): string => {
 /**
  * The seed set.
  *
- * Every one of these is a sentence the operating contract used to carry unconditionally and no
- * longer does, kept here because it passed all four tests as a *triggered* rule and failed at least
+ * Every one of these is a sentence the operating contract does not carry unconditionally, kept here
+ * because it passed all four tests as a *triggered* rule and failed at least
  * one as a resident one. What was rejected is as much the point as what was taken, and it is
  * written down in the report rather than here: "call connector_list first" is one call away from
  * being discovered, "prefer accessibility-node actions" is already in `desktop_action`'s own

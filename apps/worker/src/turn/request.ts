@@ -7,8 +7,8 @@ import type { ReasoningEffort } from '@garden/contracts';
  *
  *   - `lastStepUsd` is cleared **after** the guard that reads it and **before** the calls that fill
  *     it. A step is whatever this iteration spends - the lead call plus any specialist, compaction
- *     or search that runs inside it - and each of those used to overwrite it rather than add to it,
- *     so the spend guard was quoted the price of whichever happened to bill last;
+ *     or search that runs inside it - and each of those adds to it rather than overwriting it, or
+ *     the spend guard would be quoted the price of whichever happened to bill last;
  *   - the window is checked against the model **once**, before the first request, rather than after
  *     the provider refuses it. A window that cannot hold the catalogue and still leave room to work
  *     is a fact about the model the owner chose, and it is answerable - pick another one - but only
@@ -76,8 +76,8 @@ export const prepareStepRequest = async (
   const { refreshActivePlan } = control;
   // Cleared here, after the guard that reads it and before the calls that fill it. A step is
   // whatever this iteration spends - the lead call plus any specialist, compaction or search
-  // that runs inside it - and each of those used to overwrite this rather than add to it, so
-  // the guard was quoted the price of whichever happened to bill last.
+  // that runs inside it - and each of those adds to this rather than overwriting it, or the
+  // guard would be quoted the price of whichever happened to bill last.
   state.lastStepUsd = 0;
   // Said once, before the first request rather than after the provider refuses it. A window
   // that cannot hold the catalogue and still leave room to work is a fact about the model the

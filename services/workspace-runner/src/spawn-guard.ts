@@ -4,11 +4,10 @@ import path from 'node:path';
 /**
  * A spawn that fails is an error event, and an error event nobody listens for KILLS THIS PROCESS.
  *
- * Measured on the box. A turn asked the desktop to open `gedit`, which is not installed, and the
- * workspace runner died - not the call, the runner - with `Error: spawn gedit ENOENT` under Node's
- * own `throw er; // Unhandled 'error' event`. It came back under `Restart=always` and the turn
- * asked again, five times over, so every other task on the machine lost its runner three times for
- * a missing text editor. `NRestarts=5`.
+ * A turn that asks the desktop to open `gedit` when it is not installed would otherwise kill the
+ * workspace runner - not the call, the runner - with `Error: spawn gedit ENOENT` under Node's own
+ * `throw er; // Unhandled 'error' event`. `Restart=always` brings it back, the turn asks again, and
+ * every other task on the machine loses its runner each time, for a missing text editor.
  *
  * `ChildProcess` is an EventEmitter, and an EventEmitter with no `error` listener rethrows the
  * event as an uncaught exception. Every `spawn` in this service therefore needs one, whether or not

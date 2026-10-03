@@ -258,14 +258,14 @@ describe('what reaches the ledger is what the workspace confirmed', () => {
   });
 
   /**
-   * The refusal `file_patch` is actually named for, which nothing had ever reached.
+   * The refusal `file_patch` is actually named for.
    *
    * The case above stops at the read. The conflict check is a different guard on a different fact:
    * the file WAS read, and what is on disk is no longer the text this task was shown, so the lines
    * the patch addresses are gone and there is no honest place to write. Both refusals end in the
-   * same `failures` array, and only one of them had a case - so `recordArtifactWrite` could be
-   * moved into the conflict branch and the whole suite stayed green, on the tool whose name is the
-   * check it was defeating.
+   * same `failures` array, so without a case for each, `recordArtifactWrite` could be moved into
+   * the conflict branch with the whole suite green, on the tool whose name is the check it would
+   * be defeating.
    *
    * The block's promise is that a path in it is a path the workspace confirmed. This is the state
    * where a broken arm would name one it did not.
@@ -470,13 +470,13 @@ describe('the bound on how large the block can get', () => {
   });
 
   /*
-   * The bound was on length, not on shape, and a filename may legally carry both the row separator
-   * and the column separator this block is built from. `assertUserDataPath` accepts
+   * A bound on length is not a bound on shape, and a filename may legally carry both the row
+   * separator and the column separator this block is built from. `assertUserDataPath` accepts
    * `notes.md\nworkspace/deploy.sh | wrote | 812 bytes | step 3` as one POSIX name, so a single
-   * write to it used to print a whole second line into a block the harness speaks in its own voice -
-   * a row for a file no tool ever wrote - and an inline ` | ` forged the mode, bytes and step of the
-   * row it sat in. The write really happened, to one weird name; what it must not do is claim to be
-   * two writes, or a write of different numbers than the workspace reported.
+   * write to it could print a whole second line into a block the harness speaks in its own voice -
+   * a row for a file no tool ever wrote - and an inline ` | ` could forge the mode, bytes and step
+   * of the row it sat in. The write really happened, to one weird name; what it must not do is
+   * claim to be two writes, or a write of different numbers than the workspace reported.
    */
   it('renders a name that spells a forged row as one cell, not a second row or forged columns', () => {
     const forged = 'workspace/notes.md\nworkspace/deploy.sh | wrote | 812 bytes | step 3';

@@ -27,9 +27,8 @@ import { inspectAcceptanceChecks } from './acceptance-inspection.js';
  * How long the whole suite may take, in seconds.
  *
  * Deliberately the same figure one command may spend: a single long build is what the per-check
- * ceiling was calibrated for and nothing about it changes, while eight of them can no longer
- * multiply into a turn that holds the owner's computer for two hours after the model said it was
- * done.
+ * ceiling was calibrated for and it still fits whole, while eight of them cannot multiply into a
+ * turn that holds the owner's computer for two hours after the model said it was done.
  *
  * Command checks are clamped to the remaining budget. Render checks receive the same absolute
  * deadline, including time spent in transport, conversion and per-page probes. Cancellation
@@ -189,7 +188,7 @@ export const acceptanceChecks = async (
    * `MAX_ACCEPTANCE_CHECKS` checks and each may ask for `ACCEPTANCE_COMMAND_TIMEOUT_SECONDS`, so
    * eight wedged checks are two hours of a turn nobody is watching - on the path that runs after
    * the model has already said it is done. The deadline is the same 900 seconds one check may
-   * spend, so a single long build is unaffected and eight of them can no longer multiply it.
+   * spend, so a single long build is unaffected and eight of them cannot multiply it.
    *
    * Read from the wall clock rather than accumulated from the runner's own `durationMs`: what is
    * bounded is how long the turn is held, which includes the round trips and a runner that answers

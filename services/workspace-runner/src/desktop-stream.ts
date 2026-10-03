@@ -3,10 +3,10 @@ import type { DesktopHolder } from '@garden/contracts';
 /**
  * Display transport for the private Linux desktop.
  *
- * The runner used to spawn `ffmpeg -frames:v 1` twice a second and push whole JPEGs. This
- * module replaces that with one long-lived encoder per session whose output is split into
- * H.264 access units (or whole JPEGs on the fallback path) and handed to bounded per-subscriber
- * queues, so a stalled client drops frames instead of growing the runner's heap.
+ * One long-lived encoder per session, rather than an `ffmpeg -frames:v 1` spawned per frame, whose
+ * output is split into H.264 access units (or whole JPEGs on the fallback path) and handed to
+ * bounded per-subscriber queues, so a stalled client drops frames instead of growing the runner's
+ * heap.
  *
  * Everything here is deliberately free of X11 and process-management side effects except
  * `DisplayEncoder`, which takes its spawn function as a parameter - the parsers, the queue
@@ -666,9 +666,8 @@ export const prepareStillCapture = (
     const y = Math.max(0, Math.min(request.region.y, request.geometry.height - height));
     region = { x, y, width, height };
     /*
-     * And bounded at the far end too, which the clamp above did not do and the comment above was
-     * read as doing. `scale=` sat in the `else` below and therefore never ran for a region, so a
-     * zoom of the whole of a 2560x1600 display came back at 4.1 megapixels - three times the
+     * And bounded at the far end too, which the clamp above does not do. Without `scale=` here a
+     * zoom of the whole of a 2560x1600 display would come back at 4.1 megapixels - three times the
      * 1440x900 box the full screenshot of that same display is reduced into, and a "closer look"
      * that is larger than the picture it was supposed to be a closer look at.
      *
@@ -772,8 +771,8 @@ export interface DisplayEncoderOptions {
   /**
    * The ceiling that wait backs off to.
    *
-   * A failure that will not clear - no ffmpeg on the host, a display that is gone - used to be
-   * retried twice a second for as long as anybody was watching, each attempt spawning a process
+   * A failure that will not clear - no ffmpeg on the host, a display that is gone - would otherwise
+   * be retried twice a second for as long as anybody was watching, each attempt spawning a process
    * and writing a line. Backing off means a transient failure still recovers within a frame or
    * two and a permanent one costs a poll a minute instead of a hundred and twenty.
    */

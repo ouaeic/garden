@@ -10,12 +10,12 @@ import {
 /**
  * What generated media costs, decided here rather than by the model.
  *
- * The estimate used to be a `generate_media` parameter: the model read the catalogue, then handed
- * the number back on the next call, and both the approval card and the tool result quoted whatever
- * it wrote. Nothing checked it, so a call carrying `estimatedCostUsd: 0` - or omitting it, which
- * arrived as NaN - spent the owner's provider money with no card in front of it. The prices are
- * the provider's own and the request already carries everything they depend on, so the number is
- * derived on this side of the boundary in both places and the model's opinion is not consulted.
+ * The estimate is not a `generate_media` parameter. Taken from the model, both the approval card
+ * and the tool result would quote whatever it wrote, unchecked, so a call carrying
+ * `estimatedCostUsd: 0` - or omitting it, which arrives as NaN - would spend the owner's provider
+ * money with no card in front of it. The prices are the provider's own and the request already
+ * carries everything they depend on, so the number is derived on this side of the boundary in both
+ * places and the model's opinion is not consulted.
  */
 export const managedMediaCatalog = {
   image: {

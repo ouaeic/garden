@@ -671,15 +671,12 @@ describe('how long the owner waits', () => {
 
   test('neither a send nor a first paint waits for the agent disk to be walked', async () => {
     /**
-     * Measured before this was fixed, with the runner stubbed at 700 ms: bootstrap 716 ms median
-     * and POST /v1/tasks 716 ms median - the walk was essentially the whole response time. On a
-     * 29,000-file tree it takes 684-1279 ms.
+     * On a large tree the walk would be essentially the whole response time of either request.
      *
-     * The property is that neither response waits for it, and that used to be checked with a
-     * millisecond budget - which measures the machine as much as the server, and fails on a loaded
-     * one while the property still holds. So the walk is held open across both requests instead: if
-     * either one waits on it, nothing answers and this test times out. There is no threshold left
-     * to be unlucky against.
+     * The property is that neither response waits for it. A millisecond budget would measure the
+     * machine as much as the server, and fail on a loaded one while the property still holds. So
+     * the walk is held open across both requests instead: if either one waits on it, nothing
+     * answers and this test times out. There is no threshold to be unlucky against.
      */
     const harness = await start('Answered.');
     const sentAt = performance.now();
@@ -727,8 +724,8 @@ describe('when several devices are already watching', () => {
 describe('when a device drops and comes back', () => {
   test('a reconnect with Last-Event-ID resumes with no duplicate and no hole', async () => {
     /**
-     * The stated promise is replay-safe events across devices, and until this test there was
-     * nothing in the tree that opened a stream, cut it, and opened it again. The two halves of
+     * The stated promise is replay-safe events across devices, and this test opens a stream, cuts
+     * it, and opens it again. The two halves of
      * that promise fail in opposite directions and neither one announces itself: a cursor that
      * resumes one frame early repeats a frame, and because the client appends `assistant_delta`
      * fragments rather than replacing them, a repeat is not a flicker - it duplicates a sentence

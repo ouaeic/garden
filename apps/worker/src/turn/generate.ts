@@ -110,14 +110,13 @@ export const generateModelStep = async (
   const { honorUserControl, refreshActivePlan } = control;
   /*
    * The three channels this generation writes to the owner's timeline while it is still being
-   * generated. @see createStreamChannel in `turn/stream-channel.ts`, where the hundred and nine
-   * lines that used to sit here - between assembling the request and sending it - now live.
+   * generated. @see createStreamChannel in `turn/stream-channel.ts`.
    *
    * The ownership question travels as an accessor because the watch that answers it is created
    * with the request, below: `disowned` means another claimant is already running this task,
    * and every row this run writes from that moment lands in the middle of *their* trajectory.
-   * The halt branch below already refuses to bill or to write closing state on that arm for
-   * exactly this reason; the frame channel is the loudest of the three and did not.
+   * The halt branch below refuses to bill or to write closing state on that arm for exactly
+   * this reason, and the frame channel, the loudest of the three, must refuse too.
    *
    * `stopped` is the opposite case and is deliberately left alone: that is the owner's own
    * Stop, on their own conversation, and the words they watched being written are theirs to
@@ -403,10 +402,10 @@ export const generateModelStep = async (
   /*
    * The repeat, now that it has been paid for.
    *
-   * This sits after the billing block and not before it, which is the whole of the repair: the
-   * abort used to `continue` from above the block, so the one generation the box stops on
-   * purpose was the one generation that cost $0.00 on the ledger and left `lastStepUsd` at the
-   * previous step's figure - the number the spend guard prices the next step from.
+   * This sits after the billing block and not before it. Returning from above the block would
+   * make the one generation the box stops on purpose the one generation that cost $0.00 on the
+   * ledger, and leave `lastStepUsd` at the previous step's figure - the number the spend guard
+   * prices the next step from.
    *
    * The words are not added to the window. Half a reply and four hundred copies of one sentence
    * is not a turn a later request can carry, and the model is told what it did instead. They are

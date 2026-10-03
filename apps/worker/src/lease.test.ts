@@ -6,11 +6,11 @@ const counters = (): WorkerCounters => ({ active: 0, completed: 0, failed: 0, le
 /**
  * A promise the test resolves when the thing it is waiting for has actually happened.
  *
- * These tests used to run the loops at `pollMs: 1` and then wait a fixed ten milliseconds before
- * asserting, which is a bet that the machine schedules three lease attempts inside that window. On
- * a loaded box it does not, and the suite failed about one run in five - a flake in the one file
- * that exists to show the queue keeps running when things go wrong. Nothing here waits on the
- * clock now: every assertion is gated on the loops reporting that they reached the state.
+ * Waiting a fixed few milliseconds before asserting would be a bet that the machine schedules
+ * three lease attempts inside that window. On a loaded box it does not, and this is the one file
+ * that exists to show the queue keeps running when things go wrong, so it must not flake. Nothing
+ * here waits on the clock: every assertion is gated on the loops reporting that they reached the
+ * state.
  */
 const gate = (): { reached: Promise<void>; reach: () => void } => {
   let reach = (): void => undefined;
@@ -92,7 +92,7 @@ describe('worker lease loops', () => {
 
   it('keeps the other slots alive when recording a failure itself fails', async () => {
     // fail() writes to the store, which is exactly what may have just become unreachable. An
-    // unhandled rejection here used to end the process and take every in-flight task with it.
+    // unhandled rejection here would end the process and take every in-flight task with it.
     const gauge = counters();
     const bothSeen = gate();
     let running = true;

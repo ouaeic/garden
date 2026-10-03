@@ -177,10 +177,10 @@ export async function executeKnowledgeTool(
       /*
        * A turn cannot write the tier that follows the owner out of this workspace.
        *
-       * This used to pass `target` straight through to `createWorkspaceMemory`, so a running turn
-       * could mint a durable fact about the person. The store now refuses it and the type no longer
-       * admits it; this is the same refusal said early and in words the model can act on, because a
-       * type error in a package the model never reads is not an explanation.
+       * Passing `target` straight through to `createWorkspaceMemory` would let a running turn mint
+       * a durable fact about the person. The store refuses it and the type does not admit it; this
+       * is the same refusal said early and in words the model can act on, because a type error in a
+       * package the model never reads is not an explanation.
        *
        * The reason is measured rather than cautious. Over 505 owner-typed turns from ten projects,
        * the two person-shaped facts an extractor would most confidently propose are a design

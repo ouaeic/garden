@@ -42,8 +42,8 @@ const addressLine = (value: unknown): string => {
 /**
  * What the owner is actually being asked to approve.
  *
- * The card used to read "Delete through imap" over a JSON dump of the arguments, which is neither
- * the thing being done nor anything a person can weigh in the two seconds they give a notification.
+ * A card reading "Delete through imap" over a JSON dump of the arguments would be neither the thing
+ * being done nor anything a person can weigh in the two seconds they give a notification.
  * A message leaving the owner's own address is the one connector action they cannot take back, so
  * the card names the recipients and shows the message; everything else says what it changes and
  * where. Keyed on the action rather than on the connector, because the tier a connector action sits

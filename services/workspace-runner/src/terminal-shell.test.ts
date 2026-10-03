@@ -115,10 +115,10 @@ describe('a terminal session and the capability behind it', () => {
     disposers.push(async () => socket.close());
 
     /*
-     * Sent in the same breath as the open, which is the case that used to be lost: the runner
-     * builds the workspace before it spawns the shell, so this frame arrives while there is no pty
-     * to hand it to. `stty size` proves it was not dropped - it prints the rows and columns the
-     * shell actually believes it has.
+     * Sent in the same breath as the open, which is the case most easily lost: the runner builds
+     * the workspace before it spawns the shell, so this frame arrives while there is no pty to hand
+     * it to. `stty size` proves it was not dropped - it prints the rows and columns the shell
+     * actually believes it has.
      */
     socket.send(JSON.stringify({ type: 'resize', cols: 100, rows: 40 }));
     socket.send(JSON.stringify({ type: 'input', data: 'stty size\n' }));

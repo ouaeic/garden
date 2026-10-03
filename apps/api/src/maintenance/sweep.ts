@@ -1,7 +1,7 @@
 /**
  * The five-minute pass, and the promise that two of them never overlap.
  *
- * Each step is contained on its own: an unhandled rejection here used to reach Node's default
+ * Each step is contained on its own: an unhandled rejection here would reach Node's default
  * handler and take the whole API down, and a database blip during cleanup should not cost the
  * metering pass or the two sweeps that release held credits.
  */
@@ -28,7 +28,7 @@ export const createMaintenanceSweep = (context: SupportedContext, sweeps: Mainte
   const { log, store, meterWorkspace, config } = context;
   let maintenanceRun: Promise<void> | null = null;
   /**
-   * Each step is contained on its own: an unhandled rejection here used to reach Node's default
+   * Each step is contained on its own: an unhandled rejection here would reach Node's default
    * handler and take the whole API down, and a database blip during cleanup should not cost the
    * metering pass or the two sweeps that release held credits. Nothing in here throws, which is
    * what lets the sweeps chain safely.

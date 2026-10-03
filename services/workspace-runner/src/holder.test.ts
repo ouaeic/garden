@@ -127,11 +127,11 @@ describe('desktop control arbitration', () => {
 /**
  * The two ends of one window.
  *
- * `transfer` used to release every latched key and *then* record the new holder, so for the whole
- * of that release - a round trip to an X server, and now also to a browser page - `#holder` still
- * named the side that had just been evicted. Its queue had been discarded and its transaction
- * aborted, but a fresh submission arriving in that gap was authorized against the outgoing holder
- * and ran: the agent typing one more time into a screen the owner had already taken.
+ * Releasing every latched key and *then* recording the new holder would leave `#holder` naming the
+ * side that had just been evicted for the whole of that release - a round trip to an X server, and
+ * to a browser page. Its queue discarded and its transaction aborted, a fresh submission arriving
+ * in that gap would still be authorized against the outgoing holder and run: the agent typing one
+ * more time into a screen the owner had already taken.
  *
  * Recording the holder first closes it, and would open the mirror image if nothing else changed -
  * the incoming holder authorized to act while the outgoing one's modifiers are still latched,

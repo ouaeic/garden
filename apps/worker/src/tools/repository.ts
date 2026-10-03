@@ -110,13 +110,12 @@ export async function executeRepositoryTool(
       /**
        * Whole-word matching is ripgrep's own flag; taking the query literally is a separate one.
        *
-       * They used to be the same flag, and that was the old symbol tool's bug wearing a new
-       * cause. That tool wrapped the name in `\b...\b`, which is wrong for exactly the names it
-       * existed to find: a word boundary before `$` needs a word character in front of it, so
-       * `$scope` never matched. It returned nothing and looked like an answer. With `--fixed-
-       * strings` only on the wholeWord branch, the default path still returned nothing for
-       * `$scope.value` - now because `$` is an end-of-line anchor - and worse, `foo(bar)` matched
-       * `foobar()` and missed the call it meant. rg exits 0 or 1 on both, so nothing threw.
+       * Wrapping the name in `\b...\b` is wrong for exactly the names a symbol search exists to
+       * find: a word boundary before `$` needs a word character in front of it, so `$scope` never
+       * matches. It returns nothing and looks like an answer. And a query read as a regex returns
+       * nothing for `$scope.value`, because `$` is an end-of-line anchor, while `foo(bar)` matches
+       * `foobar()` and misses the call it meant - so `--fixed-strings` cannot be confined to the
+       * wholeWord branch. rg exits 0 or 1 on both, so nothing throws.
        */
       const wholeWord = call.arguments.wholeWord === true;
       const literal = call.arguments.literal === true || wholeWord;
@@ -263,26 +262,19 @@ export async function executeRepositoryTool(
       );
       const names = new Set(listing.entries.map((entry) => entry.name));
       /*
-       * The ladder and the command table live in `tools/diagnostics.ts`, and this is now their only
-       * caller.
-       *
-       * They moved there so the approval floor could read the same answer this call was about to
-       * act on - two copies would have been two answers, and the one the owner was asked about
-       * would have been the wrong one. That reason is gone: the `code_diagnostics` card was removed
-       * and `approval-floor.ts` no longer takes a listing of its own, so nothing else reads this
-       * table. They stay a leaf anyway, for the reason written at the top of that file: it imports
+       * The ladder and the command table live in `tools/diagnostics.ts`, and this is their only
+       * caller. They stay a leaf for the reason written at the top of that file: it imports
        * nothing, so a test that asks what a `Cargo.toml` resolves to does not drag `tool-dispatch`
        * and the runner client in behind it.
        *
-       * What replaced the card is `REPEATABLE_TOOLS_THAT_WRITE` in `turn-bounds.ts`, which takes the
-       * turn's undo point before this arm runs - measured, because `make -s` and `cargo check` write
-       * to the tree and this tool was exempt from that undo point while they did.
+       * `REPEATABLE_TOOLS_THAT_WRITE` in `turn-bounds.ts` takes the turn's undo point before this
+       * arm runs, because `make -s` and `cargo check` write to the tree.
        */
       const language = diagnosticsLanguage(requested, names);
       /*
        * The selection is one question, and this is the arm that has to ask it, because it is the
        * only place a command is executed. A directory holding a `package.json` and no
-       * `tsconfig.json` used to resolve to `tsc --noEmit` and run it: exit 1 and 4,994 bytes of the
+       * `tsconfig.json` would otherwise resolve to `tsc --noEmit` and run it: exit 1 and the
        * compiler's own usage, returned as `passed: false` with output, which is what a wall of type
        * errors looks like. `diagnosticsSelection` returns a sentence there instead, and it returns
        * the sentence rather than an approval - an unrunnable command is not the owner's decision.

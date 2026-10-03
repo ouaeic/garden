@@ -81,8 +81,8 @@ export const summariseForCompaction = async (
           tools: [],
           temperature: 0.1,
           maxTokens,
-          // The one call whose output every later step re-reads. It used to send no effort at
-          // all, which on a reasoning route is the least thinking of anything in the run.
+          // The one call whose output every later step re-reads. Sent with no effort at all, it
+          // would get the least thinking of anything in the run on a reasoning route.
           reasoningEffort: 'medium',
           // The task's OWN id even on a retry, unlike the step and handoff requests, which present
           // the parent's. @see cachePrefixTaskId in `window.ts`. This is a different prefix, not a
@@ -185,9 +185,9 @@ export const compactTurnContext = async (
         .join(', ')}.`
     : '';
   // Read before the messages go, because after it there is nothing left to read them from. Here
-  // rather than at the budget caller, which is where it used to live: an agent-declared compaction
-  // drops messages exactly as durably, so on a turn that condensed because the agent said a phase
-  // was over, the episode's `Touched:` list lost every path and command from before it.
+  // rather than at the budget caller: an agent-declared compaction drops messages exactly as
+  // durably, so on a turn that condensed because the agent said a phase was over, the episode's
+  // `Touched:` list would lose every path and command from before it.
   state.carriedArtifacts = [
     ...new Set([...(state.carriedArtifacts ?? []), ...extractTurn(state.messages).artifacts])
   ].slice(-64);
@@ -224,9 +224,10 @@ export const compactTurnContext = async (
     delete state.planVersion;
   /**
    * The acceptance record reaches the window only as a `set_acceptance` tool result, and a tool
-   * result is exactly what a compaction condenses. So the model went on working against a
-   * contract it could no longer read - and it is a contract with teeth: `finish` is refused while
-   * any check fails, so the one thing it most needed to remember was the first thing to go.
+   * result is exactly what a compaction condenses. Without this the model would go on working
+   * against a contract it can no longer read - and it is a contract with teeth: `finish` is
+   * refused while any check fails, so the one thing it most needs to remember would be the first
+   * thing to go.
    *
    * Re-pushed rather than re-declared, which is the same move the plan above makes: the record is
    * the harness's, `acceptanceAcceptedResult` already renders exactly the right text, and a model

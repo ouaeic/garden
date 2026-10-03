@@ -186,8 +186,8 @@ describe('withRetry', () => {
 
 describe('provider status classification', () => {
   it('retries a 5xx, which is the status the adapter actually produces for an upstream fault', () => {
-    // The adapter used to construct this error without a status, so it inherited GardenError's
-    // default of 400 and a three-hour task died on one upstream blip.
+    // The adapter must construct this error with its status: without one it inherits GardenError's
+    // default of 400, and a long task dies on one upstream blip.
     for (const status of [500, 502, 503, 504]) {
       expect(
         isRetryableError(

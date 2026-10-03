@@ -49,11 +49,10 @@ export class RunnerClient {
   /**
    * `audience` binds the token to the request it is for, so a token observed in flight cannot be
    * turned against another runner route. It is mandatory, and the runner refuses a token that names
-   * none: it used to be omitted for the stream credentials the client spends on several calls in a
-   * row - a browser takeover is a stream, an action and a holder change - on the reasoning that one
-   * audience would break the flow, and the effect was that those two credentials were bearer tokens
-   * for every route their scopes admitted, `browser/read-many` (which fetches an arbitrary address)
-   * and `browser/search` among them. Naming all three routes is the narrowest binding available
+   * none. Without it, the stream credentials the client spends on several calls in a row - a
+   * browser takeover is a stream, an action and a holder change - would be bearer tokens for every
+   * route their scopes admit, `browser/read-many` (which fetches an arbitrary address) and
+   * `browser/search` among them. Naming all three routes is the narrowest binding available
    * while the client asks for one credential and uses it three ways.
    */
   token(

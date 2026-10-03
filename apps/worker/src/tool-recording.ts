@@ -194,8 +194,7 @@ export const event = async (
  * owner's phone when the failure is one only they can clear.
  *
  * Both places a tool can be executed - the ordinary loop and the resumption of an approved call -
- * used to write this out separately, which is how the approved half could have been left without
- * the takeover raise.
+ * write this out through here, so neither half can be left without the takeover raise.
  */
 export const recordToolFailure = async (
   deps: ToolRecordingDeps,
@@ -319,7 +318,7 @@ export const runToolCallsTogether = async (
    *
    * Nothing here rejects. Each call is settled into its own outcome, so a runner that drops one
    * read cannot throw away three that already came back - the model is told which one failed and
-   * keeps the rest, where before an exception left the whole run unanswered.
+   * keeps the rest, rather than an exception leaving the whole run unanswered.
    */
   const settled = await deps.withLeaseRenewal(task, () =>
     deps.withCancellationWatch(task, () =>
@@ -432,12 +431,11 @@ export const raiseTaint = async (
 ): Promise<string | null> => {
   if (!origin) return null;
   const first = !state.taint;
-  // The newest eight, not the first eight. `slice(0, 8)` kept the openers and dropped the arrival:
-  // a research turn that had read eight domains and then read the attacker's page recorded nothing
-  // about the ninth - the set came back the same length, `changed` was false, and the function
-  // returned before writing the warning. Every card raised afterwards named three of the eight
-  // that did not matter. `changed` is membership for the same reason: it is the question being
-  // asked, and length was only ever a proxy for it that a full window silenced.
+  // The newest eight, not the first eight. Keeping the openers would drop the arrival: a research
+  // turn that had read eight domains and then read the attacker's page would record nothing about
+  // the ninth, and every card raised afterwards would name three of the eight that did not matter.
+  // `changed` is membership for the same reason: it is the question being asked, and length is
+  // only a proxy for it that a full window silences.
   const changed = first || !state.taint?.sources.includes(origin);
   const sources = [...new Set([...(state.taint?.sources ?? []), origin])].slice(-8);
   state.taint = {
@@ -537,7 +535,7 @@ export const recordToolResult = async (
    * classification of the call and the result, the two answers cannot disagree, and the
    * alternative is a signature change on a function four other files enter. What it buys is that
    * the timeline row and the window entry are both written knowing whether these bytes are the
-   * owner's own or somebody else's - which used to be knowable only after both had been written.
+   * owner's own or somebody else's, before either has been written.
    *
    * A harness answer is not content at all: nothing ran, nothing was fetched, and what the model
    * is holding is this build's own sentence about why. Fencing that as data somebody else wrote is
@@ -559,14 +557,15 @@ export const recordToolResult = async (
     ? sanitiseUntrusted(imageSummary ?? result)
     : (imageSummary ?? result);
   /*
-   * The row this is written to is now named, because something later has to be able to find it.
+   * The row this is written to is named, because something later has to be able to find it.
    *
    * These bytes are the raw object the tool returned - the model's copy below is bounded, fenced
-   * and possibly spilled, and this one is not - and until now nothing in the product could reach
-   * them: the readers of `task_events` are the owner's timeline and the privacy export. A `finish`
-   * that cites this call can leave a durable pointer to it, and the pointer is worth keeping only
-   * if following it is one lookup rather than a walk over the conversation decrypting payloads
-   * until one matches. The id is the harness's own; nothing the model writes can name a row.
+   * and possibly spilled, and this one is not - and without the id nothing in the product could
+   * reach them: the readers of `task_events` are the owner's timeline and the privacy export. A
+   * `finish` that cites this call can leave a durable pointer to it, and the pointer is worth
+   * keeping only if following it is one lookup rather than a walk over the conversation decrypting
+   * payloads until one matches. The id is the harness's own; nothing the model writes can name a
+   * row.
    */
   const recorded = await event(deps.store, task, key, 'tool_result', `${call.name} completed`, {
     toolCallId: call.id,

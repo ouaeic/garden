@@ -289,13 +289,13 @@ describe('the session key a request carries', () => {
   });
 
   /**
-   * THE KEY FOLLOWS THE PREAMBLE PAST THE AGE CEILING TOO, which is where the two used to part.
+   * THE KEY FOLLOWS THE PREAMBLE PAST THE AGE CEILING TOO.
    *
    * A retry inherits its parent's preamble only while the family root is inside
-   * `FORK_ANCHOR_MAX_AGE_MS`; past it the fork ranks and clocks against its own text. The key knew
-   * nothing about that ceiling, so a retry of a day-old task presented the parent's name over a
-   * preamble that was its own. The harm is not a miss: a route asked to match a name it holds a
-   * different prefix under writes the new one there, so the stale fork EVICTS the bytes the
+   * `FORK_ANCHOR_MAX_AGE_MS`; past it the fork ranks and clocks against its own text. A key that
+   * knew nothing about that ceiling would have a retry of a day-old task present the parent's
+   * name over a preamble that is its own. The harm is not a miss: a route asked to match a name it
+   * holds a different prefix under writes the new one there, so the stale fork EVICTS the bytes the
    * family's next retry inside the hour would have hit.
    *
    * Both directions in one case, on both call sites, because either alone is saturated: a rule that

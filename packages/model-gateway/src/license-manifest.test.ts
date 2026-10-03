@@ -7,12 +7,11 @@ import {
 } from './license-manifest.js';
 
 /**
- * What this suite is for, now that a review does not expire.
+ * What this suite is for, given that a review does not expire.
  *
- * It used to assert against a clock, and the clock was the whole problem: first pinned to the issue
- * date of the very records it checked, so the expiry could never fail; then pinned to `now`, so a
- * checkout nobody had touched went red on a calendar date and the repair was a person re-reading
- * six licences. Neither version tested anything about the licences themselves.
+ * It does not assert against a clock. Pinned to the issue date of the very records it checks, an
+ * expiry could never fail; pinned to `now`, a checkout nobody had touched would go red on a
+ * calendar date. Neither tests anything about the licences themselves.
  *
  * A published licence is a fact about a published artefact. So these assertions are about coverage
  * and agreement - every route the catalogue can offer has a review, every review names a real
@@ -55,9 +54,9 @@ describe('independent model-license manifest', () => {
   });
 
   /*
-   * `upstreamRevision` is what replaces the expiry: it records exactly which revision was read, so
-   * a licence that changes upstream is caught by the revision no longer matching rather than by a
-   * timer. A blank one would make the review unfalsifiable.
+   * `upstreamRevision` is what stands in for an expiry: it records exactly which revision was read,
+   * so a licence that changes upstream is caught by the revision no longer matching rather than by
+   * a timer. A blank one would make the review unfalsifiable.
    */
   it('records the upstream revision each reading was made against', () => {
     // The AGPL claim this file makes is a claim about the manifest's contents. An empty manifest

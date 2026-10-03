@@ -348,9 +348,9 @@ describe('the owner’s own skill folders', () => {
    * The security half, and the reason the origin is forced rather than read.
    *
    * `capabilityCeilingViolations` gives `builtin` an unrestricted net grant, `spend: metered` and
-   * writes outside the workspace - and until this, the only thing deciding whether a folder was
-   * `builtin` was a line in that folder's own sidecar. A folder dropped into a watched directory
-   * could hand itself the ceiling by declaring it.
+   * writes outside the workspace. If a line in a folder's own sidecar decided whether it was
+   * `builtin`, a folder dropped into a watched directory could hand itself the ceiling by
+   * declaring it.
    */
   it('will not let a folder declare itself built-in to buy the built-in grant', () => {
     const root = fixtureRoot({

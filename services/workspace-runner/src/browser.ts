@@ -164,13 +164,12 @@ interface Session {
   caller?: { owner: 'agent' | 'user'; taskId: string | null };
   creatingTab?: { owner: 'agent' | 'user'; taskId: string | null };
   /**
-   * Who holds the screen this browser is drawn on, which is not a fact this file owns any more.
+   * Who holds the screen this browser is drawn on, which is not a fact this file owns.
    *
-   * It used to be a `holder` field here, set by `setHolder` and read by every gate below - while
-   * the desktop kept a `DesktopControl` of its own for the same screen. Two answers, two takeovers,
-   * and no relation between them: an owner who took the Computer pane and an agent that still held
-   * the browser could both act on the same X server. When a desktop session exists this is that
-   * session's control object, so there is one answer and one queue.
+   * When a desktop session exists this is that session's control object, so there is one answer
+   * and one queue. A holder kept here beside the desktop's own `DesktopControl` would be two
+   * answers and two takeovers with no relation between them: an owner who took the Computer pane
+   * and an agent that still held the browser could both act on the same X server.
    */
   control: DesktopControl;
   /**
@@ -191,10 +190,10 @@ interface Session {
   /**
    * The last title read off the watched page.
    *
-   * Cached because `page.title()` is a CDP round trip into the page's own main thread, and the
-   * stream used to make one per frame with the frame's ack waiting behind it. Refreshed on the
-   * events that can change it - a navigation, a tab switch - which is every case a person would
-   * notice, at a cost of one read each instead of thirty a second.
+   * Cached because `page.title()` is a CDP round trip into the page's own main thread, and reading
+   * it per frame would put one in front of every frame's ack. Refreshed on the events that can
+   * change it - a navigation, a tab switch - which is every case a person would notice, at a cost
+   * of one read each instead of thirty a second.
    */
   streamTitle: string;
   consoleMessages: Array<{ level: string; text: string; url: string; at: string }>;
@@ -538,8 +537,8 @@ const captureScreenshot = async (page: Page, type: 'jpeg' | 'png'): Promise<Buff
  * the text being waited on, which resolves as soon as the thing arrives instead of guessing.
  *
  * Nothing here throws. A page that never fires `load` reports that it did not, because the caller
- * is usually a step inside a batch, and a thrown step takes every step after it with it - which is
- * how one badly-chosen wait used to cost a form fill as well as fifteen seconds.
+ * is usually a step inside a batch, and a thrown step takes every step after it with it - so one
+ * badly-chosen wait would cost a form fill as well as fifteen seconds.
  */
 const settlePage = async (page: Page, loadTimeout: number): Promise<boolean> => {
   const loaded = await page
@@ -565,12 +564,11 @@ const settlePage = async (page: Page, loadTimeout: number): Promise<boolean> => 
  * Ref numbers are handed out from a counter that never rewinds, so a number names one control until
  * that control leaves the page.
  *
- * The scan used to clear every `data-garden-ref` in the whole document and then re-stamp from zero
- * inside whatever scope it had been given. A scoped re-read - which is the cheap loop the
- * form-filling procedure teaches - therefore silently re-pointed every ref the agent was holding:
- * `oc-0-3` had been Submit and became Postcode, and the next click landed on a different control
- * with nothing anywhere reporting that anything had changed. It is the highest-frequency silent
- * wrong action the product had.
+ * Clearing every `data-garden-ref` in the document and re-stamping from zero inside the scope being
+ * read would make a scoped re-read - which is the cheap loop the form-filling procedure teaches -
+ * silently re-point every ref the agent was holding: `oc-0-3` would stop being Submit and become
+ * Postcode, and the next click would land on a different control with nothing anywhere reporting
+ * that anything had changed.
  *
  * A counter costs nothing and removes the whole class: an element that already carries a ref keeps
  * it, a new element gets a number never used before, and a number that has gone is simply gone.
@@ -973,9 +971,9 @@ const scanFrameElements = async (
           }
           // Every ref is assigned before anything is read, so a label can report the ref of the
           // control it names even when that control comes later in document order. An element that
-          // already carries one keeps it: that is what makes a ref survive a scoped re-read, which
-          // used to renumber the whole page from zero. Only a number belonging to another frame is
-          // replaced, which can happen when a document is moved between frames.
+          // already carries one keeps it: that is what makes a ref survive a scoped re-read. Only a
+          // number belonging to another frame is replaced, which can happen when a document is
+          // moved between frames.
           let offset = 0;
           const taken = new Set<string>();
           for (const element of visible) {
@@ -1109,12 +1107,9 @@ const scanFrameElements = async (
 };
 
 /*
- * Whether a source the agent was told to read is out on the internet.
- *
- * This used to be a second implementation living here, and the two had already drifted apart in
- * both directions: this copy refused unassigned IPv6 that core allowed, and allowed part of
- * 192.0.0.0/16 that core refused. One of them was always going to be the one missing a range, so
- * there is one, in @garden/core, shared with the connector and mail paths.
+ * Whether a source the agent was told to read is out on the internet is decided in @garden/core,
+ * shared with the connector and mail paths, rather than here: two copies of the address ranges
+ * drift apart, and one of them is always the one missing a range.
  */
 
 /** The wire shape lives in @garden/contracts, where the worker reads it from too. */
@@ -1371,15 +1366,15 @@ export const botWallMessage = (wall: BotWallReport | BotWall): string => {
  * The browser's wording would be wrong here in every particular: no tab is stopped, the site is not
  * closed to the browser, and nobody has to open anything. Saying so precisely matters because the
  * agent acts on this sentence - told the web was gone, it would stop researching, which is the
- * failure the whole route was rebuilt to end.
+ * failure the whole route exists to prevent.
  *
- * It used to say searching would be available again in about a minute, and to search again shortly.
- * That was the backoff timer described as if it were a prognosis, and on the deployment this
- * product is built for it was simply false: a server's address is what most engines are refusing,
- * so the next attempt meets the same challenge, and the one after that. Every retry the sentence
- * invited was a turn and a bill spent to be refused again. What it says now is the part that is
- * actually known - this engine did not answer, from here - and it names the routes that do not go
- * through it, without promising that waiting fixes anything.
+ * It does not say searching will be available again shortly. That would be the backoff timer
+ * described as if it were a prognosis, and on the deployment this product is built for it is
+ * simply false: a server's address is what most engines are refusing, so the next attempt meets the
+ * same challenge, and the one after that. Every retry such a sentence invites is a turn and a bill
+ * spent to be refused again. What it says is the part that is actually known - this engine did not
+ * answer, from here - and it names the routes that do not go through it, without promising that
+ * waiting fixes anything.
  */
 export const searchWallMessage = (wall: BotWall): string =>
   `Blocked by ${wall.vendor}: the search engine answered with an anti-bot challenge instead of results (${wall.reason}). Nothing else is affected - the browser, every site and every other tool still work. Do not touch the challenge, and do not simply repeat the same search: this engine is refusing this computer, not this query, so an immediate retry meets the same challenge. Read a source you already have the address of, or open a different search engine in the browser. If you needed search to make progress and have no other way in, say so and stop rather than guessing at addresses.`;
@@ -1407,24 +1402,20 @@ const DOWNLOAD_TRIGGERING_ACTIONS: BrowserAction['type'][] = [
  * three documents promise. GARDEN_BLUEPRINT.md:104, docs/AGENT_RUNTIME.md:416 and
  * docs/CAPABILITIES.md:97 all say destructive operations still require confirmation in every mode.
  *
- * The list used to be only the transactional verbs, so it kept that promise for a control named
- * "Delete" and broke it for every other way an application spells the same thing. That was
- * invisible while a separate defect carded every browser and desktop action regardless of the
- * verdict here (ATH-001): once a benign verdict was allowed to mean "no card", a click on a control
- * named Erase, Format, Reset, Overwrite, Empty Trash, Revoke or Deactivate went through untouched
- * in Balanced and Autonomous. Repairing the first defect is what made the second one reachable,
- * which is why the vocabulary is widened in the same wave.
+ * The list is wider than the transactional verbs because a benign verdict here means no card: a
+ * list that knew only "Delete" would let a click on a control named Erase, Format, Reset,
+ * Overwrite, Empty Trash, Revoke or Deactivate go through untouched in Balanced and Autonomous,
+ * which is the same promise broken for every other way an application spells the same thing.
  *
  * Confirmation words - OK, Yes, Continue - are deliberately absent. What they do depends on the
- * dialog around them, which no classifier here can see, and carding all of them is precisely the
- * ceremony ATH-001 was fixed to remove. The floor promises destructive operations and ambiguous
- * coordinates; a bare coordinate is separately and unconditionally consequential.
+ * dialog around them, which no classifier here can see, and carding all of them is ceremony rather
+ * than a safeguard. The floor promises destructive operations and ambiguous coordinates; a bare
+ * coordinate is separately and unconditionally consequential.
  *
- * AGREEING, AND THE HALF OF IT THAT CAN BE RECOGNISED. The three mode sentences promised "agreeing
- * to something on your behalf" and this list held `sign`, `accept offer`, `submit` and `confirm` -
- * so a control reading "Accept the Terms", "I agree to the Terms of Service" or "Accept the licence
- * agreement" raised nothing at all in balanced or autonomous. Driven on this tree at cd7033f: eight
- * such labels, no card in either mode.
+ * AGREEING, AND THE HALF OF IT THAT CAN BE RECOGNISED. The three mode sentences promise "agreeing
+ * to something on your behalf", and `sign`, `accept offer`, `submit` and `confirm` alone raise
+ * nothing for a control reading "Accept the Terms", "I agree to the Terms of Service" or "Accept
+ * the licence agreement".
  *
  * Consent is not a category anything here can recognise. The evidence a click carries is
  * `ElementPolicyInput` - a tag, a type, an accessible name, an autocomplete token, a form action
@@ -1433,15 +1424,15 @@ const DOWNLOAD_TRIGGERING_ACTIONS: BrowserAction['type'][] = [
  * structural rule here and it cannot see one. So the only evidence is the words, and words are a
  * list that rots.
  *
- * What is added is therefore the OBJECT of the agreement rather than the verb on the button:
- * `terms`, `licence`, `license`, `eula`. A legal document has a small, stable name; a button has
- * whatever copy a designer chose this year. "Accept", "Agree" and "Consent" are NOT added, and the
- * reason is the one that keeps OK and Continue out: they are the words on a cookie banner, a cookie
- * banner stands in front of almost every page a research turn opens, and a card there is friction on
- * ordinary reading rather than a safeguard. Both costs are stated rather than hidden - a control
- * named "License" in a footer now cards when it is only a link, and a banner whose button says "Got
- * it" is not reached by this and cannot be - and the mode sentence claims only what this keeps. See
- * docs/design/gaps/NETWORK.md.
+ * What the list carries is therefore the OBJECT of the agreement rather than the verb on the
+ * button: `terms`, `licence`, `license`, `eula`. A legal document has a small, stable name; a
+ * button has whatever copy a designer chose this year. "Accept", "Agree" and "Consent" are NOT
+ * added, and the reason is the one that keeps OK and Continue out: they are the words on a cookie
+ * banner, a cookie banner stands in front of almost every page a research turn opens, and a card
+ * there is friction on ordinary reading rather than a safeguard. Both costs are stated rather than
+ * hidden - a control named "License" in a footer cards when it is only a link, and a banner whose
+ * button says "Got it" is not reached by this and cannot be - and the mode sentence claims only
+ * what this keeps. See docs/design/gaps/NETWORK.md.
  *
  * `desktop.ts` holds the same list for the same promise and scripts/check-repository.mjs compares
  * them, because a word added to one and not the other is how one surface silently stops keeping a
@@ -1749,9 +1740,8 @@ export const browserLaunchOptions = (attempt: BrowserLaunchAttempt) => ({
 /**
  * Where the agent may drive the session browser, decided by the same module every other outbound
  * fetch asks - `parallel_web_read`, the connectors, the calendar - rather than by a second opinion
- * kept here. The session browser is the one path that used to have no opinion at all, which made
- * `navigate` a way to read the cloud metadata endpoint and every service listening on loopback out
- * of a page or an email the agent had been told to read.
+ * kept here. Without it `navigate` would be a way to read the cloud metadata endpoint and every
+ * service listening on loopback out of a page or an email the agent had been told to read.
  *
  * Two questions, deliberately answered differently: where the agent may send the browser, and what
  * page it may read back. The second is the wider set, because a page can move itself after the
@@ -2451,10 +2441,10 @@ export class BrowserManager {
         /*
          * The two events that can change what the pane is showing without anything here asking.
          *
-         * The title used to be re-read per frame, which paid for freshness thirty times a second
-         * and gated the frame ack on it. Reading it when the page says it has one costs two bounded
-         * reads per navigation instead - and only for the tab actually being watched, because
-         * background tabs are not on the stream.
+         * Re-reading the title per frame would pay for freshness thirty times a second and gate the
+         * frame ack on it. Reading it when the page says it has one costs two bounded reads per
+         * navigation instead - and only for the tab actually being watched, because background
+         * tabs are not on the stream.
          */
         const republish = () => {
           void this.#refreshTabTitle(session, tabId, candidate);
@@ -2522,10 +2512,10 @@ export class BrowserManager {
         session.page = candidate;
         void this.#retargetStream(session).catch(() => undefined);
       });
-      // Nothing here masks automation. The switch that used to suppress `navigator.webdriver`
-      // (`--disable-blink-features=AutomationControlled`) has been removed, because masking it is
-      // bot-defence evasion, which SECURITY.md places out of scope and which the owner would be
-      // the one exposed for. Sites that refuse automation are recognised and handed to the owner.
+      // Nothing here masks automation: there is no switch suppressing `navigator.webdriver`
+      // (`--disable-blink-features=AutomationControlled`), because masking it is bot-defence
+      // evasion, which SECURITY.md places out of scope and which the owner would be the one exposed
+      // for. Sites that refuse automation are recognised and handed to the owner.
       if (closed) throw new Error('Browser context closed during startup');
       active = session;
       this.#sessions.set(workspaceId, session);
@@ -2831,9 +2821,9 @@ export class BrowserManager {
 
   /**
    * Records the stop. The holder is deliberately left where it was: taking the browser off the
-   * agent used to be what made this a stop, but it stopped everything - unrelated tabs, unrelated
-   * sites, the whole task - and it could only be undone by a person. The stop is now the wall
-   * itself, which no agent call can cross and no agent call can clear.
+   * agent would stop everything - unrelated tabs, unrelated sites, the whole task - and only a
+   * person could undo it. The stop is the wall itself, which no agent call can cross and no agent
+   * call can clear.
    */
   #raiseWall(session: Session, page: Page, wall: BotWall): BotWallReport {
     const report = session.walls.raise(tabIdFor(session, page), wall);
@@ -3215,13 +3205,12 @@ export class BrowserManager {
   /**
    * Everything the pane needs, read without touching the page.
    *
-   * Deliberately synchronous. This used to await `page.title()`, and it was called once per
-   * screencast frame from inside the handler that acks them - so the frame rate was bounded by a
-   * round trip to the page's main thread, and a page that blocked its main thread (a long
-   * synchronous parse, an un-yielded WASM loop, a stray `debugger`) never resolved it, never
-   * acked, and froze the pane permanently with the socket still open and no error anywhere. The
-   * one field that genuinely needs the page is cached on the session and refreshed on the events
-   * that change it.
+   * Deliberately synchronous. It is called once per screencast frame from inside the handler that
+   * acks them, so awaiting `page.title()` here would bound the frame rate by a round trip to the
+   * page's main thread, and a page that blocked its main thread (a long synchronous parse, an
+   * un-yielded WASM loop, a stray `debugger`) would never resolve it, never ack, and freeze the
+   * pane permanently with the socket still open and no error anywhere. The one field that
+   * genuinely needs the page is cached on the session and refreshed on the events that change it.
    */
   #streamState(session: Session): BrowserStreamState {
     return {
@@ -3296,7 +3285,7 @@ export class BrowserManager {
     cdp.on('Page.screencastFrame', (frame: { data: string; sessionId: number }) => {
       // Acked first, and without waiting for it: Chromium sends no further frame until the
       // previous one is acknowledged, so anything between arrival and ack is a cap on the frame
-      // rate. It used to be an awaited `page.title()`.
+      // rate.
       void cdp
         .send('Page.screencastFrameAck', { sessionId: frame.sessionId })
         .catch(() => undefined);
@@ -3502,14 +3491,14 @@ export class BrowserManager {
   /**
    * Every browser action, through the one queue that arbitrates the screen.
    *
-   * Three things sit on this path that did not before. The holder is checked once before the
-   * session is ensured, so an owner who has taken the desktop refuses the agent's next browser
-   * call without a Chromium being launched to be refused by. The work then runs inside a
-   * `submit` slot, which re-checks the holder inside the slot: a call admitted a moment before a
-   * takeover used to go on driving the page the owner had just taken. And the slot's abort signal
-   * ends the action when the takeover arrives mid-flight - a `pressSequentially` of a long string
-   * paces itself at 30 ms a character and had a full minute to keep typing into a page whose
-   * owner was already using it.
+   * Three things sit on this path. The holder is checked once before the session is ensured, so
+   * an owner who has taken the desktop refuses the agent's next browser call without a Chromium
+   * being launched to be refused by. The work then runs inside a `submit` slot, which re-checks the
+   * holder inside the slot, so a call admitted a moment before a takeover does not go on driving
+   * the page the owner has just taken. And the slot's abort signal ends the action when the
+   * takeover arrives mid-flight - a `pressSequentially` of a long string paces itself at 30 ms a
+   * character and would otherwise have a full minute to keep typing into a page whose owner is
+   * already using it.
    */
   async act(
     workspaceId: string,
@@ -4061,12 +4050,12 @@ export class BrowserManager {
   /**
    * Hands the browser over, through the same transfer the Computer pane's Take over button uses.
    *
-   * It used to be an assignment to a field, which is every ordering defect a takeover can have at
-   * once: work already in flight kept running against the page, work already queued ran after the
-   * handover, and nothing lifted the modifiers the outgoing side was holding. `transfer` discards
-   * the queue, aborts the over-running action, releases every surface and only then admits the new
-   * holder - and when this browser is drawn on the workspace's desktop it is the *same* transfer
-   * the Computer pane performs, so the two surfaces cannot disagree about who is driving.
+   * A bare assignment to a field would be every ordering defect a takeover can have at once: work
+   * already in flight would keep running against the page, work already queued would run after the
+   * handover, and nothing would lift the modifiers the outgoing side was holding. `transfer`
+   * discards the queue, aborts the over-running action, releases every surface and only then admits
+   * the new holder - and when this browser is drawn on the workspace's desktop it is the *same*
+   * transfer the Computer pane performs, so the two surfaces cannot disagree about who is driving.
    */
   async setHolder(workspaceId: string, root: string, holder: 'agent' | 'user' | 'secure_input') {
     const session = await this.ensure(workspaceId, root);

@@ -137,15 +137,15 @@ const isLoopbackHost = (host: string): boolean => {
 };
 
 /**
- * Where an address is, relative to this computer. Three answers, because for six waves there were
- * two and the middle one was being given the wrong half of the pair.
+ * Where an address is, relative to this computer. Three answers, because with two the middle one
+ * is given the wrong half of the pair.
  *
- * `isPublicHttpUrl` answers "is this out on the internet", and every caller that needed "is this
- * somewhere data can go" or "is this somebody else's machine" has been reading it as if it did.
- * It does not: it is false for loopback and equally false for all of RFC1918, carrier-grade NAT,
- * link-local, `*.local`, `*.internal` and `*.home.arpa` - so `http://192.168.1.50/notes` and
- * `http://127.0.0.1:5173/health` came back identical, and on a self-hosted box the first is the
- * owner's NAS and the second is this process talking to itself.
+ * `isPublicHttpUrl` answers "is this out on the internet", which is not "is this somewhere data can
+ * go" or "is this somebody else's machine". It is false for loopback and equally false for all of
+ * RFC1918, carrier-grade NAT, link-local, `*.local`, `*.internal` and `*.home.arpa` - so
+ * `http://192.168.1.50/notes` and `http://127.0.0.1:5173/health` get the same answer from it, and
+ * on a self-hosted box the first is the owner's NAS and the second is this process talking to
+ * itself.
  *
  * - `self` is loopback: this process's own output, which is not a destination and not a source of
  *   anybody else's bytes.

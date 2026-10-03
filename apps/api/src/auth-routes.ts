@@ -231,10 +231,8 @@ export const registerAuthRoutes = (
       nativeOrigin?: string;
     };
   }>('/v1/auth/register/options', async (request) => {
-    // One owner, always. There used to be a REGISTRATION_MODE that could be set to 'open', which no
-    // shipped path ever wrote and which turned a single-owner box into one anybody could claim an
-    // account on - reachable only by editing the environment over SSH, which is to say by the one
-    // route this software is trying to stop needing.
+    // One owner, always. An open registration mode would turn a single-owner box into one anybody
+    // could claim an account on.
     if ((await store.countUsers()) > 0)
       throw new GardenError(
         'registration_closed',
@@ -318,16 +316,16 @@ export const registerAuthRoutes = (
       /*
        * The same answer for everybody, because this route has no session behind it.
        *
-       * Naming a username used to change the reply: a real one came back with that account's
-       * credential ids and their transports, an invented one came back with an empty list. So
-       * anyone who could reach the sign-in page could ask whether a given owner existed on this box
-       * and, when they did, learn how many authenticators they had and whether any was a phone or a
-       * security key - which is a shopping list for whoever wants to be standing next to them.
+       * If naming a username changed the reply - a real one answered with that account's credential
+       * ids and their transports, an invented one with an empty list - anyone who could reach the
+       * sign-in page could ask whether a given owner existed on this box and, when they did, learn
+       * how many authenticators they had and whether any was a phone or a security key - which is a
+       * shopping list for whoever wants to be standing next to them.
        *
        * Nothing is lost by refusing to say. Registration and enrollment both force
        * `residentKey: 'required'`, so every credential this box has ever issued is discoverable,
        * and `login/verify` resolves the account from the credential the authenticator returns
-       * rather than from anything claimed here. A username in the body is now simply ignored.
+       * rather than from anything claimed here. A username in the body is ignored.
        */
       const context = webauthnContext(request.body.nativeOrigin);
       const options = await generateAuthenticationOptions({
@@ -382,13 +380,13 @@ export const registerAuthRoutes = (
       /*
        * On a box with one owner the name is not a question worth asking.
        *
-       * It was asked, and it was the display name typed once during setup - months later, on the
-       * worst day the owner will have with this software, with the recovery code in front of them
-       * and no passkey left. Guessing it wrong answered "the username or recovery code is not
-       * valid", which reads as the code being wrong, and the code is the thing that cannot be
-       * guessed again. There is nothing to disambiguate here: one account, one code, and the code
-       * is the secret. The rate limit keys on the account that was actually resolved, so a wrong
-       * name can no longer spend somebody else's budget or dodge its own.
+       * Asking would mean the display name typed once during setup - months later, on the worst day
+       * the owner will have with this software, with the recovery code in front of them and no
+       * passkey left. Guessing it wrong would answer "the username or recovery code is not valid",
+       * which reads as the code being wrong, and the code is the thing that cannot be guessed
+       * again. There is nothing to disambiguate here: one account, one code, and the code is the
+       * secret. The rate limit keys on the account that was actually resolved, so a wrong name
+       * cannot spend somebody else's budget or dodge its own.
        */
       const sole = await store.soleUser();
       const user = sole ?? (await store.getUserByUsername(internalUsername(request.body.username)));

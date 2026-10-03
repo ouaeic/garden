@@ -5,8 +5,8 @@ import {
   signCapabilityToken,
   verifyCapabilityToken
 } from '@garden/core';
-// The branch itself, not a restatement of it. These four cases used to compare against a local
-// copy of the predicate, so removing a clause from the runner left every one of them green.
+// The branch itself, not a restatement of it: against a local copy of the predicate, removing a
+// clause from the runner would leave every one of these cases green.
 import { renewalExtendsSession } from './server.js';
 
 /**

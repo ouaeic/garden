@@ -154,8 +154,8 @@ describe('shared environment declarations', () => {
     expect(files).toContain('apps/api/src/config.ts');
     expect(files).toContain('apps/worker/src/config.ts');
     expect(files).toContain('services/workspace-runner/src/config.ts');
-    // Named because it is the one this walk used to miss: its schema is inline in index.ts, so a
-    // walk of config.ts alone left it the only unit in the repository nothing compared.
+    // Named because its schema is inline in index.ts, so a walk of config.ts alone would leave it
+    // the only unit in the repository nothing compared.
     expect(files).toContain('services/model-registry/src/index.ts');
     // And no further: this file is a few hundred zod objects and reads no environment at all, so a
     // walk that took every `index.ts` would audit the request contracts as if they were settings

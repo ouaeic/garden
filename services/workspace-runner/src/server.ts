@@ -145,9 +145,9 @@ export interface TerminalSize {
 /**
  * The size a shell starts at when the client has not said one.
  *
- * It used to be 120x32, chosen for nothing and wrong everywhere: the pane it renders into measures
- * about 70 columns on a desktop and fewer on a phone, so every full-screen program drew past the
- * edge. 80x24 is the size every terminal has defaulted to for forty years, so a client that says
+ * The pane it renders into measures about 70 columns on a desktop and fewer on a phone, so a wider
+ * default would make every full-screen program draw past the edge. 80x24 is the size every
+ * terminal has defaulted to for forty years, so a client that says
  * nothing at least gets the size programs assume when they cannot ask.
  */
 export const TERMINAL_DEFAULT_SIZE: TerminalSize = { cols: 80, rows: 24 };
@@ -175,9 +175,9 @@ export const terminalSize = (cols: unknown, rows: unknown, current: TerminalSize
 /**
  * Whether a renewal capability may extend the session a given capability opened.
  *
- * Exported because a copy of it in the test proved nothing about this branch. `terminal-renewal.
- * test.ts` used to restate these four comparisons by hand, so its four cases measured a
- * reimplementation: drop a clause here and every one of them stayed green.
+ * Exported because a copy of it in the test proves nothing about this branch. A test that restates
+ * these four comparisons by hand measures a reimplementation: drop a clause here and every one of
+ * its cases stays green.
  *
  * It cannot widen anything. Same owner, same workspace, same role, still carrying `terminal` - and
  * the audience is checked before this is reached, by the verifier. The most a renewal can do is
@@ -403,8 +403,8 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
   const limits = commandLimits(config, totalmem());
   const limiter = await resolveCommandLimiter(config.RESOURCE_LIMIT_EXECUTABLE);
   // The package helper travels with the guards so the background path can refuse a command that
-  // names it. It used to be handed to `execute()` alone, at the exec route, which meant the value
-  // existed here and never reached `processes.start`.
+  // names it. Handed to `execute()` alone, at the exec route, the value would exist here and never
+  // reach `processes.start`.
   /*
    * `hostStorage` is here because it was not, and the field it fills is the one guard this runner
    * now leans on hardest. `RunnerServerOptions.hostStorage` says it is injected so the disk floor
@@ -509,10 +509,11 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
    * The services this computer was keeping running, put back before it answers anything.
    *
    * Every other thing the runner holds is per-turn state a restart is allowed to lose. A service is
-   * the one thing whose whole promise is that it does not - the unit is `Restart=always`, so a
-   * crash used to take every server the agent had started with it and leave the link it handed the
-   * owner answering nothing. Awaited rather than fired off: a crashed runner has to stop its own
-   * orphans before it starts their replacements, or two copies end up fighting over one port.
+   * the one thing whose whole promise is that it does not - the unit is `Restart=always`, so
+   * without this a crash would take every server the agent had started with it and leave the link
+   * it handed the owner answering nothing. Awaited rather than fired off: a crashed runner has to
+   * stop its own orphans before it starts their replacements, or two copies end up fighting over
+   * one port.
    * Services are only ever started by an agent capability, so they resume under the agent's own
    * network isolation setting.
    */
@@ -559,9 +560,8 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
     }
     // A checkpoint refusal carries its reason as a code, because the reader is the worker rather
     // than a person: it decides whether a turn that lost its undo point says so in the
-    // conversation, and it used to decide by pattern-matching this service's prose. The two
-    // statuses are unchanged - a full disk is 507, an oversized tree is a 400 the caller can act
-    // on - so only the name of the failure is new.
+    // conversation, and that decision must not rest on pattern-matching this service's prose. A
+    // full disk is 507 and an oversized tree is a 400 the caller can act on.
     if (error instanceof CheckpointRefusedError) {
       void reply.status(error.code === 'checkpoint_host_disk_full' ? 507 : 400).send({
         error: { code: error.code, message, requestId }
@@ -1001,8 +1001,8 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       requireScope(request, 'exec');
       const root = workspacePath(config.WORKSPACE_ROOT, request.params.workspaceId);
       await ensureWorkspace(root);
-      // Every byte a command writes used to bypass the disk guard, which only covered the file
-      // upload route. Refusing to start is the cheap half; execute() also watches the floor while
+      // Every byte a command writes bypasses the file upload route's disk guard, so this route has
+      // its own. Refusing to start is the cheap half; execute() also watches the floor while
       // the command runs, because a command that fills the disk does it after this check.
       await assertHostStorageWrite(root, 0, probeHostStorage);
       const deferred = z
@@ -1508,12 +1508,11 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
      * The same value the read arm above records under: one task, one record, and a token minted for
      * task A cannot ask about task B's reads because `sub` is what it is signed over.
      *
-     * The role alone used to be the whole of it, which said held-or-not and never said who - so with
-     * two tasks in one workspace the guard held the second one to the first one's reads. The agent's
-     * windowed read also has no whole-file digest to claim, so before that the guard was skipped on
-     * exactly the shape that needed it most; the owner's save from the Files pane and an upload
-     * landing on a name still arrive unclaimed and stay unguarded, because neither of them said it
-     * had read anything.
+     * The role alone would say held-or-not and never say who - so with two tasks in one workspace
+     * the guard would hold the second one to the first one's reads. The agent's windowed read also
+     * has no whole-file digest to claim, so a guard keyed on that claim would skip exactly the
+     * shape that needs it most; the owner's save from the Files pane and an upload landing on a
+     * name arrive unclaimed and stay unguarded, because neither of them said it had read anything.
      */
     if (request.query.createOnly === 'true') {
       try {
@@ -2272,17 +2271,16 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
             socket.send(frame, { binary: true });
           },
           /*
-           * The congestion signal, which this route used to keep to itself.
+           * The congestion signal, handed over rather than kept to this route.
            *
-           * It had its own rule instead - drop the frame above 2 MiB buffered and tell nobody -
-           * and because the runner never saw `bufferedBytes`, `session.congested`, the bounded
-           * queue's `starved` flag, the high/low watermark hysteresis and `requestKeyframe()`
-           * were all unreachable. The encoder runs an infinite GOP on purpose, so keyframes come
-           * only on demand; a dropped delta stranded the client's decoder and no keyframe ever
-           * followed. The owner watched a still photograph of the agent's screen, with a healthy
-           * socket, no error and no spinner, until they reloaded. Handing the depth over makes
-           * the queue and the keyframe request the mechanism, which is what they were written to
-           * be - and having two mechanisms is how the drop stayed invisible for so long.
+           * Without `bufferedBytes`, `session.congested`, the bounded queue's `starved` flag, the
+           * high/low watermark hysteresis and `requestKeyframe()` are all unreachable. The encoder
+           * runs an infinite GOP on purpose, so keyframes come only on demand; a frame dropped
+           * here and told to nobody would strand the client's decoder with no keyframe to follow,
+           * and the owner would watch a still photograph of the agent's screen, with a healthy
+           * socket, no error and no spinner, until they reloaded. Handing the depth over makes the
+           * queue and the keyframe request the one mechanism - two mechanisms is how a drop stays
+           * invisible.
            */
           bufferedBytes: () => socket.bufferedAmount,
           canDecodeVideo: () => canDecodeVideo
@@ -2350,10 +2348,10 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
     '/v1/workspaces/:workspaceId/hibernate',
     async (request) => {
       requireScope(request, 'workspace.manage');
-      // Including the background work, which this used to leave running. A hibernated computer that
-      // still holds a build and three servers is not asleep in any sense the owner would recognise,
-      // and the panel that reports what is running was reading the control plane's word for it - so
-      // the box carried on serving while every screen said nothing was there. Without `forget`: the
+      // Including the background work. A hibernated computer that still holds a build and three
+      // servers is not asleep in any sense the owner would recognise, and the panel that reports
+      // what is running reads the control plane's word for it - so the box would carry on serving
+      // while every screen said nothing was there. Without `forget`: the
       // records stay on disk, and `/resume` below puts them back.
       await computations.stopWorkspace(request.params.workspaceId);
       await debuggers.stopWorkspace(
@@ -2387,8 +2385,7 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
   // Nothing to do, and nothing that could be done: there is one computer and it is this host, so
   // its capacity is the host's disk and its limits are the host's limits. The stored figure the
   // control plane is bookkeeping here reaches no allocator. Kept because the control plane still
-  // calls it; it used to answer with a note calling this the development runner, which on a
-  // packaged install is the production one.
+  // calls it.
   app.post<{ Params: { workspaceId: string } }>(
     '/v1/workspaces/:workspaceId/resize',
     async (request) => {
@@ -2428,11 +2425,10 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
      * The shell is born the size the client says its pane is, and nothing sent before it exists is
      * lost.
      *
-     * `ensureWorkspace` is a filesystem round trip, and the message handler used to be
-     * registered inside its `.then`, so every frame that arrived first was dropped on the floor -
-     * including the opening `resize` the client now sends. The pty was therefore always born the
-     * hardcoded 120x32 whatever the pane measured; against the ~70 columns a desktop pane actually
-     * has, `less`, `vim` and readline redrew in the wrong place for the whole session. Handling
+     * `ensureWorkspace` is a filesystem round trip, and a message handler registered inside its
+     * `.then` would drop every frame that arrived first - including the opening `resize` the
+     * client sends. The pty would then be born the default size whatever the pane measured, and
+     * `less`, `vim` and readline would redraw in the wrong place for the whole session. Handling
      * messages from here closes that window on the server side: the size is known before the spawn
      * rather than corrected after it, and a keystroke typed into a terminal that has just appeared
      * reaches the shell instead of vanishing.
@@ -2493,8 +2489,8 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
         terminal?.resize(size.cols, size.rows);
         return;
       }
-      // Named rather than assumed: this used to be the `else` of the resize branch, so a frame of
-      // any other type reached `resize` with two undefined numbers. Falling through to `write`
+      // Named rather than assumed: as the `else` of the resize branch, a frame of any other type
+      // would reach `resize` with two undefined numbers. Falling through to `write`
       // instead would be worse - a frame the protocol does not define would become keystrokes in
       // the owner's shell - so only a frame that says it is input is ever typed.
       if (message.type !== 'input' || typeof message.data !== 'string') return;
@@ -2502,8 +2498,8 @@ export const buildServer = async (config: RunnerConfig, options: RunnerServerOpt
       else typedEarly = (typedEarly + message.data).slice(-EARLY_INPUT_LIMIT);
     });
     // Registered here for the same reason: a socket that hangs up while the workspace is still
-    // being prepared used to leave its expiry timer armed and then spawn a shell that nothing held
-    // a handle to, so the pty outlived the connection with no way to reach it.
+    // being prepared would otherwise leave its expiry timer armed and then spawn a shell that
+    // nothing held a handle to, so the pty would outlive the connection with no way to reach it.
     socket.on('close', () => {
       hungUp = true;
       clearTimeout(expiry);

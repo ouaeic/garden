@@ -252,16 +252,14 @@ export const approvalForCall = async (
       ? await existingSkillFor(deps, task, textValue(call.arguments.name))
       : undefined;
   /*
-   * `code_diagnostics` had a lookup of its own here, and it went with the card it fed.
+   * `code_diagnostics` has no lookup of its own here.
    *
-   * It took a directory listing from the runner before every diagnostic, so the floor could tell
-   * `tsc --noEmit` from `make -s` on arguments that say only `language: 'auto'`. That round trip
-   * bought one thing and one thing only: the wording of a card that no longer exists. The dispatch
-   * arm takes the same listing a moment later and acts on it, which is where the answer was always
-   * needed; asking for it twice to decide a question nobody asks any more is a runner call per
-   * diagnostic for nothing. The bound that replaced the card is in `turn-bounds.ts` and needs no
-   * lookup at all: every `code_diagnostics` call takes the turn's undo point, whatever it resolves
-   * to.
+   * A directory listing from the runner before every diagnostic would let the floor tell
+   * `tsc --noEmit` from `make -s` on arguments that say only `language: 'auto'`, and there is no
+   * card whose wording that would decide. The dispatch arm takes the same listing a moment later
+   * and acts on it, which is where the answer is needed; asking for it twice would be a runner call
+   * per diagnostic for nothing. The bound on this tool is in `turn-bounds.ts` and needs no lookup
+   * at all: every `code_diagnostics` call takes the turn's undo point, whatever it resolves to.
    */
   const transcription =
     call.name === 'audio_read' &&
@@ -400,12 +398,12 @@ export const approvalForCall = async (
      * `desktop_action` declares every `click_at` and `drag` as consequential because a bare
      * coordinate is ambiguous - which is right when nothing can resolve it. Here something did:
      * the preflight identified the actual control under that coordinate and found it benign, so
-     * the requirement is softened rather than dropped. That softening was written as an
-     * unconditional `return`, which every caller reads as "park the turn and raise a card": a
-     * plain `navigate`, whose `declared` is null in every mode and which `ordinaryRequirement`
-     * carries on a hand-written list of verbs that must never card even in Review, came back as a
-     * card reading "Use the browser". Every browser and desktop action parked the turn, cleared
-     * the lease and deferred the rest of the batch. Null in, null out: the broker may lighten a
+     * the requirement is softened rather than dropped. It is not softened unconditionally, because
+     * every caller reads a requirement as "park the turn and raise a card": a plain `navigate`,
+     * whose `declared` is null in every mode and which `ordinaryRequirement` carries on a
+     * hand-written list of verbs that must never card even in Review, would come back as a card
+     * reading "Use the browser", and every browser and desktop action would park the turn, clear
+     * the lease and defer the rest of the batch. Null in, null out: the broker may lighten a
      * requirement and may not invent one.
      */
     if (!declared) return null;

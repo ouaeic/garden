@@ -1043,8 +1043,7 @@ describe('API production boundaries', () => {
     }>();
     expect(published).toMatchObject({ visibility: 'public', expiresAt: null });
     expect(published).not.toHaveProperty('hostingMode');
-    // The warning used to promise an "always ready" mode that held the box awake and consumed
-    // "included active hours". Neither exists, and nobody sells hours.
+    // The warning promises no "always ready" mode and no "included active hours": neither exists.
     expect(published.warning).toContain('public internet');
     expect(published.warning).not.toMatch(/active hours|always ready/i);
     const publicPage = await previewApp.inject({
@@ -1054,7 +1053,7 @@ describe('API production boundaries', () => {
     });
     expect(publicPage.statusCode).toBe(200);
     // Taking a site off the public internet hands the owner their private link back, still
-    // persistent. It used to hand back two hours.
+    // persistent.
     const unpublished = await app.inject({
       method: 'POST',
       url: `/v1/previews/${privatePreview.id}/unpublish`,
@@ -1153,10 +1152,10 @@ describe('API production boundaries', () => {
     expect(reviewedTask.statusCode, reviewedTask.body).toBe(200);
     expect(reviewedTask.json()).toMatchObject({ securityMode: 'review' });
     /*
-     * And back the other way with no passkey. Loosening used to demand a step-up inside the last
-     * five minutes, so reaching Autonomous meant a fingerprint every time - on the setting whose
-     * whole purpose is to be interrupted less. The session is already passkey-bound, and somebody
-     * holding it can send tasks regardless; the prompt bought almost nothing and cost the owner the
+     * And back the other way with no passkey. A step-up inside the last five minutes to loosen
+     * would mean a fingerprint every time Autonomous is reached - on the setting whose whole
+     * purpose is to be interrupted less. The session is already passkey-bound, and somebody holding
+     * it can send tasks regardless; the prompt would buy almost nothing and cost the owner the
      * control they reach for most. Step-up stays on the provider credential and on raising a
      * spending cap, which is asserted elsewhere in this file.
      */
@@ -3307,9 +3306,9 @@ describe('unattended recovery', () => {
 
   /**
    * A turn that takes the worker process down never reaches the worker's own failure path, so the
-   * only thing that ever reads the message queued behind it again is this sweep. It used to fail
-   * the task, say so, and leave the row - and the header went on counting a correction that could
-   * not arrive. Taking the row out of the queue is what makes the count true; saying it out loud
+   * only thing that ever reads the message queued behind it again is this sweep. Failing the task
+   * and saying so while leaving the row would keep the header counting a correction that cannot
+   * arrive. Taking the row out of the queue is what makes the count true; saying it out loud
    * is what stops that being the same thing as dropping the owner's words without a word.
    */
   test('says the message a task died holding was never started', async () => {
@@ -3361,7 +3360,7 @@ describe('unattended recovery', () => {
 
     await runMaintenance();
 
-    // The header counts queued rows, so this is the pill that used to stay on screen.
+    // The header counts queued rows, so this is the pill that must not stay on screen.
     expect(
       (await app.inject({ method: 'GET', url: `/v1/tasks/${taskId}`, headers: { cookie } })).json<{
         status: string;
@@ -3920,7 +3919,7 @@ describe('unattended recovery', () => {
 
     const failure = new Error('terminating connection due to administrator command');
     vi.spyOn(store, 'cleanupExpired').mockRejectedValueOnce(failure);
-    // A rejection escaping here used to reach Node's default handler and end the process.
+    // A rejection escaping here would reach Node's default handler and end the process.
     await expect(runMaintenance()).resolves.toBeUndefined();
     expect(lines.map((line) => line.event)).toContain('maintenance.cleanup_failed');
     expect(lines.map((line) => line.event)).toContain('maintenance.swept');
@@ -4143,10 +4142,10 @@ describe('spending caps', () => {
     /*
      * The direction decides whether a passkey is asked for.
      *
-     * Removing the cap is the one control between the owner and an unbounded provider bill, and it
-     * used to need nothing but an unlocked browser - while reading an export, which spends nothing,
-     * needed a passkey. Tightening still needs nothing: it cannot cost anybody anything, and asking
-     * would put a biometric prompt in front of a routine adjustment.
+     * Removing the cap is the one control between the owner and an unbounded provider bill, so it
+     * needs a passkey, as reading an export does, which spends nothing. Tightening needs nothing:
+     * it cannot cost anybody anything, and asking would put a biometric prompt in front of a
+     * routine adjustment.
      */
     await database.query("UPDATE sessions SET step_up_at=NOW()-INTERVAL '10 minutes'");
     const tightened = await app.inject({
@@ -4791,8 +4790,8 @@ describe('capability and preview boundaries', () => {
       });
 
     // 4101 is this server's own API port, 4401 the preview gateway, 4201 a sibling service's
-    // health endpoint and 5432 the database. The contract has always refused the runner's 4300;
-    // every other loopback service used to be publishable.
+    // health endpoint and 5432 the database. Every loopback service is refused, not only the
+    // runner's 4300.
     for (const port of [4101, 4201, 4401, 5432]) {
       const refused = await preview(port, `preview-${port}`);
       expect(refused.statusCode, `port ${port}: ${refused.body}`).toBe(422);
@@ -5058,7 +5057,7 @@ describe('authentication posture', () => {
     expect(limited.statusCode).toBe(429);
     expect(limited.json<{ error: { code: string } }>().error.code).toBe('auth_rate_limited');
 
-    // The second recovery route derives the same hash and used to have no throttle of its own.
+    // The second recovery route derives the same hash and needs a throttle of its own.
     const verify = (index: number) =>
       app.inject({
         method: 'POST',
@@ -6250,9 +6249,9 @@ describe('where web searches are answered', () => {
    * The one disclosure garden cannot get wrong. A search query is routinely the most revealing
    * sentence in a conversation, and OpenRouter's zero-retention enforcement is documented as
    * covering inference routing only - "It does not apply to plugins and tools you choose to enable,
-   * such as web search". That cuts both ways, and the product used to read only one half of it:
-   * because the guarantee never covered a search, refusing to send the search tools protected
-   * nothing, while quietly costing a server-hosted box the only search route that works from a
+   * such as web search". That cuts both ways, and the product has to read both halves: because the
+   * guarantee never covers a search, refusing to send the search tools would protect nothing, while
+   * quietly costing a server-hosted box the only search route that works from a
    * datacenter address. What the owner is actually owed is the sentence saying where their queries
    * go, and it has to reach that verdict through the same function the worker sends the request
    * with, or the two can disagree about a task that has already run.
@@ -6333,17 +6332,17 @@ describe('where web searches are answered', () => {
   }, 30_000);
 
   /**
-   * The bug this whole wave is about, held down at the surface an owner actually reads.
+   * Provider-side search survives a zero-retention credential, held down at the surface an owner
+   * actually reads.
    *
-   * The shipped default is a credential that refuses data retention, and that used to take
-   * provider-side search off the box - which on a server is the only search route that works, since
-   * search engines answer a datacenter address with an anti-bot challenge rather than results. The
-   * owner was never offered that trade: nothing on this page said their privacy setting had also
-   * bought them a box that cannot search, and no setting on this page could give it back.
+   * The shipped default is a credential that refuses data retention. Taking provider-side search
+   * off the box for it would remove what on a server is the only search route that works, since
+   * search engines answer a datacenter address with an anti-bot challenge rather than results - a
+   * trade nothing on this page offers and no setting on this page could undo.
    *
-   * It bought nothing either. The retention promise covers inference routing and says in terms that
-   * it does not cover tools, so the query was outside it whichever way this resolved. What is owed
-   * is the sentence, and the sentence is what this asserts.
+   * It would buy nothing either. The retention promise covers inference routing and says in terms
+   * that it does not cover tools, so the query is outside it whichever way this resolves. What is
+   * owed is the sentence, and the sentence is what this asserts.
    */
   test('still answers searches on the provider when the credential enforces zero retention', async () => {
     stubProviderCalls();
@@ -6382,7 +6381,7 @@ describe('where web searches are answered', () => {
     stubProviderCalls();
     const directory = await mkdtemp(join(tmpdir(), 'garden-api-websearch-env-'));
     disposers.push(() => rm(directory, { recursive: true, force: true }));
-    // AI_REQUIRE_ZDR is the shipped default and no longer speaks to this question at all.
+    // AI_REQUIRE_ZDR is the shipped default and does not speak to this question at all.
     const settings = await providerSettings(isolatedConfig(directory), null);
     expect(settings.webSearch).toMatchObject({
       mode: 'server',
@@ -6507,8 +6506,9 @@ describe('a half-typed message', () => {
           privacyRoute: 'provider_zdr',
           spendCap: '2.50'
         },
-        // A message that is mostly its files used to sync as an empty draft: the tray lived in one
-        // composer's memory, so the other device saw the sentence and none of the attachments.
+        // A message that is mostly its files has to sync with them: a tray that lived in one
+        // composer's memory would leave the other device with the sentence and none of the
+        // attachments.
         attachments: [
           {
             path: 'workspace/uploads/abc-report.pdf',
@@ -6660,11 +6660,10 @@ describe('what the computer is running', () => {
 
     /*
      * And it keeps asking after the box is hibernated, because the status is not evidence about what
-     * is running. This used to short-circuit on `status !== 'running'`, justified by the claim that
-     * hibernating clears the runner's session table — which it did not do, and which services are
-     * specifically built to survive in the cases where it does: the runner starts every one it finds
-     * on disk when it boots. So a box the control plane called asleep could be serving three ports
-     * while this panel reported an empty machine. Reading it still cannot start anything; the
+     * is running. Services are built to survive a runner restart: the runner starts every one it
+     * finds on disk when it boots. So a box the control plane calls asleep can be serving three
+     * ports, and a panel that short-circuited on `status !== 'running'` would report an empty
+     * machine. Reading it still cannot start anything; the
      * runner's route reads an in-memory table and answers `[]` for a workspace it holds nothing for.
      */
     await app.inject({
@@ -6731,9 +6730,9 @@ describe('what the computer is running', () => {
 });
 
 /*
- * Search used to read the owner's whole history on every keystroke - every conversation, every
- * event, decrypted and matched with `includes`, in the API's own event loop. It answered instantly
- * on a new box and in seconds on a used one, and nothing said so.
+ * Search must not read the owner's whole history on every keystroke - every conversation, every
+ * event, decrypted and matched with `includes`, in the API's own event loop - which answers
+ * instantly on a new box and in seconds on a used one, and nothing says so.
  */
 describe('searching the owner’s own history', () => {
   test('answers from the index the agent uses, one conversation per result', async () => {
@@ -7507,8 +7506,8 @@ describe('what the computer wrote down about its owner', () => {
     expect(rows.get(watched.id)!.origin).toBe(rows.get(episode.id)!.origin);
 
     /*
-     * And the queue carries it too. The review screen used to draw its headline off `trust`, so a
-     * disputed pair of one owner sentence against one model sentence read as two rows the box had
+     * And the queue carries it too. A review screen that drew its headline off `trust` alone would
+     * read a disputed pair of one owner sentence against one model sentence as two rows the box had
      * worked out for itself - and `resolveMemoryContradiction` lets the first retire the second, so
      * which is which is the whole of that decision.
      */
@@ -8125,9 +8124,8 @@ describe('reading past the first page', () => {
     expect(page.map((row) => row.id)).not.toContain(secondPage[0]!.id);
 
     /*
-     * And the export, which used to decrypt every frame of every conversation into one array and
-     * serialise the array into one string. It is written out as it is read now; the document is the
-     * same, and the assertion that matters is that nothing was dropped at the page boundary.
+     * And the export, which is written out as it is read rather than assembled whole; the
+     * assertion that matters is that nothing was dropped at the page boundary.
      */
     const exported = await app.inject({
       method: 'GET',
@@ -8860,9 +8858,9 @@ describe('control-plane gates', () => {
   });
 
   /**
-   * `?after=500&after=600` used to make `request.query.after` an array, `Number([…])` `NaN`, and
-   * `|| 0` a cursor of zero - so a query the server could not read opened a stream that replayed
-   * the entire conversation. One measured turn wrote 1,015 `assistant_delta` rows.
+   * `?after=500&after=600` makes `request.query.after` an array, `Number([…])` `NaN`, and `|| 0` a
+   * cursor of zero - so read naively, a query the server cannot read would open a stream that
+   * replays the entire conversation.
    */
   test('refuses a repeated cursor on the event stream instead of replaying the conversation', async () => {
     stubProviderFetch();

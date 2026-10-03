@@ -109,9 +109,9 @@ describe('a long job is bounded by the path it runs on', () => {
 
   /*
    * The same sixty seconds, accepted. Nothing holds a request open on this route - it returns a
-   * session id in milliseconds - so the hour it used to share with the foreground was never about
-   * a resource this process spends, and it was the number that made a six-hour alignment or a
-   * variant-calling run impossible to ask for on the one path built to outlive a turn.
+   * session id in milliseconds - so the foreground's hour is not about a resource this process
+   * spends, and applied here it would make a six-hour alignment or a variant-calling run impossible
+   * to ask for on the one path built to outlive a turn.
    */
   it('accepts the identical command in the background', async () => {
     const { app, id, token } = await harness();
@@ -407,15 +407,15 @@ describe('the ceiling an owner configures is the ceiling the box enforces', () =
     return { app, start };
   };
 
-  // Two days of ceiling, thirty-six hours asked for: past the schema cap that used to sit here and
-  // inside what this box was told to allow.
+  // Two days of ceiling, thirty-six hours asked for: past a day and inside what this box was told
+  // to allow.
   it('runs a thirty-six hour job on a box whose owner allowed two days', async () => {
     const { start } = await harness('00000000-0000-4000-8000-0000000000e3', 172_800, 'ceiling-up');
     const response = await start(129_600);
     expect(response.statusCode).toBe(200);
     const started = response.json<{ status: string; deadlineAt?: string }>();
     expect(started.status).toBe('running');
-    // The deadline the caller asked for, not the day the schema used to impose.
+    // The deadline the caller asked for, not a day imposed by the schema.
     const hoursAway = (Date.parse(started.deadlineAt ?? '') - Date.now()) / 3_600_000;
     expect(hoursAway).toBeGreaterThan(35.9);
     expect(hoursAway).toBeLessThan(36.1);
