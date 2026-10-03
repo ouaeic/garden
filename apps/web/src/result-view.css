@@ -38,18 +38,22 @@
 .result-view-loading {
   padding: 16px;
 }
-.result-view-marks {
+.markable {
+  position: relative;
+  height: 100%;
+}
+.mark-layer {
   position: absolute;
   inset: 0;
   pointer-events: none;
 }
-.result-view-marks.is-marking {
+.mark-layer.is-marking {
   pointer-events: auto;
   cursor: crosshair;
   touch-action: none;
   background: color-mix(in srgb, var(--text) 6%, transparent);
 }
-.result-view-circle {
+.mark-circle {
   position: absolute;
   transform: translate(-50%, -50%);
   border: 2px solid var(--text);

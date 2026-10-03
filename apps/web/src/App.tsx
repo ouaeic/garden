@@ -7,19 +7,7 @@ import { setLifeMode } from './life/settings';
 import { recoverDeviceDrafts, forgetDraftKey } from './draft-storage';
 import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import {
-  ArrowUpRight,
-  Bell,
-  Clock3,
-  Cog,
-  FolderOpen,
-  House,
-  LibraryBig,
-  Monitor,
-  Sparkles,
-  Plus,
-  Search
-} from './icons';
+import { ArrowUpRight, Bell, Cog, House, Monitor, Sparkles, Plus, Search } from './icons';
 import type { Task, Workspace, Project, ConversationSource } from '@garden/contracts';
 import { get, ApiError, post, isNativeClient } from './client';
 import type { NativeStatus } from './native';
@@ -31,7 +19,7 @@ import { bellBird } from './life/growth';
 import Stats from './Stats';
 import './living-interface.css';
 import { fileNavigationBlocked } from './file-navigation';
-import { initialNavigation } from './navigation';
+import { initialComputerTool, initialNavigation } from './navigation';
 import type { View } from './navigation';
 import type { Bootstrap, Decision, Draft } from './model';
 import { needsAttention, shortDate, taskStatusLabel, mergeTaskRefresh } from './model';
@@ -53,21 +41,15 @@ const TaskSurface = lazy(() => import('./TaskSurface'));
 const ProjectSpace = lazy(() => import('./ProjectSpace'));
 const NewConversation = lazy(() => import('./NewConversation'));
 const Computer = lazy(() => import('./Computer'));
-const Automations = lazy(() =>
-  import('./library/Watches').then((module) => ({ default: module.WatchesLibrary }))
-);
-const Library = lazy(() => import('./Library'));
 const sheetTitles: Partial<Record<View, string>> = {
   projects: 'Projects',
-  library: 'Library',
   settings: 'Settings',
-  automations: 'Automations',
   attention: 'Needs you'
 };
 const Settings = lazy(() => import('./Settings'));
 const UpdateNotice = lazy(() => import('./UpdateNotice'));
 const NativeSetup = lazy(() => import('./NativeSetup'));
-import type { ComputerTool as Tool } from './Computer';
+import { computerTool, type ComputerTool as Tool } from './computer-tools';
 const Login = lazy(() => import('./Login'));
 const SearchDialog = lazy(() => import('./SearchDialog'));
 class Boundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -126,7 +108,7 @@ function WorkspaceApp() {
   } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
-  const [tool, setTool] = useState<Tool>('files');
+  const [tool, setTool] = useState<Tool>(() => computerTool(initialComputerTool()));
   const [computerOpened, setComputerOpened] = useState(
     initialNavigation().view === 'computer' ||
       new URLSearchParams(location.search).get('behind') === 'computer'
@@ -437,6 +419,11 @@ function WorkspaceApp() {
     );
     window.dispatchEvent(new Event('garden:surface-location'));
   }
+  function openComputer(next: Tool) {
+    setTool(next);
+    navigate('computer');
+    setSurfaceLocation({ tool: next }, true);
+  }
   function closeSheet() {
     if (fileNavigationBlocked()) return;
     const depth = sheetHistoryDepth();
@@ -579,21 +566,18 @@ function WorkspaceApp() {
         <nav className="desk-navigation" aria-label="Workspace navigation">
           {(
             [
-              ['projects', 'Projects', FolderOpen],
-              ['library', 'Library', LibraryBig],
-              ['computer', 'Computer', Monitor],
-              ['automations', 'Automations', Clock3]
+              ['work', 'Home', House],
+              ['computer', 'Computer', Monitor]
             ] as const
           ).map(([view, label, Icon]) => (
             <Button
               key={view}
               aria-label={label}
-              {...(view === 'computer'
-                ? { 'aria-current': baseView === 'computer' ? ('page' as const) : undefined }
-                : {
-                    'aria-haspopup': 'dialog' as const,
-                    'aria-expanded': navigation.view === view
-                  })}
+              aria-current={
+                (view === 'work' ? baseView === 'work' && !activeProjectId : baseView === view)
+                  ? 'page'
+                  : undefined
+              }
               onClick={() => navigate(view)}
             >
               <Icon size={17} />
@@ -641,12 +625,7 @@ function WorkspaceApp() {
       </header>
       <div className="shell-notices">
         <Suspense fallback={null}>
-          <UpdateNotice
-            onSettings={() => {
-              navigate('settings');
-              setSurfaceLocation({ section: 'Instance' }, true);
-            }}
-          />
+          <UpdateNotice onSettings={() => openComputer('machine')} />
         </Suspense>
         {offline && (
           <div className="offline-banner" role="status">
@@ -742,8 +721,11 @@ function WorkspaceApp() {
                 onProject={(id) => navigate('work', null, id)}
                 onProjects={() => navigate('projects')}
                 onAttention={() => navigate('attention')}
-                onAutomations={() => navigate('automations')}
+                onAutomations={() => openComputer('runs')}
                 onComputer={() => navigate('computer')}
+                onRun={(process) =>
+                  process.ownerTaskId ? openTask(process.ownerTaskId) : openComputer('runs')
+                }
                 bootstrap={bootstrap}
                 workspace={workspace}
                 onNew={() => setNewWork(true)}
@@ -820,7 +802,22 @@ function WorkspaceApp() {
                   task={task}
                   initialTool={tool}
                   visible={baseView === 'computer' && !sheetTitle}
+                  onToolChange={(next) => {
+                    setTool(next);
+                    setSurfaceLocation({ tool: next }, true);
+                  }}
                   onChange={requestRefresh}
+                  projects={bootstrap.projects ?? []}
+                  knownTasks={bootstrap.tasks}
+                  onOpenTask={openTask}
+                  onTaskDeleted={(id) => {
+                    deletedTasks.current.add(id);
+                    setBootstrap((current) =>
+                      current
+                        ? { ...current, tasks: current.tasks.filter((item) => item.id !== id) }
+                        : current
+                    );
+                  }}
                 />
               )}
             </section>
@@ -831,10 +828,8 @@ function WorkspaceApp() {
         {(
           [
             ['work', 'Home', House],
-            ['projects', 'Projects', FolderOpen],
             ['attention', 'Needs you', Bell],
-            ['computer', 'Computer', Monitor],
-            ['library', 'Library', LibraryBig]
+            ['computer', 'Computer', Monitor]
           ] as const
         ).map(([view, label, Icon]) => (
           <button
@@ -878,10 +873,6 @@ function WorkspaceApp() {
               <section className="overview projects-index desk-project-index">
                 <header className="management-heading">
                   <h1>Projects</h1>
-                  <Button onClick={() => navigate('automations')}>
-                    <Clock3 size={15} />
-                    Automations
-                  </Button>
                   <Button className="primary" onClick={() => setNewWork(true)}>
                     <Plus size={16} />
                     New project
@@ -943,39 +934,6 @@ function WorkspaceApp() {
                 />
               </section>
             )}
-            {navigation.view === 'automations' && (
-              <section className="management-page">
-                <header className="management-heading">
-                  <p className="eyebrow">While you’re away</p>
-                  <h1>Automations</h1>
-                  <p className="muted">Schedule useful work and return to the results.</p>
-                </header>
-                <div className="management-content">
-                  <Automations
-                    workspace={workspace}
-                    onOpenTask={openTask}
-                    onChange={requestRefresh}
-                  />
-                </div>
-              </section>
-            )}
-            {navigation.view === 'library' && (
-              <Library
-                workspace={workspace}
-                onOpenTask={openTask}
-                onChange={requestRefresh}
-                projects={bootstrap.projects ?? []}
-                knownTasks={bootstrap.tasks}
-                onTaskDeleted={(id) => {
-                  deletedTasks.current.add(id);
-                  setBootstrap((current) =>
-                    current
-                      ? { ...current, tasks: current.tasks.filter((task) => task.id !== id) }
-                      : current
-                  );
-                }}
-              />
-            )}
             {navigation.view === 'settings' && (
               <Settings
                 workspace={workspace}
@@ -984,7 +942,8 @@ function WorkspaceApp() {
                 onThemeChange={setTheme}
                 palette={palette}
                 onPaletteChange={setPalette}
-                onComputer={() => navigate('computer')}
+                projects={bootstrap.projects ?? []}
+                onOpenTask={openTask}
               />
             )}
             {navigation.view === 'attention' && (
@@ -1116,6 +1075,10 @@ function WorkspaceApp() {
             onView={(view) => {
               setSearchOpen(false);
               navigate(view);
+            }}
+            onComputer={(next) => {
+              setSearchOpen(false);
+              openComputer(next);
             }}
             onNew={() => {
               setSearchOpen(false);

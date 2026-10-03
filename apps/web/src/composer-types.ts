@@ -23,4 +23,6 @@ export interface ComposerProps {
   toolbarExtra?: ReactNode;
   onSent: (task: Task) => void;
   onDraft: (draft: Draft) => void;
+  /** While the agent is waiting on a question, what is typed here is the answer. */
+  answer?: { question: string; onAnswer: (text: string) => Promise<void> };
 }

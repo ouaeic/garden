@@ -24,13 +24,7 @@ export function ComputerSettings({
   workspace: Workspace | null;
   onChange: () => void;
 }) {
-  const permissionHelpId = useId(),
-    newPermissionHelpId = useId();
-  const [reviewDraft, setReviewDraft] = useState<{ workspaceId: string; mode: SecurityMode }>();
-  const reviewMode =
-    reviewDraft && reviewDraft.workspaceId === workspace?.id
-      ? reviewDraft.mode
-      : (workspace?.securityMode ?? 'balanced');
+  const newPermissionHelpId = useId();
   const [newReviewMode, setNewReviewMode] = useState<SecurityMode>('balanced');
   const root = workspace ? `/v1/workspaces/${workspace.id}` : null;
   const snapshots = useResource<WorkspaceSnapshot[]>(root ? `${root}/snapshots` : null);
@@ -89,46 +83,6 @@ export function ComputerSettings({
               </Button>
             </div>
             <ActionFeedback action={action} />
-            <form
-              className="stack management-filter"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const form = new FormData(event.currentTarget);
-                void action.run(
-                  () =>
-                    patch(`${root}/security-mode`, {
-                      securityMode: fieldValue(form, 'securityMode')
-                    }),
-                  'Default review level saved'
-                );
-              }}
-            >
-              <Field label="Review level for new work">
-                <select
-                  name="securityMode"
-                  value={reviewMode}
-                  aria-describedby={permissionHelpId}
-                  onChange={(event) =>
-                    setReviewDraft({
-                      workspaceId: workspace.id,
-                      mode: event.target.value as SecurityMode
-                    })
-                  }
-                >
-                  <option value="review">Review each action</option>
-                  <option value="balanced">Balanced</option>
-                  <option value="autonomous">Autonomous</option>
-                </select>
-              </Field>
-              <details>
-                <summary>What this mode allows</summary>
-                <p id={permissionHelpId}>{permissionModeSummary(reviewMode)}</p>
-                <p className="muted">Existing conversations retain their own review level.</p>
-              </details>
-              <Button type="submit" busy={action.busy}>
-                Save review level
-              </Button>
-            </form>
             <details>
               <summary>Storage allocation</summary>
               <form
@@ -356,5 +310,69 @@ export function ComputerSettings({
         </form>
       </Section>
     </>
+  );
+}
+
+/** How much new work may do before it asks: the default for conversations started from now on. */
+export function ReviewLevelSettings({
+  workspace,
+  onChange
+}: {
+  workspace: Workspace | null;
+  onChange: () => void;
+}) {
+  const permissionHelpId = useId();
+  const [reviewDraft, setReviewDraft] = useState<{ workspaceId: string; mode: SecurityMode }>();
+  const reviewMode =
+    reviewDraft && reviewDraft.workspaceId === workspace?.id
+      ? reviewDraft.mode
+      : (workspace?.securityMode ?? 'balanced');
+  const action = useAction(onChange);
+  if (!workspace) return null;
+  const root = `/v1/workspaces/${workspace.id}`;
+  return (
+    <Section title="Review level" description="What new work may do before it asks you.">
+      <form
+        className="stack management-filter"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const form = new FormData(event.currentTarget);
+          void action.run(
+            () =>
+              patch(`${root}/security-mode`, {
+                securityMode: fieldValue(form, 'securityMode')
+              }),
+            'Default review level saved'
+          );
+        }}
+      >
+        <Field label="Review level for new work">
+          <select
+            name="securityMode"
+            value={reviewMode}
+            aria-describedby={permissionHelpId}
+            onChange={(event) =>
+              setReviewDraft({
+                workspaceId: workspace.id,
+                mode: event.target.value as SecurityMode
+              })
+            }
+          >
+            <option value="review">Review each action</option>
+            <option value="balanced">Balanced</option>
+            <option value="autonomous">Autonomous</option>
+          </select>
+        </Field>
+        <details>
+          <summary>What this mode allows</summary>
+          <p id={permissionHelpId}>{permissionModeSummary(reviewMode)}</p>
+          <p className="muted">Existing conversations retain their own review level.</p>
+        </details>
+        <Button type="submit" busy={action.busy}>
+          Save review level
+        </Button>
+      </form>
+      <ActionFeedback action={action} />
+    </Section>
   );
 }

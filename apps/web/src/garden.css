@@ -1156,11 +1156,31 @@
   margin-top: 12px;
   flex-wrap: wrap;
 }
-.garden-attention-jump {
-  width: 100%;
-  justify-content: space-between;
-}
+/* Docked above the composer: what the agent is waiting on, answered from the box below it. */
 .work-attention {
-  scroll-margin-block: 18px;
-  margin-bottom: 24px;
+  display: grid;
+  gap: 8px;
+  max-height: min(45vh, 420px);
+  overflow: auto;
+  margin-bottom: 8px;
+  overscroll-behavior: contain;
+}
+.work-attention .question-card {
+  padding: 12px 14px;
+}
+.work-attention .question-card h2 {
+  margin: 4px 0;
+  font-size: 18px;
+}
+.answer-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.answer-choices .answer-choice {
+  width: auto;
+}
+.question-hint {
+  margin: 4px 0 0;
 }

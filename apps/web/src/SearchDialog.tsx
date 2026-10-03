@@ -1,3 +1,4 @@
+import type { ComputerTool } from './computer-tools';
 import { useEffect, useState } from 'react';
 import { Command, FileText, Search } from './icons';
 import type { Task, Workspace } from '@garden/contracts';
@@ -12,6 +13,7 @@ export default function SearchDialog({
   onClose,
   onTask,
   onView,
+  onComputer,
   onNew,
   settings = []
 }: {
@@ -20,6 +22,7 @@ export default function SearchDialog({
   onClose: () => void;
   onTask: (id: string) => void;
   onView: (view: View) => void;
+  onComputer: (tool: ComputerTool) => void;
   onNew: () => void;
   /** Screen preferences that can be flipped without opening Settings. */
   settings?: { label: string; action: () => void }[];
@@ -61,10 +64,15 @@ export default function SearchDialog({
     { label: 'Home', action: () => onView('work') },
     { label: 'Projects', action: () => onView('projects') },
     { label: 'Needs you — questions and approvals', action: () => onView('attention') },
-    { label: 'Computer — files, terminal, browser, desktop', action: () => onView('computer') },
-    { label: 'Automations — schedules and watches', action: () => onView('automations') },
-    { label: 'Library — results, memory, skills', action: () => onView('library') },
-    { label: 'Settings — models, spending, appearance, account', action: () => onView('settings') },
+    { label: 'Runs — jobs, pipelines, apps and schedules', action: () => onComputer('runs') },
+    { label: 'Results — everything the work produced', action: () => onComputer('results') },
+    { label: 'Files — the computer’s files', action: () => onComputer('files') },
+    { label: 'Terminal', action: () => onComputer('terminal') },
+    { label: 'Machine — health, recovery and updates', action: () => onComputer('machine') },
+    {
+      label: 'Settings — models, spending, memory, skills, appearance, account',
+      action: () => onView('settings')
+    },
     ...settings
   ];
   return (

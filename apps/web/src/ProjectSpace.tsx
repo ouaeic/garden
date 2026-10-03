@@ -306,7 +306,7 @@ export default function ProjectSpace({
     >
       <div className="project-topbar">
         <header className="project-space-header">
-          <Button className="project-back" aria-label="All projects" onClick={onAllProjects}>
+          <Button className="project-back" aria-label="Back to Home" onClick={onAllProjects}>
             <ArrowLeft size={15} />
           </Button>
           <div className="project-space-title">
@@ -383,6 +383,7 @@ export default function ProjectSpace({
                   if (!fileNavigationBlocked()) onTask(conversation.id);
                 }}
               >
+                <StatusSprite stage={stageOf(conversation)} />
                 {conversation.title === project.title ? 'Main conversation' : conversation.title}
               </Button>
             ))}
@@ -462,8 +463,6 @@ export default function ProjectSpace({
             <DeskSupport
               project={project}
               {...(taskId ? { taskId } : {})}
-              tasks={conversations}
-              onTask={onTask}
               onProcesses={openProcesses}
             />
           </Suspense>

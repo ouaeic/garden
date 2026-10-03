@@ -1,21 +1,31 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import type { Task, Workspace } from '@garden/contracts';
+import type { ManagedProcess, Project, Task, Workspace } from '@garden/contracts';
 const Files = lazy(() =>
   import('./computer/Files.js').then((module) => ({ default: module.Files }))
 );
 import { Operations } from './computer/Operations.js';
+import { COMPUTER_TOOLS as TOOLS, type ComputerTool } from './computer-tools';
 import './computer.css';
 
 const Terminal = lazy(() => import('./computer/Terminal.js'));
 const Screen = lazy(() => import('./computer/Screen.js'));
-export type ComputerTool =
-  | 'files'
-  | 'terminal'
-  | 'browser'
-  | 'desktop'
-  | 'previews'
-  | 'processes'
-  | 'checkpoints';
+const Schedules = lazy(() =>
+  import('./library/Watches.js').then((module) => ({ default: module.WatchesLibrary }))
+);
+const Results = lazy(() =>
+  import('./library/Results.js').then((module) => ({ default: module.ResultsLibrary }))
+);
+const ComputerSettings = lazy(() =>
+  import('./settings/Computer.js').then((module) => ({ default: module.ComputerSettings }))
+);
+const InstanceSettings = lazy(() =>
+  import('./settings/Instance.js').then((module) => ({ default: module.InstanceSettings }))
+);
+
+export type { ComputerTool } from './computer-tools';
+/** Inside a conversation the machine-wide tabs stay on the Computer page. */
+const EMBEDDED: readonly ComputerTool[] = ['runs', 'terminal', 'browser', 'desktop', 'machine'];
+
 export interface ComputerProps {
   workspace: Workspace | null;
   task?: Task | null;
@@ -24,28 +34,44 @@ export interface ComputerProps {
   onChange: () => void;
   embedded?: boolean;
   onToolChange?: (tool: ComputerTool) => void;
+  /** What the Results tab lists; absent inside a conversation, which has no Results tab. */
+  projects?: Project[];
+  knownTasks?: Task[];
+  onOpenTask?: (id: string) => void;
+  onTaskDeleted?: (id: string) => void;
+  /** Inside a conversation: a run handed back to it as something to talk about. */
+  onAskAboutRun?: (process: ManagedProcess) => void;
 }
 
+/**
+ * The machine itself: what is running on it, what it has produced, its files, and direct hands on
+ * its terminal, browser and desktop. Runs come first because a remote computer is mostly a place
+ * where work is happening.
+ */
 export default function Computer({
   workspace,
   task,
-  initialTool = 'files',
+  initialTool = 'runs',
   visible = true,
   embedded = false,
   onToolChange,
-  onChange
+  onChange,
+  projects = [],
+  knownTasks = [],
+  onOpenTask = () => undefined,
+  onTaskDeleted = () => undefined,
+  onAskAboutRun
 }: ComputerProps) {
-  const [tool, setTool] = useState<ComputerTool>(initialTool);
-  const [filesOpened, setFilesOpened] = useState(initialTool === 'files');
-  const [terminalOpened, setTerminalOpened] = useState(initialTool === 'terminal');
+  const tools = embedded ? EMBEDDED : TOOLS;
+  const start = tools.includes(initialTool) ? initialTool : tools[0]!;
+  const [tool, setTool] = useState<ComputerTool>(start);
+  const [opened, setOpened] = useState<ReadonlySet<ComputerTool>>(() => new Set([start]));
   useEffect(() => {
-    setTool(initialTool);
-    if (initialTool === 'files') setFilesOpened(true);
-    if (initialTool === 'terminal') setTerminalOpened(true);
-  }, [initialTool]);
+    setTool(start);
+    setOpened((current) => new Set([...current, start]));
+  }, [start]);
   const select = (next: ComputerTool) => {
-    if (next === 'terminal') setTerminalOpened(true);
-    if (next === 'files') setFilesOpened(true);
+    setOpened((current) => new Set([...current, next]));
     setTool(next);
     onToolChange?.(next);
   };
@@ -53,45 +79,28 @@ export default function Computer({
     return (
       <section className="panel empty">Choose a computer to open its files and sessions.</section>
     );
+  // Files and the terminal keep their state while another tab is showing.
+  const kept = (name: ComputerTool) => opened.has(name);
   return (
     <section className="computer panel" aria-label={`${workspace.name} computer`}>
       {!embedded && (
-        <header className="section-heading">
-          <div>
-            <p className="eyebrow">All computer work</p>
-            <h2>{task?.title ?? workspace.name}</h2>
-          </div>
+        <header className="computer-heading">
+          <h1>{workspace.name}</h1>
           <span className="muted">{workspace.status}</span>
         </header>
       )}
       <nav className="computer-tabs" aria-label="Computer tools">
-        {(
-          [
-            'files',
-            'terminal',
-            'browser',
-            'desktop',
-            'previews',
-            'processes',
-            'checkpoints'
-          ] as const
-        )
-          .filter((name) => !embedded || name !== 'files')
-          .map((name) => (
-            <button
-              type="button"
-              key={name}
-              className={tool === name ? 'button active' : 'button'}
-              aria-pressed={tool === name}
-              onClick={() => select(name)}
-            >
-              {name === 'checkpoints'
-                ? 'Recovery'
-                : name === 'processes'
-                  ? 'Jobs'
-                  : name[0]!.toUpperCase() + name.slice(1)}
-            </button>
-          ))}
+        {tools.map((name) => (
+          <button
+            type="button"
+            key={name}
+            className={tool === name ? 'button active' : 'button'}
+            aria-pressed={tool === name}
+            onClick={() => select(name)}
+          >
+            {name === 'machine' && embedded ? 'Recovery' : name[0]!.toUpperCase() + name.slice(1)}
+          </button>
+        ))}
       </nav>
       <Suspense
         fallback={
@@ -100,7 +109,37 @@ export default function Computer({
           </p>
         }
       >
-        {filesOpened && (
+        {visible && tool === 'runs' && (
+          <div className="computer-runs">
+            <Operations
+              workspace={workspace}
+              task={task ?? null}
+              tool="processes"
+              onChange={onChange}
+              {...(onAskAboutRun ? { onAsk: onAskAboutRun } : {})}
+            />
+            <Operations
+              workspace={workspace}
+              task={task ?? null}
+              tool="previews"
+              onChange={onChange}
+            />
+            {!embedded && (
+              <Schedules workspace={workspace} onOpenTask={onOpenTask} onChange={onChange} />
+            )}
+          </div>
+        )}
+        {!embedded && visible && tool === 'results' && (
+          <Results
+            workspace={workspace}
+            projects={projects}
+            knownTasks={knownTasks}
+            onOpenTask={onOpenTask}
+            onChange={onChange}
+            onTaskDeleted={onTaskDeleted}
+          />
+        )}
+        {!embedded && kept('files') && (
           <div hidden={tool !== 'files'}>
             <Files
               key={workspace.id}
@@ -110,7 +149,7 @@ export default function Computer({
             />
           </div>
         )}
-        {terminalOpened && (
+        {kept('terminal') && (
           <div hidden={tool !== 'terminal'}>
             <Terminal
               key={workspace.id}
@@ -127,14 +166,17 @@ export default function Computer({
             surface={tool}
           />
         )}
-        {visible && (tool === 'previews' || tool === 'processes' || tool === 'checkpoints') && (
-          <Operations
-            key={`${workspace.id}:${tool}`}
-            workspace={workspace}
-            task={task ?? null}
-            tool={tool}
-            onChange={onChange}
-          />
+        {visible && tool === 'machine' && (
+          <div className="computer-machine">
+            {!embedded && <ComputerSettings workspace={workspace} onChange={onChange} />}
+            <Operations
+              workspace={workspace}
+              task={task ?? null}
+              tool="checkpoints"
+              onChange={onChange}
+            />
+            {!embedded && <InstanceSettings />}
+          </div>
         )}
       </Suspense>
     </section>

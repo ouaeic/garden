@@ -104,17 +104,18 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
       await stats.dispatchEvent('click', { detail: 1 });
       assert(await panel.isVisible(), 'The synthesized click after a hold must not close Stats');
       await page.screenshot({ path: resolve(report, `mobile-stats-${width}.png`) });
-      await bar.getByRole('button', { name: 'Projects', exact: true }).click();
+      assert.equal(await bar.getByRole('button').count(), 3, 'Home, Needs you and Computer');
+      await bar.getByRole('button', { name: 'Computer', exact: true }).click();
       await panel.waitFor({ state: 'hidden' });
+      await page.locator('.computer-runs').waitFor();
       await fits();
-      await page.locator('#navigation-page.desk-sheet-projects').waitFor();
-      await page.getByRole('button', { name: 'Automations', exact: true }).click();
-      await page.getByRole('region', { name: 'Automations', exact: true }).waitFor();
-      await fits();
-      for (const name of ['Library', 'Needs you', 'Computer', 'Home']) {
-        await bar.getByRole('button', { name, exact: true }).click();
+      const computerTabs = page.getByRole('navigation', { name: 'Computer tools', exact: true });
+      for (const name of ['Results', 'Files', 'Machine', 'Runs']) {
+        await computerTabs.getByRole('button', { name, exact: true }).click();
         await fits();
-        if (name === 'Computer') {
+        if (name === 'Results')
+          await page.screenshot({ path: resolve(report, `mobile-computer-results-${width}.png`) });
+        if (name === 'Files') {
           await page.locator('.computer-file-list').waitFor();
           for (const theme of ['light', 'dark']) {
             await page.evaluate((theme) => {
@@ -127,6 +128,10 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
             await fits();
           }
         }
+      }
+      for (const name of ['Needs you', 'Home']) {
+        await bar.getByRole('button', { name, exact: true }).click();
+        await fits();
       }
       await page.getByRole('button', { name: 'Settings', exact: true }).click();
       const settings = page.getByRole('region', { name: 'Settings', exact: true });
@@ -142,14 +147,6 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
         await fits();
       }
       await page.screenshot({ path: resolve(report, `mobile-settings-${width}.png`) });
-      await bar.getByRole('button', { name: 'Library', exact: true }).click();
-      const library = page.getByRole('region', { name: 'Library', exact: true });
-      await library.waitFor();
-      for (const name of ['Results', 'Memory', 'Skills']) {
-        await library.getByRole('button', { name, exact: true }).click();
-        await fits();
-      }
-      await page.screenshot({ path: resolve(report, `mobile-library-${width}.png`) });
       await page.goto(`${origin}/?task=${task.id}&project=${task.projectId}`);
       await bar.waitFor();
       for (const name of ['Files', 'Activity', 'Tools']) {
@@ -161,11 +158,12 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
         await fits();
       }
       await page.screenshot({ path: resolve(report, `mobile-project-tools-${width}.png`) });
-      await bar.getByRole('button', { name: 'Library', exact: true }).click();
-      await library.waitFor();
+      await bar.getByRole('button', { name: 'Needs you', exact: true }).click();
+      const attention = page.getByRole('region', { name: 'Needs you', exact: true });
+      await attention.waitFor();
       await fits();
       await page.goBack();
-      await library.waitFor({ state: 'detached' });
+      await attention.waitFor({ state: 'detached' });
       await page.locator('.project-panel.navigation-page[open]').waitFor();
       await fits();
     }
@@ -254,7 +252,7 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
       'Painted-edge checks passed on desktop and mobile: absent, transparent and hidden borders are rejected; returning borders can be used again.'
     );
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(`${origin}/?view=library`);
+    await page.goto(`${origin}/?view=attention`);
     await page.locator('.navigation-page[open]').waitFor();
     await page.locator('.life-layer').waitFor({ state: 'attached' });
     // Leave only the phone bar's real top border available on this page.
@@ -278,6 +276,7 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
     const pagePanel = await page.locator('.navigation-page .dialog-body').evaluateHandle((body) => {
       const panel = document.createElement('section');
       panel.className = 'panel';
+      panel.id = 'perch-probe';
       panel.style.cssText =
         'position:fixed;left:24px;top:200px;width:250px;height:100px;border:1px solid currentColor';
       body.append(panel);
@@ -285,7 +284,7 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
     });
     const hideOtherEdges = await page.addStyleTag({
       content:
-        '[data-perch], .desk-card, .desk-work-card, .phone-bar, .garden-masthead { border-style:none !important; }'
+        '[data-perch], .desk-card, .desk-work-card, .phone-bar, .garden-masthead, .empty { border-style:none !important; }'
     });
     await barSnail.waitFor({ state: 'detached' });
     await page.evaluate(() =>
@@ -294,7 +293,9 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
     await barSnail.waitFor({ state: 'attached' });
     await page.waitForFunction(() => {
       const actor = document.querySelector('[data-creature="snail"]')?.getBoundingClientRect();
-      return actor && actor.top < 200 && Math.abs(actor.bottom - 200) < 3;
+      // Measured, not assumed: the page around the probe decides where its border lands.
+      const edge = document.getElementById('perch-probe')?.getBoundingClientRect().top;
+      return actor && edge !== undefined && actor.top < edge && Math.abs(actor.bottom - edge) < 3;
     });
     const modal = await page.evaluateHandle(() => {
       const dialog = document.createElement('dialog');
@@ -326,7 +327,7 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
       Math.random = () => 0;
     });
     await page.emulateMedia({ reducedMotion: 'no-preference' });
-    await page.goto(`${origin}/?view=library`);
+    await page.goto(`${origin}/?view=attention`);
     await page.locator('.navigation-page[open]').waitFor();
     await page.locator('.life-layer').waitFor({ state: 'attached' });
     await page.evaluate(() =>

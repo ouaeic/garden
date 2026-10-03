@@ -36,7 +36,8 @@ export function useComposer({
   onContextChange,
   onEditingChange,
   onSent,
-  onDraft
+  onDraft,
+  answer
 }: ComposerProps) {
   const context =
     suppliedContext === undefined ? (initialDraft?.controls?.context ?? null) : suppliedContext;
@@ -414,6 +415,22 @@ export function useComposer({
       return;
     if (!navigator.onLine) {
       setError(new Error('You are offline. Your draft is kept; reconnect before sending.'));
+      return;
+    }
+    if (answer && body.trim()) {
+      sending.current = true;
+      setBusy(true);
+      setError(null);
+      try {
+        await answer.onAnswer(body.trim());
+        if (mounted.current) setBody('');
+        onDraftRef.current(clearedDraft());
+      } catch (cause) {
+        if (mounted.current) setError(cause);
+      } finally {
+        sending.current = false;
+        if (mounted.current) setBusy(false);
+      }
       return;
     }
     let limit: number | undefined;

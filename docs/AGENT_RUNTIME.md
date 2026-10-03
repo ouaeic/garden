@@ -562,9 +562,9 @@ conversations that inherited shared evidence. Evidence locks prevent a correctio
 new pack into storage. Resuming a conversation checks validity again; a failed refresh removes the
 previous preview instead of retaining possibly revoked content.
 
-The owner's Memory Library uses paginated, source-linked search across project workspaces. Its
-project selector also exposes saved facts and review queues. This owner browsing surface does not
-widen agent recall to unrelated projects. Reads decrypt with the record's origin context; mutation
+The memory view in Settings → Knowledge uses paginated, source-linked search across project
+workspaces. Its project selector also exposes saved facts and review queues. This owner browsing
+surface does not widen agent recall to unrelated projects. Reads decrypt with the record's origin context; mutation
 routes use that origin workspace's ownership checks.
 
 Recall is lexical throughout, and the semantic channel was removed rather than finished. Migration

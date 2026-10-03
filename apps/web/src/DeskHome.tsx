@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { ArrowUpRight, Clock3, Plus } from './icons';
-import type { Project, Task, Workspace } from '@garden/contracts';
+import type { ManagedProcess, Project, Task, Workspace } from '@garden/contracts';
+import { RunRows, useRuns } from './runs';
 import type { Bootstrap } from './model';
 import {
   bytes,
@@ -89,6 +90,7 @@ export default function DeskHome({
   onAttention,
   onAutomations,
   onComputer,
+  onRun,
   onNew
 }: {
   projects: Project[];
@@ -103,8 +105,10 @@ export default function DeskHome({
   onAttention: () => void;
   onAutomations: () => void;
   onComputer: () => void;
+  onRun: (process: ManagedProcess) => void;
   onNew: () => void;
 }) {
+  const runs = useRuns(workspace ? `/v1/workspaces/${workspace.id}/processes` : null);
   const recent = [...tasks].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const attention = recent.filter(needsAttention);
   const growing = recent.filter((task) => hasOngoingWork(task) && !needsAttention(task));
@@ -290,7 +294,7 @@ export default function DeskHome({
               />
             ))}
           </span>
-          <Button onClick={onProjects}>
+          <Button onClick={onProjects} aria-label="All projects">
             All <ArrowUpRight size={14} />
           </Button>
         </header>
@@ -304,7 +308,8 @@ export default function DeskHome({
                   type="button"
                   className="project-tile"
                   key={project.id}
-                  onClick={() => onProject(project.id)}
+                  // Opening a project is almost always to carry on; its overview is one click on.
+                  onClick={() => (latest ? onTask(latest.id) : onProject(project.id))}
                 >
                   <StatusSprite stage={projectStage(project, latest)} scale={3} />
                   <span>
@@ -352,7 +357,7 @@ export default function DeskHome({
           )}
         </header>
         <ScrollRegion label="Today" className="desk-card-scroll">
-          <h3 className="home-divider">Needs you</h3>
+          {attention.length > 0 && <h3 className="home-divider">Needs you</h3>}
           {attention.map((task) =>
             row(
               task,
@@ -362,8 +367,7 @@ export default function DeskHome({
               </>
             )
           )}
-          {!attention.length && <p className="home-quiet">Nothing needs you.</p>}
-          <h3 className="home-divider">Growing</h3>
+          {growing.length > 0 && <h3 className="home-divider">Working</h3>}
           {growing.map((task) =>
             row(
               task,
@@ -382,7 +386,16 @@ export default function DeskHome({
               ) : undefined
             )
           )}
-          {!growing.length && <p className="home-quiet">Nothing is running.</p>}
+          {runs.active.length > 0 && (
+            <h3 className="home-divider">Running on {workspace?.name ?? 'the computer'}</h3>
+          )}
+          <RunRows
+            processes={runs.active}
+            observedAt={runs.list?.observedAt}
+            onOpen={onRun}
+            limit={5}
+            onMore={onAutomations}
+          />
           {ready.length > 0 && <h3 className="home-divider">Ready</h3>}
           {ready.map((task) =>
             row(
@@ -392,7 +405,7 @@ export default function DeskHome({
               </>
             )
           )}
-          <h3 className="home-divider">Next up</h3>
+          {upcoming.length > 0 && <h3 className="home-divider">Next up</h3>}
           {upcoming.map((schedule) => (
             <button
               type="button"
@@ -407,11 +420,11 @@ export default function DeskHome({
               </span>
             </button>
           ))}
-          {!upcoming.length && (
-            <button type="button" className="home-quiet home-link" onClick={onAutomations}>
-              No automations scheduled. Set one up
-            </button>
-          )}
+          {!attention.length &&
+            !growing.length &&
+            !runs.active.length &&
+            !ready.length &&
+            !upcoming.length && <p className="home-quiet">All quiet. Start something above.</p>}
         </ScrollRegion>
       </section>
     </section>
