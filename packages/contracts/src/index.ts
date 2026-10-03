@@ -2241,11 +2241,62 @@ export const OwnerPreferences = z.object({
 export type OwnerPreferences = z.infer<typeof OwnerPreferences>;
 
 /** One comment on a result: on quoted text, on a circled region of a view, or on the whole of it. */
+/**
+ * Where a comment points, said the way the content says it: the words highlighted, the element
+ * under a point with its own text and the heading it sits under, a table cell, a spot on a PDF
+ * page. The model reads this as text; nothing about it depends on pixels or the owner's screen.
+ */
+export const ResultAnchor = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('text'),
+    quote: z.string().min(1).max(4_000),
+    /** A little of the text on either side, so a repeated phrase still finds the right place. */
+    before: z.string().max(80).optional(),
+    after: z.string().max(80).optional()
+  }),
+  z.object({
+    kind: z.literal('point'),
+    /** A selector for the element inside the result, used to put the pin back where it was. */
+    path: z.string().max(400),
+    /** The element's own words: its text, label, alt or title. */
+    label: z.string().max(300),
+    /** The nearest heading or label above it. */
+    context: z.string().max(200).optional(),
+    /** Where in that element, as fractions of its box. */
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1)
+  }),
+  z.object({
+    kind: z.literal('cell'),
+    row: z.number().int().min(0),
+    column: z.string().max(200),
+    value: z.string().max(500)
+  }),
+  z.object({
+    kind: z.literal('page'),
+    page: z.number().int().min(1),
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1),
+    text: z.string().max(300).optional()
+  }),
+  /** A place with nothing readable under it, such as a photograph, as fractions of its box. */
+  z.object({
+    kind: z.literal('spot'),
+    path: z.string().max(400).optional(),
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1)
+  })
+]);
+export type ResultAnchor = z.infer<typeof ResultAnchor>;
+
+/** One comment on a result, numbered as the pin the owner placed. */
 export const ResultNote = z.object({
-  /** What it is about: "the answer", or the name of the view or file. */
+  id: z.string().min(1).max(64).optional(),
+  /** What it is about: "the answer", or the name of the view, app or file. */
   on: z.string().min(1).max(200),
+  anchor: ResultAnchor.optional(),
+  /** Older comments carry these instead of an anchor. */
   quote: z.string().max(4_000).optional(),
-  /** A circled region, as fractions of the view's width and height, and the text found under it. */
   region: z
     .object({
       x: z.number().min(0).max(1),

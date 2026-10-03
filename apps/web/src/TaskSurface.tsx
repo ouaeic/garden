@@ -56,7 +56,7 @@ import { createQuestionAnswerSender } from './task-actions';
 import { TaskOutputs, TaskProgress } from './TaskCanvas';
 import Sources from './Sources';
 import Thread, { exchangesOf, OwnerLine } from './Thread';
-import { Commentable, withNote } from './result-notes';
+import { CommentSurface, withNote } from './result-notes';
 import { currentWork } from './current-work';
 import { completionChecks, evidenceSource } from './completion-checks';
 import MessageAttachmentList from './MessageAttachmentList';
@@ -406,11 +406,11 @@ export default function TaskSurface({
   const resultAnswer = answer.markdown ? (
     <article className="garden-answer">
       <Suspense fallback={<Spinner label="Opening the result…" />}>
-        <Commentable on="the answer" onNote={addNote}>
+        <CommentSurface on="the answer" notes={notes} onNote={addNote}>
           <Markdown artifacts={artifacts} onArtifact={showArtifact} imageMode="links">
             {answer.markdown}
           </Markdown>
-        </Commentable>
+        </CommentSurface>
       </Suspense>
       {writing ? (
         <div className="writing-indicator typing-cursor" role="status">

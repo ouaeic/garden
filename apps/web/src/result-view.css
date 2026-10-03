@@ -38,31 +38,55 @@
 .result-view-loading {
   padding: 16px;
 }
-.markable {
+.comment-surface {
   position: relative;
+}
+.comment-content {
+  display: contents;
+}
+.comment-surface.is-commenting .comment-content,
+.comment-surface.is-commenting .comment-content * {
+  cursor: crosshair;
+}
+/* A pin hangs from its bottom-left corner, which sits on what it is about. */
+.comment-pin {
+  position: absolute;
+  z-index: 4;
+  transform: translate(-1px, -100%);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  font: 600 11px/1 var(--font-read);
+  text-shadow: none;
+  color: var(--bg);
+  background: var(--text);
+  border-radius: 9px 9px 9px 0;
+  box-shadow: 0 0 0 1px var(--bg);
+  transition: box-shadow 160ms ease-out;
+}
+.comment-pin.is-focus,
+.comment-pin.is-draft {
+  box-shadow:
+    0 0 0 1px var(--bg),
+    0 0 0 4px var(--text);
+}
+.comment-frame {
   height: 100%;
 }
-.mark-layer {
+.comment-catch {
   position: absolute;
   inset: 0;
-  pointer-events: none;
-}
-.mark-layer.is-marking {
-  pointer-events: auto;
+  z-index: 3;
+  width: 100%;
+  border: 0;
+  padding: 0;
   cursor: crosshair;
-  touch-action: none;
-  background: color-mix(in srgb, var(--text) 6%, transparent);
+  background: color-mix(in srgb, var(--text) 5%, transparent);
 }
-.mark-circle {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  border: 2px solid var(--text);
-  border-radius: 50%;
-  box-shadow: 0 0 0 2px var(--bg);
-  pointer-events: none;
-}
-.commentable {
-  position: relative;
+::highlight(garden-comments) {
+  background-color: color-mix(in srgb, var(--text) 22%, transparent);
 }
 .note-offer {
   position: absolute;

@@ -1,0 +1,147 @@
+/*
+ * The handheld: a dark case with a lit screen set into it. The masthead and the phone bar are
+ * the case; everything that changes is on the screen. Loaded after every other stylesheet.
+ */
+
+/* Ink on an LCD casts a faint shadow onto the reflector, a pixel down and to the right. */
+body {
+  text-shadow: var(--ink-shadow);
+}
+:is(img, canvas, iframe, video, svg) {
+  text-shadow: none;
+}
+
+/* Reading surfaces use the crisp face; the pixel face stays on the controls it was drawn for. */
+:where(
+  .markdown,
+  .owner-line,
+  .thread-body,
+  .thread-ask,
+  .thread-answer,
+  textarea,
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='color']),
+  pre,
+  code,
+  kbd,
+  samp,
+  .composer-notes,
+  .note-popover textarea,
+  .run-row small,
+  .process-row-summary,
+  .desk-file-changes,
+  .home-row small,
+  .tile-meta,
+  .muted,
+  small
+) {
+  font-family: var(--font-read);
+  /* Matched to the pixel face's x-height, so the two faces read as one size wherever they meet. */
+  font-size-adjust: 0.4;
+}
+:where(.markdown) {
+  line-height: 1.6;
+}
+:where(.markdown) :is(h1, h2, h3, h4) {
+  font-family: var(--font-display);
+  font-size-adjust: none;
+}
+
+/* The case. */
+body:has(.desk-shell) {
+  background: var(--bezel);
+}
+.garden-shell.desk-shell {
+  background: var(--bezel);
+  padding: 0 12px 12px;
+  color-scheme: dark;
+}
+.desk-shell .garden-masthead {
+  background: none;
+  /* The seam above the screen; bats hang from it. */
+  border-bottom: 1px solid var(--bezel-edge);
+  color: var(--bezel-ink);
+  text-shadow: none;
+}
+.desk-shell .garden-masthead :is(.button, .brand, .brand-button, kbd) {
+  color: var(--bezel-ink);
+  text-shadow: none;
+}
+.desk-shell .garden-masthead .garden-wordmark {
+  color: var(--bezel-brand);
+}
+.desk-shell .garden-masthead .button {
+  background: none;
+  border-color: transparent;
+}
+.desk-shell .garden-masthead .button:hover,
+.desk-shell .desk-navigation .button:is([aria-expanded='true'], [aria-current='page']) {
+  color: var(--bezel-ink);
+  background: color-mix(in srgb, var(--bezel-ink) 12%, transparent);
+  border-color: color-mix(in srgb, var(--bezel-ink) 45%, transparent);
+}
+.desk-shell .desk-navigation .button {
+  color: var(--bezel-muted);
+}
+.desk-shell .garden-masthead .global-search kbd {
+  border-color: var(--bezel-muted);
+}
+
+/* The power lamp: lit while the computer runs, dark while it sleeps. */
+.power-lamp-led {
+  width: 8px;
+  height: 8px;
+  margin-right: 10px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--lamp) 25%, var(--bezel-edge));
+  flex: none;
+}
+.power-lamp-led[data-on='true'] {
+  background: var(--lamp);
+  box-shadow:
+    0 0 6px color-mix(in srgb, var(--lamp) 70%, transparent),
+    0 0 1px var(--lamp);
+}
+
+/* The screen, set into the case: recessed, square-cornered, the case rounder at one corner. */
+.desk-shell .garden-main {
+  border-radius: 3px;
+  box-shadow:
+    inset 3px 3px 0 color-mix(in srgb, black 30%, transparent),
+    inset 0 0 28px color-mix(in srgb, black 16%, transparent),
+    0 0 0 1px var(--bezel-edge);
+}
+@media (min-width: 701px) {
+  .garden-shell.desk-shell {
+    border-bottom-right-radius: 44px;
+  }
+  .desk-shell .garden-main {
+    border-bottom-right-radius: 3px 3px;
+  }
+}
+
+/* On a phone the bar below the screen is part of the case too. */
+@media (max-width: 700px) {
+  .garden-shell.desk-shell {
+    padding: 0 6px;
+  }
+  .desk-shell .phone-bar {
+    background: var(--bezel);
+    /* The seam where the screen meets the case; creatures still walk along it. */
+    border-top: 1px solid var(--bezel-edge);
+    color: var(--bezel-muted);
+    text-shadow: none;
+  }
+  .desk-shell .phone-bar button {
+    color: var(--bezel-muted);
+  }
+  .desk-shell .phone-bar button[aria-current='page'] {
+    color: var(--bezel-ink);
+    background: color-mix(in srgb, var(--bezel-ink) 12%, transparent);
+  }
+}
+
+@media (prefers-contrast: more), (forced-colors: active), print {
+  body {
+    text-shadow: none;
+  }
+}

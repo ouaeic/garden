@@ -185,6 +185,30 @@ describe('preview origin isolation', () => {
     expect(response.headers['service-worker-allowed']).toBe(path);
   });
 
+  it('adds the comment bridge to an app page only when garden frames it', async () => {
+    const { gateway } = await buildGateway(isolated);
+    disposers.push(() => gateway.close());
+    const open = (dest: string) =>
+      gateway.inject({
+        method: 'GET',
+        url: path,
+        headers: {
+          host: 'app.example.test:8443',
+          'x-forwarded-proto': 'https',
+          'sec-fetch-dest': dest,
+          cookie: `__Secure-garden-preview-access=${accessToken}`
+        }
+      });
+    const framed = await open('iframe');
+    expect(framed.statusCode).toBe(200);
+    expect(framed.body).toContain("window.__gardenFrame='app'");
+    expect(framed.body).toContain('export function anchorAt');
+    expect(framed.body.endsWith('<title>Agent app</title>')).toBe(true);
+    expect(framed.headers.vary).toContain('sec-fetch-dest');
+    const direct = await open('document');
+    expect(direct.body).toBe('<!doctype html><title>Agent app</title>');
+  });
+
   it.each([
     { host: 'app.example.test', 'x-forwarded-proto': 'https' },
     { host: 'app.example.test:8444', 'x-forwarded-proto': 'https' },

@@ -32,6 +32,7 @@ import './workspace-interface.css';
 import './desk.css';
 import './pixel.css';
 import './shell.css';
+import './screen.css';
 import { useWorkspaceViewport } from './use-workspace-viewport';
 const DeskHome = lazy(() => import('./DeskHome'));
 const GardenLife = lazy(() => import('./life/GardenLife'));
@@ -70,6 +71,10 @@ class Boundary extends Component<{ children: ReactNode }, { error: Error | null 
     );
   }
 }
+/** The browser's own bar continues the case the screen sits in. */
+const caseColour = () =>
+  getComputedStyle(document.documentElement).getPropertyValue('--bezel').trim();
+
 export default function App() {
   return (
     <Boundary>
@@ -260,9 +265,7 @@ function WorkspaceApp() {
   useEffect(() => {
     if (palette === 'field') delete document.documentElement.dataset.palette;
     else document.documentElement.dataset.palette = palette;
-    document
-      .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', getComputedStyle(document.documentElement).backgroundColor);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', caseColour());
     try {
       localStorage.setItem('garden-palette', palette);
     } catch {
@@ -272,9 +275,7 @@ function WorkspaceApp() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
-    document
-      .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', getComputedStyle(document.documentElement).backgroundColor);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', caseColour());
     try {
       localStorage.setItem('garden-theme', theme);
     } catch {
@@ -556,6 +557,12 @@ function WorkspaceApp() {
         Skip to work
       </a>
       <header className="garden-masthead">
+        <i
+          className="power-lamp-led"
+          data-on={workspace?.status === 'running' ? 'true' : 'false'}
+          title={workspace ? `${workspace.name} · ${workspace.status}` : undefined}
+          aria-hidden="true"
+        />
         <button
           className="brand-button"
           onClick={() => navigate('work')}

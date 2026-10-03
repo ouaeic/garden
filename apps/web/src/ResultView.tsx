@@ -4,7 +4,8 @@ import { responseError } from './client.js';
 import { message } from './computer/format.js';
 import { Maximize2, X } from './icons';
 import { useExpandedView } from './use-expanded-view';
-import { Markable, MarkButton } from './result-notes';
+import { CommentButton, FrameComments } from './result-notes';
+import bridgeSource from './marks-bridge.js?raw';
 import { Button } from './ui';
 import './result-view.css';
 
@@ -18,16 +19,8 @@ const POLICY =
   "img-src data: blob:; media-src data: blob:; font-src data:; connect-src 'none'; " +
   "form-action 'none'; base-uri 'none'";
 
-/** Reports its height, answers what lies under a point, and hands links to the parent. */
-const BRIDGE = `<script>(()=>{const post=(m)=>parent.postMessage(Object.assign({garden:1},m),'*');
-const size=()=>post({type:'height',value:Math.ceil(document.documentElement.getBoundingClientRect().height)});
-addEventListener('load',size);new ResizeObserver(size).observe(document.documentElement);
-addEventListener('message',(e)=>{const d=e.data||{};if(d.garden!==1||d.type!=='probe')return;
-const el=document.elementFromPoint(d.x*innerWidth,d.y*document.documentElement.scrollHeight-scrollY);
-const t=(el&&(el.closest('[data-label]')?.getAttribute('data-label')||el.innerText||el.textContent||''))||'';
-post({type:'probe',id:d.id,text:t.replace(/\\s+/g,' ').trim().slice(0,300)})});
-addEventListener('click',(e)=>{const a=e.target.closest&&e.target.closest('a[href]');if(!a)return;
-const h=a.getAttribute('href');if(h&&!h.startsWith('#')){e.preventDefault();post({type:'open',href:a.href})}},true);})();</script>`;
+/** Reports its height, hands links to the parent, and anchors and draws the owner's comments. */
+const BRIDGE = `<script>window.__gardenFrame='view'</script><script type="module">${bridgeSource}</script>`;
 
 const themeStyle = (): string => {
   const style = getComputedStyle(document.documentElement);
@@ -38,16 +31,10 @@ const themeStyle = (): string => {
 export const viewDocument = (html: string, theme = ''): string =>
   `<!doctype html><meta http-equiv="Content-Security-Policy" content="${POLICY}"><meta name="viewport" content="width=device-width,initial-scale=1">${theme}${BRIDGE}${html}`;
 
-interface Circle {
-  x: number;
-  y: number;
-  radius: number;
-}
-
 /**
  * A result the model chose to show rather than describe: its own HTML, live, at the size the work
- * needs. Mark turns the pointer into a pen - press to circle a place, then say what is wrong or
- * wanted there - and every comment travels with the next message.
+ * needs. Select its words, or press Comment and then anything in it, to pin a comment there; every
+ * comment travels with the next message.
  */
 export default function ResultView({
   artifact,
@@ -62,9 +49,8 @@ export default function ResultView({
   const [html, setHtml] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [height, setHeight] = useState(360);
-  const [marking, setMarking] = useState(false);
+  const [commenting, setCommenting] = useState(false);
   const frame = useRef<HTMLIFrameElement>(null);
-  const probes = useRef(new Map<string, (text: string) => void>());
   const { ref: stage, expanded, toggle } = useExpandedView<HTMLElement>();
 
   useEffect(() => {
@@ -90,10 +76,6 @@ export default function ResultView({
       if (data.garden !== 1) return;
       if (data.type === 'height' && typeof data.value === 'number')
         setHeight(Math.max(120, Math.min(data.value, 6000)));
-      if (data.type === 'probe' && typeof data.id === 'string') {
-        probes.current.get(data.id)?.(typeof data.text === 'string' ? data.text : '');
-        probes.current.delete(data.id);
-      }
       if (data.type === 'open' && typeof data.href === 'string' && /^https?:\/\//.test(data.href))
         window.open(data.href, '_blank', 'noopener,noreferrer');
     };
@@ -102,20 +84,6 @@ export default function ResultView({
   }, []);
 
   const srcDoc = useMemo(() => (html === null ? '' : viewDocument(html, themeStyle())), [html]);
-
-  /** What the view shows under a point, asked of the view itself and never waited on for long. */
-  const probe = (circle: Circle): Promise<string> =>
-    new Promise((resolve) => {
-      const id = Math.random().toString(36).slice(2);
-      probes.current.set(id, resolve);
-      frame.current?.contentWindow?.postMessage(
-        { garden: 1, type: 'probe', id, x: circle.x, y: circle.y },
-        '*'
-      );
-      setTimeout(() => {
-        if (probes.current.delete(id)) resolve('');
-      }, 400);
-    });
 
   if (error)
     return (
@@ -129,7 +97,10 @@ export default function ResultView({
         <span className="eyebrow">{artifact.name.replace(/\.html?$/i, '')}</span>
         <div className="row">
           {onNote && (
-            <MarkButton marking={marking} onToggle={() => setMarking((value) => !value)} />
+            <CommentButton
+              commenting={commenting}
+              onToggle={() => setCommenting((value) => !value)}
+            />
           )}
           <Button
             onClick={() => void toggle()}
@@ -143,12 +114,13 @@ export default function ResultView({
         <p className="muted result-view-loading">Opening the view…</p>
       ) : (
         <div className="result-view-stage" style={expanded ? undefined : { height }}>
-          <Markable
+          <FrameComments
+            frame={frame}
             on={artifact.name}
             notes={notes}
             onNote={onNote ?? (() => undefined)}
-            marking={marking}
-            probe={probe}
+            commenting={commenting}
+            onDone={() => setCommenting(false)}
           >
             <iframe
               ref={frame}
@@ -158,7 +130,7 @@ export default function ResultView({
               referrerPolicy="no-referrer"
               className="result-view-frame"
             />
-          </Markable>
+          </FrameComments>
         </div>
       )}
     </article>

@@ -13,6 +13,20 @@
   font-display: swap;
 }
 @font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('/fonts/IBMPlexMono-Regular.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('/fonts/IBMPlexMono-Medium.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 500 700;
+  font-display: swap;
+}
+@font-face {
   font-family: 'Pixel Operator Mono';
   src: url('/fonts/PixelOperatorMono.ttf') format('truetype');
   font-style: normal;
@@ -25,10 +39,18 @@
    * Light mode reads dark ink on a lit field; dark mode inverts the ramp. A fifth tone is never
    * mixed: it is dithered from two neighbours, which is how the hardware did it.
    */
-  --s0: #b7c58b;
-  --s1: #91a266;
-  --s2: #3d4f2b;
-  --s3: #26351f;
+  --s0: #a9bc63;
+  --s1: #84994b;
+  --s2: #34481f;
+  --s3: #18280f;
+  /* The case the screen sits in, and its red power lamp. */
+  --bezel: #393a46;
+  --bezel-edge: #2b2c35;
+  --bezel-ink: #c3c5d0;
+  --bezel-muted: #8c8e9c;
+  --lamp: #e2384e;
+  /* The name printed on the case, in the screen's lit shade. */
+  --bezel-brand: var(--s0);
   --bg: var(--s0);
   --tint: var(--s1);
   --muted: var(--s2);
@@ -61,6 +83,10 @@
   --font-sans: 'Pixel Operator', 'Segoe UI', sans-serif;
   --font-display: var(--font-sans);
   --font-mono: 'Pixel Operator Mono', ui-monospace, monospace;
+  /* What is read rather than glanced at: crisp at any size, still a machine's typeface. */
+  --font-read: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  /* A lit pixel casts a soft shadow onto the reflector behind it. */
+  --ink-shadow: 1px 1px 0 color-mix(in srgb, var(--s3) 24%, transparent);
   font: 16px/1.5 var(--font-sans);
   font-synthesis: none;
   text-rendering: geometricPrecision;
@@ -69,12 +95,17 @@
   background: var(--lcd-texture), var(--bg);
   color-scheme: light;
 }
-/* The pocket model's grey glass. */
+/* The pocket model's grey glass, in its silver case. */
 :root[data-palette='pocket'] {
   --s0: #c5c7b8;
   --s1: #9a9c8c;
   --s2: #46483e;
   --s3: #2a2b25;
+  --bezel: #8d8f95;
+  --bezel-edge: #74767c;
+  --bezel-ink: #1f2024;
+  --bezel-muted: #3e4046;
+  --bezel-brand: var(--bezel-ink);
 }
 /* The lit screen of the backlit model, seen in a dark room. */
 :root[data-palette='backlight'] {
@@ -95,6 +126,7 @@
   --tint: var(--s2);
   --muted: var(--s1);
   --text: var(--s0);
+  --ink-shadow: 1px 1px 0 color-mix(in srgb, black 45%, transparent);
   color-scheme: dark;
 }
 /* Small tiles keep WebKit rasterization uniform across large interface surfaces. */
@@ -103,13 +135,13 @@
     repeating-linear-gradient(
         0deg,
         transparent 0 2px,
-        color-mix(in srgb, var(--text) 4%, transparent) 2px 3px
+        color-mix(in srgb, var(--text) 7%, transparent) 2px 3px
       )
       0 0 / 3px 3px,
     repeating-linear-gradient(
         90deg,
         transparent 0 2px,
-        color-mix(in srgb, var(--text) 4%, transparent) 2px 3px
+        color-mix(in srgb, var(--text) 7%, transparent) 2px 3px
       )
       0 0 / 3px 3px;
   --lcd-texture-inverse:

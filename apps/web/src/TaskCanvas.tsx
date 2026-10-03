@@ -9,7 +9,7 @@ import type {
   TaskEvent
 } from '@garden/contracts';
 import { isViewArtifact } from './view-artifact';
-import { Markable, MarkButton } from './result-notes';
+import { CommentButton, CommentSurface, FrameComments } from './result-notes';
 import { isNativeClient, post } from './client';
 import { resultSnapshot } from './result-snapshot';
 import { previewIsolated, previewUrl } from './preview-url';
@@ -58,23 +58,17 @@ export function TaskOutputs({
     expanded: fileExpanded,
     toggle: toggleFileExpanded
   } = useExpandedView<HTMLElement>();
-  /** Which result the pointer is marking, if any. */
-  const [marking, setMarking] = useState<string | null>(null);
-  const markToggle = (id: string) =>
+  /** Which result the pointer is pinning comments to, if any. */
+  const [commenting, setCommenting] = useState<string | null>(null);
+  const commentToggle = (id: string) =>
     onNote ? (
-      <MarkButton
-        marking={marking === id}
-        onToggle={() => setMarking((current) => (current === id ? null : id))}
+      <CommentButton
+        commenting={commenting === id}
+        onToggle={() => setCommenting((current) => (current === id ? null : id))}
       />
     ) : null;
-  const markable = (id: string, on: string, content: ReactNode) =>
-    onNote ? (
-      <Markable on={on} notes={notes ?? []} onNote={onNote} marking={marking === id}>
-        {content}
-      </Markable>
-    ) : (
-      content
-    );
+  const leave = () => setCommenting(null);
+  const appFrame = useRef<HTMLIFrameElement>(null);
   const [opened, setOpened] = useState<{ id: string; url: string } | null>(null);
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [frameState, setFrameState] = useState<'loading' | 'loaded' | 'slow' | 'failed'>('loading');
@@ -250,6 +244,7 @@ export function TaskOutputs({
   }
   const frame = opened && (
     <iframe
+      ref={appFrame}
       key={`${opened.id}:${preview?.previewRevision ?? ''}`}
       title={preview?.title ?? 'Task preview'}
       src={opened.url}
@@ -288,7 +283,7 @@ export function TaskOutputs({
               <FileText size={16} aria-hidden="true" />
               <h2>{featured.name}</h2>
               <div className="garden-output-actions">
-                {markToggle(featured.id)}
+                {commentToggle(featured.id)}
                 <Button onClick={() => void toggleFileExpanded().catch(setError)}>
                   <Maximize2 size={15} />
                   {fileExpanded ? 'Exit full screen' : 'Expand'}
@@ -296,9 +291,19 @@ export function TaskOutputs({
               </div>
             </header>
             <div className="garden-artifact-view">
-              {markable(
-                featured.id,
-                featured.name,
+              {onNote ? (
+                <CommentSurface
+                  on={featured.name}
+                  notes={notes}
+                  onNote={onNote}
+                  commenting={commenting === featured.id}
+                  onDone={leave}
+                >
+                  <Suspense fallback={<Spinner label="Opening your result…" />}>
+                    <ResultPreview artifact={featured} />
+                  </Suspense>
+                </CommentSurface>
+              ) : (
                 <Suspense fallback={<Spinner label="Opening your result…" />}>
                   <ResultPreview artifact={featured} />
                 </Suspense>
@@ -369,7 +374,7 @@ export function TaskOutputs({
                     <Button busy={busy === preview.id} onClick={() => void copyLink(preview)}>
                       Copy link
                     </Button>
-                    {opened && markToggle(preview.id)}
+                    {opened && commentToggle(preview.id)}
                     {!opened ? (
                       <Button busy={busy === preview.id} onClick={() => void open(preview)}>
                         View here
@@ -414,7 +419,20 @@ export function TaskOutputs({
             </header>
             {opened?.id === preview.id && viewablePreview ? (
               <div className="garden-preview-live">
-                {markable(preview.id, preview.title, frame)}
+                {onNote ? (
+                  <FrameComments
+                    frame={appFrame}
+                    on={preview.title}
+                    notes={notes}
+                    onNote={onNote}
+                    commenting={commenting === preview.id}
+                    onDone={leave}
+                  >
+                    {frame}
+                  </FrameComments>
+                ) : (
+                  frame
+                )}
                 {frameState !== 'loaded' && (
                   <div className="garden-preview-state" role="status">
                     {frameState === 'failed'
