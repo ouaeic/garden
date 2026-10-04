@@ -43,8 +43,9 @@ export function projectStage(project: Project, latest: Task | undefined): Stage 
   return latest ? stageOf(latest) : 'bloom';
 }
 
+/** The bud opened: a round flower with its heart, on a stem cupped by two leaves. */
 const bloom = [
-  ['..333...', '.32023..', '..333...', '...3.33.', '.333323.', '...33...', '...3....', '33333333']
+  ['..333...', '.31113..', '3112113.', '.31113..', '..333...', '.3.3.3..', '..333...', '33333333']
 ] as const;
 
 export default function StatusSprite({
