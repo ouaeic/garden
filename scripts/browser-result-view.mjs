@@ -228,6 +228,9 @@ export async function checkResultView({
       /1\. comparison\.html at “Brook” under “Three laptops compared” \(#bars > div:nth-of-type\(2\)\): Add the weights here too/
     );
     assert.match(sent.prompt, /2\. the answer on “Aster lasts longest”: By how much\?/);
+    // The send is confirmed and the comments leave the composer before the page goes, so no later
+    // check opens this task to find a send still waiting on its receipt.
+    await chips.waitFor({ state: 'detached' });
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
