@@ -1,6 +1,4 @@
-import { useEffect, useState } from 'react';
-import type { ManagedProcess, ProcessList } from '@garden/contracts';
-import { get } from './client';
+import type { ManagedProcess } from '@garden/contracts';
 import { Activity } from './icons';
 import {
   processActive,
@@ -11,28 +9,12 @@ import {
   processNeedsAttention
 } from './process-display';
 import { useVisibleClock } from './visible-clock';
-import { observeVisiblePoll } from './visible-poll';
+import { useProcessFeed } from './process-feed';
 import './runs.css';
 
-/**
- * What is executing on the computer, read while the view is visible and at the runner's own pace:
- * resources are sampled every couple of minutes, so asking sooner only repeats the last answer.
- */
+/** What is executing on the computer, as one shared feed per list (see `process-feed.ts`). */
 export function useRuns(endpoint: string | null) {
-  const [list, setList] = useState<ProcessList | null>(null);
-  useEffect(() => {
-    if (!endpoint) return;
-    let pace = 120_000;
-    return observeVisiblePoll(
-      async (signal) => {
-        const next = await get<ProcessList>(endpoint, { signal });
-        pace = Math.max(60_000, next.refreshAfterMs ?? 120_000);
-        setList(next);
-      },
-      () => pace,
-      () => undefined
-    );
-  }, [endpoint]);
+  const { list } = useProcessFeed(endpoint);
   const active = (list?.processes ?? []).filter(
     (process) => processActive(process) || processNeedsAttention(process)
   );

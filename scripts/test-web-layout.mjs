@@ -755,6 +755,24 @@ try {
       },
       { palette: process.env.GARDEN_UI_PALETTE, theme: process.env.GARDEN_UI_THEME }
     );
+  // A shadow to judge by eye, as "fall,softness,depth" in CSS pixels and a share of full depth.
+  if (process.env.GARDEN_UI_SHADOW)
+    await context.addInitScript((shadow) => {
+      const [fall, softness, depth] = shadow.split(',');
+      const tune = () => {
+        const filter = document.getElementById('lcd-shadow');
+        if (!filter) return false;
+        filter.querySelector('feOffset')?.setAttribute('dx', fall);
+        filter.querySelector('feOffset')?.setAttribute('dy', fall);
+        filter.querySelector('feGaussianBlur')?.setAttribute('stdDeviation', softness);
+        filter.querySelector('feFlood')?.setAttribute('flood-opacity', depth);
+        return true;
+      };
+      new MutationObserver((_, observer) => tune() && observer.disconnect()).observe(document, {
+        childList: true,
+        subtree: true
+      });
+    }, process.env.GARDEN_UI_SHADOW);
   await context.route('**/*', async (route) => {
     const url = new URL(route.request().url());
     if (url.origin === isolatedPreviewOrigin) return route.continue();

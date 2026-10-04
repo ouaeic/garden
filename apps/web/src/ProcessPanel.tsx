@@ -2,8 +2,9 @@ import ScrollRegion from './ScrollRegion';
 import { WorkflowProgress } from './WorkflowProgress';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Activity, MessageSquare, RefreshCw, Square } from './icons';
-import type { ComputationSession, ManagedProcess, ProcessList } from '@garden/contracts';
-import { get, post } from './client';
+import type { ManagedProcess } from '@garden/contracts';
+import { post } from './client';
+import { refreshProcesses, useProcessFeed } from './process-feed';
 import { Button, Dialog, ErrorNotice, Spinner } from './ui';
 import { useVisibleClock } from './visible-clock';
 import {
@@ -40,86 +41,46 @@ export default function ProcessPanel({
     : taskId
       ? `/v1/tasks/${taskId}/processes`
       : `/v1/workspaces/${workspaceId}/processes`;
-  const [list, setList] = useState<ProcessList | null>(null);
-  const [error, setError] = useState<unknown>(null);
-  const [loading, setLoading] = useState(false);
+  const [actionError, setActionError] = useState<unknown>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<ManagedProcess | null>(null);
   const [logs, setLogs] = useState<Record<string, string>>({});
   const [showFinished, setShowFinished] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
   const [historyLimit, setHistoryLimit] = useState(10);
+  // A busy notebook kernel is worth reading every few seconds; anything else at the runner's pace.
+  const [kernelBusy, setKernelBusy] = useState(false);
+  const feed = useProcessFeed(visible ? endpoint : null, {
+    kernels: !taskId && !projectId,
+    paceMs: kernelBusy ? 10_000 : undefined
+  });
+  const list = feed.list;
+  const error = actionError ?? feed.error;
+  const refresh = useCallback(() => refreshProcesses(endpoint), [endpoint]);
   const clock = useVisibleClock(
     visible && Boolean(list?.processes.some(processActive)),
     30_000,
     list?.observedAt
   );
-  const request = useRef<AbortController | null>(null);
   const generation = useRef(0);
-  const refresh = useCallback(async () => {
-    request.current?.abort();
-    const controller = new AbortController();
-    request.current = controller;
-    setLoading(true);
-    try {
-      const [result, computations] = await Promise.all([
-        get<ProcessList>(endpoint, { signal: controller.signal }),
-        !taskId && !projectId
-          ? get<{ sessions: ComputationSession[] }>(`/v1/workspaces/${workspaceId}/computation`, {
-              signal: controller.signal
-            }).catch(() => null)
-          : Promise.resolve(undefined)
-      ]);
-      if (computations !== undefined) {
-        result.computationSessions = computations?.sessions ?? [];
-        if (!computations) result.unavailableComputationWorkspaces = 1;
-      }
-      if (controller.signal.aborted) return;
-      setList(result);
-      setError(null);
-    } catch (cause) {
-      if (!controller.signal.aborted) setError(cause);
-    } finally {
-      if (!controller.signal.aborted) setLoading(false);
-    }
-  }, [endpoint, taskId, projectId, workspaceId]);
   useEffect(() => {
     generation.current++;
-    setList(null);
     setLogs({});
     setConfirm(null);
     setBusy(null);
-    setError(null);
+    setActionError(null);
     setShowFinished(false);
     setShowSaved(false);
     setHistoryLimit(10);
     return () => {
       generation.current++;
-      request.current?.abort();
     };
-  }, [refresh]);
-  useEffect(() => {
-    if (visible) void refresh();
-    else request.current?.abort();
-  }, [refresh, visible]);
+  }, [endpoint]);
   const refreshAfterMs = Math.max(60_000, list?.refreshAfterMs ?? 120_000);
   const kernels = list?.computationSessions ?? [];
   const kernelCount = kernels.filter((session) => computationActive(session.state)).length;
-  const pollAfterMs = kernels.some((session) => session.state === 'busy') ? 10_000 : refreshAfterMs;
-  useEffect(() => {
-    if (!visible) return;
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') void refresh();
-    }, pollAfterMs);
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') void refresh();
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-  }, [refresh, pollAfterMs, visible]);
+  const anyKernelBusy = kernels.some((session) => session.state === 'busy');
+  useEffect(() => setKernelBusy(anyKernelBusy), [anyKernelBusy]);
   const active = list?.processes.filter(processActive) ?? [];
   const attention = list?.processes.filter(processNeedsAttention) ?? [];
   const finished = (
@@ -138,7 +99,7 @@ export default function ProcessPanel({
     const at = generation.current,
       id = key(process);
     setBusy(id);
-    setError(null);
+    setActionError(null);
     try {
       const base = `/v1/workspaces/${process.workspaceId ?? workspaceId}/processes/${encodeURIComponent(process.sessionId)}`;
       const workflow = action === 'resume' ? process.workflow : undefined;
@@ -157,9 +118,9 @@ export default function ProcessPanel({
           [id]: `${result.stdout ?? ''}${result.stderr ?? ''}`.slice(-100_000)
         }));
       else setConfirm(null);
-      await refresh();
+      refresh();
     } catch (cause) {
-      if (generation.current === at) setError(cause);
+      if (generation.current === at) setActionError(cause);
     } finally {
       if (generation.current === at) setBusy(null);
     }
@@ -181,12 +142,12 @@ export default function ProcessPanel({
               : 'Jobs, services and analysis sessions on this computer.'}
           </p>
         </div>
-        <Button aria-label="Refresh processes" busy={loading} onClick={() => void refresh()}>
+        <Button aria-label="Refresh processes" busy={feed.loading} onClick={refresh}>
           <RefreshCw size={15} aria-hidden="true" />
           <span>Refresh</span>
         </Button>
       </header>
-      <ErrorNotice error={error} onRetry={() => void refresh()} />
+      <ErrorNotice error={error} onRetry={refresh} />
       {Boolean(error) && list && (
         <p className="process-note">
           Showing the last received status; the computer may have changed.
@@ -449,7 +410,7 @@ export default function ProcessPanel({
                         ? endedKernels.slice(0, historyLimit)
                         : kernels.filter((session) => computationActive(session.state))
                     }
-                    onChange={refresh}
+                    onChange={async () => refresh()}
                   />
                 </Suspense>
               )}

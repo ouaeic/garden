@@ -273,11 +273,17 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
     assert.equal(await panel.getByRole('article').count(), 2);
     const interrupted = panel.getByRole('article', { name: 'Checkpointed assembly' });
     assert(await interrupted.isVisible(), 'Interrupted work stays visible without opening history');
-    // Reads the page started before the window opens may still land; count only after they have.
-    for (let settled = -1; settled !== fixture.reads + fixture.projectReads; ) {
-      settled = fixture.reads + fixture.projectReads;
-      await page.waitForTimeout(400);
-    }
+    // The clock runs on while the page renders, so an arbitrary moment can fall just before a poll
+    // that is due. Count from a refresh instead: the window is then the poller's own interval.
+    const refreshed = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname.startsWith('/v1/projects/') &&
+        response.url().endsWith('/processes')
+    );
+    let landed = false;
+    void refreshed.then(() => (landed = true));
+    for (let waited = 0; !landed && waited < 125_000; waited += 250) await page.clock.runFor(250);
+    await refreshed;
     const before = fixture.reads;
     const projectBefore = fixture.projectReads;
     await page.clock.runFor(119_000);
