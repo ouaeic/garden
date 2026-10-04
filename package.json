@@ -12,7 +12,7 @@
     "dev:postgres": "pnpm --parallel --filter @garden/api --filter @garden/web --filter @garden/worker --filter @garden/workspace-runner dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck && tsc -p evals/tsconfig.json --noEmit",
-    "test": "pnpm -r test",
+    "test": "pnpm -r --no-sort test",
     "eval": "NODE_OPTIONS=--conditions=development tsx evals/run.ts",
     "eval:gate": "pnpm eval -- --gate",
     "eval:context": "NODE_OPTIONS=--conditions=development tsx evals/context-quality/run.ts",
