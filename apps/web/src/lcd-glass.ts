@@ -28,12 +28,12 @@ const REFLECTOR = 0.04;
 const PITCH = 2;
 /**
  * How far the shadow falls, and how soft it is, in CSS pixels: half a dot down and right, and
- * softened by about a quarter of one, as in a photograph of the panel.
+ * softened by about half of one, as in a photograph of the panel.
  */
 const SHADOW_FALL = 1;
-const SHADOW_SOFTNESS = 0.5;
+const SHADOW_SOFTNESS = 0.9;
 /** How dark the shadow of fully driven crystal is on the reflector. */
-const SHADOW_DEPTH = 0.5;
+const SHADOW_DEPTH = 0.35;
 
 type Rgb = [number, number, number];
 
