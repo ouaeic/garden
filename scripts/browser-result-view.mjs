@@ -269,6 +269,14 @@ export async function checkAppComments({ context, errors }) {
       document.querySelector('iframe').srcdoc = html;
     }, app);
     await page.waitForFunction(() => window.heard.some((data) => data.type === 'ready'));
+    // Garden may start listening after the page announced itself; asking again gets an answer.
+    await page.evaluate(() => {
+      window.heard = [];
+      document.querySelector('iframe').contentWindow.postMessage({ garden: 1, type: 'hello' }, '*');
+    });
+    await page.waitForFunction(() => window.heard.some((data) => data.type === 'ready'), null, {
+      timeout: 5000
+    });
     const tell = (message) =>
       page.evaluate(
         (data) => document.querySelector('iframe').contentWindow.postMessage(data, '*'),

@@ -408,8 +408,11 @@ html.garden-commenting,html.garden-commenting *{cursor:crosshair!important}`;
       }
     }).observe(root(), { childList: true, subtree: true, characterData: true });
     size();
+    started = true;
     post({ type: 'ready' });
   };
+  // Garden may start listening after this page has said it is ready, so it asks, and is answered.
+  let started = false;
   if (document.readyState === 'loading') addEventListener('DOMContentLoaded', start);
   else start();
   addEventListener('load', size);
@@ -418,6 +421,7 @@ html.garden-commenting,html.garden-commenting *{cursor:crosshair!important}`;
   addEventListener('message', (event) => {
     const data = event.data || {};
     if (event.source !== window.parent || data.garden !== 1) return;
+    if (data.type === 'hello' && started) post({ type: 'ready' });
     if (data.type === 'unselect') getSelection()?.removeAllRanges();
     if (data.type !== 'comments') return;
     commenting = Boolean(data.commenting);
