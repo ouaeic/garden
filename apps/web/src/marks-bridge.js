@@ -352,11 +352,11 @@ if ((mode === 'view' || mode === 'app') && window.parent !== window) {
 [data-garden-pins]{position:absolute;left:0;top:0;width:0;height:0;z-index:2147483647}
 [data-garden-pins] b{position:absolute;transform:translate(-1px,-100%);min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;display:grid;place-items:center;font:600 11px/1 ui-monospace,Menlo,monospace;color:var(--pin-paper);background:var(--pin-ink);border-radius:9px 9px 9px 0;box-shadow:0 0 0 1px var(--pin-paper);pointer-events:auto;cursor:default}
 [data-garden-pins] b.is-focus{box-shadow:0 0 0 1px var(--pin-paper),0 0 0 4px var(--pin-ink)}
-::highlight(garden-comments){background-color:color-mix(in srgb,var(--pin-ink,#18280f) 22%,transparent)}
+::highlight(garden-comments){background-color:color-mix(in srgb,var(--pin-ink,#183810) 22%,transparent)}
 html.garden-commenting,html.garden-commenting *{cursor:crosshair!important}`;
   const paint = (ink, paper) => {
-    document.documentElement.style.setProperty('--pin-ink', ink || '#18280f');
-    document.documentElement.style.setProperty('--pin-paper', paper || '#c4cf8f');
+    document.documentElement.style.setProperty('--pin-ink', ink || '#183810');
+    document.documentElement.style.setProperty('--pin-paper', paper || '#a8bc1c');
   };
   paint();
   let queued = false;
@@ -408,8 +408,11 @@ html.garden-commenting,html.garden-commenting *{cursor:crosshair!important}`;
       }
     }).observe(root(), { childList: true, subtree: true, characterData: true });
     size();
+    started = true;
     post({ type: 'ready' });
   };
+  // Garden may start listening after this page has said it is ready, so it asks, and is answered.
+  let started = false;
   if (document.readyState === 'loading') addEventListener('DOMContentLoaded', start);
   else start();
   addEventListener('load', size);
@@ -418,6 +421,7 @@ html.garden-commenting,html.garden-commenting *{cursor:crosshair!important}`;
   addEventListener('message', (event) => {
     const data = event.data || {};
     if (event.source !== window.parent || data.garden !== 1) return;
+    if (data.type === 'hello' && started) post({ type: 'ready' });
     if (data.type === 'unselect') getSelection()?.removeAllRanges();
     if (data.type !== 'comments') return;
     commenting = Boolean(data.commenting);

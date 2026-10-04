@@ -14,6 +14,7 @@ import type { NativeStatus } from './native';
 import { createTaskNotifier } from './native-notices';
 import { subscribeWorkerNavigation } from './worker-navigation';
 import Brand from './Brand';
+import { watchGlass } from './lcd-glass';
 import { Sprite } from './life/Sprite';
 import { bellBird } from './life/growth';
 import Stats from './Stats';
@@ -22,7 +23,7 @@ import { fileNavigationBlocked } from './file-navigation';
 import { initialComputerTool, initialNavigation } from './navigation';
 import type { View } from './navigation';
 import type { Bootstrap, Decision, Draft } from './model';
-import { needsAttention, shortDate, taskStatusLabel, mergeTaskRefresh } from './model';
+import { isWorking, needsAttention, shortDate, taskStatusLabel, mergeTaskRefresh } from './model';
 import { Button, Dialog, Empty, ErrorNotice, Spinner } from './ui';
 import DecisionQueue from './DecisionQueue';
 import ProjectCollection from './ProjectCollection';
@@ -71,9 +72,19 @@ class Boundary extends Component<{ children: ReactNode }, { error: Error | null 
     );
   }
 }
-/** The browser's own bar continues the case the screen sits in. */
-const caseColour = () =>
-  getComputedStyle(document.documentElement).getPropertyValue('--bezel').trim();
+/** The computer's state, shown as a lamp drawn on the screen beside its name. */
+type Lamp = 'off' | 'on' | 'busy' | 'starting' | 'fault';
+const lampFor = (workspace: Workspace | null, working: boolean): { lamp: Lamp; title: string } => {
+  const status = workspace?.status;
+  if (status === 'running')
+    return working
+      ? { lamp: 'busy', title: 'Computer on · working' }
+      : { lamp: 'on', title: 'Computer on' };
+  if (status === 'provisioning' || status === 'resizing')
+    return { lamp: 'starting', title: `Computer ${status}` };
+  if (status === 'failed') return { lamp: 'fault', title: 'Computer needs a look' };
+  return { lamp: 'off', title: status === 'hibernated' ? 'Computer asleep' : 'Computer off' };
+};
 
 export default function App() {
   return (
@@ -262,10 +273,13 @@ function WorkspaceApp() {
     }, 15000);
     return () => clearInterval(timer);
   }, [Boolean(bootstrap), authRequired, refresh, refreshDecisions]);
+  useEffect(watchGlass, []);
   useEffect(() => {
     if (palette === 'field') delete document.documentElement.dataset.palette;
     else document.documentElement.dataset.palette = palette;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', caseColour());
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', getComputedStyle(document.documentElement).backgroundColor);
     try {
       localStorage.setItem('garden-palette', palette);
     } catch {
@@ -275,7 +289,9 @@ function WorkspaceApp() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', caseColour());
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', getComputedStyle(document.documentElement).backgroundColor);
     try {
       localStorage.setItem('garden-theme', theme);
     } catch {
@@ -549,6 +565,7 @@ function WorkspaceApp() {
     ...decisions.map((decision) => decision.taskId),
     ...attentionTasks.map((item) => item.id)
   ]).size;
+  const computerLamp = lampFor(workspace, bootstrap.tasks.some(isWorking));
   return (
     <div
       className={`garden-shell desk-shell ${task && baseView === 'work' ? 'task-open' : ''} ${activeProjectId && baseView === 'work' ? 'has-project' : ''}`}
@@ -557,12 +574,6 @@ function WorkspaceApp() {
         Skip to work
       </a>
       <header className="garden-masthead">
-        <i
-          className="power-lamp-led"
-          data-on={workspace?.status === 'running' ? 'true' : 'false'}
-          title={workspace ? `${workspace.name} · ${workspace.status}` : undefined}
-          aria-hidden="true"
-        />
         <button
           className="brand-button"
           onClick={() => navigate('work')}
@@ -586,9 +597,13 @@ function WorkspaceApp() {
                   : undefined
               }
               onClick={() => navigate(view)}
+              {...(view === 'computer' ? { title: computerLamp.title } : {})}
             >
               <Icon size={17} />
               <span>{label}</span>
+              {view === 'computer' && (
+                <i className="screen-lamp" data-lamp={computerLamp.lamp} aria-hidden="true" />
+              )}
             </Button>
           ))}
         </nav>
@@ -854,11 +869,15 @@ function WorkspaceApp() {
             }
             onClick={() => navigate(view)}
             {...(view === 'attention' ? { 'data-perch-bell': true } : {})}
+            {...(view === 'computer' ? { title: computerLamp.title } : {})}
           >
             <Icon size={20} />
             <span>{label}</span>
             {view === 'attention' && attentionCount > 0 && (
               <span className="notification-count">{attentionCount}</span>
+            )}
+            {view === 'computer' && (
+              <i className="screen-lamp" data-lamp={computerLamp.lamp} aria-hidden="true" />
             )}
           </button>
         ))}

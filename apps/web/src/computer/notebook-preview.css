@@ -44,7 +44,7 @@
   margin: 0.5rem 0;
   padding: 0.8rem;
   border-radius: 0;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   font-size: 16px;
   line-height: 1.6;
   max-height: 32rem;
@@ -100,7 +100,7 @@
 }
 
 .notebook-toolbar .button[aria-pressed='true'] {
-  background: var(--lcd-texture-inverse), var(--paper);
+  background: var(--paper);
   color: var(--ink);
   border-color: var(--paper);
 }
@@ -134,7 +134,7 @@
 .notebook-stale {
   padding: 0.65rem 0.8rem;
   border-left: 3px solid var(--muted);
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
   font-size: 16px;
 }
 .notebook-editor .row {

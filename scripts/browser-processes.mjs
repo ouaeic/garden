@@ -273,6 +273,11 @@ export async function checkProjectProcesses({ context, origin, taskId, fixture, 
     assert.equal(await panel.getByRole('article').count(), 2);
     const interrupted = panel.getByRole('article', { name: 'Checkpointed assembly' });
     assert(await interrupted.isVisible(), 'Interrupted work stays visible without opening history');
+    // Reads the page started before the window opens may still land; count only after they have.
+    for (let settled = -1; settled !== fixture.reads + fixture.projectReads; ) {
+      settled = fixture.reads + fixture.projectReads;
+      await page.waitForTimeout(400);
+    }
     const before = fixture.reads;
     const projectBefore = fixture.projectReads;
     await page.clock.runFor(119_000);

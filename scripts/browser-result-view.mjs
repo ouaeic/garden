@@ -228,6 +228,9 @@ export async function checkResultView({
       /1\. comparison\.html at “Brook” under “Three laptops compared” \(#bars > div:nth-of-type\(2\)\): Add the weights here too/
     );
     assert.match(sent.prompt, /2\. the answer on “Aster lasts longest”: By how much\?/);
+    // The send is confirmed and the comments leave the composer before the page goes, so no later
+    // check opens this task to find a send still waiting on its receipt.
+    await chips.waitFor({ state: 'detached' });
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
@@ -266,6 +269,14 @@ export async function checkAppComments({ context, errors }) {
       document.querySelector('iframe').srcdoc = html;
     }, app);
     await page.waitForFunction(() => window.heard.some((data) => data.type === 'ready'));
+    // Garden may start listening after the page announced itself; asking again gets an answer.
+    await page.evaluate(() => {
+      window.heard = [];
+      document.querySelector('iframe').contentWindow.postMessage({ garden: 1, type: 'hello' }, '*');
+    });
+    await page.waitForFunction(() => window.heard.some((data) => data.type === 'ready'), null, {
+      timeout: 5000
+    });
     const tell = (message) =>
       page.evaluate(
         (data) => document.querySelector('iframe').contentWindow.postMessage(data, '*'),

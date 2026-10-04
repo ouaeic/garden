@@ -22,7 +22,7 @@
   margin: 0 0 8px;
   padding: 8px 12px;
   border: 1px solid var(--line);
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
   color: var(--text);
   text-align: left;
 }

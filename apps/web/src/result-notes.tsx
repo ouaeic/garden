@@ -475,7 +475,16 @@ export function FrameComments({
       );
     };
     window.addEventListener('message', receive);
-    return () => window.removeEventListener('message', receive);
+    // The page inside may have said it was ready before this listened; ask, now and on each load.
+    const hello = () =>
+      frame.current?.contentWindow?.postMessage({ garden: 1, type: 'hello' }, '*');
+    const host = surface.current;
+    host?.addEventListener('load', hello, true);
+    hello();
+    return () => {
+      window.removeEventListener('message', receive);
+      host?.removeEventListener('load', hello, true);
+    };
   }, [frame, offset]);
 
   useEffect(() => {

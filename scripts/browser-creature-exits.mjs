@@ -22,13 +22,16 @@ export async function checkCreatureExits({ context, origin, report }) {
         if (frightened === 'flight') {
           await page.addStyleTag({
             content: `
-            [data-perch], .desk-card, .desk-work-card, .panel, .phone-bar, .garden-masthead { border: none !important; }
+            [data-perch], .desk-card, .desk-work-card, .panel { border: none !important; }
             .exit-test-perch { position: fixed; width: 150px; height: 80px; z-index: 20;
               background: var(--bg); border-top: 1px solid var(--text) !important; }
           `
           });
-          await page.evaluate(() => {
-            Math.random = () => 0.1;
+          await page.evaluate((kind) => {
+            // A monkey's first draw chooses between hanging from the top of the work area and a
+            // card; this one takes a card, then the upper perch, so its leap is down to the lower.
+            const draws = kind === 'monkey' ? [0.6] : [];
+            Math.random = () => (draws.length ? draws.shift() : 0.1);
             for (const [left, top] of [
               [20, 140],
               [210, 440]
@@ -40,7 +43,7 @@ export async function checkCreatureExits({ context, origin, report }) {
               edge.style.top = `${top}px`;
               document.body.append(edge);
             }
-          });
+          }, kind);
         }
         await page.evaluate(
           ({ scene, kind }) => {

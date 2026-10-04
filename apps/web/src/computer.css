@@ -1,5 +1,5 @@
 .computer {
-  --raised-fill: var(--lcd-texture), var(--tint);
+  --raised-fill: var(--tint);
   min-width: 0;
 }
 .computer-heading {
@@ -177,13 +177,13 @@ button.computer-file-row:hover {
   height: min(65vh, 600px);
   min-height: 300px;
   padding: 0.8rem;
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
   border-radius: 0;
   overflow: hidden;
 }
 .computer-screen {
   position: relative;
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 0;
   overflow: hidden;
@@ -220,7 +220,7 @@ button.computer-file-row:hover {
   justify-items: center;
   text-align: center;
   padding: 1.5rem;
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
   color: var(--text);
 }
 .computer-address {
@@ -295,7 +295,7 @@ button.computer-file-row:hover {
   border-radius: 0;
   flex-shrink: 0;
   max-width: 235px;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
 }
 .garden-browser-tab.active {
   border-color: var(--line-strong);
@@ -379,7 +379,7 @@ button.computer-file-row:hover {
   z-index: 90;
   height: 100dvh;
   overflow-y: auto;
-  background: var(--lcd-texture), var(--bg);
+  background: var(--bg);
   padding: max(14px, env(safe-area-inset-top, 0px)) 20px max(14px, env(safe-area-inset-bottom, 0px));
 }
 .garden-screen-surface.expanded .computer-screen canvas {
@@ -402,7 +402,7 @@ button.computer-file-row:hover {
   padding: 1.1rem 1.25rem;
   border: 1px solid var(--line);
   border-radius: 0;
-  background: var(--lcd-texture), var(--panel);
+  background: var(--panel);
 }
 .computer-handoff h2 {
   font-size: 16px;

@@ -1,56 +1,41 @@
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
-export async function checkInterfaceTexture(page) {
-  const coverage = await page.evaluate(() => {
-    // The case the screen is set into is plastic, not glass, and carries no matrix.
-    const probe = document.createElement('i');
-    probe.style.background = 'var(--bezel)';
-    document.body.append(probe);
-    const bezel = getComputedStyle(probe).backgroundColor;
-    probe.remove();
-    const painted = [...document.querySelectorAll('*')].filter((element) => {
-      if (element.matches('img, canvas, iframe, video, object, embed')) return false;
-      const box = element.getBoundingClientRect();
-      const style = getComputedStyle(element);
-      if (style.backgroundColor === bezel) return false;
-      // A masked image paints its own silhouette, rather than an opaque interface surface.
-      if (style.maskImage !== 'none') return false;
-      return (
-        box.width >= 12 &&
-        box.height >= 12 &&
-        box.bottom > 0 &&
-        box.right > 0 &&
-        box.top < innerHeight &&
-        box.left < innerWidth &&
-        style.visibility === 'visible' &&
-        /^(?:rgb\(|color\([^/]+\)$)/.test(style.backgroundColor)
-      );
-    });
+/**
+ * The panel: the screen casts its own shadow through one filter, and one layer of glass over the
+ * whole window carries the dot matrix at the display's own pixel size.
+ */
+export async function checkScreenGlass(page) {
+  const glass = await page.evaluate(() => {
+    const screen = document.querySelector('.garden-shell.desk-shell');
+    if (!screen) return null;
+    const style = getComputedStyle(screen.parentElement, '::after');
+    const matrix =
+      document.querySelector('#lcd-shadow [data-role="driven"]')?.getAttribute('values') ?? '';
     return {
-      count: painted.length,
-      untiled: painted
-        .filter((element) => {
-          const style = getComputedStyle(element);
-          const images = style.backgroundImage.split(/, (?=(?:repeating-)?linear-gradient)/);
-          const sizes = style.backgroundSize.split(', ');
-          return images.some(
-            (image, index) =>
-              image.includes('repeating-linear-gradient') && sizes[index] !== '3px 3px'
-          );
-        })
-        .map((element) => element.className),
-      missing: painted
-        .filter(
-          (element) =>
-            !getComputedStyle(element).backgroundImage.includes('repeating-linear-gradient')
-        )
-        .map((element) => `${element.tagName.toLowerCase()}.${element.className}`)
+      filter: getComputedStyle(screen).filter,
+      matrix: matrix.trim().split(/\s+/).length,
+      flood: document.querySelector('#lcd-shadow feFlood')?.getAttribute('flood-color') ?? '',
+      content: style.content,
+      zIndex: style.zIndex,
+      pointer: style.pointerEvents,
+      image: style.backgroundImage.slice(0, 30),
+      devicePixels: parseFloat(style.backgroundSize) * devicePixelRatio
     };
   });
-  assert(coverage.count > 0, 'Check visible painted interface surfaces');
-  assert.deepEqual(coverage.missing, [], 'Every opaque interface surface retains the LCD matrix');
-  assert.deepEqual(coverage.untiled, [], 'Interface grids rasterize as bounded pixel tiles');
+  assert(glass, 'A screen is on show');
+  assert.match(glass.filter, /url\("?#lcd-shadow"?\)/, 'The screen casts its own shadow');
+  assert.equal(glass.matrix, 20, 'The shadow knows how driven each point is');
+  assert.notEqual(glass.flood, '', 'The shadow takes the palette’s driven shade');
+  assert.equal(glass.content, '""', 'The screen carries its glass');
+  assert.equal(glass.zIndex, '40');
+  assert.equal(glass.pointer, 'none', 'The glass never takes a press');
+  assert.match(glass.image, /^url\("data:image\/png/, 'The glass carries the dot matrix');
+  assert(
+    Math.abs(glass.devicePixels - Math.round(glass.devicePixels)) < 0.01,
+    `A dot is a whole number of device pixels (${glass.devicePixels})`
+  );
+  return glass;
 }
 
 export async function checkOutputAppearance({ context, origin, task, report }) {
@@ -64,7 +49,7 @@ export async function checkOutputAppearance({ context, origin, task, report }) {
     }, theme);
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: width === 1440 ? 1000 : 844 });
-      await checkInterfaceTexture(page);
+      await checkScreenGlass(page);
       await page.screenshot({ path: resolve(report, `summary-${theme}-${width}.png`) });
       assert(await visual.evaluate((element) => element.scrollWidth <= element.clientWidth));
     }

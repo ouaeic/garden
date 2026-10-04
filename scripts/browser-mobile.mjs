@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { checkInterfaceTexture } from './browser-output-appearance.mjs';
+import { checkScreenGlass } from './browser-output-appearance.mjs';
 import { captureBrowserErrors } from './browser-errors.mjs';
 import { writeFile } from 'node:fs/promises';
 
@@ -121,7 +121,7 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
             await page.evaluate((theme) => {
               document.documentElement.dataset.theme = theme;
             }, theme);
-            await checkInterfaceTexture(page);
+            await checkScreenGlass(page);
             await page.screenshot({
               path: resolve(report, `mobile-computer-files-${theme}-${width}.png`)
             });
@@ -216,31 +216,47 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
         );
         const snail = page.locator('[data-creature="snail"]');
         await snail.waitFor({ state: 'attached' });
-        const candidates = page.locator(
-          '[data-perch], .desk-card, .desk-work-card, .panel, .phone-bar, .garden-masthead'
-        );
+        const candidates = page.locator('[data-perch], .desk-card, .desk-work-card, .panel');
         assert(
           (await candidates.count()) > 0,
           'The border visibility check needs real candidate edges'
         );
         const hiddenBorders = await page.addStyleTag({
-          content: `[data-perch], .desk-card, .desk-work-card, .panel, .phone-bar, .garden-masthead { ${rule} !important; }`
+          content: `[data-perch], .desk-card, .desk-work-card, .panel { ${rule} !important; }`
         });
-        await snail.waitFor({ state: 'detached' });
+        // A snail on a card leaves when its edge goes; one on the screen's floor stays.
+        await page.waitForFunction(() => {
+          const actor = document.querySelector('[data-creature="snail"]');
+          const screen = document.querySelector('.desk-shell .garden-main');
+          if (!actor) return true;
+          const floor =
+            screen.getBoundingClientRect().bottom -
+            parseFloat(getComputedStyle(screen).borderBottomWidth);
+          return Math.abs(actor.getBoundingClientRect().bottom - floor) < 3;
+        });
         await page.evaluate((names) => {
           for (const name of names)
             dispatchEvent(new CustomEvent('garden:scene', { detail: name }));
         }, Object.keys(scenes));
-        await page.waitForTimeout(400);
-        assert.equal(
-          await page
-            .locator(
-              '[data-creature="bird"], [data-creature="monkey"], [data-creature="frog"], [data-creature="ladybird"], [data-creature="snail"]'
+        await page.waitForTimeout(1500);
+        // The screen's own floor is still there; an edge whose border cannot be seen is not.
+        const onHidden = await page.evaluate(() => {
+          const edges = [
+            ...document.querySelectorAll('[data-perch], .desk-card, .desk-work-card, .panel')
+          ].map((element) => element.getBoundingClientRect());
+          return [...document.querySelectorAll('[data-creature]')]
+            .map((actor) => ({ kind: actor.dataset.creature, box: actor.getBoundingClientRect() }))
+            .filter(({ box }) =>
+              edges.some(
+                (edge) =>
+                  Math.abs(box.bottom - edge.top) < 2 &&
+                  box.left >= edge.left &&
+                  box.right <= edge.right
+              )
             )
-            .count(),
-          0,
-          `No invisible perches at ${width}px with ${rule}`
-        );
+            .map(({ kind }) => kind);
+        });
+        assert.deepEqual(onHidden, [], `No invisible perches at ${width}px with ${rule}`);
         await hiddenBorders.evaluate((element) => element.remove());
         await page.evaluate(() =>
           dispatchEvent(new CustomEvent('garden:scene', { detail: 'snailCrawl' }))
@@ -255,24 +271,45 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
     await page.goto(`${origin}/?view=attention`);
     await page.locator('.navigation-page[open]').waitFor();
     await page.locator('.life-layer').waitFor({ state: 'attached' });
-    // Leave only the phone bar's real top border available on this page.
+    // With no card edge to use, a walker keeps to the screen's own floor, inside the lens.
     const onlyBar = await page.addStyleTag({
       content:
-        '[data-perch], .desk-card, .desk-work-card, .panel, .garden-masthead { border-style: none !important; }'
+        '[data-perch], .desk-card, .desk-work-card, .panel { border-style: none !important; }'
     });
+    const screenInside = () =>
+      page.evaluate(() => {
+        const screen = document.querySelector('.navigation-page[open]');
+        const box = screen.getBoundingClientRect();
+        const style = getComputedStyle(screen);
+        return {
+          top: box.top + parseFloat(style.borderTopWidth),
+          bottom: box.bottom - parseFloat(style.borderBottomWidth)
+        };
+      });
     await page.evaluate(() =>
       dispatchEvent(new CustomEvent('garden:scene', { detail: 'snailCrawl' }))
     );
     const barSnail = page.locator('[data-creature="snail"]');
     await barSnail.waitFor({ state: 'attached' });
-    await page.waitForFunction(() => {
+    const floor = (await screenInside()).bottom;
+    await page.waitForFunction((floor) => {
       const actor = document.querySelector('[data-creature="snail"]')?.getBoundingClientRect();
-      const bar = document.querySelector('.phone-bar')?.getBoundingClientRect();
-      return actor && bar && actor.top < bar.top && Math.abs(actor.bottom - bar.top) < 3;
-    });
+      return actor && Math.abs(actor.bottom - floor) < 3;
+    }, floor);
+    const barTop = await page
+      .locator('.phone-bar')
+      .evaluate((bar) => bar.getBoundingClientRect().top);
+    assert(barTop >= floor, `The floor is the work area’s, above the bar (${floor} vs ${barTop})`);
     await page.screenshot({ path: resolve(report, 'mobile-library-border-creature.png') });
     await onlyBar.evaluate((element) => element.remove());
     // A normal page may contain usable borders; only actual modal dialogs exclude them.
+    await page.reload();
+    await page.locator('.navigation-page[open]').waitFor();
+    await page.locator('.life-layer').waitFor({ state: 'attached' });
+    // The first edge on offer, which is the probe rather than the floor that follows it.
+    await page.evaluate(() => {
+      Math.random = () => 0;
+    });
     const pagePanel = await page.locator('.navigation-page .dialog-body').evaluateHandle((body) => {
       const panel = document.createElement('section');
       panel.className = 'panel';
@@ -283,10 +320,8 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
       return panel;
     });
     const hideOtherEdges = await page.addStyleTag({
-      content:
-        '[data-perch], .desk-card, .desk-work-card, .phone-bar, .garden-masthead, .empty { border-style:none !important; }'
+      content: '[data-perch], .desk-card, .desk-work-card, .empty { border-style:none !important; }'
     });
-    await barSnail.waitFor({ state: 'detached' });
     await page.evaluate(() =>
       dispatchEvent(new CustomEvent('garden:scene', { detail: 'snailCrawl' }))
     );
@@ -313,7 +348,7 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
     await modal.evaluate((element) => element.remove());
     await pagePanel.evaluate((element) => element.remove());
     await hideOtherEdges.evaluate((element) => element.remove());
-    console.log('Mobile creatures use actual page borders and the full-width phone bar.');
+    console.log('Mobile creatures use actual page borders and the screen’s own floor.');
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto(origin);
     await page.locator('.home-projects').waitFor();
@@ -338,8 +373,8 @@ export async function checkMobileNavigation({ context, origin, task, bootstrap, 
       await page
         .locator('.life-clip:has([data-creature="bat"])')
         .evaluate((clip) => clip.getBoundingClientRect().top),
-      await page.locator('.garden-masthead').evaluate((bar) => bar.getBoundingClientRect().bottom),
-      'Bats can hang from the same painted masthead on phones'
+      (await screenInside()).top,
+      'Bats hang from the top of the work area on phones'
     );
     await page.clock.setFixedTime(new Date('2026-09-29T12:00:00'));
     await page.reload();
