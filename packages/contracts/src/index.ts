@@ -813,9 +813,9 @@ export const TaskEventKind = z.enum([
   /**
    * The agent stopped and put a question to the owner.
    *
-   * Its own kind rather than an approval, because the two are different acts and were being drawn
-   * as one: a blocker used to come back as a `finish` with a `not_applicable` verification, which
-   * lands as a completion card indistinguishable from finished work. An approval asks permission for
+   * Its own kind rather than an approval or a finish, because these are different acts: a blocker
+   * carried as a `finish` with a `not_applicable` verification would land as a completion card
+   * indistinguishable from finished work. An approval asks permission for
    * something the agent is about to do and is answered yes or no; this asks for a decision the agent
    * cannot make and is answered in words, or by picking one of the options it listed.
    */
@@ -1398,11 +1398,11 @@ const approvalToolWord = (value: string | null | undefined): string =>
 /**
  * The message a refusal sends back, said once, in the one place every layer reads it from.
  *
- * The refusal the model saw used to be four words - "The user denied this action" - and that was
- * the whole of what it learned. It could not tell "not that file" from "not right now" from "not
- * ever", so the next thing it did was try a neighbouring version of the thing that had just been
- * refused, and the owner answered the same question again wearing a slightly different costume. A
- * refusal with a reason on it is steering; a refusal without one is a wall to walk along.
+ * A bare refusal - "The user denied this action" - is the whole of what the model would learn. It
+ * cannot tell "not that file" from "not right now" from "not ever", so the next thing it does is
+ * try a neighbouring version of the thing that had just been refused, and the owner answers the
+ * same question again wearing a slightly different costume. A refusal with a reason on it is
+ * steering; a refusal without one is a wall to walk along.
  *
  * This is deliberately the owner's own sentence and not a harness notice about the owner. It is
  * carried on the channel that already exists for owner speech - a message to the conversation,
@@ -1417,11 +1417,11 @@ const approvalToolWord = (value: string | null | undefined): string =>
  * how a product ends up disagreeing with its own user in their own voice.
  *
  * Empty when there is no reason, and callers send nothing at all in that case: a denial with no
- * note must cost exactly the requests a denial cost before this existed.
+ * note costs no request beyond the denial itself.
  *
  * One string in `contracts` rather than one in a client and one in the worker, for the reason
- * `MEDIA_VIDEO_UNAVAILABLE_REASON` above gives - which is itself the audit's own finding about
- * approvals: when a policy is written twice it is the stale copy that ends up winning.
+ * `MEDIA_VIDEO_UNAVAILABLE_REASON` above gives: when a policy is written twice it is the stale copy
+ * that ends up winning.
  */
 export const approvalDenialMessage = (input: {
   /** The tool the refused call was bound to, when the card knew it. */
@@ -1439,8 +1439,8 @@ export const approvalDenialMessage = (input: {
  *
  * The first three are derived by the server from state it can already see: an approval is pending,
  * a conversation reached a terminal status, a task stopped at a spending ceiling. Nothing decides
- * to send them, which is why a fifteen-minute watcher used to push "finished" ninety-six times a
- * day without ever saying whether anything had changed.
+ * to send them, so they cannot say whether anything changed: a fifteen-minute watcher would push
+ * "finished" ninety-six times a day.
  *
  * The last two are raised by the agent, and they are the two moments only the agent knows about.
  * `agent_message` is the one it chose to send - the page moved, the build went red, the thing the
@@ -2226,10 +2226,10 @@ export const OwnerPreferences = z.object({
   /**
    * Whether the computer panel is open, and on which tab.
    *
-   * A device-local choice until now, which made it one of the few things about this software that
-   * was a fact about a browser rather than about its owner: open the files on the laptop, pick the
-   * phone up, and the phone had its own idea. On a computer whose whole point is being the same
-   * computer from anywhere, a panel that does not travel is not a setting.
+   * Stored with the owner rather than on the device. A device-local choice would be a fact about a
+   * browser rather than about its owner: open the files on the laptop, pick the phone up, and the
+   * phone would have its own idea. On a computer whose whole point is being the same computer from
+   * anywhere, a panel that does not travel is not a setting.
    */
   inspector: z
     .object({

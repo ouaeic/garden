@@ -380,7 +380,7 @@ export const registerTaskRoutes = (context: RouteContext): void => {
        * The two events stay in their own order and cannot be run together: `appendTaskEvent` takes
        * the row lock that hands out the sequence number, so racing them is how "Task queued" comes
        * second in the conversation the owner is reading. The usage row is in another table with no
-       * ordering to keep, so it no longer waits for either of them.
+       * ordering to keep, so it waits for neither of them.
        */
       await Promise.all([
         store.recordUsage({
@@ -432,17 +432,13 @@ export const registerTaskRoutes = (context: RouteContext): void => {
        * by this point, and neither a ranking over the whole catalogue nor the insert that records
        * it is worth holding a send the owner is watching.
        *
-       * The comment here said "caught rather than awaited" while the call was awaited, which is how
-       * a synchronous pass over a few hundred models and a round trip to the database stayed in
-       * front of every first message on the box without anybody meaning them to be. The `.catch` is
-       * attached on this line and not later, so nothing about this can become an unhandled
-       * rejection, and the notice still lands ahead of the worker's first frame - it is one insert
-       * against a task that has yet to be leased, let alone answered.
+       * The `.catch` is attached on this line and not later, so nothing about this can become an
+       * unhandled rejection, and the notice still lands ahead of the worker's first frame - it is
+       * one insert against a task that has yet to be leased, let alone answered.
        *
-       * The round trip came back the same way a second time, as `await store.effectiveSpendLimits`
-       * inside the argument list: arguments are evaluated before the call, so the read was in
-       * front of `void` and not behind it. The account id goes in instead and the read happens
-       * inside.
+       * The account id goes in rather than `await store.effectiveSpendLimits` inside the argument
+       * list: arguments are evaluated before the call, so that read would be in front of `void` and
+       * not behind it. The read happens inside.
        */
       void noteModelFit({
         taskId: task.id,
@@ -460,8 +456,8 @@ export const registerTaskRoutes = (context: RouteContext): void => {
        * `selectModel`'s `relaxed_unbenchmarked` arm is the case: every measured model that could do
        * the work is above the ceiling, so an unmeasured one is answering. That is a fact about the
        * quality of this reply and the owner is the only person who can act on it - by raising the
-       * ceiling or accepting the route - and until now it was computed and dropped on the floor. The
-       * `blocked` arm never reaches here; it refused the request above.
+       * ceiling or accepting the route - so it is said rather than dropped. The `blocked` arm never
+       * reaches here; it refused the request above.
        */
       if (chosen?.message)
         await store.appendTaskEvent({
@@ -809,9 +805,9 @@ export const registerTaskRoutes = (context: RouteContext): void => {
       /*
        * No second factor for choosing how much this run asks.
        *
-       * Loosening used to demand a passkey inside the last five minutes, so in practice moving a
-       * conversation to Autonomous meant a fingerprint every single time - on the setting whose
-       * entire purpose is to be interrupted less. The session is already bound to a passkey; asking
+       * Demanding a passkey inside the last five minutes to loosen would in practice mean a
+       * fingerprint every time a conversation moves to Autonomous - on the setting whose entire
+       * purpose is to be interrupted less. The session is already bound to a passkey; asking
        * again buys almost nothing here, because an attacker holding it can send tasks anyway, and
        * it costs the owner the one control they reach for most.
        *

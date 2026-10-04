@@ -233,9 +233,9 @@ describe('reclaiming what a crashed runner left behind', () => {
    * of a stale number is the worst thing this file could do, so a run that began before this boot is
    * left strictly alone however alive its old number looks.
    *
-   * The command line is deliberately no longer consulted, and this is the case that used to justify
-   * it: it cannot do this job, because `sh -c` and every wrapper in the chain exec in place and
-   * answer `ps` with something the record never wrote down.
+   * The command line is deliberately not consulted: it cannot do this job, because `sh -c` and
+   * every wrapper in the chain exec in place and answer `ps` with something the record never wrote
+   * down.
    */
   it('leaves a stranger holding a pid from before the last boot completely alone', async () => {
     const signals: NodeJS.Signals[] = [];
@@ -574,12 +574,11 @@ describe('a service the computer keeps running', () => {
     'has no deadline, whatever deadline the call that declared it asked for',
     async () => {
       /*
-       * The hour was the bug. Every other thing this manager starts is scoped to a turn, and a
-       * background session was capped - so "build me a dashboard and give me a link" produced a
-       * link that stopped answering by dinner while the Running row still called it alive. A
-       * service ignores `timeoutSeconds` entirely, and nothing exercised that: the ceiling is
-       * applied in the same `#launch` both paths share, one ternary away from covering services
-       * too.
+       * A service ignores `timeoutSeconds` entirely. Every other thing this manager starts is
+       * scoped to a turn, and a capped service would turn "build me a dashboard and give me a link"
+       * into a link that stops answering by dinner while the Running row still calls it alive. The
+       * ceiling is applied in the same `#launch` both paths share, one ternary away from covering
+       * services too.
        */
       const root = await workspace();
       const manager = new ProcessManager(50, HEALTHY_POLICY);
@@ -595,7 +594,7 @@ describe('a service the computer keeps running', () => {
           service: 'patient server',
           maxOutputBytes: 4_096
         },
-        // The route's own ceiling, which is the other bound that used to reach a service.
+        // The route's own ceiling, which is the other bound that must not reach a service.
         1,
         false
       );

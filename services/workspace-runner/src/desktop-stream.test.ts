@@ -62,10 +62,10 @@ describe('capturing one rectangle instead of the whole screen', () => {
   });
 
   /**
-   * The bound the `scale=` filter did not carry, because it sat in the `else` below the region
-   * branch and therefore never ran for a region at all. A zoom of the whole of a 2560x1600 display
-   * came back at 4.1 megapixels: three times the box the full screenshot of that display is reduced
-   * into, and a closer look larger than the picture it is a closer look at.
+   * A region carries the same `scale=` bound as the full still. Without it a zoom of the whole of
+   * a 2560x1600 display would come back at 4.1 megapixels: three times the box the full screenshot
+   * of that display is reduced into, and a closer look larger than the picture it is a closer look
+   * at.
    */
   it('reduces a region larger than the image instead of sending it at native density', () => {
     const args = stillCaptureArguments({

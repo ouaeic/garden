@@ -33,20 +33,20 @@ describe('web tool route', () => {
   });
 
   /**
-   * The precedence this module used to have, and why it is gone.
+   * Why zero data retention is not a refusal here.
    *
-   * Two refusals stood above the provider check: a credential enforcing zero data retention, and a
-   * conversation started on the zero-retention route. On an OpenRouter box those are one bit - the
-   * credential's flag is what labels every model `provider_zdr`, and a task may only run on a model
-   * whose route matches its own - and that bit ships on. So the shipped default refused provider
-   * search everywhere, which on a server is the only search that works, and the owner was never
-   * told that is what their privacy setting bought.
+   * A credential enforcing zero data retention, and a conversation started on the zero-retention
+   * route, look like two refusals. On an OpenRouter box they are one bit - the credential's flag is
+   * what labels every model `provider_zdr`, and a task may only run on a model whose route matches
+   * its own - and that bit ships on. Refusing on it would make the shipped default refuse provider
+   * search everywhere, which on a server is the only search that works, without the owner ever
+   * being told that is what their privacy setting bought.
    *
-   * It bought nothing. Zero-retention enforcement covers inference routing and says in terms that
-   * it does not cover tools, so the query was outside that guarantee either way; refusing only
-   * decided that the search would not happen. The retention facts are therefore not inputs here at
-   * all, and this asserts the absence rather than trusting a comment to hold the line - a reason
-   * added back would be a refusal added back.
+   * It would buy nothing. Zero-retention enforcement covers inference routing and says in terms
+   * that it does not cover tools, so the query is outside that guarantee either way; refusing would
+   * only decide that the search does not happen. The retention facts are therefore not inputs here
+   * at all, and this asserts the absence rather than trusting a comment to hold the line - a reason
+   * added would be a refusal added.
    */
   it('names no retention reason, because a promise about inference never covered a search', () => {
     expect(WebToolRouteReason.options).toEqual([
@@ -82,12 +82,11 @@ describe('web tool route', () => {
   });
 
   /**
-   * The switch an owner who wants the old behaviour reaches for.
+   * The switch an owner who wants every search kept in house reaches for.
    *
-   * It is the whole of the escape hatch now, so it has to be enough on its own: with it set, this
-   * box searches in house on every task, exactly as a zero-retention credential used to make it -
-   * and unlike the credential it takes no passkey step-up to set, which matters to an owner whose
-   * saved credential is the thing holding their box in the broken state.
+   * It is the whole of the escape hatch, so it has to be enough on its own: with it set, this box
+   * searches in house on every task - and unlike a credential edit it takes no passkey step-up to
+   * set.
    */
   it('restores the old in-house-everywhere behaviour from the one switch that is about search', () => {
     for (const provider of ['openrouter', 'custom'])
@@ -246,7 +245,7 @@ describe('provider web tools', () => {
 
 describe('duplicated web capabilities', () => {
   /**
-   * What this guards is no longer the agent's catalogue but the search request itself. That request
+   * What this guards is not the agent's catalogue but the search request itself. That request
    * asks the provider to run one search and must offer the model no function tools at all: a request
    * carrying both would be asking the same question of two answerers in one breath, and which one
    * came back would depend on what the model reached for.

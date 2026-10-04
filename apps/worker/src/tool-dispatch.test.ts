@@ -1462,8 +1462,8 @@ describe('the repository arms', () => {
    * ripgrep searches in parallel and emits in completion order, so without this the three hundred
    * symbols the tool keeps are whichever three hundred finished first - measured on this repository,
    * a different forty-four files on each of three consecutive runs, while `IDEMPOTENT_WITHIN_TURN`
-   * called the answer a pure function of the workspace. Removing `--sort path` turned no test red
-   * until this one, which is why it is here rather than in a comment.
+   * calls the answer a pure function of the workspace. No other test turns red when `--sort path`
+   * is removed, which is why this is a test rather than a comment.
    */
   it('asks ripgrep for the symbols in a settled order, because the budget keeps a prefix of them', async () => {
     const executed = await dispatch(
@@ -1643,9 +1643,7 @@ describe('the repository arms', () => {
       }
     );
 
-    // Found by route rather than by index. It was written that way when the approval floor took a
-    // listing of its own ahead of this call; the floor no longer does, and finding the exec by its
-    // path is still the right shape - what is being asserted is the clamp, not the call order.
+    // Found by route rather than by index: what is being asserted is the clamp, not the call order.
     const exec = executed.calls.find((entry) => entry.path === `${root}/exec`);
     expect(exec?.body).toMatchObject({ timeoutSeconds: 300 });
   });
@@ -1660,8 +1658,7 @@ describe('the repository arms', () => {
     );
 
     // One listing and no exec at all: a directory holding no project marker resolves to no command,
-    // so nothing is run and nothing is asked. It was two listings while the approval floor took one
-    // of its own to decide a card that no longer exists.
+    // so nothing is run and nothing is asked.
     expect(executed.calls.map((entry) => entry.path)).toEqual([`${root}/files?path=workspace`]);
     expect(executed.result).toMatchObject({ available: false });
   });
@@ -3152,12 +3149,12 @@ describe('the publishing arms', () => {
   /*
    * The reach decides what is created, and a reach nothing recognises creates the PRIVATE one.
    *
-   * Both halves of this used to be their own tool name, so there was no third answer to give. There
-   * is now, and it has to fall the same way the approval floor falls: `publishesPublicly` in
-   * @garden/contracts is one exported equality against the literal `public`, called here and in
-   * `approval-policy.ts`, so a value neither recognises is private for the card AND private for the
-   * thing that gets made. The other pairing - a floor reading private on a call this arm publishes
-   * publicly - is the defect that blocked this merge for a wave.
+   * Both halves of this are one tool, so there is a third answer to give, and it has to fall the
+   * same way the approval floor falls: `publishesPublicly` in @garden/contracts is one exported
+   * equality against the literal `public`, called here and in `approval-policy.ts`, so a value
+   * neither recognises is private for the card AND private for the thing that gets made. The other
+   * pairing - a floor reading private on a call this arm publishes publicly - would be a public
+   * address the owner was never asked about.
    */
   it.each([['omitted', undefined] as const, ['a reach nothing recognises', 'PUBLIC'] as const])(
     'creates a private preview when the reach is %s',
@@ -3480,14 +3477,14 @@ describe('the connector arms', () => {
     /*
      * The other half of narrowing the catalogue by connected kind.
      *
-     * `agentToolsFor` now sends a box only the actions its own connections reach, so a model that
-     * has not called `connector_list` yet can ask for one that is not on its wire - and the answer
-     * it used to get, "Action does not match this connector", named no alternative and cost it a
-     * whole further round trip to find out what it may ask for instead. Being wrong has to be
-     * cheap: the reachable set travels back with the refusal, in the same result.
+     * `agentToolsFor` sends a box only the actions its own connections reach, so a model that has
+     * not called `connector_list` yet can ask for one that is not on its wire - and a refusal that
+     * names no alternative costs it a whole further round trip to find out what it may ask for
+     * instead. Being wrong has to be cheap: the reachable set travels back with the refusal, in the
+     * same result.
      *
-     * Nothing about the enforcement moved. `executeConnectorAction` in @garden/core still refuses
-     * this action on this connector; what is asserted here is that the refusal is answerable.
+     * The enforcement is not here. `executeConnectorAction` in @garden/core refuses this action on
+     * this connector; what is asserted here is that the refusal is answerable.
      */
     const executed = await dispatch(
       {

@@ -168,9 +168,7 @@ export const registerPreviewRoutes = (context: RouteContext): void => {
         });
         return {
           ...workspacePreviewResponse(preview),
-          // What publishing actually does, and nothing else. This used to describe an "always
-          // ready" hosting mode holding the computer awake and consuming included active hours -
-          // a mechanism that does not exist, in the words of a plan nobody sells.
+          // What publishing actually does, and nothing else.
           warning:
             'This address is on the public internet: anyone holding it reaches the app on this computer, with no sign-in, until you unpublish or revoke it. If the computer is asleep the first request wakes it, so that one waits.'
         };

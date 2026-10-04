@@ -42,12 +42,12 @@ export interface DestinationContext {
   /**
    * Whole addresses this turn was handed - by a search, or as the page a read actually landed on.
    *
-   * Only the host used to survive a result, so following the third link a search returned scored
-   * its whole path as novel material even though the harness itself had just put that path in front
-   * of the model. Under a per-request bound that was merely untidy; under a running budget it would
-   * be the difference between a research pass that costs nothing and one that stops to ask after
-   * seventeen pages. These come from the harness's own reading of a tool result, never from what a
-   * page said, so an attacker can add addresses the agent has already been to and nothing else.
+   * If only the host survived a result, following the third link a search returned would score its
+   * whole path as novel material even though the harness itself had just put that path in front of
+   * the model. Under a running budget that is the difference between a research pass that costs
+   * nothing and one that stops to ask after seventeen pages. These come from the harness's own
+   * reading of a tool result, never from what a page said, so an attacker can add addresses the
+   * agent has already been to and nothing else.
    */
   readonly knownAddresses?: readonly string[];
   /** The owner's own words this task; material already in them is not novel. */
@@ -220,9 +220,8 @@ const MAX_KNOWN_ADDRESSES = 192;
  * Long enough that a real address is remembered whole, because a truncated one is a different
  * address.
  *
- * Under the old charge this was only a corpus of substrings and clipping the tail cost a few bytes.
- * The credit below is an identity test, so clipping the tail now costs the whole credit: at 256 a
- * real 301-character NHS disclosure-log URL that a search had just handed the model came back as
+ * The credit below is an identity test, so clipping the tail costs the whole credit: at 256 a real
+ * 301-character NHS disclosure-log URL that a search had just handed the model would be charged as
  * 94 bytes of material the model chose, two under the per-address bound, on a turn where nothing
  * had been composed at all. Measured over 136 recorded addresses one exceeds 256 and none exceeds
  * 512; the median is 54. The cost of the headroom is bounded and small - 192 addresses at 512 is
@@ -401,37 +400,34 @@ export const classifyDestination = (
   /*
    * Somewhere data cannot go is not somewhere data can be sent - and neither of those is "the LAN".
    *
-   * This asked the owner to approve the agent reading its own web server. A single "build a page
-   * and serve it" run raised ten approval cards, and every one of them was garden talking to
-   * itself: four to `localhost:8080`, three to its own preview URL on its own domain. Nothing left
-   * the machine in any of them, and the owner learned to click Approve without reading - which is
-   * the only way this rule can actually fail.
+   * Asking the owner to approve the agent reading its own web server would raise a card at every
+   * step of a "build a page and serve it" run, each one garden talking to itself -
+   * `localhost:8080`, its own preview URL on its own domain - with nothing leaving the machine, and
+   * the owner would learn to click Approve without reading - which is the only way this rule can
+   * actually fail.
    *
-   * The repair for that was `isPublicHttpUrl`, which answers "is this out on the internet" - and
-   * it is false for loopback and equally false for 192.168.0.0/16, 10.0.0.0/8, the link-local block
-   * where the cloud metadata service lives, and every `*.internal`, `*.local` and `*.home.arpa`
-   * name. So the whole of the owner's own network came back with the same verdict as this process
-   * talking to itself: `sink: false`, nought bytes charged, no card in any mode on a clean turn or
-   * a hostile one. Measured on this tree at cd7033f, nine such addresses, all three modes, both
-   * spellings: not one card. `curl http://192.168.1.50/notes` and
-   * `curl http://169.254.169.254/latest/meta-data/` were free.
+   * "Is this out on the internet" is not the answer to that: it is false for loopback and equally
+   * false for 192.168.0.0/16, 10.0.0.0/8, the link-local block where the cloud metadata service
+   * lives, and every `*.internal`, `*.local` and `*.home.arpa` name. Asked alone, it gives the
+   * whole of the owner's own network the same verdict as this process talking to itself:
+   * `sink: false`, nought bytes charged, no card in any mode on a clean turn or a hostile one, so
+   * `curl http://192.168.1.50/notes` and `curl http://169.254.169.254/latest/meta-data/` are free.
    *
    * That is one question answered where two were asked, and the two differ in exactly the way this
    * file's whole argument turns on: an address is how data leaves this computer, and the owner's
    * NAS, their router and the metadata service are all not this computer. So the question asked
-   * here is now `reachOfHttpUrl`, which has three answers, and only the first of them is free.
+   * here is `reachOfHttpUrl`, which has three answers, and only the first of them is free.
    *
-   * `self` keeps everything the loopback repair bought, because that is what it was actually
-   * buying: the health check the owner's own scenario ends on stays at nought bytes and no card.
+   * `self` is what the loopback case is actually about: the health check the owner's own scenario
+   * ends on stays at nought bytes and no card.
    * `estate` is charged and judged exactly like the internet below, differing only in the words on
    * the card - and it is the ORDINARY floor, not this one, that is entitled to treat the LAN as out
    * of scope, which it says by reading `verdict.reach` rather than by being handed a verdict that
    * lies to it. Publishing something to the internet is still gated where it is decided:
    * `publish_preview` with `reach: 'public'` raises its own external_consequential card in every
-   * security mode, on a clean turn and on a tainted one, and this is not a way round it. That
-   * sentence named the separate `publish_site` tool until the two publishing tools became one; it
-   * names the reach now because the floor reads the reach now - `publishReachOfCall` in
-   * approval-policy.ts - which is what let them merge without the public half losing its card.
+   * security mode, on a clean turn and on a tainted one, and this is not a way round it. The floor
+   * reads the reach - `publishReachOfCall` in approval-policy.ts - which is what keeps the public
+   * half of the one publishing tool behind its card.
    */
   const reach = (context.selfOrigins ?? []).some(
     (origin) => origin && host === origin.toLowerCase()
@@ -498,11 +494,11 @@ export const classifyDestination = (
   /*
    * The payload bound, on ONE piece rather than on the sum of them.
    *
-   * It used to be a single per-address bound at 96, and the two things it was holding apart are
-   * held apart by the two bounds above it now. A composed query - the boolean a research task
-   * writes into a REST read, a cursorMark, a field list - is many short pieces totalling well
-   * over 96 bytes, and it carded: the owner's research turn in autonomous asked after every such
-   * read with a card reporting a payload shape. The payload itself is one long opaque piece, and
+   * The two bounds above it hold apart what a single per-address bound would have to. A composed
+   * query - the boolean a research task writes into a REST read, a cursorMark, a field list - is
+   * many short pieces totalling well over 96 bytes, and under one per-address bound at 96 a
+   * research turn in autonomous would ask after every such read with a card reporting a payload
+   * shape. The payload itself is one long opaque piece, and
    * that is the shape this catches - a base64 blob in one path segment trips it immediately,
    * while any piece of a real link or a real query is comfortably under it.
    *

@@ -331,9 +331,7 @@ describe('preview gateway credential isolation', () => {
 
 /**
  * A live link is a promise the owner made to whoever holds it, so a sleeping computer is woken
- * rather than reported. This used to depend on a stored hosting mode and read the wrong way round:
- * the mode sold as "always on" was the only one that answered 503 to a visitor whenever the owner
- * had put the box to sleep. There is one behaviour now, and this is it.
+ * rather than reported.
  */
 describe('a preview opened while the computer is asleep', () => {
   it('wakes a hibernated computer and serves the page', async () => {

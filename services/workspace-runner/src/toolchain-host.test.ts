@@ -185,9 +185,9 @@ describe('the shipped capability list', () => {
   });
 
   /**
-   * The regression in one line. Every one of these sentences used to name apt, and this list is
-   * read by the model on a box that may have no apt at all. Whatever a family is called, it is the
-   * table's job to say so, and never this file's.
+   * None of these sentences may name a package manager, because this list is read by the model on a
+   * box that may have no apt at all. Whatever a family is called, it is the table's job to say so,
+   * and never this file's.
    */
   it('names no package manager in a sentence meant for every host', () => {
     expect(DOCUMENT_TOOLCHAIN.length).toBeGreaterThan(0);

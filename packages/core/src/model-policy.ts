@@ -480,9 +480,9 @@ export const blendWeights = (profile: TaskProfile, preference: ModelPreference):
 /**
  * Drops the latency term and shares its weight out across the rest.
  *
- * The sub-score used to fall back to a table indexed by price when nothing had timed the route,
- * which made two thirds of the "fast" dial a price lookup wearing a latency label. A sub-score
- * that is honestly absent is better than one that is silently price.
+ * Falling back to a table indexed by price when nothing has timed the route would make most of
+ * the "fast" dial a price lookup wearing a latency label. A sub-score that is honestly absent is
+ * better than one that is silently price.
  *
  * Latency is published for some routes and withheld for others rather than absent everywhere:
  * `openrouter-catalog.ts` fills `measuredLatencyMs` from `latency_last_30m`, but only for the
@@ -1076,10 +1076,8 @@ export interface ModelSelection {
  * `SpendLimits` contract and `ModelRequest` - and it is `priceCeilingFields` below that takes the
  * last step, so the conversion has one home rather than one per call site.
  *
- * The step *is* taken now, and the comment that used to stand here said the opposite: it read that
- * "every `ModelRequest` this repository builds today carries no ceiling at all", which was true
- * when the apparatus was written and stopped being true when it was threaded. Every producer of a
- * `ModelRequest` on the live path now reads the owner's stored limits and spreads them in:
+ * Every producer of a `ModelRequest` on the live path reads the owner's stored limits and spreads
+ * them in:
  *
  * - `apps/api/src/routes/models.ts` - `/v1/models/recommend`, so a recommendation is never a route
  *   the box is not allowed to take.
@@ -1179,8 +1177,9 @@ export const selectModel = (models: RoutableModel[], request: ModelRequest): Mod
      * The outcome says which of the two reasons produced that sentence, because one caller has to
      * overrule the explicit pick on its own path: the standing pin in
      * `apps/api/src/routes/support.ts` governs runs the owner is not present for, so there the
-     * ceiling wins. It used to decide by `message !== null`, which is true for an unpriced route as
-     * well as an expensive one, and so it revoked pins the ceiling had no verdict on at all.
+     * ceiling wins. Deciding by `message !== null` would not do: that is true for an unpriced route
+     * as well as an expensive one, and so it would revoke pins the ceiling has no verdict on at
+     * all.
      */
     const breach = choice ? priceCeilingBreachReason(choice.model, request) : null;
     if (!choice || !breach) return none;
@@ -1294,9 +1293,9 @@ const reasoningPattern =
   /\b(prove|proof|theorem|derive|derivation|first principles|step by step|reason through|think through|trade-?offs?|root cause|why does|why did|formally verify|architecture decision|design doc)\b/i;
 /**
  * Only phrases that mean the work leaves this process - a browser, an installer, a deployment, a
- * calendar. The words that merely describe an artefact used to live here too, so "Summarise this
- * document for me" was routed to the agentic profile with a 128K reference window; an artefact is
- * not a plan, and this list must never grow back into one.
+ * calendar. A word that merely describes an artefact does not belong here: with one, "Summarise
+ * this document for me" is routed to the agentic profile with a 128K reference window. An artefact
+ * is not a plan, and this list must never grow into one.
  */
 const agenticPattern =
   /\b(research|browse|browser|find online|search the web|compare sources|apply for|install|deploy|publish|schedule|book a|order a|host a demo|fill (?:in|out) (?:the|this|a) form)\b/i;
@@ -1587,8 +1586,8 @@ export const coarsenTaskKind = (kind: ModelTaskKind): 'general' | 'coding' | 'ag
   kind === 'coding' ? 'coding' : kind === 'agentic' ? 'agentic' : 'general';
 
 /**
- * The kind a prompt implies, in the router's full vocabulary. It used to be coarsened to three
- * kinds on the way out, which left five carefully written profiles - vision, long context,
- * reasoning, bulk summarisation, conversation - unreachable from the only entry point that used it.
+ * The kind a prompt implies, in the router's full vocabulary. Coarsened to three kinds on the way
+ * out, it would leave five carefully written profiles - vision, long context, reasoning, bulk
+ * summarisation, conversation - unreachable from the only entry point that uses it.
  */
 export const inferModelTask = (prompt: string): ModelTaskKind => classifyModelTask({ prompt }).kind;

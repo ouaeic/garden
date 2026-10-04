@@ -94,7 +94,7 @@ describe('what may be an acceptance check', () => {
  * What the journal is told about a turn that died.
  *
  * The owner of this box is also its operator, so a failure they cannot read is a failure they
- * cannot fix - and the only record of one used to be an encrypted event. What may be said out here
+ * cannot fix - and an encrypted event is not a record they can read. What may be said out here
  * is bounded by what the payload is encrypted for: the code, the counters and the machine's own
  * account of where it broke, never a word the owner or the model wrote.
  */
@@ -258,9 +258,9 @@ describe('the journal record a failed turn leaves', () => {
   });
 
   /**
-   * The other failures a worker has, which are not a task's: leasing stopped working, and the line
-   * that said so used to carry the thrown message. A driver quotes back whatever statement it was
-   * given, so a connection that dropped mid-write published a fragment of it.
+   * The other failures a worker has, which are not a task's: leasing stopped working. The line that
+   * says so must not carry the thrown message: a driver quotes back whatever statement it was
+   * given, so a connection that dropped mid-write would publish a fragment of it.
    */
   it('identifies a failure that is nobody’s task without quoting it', () => {
     const refused = Object.assign(
@@ -282,7 +282,7 @@ describe('the journal record a failed turn leaves', () => {
  * What any of this box's processes may write to the journal.
  *
  * The owner of this box is also its operator, so a failure they cannot read is a failure they
- * cannot fix - and the only record of one used to be an encrypted event. What may be said out here
+ * cannot fix - and an encrypted event is not a record they can read. What may be said out here
  * is bounded by what the payload is encrypted for: identifiers, counters and the machine's own
  * account of where it broke, never a word the owner or the model wrote. The list is an allowlist
  * for that reason: a field nobody put on it is dropped rather than printed, so the cost of an

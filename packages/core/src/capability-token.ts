@@ -13,11 +13,10 @@ export interface CapabilityTokenClaims {
    *
    * Still optional in the type, because a token minted by a control plane one release behind this
    * runner is on the wire during a rolling deploy and has to be *refused* rather than crash the
-   * parse. It is no longer optional in effect: `verifyCapabilityToken` requires an audience and
-   * compares it, so a token that names no request is now refused everywhere. It used to be skipped
-   * whenever the claim was absent, and nine of the worker's ten signing sites never set one - which
-   * made the whole scheme advisory, and made every capability a bearer token for everything its
-   * scopes admitted.
+   * parse. It is not optional in effect: `verifyCapabilityToken` requires an audience and compares
+   * it, so a token that names no request is refused everywhere. Skipping the check whenever the
+   * claim is absent would make the whole scheme advisory, and every capability a bearer token for
+   * everything its scopes admit.
    *
    * A list, for the two credentials a client uses for several calls in a row: a browser or desktop
    * takeover is a stream, an action and a holder change, and one audience would break the flow

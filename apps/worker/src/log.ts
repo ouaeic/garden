@@ -3,16 +3,13 @@ import { redactText } from '@garden/core';
 /**
  * What every garden process writes to the journal.
  *
- * Two formats used to share this box. The API wrote one JSON object per line, with an allowlist of
- * field names deciding what may appear; this process wrote English sentences, each of them guarding
- * its own values by hand. Both were defensible alone. Together they meant the owner greps twice for
- * one failure, and that half the lines on the box rested on every author remembering the rule
- * rather than on a list that drops what nobody put on it. The lease line is what that costs: it
- * printed the thrown message, so a database that refused a connection published whatever the driver
- * felt like quoting back.
+ * One format for the whole box: one JSON object per line, with an allowlist of field names deciding
+ * what may appear. Two formats would mean the owner greps twice for one failure, and a line that
+ * guards its own values by hand rests on every author remembering the rule rather than on a list
+ * that drops what nobody put on it - a line that prints a thrown message publishes whatever a
+ * database driver that refused a connection felt like quoting back.
  *
- * The structured line won, and it gained the one thing the sentences had that it lacked - the
- * priority prefix, so `journalctl -p err` still finds a real failure.
+ * Each line carries a priority prefix, so `journalctl -p err` finds a real failure.
  *
  * It lives here rather than in the API because the API depends on this package and not the other
  * way round, and the only other thing both import - `@garden/contracts` - is compiled into the

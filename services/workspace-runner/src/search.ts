@@ -9,22 +9,22 @@
  * paths outright - and renders title, link and snippet into plain HTML, so reading a result page
  * needs no more of the browser than reading any other page does.
  *
- * It used to run in the session browser, and that was wrong in three ways that all had the same
- * shape: a search is not a browsing session, but it was sharing one. A challenge on the engine
- * closed that host for the rest of the session, so the first challenge took the whole web
- * capability off the task - and the tool's own advice, carry on elsewhere, had no elsewhere to
- * point at. A search required the agent to be holding the browser, so every research task stopped
+ * It does not run in the session browser, because a search is not a browsing session and sharing
+ * one is wrong in three ways that all have the same shape. A challenge on the engine would close
+ * that host for the rest of the session, so the first challenge would take the whole web capability
+ * off the task - and the tool's own advice, carry on elsewhere, would have no elsewhere to point
+ * at. A search would require the agent to be holding the browser, so every research task would stop
  * dead while the owner was using their own Chromium, which garden actively encourages them to do.
- * And all three delegated specialists contended on that one session, so one wall took down the lead
- * and every specialist at once.
+ * And all three delegated specialists would contend on that one session, so one wall would take
+ * down the lead and every specialist at once.
  *
- * So a search now runs where a one-shot read already ran: an isolated browser with no profile, no
- * cookies and no shared state, launched for the search and closed after it, exactly as
- * `readMany` does. The session browser stays as a second attempt and only as one, because the
- * original argument for it survives in that narrower form - the profile persists, so a challenge
- * the owner cleared there stays cleared, and a search that the isolated browser could not get is
- * worth trying once through the door the owner already opened. Nothing about the isolated attempt
- * touches the session's walls, and nothing about it needs the session browser to exist.
+ * So a search runs where a one-shot read runs: an isolated browser with no profile, no cookies and
+ * no shared state, launched for the search and closed after it, exactly as `readMany` does. The
+ * session browser stays as a second attempt and only as one, because the argument for it survives
+ * in that narrower form - the profile persists, so a challenge the owner cleared there stays
+ * cleared, and a search that the isolated browser could not get is worth trying once through the
+ * door the owner already opened. Nothing about the isolated attempt touches the session's walls,
+ * and nothing about it needs the session browser to exist.
  */
 
 /** What the results page yields before any of it is trusted. */
@@ -61,11 +61,11 @@ export type SearchRoute = 'isolated' | 'session';
  * browser is a different client every time, so the only thing worth avoiding here is hammering, and
  * a minute is long enough that no loop can sit on the engine.
  *
- * It is a rate limit and not a remedy, which is a distinction the wording of the refusal used to
- * lose: waiting it out helps when the challenge was about a moment, and does nothing at all when it
- * was about the address, which is the usual case on a server. `searchWallMessage` no longer promises
- * otherwise. The route that does work from a datacenter address is the provider's own search, which
- * `resolveWebToolPlan` in @garden/contracts hands this box by default.
+ * It is a rate limit and not a remedy: waiting it out helps when the challenge was about a moment,
+ * and does nothing at all when it was about the address, which is the usual case on a server, so
+ * `searchWallMessage` does not promise otherwise. The route that does work from a datacenter
+ * address is the provider's own search, which `resolveWebToolPlan` in @garden/contracts hands this
+ * box by default.
  */
 export const SEARCH_WALL_BACKOFF_MS = 60_000;
 

@@ -57,25 +57,23 @@ export const DEFAULT_MONTHLY_CAP_USD = 100;
  * The monthly ceiling as the guard and the pane must both see it, from one place.
  *
  * `spendGuardIn` reads `spend_limits` for itself and `effectiveSpendLimits` reads it again two
- * hundred lines further down, which is how a default could be added to the surface the owner looks
- * at while the brake that stops the work carried on with `null`. Both go through here.
+ * hundred lines further down, so a default added to one alone would show on the surface the owner
+ * looks at while the brake that stops the work carried on with `null`. Both go through here.
  *
  * A stored row is the owner's answer in full, nulls included: an explicit `null` is "no ceiling,
  * thank you" and is answered for good. No row at all is nobody having asked them, and that is the
  * only case this speaks for - `monthly_cap_usd` is NULL for both, and the row's absence is the only
  * thing in the schema that tells them apart.
  *
- * ⚠ Which leaves one writer it cannot see: `garden price-ceiling set` - renamed from
- * `spend-ceiling`, which is the name to grep for in anything written before the rename - inserts
- * into `spend_limits` in raw SQL to store the two price ceilings, and any row at all takes this
- * function out of the conversation for that owner.
+ * ⚠ Which leaves one writer it cannot see: `garden price-ceiling set` inserts into `spend_limits`
+ * in raw SQL to store the two price ceilings, and any row at all takes this function out of the
+ * conversation for that owner.
  *
- * It used to write that row with every money cap NULL, which took this default off a box whose
- * owner only wanted to cap the price per million tokens. It no longer does: its INSERT arm writes
- * `monthly_cap_usd` with the constant above - read out of this file by `default_monthly_cap` in
- * scripts/garden, so the two cannot come to disagree - and its UPDATE arm leaves an answer already
- * there alone. `daily_cap_usd` and `default_task_cap_usd` stay NULL on that row, which is what both
- * of them mean anyway.
+ * A row with every money cap NULL would take this default off a box whose owner only wanted to cap
+ * the price per million tokens, so its INSERT arm writes `monthly_cap_usd` with the constant
+ * above - read out of this file by `default_monthly_cap` in scripts/garden, so the two cannot come
+ * to disagree - and its UPDATE arm leaves an answer already there alone. `daily_cap_usd` and
+ * `default_task_cap_usd` stay NULL on that row, which is what both of them mean anyway.
  *
  * What the row still does is stamp `updated_at`, and `spendCeilingAsk` in the web client reads a
  * non-epoch `updatedAt` as "this owner has been asked" - so an owner who set a price ceiling over

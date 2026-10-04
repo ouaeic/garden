@@ -383,7 +383,7 @@ describe('DataStore', () => {
   });
 
   it("takes a conversation's memory with it when the conversation is deleted", async () => {
-    // "Delete this conversation" used to leave the episode and, worse, the chunks of the owner's
+    // "Delete this conversation" must take the episode and, above all, the chunks of the owner's
     // own words held verbatim in mem.source. On a computer that offers to keep no logs it has to
     // mean it, and the schema is the only place that cannot be forgotten by a later caller.
     const user = await store.createUser({ username: 'forgetful', displayName: 'Forgetful' });
@@ -1479,9 +1479,9 @@ describe('DataStore', () => {
   });
 
   /**
-   * The invariant used to be eight callers each remembering one flag. A task the queue will not
-   * hand out again cannot go on holding a workspace, so the status decides and the caller cannot
-   * get it wrong.
+   * The invariant is not something each caller has to remember. A task the queue will not hand
+   * out again cannot go on holding a workspace, so the status decides and the caller cannot get it
+   * wrong.
    */
   it('takes the workspace back from a caller that forgot to let go of it', async () => {
     const user = await store.createUser({ username: 'forgetful', displayName: 'Forgetful' });
@@ -2049,10 +2049,10 @@ describe('DataStore', () => {
   /**
    * A visit renews a preview by its own window, not by the global one.
    *
-   * A `brief` conversation's page is created with a twenty-four hour deadline, and the renewal
-   * used to read the thirty-day constant - so the first person to open a short-lived page turned
-   * it into a long-lived one and the owner's lifetime choice stopped meaning anything. Publishing
-   * and unpublishing renew on the same path and had the same defect.
+   * A `brief` conversation's page is created with a twenty-four hour deadline. A renewal that read
+   * the thirty-day constant would let the first person to open a short-lived page turn it into a
+   * long-lived one, and the owner's lifetime choice would stop meaning anything. Publishing and
+   * unpublishing renew on the same path.
    */
   it('renews a short-lived preview by its own window rather than the ordinary one', async () => {
     const user = await store.createUser({ username: 'brief-preview', displayName: 'Brief' });
@@ -2082,7 +2082,7 @@ describe('DataStore', () => {
     };
     expect(await hoursOut(brief.id)).toBeLessThan(25);
 
-    // The visit that used to undo it.
+    // A visit must not undo it.
     await store.touchWorkspacePreview(brief.id);
     expect(await hoursOut(brief.id)).toBeLessThan(25);
     await store.touchWorkspacePreview(ordinary.id);
@@ -2385,7 +2385,7 @@ describe('DataStore', () => {
     const workspace = await store.createWorkspace(workspaceInput(user.id, 'Signal'));
 
     // A worker with nothing to do waits on the queue, and a send ends that wait immediately -
-    // this is what used to cost up to a full poll interval before the model was even called.
+    // otherwise it would cost up to a full poll interval before the model was even called.
     const startedAt = Date.now();
     const waited = store.waitForQueuedTask(5_000);
     const task = await store.createTask(taskInput(user.id, workspace.id));
@@ -2601,7 +2601,8 @@ describe('DataStore', () => {
       failureEventCiphertext: envelope
     });
 
-    // Ninety-six times a day, this used to be a notification saying only that a timer had fired.
+    // A scheduled run finishing is not news: a fifteen-minute timer would otherwise notify
+    // ninety-six times a day that it had fired.
     await store.setTaskStatusForUser(user.id, runId, 'completed');
     await expect(store.listPendingNotifications()).resolves.toEqual([]);
 
@@ -2948,9 +2949,9 @@ describe('DataStore', () => {
       }
     ]);
 
-    // The fields an unattended server routes on used to be written by one hand-kept list and read
-    // back by another, so anything the two disagreed about was dropped in transit and the whole
-    // routing layer ran on defaults it had never been told to use. They now share one contract.
+    // The fields an unattended server routes on are written and read through one contract. Two
+    // hand-kept lists would drop anything they disagreed about in transit, and the whole routing
+    // layer would run on defaults it had never been told to use.
     await store.upsertModels([
       {
         ...base,
@@ -4015,10 +4016,10 @@ describe('tiered agent memory', () => {
   /**
    * `pred_functional` is a cache of the predicate's cardinality, written by `mem.index_row()` on a
    * trigger that fires on mem.item and on nothing else - so a release that changes a cardinality in
-   * `MEMORY_PREDICATES` used to leave every stored row carrying the previous answer forever. It is
-   * the sole predicate of the `mem_fact_current_one` unique index, so a stale value is not a stale
-   * statistic: it decides whether the one-current-value-per-functional-predicate rule applies to a
-   * row at all.
+   * `MEMORY_PREDICATES` would otherwise leave every stored row carrying the previous answer
+   * forever. It is the sole predicate of the `mem_fact_current_one` unique index, so a stale value
+   * is not a stale statistic: it decides whether the one-current-value-per-functional-predicate
+   * rule applies to a row at all.
    *
    * The registry is edited directly in these three, because that is the only way to stand in the
    * position a release leaves a box in: `#recordMemoryFact` re-upserts the shipped definition on
@@ -4585,7 +4586,7 @@ describe('tiered agent memory', () => {
   it('pins a promoted standing order, so a request that does not name it still gets it', async () => {
     /*
      * `mem.item.pin` is read by the structural recall channel and by the salience formula, and
-     * until this wave no production path wrote it. It is the only thing the fused query admits
+     * promoting a standing order is what writes it. It is the only thing the fused query admits
      * with no lexical grip at all, which is exactly what a rule for the machine needs: "never run
      * git stash" is wanted on the turn where the agent is about to run it, and that turn's request
      * never says "git".
@@ -5035,8 +5036,8 @@ describe('tiered agent memory', () => {
       'pinned=60 orders=4 facts=4'
     ]);
 
-    // The other direction, at the number that used to break the first one: sixty rules deep, a
-    // request that names none of them and shares no word with any of them still reaches them.
+    // The other direction: sixty rules deep, a request that names none of them and shares no word
+    // with any of them still reaches them.
     const unrelated = (await recall('rewrite the brochure copy for the spring mailing')).map(
       (hit) => opened(hit.documentCiphertext)
     );
@@ -5217,11 +5218,11 @@ describe('tiered agent memory', () => {
   }, 120_000);
 
   it('still returns a kind the quota table has never heard of', async () => {
-    // The recall query used to inner-join the quota table by kind, so a row whose kind had no quota
-    // entry was scored, ranked and then dropped with no error and no log line. 'entity' is the
-    // specimen because it is real at the database level and unknown to everything above it: it was
-    // a declared kind that nothing ever wrote, and removing it from TypeScript left the enum value
-    // behind, which is the exact shape of the row this join must not discard.
+    // A recall query that inner-joined the quota table by kind would score, rank and then drop a
+    // row whose kind had no quota entry, with no error and no log line. 'entity' is the specimen
+    // because it is real at the database level and unknown to everything above it: the enum value
+    // exists and TypeScript does not declare it, which is the exact shape of the row this join must
+    // not discard.
     await addItem('entity' as MemoryKind, {
       title: 'garden-relay',
       body: 'The SNI relay that fronts every published service on this computer.'
@@ -5241,8 +5242,8 @@ describe('tiered agent memory', () => {
     const all = await recall('systemctl restart garden.target after a deploy');
     expect(all.length).toBeGreaterThan(1);
     const best = [...all].sort((left, right) => right.score - left.score)[0]!;
-    // The item cap used to be a trailing LIMIT after the (kind, id) sort, so what it discarded was
-    // the alphabetically last row rather than the least relevant one.
+    // An item cap applied as a trailing LIMIT after the (kind, id) sort would discard the
+    // alphabetically last row rather than the least relevant one.
     const capped = await recall('systemctl restart garden.target after a deploy', { maxItems: 1 });
     expect(capped.map((hit) => hit.id)).toEqual([best.id]);
   });
@@ -5360,7 +5361,7 @@ describe('tiered agent memory', () => {
 
   /**
    * The other half of what an acceptance check teaches. A passing command becomes a procedure; a
-   * failing one used to become nothing at all, so the box walked back into the same wall.
+   * failing one is kept too, or the box would walk back into the same wall.
    */
   it('keeps what the harness watched fail, and takes it back when the same command passes', async () => {
     const command = 'pytest -q tests/importer';
@@ -5699,15 +5700,12 @@ describe('tiered agent memory', () => {
   /**
    * Consolidation demotes and de-indexes; it does not drop, and it does not exempt.
    *
-   * This case used to assert that a cited old row stayed in the lexical index, which was the
-   * behaviour of a pass whose `indexed=FALSE` also erased `body_tokens`: an exemption was the only
-   * thing standing between a curated fact and provenance nobody could ever search for again.
-   * Measured against the only production writer of `mem.source`, that exemption did not narrow the
-   * pass, it switched it off - `recordTurnEpisode` cites every chunk it writes - so the horizon had
-   * never once run and the verbatim index was bounded by nothing.
+   * An exemption for cited rows would not narrow the pass, it would switch it off:
+   * `recordTurnEpisode`, the only production writer of `mem.source`, cites every chunk it writes,
+   * so the horizon would never run and the verbatim index would be bounded by nothing.
    *
-   * The pass erases nothing now, so both old rows leave the index and both keep every byte they
-   * were written with. The assertions below are the new contract in full: what leaves is index
+   * The pass erases nothing, so both old rows leave the index and both keep every byte they were
+   * written with. The assertions below are the contract in full: what leaves is index
    * membership, what stays is the sealed body, the keyed tokens and the vector those tokens make.
    */
   it('consolidates by de-indexing old verbatim text and keeping every byte of it', async () => {
@@ -5935,7 +5933,7 @@ describe('tiered agent memory', () => {
     // Turns inside one thread share its vocabulary, so raw BM25 over a transcript returns the same
     // conversation several times over and the other threads that also answer never appear.
     // Real task rows: mem.source.task_id is a foreign key, so deleting a conversation deletes the
-    // verbatim turns it produced. Invented ids can no longer stand in for one.
+    // verbatim turns it produced. Invented ids cannot stand in for one.
     const conversations: string[] = [];
     for (const suffix of ['a', 'b', 'c']) {
       const conversation = await store.createTask({
@@ -6069,9 +6067,8 @@ describe('tiered agent memory', () => {
    * The delete an owner is promised, asserted where the statements live rather than where the
    * route happened to hold them.
    *
-   * This repository's own record of the incident is that *a delete must find every copy -
-   * including `mem.pack`, the copy that actually reaches the model*, and until this test there was
-   * nothing anywhere that would notice if one of the six statements stopped running. Retirement is
+   * A delete must find every copy - including `mem.pack`, the copy that actually reaches the
+   * model - and this is what notices if one of the six statements stops running. Retirement is
    * a status; this is removal, and the four things it has to reach are all things the row was
    * copied into: the verbatim chunks that hang off the episode, the links pointing at it from
    * either side, every sealed bundle quoting the row *or one of its chunks*, and the vote the
@@ -6853,11 +6850,10 @@ describe('spending caps in real currency', () => {
       warnAtPercent: 80,
       timeZone: 'UTC'
     });
-    // This used to assert the opposite - that with no cap anywhere nothing is ever refused - and it
-    // was a behaviour pin on the defect, not an asset: a self-hosted box whose key arrives as an
-    // environment variable is never asked the ceiling question, so "no cap anywhere" was the
-    // documented install rather than an edge case. The day and the conversation are still the
-    // owner's to set; the month is no longer unlimited by default.
+    // A self-hosted box whose key arrives as an environment variable is never asked the ceiling
+    // question, so "no cap anywhere" would be the documented install rather than an edge case. The
+    // day and the conversation are still the owner's to set; the month is not unlimited by
+    // default.
     await expect(store.spendGuard({ userId, estimateUsd: 10_000, now })).resolves.toMatchObject({
       outcome: 'deny',
       blockedBy: 'monthly'
@@ -8593,8 +8589,8 @@ describe('the upgrade path onto rows an older garden wrote', () => {
       }
     ]);
 
-    // The store agrees with the schema: a record built from the row after the drop no longer
-    // carries the three fields that used to be served as nulls.
+    // The store agrees with the schema: a record built from the row after the drop carries none of
+    // the three dropped fields, not even as nulls.
     const store = new DataStore(database);
     const [preview] = await store.listWorkspacePreviews(OWNER_ID, SPACE_ID);
     expect(preview).toBeDefined();
@@ -8654,11 +8650,11 @@ describe('task spend on the owner-facing reads', () => {
 
   /*
    * Pinning, filing and renaming return the conversation, and the client writes what comes back
-   * straight into the sidebar row. Both statements used to answer `0 AS queued_message_count` and
-   * to not select spend at all, so `mapTask` produced a record that said no follow-ups were waiting
-   * and nothing had been spent - which the sidebar then believed until the next full reload. The
+   * straight into the sidebar row. A statement that answered `0 AS queued_message_count` and did
+   * not select spend would have `mapTask` produce a record saying no follow-ups were waiting and
+   * nothing had been spent - which the sidebar would believe until the next full reload. The
    * assertion is against `getTask` rather than against literals, because getTask is where the
-   * correct shape was already written down.
+   * correct shape is written down.
    */
   it('answers a pin, a filing and a rename with the counts getTask would give', async () => {
     const user = await store.createUser({ username: 'filer', displayName: 'Filer' });
@@ -8787,10 +8783,10 @@ describe('task spend on the owner-facing reads', () => {
 
   /*
    * The cursor is a position in an ordering, and it has to be able to express that position
-   * exactly. PostgreSQL keeps microseconds; the cursor was built from the mapped ISO string, which
-   * keeps milliseconds - so every conversation sharing a millisecond with the last row of a page
-   * sorted "after" a cursor that had been rounded up past it, and vanished from the list. Nothing
-   * about it was visible: the page came back short, and the conversation was still there.
+   * exactly. PostgreSQL keeps microseconds; a cursor built from the mapped ISO string keeps
+   * milliseconds - so every conversation sharing a millisecond with the last row of a page would
+   * sort "after" a cursor rounded up past it, and vanish from the list. Nothing about it would be
+   * visible: the page comes back short, and the conversation is still there.
    */
   it('pages the conversation list without losing one that shares a millisecond', async () => {
     const user = await store.createUser({ username: 'pager', displayName: 'Pager' });
@@ -8821,8 +8817,8 @@ describe('task spend on the owner-facing reads', () => {
 
   /**
    * A fifteen-minute watcher is ninety-six conversations a day, and the list is ordered by
-   * activity, so the schedule the owner set up once used to take the whole first page inside two
-   * days. What fell off the end was the only thing on it they had done themselves.
+   * activity, so a schedule the owner set up once could take the whole first page inside two days.
+   * What would fall off the end is the only thing on it they had done themselves.
    */
   it('keeps one schedule from taking the list the owner finds their own work in', async () => {
     const user = await store.createUser({ username: 'watched', displayName: 'Watched' });
@@ -9389,9 +9385,9 @@ describe('task spend on the owner-facing reads', () => {
     });
     /**
      * Which of the two the undo lands on, and that the answer cannot depend on anything but when
-     * each was taken. The ids above descend deliberately: the ordering used to fall through to
-     * them whenever two rows shared a created_at, which is a wrong restore that only appears on a
-     * machine that has been lived in. The order is now a sequence, which cannot tie.
+     * each was taken. The ids above descend deliberately: an ordering that fell through to them
+     * whenever two rows shared a created_at would make a wrong restore that only appears on a
+     * machine that has been lived in. The order is a sequence, which cannot tie.
      */
     await expect(store.checkpointForTaskEvent(user.id, task.id, target.id)).resolves.toMatchObject({
       id: inFront.id
@@ -9409,9 +9405,9 @@ describe('task spend on the owner-facing reads', () => {
   });
 
   it('orders two checkpoints taken in the same instant by which was taken first', async () => {
-    // The failure this removes is invisible: give two rows the same created_at and the old ordering
-    // fell through to the identifier, so an undo restored the checkpoint that already contained the
-    // work it was asked to drop. A sequence cannot tie, so the wrong answer is no longer reachable.
+    // The failure this guards is invisible: give two rows the same created_at and an ordering that
+    // fell through to the identifier would have an undo restore the checkpoint that already
+    // contains the work it was asked to drop. A sequence cannot tie, so that answer is unreachable.
     const user = await store.createUser({ username: 'tied-clock', displayName: 'Tied clock' });
     const workspace = await store.createWorkspace(workspaceInput(user.id, 'Tied clock'));
     const task = await store.createTask(taskInput(user.id, workspace.id));
@@ -9779,14 +9775,14 @@ describe('the turns a tool was reached in', () => {
 
   it('selects one owner conversations, and only where a turn opened inside the window', async () => {
     /*
-     * The selection half of the read, which had no assertion of its own until this was written.
+     * The selection half of the read, which nothing else asserts.
      *
-     * Added by the verifying pass rather than by the lane: with `w.user_id = $1` replaced by a
-     * tautology, every route test over this query still passed, because the route harness has one
-     * owner and one workspace. A second owner's turns would then land in this owner's DENOMINATOR
-     * while their tool names stayed unreadable - the key map holds only the asking owner's - so the
-     * failure is not a leak, it is every share on the report silently too small, which is the one
-     * direction that argues for deferring a tool that is actually hot.
+     * With `w.user_id = $1` replaced by a tautology, every route test over this query still passes,
+     * because the route harness has one owner and one workspace. A second owner's turns would then
+     * land in this owner's DENOMINATOR while their tool names stayed unreadable - the key map holds
+     * only the asking owner's - so the failure is not a leak, it is every share on the report
+     * silently too small, which is the one direction that argues for deferring a tool that is
+     * actually hot.
      *
      * The three window cases are here for the same reason and are the three the SQL's two arms are
      * made of: a conversation created in the window that wrote NO event at all is a turn (the model

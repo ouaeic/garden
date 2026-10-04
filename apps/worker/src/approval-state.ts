@@ -49,8 +49,8 @@ export const approvalPreviewHash = (
  * Recomputed before an approved call runs: approval and execution are separated by a database
  * round trip and an arbitrary human delay, so what the user saw must be proven to be what runs.
  *
- * An approval created before this field joined the hash was pinned to the arguments alone, so it
- * will not match once the name is included. That is the correct outcome and it is not silent: the
+ * An approval stored with a hash of the arguments alone will not match once the name is
+ * included. That is the correct outcome and it is not silent: the
  * caller takes the explicit refusal path, which tells the owner in their own conversation that the
  * action no longer matches what they approved and asks for the approval again.
  */

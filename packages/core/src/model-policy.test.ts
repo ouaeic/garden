@@ -217,8 +217,8 @@ describe('model policy', () => {
 
   it('never lets an unmeasured model outrank a measured one on the sub-score that rewards capability', () => {
     // The benchmark columns are percentiles of the live catalogue, so the best model in the world
-    // scores 1.0. It used to score its raw index over 100 - about 0.55 on agentic - and lose to
-    // every unmeasured model's 0.72 or 0.80 prior, which inverted the whole ranking.
+    // scores 1.0. Scored as its raw index over 100 - about 0.55 on agentic - it would lose to
+    // every unmeasured model's 0.72 or 0.80 prior, which inverts the whole ranking.
     const bestInTheWorld = {
       ...base,
       id: 'best',
@@ -605,11 +605,11 @@ describe('latency and reliability', () => {
   });
 
   it('does not rank an untimed model as the slowest thing on the box because one route published a latency', () => {
-    // The switch used to be pool-wide: the moment any candidate carried a `measuredLatencyMs`,
-    // every candidate that did not was scored `0` on the latency term while still carrying its
-    // full weight - "slower than the 30-second ceiling" rather than "not measured". Measured
-    // against the shipped build: adding a single `measuredLatencyMs: 800` to the weaker of two
-    // models moved it from last to first. `openrouter-catalog.ts` fills `measuredLatencyMs` only
+    // The switch must not be pool-wide: if any candidate carrying a `measuredLatencyMs` scored
+    // every candidate that did not as `0` on the latency term while still carrying its full
+    // weight, that would read "slower than the 30-second ceiling" rather than "not measured", and
+    // a single `measuredLatencyMs: 800` on the weaker of two models would move it from last to
+    // first. `openrouter-catalog.ts` fills `measuredLatencyMs` only
     // for the routes that appear in the `/endpoints/zdr` feed, so a mixed pool is the ordinary
     // case on a box that never asked for zero retention, not an edge one.
     const untimedStrong: RoutableModel = {
@@ -861,7 +861,7 @@ describe('task classification', () => {
   });
 
   it('no longer treats an artefact as a plan', () => {
-    // "document" used to sit in the agentic pattern, so a short prose edit was routed to the
+    // "document" must not sit in the agentic pattern, or a short prose edit is routed to the
     // agentic benchmark with a 128K reference window.
     expect(classifyModelTask({ prompt: 'Summarise this document for me' }).kind).toBe('general');
     expect(
@@ -887,8 +887,8 @@ describe('task classification', () => {
   });
 
   it('reaches every profile from the only entry point callers use', () => {
-    // inferModelTask used to coarsen its answer to three kinds, which left five carefully written
-    // profiles unreachable from the API.
+    // inferModelTask must not coarsen its answer to three kinds, which would leave five carefully
+    // written profiles unreachable from the API.
     expect(inferModelTask('What does this screenshot show?')).toBe('vision');
     expect(inferModelTask('Read the entire repository and map it')).toBe('long_context');
     expect(inferModelTask('Classify all these support tickets')).toBe('bulk_summarisation');
@@ -901,9 +901,9 @@ describe('task classification', () => {
 /*
  * One spelling of what a kind of work requires.
  *
- * Every ranking site outside `model-policy.ts` used to write the profile's requirements out by hand
- * beside its own call, which is two spellings of one rule: the profile decides how a candidate is
- * scored for the work while the call site decides who is eligible for it, and nothing made them
+ * A ranking site outside `model-policy.ts` that wrote the profile's requirements out by hand beside
+ * its own call would be two spellings of one rule: the profile decides how a candidate is scored
+ * for the work while the call site decides who is eligible for it, and nothing would make them
  * agree.
  */
 describe('the request a declared piece of work asks for', () => {

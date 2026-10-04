@@ -413,17 +413,17 @@ export const displayablePrefix = (
  * recorded what it returned unconditionally, every patch would announce that the model had just seen
  * the whole file, and the seen-line guard below would be inert for the one tool it exists to guard.
  *
- * So the two are no longer identical on the wire. A caller that is about to DISPLAY what it gets
- * passes the budget it will display within, and gets back only that much of the file plus the whole
- * file's hash; that prefix, and nothing beyond it, is recorded as shown. A caller that passes no
- * budget gets the file and is recorded as having shown nothing, exactly as before.
+ * So the two are told apart on the wire. A caller that is about to DISPLAY what it gets passes the
+ * budget it will display within, and gets back only that much of the file plus the whole file's
+ * hash; that prefix, and nothing beyond it, is recorded as shown. A caller that passes no budget
+ * gets the file and is recorded as having shown nothing.
  *
- * Handing back only the prefix is the point rather than an economy. The two ledgers - this one and
- * `apps/worker/src/edit/snapshots.ts` - disagreed for as long as the worker did the cutting after
- * the fact: an unwindowed read displayed lines 1-266 of a 600-line file and recorded 267-600 here,
- * so editing line 50, WHICH THE MODEL HAD BEEN SHOWN, was refused while editing line 400 was not.
- * A caller cannot display what it was never sent, so delivering the prefix is what makes the two
- * records the same set of lines by construction rather than by two implementations agreeing.
+ * Handing back only the prefix is the point rather than an economy. If the worker did the cutting
+ * after the fact, the two ledgers - this one and `apps/worker/src/edit/snapshots.ts` - would record
+ * different lines, so editing a line THE MODEL HAD BEEN SHOWN could be refused while editing one it
+ * had not was allowed. A caller cannot display what it was never sent, so delivering the prefix is
+ * what makes the two records the same set of lines by construction rather than by two
+ * implementations agreeing.
  */
 export const readWorkspaceFile = async (
   root: string,
@@ -505,10 +505,10 @@ export const readWorkspaceFile = async (
  * A window of lines, read without the whole file ever being in memory.
  *
  * `readWorkspaceFile` is the right shape for a caller that needs every byte - a patch, an upload -
- * and the wrong one for a glance at a log. `file_read` asks for a few hundred lines and used to be
- * answered with the file: against the 2 GiB ceiling the installer sets, one look at a database
- * dump buffered a gigabyte inside a service the unit file caps at 80% of host memory, and the OOM
- * killer takes the runner down with every other tool on it. This walks the file in a fixed buffer,
+ * and the wrong one for a glance at a log. `file_read` asks for a few hundred lines; answered with
+ * the whole file against the 2 GiB ceiling the installer sets, one look at a database dump would
+ * buffer a gigabyte inside a service the unit file caps at 80% of host memory, and the OOM killer
+ * would take the runner down with every other tool on it. This walks the file in a fixed buffer,
  * keeps only the requested lines and only `maxBytes` of them, and stops as soon as it has them, so
  * what a read costs follows what was asked for rather than what the file happens to weigh.
  *
@@ -745,25 +745,24 @@ const MAX_GUARDED_FILE_BYTES = 8 * 1024 ** 2;
  *
  * `heldTo` is what makes that second question askable, and it is the reader it is asked about. The
  * agent's `file_write` after a WINDOWED read claims no hash - the ranged reader has no whole-file
- * digest to give it - so the guard rode on a claim that arm never makes, opened the file write-only,
- * and never ran: measured through the shipped tool on a 8,332-line file, `file_read` of lines 1-200
- * followed by a whole-file write was accepted and destroyed 8,132 lines. It is passed for writes
- * made under an agent capability and for nothing else, because "no hash" means two opposite things
- * depending on who said it - an agent editing from a window read, or an upload, a printed document,
- * the owner pressing Replace in the file browser, none of which claimed to have read anything and
- * none of which should meet a lecture about anchors.
+ * digest to give it - so a guard that rode on that claim would never run, and a `file_read` of
+ * lines 1-200 followed by a whole-file write would be accepted and destroy the rest. It is passed
+ * for writes made under an agent capability and for nothing else, because "no hash" means two
+ * opposite things depending on who said it - an agent editing from a window read, or an upload, a
+ * printed document, the owner pressing Replace in the file browser, none of which claimed to have
+ * read anything and none of which should meet a lecture about anchors.
  *
- * ONE ARGUMENT CARRIES BOTH "HELD" AND "WHO", and that is deliberate: they were two things, a
- * boolean and a resolved path, and the pair could disagree. It said this writer is held to reads and
- * then looked up the reads of whoever had last read that path - so a second task in the workspace
- * was held to a file it had never opened and, worse, credited with a file another task had. A
- * writer who is held but nameless is now unspellable.
+ * ONE ARGUMENT CARRIES BOTH "HELD" AND "WHO", and that is deliberate: as two things, a boolean and
+ * a resolved path, the pair could disagree. A writer held to reads would be checked against the
+ * reads of whoever had last read that path - so a second task in the workspace would be held to a
+ * file it had never opened and, worse, credited with a file another task had. A writer who is held
+ * but nameless is unspellable.
  *
- * A hash on its own no longer opens the guard, for the same reason. `expectSha256` says "this is
- * the file I read" and does not say who read it; with a record that is about a reader there is
- * nothing for a nameless writer to be compared against, and the clause was answering with a record
- * belonging to somebody else - which for the owner's save was the record left by an agent's window
- * read of the same file, or by her own pane paging it. The agent, which is the caller this guard is
+ * A hash on its own does not open the guard, for the same reason. `expectSha256` says "this is the
+ * file I read" and does not say who read it; with a record that is about a reader there is nothing
+ * for a nameless writer to be compared against, and answering it would mean using a record
+ * belonging to somebody else - for the owner's save, the record left by an agent's window read of
+ * the same file, or by her own pane paging it. The agent, which is the caller this guard is
  * for, names itself on every write it makes here.
  */
 const writeFileInWorkspace = async (
@@ -825,16 +824,16 @@ const writeFileInWorkspace = async (
      * about anchors would send the model back to patch a version that no longer exists.
      *
      * It runs for a writer that named itself, and that is what keeps it aimed at editing. Everyone
-     * else is left exactly as unguarded as before: an upload replacing a file, a printed document
-     * landing on a name, the owner pressing Replace on a file the Files pane had paged through -
+     * else is left unguarded: an upload replacing a file, a printed document landing on a name,
+     * the owner pressing Replace on a file the Files pane had paged through -
      * none of them claimed to have read anything, and refusing them for lines they never pretended
      * to have seen would put a lecture about anchors in front of a person who has no idea what one
      * is.
      *
      * And it is asked about THIS writer. The record is keyed by reader and file, so the answer is
      * what this task has been shown - not what the workspace has been shown, which is not a thing
-     * that can be true. Where a second task in the same workspace had read the file, the old key
-     * handed its reads over to whoever wrote next.
+     * that can be true. Keyed by file alone, a second task's reads of the same file would be
+     * handed over to whoever wrote next.
      *
      * Binary content is skipped for the same reason: lines are not what it is made of, and a file
      * with a zero byte in it has no anchors to have seen. A file too large to hold as lines is

@@ -109,7 +109,7 @@ const Config = z.object({
   // Off by default because a command in its own network namespace cannot be reached over
   // loopback either, and that is how a published preview serves the port a command is listening
   // on. Turning it on needs the sandbox helper: an unprivileged process cannot create a network
-  // namespace, so without it the setting used to make every command fail instead of isolating.
+  // namespace, so without it the setting would make every command fail instead of isolating.
   ISOLATE_AGENT_NETWORK: z
     .string()
     .default('false')

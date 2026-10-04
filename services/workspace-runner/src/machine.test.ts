@@ -601,12 +601,10 @@ describe('the route the worker actually asks', () => {
   /**
    * THE CASE THAT FAILS IF THE ROUTE'S DEFAULT STOPS BEING A KERNEL READ.
    *
-   * Every case above this one injects `cgroup`, so until it was written nothing anywhere asserted
-   * that a server built WITHOUT that seam asks the machine at all. Measured before writing it:
-   * replacing the default with a constant left all 38 files and 662 cases of this package green.
-   * That is the fourth time this repository has proved a bound on a helper whose production caller
-   * had no case, and half the repair is not this case but the `??` that is no longer in
-   * `server.ts` - one default, in the module that owns the kernel, instead of two.
+   * Every case above this one injects `cgroup`, so without it nothing anywhere asserts that a
+   * server built WITHOUT that seam asks the machine at all: replacing the default with a constant
+   * would leave every other case of this package green. The other half is that `server.ts` carries
+   * no `??` of its own - one default, in the module that owns the kernel, instead of two.
    *
    * WHAT IT CAN AND CANNOT SEE, because the second half is a real limit rather than an omission.
    * It compares the route's answer against `readCgroup` run here, so any default that answers

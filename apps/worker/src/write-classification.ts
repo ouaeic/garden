@@ -127,14 +127,14 @@ export const isMutatingToolCall = (name: string, args: Record<string, unknown> =
     if (executable === 'sed') return lowerArgs.some((argument) => argument.startsWith('-i'));
     return (
       consequentialExecutables.has(executable) ||
-      // Read separately from the set above because `kill`, `killall` and `pkill` LEFT that set -
-      // they are not removals of data and the card they were borrowing said they were. They are
-      // still changes to this computer, and this clock asks a different question from the card:
-      // stopping a process ends whatever it was serving, and an agent that runs `kill -9 <server
-      // pid>` and then cites a curl from three calls earlier has cited a result from a machine that
-      // no longer exists. Dropping the names from both mechanisms at once would have been the one
-      // error this file's own asymmetry names as unrecoverable - a change wrongly called a check.
-      // The pair is asserted together in write-classification.test.ts: true here, no card there.
+      // Read separately from the set above because `kill`, `killall` and `pkill` are not in it -
+      // they are not removals of data, so they raise no card. They are still changes to this
+      // computer, and this clock asks a different question from the card: stopping a process ends
+      // whatever it was serving, and an agent that runs `kill -9 <server pid>` and then cites a
+      // curl from three calls earlier has cited a result from a machine that no longer exists.
+      // Dropping the names from both mechanisms at once would be the one error this file's own
+      // asymmetry names as unrecoverable - a change wrongly called a check. The pair is asserted
+      // together in write-classification.test.ts: true here, no card there.
       SIGNALLING_EXECUTABLES.has(executable) ||
       FILE_WRITING_EXECUTABLES.has(executable) ||
       executable.startsWith('mkfs') ||

@@ -160,9 +160,8 @@ export const ACCEPTANCE_TIMED_OUT_PREFIX = 'timed out after ';
 /**
  * The three-way reading of one result.
  *
- * Deliberately NOT `detail.startsWith('exit ')`, which is the rule `turn/finish.ts` used to carry
- * inline for its dead-end memories and which is only correct there because that flatMap has already
- * dropped every check that is not a command. An artifact check that ran perfectly well answers
+ * Deliberately NOT `detail.startsWith('exit ')`, which is only correct where every check that is
+ * not a command has already been dropped. An artifact check that ran perfectly well answers
  * `workspace/out.csv does not exist` or `312 bytes (needs at least 4096)`, and reading the absence
  * of an exit code as "the harness never looked" would file every missing deliverable as an
  * unobserved check - which is the folding this function exists to prevent, pointed the other way.
@@ -361,17 +360,16 @@ const expandedBeforeItRan = (executable: string, args: readonly string[]): boole
  * script `effectiveCommands` cannot read comes back as no commands at all, and that is treated as
  * unknown rather than as constant: this refuses only what it can name.
  *
- * An unquoted glob is the same case wearing a different coat, and it used to be refused wrongly.
+ * An unquoted glob is the same case wearing a different coat, and refusing it would be wrong.
  * `echo workspace/out/*.png` prints the file names when the thumbnails are there and the literal
  * pattern when they are not, so the workspace does decide the answer - the shell read it before the
- * command ever ran - and the sentence this function returns was false in a case it reached. It was
- * also refusing `echo workspace/*.jpg` while accepting
- * `for f in workspace/*.jpg; do echo "$f"; done`, which is the same check in two spellings. So an
- * argument carrying a live glob turns the refusal off - live meaning there is a shell to expand it,
- * which is a question this asks rather than assumes. That widens the evasion by one spelling -
- * `bash -lc "echo ok*"` now walks past, while `echo 'ok*'` is still refused because the quotes
- * survive tokenisation - and that is accepted in a rule this comment already says is not a security
- * boundary.
+ * command ever ran - and the sentence this function returns would be false. Refusing
+ * `echo workspace/*.jpg` while accepting `for f in workspace/*.jpg; do echo "$f"; done` would also
+ * split the same check across two spellings. So an argument carrying a live glob turns the refusal
+ * off - live meaning there is a shell to expand it, which is a question this asks rather than
+ * assumes. That widens the evasion by one spelling - `bash -lc "echo ok*"` walks past, while
+ * `echo 'ok*'` is still refused because the quotes survive tokenisation - and that is accepted in a
+ * rule this comment already says is not a security boundary.
  */
 export const acceptanceVacuousRefusal = (
   executable: string,
@@ -748,8 +746,8 @@ export const acceptanceFailureMessage = (
 
 /**
  * One line per check for the completion record, with the command in it where there was one: the
- * owner reads what was run beside what it was called, so a label can no longer stand for more
- * than its command proved.
+ * owner reads what was run beside what it was called, so a label cannot stand for more than its
+ * command proved.
  */
 export const acceptancePassedEvidence = (results: readonly AcceptanceResult[]): string[] =>
   results.map(

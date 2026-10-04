@@ -226,8 +226,7 @@ export const usageClassForPrice = (
 /**
  * The two media routes garden has actually run, offered as catalogue entries like any other.
  *
- * These are the models that were hard-coded until now - the same ids, the same prices - but they
- * are no longer the answer, only the entry that is always present. Their prices are marked
+ * They are not the answer, only the entry that is always present. Their prices are marked
  * `measured` rather than `provider`: they are figures this software recorded from real generations
  * on these routes, not something read back off a feed, and an owner comparing them with a live
  * catalogue entry deserves to know which kind of number they are looking at.

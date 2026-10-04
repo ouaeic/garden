@@ -100,11 +100,10 @@ export async function executeSurfaceTool(
         max: 20_000,
         fallback: 12_000
       });
-      // Never more than this page's share of the window it has to arrive through: twelve pages
-      // at the full allowance is 214,670 characters against a 24,000-character result cut from
-      // the middle, and what came back was page one and nothing else - not even the other eleven
-      // URLs. A single-URL read is unaffected, because one page's share is larger than the most
-      // it may ask for.
+      // Never more than this page's share of the window it has to arrive through: twelve pages at
+      // the full allowance would be cut from the middle of one result, leaving page one and nothing
+      // else - not even the other eleven URLs. A single-URL read is unaffected, because one page's
+      // share is larger than the most it may ask for.
       const perPage = Math.min(asked, perPartOutputChars(urls.length));
       const read = await context.runner.call<ParallelWebReadResult>(
         task.workspaceId,

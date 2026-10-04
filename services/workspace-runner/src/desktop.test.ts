@@ -31,13 +31,11 @@ import {
 /**
  * The words AT-SPI actually uses, copied off a real tree rather than invented.
  *
- * Every state fixture in this file used to be written from memory - `['enabled']`, `['enabled',
- * 'showing']`, an `interfaces` list in title case - and none of those sets is a thing the bridge
- * can emit. That is why two predicates could be dead for as long as they were: `selectDesktopNodes`
- * ranked on `!states.includes('disabled')` and `classifyDesktopAction` looked for `'read-only'`,
- * and neither string exists in the AT-SPI vocabulary at all. A fixture built from invented names
- * agrees with an implementation built from invented names, and the suite stays green while the
- * screen the agent is looking at is described by neither.
+ * A fixture written from memory - `['enabled']`, `['enabled', 'showing']`, an `interfaces` list in
+ * title case - is a set the bridge can never emit, and a predicate keyed on a string that does not
+ * exist in the AT-SPI vocabulary, such as `'disabled'` or `'read-only'`, is dead. A fixture built
+ * from invented names agrees with an implementation built from invented names, and the suite stays
+ * green while the screen the agent is looking at is described by neither.
  *
  * The vocabulary is `ATSPI_STATE_*` with the prefix removed and lowercased, which is what
  * `garden-desktop-bridge.py` emits and what `garden-desktop-bridge.test.py` pins. Note the two

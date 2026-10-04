@@ -5,8 +5,8 @@ import { WorkspaceFileError } from './files.js';
  * Every picture format this computer can name from a file's extension.
  *
  * A phone photograph is HEIC, a scan is TIFF, a screenshot pasted out of an older tool is BMP, and
- * a page saved from the web is increasingly AVIF. All four used to fall past this table into
- * `application/octet-stream` - "some bytes" - and the image reader then refused them for not being
+ * a page saved from the web is increasingly AVIF. Left out of this table, all four would fall into
+ * `application/octet-stream` - "some bytes" - and the image reader would refuse them for not being
  * pictures. Naming them is what separates a picture the runner has to convert from a file that was
  * never a picture at all, and the separation has to exist before either can be handled.
  */
@@ -54,13 +54,12 @@ export const MODEL_IMAGE_TYPES: ReadonlySet<string> = new Set([
  * small text - which for a diagram is the entire content.
  *
  * The four formats a model already accepts are in this table too, and they are most of the point of
- * it. Those four used to go out as they sat on disk, which read as a kindness and was the leak:
- * the strip below lives on this pass and nowhere else, so the pictures that skipped it
- * left carrying where they were taken, when, and on which camera body. JPEG is what every photo off
- * a camera roll, out of a message or off a download is, so the arrangement stripped the formats
- * that rarely hold coordinates and sent the one that almost always does. WebP and GIF become PNG
- * rather than themselves because either can have been lossless where it came from and neither
- * encoder can be asked to match a source nobody measured; PNG is lossless for both.
+ * it. The strip below lives on this pass and nowhere else, so a picture sent as it sits on disk
+ * leaves carrying where it was taken, when, and on which camera body. JPEG is what every photo off
+ * a camera roll, out of a message or off a download is, so passing those four through would strip
+ * the formats that rarely hold coordinates and send the one that almost always does. WebP and GIF
+ * become PNG rather than themselves because either can have been lossless where it came from and
+ * neither encoder can be asked to match a source nobody measured; PNG is lossless for both.
  *
  * `msvg` is ImageMagick's own renderer rather than the delegate it would otherwise reach for. The
  * delegate resolves external references, and an SVG holding an `href` to somewhere inside this
@@ -135,8 +134,8 @@ export const imageConvertArguments = (contentType: string): string[] | undefined
     // frame is the picture and the rest are dropped.
     '-delete',
     '1--1',
-    // Phones record orientation in metadata rather than in the pixels, which is why a photograph
-    // taken sideways used to arrive sideways.
+    // Phones record orientation in metadata rather than in the pixels, so without this a
+    // photograph taken sideways arrives sideways.
     '-auto-orient',
     '-resize',
     `${CONVERTED_IMAGE_MAX_SIDE}x${CONVERTED_IMAGE_MAX_SIDE}>`,

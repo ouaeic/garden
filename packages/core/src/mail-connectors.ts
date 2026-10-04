@@ -910,9 +910,9 @@ const executeCalendarAction = async (input: MailExecutionInput): Promise<MailExe
      * far more than the six fields this action can name - a repeat rule, alarms, a VTIMEZONE, a
      * status, categories, and every attendee's answer - and the write is a PUT with If-Match, so
      * anything dropped on the way out is gone with nothing to restore it from: no checkpoint and
-     * no snapshot covers a calendar server. This used to rebuild the VEVENT from those six
-     * scalars, which turned "move my Tuesday standup to 10 am" into a one-off UTC event with no
-     * reminder that re-invited everyone who had already accepted. So the loaded component is
+     * no snapshot covers a calendar server. Rebuilding the VEVENT from those six scalars would
+     * turn "move my Tuesday standup to 10 am" into a one-off UTC event with no reminder that
+     * re-invites everyone who had already accepted. So the loaded component is
      * mutated and `loaded.calendar` is what goes back, exactly as answering an invitation does
      * below. ATTENDEE lines are never touched at all: this action cannot name an attendee, so
      * re-emitting one could only ever discard an answer it had no business changing.

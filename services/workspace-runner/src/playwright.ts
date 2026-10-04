@@ -22,8 +22,8 @@
  * does not remove it from a box that has served a turn. `workspaceSurfaces` runs once per claimed
  * turn, and on a box with no `BROWSER_EXECUTABLE_PATH` - which is every box the installer builds,
  * `scripts/install-native.sh` never sets it - the browser probe asks Playwright's own registry
- * where its Chromium would be, and that question loads the package. So the first turn pays what
- * boot used to pay, and the process stays there.
+ * where its Chromium would be, and that question loads the package. So the first turn pays what an
+ * eager import would have paid at boot, and the process stays there.
  *
  * That boundary was measured rather than reasoned about, and the numbers are in
  * `docs/design/actions/WEIGHT.md`. It is stated here because the alternative was tempting and is

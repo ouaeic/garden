@@ -252,10 +252,10 @@ export class RelayConnection {
       );
       if (!config.pinnedRelaySpkiSha256) {
         // Reached only if something dialled past `relayIsUsable`. Skipping the check when there is
-        // no pin - which is what this used to do - turns the strongest gate in the client into a
-        // no-op in exactly the state where it is the only thing standing between the box's identity
-        // key and whoever currently answers for the hostname. A retry cannot help: nothing changes
-        // until the settings do, and every settings change builds a new connection.
+        // no pin would turn the strongest gate in the client into a no-op in exactly the state
+        // where it is the only thing standing between the box's identity key and whoever currently
+        // answers for the hostname. A retry cannot help: nothing changes until the settings do, and
+        // every settings change builds a new connection.
         this.#refuse(UNPINNED_REASON, generation);
         return;
       }

@@ -189,11 +189,10 @@ export const claimTurn = async (
    * has just made this task more private takes effect on the next step, and protecting a cache
    * prefix is not a reason to withhold it.
    *
-   * What the route no longer decides is the catalogue. `web_search` and `parallel_web_read` are
+   * What the route does not decide is the catalogue. `web_search` and `parallel_web_read` are
    * offered under their own names on both routes and only the `web_search` arm in `tools/web.ts`
    * knows the difference, so the mode cannot leave the model looking for a tool that is not there
-   * - which is precisely what it did, and what a research question then got answered out of
-   * memory because of.
+   * and answering a research question out of memory instead.
    *
    * Resolved here, ahead of the runtime block, because the block has to say which route is in
    * force: on the provider's route the query itself leaves this computer, and that is the one

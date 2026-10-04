@@ -18,13 +18,12 @@ import { isOpenRouterEndpoint } from './openrouter-transcription.js';
 /**
  * Generated media, fetched the same way as any other provider call.
  *
- * This used to be a service. A job row was written, a second process leased it, generated, wrote
- * the file and marked the row done, and the agent polled a `media_status` tool until it saw the
- * result. None of that bought asynchrony: the poll blocked the turn anyway, so the only thing the
- * queue added was a second tool call, a second runner client, two encrypted columns and a spend
- * reconciliation that existed purely because a queued job had not billed yet. An image takes about
- * ten seconds and speech about five, on a computer where `shell` blocks for up to an hour, so the
- * generation is just a request now and the file exists when it returns.
+ * A request, not a queued job. A queue leased by a second process would buy no asynchrony: the
+ * agent would poll for the result and the poll would block the turn anyway, so all a queue would
+ * add is a second tool call, a second runner client, encrypted job columns and a spend
+ * reconciliation for jobs that have not billed yet. An image takes about ten seconds and speech
+ * about five, on a computer where `shell` blocks for up to an hour, so the generation is just a
+ * request and the file exists when it returns.
  */
 
 const validCost = (value: unknown): number | null => {
@@ -87,9 +86,9 @@ export interface MediaRequest {
   /**
    * The voice to speak in, when the chosen route names its voices.
    *
-   * Sent only when the caller supplies one. This used to be a constant, and the constant belonged
-   * to one specific speech model - so the moment the model became the owner's choice, every other
-   * speech route would have been asked for a voice from a different model's list. A route whose
+   * Sent only when the caller supplies one. A constant would belong to one specific speech model,
+   * and the model is the owner's choice - so every other speech route would be asked for a voice
+   * from a different model's list. A route whose
    * voices garden does not know is asked without one, and the provider's own answer says what it
    * needs, which is better than this side inventing a name for it.
    */

@@ -265,7 +265,7 @@ describe('a helper the runner spawns as itself', () => {
   it('would have run it on the list an agent command uses, so the case above is a decision', async () => {
     const { root, marker } = await plantedDecoys();
     // Without this the case above passes on a decoy that could never have run at all. The path
-    // handed over here is exactly what `prepareAudio` used to resolve against, index 0 first.
+    // handed over here is exactly the one an agent command resolves against, index 0 first.
     await expect(
       prepareAudio(root, 'workspace/memo.m4a', {}, agentSearchPath(root))
     ).rejects.toThrow();

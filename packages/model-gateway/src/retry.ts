@@ -169,17 +169,16 @@ const isAbortError = (error: unknown): boolean => {
  * spreads out instead of resynchronising on the provider's next window. A provider's own
  * Retry-After hint raises the floor, and raises the ceiling with it: a wait this side invented is
  * never longer than `maxDelayMs`, and a wait the provider named is honoured up to the separate,
- * larger `maxRetryAfterMs`. Neither can park a task unboundedly, which is what the single cap was
- * there to prevent - it just stopped asking again at twenty seconds when the provider had said
- * sixty.
+ * larger `maxRetryAfterMs`. Neither can park a task unboundedly, and a single cap shared by both
+ * would stop asking again at twenty seconds when the provider had said sixty.
  */
 export const backoffDelayMs = (policy: RetryPolicy, attempt: number, error: unknown): number => {
   const exponential = Math.min(policy.maxDelayMs, policy.baseDelayMs * 2 ** (attempt - 1));
   const jittered = exponential * (0.5 + policy.random() * 0.5);
   const asked = retryAfterMsOf(error);
   // Branching on the presence of the hint rather than defaulting it to zero, so an error carrying
-  // none takes arithmetic byte-identical to what it took before: only a request the provider itself
-  // put a number on can be waited on for longer than it used to be.
+  // none is bounded by `maxDelayMs` alone: only a request the provider itself put a number on can
+  // be waited on for longer than that.
   if (asked === undefined) return Math.min(policy.maxDelayMs, jittered);
   return Math.min(policy.maxRetryAfterMs, Math.max(asked, jittered));
 };

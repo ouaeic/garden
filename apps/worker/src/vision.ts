@@ -289,9 +289,9 @@ export const routeImageObservation = async (
     return;
   }
   /*
-   * Tried in ranked order rather than once. Any failure here used to become a system notice
-   * telling the model to work from the text, so a candidate that could never answer was chosen
-   * again on the next image and on every image after it.
+   * Tried in ranked order rather than once. If any failure here became a system notice telling the
+   * model to work from the text, a candidate that could never answer would be chosen again on the
+   * next image and on every image after it.
    *
    * Two attempts, and a wall ends them: a quota, an outage or a missing credential is not this
    * candidate's fault and the next candidate is behind the same wall, so asking it is a second

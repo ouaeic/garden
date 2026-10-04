@@ -125,23 +125,20 @@ export interface ToolContext {
 type ToolDomain = (context: ToolContext, call: ModelToolCall) => Promise<unknown>;
 
 /**
- * Which module answers each tool, and the whole of what used to be a 2,110-line switch.
+ * Which module answers each tool.
  *
  * A table rather than a chain of `if`s or a switch that fans out: the tool names are the product's
  * public surface - they are what the catalogue advertises and what the model sends - and one place
  * that lists all of them against their answerers is the only artefact in which "is this tool
- * wired up" is a question you can answer by looking. The arms themselves did not change; they were
- * cut at their `case` boundaries and pasted into the nine domain modules imported above, plus
- * `delegate.ts`, which is why the wire test written against the switch passes unaltered against
- * this.
+ * wired up" is a question you can answer by looking. The arms live in the nine domain modules
+ * imported above, plus `delegate.ts`.
  *
- * The one thing a table can be that a switch could not is incomplete: a tool in the catalogue with
+ * The one thing a table can be that a switch cannot is incomplete: a tool in the catalogue with
  * no row here reaches `Unknown tool` instead of an arm. `tool-dispatch.test.ts` drives every name
  * in the catalogue through this function, which is what makes that failure impossible to land.
  *
- * Nothing falls through. Every arm in the old switch returned or threw, so grouping them across
- * modules cannot change which one runs - and a name that is not here reaches the same
- * `Unknown tool` the switch's `default` threw.
+ * Nothing falls through. Every arm returns or throws, so grouping them across modules cannot
+ * change which one runs - and a name that is not here reaches `Unknown tool`.
  */
 const DOMAIN_OF: Readonly<Record<string, ToolDomain>> = {
   load_tools: async (context, call) => enableToolGroups(context.state, call.arguments),

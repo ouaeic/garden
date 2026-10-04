@@ -1060,12 +1060,12 @@ export class WorkspaceCheckpoints {
       return !current || current.size !== details.size || current.mtimeMs !== details.mtimeMs;
     });
     // Everything this restore is going to read, proven to be there before anything is destroyed.
-    // The removal pass used to run first, and the blob store can be short an object - a collection
-    // that skipped a manifest it could not read, an interrupted delete between the manifest and
-    // the metadata. The clone then threw ENOENT into a tree that had already lost every file made
-    // since the checkpoint, the route answered a bare failure, and the services were restarted
-    // against the mixture. `restoreSnapshot` next door does the rename-aside dance; this is the
-    // cheaper half of it, and it is what turns that loss into a refusal.
+    // The blob store can be short an object - a collection that skipped a manifest it could not
+    // read, an interrupted delete between the manifest and the metadata. Were the removal pass to
+    // run first, the clone would throw ENOENT into a tree that had already lost every file made
+    // since the checkpoint, and the services would be restarted against the mixture.
+    // `restoreSnapshot` next door does the rename-aside dance; this is the cheaper half of it, and
+    // it is what turns that loss into a refusal.
     //
     // Only the outdated set, because those are exactly the files a restore opens. Refusing a
     // rewind over content it was never going to read would cost the owner an undo they could have

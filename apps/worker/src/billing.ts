@@ -38,9 +38,9 @@ export const DELEGATE_BUDGET_SHARE = 0.25;
 /**
  * What one delegated specialist may spend.
  *
- * The share is of the whole task and is now divided between the missions in flight. Each mission
- * used to check the full 25% independently, so three of them could jointly spend three quarters of
- * the task's compute before the lead had done anything with their reports.
+ * The share is of the whole task and is divided between the missions in flight. If each mission
+ * checked the full 25% independently, three of them could jointly spend three quarters of the
+ * task's compute before the lead had done anything with their reports.
  */
 export const delegateBudget = (maxComputeCredits: number, missions = 1): number =>
   Math.max(0.05, (Math.max(0, maxComputeCredits) * DELEGATE_BUDGET_SHARE) / Math.max(1, missions));
@@ -54,12 +54,9 @@ export const stepUsageKey = (taskId: string, turn: number, step: number): string
 /**
  * What a model call costs in compute credits, which is the unit the task's own ceiling is set in.
  *
- * It used to take a fourth argument, `seconds`, for a `computeSeconds` figure that was declared on
- * the response type and produced by nothing: no adapter has ever set it, so the term was zero on
- * every call this product has ever made, and the six `computeSeconds ? 'gpu_seconds' : 'tokens'`
- * ternaries beside its call sites each had one reachable arm. Removed rather than wired: a rented
- * GPU billed by the second is not a route garden offers, and a parameter that has never once been
- * non-zero is a claim about the product that is not true.
+ * Tokens only, with no term for compute seconds: a rented GPU billed by the second is not a route
+ * garden offers, and no adapter produces such a figure, so a parameter for it would always be zero
+ * and would be a claim about the product that is not true.
  */
 export const usageCredit = (model: ModelRelease, input: number, output: number): number => {
   const multiplier = { light: 0.5, medium: 1, high: 2.5, extra_high: 5 }[model.usageClass];

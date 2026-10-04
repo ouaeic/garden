@@ -81,9 +81,9 @@ describe('plan tool schema', () => {
 });
 
 describe('the size of the catalogue the model is sent', () => {
-  // Measured rather than asserted in prose. The comment above the catalogue used to carry the
-  // numbers, and a stale number in a comment reads exactly like a fresh one; this holds the real
-  // catalogue against a ceiling instead, so a description that grows back fails here.
+  // Measured rather than asserted in prose. A stale number in a comment reads exactly like a fresh
+  // one; this holds the real catalogue against a ceiling instead, so a description that grows back
+  // fails here.
   const sent = [...agentToolsFor(), COMPACT_CONTEXT_TOOL];
   const bytes = Buffer.byteLength(JSON.stringify(sent));
 
@@ -622,12 +622,10 @@ describe('the wire a box is sent about the services it has actually connected', 
  * pays on every step, but it is not the only one: `runDelegateMission` builds an isolated read-only
  * specialist and sends it a ninth of that. The two figures belong in the same file because the
  * pressure to demote a tool off the lead's wire is exactly the pressure that would blind the
- * specialist, and until this block existed nothing put them in front of the same reader.
+ * specialist, and this block puts them in front of the same reader.
  *
- * Measured when this block was written: lead 40 tools / 55,113 bytes (55,782 with the compaction
- * tool the loop adds), specialist 9 tools / 7,431 bytes. The specialist's surface did not change
- * when it moved out of delegate.ts - it is byte-identical, asserted below, because the array a
- * provider caches must not move for a refactor.
+ * The specialist's surface is pinned below, names and order, because the array a provider caches
+ * must not move for a refactor.
  */
 describe('the wire surface each audience is sent', () => {
   const lead = agentToolsFor();
@@ -670,8 +668,7 @@ describe('the wire surface each audience is sent', () => {
 
   it('still gives it a way to read the workspace and the web', () => {
     // The non-vacuity half. Every assertion above passes on an empty set, and an empty set is how
-    // this test would look if the tier were ever filtered by a name that no longer exists - which
-    // is how the catalogue's own nested-description walk once passed while finding nothing.
+    // this test would look if the tier were ever filtered by a name that no longer exists.
     expect(specialistNames).toContain('file_read');
     expect(specialistNames).toContain('web_search');
     expect(specialistNames).toContain('parallel_web_read');
@@ -724,9 +721,6 @@ describe('the wire surface each audience is sent', () => {
 
 describe('the catalogue as the model reads it', () => {
   it('gives every tool a distinct name and a description inside the size budget', () => {
-    // Named for what it proves. It used to be called "a description that survives being read
-    // alone", which it never checked: eighty-one repeated characters passed it, and both the
-    // notify limit and the video kind that could not be generated passed it too.
     const names = agentTools.map((tool) => tool.name);
     expect(new Set(names).size).toBe(names.length);
     for (const tool of agentTools) {
@@ -791,9 +785,8 @@ describe('the catalogue as the model reads it', () => {
     const recall = schema('memory_recall');
     expect(recall.properties.maxItems?.maximum).toBe(MEMORY_RECALL_ITEM_CEILING);
     expect(recall.properties.maxItems?.default).toBe(MEMORY_RECALL_MAX_ITEMS);
-    // The budget is fixed and no longer pretends otherwise. `budgetTokens` was clamped between 256
-    // and a 4,000 ceiling in packages/core and was never declared here - and with
-    // additionalProperties false the model could not have sent it if it had tried.
+    // The budget is fixed and the schema does not pretend otherwise: `budgetTokens` is not
+    // declared, and with additionalProperties false the model cannot send it.
     expect(recall.additionalProperties).toBe(false);
     expect(recall.properties).not.toHaveProperty('budgetTokens');
   });
@@ -921,9 +914,9 @@ describe('the catalogue as the model reads it', () => {
   });
 
   it('prices the generation against the model the owner actually chose', () => {
-    // The two ids in the manifest used to be the whole of the answer in both the pricer and the
-    // dispatch arm, so an owner who picked a route ten times the price still read the default's
-    // figure on the card they were about to approve.
+    // The two ids in the manifest are not the whole of the answer in the pricer or the dispatch
+    // arm: an owner who picked a route ten times the price must read that route's figure on the
+    // card they are about to approve, not the default's.
     const image = { kind: 'image', prompt: 'A logo', width: 1000, height: 1000 };
     const expensive = resolvedMediaModel('image', {
       image: mediaOption({
@@ -1191,11 +1184,10 @@ describe('declared action shapes', () => {
      * docs/design/browser-automation.md bans `waitForLoadState('networkidle')` from this codebase
      * twice and gives the reason both times - ":302 ... deprecated and wrong on SPAs with
      * long-polling/websockets", ":526 ... never fires on SPAs with websockets or long-polling".
-     * The clause pinned here used to say the opposite, in the tool the model reads before it acts:
-     * "with none of those three it waits for the network to go idle, WHICH IS WHAT A SINGLE-PAGE
-     * APPLICATION NEEDS AFTER NAVIGATE". A banned mechanism recommended, for the one page shape it
-     * is banned for. That is a description defect by this file's own rule, and it is worse than a
-     * stale one: it steers every model on every turn into the arm's worst branch.
+     * The clause pinned here must not recommend it in the tool the model reads before it acts. A
+     * banned mechanism recommended, for the one page shape it is banned for, is a description
+     * defect by this file's own rule, and worse than a stale one: it steers every model on every
+     * turn into the arm's worst branch.
      *
      * The two directions are scoped DIFFERENTLY, and the difference is the whole of what makes
      * this hold. The POSITIVE checks are taken on the extracted clause, because scanning the guide
@@ -1301,7 +1293,7 @@ describe('declared action shapes', () => {
    * answers a call. Either list can be edited without the other, and the failure is silent in both
    * directions: a verb declared here and absent there is a call the model will make and the runner
    * will refuse, spent round trip and all; a verb there and absent here is a capability the model
-   * can never find out it has. Nothing compared them until now.
+   * can never find out it has. This test compares them.
    *
    * Held as sets, both ways, rather than derived. Deriving would make the catalogue's order follow
    * the union's, and the order of these enums is prompt-prefix bytes that a provider caches - the
@@ -1357,15 +1349,14 @@ describe('declared action shapes', () => {
 
   it('declares each schedule kind, including the two fields the daily brief needs', () => {
     /*
-     * Re-pointed at the flat property bag that replaced the five-variant `oneOf`, and re-pointed
-     * rather than deleted because what it pins is a capability rather than an encoding: every one
-     * of the five kinds is still reachable, and `daily` still names the two fields that decide
-     * whether "brief me at eight" can be scheduled at all. The union frame it used to read is
-     * gone; the kinds and those two fields are the part that has to survive an encoding.
+     * What this pins is a capability rather than an encoding: every one of the five kinds is
+     * reachable through the flat property bag, and `daily` names the two fields that decide
+     * whether "brief me at eight" can be scheduled at all. The kinds and those two fields are the
+     * part that has to survive an encoding.
      *
-     * The per-kind required set is prose now, so it is asserted as prose - which is the honest
-     * shape of the promise, since the wire no longer carries a required list per kind and
-     * `TaskScheduleSpec` in @garden/contracts is what refuses a spec that is missing one.
+     * The per-kind required set is prose, so it is asserted as prose - which is the honest shape of
+     * the promise, since the wire carries no required list per kind and `TaskScheduleSpec` in
+     * @garden/contracts is what refuses a spec that is missing one.
      */
     const schedule = agentTools.find((tool) => tool.name === 'schedule');
     const spec = (
@@ -1420,8 +1411,8 @@ describe('declared action shapes', () => {
     for (const [kind, spec] of Object.entries(specs))
       expect(TaskScheduleSpec.parse(spec), kind).toMatchObject({ kind });
     // And the flat bag's own hazard, stated rather than assumed: a field belonging to another kind
-    // is stripped by the union rather than fatal, which is the property that makes one bag safe
-    // where five variants used to be.
+    // is stripped by the union rather than fatal, which is the property that makes one bag safe in
+    // place of five variants.
     expect(
       TaskScheduleSpec.parse({
         kind: 'daily',
@@ -1497,8 +1488,8 @@ describe('the reach each publishing call has, and the card the floor raises for 
       expect(approvalRequirement('publish_preview', args, mode, {})?.sideEffect, mode).toBe(
         'external_consequential'
       );
-      // Not merely "still carded": the tainted path used to REPLACE the ordinary card rather than
-      // sit above it, so a public deployment on the turn that had read a hostile page is exactly
+      // Not merely "still carded": the tainted path must sit above the ordinary card rather than
+      // replace it, because a public deployment on a turn that has read a hostile page is exactly
       // where a downgrade would hide.
       expect(
         approvalRequirement('publish_preview', args, mode, { taintSources: ['a web page'] })

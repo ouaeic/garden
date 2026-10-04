@@ -230,10 +230,10 @@ export const registerNotificationRoutes = (context: RouteContext): void => {
         taskTitle: row.taskTitle,
         kind: row.kind,
         /**
-         * A notice the workspace key will not unwrap says so, in the field a client renders. It
-         * used to be served as null, and a row with nothing to read is dropped rather than drawn -
-         * so the one notice that reports a conversation has become unreadable was the one notice
-         * that vanished silently. This is a rare row and a serious one: it means a key this box
+         * A notice the workspace key will not unwrap says so, in the field a client renders. A row
+         * with nothing to read is dropped rather than drawn, so served as null, the one notice that
+         * reports a conversation has become unreadable would be the one notice that vanished
+         * silently. This is a rare row and a serious one: it means a key this box
          * holds no longer opens what it sealed.
          */
         message: row.message ?? UNREADABLE_AGENT_MESSAGE,

@@ -5,8 +5,8 @@ import { event } from './tool-recording.js';
 /**
  * One delegated specialist on the owner's timeline, as it happens.
  *
- * A `delegate` call used to be exactly two rows - `tool_started` and, minutes later,
- * `tool_result` - so the answer to "where are the subagents?" was the whole time: running,
+ * On its own, a `delegate` call is exactly two rows - `tool_started` and, minutes later,
+ * `tool_result` - so the answer to "where are the subagents?" would be the whole time: running,
  * invisible. Every lane transition is its own `subagent` event carrying this lane's standing at
  * that moment, keyed on `laneId` so the timeline folds one lane's rows into one lane.
  *

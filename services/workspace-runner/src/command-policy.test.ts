@@ -172,7 +172,7 @@ describe('privileged helper detection', () => {
 describe('executable resolution', () => {
   it('follows a symbolic link so a renamed escalation binary is still recognised', async () => {
     // `ln -s /usr/bin/sudo ./s` presents a basename of `s` to a check that only reads the string
-    // it was handed, which is all the argument analysis used to see.
+    // it was handed, which is all argument analysis on its own can see.
     const root = await mkdtemp(path.join(tmpdir(), 'garden-policy-'));
     temporaryRoots.push(root);
     const target = path.join(root, 'sudo');

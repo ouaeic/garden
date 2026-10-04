@@ -3,11 +3,11 @@
  *
  * The approval floor's destructive rule frees a delete strictly inside `CHECKPOINT_CONTENT` because
  * a rewind puts it back, and it learns whether this turn HAS a rewind from `ApprovalContext.undoPoint`
- * - fed from `AgentState.checkpoint`, written by `#ensureTurnUndoPoint`. The undo point used to be
- * taken one gate later, inside `turn/execute-call.ts`, so on the first non-exempt call of a turn the
- * floor was answering a question about a fact nobody had established yet. The cost was one card for a
- * turn whose opening act was itself a recoverable delete, while the identical delete two calls later
- * was free: a verdict decided by position in the batch.
+ * - fed from `AgentState.checkpoint`, written by `#ensureTurnUndoPoint`. Taken one gate later,
+ * inside `turn/execute-call.ts`, the undo point would leave the floor answering a question about a
+ * fact nobody had established yet on the first non-exempt call of a turn. The cost would be one
+ * card for a turn whose opening act was itself a recoverable delete, while the identical delete two
+ * calls later would be free: a verdict decided by position in the batch.
  *
  * Asserted here rather than on `approvalRequirement`, because the rule was never the thing in doubt.
  * What is in doubt is the sequencing, and the sequencing lives in `dispatchToolCalls`.
@@ -229,11 +229,10 @@ describe('the undo point and the floor, in that order', () => {
   });
 
   /*
-   * The fail-closed direction, which the move must not trade away. `#ensureTurnUndoPoint` catches
-   * `CheckpointRefusedError` - a workspace over `CHECKPOINT_MAX_FILES`, a full host disk - tells
-   * the owner this turn has no undo point and lets the work carry on. Taking the checkpoint earlier
-   * makes that case sharper rather than weaker: the floor now sees a refusal where it used to see
-   * the same absence it saw before anybody had tried.
+   * The fail-closed direction, which the ordering must not trade away. `#ensureTurnUndoPoint`
+   * catches `CheckpointRefusedError` - a workspace over `CHECKPOINT_MAX_FILES`, a full host disk -
+   * tells the owner this turn has no undo point and lets the work carry on. The floor must see that
+   * refusal, not the same absence it would see before anybody had tried.
    */
   it('shows the floor a refusal when the checkpoint could not be taken', async () => {
     const seen = await dispatch([remove], 'refused');
@@ -499,7 +498,7 @@ describe('plan mode, enforced at dispatch and described nowhere', () => {
 
   /*
    * AND THE SENTENCE HAS TO BE TRUE OF THE SET IT DESCRIBES. This is the one sentence in the mode a
-   * model reads on every refused call, and it used to end "nothing that reaches outside", which is
+   * model reads on every refused call, and it must not end "nothing that reaches outside", which is
    * false of four names the set permits: `web_search` and `parallel_web_read` read the web,
    * `delegate` opens another window on it, and `notify` reaches the owner's phone.
    *

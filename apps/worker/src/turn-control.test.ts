@@ -192,11 +192,10 @@ describe('the request garden is about to send', () => {
  */
 describe('and it is asked before the request goes out', () => {
   /**
-   * Two files rather than one since the phase decomposition, and the ordering now spans the seam
-   * between them: the window is prepared in `turn/request.ts`, which `run()` calls strictly before
-   * `turn/generate.ts` asks this question and sends the request. So the claim is made twice - once
-   * about the order `run()` runs the two phases in, and once about where inside the second phase
-   * the question sits - which together say exactly what one file used to say on its own.
+   * Two files rather than one, and the ordering spans the seam between them: the window is
+   * prepared in `turn/request.ts`, which `run()` calls strictly before `turn/generate.ts` asks this
+   * question and sends the request. So the claim is made twice - once about the order `run()` runs
+   * the two phases in, and once about where inside the second phase the question sits.
    */
   const read = (path: string): string[] =>
     readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8').split('\n');

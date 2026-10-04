@@ -149,9 +149,9 @@ export const registerProviderRoutes = (context: RouteContext): void => {
               path: ['vendor'],
               message: 'A listed provider is saved as its own compatible connection'
             });
-          // Ollama Cloud is exempt because it no longer needs one: the catalogue below lists every
-          // model that account can reach, the same way OpenRouter's does, so naming a single model
-          // by hand went from a requirement to an optional pin.
+          // Ollama Cloud does not need a model named by hand: the catalogue below lists every model
+          // that account can reach, the same way OpenRouter's does, so a named model is an optional
+          // pin.
           if (value.spendCeiling?.timeZone !== undefined) {
             try {
               assertTimeZone(value.spendCeiling.timeZone);
@@ -227,10 +227,10 @@ export const registerProviderRoutes = (context: RouteContext): void => {
       /*
        * The key is proven before any of the work below reports success.
        *
-       * Everything this route did for an OpenRouter key - `adapter.list()`, then the catalogue
-       * refresh's `/models` and `/endpoints/zdr` - is a public route that answers 200 anonymously.
-       * So the screen's "Verify and save" verified the provider was reachable and nothing about the
-       * credential, and a mistyped or revoked key was stored, encrypted, under a green success
+       * Every other call this route makes for an OpenRouter key - the catalogue refresh's `/models`
+       * and `/endpoints/zdr` - is a public route that answers 200 anonymously. Without `/key`, the
+       * screen's "Verify and save" would verify the provider was reachable and nothing about the
+       * credential, and a mistyped or revoked key would be stored, encrypted, under a green success
        * message. `/key` is the one call the provider gates, and it is made first so a refusal costs
        * one request and leaves the previously saved credential untouched.
        */
@@ -252,9 +252,9 @@ export const registerProviderRoutes = (context: RouteContext): void => {
       });
       let pendingModels: Array<Record<string, unknown>>;
       if (input.provider === 'openrouter') {
-        // The `adapter.list()` that used to run here for every provider is gone from this arm: its
-        // answer was only ever read by the branch below, so an OpenRouter save spent a whole extra
-        // round trip on a list it discarded before asking for the catalogue it actually wanted.
+        // No `adapter.list()` in this arm: its answer would only be read by the branch below, so an
+        // OpenRouter save would spend a whole extra round trip on a list it discarded before asking
+        // for the catalogue it actually wants.
         const liveModels = await refreshOpenRouterCatalog(seedModels(), {
           baseUrl,
           apiKey: apiKey!,

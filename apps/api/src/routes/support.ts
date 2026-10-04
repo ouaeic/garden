@@ -98,8 +98,8 @@ export const createServerSupport = (context: ServerBase) => {
    *
    * The boundaries come from the same place the spending caps take theirs, and so does the figure:
    * `spendTotal` is the statement the caps themselves are measured with. The usage pane draws a
-   * window's spend beside a cap when one is set and without it when none is, and it used to reach a
-   * second, separately worded query to do it - two definitions of "what this cost" that agreed only
+   * window's spend beside a cap when one is set and without it when none is, from this same figure:
+   * a second, separately worded query would be two definitions of "what this cost" that agreed only
    * as long as nobody edited one of them. There is no allowance to report against either: the owner
    * holds the provider account and pays it directly.
    */
@@ -304,19 +304,15 @@ export const createServerSupport = (context: ServerBase) => {
      * the ceiling for an explicit id, and `selectModel`'s `requestedId` arm can never answer
      * `blocked` - because the ceiling governs what garden chooses for the owner, never what the
      * owner chooses for themselves. A pin is not that. It is a setting made once on a screen, and
-     * it then governs runs the owner is not present for, so on this path the ceiling wins:
-     * measured before this line existed, a pin at 30x the input ceiling and 45x the output ceiling
-     * was honoured for a schedule while the ranked pick on the same box was correctly held.
+     * it then governs runs the owner is not present for, so on this path the ceiling wins.
      *
      * `ceilingOutcome === 'requested_over_ceiling'` is the whole test, and it is the price rather
-     * than the sentence about the price. The first version of this guard read `message !== null`,
-     * which is a defect the code it replaced did not have: `selectModel`'s `requestedId` arm says
-     * one sentence for a rate over the ceiling AND for a rate the catalogue does not publish, so an
-     * owner who set a ceiling lost their standing pin on every unpriced route - free routes
-     * included, and every row of the reviewed open-weight seed allowlist, which is the catalogue on
-     * any box whose live price refresh has not run. Measured through POST /v1/schedules: 201 on the
-     * pinned model before that guard, 402 after it. Prose is not an API; `selectModel` now carries
-     * the distinction in the outcome and this reads that.
+     * than the sentence about the price. `selectModel`'s `requestedId` arm says one sentence for a
+     * rate over the ceiling AND for a rate the catalogue does not publish, so a guard reading
+     * `message !== null` would cost an owner who set a ceiling their standing pin on every unpriced
+     * route - free routes included, and every row of the reviewed open-weight seed allowlist, which
+     * is the catalogue on any box whose live price refresh has not run. Prose is not an API;
+     * `selectModel` carries the distinction in the outcome and this reads that.
      *
      * So the two halves are ruled separately. A published rate above the ceiling: the ceiling wins,
      * for the reason in the paragraph above. No published rate: the pin stands, because an absent
@@ -324,11 +320,10 @@ export const createServerSupport = (context: ServerBase) => {
      * about the catalogue. A row can carry one rate and not the other, and that is ruled by the
      * rate it does carry: `priceCeilingBreachReason` compares every published rate before it
      * reports a missing one, so `requested_unpriced` here means the ceiling had nothing to compare
-     * on either side - not that the side nobody looked at was fine. Before that ordering, a pin on
-     * a route publishing $900 per million out ran unattended under a $15 output ceiling because its
-     * input rate was null. That deliberately does not agree with the ranked path, and should not:
-     * `isModelEligible` keeps an unpriced route out of an automatic pick under a ceiling, where
-     * nobody named anything and the box is choosing how to spend the owner's money on its own.
+     * on either side - not that the side nobody looked at was fine. That deliberately does not
+     * agree with the ranked path, and should not: `isModelEligible` keeps an unpriced route out of
+     * an automatic pick under a ceiling, where nobody named anything and the box is choosing how to
+     * spend the owner's money on its own.
      *
      * The fallback is the part that matters. A pin the catalogue can no longer serve - a withdrawn
      * route, or one that does not answer on the privacy route this run asked for - would otherwise
@@ -365,12 +360,12 @@ export const createServerSupport = (context: ServerBase) => {
   /**
    * Put the catalogue back if something flattened it.
    *
-   * The registry service used to write the static seed over the enriched catalogue once an hour,
-   * which left every model at availability 'review' with no prices - out of the picker, and
-   * `model_unavailable` for anything pinned to one. That is fixed at the source, but a box that
-   * already hit it stays flattened until its owner happens to re-save their provider key, and
-   * nothing tells them that is the cure. So it repairs itself: if every model in the catalogue is
-   * still in the seeded state and the owner has a working credential, ask the provider again.
+   * A catalogue with the static seed written over the enriched one leaves every model at
+   * availability 'review' with no prices - out of the picker, and `model_unavailable` for anything
+   * pinned to one. A box in that state stays flattened until its owner happens to re-save their
+   * provider key, and nothing tells them that is the cure. So it repairs itself: if every model in
+   * the catalogue is still in the seeded state and the owner has a working credential, ask the
+   * provider again.
    *
    * Runs without being awaited. It is a repair, not a precondition - the server should answer
    * requests while it happens, and a provider that is down must not delay startup.
@@ -637,12 +632,10 @@ export const createServerSupport = (context: ServerBase) => {
   /**
    * Where this box's web searches are answered.
    *
-   * One verdict, not two. This used to publish an answer per privacy route, on the reasoning that
-   * an owner should be told what choosing a route would mean before they chose it - but no box ever
-   * offered that choice. A model's privacy route is set from the credential's retention flag and a
+   * One verdict, not two. A model's privacy route is set from the credential's retention flag and a
    * task may only run on a model whose route matches its own, so every conversation on a given box
-   * is on the same route, and the second heading described a conversation that could not be started
-   * here. Where a query goes is a fact about the box, so it is reported as one.
+   * is on the same route, and an answer per privacy route would describe a conversation that could
+   * not be started here. Where a query goes is a fact about the box, so it is reported as one.
    *
    * The verdict itself is not computed here: `resolveWebToolPlan` in @garden/contracts is the only
    * place in this repository that decides it, so the sentence on the settings page and the tools
@@ -673,9 +666,8 @@ export const createServerSupport = (context: ServerBase) => {
    * use.
    *
    * A credential that cannot be read answers with the deployment's own configured provider, which
-   * is the only thing left that is true about this box. The retention flag used to be read here as
-   * well, and an unreadable one was assumed to be on; it is no longer part of this question, so
-   * there is no longer a privacy fact to be cautious about on the way past.
+   * is the only thing left that is true about this box. The retention flag is not part of this
+   * question, so there is no privacy fact to be cautious about on the way past.
    */
   const webSearchRouteFor = async (userId: string) => {
     try {

@@ -106,11 +106,11 @@ describe('what a new turn keeps and what it drops', () => {
 
 describe('when the agent is allowed to stop and ask', () => {
   /**
-   * The tool exists because the operating contract told the model to ask when a missing choice
-   * materially changes the result and gave it nowhere to ask - a blocker came back as a finish with
-   * a not_applicable verification and read to the owner exactly like finished work. The failure it
-   * creates is the opposite one, an agent that asks instead of working, and these are the four
-   * places that failure is caught before the conversation is parked and a device is rung.
+   * The tool exists because the operating contract tells the model to ask when a missing choice
+   * materially changes the result, and without somewhere to ask a blocker would come back as a
+   * finish with a not_applicable verification and read to the owner exactly like finished work. The
+   * failure it creates is the opposite one, an agent that asks instead of working, and these are
+   * the four places that failure is caught before the conversation is parked and a device is rung.
    */
   const looked = { turnToolResults: { 'call-1': { name: 'file_read', success: true } } };
 

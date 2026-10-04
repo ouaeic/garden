@@ -84,19 +84,15 @@ export const BASE_SYSTEM_PROMPT = baseSystemPrompt();
 /**
  * The marker of the guidance block this contract absorbed.
  *
- * It used to be a separate system message whose content was chosen per request by keyword: six
- * regexes over the last four user turns picked which of seven playbooks were in force. Measured
- * against twenty-four owner-shaped requests it was wrong on ten: five received no guidance at all -
- * "apply for this job for me: <url>" among them - and five more received a block aimed at the wrong
- * tools, because "tailor my CV and give me a PDF" contains no authoring verb and "go through my
- * photos" reads as image generation. The whole guidance set was 4.9 kB, against a tool catalogue an
- * order of magnitude larger that is already sent unconditionally on the same request - so
- * withholding it was never the cheaper mistake.
+ * Guidance is part of the contract rather than chosen per request by keyword, because no keyword
+ * rule picks the right playbook: "tailor my CV and give me a PDF" contains no authoring verb and
+ * "go through my photos" reads as image generation. The whole guidance set is small against a tool
+ * catalogue an order of magnitude larger that is already sent unconditionally on the same request,
+ * so withholding it is never the cheaper mistake.
  *
- * It also moved. The block was spliced ahead of the user's goal and rewritten whenever a new
- * playbook activated, which ended the cached prefix at position two and re-billed the entire
- * trajectory on that step. Folded into the contract it is one message at index 0, byte-identical
- * for the life of every task.
+ * A separate block spliced ahead of the user's goal and rewritten whenever a new playbook activated
+ * would end the cached prefix at position two and re-bill the entire trajectory on that step.
+ * Folded into the contract it is one message at index 0, byte-identical for the life of every task.
  */
 const LEGACY_GUIDANCE_MARKER = 'SITUATIONAL GUIDANCE';
 
@@ -275,11 +271,9 @@ export const clockLine = (now: Date, timeZone: string): string => {
 /**
  * The head of the dynamic block, and the string a resumed turn finds its previous copy by.
  *
- * It used to open "CLOUD RUNTIME CONTEXT", from a hosted product this is not: the computer is the
- * owner's own Linux host, which the operating contract immediately above it already says. Renaming
- * it means a window saved before this wave carries the old opening, so both are recognised - an
- * unmatched block is not replaced but inserted, and the stale one would go on telling the model
- * about a machine that is not there.
+ * A saved window may carry the block under its older opening, "CLOUD RUNTIME CONTEXT", so both are
+ * recognised - an unmatched block is not replaced but inserted, and the stale one would go on
+ * telling the model about a machine that is not there.
  */
 export const RUNTIME_CONTEXT_MARKER = 'GARDEN RUNTIME CONTEXT';
 const LEGACY_RUNTIME_CONTEXT_MARKERS = ['CLOUD RUNTIME CONTEXT'];
@@ -338,26 +332,19 @@ export const isRuntimeContext = (message: ModelMessage): boolean =>
   );
 
 /**
- * This block used to sit ahead of the entire trajectory, and the rule that followed from that -
- * "it deliberately carries no live counter", because one changed digit invalidated the cached
- * prefix for the whole request - is recorded here because it was true and is no longer where it
- * applies. `refreshRuntimeContext` now removes every earlier copy and pushes this at the TAIL, on
- * every step, precisely so that it is free to change: `markCacheBreakpoints` anchors at the end of
- * the leading system run, and everything after the last breakpoint is re-read rather than
- * re-cached. The agent-file byte total is still absent, but for the reason that outlived the cache
- * argument: it was advisory, and the next line already sends the agent to `df -h` for the number
- * that is not.
+ * `refreshRuntimeContext` removes every earlier copy and pushes this at the TAIL, on every step,
+ * precisely so that it is free to change: `markCacheBreakpoints` anchors at the end of the leading
+ * system run, and everything after the last breakpoint is re-read rather than re-cached. The
+ * agent-file byte total is absent because it would be advisory, and the next line already sends the
+ * agent to `df -h` for the number that is not.
  *
  * What a live figure still has to earn is CHURN, which is a different cost from cache invalidation:
  * the block is only re-pushed when its bytes differ, so a counter that moves on every step makes
  * the tail differ on every step. `spend` below is quantised to a twentieth of the ceiling for that
- * reason, and the measurement is in the wave-2 lane report.
+ * reason.
  */
 export const runtimeContext = (
-  /**
-   * Only what the block actually says. It used to declare an id and a region as well - a region is
-   * a fleet's idea and there is one machine here, and neither was ever interpolated.
-   */
+  /** Only what the block actually says: there is one machine here, so no id and no region. */
   workspace: {
     name: string;
     securityMode: TaskRecord['securityMode'];
@@ -392,9 +379,9 @@ export const runtimeContext = (
   machineSummary = '',
   /**
    * Whether a schedule started this run rather than the owner. It changes what the run is for: an
-   * unattended run finishes silently unless it decides there is something worth an interruption,
-   * and every finished task used to announce itself regardless - which is what turned a
-   * quarter-hourly page monitor into ninety-six identical pushes a day.
+   * unattended run finishes silently unless it decides there is something worth an interruption.
+   * If every finished task announced itself, a quarter-hourly page monitor would be ninety-six
+   * identical pushes a day.
    */
   unattended = false,
   /**
@@ -647,11 +634,9 @@ export type TruncationRecovery = string | ((cut: TruncationCut) => string);
 /**
  * The middle of an over-long value, with a marker saying what was dropped.
  *
- * The marker used to end "full content remains in the encrypted task event or workspace file",
- * which was true and useless: there is no tool that reads a task event, so the one recovery it
- * named was one the model could not perform, and the omitted span was in practice unrecoverable.
- * It says what is gone and nothing about where to find it; where a caller knows a real way to get
- * the rest, it passes one in `recovery` and that is what the model is told.
+ * It says what is gone and nothing about where it is stored: no tool reads a task event, so naming
+ * one would offer a recovery the model cannot perform. Where a caller knows a real way to get the
+ * rest, it passes one in `recovery` and that is what the model is told.
  */
 export const truncateMiddle = (
   value: string,
@@ -720,15 +705,12 @@ const OWNER_RESTATE_RECOVERY = 'ask the owner to restate the part you need';
 /**
  * What a cut owner message is labelled, and how a later pass recognises one it has already cut.
  *
- * Whether this message was already cut is asked of the message and not of its text. It used to be a
- * content test, justified on the grounds that the only text reaching a `user` message is text the
- * owner typed - true of all three entry points, and beside the point, because what the owner types
- * can quote anything. This phrase appears in this repository's own test files, so pasting garden's
- * source into garden made a message uncuttable and pushed the cost onto its neighbours: two windows
- * differing by fifty-nine characters dropped nothing and then dropped thirty-six messages, taking
- * 468,530 characters of the owner's corrections with them. Owner-authored text was being trusted as
- * a category where the fact wanted was about its source, and `ModelMessage.ownerCut` carries that
- * fact instead - set where the cut is made, persisted with the message, unforgeable by content.
+ * Whether this message was already cut is asked of the message and not of its text. A content test
+ * fails because what the owner types can quote anything: this phrase appears in this repository's
+ * own test files, so pasting garden's source into garden would make a message uncuttable and push
+ * the cost onto its neighbours. The fact wanted is about the text's source, and
+ * `ModelMessage.ownerCut` carries it - set where the cut is made, persisted with the message,
+ * unforgeable by content.
  */
 const OWNER_CUT_LABEL = 'this earlier message from the owner';
 
@@ -779,7 +761,7 @@ const ownerDropRecord = (content: string): { messages: number; characters: numbe
  *
  * `compactionHeadTokens` reserves this whether or not a record is present, so the budget the owner
  * class is held to does not move when one appears or when its digits grow. @see compactionHeadTokens
- * for what that shift used to cost. Both counts are bounded by the window they describe, so
+ * for what that shift would cost. Both counts are bounded by the window they describe, so
  * `MAX_SAFE_INTEGER` is an upper bound with room to spare and this is 47 tokens.
  */
 const OWNER_DROP_RECORD_CHARS = ownerDropMarker(
@@ -893,21 +875,17 @@ const VERBATIM_USER_CHARS = 4_000;
  * trajectory it cut 61,442 characters and `planCompaction` returned null again every time -
  * because by then the condensable work it needed to expose has already been condensed.
  *
- * DERIVED, NOT SWEPT. A percentage of the tail was tried first and it is the wrong shape: it
- * cannot see the head, and the head is half of the inequality. The condition for a compaction to
- * have anything to condense is that something other than the owner's turns fits between the head
- * and the tail -
+ * DERIVED, NOT SWEPT. A percentage of the tail is the wrong shape: it cannot see the head, and the
+ * head is half of the inequality. The condition for a compaction to have anything to condense is
+ * that something other than the owner's turns fits between the head and the tail -
  *
  *     ownerTokens <= targetTailTokens - headTokens - OWNER_WINDOW_RESERVE_TOKENS
  *
  * - so that is the bound, read off the window in front of it rather than chosen. On a
  * 131,072-token model the tail is 32,549 tokens and a real preamble runs 11,000 to 14,000, which
  * leaves the owner about 18,000 tokens; on a trajectory whose head is a bare system prompt the
- * same expression leaves them nearer 28,000. A fixed share had to assume the worst head on every
- * window and cut the owner's words on tasks that were never in danger: at 35% of the tail it
- * removed 28,519 characters across four typed messages on the owner's own 8,159-step session, a
- * run that made 75 compactions and refused none. Measured against the head, that session is not
- * cut at all.
+ * same expression leaves them nearer 28,000. A fixed share would have to assume the worst head on
+ * every window and cut the owner's words on tasks that are never in danger.
  *
  * `evals/context-quality/configurations.ts` substitutes this reserve rather than a share, so
  * `owner-unbounded` is the inequality made unsatisfiable and `starved` is it made brutal.
@@ -973,26 +951,22 @@ export const OWNER_MINIMUM_CHARS = 240;
  * Where the older-result floor starts falling, and where it reaches the hard floor - measured in
  * tokens of actual work rather than as a share of whatever window the chosen model happens to have.
  *
- * The floor used to be applied unconditionally, which meant a twelve-step trajectory occupying 38%
- * of a 160,000-token budget still had the middle cut out of seven of its twelve tool results - the
- * agent re-reading files it had read four steps earlier while 60% of the window sat empty. That is
- * why nothing is reduced before the start line, and why past it the floor slides in proportion
- * instead of dropping.
+ * Applied unconditionally, the floor would cut the middle out of seven of the twelve tool results
+ * of a twelve-step trajectory occupying 38% of a 160,000-token budget - the agent re-reading files
+ * it had read four steps earlier while 60% of the window sat empty. That is why nothing is reduced
+ * before the start line, and why past it the floor slides in proportion instead of dropping.
  *
- * Expressing the start as a share of the budget then produced the opposite fault, and a perverse
- * one: on a million-token model half the budget is 480,000 tokens, which no ordinary task ever
- * reaches, so the squeeze never ran at all. Replaying a seventeen-turn research conversation -
- * three page reads and an answer per turn - against this function measured 11,966,272 input tokens
- * on a 1,000,000-token model with the floor sitting at 24,000 characters on every one of the
- * seventeen turns, against 4,511,284 for identical work on a 200,000-token model whose share-based
- * start was reached on turn three. Choosing the larger window made the same conversation cost two
- * and a half times more. Anchored here it costs 4,813,534 on either model.
+ * Expressing the start as a share of the budget produces the opposite fault, and a perverse one: on
+ * a million-token model half the budget is 480,000 tokens, which no ordinary task ever reaches, so
+ * the squeeze would never run at all. A seventeen-turn research conversation - three page reads and
+ * an answer per turn - would then cost two and a half times more on a 1,000,000-token model than
+ * the identical work on a 200,000-token one. Anchored here it costs the same on either model.
  *
  * 80,000 rather than lower because the twelve-step trajectory the paragraph above defends measures
- * 68,899 tokens, so it stays whole by intent and not by rounding; and because every model whose own
- * half-budget already sits below this line behaves exactly as it did before - the 200,000-token
- * conversation costs 4,511,284 either way. The share below survives as that clamp: a small window
- * must still start squeezing halfway through itself, whatever the absolute lines say.
+ * 68,899 tokens, so it stays whole by intent and not by rounding; and because a model whose own
+ * half-budget already sits below this line is governed by that half-budget, not by this line. The
+ * share below is that clamp: a small window must still start squeezing halfway through itself,
+ * whatever the absolute lines say.
  */
 const TOOL_OUTPUT_SQUEEZE_START_TOKENS = 80_000;
 const TOOL_OUTPUT_SQUEEZE_FLOOR_TOKENS = 192_000;
@@ -1110,24 +1084,22 @@ export const toolResultText = (result: unknown): string => json(result);
 /**
  * What a cut tool result says when there is no file to point at.
  *
- * Two production paths reach a cut with no recovery, and until this existed both of them told the
+ * Two production paths reach a cut with no recovery, and without this both of them would tell the
  * model one thing: a number. `recordToolResult` passes none when `spillOverflow` answered null -
  * the runner refused the write, or the body was past `MAX_SPILL_CHARS`. `delegate.ts` passes none
  * because a specialist's window is not built by `recordToolResult` at all: it pushes its own tool
  * messages through `serializeToolResultForModel(result, 16_000)`, so a specialist never spills and
- * every over-length read it makes was answered with `[… N characters omitted from tool output …]`
- * and nothing else. That is the window the catalogue advertises as the place to put a page likely
- * to be hostile, run by a model on a sixteen-step budget, and the class of tool that fills it -
- * file_read, code_search, document_read, parallel_web_read - is exactly the class that takes a
- * narrower request.
+ * every over-length read it makes would be answered with `[… N characters omitted from tool
+ * output …]` and nothing else. That is the window the catalogue advertises as the place to put a
+ * page likely to be hostile, run by a model on a sixteen-step budget, and the class of tool that
+ * fills it - file_read, code_search, document_read, parallel_web_read - is exactly the class that
+ * takes a narrower request.
  *
- * The advice itself was already in this file and arrived too late to be advice.
  * `laterToolOutputRecovery` says the same first clause, but it is only passed by the older-output
- * squeeze - so the model was told how to ask better on the step the floor first descended, which
- * `spillCarriedRecovery`'s note measures at step 37 of a 131,072-token window. The call it would
- * have changed had by then been made thirty more times. Saying it at the FIRST cut is the whole
- * change; see benchmarks.md §11.2, where mini-swe-agent's coaching warning is called free because
- * it changes the next call rather than merely saving tokens on this one.
+ * squeeze, which first descends around step 37 of a 131,072-token window (`spillCarriedRecovery`'s
+ * note) - too late to be advice, because the call it would change has by then been made thirty more
+ * times. It is said here, at the FIRST cut, because advice that changes the next call is worth more
+ * than tokens saved on this one; see benchmarks.md §11.2.
  *
  * It opens by saying what it does NOT do, because its sibling does. A window can hold both markers
  * at once - one result spilled, the next refused - and a model that has just been handed a path is
@@ -1403,12 +1375,11 @@ export const MIN_PROTECTED_TAIL_MESSAGES = 8;
 /**
  * Below this a compaction costs a model call and a cache rewrite without freeing useful room.
  *
- * One number for both triggers. An agent-declared compaction used to be let through at two, because
- * a budget-derived tail left it a sliver or nothing and two was the only way it ever condensed
- * anything; with the tail now taken from the window in front of it, a span this short is no longer
- * a small compaction but the sign that there is nothing worth condensing - and swept across window
- * shapes it is exactly where the brief section written to replace the span comes out larger than
- * the span itself, so the turn pays a model call to make its own prompt bigger.
+ * One number for both triggers, an agent-declared compaction included. With the tail taken from the
+ * window in front of it, a span this short is not a small compaction but the sign that there is
+ * nothing worth condensing - and swept across window shapes it is exactly where the brief section
+ * written to replace the span comes out larger than the span itself, so the turn pays a model call
+ * to make its own prompt bigger.
  */
 export const MIN_CONDENSED_MESSAGES = 6;
 /** Capped so the rendered brief always stays inside the 32k-character system-message bound below. */
@@ -1534,11 +1505,9 @@ const preambleEnd = (messages: ModelMessage[]): number => {
 /**
  * Where a preamble block belongs: at the end of the leading run of system messages.
  *
- * Every caller used to hard-code its own index - the brief at 2, the curated knowledge at 2 or 3
- * depending on whether the brief was there, the memory pack by walking the run itself. Those
- * numbers were all counting the same thing and only agreed by luck; the moment one system block
- * moved out of the head they would have started inserting preamble after the user's goal, which is
- * exactly where `condensableStart` stops protecting it.
+ * One function rather than an index per caller: hard-coded indices all count the same thing and
+ * agree only by luck, and the moment one system block moves out of the head they start inserting
+ * preamble after the user's goal, which is exactly where `condensableStart` stops protecting it.
  */
 export const preambleInsertIndex = (messages: ModelMessage[]): number => preambleEnd(messages) + 1;
 
@@ -1753,8 +1722,8 @@ const renderSpillIndex = (entries: string[], omitted: number): string =>
  * name is the hash of bytes the model no longer holds. Measured on the shipped `compactContext`
  * at a 131,072-token window: the anchor line carries the path when the span is 36 messages and
  * does not at 178, 254, 474 or 478, and the spans a budget-triggered compaction actually takes on
- * real trajectories are 47 to 343. So on every compaction that matters the pointer went, and the
- * file stayed on the disk with nothing left that could name it.
+ * real trajectories are 47 to 343. So without this, on every compaction that matters the pointer
+ * goes, and the file stays on the disk with nothing left that could name it.
  *
  * Most recent first. Frequency, which is how the anchors rank, says nothing here - the file is
  * named by its own hash, so a poll loop reading the same output ten times has one file and ten
@@ -1922,14 +1891,14 @@ const transcriptLine = (message: ModelMessage, limit: number): string => {
     ?.map((call) => `${call.name}(${truncateMiddle(json(call.arguments), 600, 'call arguments')})`)
     .join('; ');
   /*
-   * The reasoning channel, which this line used to drop before any summariser saw it.
+   * The reasoning channel, carried through to the summariser.
    *
    * `compactionRequest` instructs the summariser to preserve "decisions taken and the reason for
    * them, including approaches that were rejected", and the preamble tells the model to put exactly
-   * that material in the reasoning channel or nowhere. Building the transcript from content and
-   * tool calls alone therefore withheld from the summariser the one channel the harness had asked
-   * the model to put the answer in, and then asked it to keep the answer. A summariser cannot
-   * summarise what it was never shown.
+   * that material in the reasoning channel or nowhere. A transcript built from content and tool
+   * calls alone would withhold from the summariser the one channel the harness asked the model to
+   * put the answer in, and then ask it to keep the answer. A summariser cannot summarise what it
+   * was never shown.
    *
    * Bounded by the same per-message `limit` as the content and appended after it, so a long
    * reasoning block cannot crowd out the prose or the identifiers in the call arguments. Measured
@@ -1938,8 +1907,8 @@ const transcriptLine = (message: ModelMessage, limit: number): string => {
    *
    * What this does NOT establish: that a real summarising model keeps the material now that it can
    * see it. Both halves of `evals/context-quality` compact with an extractive summariser, so the
-   * rig can price this line and cannot score it. What decides it is that the harness had been
-   * asking for something it was itself hiding.
+   * rig can price this line and cannot score it. What decides it is that the harness would
+   * otherwise be asking for something it was itself hiding.
    */
   const thought = message.reasoning
     ? truncateMiddle(message.reasoning.replace(/\s+/g, ' ').trim(), limit, 'condensed reasoning')
@@ -1976,10 +1945,10 @@ export const compactionTranscript = (
  * The order the owner's own messages are given up in, worst first.
  *
  * One statement of the priority, read by the bound below and by the last-resort pass in
- * `prepareModelContext` that already used it. The two used to say it separately and agreed only by
- * accident; they are the same sentence about the same class and a change to one that did not reach
- * the other would be a window where the harness cut the goal in one pass to protect a middle it
- * had already decided was worth less.
+ * `prepareModelContext`. Stated twice, the two would agree only by accident; they are the same
+ * sentence about the same class and a change to one that did not reach the other would be a window
+ * where the harness cut the goal in one pass to protect a middle it had already decided was worth
+ * less.
  *
  * MIDDLE-OUT, not oldest-first. The opening request and the newest thing the owner said are the
  * two the model most needs whole - one is what the task is for, the other is the correction it has
@@ -2018,15 +1987,15 @@ export const ownerEvictionOrder = (messages: readonly ModelMessage[]): number[] 
  * are untouched, the opening request is untouched because it is not a candidate, and so is the
  * newest thing the owner said. What goes is the middle of a pasted log.
  *
- * The corpus that number comes from is worth naming, because the first pass at this bound was
- * priced on one that was wrong. A Claude Code transcript records harness-authored
- * `<task-notification>` blocks with `origin.kind: 'task-notification'` in the `user` role, and in
- * this session those 29 records carry 160,914 characters - 63% of everything that looks like the
- * owner speaking. Garden has no such class: `turn/claim.ts:247`, `turn-control.ts:70` and
- * `turn/resume.ts:271` are the only three places a `user` message enters a persisted trajectory
- * and all three carry text the owner typed, which is exactly what `planCompaction`'s rule assumes
- * when it says a `user` message here is the owner's. Counted as owner text they turn a session
- * that never refuses a compaction into one that refuses 3,564 of 4,292.
+ * The corpus that number comes from is worth naming, because the wrong one prices this bound
+ * wrongly. A Claude Code transcript records harness-authored `<task-notification>` blocks with
+ * `origin.kind: 'task-notification'` in the `user` role, and in this session those 29 records carry
+ * 160,914 characters - 63% of everything that looks like the owner speaking. Garden has no such
+ * class: `turn/claim.ts:247`, `turn-control.ts:70` and `turn/resume.ts:271` are the only three
+ * places a `user` message enters a persisted trajectory and all three carry text the owner typed,
+ * which is exactly what `planCompaction`'s rule assumes when it says a `user` message here is the
+ * owner's. Counted as owner text they turn a session that never refuses a compaction into one that
+ * refuses 3,564 of 4,292.
  *
  * THE GOAL AND THE NEWEST CORRECTION ARE NOT CANDIDATES. They are the two ends of
  * `ownerEvictionOrder` and the two the eviction order says are worth most; the accumulation the
@@ -2044,18 +2013,15 @@ export const ownerEvictionOrder = (messages: readonly ModelMessage[]): number[] 
  *
  *     resident candidate text <= maximumChars
  *
- * One term, exact, and constant in the number of messages. It used to have a second -
- * `candidates * OWNER_MINIMUM_CHARS` - and that term is why this paragraph is being rewritten,
- * because a bound that is linear in message count is not a bound. Cutting alone cannot deliver
- * the single term: below `OWNER_MINIMUM_CHARS` a cut costs more than it saves, so past
+ * One term, exact, and constant in the number of messages. A second term -
+ * `candidates * OWNER_MINIMUM_CHARS` - would make it linear in message count, and a bound that is
+ * linear in message count is not a bound. Cutting alone cannot deliver the single term: below
+ * `OWNER_MINIMUM_CHARS` a cut costs more than it saves, so past
  * `maximumChars / OWNER_MINIMUM_CHARS` candidates every one of them sits at the floor and the
- * class grows without limit anyway. Measured at the production call site on a 131,072-token model
- * with the base preamble as its head, that line is 306 candidates and the budget is 73,576
- * characters: at 541 accumulated owner messages the class alone is 32,400 tokens against a target
- * tail of 32,491, which is the whole tail, and driven to 1,201 it is 72,000 tokens - 2.2 times the
- * tail it is supposed to fit inside. Driven six thousand steps with a 14,000-character owner
- * message every fifth, 3,953 of 5,937 compactions refused and the deterministic soft pass stood in
- * on 5,715 of the 6,000 steps.
+ * class grows without limit anyway.
+ * Measured at the production call site on a 131,072-token model with the base preamble as its head,
+ * that line is 306 candidates and the budget is 73,576 characters; with cutting alone, 541
+ * accumulated owner messages would fill the whole target tail, and 1,201 would be 2.2 times it.
  *
  * SO PAST THE FLOOR THE MESSAGE GOES, RATHER THAN THE REST OF ITS TEXT. The order is the one that
  * already exists: `ownerEvictionOrder`, worst first, so candidates are admitted from its most
@@ -2067,8 +2033,8 @@ export const ownerEvictionOrder = (messages: readonly ModelMessage[]): number[] 
  * WHAT IS DROPPED IS NOT DROPPED SILENTLY. `ownerDropMarker` states how many of the owner's
  * messages are gone and how many characters, cumulatively across every pass, and names the same
  * recovery a cut names. It is one line for the whole class rather than one per message, which is
- * the arithmetic above: a residue per dropped message would reintroduce the term this change
- * removes.
+ * the arithmetic above: a residue per dropped message would reintroduce the term the bound
+ * excludes.
  *
  * The bound does not cover the goal or the newest correction, which are not candidates, and it
  * does not cover that one marker line, which is a constant in the head and is counted there by
@@ -2133,7 +2099,7 @@ export const ownerWindowCap = (lengths: readonly number[], maximumChars: number)
  * admissible for what is left, so the water level it returns is at or above the floor and the sum
  * of what it keeps is at most the budget. The two together are the whole of the single-term bound,
  * and the clamp inside `ownerWindowCap` is unreachable from here rather than merely unlikely.
- * `context.test.ts` asserts that, because it used to be the escape.
+ * `context.test.ts` asserts that, because the clamp is where the bound would escape.
  */
 export const ownerWindowAdmits = (costs: readonly number[], maximumChars: number): Set<number> => {
   const admitted = new Set<number>();
@@ -2171,22 +2137,21 @@ export const boundOwnerWindow = (
    * is charged its whole length rather than the floor.
    *
    * `truncateMiddle` counts what IT removed, so a second cut of an already-cut message writes a
-   * number that is true of the string in front of it and false about what the owner wrote: driven
-   * through this function with a shrinking tail, a 120,000-character message came back saying
-   * 23,940 characters were omitted with 112,117 actually gone. `laterToolOutputRecovery` documents
-   * the same hazard for tool output, and a marker that understates the gap by five times is worse
-   * than no marker, because a model reads it and decides not to ask.
+   * number that is true of the string in front of it and false about what the owner wrote: a
+   * 120,000-character message cut twice under a shrinking tail can say 23,940 characters were
+   * omitted with 112,117 actually gone. `laterToolOutputRecovery` documents the same hazard for
+   * tool output, and a marker that understates the gap by five times is worse than no marker,
+   * because a model reads it and decides not to ask.
    *
-   * That used to be left implicit, on the argument that such a message sits at the cap it was cut
+   * It is not safe to leave implicit on the argument that such a message sits at the cap it was cut
    * to and so would be cut to the same cap again. The head and the tail do not hold still - the
    * brief reaches its ceiling, a resumed task carries a bigger preamble, and the drop marker below
    * is itself 156 characters of head that appears the first time anything is dropped - and every
-   * one of those makes the budget smaller underneath a message that cannot answer. Measured: over
-   * 600 driven steps the budget moved 73,576 -> 73,424 -> 73,420, and holding those messages to
-   * the new cap by DROPPING them cost 117 messages of about 10,500 characters each to a budget
-   * change of 156. Charging the length instead is what stops that: an incompressible message is
-   * either admitted whole or given up by the order, and a 156-character shift now costs at most
-   * the one candidate the eviction order already ranks last.
+   * one of those makes the budget smaller underneath a message that cannot answer. Holding those
+   * messages to the new cap by DROPPING them would give up whole messages of the owner's text to a
+   * budget change of 156 characters. Charging the length instead is what stops that: an
+   * incompressible message is either admitted whole or given up by the order, and a 156-character
+   * shift costs at most the one candidate the eviction order already ranks last.
    */
   const cuttable = (index: number): boolean => messages[index]?.ownerCut !== true;
   const admitted = ownerWindowAdmits(
@@ -2264,9 +2229,9 @@ export const boundOwnerWindow = (
  * the budget underneath the class the budget is for - over 600 driven steps, 73,576 -> 73,424 ->
  * 73,420 - and a message this bound has already cut sits at EXACTLY the cap it was cut to, so a
  * budget that shifts by 156 characters is a message that no longer fits and cannot be cut again.
- * That cost 117 messages of about 10,500 characters each before the reservation was made. Counted
- * at its ceiling the budget does not move at all, and `OWNER_DROP_RECORD_CHARS` is a real ceiling
- * rather than a guess: it is the marker rendered at the largest numbers either count can hold.
+ * Counted at its ceiling the budget does not move at all, and `OWNER_DROP_RECORD_CHARS` is a real
+ * ceiling rather than a guess: it is the marker rendered at the largest numbers either count can
+ * hold.
  */
 export const compactionHeadTokens = (messages: ModelMessage[]): number => {
   const start = condensableStart(messages);
@@ -2921,12 +2886,12 @@ export const markCacheBreakpoints = (
    *
    * Two grid positions one stride apart do not always resolve to two different marks: the newest
    * cache-eligible message at or before each of them can be the same one, because an assistant turn
-   * is not eligible and a run of them swallows a whole stride. That used to spend two of the four
-   * breakpoints a request may carry on one index and send three where four were allowed - silently,
-   * since the set that de-duplicated them was also the set that counted them. It became visible
-   * when the stride halved: `agent-run.test.ts`'s republished-plan case reads the count per step and
-   * saw it fall from four to three at the step whose prefix had just moved, which is the one step
-   * where a lost breakpoint costs the most.
+   * is not eligible and a run of them swallows a whole stride. Taking the grid positions as they
+   * come would spend two of the four breakpoints a request may carry on one index and send three
+   * where four were allowed - silently, since the set that de-duplicates them is also the set that
+   * counts them. `agent-run.test.ts`'s republished-plan case reads the count per step, and the loss
+   * lands at the step whose prefix has just moved, which is the one step where a lost breakpoint
+   * costs the most.
    *
    * Nearest first because a mark is worth the prefix it covers, so the deeper grid positions are
    * the fallback, taken only when a nearer one collided.
@@ -3211,19 +3176,14 @@ export const prepareModelContext = (
       /*
        * Pushed at the tail, not spliced into the leading system run.
        *
-       * It used to go in at the first non-system index - through a local that shadowed the module's
-       * own `stablePrefixEnd`, which is the function whose whole job is to say where the prompt
-       * stops being rewritten. The two names meant opposite things at that line, and the code did
-       * what the name it shadowed forbids: `markCacheBreakpoints` puts the anchor at the end of the
-       * leading system run, so splicing a block that is REWRITTEN ON EVERY STEP into that run moves
-       * the anchor onto changing bytes and takes every breakpoint behind it down with it. Measured
-       * on `long-a-full-window-condenses-rather-than-stubbing-itself`: from the first soft pass on,
-       * the leading preamble stopped being byte-identical and the turn's cached share settled at
-       * 44%.
+       * `markCacheBreakpoints` puts the anchor at the end of the leading system run, so splicing
+       * a block that is REWRITTEN ON EVERY STEP into that run moves the anchor onto changing bytes
+       * and takes every breakpoint behind it down with it: from the first soft pass on, the
+       * leading preamble would stop being byte-identical.
        *
        * At the tail it is free. The tail is rewritten every step anyway - the runtime block sits
        * there for that exact reason - so a summary that changes as more of the window is condensed
-       * costs nothing it was not already costing, and the stubs it explains now read forward to it
+       * costs nothing it was not already costing, and the stubs it explains read forward to it
        * rather than backwards. It is also the last thing the model reads before answering, which is
        * where a note about what is missing from the window belongs.
        */

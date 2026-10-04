@@ -88,8 +88,8 @@ const taskRow = (input: {
  * The gap is load-bearing: one memory row expires inside it (`m-window` below), so a fork that
  * clocked itself rather than its parent DROPS a row the parent carried and the byte equality goes
  * red. A fixture whose two tasks shared a creation instant would let a fork that ignored the
- * anchoring pass. The gap used to be a day, which the age ceiling now correctly refuses; the day is
- * kept, as `staleRoot` below, to be the case that must NOT inherit.
+ * anchoring pass. A day's gap is past the age ceiling, so the day is `staleRoot` below, the case
+ * that must NOT inherit.
  */
 const root = taskRow({ id: rootId, createdAt: '2026-08-02T08:30:00.000Z', prompt: ROOT_GOAL });
 const retry = taskRow({

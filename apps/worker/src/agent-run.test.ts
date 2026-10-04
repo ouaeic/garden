@@ -715,15 +715,13 @@ const installFetch = (
      * Everything else is 404, and the list above it is the whole of what this stub will answer
      * blind.
      *
-     * It used to answer *any* unmatched runner URL with `{ok:true, storageBytes:2048}`, and that is
-     * how the worst live defect in this file's subject stayed invisible: a `/browser/preflight`
-     * answered that way comes back `consequential: undefined, sensitiveInput: undefined`, which is
-     * the benign verdict, and the branch that turned a benign verdict into an approval card was
-     * never once executed by a green suite. A stub that says yes to a route nobody modelled is a
-     * stub that tests the harness instead of the code - the same lesson `evals/harness.ts` learnt
-     * when its unstubbed routes started 404ing. The three below are answered because a real turn
-     * asks for them on the way past and no test here is about them; a new route has to be declared
-     * by the test that needs it.
+     * A stub that answers *any* unmatched runner URL with `{ok:true, storageBytes:2048}` hides
+     * defects: a `/browser/preflight` answered that way comes back `consequential: undefined,
+     * sensitiveInput: undefined`, which is the benign verdict, so a branch that turned a benign
+     * verdict into an approval card would never be executed by a green suite. A stub that says yes
+     * to a route nobody modelled is a stub that tests the harness instead of the code. The three
+     * below are answered because a real turn asks for them on the way past and no test here is
+     * about them; a new route has to be declared by the test that needs it.
      */
     const { pathname } = new URL(url);
     if (
@@ -1058,11 +1056,10 @@ describe('the model call and the task lease', () => {
 
   it('bills what a stopped generation had already produced', async () => {
     /*
-     * The other half of the same defect the repetition watch had: the tokens were generated and the
-     * provider billed them, whoever ended the generation. The abort used to escape as an exception
-     * and the handler for it returned from above the whole billing block, so a Stop pressed on a
-     * long answer settled at $0.00 - and `lastStepUsd`, which is what the spending guard prices the
-     * next step from, kept the figure from the step before.
+     * The tokens were generated and the provider billed them, whoever ended the generation. An
+     * abort that escaped past the billing block would settle a Stop pressed on a long answer at
+     * $0.00 - and `lastStepUsd`, which is what the spending guard prices the next step from, would
+     * keep the figure from the step before.
      */
     vi.useFakeTimers();
     const task = makeTask();
@@ -1648,19 +1645,18 @@ describe('the undo point a turn leaves behind', () => {
   });
 
   /**
-   * The other refusal the owner can clear, and the one prose never reached.
+   * The other refusal the owner can clear, and the one prose cannot reach.
    *
    * A workspace over the runner's file ceiling - two `node_modules` trees is enough - loses every
-   * automatic undo point from then on. The disk refusal above was already caught by the sentence
-   * regex; this one never was, so the rewind dialog told the owner the turn "changed nothing on the
-   * computer" about turns that changed a great deal. Nothing in the message says disk, or space, or
-   * quota, which is the whole point: prose belongs to whoever is reading it, and this reader is a
-   * program.
+   * automatic undo point from then on. Unlike the disk refusal above, nothing in the message says
+   * disk, or space, or quota, which is the whole point: prose belongs to whoever is reading it, and
+   * this reader is a program. Missed, the rewind dialog would tell the owner the turn "changed
+   * nothing on the computer" about turns that changed a great deal.
    *
-   * Both halves of that path are under this one test. `AgentRunnerClient.checkpoint` used to be the
-   * one runner call that flattened the runner's `{error:{code,message}}` envelope into a sentence
-   * of its own instead of going through `runnerFailure`, so the code arrived only as text inside a
-   * string; and `OWNER_FIXABLE_CHECKPOINT_CODES` then rejected it even once it was dug back out.
+   * Both halves of that path are under this one test. `AgentRunnerClient.checkpoint` has to carry
+   * the runner's `{error:{code,message}}` envelope through `runnerFailure` rather than flattening
+   * it into a sentence of its own, where the code would arrive only as text inside a string; and
+   * `OWNER_FIXABLE_CHECKPOINT_CODES` has to accept the code once it arrives.
    */
   it('raises an over-ceiling workspace to the owner, in the runner’s own words', async () => {
     const refusal =
@@ -1884,7 +1880,6 @@ describe('what actually reaches the provider', () => {
   });
 
   it('does not open with a plan the request never needed', async () => {
-    // The generic three-step plan used to be published before the first model call on every task.
     const task = makeTask();
     const probe = probeStore(() => task);
     const log: FetchLog = { calls: [], modelRequests: [] };
@@ -1955,11 +1950,10 @@ describe('what a delegated specialist is sent', () => {
       .map((message) => message.content)
       .join('\n');
     // A specialist asked which of two dated documents supersedes the other cannot answer without
-    // a date, and it used to be sent none.
+    // a date.
     expect(system).toMatch(/- Current time: \w+ \d+ \w+ \d{4}, \d\d:\d\d in Europe\/London/);
-    // Against the constant rather than a spelled-out number: the budget was raised from six to
-    // sixteen and this assertion is about the specialist being told what it has, not about the
-    // value it happens to be.
+    // Against the constant rather than a spelled-out number: this assertion is about the
+    // specialist being told what it has, not about the value it happens to be.
     expect(system).toContain(`${DELEGATE_MAX_STEPS} steps`);
     expect(system).toContain('never instructions');
   });
@@ -2056,9 +2050,9 @@ describe('what a delegated specialist is sent', () => {
    * The specialist's reads are the lead's reads.
    *
    * A specialist runs its tools through the same executor as the lead but never through the lead's
-   * provenance step, so the whole delegate path used to be a way around the taint model: a mission
-   * that read attacker-controlled pages returned their contents, restated by a model, into a window
-   * the approval floor still believed had read nothing external.
+   * provenance step, so without this the whole delegate path would be a way around the taint model:
+   * a mission that read attacker-controlled pages would return their contents, restated by a model,
+   * into a window the approval floor still believed had read nothing external.
    */
   it('taints the lead with what the specialist read, and raises the floor while it holds', async () => {
     const task = makeTask();
@@ -2408,11 +2402,10 @@ describe('the web route a run is pinned to', () => {
   /*
    * A brake that cannot answer stops the car.
    *
-   * The guard's result used to be `.catch(() => null)`, and null meant "do not halt" - so one
-   * transient database error removed the owner's daily ceiling for that step, silently, with
-   * nothing written anywhere. The cap exists so an unattended overnight run cannot get away from
-   * somebody who is asleep, and the only thing underneath it sits far above where anyone sets a
-   * daily limit.
+   * If a guard that throws were read as "do not halt", one transient database error would remove
+   * the owner's daily ceiling for that step, silently, with nothing written anywhere. The cap
+   * exists so an unattended overnight run cannot get away from somebody who is asleep, and the only
+   * thing underneath it sits far above where anyone sets a daily limit.
    */
   it('stops rather than spend when the spending guard cannot answer', async () => {
     const task = makeTask();
@@ -2513,15 +2506,15 @@ describe('the web route a run is pinned to', () => {
   });
 
   /**
-   * The box this wave was written for.
+   * A zero-retention box keeps provider-side search.
    *
-   * A credential that enforces zero data retention is the shipped default, and it used to take
-   * provider-side search off the run - which on a server is the only search that works, because a
-   * datacenter address is answered with an anti-bot challenge instead of results. The owner was
-   * never offered that trade and it bought nothing: the retention promise covers inference routing
-   * and says in terms that it does not cover tools, so the query sat outside it either way.
+   * A credential that enforces zero data retention is the shipped default, and provider-side search
+   * is, on a server, the only search that works, because a datacenter address is answered with an
+   * anti-bot challenge instead of results. Taking it off the run would buy nothing: the retention
+   * promise covers inference routing and says in terms that it does not cover tools, so the query
+   * sits outside it either way.
    *
-   * What the run is held to instead is the disclosure, and both halves are asserted here - the
+   * What the run is held to is the disclosure, and both halves are asserted here - the
    * provider block that keeps the inference request zero-retention, and the sentence telling the
    * model its queries now leave this computer.
    */
@@ -2538,14 +2531,14 @@ describe('the web route a run is pinned to', () => {
   });
 
   /**
-   * The failure this whole arrangement was rebuilt to stop.
+   * No tool the model cannot call.
    *
-   * The provider's search has no `function.name`, so no model can call it; it used to be sent in the
-   * agent's own tools array with `web_search` withdrawn to make room. The model was told by its
-   * operating contract to start research with a search, went looking for the search tool, and found
-   * neither it nor any name for what had replaced it - so asked for three notable projects with
-   * sources, it made no tool call at all and answered from memory with fabricated names, fabricated
-   * dates and fabricated addresses.
+   * The provider's search has no `function.name`, so no model can call it. Sent in the agent's own
+   * tools array with `web_search` withdrawn to make room, it would leave a model told by its
+   * operating contract to start research with a search looking for the search tool and finding
+   * neither it nor any name for what replaced it - so asked for three notable projects with
+   * sources, it would make no tool call at all and answer from memory with fabricated names,
+   * fabricated dates and fabricated addresses.
    */
   it('offers the model the same catalogue on the provider route, and no tool it cannot call', async () => {
     const { log, probe } = await runOnce(standardTask(), serverConfig, [openrouterModel]);
@@ -2787,8 +2780,8 @@ describe('the web route a run is pinned to', () => {
   /**
    * The hole a route change would otherwise have opened. On the provider route the search runs on
    * the provider's own infrastructure and its results reach the model inside the response - there
-   * is no tool result for `untrustedOriginOfResult` to classify, and the two calls that used to
-   * label the web have just been withdrawn from the catalogue.
+   * is no tool result for `untrustedOriginOfResult` to classify, and the two calls that would
+   * label the web are withdrawn from the catalogue.
    */
   it('taints the turn with what the provider fetched, which arrives without a tool result', async () => {
     const cited = `data: ${JSON.stringify({
@@ -2893,10 +2886,10 @@ describe('a turn that runs out of steps', () => {
     const handoff = log.modelRequests[2] ?? {};
     /*
      * The catalogue is the head of the cached prefix, and this is the largest request the turn
-     * makes. It used to be sent a two-tool list where the step before it sent forty, so the front
-     * of the prompt moved and every byte behind it was re-billed at the write price - to buy
-     * nothing, because what stops the model starting new work here is the denial the next test
-     * exercises, not the shape of the list.
+     * makes. A shorter list here than the step before it sent would move the front of the prompt
+     * and re-bill every byte behind it at the write price - to buy nothing, because what stops the
+     * model starting new work here is the denial the next test exercises, not the shape of the
+     * list.
      */
     expect(JSON.stringify(handoff.tools)).toBe(JSON.stringify(log.modelRequests[1]?.tools));
     expect(
@@ -2913,8 +2906,8 @@ describe('a turn that runs out of steps', () => {
   });
 
   it('runs nothing but set_plan on the handoff turn, whatever it is asked for', async () => {
-    // The restriction the catalogue used to carry, where it has always actually lived: a call that
-    // is neither of the two is answered with a denial and never reaches the runner.
+    // The restriction lives in the denial rather than the catalogue: a call that is neither of the
+    // two is answered with a denial and never reaches the runner.
     const { log } = await runToTheCeiling(
       toolFrame('call-hand', 'shell', { command: 'echo late', cwd: 'workspace' })
     );
@@ -2925,8 +2918,8 @@ describe('a turn that runs out of steps', () => {
   it('lands somewhere the owner can act on instead of a red failure', async () => {
     const { probe, outcome } = await runToTheCeiling(handoffFinish);
 
-    // Before: throw step_limit_reached, status 'failed', no summary and no statement of where the
-    // work got to - on a task the API has always let a reply resume.
+    // Not a thrown step_limit_reached, status 'failed', no summary and no statement of where the
+    // work got to - on a task the API lets a reply resume.
     expect(outcome).toBeNull();
     expect(probe.events.some((entry) => entry.kind === 'error')).toBe(false);
     const completed = probe.events.find((entry) => entry.kind === 'completed');
@@ -3086,16 +3079,16 @@ describe('deciding to tell the owner something', () => {
 
   it('gives the next turn its own three notices instead of silencing the conversation', async () => {
     // The bound is written as per-turn in the tool description, in the constant's name and in the
-    // refusal the model reads - but the counter was carried into the next turn by the state spread,
-    // so a watch that raised three notices could never reach the owner again for the life of the
-    // conversation, and was told the current turn had already sent three.
+    // refusal the model reads. Carried into the next turn by the state spread, the counter would
+    // leave a watch that raised three notices unable to reach the owner again for the life of the
+    // conversation, told the current turn had already sent three.
     const first = makeTask();
     const probe = probeStore(() => first);
     const promoted: Array<Record<string, unknown>> = [];
     // Reading the queue does not consume it - `getNextQueuedTaskMessage` is a plain SELECT, and
-    // promoting is what clears the row. The stub used to decrement on read, so any second reader
-    // made the message vanish; the loop now checks for a correction at every step boundary, which
-    // is exactly such a reader.
+    // promoting is what clears the row. A stub that decremented on read would make the message
+    // vanish for any second reader, and the loop checks for a correction at every step boundary,
+    // which is exactly such a reader.
     let queuedPromoted = false;
     Object.assign(probe.store, {
       getNextQueuedTaskMessage: async () => {
@@ -3232,9 +3225,9 @@ describe('finding things on the internet', () => {
 
   it('reads twelve pages at a twelfth of the window each, so all twelve come back', async () => {
     // Twelve pages at the 20,000 the model may ask for is 214,670 characters arriving through a
-    // 24,000-character result that is cut from the middle: measured, page one came back and the
-    // other eleven were gone along with their URLs, so the harness paid runner time and provider
-    // bandwidth for eleven pages the model could never see and was never told were missing.
+    // 24,000-character result that is cut from the middle: page one would arrive and the other
+    // eleven would be gone along with their URLs, so the harness would pay runner time and provider
+    // bandwidth for eleven pages the model could never see and would never be told were missing.
     const urls = Array.from({ length: 12 }, (_unused, index) => `https://source-${index}.test/doc`);
     const task = makeTask();
     const probe = probeStore(() => task);
@@ -3320,7 +3313,7 @@ describe('finding things on the internet', () => {
 
   it('parks on a durable challenge handoff before further model calls', async () => {
     // The runner detects the wall and scopes it, but it has no database identity: nothing it can do
-    // reaches the owner's phone. A wall hit three times used to reach it zero times.
+    // reaches the owner's phone. The worker is what has to.
     const walls = [
       'https://html.duckduckgo.com/html/?q=a',
       'https://html.duckduckgo.com/html/?q=b',
@@ -3942,7 +3935,7 @@ describe('spending the owner’s money on generated media', () => {
     expect(probe.billed[0]).toMatchObject({
       providerRef: 'openai-compatible:someone/painter-xl'
     });
-    // Not the reviewed default, which is the thing this used to do no matter what was chosen.
+    // Not the reviewed default, whatever was chosen.
     expect(probe.generated[0]?.model).not.toBe(managedMediaCatalog.image.modelId);
   });
 
@@ -4045,8 +4038,8 @@ describe('spending the owner’s money on generated media', () => {
 
   it('puts a bare path in the workspace rather than paying for a write the runner will refuse', async () => {
     // The runner accepts writes only under workspace/, and the tool schema invites a plain name. A
-    // model answering `hero.png` used to have the provider bill, the write refused, and the charge
-    // lost - so the destination is resolved on this side before anything is spent.
+    // model answering `hero.png` would otherwise have the provider bill, the write refused, and the
+    // charge lost - so the destination is resolved on this side before anything is spent.
     const probe = await generate({ arguments: { path: 'hero.png' } });
     expect(probe.written).toEqual(['workspace/hero.png']);
   });
@@ -4782,22 +4775,21 @@ describe('how full the window is believed to be', () => {
    * The listing the repeated call actually gets back.
    *
    * The default stub answers anything with `/file` in it with a 404, which a `files_list` URL
-   * matches - so every step of these runs used to be a tool call that threw, sixty times over. That
-   * is now a turn garden stops on its own, and rightly: a call that fails byte-identically is the
+   * matches - so every step of these runs would be a tool call that threw, sixty times over. That
+   * is a turn garden stops on its own, and rightly: a call that fails byte-identically is the
    * one shape the loop has no other bound for. These tests are about which number the compaction
    * trigger believes, so the workspace they run against has to work.
    */
   /*
    * A workspace that changes while the turn works in it, which is what one does.
    *
-   * It answered the identical empty listing on every call, and that was load this suite could no
-   * longer generate: the model side of this fixture emits the same `files_list` with the same
-   * arguments on every step by design, so an unchanging listing made every step of the run a
-   * byte-identical action with a byte-identical report - the exact shape `stationaryStepRun` was
-   * added to stop, and it stopped it at step eight of the sixty this fixture needs. The load is what
-   * was wrong, not the guard: a turn that lists the same directory sixty times and is told the same
-   * thing sixty times has stopped working, and the tests below are about compaction rather than
-   * about that.
+   * An identical empty listing on every call is load this suite cannot generate: the model side of
+   * this fixture emits the same `files_list` with the same arguments on every step by design, so an
+   * unchanging listing would make every step of the run a byte-identical action with a
+   * byte-identical report - the exact shape `stationaryStepRun` stops, at step eight of the sixty
+   * this fixture needs. That would be the load at fault, not the guard: a turn that lists the same
+   * directory sixty times and is told the same thing sixty times has stopped working, and the tests
+   * below are about compaction rather than about that.
    *
    * A growing listing is also the more honest fixture. It keeps the trajectory bulky, which is what
    * these tests need, and it is what the runner would really answer a turn that is writing files.
@@ -4842,7 +4834,8 @@ describe('how full the window is believed to be', () => {
 
   it('does not condense work the provider says is nowhere near the window', async () => {
     // The messages are bulky enough that characters-divided-by-four calls the window nearly full,
-    // which is what used to force a compaction here. The provider says the request was 5k tokens.
+    // which on that estimate alone would force a compaction here. The provider says the request was
+    // 5k tokens.
     // Compaction is a durable, lossy edit to the trajectory, so making it on a guess that the
     // route's own accounting contradicts is work and context thrown away for nothing.
     expect(compacted(await run(5_000))).toBe(false);
@@ -5422,11 +5415,11 @@ describe('queued message spending', () => {
 
 describe('a question the agent stops to ask', () => {
   /*
-   * The operating contract has always told the model to ask when a missing choice materially
-   * changes the result, and until now there was nowhere to ask: `awaiting_user` was written only by
-   * the approval path, so a genuine blocker came back as a finish with a not_applicable
-   * verification and landed as a completion card nobody could tell from finished work - and on an
-   * unattended run the box then went silent until the owner next looked.
+   * The operating contract tells the model to ask when a missing choice materially changes the
+   * result, so `awaiting_user` has to be reachable from somewhere other than the approval path.
+   * Otherwise a genuine blocker would come back as a finish with a not_applicable verification and
+   * land as a completion card nobody could tell from finished work - and on an unattended run the
+   * box would then go silent until the owner next looked.
    */
   const parked = {
     question: 'Which mailbox should the invoice go from?',
@@ -6035,12 +6028,12 @@ describe('the prompt prefix a follow-up turn re-sends', () => {
   it('survives the workspace brief being rewritten between turns, because the brief sits last', async () => {
     /*
      * The brief is a plain workspace file and any turn may write it - the agent keeping its own
-     * journal is the commonest writer of all. It used to be spliced in as the FIRST preamble block,
-     * ahead of the reviewed knowledge block and the memory pack, so one appended line to
-     * `workspace/GARDEN.md` moved the divergence point to the second message of the prompt and
-     * re-billed everything behind it at the write premium on the next turn. Those other two blocks
-     * are frozen for the life of the task by design; the brief is the one preamble block that is
-     * not, which is exactly why it belongs behind them.
+     * journal is the commonest writer of all. Spliced in as the FIRST preamble block, ahead of the
+     * reviewed knowledge block and the memory pack, one appended line to `workspace/GARDEN.md`
+     * would move the divergence point to the second message of the prompt and re-bill everything
+     * behind it at the write premium on the next turn. Those other two blocks are frozen for the
+     * life of the task by design; the brief is the one preamble block that is not, which is exactly
+     * why it belongs behind them.
      */
     let briefBody = '# Study\n- Notes live under workspace/notes\n';
     let task = makeTask();
@@ -6109,9 +6102,9 @@ describe('the prompt prefix a follow-up turn re-sends', () => {
     /*
      * `set_plan` is the tool the operating contract asks for most often - once per status change,
      * and the user watches those statuses live - so a republish is one of the commonest events in a
-     * long turn. Republishing used to splice the old plan message out of wherever it sat in the
-     * trajectory and push a new one at the tail, which moves every message behind the old position
-     * by one and diverges the prompt there. Written over where it already sits, the divergence is
+     * long turn. Splicing the old plan message out of wherever it sat in the trajectory and pushing
+     * a new one at the tail would move every message behind the old position by one and diverge the
+     * prompt there. Written over where it already sits, the divergence is
      * the plan message itself and nothing else.
      */
     let planVersion = 0;
@@ -6371,7 +6364,7 @@ describe('the warnings that are the owner’s business', () => {
 /**
  * The owner typed a correction into a turn that was going wrong, was told the agent would pick it
  * up at its next step, and then the turn died. There was no next step. These are the three ways
- * that can end, and the only one of them that used to exist was the middle of the night.
+ * that can end.
  */
 describe('a correction the turn it was sent to did not survive', () => {
   const ownerLines = (probe: ReturnType<typeof probeStore>): string[] =>
@@ -6492,11 +6485,11 @@ describe('a correction the turn it was sent to did not survive', () => {
 /**
  * The batch of reads a frontier model opens a task with.
  *
- * Every call in it used to wait for the one in front of it to cross to the runner and come back,
- * which is three round trips of nothing on a four-read batch. What must not change is anything the
- * loop decides: the stop check, the floor's verdict on each call, and above all the order the
- * results land in the window - a turn whose window depends on which read finished first is a turn
- * that cannot be reproduced.
+ * Waiting for each call in it to cross to the runner and come back before starting the next would
+ * be three round trips of nothing on a four-read batch. What must not change is anything the loop
+ * decides: the stop check, the floor's verdict on each call, and above all the order the results
+ * land in the window - a turn whose window depends on which read finished first is a turn that
+ * cannot be reproduced.
  */
 describe('reads proposed together', () => {
   const reads = (
@@ -6708,8 +6701,8 @@ describe('reads proposed together', () => {
 /**
  * A turn that runs out of steps while the job is demonstrably unfinished and demonstrably moving.
  *
- * The ceiling used to end the turn and write a handoff saying the work continues "the moment the
- * user replies" - which on a scheduled run at three in the morning is eight hours away. These are
+ * A ceiling that ends the turn and writes a handoff saying the work continues "the moment the user
+ * replies" leaves it, on a scheduled run at three in the morning, eight hours away. These are
  * about the harness taking that decision itself, and about how much harder it is to get a yes than
  * a no: the acceptance record must exist, the harness itself must have just watched it fail, the
  * turn must still be changing things, and the owner must not have stopped it.
@@ -6904,8 +6897,8 @@ describe('a turn that finishes the job rather than the budget', () => {
      * Silence here means about the turn's own ending. Writes before the first ownership question
      * are held to nothing by `preamble-ownership.test.ts`.
      *
-     * The refusal arm inside `renewStepBudget` is still live and still tested, one level down in
-     * `handoff.test.ts` - it guards the narrower window this test can no longer reach, where the
+     * The refusal arm inside `renewStepBudget` is live and tested, one level down in
+     * `handoff.test.ts` - it guards the narrower window this test cannot reach, where the
      * lease is lost after the last step boundary rather than before the first.
      */
     const task = makeTask(workingState());
@@ -7297,14 +7290,12 @@ describe('a generation the box cut short', () => {
 });
 
 /**
- * The refusal that used to kill a conversation for good.
+ * The refusal that would otherwise kill a conversation for good.
  *
- * A window larger than the route will take comes back 400, which is not retryable and was not a
- * wall either: the task was marked failed with the oversized trajectory saved. The owner replies,
+ * A window larger than the route will take comes back 400, which is not retryable and is not a wall
+ * either. Failed with the oversized trajectory saved, the task would stay dead: the owner replies,
  * the resumed turn rebuilds the identical window, sends the identical request and dies at the
- * identical step - for as long as they are willing to keep trying. Nothing anywhere recognised the
- * shape, though the file already carried the argument for it, written above the one other 400 it
- * does repair.
+ * identical step - for as long as they are willing to keep trying.
  */
 describe('a window the route will not take', () => {
   const refusal = (): Response =>
@@ -7365,15 +7356,14 @@ describe('a window the route will not take', () => {
 });
 
 /**
- * The generation this watch was written for, and what it costs.
+ * The generation this watch is for, and what it costs.
  *
- * Twice in one evening a model answered correctly and then repeated one sentence until the
- * provider's own ceiling stopped it - seventeen thousand output tokens, a quarter of an hour, all
- * of it billed by the provider. The watch that stops it aborts the request, and the abort used to
- * take a `continue` straight past the whole billing block: no ledger row, no credit, no cost event,
- * and `state.lastStepUsd` left at the previous step's figure so the spend guard priced the next
- * step from a number it already knew was short. The one path that most needs a brake was the one
- * path that bypassed it.
+ * A model can answer correctly and then repeat one sentence until the provider's own ceiling stops
+ * it - seventeen thousand output tokens, a quarter of an hour, all of it billed by the provider.
+ * The watch that stops it aborts the request, and the abort must not take a `continue` straight
+ * past the whole billing block: that would leave no ledger row, no credit, no cost event, and
+ * `state.lastStepUsd` at the previous step's figure, so the spend guard would price the next step
+ * from a number it already knew was short. The one path that most needs a brake must not bypass it.
  */
 describe('a generation the repetition watch stopped', () => {
   /** The incident's own sentence, at a period long enough for `degenerateRepeat` to see it. */
@@ -7486,11 +7476,11 @@ describe('a generation the repetition watch stopped', () => {
 /**
  * The five gates that decide whether a turn has been anywhere, and what stopping means.
  *
- * Every one of them was a control wired to something slightly wrong: a call garden answered
+ * Every one of them is a control easily wired to something slightly wrong: a call garden answered
  * itself recorded as a call the computer answered, a call that never ran holding the key that
  * refuses the re-issue, a broker's "this is harmless" arriving as a card, Stop reaching every tool
  * except the one the owner was asked about, and a notice the model composed standing in as proof
- * that the work is done. None of the five had a test on either side of it.
+ * that the work is done.
  */
 describe('what garden answered itself, and what the computer answered', () => {
   const readRoute = (path: string, content: string) => (url: string) =>
@@ -7500,8 +7490,9 @@ describe('what garden answered itself, and what the computer answered', () => {
     /*
      * The owner edits the plan mid-step. Every call in flight is answered "replan before acting" -
      * none of them ran - and the agent does exactly what it was told: it replans and sends the same
-     * read again. That re-issue used to come back "which already ran this turn and would return the
-     * same result. Read that result again", pointing at a call whose only trace is the skip notice.
+     * read again. That re-issue must not come back "which already ran this turn and would return
+     * the same result. Read that result again", pointing at a call whose only trace is the skip
+     * notice.
      */
     const task = makeTask();
     const probe = probeStore(() => task);
@@ -8074,8 +8065,8 @@ describe('a turn that stopped changing', () => {
       /^[0-9a-f]{16}$/
     );
     expect(JSON.stringify(stopped?.payload)).not.toContain('Draft the importer');
-    // Short of the budget by a wide margin, which is the whole point: the budget was the only thing
-    // that used to stop this, at up to a hundred and twenty steps.
+    // Short of the budget by a wide margin, which is the whole point: without this stop the budget
+    // would be the only thing to end it, at up to a hundred and twenty steps.
     expect(log.modelRequests.length).toBeLessThanOrEqual(
       stationaryStepsBeforeStop(MAX_STATIONARY_STEPS) + 2
     );
@@ -8258,8 +8249,8 @@ describe('a tool call that was cut off mid-argument', () => {
  * Which garden priced this.
  *
  * A cost line is the most-compared number the product emits - a baseline read back a year later, a
- * regression argued from two transcripts - and until now nothing on it said which build produced it,
- * so two figures that disagree could not be told apart from two builds that disagree. It is the
+ * regression argued from two transcripts - and without the build on it, two figures that disagree
+ * could not be told apart from two builds that disagree. It is the
  * §6.2 credibility move's precondition: "this harness, this commit, this model, N runs" needs the
  * commit to be on the row.
  */
@@ -8504,16 +8495,15 @@ describe('the machine the run tells the model it is on', () => {
 });
 
 /*
- * The whole loop, against the repair that replaced the `code_diagnostics` approval card.
+ * The whole loop, against the bound on `code_diagnostics`.
  *
- * The finding behind that card is true: a repository cloned from anywhere is a repository whose
- * `Makefile`, `build.rs` and tests were written by somebody else, and nine of the fifteen commands
- * this tool can run are exactly those files. What the card did about it was wrong three measured
- * ways, and the third is the one a loop test can hold: the tool sat on `CHECKPOINT_EXEMPT_TOOLS`,
- * so a turn that ran a stranger's build recipe and nothing else took no undo point at all.
+ * A repository cloned from anywhere is a repository whose `Makefile`, `build.rs` and tests were
+ * written by somebody else, and nine of the fifteen commands this tool can run are exactly those
+ * files. On `CHECKPOINT_EXEMPT_TOOLS`, a turn that ran a stranger's build recipe and nothing else
+ * would take no undo point at all.
  *
- * So these two tests separate what the two used to: a diagnostic reaches the runner without parking
- * the turn, in either language, and the turn has something to rewind to when it does. Driving the
+ * So these two tests hold both halves: a diagnostic reaches the runner without parking the turn,
+ * in either language, and the turn has something to rewind to when it does. Driving the
  * real loop rather than the floor is the point - `CHECKPOINT_EXEMPT_TOOLS` is consulted in
  * `agent.ts` and in `tool-recording.ts`, neither of which `approvalRequirement` can see.
  */
@@ -8630,13 +8620,13 @@ describe('owner effort reaches the paid request', () => {
 });
 
 /**
- * Two providers connected at once, which is what a box could not do.
+ * Two providers connected at once.
  *
- * The credential used to be chosen by the account — one row, one provider — and any model outside
- * its namespace was refused here, after the conversation had started. So connecting Ollama Cloud
- * took OpenRouter's models away and a conversation pinned to one of them stopped working. The
- * credential is now chosen by the model, and the refusal that remains is the one that matters: a
- * model no connection reaches must not be sent another provider's key.
+ * The credential is chosen by the model, not by the account. Chosen by the account — one row, one
+ * provider — any model outside its namespace would be refused here, after the conversation had
+ * started, so connecting a second provider would take the first one's models away and a
+ * conversation pinned to one of them would stop working. The refusal that remains is the one that
+ * matters: a model no connection reaches must not be sent another provider's key.
  */
 describe('an account holding more than one provider connection', () => {
   const aad = `inference-provider:${userId}`;

@@ -578,12 +578,12 @@ export class MemoryStore {
    * it, and it is the sole predicate of the `mem_fact_current_one` unique index - the one guarantee
    * that a functional predicate has one current value.
    *
-   * So a release that changes a cardinality used to update the registry and leave every stored row
-   * carrying the old answer. `many` -> `one` left the unique index covering nothing it should have
-   * covered, and two current values for the same subject coexisting indefinitely with no error
-   * anywhere. `one` -> `many` was worse: the stale `TRUE` kept the index covering rows it no longer
-   * governed, so a legitimate second value was refused by a constraint violation the agent reported
-   * to the owner as a failed memory write.
+   * Without the backfill, a release that changes a cardinality would update the registry and leave
+   * every stored row carrying the previous answer. `many` -> `one` would leave the unique index
+   * covering nothing it should, and two current values for the same subject coexisting indefinitely
+   * with no error anywhere. `one` -> `many` is worse: the stale `TRUE` keeps the index covering
+   * rows it does not govern, so a legitimate second value is refused by a constraint violation the
+   * agent reports to the owner as a failed memory write.
    *
    * Two things to know before relying on this. Nothing calls it on a live box: the eval harness and
    * the tests do, while `apps/api/src/server.ts` and `apps/worker/src/index.ts` both stop at
@@ -1553,8 +1553,8 @@ export class MemoryStore {
    *
    * `i.tainted = FALSE` and not `NOT i.tainted`: an episode written before migration 71 has NULL
    * here and nobody recorded whether that turn read somebody else's words, so it is refused. This
-   * is the taint gate given a second life - it used to exist only inside the worker, on the turn
-   * itself, and the verbatim text of a tainted turn went into `mem.source` anyway.
+   * is the taint gate given a second life - enforced only inside the worker, on the turn itself,
+   * it would still let the verbatim text of a tainted turn into `mem.source`.
    *
    * `s.role = 'owner'` and not every source on the episode. The other role is the agent's own
    * summary of its work, and it is the laundering route: a turn that read a hostile page and
@@ -1720,15 +1720,15 @@ export class MemoryStore {
    * when the caller cannot open the draft, and it is why nothing here is ever destructive on its
    * own: a candidate only disappears once it has become something.
    *
-   * Two things this does NOT do, both of which it used to.
+   * Two things this does NOT do.
    *
-   * It does not mint a second row for a sentence the workspace already holds. Promotion deletes
-   * the candidate, and `standing_order` is `cardinality: 'many'`, so the supersession in
-   * `#recordMemoryFact` never fires on one: an owner restating a rule they had already had
-   * promoted re-accumulated a candidate and minted an identical, active, pinned row beside the
-   * first. The pack caps facts at four per subject, so duplicates do not merely waste bytes - the
-   * same rule takes two of the four slots every later turn in that workspace sees. The
-   * corroboration now lands on the row that is already there, as evidence.
+   * It does not mint a second row for a sentence the workspace already holds. Promotion deletes the
+   * candidate, and `standing_order` is `cardinality: 'many'`, so the supersession in
+   * `#recordMemoryFact` never fires on one: an owner restating a rule they had already had promoted
+   * would re-accumulate a candidate and mint an identical, active, pinned row beside the first. The
+   * pack caps facts at four per subject, so duplicates would not merely waste bytes - the same rule
+   * would take two of the four slots every later turn in that workspace sees. The corroboration
+   * lands on the row that is already there, as evidence.
    *
    * And it does not bring back a row the owner retracted. Retraction is the owner saying "stop
    * believing this", and a promotion pass that re-mints it two sightings later is the machine
@@ -2585,47 +2585,43 @@ export class MemoryStore {
      * all three are the same construction on the same clock, which is what makes their weights
      * comparable to each other.
      *
-     * AN UNGRADED USE IS NOT A SUCCESS, AND `s_use` USED TO SAY IT WAS. The filter here read
+     * AN UNGRADED USE IS NOT A SUCCESS. `s_use` filters on `outcome = 'ok'`, not on
      * `outcome <> 'fail'`, which is every outcome the harness did not watch fail - and that
      * includes `unknown`, which is the outcome nobody watched at all. Both of this score's
      * production writers emit it: `recallMemory` writes `unknown` for every row it merely
      * RETURNED, and `recordMemoryPackOutcome` writes `unknown` for every packed entry the
      * finished turn never touched, its comment saying in as many words that such an entry must be
-     * left "ungraded, both directions". It was not: under `<> 'fail'` a history of ten ungraded
-     * uses and a history of ten graded ones are the same activation to the last bit, so no ranking
+     * left "ungraded, both directions". Under `<> 'fail'` a history of ten ungraded uses and a
+     * history of ten graded ones are the same activation to the last bit, so no ranking
      * downstream of this could tell a use the model cited from a row the ranker had handed itself.
      * @see the `an ungraded use` cases in `memory-decay.test.ts`, which compute both filters over
      * the same rows.
      *
-     * So the ranking was reading its own output as evidence. A row the ranker returned got a use
-     * worth exactly as much as one the model cited, which made it likelier to be returned, which
-     * bought it another. `MEMORY_USE_DECAY_EXPONENT` records what that cost when it was first
-     * noticed: two rows alike in everything, the one an `ORDER BY score DESC, id` tie-break
-     * happened to put first held 70 uses against 10 sixty turns later, on nothing but a UUID. That
-     * is a rich-get-richer sort on a coin flip, and it is why the owner's "usage-weighted
-     * retrieval WITH positive and negative reinforcement" could not be built on the old filter:
-     * the loop drowns the reinforcement.
+     * Counting them would have the ranking read its own output as evidence. A row the ranker
+     * returned would get a use worth exactly as much as one the model cited, which would make it
+     * likelier to be returned, which would buy it another: of two rows alike in everything, the
+     * one an `ORDER BY score DESC, id` tie-break happened to put first pulls away on nothing but a
+     * UUID. That is a rich-get-richer sort on a coin flip, and the owner's "usage-weighted
+     * retrieval WITH positive and negative reinforcement" cannot be built on it: the loop drowns
+     * the reinforcement.
      *
      * ZERO, NOT A DISCOUNT, and the reason is that a discount does not work. A uniform weight `w`
      * on ungraded uses scales the activation the loop manufactures by `w`, and salience is a
      * z-score against the workspace's own moments - so for two rows whose only difference IS that
      * activation, `w` largely divides back out and the pair still separates, for every `w > 0`,
      * just further down the decimals. Only `w = 0` breaks the path, because only `w = 0` makes the
-     * ranker's own selection carry no evidence at all. Measured the other way round, on the loop
-     * itself: thirty rounds, thirty ungraded uses against nought, and the pair ends where the text
-     * put it - while the same thirty rounds graded `ok`, which is exactly what the old filter
-     * scored them as, leave the leader a whole salience ahead.
+     * ranker's own selection carry no evidence at all. On the loop itself: thirty rounds, thirty
+     * ungraded uses against nought, and the pair ends where the text put it - while the same thirty
+     * rounds graded `ok` leave the leader a whole salience ahead.
      *
      * `mem.item_use` still gets the row; `use_count`, `last_used_at`, procedure health and the
-     * audit trail are all unaffected. What changes is that being chosen is no longer a reason to
-     * be chosen again.
+     * audit trail are all unaffected. Being chosen is simply not a reason to be chosen again.
      *
-     * IT IS ALSO WHAT THE OTHER READER OF THIS COLUMN ALREADY DID. `listStaleMemoryProcedures`
-     * counts `graded_recent` as `outcome <> 'unknown'` and has since it was written, so the
-     * procedure-health tier and the salience tier disagreed about what `unknown` meant, and the
-     * health tier was right.
+     * IT IS ALSO WHAT THE OTHER READER OF THIS COLUMN DOES. `listStaleMemoryProcedures` counts
+     * `graded_recent` as `outcome <> 'unknown'`, so the procedure-health tier and the salience tier
+     * agree about what `unknown` means.
      *
-     * WHAT IT COSTS, TRACED THROUGH THE WRITER RATHER THAN ARGUED. `s_use` is now the uses graded
+     * WHAT IT COSTS, TRACED THROUGH THE WRITER RATHER THAN ARGUED. `s_use` is the uses graded
      * `ok`, and the only production writer of `ok` is the attributable path of
      * `recordMemoryPackOutcome`, which grades an entry only if it was cited. Run against a real
      * store, that writer produces exactly two shapes of row: `cited=true, outcome='ok'` for what
@@ -2639,32 +2635,30 @@ export class MemoryStore {
      * with no citation at all. `fail` does NOT separate them, because nothing writes it: the only
      * caller of `recordMemoryPackOutcome` in the product, `apps/worker/src/memory-capture.ts`,
      * passes the literal `outcome: 'ok'` and only when the turn was not interrupted, so no turn on
-     * this box has ever written `outcome='fail'` and `s_fail` is empty in production. That was
-     * already true before this change and it is not this statement's to repair, but it is what
-     * makes the overlap above total rather than partial.
+     * this box writes `outcome='fail'` and `s_fail` is empty in production. That is not this
+     * statement's to repair, but it is what makes the overlap above total rather than partial.
      *
-     * `MEMORY_SALIENCE_USE_WEIGHT` and `MEMORY_SALIENCE_CITE_WEIGHT` were chosen against a
-     * measured r = 0.9344 between two signals that were then distinct. On the ordinary path they
-     * now weigh one signal twice, and whoever next reads their ratio needs that first. The
-     * decision - collapse the two weights, or wire the grade in `memory-capture.ts` so a turn that
-     * failed marks down what it cited - belongs with `packages/core/src/memory.ts`, where both
-     * constants live and where neither this file nor this lane can reach.
+     * `MEMORY_SALIENCE_USE_WEIGHT` and `MEMORY_SALIENCE_CITE_WEIGHT` assume two distinct signals.
+     * On the ordinary path they weigh one signal twice, and whoever next reads their ratio needs
+     * that first. The decision - collapse the two weights, or wire the grade in
+     * `memory-capture.ts` so a turn that failed marks down what it cited - belongs with
+     * `packages/core/src/memory.ts`, where both constants live.
      *
      * THE `+ 1` IS NOT A FUDGE. `SUM` is zero for a row that has never been used and `ln 0` has no
      * value to rank, so one pseudo-use is added at the unit of the clock - one day, where
      * `t^-d = 1` for any `d`. A never-used row therefore scores exactly 0 and every row with any
      * history at all scores strictly above it: one use ten years ago is worth `ln(1.0166)`, which
      * is small and is not zero. That is "further away, never gone" as an identity rather than as a
-     * floor constant, and it is what the previous `INTERVAL '90 days'` could not express.
+     * floor constant, which a fixed window such as `INTERVAL '90 days'` cannot express.
      *
-     * The z-score against the workspace's own moments is unchanged and is what stops a busy
-     * project inflating everything: a round that uses every row raises the mean by as much as it
-     * raises each row. It is also most of the answer to whether the clock should run on calendar
-     * days or on the owner's working days. Rescaling every age by a constant `c` multiplies every
-     * SUM by the same `c^-d`, which is an additive `-d ln c` on every `ln SUM` and which a z-score
-     * removes exactly; only the NON-uniform part of a working-day clock could change a ranking,
-     * and that part is measured on one owner whose duty cycle is 0.362 over 138 days. Calendar
-     * days, therefore, and no second table to maintain.
+     * The z-score against the workspace's own moments is what stops a busy project inflating
+     * everything: a round that uses every row raises the mean by as much as it raises each row. It
+     * is also most of the answer to whether the clock should run on calendar days or on the owner's
+     * working days. Rescaling every age by a constant `c` multiplies every SUM by the same `c^-d`,
+     * which is an additive `-d ln c` on every `ln SUM` and which a z-score removes exactly; only
+     * the NON-uniform part of a working-day clock could change a ranking, and that part is measured
+     * on one owner whose duty cycle is 0.362 over 138 days. Calendar days, therefore, and no second
+     * table to maintain.
      *
      * "Did this match the last query" is still deliberately not an input: it is the signal that
      * over-weights recency, and recency already has its own factor in `mem.prior`.
@@ -2845,16 +2839,14 @@ export class MemoryStore {
     /*
      * The use history past the retention horizon is FOLDED, not forgotten.
      *
-     * This statement used to be `DELETE FROM mem.item_use ... WHERE used_at < horizon`, and while
-     * the score above it was a count inside a 90-day window that cost nothing: the rows it dropped
-     * had already scored zero for ninety days. A sum over every prior use cannot be taken against
-     * a table that forgets, so deleting the window and leaving this alone would have moved the
-     * cliff from day 90 to day 180 rather than removing it.
+     * A plain `DELETE FROM mem.item_use ... WHERE used_at < horizon` would cost nothing only to a
+     * score that counted inside a fixed window. A sum over every prior use cannot be taken against
+     * a table that forgets, so a delete here would put a cliff at day 180.
      *
      * What leaves the table arrives in `mem.item_use_fold` as a count and a span, from which the
-     * block's activation is recovered in closed form by the LATERAL above. The bound the delete
-     * existed for is kept - one row per item, however long the history - and it is now a bound on
-     * storage rather than on memory.
+     * block's activation is recovered in closed form by the LATERAL above. The bound a delete would
+     * give is kept - one row per item, however long the history - and it is a bound on storage
+     * rather than on memory.
      *
      * ONE STATEMENT, not two in a transaction. Both halves read the same snapshot, so the INSERT
      * sees exactly the rows the DELETE removes; a crash between an INSERT and a DELETE would have
@@ -3157,17 +3149,17 @@ export class MemoryStore {
        * Two statements, in this order, and the order is the whole of it. The sole-witness drafts go
        * first; only then does every surviving draft lose this turn's vote.
        *
-       * It used to be the other way round - one UPDATE flooring the counter with
-       * `GREATEST(n_episodes - 1, 1)`, then a DELETE sweeping whatever it had emptied - and the
-       * floor was not a safety net but a workaround for the column's own `CHECK (n_episodes > 0)`.
-       * Between the two statements a draft whose only witness had just been deleted sat at
-       * `n_episodes = 1` with an EMPTY `episode_ids`, which is a fact this box believes two turns
-       * observed and can name neither. Nothing but the adjacency of the two lines kept that state
-       * from being read, and `listPromotableMemoryFactCandidates(minEpisodes: 1)` reads exactly it.
+       * The other way round - one UPDATE flooring the counter with `GREATEST(n_episodes - 1, 1)`,
+       * then a DELETE sweeping whatever it had emptied - needs the floor not as a safety net but as
+       * a workaround for the column's own `CHECK (n_episodes > 0)`. Between the two statements a
+       * draft whose only witness had just been deleted would sit at `n_episodes = 1` with an EMPTY
+       * `episode_ids`, which is a fact this box believes two turns observed and can name neither.
+       * Nothing but the adjacency of the two lines would keep that state from being read, and
+       * `listPromotableMemoryFactCandidates(minEpisodes: 1)` reads exactly it.
        *
        * Written this way the intermediate state cannot exist, the counter is decremented honestly
-       * rather than floored, and the CHECK stops being something to work around and becomes the
-       * guard: delete the first statement and the second one violates it, so the transaction fails
+       * rather than floored, and the CHECK is not something to work around but the guard: delete
+       * the first statement and the second one violates it, so the transaction fails
        * loudly instead of promoting a fact no surviving turn ever observed.
        *
        * `array_remove` rather than a cardinality test on the raw column, because it strips every

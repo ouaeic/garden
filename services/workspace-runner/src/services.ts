@@ -392,13 +392,12 @@ export type Reclaim = 'gone' | 'killed' | 'foreign';
  * ascending order to `pid_max` before reusing any, and `Restart=always` brings the runner back in
  * seconds rather than in the four million forks that would take.
  *
- * This deliberately does not look at the process's command line, which is what it used to do. A
- * command line is not durable: `sh -c 'sleep 30'` execs the inner command and answers `ps` with
- * `sleep 30`, and every wrapper in the chain this runner builds - prlimit, the sudo helper - execs
- * in place too. Measured on the shipped path, a service declared as `/bin/sh -c ...` was
- * unrecognisable within milliseconds of starting, so its own runner read it as a stranger, left it
- * holding the port and started a second copy beside it - which is precisely the failure the pid is
- * written down to prevent.
+ * This deliberately does not look at the process's command line. A command line is not durable:
+ * `sh -c 'sleep 30'` execs the inner command and answers `ps` with `sleep 30`, and every wrapper in
+ * the chain this runner builds - prlimit, the sudo helper - execs in place too. A service declared
+ * as `/bin/sh -c ...` is unrecognisable within milliseconds of starting, so its own runner would
+ * read it as a stranger, leave it holding the port and start a second copy beside it - which is
+ * precisely the failure the pid is written down to prevent.
  */
 export const reclaimOrphan = async (
   record: ServiceRecord,

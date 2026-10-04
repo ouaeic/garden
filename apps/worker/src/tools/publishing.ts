@@ -50,9 +50,9 @@ const previewPort = (value: unknown): number => {
  * the same kind of token and hand back the same kind of address - the differences between them are
  * lifetime and audience, which is exactly what a reader comparing them needs to see at once.
  *
- * It was three tools until `publish_site` became `publish_preview`'s `reach: 'public'`. What it did
- * is all still here, in the one arm below; what is gone is a second NAME for it, which is what the
- * approval floor used to have to read in order to guess how far a call reached.
+ * A public site is `publish_preview`'s `reach: 'public'`, not a tool of its own, in the one arm
+ * below: with one NAME for both, the approval floor reads how far a call reaches from its
+ * arguments rather than guessing it from the name.
  */
 export async function executePublishingTool(
   context: ToolContext,
@@ -110,8 +110,8 @@ export async function executePublishingTool(
           // writes the file where it is told instead of choosing a name from the input stem, it
           // runs on a throwaway profile so a concurrent conversion started by a skill cannot
           // corrupt this one, and it exits non-zero when the bytes are not there - which
-          // LibreOffice does not, and which is exactly how a review copy used to come back as a
-          // missing file rather than as a conversion failure.
+          // LibreOffice does not, and without which a review copy comes back as a missing file
+          // rather than as a conversion failure.
           const rendered = await context.runner.call<ExecObservation>(
             task.workspaceId,
             task.id,

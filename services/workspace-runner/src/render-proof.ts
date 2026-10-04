@@ -92,12 +92,11 @@ const BLANK_PROBE_DPI = 20;
  * text layer has every page, and rendering all of them would turn a check into a job - so past this
  * many the check says it cannot answer rather than answering for the ones it looked at.
  *
- * Set at 16 while nothing could reach this route, and 16 is too low the moment something can: a
- * twenty-page scan is an ordinary thing to be handed, and it came back saying the document could
- * not be vouched for. That sentence is true and it is not what the owner needed, because the limit
- * it was reporting was this constant rather than anything about their file. At the measured 52ms a
- * page this covers a long scan for about three seconds against a 30s probe budget, so what is left
- * past it is genuinely a job rather than a document.
+ * A twenty-page scan is an ordinary thing to be handed, and a limit below it would answer that the
+ * document could not be vouched for. That sentence is true and it is not what the owner needed,
+ * because the limit it would be reporting is this constant rather than anything about their file.
+ * At the measured 52ms a page this covers a long scan for about three seconds against a 30s probe
+ * budget, so what is left past it is genuinely a job rather than a document.
  */
 export const MAX_BLANK_PROBE_PAGES = 64;
 
@@ -343,9 +342,9 @@ const run = async (
 /**
  * The tools this needs, resolved against the system directories and no others.
  *
- * Not the way an agent command resolves them, which is what this used to do. All three are spawned
- * by the runner's own account, outside the sandbox, so resolving them on `agentSearchPath` meant a
- * file the agent had written called `pdftotext` would be the one that ran on the owner's document.
+ * Not the way an agent command resolves them. All three are spawned by the runner's own account,
+ * outside the sandbox, so resolving them on `agentSearchPath` would let a file the agent had
+ * written called `pdftotext` be the one that ran on the owner's document.
  * @see hostSearchPath.
  *
  * Held as a value the caller passes in so the measurement can be exercised against a poppler that

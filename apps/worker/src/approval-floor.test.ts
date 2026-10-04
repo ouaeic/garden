@@ -252,18 +252,17 @@ describe('the approval floor is evaluated once per call', () => {
 });
 
 /*
- * The lookup this floor used to do before every diagnostic, and no longer does.
+ * The lookup this floor does not do before a diagnostic.
  *
- * A `code_diagnostics` call carries `language: 'auto'` and settles nothing, so the removed approval
- * card could not tell `tsc --noEmit` from `make -s` on the arguments. It bought the answer with a
- * directory listing taken here, from the runner, before every call. The card is gone and so is the
- * round trip - which is the second saving, and the one nobody would have noticed: the dispatch arm
- * takes the same listing a moment later and acts on it, so this one was a runner call per
- * diagnostic spent entirely on the wording of a question.
+ * A `code_diagnostics` call carries `language: 'auto'` and settles nothing, so the arguments alone
+ * cannot tell `tsc --noEmit` from `make -s`, and the floor raises no card that would need to. A
+ * directory listing taken here, from the runner, would be a runner call per diagnostic spent
+ * entirely on the wording of a question: the dispatch arm takes the same listing a moment later
+ * and acts on it.
  *
- * Both halves are asserted, because "the card is gone" and "the lookup is gone" fail differently.
- * A floor that still asks costs the owner a click; a floor that still looks costs a round trip on
- * every diagnostic and shows up as nothing at all.
+ * Both halves are asserted, because "no card" and "no lookup" fail differently. A floor that asks
+ * costs the owner a click; a floor that looks costs a round trip on every diagnostic and shows up
+ * as nothing at all.
  */
 describe('what the floor no longer has to look up before a diagnostic runs', () => {
   const listing = (entries: string[], seen: string[] = [], fail = false): ApprovalFloorDeps => ({
@@ -304,10 +303,9 @@ describe('what the floor no longer has to look up before a diagnostic runs', () 
 
   /*
    * The owner's own Rust project against the owner's own TypeScript project, driven through the
-   * real listing so the two calls genuinely differ - identical arguments, one marker file apart,
-   * which is the only place in the product where that difference was ever visible. The Rust one
-   * used to cost a card and the TypeScript one did not, and the difference is measured here rather
-   * than argued: `evals/cards` counts the same pair over a whole trajectory.
+   * real listing so the two calls genuinely differ - identical arguments, one marker file apart.
+   * Neither costs a card, and that is measured here rather than argued: `evals/cards` counts the
+   * same pair over a whole trajectory.
    */
   it('charges a Cargo.toml exactly what it charges a package.json, which is nothing', async () => {
     expect(await judge(['Cargo.toml', 'src'])).toBeNull();
@@ -319,7 +317,7 @@ describe('what the floor no longer has to look up before a diagnostic runs', () 
 
   /*
    * The saving, asserted as an absence of a runner call rather than as a comment claiming one.
-   * `files.read` here was the listing; nothing else in this floor reaches the runner for a
+   * `files.read` here would be the listing; nothing else in this floor reaches the runner for a
    * diagnostic, so an empty scope list is the whole statement.
    */
   it('reaches the runner not at all, where it used to take a listing before every call', async () => {
@@ -329,9 +327,9 @@ describe('what the floor no longer has to look up before a diagnostic runs', () 
   });
 
   /*
-   * The old branch failed closed: a listing it could not take became a card, on the reasoning that
-   * unknown must not read as safe. With nothing to be unknown about, a runner that is not answering
-   * costs the diagnostic nothing here - it is the dispatch arm's error to report, once, in its own
+   * Failing closed - a listing that cannot be taken becoming a card, because unknown must not read
+   * as safe - has nothing to be unknown about here, so a runner that is not answering costs the
+   * diagnostic nothing - it is the dispatch arm's error to report, once, in its own
    * words.
    */
   it('does not invent a card out of a runner that is not answering', async () => {
@@ -339,9 +337,9 @@ describe('what the floor no longer has to look up before a diagnostic runs', () 
   });
 
   /*
-   * `language` is the one argument the model chooses freely, and it used to be the one worth asking
-   * about twice: it could neither walk past the card nor invent one. Now it decides only which
-   * command the dispatch arm runs, and this floor has no opinion about any of them.
+   * `language` is the one argument the model chooses freely, so it must neither walk past a card
+   * nor invent one. It decides only which command the dispatch arm runs, and this floor has no
+   * opinion about any of them.
    */
   it('has no opinion about the language the call names, whichever it names', async () => {
     expect(await judge(['package.json', 'tsconfig.json'], { language: 'go' })).toBeNull();

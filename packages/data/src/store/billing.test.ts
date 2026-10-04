@@ -8,7 +8,7 @@ import { DataStore } from '../store.js';
  * `usage_entries` is append-only and four-valued: a charge is `reserved` before the work runs,
  * `settled` when the provider's own figure lands, `released` when the reservation was never spent,
  * and `credited` when money that was taken came back. Only `settled` is money gone. Every reader
- * that answers "what has been spent" has to say so in SQL, and one of them did not.
+ * that answers "what has been spent" has to say so in SQL.
  */
 describe('BillingStore spend readers', () => {
   let database: Database;
@@ -48,8 +48,8 @@ describe('BillingStore spend readers', () => {
   /**
    * The media brake reads this number and refuses to generate past it, so anything it counts that
    * is not money the owner spent shortens the task for no reason. A reservation that never settled
-   * is money nobody took; a refund is money that came back. Both were counted for the life of the
-   * task, because this was the one reader in the file with no `state` filter at all.
+   * is money nobody took; a refund is money that came back. Without a `state` filter both would
+   * count for the life of the task.
    */
   it('counts reserved and settled media charges against the media brake', async () => {
     const { userId, taskId } = await seedTask();

@@ -258,9 +258,9 @@ export const honorUserControl = async (
  *
  * This repository's named signature defect is a control wired to nothing - a gate that computes the
  * right verdict and is never consulted, a set that is built and never read, a withdrawal that is
- * decided and then not applied. The audit found that shape more than thirty times, and every one of
- * them was found by a human reading two files against each other, because nothing in the product
- * ever re-derives what it is about to do from what it has recorded.
+ * decided and then not applied. Without this, that shape is found only by a human reading two files
+ * against each other, because nothing else in the product re-derives what it is about to do from
+ * what it has recorded.
  *
  * The model request is the largest such control in garden: it is the whole of what the model sees,
  * it is assembled from four independent inputs at three different points in the loop, and a
@@ -278,10 +278,10 @@ export const honorUserControl = async (
  *   built once for the whole run precisely so the catalogue stays byte-identical across steps; a
  *   later rebuild that forgets a withdrawal restores a tool the box cannot honour, and moves the
  *   head of the cached prefix while doing it. Compared by content and not only by name, and that
- *   is not belt-and-braces: `connector_action` is now shaped by which kinds of service the owner
+ *   is not belt-and-braces: `connector_action` is shaped by which kinds of service the owner
  *   has connected, so a rebuild that read the connector table again instead of the fact frozen on
  *   the run would produce the same forty-one names carrying a different request. A name check
- *   would have called that derivable.
+ *   would call that derivable.
  * - `reservedTokens` diverging from the array actually sent. Three places compute it independently
  *   from three arrays, and it is the number the input budget, the compaction trigger and the
  *   handoff's own floor are all derived from. A drift there is a window sized against a request

@@ -27,20 +27,19 @@ export const registerPrivacyRoutes = (context: RouteContext): void => {
   /**
    * Everything this box holds about its owner, written out as it is read.
    *
-   * It used to be assembled whole and then serialised: every `assistant_delta` frame of every turn
-   * of every conversation decrypted into one array, that array into one string, and the string into
+   * Assembled whole and then serialised, it would be every `assistant_delta` frame of every turn of
+   * every conversation decrypted into one array, that array into one string, and the string into
    * one response. On a box a year old that is tens of millions of frames, and the failure is the
    * API's heap - the process restarted by systemd, taking every in-flight turn with it, on the one
    * route that exists so an owner can get their data out.
    *
    * So the document is emitted a piece at a time and nothing bigger than one page of one task's
-   * events is ever in memory. It is still the same JSON document, byte for byte the same shape: the
-   * bound is what was missing, not the format, and the client that reads this parses it whole
-   * (`apps/web/src/api.ts` reads it with `.json()` and hands it straight to a Blob). NDJSON would
-   * have bounded the same bytes and broken that button, in a wave where no lane may edit it.
+   * events is ever in memory. It is still one JSON document, because the client that reads this
+   * parses it whole (`apps/web/src/api.ts` reads it with `.json()` and hands it straight to a
+   * Blob). NDJSON would bound the same bytes and break that button.
    *
-   * The schedules read is hoisted out of the workspace loop, where it re-read every schedule the
-   * owner has once per workspace and then threw away all but one workspace's worth.
+   * The schedules read sits outside the workspace loop; inside it, it would re-read every schedule
+   * the owner has once per workspace and then throw away all but one workspace's worth.
    */
   app.get('/v1/privacy/export', async (request, reply) => {
     const user = requireUser(request.user);

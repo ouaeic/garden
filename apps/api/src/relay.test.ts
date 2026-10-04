@@ -104,14 +104,12 @@ class FakeLink implements RelayLink {
     };
     this.#onStatus(this.status);
     /*
-     * This used to be one `setTimeout(…, 0)`, under a comment saying it gave the supervisor's file
-     * writes "a turn". One macrotask is not a turn: the write is two filesystem round trips past
-     * where the tick returns, so the assertion below it read the settings file before the
-     * revocation reached it. On an idle machine the write happened to win the race and the suite
-     * was green; run beside the other eleven packages it lost, and the red read as "the supervisor
+     * Not one `setTimeout(…, 0)`: one macrotask does not give the supervisor's file writes a
+     * turn. The write is two filesystem round trips past where the tick returns, so an assertion
+     * after it can read the settings file before the revocation reaches it. On an idle machine the
+     * write tends to win that race; on a loaded one it loses, and the red reads as "the supervisor
      * does not persist a revocation" - a defect in shipped code - rather than as "the test looked
-     * too early". Reproduced deliberately by putting eight writer processes on the same temporary
-     * filesystem, which fails it every time.
+     * too early".
      */
     await this.#settle();
   }
@@ -547,9 +545,9 @@ describe('the relay routes an owner uses', () => {
     ]);
     /**
      * The client refuses a ticket whose version it does not know, and refuses one carrying a field
-     * it has never heard of. This one used to be version 1 with the code under a name of its own
-     * and no expiry, so the QR code the settings screen draws could not be imported by anything.
-     * Asserted field by field, because every one of them is a rule on the other side.
+     * it has never heard of, so a ticket that drifts from its rules leaves the QR code the settings
+     * screen draws importable by nothing. Asserted field by field, because every one of them is a
+     * rule on the other side.
      */
     expect(Object.keys(ticket).sort()).toEqual([
       'discovery',

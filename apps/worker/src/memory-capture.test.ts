@@ -263,14 +263,12 @@ describe('what a finished turn tells the store about the memory it was given', (
    * `recordTurnEpisode` keeps the first eight six-kilobyte chunks of each part and drops the rest.
    * On the owner's real corpus - 675 turns, 233,064 characters, 11 projects, 49 active days, on the
    * strict owner-turn filter - the widest single turn is 14,625 characters against 48,000 bytes per
-   * part, so it has never fired and 100.0% of what the owner typed reached a source row. The 197 of
-   * 3,950 (5.0%) and 34.6 MB of 59.9 MB (57.7%) this comment used to state were measured on a
-   * corpus that counted machine-written text as the owner's, and are void.
+   * part, so it has never fired and 100.0% of what the owner typed reached a source row.
    *
-   * The cap is right and is unchanged, and a bound that has not fired yet is not a bound that
-   * cannot. What was wrong is that nothing said so when it did, so the owner could search memory
-   * for a constraint they had definitely written and be told, truthfully and uselessly, that
-   * nothing matched. That is what this describe block holds in place.
+   * The cap is right, and a bound that has not fired yet is not a bound that cannot. What matters
+   * is that something says so when it does; otherwise the owner could search memory for a
+   * constraint they had definitely written and be told, truthfully and uselessly, that nothing
+   * matched. That is what this describe block holds in place.
    */
   describe('saying what the verbatim cap refused', () => {
     const oversized = 'The brief. '.padEnd(60_000, 'y');
@@ -329,14 +327,14 @@ describe('what a finished turn tells the store about the memory it was given', (
 });
 
 /*
- * The nightly proposer's production call site, after the deletion.
+ * No nightly proposer call site.
  *
- * `captureMemory` used to make one model call a day here, hung off the consolidation cadence, and
- * `docs/design/memory2/RULES.md` records what retired it. The removal is asserted where it can
- * fail rather than by the absence of a symbol: the store this turn is handed throws on all three
- * of the reads that were the nightly route's and nobody else's, and `captureMemory` catches
- * everything and reports it as a timeline warning - so a call site put back does not fail to
- * compile somewhere else, it turns this green case red with the warning in hand.
+ * `captureMemory` makes no daily model call off the consolidation cadence, and
+ * `docs/design/memory2/RULES.md` records why. That is asserted where it can fail rather than by the
+ * absence of a symbol: the store this turn is handed throws on all three of the reads only a
+ * nightly proposer would make, and `captureMemory` catches everything and reports it as a timeline
+ * warning - so a call site added here does not fail to compile somewhere else, it turns this green
+ * case red with the warning in hand.
  *
  * The consolidation beside it is the positive control, in both directions: the cadence still
  * fires, exactly once, and a second turn inside the same day does not fire it again. Without it

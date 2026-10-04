@@ -372,11 +372,11 @@ export const injectMemoryPack = (
  * Agent-initiated recall
  *
  * The pack answers the opening request and is then frozen for the task's lifetime, which is what
- * keeps the cached prefix alive. Everything the task turns out to need and did not open with was,
- * until now, unreachable: memory arrived once and could never be asked a question. This is the
- * question. It is the same fusion query, re-planned from the agent's own words, ordered by
- * relevance rather than for byte-stability, and returned as a tool result - so it lands after the
- * last cache breakpoint and costs the query and its answer, not the prompt behind it.
+ * keeps the cached prefix alive. Without a way to ask, everything the task turns out to need and
+ * did not open with would be unreachable: memory would arrive once and never be asked a question.
+ * This is the question. It is the same fusion query, re-planned from the agent's own words,
+ * ordered by relevance rather than for byte-stability, and returned as a tool result - so it lands
+ * after the last cache breakpoint and costs the query and its answer, not the prompt behind it.
  * ------------------------------------------------------------------------ */
 
 export type MemoryRecallStore = Pick<
@@ -461,15 +461,11 @@ export const recallMemory = async (input: MemoryRecallInput): Promise<MemoryReca
     workspaceId: input.workspaceId,
     plan: planMemoryQuery(query, memoryIndexKey(input.dataKey)),
     now: input.now ?? runtimeDate(),
-    // A fixed budget, not a clamped request. There used to be a `budgetTokens` input clamped
-    // between 256 and a 4,000 ceiling, and nothing could ever set it: the tool schema is
-    // `additionalProperties: false` and never declared the field, so every recall this computer
-    // has ever answered was answered at exactly `MEMORY_RECALL_BUDGET_TOKENS`. Two tuned-looking
-    // numbers in `packages/core` read to the next maintainer as live controls - raise the ceiling
-    // and no model can reach it, lower it and `clamp` silently halves what nobody asked for - and
-    // `pnpm check` passed either way. The clamp and its ceiling are gone rather than wired: the
+    // A fixed budget, not a clamped request. The tool schema is `additionalProperties: false` and
+    // declares no budget field, so a clamped input here could never be set by any model, and a
+    // tuned-looking ceiling behind it would read to the next maintainer as a live control. The
     // model already chooses how much recall it gets through `maxItems`, and a second, overlapping
-    // budget dial is a way to ask the same question twice (ATH-164).
+    // budget dial is a way to ask the same question twice.
     budgetTokens: MEMORY_RECALL_BUDGET_TOKENS,
     maxItems: clamp(input.maxItems, MEMORY_RECALL_MAX_ITEMS, 1, MEMORY_RECALL_ITEM_CEILING),
     quotas: MEMORY_RECALL_QUOTAS,
@@ -506,8 +502,8 @@ export const recallMemory = async (input: MemoryRecallInput): Promise<MemoryReca
   // returns what the ranker chose, and whether the agent went on to do anything with it is settled
   // when the turn is verified, by `recordMemoryPackOutcome`. `unknown` scores in neither the
   // positive nor the negative activation - see the salience recompute in
-  // `packages/data/src/store/memory.ts`, where it used to score as a success, which is what made
-  // being returned once a reason to be returned again.
+  // `packages/data/src/store/memory.ts`, where scoring it as a success would make being returned
+  // once a reason to be returned again.
   const itemIds = entries.filter((entry) => entry.layer === 'item').map((entry) => entry.id);
   if (itemIds.length > 0)
     await input.store.recordMemoryUse({
@@ -565,12 +561,11 @@ export interface MemorySessionTurn {
    * all for the other half - the half that is 80% of the record.
    *
    * Measured on the owner's own trajectories over 146 probes whose answer is only in a tool result
-   * (`docs/design/reach/RIG.md`, another lane's rig): `session_search` locates the right stored
-   * turn on 100.0% of them, and reaching from the id it used to return answers 25.3%. Reaching
-   * from this one answers 86.3%, against a hard ceiling of 92.5% set by
-   * `MEMORY_REACH_MAX_CHARS`. One string per match, in a tool result rather than in the resident
-   * catalogue, and no new call, tool or concept: the id is dereferenced by the arm that already
-   * exists under the bound that already exists.
+   * (`docs/design/reach/RIG.md`): `session_search` locates the right stored turn on 100.0% of
+   * them, and reaching from `id` answers 25.3%. Reaching from this one answers 86.3%, against a
+   * hard ceiling of 92.5% set by `MEMORY_REACH_MAX_CHARS`. One string per match, in a tool result
+   * rather than in the resident catalogue, and no new call, tool or concept: the id is
+   * dereferenced by the arm that already exists under the bound that already exists.
    *
    * Absent rather than null when there is none, so a row captured outside `recordTurnEpisode`
    * costs nothing to report.
@@ -1038,7 +1033,7 @@ export interface MemoryReachInput {
  * The cited tool results are spent from the budget FIRST and the verbatim rows get what is left.
  * That ordering is the point of the whole operation: the verbatim tier is reachable by search, and
  * the tool results are reachable by nothing else at all - they are 80% of what a trajectory is
- * made of and until this arm existed the only reader of `task_events` was the owner's own timeline.
+ * made of.
  */
 export const reachMemoryEvidence = async (
   input: MemoryReachInput
@@ -1660,14 +1655,12 @@ export const MEMORY_STANDING_ORDER_MAX_CHARS = 200;
  * kept anyway: a connective that is restrictive in English does not stop being restrictive because
  * this owner has not typed it yet, and an unused alternative in a regex costs nothing.
  *
- * What that measurement says about the MERGE has to be restated now the nightly proposer is gone,
- * because the merge is the half that was aimed at it. On this corpus the split merges nothing: 35
- * distinct cores out of 35 distinct sentences, so no two of the owner's own typed rules ever meet
- * on one counter, and a writer that says one thing twice in two phrasings no longer exists. What
- * the split still does, on those 3 sightings of 40, is the half that was always the pattern path's:
- * a rule reaches `mem.item` carrying the exception it was stated with, or does not reach it at all.
- * That is `promotedStandingOrder`'s refusal, and it is a claim about what a stored sentence says
- * rather than a way of collecting sightings.
+ * On this corpus the split merges nothing: 35 distinct cores out of 35 distinct sentences, so no
+ * two of the owner's own typed rules ever meet on one counter. What the split does, on those 3
+ * sightings of 40, is keep the exception with the rule: a rule reaches `mem.item` carrying the
+ * exception it was stated with, or does not reach it at all. That is `promotedStandingOrder`'s
+ * refusal, and it is a claim about what a stored sentence says rather than a way of collecting
+ * sightings.
  */
 const QUALIFICATION_OPENERS = [
   'but',
@@ -1842,8 +1835,8 @@ const DISCRETION_GRANT = [
  * - "unless I allow it" is the owner's act, "unless it can be lost" is a caution.
  *
  * The modals refuse their own negation in every spelling: "you may not", "you may never", "you
- * may no longer" and "you can't" all tighten, and a lookahead that named only "not" read "you may
- * never touch /etc" as a permission.
+ * may no longer" and "you can't" all tighten, and a lookahead that named only "not" would read
+ * "you may never touch /etc" as a permission.
  */
 const CONTRAST_GRANT = [
   String.raw`\b(?:you|garden|the agent|agents?)\s+(?:may|might|can|could)\b(?!'t\b|\s+(?:not|never|no longer)\b)`,
@@ -2015,11 +2008,9 @@ export const factCandidateKeys = (
   /*
    * The split is taken here and never handed in.
    *
-   * It used to be an optional parameter, for the one writer that held a rule and two clauses
-   * already apart - the nightly proposer, whose reply could attach two carve-outs to one sentence.
-   * That writer is gone, and with it the only way a single sighting can carry more than one clause:
-   * `splitQualification` takes one split per sentence. Two clauses on one rule are now necessarily
-   * two sightings, which is the shape the accumulator was built for.
+   * No writer holds a rule and its clauses already apart, and `splitQualification` takes one split
+   * per sentence, so a single sighting carries at most one clause. Two clauses on one rule are
+   * necessarily two sightings, which is the shape the accumulator was built for.
    */
   const rule = splitQualification(observation.object);
   return {
@@ -2499,9 +2490,9 @@ export const observedStandingOrders = (text: string): MemoryFactObservation[] =>
     const head = STANDING_HEAD.exec(line);
     if (head && STANDING_DANGLING.has((head[1] ?? '').toLowerCase())) continue;
     /*
-     * Where the rule starts, which the three refusals below are measured against and the old
-     * `.some()` threw away. An imperative rule starts at 0 by construction; a marker rule starts
-     * wherever the earliest marker matched, and everything in front of that is frame.
+     * Where the rule starts, which the three refusals below are measured against. An imperative
+     * rule starts at 0 by construction; a marker rule starts wherever the earliest marker matched,
+     * and everything in front of that is frame.
      */
     const startsAt = head
       ? 0
@@ -2511,7 +2502,7 @@ export const observedStandingOrders = (text: string): MemoryFactObservation[] =>
         }, Number.POSITIVE_INFINITY);
     if (startsAt === Number.POSITIVE_INFINITY) continue;
     // Asked about, quoted, or attributed to somebody. All three are sentences that contain a rule
-    // without being one, and all three used to be stored as the rule they contain.
+    // without being one.
     if (STANDING_ASKED.test(line) || STANDING_QUOTED.test(line)) continue;
     /*
      * Everything in front of the owner's own words is frame, and neither `startsAt` nor the rule
@@ -2616,13 +2607,11 @@ export interface TurnEpisodeResult {
    * Measured over the owner's real corpus - 675 turns, 233,064 characters, 11 projects, 49 active
    * days, on the strict owner-turn filter - the widest single turn is 14,625 characters against
    * `MEMORY_MAX_SOURCE_CHUNKS * MEMORY_SOURCE_CHUNK_BYTES` = 48,000 bytes per part. This is 0 on
-   * every one of them, and 100.0% of what the owner typed reaches a source row. The 197 turns
-   * (5.0%) and 34.6 MB of 59.9 MB (57.7%) this used to state were measured on a corpus that
-   * counted machine-written text as the owner's; they are void and are not the cap's rationale.
+   * every one of them, and 100.0% of what the owner typed reaches a source row.
    *
-   * The cap is unchanged. What was wrong was never the number, it was that reaching it happened in
-   * silence - the owner could search for a brief stored with its tail cut off and be told only
-   * that nothing matched - and `captureMemory` says so out loud when this is non-zero.
+   * Reaching the cap must not happen in silence - the owner could search for a brief stored with
+   * its tail cut off and be told only that nothing matched - so `captureMemory` says so out loud
+   * when this is non-zero.
    */
   readonly sourceChunksDropped: number;
   readonly factCandidates: number;
@@ -3006,13 +2995,13 @@ export const recordMemoryPackOutcome = async (input: {
       cited: false,
       // The per-item half. The grade belongs to what the turn can be shown to have used: an entry
       // the finished work never touched is not evidence that the pack worked, and crediting it
-      // with the turn's success is what made `ok_count` a count of injections rather than of help.
+      // with the turn's success would make `ok_count` a count of injections rather than of help.
       // The same argument runs the other way and matters more - a turn that failed must not enter
       // `fail` against the eleven entries it never read, because that is how a procedure the agent
-      // ignored gets demoted for a mistake somebody else made. Ungraded, both directions - and
-      // that is now true of the score as well as of this call. `unknown` used to enter the
-      // positive activation in `consolidateMemory` at exactly the weight of a graded success, so
-      // every entry this branch declined to credit was credited anyway, one rank at a time.
+      // ignored gets demoted for a mistake somebody else made. Ungraded, both directions - for the
+      // score as well as for this call. If `unknown` entered the positive activation in
+      // `consolidateMemory` at the weight of a graded success, every entry this branch declined to
+      // credit would be credited anyway, one rank at a time.
       outcome: 'unknown'
     });
   return recorded;

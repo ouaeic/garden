@@ -153,8 +153,8 @@ describe('what the turn treats as somebody else’s words', () => {
     expect(untrustedOriginOfResult(call('web_search'), { results: [] })).toBe('web search results');
     expect(
       untrustedOriginOfResult(call('parallel_web_read'), {
-        // The shape the runner actually answers with. This fixture used to say `pages`, which
-        // nothing sends - so the assertion passed while the label named no host at all.
+        // The shape the runner actually answers with. A fixture saying `pages`, which nothing
+        // sends, would pass while the label named no host at all.
         sources: [
           { requestedUrl: 'https://vendor.example/pricing', url: 'https://vendor.example/pricing' }
         ]
@@ -193,8 +193,8 @@ describe('what the turn treats as somebody else’s words', () => {
   it('labels what a background process printed, which nothing watched it fetch', () => {
     // `shell` is judged on the command it was handed. A `node ingest.js` that reads its URL out of
     // a config file names no address, is not a network client, and starts clean - and its output
-    // arrives here, through a session id carrying nothing about what started it. The whole turn
-    // used to report clean, so every sink stayed ungated.
+    // arrives here, through a session id carrying nothing about what started it. Unlabelled, the
+    // whole turn would report clean, so every sink would stay ungated.
     expect(untrustedOriginOfResult(call('process', { action: 'log', sessionId: 'p1' }), {})).toBe(
       'background process output'
     );
@@ -359,11 +359,11 @@ describe('what the turn treats as somebody else’s words', () => {
   });
 
   /**
-   * The route change that would otherwise have walked around the whole model. On the provider
-   * route the search runs on the provider's infrastructure and its results reach the model inside
-   * the response, so no tool result is ever produced - and the two calls that used to label the
-   * web, `web_search` and `parallel_web_read`, are withdrawn from the catalogue on exactly that
-   * route. Without this the more capable web route would also have been the unlabelled one.
+   * The route that would otherwise walk around the whole model. On the provider route the search
+   * runs on the provider's infrastructure and its results reach the model inside the response, so
+   * no tool result is ever produced - and the two calls that label the web elsewhere, `web_search`
+   * and `parallel_web_read`, are withdrawn from the catalogue on exactly that route. Without this
+   * the more capable web route would also be the unlabelled one.
    */
   it('labels the web the provider fetched, which never comes back as a tool result', () => {
     expect(

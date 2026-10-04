@@ -1,17 +1,14 @@
 /**
  * The one place this package looks at OpenRouter's `/models` document before believing any of it.
  *
- * That document comes from a service garden does not control, and it used to be read through a
- * bare TypeScript interface - a compile-time description of what the wire was expected to hold,
- * which nothing checked at run time. Measured against the built parser, four reshapes of the
- * document each threw a raw TypeError out of the whole refresh rather than out of one row:
- * `supported_parameters` as an object and `architecture.input_modalities` as an object both gave
- * "object is not iterable", `pricing.overrides` as an object gave "((intermediate value) ?? [])
- * .flatMap is not a function", and a single `null` inside `data` gave "Cannot read properties of
- * null (reading 'id')". The degradation was safe - every caller records the failure and leaves the
- * previous catalogue serving - but the owner reads that raw JavaScript sentence in `garden doctor`,
- * and one provider's field reshape stopped every model in the catalogue from being refreshed for as
- * long as it lasted.
+ * That document comes from a service garden does not control, and a bare TypeScript interface is
+ * only a compile-time description of what the wire is expected to hold, which nothing checks at run
+ * time. Read through one, four reshapes of the document each throw a raw TypeError out of the whole
+ * refresh rather than out of one row: `supported_parameters` as an object,
+ * `architecture.input_modalities` as an object, `pricing.overrides` as an object, and a single
+ * `null` inside `data`. Every caller records the failure and leaves the previous catalogue serving,
+ * but the owner would read a raw JavaScript sentence in `garden doctor`, and one provider's field
+ * reshape would stop every model in the catalogue from being refreshed for as long as it lasted.
  *
  * This is a narrowing, not a schema. It brings in no validation vocabulary and no dependency: it
  * walks the document once and answers with the shape the rest of openrouter-catalog.ts already
@@ -123,9 +120,9 @@ const numberIn = (value: unknown): number | null => {
 /**
  * A rate, kept as the string the price arithmetic downstream already expects.
  *
- * A rate that arrived as a JSON number used to work by accident - `perMillion` calls `Number` on it
- * and never looked at the type - so it is converted here rather than dropped, which keeps that
- * accident working under a type that is now true of the value instead of merely declared about it.
+ * A rate that arrives as a JSON number works by accident - `perMillion` calls `Number` on it and
+ * never looks at the type - so it is converted here rather than dropped, which keeps that accident
+ * working under a type that is true of the value instead of merely declared about it.
  */
 const rateIn = (value: unknown): Rate => {
   if (typeof value === 'string') return value;

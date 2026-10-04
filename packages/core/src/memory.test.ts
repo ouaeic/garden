@@ -734,9 +734,9 @@ describe('an open validity interval says what it means', () => {
 
   it('names the open end instead of trailing off after the separator', () => {
     const rendered = renderMemoryPack([open]).body;
-    // The whole defect in one assertion: the bytes used to end `.../` and the block's own header
-    // explains only what an *ended* validity means, so the live entries - which are all of them,
-    // most of the time - were the ones rendered ambiguously.
+    // The bytes must not end `.../`: the block's own header explains only what an *ended* validity
+    // means, so the live entries - which are all of them, most of the time - would be the ones
+    // rendered ambiguously.
     expect(rendered).toContain('valid=2026-07-01T00:00:00.000Z/Present');
     expect(rendered).not.toMatch(/valid=\S+\/(?:\s|$)/mu);
   });

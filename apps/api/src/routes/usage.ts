@@ -340,27 +340,26 @@ export const registerUsageRoutes = (context: RouteContext): void => {
       /*
        * A passkey to loosen the brake, nothing to tighten it.
        *
-       * Adding a device needs a passkey and reading an export needs a passkey, while removing the
-       * one control standing between the owner and an unbounded provider bill needed only an
-       * unlocked browser. Asking on every edit would be friction on a routine adjustment, and the
-       * direction is what matters: raising a ceiling or clearing it is the escalation, lowering one
-       * cannot hurt. A cap that was null is already unlimited, so setting a number there is a
-       * tightening even though it "changes" the value.
+       * Adding a device needs a passkey and reading an export needs a passkey, so removing the one
+       * control standing between the owner and an unbounded provider bill needs one too. Asking on
+       * every edit would be friction on a routine adjustment, and the direction is what matters:
+       * raising a ceiling or clearing it is the escalation, lowering one cannot hurt. A cap that
+       * was null is already unlimited, so setting a number there is a tightening even though it
+       * "changes" the value.
        *
        * And a ceiling nobody has chosen is not one the owner is loosening.
        *
-       * `current` is `effectiveSpendLimits`, so since the monthly cap acquired a default, `was` on a
-       * fresh box is this box's own guess rather than the owner's decision - and the first answer to
+       * `current` is `effectiveSpendLimits`, and the monthly cap has a default, so `was` on a fresh
+       * box is this box's own guess rather than the owner's decision - and the first answer to
        * the ceiling question, which is a decline, is sent as explicit nulls. Without the exemption
        * below that answer is a clearing, and saying "no ceiling, thank you" on a box that has never
        * been asked anything else costs a biometric prompt. The epoch stamp is the test, and it is
        * the same one the question itself uses to decide it is still owed.
        *
-       * The exemption cannot cost anything, and the reason is arithmetic rather than judgement: a
-       * box that has never saved a limit had no cap at all until this default existed, and this PUT
-       * asked for no passkey then either. Waving it through cannot leave such a box worse off than
-       * the version that shipped without a default. One saved answer in either direction moves
-       * `updatedAt` off the epoch, and from then on every loosening asks, exactly as it does now.
+       * The exemption cannot cost anything: a box that has never saved a limit has only the
+       * default, which nobody chose, so waving the decline through leaves it no worse off than a
+       * box with no default at all. One saved answer in either direction moves `updatedAt` off the
+       * epoch, and from then on every loosening asks.
        */
       const stored = await store.effectiveSpendLimits(user.id);
       const current = { ...stored, ...ownerPriceCeiling(stored) };

@@ -5,11 +5,11 @@ import { ZodError } from 'zod';
  * The batch of calls the model proposed, and the nine gates each one passes before it runs.
  *
  * The gates are ordered by what a call that is answered instead of run leaves behind, and every one
- * of the nine is here because the alternative was observed:
+ * of the nine is here because the alternative does harm:
  *
  *   1. **the owner**, re-asked before *every* call rather than once before the batch. A model
- *      routinely proposes several actions at a time, and a single check meant a cancel landing
- *      after the first one still sent the email, published the artifact and fired the POST -
+ *      routinely proposes several actions at a time, and with a single check a cancel landing
+ *      after the first one would still send the email, publish the artifact and fire the POST -
  *      minutes after the interface said the task had stopped;
  *   2. **plan mode**, which answers anything outside the derived read-only fence with a sentence
  *      saying what to do with the step instead. It is second because everything below it can start
@@ -19,22 +19,18 @@ import { ZodError } from 'zod';
  *      the results are recorded strictly in the order the model declared them;
  *   4. **the repeat**, for the eight tools whose answer is a pure function of their arguments;
  *   5. **arguments that would not parse**, told apart from arguments cut off at the output cap,
- *      because what to do about it differs and they used to be told apart by guesswork;
+ *      because what to do about it differs;
  *   6. **a plan the owner moved** under a call that was already proposed;
  *   7. the tools the harness answers itself - `compact_context`, `notify`, `ask` - plus
  *      `set_acceptance`;
  *   8. **the approval floor**, memoised per model response;
  *   9. and then the call runs.
  *
- * The idempotency key is registered at gate 6 and not at gate 4, which is two gates later than it
- * used to be and is the whole of one repair: the owner edits the plan mid-step, three `file_read`s
- * are answered "replan before acting" - none of them ran - the agent replans and re-issues exactly
- * those three, which is what it was just told to do, and each comes back "which already ran this
- * turn". There is no result to read, only the skip notice, and those three files were unreadable
- * for the rest of the turn.
- *
- * Lifted out of `AgentWorker.run()` unchanged; the three `return`s became `'returned'`, and the
- * approval memo is created here rather than one line above the loop. That is the whole of the edit.
+ * The idempotency key is registered at gate 6 and not at gate 4. At gate 4, the owner edits the
+ * plan mid-step, three `file_read`s are answered "replan before acting" - none of them ran - the
+ * agent replans and re-issues exactly those three, which is what it was just told to do, and each
+ * would come back "which already ran this turn". There would be no result to read, only the skip
+ * notice, and those three files would be unreadable for the rest of the turn.
  */
 import type { ModelResponse, ModelToolCall } from '@garden/model-gateway';
 import type { ModelRelease, WebToolPlan } from '@garden/contracts';
@@ -143,15 +139,15 @@ export const PLAN_MODE_PERMITTED: ReadonlySet<string> = new Set([
  *
  * It says what to do with the step instead of only saying no, which is the difference between a
  * refusal a model can act on and one it re-proposes: every other answered call in this file is
- * worded that way, and the two that were not were measured costing a turn its whole step budget.
+ * worded that way, and a refusal that only says no can cost a turn its whole step budget.
  *
  * It also says, in as many words, that leaving the mode is not the model's to do. That sentence is
  * not the enforcement - the enforcement is that no tool on the wire writes `state.mode`, and
  * dispatch.test.ts drives every name in the lead catalogue to show it - but a model that is refused
  * without being told who can lift the refusal spends its steps looking for the lever.
  *
- * It says what the mode stops and NOT one word more, which is a correction rather than a style. It
- * used to end "nothing that reaches outside", and four permitted tools reach outside:
+ * It says what the mode stops and NOT one word more, which is a correctness rule rather than a
+ * style. "Nothing that reaches outside" would be false, because four permitted tools reach outside:
  * `web_search` and `parallel_web_read` read the web, `delegate` opens another window on it, and
  * `notify` reaches the owner's phone. The cost of the wider claim is not pedantry - `notify` and
  * `ask` are the two channels this mode leaves the model, and a model told that nothing reaches
@@ -416,9 +412,8 @@ export const dispatchToolCalls = async (
         {
           skipped: true,
           /*
-           * Which of the two it was decides what to do about it, and they used to be told
-           * apart by guesswork - every unparseable call was reported as truncation, so a model
-           * that had simply written bad JSON was advised to send less of it.
+           * Which of the two it was decides what to do about it: reported as truncation, a model
+           * that had simply written bad JSON would be advised to send less of it.
            */
           reason: cutOff
             ? truncations >= MAX_ARGUMENT_TRUNCATIONS
@@ -451,15 +446,15 @@ export const dispatchToolCalls = async (
     /*
      * Registered here, past every gate that answers a call instead of running it.
      *
-     * It used to be registered at the repeat check above, which is two gates too early. The
-     * owner edits the plan mid-step, three `file_read`s are answered "replan before acting" -
-     * none of them ran - the agent replans and re-issues exactly those three, which is what it
-     * was just told to do, and each one comes back "which already ran this turn and would
-     * return the same result. Read that result again": there is no result to read, only the
-     * skip notice, and those three files are unreadable for the rest of the turn. Truncation
-     * has the same shape and a sharper edge, because `repo_overview` has no required
-     * parameters, so a valid minimal call and a call cut off mid-JSON are both `{}` - one
-     * truncated `repo_overview` retired the tool for the whole turn.
+     * The repeat check above is two gates too early. There, the owner edits the plan mid-step,
+     * three `file_read`s are answered "replan before acting" - none of them ran - the agent
+     * replans and re-issues exactly those three, which is what it was just told to do, and each
+     * one would come back "which already ran this turn and would return the same result. Read
+     * that result again": there is no result to read, only the skip notice, and those three files
+     * would be unreadable for the rest of the turn. Truncation has the same shape and a sharper
+     * edge, because `repo_overview` has no required parameters, so a valid minimal call and a
+     * call cut off mid-JSON are both `{}` - one truncated `repo_overview` would retire the tool
+     * for the whole turn.
      *
      * Nothing between here and `#execute` answers one of these eight without running it. An
      * approval can park one, and that is deliberate: the parked call is resumed by id rather
@@ -532,26 +527,25 @@ export const dispatchToolCalls = async (
     /*
      * The undo point, in front of the floor rather than behind it.
      *
-     * It used to be taken inside `executeApprovedCall`, one gate later, and that put the floor in
-     * the position of answering a question about a fact that did not exist yet. The destructive
-     * rule frees a delete strictly inside `CHECKPOINT_CONTENT` because a rewind puts it back, and
-     * it reads `ApprovalContext.undoPoint` to know there is a rewind; absent keeps the card. So a
-     * turn whose FIRST non-exempt call was itself a recoverable delete paid a card, and the same
-     * `rm -rf dist` two calls later did not. Nothing about the delete decided that - only where it
-     * happened to fall in the batch, which is not a bound, and no rig row could see it.
+     * Taken inside `executeApprovedCall`, one gate later, it would put the floor in the position
+     * of answering a question about a fact that did not exist yet. The destructive rule frees a
+     * delete strictly inside `CHECKPOINT_CONTENT` because a rewind puts it back, and it reads
+     * `ApprovalContext.undoPoint` to know there is a rewind; absent keeps the card. So a turn whose
+     * FIRST non-exempt call was itself a recoverable delete would pay a card, and the same
+     * `rm -rf dist` two calls later would not - decided by where the delete fell in the batch,
+     * which is not a bound.
      *
-     * Moving it here answers the question the rule is actually asking. `#ensureTurnUndoPoint` is
+     * Taking it here answers the question the rule is actually asking. `#ensureTurnUndoPoint` is
      * unconditional for a non-exempt tool and returns immediately for an exempt one, so this costs
      * an exempt call nothing; and it records `{ turn, id: null }` when the runner REFUSES - a
      * workspace over `CHECKPOINT_MAX_FILES`, a full host disk - which the floor reads as no rewind
-     * and cards. The fail-closed direction is not traded away by the move, it is made exact: before
-     * it, "the checkpoint has not been taken yet" and "the checkpoint could not be taken" were the
-     * same absent fact.
+     * and cards. The fail-closed direction is exact: "the checkpoint has not been taken yet" and
+     * "the checkpoint could not be taken" are never the same absent fact.
      *
-     * What it costs, said plainly: a call the floor CARDS now takes a checkpoint it did not take
-     * before, and if the owner declines it, that walk bought nothing. An approved one pays it
-     * either way - `turn/resume.ts` takes the undo point before running the approved call - so the
-     * new cost is exactly one workspace walk per declined or unanswered card. A turn that only
+     * What it costs, said plainly: a call the floor CARDS takes a checkpoint, and if the owner
+     * declines it, that walk bought nothing. An approved one pays it either way - `turn/resume.ts`
+     * takes the undo point before running the approved call - so the extra cost is exactly one
+     * workspace walk per declined or unanswered card. A turn that only
      * reads still costs nothing, because every tool in it is exempt.
      */
     await deps.resume.ensureTurnUndoPoint(task, key, state, call.name);

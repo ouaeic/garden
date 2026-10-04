@@ -6,13 +6,12 @@ import { vendorForEndpoint } from './vendors.js';
 /**
  * Prices for a model company's own endpoint, where the endpoint publishes none.
  *
- * A direct key lists models without prices, so every call through it used to be costed at a flat
- * guess per usage class - which put a model that bills fifteen dollars per million output tokens
- * against the owner's ceiling at four. The companies' list prices are published, and the one feed
- * that carries all of them in a single machine-readable place is the aggregator's public model
- * list, which states each first-party model at the price its maker charges. That list is read -
- * publicly, with no key and nothing of the owner's in the request - and matched to the direct
- * model by name.
+ * A direct key lists models without prices, and a flat guess per usage class would put a model that
+ * bills fifteen dollars per million output tokens against the owner's ceiling at four. The
+ * companies' list prices are published, and the one feed that carries all of them in a single
+ * machine-readable place is the aggregator's public model list, which states each first-party model
+ * at the price its maker charges. That list is read - publicly, with no key and nothing of the
+ * owner's in the request - and matched to the direct model by name.
  *
  * Only for the companies whose own models these are. A host serving open models sets its own
  * prices, which the aggregator's figure for the same weights says nothing about, so those stay

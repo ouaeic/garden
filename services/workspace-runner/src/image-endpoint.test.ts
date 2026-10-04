@@ -130,10 +130,10 @@ describe('reading a picture a model can be shown', () => {
   });
 
   /*
-   * The other half of the promise, and the half that was a leak. A picture a model already accepts
-   * used to be handed over exactly as it sat on disk, which sounded like care for the owner's
-   * sharpness and meant that the one format every camera roll produces went out with the camera's
-   * own notes on it. The converter is where the stripping happens, so a photograph has to reach it.
+   * The other half of the promise. A picture a model already accepts is not handed over exactly
+   * as it sits on disk, because the one format every camera roll produces would then go out with
+   * the camera's own notes on it. The converter is where the stripping happens, so a photograph has
+   * to reach it.
    */
   it('sends a photograph to the converter rather than out as it sits on disk', async () => {
     const { read } = await serve({ 'IMG_0422.JPG': 'jpeg-bytes' });

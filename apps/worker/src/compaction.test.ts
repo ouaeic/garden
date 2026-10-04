@@ -231,10 +231,10 @@ describe('the transcript a compaction hands its summariser', () => {
    * that message reaches the summariser - so this is a statement about the reasoning channel and
    * not about the fixture.
    *
-   * It used to assert the opposite, and the opposite was the defect: `compactionRequest` asks the
-   * summariser to preserve the reasons behind decisions, the preamble tells the model to put those
-   * reasons in the reasoning channel or nowhere, and `transcriptLine` then built the transcript
-   * from content and tool calls alone. The harness was hiding the answer and asking for it.
+   * `compactionRequest` asks the summariser to preserve the reasons behind decisions, and the
+   * preamble tells the model to put those reasons in the reasoning channel or nowhere - so a
+   * transcript built from content and tool calls alone would have the harness hiding the answer
+   * and asking for it.
    */
   it('carries the reasoning that produced them, which is the channel the summariser is told to keep', async () => {
     const held = harness();

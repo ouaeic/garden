@@ -190,10 +190,10 @@ describe('the sentence the acceptance record shows the owner', () => {
 
   /**
    * The sentence above is the honest one and it is still a refusal, so how far it sits decides
-   * whether this check is usable. At 16 a twenty-page scan came back unvouchable - the ceiling
-   * describing itself rather than the document - which is a guard firing on ordinary work.
+   * whether this check is usable. Set too low, a twenty-page scan comes back unvouchable - the
+   * ceiling describing itself rather than the document - which is a guard firing on ordinary work.
    *
-   * A floor rather than an equality, because the number is a cost decision and may rise again; what
+   * A floor rather than an equality, because the number is a cost decision and may rise; what
    * must not happen is it quietly falling back under the documents people actually have.
    */
   it('reaches the end of a scan rather than reporting its own ceiling', () => {
@@ -460,8 +460,8 @@ describe('the route the acceptance record calls', () => {
   /**
    * A page reader in one of the six system directories, or nothing.
    *
-   * The route resolves poppler on `hostSearchPath` now, so a stub the test writes into the
-   * workspace can no longer stand in for it - which is the point, and is asserted below. What is
+   * The route resolves poppler on `hostSearchPath`, so a stub the test writes into the workspace
+   * cannot stand in for it - which is the point, and is asserted below. What is
    * left for the measuring case is the host's own copy, when the host has one.
    */
   const systemPdftotext = (): string | undefined =>
@@ -472,7 +472,7 @@ describe('the route the acceptance record calls', () => {
 
   /**
    * A server holding one document, and optionally a page reader planted where an agent could put
-   * one - the first entry of `agentSearchPath`, which this route used to resolve against.
+   * one - the first entry of `agentSearchPath`.
    */
   const serve = async (options: { reader?: string; document?: Buffer }) => {
     const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'garden-render-route-'));
@@ -514,9 +514,9 @@ describe('the route the acceptance record calls', () => {
   };
 
   /**
-   * The case this used to be, inverted. It planted a page reader in the workspace's own tool bin -
-   * a directory `scripts/garden-sandbox` grants the agent write on - and the route ran it, on the
-   * owner's document, as the runner's own account. It is kept as the proof that it no longer does.
+   * A page reader planted in the workspace's own tool bin - a directory `scripts/garden-sandbox`
+   * grants the agent write on - must not be run on the owner's document as the runner's own
+   * account.
    *
    * The status is asserted only as "not the measurement", because which refusal arrives depends on
    * whether this host has poppler in a system directory. The marker is the assertion that matters:
@@ -610,7 +610,7 @@ describe('the route the acceptance record calls', () => {
  *
  * pdftotext, pdftoppm and garden-office-convert are spawned by the runner's own account against
  * the owner's document. Both directories planted here are ones the sandbox grants the agent write
- * on, and one of them used to lead the list this resolved against.
+ * on, and one of them leads the list an agent command resolves against.
  */
 describe('the tools a render proof spawns', () => {
   const planted = async (): Promise<{ root: string; decoy: string }> => {

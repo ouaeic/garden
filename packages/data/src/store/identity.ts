@@ -512,10 +512,10 @@ export class IdentityStore {
    * Whether this grant is still good, without spending it.
    *
    * The registration ceremony needs to know whose account it is building options for before the
-   * authenticator has done anything, and that question used to be asked by consuming the grant. A
-   * biometric prompt the owner dismissed - or an authenticator that timed out, or a phone that rang
-   * mid-tap - therefore burned the link permanently, and the only way forward was to walk back to a
-   * device that is already signed in and mint another one behind a passkey confirmation. Reading it
+   * authenticator has done anything. Asking that by consuming the grant would let a biometric
+   * prompt the owner dismissed - or an authenticator that timed out, or a phone that rang mid-tap -
+   * burn the link permanently, and the only way forward would be to walk back to a device that is
+   * already signed in and mint another one behind a passkey confirmation. Reading it
    * here and spending it in `consumeDeviceEnrollment` once a credential actually exists keeps the
    * same single-use guarantee: the UPDATE is still the only thing that marks it spent, so a second
    * device racing for the same link still loses.
