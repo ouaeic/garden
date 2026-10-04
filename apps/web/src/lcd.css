@@ -66,8 +66,8 @@
   /* A one-pixel checkerboard of the tint over whatever lies beneath: the in-between tone. */
   --dither: conic-gradient(var(--tint) 0 25%, transparent 0 50%, var(--tint) 0 75%, transparent 0) 0
     0 / 2px 2px;
-  /* One lit pixel in four: the veil behind sheets and dialogs. */
-  --veil: conic-gradient(var(--text) 0 25%, transparent 0) 0 0 / 2px 2px;
+  /* One driven pixel in four: the veil behind sheets and dialogs, which dims in either theme. */
+  --veil: conic-gradient(var(--s3) 0 25%, transparent 0) 0 0 / 2px 2px;
   --raised-fill: var(--dither), var(--bg);
   --type-s: 16px;
   --type-m: 24px;

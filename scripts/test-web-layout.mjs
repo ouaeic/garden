@@ -742,6 +742,19 @@ try {
     deviceScaleFactor: Number(process.env.GARDEN_UI_SCALE ?? 1),
     reducedMotion: 'reduce'
   });
+  // A screen to look at in a given palette and theme, for judging them by eye.
+  if (process.env.GARDEN_UI_PALETTE || process.env.GARDEN_UI_THEME)
+    await context.addInitScript(
+      ({ palette, theme }) => {
+        try {
+          if (palette) localStorage.setItem('garden-palette', palette);
+          if (theme) localStorage.setItem('garden-theme', theme);
+        } catch {
+          // Sandboxed frames have no storage, and no screen of their own to colour.
+        }
+      },
+      { palette: process.env.GARDEN_UI_PALETTE, theme: process.env.GARDEN_UI_THEME }
+    );
   await context.route('**/*', async (route) => {
     const url = new URL(route.request().url());
     if (url.origin === isolatedPreviewOrigin) return route.continue();

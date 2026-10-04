@@ -28,8 +28,10 @@ export async function checkCreatureExits({ context, origin, report }) {
           `
           });
           await page.evaluate((kind) => {
-            // A monkey can also start hanging from the top of the screen; this one starts on a card.
-            Math.random = () => (kind === 'monkey' ? 0.6 : 0.1);
+            // A monkey's first draw chooses between hanging from the top of the work area and a
+            // card; this one takes a card, then the upper perch, so its leap is down to the lower.
+            const draws = kind === 'monkey' ? [0.6] : [];
+            Math.random = () => (draws.length ? draws.shift() : 0.1);
             for (const [left, top] of [
               [20, 140],
               [210, 440]

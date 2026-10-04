@@ -19,7 +19,7 @@
  */
 
 /** Lightening of driven crystal averaged over a dot, whatever the density. */
-const GAP_WEIGHT = 0.06;
+const GAP_WEIGHT = 0.045;
 /** How much darker an undriven dot is than the reflector around it. */
 const DOT_ALPHA = 0.025;
 /** How much brighter the reflector shows between dots than through them. */
