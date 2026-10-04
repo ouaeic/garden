@@ -17,10 +17,33 @@ export async function checkBackgroundWork({ context, origin, report, taskId }) {
       maxBootstrapRequests = Math.max(maxBootstrapRequests, activeBootstrap.size);
     }
     if (url.pathname.startsWith('/v1/'))
-      requests.push({ path: url.pathname, method: request.method() });
+      requests.push({
+        path: url.pathname,
+        method: request.method(),
+        startedWhile: request.headers()['x-beta-visibility'] ?? 'unknown'
+      });
   });
+  /*
+   * The network sees a request some time after the page asks for it, so a read begun while the
+   * page was visible can reach it just after the page is hidden. Each fetch is labelled with the
+   * visibility it began under; only one begun while hidden, or not labelled at all, is traffic
+   * the hidden page made.
+   */
+  const madeWhileHidden = (list) =>
+    list
+      .filter((request) => request.startedWhile !== 'visible')
+      .map(({ path, method }) => ({ path, method }));
   await page.addInitScript(() => {
     window.betaVisibility = 'visible';
+    const fetchFromPage = window.fetch.bind(window);
+    window.fetch = (input, init = {}) => {
+      const url = new URL(input instanceof Request ? input.url : String(input), location.href);
+      // Only the page's own reads are labelled, so nothing cross-origin needs a preflight.
+      if (url.origin !== location.origin) return fetchFromPage(input, init);
+      const headers = new Headers(init.headers ?? (input instanceof Request ? input.headers : {}));
+      headers.set('x-beta-visibility', window.betaVisibility);
+      return fetchFromPage(input, { ...init, headers });
+    };
     Object.defineProperty(document, 'visibilityState', {
       configurable: true,
       get: () => window.betaVisibility
@@ -46,7 +69,7 @@ export async function checkBackgroundWork({ context, origin, report, taskId }) {
     await visibility('hidden');
     const start = requests.length;
     await page.clock.runFor(180_000);
-    const hiddenRequests = requests.slice(start);
+    const hiddenRequests = madeWhileHidden(requests.slice(start));
     await writeFile(
       resolve(report, 'background-traffic.json'),
       JSON.stringify({ hiddenDurationMs: 180_000, hiddenRequests, requests }, null, 2) + '\n'
@@ -86,7 +109,7 @@ export async function checkBackgroundWork({ context, origin, report, taskId }) {
     await visibility('hidden');
     const projectStart = requests.length;
     await page.clock.runFor(180_000);
-    const projectHiddenRequests = requests.slice(projectStart);
+    const projectHiddenRequests = madeWhileHidden(requests.slice(projectStart));
     await writeFile(
       resolve(report, 'background-traffic.json'),
       JSON.stringify(

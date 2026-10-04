@@ -37,6 +37,7 @@ import './screen.css';
 import { useWorkspaceViewport } from './use-workspace-viewport';
 const DeskHome = lazy(() => import('./DeskHome'));
 const GardenLife = lazy(() => import('./life/GardenLife'));
+const Scenery = lazy(() => import('./life/Scenery'));
 import { setSurfaceLocation, sheetHistoryDepth } from './surface-location';
 const Composer = lazy(() => import('./Composer'));
 const TaskSurface = lazy(() => import('./TaskSurface'));
@@ -883,6 +884,7 @@ function WorkspaceApp() {
         ))}
       </nav>
       <Suspense fallback={null}>
+        <Scenery />
         <GardenLife />
       </Suspense>
       {sheetTitle && (
