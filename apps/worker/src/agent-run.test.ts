@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { DIAGNOSTIC_CAPTURE_BYTES } from '@garden/contracts';
+import { AGREED_DEAL_MARKER, DIAGNOSTIC_CAPTURE_BYTES } from '@garden/contracts';
 import { CapturedRuntimeReplay, replayRuntime, type RuntimeSegment } from './runtime-replay.js';
 import {
   diagnosticPlainHash,
@@ -5633,6 +5633,90 @@ describe('a question the agent stops to ask', () => {
 
     expect(log.modelRequests).toHaveLength(0);
     expect(probe.checkpoints.at(-1)).toMatchObject({ status: 'awaiting_user', clearLease: true });
+  });
+});
+
+describe('a deal the agent proposes before the work', () => {
+  const deal = {
+    summary: 'File-ready tax return, with every figure traced to a document.',
+    goals: [
+      {
+        title: '2025 tax return',
+        outcome: 'A return ready to file.',
+        doneWhen: 'It passes validation and every figure links to its source.',
+        estimate: 'about 2 days',
+        capUsd: 8
+      }
+    ],
+    questions: [{ question: 'Claim the home office?', options: ['2 days a week', 'No'] }],
+    actAsYou: false
+  };
+
+  it('parks the conversation on the deal and rings a device', async () => {
+    const task = makeTask();
+    const probe = probeStore(() => task);
+    installFetch([toolFrame('call-1', 'propose_deal', deal), textFrame('Never reached.')], {
+      calls: [],
+      modelRequests: []
+    });
+
+    await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 4 }), masterKey, runnerSecret)
+      .run(task)
+      .catch(() => undefined);
+
+    const asked = probe.events.filter((entry) => entry.kind === 'question_asked');
+    expect(asked).toHaveLength(1);
+    expect(asked[0]?.payload).toMatchObject({ question: deal.summary, deal });
+    expect(probe.notifications).toEqual([
+      { kind: 'agent_message', message: `A deal is ready: ${deal.summary}` }
+    ]);
+    expect(probe.checkpoints.at(-1)).toMatchObject({ status: 'awaiting_user', clearLease: true });
+    const saved = decryptCheckpoints(probe.checkpoints).at(-1) as unknown as {
+      question?: { deal?: boolean };
+    };
+    expect(saved.question?.deal).toBe(true);
+  });
+
+  it('refuses a second deal for a goal planted with agreed terms, and the turn carries on', async () => {
+    const task = makeTask({
+      messages: [{ role: 'user', content: `${AGREED_DEAL_MARKER}\nGoal: 2025 tax return.` }],
+      step: 0,
+      credits: 0,
+      turn: 0
+    });
+    const probe = probeStore(() => task);
+    const log: FetchLog = { calls: [], modelRequests: [] };
+    installFetch([toolFrame('call-1', 'propose_deal', deal), textFrame('Carrying it out.')], log);
+
+    await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 4 }), masterKey, runnerSecret)
+      .run(task)
+      .catch(() => undefined);
+
+    expect(probe.events.some((entry) => entry.kind === 'question_asked')).toBe(false);
+    const sent = log.modelRequests.at(-1)?.messages as Array<{ role: string; content: string }>;
+    expect(
+      sent.some((message) => message.role === 'tool' && message.content.includes('already agreed'))
+    ).toBe(true);
+  });
+
+  it('refuses a malformed deal with the reason, rather than parking on it', async () => {
+    const task = makeTask();
+    const probe = probeStore(() => task);
+    const log: FetchLog = { calls: [], modelRequests: [] };
+    installFetch(
+      [toolFrame('call-1', 'propose_deal', { ...deal, goals: [] }), textFrame('Fixed.')],
+      log
+    );
+
+    await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 4 }), masterKey, runnerSecret)
+      .run(task)
+      .catch(() => undefined);
+
+    expect(probe.events.some((entry) => entry.kind === 'question_asked')).toBe(false);
+    const sent = log.modelRequests.at(-1)?.messages as Array<{ role: string; content: string }>;
+    expect(
+      sent.some((message) => message.role === 'tool' && message.content.includes('malformed'))
+    ).toBe(true);
   });
 });
 

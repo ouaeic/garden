@@ -37,6 +37,7 @@ const NON_MUTATING_TOOLS = new Set([
   // in front of the completion-evidence rule, where the only result after it is the question - which
   // shows nothing about the work, for exactly the reason notify is listed below.
   'ask',
+  'propose_deal',
   // Added with the tool and not with the set, which is the whole defect: a transcription read as a
   // change, so one voice memo took a full workspace checkpoint, set mutatedBeyondProse, and sent
   // the model back for a set_acceptance on a job with nothing to build. The transcript sidecar it

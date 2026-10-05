@@ -63,6 +63,7 @@ export const drainCorrection = async (
   const nextState = structuredClone(state);
   const answersQuestion = Boolean(message.questionId && message.questionId === state.question?.id);
   if (answersQuestion) {
+    if (state.question?.deal) nextState.dealAgreed = true;
     delete nextState.question;
     nextState.questionsAsked = 0;
   }

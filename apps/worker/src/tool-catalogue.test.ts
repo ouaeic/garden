@@ -94,9 +94,10 @@ describe('the size of the catalogue the model is sent', () => {
   });
 
   it('stays inside the wire budget the whole prefix is cached against', () => {
-    // The complete catalogue measures 41,373 bytes; the resident core has its own ceiling in
-    // tool-groups.test.ts.
-    expect(bytes).toBeLessThan(41_500);
+    // The complete catalogue measures 43,013 bytes: 1,466 of them are `propose_deal` and 174 are
+    // `ask`'s default and waitHours, both capabilities rather than prose. The resident core has its
+    // own ceiling in tool-groups.test.ts.
+    expect(bytes).toBeLessThan(43_100);
     // Each tool and nested parameter description is bounded separately.
     for (const tool of sent)
       expect(Buffer.byteLength(tool.description), `${tool.name} description`).toBeLessThan(1_400);
@@ -319,8 +320,8 @@ describe('the wire a box without a browser or a screen is sent', () => {
 
   it('holds the bare-box wire under a ceiling of its own', () => {
     // A ceiling, not an equality: a capability a bare box can honour is paid for here as well.
-    // Measured at 34,057 bytes without either surface.
-    expect(Buffer.byteLength(JSON.stringify(bare))).toBeLessThan(34_100);
+    // Measured at 35,697 bytes without either surface.
+    expect(Buffer.byteLength(JSON.stringify(bare))).toBeLessThan(35_800);
     // The direction that fails silently: a gate wired to nothing returns the full catalogue.
     expect(Buffer.byteLength(JSON.stringify(bare))).toBeLessThan(
       Buffer.byteLength(JSON.stringify(provisioned)) - 6_000

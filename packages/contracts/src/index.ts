@@ -21,6 +21,8 @@ export * from './computation.js';
 export * from './coding-missions.js';
 export * from './native-authorization.js';
 export * from './approval-grants.js';
+export * from './deal.js';
+export * from './moves.js';
 
 /**
  * Which computer answers a web search, and what that discloses to whom. It lives in its own file
@@ -2236,7 +2238,12 @@ export const OwnerPreferences = z.object({
       open: z.boolean(),
       tab: z.enum(['files', 'computer', 'terminal', 'preview'])
     })
-    .optional()
+    .optional(),
+  /**
+   * When the owner last read the catch-up. What changed after it is what "since you left" means,
+   * on whichever device they come back on; held here for the same reason as `place`.
+   */
+  lastLookAt: IsoDate.optional()
 });
 export type OwnerPreferences = z.infer<typeof OwnerPreferences>;
 

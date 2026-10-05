@@ -18,8 +18,9 @@ it('partitions all advanced capabilities into discoverable groups without duplic
   expect([...core.map((tool) => tool.name), ...grouped].sort()).toEqual(
     full.map((tool) => tool.name).sort()
   );
-  // The resident core, sent on every request: 9,705 bytes measured.
-  expect(Buffer.byteLength(JSON.stringify([...core, COMPACT_CONTEXT_TOOL]))).toBeLessThan(9_800);
+  // The resident core, sent on every request: 11,264 bytes measured, 1,385 of them `propose_deal`
+  // and 174 the default an unanswered `ask` falls back to.
+  expect(Buffer.byteLength(JSON.stringify([...core, COMPACT_CONTEXT_TOOL]))).toBeLessThan(11_350);
 });
 
 it('adds chosen groups in activation order while preserving the entire existing prefix', () => {

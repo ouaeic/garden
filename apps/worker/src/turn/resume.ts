@@ -350,6 +350,7 @@ export const resumeParkedTurn = async (
     if (answeredState) {
       answeredState.ownerReasoningEffort =
         waiting?.reasoningEffort ?? task.reasoningEffort ?? 'auto';
+      if (asked.deal) answeredState.dealAgreed = true;
       delete answeredState.question;
       answeredState.questionsAsked = 0;
       answeredState.memoryOwnerRequest = appendMemoryOwnerInput(

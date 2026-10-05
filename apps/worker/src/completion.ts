@@ -231,7 +231,13 @@ export const askOutcome = (
   state: Pick<AgentState, 'turnToolResults' | 'questionsAsked'>,
   args: Record<string, unknown>
 ):
-  | { ok: true; question: string; options: string[]; why: string }
+  | {
+      ok: true;
+      question: string;
+      options: string[];
+      why: string;
+      fallback?: { choice: string; waitHours: number };
+    }
   | { ok: false; refusal: string } => {
   const question = textValue(args.question).trim().replace(/\s+/g, ' ').slice(0, 200);
   const why = textValue(args.why).trim().replace(/\s+/g, ' ').slice(0, 240);
@@ -255,7 +261,21 @@ export const askOutcome = (
       ok: false,
       refusal: `Refused: this turn has already asked ${MAX_QUESTIONS_PER_TURN} questions, which is the limit. Make the most reasonable assumption, carry on, and say plainly in your reply what you assumed and what would change it.`
     };
-  return { ok: true, question, options, why };
+  const choice = textValue(args.default).trim().slice(0, 80);
+  const waitHours = Number(args.waitHours);
+  if (choice && !(waitHours >= 1 && waitHours <= 168))
+    return {
+      ok: false,
+      refusal:
+        'Refused: a default needs waitHours, between 1 and 168, so the user knows how long they have.'
+    };
+  return {
+    ok: true,
+    question,
+    options,
+    why,
+    ...(choice ? { fallback: { choice, waitHours } } : {})
+  };
 };
 
 /**

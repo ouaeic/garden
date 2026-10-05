@@ -193,6 +193,28 @@ export class ConnectorStore {
     }));
   }
 
+  /**
+   * Records an outward action that ran on a lent key rather than on a card: approved at once, by
+   * the key, so the record lists it beside the ones the owner approved by hand.
+   */
+  async recordKeyAuthorizedAction(input: Omit<ApprovalInput, 'expiresAt'>): Promise<void> {
+    await this.database.query(
+      `INSERT INTO approvals(id,user_id,task_id,action,origin,side_effect,preview_ciphertext,
+         preview_hash,status,decision_scope,expires_at,resolved_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,'approved','key',NOW(),NOW())`,
+      [
+        randomUUID(),
+        input.userId,
+        input.taskId,
+        input.action,
+        input.origin ?? null,
+        input.sideEffect,
+        JSON.stringify(input.previewCiphertext),
+        input.previewHash
+      ]
+    );
+  }
+
   /** The follow-up path needs an existence answer, independent of approval-list pagination. */
   async hasPendingApproval(userId: string, taskId: string): Promise<boolean> {
     const result = await this.database.query(

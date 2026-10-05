@@ -287,8 +287,15 @@ export interface AgentState {
     why?: string;
     waiting?: boolean;
     handoff?: { kind: 'challenge'; surface: 'browser'; tabId?: string; url: string };
+    /** The question is a deal: its answer carries the agreed terms. */
+    deal?: true;
+    /** The safe choice the API answers with once `answerBy` passes unanswered. */
+    default?: string;
+    answerBy?: string;
   };
   questionsAsked?: number;
+  /** A deal was agreed in this conversation, so another one is refused. */
+  dealAgreed?: true;
   /**
    * The tool call this worker had started but not yet recorded a result for. Written durably before
    * the call runs, so a worker that dies mid-call leaves evidence of what it had already set in

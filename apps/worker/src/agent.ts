@@ -14,7 +14,7 @@ import {
   runtimeValue
 } from '@garden/core';
 import { TaskDiagnosticCapture } from './diagnostic-capture.js';
-import { askUser, parkBrowserHandoff, saveQuestion } from './questions.js';
+import { askUser, parkBrowserHandoff, proposeDeal, saveQuestion } from './questions.js';
 import { BrowserActionReceipt } from '@garden/contracts';
 import { browserActionRequestId } from './browser-action-receipts.js';
 import { codingMissionAdapter } from './coding-mission-gateway.js';
@@ -498,7 +498,9 @@ export class AgentWorker {
         this.#recordToolResult(task, key, state, call, result, leadModel, catalog),
       compactContext: (task, key, state, input) => this.#compactContext(task, key, state, input),
       sendNotice: (task, key, state, call) => this.#sendNotice(task, key, state, call),
-      askUser: (task, key, state, call) => askUser(this.#turnControl, task, key, state, call)
+      askUser: (task, key, state, call) => askUser(this.#turnControl, task, key, state, call),
+      proposeDeal: (task, key, state, call) =>
+        proposeDeal(this.#turnControl, task, key, state, call)
     };
   }
 

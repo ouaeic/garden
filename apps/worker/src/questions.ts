@@ -1,7 +1,8 @@
-import { runtimeUUID } from '@garden/core';
+import { runtimeNow, runtimeUUID } from '@garden/core';
 import { botWallSite } from './provenance.js';
 
 import { GardenError, encryptJson } from '@garden/core';
+import { AGREED_DEAL_MARKER, TaskDeal } from '@garden/contracts';
 import type { DataStore, TaskRecord } from '@garden/data';
 import type { ModelToolCall } from '@garden/model-gateway';
 import type { AgentState } from './agent-state.js';
@@ -85,15 +86,19 @@ export async function askUser(
   if (state.question) return refuse('A question is already waiting for an answer.');
   const outcome = askOutcome(state, call.arguments);
   if (!outcome.ok) return refuse(outcome.refusal.replace(/^Refused: /, ''));
-  const { question, options, why } = outcome;
+  const { question, options, why, fallback } = outcome;
   const id = runtimeUUID();
+  const answerBy = fallback
+    ? new Date(runtimeNow() + fallback.waitHours * 3_600_000).toISOString()
+    : undefined;
   state.questionsAsked = (state.questionsAsked ?? 0) + 1;
   state.question = {
     id,
     question,
     ...(why ? { why } : {}),
     askedAtStep: state.step,
-    waiting: true
+    waiting: true,
+    ...(fallback && answerBy ? { default: fallback.choice, answerBy } : {})
   };
   state.messages.push({
     role: 'tool',
@@ -107,6 +112,7 @@ export async function askUser(
     ...(why ? { why } : {}),
     questionId: id,
     ...(options.length ? { options } : {}),
+    ...(fallback && answerBy ? { default: fallback.choice, answerBy } : {}),
     unattended: state.unattended === true
   });
   await deps.store
@@ -115,6 +121,82 @@ export async function askUser(
       taskId: task.id,
       kind: 'agent_message',
       messageCiphertext: encryptJson({ message: question }, key, agentNotificationAad(task.id))
+    })
+    .catch(() => undefined);
+  return true;
+}
+
+/**
+ * Parks the turn on a deal: the agreed terms come back as the answer, in words.
+ *
+ * Refused where nobody can agree to anything - a scheduled run - and once a deal stands, so the
+ * owner is never asked twice for the same job. A planted sibling goal starts from a prompt that
+ * already carries its terms, which is the same thing said from the other end.
+ */
+export async function proposeDeal(
+  deps: QuestionDeps,
+  task: TaskRecord,
+  key: Uint8Array,
+  state: AgentState,
+  call: ModelToolCall
+): Promise<boolean> {
+  state.turnToolResults ??= {};
+  const refuse = (reason: string) => {
+    state.messages.push({ role: 'tool', toolCallId: call.id, content: `Refused: ${reason}` });
+    state.turnToolResults![call.id] = { name: call.name, success: false };
+    return false;
+  };
+  if (state.unattended)
+    return refuse('a scheduled run has nobody to agree a deal with. Work within the schedule.');
+  if (state.question) return refuse('A question is already waiting for an answer.');
+  const agreed =
+    state.dealAgreed ||
+    state.messages.some(
+      (message) =>
+        message.role === 'user' &&
+        typeof message.content === 'string' &&
+        message.content.trimStart().startsWith(AGREED_DEAL_MARKER)
+    );
+  if (agreed) return refuse('the deal for this goal is already agreed. Carry it out.');
+  const parsed = TaskDeal.safeParse(call.arguments);
+  if (!parsed.success)
+    return refuse(
+      `the deal is malformed (${parsed.error.issues
+        .slice(0, 3)
+        .map((issue) => `${issue.path.join('.') || 'deal'}: ${issue.message}`)
+        .join('; ')}). Fix it and propose again.`
+    );
+  const deal = parsed.data;
+  const id = runtimeUUID();
+  state.question = {
+    id,
+    question: deal.summary,
+    askedAtStep: state.step,
+    waiting: true,
+    deal: true
+  };
+  state.messages.push({
+    role: 'tool',
+    toolCallId: call.id,
+    content: 'Sent to the user. The agreed terms resume this turn.'
+  });
+  state.turnToolResults[call.id] = { name: call.name, success: true };
+  sealUnansweredToolCalls(state.messages, 'waiting for the user to agree the deal');
+  await saveQuestion(deps, task, key, state, true, {
+    question: deal.summary,
+    questionId: id,
+    deal
+  });
+  await deps.store
+    .createAgentNotification({
+      userId: task.userId,
+      taskId: task.id,
+      kind: 'agent_message',
+      messageCiphertext: encryptJson(
+        { message: `A deal is ready: ${deal.summary}` },
+        key,
+        agentNotificationAad(task.id)
+      )
     })
     .catch(() => undefined);
   return true;

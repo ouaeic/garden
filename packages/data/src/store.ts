@@ -1364,6 +1364,10 @@ export class DataStore {
     return this.#connectors.listApprovals(...args);
   }
 
+  recordKeyAuthorizedAction(...args: Parameters<ConnectorStore['recordKeyAuthorizedAction']>) {
+    return this.#connectors.recordKeyAuthorizedAction(...args);
+  }
+
   hasPendingApproval(...args: Parameters<ConnectorStore['hasPendingApproval']>) {
     return this.#connectors.hasPendingApproval(...args);
   }
