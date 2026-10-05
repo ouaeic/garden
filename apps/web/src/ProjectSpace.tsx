@@ -384,7 +384,9 @@ export default function ProjectSpace({
                 }}
               >
                 <StatusSprite stage={stageOf(conversation)} />
-                {conversation.title === project.title ? 'Main conversation' : conversation.title}
+                <span>
+                  {conversation.title === project.title ? 'Main conversation' : conversation.title}
+                </span>
               </Button>
             ))}
             {cursor && <Button onClick={() => selectView('activity')}>All conversations</Button>}
