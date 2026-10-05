@@ -1070,7 +1070,7 @@ try {
       });
       const failure = approvalFailures.shift();
       if (failure) return route.fulfill({ status: failure.status, json: { error: failure } });
-      if (approvalAction[2] === 'approve' && request.postDataJSON().scope === 'run') {
+      if (approvalAction[2] === 'approve' && request.postDataJSON().scope === 'conversation') {
         const source = approvals.find((approval) => approval.id === approvalAction[1]);
         assert(source?.preview?.taskGrant?.description);
         taskPermissions.push({
@@ -2721,7 +2721,9 @@ try {
         false
       );
       assert.equal(
-        await card.getByRole('button', { name: 'Allow for this run', exact: true }).isEnabled(),
+        await card
+          .getByRole('button', { name: 'Allow in this conversation', exact: true })
+          .isEnabled(),
         true
       );
       assert(
@@ -2758,6 +2760,7 @@ try {
         `All three approval actions must be reachable in the request dock: ${JSON.stringify(approvalLayout)}`
       );
       await card.screenshot({ path: resolve(report, `approval-compact-${width}.png`) });
+      await approvalPage.screenshot({ path: resolve(report, `approval-dock-${width}.png`) });
       await card.getByText('Inspect full action', { exact: true }).click();
       const detail = await card.locator('.decision-detail').innerText();
       assert(detail.includes('python3'));
@@ -2771,30 +2774,32 @@ try {
     }
     const scopeId = approvals[0].id;
     approvalFailures = [{ status: 403, code: 'step_up_required', message: 'Authenticate again.' }];
-    await card.getByRole('button', { name: 'Allow for this run', exact: true }).click();
+    await card.getByRole('button', { name: 'Allow in this conversation', exact: true }).click();
     await card.waitFor({ state: 'hidden' });
     assert.deepEqual(
       approvalRequests.slice(-2),
       [
-        { id: scopeId, action: 'approve', body: { scope: 'run' } },
-        { id: scopeId, action: 'approve', body: { scope: 'run' } }
+        { id: scopeId, action: 'approve', body: { scope: 'conversation' } },
+        { id: scopeId, action: 'approve', body: { scope: 'conversation' } }
       ],
       'The selected scope must survive authentication retry'
     );
     assert.equal(taskPermissions.length, 1);
     await approvalPage.reload();
     await approvalPage.getByRole('button', { name: 'Work options', exact: true }).click();
-    const permissionPanel = approvalPage.getByRole('region', { name: 'Run permissions' });
+    const permissionPanel = approvalPage.getByRole('region', { name: 'Conversation permissions' });
     await permissionPanel.getByRole('button', { name: 'Revoke', exact: true }).waitFor();
     assert((await permissionPanel.innerText()).includes('https://unpkg.com'));
     await permissionPanel.getByRole('button', { name: 'Revoke', exact: true }).click();
     await permissionPanel
-      .getByText('No reusable permissions in this run.', { exact: true })
+      .getByText('Nothing allowed in this conversation yet.', { exact: true })
       .waitFor();
     assert.equal(taskPermissions.length, 0);
     await approvalPage.reload();
     await approvalPage.getByRole('button', { name: 'Work options', exact: true }).click();
-    await approvalPage.getByText('No reusable permissions in this run.', { exact: true }).waitFor();
+    await approvalPage
+      .getByText('Nothing allowed in this conversation yet.', { exact: true })
+      .waitFor();
     await approvalPage.close();
     approvals = [];
   }

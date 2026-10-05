@@ -1376,8 +1376,10 @@ export class DataStore {
     return this.#connectors.getApproval(...args);
   }
 
-  hasTaskApprovalGrant(...args: Parameters<ConnectorStore['hasTaskApprovalGrant']>) {
-    return this.#connectors.hasTaskApprovalGrant(...args);
+  listActiveTaskApprovalGrants(
+    ...args: Parameters<ConnectorStore['listActiveTaskApprovalGrants']>
+  ) {
+    return this.#connectors.listActiveTaskApprovalGrants(...args);
   }
   listTaskApprovalGrants(...args: Parameters<ConnectorStore['listTaskApprovalGrants']>) {
     return this.#connectors.listTaskApprovalGrants(...args);

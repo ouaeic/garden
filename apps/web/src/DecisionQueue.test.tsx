@@ -31,7 +31,7 @@ describe('approval cards separate the decision from inspection detail', () => {
     const html = renderToStaticMarkup(
       <DecisionCard decision={{ ...decision, preview }} onResolved={() => {}} />
     );
-    expect(html).toContain('Allow for this run');
+    expect(html).toContain('Allow in this conversation');
     expect(html).toContain('Approve once');
     expect(html).toContain('using python3');
     expect(html).toContain('Work options');
@@ -44,10 +44,10 @@ describe('approval cards separate the decision from inspection detail', () => {
         onResolved={() => {}}
       />
     );
-    expect(privateHtml).not.toContain('Allow for this run');
+    expect(privateHtml).not.toContain('Allow in this conversation');
     expect(
       renderToStaticMarkup(<DecisionCard decision={decision} onResolved={() => {}} />)
-    ).not.toContain('Allow for this run');
+    ).not.toContain('Allow in this conversation');
   });
   it('keeps the complete command inspectable without showing a script or provenance as the destination', () => {
     const html = renderToStaticMarkup(<DecisionCard decision={decision} onResolved={() => {}} />);
@@ -74,7 +74,7 @@ describe('approval cards separate the decision from inspection detail', () => {
     );
     expect(html.split('<details')[0]).not.toContain('shot-exploded.png');
     expect(html).not.toContain('<dt>Destination</dt>');
-    expect(html).not.toContain('Addresses referenced');
+    expect(html).not.toContain('decision-addresses');
     expect(html).toContain('python3');
   });
 });

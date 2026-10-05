@@ -50,11 +50,11 @@ export function DecisionCard({
     decision.action === 'secure_input_handoff' ||
     /^Secure (browser|desktop) input required$/.test(decision.action);
   const expired = Date.parse(decision.expiresAt) <= Date.now();
-  async function resolve(action: 'approve' | 'deny', scope: 'once' | 'run' = 'once') {
+  async function resolve(action: 'approve' | 'deny', scope: 'once' | 'conversation' = 'once') {
     const body =
       action === 'deny' && note.trim()
         ? { note: note.trim() }
-        : action === 'approve' && scope === 'run'
+        : action === 'approve' && scope === 'conversation'
           ? { scope }
           : {};
     setBusy(true);
@@ -107,6 +107,8 @@ export function DecisionCard({
         <ErrorNotice error={error} />
       </article>
     );
+  // What to decide comes first and the decision straight after it; the detail behind it, and a
+  // reason for denying, stay folded below so the card never pushes its own buttons out of view.
   return (
     <article className="decision-card text-box">
       <div className="eyebrow">
@@ -121,25 +123,44 @@ export function DecisionCard({
       )}
       <h3>{decision.action === tool ? (approvalToolPhrases[tool] ?? tool) : decision.action}</h3>
       {introduction && <p>{introduction}</p>}
-      <dl className="facts">
-        {addresses.length > 0 && (
-          <div>
-            <dt>Addresses referenced</dt>
-            <dd>{addresses.join(', ')}</dd>
-          </div>
+      {addresses.length > 0 && (
+        <p className="decision-addresses">
+          <span>Reaches</span> {addresses.join(', ')}
+        </p>
+      )}
+      <div className="row decision-actions">
+        <Button
+          className="primary"
+          busy={busy}
+          disabled={expired}
+          onClick={() => resolve('approve')}
+        >
+          {expired ? 'Expired' : 'Approve once'}
+        </Button>
+        {grantDescription && (
+          <Button disabled={busy || expired} onClick={() => resolve('approve', 'conversation')}>
+            Allow in this conversation
+          </Button>
         )}
-      </dl>
+        <Button disabled={busy || expired} onClick={() => resolve('deny')}>
+          Deny
+        </Button>
+      </div>
+      {grantDescription && (
+        <div className="decision-permission">
+          <strong>In this conversation</strong>
+          <p>{grantDescription}</p>
+          <small>
+            Ends if you stop the conversation or change its approvals. Revoke in Work options.
+          </small>
+        </div>
+      )}
+      <ErrorNotice error={error} />
       <details className="decision-detail">
         <summary>Inspect full action</summary>
         {decision.origin && <p>Content read before this action: {decision.origin}</p>}
         <p>Effect: {decision.sideEffect.replaceAll('_', ' ')}</p>
         <p>Expires: {date(decision.expiresAt)}</p>
-        {grantDescription && (
-          <p>
-            Run permissions survive pause and reconnect. They end with a new direction, run
-            completion, a change of approval mode, or revocation in Work options.
-          </p>
-        )}
         {command && (
           <pre className="command-preview">
             <code>{command}</code>
@@ -154,49 +175,21 @@ export function DecisionCard({
       <details className="decision-note">
         <summary>Add a reason for denying</summary>
         <label className="field">
-          <span>Reason for denying (optional)</span>
+          <span className="sr-only">Reason for denying (optional)</span>
           <textarea
             value={note}
             onChange={(event) => setNote(event.target.value)}
             maxLength={APPROVAL_NOTE_MAX_CHARS}
-            rows={3}
+            rows={2}
             disabled={busy || expired}
             aria-describedby={noteHintId}
-            placeholder="Explain what should change before the agent continues."
+            placeholder="What should change before the agent continues."
           />
         </label>
         <small id={noteHintId}>
-          Sent only if you deny. Uses this task’s existing allowance. {note.length}/
-          {APPROVAL_NOTE_MAX_CHARS}
+          Sent with Deny. {note.length}/{APPROVAL_NOTE_MAX_CHARS}
         </small>
       </details>
-      <ErrorNotice error={error} />
-      {grantDescription && (
-        <div className="decision-permission">
-          <strong>For this run</strong>
-          <p>{grantDescription}</p>
-          <small>Review or revoke in Work options.</small>
-        </div>
-      )}
-      <div className="row decision-actions">
-        <Button
-          className="primary"
-          busy={busy}
-          disabled={expired}
-          onClick={() => resolve('approve')}
-        >
-          {expired ? 'Expired' : 'Approve once'}
-        </Button>
-        {grantDescription && (
-          <Button disabled={busy || expired} onClick={() => resolve('approve', 'run')}>
-            Allow for this run
-          </Button>
-        )}
-        <Button disabled={busy || expired} onClick={() => resolve('deny')}>
-          Deny
-        </Button>
-      </div>
-      {!grantDescription && <small>This approval applies to the action shown here.</small>}
     </article>
   );
 }

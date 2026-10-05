@@ -1,9 +1,7 @@
-import { runtimeValue } from '@garden/core';
 import { textValue } from './values.js';
-import { createHmac } from 'node:crypto';
 import { posix } from 'node:path';
-import { canonicalApprovalScope, TaskApprovalScope } from '@garden/contracts';
-import { reachOfHttpUrl, unwrapDataKey } from '@garden/core';
+import { approvalScopeCovers, TaskApprovalScope } from '@garden/contracts';
+import { decryptJson, reachOfHttpUrl, unwrapDataKey } from '@garden/core';
 import type { TaskRecord } from '@garden/data';
 import {
   callDestinations,
@@ -104,7 +102,11 @@ export const mergeTaskApproval = (
   return parsed.success ? parsed.data : undefined;
 };
 
-/** Fresh indexed lookup: a revoked grant must not survive in a worker cache or a copied state. */
+/**
+ * Fresh lookup on every call: a revoked permission must not survive in a worker cache or a copied
+ * state. A call needs no card when one permission the owner gave in this conversation, in its
+ * current approval mode, covers everything the call would have asked for.
+ */
 export const useTaskApproval = async (
   deps: ApprovalFloorDeps,
   task: TaskRecord,
@@ -121,15 +123,20 @@ export const useTaskApproval = async (
   const workspace = await deps.store.getWorkspaceById(task.workspaceId);
   if (!workspace?.wrappedKey) return false;
   const key = unwrapDataKey(workspace.wrappedKey, deps.masterKey, workspace.id);
-  const scope = canonicalApprovalScope(requirement.taskGrant);
-  const hash = runtimeValue(`approval.scope:${scope}`, () =>
-    createHmac('sha256', key).update(scope).digest('hex')
-  );
-  return deps.store.hasTaskApprovalGrant(
+  const requested = requirement.taskGrant;
+  const grants = await deps.store.listActiveTaskApprovalGrants(
     task.userId,
     task.id,
-    state.turn ?? 0,
-    task.securityMode,
-    hash
+    task.securityMode
   );
+  return grants.some((grant) => {
+    try {
+      const granted = TaskApprovalScope.safeParse(
+        decryptJson<unknown>(grant.scopeCiphertext, key, `task-approval:${task.id}:${grant.id}`)
+      );
+      return granted.success && approvalScopeCovers(granted.data, requested);
+    } catch {
+      return false;
+    }
+  });
 };
