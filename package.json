@@ -40,17 +40,17 @@
     "test:beta": "node scripts/test-beta-journeys.mjs"
   },
   "devDependencies": {
-    "@eslint/js": "9.39.5",
-    "@types/node": "24.13.3",
-    "eslint": "9.39.5",
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.6.4",
+    "eslint": "10.11.0",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-react-hooks": "7.1.1",
-    "globals": "17.11.0",
-    "prettier": "3.8.5",
-    "tsx": "4.23.12",
-    "typescript": "5.9.3",
-    "typescript-eslint": "8.56.0",
-    "vitest": "4.1.11",
-    "zod": "4.4.3"
+    "globals": "17.13.0",
+    "prettier": "3.9.9",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "typescript-eslint": "8.71.0",
+    "vitest": "5.0.3",
+    "zod": "4.6.5"
   }
 }
