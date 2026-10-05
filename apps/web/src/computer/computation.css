@@ -4,7 +4,7 @@
   gap: 0.75rem;
   padding: 1rem;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 14px;
 }
 .computation-card > .row {
   flex-wrap: wrap;
@@ -21,7 +21,7 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   padding: 0.75rem;
-  border-radius: 0;
+  border-radius: 14px;
   background: var(--raised-fill);
 }
 .project-computations {
@@ -40,7 +40,7 @@
   padding: 0.6rem;
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 14px;
 }
 .garden-computation-values pre {
   grid-column: 1 / -1;

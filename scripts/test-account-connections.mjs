@@ -34,7 +34,7 @@ test(
             resolveId: (id) => (id === 'virtual:account-proof' ? '\0account-proof.js' : null),
             load: (id) =>
               id === '\0account-proof.js'
-                ? `import ${JSON.stringify(path.join(root, 'src/styles.css'))};import ${JSON.stringify(path.join(root, 'src/library.css'))};import React from 'react';import {createRoot} from 'react-dom/client';import {ConnectionsLibrary} from ${JSON.stringify(path.join(root, 'src/library/Connections.tsx'))};createRoot(document.getElementById('root')).render(React.createElement(ConnectionsLibrary,{onChange:()=>{}}));`
+                ? `import ${JSON.stringify(path.join(root, 'src/styles/index.css'))};import React from 'react';import {createRoot} from 'react-dom/client';import {ConnectionsLibrary} from ${JSON.stringify(path.join(root, 'src/library/Connections.tsx'))};createRoot(document.getElementById('root')).render(React.createElement(ConnectionsLibrary,{onChange:()=>{}}));`
                 : null
           }
         ],

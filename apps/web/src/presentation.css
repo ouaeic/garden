@@ -22,7 +22,7 @@
   gap: 0.2rem;
   padding: 0.7rem 0.85rem;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 14px;
   overflow-wrap: anywhere;
   min-width: 0;
   color: inherit;
@@ -56,10 +56,10 @@
   margin: 16px 0;
   padding: 16px 18px;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 14px;
   background: var(--panel);
   overflow-wrap: anywhere;
-  font-size: 16px;
+  font-size: 14px;
 }
 .resource-wait-note p {
   margin: 8px 0 0;
@@ -87,7 +87,7 @@
 .private-diagnostic-delete {
   padding: 1rem;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 14px;
   display: grid;
   gap: 0.75rem;
 }
@@ -111,7 +111,7 @@
 }
 .work-summary-visual .muted,
 .work-summary-visual figcaption {
-  font-size: 16px;
+  font-size: 14px;
 }
 .work-summary-charts {
   display: grid;
@@ -155,7 +155,7 @@
   list-style: none;
   padding: 0;
   margin: 10px 0 0;
-  font-size: 16px;
+  font-size: 14px;
 }
 .work-summary-legend li {
   display: flex;
@@ -172,7 +172,7 @@
   grid-template-columns: 80px minmax(0, 1fr);
   gap: 12px;
   align-items: center;
-  font-size: 16px;
+  font-size: 14px;
 }
 .work-summary-outputs dd {
   display: flex;

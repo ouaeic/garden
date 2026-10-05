@@ -19,7 +19,7 @@
   margin: 0;
 }
 .notebook-note {
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
@@ -27,12 +27,12 @@
   margin: 1rem 0;
   padding: 1rem;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 14px;
   min-width: 0;
   overflow-wrap: anywhere;
 }
 .notebook-cell > header {
-  font-size: 16px;
+  font-size: 14px;
   margin-bottom: 0.8rem;
 }
 .notebook-text {
@@ -43,9 +43,9 @@
   overflow-wrap: anywhere;
   margin: 0.5rem 0;
   padding: 0.8rem;
-  border-radius: 0;
+  border-radius: 14px;
   background: var(--panel);
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1.6;
   max-height: 32rem;
   overflow: auto;
@@ -55,7 +55,7 @@
 }
 .notebook-text p,
 .notebook-pages {
-  font-size: 16px;
+  font-size: 14px;
 }
 .notebook-output {
   padding-top: 0.8rem;
@@ -63,11 +63,11 @@
   border-top: 1px solid var(--line);
 }
 .notebook-empty {
-  font-size: 16px;
+  font-size: 14px;
 }
 .notebook-cell details {
   margin-top: 0.65rem;
-  font-size: 16px;
+  font-size: 14px;
 }
 .notebook-cell summary {
   cursor: pointer;
@@ -87,7 +87,7 @@
   height: 22rem;
   background: white;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 14px;
 }
 .notebook-error {
   border-left: 3px solid var(--danger);
@@ -101,7 +101,7 @@
 
 .notebook-toolbar .button[aria-pressed='true'] {
   background: var(--paper);
-  color: var(--ink);
+  color: var(--paper-ink);
   border-color: var(--paper);
 }
 
@@ -127,7 +127,7 @@
   min-width: 0;
   resize: vertical;
   font-family: var(--font-mono);
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1.6;
   tab-size: 4;
 }
@@ -135,7 +135,7 @@
   padding: 0.65rem 0.8rem;
   border-left: 3px solid var(--muted);
   background: var(--panel);
-  font-size: 16px;
+  font-size: 14px;
 }
 .notebook-editor .row {
   flex-wrap: wrap;

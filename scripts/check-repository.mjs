@@ -1170,6 +1170,12 @@ const keysAtTopLevel = (body) =>
 
 const copiedConstants = [
   {
+    what: 'the words that open every agreed deal',
+    owner: 'packages/contracts/src/deal.ts',
+    copy: 'apps/web/src/goal/timeline.ts',
+    find: /AGREED_DEAL_MARKER = '([^']+)'/
+  },
+  {
     what: 'the approval correction note bound',
     owner: 'packages/contracts/src/index.ts',
     copy: 'apps/web/src/approval-copy.ts',

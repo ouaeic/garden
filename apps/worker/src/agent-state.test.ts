@@ -80,6 +80,7 @@ const FIELDS: ReadonlyArray<keyof AgentState> = [
   'question',
   'browserHandoff',
   'questionsAsked',
+  'dealAgreed',
   'inFlight',
   'acceptance',
   'acceptanceFailures',
@@ -249,7 +250,8 @@ const FULL: Required<AgentState> = {
     handoffOnly: true
   },
   browserHandoff: { vendor: 'test', url: 'https://example.com', reason: 'verification' },
-  question: { question: 'which database should this point at?', askedAtStep: 12 },
+  question: { question: 'which database should this point at?', askedAtStep: 12, deal: true },
+  dealAgreed: true,
   questionsAsked: 1,
   inFlight: { toolCallId: 'call-4', tool: 'browser_action', startedAt: '2026-08-25T09:00:00.000Z' },
   acceptance: {
@@ -435,6 +437,8 @@ describe('what a new turn inherits', () => {
       'lastStepUsd',
       'spendWarnings',
       'checkpoint',
+      // Carried: a deal is agreed for the conversation, not for the turn that planted it.
+      'dealAgreed',
       'inFlight',
       'acceptance',
       'acceptanceTurn',

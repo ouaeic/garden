@@ -16,15 +16,7 @@ const journeys = [
   },
   { id: 'chromium-complete', command: ['pnpm', 'test:ui'], engine: 'chromium' },
   { id: 'webkit-complete', command: ['node', 'scripts/test-web-layout.mjs'], engine: 'webkit' },
-  { id: 'webkit-owner-devices', command: ['pnpm', 'test:auth-ui'], engine: 'webkit' },
-  ...['chromium', 'webkit'].flatMap((engine) =>
-    ['memory', 'models', 'updates'].map((focus) => ({
-      id: `${engine}-${focus}`,
-      engine,
-      focus,
-      command: ['node', 'scripts/test-web-layout.mjs']
-    }))
-  )
+  { id: 'webkit-owner-devices', command: ['pnpm', 'test:auth-ui'], engine: 'webkit' }
 ];
 assert(journeys.length > 0);
 const results = [];
@@ -39,7 +31,7 @@ for (const journey of journeys) {
     env: {
       ...process.env,
       GARDEN_UI_ENGINE: journey.engine,
-      GARDEN_UI_FOCUS: journey.focus ?? '',
+      GARDEN_UI_FOCUS: '',
       GARDEN_UI_REPORT: folder,
       GARDEN_AUTH_REPORT: folder
     },

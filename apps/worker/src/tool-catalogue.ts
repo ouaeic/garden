@@ -1236,7 +1236,70 @@ export const agentTools: ModelTool[] = [
           items: { type: 'string', maxLength: 80 },
           description: 'Answers to offer when there is a fixed set; any reply is accepted.'
         },
-        why: { type: 'string', maxLength: 240, description: 'What waits on the answer.' }
+        why: { type: 'string', maxLength: 240, description: 'What waits on the answer.' },
+        default: {
+          type: 'string',
+          maxLength: 80,
+          description: 'The safe choice taken if no answer comes within waitHours.'
+        },
+        waitHours: { type: 'number', minimum: 1, maximum: 168 }
+      }
+    }
+  },
+  {
+    name: 'propose_deal',
+    description:
+      'Agree the job before substantial work (more than a few minutes, several deliverables, spending, or acting outside this computer). Ask now every question you can foresee so the run needs nobody later; split independent asks into goals. Not for quick answers, nor once agreed. Pauses the turn until the user agrees.',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['summary', 'goals', 'questions', 'actAsYou'],
+      properties: {
+        summary: { type: 'string', maxLength: 200 },
+        goals: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 4,
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['title', 'outcome', 'doneWhen', 'capUsd'],
+            properties: {
+              title: { type: 'string', maxLength: 80 },
+              outcome: { type: 'string', maxLength: 240 },
+              doneWhen: {
+                type: 'string',
+                maxLength: 240,
+                description: 'A check anyone could run.'
+              },
+              estimate: { type: 'string', maxLength: 60 },
+              rhythm: { type: 'string', maxLength: 100, description: 'Recurring work only.' },
+              capUsd: { type: 'number', exclusiveMinimum: 0, maximum: 1000 }
+            }
+          }
+        },
+        questions: {
+          type: 'array',
+          maxItems: 6,
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['question', 'options'],
+            properties: {
+              question: { type: 'string', maxLength: 160 },
+              options: {
+                type: 'array',
+                minItems: 2,
+                maxItems: 4,
+                items: { type: 'string', maxLength: 60 }
+              }
+            }
+          }
+        },
+        actAsYou: {
+          type: 'boolean',
+          description: 'True when the work must send, submit or book as the user.'
+        }
       }
     }
   },
@@ -1693,6 +1756,7 @@ const coreToolNames = new Set([
   'file_patch',
   'web_search',
   'ask',
+  'propose_deal',
   'publish_artifact'
 ]);
 

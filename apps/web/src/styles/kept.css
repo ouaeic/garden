@@ -1,0 +1,354 @@
+/*
+ * The engines kept from before - result previews, the computer's tools, settings, sign-in - speak
+ * in an older set of names. These are those names, said in the greenhouse's own tokens, so every
+ * kept surface takes the same light without a second palette anywhere.
+ */
+:root {
+  --text: var(--ink);
+  --muted: var(--ink-2);
+  --dim: var(--ink-3);
+  --panel: var(--pane);
+  --raised-fill: var(--pane-2);
+  --line-strong: var(--line-2);
+  --border: var(--line);
+  --accent: var(--leaf);
+  --tint: color-mix(in oklab, var(--leaf) 12%, transparent);
+  --danger: var(--rose);
+  --font-sans: var(--body);
+  --font-mono: var(--mono);
+  --font-read: var(--display);
+  --font-display: var(--display);
+}
+
+/*
+ * Work shown as it is sits on paper in either theme, so whatever a surface on paper holds - a
+ * loading line, a table, a control - reads in paper ink rather than the night's.
+ */
+.answer,
+.garden-artifact-view {
+  --ink: var(--paper-ink);
+  --ink-2: var(--paper-2);
+  --ink-3: var(--paper-2);
+  --line: var(--paper-line);
+  --line-2: rgba(22, 35, 28, 0.22);
+  --pane: rgba(22, 35, 28, 0.04);
+  --pane-2: rgba(22, 35, 28, 0.07);
+  --leaf: var(--paper-leaf);
+  --text: var(--ink);
+  --muted: var(--ink-2);
+  --dim: var(--ink-3);
+  --panel: var(--pane);
+  --raised-fill: var(--pane-2);
+  --line-strong: var(--line-2);
+  --border: var(--line);
+  --accent: var(--leaf);
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 15px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--pane-2);
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.15;
+  text-decoration: none;
+  transition:
+    transform 0.35s var(--ease),
+    border-color 0.3s,
+    background 0.3s;
+}
+.button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--ink-3);
+}
+.button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.button svg {
+  width: 16px;
+  height: 16px;
+}
+.button.primary,
+a.button.primary {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: transparent;
+}
+.button.danger,
+.button.destructive {
+  color: var(--rose);
+  border-color: color-mix(in oklab, var(--rose) 45%, transparent);
+  background: color-mix(in oklab, var(--rose) 10%, transparent);
+}
+.quiet-button,
+.button.quiet-button {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-2);
+}
+.text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.link-button {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.between {
+  justify-content: space-between;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.panel {
+  min-width: 0;
+  padding: 22px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--pane);
+}
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.section-heading :where(h2, h3) {
+  margin: 0;
+}
+.section-intro p {
+  max-width: 640px;
+  color: var(--ink-2);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+  font-size: 14px;
+}
+.field > label {
+  font: 500 11px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+:where(.field, .dialog, .management-section)
+  :where(input:not([type='checkbox']):not([type='radio']), select, textarea) {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 13px;
+  border-radius: 12px;
+  border: 1px solid var(--line-2);
+  background: var(--pane);
+  color: var(--ink);
+  outline: 0;
+  transition: border-color 0.3s;
+}
+:where(.field, .dialog, .management-section) :where(input, select, textarea):focus {
+  border-color: var(--leaf);
+}
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--leaf);
+}
+.check {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  font: 500 11px/1.3 var(--mono);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: var(--ink-2);
+}
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 12px 0;
+  padding: 12px 15px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in oklab, var(--rose) 40%, transparent);
+  background: color-mix(in oklab, var(--rose) 8%, transparent);
+  color: var(--rose);
+  font-size: 13.5px;
+  overflow-wrap: anywhere;
+}
+.error span {
+  min-width: 0;
+}
+.empty:has(> h3) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  border: 1px dashed var(--line-2);
+}
+.empty h3 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink);
+}
+.empty p {
+  margin: 0;
+}
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 90px;
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.spin {
+  animation: turn 1.1s linear infinite;
+}
+@keyframes turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.facts {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  font-size: 14px;
+}
+.facts > div {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 14px;
+}
+.facts dt {
+  color: var(--ink-2);
+}
+.facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+details > summary {
+  cursor: pointer;
+  color: var(--ink-2);
+}
+details[open] > summary {
+  margin-bottom: 10px;
+}
+code,
+kbd,
+pre {
+  font-family: var(--mono);
+  font-size: 0.92em;
+}
+
+/* Dialogs opened by kept workflows: the same sheet as the deal and the catch-up. */
+.dialog {
+  width: min(640px, calc(100% - 32px));
+  max-height: min(86vh, 860px);
+  padding: 0;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid var(--line-2);
+  background: var(--pane-solid);
+  color: var(--ink);
+  box-shadow: 0 60px 140px -50px rgba(0, 0, 0, 0.8);
+}
+.dialog[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  animation: sheet-in 0.8s var(--ease) both;
+}
+.dialog.wide {
+  width: min(980px, calc(100% - 32px));
+}
+.dialog::backdrop {
+  background: var(--scrim);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 20px 12px 26px;
+}
+.dialog-heading h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-optical-sizing: auto;
+  font-weight: 380;
+  font-size: 26px;
+  letter-spacing: -0.02em;
+}
+.dialog-heading .button {
+  width: 36px;
+  padding: 0;
+}
+.dialog-body {
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 26px 26px;
+}
+.update-notice {
+  position: fixed;
+  left: 50%;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  z-index: 75;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 32px);
+  padding: 8px 8px 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--pane-solid);
+  box-shadow: var(--shadow);
+  font-size: 13.5px;
+  transform: translateX(-50%);
+}

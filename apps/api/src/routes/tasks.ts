@@ -1,5 +1,5 @@
 import { taskResumeSpend } from '../task-spend.js';
-import { registerQuestionRoutes } from './questions.js';
+import { answerQuestion, registerQuestionRoutes } from './questions.js';
 import { continueTaskOperation } from '../task-continuation.js';
 import {
   beginProjectExecution,
@@ -18,15 +18,20 @@ import { stopCodingMissionFamily, removeCodingMissionFamily } from '../coding-mi
 import { randomUUID } from 'node:crypto';
 import {
   CreateTaskRequest,
+  PlantDealRequest,
   RaiseTaskSpendCeilingRequest,
+  TASK_TITLE_MAX_LENGTH,
+  TaskDeal,
+  agreedDealText,
   TaskPageQuery,
   UpdateSecurityModeRequest,
   UpdateTaskPlanRequest,
   UpdateTaskRequest
 } from '@garden/contracts';
-import type { TaskPage, TaskPlanStep } from '@garden/contracts';
+import type { PlantDealResponse, TaskPage, TaskPlanStep } from '@garden/contracts';
 import {
   GardenError,
+  decryptJson,
   encryptJson,
   inferModelTask,
   modelFit,
@@ -35,8 +40,9 @@ import {
   spendHalt,
   unwrapDataKey
 } from '@garden/core';
-import type { RoutableModel } from '@garden/core';
+import type { EncryptedEnvelope, RoutableModel } from '@garden/core';
 import { writeProjectModelPreferences, readProjectModelPreferences } from '@garden/data';
+import type { UserRecord } from '@garden/data';
 import { ownerPriceCeiling, resumableTaskStatuses } from '../context.js';
 import { withTaskDeliveryStatus } from '../task-delivery-status.js';
 import { requireUser } from '../http/auth-hook.js';
@@ -194,308 +200,424 @@ export const registerTaskRoutes = (context: RouteContext): void => {
     });
   };
 
-  app.post('/v1/tasks', async (request, reply) => {
-    const user = requireUser(request.user);
-    return idempotent(request, reply, user, async () => {
-      const input = CreateTaskRequest.parse(request.body);
-      const project = input.projectId ? await store.getProject(user.id, input.projectId) : null;
-      if (input.projectId && !project)
-        throw new GardenError('project_not_found', 'Project not found', 404);
-      if (project && input.workspaceId !== project.workspaceId)
+  /** Shared by the route and by planting a deal, which starts a goal per agreed term. */
+  const createTask = async (user: UserRecord, body: unknown) => {
+    const input = CreateTaskRequest.parse(body);
+    const project = input.projectId ? await store.getProject(user.id, input.projectId) : null;
+    if (input.projectId && !project)
+      throw new GardenError('project_not_found', 'Project not found', 404);
+    if (project && input.workspaceId !== project.workspaceId)
+      throw new GardenError(
+        'project_workspace_changed',
+        'Reload this project before starting a conversation.',
+        409
+      );
+    if (input.source) {
+      const source = await store.getTask(user.id, input.source.taskId);
+      if (!project || source?.projectId !== project.id)
         throw new GardenError(
-          'project_workspace_changed',
-          'Reload this project before starting a conversation.',
-          409
+          'project_source_unavailable',
+          'The selected context is not in this project.',
+          404
         );
-      if (input.source) {
-        const source = await store.getTask(user.id, input.source.taskId);
-        if (!project || source?.projectId !== project.id)
-          throw new GardenError(
-            'project_source_unavailable',
-            'The selected context is not in this project.',
-            404
-          );
-        if (
-          input.source.eventId &&
-          !(
-            await database.query('SELECT id FROM task_events WHERE task_id=$1 AND id=$2', [
-              source.id,
-              input.source.eventId
-            ])
-          ).rows.length
-        )
-          throw new GardenError(
-            'project_source_unavailable',
-            'The selected message is unavailable.',
-            404
-          );
-      }
-      const conversationChoices = project ? input.modelChoices : undefined;
-      const explicitModelOverride = Boolean(input.modelId && !input.modelChoices?.main);
-      if (project && !input.modelId && !input.modelChoices?.main) {
-        const defaults = await readProjectModelPreferences(store, masterKey, {
-          id: project.id,
-          userId: user.id
-        });
-        if (defaults.choices.main)
-          input.modelChoices = { ...input.modelChoices, main: defaults.choices.main };
-      }
-      // Three chains, none of which reads anything another one writes: the computer this runs on,
-      // the money it may spend, and the model that will answer. See `started` above for why the
-      // refusals still arrive in this order.
-      const workspaceRead = started(store.getWorkspace(user.id, input.workspaceId));
-      const guarded = started(
-        resolveSpendCeiling(user.id, input.maxSpendUsd).then(async (ceilingUsd) => {
-          await assertSpendCeilingAllowed({ userId: user.id, ceilingUsd });
-          return ceilingUsd;
-        })
-      );
-      const routed = started(
-        modelsForUser(user).then(async (catalog) => {
-          const main = input.modelChoices?.main;
-          if (main || input.modelId) {
-            const resolved = selectPurposeModel({
-              purpose: 'main',
-              choice: main ?? { automatic: false, preference: 'balanced', modelId: input.modelId! },
-              catalog,
-              privacyRoute: input.privacyRoute,
-              taskKind: inferModelTask(input.prompt),
-              ceiling: ownerPriceCeiling(await store.effectiveSpendLimits(user.id))
-            });
-            if (!resolved.model)
-              throw new GardenError(
-                'model_unavailable',
-                resolved.reason ?? 'No model is available for this project'
-              );
-            if (input.modelId && input.modelId !== resolved.model.id)
-              throw new GardenError(
-                'model_choice_conflict',
-                'The prompt and project must choose the same main model'
-              );
-            return { catalog, chosen: { model: resolved.model, message: null } };
-          }
-          return {
-            catalog,
-            chosen: await pickModelUnderPriceCeiling(user.id, catalog, {
-              privacyRoute: input.privacyRoute,
-              taskKind: inferModelTask(input.prompt)
-            })
-          };
-        })
-      );
-      const workspace = (await workspaceRead)();
-      if (!workspace?.wrappedKey)
-        throw new GardenError('workspace_not_found', 'Workspace not found');
-      if (workspace.status !== 'running')
-        throw new GardenError('workspace_unavailable', 'Workspace is not running');
-      const spendCeilingUsd = (await guarded)();
-      const { catalog, chosen } = (await routed)();
-      const selected = chosen?.model;
       if (
-        !selected ||
-        selected.availability !== 'available' ||
-        selected.privacyRoute !== input.privacyRoute
-      ) {
+        input.source.eventId &&
+        !(
+          await database.query('SELECT id FROM task_events WHERE task_id=$1 AND id=$2', [
+            source.id,
+            input.source.eventId
+          ])
+        ).rows.length
+      )
         throw new GardenError(
-          'model_unavailable',
-          'The selected model is not available for this privacy route'
+          'project_source_unavailable',
+          'The selected message is unavailable.',
+          404
         );
-      }
-      const reasoningEffort = validateTaskReasoning(input.reasoningEffort ?? 'auto', selected);
-      const dataKey = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
-      const title = input.title ?? provisionalTaskTitle(input.prompt);
-      const prepared = await database.transaction(async () => {
-        const created = await store.createTask({
-          userId: user.id,
-          workspaceId: workspace.id,
-          ...(project ? { projectId: project.id } : {}),
-          modelOverride: explicitModelOverride,
-          ...(conversationChoices
-            ? {
-                modelChoicesCiphertext: encryptJson(
-                  conversationChoices,
-                  dataKey,
-                  `conversation-models:${project!.id}`
-                )
-              }
-            : {}),
-          ...(input.source
-            ? {
-                conversationSourceCiphertext: encryptJson(
-                  input.source,
-                  dataKey,
-                  `conversation-source:${project!.id}`
-                )
-              }
-            : {}),
-          titleCiphertext: encryptJson({ title }, dataKey, `task-title:${workspace.id}`),
-          nameIndex: nameIndexFor(title, input.prompt, dataKey),
-          modelId: selected.id,
-          reasoningEffort,
-          privacyRoute: input.privacyRoute,
-          maxComputeCredits: Math.max(
-            input.maxComputeCredits,
-            computeAllowanceFor(selected, config.TASK_MAX_STEPS)
-          ),
-          maxSpendUsd: spendCeilingUsd,
-          securityMode: input.securityMode ?? project?.securityMode ?? workspace.securityMode,
-          promptCiphertext: encryptJson(
+    }
+    const conversationChoices = project ? input.modelChoices : undefined;
+    const explicitModelOverride = Boolean(input.modelId && !input.modelChoices?.main);
+    if (project && !input.modelId && !input.modelChoices?.main) {
+      const defaults = await readProjectModelPreferences(store, masterKey, {
+        id: project.id,
+        userId: user.id
+      });
+      if (defaults.choices.main)
+        input.modelChoices = { ...input.modelChoices, main: defaults.choices.main };
+    }
+    // Three chains, none of which reads anything another one writes: the computer this runs on,
+    // the money it may spend, and the model that will answer. See `started` above for why the
+    // refusals still arrive in this order.
+    const workspaceRead = started(store.getWorkspace(user.id, input.workspaceId));
+    const guarded = started(
+      resolveSpendCeiling(user.id, input.maxSpendUsd).then(async (ceilingUsd) => {
+        await assertSpendCeilingAllowed({ userId: user.id, ceilingUsd });
+        return ceilingUsd;
+      })
+    );
+    const routed = started(
+      modelsForUser(user).then(async (catalog) => {
+        const main = input.modelChoices?.main;
+        if (main || input.modelId) {
+          const resolved = selectPurposeModel({
+            purpose: 'main',
+            choice: main ?? { automatic: false, preference: 'balanced', modelId: input.modelId! },
+            catalog,
+            privacyRoute: input.privacyRoute,
+            taskKind: inferModelTask(input.prompt),
+            ceiling: ownerPriceCeiling(await store.effectiveSpendLimits(user.id))
+          });
+          if (!resolved.model)
+            throw new GardenError(
+              'model_unavailable',
+              resolved.reason ?? 'No model is available for this project'
+            );
+          if (input.modelId && input.modelId !== resolved.model.id)
+            throw new GardenError(
+              'model_choice_conflict',
+              'The prompt and project must choose the same main model'
+            );
+          return { catalog, chosen: { model: resolved.model, message: null } };
+        }
+        return {
+          catalog,
+          chosen: await pickModelUnderPriceCeiling(user.id, catalog, {
+            privacyRoute: input.privacyRoute,
+            taskKind: inferModelTask(input.prompt)
+          })
+        };
+      })
+    );
+    const workspace = (await workspaceRead)();
+    if (!workspace?.wrappedKey) throw new GardenError('workspace_not_found', 'Workspace not found');
+    if (workspace.status !== 'running')
+      throw new GardenError('workspace_unavailable', 'Workspace is not running');
+    const spendCeilingUsd = (await guarded)();
+    const { catalog, chosen } = (await routed)();
+    const selected = chosen?.model;
+    if (
+      !selected ||
+      selected.availability !== 'available' ||
+      selected.privacyRoute !== input.privacyRoute
+    ) {
+      throw new GardenError(
+        'model_unavailable',
+        'The selected model is not available for this privacy route'
+      );
+    }
+    const reasoningEffort = validateTaskReasoning(input.reasoningEffort ?? 'auto', selected);
+    const dataKey = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
+    const title = input.title ?? provisionalTaskTitle(input.prompt);
+    const prepared = await database.transaction(async () => {
+      const created = await store.createTask({
+        userId: user.id,
+        workspaceId: workspace.id,
+        ...(project ? { projectId: project.id } : {}),
+        modelOverride: explicitModelOverride,
+        ...(conversationChoices
+          ? {
+              modelChoicesCiphertext: encryptJson(
+                conversationChoices,
+                dataKey,
+                `conversation-models:${project!.id}`
+              )
+            }
+          : {}),
+        ...(input.source
+          ? {
+              conversationSourceCiphertext: encryptJson(
+                input.source,
+                dataKey,
+                `conversation-source:${project!.id}`
+              )
+            }
+          : {}),
+        titleCiphertext: encryptJson({ title }, dataKey, `task-title:${workspace.id}`),
+        nameIndex: nameIndexFor(title, input.prompt, dataKey),
+        modelId: selected.id,
+        reasoningEffort,
+        privacyRoute: input.privacyRoute,
+        maxComputeCredits: Math.max(
+          input.maxComputeCredits,
+          computeAllowanceFor(selected, config.TASK_MAX_STEPS)
+        ),
+        maxSpendUsd: spendCeilingUsd,
+        securityMode: input.securityMode ?? project?.securityMode ?? workspace.securityMode,
+        promptCiphertext: encryptJson(
+          {
+            prompt: input.prompt,
+            attachments: input.attachments?.length ? input.attachments : undefined
+          },
+          dataKey,
+          `task-prompt:${workspace.id}`
+        )
+      });
+      const titled = input.title
+        ? await store.renameTask(
+            user.id,
+            created.id,
+            encryptJson({ title }, dataKey, `task-title:${workspace.id}`),
+            nameIndexFor(title, input.prompt, dataKey)
+          )
+        : created;
+      if (!titled) throw new GardenError('task_unavailable', 'The task could not be named', 409);
+      if (!project && input.modelChoices && Object.keys(input.modelChoices).length)
+        await writeProjectModelPreferences(store, masterKey, titled, {
+          expectedRevision: 0,
+          choices: input.modelChoices
+        });
+      return {
+        task: titled,
+        // A project conversation works in the project's folder unless it asked for its own copy.
+        execution: await beginProjectExecution(
+          context,
+          titled,
+          input.attachments ?? [],
+          Boolean(project) && input.execution !== 'shared'
+        )
+      };
+    });
+    let task = prepared.task;
+    /*
+     * The reservation beside the timeline, not behind it.
+     *
+     * The two events stay in their own order and cannot be run together: `appendTaskEvent` takes
+     * the row lock that hands out the sequence number, so racing them is how "Task queued" comes
+     * second in the conversation the owner is reading. The usage row is in another table with no
+     * ordering to keep, so it no longer waits for either of them.
+     */
+    await Promise.all([
+      store.recordUsage({
+        userId: user.id,
+        workspaceId: workspace.id,
+        taskId: task.id,
+        kind: 'task_compute',
+        resourceClass: selected.usageClass,
+        quantity: input.maxComputeCredits,
+        unit: 'credits',
+        credits: input.maxComputeCredits,
+        state: 'reserved',
+        idempotencyKey: `task:${task.id}:reservation`
+      }),
+      store
+        .appendTaskEvent({
+          taskId: task.id,
+          kind: 'task_created',
+          summary: 'Task queued',
+          payloadCiphertext: encryptJson(
             {
-              prompt: input.prompt,
-              attachments: input.attachments?.length ? input.attachments : undefined
+              model: selected.displayName,
+              privacyRoute: selected.privacyRoute,
+              budget: input.maxComputeCredits
             },
             dataKey,
-            `task-prompt:${workspace.id}`
+            `task-event:${task.id}`
           )
-        });
-        const titled = input.title
-          ? await store.renameTask(
-              user.id,
-              created.id,
-              encryptJson({ title }, dataKey, `task-title:${workspace.id}`),
-              nameIndexFor(title, input.prompt, dataKey)
-            )
-          : created;
-        if (!titled) throw new GardenError('task_unavailable', 'The task could not be named', 409);
-        if (!project && input.modelChoices && Object.keys(input.modelChoices).length)
-          await writeProjectModelPreferences(store, masterKey, titled, {
-            expectedRevision: 0,
-            choices: input.modelChoices
-          });
-        return {
-          task: titled,
-          // A project conversation works in the project's folder unless it asked for its own copy.
-          execution: await beginProjectExecution(
-            context,
-            titled,
-            input.attachments ?? [],
-            Boolean(project) && input.execution !== 'shared'
-          )
-        };
-      });
-      let task = prepared.task;
-      /*
-       * The reservation beside the timeline, not behind it.
-       *
-       * The two events stay in their own order and cannot be run together: `appendTaskEvent` takes
-       * the row lock that hands out the sequence number, so racing them is how "Task queued" comes
-       * second in the conversation the owner is reading. The usage row is in another table with no
-       * ordering to keep, so it no longer waits for either of them.
-       */
-      await Promise.all([
-        store.recordUsage({
-          userId: user.id,
-          workspaceId: workspace.id,
-          taskId: task.id,
-          kind: 'task_compute',
-          resourceClass: selected.usageClass,
-          quantity: input.maxComputeCredits,
-          unit: 'credits',
-          credits: input.maxComputeCredits,
-          state: 'reserved',
-          idempotencyKey: `task:${task.id}:reservation`
-        }),
-        store
-          .appendTaskEvent({
+        })
+        .then(() =>
+          store.appendTaskEvent({
             taskId: task.id,
-            kind: 'task_created',
-            summary: 'Task queued',
+            kind: 'user_message',
+            summary: 'User message',
             payloadCiphertext: encryptJson(
               {
-                model: selected.displayName,
-                privacyRoute: selected.privacyRoute,
-                budget: input.maxComputeCredits
+                markdown: input.prompt,
+                attachments: input.attachments?.length ? input.attachments : undefined
               },
               dataKey,
               `task-event:${task.id}`
             )
           })
-          .then(() =>
-            store.appendTaskEvent({
-              taskId: task.id,
-              kind: 'user_message',
-              summary: 'User message',
-              payloadCiphertext: encryptJson(
-                {
-                  markdown: input.prompt,
-                  attachments: input.attachments?.length ? input.attachments : undefined
-                },
-                dataKey,
-                `task-event:${task.id}`
-              )
-            })
-          )
-      ]);
-      /*
-       * After the request it is about, so the owner reads what they asked for and then what will be
-       * answering it. Started rather than awaited into the response: the task exists and is queued
-       * by this point, and neither a ranking over the whole catalogue nor the insert that records
-       * it is worth holding a send the owner is watching.
-       *
-       * The comment here said "caught rather than awaited" while the call was awaited, which is how
-       * a synchronous pass over a few hundred models and a round trip to the database stayed in
-       * front of every first message on the box without anybody meaning them to be. The `.catch` is
-       * attached on this line and not later, so nothing about this can become an unhandled
-       * rejection, and the notice still lands ahead of the worker's first frame - it is one insert
-       * against a task that has yet to be leased, let alone answered.
-       *
-       * The round trip came back the same way a second time, as `await store.effectiveSpendLimits`
-       * inside the argument list: arguments are evaluated before the call, so the read was in
-       * front of `void` and not behind it. The account id goes in instead and the read happens
-       * inside.
-       */
-      void noteModelFit({
+        )
+    ]);
+    /*
+     * After the request it is about, so the owner reads what they asked for and then what will be
+     * answering it. Started rather than awaited into the response: the task exists and is queued
+     * by this point, and neither a ranking over the whole catalogue nor the insert that records
+     * it is worth holding a send the owner is watching.
+     *
+     * The comment here said "caught rather than awaited" while the call was awaited, which is how
+     * a synchronous pass over a few hundred models and a round trip to the database stayed in
+     * front of every first message on the box without anybody meaning them to be. The `.catch` is
+     * attached on this line and not later, so nothing about this can become an unhandled
+     * rejection, and the notice still lands ahead of the worker's first frame - it is one insert
+     * against a task that has yet to be leased, let alone answered.
+     *
+     * The round trip came back the same way a second time, as `await store.effectiveSpendLimits`
+     * inside the argument list: arguments are evaluated before the call, so the read was in
+     * front of `void` and not behind it. The account id goes in instead and the read happens
+     * inside.
+     */
+    void noteModelFit({
+      taskId: task.id,
+      userId: user.id,
+      dataKey,
+      catalog,
+      chosen: selected,
+      privacyRoute: input.privacyRoute,
+      prompt: input.prompt,
+      attachments: input.attachments ?? []
+    }).catch((error: unknown) => log.warn('models.fit_note_failed', errorFields(error)));
+    /*
+     * What the ceiling did to this pick, when it did something worth saying.
+     *
+     * `selectModel`'s `relaxed_unbenchmarked` arm is the case: every measured model that could do
+     * the work is above the ceiling, so an unmeasured one is answering. That is a fact about the
+     * quality of this reply and the owner is the only person who can act on it - by raising the
+     * ceiling or accepting the route - and until now it was computed and dropped on the floor. The
+     * `blocked` arm never reaches here; it refused the request above.
+     */
+    if (chosen?.message)
+      await store.appendTaskEvent({
         taskId: task.id,
-        userId: user.id,
-        dataKey,
-        catalog,
-        chosen: selected,
-        privacyRoute: input.privacyRoute,
-        prompt: input.prompt,
-        attachments: input.attachments ?? []
-      }).catch((error: unknown) => log.warn('models.fit_note_failed', errorFields(error)));
-      /*
-       * What the ceiling did to this pick, when it did something worth saying.
-       *
-       * `selectModel`'s `relaxed_unbenchmarked` arm is the case: every measured model that could do
-       * the work is above the ceiling, so an unmeasured one is answering. That is a fact about the
-       * quality of this reply and the owner is the only person who can act on it - by raising the
-       * ceiling or accepting the route - and until now it was computed and dropped on the floor. The
-       * `blocked` arm never reaches here; it refused the request above.
-       */
-      if (chosen?.message)
-        await store.appendTaskEvent({
-          taskId: task.id,
-          kind: 'notice',
-          summary: chosen.message.slice(0, 500),
-          payloadCiphertext: encryptJson(
-            { headline: chosen.message, detail: '' },
-            dataKey,
-            `task-event:${task.id}`
+        kind: 'notice',
+        summary: chosen.message.slice(0, 500),
+        payloadCiphertext: encryptJson(
+          { headline: chosen.message, detail: '' },
+          dataKey,
+          `task-event:${task.id}`
+        )
+      });
+    try {
+      task = await completeProjectExecution(context, task, prepared.execution);
+    } catch (error) {
+      task = (await store.getTask(user.id, task.id)) ?? task;
+      await store.appendTaskEvent({
+        taskId: task.id,
+        kind: 'notice',
+        summary: 'Project preparation needs attention',
+        payloadCiphertext: encryptJson(
+          {
+            headline: 'Project preparation needs attention',
+            detail:
+              error instanceof Error
+                ? error.message
+                : 'The project could not be prepared. Send the message again to retry preparation.'
+          },
+          dataKey,
+          `task-event:${task.id}`
+        )
+      });
+    }
+    return privateTaskResponse(task);
+  };
+  app.post('/v1/tasks', async (request, reply) => {
+    const user = requireUser(request.user);
+    return idempotent(request, reply, user, () => createTask(user, request.body));
+  });
+  /**
+   * Plants a deal the agent proposed: lends the keys, sets each goal's cap, starts a conversation
+   * per extra goal, and answers the parked deal with the agreed terms in words.
+   *
+   * The siblings are created before the answer, because the answer is the commit: once it lands the
+   * deal is no longer waiting, so a retry after a failure could not start the goals it had missed.
+   */
+  app.post<{ Params: { taskId: string } }>('/v1/tasks/:taskId/deal', async (request, reply) => {
+    const user = requireUser(request.user);
+    return idempotent(request, reply, user, async (): Promise<PlantDealResponse> => {
+      const input = PlantDealRequest.parse(request.body);
+      const task = await store.getTask(user.id, request.params.taskId);
+      if (!task) throw new GardenError('task_not_found', 'Conversation not found', 404);
+      const workspace = await store.getWorkspace(user.id, task.workspaceId);
+      if (!workspace?.wrappedKey)
+        throw new GardenError('workspace_not_found', 'Workspace not found', 404);
+      const key = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
+      const state = task.agentStateCiphertext
+        ? decryptJson<{ question?: { id?: string; deal?: boolean } }>(
+            task.agentStateCiphertext,
+            key
           )
+        : null;
+      const row = (
+        await database.query(
+          "SELECT payload_ciphertext FROM task_events WHERE task_id=$1 AND id=$2 AND kind='question_asked'",
+          [task.id, input.questionId]
+        )
+      ).rows[0];
+      if (
+        task.status !== 'awaiting_user' ||
+        !state?.question?.deal ||
+        state.question.id !== input.questionId ||
+        !row
+      )
+        throw new GardenError(
+          'question_changed',
+          'This deal is no longer waiting. Refresh the conversation.',
+          409
+        );
+      const deal = TaskDeal.parse(
+        decryptJson<{ payload?: { deal?: unknown } }>(
+          row.payload_ciphertext as EncryptedEnvelope,
+          key
+        ).payload?.deal
+      );
+      if (input.goals.some((index) => index >= deal.goals.length))
+        throw new GardenError('deal_goal_unknown', 'That goal is not part of this deal', 400);
+      for (const cap of input.capsUsd)
+        await assertSpendCeilingAllowed({ userId: user.id, ceilingUsd: cap });
+      const securityMode = input.actAsYou
+        ? 'autonomous'
+        : task.securityMode === 'autonomous'
+          ? 'balanced'
+          : task.securityMode;
+      const planted = input.goals.map((index, at) => ({
+        goal: deal.goals[index]!,
+        capUsd: input.capsUsd[at]!
+      }));
+      const [first, ...others] = planted;
+      const original = openPrompt(task, key);
+      const siblings: string[] = [];
+      for (const { goal, capUsd } of others) {
+        const created = await createTask(user, {
+          workspaceId: task.workspaceId,
+          prompt: agreedDealText({
+            deal,
+            goal,
+            answers: input.answers,
+            actAsYou: input.actAsYou,
+            capUsd,
+            plantedFrom: first!.goal.title,
+            ...(original ? { request: original } : {}),
+            ...(input.note ? { note: input.note } : {})
+          }),
+          title: goal.title.slice(0, TASK_TITLE_MAX_LENGTH),
+          // Routed the way the conversation was: a model the owner pinned stays pinned.
+          ...(task.modelOverride ? { modelId: task.modelId } : {}),
+          privacyRoute: task.privacyRoute,
+          securityMode,
+          reasoningEffort: task.reasoningEffort,
+          maxComputeCredits: task.maxComputeCredits,
+          maxSpendUsd: capUsd
         });
-      try {
-        task = await completeProjectExecution(context, task, prepared.execution);
-      } catch (error) {
-        task = (await store.getTask(user.id, task.id)) ?? task;
-        await store.appendTaskEvent({
-          taskId: task.id,
-          kind: 'notice',
-          summary: 'Project preparation needs attention',
-          payloadCiphertext: encryptJson(
-            {
-              headline: 'Project preparation needs attention',
-              detail:
-                error instanceof Error
-                  ? error.message
-                  : 'The project could not be prepared. Send the message again to retry preparation.'
-            },
-            dataKey,
-            `task-event:${task.id}`
-          )
-        });
+        siblings.push(created.id);
       }
-      return privateTaskResponse(task);
+      await database.query(
+        'UPDATE tasks SET max_spend_usd=$3, updated_at=NOW() WHERE id=$1 AND user_id=$2',
+        [task.id, user.id, first!.capUsd]
+      );
+      if (securityMode !== task.securityMode)
+        await store.updateTaskSecurityMode(user.id, task.id, securityMode);
+      const name = first!.goal.title.slice(0, TASK_TITLE_MAX_LENGTH);
+      await store.renameTask(
+        user.id,
+        task.id,
+        encryptJson({ title: name }, key, `task-title:${workspace.id}`),
+        nameIndexFor(name, original || name, key)
+      );
+      await answerQuestion(context, user, task.id, {
+        questionId: input.questionId,
+        prompt: agreedDealText({
+          deal,
+          goal: first!.goal,
+          answers: input.answers,
+          actAsYou: input.actAsYou,
+          capUsd: first!.capUsd,
+          alongside: others.map(({ goal }) => goal.title),
+          ...(input.note ? { note: input.note } : {})
+        })
+      });
+      log.info('task.deal_planted', { taskId: task.id, goals: planted.length });
+      return { taskIds: [task.id, ...siblings] };
     });
   });
 

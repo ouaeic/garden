@@ -40,7 +40,7 @@ test(
             resolveId: (id) => (id === 'virtual:proof' ? '\0proof.js' : null),
             load: (id) =>
               id === '\0proof.js'
-                ? `import ${JSON.stringify(path.join(root, 'src/styles.css'))};import ${JSON.stringify(path.join(root, 'src/presentation.css'))};import React from 'react';import{createRoot}from'react-dom/client';import Capture from ${JSON.stringify(path.join(root, 'src/PrivateDiagnostics.tsx'))};createRoot(document.getElementById('root')).render(React.createElement(Capture,{taskId:${JSON.stringify(taskId)}}));`
+                ? `import ${JSON.stringify(path.join(root, 'src/styles/index.css'))};import ${JSON.stringify(path.join(root, 'src/presentation.css'))};import React from 'react';import{createRoot}from'react-dom/client';import Capture from ${JSON.stringify(path.join(root, 'src/PrivateDiagnostics.tsx'))};createRoot(document.getElementById('root')).render(React.createElement(Capture,{taskId:${JSON.stringify(taskId)}}));`
                 : null
           }
         ],

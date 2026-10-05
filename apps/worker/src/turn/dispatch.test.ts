@@ -186,7 +186,8 @@ const dispatch = async (
     recordToolResult: async () => undefined,
     compactContext: (async () => undefined) as unknown as TurnDispatchDeps['compactContext'],
     sendNotice: async () => undefined,
-    askUser: async () => false
+    askUser: async () => false,
+    proposeDeal: async () => false
   } as unknown as TurnDispatchDeps;
 
   await dispatchToolCalls(
@@ -326,6 +327,10 @@ const planDispatch = async (
     },
     askUser: async (_t: TaskRecord, _k: Uint8Array, _s: AgentState, call: ModelToolCall) => {
       order.push(`asked:${call.name}`);
+      return false;
+    },
+    proposeDeal: async (_t: TaskRecord, _k: Uint8Array, _s: AgentState, call: ModelToolCall) => {
+      order.push(`proposed:${call.name}`);
       return false;
     }
   } as unknown as TurnDispatchDeps;
@@ -541,12 +546,12 @@ describe('what plan mode permits, derived rather than listed', () => {
   });
 
   it('permits nothing the checkpoint rule says needs an undo point', () => {
-    // The basis, stated as the containment it is: the two names added by hand are the whole of what
-    // this set has that the checkpoint rule does not, so a reader checks the addition, not the set.
+    // The basis, stated as the containment it is: the three names added by hand are the whole of
+    // what this set has that the checkpoint rule does not, so a reader checks the addition, not the set.
     for (const name of PLAN_MODE_PERMITTED)
       expect(
-        CHECKPOINT_EXEMPT_TOOLS.has(name) || ['ask', 'delegate'].includes(name),
-        `${name} is neither checkpoint-exempt nor one of the two added by name`
+        CHECKPOINT_EXEMPT_TOOLS.has(name) || ['ask', 'propose_deal', 'delegate'].includes(name),
+        `${name} is neither checkpoint-exempt nor one of the three added by name`
       ).toBe(true);
     /*
      * And the other direction, which is where the two derivations disagree and where the stricter

@@ -127,6 +127,14 @@ describe('when the agent is allowed to stop and ask', () => {
     });
   });
 
+  it('keeps a default only with the time it will wait, so the user knows how long they have', () => {
+    expect(
+      askOutcome(looked, { question: 'Apply anyway?', default: 'Skip it', waitHours: 36 })
+    ).toMatchObject({ ok: true, fallback: { choice: 'Skip it', waitHours: 36 } });
+    const unbounded = askOutcome(looked, { question: 'Apply anyway?', default: 'Skip it' });
+    expect(unbounded.ok ? '' : unbounded.refusal).toContain('waitHours');
+  });
+
   it('refuses a single option, because one option is not a choice', () => {
     const outcome = askOutcome(looked, { question: 'A4?', why: 'Page size', options: ['A4'] });
     expect(outcome.ok ? '' : outcome.refusal).toContain('at least two');

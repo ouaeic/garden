@@ -1,15 +1,13 @@
-/* The native traffic lights and drag area share the screen's own surface. */
-body {
-  padding-top: 32px !important;
+/* The native traffic lights sit in a strip of the garden's own light above the interface. */
+#root {
+  box-sizing: border-box;
+  padding-top: 32px;
 }
 body::before {
   content: '';
   position: fixed;
   inset: 0 0 auto;
   height: 32px;
-  background: var(--lcd-texture), var(--bg);
   z-index: 10000;
-}
-.garden-shell.desk-shell {
-  height: calc(min(var(--garden-viewport-height, 100dvh), 100dvh) - 32px);
+  -webkit-app-region: drag;
 }

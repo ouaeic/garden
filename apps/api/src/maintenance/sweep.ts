@@ -16,6 +16,7 @@ export interface MaintenanceSweeps {
   failTasksAtAttemptLimit: () => Promise<number>;
   recoverStrandedScheduledTasks: () => Promise<number>;
   retryProviderWalls: () => Promise<number>;
+  answerLapsedQuestions: () => Promise<number>;
 }
 
 export const createMaintenanceSweep = (context: SupportedContext, sweeps: MaintenanceSweeps) => {
@@ -23,7 +24,8 @@ export const createMaintenanceSweep = (context: SupportedContext, sweeps: Mainte
     sweepExpiredApprovals,
     failTasksAtAttemptLimit,
     recoverStrandedScheduledTasks,
-    retryProviderWalls
+    retryProviderWalls,
+    answerLapsedQuestions
   } = sweeps;
   const { log, store, meterWorkspace, config } = context;
   let maintenanceRun: Promise<void> | null = null;
@@ -50,6 +52,7 @@ export const createMaintenanceSweep = (context: SupportedContext, sweeps: Mainte
     await step('maintenance.attempt_limit_sweep_failed', failTasksAtAttemptLimit);
     await step('maintenance.schedule_recovery_failed', recoverStrandedScheduledTasks);
     await step('maintenance.provider_wall_retry_failed', retryProviderWalls);
+    await step('maintenance.question_default_failed', answerLapsedQuestions);
     await step('maintenance.metering_failed', async () => {
       const running = await store.listRunningWorkspaces();
       await Promise.all(running.map(meterWorkspace));

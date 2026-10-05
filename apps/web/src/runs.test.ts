@@ -1,7 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { ManagedProcess } from '@garden/contracts';
-import { computerTool } from './computer-tools';
-import { initialComputerTool, initialNavigation } from './navigation';
 import { runSummary } from './runs';
 
 const run = (over: Partial<ManagedProcess> = {}): ManagedProcess => ({
@@ -47,30 +45,5 @@ describe('a run read at a glance', () => {
       0
     );
     expect(summary.startsWith('Needs a look · ')).toBe(true);
-  });
-});
-
-describe('where a link to the computer lands', () => {
-  afterEach(() => vi.unstubAllGlobals());
-  const at = (search: string) => vi.stubGlobal('location', { search });
-
-  it('maps the tab names that were merged onto the tabs that hold them now', () => {
-    expect(computerTool('processes')).toBe('runs');
-    expect(computerTool('previews')).toBe('runs');
-    expect(computerTool('checkpoints')).toBe('machine');
-    expect(computerTool('terminal')).toBe('terminal');
-    expect(computerTool('nonsense')).toBe('runs');
-    expect(computerTool(null)).toBe('runs');
-  });
-
-  it('sends the places that became tabs to the Computer page', () => {
-    at('?view=automations');
-    expect(initialNavigation().view).toBe('computer');
-    expect(initialComputerTool()).toBe('runs');
-    at('?view=library');
-    expect(initialNavigation().view).toBe('computer');
-    expect(initialComputerTool()).toBe('results');
-    at('?view=settings');
-    expect(initialNavigation().view).toBe('settings');
   });
 });

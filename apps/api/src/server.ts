@@ -47,8 +47,10 @@ import { runNameBackfill } from './maintenance/name-backfill.js';
 import { createProviderWallMaintenance } from './maintenance/provider-walls.js';
 import { createScheduleDispatch } from './maintenance/schedule-dispatch.js';
 import { createMaintenanceSweep } from './maintenance/sweep.js';
+import { createQuestionDefaultSweep } from './maintenance/question-defaults.js';
 import { registerAccountRoutes } from './routes/account.js';
 import { registerApprovalRoutes } from './routes/approvals.js';
+import { registerMoveRoutes } from './routes/moves.js';
 import { registerBootstrapRoutes } from './routes/bootstrap.js';
 import { registerConnectorRoutes } from './routes/connectors.js';
 import { registerDeviceRoutes } from './routes/devices.js';
@@ -226,19 +228,19 @@ export const buildServer = async (
   const maintenanceContext: SupportedContext = { ...base, ...support };
   const schedules = createScheduleDispatch(maintenanceContext);
   const providerWallMaintenance = createProviderWallMaintenance(maintenanceContext);
-  const { maintain, maintenanceTimer } = createMaintenanceSweep(maintenanceContext, {
-    sweepExpiredApprovals: createApprovalSweep(maintenanceContext),
-    failTasksAtAttemptLimit: createAttemptLimitSweep(maintenanceContext),
-    recoverStrandedScheduledTasks: schedules.recoverStrandedScheduledTasks,
-    retryProviderWalls: providerWallMaintenance.retryProviderWalls
-  });
-
   const routes: RouteContext = {
     ...maintenanceContext,
     requireRecentStepUp,
     idempotent,
     resumeTasksWaitingOnAProvider: providerWallMaintenance.resumeTasksWaitingOnAProvider
   };
+  const { maintain, maintenanceTimer } = createMaintenanceSweep(maintenanceContext, {
+    sweepExpiredApprovals: createApprovalSweep(maintenanceContext),
+    failTasksAtAttemptLimit: createAttemptLimitSweep(maintenanceContext),
+    recoverStrandedScheduledTasks: schedules.recoverStrandedScheduledTasks,
+    retryProviderWalls: providerWallMaintenance.retryProviderWalls,
+    answerLapsedQuestions: createQuestionDefaultSweep(routes)
+  });
 
   /*
    * Hooks first, and this is not a style choice: Fastify decides a route's hooks when the route is
@@ -254,6 +256,7 @@ export const buildServer = async (
   registerNotificationRoutes(routes);
   registerDraftRoutes(routes);
   registerApprovalRoutes(routes);
+  registerMoveRoutes(routes);
   registerPrivacyRoutes(routes);
   registerUsageRoutes(routes);
   registerScheduleRoutes(routes);

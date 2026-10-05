@@ -1,128 +1,91 @@
+/**
+ * The mark and every icon made from it: the word's own italic "g", in leaf on the night garden.
+ *
+ * Rendered by a real browser from the bundled Fraunces with the axes the interface sets on the
+ * word, so the icon and the header are one letterform. Writes the web icons, the native sources,
+ * and then runs the native icon generator over them.
+ *
+ *   node scripts/build-brand.mjs
+ */
 import assert from 'node:assert/strict';
-import { readFile, writeFile, readdir, copyFile } from 'node:fs/promises';
+import { copyFile, readdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { format, resolveConfig } from 'prettier';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const palette = await readFile(root + 'apps/web/src/lcd.css', 'utf8');
-const light = palette.match(/--s0:\s*(#[\da-f]{6});/i)?.[1];
-const dark = palette.match(/--s3:\s*(#[\da-f]{6});/i)?.[1];
-assert(light && dark, 'Garden must define both ends of its ink palette');
-const requireRunner = createRequire(
-  new URL('../services/workspace-runner/package.json', import.meta.url)
+const tokens = await readFile(root + 'apps/web/src/styles/foundation.css', 'utf8');
+const token = (name) => tokens.match(new RegExp(`${name}:\\s*(#[\\da-f]{6});`, 'i'))?.[1];
+const night = token('--bg');
+const card = token('--card');
+const leaf = token('--leaf');
+assert(night && card && leaf, 'The mark takes its colours from the night theme');
+const font = (await readFile(root + 'apps/web/public/fonts/Fraunces-Italic.woff2')).toString(
+  'base64'
 );
-const { chromium } = requireRunner('playwright-core');
-const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage();
-const save = async (path, data) => {
-  const target = root + path;
-  if (path.endsWith('.svg')) {
-    data = await format(data, { ...(await resolveConfig(target)), parser: 'html' });
-  }
-  await writeFile(target, data);
-};
 
-try {
-  for (const name of ['icon', 'wordmark']) {
-    const source = await readFile(root + `design/brand/selected-${name}.png`);
-    const artwork = await page.evaluate(
-      async (uri) => {
-        const image = new globalThis.Image();
-        image.src = uri;
-        await image.decode();
-        const canvas = globalThis.document.createElement('canvas');
-        canvas.width = image.width;
-        canvas.height = image.height;
-        const context = canvas.getContext('2d');
-        context.drawImage(image, 0, 0);
-        const { data } = context.getImageData(0, 0, image.width, image.height);
-        // The selected artwork has one light ink on a dark backdrop. Trace its silhouette so
-        // the interface can supply its own ink without carrying the backdrop or a colour filter.
-        const ink = (x, y) => {
-          const at = (y * image.width + x) * 4;
-          return data[at] * 0.2126 + data[at + 1] * 0.7152 + data[at + 2] * 0.0722 > 128;
-        };
-        const rectangles = [];
-        let previous = new Map();
-        let left = image.width,
-          top = image.height,
-          right = 0,
-          bottom = 0;
-        for (let y = 0; y < image.height; y++) {
-          const row = new Map();
-          for (let x = 0; x < image.width; x++) {
-            if (!ink(x, y)) continue;
-            const start = x;
-            while (x < image.width && ink(x, y)) x++;
-            const width = x - start;
-            const key = `${start},${width}`;
-            const rectangle = previous.get(key) || { x: start, y, width, height: 0 };
-            if (!previous.has(key)) rectangles.push(rectangle);
-            rectangle.height++;
-            row.set(key, rectangle);
-            left = Math.min(left, start);
-            top = Math.min(top, y);
-            right = Math.max(right, x);
-            bottom = Math.max(bottom, y + 1);
-          }
-          previous = row;
-        }
-        return { rectangles, width: image.width, height: image.height, left, top, right, bottom };
-      },
-      `data:image/png;base64,${source.toString('base64')}`
+const runner = createRequire(new URL('../services/workspace-runner/package.json', import.meta.url));
+const { chromium } = runner('playwright-core');
+const browser = await chromium.launch({ headless: true });
+
+/**
+ * One rendering of the mark. `inset` is the share of the canvas left around the tile, `radius` the
+ * tile's corner as a share of the tile, `scale` the letter's height as a share of the tile.
+ */
+async function render(size, { ink = leaf, tile = true, inset = 0, radius = 0, scale = 0.78 } = {}) {
+  const page = await browser.newPage({ viewport: { width: size, height: size } });
+  try {
+    const box = size * (1 - 2 * inset);
+    await page.setContent(`<!doctype html><style>
+      @font-face { font-family: Mark; src: url(data:font/woff2;base64,${font}) format('woff2'); font-style: italic; font-weight: 100 900; }
+      html, body { margin: 0; background: transparent; }
+      .tile { position: absolute; left: ${size * inset}px; top: ${size * inset}px; width: ${box}px; height: ${box}px;
+        border-radius: ${box * radius}px; display: grid; place-items: center; overflow: hidden;
+        background: ${tile ? `radial-gradient(120% 90% at 30% 15%, ${card}, ${night} 70%)` : 'transparent'}; }
+      .g { font: italic 520 ${box * scale}px/1 Mark; color: ${ink}; letter-spacing: 0;
+        font-variation-settings: 'SOFT' 100, 'opsz' 144; transform: translateY(-${box * 0.2}px); }
+    </style><div class="tile"><span class="g">g</span></div>`);
+    await page.evaluate(() => document.fonts.ready);
+    assert.ok(
+      await page.evaluate(() => document.fonts.check(`italic 520 40px Mark`)),
+      'The bundled Fraunces must load'
     );
-    assert(artwork.rectangles.length > 0, `${name} must contain visible artwork`);
-    const path = artwork.rectangles
-      .map(({ x, y, width, height }) => `M${x} ${y}h${width}v${height}h-${width}z`)
-      .join('');
-    const viewBox =
-      name === 'icon'
-        ? `0 0 ${artwork.width} ${artwork.height}`
-        : `${artwork.left} ${artwork.top} ${artwork.right - artwork.left} ${artwork.bottom - artwork.top}`;
-    const svg = (fill, backdrop = '') =>
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" shape-rendering="crispEdges">${backdrop}<path fill="${fill}" d="${path}"/></svg>\n`;
-    await save(`apps/web/public/brand/garden-${name}.svg`, svg('currentColor'));
-    if (name === 'wordmark') continue;
-    await save(
-      'apps/web/public/garden-mark.svg',
-      svg(light, `<path fill="${dark}" d="M0 0h${artwork.width}v${artwork.height}H0z"/>`)
-    );
-    const render = async (size, fill, background) => {
-      const png = await page.evaluate(
-        async ({ svg, size, background }) => {
-          const image = new globalThis.Image();
-          image.src = `data:image/svg+xml;base64,${btoa(svg)}`;
-          await image.decode();
-          const canvas = globalThis.document.createElement('canvas');
-          canvas.width = canvas.height = size;
-          const context = canvas.getContext('2d');
-          if (background) {
-            context.fillStyle = background;
-            context.fillRect(0, 0, size, size);
-          }
-          context.drawImage(image, 0, 0, size, size);
-          return canvas.toDataURL('image/png').split(',')[1];
-        },
-        { svg: svg(fill), size, background }
-      );
-      return Buffer.from(png, 'base64');
-    };
-    await save('apps/desktop/src-tauri/icons/garden-logo.png', await render(1024, light));
-    await save('apps/desktop/src-tauri/icons/garden-monochrome.png', await render(1024, '#ffffff'));
-    for (const [file, size, background] of [
-      ['garden-icon-192.png', 192, dark],
-      ['garden-icon-512.png', 512, dark],
-      ['garden-maskable-512.png', 512, dark],
-      ['garden-apple-touch.png', 180, dark],
-      ['garden-mark-512.png', 512, undefined]
-    ])
-      await save(`apps/web/public/brand/${file}`, await render(size, light, background));
+    return await page.screenshot({ omitBackground: true, type: 'png' });
+  } finally {
+    await page.close();
   }
+}
+
+const write = (path, bytes) => writeFile(root + path, bytes);
+try {
+  // Installed web icons fill their square; the system rounds them. The maskable one keeps the
+  // letter inside the safe circle, and the favicon is a rounded tile small enough for a tab.
+  await write('apps/web/public/brand/garden-icon-192.png', await render(192));
+  await write('apps/web/public/brand/garden-icon-512.png', await render(512));
+  await write('apps/web/public/brand/garden-maskable-512.png', await render(512, { scale: 0.6 }));
+  await write('apps/web/public/brand/garden-apple-touch.png', await render(180));
+  await write('apps/web/public/brand/garden-favicon.png', await render(64, { radius: 0.24 }));
+  // A desktop icon sits on the platform's grid: a rounded tile inset from the canvas edge.
+  await write(
+    'apps/desktop/src-tauri/icons/garden-logo.png',
+    await render(1024, { inset: 0.098, radius: 0.225 })
+  );
+  await write(
+    'apps/desktop/src-tauri/icons/garden-monochrome.png',
+    await render(1024, { ink: '#ffffff', tile: false, scale: 0.7 })
+  );
 } finally {
   await browser.close();
 }
+await write(
+  'apps/desktop/src-tauri/icons/garden-android-background.svg',
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108"><rect width="108" height="108" fill="${night}"/></svg>\n`
+);
+const config = root + 'apps/desktop/src-tauri/icons/garden-icon.json';
+await write(
+  'apps/desktop/src-tauri/icons/garden-icon.json',
+  JSON.stringify({ ...JSON.parse(await readFile(config, 'utf8')), bg_color: night }, null, 2) + '\n'
+);
 
 const generated = spawnSync(
   'pnpm',
@@ -141,7 +104,7 @@ const generated = spawnSync(
 assert.equal(generated.status, 0, 'Native icon export must succeed');
 // Tauri writes mobile icons directly into initialized native projects. Keep the source copies
 // alongside the desktop exports, without copying unrelated native resources.
-for (const [source, generated] of [
+for (const [source, target] of [
   ['icons/android', 'gen/android/app/src/main/res'],
   ['icons/ios', 'gen/apple/Assets.xcassets/AppIcon.appiconset']
 ]) {
@@ -152,12 +115,12 @@ for (const [source, generated] of [
   assert(files.length > 0, `${source} must contain platform icons`);
   for (const file of files) {
     if (source === 'icons/ios' && file.endsWith('.png')) {
-      const target = directory + generated + '/' + file;
-      const opaque = spawnSync('magick', [target, '-alpha', 'off', 'PNG24:' + target], {
+      const output = directory + target + '/' + file;
+      const opaque = spawnSync('magick', [output, '-alpha', 'off', 'PNG24:' + output], {
         stdio: 'inherit'
       });
       assert.equal(opaque.status, 0, `${file} must export without an alpha channel`);
     }
-    await copyFile(directory + generated + '/' + file, directory + source + '/' + file);
+    await copyFile(directory + target + '/' + file, directory + source + '/' + file);
   }
 }

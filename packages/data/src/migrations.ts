@@ -4005,5 +4005,14 @@ CREATE TABLE IF NOT EXISTS model_throughput_ceiling (
         attempts INTEGER NOT NULL,
         resets_at TIMESTAMPTZ NOT NULL
       );`
+  },
+  {
+    version: 113,
+    name: 'key_authorized_actions',
+    // An outward action a lent key allowed is recorded beside the ones the owner approved by hand,
+    // so the record of what left the computer is one list whichever way it was allowed.
+    sql: `ALTER TABLE approvals DROP CONSTRAINT IF EXISTS approvals_decision_scope_check;
+      ALTER TABLE approvals ADD CONSTRAINT approvals_decision_scope_check
+        CHECK(decision_scope IN ('once','run','key'));`
   }
 ] as const;

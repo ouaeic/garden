@@ -57,6 +57,7 @@ import { declareAcceptance, type AcceptanceDeclarationDeps } from './acceptance-
 import { parkForApproval } from './approval-park.js';
 import { recoverApprovalProposal } from './approval-recovery.js';
 import type { TurnRun } from './claim.js';
+import { recordKeyAuthorized } from './key-ledger.js';
 import { executeApprovedCall } from './execute-call.js';
 import type { CompactContext, TurnLoopControl, TurnStepBudget } from './loop-context.js';
 import type { TurnResumeDeps } from './resume.js';
@@ -135,6 +136,7 @@ import type { TurnResumeDeps } from './resume.js';
 export const PLAN_MODE_PERMITTED: ReadonlySet<string> = new Set([
   ...[...CHECKPOINT_EXEMPT_TOOLS].filter((name) => !isMutatingToolCall(name)),
   'ask',
+  'propose_deal',
   'delegate'
 ]);
 
@@ -211,6 +213,12 @@ export interface TurnDispatchDeps {
     state: AgentState,
     call: ModelToolCall,
     deferred: readonly ModelToolCall[]
+  ): Promise<boolean>;
+  proposeDeal(
+    task: TaskRecord,
+    key: Uint8Array,
+    state: AgentState,
+    call: ModelToolCall
   ): Promise<boolean>;
 }
 
@@ -522,6 +530,10 @@ export const dispatchToolCalls = async (
         return 'returned';
       continue;
     }
+    if (call.name === 'propose_deal') {
+      if (await deps.proposeDeal(task, key, state, call)) return 'returned';
+      continue;
+    }
     if (call.name === 'set_acceptance') {
       // @see declareAcceptance in `turn/acceptance-declaration.ts`, where the ninety-three
       // lines that ran here now live - including the red baseline, which is the only part of
@@ -609,6 +621,7 @@ export const dispatchToolCalls = async (
       }
       continue;
     }
+    await recordKeyAuthorized(deps.store, task, key, call);
     // Run it, record it, and leave behind whatever a worker that died mid-call would need.
     // @see executeApprovedCall in `turn/execute-call.ts`.
     await executeApprovedCall(

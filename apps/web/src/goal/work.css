@@ -1,0 +1,215 @@
+/* The work, as the results engine draws it: a card per result, live apps, files to take away. */
+.garden-outputs {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.garden-output-section {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.garden-output-section:empty {
+  display: none;
+}
+.garden-output-primary {
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: var(--pane);
+  box-shadow: var(--shadow);
+}
+.garden-output-primary.expanded {
+  position: fixed;
+  inset: 12px;
+  z-index: 60;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.garden-output-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 10px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.garden-output-bar > svg {
+  width: 16px;
+  height: 16px;
+  color: var(--ink-3);
+}
+.garden-output-bar > h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 13px var(--mono);
+  color: var(--ink-2);
+}
+.garden-output-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.garden-output-actions .button {
+  min-height: 30px;
+  padding: 5px 11px;
+  font-size: 12.5px;
+}
+.garden-output-actions p {
+  margin: 0;
+  font-size: 12.5px;
+}
+.garden-artifact-view {
+  min-width: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--paper-ink);
+}
+.garden-artifact-view > :where(img, svg, figure) {
+  display: block;
+  width: 100%;
+}
+.garden-artifact-view pre {
+  margin: 0;
+  padding: 18px;
+  overflow: auto;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.garden-preview-live {
+  position: relative;
+  min-width: 0;
+  background: #fff;
+}
+.garden-preview-frame {
+  display: block;
+  width: 100%;
+  height: min(70vh, 720px);
+  border: 0;
+  background: #fff;
+}
+.garden-output-primary.expanded .garden-preview-live,
+.garden-output-primary.expanded .garden-preview-frame,
+.garden-output-primary.expanded .garden-artifact-view {
+  height: 100%;
+}
+.garden-preview-state {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--ink-2);
+  font-size: 13.5px;
+}
+.garden-preview-live > .garden-preview-state {
+  position: absolute;
+  inset: 0;
+  place-content: center;
+  background: color-mix(in oklab, var(--card) 92%, transparent);
+}
+.garden-preview-state strong {
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 420;
+  color: var(--ink);
+}
+.garden-preview-state p {
+  max-width: 46ch;
+  margin: 0;
+}
+.garden-captured-result {
+  margin: 0;
+}
+.garden-captured-result img {
+  display: block;
+  width: 100%;
+}
+.garden-captured-result figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 16px;
+  font: 12px var(--mono);
+  color: var(--ink-3);
+}
+.garden-output-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.garden-output-tabs .button[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--bg);
+}
+.garden-source-bundle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.garden-delivery-list {
+  display: grid;
+  gap: 8px;
+}
+.garden-delivery {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--pane);
+}
+.garden-delivery > svg {
+  width: 18px;
+  height: 18px;
+  color: var(--ink-3);
+}
+.garden-delivery-details {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.garden-delivery-details strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.garden-delivery-details small {
+  font: 11.5px var(--mono);
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+.garden-delivery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.garden-delivery-actions .button {
+  min-height: 30px;
+  padding: 5px 11px;
+  font-size: 12.5px;
+}
+@media (max-width: 700px) {
+  .garden-delivery {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .garden-delivery-actions {
+    grid-column: 1 / -1;
+  }
+  .garden-preview-frame {
+    height: 60vh;
+  }
+}

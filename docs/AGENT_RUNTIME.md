@@ -122,6 +122,29 @@ last call to a short handoff, where only `set_plan` runs and the reply says what
 and what to send back to carry on. A reply cut off at the model's output limit is continued up to the
 limit and then completed as it stands, marked interrupted.
 
+## Deals
+
+Before substantial work - longer than a few minutes, several deliverables, spending, or acting
+outside this computer - the lead can call `propose_deal`. A deal names each goal with its outcome,
+the check that says it is done, an estimate and a cap, every question the model can foresee, and
+whether the work must act as the owner. It parks the turn the way `ask` does, as a
+`question_asked` event carrying the deal, so every surface that answers a question can plant one.
+
+`POST /v1/tasks/:taskId/deal` plants it. The owner's answers, the keys they lend and each goal's
+cap become the reply, in words beginning `Deal agreed.`; lending "act as me" moves the conversation
+to Autonomous, and every further goal becomes a conversation of its own that starts from the same
+terms. A scheduled run never proposes a deal, and a conversation that already has one is refused a
+second, so the owner is asked once per job.
+
+`ask` can carry a `default` and the hours it will wait for an answer. When that time passes
+unanswered, the API's maintenance pass answers with the default, saying it was the owner's silence,
+and the turn carries on. A question without a default waits for as long as the owner takes.
+
+An outward action that runs on a lent key instead of a card - what Balanced would have carded as
+consequential, run under Autonomous - is written to the approvals table as approved by the key,
+before it runs. `GET /v1/record` lists those beside the cards the owner answered and the connected
+services' writes, and `GET /v1/moves` lists everything waiting on the owner as one typed list.
+
 ## Documents
 
 The model chooses how to produce a document; the computer supplies the tools. The runtime block lists
@@ -151,7 +174,7 @@ cell; the page and the text near the pin; or, on a picture, the place within it.
 The same anchoring code runs inside a view's frame and inside a live app, where the preview gateway
 adds it to pages that garden itself frames, so each pin is drawn by the content it points at and
 stays on it through scrolling, resizing and re-rendering. Comments are numbered as their pins are,
-wait in the composer, and go with the next message, which may consist of the comments alone.
+wait in the ask bar, and go with the next message, which may consist of the comments alone.
 
 ## Long work
 

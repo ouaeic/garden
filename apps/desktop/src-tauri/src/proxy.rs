@@ -1481,7 +1481,7 @@ fn offline_page(
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Connect garden</title>
-<link rel="stylesheet" href="/__garden/theme/lcd.css">
+<link rel="stylesheet" href="/__garden/theme/foundation.css">
 <link rel="stylesheet" href="/__garden/theme/setup.css">
 <main>
   <div class="brand">garden</div>

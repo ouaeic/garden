@@ -304,10 +304,15 @@ certify that you have the right to do so.
 The password workflow drill is `pnpm test:auth-ui`. It exercises the real authentication routes and
 database with browser sign-in, recovery, remembered sessions and password confirmation.
 
-The browser layout drill is `pnpm test:ui`. It uses the runner’s installed Chromium and local
-fixtures, with no provider credentials or network calls. It exercises responsive layout, keyboard
-focus, effort drafts, preview playback, downloads, and expansion without restarting the preview.
-Set `GARDEN_UI_REPORT` to a local directory to retain its screenshots.
+The browser layout drill is `pnpm test:ui`. It serves the built client against the fixture scene in
+`scripts/garden-fixtures.mjs`, with no provider credentials or network calls, and walks the owner's
+journeys: the desk and its catch-up, planting a deal, a send retried after a lost reply, approvals
+and declines, a goal at each distance, keys, settings, reconnecting, day and night, and the phone
+menu. Every view is held to four widths with nothing past the screen's edge or left under the ask
+bar; text is held to AA contrast against the pixels actually behind it; focus is visible on every
+control the keyboard reaches; a hidden page reads nothing. Any page error or any request the scene
+does not serve fails the run. `GARDEN_UI_ENGINE` picks `chromium`, `webkit` or `both`,
+`GARDEN_UI_FOCUS` picks journeys by name, and `GARDEN_UI_REPORT` keeps the screenshots.
 The SVG drill checks real image rendering from attachment responses, script and external-resource
 isolation, bounded streaming, failed loads, replacement cancellation and phone layout. Set
 `GARDEN_SVG_REPORT` to retain its screenshot and request evidence.
@@ -317,7 +322,7 @@ saved-result presentations, source editing, scoped downloads and phone layout. S
 checks explicit parent navigation, current hashes, missing/changed records, stale response
 cancellation and keyboard return using native run records. Set `GARDEN_PROVENANCE_REPORT` to retain
 its phone screenshot and request evidence. The selected-rerun drill checks encrypted draft recovery,
-server conflicts, changed-record refusal, conversation submission and phone layout. Set
+server conflicts, changed-record refusal, planting through the ask bar and phone layout. Set
 `GARDEN_RERUN_REPORT` to retain its screenshot and request evidence.
 
 The account-connection drill checks scoped consent, callback completion and recovery when a provider
@@ -328,10 +333,6 @@ The private-diagnostics browser drill checks opt-in controls, lost acknowledgeme
 scoped download links, deletion and phone/keyboard layout. Set `GARDEN_DIAGNOSTIC_SCREENSHOT` to
 retain its screenshot. The private replay command executes the real worker controller against recorded observations.
 Every external boundary must refuse live fallback; tests disable transports during playback.
-
-The project Git browser drill checks durable setup identity after an interrupted response,
-scoped history downloads, cleanup of prepared downloads, and phone/keyboard layout. Set
-`GARDEN_GIT_SCREENSHOT` to retain its screenshot.
 
 The voice recovery browser drill uses a local WebSocket service and simulated audio. It checks
 reconnection without another session, preserved mute, paused capture, keyboard Stop and phone
@@ -344,9 +345,8 @@ exercise both archive formats, reproduce the result in a fresh directory, and re
 or installer drift. The repository gate explicitly reports skipped optional toolchain coverage;
 run installed native acceptance before releasing a change to that recipe.
 
-The beta journey matrix is `pnpm test:beta`. It runs the complete browser workflows, password and
-remembered-device routes, provider setup, memory and update flows in Chromium and WebKit.
-Hidden-page traffic and overlapping refreshes are measured in the browser. Set `GARDEN_BETA_REPORT`
+The beta journey matrix is `pnpm test:beta`. It runs the complete browser workflows, with the
+password and remembered-device routes, in Chromium and WebKit. Set `GARDEN_BETA_REPORT`
 to retain the journey results, request counts, screenshots and logs. The matrix uses synthetic
 fixtures and disposable authentication databases; live providers and physical device acceptance
 remain separate checks.

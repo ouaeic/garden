@@ -359,6 +359,7 @@ const LOOP_ANSWERED_TOOLS: ReadonlySet<string> = new Set([
   'compact_context',
   'notify',
   'ask',
+  'propose_deal',
   'set_acceptance'
 ]);
 
@@ -590,7 +591,7 @@ export const repeatedFailureBreak = (count: number, tool: string): string =>
  */
 export const BOOKKEEPING_TOOLS: ReadonlySet<string> = new Set(
   [...LOOP_ANSWERED_TOOLS, 'set_plan', 'load_tools'].filter(
-    (name) => !['finish', 'ask', 'notify'].includes(name)
+    (name) => !['finish', 'ask', 'propose_deal', 'notify'].includes(name)
   )
 );
 

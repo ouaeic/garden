@@ -102,17 +102,17 @@ is re-derived, naming the value it should now carry. The instruction is no longe
 ```baseline
 fixtures  66
 long-a-finished-phase-is-never-declared.modelCalls  38
-long-a-finished-phase-is-never-declared.promptTokens  982,552
-long-a-finished-phase-is-never-declared.catalogueTokens  124,906
-long-a-finished-phase-is-never-declared.cachePrefix  92
+long-a-finished-phase-is-never-declared.promptTokens  998,246
+long-a-finished-phase-is-never-declared.catalogueTokens  140,600
+long-a-finished-phase-is-never-declared.cachePrefix  93
 long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.modelCalls  40
-long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.promptTokens  907,068
-long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.catalogueTokens  128,194
+long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.promptTokens  923,175
+long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.catalogueTokens  144,301
 long-a-finished-phase-is-condensed-and-nothing-is-taken-quietly.cachePrefix  90
 long-finished-phases-condense-rather-than-shred.cachePrefix  75
 compaction.extraModelCalls  2
-compaction.tokensSaved  75,484
-compaction.cachePointsGivenUp  2
+compaction.tokensSaved  75,071
+compaction.cachePointsGivenUp  3
 floorWalk.cachePointsLost  15
 ```
 
