@@ -283,15 +283,29 @@ async function measureContrast(page) {
     return found;
   });
   if (!runs.length) return ['No text was found to measure'];
-  const hidden = await page.addStyleTag({
-    content:
-      '*,*::before,*::after{color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important;text-decoration-color:transparent!important;caret-color:transparent!important}'
+  await page.evaluate(() => {
+    const hide = document.createElement('style');
+    hide.id = 'garden-measure-hide';
+    hide.textContent =
+      '*,*::before,*::after{color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important;text-decoration-color:transparent!important;caret-color:transparent!important}';
+    document.head.append(hide);
   });
   await page.evaluate(
     () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))
   );
   const png = (await page.screenshot({ type: 'png' })).toString('base64');
-  await hidden.evaluate((style) => style.remove());
+  await page.evaluate(
+    () =>
+      new Promise((done) => {
+        document.getElementById('garden-measure-hide')?.remove();
+        requestAnimationFrame(() => requestAnimationFrame(done));
+      })
+  );
+  assert.equal(
+    await page.evaluate(() => document.getElementById('garden-measure-hide')),
+    null,
+    'The text comes back after it is measured'
+  );
   return page.evaluate(
     async ({ png, runs }) => {
       const image = new Image();
@@ -485,7 +499,7 @@ const journeys = {
             }
           return parts.join('\n');
         };
-        const settle = () => new Promise((done) => setTimeout(done, 40));
+        const settle = () => new Promise((done) => setTimeout(done, 120));
         await settle();
         const withFocus = look();
         element.blur();
@@ -782,6 +796,15 @@ try {
           page.setDefaultTimeout(8000);
           const failures = [];
           await captureBrowserErrors(page, failures);
+          // Reduced motion shortens transitions to a blink; a slow machine can still read a style
+          // mid-blink. The harness measures end states, so it turns them off outright.
+          await page.addInitScript(() =>
+            addEventListener('DOMContentLoaded', () => {
+              const still = document.createElement('style');
+              still.textContent = '*,*::before,*::after{transition:none!important}';
+              document.head.append(still);
+            })
+          );
           const started = Date.now();
           const label = `${engine.name()} ${name}${scheme === 'light' ? ' (day)' : ''}`;
           try {
