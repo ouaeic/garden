@@ -515,9 +515,18 @@ jobs:
           fi
           [ -n "$(systemctl show --property=Version --value)" ] ||
             { echo 'systemctl can no longer reach the manager, so nginx cannot be reloaded' >&2; exit 1; }
-          echo 'ok  the four trees are writable, nothing else is, and the reload path is open'
+          # The step every renewal ends on. Writable trees are not enough: nginx opens its pid file
+          # and logs before testing anything, and a renewal that cannot run this refuses every
+          # certificate it is given while the trees above look perfectly fine.
+          nginx -t || { echo 'nginx cannot test its configuration from here' >&2; exit 1; }
+          echo 'ok  the four trees are writable, nothing else is, the reload path is open and nginx can test itself'
           CERTIFICATE
           sudo chmod 0755 /opt/garden-drill/certificate.sh
+          # The distribution's own nginx, running, so its pid file and logs are where the unit has to
+          # reach them.
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends nginx >/dev/null
+          sudo systemctl start nginx.service
           # Read out of the unit rather than written again here: a second copy of a directive set
           # is a directive set that drifts, and this drill is worth having only while it is the
           # same one the timer will use.

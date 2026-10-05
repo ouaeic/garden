@@ -9,11 +9,17 @@ identity_key="$garden_config/tls/server.key"
 certificate="$garden_config/tls/server.crt"
 acme_webroot="$garden_state/acme"
 network_refresh="${GARDEN_NETWORK_REFRESH:-/usr/local/lib/garden/garden-network-refresh}"
+nginx_snippets="${GARDEN_NGINX_SNIPPETS:-/etc/nginx/snippets}"
 subscriber_agreement="https://letsencrypt.org/repository/"
 # Renewal runs unattended from a timer. Without a record of the last failure the only symptom is a
 # browser warning days later, so every failed attempt leaves a note here that `garden doctor` and
 # the login banner read. Same shape as the dynamic-DNS error file: timestamp, then reason.
 certificate_error="$garden_state/certificate.error"
+# A certificate the authority issued that nginx then refused. It is still a good certificate, and
+# asking for another counts against the authority's limit of five identical certificates a week,
+# which a renewal retried every quarter hour exhausts in an afternoon. So it is kept, and the next
+# attempt installs it again before asking for anything. It holds a public chain and no key.
+pending_certificate="$garden_state/certificate.pending"
 
 # Ordinary certificates last 90 days; renewing at 30 leaves two further attempts before anything
 # served to a browser expires.
@@ -111,8 +117,9 @@ certificate_hostnames() {
 }
 
 certificate_subject_alt_names() {
-  [ -s "$certificate" ] || return 0
-  openssl x509 -in "$certificate" -noout -ext subjectAltName 2>/dev/null |
+  names_source="${1:-$certificate}"
+  [ -s "$names_source" ] || return 0
+  openssl x509 -in "$names_source" -noout -ext subjectAltName 2>/dev/null |
     tr ',' '\n' |
     sed -n -e 's/^[[:space:]]*DNS://p' -e 's/^[[:space:]]*IP Address://p' |
     tr 'A-Z' 'a-z' |
@@ -125,7 +132,7 @@ certificate_subject_alt_names() {
 # expanded, so a textual comparison against the compact form would report a permanent mismatch
 # and reissue on every timer firing.
 certificate_covers_configured_names() {
-  served_names=$(certificate_subject_alt_names)
+  served_names=$(certificate_subject_alt_names "${1:-$certificate}")
   {
     certificate_hostnames
     if [ "$(control_value ACME_INCLUDE_IPS)" = true ]; then
@@ -165,7 +172,7 @@ certificate_ip_addresses() {
 # current certbot rejects one supplied through a CSR. lego ships as a single static binary with
 # no runtime, so there is no interpreter or virtual environment to maintain on the host.
 lego_version="5.3.1"
-lego_binary="/usr/local/lib/garden/lego"
+lego_binary="${GARDEN_LEGO:-/usr/local/lib/garden/lego}"
 lego_sha256_amd64="b3c71b122ee1947eacfe0b809b955647f6377239fe4bfc49f73b1a091ae1252a"
 lego_sha256_arm64="58db563a2b97c2259516fa9910b4a9e1634a0737723d0381a65af1bf93a4b433"
 
@@ -257,6 +264,14 @@ issue_certificate() {
   [ -n "$hostnames$addresses" ] ||
     fail "no usable hostname or globally routable address was found; run sudo garden set-hostname ai.example.com or sudo garden ddns configure"
 
+  if pending_certificate_usable; then
+    install_certificate "$pending_certificate"
+    clear_renewal_failure
+    note "installed the certificate issued on an earlier attempt; nothing new was requested"
+    return 0
+  fi
+  rm -f "$pending_certificate"
+
   require_acme_client
   if [ -z "$skip_preflight" ]; then
     for hostname_value in $hostnames; do
@@ -314,18 +329,13 @@ issue_certificate() {
     fail "the ACME client reported success but produced no certificate chain"
   cp "$issued_chain" "$work_directory/fullchain.pem"
 
-  identity_fingerprint=$(
-    openssl pkey -in "$identity_key" -pubout -outform DER 2>/dev/null |
-      openssl dgst -sha256 -binary |
-      openssl base64 -A
-  )
   issued_fingerprint=$(
     openssl x509 -in "$work_directory/fullchain.pem" -noout -pubkey 2>/dev/null |
       openssl pkey -pubin -outform DER 2>/dev/null |
       openssl dgst -sha256 -binary |
       openssl base64 -A
   )
-  [ -n "$identity_fingerprint" ] && [ "$identity_fingerprint" = "$issued_fingerprint" ] ||
+  [ -n "$issued_fingerprint" ] && [ "$(identity_fingerprint)" = "$issued_fingerprint" ] ||
     fail "the issued certificate does not carry the pinned identity key; it was discarded"
   openssl x509 -in "$work_directory/fullchain.pem" -noout -checkend 0 >/dev/null ||
     fail "the issued certificate is already expired; it was discarded"
@@ -352,7 +362,7 @@ issue_certificate() {
 # load the box afterwards.
 set_hsts() {
   hsts_source="$garden_root/infra/native/nginx-hsts-$1.conf"
-  hsts_target=/etc/nginx/snippets/garden-hsts.conf
+  hsts_target="$nginx_snippets/garden-hsts.conf"
   [ -f "$hsts_source" ] || fail "the HSTS snippet $hsts_source is missing from this installation"
   cmp -s "$hsts_source" "$hsts_target" 2>/dev/null && return 0
   hsts_previous=""
@@ -361,12 +371,21 @@ set_hsts() {
     cat "$hsts_target" >"$hsts_previous"
   fi
   install -m 0644 "$hsts_source" "$hsts_target"
-  if ! nginx -t >/dev/null 2>&1; then
+  if ! nginx_check=$(nginx -t 2>&1); then
     [ -z "$hsts_previous" ] || install -m 0644 "$hsts_previous" "$hsts_target"
     [ -z "$hsts_previous" ] || rm -f "$hsts_previous"
-    fail "nginx rejected the HSTS change; the previous setting was restored"
+    fail "nginx rejected the HSTS change ($(nginx_refusal "$nginx_check")); the previous setting was restored"
   fi
   [ -z "$hsts_previous" ] || rm -f "$hsts_previous"
+}
+
+# nginx's own account of why it refused, for the record the owner reads: its last fault line, not
+# the closing "test failed" that follows every fault. Discarding it once left a sandbox that could not write nginx's pid file reported as a
+# rejected certificate for an afternoon.
+nginx_refusal() {
+  printf '%s\n' "$1" |
+    awk '/\[(emerg|crit|alert)\]/ {fault = $0} /failed/ {other = $0} END {print (fault != "" ? fault : other)}' |
+    sed 's/^.*\] [0-9#]*: //'
 }
 
 # Replacing the served certificate is only safe if nginx still accepts the result;
@@ -379,19 +398,45 @@ install_certificate() {
     cat "$certificate" >"$previous_certificate"
   fi
   install -m 0644 "$new_certificate" "$certificate"
-  if ! nginx -t >/dev/null 2>&1; then
+  if ! nginx_check=$(nginx -t 2>&1); then
     if [ -n "$previous_certificate" ]; then
       install -m 0644 "$previous_certificate" "$certificate"
       rm -f "$previous_certificate"
     fi
-    fail "nginx rejected the new certificate; the previous certificate was restored"
+    if [ "$new_certificate" != "$pending_certificate" ]; then
+      install -d -m 0755 "$garden_state" 2>/dev/null || true
+      install -m 0644 "$new_certificate" "$pending_certificate" 2>/dev/null || true
+    fi
+    fail "nginx rejected the new certificate ($(nginx_refusal "$nginx_check")); the previous certificate was restored and the new one kept for the next attempt"
   fi
   [ -z "$previous_certificate" ] || rm -f "$previous_certificate"
+  rm -f "$pending_certificate"
   # After the certificate is known good, so a rejected certificate never leaves HSTS on behind it.
   if certificate_is_ca_issued; then set_hsts on; else set_hsts off; fi
   if systemctl is-active --quiet nginx.service; then
     systemctl reload nginx.service
   fi
+}
+
+# The kept certificate is used only while it is still the one the authority would issue now: it
+# carries the pinned identity key, covers every configured name, and has more than a day left.
+pending_certificate_usable() {
+  [ -s "$pending_certificate" ] || return 1
+  openssl x509 -in "$pending_certificate" -noout -checkend 86400 >/dev/null 2>&1 || return 1
+  certificate_covers_configured_names "$pending_certificate" || return 1
+  pending_fingerprint=$(
+    openssl x509 -in "$pending_certificate" -noout -pubkey 2>/dev/null |
+      openssl pkey -pubin -outform DER 2>/dev/null |
+      openssl dgst -sha256 -binary |
+      openssl base64 -A
+  )
+  [ -n "$pending_fingerprint" ] && [ "$pending_fingerprint" = "$(identity_fingerprint)" ]
+}
+
+identity_fingerprint() {
+  openssl pkey -in "$identity_key" -pubout -outform DER 2>/dev/null |
+    openssl dgst -sha256 -binary |
+    openssl base64 -A
 }
 
 renew_certificate() {
