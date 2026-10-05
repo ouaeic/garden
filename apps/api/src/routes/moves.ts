@@ -163,9 +163,10 @@ export const registerMoveRoutes = (context: RouteContext): void => {
     return moves.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
   });
 
-  app.get<{ Querystring: { limit?: string } }>('/v1/record', async (request) => {
+  app.get<{ Querystring: { limit?: string; taskId?: string } }>('/v1/record', async (request) => {
     const user = requireUser(request.user);
     const limit = z.coerce.number().int().min(1).max(200).default(100).parse(request.query.limit);
+    const only = z.uuid().optional().parse(request.query.taskId);
     const open = opener(user.id);
     const entries: RecordEntry[] = [];
     for (const approval of await store.listApprovals(user.id, null, { limit })) {
@@ -200,6 +201,9 @@ export const registerMoveRoutes = (context: RouteContext): void => {
         verdict: audit.outcome === 'denied' ? 'refused' : audit.outcome
       });
     }
-    return entries.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, limit);
+    return entries
+      .filter((entry) => !only || entry.taskId === only)
+      .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
+      .slice(0, limit);
   });
 };

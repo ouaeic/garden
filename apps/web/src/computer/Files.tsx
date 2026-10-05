@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import type { Artifact, Workspace } from '@garden/contracts';
 import { del, get, post, request } from '../client.js';
 import { download } from '../management.js';
@@ -6,6 +6,9 @@ import { readWorkspaceFile, saveWorkspaceFile } from './workspace-file';
 import type { WorkspaceTextFile } from './workspace-file';
 import { ResultPreview } from './ResultPreview.js';
 import { artifactRequest, bytes, message } from './format.js';
+
+const TablePreview = lazy(() => import('./TablePreview'));
+const TABLE_FILE = /\.(?:csv|tsv|jsonl|ndjson)$/i;
 
 interface Entry {
   name: string;
@@ -285,6 +288,23 @@ export function Files({
               )}
               {file.binary ? (
                 <p className="empty">Binary file. Download it to open it in its application.</p>
+              ) : TABLE_FILE.test(file.path) ? (
+                <>
+                  <Suspense fallback={<p className="muted">Opening the table…</p>}>
+                    <TablePreview base={`/v1/workspaces/${workspace.id}`} path={file.path} />
+                  </Suspense>
+                  <details>
+                    <summary>Edit as text</summary>
+                    <textarea
+                      className="computer-source field"
+                      aria-label={`Contents of ${file.path}`}
+                      spellCheck={false}
+                      readOnly={file.truncated || !file.sha}
+                      value={file.text}
+                      onChange={(e) => setFile({ ...file, text: e.target.value })}
+                    />
+                  </details>
+                </>
               ) : (
                 <textarea
                   className="computer-source field"

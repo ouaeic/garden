@@ -1,0 +1,522 @@
+/*
+ * The greenhouse. Glass panes over slow, moving light; one fixed viewport whose panes scroll.
+ * Night is the first theme and day its mirror; every colour below is a token, and nothing outside
+ * this file names a colour of its own.
+ */
+
+@font-face {
+  font-family: 'Fraunces';
+  src: url('/fonts/Fraunces.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Fraunces';
+  src: url('/fonts/Fraunces-Italic.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/fonts/GeistMono.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+@property --sweep {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+:root {
+  --bg: #07120e;
+  --bg-deep: #040b08;
+  --pane: rgba(6, 20, 14, 0.36);
+  --pane-2: rgba(16, 38, 28, 0.5);
+  --pane-solid: rgba(13, 29, 23, 0.94);
+  --card: #10221b;
+  --line: rgba(190, 228, 206, 0.1);
+  --line-2: rgba(190, 228, 206, 0.19);
+  --ink: #e9f2ec;
+  --ink-2: #a3b9ad;
+  --ink-3: #7d9488;
+  --leaf: #8ad8a5;
+  --leaf-2: #4ea677;
+  --on-leaf: #05150d;
+  --bloom: #f3b58c;
+  --dew: #f5cf78;
+  --rose: #ee9191;
+  --sky: #9fcbdc;
+  --paper: #f3f6f0;
+  --paper-ink: #16231c;
+  --paper-2: #5d6f64;
+  --paper-line: rgba(22, 35, 28, 0.12);
+  --light-a: #1e6a49;
+  --light-b: #0e4b55;
+  --light-c: #3a7837;
+  --light-d: #5d4e22;
+  --canopy: rgba(2, 8, 5, 0.42);
+  --scrim: rgba(4, 11, 8, 0.58);
+  --shadow: 0 40px 90px -40px rgba(0, 0, 0, 0.75);
+  --lift: 0 24px 60px -24px rgba(0, 0, 0, 0.6);
+  --display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --body: 'Geist', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --ease: cubic-bezier(0.22, 0.8, 0.16, 1);
+  --radius: 24px;
+  --gutter: 28px;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --bg: #e4ece3;
+    --bg-deep: #d6e2d5;
+    --pane: rgba(255, 255, 255, 0.52);
+    --pane-2: rgba(255, 255, 255, 0.74);
+    --pane-solid: rgba(248, 251, 246, 0.96);
+    --card: #f9fbf7;
+    --line: rgba(22, 58, 38, 0.1);
+    --line-2: rgba(22, 58, 38, 0.18);
+    --ink: #0f2119;
+    --ink-2: #44594b;
+    --ink-3: #55685d;
+    --leaf: #1b6b40;
+    --leaf-2: #2b8a55;
+    --on-leaf: #ffffff;
+    --bloom: #994d22;
+    --dew: #7f5a05;
+    --rose: #a63e3e;
+    --sky: #255f76;
+    --paper: #ffffff;
+    --light-a: #bfe6a9;
+    --light-b: #f7e3a3;
+    --light-c: #a9dccb;
+    --light-d: #ffffff;
+    --canopy: rgba(40, 80, 50, 0.16);
+    --scrim: rgba(214, 226, 213, 0.6);
+    --shadow: 0 40px 80px -45px rgba(25, 60, 40, 0.45);
+    --lift: 0 24px 50px -28px rgba(25, 60, 40, 0.45);
+    color-scheme: light;
+  }
+}
+:root[data-theme='light'] {
+  --bg: #e4ece3;
+  --bg-deep: #d6e2d5;
+  --pane: rgba(255, 255, 255, 0.52);
+  --pane-2: rgba(255, 255, 255, 0.74);
+  --pane-solid: rgba(248, 251, 246, 0.96);
+  --card: #f9fbf7;
+  --line: rgba(22, 58, 38, 0.1);
+  --line-2: rgba(22, 58, 38, 0.18);
+  --ink: #0f2119;
+  --ink-2: #44594b;
+  --ink-3: #55685d;
+  --leaf: #1b6b40;
+  --leaf-2: #2b8a55;
+  --on-leaf: #ffffff;
+  --bloom: #994d22;
+  --dew: #7f5a05;
+  --rose: #a63e3e;
+  --sky: #255f76;
+  --paper: #ffffff;
+  --light-a: #bfe6a9;
+  --light-b: #f7e3a3;
+  --light-c: #a9dccb;
+  --light-d: #ffffff;
+  --canopy: rgba(40, 80, 50, 0.16);
+  --scrim: rgba(214, 226, 213, 0.6);
+  --shadow: 0 40px 80px -45px rgba(25, 60, 40, 0.45);
+  --lift: 0 24px 50px -28px rgba(25, 60, 40, 0.45);
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 var(--body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+}
+a {
+  color: var(--leaf);
+}
+:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 3px;
+}
+::selection {
+  background: color-mix(in oklab, var(--leaf) 35%, transparent);
+}
+[hidden] {
+  display: none !important;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Type. */
+.eyebrow {
+  font: 500 11px/1.25 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.display {
+  font-family: var(--display);
+  font-optical-sizing: auto;
+  font-variation-settings: 'SOFT' 100;
+  letter-spacing: -0.035em;
+  font-weight: 340;
+  text-wrap: balance;
+}
+.display em,
+.accent {
+  font-style: italic;
+  color: var(--leaf);
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+.mono {
+  font-family: var(--mono);
+}
+.muted {
+  color: var(--ink-2);
+}
+.faint {
+  color: var(--ink-3);
+}
+
+/* Surfaces. */
+.pane {
+  background: var(--pane);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  backdrop-filter: blur(26px) saturate(140%);
+  -webkit-backdrop-filter: blur(26px) saturate(140%);
+}
+.pane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px 18px 8px;
+}
+.pane-head h2,
+.section-head h2 {
+  margin: 0;
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.pane-head .count,
+.section-head .count {
+  font: 500 11px var(--mono);
+  color: var(--ink-3);
+}
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+.scroll {
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+
+/* Controls. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--pane-2);
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.1;
+  white-space: nowrap;
+  text-decoration: none;
+  color: var(--ink);
+  transition:
+    transform 0.35s var(--ease),
+    background 0.3s,
+    border-color 0.3s,
+    opacity 0.3s;
+}
+.btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--ink-3);
+}
+.btn:active {
+  transform: scale(0.98);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+}
+.btn svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.btn.primary {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: transparent;
+}
+.btn.leaf {
+  background: var(--leaf);
+  color: var(--on-leaf);
+  border-color: transparent;
+}
+.btn.danger {
+  background: color-mix(in oklab, var(--rose) 14%, transparent);
+  color: var(--rose);
+  border-color: color-mix(in oklab, var(--rose) 45%, transparent);
+}
+.btn.ghost {
+  background: transparent;
+}
+.btn.small {
+  min-height: 30px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+}
+.btn.big {
+  min-height: 46px;
+  padding: 12px 22px;
+  font-size: 15px;
+}
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--pane);
+  color: var(--ink-2);
+  transition:
+    color 0.3s,
+    border-color 0.3s;
+}
+.icon-btn:hover {
+  color: var(--ink);
+  border-color: var(--line-2);
+}
+.icon-btn svg {
+  width: 17px;
+  height: 17px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line-2);
+  background: transparent;
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-size: 13px;
+  color: var(--ink-2);
+  transition:
+    background 0.35s var(--ease),
+    color 0.3s,
+    border-color 0.3s;
+}
+.chip:hover {
+  color: var(--ink);
+  border-color: var(--ink-3);
+}
+.chip[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: transparent;
+}
+.seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--pane);
+  border: 1px solid var(--line);
+}
+.seg button {
+  border: 0;
+  background: none;
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-size: 13px;
+  color: var(--ink-2);
+  transition:
+    background 0.35s var(--ease),
+    color 0.3s;
+}
+.seg button[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--bg);
+}
+.field {
+  width: 100%;
+  min-width: 0;
+  padding: 11px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line-2);
+  background: var(--pane);
+  color: var(--ink);
+  outline: 0;
+  transition: border-color 0.3s;
+}
+.field:focus {
+  border-color: var(--leaf);
+}
+.dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--c, var(--leaf));
+  box-shadow: 0 0 10px var(--c, var(--leaf));
+}
+.dot.live {
+  animation: breathe 2.6s ease-in-out infinite;
+}
+.proof {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font: 11.5px var(--mono);
+  color: var(--leaf);
+  background: color-mix(in oklab, var(--leaf) 12%, transparent);
+}
+.proof svg {
+  width: 11px;
+  height: 11px;
+}
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  font: 500 10.5px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--c, var(--ink-2));
+  background: var(--pane);
+}
+.error-line {
+  color: var(--rose);
+  font-size: 13.5px;
+}
+.empty {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 4px 18px 20px;
+  color: var(--ink-2);
+  font-size: 14px;
+}
+.empty svg {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  color: var(--leaf);
+}
+
+/* Motion. */
+.rise {
+  animation: rise 0.85s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.8);
+  }
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@keyframes sweep {
+  to {
+    --sweep: 360deg;
+  }
+}
+.skeleton {
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--pane), var(--pane-2), var(--pane));
+  background-size: 200% 100%;
+  animation: shimmer 1.2s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

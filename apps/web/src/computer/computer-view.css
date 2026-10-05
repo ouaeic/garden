@@ -1,0 +1,56 @@
+.computer-view {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 16px;
+}
+.computer-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  padding-top: 12px;
+}
+.computer-head h1 {
+  margin: 4px 0 0;
+  font-size: clamp(30px, 3.6vw, 48px);
+  line-height: 1;
+}
+.computer-stage {
+  min-height: 0;
+  padding-bottom: 150px;
+}
+.computer-running {
+  display: grid;
+  gap: 16px;
+}
+.computer-screen,
+.computer-terminal {
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: #060c09;
+}
+.computer-terminal {
+  height: min(70vh, 720px);
+  padding: 10px;
+}
+.computer-stage > * > section,
+.computer-running > section {
+  border-radius: var(--radius);
+}
+@media (max-width: 900px) {
+  .computer-view {
+    display: block;
+    overflow: auto;
+  }
+  .computer-head .seg {
+    max-width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .computer-stage {
+    overflow: visible;
+  }
+}

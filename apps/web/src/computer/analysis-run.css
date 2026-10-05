@@ -2,7 +2,7 @@
   min-width: 0;
   padding: clamp(0.75rem, 2vw, 1.25rem);
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 14px;
 }
 .analysis-run h3,
 .analysis-run p {
@@ -20,8 +20,8 @@
 .analysis-run-status {
   padding: 0.3rem 0.55rem;
   border: 1px solid var(--line);
-  border-radius: 0;
-  font-size: 16px;
+  border-radius: 14px;
+  font-size: 14px;
 }
 .analysis-run-status.failed,
 .analysis-run-status.interrupted {
@@ -36,7 +36,7 @@
   margin: 0.25rem 0;
 }
 .analysis-run-facts dt {
-  font-size: 16px;
+  font-size: 14px;
   color: var(--muted);
 }
 .analysis-run-facts dd {
@@ -79,12 +79,12 @@
   overflow-wrap: anywhere;
 }
 .analysis-run-files a {
-  font-size: 16px;
+  font-size: 14px;
 }
 .analysis-run-hash {
   display: block;
   overflow-wrap: anywhere;
-  font-size: 16px;
+  font-size: 14px;
 }
 .analysis-run-path {
   overflow-wrap: anywhere;
@@ -116,5 +116,5 @@
 }
 .analysis-provenance-nav summary {
   cursor: pointer;
-  font-size: 16px;
+  font-size: 14px;
 }

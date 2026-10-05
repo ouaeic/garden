@@ -1,0 +1,128 @@
+.record {
+  height: 100%;
+  max-width: 1060px;
+  margin: 0 auto;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding: 14px 2px 150px;
+}
+.record-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 20px;
+}
+.record-head h1 {
+  margin: 0 auto 0 0;
+  font-size: clamp(32px, 4vw, 56px);
+  line-height: 1;
+}
+.record-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin: 0;
+}
+.record-stats div {
+  display: grid;
+}
+.record-stats dd {
+  margin: 0;
+  font: 500 22px var(--mono);
+}
+.record-stats dt {
+  font: 12px var(--mono);
+  color: var(--ink-3);
+}
+.ledger {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.record-row {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+  padding: 13px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--pane);
+}
+.record-row time {
+  padding-top: 2px;
+  font: 11.5px var(--mono);
+  color: var(--ink-3);
+}
+.record-what p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.record-what small {
+  display: block;
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.record-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+}
+.kchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--pane-2);
+  font: 11px var(--mono);
+  color: var(--ink-2);
+}
+button.kchip:hover {
+  color: var(--ink);
+}
+.kchip svg {
+  width: 11px;
+  height: 11px;
+}
+.verdict {
+  padding: 3px 8px;
+  border-radius: 999px;
+  font: 500 10.5px var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ink-3);
+  background: var(--pane-2);
+}
+.record-row[data-verdict='approved'] .verdict,
+.record-row[data-verdict='succeeded'] .verdict {
+  color: var(--leaf);
+  background: color-mix(in oklab, var(--leaf) 13%, transparent);
+}
+.record-row[data-verdict='denied'] .verdict,
+.record-row[data-verdict='refused'] .verdict,
+.record-row[data-verdict='failed'] .verdict {
+  color: var(--rose);
+  background: color-mix(in oklab, var(--rose) 13%, transparent);
+}
+.record-row[data-verdict='waiting'] .verdict {
+  color: var(--dew);
+  background: color-mix(in oklab, var(--dew) 13%, transparent);
+}
+@media (max-width: 700px) {
+  .record-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .record-row .verdict {
+    justify-self: start;
+  }
+}

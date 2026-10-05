@@ -12,7 +12,7 @@
   padding: 0.75rem 0;
 }
 .table-preview-note {
-  font-size: 16px;
+  font-size: 14px;
   margin: 0.5rem 0;
   overflow-wrap: anywhere;
 }
@@ -23,7 +23,7 @@
   max-height: 32rem;
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 14px;
   overscroll-behavior: contain;
 }
 .table-preview-scroll:focus-visible {
@@ -34,7 +34,7 @@
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 16px;
+  font-size: 14px;
 }
 .table-preview th,
 .table-preview td {
@@ -57,7 +57,7 @@
 .table-preview th small {
   display: block;
   font-weight: 400;
-  font-size: 16px;
+  font-size: 14px;
   margin-top: 0.25rem;
 }
 .table-preview .table-preview-row-number {

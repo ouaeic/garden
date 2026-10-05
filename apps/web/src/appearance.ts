@@ -1,24 +1,37 @@
-export function storedDisplayMode(): 'light' | 'dark' {
+/**
+ * Day or night. `system` follows the device; the other two are the owner's own choice and win over
+ * it. Held per device, because a phone in bed and a desk at noon are different rooms.
+ */
+export type Theme = 'system' | 'light' | 'dark';
+const KEY = 'garden-theme';
+
+export function storedTheme(): Theme {
   try {
-    return localStorage.getItem('garden-theme') === 'dark' ? 'dark' : 'light';
+    const value = localStorage.getItem(KEY);
+    return value === 'light' || value === 'dark' ? value : 'system';
   } catch {
-    return 'light';
+    return 'system';
   }
 }
 
-/** Each screen uses the same four-shade LCD ramp. */
-export type Palette = 'field' | 'pocket' | 'backlight' | 'amber';
-export const palettes: { value: Palette; label: string }[] = [
-  { value: 'field', label: 'Field green' },
-  { value: 'pocket', label: 'Pocket grey' },
-  { value: 'backlight', label: 'Backlight teal' },
-  { value: 'amber', label: 'Warm amber (low blue light)' }
-];
-export function storedPalette(): Palette {
+const systemDark = () => matchMedia('(prefers-color-scheme: dark)').matches;
+export const isDark = (theme: Theme = storedTheme()) =>
+  theme === 'dark' || (theme === 'system' && systemDark());
+
+export function applyTheme(theme: Theme = storedTheme()): void {
+  const root = document.documentElement;
+  if (theme === 'system') root.removeAttribute('data-theme');
+  else root.setAttribute('data-theme', theme);
   try {
-    const value = localStorage.getItem('garden-palette');
-    return value === 'pocket' || value === 'backlight' || value === 'amber' ? value : 'field';
+    if (theme === 'system') localStorage.removeItem(KEY);
+    else localStorage.setItem(KEY, theme);
   } catch {
-    return 'field';
+    // A private window keeps the choice for this visit only.
   }
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', isDark(theme) ? '#07120e' : '#e4ece3');
 }
+
+/** The header's switch: to whichever of day and night is not showing now. */
+export const toggleTheme = () => applyTheme(isDark() ? 'light' : 'dark');
