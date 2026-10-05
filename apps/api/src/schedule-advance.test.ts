@@ -86,6 +86,15 @@ describe('advancing a schedule across a daylight-saving transition', () => {
     expect(advanceScheduleRun({ kind: 'once', runAt: now.toISOString() }, now, now)).toBeNull();
   });
 
+  test('spends a one-off on its first run, even when it was run before its time', () => {
+    const now = new Date('2026-11-01T05:30:00.000Z');
+    const later = '2026-11-04T09:00:00.000Z';
+    expect(advanceScheduleRun({ kind: 'once', runAt: later }, null, now)?.toISOString()).toBe(
+      later
+    );
+    expect(advanceScheduleRun({ kind: 'once', runAt: later }, now, now)).toBeNull();
+  });
+
   test('never returns a run at or before the moment it was asked', () => {
     const spec = { kind: 'cron', timeZone: newYork, expression: '*/30 * * * *' } as const;
     for (const iso of [

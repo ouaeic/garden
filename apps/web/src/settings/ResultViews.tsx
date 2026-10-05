@@ -39,8 +39,8 @@ export function ResultViewSettings() {
       </label>
       <p className="muted" id="result-views-hint">
         When a chart, comparison or layout says more than prose, the agent can publish one page you
-        can circle and comment on. Each view is written once and then edited, so it costs about one
-        long answer.
+        can circle and comment on. Each view is written once and then edited in place, and what it
+        cost shows in Spending like any other answer.
       </p>
       <ActionFeedback action={action} />
     </Section>

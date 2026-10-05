@@ -9135,6 +9135,53 @@ describe('control-plane gates', () => {
     );
   });
 
+  /*
+   * Lending a key is the same decision as choosing the mode, one consequence at a time, so it is
+   * refused to a token on the goal and on the computer alike, and stays the owner's to make.
+   */
+  test('refuses an automation token that asks to lend itself keys', async () => {
+    stubProviderFetch();
+    const directory = await mkdtemp(join(tmpdir(), 'garden-api-token-keys-'));
+    disposers.push(() => rm(directory, { recursive: true, force: true }));
+    const { app } = await buildDomainServer(isolatedConfig(directory));
+    disposers.push(() => app.close());
+    const { cookie, taskId, workspaceId } = await seedOwnerWithTask(
+      app,
+      'token-keys',
+      'Publish the site'
+    );
+    const token = (
+      await app.inject({
+        method: 'POST',
+        url: '/v1/api-tokens',
+        headers: { cookie },
+        payload: {
+          label: 'Deploy bot',
+          scopes: ['tasks:read', 'tasks:write', 'workspaces:read', 'workspaces:write'],
+          expiresInDays: 7
+        }
+      })
+    ).json<{ token: string }>().token;
+    for (const url of [`/v1/tasks/${taskId}/keys`, `/v1/workspaces/${workspaceId}/keys`]) {
+      const lent = await app.inject({
+        method: 'PATCH',
+        url,
+        headers: { authorization: `Bearer ${token}`, 'idempotency-key': `token-keys-${url}` },
+        payload: { lentKeys: ['publish', 'remove'] }
+      });
+      expect(lent.statusCode, lent.body).toBe(403);
+      expect(lent.json<{ error: { code: string } }>().error.code).toBe('api_token_scope_required');
+    }
+    const byTheOwner = await app.inject({
+      method: 'PATCH',
+      url: `/v1/tasks/${taskId}/keys`,
+      headers: { cookie, 'idempotency-key': 'owner-keys' },
+      payload: { lentKeys: ['publish'] }
+    });
+    expect(byTheOwner.statusCode, byTheOwner.body).toBe(200);
+    expect(byTheOwner.json<{ lentKeys: string[] }>().lentKeys).toEqual(['publish']);
+  });
+
   /**
    * The recheck route is documented as answering 200 whether or not the account replied, so its
    * failure never passes the error handler - which is the only other place a message built from an

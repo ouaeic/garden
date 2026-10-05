@@ -285,6 +285,19 @@ about plus more.
 - _Review_ is Balanced plus a card in front of every command, every file written, and every browser
   or desktop action.
 
+**Keys beyond the mode.** The owner can also lend four keys - spend, publish, remove and rules - on
+the computer as a standing default for new goals, through a deal, or on one goal. Each answers in
+advance the cards the mode still raises for that kind of consequence: priced media and
+transcription spending; public links, deploys, registry publishes, uploads and services others can
+reach; removals outside the undo point, store destruction, forced pushes and deletes in connected
+services; schedules, memory, skills, services and anything set to run later. A card names the keys
+that answer it, all of which must be lent, and a merged card keeps a key only when every part of it
+names one. A card raised because the turn read untrusted content names no key, so nothing a page,
+document or message says can spend one; private input, signatures, CAPTCHAs, stopping the computer,
+credentials in memory and unpriced spending name none either. Every action a key allowed is written
+to the approvals table as approved by the key before it runs. Lending is the owner's: API tokens
+cannot change keys on a goal or on the computer.
+
 The authoritative wording of all three is `SECURITY_MODE_FLOOR` in
 `apps/worker/src/approval-common.ts`, used by the branches that enforce it and is held
 against the page the owner reads by `scripts/check-repository.mjs`. It is deliberately not restated

@@ -4014,5 +4014,15 @@ CREATE TABLE IF NOT EXISTS model_throughput_ceiling (
     sql: `ALTER TABLE approvals DROP CONSTRAINT IF EXISTS approvals_decision_scope_check;
       ALTER TABLE approvals ADD CONSTRAINT approvals_decision_scope_check
         CHECK(decision_scope IN ('once','run','key'));`
+  },
+  {
+    version: 114,
+    name: 'lent_keys',
+    // Keys the owner lends beyond the security mode, standing on the workspace and copied onto each
+    // goal it starts, where a deal or the goal itself can change them.
+    sql: `ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS lent_keys TEXT[] NOT NULL DEFAULT '{}'
+        CHECK (lent_keys <@ ARRAY['spend','publish','remove','rules']::TEXT[]);
+      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS lent_keys TEXT[] NOT NULL DEFAULT '{}'
+        CHECK (lent_keys <@ ARRAY['spend','publish','remove','rules']::TEXT[]);`
   }
 ] as const;

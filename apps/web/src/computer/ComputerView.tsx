@@ -28,7 +28,13 @@ type Tab = (typeof TABS)[number][0];
  * terminal and files, the rhythms that wake it, and the points it can be put back to. The terminal
  * and files keep their place while another tab is showing.
  */
-export default function ComputerView({ tab }: { tab: string | null }) {
+export default function ComputerView({
+  tab,
+  section = null
+}: {
+  tab: string | null;
+  section?: string | null;
+}) {
   const { bootstrap } = useGarden();
   const workspace = primaryWorkspace(bootstrap);
   const current: Tab = TABS.some(([id]) => id === tab) ? (tab as Tab) : 'running';
@@ -96,6 +102,7 @@ export default function ComputerView({ tab }: { tab: string | null }) {
               workspace={workspace}
               onOpenTask={(id) => go({ view: 'goal', goal: id })}
               onChange={refreshSoon}
+              startNew={section === 'new'}
             />
           )}
           {current === 'undo' && (

@@ -19,6 +19,7 @@ export function createGardenFixtures(now = Date.now()) {
     name: 'garden',
     status: 'running',
     securityMode: 'balanced',
+    lentKeys: ['spend'],
     region: 'local',
     storageBytes: 41_000_000_000,
     storageLimitBytes: 100_000_000_000,
@@ -34,6 +35,7 @@ export function createGardenFixtures(now = Date.now()) {
     modelId: 'fixture/lead',
     privacyRoute: 'provider_zdr',
     securityMode: 'balanced',
+    lentKeys: [],
     reasoningEffort: 'auto',
     maxComputeCredits: 40,
     actualComputeCredits: 6,
@@ -64,6 +66,7 @@ export function createGardenFixtures(now = Date.now()) {
   const tasks = [
     task(1, {
       title: 'RNA-seq reanalysis for the paper',
+      lentKeys: ['publish'],
       maxSpendUsd: 14,
       spentUsd: 6.2,
       securityMode: 'balanced',
@@ -185,6 +188,24 @@ export function createGardenFixtures(now = Date.now()) {
   ];
   const schedules = [
     {
+      id: '30000000-0000-4000-8000-000000000009',
+      workspaceId: workspace.id,
+      title: 'Send Ana the grant report',
+      prompt: 'Send Ana the final grant report from workspace/grant/report.pdf.',
+      modelId: 'fixture/lead',
+      privacyRoute: 'provider_zdr',
+      maxComputeCredits: 2,
+      maxSpendUsd: 1,
+      spec: { kind: 'once', runAt: at(2 * 24 * HOUR) },
+      enabled: true,
+      nextRunAt: at(2 * 24 * HOUR),
+      lastRunAt: null,
+      lastTaskId: null,
+      lastErrorCode: null,
+      createdAt: at(-2 * HOUR),
+      updatedAt: at(-2 * HOUR)
+    },
+    {
       id: '30000000-0000-4000-8000-000000000001',
       workspaceId: workspace.id,
       title: 'Morning brief',
@@ -304,7 +325,7 @@ export function createGardenFixtures(now = Date.now()) {
         taskId: null,
         taskTitle: null,
         action: 'mail:message.send',
-        detail: 'The service answered 200.',
+        detail: '',
         tool: 'connector_action',
         source: 'connector',
         verdict: 'succeeded'
@@ -828,6 +849,8 @@ export function createGardenFixtures(now = Date.now()) {
       return (json(response, { preferences: state.preferences }), true);
     }
     if (path === '/v1/search') return (json(response, []), true);
+    if (path === '/v1/schedules' && method === 'GET')
+      return (json(response, state.schedules), true);
     if (path === `/v1/workspaces/${workspace.id}/memories`) return (json(response, []), true);
     if (path === `/v1/workspaces/${workspace.id}/memory-library`)
       return (
@@ -1000,6 +1023,19 @@ export function createGardenFixtures(now = Date.now()) {
     if ((match = /^\/v1\/approvals\/([^/]+)\/(approve|deny)$/.exec(path)) && method === 'POST') {
       state.moves = state.moves.filter((move) => move.approvalId !== match[1]);
       return (json(response, { ok: true }), true);
+    }
+    if ((match = /^\/v1\/tasks\/([^/]+)\/keys$/.exec(path)) && method === 'PATCH') {
+      const found = findTask(match[1]);
+      if (found) found.lentKeys = (await body(request)).lentKeys;
+      return (json(response, found), true);
+    }
+    if (path === `/v1/workspaces/${workspace.id}/keys` && method === 'PATCH') {
+      workspace.lentKeys = (await body(request)).lentKeys;
+      return (json(response, workspace), true);
+    }
+    if (path === `/v1/workspaces/${workspace.id}/security-mode` && method === 'PATCH') {
+      workspace.securityMode = (await body(request)).securityMode;
+      return (json(response, workspace), true);
     }
     if ((match = /^\/v1\/tasks\/([^/]+)$/.exec(path))) {
       const found = findTask(match[1]);

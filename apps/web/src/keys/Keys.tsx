@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { SpendLimits, Task } from '@garden/contracts';
+import type { OwnerKey, SpendLimits, Task } from '@garden/contracts';
 import { ApiError, get, patch, put } from '../client';
 import { stepUp } from '../auth';
-import { setTaskKeys, taskAction } from '../app/actions';
+import { setGoalKeys, setTaskKeys, taskAction } from '../app/actions';
 import { growth, money } from '../app/derive';
 import HoldButton from '../app/HoldButton';
-import { Check, Lock, Publish, Remove, Rules, Speak, Spend } from '../app/icons';
+import { Check, Publish, Remove, Rules, Speak, Spend } from '../app/icons';
 import { openGoal } from '../app/route';
 import { primaryWorkspace, refreshSoon, useGarden } from '../app/store';
 import { toast } from '../app/toast';
@@ -28,37 +28,29 @@ const KEYS = [
     id: 'act',
     name: 'Act as you',
     icon: Speak,
-    what: 'Send, submit and book in your browser, mail and calendar'
+    what: 'Send, submit and book in your browser, mail, calendar and connected services'
   },
   {
     id: 'publish',
     name: 'Publish',
     icon: Publish,
-    what: 'Public links to your apps',
-    locked: true
+    what: 'Public links, deploys, package releases, uploads, and services others can reach'
   },
   {
     id: 'remove',
     name: 'Remove',
     icon: Remove,
-    what: 'Delete anything outside an undo point',
-    locked: true
+    what: 'Delete outside an undo point: files elsewhere, databases, volumes, remote history'
   },
   {
     id: 'rules',
     name: 'Rules',
     icon: Rules,
-    what: 'Schedules, memory, services and connections',
-    locked: true
-  },
-  {
-    id: 'accounts',
-    name: 'Accounts',
-    icon: Lock,
-    what: 'Passwords, codes and signatures',
-    locked: true
+    what: 'Schedules, memory, skills, services, and anything set to run later'
   }
 ] as const;
+
+type LendableKey = OwnerKey;
 
 /** How many consequential cards in a row the owner approved unchanged before the offer is made. */
 const EARNED_AFTER = 10;
@@ -91,6 +83,24 @@ export default function Keys() {
       !task.archivedAt
   );
   const standing = workspace?.securityMode ?? 'balanced';
+  const standingKeys: readonly OwnerKey[] = workspace?.lentKeys ?? [];
+  const open = (task: Task) =>
+    !['completed', 'failed', 'cancelled'].includes(task.status) && !task.archivedAt;
+  const holding = (key: OwnerKey) =>
+    tasks.filter((task) => open(task) && (task.lentKeys ?? []).includes(key));
+  const lendStanding = async (key: OwnerKey, on: boolean) => {
+    if (!workspace) return;
+    const next = on
+      ? [...new Set([...standingKeys, key])]
+      : standingKeys.filter((item) => item !== key);
+    try {
+      await patch(`/v1/workspaces/${workspace.id}/keys`, { lentKeys: next });
+      refreshSoon(0);
+      toast(on ? 'New goals start with this key.' : 'New goals will ask first.');
+    } catch (cause) {
+      toast(cause instanceof Error ? cause.message : 'That did not change.');
+    }
+  };
   const streak = useMemo(() => {
     if (!history) return 0;
     let count = 0;
@@ -156,7 +166,10 @@ export default function Keys() {
   const nodes = KEYS.map((key, index) => {
     const angle = -Math.PI / 2 + (index * 2 * Math.PI) / KEYS.length;
     const isLent =
-      key.id === 'spend' || (key.id === 'act' && (standing === 'autonomous' || lent.length > 0));
+      key.id === 'spend' ||
+      (key.id === 'act'
+        ? standing === 'autonomous' || lent.length > 0
+        : standingKeys.includes(key.id) || holding(key.id).length > 0);
     return { key, x: 250 + R * Math.cos(angle), y: 250 + R * Math.sin(angle), isLent };
   });
 
@@ -209,7 +222,11 @@ export default function Keys() {
                       : lent.length
                         ? `${lent.length} goal${lent.length === 1 ? '' : 's'}`
                         : 'with you'
-                    : 'always you'}
+                    : standingKeys.includes(key.id)
+                      ? 'by default'
+                      : holding(key.id).length
+                        ? `${holding(key.id).length} goal${holding(key.id).length === 1 ? '' : 's'}`
+                        : 'with you'}
               </text>
             </g>
           ))}
@@ -222,8 +239,9 @@ export default function Keys() {
             What it may do <em>without you.</em>
           </h1>
           <p className="muted">
-            Everything on your computer can be undone, so only the outside world needs a key. A deal
-            lends keys to one goal; what you set here is the default for new goals.
+            Work on your computer inside an undo point never needs a key. Each key below answers one
+            kind of consequence in advance. A deal lends keys to one goal; what you set here is the
+            default for new goals. Whatever a key allows is still written to the Record.
           </p>
         </header>
 
@@ -284,6 +302,14 @@ export default function Keys() {
                   />
                 </div>
               )}
+              <div className="key-switch">
+                <span>Paid images, audio and video within the cap</span>
+                <Lend
+                  label="Paid media, for new goals"
+                  on={standingKeys.includes('spend')}
+                  onChange={(on) => void lendStanding('spend', on)}
+                />
+              </div>
             </div>
           </article>
           <article className="key-row">
@@ -340,36 +366,95 @@ export default function Keys() {
               )}
             </div>
           </article>
-          {KEYS.slice(2).map((key) => (
-            <article key={key.id} className="key-row is-locked">
-              <span className="key-icon">
-                <key.icon />
-              </span>
-              <div>
-                <div className="key-row-top">
-                  <b>{key.name}</b>
-                  <span className="lock-line">
-                    <Lock /> Always asks you
-                  </span>
+          {KEYS.slice(2).map((key) => {
+            const id = key.id as LendableKey;
+            const goals = holding(id);
+            return (
+              <article key={key.id} className="key-row">
+                <span className="key-icon">
+                  <key.icon />
+                </span>
+                <div>
+                  <div className="key-row-top">
+                    <b>{key.name}</b>
+                    <Lend
+                      label={`${key.name}, for new goals`}
+                      on={standingKeys.includes(id)}
+                      onChange={(on) => void lendStanding(id, on)}
+                    />
+                  </div>
+                  <p className="faint">{key.what}</p>
+                  {goals.length > 0 && (
+                    <ul className="loans">
+                      {goals.map((task) => (
+                        <li key={task.id}>
+                          <button type="button" className="loan" onClick={() => openGoal(task.id)}>
+                            <Check /> Lent to {task.title}
+                          </button>
+                          <button
+                            type="button"
+                            className="link-button"
+                            onClick={() =>
+                              void setGoalKeys(
+                                task.id,
+                                (task.lentKeys ?? []).filter((item) => item !== id)
+                              ).then(() => toast('Taken back.'))
+                            }
+                          >
+                            Take back
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-                <p className="faint">{key.what}</p>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </section>
+
+        <p className="key-note faint">
+          Passwords, codes and signatures are not a key: you type them yourself on the computer, so
+          they never pass through a model. Anything the agent reads on a page or in a message can
+          never use a key either; those requests always come to you.
+        </p>
 
         <section className="stop-card">
           <div className="eyebrow">The stop that always works</div>
           <p>
             Every goal stops at its next safe point,{' '}
-            {growing.length ? `${growing.length} of them growing now` : 'nothing is growing now'}.
-            Nothing restarts until you say so.
+            {growing.length
+              ? `${growing.length} ${growing.length === 1 ? 'is' : 'are'} working right now`
+              : 'none is working right now'}
+            . Nothing restarts until you say so.
           </p>
           <HoldButton className="btn danger big" onHeld={() => void stopAll()}>
             Hold to stop everything
           </HoldButton>
         </section>
       </div>
+    </div>
+  );
+}
+
+/** The two positions every lendable key has: it asks, or it is lent. */
+function Lend({
+  label,
+  on,
+  onChange
+}: {
+  label: string;
+  on: boolean;
+  onChange: (on: boolean) => void;
+}) {
+  return (
+    <div className="seg" role="group" aria-label={label}>
+      <button type="button" aria-pressed={!on} onClick={() => onChange(false)}>
+        Ask first
+      </button>
+      <button type="button" aria-pressed={on} onClick={() => onChange(true)}>
+        Lent by default
+      </button>
     </div>
   );
 }

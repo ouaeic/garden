@@ -27,6 +27,13 @@ export const Sprout = stroke(
     <path d="M12 13c0-4 2.8-6.8 7.3-6.8 0 4-2.9 6.8-7.3 6.8zM12 15.5c0-3.4-2.3-5.6-6.2-5.6 0 3.3 2.4 5.6 6.2 5.6z" />
   </>
 );
+export const Tune = stroke(
+  <>
+    <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
+    <circle cx="15" cy="7" r="2" />
+    <circle cx="9" cy="17" r="2" />
+  </>
+);
 export const Bloom = stroke(
   <>
     <circle cx="12" cy="12" r="2.4" />

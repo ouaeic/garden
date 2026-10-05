@@ -562,7 +562,7 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
               {saved?.source === 'encrypted_database' && (
                 <ConfirmButton
                   label="Remove saved connection"
-                  description="Remove this saved connection. Tasks that need it will wait until it is connected again. Other saved providers remain available."
+                  description="Remove this saved connection. Goals that need it will wait until it is connected again. Other saved providers remain available."
                   action={async () => {
                     await sensitive(() =>
                       del(`/v1/providers?connectionId=${encodeURIComponent(selected)}`)
@@ -584,7 +584,7 @@ export function ProviderSettings({ onChange }: { onChange: () => void }) {
       </Section>
       <Section
         title="Model defaults"
-        description="Choose the main agent and the models behind its specialist work. New projects inherit these defaults."
+        description="Choose the main agent and the models behind its specialist work. New goals inherit these defaults."
       >
         <DefaultModels connectionRevision={connectionRevision} onChange={onChange} />
       </Section>

@@ -25,6 +25,7 @@ import {
   agreedDealText,
   TaskPageQuery,
   UpdateSecurityModeRequest,
+  UpdateLentKeysRequest,
   UpdateTaskPlanRequest,
   UpdateTaskRequest
 } from '@garden/contracts';
@@ -576,6 +577,7 @@ export const registerTaskRoutes = (context: RouteContext): void => {
             answers: input.answers,
             actAsYou: input.actAsYou,
             capUsd,
+            ...(input.keys ? { keys: input.keys } : {}),
             plantedFrom: first!.goal.title,
             ...(original ? { request: original } : {}),
             ...(input.note ? { note: input.note } : {})
@@ -589,8 +591,10 @@ export const registerTaskRoutes = (context: RouteContext): void => {
           maxComputeCredits: task.maxComputeCredits,
           maxSpendUsd: capUsd
         });
+        if (input.keys) await store.updateTaskLentKeys(user.id, created.id, input.keys);
         siblings.push(created.id);
       }
+      if (input.keys) await store.updateTaskLentKeys(user.id, task.id, input.keys);
       await database.query(
         'UPDATE tasks SET max_spend_usd=$3, updated_at=NOW() WHERE id=$1 AND user_id=$2',
         [task.id, user.id, first!.capUsd]
@@ -612,6 +616,7 @@ export const registerTaskRoutes = (context: RouteContext): void => {
           answers: input.answers,
           actAsYou: input.actAsYou,
           capUsd: first!.capUsd,
+          ...(input.keys ? { keys: input.keys } : {}),
           alongside: others.map(({ goal }) => goal.title),
           ...(input.note ? { note: input.note } : {})
         })
@@ -914,6 +919,29 @@ export const registerTaskRoutes = (context: RouteContext): void => {
       );
     }
   );
+
+  /*
+   * The keys one goal holds beyond its mode. The same footing as the mode itself, for the same
+   * reasons: no second factor at the owner's keyboard, and no bearer token may change it.
+   */
+  app.patch<{ Params: { taskId: string } }>('/v1/tasks/:taskId/keys', async (request, reply) => {
+    const user = requireUser(request.user);
+    const input = UpdateLentKeysRequest.parse(request.body);
+    const task = await store.getTask(user.id, request.params.taskId);
+    if (!task || task.userId !== user.id) throw new GardenError('task_not_found', 'Task not found');
+    return idempotent(request, reply, user, async () => {
+      const updated = await store.updateTaskLentKeys(user.id, task.id, input.lentKeys);
+      if (!updated) throw new GardenError('task_not_found', 'Task not found');
+      await recordSecurityEvent(store, {
+        userId: user.id,
+        kind: 'task_keys_changed',
+        outcome: 'succeeded',
+        metadata: { taskId: task.id, lentKeys: input.lentKeys }
+      });
+      const workspace = await store.getWorkspace(user.id, task.workspaceId);
+      return privateTaskResponse(updated, workspace ?? undefined);
+    });
+  });
 
   app.patch<{ Params: { taskId: string } }>(
     '/v1/tasks/:taskId/security-mode',

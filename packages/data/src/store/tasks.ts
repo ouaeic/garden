@@ -430,14 +430,18 @@ export class TaskStore {
     maxSpendUsd?: number | null;
     promptCiphertext: EncryptedEnvelope;
     securityMode?: TaskRecord['securityMode'];
+    /** Absent starts the goal with the keys its computer lends to every new goal. */
+    lentKeys?: TaskRecord['lentKeys'];
   }): Promise<TaskRecord> {
     const id = randomUUID();
     const result = await this.database.query(
       `INSERT INTO tasks(
         id,user_id,workspace_id,title,status,model_id,privacy_route,max_compute_credits,
-        prompt_ciphertext,security_mode,max_spend_usd,name_tsv,reasoning_effort,project_id,model_override,conversation_source_ciphertext,model_choices_ciphertext
+        prompt_ciphertext,security_mode,max_spend_usd,name_tsv,reasoning_effort,project_id,model_override,conversation_source_ciphertext,model_choices_ciphertext,
+        lent_keys
        ) VALUES ($1,$2,$3,$4,'queued',$5,$6,$7,$8::jsonb,$9,$10,${taskNameTsv(11, 12, 13)},$14,
-         $15,$16,$17::jsonb,$18::jsonb)
+         $15,$16,$17::jsonb,$18::jsonb,
+         COALESCE($19::TEXT[],(SELECT lent_keys FROM workspaces WHERE id=$3),'{}'))
        RETURNING *`,
       [
         id,
@@ -457,7 +461,8 @@ export class TaskStore {
         input.conversationSourceCiphertext
           ? JSON.stringify(input.conversationSourceCiphertext)
           : null,
-        input.modelChoicesCiphertext ? JSON.stringify(input.modelChoicesCiphertext) : null
+        input.modelChoicesCiphertext ? JSON.stringify(input.modelChoicesCiphertext) : null,
+        input.lentKeys ?? null
       ]
     );
     const task = mapTask(result.rows[0]!);
@@ -494,13 +499,14 @@ export class TaskStore {
         id,user_id,workspace_id,parent_task_id,branched_from_event_id,title,status,model_id,
         privacy_route,max_compute_credits,prompt_ciphertext,agent_state_ciphertext,completed_at,
         fork_kind,security_mode,max_spend_usd,rewind_scope,restored_checkpoint_id,name_tsv,reasoning_effort,
-        model_override,model_choices_ciphertext,model_preferences_revision
+        model_override,model_choices_ciphertext,model_preferences_revision,lent_keys
        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,
         CASE WHEN $7='completed' THEN NOW() ELSE NULL END,$13,$14,$15,$16,$17,
         ${taskNameTsv(18, 19, 20)},COALESCE($21,(SELECT reasoning_effort FROM tasks WHERE id=$4 AND user_id=$2),'auto'),
         (SELECT model_override OR model_id<>$8 FROM tasks WHERE id=$4 AND user_id=$2),
         (SELECT model_choices_ciphertext FROM tasks WHERE id=$4 AND user_id=$2),
-        (SELECT model_preferences_revision FROM tasks WHERE id=$4 AND user_id=$2))
+        (SELECT model_preferences_revision FROM tasks WHERE id=$4 AND user_id=$2),
+        COALESCE((SELECT lent_keys FROM tasks WHERE id=$4 AND user_id=$2),'{}'))
        RETURNING *`,
       [
         id,
@@ -1749,6 +1755,20 @@ export class TaskStore {
     // watching: they pressed the button.
     if (cancelled.wasHeld) this.#signalWorkspaceRelease(id);
     return true;
+  }
+
+  /** Replaces the keys one goal holds beyond its security mode. */
+  async updateTaskLentKeys(
+    userId: string,
+    id: string,
+    lentKeys: TaskRecord['lentKeys']
+  ): Promise<TaskRecord | null> {
+    const result = await this.database.query(
+      `UPDATE tasks t SET lent_keys=$3::TEXT[],updated_at=NOW()
+       WHERE t.id=$1 AND t.user_id=$2 RETURNING t.*,${TASK_LIVE_COUNTS}`,
+      [id, userId, [...new Set(lentKeys)]]
+    );
+    return result.rows[0] ? mapTask(result.rows[0]) : null;
   }
 
   async updateTaskSecurityMode(

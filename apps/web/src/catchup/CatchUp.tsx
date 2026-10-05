@@ -3,12 +3,11 @@ import type { RecordEntry, Task, TaskEvent } from '@garden/contracts';
 import { get } from '../client';
 import { loadEventPage } from '../stream';
 import { accept } from '../app/actions';
-import { GROWTH_COLOR, GROWTH_WORD, ago, growth, leaves, money } from '../app/derive';
-import { Check, Close } from '../app/icons';
+import { GROWTH_COLOR, GROWTH_WORD, ago, goalLine, growth, money } from '../app/derive';
+import { Bloom, Check, Close, Sprout } from '../app/icons';
 import { go, openGoal } from '../app/route';
 import { useGarden } from '../app/store';
 import { toast } from '../app/toast';
-import Plant from '../today/Plant';
 import { NOTE_LABEL, notesFrom, type Note } from '../goal/timeline';
 import './catchup.css';
 
@@ -148,7 +147,6 @@ export default function CatchUp({ since, onClose }: { since: string | null; onCl
             <div className="catchup-grid">
               {stories.map((story, index) => {
                 const state = growth(story.task, moves);
-                const grown = leaves(story.task);
                 return (
                   <article
                     key={story.task.id}
@@ -156,15 +154,11 @@ export default function CatchUp({ since, onClose }: { since: string | null; onCl
                     style={{ '--i': index, '--glow': GROWTH_COLOR[state] } as React.CSSProperties}
                   >
                     <header>
-                      <Plant
-                        className="catchup-plant"
-                        seed={story.task.id}
-                        total={grown.total}
-                        done={grown.done}
-                        current={false}
-                        bloom={state === 'ready'}
-                        needs={state === 'needs'}
-                      />
+                      {state === 'ready' ? (
+                        <Bloom className="catchup-mark" />
+                      ) : (
+                        <Sprout className="catchup-mark" />
+                      )}
                       <div>
                         <span
                           className="tag"
@@ -185,9 +179,7 @@ export default function CatchUp({ since, onClose }: { since: string | null; onCl
                         ))}
                       </ul>
                     ) : (
-                      <p className="muted">
-                        {story.task.activity?.latest ?? 'Quietly carrying on.'}
-                      </p>
+                      <p className="muted">{goalLine(story.task, moves)}</p>
                     )}
                     <footer>
                       {story.task.activity?.ending?.verification === 'verified' && (

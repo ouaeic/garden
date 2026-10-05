@@ -66,6 +66,11 @@ export const PlantDealRequest = z
       .min(1)
       .max(DEAL_MAX_GOALS),
     actAsYou: z.boolean(),
+    /** The keys beyond acting as you that the planted goals may use; absent keeps the standing set. */
+    keys: z
+      .array(z.enum(['spend', 'publish', 'remove', 'rules']))
+      .max(4)
+      .optional(),
     /** Per planted goal, in the order of `goals`. */
     capsUsd: z.array(z.number().positive().max(1_000)).min(1).max(DEAL_MAX_GOALS),
     note: z.string().trim().max(2_000).optional()
@@ -82,6 +87,13 @@ export type PlantDealRequest = z.infer<typeof PlantDealRequest>;
 export const PlantDealResponse = z.object({ taskIds: z.array(z.uuid()).min(1) }).strict();
 export type PlantDealResponse = z.infer<typeof PlantDealResponse>;
 
+const KEY_WORDS: Record<string, string> = {
+  spend: 'paid media and other spending within the cap',
+  publish: 'publishing and deploying',
+  remove: 'deleting outside an undo point',
+  rules: 'schedules, memory, skills and services'
+};
+
 const answered = (question: DealQuestion, answer: string | undefined) =>
   `- ${question.question} ${answer?.trim() || 'No answer: take the safe choice.'}`;
 
@@ -92,6 +104,7 @@ export const agreedDealText = (input: {
   answers: readonly string[];
   actAsYou: boolean;
   capUsd: number;
+  keys?: readonly string[];
   alongside?: readonly string[];
   plantedFrom?: string;
   request?: string;
@@ -106,6 +119,9 @@ export const agreedDealText = (input: {
       ? ['Answers:', ...input.deal.questions.map((q, i) => answered(q, input.answers[i]))]
       : []),
     `Keys: ${input.actAsYou ? 'act as me (send, submit, book) within this goal' : 'do not send, submit or book as me; ask first'}. Spend up to $${input.capUsd.toFixed(2)} on this goal.`,
+    ...(input.keys?.length
+      ? [`Also lent without asking: ${input.keys.map((key) => KEY_WORDS[key] ?? key).join('; ')}.`]
+      : []),
     ...(input.alongside?.length
       ? [`Planted alongside as separate goals, not yours to do: ${input.alongside.join('; ')}.`]
       : []),

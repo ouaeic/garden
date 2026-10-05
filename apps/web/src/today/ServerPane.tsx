@@ -4,21 +4,15 @@ import { get } from '../client';
 import type { Bootstrap } from '../model';
 import { useProcessFeed } from '../process-feed';
 import { money } from '../app/derive';
+import { bytes } from '../model';
 import { go } from '../app/route';
 
 /**
- * The machine as a place: how much room is left, what is running on it, and what today has cost.
+ * The machine as a place: what it is running, what it has left, and what today has cost.
  *
- * Room is said in work rather than in percentages, because the question behind it is "can I ask
- * for more now"; the gauges are there for anyone who wants the numbers.
+ * Every figure is a reading, never a judgement about what will fit: what a job needs is not known
+ * until it runs, so the pane says what is free and leaves the deciding to the owner.
  */
-export function roomFor(cpu: number, memory: number): string {
-  const load = Math.max(cpu, memory);
-  if (load < 45) return 'Room for two more heavy jobs';
-  if (load < 75) return 'Room for one more heavy job';
-  return 'Busy. New work waits its turn';
-}
-
 function Gauge({ label, value }: { label: string; value: number | null }) {
   const c = 2 * Math.PI * 21;
   const shown = value === null ? null : Math.round(Math.min(100, Math.max(0, value)));
@@ -66,8 +60,10 @@ export default function ServerPane({
     void get<SpendLimits>('/v1/spend-limits').then(setLimits, () => undefined);
   }, []);
   const titles = new Map(tasks.map((task) => [task.id, task.title]));
-  const running = (list?.processes ?? [])
-    .filter((process) => process.status === 'running' && !process.archived)
+  const live = (list?.processes ?? []).filter(
+    (process) => process.status === 'running' && !process.archived
+  );
+  const running = [...live]
     .sort((a, b) => (b.resources?.cpuPercent ?? 0) - (a.resources?.cpuPercent ?? 0))
     .slice(0, 4);
   const cores = list?.host?.logicalCpus ?? null;
@@ -81,8 +77,26 @@ export default function ServerPane({
         </button>
       </div>
       <div className="server-body">
-        <p className="server-room display">
-          {cpu === null ? 'Waiting for the first reading' : roomFor(cpu, memory ?? 0)}.
+        <p className="server-facts">
+          {computer ? (
+            <>
+              <span>
+                <b className="num">{live.length}</b> running
+              </span>
+              <span>
+                <b className="num">{bytes(computer.memoryTotalBytes - computer.memoryUsedBytes)}</b>{' '}
+                memory free
+              </span>
+              <span>
+                <b className="num">
+                  {bytes(Math.max(0, usage.storageLimitBytes - usage.storageBytes))}
+                </b>{' '}
+                disk free
+              </span>
+            </>
+          ) : (
+            <span>Waiting for the first reading</span>
+          )}
         </p>
         <div className="gauges">
           <Gauge label="CPU" value={cpu} />

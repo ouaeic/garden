@@ -51,6 +51,7 @@
 
 /* Growing goals, a line each. */
 .goal-rows {
+  container-type: inline-size;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -123,6 +124,36 @@
   justify-content: flex-end;
   min-width: 112px;
 }
+/* A narrow column keeps the title whole: what it is doing moves beneath it instead of beside it. */
+@container (max-width: 640px) {
+  .goal-row-open {
+    grid-template-columns: 18px minmax(0, 1fr) max-content auto;
+    grid-template-areas:
+      'mark title pips spend'
+      'mark line pips spend';
+    row-gap: 2px;
+  }
+  .goal-row-mark {
+    grid-area: mark;
+  }
+  .goal-row-title {
+    grid-area: title;
+  }
+  .goal-row-line {
+    grid-area: line;
+    font-size: 13px;
+  }
+  .goal-row-pips,
+  .goal-row-proof {
+    grid-area: pips;
+  }
+  .goal-row-pips {
+    width: 64px;
+  }
+  .goal-row-spend {
+    grid-area: spend;
+  }
+}
 .goal-row-state {
   font: 500 11px var(--mono);
   letter-spacing: 0.1em;
@@ -180,170 +211,6 @@
 .seedbed .btn {
   grid-column: 2;
   justify-self: start;
-}
-
-/* Plants. */
-.plant {
-  width: 160px;
-  height: 178px;
-  overflow: visible;
-}
-.plant-soil {
-  fill: var(--ink);
-  opacity: 0.07;
-}
-.plant-sway {
-  transform-box: view-box;
-  transform-origin: 80px 172px;
-  animation: sway 7s ease-in-out infinite alternate;
-}
-@keyframes sway {
-  from {
-    transform: rotate(-1.6deg);
-  }
-  to {
-    transform: rotate(1.6deg);
-  }
-}
-.plant-stem {
-  fill: none;
-  stroke: var(--leaf-2);
-  stroke-width: 2.4;
-  stroke-linecap: round;
-  stroke-dasharray: 1 1;
-  transition: stroke-dashoffset 1.8s var(--ease);
-}
-.plant-blade {
-  transform-box: fill-box;
-  transform-origin: 0% 50%;
-  transform: scale(0);
-  transition: transform 1.3s var(--ease);
-}
-.plant-blade-fill {
-  fill: var(--leaf);
-  fill-opacity: 0;
-  stroke: var(--leaf);
-  stroke-width: 1;
-  transition: fill-opacity 0.7s;
-}
-.plant-rib {
-  fill: none;
-  stroke: var(--bg);
-  stroke-width: 0.8;
-  opacity: 0.45;
-}
-.plant-leaf.is-drafted .plant-blade {
-  transform: scale(0.6);
-}
-.plant-leaf.is-done .plant-blade {
-  transform: scale(1);
-}
-.plant-leaf.is-done .plant-blade-fill {
-  fill-opacity: 0.92;
-}
-.plant-crown {
-  transition: transform 1.8s var(--ease);
-}
-.plant-bud {
-  fill: var(--leaf);
-  transition: opacity 0.6s;
-}
-.plant-flower {
-  transform-box: fill-box;
-  transform-origin: center;
-  transform: scale(0) rotate(-60deg);
-  transition: transform 1.6s var(--ease);
-}
-.plant-flower ellipse {
-  fill: var(--bloom);
-  fill-opacity: 0.9;
-}
-.plant-flower circle {
-  fill: var(--dew);
-}
-.plant.is-bloom .plant-flower {
-  transform: scale(1) rotate(0);
-}
-.plant.is-bloom .plant-bud {
-  opacity: 0;
-}
-.plant-dew {
-  fill: var(--dew);
-  opacity: 0;
-  transition: opacity 0.6s;
-}
-.plant.is-needs .plant-dew {
-  opacity: 1;
-  animation: dew 2.2s ease-in-out infinite;
-}
-@keyframes dew {
-  50% {
-    filter: drop-shadow(0 0 8px var(--dew));
-  }
-}
-
-/* Ready. */
-.ready-list {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.ready-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 14px 6px 6px;
-  border-radius: 22px;
-  border: 1px solid var(--line);
-  background: var(--pane);
-  transition: border-color 0.3s;
-}
-.ready-item:hover {
-  border-color: var(--line-2);
-}
-.ready-open {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: 0;
-  background: none;
-  padding: 0;
-  text-align: left;
-  color: inherit;
-}
-.ready-plant {
-  width: 64px;
-  height: 72px;
-  flex: none;
-}
-.ready-text {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-.ready-title {
-  font-family: var(--display);
-  font-size: 19px;
-  font-weight: 430;
-  letter-spacing: -0.01em;
-}
-.ready-line {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13.5px;
-  color: var(--ink-2);
-}
-.ready-proofs {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  font-size: 11.5px;
 }
 
 /* Your move. */
@@ -499,6 +366,14 @@
   display: flex;
   gap: 4px;
 }
+.rhythm-acts[hidden] {
+  display: none;
+}
+.pane-tools {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 12px;
+}
 .rhythm-acts .icon-btn {
   width: 30px;
   height: 30px;
@@ -527,12 +402,17 @@
   gap: 14px;
   padding: 0 18px 18px;
 }
-.server-room {
+.server-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
   margin: 0;
-  font-size: 21px;
-  line-height: 1.2;
-  letter-spacing: -0.015em;
-  font-weight: 400;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.server-facts b {
+  font-weight: 500;
+  color: var(--ink);
 }
 .gauges {
   display: grid;
@@ -694,10 +574,16 @@
 @media (max-width: 760px) {
   .goal-row-open {
     grid-template-columns: 18px minmax(0, 1fr);
+    grid-template-areas: none;
     row-gap: 3px;
     padding: 12px 0 12px 14px;
   }
+  .goal-row-mark,
+  .goal-row-title {
+    grid-area: auto;
+  }
   .goal-row-line {
+    grid-area: auto;
     grid-column: 2;
     white-space: normal;
     display: -webkit-box;

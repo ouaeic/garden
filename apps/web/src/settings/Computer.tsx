@@ -16,6 +16,13 @@ import {
   useResource
 } from '../management.js';
 import { bytes, date } from '../model.js';
+import { refresh, useGarden } from '../app/store';
+
+const MODE_WORDS: readonly [SecurityMode, string][] = [
+  ['review', 'Ask about everything'],
+  ['balanced', 'Ask first'],
+  ['autonomous', 'May act as you']
+];
 
 export function ComputerSettings({
   workspace,
@@ -32,6 +39,8 @@ export function ComputerSettings({
   const briefAction = useAction(() => brief.refresh());
   const snapshotAction = useAction(() => snapshots.refresh());
   const createAction = useAction(onChange);
+  const switchAction = useAction();
+  const computers = useGarden().bootstrap?.workspaces ?? [];
   const action = useAction(() => {
     snapshots.refresh();
     onChange();
@@ -153,7 +162,7 @@ export function ComputerSettings({
           </Section>
           <Section
             title="Recovery points"
-            description="Save workspace files and the browser profile. Task history, account settings and mounted bulk storage are separate."
+            description="Save workspace files and the browser profile. Goal history, account settings and mounted bulk storage are separate."
           >
             <ResourceState resource={snapshots} />
             <form
@@ -198,7 +207,7 @@ export function ComputerSettings({
                       title={`Restore ${snapshot.name}`}
                       disabled={snapshot.status !== 'ready'}
                       confirmText={workspace.name}
-                      description="This restores the workspace files and browser profile. A safety recovery point is created first. Pause active work before restoring. Task and artifact records stay current, so check file-backed results afterwards."
+                      description="This restores the workspace files and browser profile. A safety recovery point is created first. Pause active work before restoring. Goal and result records stay current, so check file-backed results afterwards."
                       action={async () => {
                         await sensitive(() =>
                           post(`${root}/snapshots/${snapshot.id}/restore`, {
@@ -244,9 +253,47 @@ export function ComputerSettings({
       ) : (
         <p className="empty">Create a computer to begin.</p>
       )}
+      {computers.length > 1 && (
+        <Section
+          title="Your computers"
+          description="Each has its own files, browser and brief. New goals start on the one you work on."
+        >
+          <div className="management-list">
+            {computers.map((computer) => (
+              <article key={computer.id} className="management-item">
+                <div>
+                  <strong>{computer.name}</strong>
+                  <p className="muted">
+                    {computer.status} · {bytes(computer.storageBytes)} of{' '}
+                    {bytes(computer.storageLimitBytes)}
+                  </p>
+                </div>
+                {computer.id === workspace?.id ? (
+                  <span className="muted">Working here</span>
+                ) : (
+                  <Button
+                    busy={switchAction.busy}
+                    onClick={() =>
+                      void switchAction.run(async () => {
+                        await put('/v1/account/preferences', {
+                          place: { workspaceId: computer.id, taskId: null }
+                        });
+                        await refresh();
+                      }, `Working on ${computer.name}`)
+                    }
+                  >
+                    Work here
+                  </Button>
+                )}
+              </article>
+            ))}
+          </div>
+          <ActionFeedback action={switchAction} />
+        </Section>
+      )}
       <Section
-        title="Another workspace"
-        description="A separate workspace on the same owner-controlled server."
+        title="Another computer"
+        description="A separate computer on the same server, with its own files, browser and brief."
       >
         <form
           className="stack"
@@ -262,7 +309,7 @@ export function ComputerSettings({
                     storageLimitBytes: Math.round(Number(values.get('storage')) * 1e9),
                     securityMode: fieldValue(values, 'securityMode')
                   }),
-                'Workspace created'
+                'Computer created'
               )
               .then((ok) => {
                 if (ok) {
@@ -273,7 +320,7 @@ export function ComputerSettings({
           }}
         >
           <div className="management-grid">
-            <Field label="Workspace name">
+            <Field label="Name">
               <input required name="name" maxLength={80} />
             </Field>
             <Field label="Storage allocation · GB">
@@ -286,16 +333,18 @@ export function ComputerSettings({
                 defaultValue={50}
               />
             </Field>
-            <Field label="Default review level">
+            <Field label="Acting as you">
               <select
                 name="securityMode"
                 value={newReviewMode}
                 aria-describedby={newPermissionHelpId}
                 onChange={(event) => setNewReviewMode(event.target.value as SecurityMode)}
               >
-                <option value="review">Review</option>
-                <option value="balanced">Balanced</option>
-                <option value="autonomous">Autonomous</option>
+                {MODE_WORDS.map(([mode, words]) => (
+                  <option key={mode} value={mode}>
+                    {words}
+                  </option>
+                ))}
               </select>
             </Field>
           </div>
@@ -304,75 +353,11 @@ export function ComputerSettings({
             <p id={newPermissionHelpId}>{permissionModeSummary(newReviewMode)}</p>
           </details>
           <Button type="submit" busy={createAction.busy}>
-            Create workspace
+            Create computer
           </Button>
           <ActionFeedback action={createAction} />
         </form>
       </Section>
     </>
-  );
-}
-
-/** How much new work may do before it asks: the default for conversations started from now on. */
-export function ReviewLevelSettings({
-  workspace,
-  onChange
-}: {
-  workspace: Workspace | null;
-  onChange: () => void;
-}) {
-  const permissionHelpId = useId();
-  const [reviewDraft, setReviewDraft] = useState<{ workspaceId: string; mode: SecurityMode }>();
-  const reviewMode =
-    reviewDraft && reviewDraft.workspaceId === workspace?.id
-      ? reviewDraft.mode
-      : (workspace?.securityMode ?? 'balanced');
-  const action = useAction(onChange);
-  if (!workspace) return null;
-  const root = `/v1/workspaces/${workspace.id}`;
-  return (
-    <Section title="Review level" description="What new work may do before it asks you.">
-      <form
-        className="stack management-filter"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const form = new FormData(event.currentTarget);
-          void action.run(
-            () =>
-              patch(`${root}/security-mode`, {
-                securityMode: fieldValue(form, 'securityMode')
-              }),
-            'Default review level saved'
-          );
-        }}
-      >
-        <Field label="Review level for new work">
-          <select
-            name="securityMode"
-            value={reviewMode}
-            aria-describedby={permissionHelpId}
-            onChange={(event) =>
-              setReviewDraft({
-                workspaceId: workspace.id,
-                mode: event.target.value as SecurityMode
-              })
-            }
-          >
-            <option value="review">Review each action</option>
-            <option value="balanced">Balanced</option>
-            <option value="autonomous">Autonomous</option>
-          </select>
-        </Field>
-        <details>
-          <summary>What this mode allows</summary>
-          <p id={permissionHelpId}>{permissionModeSummary(reviewMode)}</p>
-          <p className="muted">Existing conversations retain their own review level.</p>
-        </details>
-        <Button type="submit" busy={action.busy}>
-          Save review level
-        </Button>
-      </form>
-      <ActionFeedback action={action} />
-    </Section>
   );
 }

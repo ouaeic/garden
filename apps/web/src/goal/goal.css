@@ -83,9 +83,23 @@
   padding-bottom: 130px;
   text-align: center;
 }
-.glance-plant {
-  width: 220px;
-  height: 244px;
+/* How far it has come, at the same grain as its row on Today. */
+.glance-steps {
+  display: flex;
+  gap: 5px;
+  width: min(280px, 70vw);
+}
+.glance-steps span {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line-2);
+}
+.glance-steps .is-drafted {
+  background: color-mix(in oklab, var(--glow) 45%, var(--line-2));
+}
+.glance-steps .is-done {
+  background: var(--glow);
 }
 .glance-view h2 {
   margin: 0;
@@ -151,6 +165,16 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-2);
+}
+.look-h .count.link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 .look-h .count {
   letter-spacing: 0.04em;
@@ -433,7 +457,7 @@
   list-style: none;
   border-radius: 18px;
   border: 1px solid var(--line);
-  background: color-mix(in oklab, var(--bg-deep) 70%, transparent);
+  background: var(--well);
   font: 12px/1.6 var(--mono);
 }
 .raw-row button {

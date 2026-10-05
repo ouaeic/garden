@@ -1,4 +1,4 @@
-import type { PlantDealRequest, PlantDealResponse, Task } from '@garden/contracts';
+import type { OwnerKey, PlantDealRequest, PlantDealResponse, Task } from '@garden/contracts';
 import { ApiError, patch, post, put } from '../client';
 import { stepUp } from '../auth';
 import { putTask, refreshSoon } from './store';
@@ -51,6 +51,12 @@ export const raiseCapAndResume = async (taskId: string, maxSpendUsd: number) => 
   putTask(await post<Task>(`/v1/tasks/${taskId}/spend-ceiling`, { maxSpendUsd }));
   return taskAction(taskId, 'resume');
 };
+
+/** The keys one goal holds beyond acting as the owner. */
+export const setGoalKeys = (taskId: string, lentKeys: OwnerKey[]) =>
+  settle(
+    patch<Task>(`/v1/tasks/${taskId}/keys`, { lentKeys }).then((task) => (putTask(task), task))
+  );
 
 export const setTaskKeys = (taskId: string, actAsYou: boolean) =>
   settle(

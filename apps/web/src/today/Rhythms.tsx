@@ -3,7 +3,7 @@ import type { TaskSchedule, TaskScheduleSpec } from '@garden/contracts';
 import { post } from '../client';
 import { refreshSoon } from '../app/store';
 import { ago, until } from '../app/derive';
-import { openGoal } from '../app/route';
+import { go, openGoal } from '../app/route';
 import { Pause, Play, Refresh } from '../app/icons';
 import { toast } from '../app/toast';
 
@@ -27,8 +27,21 @@ export function rhythmText(spec: TaskScheduleSpec, trigger?: boolean): string {
   }
 }
 
-/** Standing work: what runs on its own, when it runs next, and how its last run went. */
+/** A one-off that has had its run: nothing to pause or resume, only what it did. */
+const spent = (schedule: TaskSchedule) =>
+  schedule.spec.kind === 'once' && !schedule.enabled && Boolean(schedule.lastRunAt);
+
+/** Standing work and work set for a time: what runs, when it runs next, how its last run went. */
 export default function Rhythms({ schedules }: { schedules: readonly TaskSchedule[] }) {
+  const repeating = schedules.filter((schedule) => schedule.spec.kind !== 'once').length;
+  const once = schedules.filter(
+    (schedule) => schedule.spec.kind === 'once' && !spent(schedule)
+  ).length;
+  const shown = [...schedules].sort(
+    (a, b) =>
+      Number(spent(a)) - Number(spent(b)) ||
+      Date.parse(a.nextRunAt ?? '9999') - Date.parse(b.nextRunAt ?? '9999')
+  );
   const [busy, setBusy] = useState<string | null>(null);
   const act = async (schedule: TaskSchedule, action: 'run' | 'pause' | 'resume') => {
     setBusy(schedule.id);
@@ -52,12 +65,26 @@ export default function Rhythms({ schedules }: { schedules: readonly TaskSchedul
     <section className="pane rhythms" aria-labelledby="rhythms-title">
       <div className="pane-head">
         <h2 id="rhythms-title">Rhythms</h2>
-        <span className="count">{schedules.length ? `${schedules.length} standing` : ''}</span>
+        <span className="pane-tools">
+          <span className="count">
+            {[repeating && `${repeating} repeating`, once && `${once} set for later`]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
+          <button
+            type="button"
+            className="count link"
+            onClick={() => go({ view: 'computer', tab: 'rhythms', section: 'new' })}
+          >
+            Schedule
+          </button>
+        </span>
       </div>
       {schedules.length ? (
         <ul className="rhythm-list">
-          {schedules.map((schedule) => {
+          {shown.map((schedule) => {
             const failing = Boolean(schedule.lastErrorCode);
+            const done = spent(schedule);
             return (
               <li key={schedule.id} className="rhythm" data-enabled={schedule.enabled}>
                 <span
@@ -90,14 +117,16 @@ export default function Rhythms({ schedules }: { schedules: readonly TaskSchedul
                 <span className="rhythm-when mono">
                   <span>{rhythmText(schedule.spec, Boolean(schedule.trigger))}</span>
                   <span className="faint">
-                    {schedule.enabled
-                      ? schedule.nextRunAt
-                        ? `next ${until(schedule.nextRunAt)}`
-                        : ''
-                      : 'paused'}
+                    {done
+                      ? 'done'
+                      : schedule.enabled
+                        ? schedule.nextRunAt
+                          ? `next ${until(schedule.nextRunAt)}`
+                          : ''
+                        : 'paused'}
                   </span>
                 </span>
-                <span className="rhythm-acts">
+                <span className="rhythm-acts" hidden={done}>
                   <button
                     type="button"
                     className="icon-btn"
@@ -125,7 +154,8 @@ export default function Rhythms({ schedules }: { schedules: readonly TaskSchedul
         </ul>
       ) : (
         <p className="pane-note">
-          Ask for anything on a rhythm (“every Monday, check…”) and it will stand here.
+          Ask for anything on a rhythm (“every Monday, check…”) or for a set time (“on Friday at
+          nine…”), or schedule it yourself, and it will stand here.
         </p>
       )}
     </section>

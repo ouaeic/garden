@@ -34,6 +34,7 @@ import {
   APPROVAL_RANK,
   SECURITY_MODE_FLOOR,
   DEFERRED_EXECUTION_ACTION,
+  mergeKeys,
   namedObjects,
   shellInvocation
 } from './approval-common.js';
@@ -87,11 +88,13 @@ const strongestRequirement = (
   if (!ordinary) return raised;
   const strongest =
     APPROVAL_RANK[ordinary.sideEffect] > APPROVAL_RANK[raised.sideEffect] ? ordinary : raised;
-  const { recovery: _recovery, taskGrant: _taskGrant, ...required } = strongest;
+  const { recovery: _recovery, taskGrant: _taskGrant, keys: _keys, ...required } = strongest;
   const taskGrant = mergeTaskApproval(raised.taskGrant, ordinary.taskGrant);
+  const keys = mergeKeys(raised.keys, ordinary.keys);
   return {
     ...required,
     ...(taskGrant ? { taskGrant } : {}),
+    ...(keys ? { keys } : {}),
     ...(raised.recovery && ordinary.recovery
       ? {
           recovery:
@@ -237,6 +240,15 @@ const serviceRequirement = (
           ? ` It listens on this computer only, so nothing off this machine can reach it directly.`
           : '';
   return {
+    // A service is a standing rule on this computer; one others can reach is also published.
+    ...(taintSources.length
+      ? {}
+      : {
+          keys:
+            bindReach === 'internet' || bindReach === 'estate'
+              ? (['rules', 'publish'] as const)
+              : (['rules'] as const)
+        }),
     sideEffect:
       taintSources.length || bindReach === 'internet' || bindReach === 'estate'
         ? 'external_consequential'
@@ -422,6 +434,7 @@ const ordinaryRequirement = (
   );
   if (deferred.length)
     return {
+      keys: ['rules'],
       sideEffect: 'external_consequential',
       action: DEFERRED_EXECUTION_ACTION,
       preview: `${namedObjects(deferred)} is executed by a later process - the login shell, git itself, or one of the coding CLIs, all of which run under the agent's own HOME - so whatever it says runs after this task, outside any approval this task could raise.`
@@ -431,12 +444,14 @@ const ordinaryRequirement = (
     .sort((left, right) => left.length - right.length);
   if (scheduled.length)
     return {
+      keys: ['rules'],
       sideEffect: 'external_consequential',
       action: DEFERRED_EXECUTION_ACTION,
       preview: `${namedObjects(scheduled)} is inside a directory a scheduler or an init system runs the contents of, so whatever it says runs on its own schedule after this task, outside any approval this task could raise.`
     };
   if (name === 'schedule' && textValue(args.action) !== 'list')
     return {
+      keys: ['rules'],
       sideEffect: 'external_reversible',
       action: `${textValue(args.action, 'Change')} scheduled work`,
       preview:
@@ -446,8 +461,12 @@ const ordinaryRequirement = (
     };
   if (name === 'memory') {
     const reason = memoryApprovalReason(args, now, context.taintSources ?? []);
+    // A credential is never memory's to keep, and a write in a tainted turn is not the owner's.
+    const lendable =
+      !(context.taintSources ?? []).length && !memoryCredentialScan(textValue(args.content)).length;
     if (reason)
       return {
+        ...(lendable ? { keys: ['rules'] as const } : {}),
         sideEffect: 'workspace_write',
         action: `Review long-term ${['replace', 'remove'].includes(textValue(args.action)) ? '' : `${textValue(args.target, 'workspace')} `}memory`,
         preview:
@@ -460,11 +479,13 @@ const ordinaryRequirement = (
   if (name === 'skill' && ['upsert', 'remove'].includes(textValue(args.action))) {
     if (textValue(args.action) === 'remove')
       return {
+        keys: ['rules'],
         sideEffect: 'workspace_write',
         action: `Review reusable skill ${textValue(args.id, 'change')}`,
         preview: `Remove skill ${textValue(args.id, 'unknown')}.`
       };
     return {
+      keys: ['rules'],
       sideEffect: 'workspace_write',
       action: skillUpsertAction(
         textValue(args.name, textValue(args.id, 'change')),
@@ -507,6 +528,7 @@ const ordinaryRequirement = (
     };
   if (name === 'coding_agent' && textValue(args.action) === 'run')
     return {
+      keys: ['act'],
       sideEffect: 'external_reversible',
       action: `Delegate repository work to ${codingAgentName(args.agent)}`,
       preview: `${textValue(args.prompt).slice(0, 2000)}\n\nThe selected subscription service can inspect and modify files inside this agent computer. garden keeps the process inside the workspace and records its bounded result.`
@@ -519,6 +541,7 @@ const ordinaryRequirement = (
     const label = textValue(args.label, 'App');
     const port = textValue(args.port, 'unknown');
     return {
+      keys: ['publish'],
       sideEffect: 'external_consequential',
       action: `Publish ${label} publicly`,
       preview: `Expose workspace port ${port} at a persistent public URL. Anyone with the URL can access the app until it is unpublished or revoked, and the URL answers only while something is still listening on that port.`
@@ -636,6 +659,11 @@ const ordinaryRequirement = (
       return null;
     if (definition?.sideEffect === 'delete' || definition?.sideEffect === 'write')
       return {
+        // Writing through a connected service is acting as the owner there; a delete is a removal.
+        keys:
+          definition.sideEffect === 'delete' && action !== 'mcp_call_tool'
+            ? ['act', 'remove']
+            : ['act'],
         sideEffect:
           definition.sideEffect === 'delete' ? 'external_consequential' : 'external_reversible',
         ...connectorApprovalCard(

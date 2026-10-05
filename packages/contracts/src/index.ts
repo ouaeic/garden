@@ -55,6 +55,20 @@ export const SecurityMode = z.enum(['review', 'balanced', 'autonomous']);
 export type SecurityMode = z.infer<typeof SecurityMode>;
 
 /**
+ * What the owner can lend beyond the security mode, one kind of consequence at a time.
+ *
+ * "Act as you" is not on this list because it already has a home: it is the Autonomous mode. These
+ * are the cards Autonomous still raises, grouped the way an owner thinks about them. A lent key
+ * removes a card only for actions the owner's own instruction asked for: a card raised because the
+ * turn read untrusted content names no key, so nothing a web page or an email says can spend one.
+ */
+export const OwnerKey = z.enum(['spend', 'publish', 'remove', 'rules']);
+export type OwnerKey = z.infer<typeof OwnerKey>;
+export const LentKeys = z.array(OwnerKey).max(4);
+export const UpdateLentKeysRequest = z.object({ lentKeys: LentKeys }).strict();
+export type UpdateLentKeysRequest = z.infer<typeof UpdateLentKeysRequest>;
+
+/**
  * Whether this conversation is allowed to change anything yet.
  *
  * `act` is every task garden has ever run, and it is the default everywhere by absence: a state
@@ -145,6 +159,8 @@ export const Workspace = z.object({
    */
   keyProtection: z.literal('hosted').default('hosted'),
   securityMode: SecurityMode.default('balanced'),
+  /** The keys new goals on this computer start with; a deal or the goal itself can change them. */
+  lentKeys: LentKeys.default([]),
   createdAt: IsoDate,
   updatedAt: IsoDate
 });
@@ -624,6 +640,7 @@ export const Task = z.object({
   pendingDeliveryCount: z.number().int().nonnegative().optional(),
   privacyRoute: PrivacyRoute,
   securityMode: SecurityMode.default('balanced'),
+  lentKeys: LentKeys.default([]),
   maxComputeCredits: z.number().nonnegative(),
   actualComputeCredits: z.number().nonnegative(),
   /** The task's own ceiling in real currency. Null when only the account-level caps apply. */

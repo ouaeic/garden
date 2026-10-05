@@ -220,6 +220,8 @@ const requiredApiTokenScope = (method: string, route: string): ApiTokenScope | u
    * every reason to know.
    */
   if (route === '/v1/tasks/:taskId/security-mode') return writing ? undefined : 'tasks:read';
+  // Lending a key is the same decision as choosing the mode, so a token is refused it the same way.
+  if (route === '/v1/tasks/:taskId/keys') return writing ? undefined : 'tasks:read';
   if (route === '/v1/tasks/:taskId/bundle' || route === '/v1/tasks/:taskId/directories')
     return 'files:read';
   if (route === '/v1/coding-missions/:missionId/review') return 'files:read';
@@ -252,7 +254,10 @@ const requiredApiTokenScope = (method: string, route: string): ApiTokenScope | u
      * Reading stays available for the same reason it does there: a client that may not change how
      * much a run asks still has every reason to know what it will ask.
      */
-    if (route === '/v1/workspaces/:workspaceId/security-mode')
+    if (
+      route === '/v1/workspaces/:workspaceId/security-mode' ||
+      route === '/v1/workspaces/:workspaceId/keys'
+    )
       return writing ? undefined : 'workspaces:read';
     if (
       [

@@ -197,17 +197,6 @@
   padding: 5px 10px;
   font-size: 12px;
 }
-.lock-line {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font: 11.5px var(--mono);
-  color: var(--ink-3);
-}
-.lock-line svg {
-  width: 12px;
-  height: 12px;
-}
 .caps {
   display: flex;
   flex-wrap: wrap;
@@ -259,6 +248,19 @@
   background: color-mix(in oklab, var(--leaf) 13%, transparent);
   color: var(--leaf);
   font: 11.5px var(--mono);
+}
+.loans .link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-2);
+  font: 12px var(--body);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.loans .link-button:hover {
+  color: var(--ink);
 }
 .loan svg {
   width: 11px;
@@ -314,4 +316,21 @@
     overflow: visible;
     padding-bottom: 170px;
   }
+}
+
+.key-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.key-note {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 13px;
+  line-height: 1.55;
 }

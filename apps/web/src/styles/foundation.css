@@ -39,6 +39,7 @@
 :root {
   --bg: #07120e;
   --bg-deep: #040b08;
+  --well: color-mix(in oklab, var(--bg-deep) 70%, transparent);
   --pane: rgba(6, 20, 14, 0.52);
   --pane-2: rgba(16, 38, 28, 0.5);
   --pane-solid: rgba(13, 29, 23, 0.94);
@@ -78,62 +79,64 @@
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme='dark']) {
-    --bg: #e4ece3;
-    --bg-deep: #d6e2d5;
-    --pane: rgba(255, 255, 255, 0.76);
-    --pane-2: rgba(255, 255, 255, 0.74);
-    --pane-solid: rgba(248, 251, 246, 0.96);
-    --card: #f9fbf7;
+    --bg: #9fc394;
+    --bg-deep: #8fb587;
+    --well: rgba(250, 253, 246, 0.42);
+    --pane: rgba(244, 250, 238, 0.74);
+    --pane-2: rgba(250, 253, 246, 0.84);
+    --pane-solid: rgba(246, 251, 241, 0.96);
+    --card: #f5faef;
     --line: rgba(22, 58, 38, 0.1);
     --line-2: rgba(22, 58, 38, 0.18);
     --ink: #0f2119;
     --ink-2: #2b3d32;
-    --ink-3: #3a4a40;
-    --leaf: #175d38;
+    --ink-3: #2c3b33;
+    --leaf: #155634;
     --leaf-2: #2b8a55;
     --on-leaf: #ffffff;
-    --bloom: #994d22;
-    --dew: #7f5a05;
-    --rose: #a63e3e;
-    --sky: #255f76;
+    --bloom: #763b1a;
+    --dew: #634604;
+    --rose: #813030;
+    --sky: #1f5164;
     --paper: #ffffff;
-    --light-a: #bfe6a9;
-    --light-b: #f7e3a3;
-    --light-c: #a9dccb;
+    --light-a: #fff1c2;
+    --light-b: #effbd8;
+    --light-c: #d5efb4;
     --light-d: #ffffff;
-    --canopy: rgba(40, 80, 50, 0.08);
-    --scrim: rgba(214, 226, 213, 0.6);
+    --canopy: rgba(24, 66, 36, 0.12);
+    --scrim: rgba(150, 190, 142, 0.55);
     --shadow: 0 40px 80px -45px rgba(25, 60, 40, 0.45);
     --lift: 0 24px 50px -28px rgba(25, 60, 40, 0.45);
     color-scheme: light;
   }
 }
 :root[data-theme='light'] {
-  --bg: #e4ece3;
-  --bg-deep: #d6e2d5;
-  --pane: rgba(255, 255, 255, 0.76);
-  --pane-2: rgba(255, 255, 255, 0.74);
-  --pane-solid: rgba(248, 251, 246, 0.96);
-  --card: #f9fbf7;
+  --bg: #9fc394;
+  --bg-deep: #8fb587;
+  --well: rgba(250, 253, 246, 0.42);
+  --pane: rgba(244, 250, 238, 0.74);
+  --pane-2: rgba(250, 253, 246, 0.84);
+  --pane-solid: rgba(246, 251, 241, 0.96);
+  --card: #f5faef;
   --line: rgba(22, 58, 38, 0.1);
   --line-2: rgba(22, 58, 38, 0.18);
   --ink: #0f2119;
   --ink-2: #2b3d32;
-  --ink-3: #3a4a40;
-  --leaf: #175d38;
+  --ink-3: #2c3b33;
+  --leaf: #155634;
   --leaf-2: #2b8a55;
   --on-leaf: #ffffff;
-  --bloom: #994d22;
-  --dew: #7f5a05;
-  --rose: #a63e3e;
-  --sky: #255f76;
+  --bloom: #763b1a;
+  --dew: #634604;
+  --rose: #813030;
+  --sky: #1f5164;
   --paper: #ffffff;
-  --light-a: #bfe6a9;
-  --light-b: #f7e3a3;
-  --light-c: #a9dccb;
+  --light-a: #fff1c2;
+  --light-b: #effbd8;
+  --light-c: #d5efb4;
   --light-d: #ffffff;
-  --canopy: rgba(40, 80, 50, 0.08);
-  --scrim: rgba(214, 226, 213, 0.6);
+  --canopy: rgba(24, 66, 36, 0.12);
+  --scrim: rgba(150, 190, 142, 0.55);
   --shadow: 0 40px 80px -45px rgba(25, 60, 40, 0.45);
   --lift: 0 24px 50px -28px rgba(25, 60, 40, 0.45);
   color-scheme: light;
@@ -206,8 +209,7 @@ a {
   font-weight: 340;
   text-wrap: balance;
 }
-.display em,
-.accent {
+.display em {
   font-style: italic;
   color: var(--leaf);
 }

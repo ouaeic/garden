@@ -728,6 +728,70 @@ const journeys = {
     );
   },
 
+  /** Every key can be lent, standing or to one goal, and taken back; none is locked. */
+  async keys({ page, origin, fixtures }) {
+    await page.goto(`${origin}/?view=keys`);
+    const rows = page.getByRole('region', { name: 'Standing keys' });
+    await rows.waitFor();
+    assert.equal(await page.getByText('Always asks you').count(), 0, 'No key is locked');
+    await page
+      .getByRole('group', { name: 'Publish, for new goals' })
+      .getByRole('button', { name: 'Lent by default' })
+      .click();
+    await page.waitForFunction(() =>
+      document.body.textContent?.includes('New goals start with this key')
+    );
+    assert.deepEqual([...fixtures.state.workspace.lentKeys].sort(), ['publish', 'spend']);
+    const loan = rows.getByRole('listitem').filter({ hasText: 'Lent to RNA-seq reanalysis' });
+    await loan.first().getByRole('button', { name: 'Take back' }).click();
+    await page.waitForFunction(() => document.body.textContent?.includes('Taken back'));
+    assert.deepEqual(fixtures.state.tasks[0].lentKeys, []);
+    await page.getByText(/never pass through a model/).waitFor();
+  },
+
+  /** The ask bar's options choose the model, effort, keys and cap without making the bar bigger. */
+  async options({ page, origin, fixtures }) {
+    await page.goto(`${origin}/?view=today`);
+    const bar = page.locator('form.ask');
+    const before = await bar.boundingBox();
+    await page.getByRole('button', { name: 'Options for this message' }).click();
+    const panel = page.getByRole('dialog', { name: 'Options for this message' });
+    await panel.waitFor();
+    await panel.getByRole('button', { name: 'May act as you' }).click();
+    await panel.getByRole('spinbutton').fill('7');
+    await page.keyboard.press('Escape');
+    await panel.waitFor({ state: 'detached' });
+    await page.getByRole('button', { name: /\$7 cap · May act as you/ }).waitFor();
+    const after = await bar.boundingBox();
+    assert.equal(Math.round(after.height), Math.round(before.height), 'The bar stays one line');
+    await page
+      .getByRole('textbox', { name: 'What should garden grow?' })
+      .fill('Draft the lab newsletter');
+    await page.getByRole('button', { name: 'Plant', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('#ask-input')?.value === '');
+    const sent = fixtures.state.created.at(-1);
+    assert.equal(sent.securityMode, 'autonomous');
+    assert.equal(sent.maxSpendUsd, 7);
+    // On a phone the hint stays one line however long it is, and attaching moves into the options.
+    await page.setViewportSize({ width: 320, height: 760 });
+    await page.goto(`${origin}/?goal=${fixtures.id(1)}`);
+    const field = page.locator('form.ask .ask-field');
+    await field.waitFor();
+    assert.ok((await field.boundingBox()).height < 64, 'The phone bar stays one line');
+    await page.getByRole('button', { name: 'Options for this message' }).click();
+    await panel.getByRole('button', { name: 'Attach files' }).waitFor();
+  },
+
+  /** Something can be set for one time as well as on a rhythm, and scheduled from the desk. */
+  async scheduling({ page, origin }) {
+    await page.goto(`${origin}/?view=today`);
+    const rhythms = page.getByRole('region', { name: 'Rhythms' });
+    await rhythms.getByText(/^Once · /).waitFor();
+    await rhythms.getByText('1 set for later', { exact: false }).waitFor();
+    await rhythms.getByRole('button', { name: 'Schedule', exact: true }).click();
+    await page.getByRole('dialog', { name: 'New automation' }).waitFor();
+  },
+
   /** Day and night switch at once and are remembered on this device. */
   async theme({ page, origin }) {
     await page.goto(`${origin}/?view=today`);

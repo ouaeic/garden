@@ -198,6 +198,8 @@ export const money = (value: number): string =>
   new Intl.NumberFormat(undefined, {
     style: 'currency',
     currency: 'USD',
+    // Every cost is in dollars; a locale that would write "US$" says nothing more than "$".
+    currencyDisplay: 'narrowSymbol',
     maximumFractionDigits: value > 0 && value < 0.01 ? 4 : 2
   }).format(value);
 export const bytes = (value: number): string =>

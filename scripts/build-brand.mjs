@@ -1,10 +1,11 @@
 /**
- * Every icon, cut from the wordmark's own g, in leaf on the night garden.
+ * Every icon: one leaf, in the wordmark's colour, on the night garden.
  *
- * The outline comes from apps/web/src/app/wordmark-outline.ts, the same one the header draws, so
- * the icon and the word are one letterform. The g is a fine monoline, so small icons get a little
- * of its own colour stroked around it to stay a g at tab size. Writes the web icons, the native
- * sources, and then runs the native icon generator over them.
+ * The word is the mark wherever there is room for a word; where there is only a square - a tab, a
+ * dock, a home screen - a single leaf stands for it, drawn in the colour the word is written in at
+ * night. Small icons get a little of the leaf's own colour stroked around it so it keeps its shape
+ * at tab size. Also writes the wordmark as a file for the screens drawn outside the web client,
+ * and then runs the native icon generator over the native sources.
  *
  *   node scripts/build-brand.mjs
  */
@@ -19,13 +20,17 @@ const tokens = await readFile(root + 'apps/web/src/styles/foundation.css', 'utf8
 const token = (name) => tokens.match(new RegExp(`${name}:\\s*(#[\\da-f]{6});`, 'i'))?.[1];
 const night = token('--bg');
 const card = token('--card');
-const leaf = token('--leaf');
-assert(night && card && leaf, 'The mark takes its colours from the night theme');
+const lit = token('--light-a');
+const ink = token('--ink');
+assert(night && card && ink && lit, 'The mark takes its colours from the night theme');
+
+// The leaf, on a 100-unit square: base low on the left, tip high on the right, a vein down its
+// middle and a short stem. The vein is cut out of the leaf so it shows whatever is behind it.
+const LEAF = 'M27 81C21 55 39 27 79 16C83 48 63 77 27 81Z';
+const VEIN = 'M33 75C44 62 55 48 66 31';
+const STEM = 'M28 80C25 84 22 86.5 18 88.5';
 const outline = await readFile(root + 'apps/web/src/app/wordmark-outline.ts', 'utf8');
-const field = (name) => outline.match(new RegExp(`${name}: '([^']+)'`))?.[1];
-const g = field('g');
-const gViewBox = field('gViewBox');
-assert(g && gViewBox, 'The wordmark outline must carry its g');
+const field = (name) => outline.match(new RegExp(`${name}:\\s*'([^']+)'`))?.[1];
 const [viewBox, word, tendril, cut] = ['viewBox', 'word', 'tendril', 'cut'].map(field);
 assert(viewBox && word && tendril && cut, 'The wordmark outline must carry the whole word');
 
@@ -39,7 +44,7 @@ const browser = await chromium.launch({ headless: true });
  */
 async function render(
   size,
-  { ink = leaf, tile = true, inset = 0, radius = 0, scale = 0.74, weight = 0.6 } = {}
+  { color = ink, tile = true, inset = 0, radius = 0, scale = 0.72, weight = 0 } = {}
 ) {
   const page = await browser.newPage({ viewport: { width: size, height: size } });
   try {
@@ -48,10 +53,14 @@ async function render(
       html, body { margin: 0; background: transparent; }
       .tile { position: absolute; left: ${size * inset}px; top: ${size * inset}px; width: ${box}px; height: ${box}px;
         border-radius: ${box * radius}px; display: grid; place-items: center; overflow: hidden;
-        background: ${tile ? `radial-gradient(120% 90% at 30% 15%, ${card}, ${night} 70%)` : 'transparent'}; }
+        background: ${tile ? `radial-gradient(120% 95% at 28% 12%, color-mix(in srgb, ${lit} 62%, ${card}), ${card} 52%, ${night} 88%)` : 'transparent'}; }
       svg { height: ${box * scale}px; width: auto; overflow: visible; }
-    </style><div class="tile"><svg viewBox="${gViewBox}"><path d="${g}" fill="${ink}" stroke="${ink}"
-      stroke-width="${weight}" stroke-linejoin="round"/></svg></div>`);
+    </style><div class="tile"><svg viewBox="8 8 84 84"><defs><mask id="vein" maskUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="100" height="100" fill="#fff"/><path d="${VEIN}" fill="none" stroke="#000"
+      stroke-width="${2.2 + weight / 2}" stroke-linecap="round"/></mask></defs>
+      <path d="${LEAF}" fill="${color}" stroke="${color}" stroke-width="${weight}" stroke-linejoin="round" mask="url(#vein)"/>
+      <path d="${STEM}" fill="none" stroke="${color}" stroke-width="${4.2 + weight}" stroke-linecap="round"/>
+      </svg></div>`);
     return await page.screenshot({ omitBackground: true, type: 'png' });
   } finally {
     await page.close();
@@ -61,17 +70,14 @@ async function render(
 const write = (path, bytes) => writeFile(root + path, bytes);
 try {
   // Installed web icons fill their square; the system rounds them. The maskable one keeps the
-  // letter inside the safe circle, and the favicon is a rounded tile small enough for a tab.
-  await write('apps/web/public/brand/garden-icon-192.png', await render(192, { weight: 1.2 }));
+  // leaf inside the safe circle, and the favicon is a rounded tile small enough for a tab.
+  await write('apps/web/public/brand/garden-icon-192.png', await render(192, { weight: 1 }));
   await write('apps/web/public/brand/garden-icon-512.png', await render(512));
-  await write(
-    'apps/web/public/brand/garden-maskable-512.png',
-    await render(512, { scale: 0.6, weight: 0.9 })
-  );
-  await write('apps/web/public/brand/garden-apple-touch.png', await render(180, { weight: 1.2 }));
+  await write('apps/web/public/brand/garden-maskable-512.png', await render(512, { scale: 0.56 }));
+  await write('apps/web/public/brand/garden-apple-touch.png', await render(180, { weight: 1 }));
   await write(
     'apps/web/public/brand/garden-favicon.png',
-    await render(64, { radius: 0.24, scale: 0.8, weight: 2.2 })
+    await render(64, { radius: 0.24, scale: 0.8, weight: 3 })
   );
   // A desktop icon sits on the platform's grid: a rounded tile inset from the canvas edge.
   await write(
@@ -80,7 +86,7 @@ try {
   );
   await write(
     'apps/desktop/src-tauri/icons/garden-monochrome.png',
-    await render(1024, { ink: '#ffffff', tile: false, scale: 0.7 })
+    await render(1024, { color: '#ffffff', tile: false, scale: 0.66 })
   );
 } finally {
   await browser.close();

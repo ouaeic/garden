@@ -1,5 +1,5 @@
 /** Shared approval facts and presentation bounds; no authority is derived here. */
-import { type TaskApprovalScope } from '@garden/contracts';
+import { type OwnerKey, type TaskApprovalScope } from '@garden/contracts';
 import { type ResolvedMediaModel } from './media.js';
 import { textValue } from './values.js';
 
@@ -38,7 +38,32 @@ export interface ApprovalRequirement {
   preview: string;
   /** Reject this proposal and let Autonomous try a separately checked alternative. */
   recovery?: 'verify_public_source' | 'separate_network_steps' | 'use_explicit_cwd';
+  /**
+   * The owner's keys that answer this card in advance, all of them needed. Absent means no key
+   * does: a card about untrusted content, a hand-off, or a check on the agent's own machinery.
+   */
+  keys?: readonly CardKey[];
 }
+
+/** An owner key, or "act": acting as the owner, which the Autonomous mode lends. */
+export type CardKey = OwnerKey | 'act';
+
+/** A requirement answered by keys - every one it names - that the owner has lent this goal. */
+export const lentKeysCover = (
+  requirement: Pick<ApprovalRequirement, 'keys'>,
+  lent: { securityMode: string; lentKeys?: readonly OwnerKey[] }
+): boolean =>
+  Boolean(requirement.keys?.length) &&
+  requirement.keys!.every((key) =>
+    key === 'act' ? lent.securityMode === 'autonomous' : (lent.lentKeys ?? []).includes(key)
+  );
+
+/** Two cards that merge keep a key only when both sides name one: an unkeyed side stays unkeyed. */
+export const mergeKeys = (
+  left: ApprovalRequirement['keys'],
+  right: ApprovalRequirement['keys']
+): ApprovalRequirement['keys'] =>
+  left?.length && right?.length ? [...new Set([...left, ...right])] : undefined;
 
 export const APPROVAL_RANK: Record<ApprovalRequirement['sideEffect'], number> = {
   workspace_write: 0,

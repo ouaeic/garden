@@ -1,13 +1,9 @@
-import type { Task } from '@garden/contracts';
-import { accept } from '../app/actions';
-import { ago, beds, dayStamp, money, verdict } from '../app/derive';
-import { Check, Sprout } from '../app/icons';
-import { go, openGoal } from '../app/route';
+import { beds, dayStamp, verdict } from '../app/derive';
+import { Sprout } from '../app/icons';
+import { go } from '../app/route';
 import { primaryWorkspace, useGarden } from '../app/store';
-import { toast } from '../app/toast';
 import GoalRow from './GoalRow';
 import Moves from './Moves';
-import Plant from './Plant';
 import Rhythms from './Rhythms';
 import ServerPane from './ServerPane';
 import { askExample } from '../ask/ask-bus';
@@ -82,9 +78,9 @@ export default function Today({ catchUp }: { catchUp: boolean }) {
               <h2 id="ready-title">Ready for you</h2>
               <span className="count">{ready.length}</span>
             </div>
-            <ul className="ready-list">
-              {ready.slice(0, 8).map((task, index) => (
-                <ReadyItem key={task.id} task={task} index={index} />
+            <ul className="goal-rows rise" style={{ '--i': 3 } as React.CSSProperties}>
+              {ready.slice(0, 8).map((task) => (
+                <GoalRow key={task.id} task={task} moves={moves} />
               ))}
             </ul>
           </section>
@@ -100,53 +96,6 @@ export default function Today({ catchUp }: { catchUp: boolean }) {
         />
       </aside>
     </div>
-  );
-}
-
-function ReadyItem({ task, index }: { task: Task; index: number }) {
-  const verified = task.activity?.ending?.verification === 'verified';
-  const steps = task.activity?.stepsTotal ?? 0;
-  return (
-    <li className="ready-item rise" style={{ '--i': index + 3 } as React.CSSProperties}>
-      <button type="button" className="ready-open" onClick={() => openGoal(task.id, 'glance')}>
-        <Plant
-          className="ready-plant"
-          seed={task.id}
-          total={Math.max(3, Math.min(steps, 9))}
-          done={Math.max(3, Math.min(steps, 9))}
-          current={false}
-          bloom
-          needs={false}
-        />
-        <span className="ready-text">
-          <span className="ready-title">{task.title}</span>
-          <span className="ready-line">{task.activity?.latest || 'Finished.'}</span>
-          <span className="ready-proofs">
-            {verified && (
-              <span className="proof">
-                <Check /> Checked
-              </span>
-            )}
-            <span className="faint mono">
-              {ago(task.completedAt)} · {money(task.spentUsd)}
-            </span>
-          </span>
-        </span>
-      </button>
-      <button
-        type="button"
-        className="btn ghost small"
-        onClick={() =>
-          void accept(task.id).then(() =>
-            toast(`Accepted “${task.title}”.`, {
-              action: { label: 'Undo', run: () => void accept(task.id, false) }
-            })
-          )
-        }
-      >
-        Accept
-      </button>
-    </li>
   );
 }
 

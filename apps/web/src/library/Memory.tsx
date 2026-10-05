@@ -185,7 +185,7 @@ export function MemoryLibrary({
                         ? 'About you'
                         : memory.workspaceId === workspace.id
                           ? 'Shared memory'
-                          : 'This project'}{' '}
+                          : 'Goal memory'}{' '}
                       · {memory.status} · {memory.source}
                       {memory.validUntil && ` · expires ${date(memory.validUntil)}`}
                     </p>
@@ -199,7 +199,7 @@ export function MemoryLibrary({
                     <Button onClick={() => setEditing(memory)}>Edit</Button>
                     <ConfirmButton
                       label="Forget"
-                      description="Remove this saved fact from memory. Future tasks will no longer recall it."
+                      description="Remove this saved fact from memory. Future goals will no longer recall it."
                       action={async () => {
                         await del(`${memoryRoot(memory)}/memories/${memory.id}`);
                         memories.refresh();
