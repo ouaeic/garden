@@ -168,6 +168,10 @@ test('certificate confinement refusal reaches the remaining checks under dash an
     '#!/bin/sh\nprintf "%s\\n" "$@" > "$SYSTEMCTL_RECEIPT"\nprintf "%s" "$SYSTEMCTL_REPLY"\n',
     { mode: 0o700 }
   );
+  // nginx stands in for the test every renewal ends on; NGINX_STATUS decides whether it can run.
+  writeFileSync(join(directory, 'nginx'), '#!/bin/sh\nexit "${NGINX_STATUS:-0}"\n', {
+    mode: 0o700
+  });
   const denied = join(directory, 'denied-directory');
   mkdirSync(denied);
   const env = {
@@ -198,6 +202,10 @@ test('certificate confinement refusal reaches the remaining checks under dash an
   const disconnected = run('dash', ['-c', script], { env: { ...env, SYSTEMCTL_REPLY: '' } });
   assert.equal(disconnected.status, 1, output(disconnected));
   assert.match(disconnected.stderr, /systemctl can no longer reach the manager/);
+
+  const untestable = run('dash', ['-c', script], { env: { ...env, NGINX_STATUS: '1' } });
+  assert.equal(untestable.status, 1, output(untestable));
+  assert.match(untestable.stderr, /nginx cannot test its configuration from here/);
 });
 
 test('pnpm native build commands deliver the exact bundle, simulator and APK flags to Tauri', (t) => {

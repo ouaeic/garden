@@ -96,6 +96,66 @@ fi
 grep -q 'the served certificate is still valid until' "$state/certificate.error"
 printf 'ok  a due certificate that cannot be reissued records the remaining validity\n'
 
+# The renewal of 5 Oct 2026: the authority issued a good certificate, nginx refused it for a reason
+# of its own (a sandbox that could not open its pid file), and every retry asked the authority for
+# another until its weekly limit ran out. The refusal must say what nginx said, the issued
+# certificate must be kept, and the next attempt must install it without asking for a new one.
+openssl req -newkey rsa:2048 -nodes -keyout "$config/tls/server.key" -out "$authority/identity.csr" \
+  -subj '/CN=garden.test' >/dev/null 2>&1
+openssl x509 -req -in "$authority/identity.csr" -CA "$authority/ca.crt" -CAkey "$authority/ca.key" \
+  -CAcreateserial -days 2 -extfile "$authority/extensions" -out "$config/tls/server.crt" \
+  >/dev/null 2>&1
+printf 'ACME_ENABLED=true\nACME_EMAIL=owner@garden.test\nACME_INCLUDE_IPS=false\nPUBLIC_APP_URL=https://garden.test\n' \
+  >"$config/control.env"
+mkdir -p "$test_root/snippets"
+issued="$test_root/issued"
+: >"$issued"
+make_fake lego "
+if [ \"\${1:-}\" = --version ]; then printf 'lego version 5.3.1 linux/amd64\\n'; exit 0; fi
+printf 'issued\\n' >>'$issued'
+while [ \$# -gt 0 ]; do
+  case \"\$1\" in
+    --path) out=\"\$2/certificates\"; shift 2 ;;
+    --private-key) key=\"\$2\"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+mkdir -p \"\$out\"
+openssl req -new -key \"\$key\" -subj /CN=garden.test -out \"\$out/request.csr\" 2>/dev/null
+openssl x509 -req -in \"\$out/request.csr\" -CA '$authority/ca.crt' -CAkey '$authority/ca.key' \\
+  -CAcreateserial -days 90 -extfile '$authority/extensions' -out \"\$out/garden.test.crt\" 2>/dev/null"
+make_fake nginx "
+if [ -e '$test_root/nginx-refuses' ]; then
+  printf 'nginx: the configuration file /etc/nginx/nginx.conf syntax is ok\\n' >&2
+  printf '2026/10/05 12:33:46 [emerg] 1#1: open() \"/run/nginx.pid\" failed (30: Read-only file system)\\n' >&2
+  printf 'nginx: configuration file /etc/nginx/nginx.conf test failed\\n' >&2
+  exit 1
+fi
+exit 0"
+renew_with_lego() {
+  GARDEN_LEGO="$fake_bin/lego" GARDEN_ROOT="$repository_root" \
+    GARDEN_NGINX_SNIPPETS="$test_root/snippets" run_certificate renew
+}
+served_before=$(openssl x509 -in "$config/tls/server.crt" -noout -serial)
+: >"$test_root/nginx-refuses"
+if renew_with_lego >/dev/null 2>&1; then
+  printf 'a certificate nginx refused was reported as installed\n' >&2
+  exit 1
+fi
+grep -q 'open() "/run/nginx.pid" failed (30: Read-only file system)' "$state/certificate.error"
+test "$(openssl x509 -in "$config/tls/server.crt" -noout -serial)" = "$served_before"
+test -s "$state/certificate.pending"
+test "$(grep -c issued "$issued")" -eq 1
+printf 'ok  a refused certificate says why nginx refused it, and is kept rather than thrown away\n'
+
+rm -f "$test_root/nginx-refuses"
+renew_with_lego >/dev/null 2>&1
+test "$(grep -c issued "$issued")" -eq 1
+test "$(openssl x509 -in "$config/tls/server.crt" -noout -serial)" != "$served_before"
+test ! -e "$state/certificate.pending"
+test ! -e "$state/certificate.error"
+printf 'ok  the next attempt installs the kept certificate without asking the authority again\n'
+
 # Turning automatic issuance off must not leave an alarm about a job that no longer runs.
 printf 'boom\n' >"$state/certificate.error"
 run_certificate disable >/dev/null 2>&1 || true

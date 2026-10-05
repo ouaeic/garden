@@ -6,7 +6,10 @@ Wants=network-online.target
 # back online with DNS or its uplink not settled, which the next few minutes usually fix; waiting
 # for the six-hourly tick instead means hours of browser warnings for a fault that cleared almost
 # immediately.
-StartLimitIntervalSec=1h
+# The window has to hold all four: an attempt can run for its whole quarter-hour timeout before
+# the quarter-hour wait, so four attempts span up to two hours, and a one-hour window never sees
+# more than four starts - which retried forever instead of stopping.
+StartLimitIntervalSec=3h
 StartLimitBurst=4
 # A renewal that keeps failing is invisible: the served certificate simply expires and every
 # client gets a full-page warning with nothing said to the owner. This records the failure where
@@ -43,3 +46,9 @@ ReadWritePaths=/etc/garden
 ReadWritePaths=/etc/nginx/snippets
 ReadWritePaths=/var/lib/garden
 ReadWritePaths=/usr/local/lib/garden
+# `nginx -t`, which decides whether a new certificate may be served, opens nginx's pid file and its
+# logs before it says anything about the configuration. Read-only, it refuses every certificate.
+# The pid file is named rather than /run. Both are optional, so a box whose nginx is down or not
+# yet installed still starts the unit, and the test then fails for that reason instead.
+ReadWritePaths=-/run/nginx.pid
+ReadWritePaths=-/var/log/nginx
