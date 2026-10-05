@@ -73,14 +73,14 @@ export function SpendingSettings({ onChange }: { onChange: () => void }) {
             {(['byDay', 'byModel', 'byTask'] as const).map((key) => (
               <details key={key}>
                 <summary>
-                  {key === 'byDay' ? 'Daily history' : key === 'byModel' ? 'By model' : 'By task'}
+                  {key === 'byDay' ? 'Daily history' : key === 'byModel' ? 'By model' : 'By goal'}
                 </summary>
                 {spend.value![key].length ? (
                   <div className="management-scroll">
                     <table className="management-table">
                       <thead>
                         <tr>
-                          <th>{key === 'byDay' ? 'Day' : key === 'byModel' ? 'Model' : 'Task'}</th>
+                          <th>{key === 'byDay' ? 'Day' : key === 'byModel' ? 'Model' : 'Goal'}</th>
                           <th>Cost</th>
                         </tr>
                       </thead>
@@ -168,7 +168,7 @@ export function SpendingSettings({ onChange }: { onChange: () => void }) {
                   placeholder="No cap"
                 />
               </Field>
-              <Field label="Default per-task cap · USD">
+              <Field label="Each new goal · USD">
                 <input
                   name="task"
                   type="number"

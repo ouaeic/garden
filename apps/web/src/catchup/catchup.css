@@ -22,13 +22,16 @@
 }
 .catchup-card header {
   display: flex;
-  align-items: flex-end;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 10px;
 }
-.catchup-plant {
-  width: 70px;
-  height: 78px;
+/* The same small growth mark the desk's rows carry. */
+.catchup-mark {
   flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  color: var(--glow);
 }
 .catchup-card h3 {
   margin: 8px 0 0;

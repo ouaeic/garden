@@ -213,7 +213,7 @@ export default function Shell() {
             {route.view === 'goal' && route.goal && <Goal id={route.goal} zoom={route.zoom} />}
             {route.view === 'keys' && <Keys />}
             {route.view === 'record' && <Record />}
-            {route.view === 'computer' && <ComputerView tab={route.tab} />}
+            {route.view === 'computer' && <ComputerView tab={route.tab} section={route.section} />}
             {route.view === 'settings' && <SettingsView section={route.section} />}
           </Suspense>
         </ViewBoundary>

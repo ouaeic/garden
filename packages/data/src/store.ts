@@ -1114,6 +1114,14 @@ export class DataStore {
     return this.#tasks.updateTaskSecurityMode(...args);
   }
 
+  updateTaskLentKeys(...args: Parameters<TaskStore['updateTaskLentKeys']>) {
+    return this.#tasks.updateTaskLentKeys(...args);
+  }
+
+  updateWorkspaceLentKeys(...args: Parameters<WorkspaceStore['updateWorkspaceLentKeys']>) {
+    return this.#workspaces.updateWorkspaceLentKeys(...args);
+  }
+
   updateWorkspaceSecurityMode(...args: Parameters<WorkspaceStore['updateWorkspaceSecurityMode']>) {
     return this.#workspaces.updateWorkspaceSecurityMode(...args);
   }

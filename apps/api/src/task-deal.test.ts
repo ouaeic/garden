@@ -183,6 +183,63 @@ describe('planting a deal', () => {
     expect(prompt).toContain('Do my taxes and apply to jobs');
   });
 
+  it('lends the keys it was given to every goal it plants, and says so to each', async () => {
+    const f = await fixture();
+    const response = await f.app.inject({
+      method: 'POST',
+      url: `/v1/tasks/${f.task.id}/deal`,
+      payload: {
+        questionId: f.questionId,
+        answers: ['', ''],
+        goals: [0, 1],
+        actAsYou: false,
+        keys: ['publish', 'rules'],
+        capsUsd: [6, 10]
+      }
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    const { taskIds } = response.json<{ taskIds: string[] }>();
+    for (const id of taskIds) {
+      const planted = (await store.getTask(f.user.id, id))!;
+      expect([...planted.lentKeys].sort()).toEqual(['publish', 'rules']);
+    }
+    const sibling = (await store.getTask(f.user.id, taskIds[1]!))!;
+    const prompt = decryptJson<{ prompt: string }>(sibling.promptCiphertext, key).prompt;
+    expect(prompt).toContain('Also lent without asking: publishing and deploying');
+  });
+
+  it('changes one goal’s keys, and starts new goals with the ones the computer lends', async () => {
+    const f = await fixture();
+    const changed = await f.app.inject({
+      method: 'PATCH',
+      url: `/v1/tasks/${f.task.id}/keys`,
+      payload: { lentKeys: ['remove'] }
+    });
+    expect(changed.statusCode, changed.body).toBe(200);
+    expect((await store.getTask(f.user.id, f.task.id))!.lentKeys).toEqual(['remove']);
+    const refused = await f.app.inject({
+      method: 'PATCH',
+      url: `/v1/tasks/${f.task.id}/keys`,
+      payload: { lentKeys: ['accounts'] }
+    });
+    // A key that does not exist is refused, and the goal keeps what it had.
+    expect(refused.statusCode).not.toBe(200);
+    expect((await store.getTask(f.user.id, f.task.id))!.lentKeys).toEqual(['remove']);
+
+    await store.updateWorkspaceLentKeys(f.user.id, f.task.workspaceId, ['spend', 'rules']);
+    const next = await store.createTask({
+      userId: f.user.id,
+      workspaceId: f.task.workspaceId,
+      modelId: 'model',
+      privacyRoute: 'provider_zdr',
+      maxComputeCredits: 4,
+      titleCiphertext: encryptJson({ title: 'Next' }, key, `task-title:${f.task.workspaceId}`),
+      promptCiphertext: encryptJson({ prompt: 'x' }, key, `task-prompt:${f.task.workspaceId}`),
+      nameIndex: { nameTokens: '', openingTokens: '' }
+    });
+    expect([...next.lentKeys].sort()).toEqual(['rules', 'spend']);
+  });
+
   it('refuses a deal that is no longer waiting, and a goal it never proposed', async () => {
     const f = await fixture();
     const unknownGoal = await f.app.inject({

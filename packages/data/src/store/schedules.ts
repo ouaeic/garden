@@ -670,10 +670,11 @@ export class ScheduleStore {
         // run exists without its provenance, and the sidebar reads tasks, not runs.
         `INSERT INTO tasks(
           id,user_id,workspace_id,title,status,model_id,privacy_route,max_compute_credits,
-          prompt_ciphertext,security_mode,completed_at,max_spend_usd,schedule_id
+          prompt_ciphertext,security_mode,completed_at,max_spend_usd,schedule_id,lent_keys
          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,
            (SELECT security_mode FROM workspaces WHERE id=$3),
-           CASE WHEN $5='failed' THEN NOW() ELSE NULL END,$10,$11) RETURNING *`,
+           CASE WHEN $5='failed' THEN NOW() ELSE NULL END,$10,$11,
+           (SELECT lent_keys FROM workspaces WHERE id=$3)) RETURNING *`,
         [
           input.taskId,
           schedule.user_id,

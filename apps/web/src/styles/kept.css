@@ -82,8 +82,7 @@ a.button.primary {
   color: var(--bg);
   border-color: transparent;
 }
-.button.danger,
-.button.destructive {
+.button.danger {
   color: var(--rose);
   border-color: color-mix(in oklab, var(--rose) 45%, transparent);
   background: color-mix(in oklab, var(--rose) 10%, transparent);
@@ -145,10 +144,6 @@ a.button.primary {
 }
 .section-heading :where(h2, h3) {
   margin: 0;
-}
-.section-intro p {
-  max-width: 640px;
-  color: var(--ink-2);
 }
 .field {
   display: flex;

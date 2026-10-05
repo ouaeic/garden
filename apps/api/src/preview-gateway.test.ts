@@ -39,6 +39,7 @@ const workspace: WorkspaceRecord = {
   region: 'self-hosted',
   keyProtection: 'hosted',
   securityMode: 'balanced',
+  lentKeys: [],
   runnerRef: null,
   computeMeteredAt: null,
   createdAt: now,

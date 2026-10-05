@@ -136,6 +136,7 @@ export const taskResponse = (
     : { pendingDeliveryCount: task.pendingDeliveryCount }),
   privacyRoute: task.privacyRoute as TaskPage['tasks'][number]['privacyRoute'],
   securityMode: task.securityMode,
+  lentKeys: task.lentKeys ?? [],
   maxComputeCredits: task.maxComputeCredits,
   actualComputeCredits: task.actualComputeCredits,
   maxSpendUsd: task.maxSpendUsd,
@@ -228,6 +229,7 @@ export const workspaceResponse = (
   region: workspace.region,
   keyProtection: workspace.keyProtection,
   securityMode: workspace.securityMode,
+  lentKeys: workspace.lentKeys ?? [],
   createdAt: workspace.createdAt,
   updatedAt: workspace.updatedAt
 });

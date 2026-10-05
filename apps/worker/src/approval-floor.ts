@@ -34,7 +34,7 @@ import { pinMediaGenerationApproval } from './media-approval.js';
 import { computationApproval } from './computation-approval.js';
 import { jobRecoveryApproval } from './job-recovery-approval.js';
 import { processInputApproval } from './process-input-approval.js';
-import { SECURITY_MODE_FLOOR } from './approval-common.js';
+import { SECURITY_MODE_FLOOR, lentKeysCover } from './approval-common.js';
 import {
   currentTranscriptionCredential,
   pinTranscriptionApproval
@@ -322,6 +322,9 @@ export const approvalForCall = async (
     ...undoPointFor(state),
     ...deps.destinationContext(state)
   });
+  // A card every key of which the owner has lent this goal is answered already. Its receipt is
+  // written by the dispatch, beside the cards the owner answered by hand.
+  if (declared && lentKeysCover(declared, task)) return null;
   if (declared && transcription?.credential) {
     if (!state)
       throw new GardenError(

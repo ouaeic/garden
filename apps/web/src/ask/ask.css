@@ -121,8 +121,22 @@
   color: var(--ink);
   font: 16px/1.4 var(--body);
 }
-.ask textarea::placeholder {
+.ask-input {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-self: center;
+}
+.ask-hint {
+  position: absolute;
+  inset: 9px 0 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--ink-3);
+  font: 16px/1.4 var(--body);
+  pointer-events: none;
 }
 .ask .icon-btn {
   width: 40px;
@@ -165,4 +179,94 @@
   .ask-mark {
     display: none;
   }
+}
+.ask-attach-row {
+  display: none;
+  justify-self: start;
+}
+@media (max-width: 480px) {
+  .ask-field {
+    gap: 4px;
+  }
+  .ask .ask-attach {
+    display: none;
+  }
+  .ask-attach-row {
+    display: inline-flex;
+  }
+  .ask .icon-btn {
+    width: 36px;
+  }
+}
+
+/* Options for one message, floated above the bar so the bar itself never grows. */
+.ask-options {
+  position: absolute;
+  right: 8px;
+  bottom: calc(100% + 52px);
+  z-index: 2;
+  display: grid;
+  gap: 14px;
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(70vh, 520px);
+  overflow: auto;
+  padding: 16px;
+  background: var(--pane-solid);
+  box-shadow: var(--shadow);
+  animation: rise 0.3s var(--ease) both;
+}
+.ask-option {
+  display: grid;
+  gap: 7px;
+}
+.ask-option > span:first-child {
+  font: 500 11px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.ask-option select {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line-2);
+  background: var(--pane-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13.5px;
+}
+.ask-option .seg {
+  flex-wrap: wrap;
+}
+.ask-money {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line-2);
+  background: var(--pane-2);
+  color: var(--ink-2);
+}
+.ask-money input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: 13.5px var(--mono);
+  outline: none;
+}
+.ask-check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.ask-check input {
+  accent-color: var(--leaf);
+}
+.ask-tune[aria-expanded='true'] {
+  color: var(--leaf);
 }

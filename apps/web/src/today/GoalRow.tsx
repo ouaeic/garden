@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import type { OwnerMove, Task } from '@garden/contracts';
-import { approve, raiseCapAndResume } from '../app/actions';
+import { accept, approve, raiseCapAndResume } from '../app/actions';
 import {
   GROWTH_COLOR,
   GROWTH_WORD,
+  ago,
   goalLine,
   growth,
   leaves,
@@ -11,7 +12,7 @@ import {
   movesFor,
   raisedCap
 } from '../app/derive';
-import { Sprout } from '../app/icons';
+import { Bloom, Check, Sprout } from '../app/icons';
 import { openDeal, openGoal } from '../app/route';
 import { toast } from '../app/toast';
 
@@ -22,7 +23,10 @@ import { toast } from '../app/toast';
 export default function GoalRow({ task, moves }: { task: Task; moves: readonly OwnerMove[] }) {
   const state = growth(task, moves);
   const grown = leaves(task);
-  const line = goalLine(task, moves);
+  const ready = state === 'ready';
+  // A finished goal is described by what it ended with; one still growing, by what it needs or does.
+  const line = ready ? task.activity?.latest || goalLine(task, moves) : goalLine(task, moves);
+  const verified = task.activity?.ending?.verification === 'verified';
   return (
     <li
       className="goal-row"
@@ -33,29 +37,63 @@ export default function GoalRow({ task, moves }: { task: Task; moves: readonly O
       <button
         type="button"
         className="goal-row-open"
-        onClick={() => openGoal(task.id)}
+        onClick={() => openGoal(task.id, ready ? 'glance' : 'look')}
         aria-label={`${task.title}. ${GROWTH_WORD[state]}. ${line}`}
       >
-        <Sprout className="goal-row-mark" />
+        {ready ? <Bloom className="goal-row-mark" /> : <Sprout className="goal-row-mark" />}
         <span className="goal-row-title">{task.title}</span>
         <span className="goal-row-line">{line}</span>
-        <span className="goal-row-pips" aria-hidden="true">
-          {Array.from({ length: grown.total }, (_, i) => (
-            <span
-              key={i}
-              className={`pip ${i < grown.done ? 'is-done' : i === grown.done && grown.current ? 'is-drafted' : ''}`}
-            />
-          ))}
-        </span>
+        {ready ? (
+          <span className="goal-row-proof">
+            {verified && (
+              <span className="proof">
+                <Check /> Checked
+              </span>
+            )}
+          </span>
+        ) : (
+          <span className="goal-row-pips" aria-hidden="true">
+            {Array.from({ length: grown.total }, (_, i) => (
+              <span
+                key={i}
+                className={`pip ${i < grown.done ? 'is-done' : i === grown.done && grown.current ? 'is-drafted' : ''}`}
+              />
+            ))}
+          </span>
+        )}
         <span className="goal-row-spend num">
-          {money(task.spentUsd)}
-          {task.maxSpendUsd ? ` of ${money(task.maxSpendUsd)}` : ''}
+          {ready
+            ? `${ago(task.completedAt)} · ${money(task.spentUsd)}`
+            : `${money(task.spentUsd)}${task.maxSpendUsd ? ` of ${money(task.maxSpendUsd)}` : ''}`}
         </span>
       </button>
       <span className="goal-row-act">
-        <RowAction task={task} move={movesFor(moves, task.id)[0]} state={GROWTH_WORD[state]} />
+        {ready ? (
+          <AcceptAction task={task} />
+        ) : (
+          <RowAction task={task} move={movesFor(moves, task.id)[0]} state={GROWTH_WORD[state]} />
+        )}
       </span>
     </li>
+  );
+}
+
+/** Accepting files a finished goal away; the toast keeps it one press from coming back. */
+function AcceptAction({ task }: { task: Task }) {
+  return (
+    <button
+      type="button"
+      className="btn small"
+      onClick={() =>
+        void accept(task.id).then(() =>
+          toast(`Accepted “${task.title}”.`, {
+            action: { label: 'Undo', run: () => void accept(task.id, false) }
+          })
+        )
+      }
+    >
+      Accept
+    </button>
   );
 }
 

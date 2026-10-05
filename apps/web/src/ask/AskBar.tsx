@@ -2,13 +2,14 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import type { OwnerMove, Task, Workspace } from '@garden/contracts';
 import type { Bootstrap } from '../model';
 import { useComposer } from '../use-composer';
-import { Close, Mic, Paperclip, Sprout, Stop, Up } from '../app/icons';
+import { Close, Mic, Paperclip, Sprout, Stop, Tune, Up } from '../app/icons';
 import { putTask, refreshSoon } from '../app/store';
 import { isNativeClient } from '../client';
 import { growth } from '../app/derive';
 import { answer as answerQuestion } from '../app/actions';
 import { onAskText, watchSent } from './ask-bus';
 import { NEW_GOAL, seedDirection, setDirection, useDirection } from './direction';
+import AskOptions, { settingsSummary, type AskSettings } from './AskOptions';
 import './ask.css';
 
 const DictationSetup = lazy(() => import('../DictationSetup'));
@@ -140,8 +141,37 @@ function AskForm({
     saved,
     draftConflict,
     resolveDraft,
-    retryDraftSync
+    retryDraftSync,
+    models,
+    modelId,
+    modelChoices,
+    reasoningEffort,
+    efforts,
+    cap,
+    securityMode,
+    privacyRoute,
+    interrupt,
+    changeModel,
+    changeEffort,
+    changeCap,
+    changeSecurityMode,
+    changePrivacy,
+    setInterrupt
   } = composer;
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const settings: AskSettings = {
+    models,
+    modelId,
+    automatic: !task && Boolean(modelChoices.main?.automatic),
+    efforts,
+    reasoningEffort,
+    cap,
+    securityMode,
+    privacyRoute: privacyRoute === 'external' ? 'external' : 'provider_zdr',
+    privacyLocked: bootstrap.instance.enforceZeroDataRetention,
+    interrupt
+  };
+  const summary = settingsSummary(settings, task?.securityMode ?? workspace.securityMode);
   // A synced draft is the normal state and is only announced; trouble is shown.
   const quiet = saved === 'Draft synced' || saved === 'Saving draft…';
 
@@ -163,7 +193,7 @@ function AskForm({
   const placeholder = question
     ? `Answer: ${question.question}`
     : task
-      ? `Tell “${task.title}” something`
+      ? 'Tell this goal something'
       : 'What should garden grow?';
   return (
     <form
@@ -179,6 +209,29 @@ function AskForm({
           <DictationSetup onClose={() => setDictationSetup(false)} onStart={startDictation} />
         </Suspense>
       )}
+      {optionsOpen && !question && (
+        <AskOptions
+          settings={settings}
+          forTask={Boolean(task)}
+          running={Boolean(task && ['queued', 'planning', 'running'].includes(task.status))}
+          disabled={editingDisabled}
+          onModel={changeModel}
+          onEffort={changeEffort}
+          onCap={changeCap}
+          onKeys={changeSecurityMode}
+          onPrivacy={changePrivacy}
+          onInterrupt={setInterrupt}
+          onAttach={
+            uploading || voiceBusy
+              ? undefined
+              : () => {
+                  setOptionsOpen(false);
+                  fileInput.current?.click();
+                }
+          }
+          onClose={() => setOptionsOpen(false)}
+        />
+      )}
       <div className="ask-above" aria-live="polite">
         {typing && !task && (
           <>
@@ -191,6 +244,11 @@ function AskForm({
             </span>
             <span className="hint">Anything big comes back as a deal first</span>
           </>
+        )}
+        {summary && !question && (
+          <button type="button" className="hint hint-button" onClick={() => setOptionsOpen(true)}>
+            <Tune /> {summary}
+          </button>
         )}
         {canFresh && !typing && (
           <button type="button" className="hint hint-button" onClick={onFresh}>
@@ -309,27 +367,34 @@ function AskForm({
         <Sprout className="ask-mark" />
         <label className="sr-only" htmlFor="ask-input">
           {question
-            ? 'Your answer'
+            ? `Your answer to: ${question.question}`
             : task
               ? `Direction for ${task.title}`
               : 'What should garden grow?'}
         </label>
-        <textarea
-          id="ask-input"
-          ref={input}
-          rows={1}
-          value={body}
-          maxLength={200_000}
-          disabled={editingDisabled || voiceBusy}
-          placeholder={placeholder}
-          onChange={(event) => changeBody(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              void send();
-            }
-          }}
-        />
+        {/* Drawn rather than a placeholder: a textarea's own hint wraps, and the field grows with it. */}
+        <span className="ask-input">
+          <textarea
+            id="ask-input"
+            ref={input}
+            rows={1}
+            value={body}
+            maxLength={200_000}
+            disabled={editingDisabled || voiceBusy}
+            onChange={(event) => changeBody(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                void send();
+              }
+            }}
+          />
+          {!body && (
+            <span className="ask-hint" aria-hidden="true">
+              {placeholder}
+            </span>
+          )}
+        </span>
         <input
           ref={fileInput}
           type="file"
@@ -342,7 +407,19 @@ function AskForm({
         {!question && (
           <button
             type="button"
-            className="icon-btn"
+            className="icon-btn ask-tune"
+            aria-label="Options for this message"
+            aria-expanded={optionsOpen}
+            aria-controls="ask-options"
+            onClick={() => setOptionsOpen((open) => !open)}
+          >
+            <Tune />
+          </button>
+        )}
+        {!question && (
+          <button
+            type="button"
+            className="icon-btn ask-attach"
             aria-label="Attach files"
             disabled={editingDisabled || uploading || voiceBusy}
             onClick={() => fileInput.current?.click()}

@@ -8,7 +8,6 @@ import { Back, Close, Eye, Mic, More, Pause, Play, Stop } from '../app/icons';
 import { go, type Zoom } from '../app/route';
 import { putTask, refreshSoon, useGarden } from '../app/store';
 import { toast } from '../app/toast';
-import Plant from '../today/Plant';
 import Look from './Look';
 import { doneWhen, notesFrom, outcome } from './timeline';
 import './goal.css';
@@ -192,15 +191,24 @@ function GoalRecord({
       <div className="goal-body" data-zoom={zoom}>
         {zoom === 'glance' && (
           <section className="glance-view rise" aria-label="At a glance">
-            <Plant
-              className="glance-plant"
-              seed={task.id}
-              total={leaves(task).total}
-              done={leaves(task).done}
-              current={leaves(task).current && state === 'working'}
-              bloom={state === 'ready' || state === 'done'}
-              needs={state === 'needs'}
-            />
+            <span
+              className="glance-steps"
+              role="img"
+              aria-label={`${leaves(task).done} of ${leaves(task).total} steps done`}
+            >
+              {Array.from({ length: leaves(task).total }, (_, i) => (
+                <span
+                  key={i}
+                  className={
+                    i < leaves(task).done
+                      ? 'is-done'
+                      : i === leaves(task).done && leaves(task).current
+                        ? 'is-drafted'
+                        : ''
+                  }
+                />
+              ))}
+            </span>
             <h2 className="display">{goalLine(task, moves)}</h2>
             {(finished ? outcome(record.events) : task.activity?.latest) && (
               <p className="glance-said">

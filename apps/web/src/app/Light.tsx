@@ -68,14 +68,16 @@ export default function Light() {
       context.globalCompositeOperation = 'source-over';
       context.fillStyle = palette.bg;
       context.fillRect(0, 0, w, h);
-      context.globalCompositeOperation = palette.light ? 'source-over' : 'screen';
+      // Night lifts the dark with coloured light; day is the same garden with the sun behind it,
+      // so its light brightens what is there rather than tinting it.
+      context.globalCompositeOperation = 'screen';
       for (const blob of BLOBS) {
         const x = (blob.x + 0.32 * Math.sin(t * blob.sx + blob.p)) * w;
         const y = (blob.y + 0.28 * Math.cos(t * blob.sy + blob.p * 1.3)) * h;
         const r = blob.r * Math.max(w, h);
         const gradient = context.createRadialGradient(x, y, 0, x, y, r);
         const color = palette.colors[blob.c] || '#1e6a49';
-        gradient.addColorStop(0, rgba(color, palette.light ? 0.5 : 0.17));
+        gradient.addColorStop(0, rgba(color, palette.light ? 0.3 : 0.17));
         gradient.addColorStop(1, rgba(color, 0));
         context.fillStyle = gradient;
         context.beginPath();

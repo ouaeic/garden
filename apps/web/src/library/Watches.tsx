@@ -31,15 +31,18 @@ const localDate = (value: string): string => {
 export function WatchesLibrary({
   workspace,
   onOpenTask,
-  onChange
+  onChange,
+  startNew = false
 }: {
+  /** Opens with a new schedule's form already showing, for the desk's "Schedule" button. */
+  startNew?: boolean;
   workspace: Workspace | null;
   onOpenTask: (id: string) => void;
   onChange: () => void;
 }) {
   const watches = useResource<TaskSchedule[]>('/v1/schedules');
   const models = useResource<ModelRelease[]>('/v1/models');
-  const [editing, setEditing] = useState<TaskSchedule | 'new' | null>(null);
+  const [editing, setEditing] = useState<TaskSchedule | 'new' | null>(startNew ? 'new' : null);
   const [secret, setSecret] = useState<{ url: string; secret: string } | null>(null);
   const action = useAction(() => {
     watches.refresh();

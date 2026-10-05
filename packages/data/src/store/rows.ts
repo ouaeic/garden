@@ -46,6 +46,18 @@ import type {
   OwnerBlockRecord
 } from '../store.js';
 
+const OWNER_KEYS = new Set(['spend', 'publish', 'remove', 'rules']);
+/** A TEXT[] as either driver returns it, kept to the keys that exist. */
+export const lentKeysOf = (value: unknown): TaskRecord['lentKeys'] => {
+  const items = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.replace(/^\{|\}$/g, '').split(',')
+      : [];
+  return items
+    .map(String)
+    .filter((item): item is TaskRecord['lentKeys'][number] => OWNER_KEYS.has(item));
+};
 export const iso = (value: unknown): string => new Date(String(value)).toISOString();
 export const json = <T>(value: unknown): T =>
   (typeof value === 'string' ? JSON.parse(value) : value) as T;
@@ -128,6 +140,7 @@ export const mapWorkspace = (row: Record<string, unknown>): WorkspaceRecord => (
   region: String(row.region),
   keyProtection: (optionalText(row.wrapping_mode) ?? 'hosted') as WorkspaceRecord['keyProtection'],
   securityMode: (optionalText(row.security_mode) ?? 'balanced') as WorkspaceRecord['securityMode'],
+  lentKeys: lentKeysOf(row.lent_keys),
   runnerRef: optionalText(row.runner_ref),
   computeMeteredAt: row.compute_metered_at ? iso(row.compute_metered_at) : null,
   ...(optionalText(row.wrapped_key) ? { wrappedKey: optionalText(row.wrapped_key)! } : {}),
@@ -170,6 +183,7 @@ export const mapTask = (row: Record<string, unknown>): TaskRecord => {
     >,
     privacyRoute: String(row.privacy_route),
     securityMode: (optionalText(row.security_mode) ?? 'balanced') as TaskRecord['securityMode'],
+    lentKeys: lentKeysOf(row.lent_keys),
     maxComputeCredits: Number(row.max_compute_credits),
     actualComputeCredits: Number(row.actual_compute_credits),
     maxSpendUsd: numericOrNull(row.max_spend_usd),

@@ -9,7 +9,7 @@ import type {
   TaskReasoningEffort,
   TaskScheduleSpec
 } from '@garden/contracts';
-import type { SecurityMode } from '@garden/contracts';
+import type { OwnerKey, SecurityMode } from '@garden/contracts';
 
 export interface UserRecord {
   id: string;
@@ -72,6 +72,7 @@ export interface WorkspaceRecord {
   region: string;
   keyProtection: 'hosted';
   securityMode: SecurityMode;
+  lentKeys: OwnerKey[];
   runnerRef: string | null;
   computeMeteredAt: string | null;
   wrappedKey?: string;
@@ -121,6 +122,7 @@ export interface TaskRecord {
   reasoningEffort?: TaskReasoningEffort;
   privacyRoute: string;
   securityMode: SecurityMode;
+  lentKeys: OwnerKey[];
   maxComputeCredits: number;
   actualComputeCredits: number;
   /** Ceiling in real currency. Null means only the account-level caps bound this task. */

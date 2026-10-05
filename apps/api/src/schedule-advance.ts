@@ -120,6 +120,9 @@ export const advanceScheduleRun = (
   firedFor: Date | null,
   now = new Date()
 ): Date | null => {
+  // A one-off is spent by its first run, whenever that was. "Run now" before its time is that run;
+  // looking forward from now would find runAt still ahead and run it a second time.
+  if (spec.kind === 'once' && firedFor) return null;
   const candidate = nextScheduleRun(spec, now);
   if (!candidate || !isWallClock(spec)) return candidate;
   const formatter = wallClockFormatter(spec.timeZone);

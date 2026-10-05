@@ -41,6 +41,7 @@ export const mediaApprovalRequirement = (
         };
       if (mediaArgs.operation === 'delete_video')
         return {
+          keys: ['remove'],
           sideEffect: 'external_consequential',
           action: 'Delete this completed video from the provider library',
           preview: `Permanently remove provider video ${textValue(mediaArgs.providerVideoId)} from this connected account. Download any copy you want to keep first. This removes provider storage only; it does not cancel processing or reverse charges.`
@@ -80,6 +81,9 @@ export const mediaApprovalRequirement = (
     const unpriced = quoteUsd === null;
     if (unpriced || committedUsd + estimateUsd >= MEDIA_APPROVAL_USD)
       return {
+        // A priced generation is spending, which the spend key lends within the goal's cap. An
+        // unpriced one has no figure for the cap to hold, so it always asks.
+        ...(unpriced ? {} : { keys: ['spend'] as const }),
         sideEffect: 'external_reversible',
         action: 'Approve continued provider spend on generated media',
         preview: `Generate ${textValue(mediaArgs.kind, 'media')}${model ? ` with ${model.displayName}` : ''} ${unpriced ? 'from the connected provider account. This model publishes no price garden can read, so the cost is only known once the provider bills it.' : `for about $${estimateUsd.toFixed(3)} from the connected provider account.`}${unpriced && typeof mediaArgs.maxCostUsd === 'number' && Number.isFinite(mediaArgs.maxCostUsd) ? ` Reserve $${mediaArgs.maxCostUsd.toFixed(2)} for this request; final billing may differ.` : ''}${committedUsd > 0 ? ` This task has already spent about $${committedUsd.toFixed(2)} generating media.` : ''}\n\nEvery further generation in this task asks again.`
@@ -116,6 +120,9 @@ export const mediaApprovalRequirement = (
       committedUsd + estimateUsd >= MEDIA_APPROVAL_USD
     )
       return {
+        // Only plain spending is a key's to lend: an unbounded price, or a recording leaving the
+        // zero-retention route, is a different question and keeps its card.
+        ...(!external && estimateUsd !== null ? { keys: ['spend'] as const } : {}),
         sideEffect: 'external_reversible',
         action: external
           ? 'Send this recording for external transcription'

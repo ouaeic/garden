@@ -44,4 +44,29 @@ describe('the receipt for an action a lent key allowed', () => {
       recordKeyAuthorized({ recordKeyAuthorizedAction }, task('autonomous'), key, consequential)
     ).resolves.toBeUndefined();
   });
+
+  it('writes one for a card a lent key answered, in whatever mode the goal is in', async () => {
+    const recordKeyAuthorizedAction = vi.fn(async () => undefined);
+    const publish = {
+      id: 'c3',
+      name: 'publish_preview',
+      arguments: { label: 'site', port: '5173', reach: 'public' }
+    };
+    await recordKeyAuthorized(
+      { recordKeyAuthorizedAction },
+      { ...task('balanced'), lentKeys: ['publish'] } as TaskRecord,
+      key,
+      publish
+    );
+    await recordKeyAuthorized(
+      { recordKeyAuthorizedAction },
+      { ...task('balanced'), lentKeys: ['rules'] } as TaskRecord,
+      key,
+      publish
+    );
+    expect(recordKeyAuthorizedAction).toHaveBeenCalledTimes(1);
+    expect(recordKeyAuthorizedAction.mock.calls[0]).toMatchObject([
+      { action: 'Publish site publicly' }
+    ]);
+  });
 });

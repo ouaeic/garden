@@ -7,7 +7,11 @@ import { removeCodingMissionFamily } from '../coding-mission-cleanup.js';
  * A group registered before that hook would ship with no check at all.
  */
 
-import { CreateWorkspaceRequest, UpdateSecurityModeRequest } from '@garden/contracts';
+import {
+  CreateWorkspaceRequest,
+  UpdateLentKeysRequest,
+  UpdateSecurityModeRequest
+} from '@garden/contracts';
 import type { Workspace } from '@garden/contracts';
 import { GardenError } from '@garden/core';
 import type { UserRecord } from '@garden/data';
@@ -174,6 +178,33 @@ export const registerWorkspaceRoutes = (context: RouteContext): void => {
       resizeWorkspace(user, request.params.workspaceId, ResizeWorkspaceRequest.parse(request.body))
     );
   });
+
+  /** The keys every new goal on this computer starts with. */
+  app.patch<{ Params: { workspaceId: string } }>(
+    '/v1/workspaces/:workspaceId/keys',
+    async (request, reply) => {
+      const user = requireUser(request.user);
+      const input = UpdateLentKeysRequest.parse(request.body);
+      const workspace = await store.getWorkspace(user.id, request.params.workspaceId);
+      if (!workspace || workspace.userId !== user.id)
+        throw new GardenError(
+          'workspace_owner_required',
+          'Only the workspace owner can change the keys it lends',
+          403
+        );
+      return idempotent(request, reply, user, async () => {
+        const updated = await store.updateWorkspaceLentKeys(user.id, workspace.id, input.lentKeys);
+        if (!updated) throw new GardenError('workspace_not_found', 'Workspace not found');
+        await recordSecurityEvent(store, {
+          userId: user.id,
+          kind: 'workspace_keys_changed',
+          outcome: 'succeeded',
+          metadata: { workspaceId: workspace.id, lentKeys: input.lentKeys }
+        });
+        return workspaceResponse(updated);
+      });
+    }
+  );
 
   app.patch<{ Params: { workspaceId: string } }>(
     '/v1/workspaces/:workspaceId/security-mode',

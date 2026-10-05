@@ -769,6 +769,20 @@ export class WorkspaceStore {
     return result.rowCount === 1;
   }
 
+  /** Replaces the keys this computer lends to every goal it starts from now on. */
+  async updateWorkspaceLentKeys(
+    userId: string,
+    id: string,
+    lentKeys: WorkspaceRecord['lentKeys']
+  ): Promise<WorkspaceRecord | null> {
+    const result = await this.database.query(
+      `UPDATE workspaces SET lent_keys=$3::TEXT[],updated_at=NOW()
+       WHERE id=$1 AND user_id=$2 RETURNING *`,
+      [id, userId, [...new Set(lentKeys)]]
+    );
+    return result.rows[0] ? mapWorkspace(result.rows[0]) : null;
+  }
+
   async updateWorkspaceSecurityMode(
     userId: string,
     id: string,

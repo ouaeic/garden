@@ -6,13 +6,37 @@ import type { useTaskRecord } from '../useTaskRecord';
 import { CommentSurface, withNote } from '../result-notes';
 import { TaskOutputs } from '../TaskCanvas';
 import { setDirection, useDirection } from '../ask/direction';
-import { raiseCapAndResume } from '../app/actions';
-import { ago, money } from '../app/derive';
-import { Check, Lock, Speak, Spend, Sprout } from '../app/icons';
+import { raiseCapAndResume, setGoalKeys } from '../app/actions';
+import { ago, money, raisedCap } from '../app/derive';
+import { Check, Publish, Remove, Rules, Speak, Spend, Sprout } from '../app/icons';
 import { go } from '../app/route';
 import { toast } from '../app/toast';
 import { NOTE_LABEL, type Note } from './timeline';
 import './work.css';
+
+const GOAL_KEYS = [
+  {
+    id: 'publish',
+    name: 'Publish',
+    icon: Publish,
+    lent: 'Publishes, deploys and shares links without asking',
+    kept: 'Asks before anything goes public'
+  },
+  {
+    id: 'remove',
+    name: 'Remove',
+    icon: Remove,
+    lent: 'Deletes outside an undo point without asking',
+    kept: 'Asks before deleting what it cannot undo'
+  },
+  {
+    id: 'rules',
+    name: 'Rules',
+    icon: Rules,
+    lent: 'Sets schedules, memory and services without asking',
+    kept: 'Asks before changing standing rules'
+  }
+] as const;
 
 const Markdown = lazy(() => import('../MarkdownBody'));
 const CodingMissions = lazy(() => import('../CodingMissions'));
@@ -149,7 +173,7 @@ export default function Look({
                     onClick={() =>
                       void raiseCapAndResume(
                         task.id,
-                        Math.max(task.spentUsd * 1.5, (task.maxSpendUsd ?? 0) + 5)
+                        raisedCap(task.spentUsd, task.maxSpendUsd)
                       ).then(
                         () => toast('Cap raised. Carrying on.'),
                         (cause: unknown) =>
@@ -180,15 +204,40 @@ export default function Look({
                 </small>
               </span>
             </button>
-            <div className="held">
-              <span className="key-icon">
-                <Lock />
-              </span>
-              <span>
-                <b>Publish, remove, rules, accounts</b>
-                <small>Always ask you</small>
-              </span>
-            </div>
+            {GOAL_KEYS.map((key) => {
+              const lent = (task.lentKeys ?? []).includes(key.id);
+              return (
+                <button
+                  key={key.id}
+                  type="button"
+                  className={`held ${lent ? 'is-lent' : ''}`}
+                  aria-pressed={lent}
+                  onClick={() =>
+                    void setGoalKeys(
+                      task.id,
+                      lent
+                        ? (task.lentKeys ?? []).filter((item) => item !== key.id)
+                        : [...(task.lentKeys ?? []), key.id]
+                    ).then(
+                      () =>
+                        toast(
+                          lent ? `${key.name}: taken back.` : `${key.name}: lent to this goal.`
+                        ),
+                      (cause: unknown) =>
+                        toast(cause instanceof Error ? cause.message : 'That did not change.')
+                    )
+                  }
+                >
+                  <span className="key-icon">
+                    <key.icon />
+                  </span>
+                  <span>
+                    <b>{key.name}</b> · {lent ? 'lent' : 'kept'}
+                    <small>{lent ? key.lent : key.kept}</small>
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </section>
       </aside>
@@ -227,7 +276,16 @@ export default function Look({
         <Suspense fallback={null}>
           <SubagentLanes events={events} />
         </Suspense>
-        <h2 className="look-h">Notes from the work</h2>
+        <h2 className="look-h">
+          Notes from the work
+          <button
+            type="button"
+            className="count link"
+            onClick={() => go({ zoom: 'inspect' }, { replace: true })}
+          >
+            See everything
+          </button>
+        </h2>
         {notes.length ? (
           <ol className="notes">
             {notes.slice(0, 60).map((note) => (
@@ -238,15 +296,6 @@ export default function Look({
                 </div>
                 <p>{note.title}</p>
                 {note.body && <p className="note-body">{note.body}</p>}
-                {note.kind !== 'you' && (
-                  <button
-                    type="button"
-                    className="link-button"
-                    onClick={() => go({ zoom: 'inspect' }, { replace: true })}
-                  >
-                    See exactly
-                  </button>
-                )}
               </li>
             ))}
           </ol>

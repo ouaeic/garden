@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { OwnerMove, TaskDeal } from '@garden/contracts';
+import type { OwnerKey, OwnerMove, TaskDeal } from '@garden/contracts';
 import { plantDeal } from '../app/actions';
 import { money } from '../app/derive';
-import { Check, Close, Lock, Publish, Remove, Rules, Speak, Spend, Sprout } from '../app/icons';
+import { Check, Close, Publish, Remove, Rules, Speak, Spend, Sprout } from '../app/icons';
 import { closeSheet } from '../app/route';
-import { refresh } from '../app/store';
+import { primaryWorkspace, refresh, useGarden } from '../app/store';
 import { toast } from '../app/toast';
 import { flySeeds } from './seeds';
 import './deal.css';
@@ -12,12 +12,29 @@ import './deal.css';
 type DealMove = Extract<OwnerMove, { kind: 'deal' }>;
 
 /** The keys every mode keeps for the owner, said once so a lent key is never mistaken for them. */
-const KEPT = [
-  { icon: Publish, name: 'Publish', note: 'Public links to your apps always ask first.' },
-  { icon: Remove, name: 'Remove', note: 'Deleting anything outside an undo point always asks.' },
-  { icon: Rules, name: 'Rules', note: 'Schedules, memory, services and connections always ask.' },
-  { icon: Lock, name: 'Accounts', note: 'Passwords, codes and signatures always come to you.' }
-];
+const LENDABLE = [
+  {
+    id: 'publish',
+    icon: Publish,
+    name: 'Publish',
+    lent: 'Lent: may publish, deploy and share links',
+    kept: 'Kept: it asks before anything goes public'
+  },
+  {
+    id: 'remove',
+    icon: Remove,
+    name: 'Remove',
+    lent: 'Lent: may delete outside an undo point',
+    kept: 'Kept: it asks before deleting what it cannot undo'
+  },
+  {
+    id: 'rules',
+    icon: Rules,
+    name: 'Rules',
+    lent: 'Lent: may set schedules, memory and services',
+    kept: 'Kept: it asks before changing standing rules'
+  }
+] as const;
 
 /**
  * The deal, laid out to be agreed in one sitting: what will grow and how you will know it is done,
@@ -75,6 +92,15 @@ function DealBody({ move }: { move: DealMove }) {
   const [planted, setPlanted] = useState<boolean[]>(() => deal.goals.map(() => true));
   const [caps, setCaps] = useState<number[]>(() => deal.goals.map((goal) => goal.capUsd));
   const [actAsYou, setActAsYou] = useState(deal.actAsYou);
+  const { bootstrap } = useGarden();
+  // Starts from what the computer lends every new goal; the deal is where that changes per goal.
+  const [keys, setKeys] = useState<OwnerKey[]>(() => [
+    ...(primaryWorkspace(bootstrap)?.lentKeys ?? [])
+  ]);
+  const toggleKey = (key: OwnerKey) =>
+    setKeys((current) =>
+      current.includes(key) ? current.filter((item) => item !== key) : [...current, key]
+    );
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -102,6 +128,7 @@ function DealBody({ move }: { move: DealMove }) {
         answers,
         goals: chosen,
         actAsYou,
+        keys,
         capsUsd: chosen.map((index) => caps[index]!),
         ...(note.trim() ? { note: note.trim() } : {})
       });
@@ -304,19 +331,20 @@ function DealBody({ move }: { move: DealMove }) {
                     : 'Kept: it asks before sending, submitting or booking'}
                 </span>
               </button>
-              {KEPT.map((key, index) => (
+              {LENDABLE.map((key, index) => (
                 <button
-                  key={key.name}
+                  key={key.id}
                   type="button"
-                  className="key-tile is-kept reveal"
+                  className={`key-tile reveal ${keys.includes(key.id) ? 'is-lent' : ''}`}
                   style={{ '--i': 13 + index } as React.CSSProperties}
-                  onClick={() => toast(`${key.name} stays with you. ${key.note}`)}
+                  aria-pressed={keys.includes(key.id)}
+                  onClick={() => toggleKey(key.id)}
                 >
                   <span className="key-icon">
                     <key.icon />
                   </span>
                   <b>{key.name}</b>
-                  <span>Always asks you</span>
+                  <span>{keys.includes(key.id) ? key.lent : key.kept}</span>
                 </button>
               ))}
             </div>
@@ -336,6 +364,17 @@ function DealBody({ move }: { move: DealMove }) {
           <span>
             Acts as you <b>{actAsYou ? 'yes' : 'no'}</b>
           </span>
+          {keys.filter((key) => key !== 'spend').length > 0 && (
+            <span>
+              Also lent{' '}
+              <b>
+                {keys
+                  .filter((key) => key !== 'spend')
+                  .map((key) => LENDABLE.find((item) => item.id === key)?.name)
+                  .join(', ')}
+              </b>
+            </span>
+          )}
         </div>
         {error && <p className="error-line">{error}</p>}
         <button type="button" className="btn ghost" onClick={closeSheet}>

@@ -198,7 +198,11 @@ export const registerMoveRoutes = (context: RouteContext): void => {
         taskId: audit.taskId,
         taskTitle: opened?.title ?? null,
         action: audit.operation,
-        detail: audit.statusCode ? `The service answered ${audit.statusCode}.` : '',
+        // The verdict already says it went through; a status code only explains a refusal.
+        detail:
+          audit.outcome === 'failed' && audit.statusCode
+            ? `The service refused it (${audit.statusCode}).`
+            : '',
         tool: 'connector_action',
         source: 'connector',
         verdict: audit.outcome === 'denied' ? 'refused' : audit.outcome

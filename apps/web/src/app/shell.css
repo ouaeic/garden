@@ -73,7 +73,7 @@
   padding: 0 5px;
   border-radius: 999px;
   background: var(--dew);
-  color: var(--bg);
+  color: var(--card);
   font: 600 11px/18px var(--mono);
   text-align: center;
 }
@@ -397,4 +397,34 @@
   .views button {
     padding: 6px 6px;
   }
+}
+
+/*
+ * The panes that start right under the header scroll beneath the wordmark's hanging g. Their top
+ * edge dissolves over the band the g reaches into, and that band is borrowed from the space above
+ * them, so nothing at rest moves or fades - only what is scrolled up into it.
+ */
+.stage
+  :is(
+    .today-main,
+    .today-side,
+    .record,
+    .keys-side,
+    .settings-nav,
+    .settings-room,
+    .look-side,
+    .look-notes
+  ) {
+  --edge: 18px;
+  margin-top: calc(var(--edge) * -1);
+  padding-top: calc(var(--edge) + var(--rest, 0px));
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--edge));
+  mask-image: linear-gradient(to bottom, transparent 0, #000 var(--edge));
+}
+/* Each pane keeps the top spacing its own stylesheet gives it, below the borrowed band. */
+.stage .record {
+  --rest: 14px;
+}
+.stage :is(.settings-nav, .settings-room) {
+  --rest: 12px;
 }

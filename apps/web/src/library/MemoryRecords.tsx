@@ -66,7 +66,7 @@ export function MemoryRecords({
   return (
     <Section
       title="Memory record"
-      description="Search what Garden retained across your projects. History records what happened; learned facts and procedures can help later work."
+      description="Search what Garden retained across your goals. History records what happened; learned facts and procedures can help later work."
     >
       <form
         className="memory-filters"
@@ -85,14 +85,14 @@ export function MemoryRecords({
         />
         <Button type="submit">Search</Button>
         <select
-          aria-label="Memory project"
+          aria-label="Whose memory"
           value={scope}
           onChange={(event) => {
             setScope(event.target.value);
             setCursors([]);
           }}
         >
-          <option value="">All projects</option>
+          <option value="">All goals</option>
           <option value={workspaceId}>Shared memory</option>
           {projects.map((project) => (
             <option key={project.id} value={project.workspaceId}>
@@ -131,7 +131,7 @@ export function MemoryRecords({
                 <p className="muted management-metadata">
                   {labels[item.kind] ?? item.kind} ·{' '}
                   {project?.title ??
-                    (item.workspaceId === workspaceId ? 'Shared memory' : 'Project memory')}{' '}
+                    (item.workspaceId === workspaceId ? 'Shared memory' : 'Goal memory')}{' '}
                   · {expired && item.status === 'active' ? 'expired' : item.status} ·{' '}
                   {date(item.observedAt)}
                 </p>

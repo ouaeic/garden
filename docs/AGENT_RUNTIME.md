@@ -141,8 +141,8 @@ unanswered, the API's maintenance pass answers with the default, saying it was t
 and the turn carries on. A question without a default waits for as long as the owner takes.
 
 An outward action that runs on a lent key instead of a card - what Balanced would have carded as
-consequential, run under Autonomous - is written to the approvals table as approved by the key,
-before it runs. `GET /v1/record` lists those beside the cards the owner answered and the connected
+consequential, run under Autonomous, or a card the goal's own mode raised that a lent key answered -
+is written to the approvals table as approved by the key, before it runs. `GET /v1/record` lists those beside the cards the owner answered and the connected
 services' writes, and `GET /v1/moves` lists everything waiting on the owner as one typed list.
 
 ## Documents
@@ -680,7 +680,11 @@ from a parent task remove this authorization. Preparing a draft never authorizes
 
 Provenance checks, private-address restrictions, credential isolation and owner takeover remain
 active. Other tools retain their approval floors for external writes, public publishing,
-destructive operations, durable configuration, other connected services and remote execution.
+destructive operations, durable configuration, other connected services and remote execution -
+unless the owner has lent the key for that kind of consequence. A card carries the keys that answer
+it (`ApprovalRequirement.keys`); the floor returns nothing for a card whose every key the goal holds
+(`lentKeysCover` in `apps/worker/src/approval-common.ts`), and a card raised by untrusted content
+carries none. `SECURITY.md` lists what each key covers.
 
 **A read is a read, however it is spelled.** The floor judges what a shell command does, not what
 shape the model wrote it in. A command wrapped in an inline script — which the catalogue itself tells

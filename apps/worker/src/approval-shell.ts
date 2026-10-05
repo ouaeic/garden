@@ -231,7 +231,15 @@ export const shellApprovalRequirement = (
           destructiveCommand(command, rest, rebased, commandInterpreters.has(executable))
         )
         .find(Boolean);
-    if (destructive) return { sideEffect: 'external_consequential', ...destructive };
+    if (destructive)
+      return {
+        // Stopping the computer is not a removal any key covers; every other card here is one.
+        ...(destructive.action.startsWith('Stop this computer')
+          ? {}
+          : { keys: ['remove'] as const }),
+        sideEffect: 'external_consequential',
+        ...destructive
+      };
     const inScript = scriptDestroysAStore(commandScript(args), executable);
     const inAnotherBox = carried
       .map(({ carrier, command }): DestructionOperation | null => {
@@ -252,6 +260,7 @@ export const shellApprovalRequirement = (
       inAnotherBox;
     if (destruction)
       return {
+        keys: destruction.kind === 'persistence' ? ['rules'] : ['remove'],
         sideEffect: 'external_consequential',
         action:
           destruction.kind === 'store'
@@ -271,12 +280,18 @@ export const shellApprovalRequirement = (
       (commands.length === 0 && commandInterpreters.has(executable)
         ? publishingOperation(commandArgs)
         : null);
-    if (publishing) return { sideEffect: 'external_consequential', ...publishCard(publishing) };
+    if (publishing)
+      return {
+        keys: ['publish'],
+        sideEffect: 'external_consequential',
+        ...publishCard(publishing)
+      };
     const gitConfigWrite = commands.find(
       ([command = '', ...rest]) => command === 'git' && gitConfigRunsCode(rest)
     );
     if (gitConfigWrite)
       return {
+        keys: ['rules'],
         sideEffect: 'external_consequential',
         action: DEFERRED_EXECUTION_ACTION,
         preview: `Run ${invocation}. git config writes .gitconfig without naming it, and what lands there - core.hooksPath, or an alias - is executed by every later git invocation on this computer, outside any approval this task could raise.`
@@ -300,6 +315,7 @@ export const shellApprovalRequirement = (
     const forced = commands.find((command) => forcedGitPush(command));
     if (forced)
       return {
+        keys: ['remove'],
         sideEffect: 'external_consequential',
         action: 'Overwrite history on a Git remote',
         preview: `Run ${invocation}. A forced push replaces what the remote has rather than adding to it, and the commits it discards live on that remote and not on this computer, so nothing here can put them back. Anyone who already fetched the old history keeps a copy this one no longer agrees with.`
@@ -318,6 +334,7 @@ export const shellApprovalRequirement = (
     const sender = commands.find(([command = '', ...rest]) => sendsDataOverNetwork(command, rest));
     if (sender)
       return {
+        keys: ['publish'],
         sideEffect: 'external_reversible',
         action: `Send data using ${sender[0]}`,
         preview: `Run ${invocation} with outbound network access. This can change an external service or upload workspace data.`
