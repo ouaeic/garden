@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TaskEvent } from '@garden/contracts';
-import { doneWhen, notesFrom } from './timeline';
+import { doneWhen, notesFrom, outcome } from './timeline';
 
 let sequence = 0;
 const event = (
@@ -46,5 +46,16 @@ describe('the notes a goal keeps', () => {
     expect(doneWhen([planted])).toBe('It passes validation.');
     expect(notesFrom([planted])[0]).toMatchObject({ kind: 'deal', title: 'Deal agreed' });
     expect(doneWhen([event('user_message', { markdown: 'Just do it' })])).toBeNull();
+  });
+
+  it('says what came of a finished goal in its last completion’s words', () => {
+    expect(
+      outcome([
+        event('completed', { summary: 'A first draft.' }),
+        event('user_message', { markdown: 'Again, shorter' }),
+        event('completed', { summary: 'A return ready to file.' })
+      ])
+    ).toBe('A return ready to file.');
+    expect(outcome([event('assistant_message', { markdown: 'Working' })])).toBeNull();
   });
 });

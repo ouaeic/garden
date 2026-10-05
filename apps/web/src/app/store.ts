@@ -2,6 +2,8 @@ import { useSyncExternalStore } from 'react';
 import type { OwnerMove, Task, Workspace } from '@garden/contracts';
 import { ApiError, get, post } from '../client';
 import type { Bootstrap } from '../model';
+import { forgetDraftKey, recoverDeviceDrafts } from '../draft-storage';
+import { toast } from './toast';
 
 /**
  * Everything the desk shows, held once for the whole interface.
@@ -29,6 +31,26 @@ const set = (patch: Partial<GardenState>) => {
   listeners.forEach((listener) => listener());
 };
 
+/**
+ * A draft sealed on this device wins over the server's copy of the same scope: it is the newer
+ * of the two whenever it exists, because it is only kept until the server has caught up.
+ */
+let draftWarned = false;
+async function withDeviceDrafts(bootstrap: Bootstrap): Promise<void> {
+  try {
+    const scope = (draft: Bootstrap['drafts'][number]) =>
+      draft.taskId ?? `new:${draft.workspaceId}`;
+    const merged = new Map(bootstrap.drafts.map((draft) => [scope(draft), draft]));
+    for (const draft of await recoverDeviceDrafts(bootstrap.user.id))
+      merged.set(scope(draft), draft);
+    bootstrap.drafts = [...merged.values()];
+  } catch {
+    if (draftWarned) return;
+    draftWarned = true;
+    toast('Drafts kept on this device could not be opened. Reload to try again.');
+  }
+}
+
 let inFlight: Promise<void> | null = null;
 let again = false;
 let soon: ReturnType<typeof setTimeout> | undefined;
@@ -47,10 +69,13 @@ export function refresh(): Promise<void> {
           get<Bootstrap>('/v1/bootstrap'),
           get<OwnerMove[]>('/v1/moves')
         ]);
+        await withDeviceDrafts(bootstrap);
         set({ bootstrap, moves, error: null, signedOut: false, loadedAt: Date.now() });
       } catch (error) {
-        if (error instanceof ApiError && SIGNED_OUT.has(error.code)) set({ signedOut: true });
-        else set({ error });
+        if (error instanceof ApiError && SIGNED_OUT.has(error.code)) {
+          forgetDraftKey();
+          set({ signedOut: true });
+        } else set({ error });
       }
     } while (again);
   })().finally(() => {

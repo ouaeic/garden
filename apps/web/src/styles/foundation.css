@@ -39,15 +39,15 @@
 :root {
   --bg: #07120e;
   --bg-deep: #040b08;
-  --pane: rgba(6, 20, 14, 0.36);
+  --pane: rgba(6, 20, 14, 0.52);
   --pane-2: rgba(16, 38, 28, 0.5);
   --pane-solid: rgba(13, 29, 23, 0.94);
   --card: #10221b;
   --line: rgba(190, 228, 206, 0.1);
   --line-2: rgba(190, 228, 206, 0.19);
   --ink: #e9f2ec;
-  --ink-2: #a3b9ad;
-  --ink-3: #7d9488;
+  --ink-2: #cbdcd2;
+  --ink-3: #b6cabe;
   --leaf: #8ad8a5;
   --leaf-2: #4ea677;
   --on-leaf: #05150d;
@@ -59,6 +59,7 @@
   --paper-ink: #16231c;
   --paper-2: #5d6f64;
   --paper-line: rgba(22, 35, 28, 0.12);
+  --paper-leaf: #1b6b40;
   --light-a: #1e6a49;
   --light-b: #0e4b55;
   --light-c: #3a7837;
@@ -79,16 +80,16 @@
   :root:not([data-theme='dark']) {
     --bg: #e4ece3;
     --bg-deep: #d6e2d5;
-    --pane: rgba(255, 255, 255, 0.52);
+    --pane: rgba(255, 255, 255, 0.76);
     --pane-2: rgba(255, 255, 255, 0.74);
     --pane-solid: rgba(248, 251, 246, 0.96);
     --card: #f9fbf7;
     --line: rgba(22, 58, 38, 0.1);
     --line-2: rgba(22, 58, 38, 0.18);
     --ink: #0f2119;
-    --ink-2: #44594b;
-    --ink-3: #55685d;
-    --leaf: #1b6b40;
+    --ink-2: #2b3d32;
+    --ink-3: #3a4a40;
+    --leaf: #175d38;
     --leaf-2: #2b8a55;
     --on-leaf: #ffffff;
     --bloom: #994d22;
@@ -100,7 +101,7 @@
     --light-b: #f7e3a3;
     --light-c: #a9dccb;
     --light-d: #ffffff;
-    --canopy: rgba(40, 80, 50, 0.16);
+    --canopy: rgba(40, 80, 50, 0.08);
     --scrim: rgba(214, 226, 213, 0.6);
     --shadow: 0 40px 80px -45px rgba(25, 60, 40, 0.45);
     --lift: 0 24px 50px -28px rgba(25, 60, 40, 0.45);
@@ -110,16 +111,16 @@
 :root[data-theme='light'] {
   --bg: #e4ece3;
   --bg-deep: #d6e2d5;
-  --pane: rgba(255, 255, 255, 0.52);
+  --pane: rgba(255, 255, 255, 0.76);
   --pane-2: rgba(255, 255, 255, 0.74);
   --pane-solid: rgba(248, 251, 246, 0.96);
   --card: #f9fbf7;
   --line: rgba(22, 58, 38, 0.1);
   --line-2: rgba(22, 58, 38, 0.18);
   --ink: #0f2119;
-  --ink-2: #44594b;
-  --ink-3: #55685d;
-  --leaf: #1b6b40;
+  --ink-2: #2b3d32;
+  --ink-3: #3a4a40;
+  --leaf: #175d38;
   --leaf-2: #2b8a55;
   --on-leaf: #ffffff;
   --bloom: #994d22;
@@ -131,7 +132,7 @@
   --light-b: #f7e3a3;
   --light-c: #a9dccb;
   --light-d: #ffffff;
-  --canopy: rgba(40, 80, 50, 0.16);
+  --canopy: rgba(40, 80, 50, 0.08);
   --scrim: rgba(214, 226, 213, 0.6);
   --shadow: 0 40px 80px -45px rgba(25, 60, 40, 0.45);
   --lift: 0 24px 50px -28px rgba(25, 60, 40, 0.45);
@@ -223,6 +224,32 @@ a {
   color: var(--ink-3);
 }
 
+/* The light behind everything, and the word that names it. */
+.light {
+  position: fixed;
+  inset: -4%;
+  width: 108%;
+  height: 108%;
+  z-index: -3;
+  display: block;
+  filter: blur(18px);
+}
+.brand {
+  border: 0;
+  background: none;
+  padding: 0;
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 520;
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variation-settings:
+    'SOFT' 100,
+    'opsz' 96;
+  color: var(--ink);
+}
+
 /* Surfaces. */
 .pane {
   background: var(--pane);
@@ -249,7 +276,7 @@ a {
 .pane-head .count,
 .section-head .count {
   font: 500 11px var(--mono);
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 .section-head {
   display: flex;
@@ -402,7 +429,7 @@ a {
   background: var(--ink);
   color: var(--bg);
 }
-.field {
+.input {
   width: 100%;
   min-width: 0;
   padding: 11px 14px;
@@ -413,7 +440,7 @@ a {
   outline: 0;
   transition: border-color 0.3s;
 }
-.field:focus {
+.input:focus {
   border-color: var(--leaf);
 }
 .dot {

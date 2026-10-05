@@ -93,6 +93,14 @@
   font-size: clamp(30px, 4vw, 54px);
   line-height: 1.04;
 }
+.glance-said {
+  margin: -6px 0 0;
+  max-width: 46ch;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  text-wrap: balance;
+}
 .glance-stats {
   display: flex;
   flex-wrap: wrap;
@@ -144,7 +152,7 @@
   text-transform: uppercase;
   color: var(--ink-2);
 }
-.look-h .faint {
+.look-h .count {
   letter-spacing: 0.04em;
   text-transform: none;
 }
@@ -277,7 +285,7 @@
   line-height: 1.15;
 }
 .answer :where(a) {
-  color: #1b6b40;
+  color: var(--paper-leaf);
 }
 .answer :where(code, pre) {
   font-family: var(--mono);
@@ -402,7 +410,7 @@
 .note .link-button {
   margin: 6px 0 0;
   font: 11.5px var(--mono);
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 /* Inspect. */

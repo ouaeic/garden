@@ -7,7 +7,7 @@ The default path requires four concepts:
 1. install garden on a computer;
 2. create the owner password, with a passkey available as an option;
 3. connect model access;
-4. ask for an outcome.
+4. ask for an outcome, and agree its deal when it is substantial.
 
 The installed client can perform step 1 from a small secondary action on the sign-in screen. It
 verifies the SSH host fingerprint, runs the fixed installer directly, and imports the returned
@@ -18,8 +18,8 @@ or plugin bundles in the main flow.
 
 ## Progressive disclosure
 
-- Chat and composer dominate the screen.
-- The activity group is compact while running and collapses to a result when complete.
+- The desk leads with a verdict and what needs the owner; a goal's work is the page, not a chat.
+- A goal opens at Look; Glance is one line and a plant, and Inspect holds the raw record.
 - Browser/desktop/terminal/files open only when requested or needed.
 - Model selection shows a recommended default; capability and vision handoff details appear when
   relevant.
@@ -30,10 +30,10 @@ or plugin bundles in the main flow.
 
 ## Task lifecycle
 
-- Send and stream.
-- See a concise live plan.
-- Expand activity only for detail.
-- Approve a clearly described consequential step.
+- Ask once; agree a deal for anything substantial, lending keys for what it may do alone.
+- See deliverables tick off and notes from the work, without tool chatter.
+- Inspect only for detail.
+- Approve a clearly described consequential step it was not lent a key for.
 - Take over browser/desktop for secure or human-only input, or for one page a site is challenging —
   the agent keeps working everywhere else while that page waits.
 - Hear from the agent itself: a notice when it decides the owner wants to know something now, and a
@@ -68,8 +68,8 @@ self-hosted interface.
 ## Accessibility and efficiency
 
 - Keyboard-operable controls and labeled icon buttons.
-- Reduced-motion support for decorative glow animation.
-- Dark-only OLED-conscious theme.
+- Reduced-motion support: the light holds still and nothing rises or sweeps.
+- Night first with a day mirror; every text held to AA against the painted pixels behind it.
 - Responsive narrow layout and installable PWA.
 - Virtualized/compact task activity instead of one bubble per tool event.
 - Screenshots and desktop frames are streamed on demand, not continuously when hidden.

@@ -2,11 +2,12 @@
 
 ## Implemented in source
 
-- A four-shade dot-matrix interface that fits the screen with only its cards scrolling: status as
-  small plant sprites, masthead doors on wide screens and a button row on phones, docked project
-  panels, three hardware palettes in light and dark mode, and an optional living layer of small
-  visiting creatures that never takes input or space;
-  event-derived progress, model effort controls, direct result links and scoped source downloads.
+- An interface built around goals rather than chat: a desk that opens on a verdict, goals drawn
+  as growing plants, a deck of what needs the owner, rhythms, and the server's room; one ask bar
+  that plants, directs or answers; deals agreed before substantial work; lendable keys with a
+  hold-to-stop; a record of everything that left the computer; a goal at three distances with the
+  computer watchable live. Night first with a day mirror, fitting the screen with only its panes
+  scrolling, and held to AA contrast against what is painted behind the text.
 - One primary agent computer; no SaaS pricing, provisioning, subscriptions, model resale, or local
   inference.
 - First-owner pairing gate, passkeys, sessions, step-up, recovery, and scoped API tokens.

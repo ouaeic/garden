@@ -447,7 +447,7 @@
   display: flex;
   gap: 6px;
 }
-.move-reply .field {
+.move-reply .input {
   padding: 9px 12px;
   font-size: 13.5px;
 }
@@ -478,8 +478,8 @@
 .rhythm .dot {
   grid-area: dot;
 }
-.rhythm[data-enabled='false'] {
-  opacity: 0.72;
+.rhythm[data-enabled='false'] .rhythm-title {
+  color: var(--ink-2);
 }
 .rhythm-main {
   grid-area: main;

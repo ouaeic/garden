@@ -28,8 +28,11 @@ const CANOPY = Array.from({ length: 34 }, (_, i) => {
   };
 });
 
-const rgba = (hex: string, alpha: number) => {
-  const n = parseInt(hex.replace('#', '').slice(0, 6), 16);
+/** A theme colour with an alpha. The build writes `#ffffff` as `#fff`, so both lengths are read. */
+export const rgba = (hex: string, alpha: number) => {
+  const digits = hex.replace('#', '');
+  const full = digits.length < 6 ? [...digits.slice(0, 3)].map((d) => d + d).join('') : digits;
+  const n = parseInt(full.slice(0, 6), 16);
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
 };
 
@@ -72,7 +75,7 @@ export default function Light() {
         const r = blob.r * Math.max(w, h);
         const gradient = context.createRadialGradient(x, y, 0, x, y, r);
         const color = palette.colors[blob.c] || '#1e6a49';
-        gradient.addColorStop(0, rgba(color, palette.light ? 0.55 : 0.34));
+        gradient.addColorStop(0, rgba(color, palette.light ? 0.5 : 0.17));
         gradient.addColorStop(1, rgba(color, 0));
         context.fillStyle = gradient;
         context.beginPath();
@@ -81,7 +84,7 @@ export default function Light() {
       }
       context.globalCompositeOperation = palette.light ? 'soft-light' : 'screen';
       for (let i = 0; i < 3; i++) {
-        const alpha = (palette.light ? 0.28 : 0.07) * (0.6 + 0.4 * Math.sin(t * 0.00012 + i * 2));
+        const alpha = (palette.light ? 0.22 : 0.035) * (0.6 + 0.4 * Math.sin(t * 0.00012 + i * 2));
         const x0 = w * (0.08 + i * 0.2);
         const shaft = context.createLinearGradient(x0, 0, x0 + w * 0.5, h);
         shaft.addColorStop(0, `rgba(255,240,200,${alpha})`);

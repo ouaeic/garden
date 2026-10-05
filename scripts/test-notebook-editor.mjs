@@ -35,7 +35,7 @@ test(
             resolveId: (id) => (id === 'virtual:notebook-proof' ? '\0notebook-proof.js' : null),
             load: (id) =>
               id === '\0notebook-proof.js'
-                ? `import ${JSON.stringify(path.join(root, 'src/styles.css'))};import React from 'react';import {createRoot} from 'react-dom/client';import NotebookPreview from ${JSON.stringify(path.join(root, 'src/computer/NotebookPreview.tsx'))};import {fileNavigationBlocked} from ${JSON.stringify(path.join(root, 'src/file-navigation.ts'))};const root=createRoot(document.getElementById('root'));window.show=(editable=true)=>root.render(React.createElement(NotebookPreview,{key:String(editable),url:'/v1/workspaces/project/download?path=workspace/analysis.ipynb',name:'analysis.ipynb',...(editable?{editable:{workspaceId:'project',path:'workspace/analysis.ipynb'}}:{})}));window.tryLeave=()=>!fileNavigationBlocked();window.show();`
+                ? `import ${JSON.stringify(path.join(root, 'src/styles/index.css'))};import React from 'react';import {createRoot} from 'react-dom/client';import NotebookPreview from ${JSON.stringify(path.join(root, 'src/computer/NotebookPreview.tsx'))};import {fileNavigationBlocked} from ${JSON.stringify(path.join(root, 'src/file-navigation.ts'))};const root=createRoot(document.getElementById('root'));window.show=(editable=true)=>root.render(React.createElement(NotebookPreview,{key:String(editable),url:'/v1/workspaces/project/download?path=workspace/analysis.ipynb',name:'analysis.ipynb',...(editable?{editable:{workspaceId:'project',path:'workspace/analysis.ipynb'}}:{})}));window.tryLeave=()=>!fileNavigationBlocked();window.show();`
                 : null
           }
         ],

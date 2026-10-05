@@ -47,7 +47,7 @@ try {
           id === '\0password-proof.js'
             ? `
       import React,{useEffect,useState} from 'react';import {createRoot} from 'react-dom/client';
-      import ${JSON.stringify(path.join(root, 'src/styles.css'))};
+      import ${JSON.stringify(path.join(root, 'src/styles/index.css'))};
       import Login from ${JSON.stringify(path.join(root, 'src/Login.tsx'))};
       import {useAuthEntry} from ${JSON.stringify(path.join(root, 'src/auth-entry.ts'))};
       import {stepUp,signOut} from ${JSON.stringify(path.join(root, 'src/auth.ts'))};

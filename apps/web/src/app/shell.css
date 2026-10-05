@@ -1,13 +1,4 @@
-/* The frame: light, header, stage, ask bar, sheets and toasts. */
-.light {
-  position: fixed;
-  inset: -4%;
-  width: 108%;
-  height: 108%;
-  z-index: -3;
-  display: block;
-  filter: blur(18px);
-}
+/* The frame: header, stage, ask bar, sheets and toasts. The light and the word are primitives. */
 .vignette {
   position: fixed;
   inset: 0;
@@ -41,21 +32,6 @@
   align-items: center;
   gap: 16px;
   padding: calc(14px + env(safe-area-inset-top, 0px)) var(--gutter) 8px;
-}
-.brand {
-  border: 0;
-  background: none;
-  padding: 0;
-  font-family: var(--display);
-  font-style: italic;
-  font-weight: 520;
-  font-size: 28px;
-  line-height: 1;
-  letter-spacing: -0.03em;
-  font-variation-settings:
-    'SOFT' 100,
-    'opsz' 96;
-  color: var(--ink);
 }
 .views {
   display: flex;
@@ -121,6 +97,50 @@
 .top-tools {
   display: flex;
   gap: 6px;
+}
+.lost {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  color: var(--dew);
+  font: 12px var(--mono);
+}
+.phone-menu {
+  display: none;
+  position: relative;
+}
+.phone-menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 50;
+  display: grid;
+  min-width: 200px;
+  padding: 6px;
+  background: var(--pane-solid);
+  animation: rise 0.25s var(--ease) both;
+}
+.phone-menu-list button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink);
+  font-size: 14px;
+  text-align: left;
+}
+.phone-menu-list button:hover,
+.phone-menu-list button[aria-current='page'] {
+  background: var(--pane-2);
+}
+.phone-menu-list svg {
+  width: 17px;
+  height: 17px;
+  color: var(--ink-2);
 }
 .top-tools .icon-btn[aria-pressed='true'] {
   color: var(--ink);
@@ -330,8 +350,19 @@
     padding: 6px 10px;
     font-size: 12.5px;
   }
-  .top-tools .icon-btn:not(:first-child) {
+  .top-tools > .icon-btn {
     display: none;
+  }
+  .phone-menu {
+    display: block;
+  }
+  .lost {
+    position: fixed;
+    top: calc(64px + env(safe-area-inset-top, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 40;
+    background: var(--pane-solid);
   }
   .sheet {
     border-radius: 24px;

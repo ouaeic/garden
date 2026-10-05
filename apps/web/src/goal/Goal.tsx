@@ -10,7 +10,7 @@ import { putTask, refreshSoon, useGarden } from '../app/store';
 import { toast } from '../app/toast';
 import Plant from '../today/Plant';
 import Look from './Look';
-import { doneWhen, notesFrom } from './timeline';
+import { doneWhen, notesFrom, outcome } from './timeline';
 import './goal.css';
 
 const Inspect = lazy(() => import('./Inspect'));
@@ -202,6 +202,11 @@ function GoalRecord({
               needs={state === 'needs'}
             />
             <h2 className="display">{goalLine(task, moves)}</h2>
+            {(finished ? outcome(record.events) : task.activity?.latest) && (
+              <p className="glance-said">
+                {finished ? outcome(record.events) : task.activity?.latest}
+              </p>
+            )}
             <dl className="glance-stats num">
               <div>
                 <dt>steps done</dt>

@@ -69,7 +69,7 @@ for number,name in enumerate(['Counts','Percentage','Plot']):
             resolveId: (id) => (id === 'virtual:provenance-proof' ? '\0provenance-proof.js' : null),
             load: (id) =>
               id === '\0provenance-proof.js'
-                ? `import ${JSON.stringify(path.join(root, 'src/styles.css'))};import React from 'react';import {createRoot} from 'react-dom/client';import SourceInspector from ${JSON.stringify(path.join(root, 'src/computer/SourceInspector.tsx'))};createRoot(document.getElementById('root')).render(React.createElement(SourceInspector,{workspaceId:'project',path:'workspace/analysis/plot-run.json'}));`
+                ? `import ${JSON.stringify(path.join(root, 'src/styles/index.css'))};import React from 'react';import {createRoot} from 'react-dom/client';import SourceInspector from ${JSON.stringify(path.join(root, 'src/computer/SourceInspector.tsx'))};createRoot(document.getElementById('root')).render(React.createElement(SourceInspector,{workspaceId:'project',path:'workspace/analysis/plot-run.json'}));`
                 : null
           }
         ],

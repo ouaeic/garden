@@ -416,14 +416,6 @@ export function CommentSurface({
   );
 }
 
-const themeInk = () => {
-  const style = getComputedStyle(document.documentElement);
-  return {
-    ink: style.getPropertyValue('--text').trim(),
-    paper: style.getPropertyValue('--bg').trim()
-  };
-};
-
 /**
  * A frame — a drawn view or a live app — taking comments. The page inside runs the same anchoring
  * code and draws the pins itself, so they scroll with it. An app the bridge never reached takes
@@ -495,8 +487,7 @@ export function FrameComments({
         type: 'comments',
         commenting: commenting && !writing,
         pins: JSON.parse(signature) as Pin[],
-        focus,
-        ...themeInk()
+        focus
       },
       '*'
     );

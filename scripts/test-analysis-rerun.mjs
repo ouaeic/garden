@@ -17,7 +17,7 @@ const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const report = process.env.GARDEN_RERUN_REPORT;
 
 test(
-  'selected scientific reruns survive reload, check drift, and submit through the conversation',
+  'selected scientific reruns survive reload, check drift, and plant through the ask bar',
   { timeout: 120_000 },
   async () => {
     const directory = await mkdtemp(path.join(tmpdir(), 'garden-rerun-view-'));
@@ -63,19 +63,13 @@ test(
         status: 'running',
         securityMode: 'autonomous'
       };
-      const task = {
-        id: '20000000-0000-4000-8000-000000000002',
-        workspaceId: workspace.id,
-        projectId: '20000000-0000-4000-8000-000000000002',
-        status: 'completed',
-        modelId: 'test/model',
-        privacyRoute: 'provider_zdr',
-        securityMode: 'autonomous',
-        reasoningEffort: 'auto'
-      };
-      const bootstrap = {
-        user: { id: 'user' },
+      const bootstrap = (drafts) => ({
+        user: { id: 'user', displayName: 'Owner', preferences: {} },
         instance: { enforceZeroDataRetention: false },
+        workspaces: [workspace],
+        tasks: [],
+        drafts,
+        schedules: [],
         models: [
           {
             id: 'test/model',
@@ -85,7 +79,7 @@ test(
             availability: 'available'
           }
         ]
-      };
+      });
       const manifestPath = 'workspace/analysis/run.json';
       const root = path.resolve(import.meta.dirname, '../apps/web'),
         output = path.join(directory, 'dist');
@@ -101,17 +95,18 @@ test(
             load: (id) =>
               id === '\0rerun-proof.js'
                 ? `
-import ${JSON.stringify(path.join(root, 'src/styles.css'))};
-import ${JSON.stringify(path.join(root, 'src/garden.css'))};
-import React,{useState} from 'react';import {createRoot} from 'react-dom/client';
+import ${JSON.stringify(path.join(root, 'src/styles/index.css'))};
+
+import React from 'react';import {createRoot} from 'react-dom/client';
 import SourceInspector from ${JSON.stringify(path.join(root, 'src/computer/SourceInspector.tsx'))};
-import Composer from ${JSON.stringify(path.join(root, 'src/Composer.tsx'))};
-import {recoverDeviceDrafts} from ${JSON.stringify(path.join(root, 'src/draft-storage.ts'))};
-const recovered=await recoverDeviceDrafts('user');const serverDraft=await fetch('/v1/drafts').then(r=>r.json());const draft=recovered.at(-1)??serverDraft;
-function Proof(){const[context,setContext]=useState(draft.controls?.context??null);return React.createElement(React.Fragment,null,
- React.createElement(SourceInspector,{workspaceId:${JSON.stringify(workspace.id)},path:${JSON.stringify(manifestPath)},onRerunAnalysis:setContext}),
- React.createElement('button',{onClick:()=>setContext({kind:'selection',text:'Keep this selected passage'})},'Select passage'),
- React.createElement(Composer,{workspace:${JSON.stringify(workspace)},task:${JSON.stringify(task)},bootstrap:${JSON.stringify(bootstrap)},initialDraft:draft,context,onContextChange:setContext,onDraft:()=>{},onSent:()=>setContext(null)}));}
+import AskBar from ${JSON.stringify(path.join(root, 'src/ask/AskBar.tsx'))};
+import {NEW_GOAL,rerunAnalysis,setDirection} from ${JSON.stringify(path.join(root, 'src/ask/direction.ts'))};
+import {refresh,useGarden} from ${JSON.stringify(path.join(root, 'src/app/store.ts'))};
+await refresh();
+function Proof(){const{bootstrap,moves}=useGarden();if(!bootstrap)return null;return React.createElement(React.Fragment,null,
+ React.createElement(SourceInspector,{workspaceId:${JSON.stringify(workspace.id)},path:${JSON.stringify(manifestPath)},onRerunAnalysis:rerunAnalysis}),
+ React.createElement('button',{onClick:()=>setDirection(NEW_GOAL,{kind:'selection',text:'Keep this selected passage'})},'Select passage'),
+ React.createElement(AskBar,{bootstrap,workspace:bootstrap.workspaces[0],goal:null,moves}));}
 createRoot(document.getElementById('root')).render(React.createElement(Proof));`
                 : null
           }
@@ -129,7 +124,7 @@ createRoot(document.getElementById('root')).render(React.createElement(Proof));`
         .join('');
       let draft = {
         workspaceId: workspace.id,
-        taskId: task.id,
+        taskId: null,
         body: '',
         attachments: [],
         revision: 0
@@ -137,7 +132,19 @@ createRoot(document.getElementById('root')).render(React.createElement(Proof));`
       let drift = false,
         conflict = false,
         offlineDraft = false;
+      const planted = {
+        id: '20000000-0000-4000-8000-000000000002',
+        workspaceId: workspace.id,
+        scheduleId: null,
+        title: 'Rerun base counts',
+        status: 'queued',
+        securityMode: 'autonomous',
+        spentUsd: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
       const sent = [],
+        unknown = [],
         requests = [],
         writes = [];
       const json = (res, status, value) =>
@@ -149,7 +156,7 @@ createRoot(document.getElementById('root')).render(React.createElement(Proof));`
             requests.push({ method: req.method, path: url.pathname });
           if (url.pathname === '/')
             return res.end(
-              `<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">${css}<main style="max-width:800px;margin:auto;padding:16px"><div id="root"></div></main><script type="module" src="/proof.js"></script>`
+              `<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">${css}<main style="max-width:800px;margin:auto;padding:16px 16px 200px"><div id="root"></div></main><script type="module" src="/proof.js"></script>`
             );
           if (url.pathname === '/v1/drafts/device-key')
             return json(res, 200, {
@@ -186,9 +193,9 @@ createRoot(document.getElementById('root')).render(React.createElement(Proof));`
               .writeHead(200, { 'x-content-sha256': sha(bytes), 'x-truncated': 'false' })
               .end(bytes);
           }
-          if (url.pathname === `/v1/tasks/${task.id}/model-preferences`)
-            return json(res, 200, { revision: 0, purposes: [], projectTaskId: task.projectId });
-          if (url.pathname === `/v1/tasks/${task.id}/messages`) {
+          if (url.pathname === '/v1/bootstrap') return json(res, 200, bootstrap([draft]));
+          if (url.pathname === '/v1/moves') return json(res, 200, []);
+          if (url.pathname === '/v1/tasks') {
             assert.equal(req.method, 'POST');
             let chunks = [];
             for await (const chunk of req) chunks.push(chunk);
@@ -196,7 +203,11 @@ createRoot(document.getElementById('root')).render(React.createElement(Proof));`
               payload: JSON.parse(Buffer.concat(chunks)),
               key: req.headers['idempotency-key']
             });
-            return json(res, 200, task);
+            return json(res, 200, planted);
+          }
+          if (url.pathname.startsWith('/v1/')) {
+            unknown.push(`${req.method} ${url.pathname}`);
+            return json(res, 404, { error: { code: 'not_found', message: 'Not in this proof' } });
           }
           if (!/^\/(?:assets\/[^/]+|proof.js)$/.test(url.pathname)) return res.writeHead(404).end();
           res.setHeader(
@@ -220,8 +231,10 @@ createRoot(document.getElementById('root')).render(React.createElement(Proof));`
       await page.goto(`http://127.0.0.1:${server.address().port}`);
       const select = () =>
         page.getByRole('button', { name: 'Rerun with changes', exact: true }).click();
-      const input = page.getByRole('textbox', { name: 'Add direction to this work', exact: true });
-      const context = page.getByRole('region', { name: 'Selected analysis', exact: true });
+      const input = page.getByRole('textbox', { name: 'What should garden grow?', exact: true });
+      const context = page.getByText('Rerun “Base counts” with your changes', { exact: true });
+      const passage = (text) => page.getByText(`“${text}” will go with this`, { exact: true });
+      const plant = () => page.getByRole('button', { name: 'Plant', exact: true }).click();
       const synced = () =>
         page.getByRole('status', { name: 'Draft synced', exact: true }).waitFor();
       const saveAction = async (action, matches) => {
@@ -240,6 +253,7 @@ createRoot(document.getElementById('root')).render(React.createElement(Proof));`
 
       await page.getByRole('region', { name: 'Analysis run record', exact: true }).waitFor();
       await saveAction(select, (value) => value.controls?.context?.kind === 'analysis');
+      await context.waitFor();
       assert.equal(draft.body, '');
       assert.equal(draft.controls.context.sha256, sha(record));
       assert.equal(sent.length, 0, 'Selecting a run never starts a model or process');
@@ -250,17 +264,21 @@ createRoot(document.getElementById('root')).render(React.createElement(Proof));`
       await page.reload();
       await context.waitFor();
       assert.equal(await input.inputValue(), 'Use a minimum sequence length of 20.');
+      assert.equal(
+        draft.controls?.context?.kind,
+        'analysis',
+        'Opening a saved draft never rewrites away what it points at'
+      );
       drift = true;
-      await page.getByRole('button', { name: 'Send', exact: true }).click();
+      await plant();
       await page.getByText(/The selected analysis record has changed/).waitFor();
       assert.equal(sent.length, 0, 'Changed record blocks submission before model spend');
       drift = false;
-      await page.getByRole('button', { name: 'Send', exact: true }).click();
+      await plant();
       await context.waitFor({ state: 'hidden' });
       assert.equal(sent.length, 1);
       assert.ok(sent[0].key);
-      assert.equal(sent[0].payload.securityMode, 'autonomous');
-      assert.equal(sent[0].payload.privacyRoute, 'provider_zdr');
+      assert.equal(sent[0].payload.workspaceId, workspace.id);
       assert.ok(sent[0].payload.prompt.startsWith('Use a minimum sequence length of 20.'));
       assert.deepEqual(
         JSON.parse(sent[0].payload.prompt.split('as a separate run that keeps the original: ')[1]),
@@ -274,6 +292,7 @@ createRoot(document.getElementById('root')).render(React.createElement(Proof));`
         }
       );
       await page.reload();
+      await page.getByRole('region', { name: 'Analysis run record', exact: true }).waitFor();
       assert.equal(await input.inputValue(), '');
       assert.equal(await context.count(), 0);
       await saveAction(
@@ -281,16 +300,14 @@ createRoot(document.getElementById('root')).render(React.createElement(Proof));`
         (value) => value.controls?.context?.kind === 'selection'
       );
       await page.reload();
-      await page.getByRole('region', { name: 'Selected context', exact: true }).waitFor();
+      await passage('Keep this selected passage').waitFor();
       await saveAction(
-        () => page.getByRole('button', { name: 'Clear selected context', exact: true }).click(),
+        () => page.getByRole('button', { name: 'Drop the passage', exact: true }).click(),
         (value) => !value.controls?.context
       );
       await page.reload();
-      assert.equal(
-        await page.getByRole('region', { name: 'Selected context', exact: true }).count(),
-        0
-      );
+      await page.getByRole('region', { name: 'Analysis run record', exact: true }).waitFor();
+      assert.equal(await passage('Keep this selected passage').count(), 0);
       offlineDraft = true;
       await select();
       await Promise.all([
@@ -315,18 +332,18 @@ createRoot(document.getElementById('root')).render(React.createElement(Proof));`
       };
       conflict = true;
       await input.fill('A conflicting local edit');
-      await page.getByRole('status', { name: 'Choose a draft version', exact: true }).waitFor();
       conflict = false;
       await page.getByRole('button', { name: 'Use other draft', exact: true }).click();
-      await page.getByRole('region', { name: 'Selected context', exact: true }).waitFor();
+      await passage('Direction from another device').waitFor();
       assert.equal(await input.inputValue(), 'Keep the server direction');
       await saveAction(select, (value) => value.controls?.context?.kind === 'analysis');
-      await page.setViewportSize({ width: 360, height: 760 });
+      await page.setViewportSize({ width: 320, height: 700 });
       await context.waitFor();
       assert.equal(
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
         true
       );
+      assert.deepEqual(unknown, [], 'The ask bar only calls what this proof serves');
       assert.deepEqual(errors, []);
       assert.ok(writes.length > 0);
       if (report) {
@@ -344,11 +361,10 @@ createRoot(document.getElementById('root')).render(React.createElement(Proof));`
                 'server reload',
                 'encrypted device recovery',
                 'changed record refusal',
-                'existing conversation submission',
-                'settings retained',
+                'new goal submission',
                 'clear survives reload',
                 'server conflict context',
-                '360px layout'
+                '320px layout'
               ],
               requests,
               submissions: sent.length

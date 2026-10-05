@@ -1,11 +1,20 @@
-import { Component, lazy, Suspense, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import {
+  Component,
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode
+} from 'react';
 import { toggleTheme } from '../appearance';
 import AskBar from '../ask/AskBar';
 import { stopWatching, watching } from '../ask/ask-bus';
 import Today from '../today/Today';
 import { markLooked } from './actions';
 import { beds, GROWTH_COLOR, growth, money } from './derive';
-import { Screen, Search as SearchIcon, Settings, Theme } from './icons';
+import { More, Screen, Search as SearchIcon, Settings, Theme } from './icons';
 import Light from './Light';
 import { closeSheet, go, openDeal, openGoal, useRoute, type View } from './route';
 import { primaryWorkspace, useGarden } from './store';
@@ -31,7 +40,7 @@ const NAV: { view: View; label: string }[] = [
 /** The frame every view sits in: the light, the header, the stage, the ask bar and the sheets. */
 export default function Shell() {
   const route = useRoute();
-  const { bootstrap, moves } = useGarden();
+  const { bootstrap, moves, error } = useGarden();
   const workspace = primaryWorkspace(bootstrap);
   const tasks = useMemo(() => bootstrap?.tasks ?? [], [bootstrap]);
   const lastLookAt = bootstrap?.user.preferences?.lastLookAt as string | undefined;
@@ -93,12 +102,15 @@ export default function Shell() {
     (move): move is Extract<typeof move, { kind: 'deal' }> =>
       move.kind === 'deal' && move.taskId === route.goal
   );
+  // An open sheet is the only thing that can be reached; what is behind it waits, out of the tab
+  // order and out of the reading order, until it closes.
+  const away = route.sheet ? true : undefined;
   return (
     <div className="app" data-view={route.view}>
       <Light />
       <div className="vignette" aria-hidden="true" />
       <div className="grain" aria-hidden="true" />
-      <header className="top">
+      <header className="top" inert={away}>
         <button type="button" className="brand" onClick={() => go({ view: 'today', sheet: null })}>
           <span className="sr-only">garden, back to Today</span>
           <span aria-hidden="true">garden</span>
@@ -141,6 +153,11 @@ export default function Shell() {
           </span>
           {daily !== undefined && <span className="num glance-spend">{money(daily)} today</span>}
         </div>
+        {error ? (
+          <span className="lost" role="status">
+            Reconnecting…
+          </span>
+        ) : null}
         <div className="top-tools">
           <button
             type="button"
@@ -176,10 +193,15 @@ export default function Shell() {
           >
             <Theme />
           </button>
+          <PhoneMenu view={route.view} />
         </div>
       </header>
 
-      <main className="stage" key={route.view === 'goal' ? `goal:${route.goal}` : route.view}>
+      <main
+        className="stage"
+        key={route.view === 'goal' ? `goal:${route.goal}` : route.view}
+        inert={away}
+      >
         <ViewBoundary>
           <Suspense fallback={<div className="view-loading" aria-busy="true" />}>
             {route.view === 'today' && <Today catchUp={changed.length > 0} />}
@@ -193,7 +215,13 @@ export default function Shell() {
       </main>
 
       {workspace && route.view !== 'settings' && (
-        <AskBar bootstrap={bootstrap} workspace={workspace} goal={goalTask ?? null} moves={moves} />
+        <AskBar
+          bootstrap={bootstrap}
+          workspace={workspace}
+          goal={goalTask ?? null}
+          moves={moves}
+          away={away}
+        />
       )}
 
       <Suspense fallback={null}>
@@ -213,6 +241,67 @@ export default function Shell() {
         <UpdateNotice onSettings={() => go({ view: 'settings', section: 'instance' })} />
       </Suspense>
       <Toasts />
+    </div>
+  );
+}
+
+/** On a phone the header keeps the views; the rest of the tools fold into one menu. */
+function PhoneMenu({ view }: { view: View }) {
+  const [open, setOpen] = useState(false);
+  const menu = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (event: PointerEvent) => {
+      if (!menu.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(false);
+    addEventListener('pointerdown', away);
+    addEventListener('keydown', escape);
+    return () => {
+      removeEventListener('pointerdown', away);
+      removeEventListener('keydown', escape);
+    };
+  }, [open]);
+  const pick = (run: () => void) => () => {
+    setOpen(false);
+    run();
+  };
+  return (
+    <div className="phone-menu" ref={menu}>
+      <button
+        type="button"
+        className="icon-btn"
+        aria-label="More"
+        aria-expanded={open}
+        aria-controls="phone-menu"
+        onClick={() => setOpen(!open)}
+      >
+        <More />
+      </button>
+      {open && (
+        <div id="phone-menu" className="phone-menu-list pane">
+          <button type="button" onClick={pick(() => go({ sheet: 'search' }))}>
+            <SearchIcon /> Search
+          </button>
+          <button
+            type="button"
+            aria-current={view === 'computer' ? 'page' : undefined}
+            onClick={pick(() => go({ view: 'computer', sheet: null }))}
+          >
+            <Screen /> Your computer
+          </button>
+          <button
+            type="button"
+            aria-current={view === 'settings' ? 'page' : undefined}
+            onClick={pick(() => go({ view: 'settings', sheet: null }))}
+          >
+            <Settings /> Settings
+          </button>
+          <button type="button" onClick={pick(toggleTheme)}>
+            <Theme /> Day or night
+          </button>
+        </div>
+      )}
     </div>
   );
 }

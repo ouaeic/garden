@@ -31,6 +31,7 @@ export default [
     // Browser probes run DOM callbacks inside the page alongside their Node harness.
     files: [
       'scripts/browser-*.mjs',
+      'scripts/build-brand.mjs',
       'scripts/test-browser-errors.mjs',
       'scripts/test-account-connections.mjs',
       'scripts/test-analysis-*.mjs',
@@ -38,8 +39,6 @@ export default [
       'scripts/test-password-workflows.mjs',
       'scripts/test-pdf-viewer.mjs',
       'scripts/test-private-diagnostics.mjs',
-      'scripts/test-project-cleanup.mjs',
-      'scripts/test-project-git.mjs',
       'scripts/test-svg-preview.mjs',
       'scripts/test-voice-reconnect.mjs',
       'scripts/test-web-layout.mjs'

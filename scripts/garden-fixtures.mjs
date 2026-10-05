@@ -246,6 +246,8 @@ export function createGardenFixtures(now = Date.now()) {
     moves,
     schedules,
     preferences: { lastLookAt: at(-26 * HOUR) },
+    drafts: new Map(),
+    serverUpdate: 'current',
     created: [],
     record: [
       {
@@ -322,7 +324,7 @@ export function createGardenFixtures(now = Date.now()) {
     tasksCursor: null,
     scheduleRunCounts: {},
     schedules: state.schedules,
-    drafts: [],
+    drafts: [...state.drafts.values()],
     projects: [],
     projectsCursor: null,
     models: [
@@ -708,6 +710,10 @@ export function createGardenFixtures(now = Date.now()) {
       );
     if ((match = /^\/v1\/tasks\/([^/]+)\/presentation$/.exec(path)))
       return (json(response, presentationFor(match[1])), true);
+    if (/^\/v1\/tasks\/[^/]+\/coding-missions$/.test(path))
+      return (json(response, { missions: [] }), true);
+    if (/^\/v1\/tasks\/[^/]+\/media-(jobs|assets|batches)$/.test(path))
+      return (json(response, []), true);
     if ((match = /^\/v1\/tasks\/([^/]+)\/processes$/.exec(path)))
       return (json(response, processes()), true);
     if ((match = /^\/v1\/artifacts\/([^/]+)\/content$/.exec(path))) {
@@ -792,7 +798,10 @@ export function createGardenFixtures(now = Date.now()) {
       return (
         json(response, {
           checkedAt: at(0),
-          server: { status: 'current', revision: null },
+          server: {
+            status: state.serverUpdate,
+            revision: state.serverUpdate === 'available' ? 'f00dfeed' : null
+          },
           client: null
         }),
         true
@@ -819,6 +828,140 @@ export function createGardenFixtures(now = Date.now()) {
       return (json(response, { preferences: state.preferences }), true);
     }
     if (path === '/v1/search') return (json(response, []), true);
+    if (path === `/v1/workspaces/${workspace.id}/memories`) return (json(response, []), true);
+    if (path === `/v1/workspaces/${workspace.id}/memory-library`)
+      return (
+        json(response, {
+          items: [
+            {
+              id: randomUUID(),
+              workspaceId: workspace.id,
+              projectId: null,
+              taskId: id(3),
+              kind: 'fact',
+              status: 'active',
+              excerpt: 'Files taxes in the UK; the home office is claimed on actual costs.',
+              observedAt: at(-30 * 24 * HOUR),
+              validTo: null,
+              lastVerified: at(-2 * HOUR)
+            }
+          ],
+          nextCursor: null
+        }),
+        true
+      );
+    if (path === '/v1/account/memory-block')
+      return (
+        json(response, {
+          text: 'I am a computational biologist in Berlin. Keep summaries short.',
+          bytes: 64,
+          limit: 2000,
+          version: 3,
+          updatedAt: at(-9 * 24 * HOUR)
+        }),
+        true
+      );
+    if (path === `/v1/workspaces/${workspace.id}/memory-review`)
+      return (json(response, { procedures: [], disputed: [], proposals: [] }), true);
+    if (path === `/v1/workspaces/${workspace.id}/skills`) return (json(response, []), true);
+    if (path === `/v1/workspaces/${workspace.id}/brief`)
+      return (json(response, { markdown: '', path: 'GARDEN.md' }), true);
+    if (path === '/v1/notifications/settings')
+      return (
+        json(response, {
+          kinds: {
+            approvalRequired: true,
+            taskFinished: true,
+            spendPaused: true,
+            agentMessage: true,
+            takeoverNeeded: true
+          },
+          quietHoursStart: '22:00',
+          quietHoursEnd: '07:00',
+          quietHoursAllowApprovals: true,
+          timeZone: 'Europe/Berlin'
+        }),
+        true
+      );
+    if (path === '/v1/notifications/config')
+      return (json(response, { enabled: false, publicKey: null }), true);
+    if (path === '/v1/notifications/destinations') return (json(response, []), true);
+    if (path === '/v1/instance/diagnostics')
+      return (
+        json(response, {
+          certificate: null,
+          dynamicDns: null,
+          backup: null,
+          autoUpdate: null,
+          backupTimer: null,
+          build: { version: 'fixture' }
+        }),
+        true
+      );
+    if (path === '/v1/relay') return (json(response, { enabled: false, state: 'Disabled' }), true);
+    if (path === '/v1/spend') {
+      const window = (name, spentUsd, capUsd) => ({
+        name,
+        spentUsd,
+        pendingUsd: 0,
+        capUsd,
+        warnAtUsd: capUsd === null ? null : capUsd * 0.8,
+        projectedUsd: spentUsd,
+        state: 'ok',
+        startsAt: name === 'task' ? null : at(-12 * HOUR),
+        endsAt: name === 'task' ? null : at(12 * HOUR)
+      });
+      return (
+        json(response, {
+          limits: {
+            dailyCapUsd: 10,
+            monthlyCapUsd: 150,
+            defaultTaskCapUsd: 5,
+            warnAtPercent: 80,
+            updatedAt: at(-24 * HOUR)
+          },
+          windows: [window('daily', 0.73, 10), window('monthly', 41.2, 150)],
+          byDay: [{ key: at(0).slice(0, 10), costUsd: 0.73, calls: 31 }],
+          byModel: [{ key: 'fixture/lead', costUsd: 0.73, calls: 31 }],
+          byTask: [{ key: id(1), costUsd: 0.6, calls: 22 }]
+        }),
+        true
+      );
+    }
+    if (path === '/v1/usage')
+      return (
+        json(response, {
+          period: { start: at(-12 * HOUR), end: at(12 * HOUR) },
+          totals: { settled: 0.73 },
+          storageBytes: workspace.storageBytes,
+          storageLimitBytes: workspace.storageLimitBytes,
+          storageThreshold: 'ok',
+          history: []
+        }),
+        true
+      );
+    if (path === '/v1/drafts/device-key')
+      return (
+        json(response, {
+          userId: '40000000-0000-4000-8000-000000000004',
+          sessionId: 'fixture-session',
+          key: Buffer.alloc(32, 7).toString('base64url')
+        }),
+        true
+      );
+    if (path === '/v1/drafts') {
+      const scope = (draft) => `${draft.workspaceId}:${draft.taskId ?? ''}`;
+      if (method === 'GET') {
+        const key = `${url.searchParams.get('workspaceId')}:${url.searchParams.get('taskId') ?? ''}`;
+        return (json(response, state.drafts.get(key) ?? null), true);
+      }
+      const input = await body(request);
+      const current = state.drafts.get(scope(input));
+      const revision = (current?.revision ?? 0) + 1;
+      const { expectedRevision: _expected, ...draft } = input;
+      state.drafts.set(scope(input), { ...draft, revision, updatedAt: at(0) });
+      return (json(response, { revision, updatedAt: at(0) }), true);
+    }
     if (path === '/v1/tasks' && method === 'POST') {
       const input = await body(request);
       const created = {

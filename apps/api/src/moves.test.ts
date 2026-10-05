@@ -127,7 +127,7 @@ const setup = async () => {
       ).title
     })
   } as unknown as RouteContext);
-  return { app };
+  return { app, carded, paused };
 };
 
 describe('what is waiting on the owner, and what left the computer', () => {
@@ -157,5 +157,18 @@ describe('what is waiting on the owner, and what left the computer', () => {
       ['card', 'waiting', 'Submit the application'],
       ['key', 'approved', 'Send the email']
     ]);
+  });
+
+  it('keeps one goal’s record to that goal, filtered where it is stored', async () => {
+    const { app, carded, paused } = await setup();
+    const of = async (taskId: string) =>
+      (await app.inject({ method: 'GET', url: `/v1/record?taskId=${taskId}` })).json<
+        RecordEntry[]
+      >();
+    expect((await of(carded.id)).map((entry) => entry.action).sort()).toEqual([
+      'Send the email',
+      'Submit the application'
+    ]);
+    expect(await of(paused.id)).toEqual([]);
   });
 });

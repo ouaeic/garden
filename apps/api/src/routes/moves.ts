@@ -169,7 +169,10 @@ export const registerMoveRoutes = (context: RouteContext): void => {
     const only = z.uuid().optional().parse(request.query.taskId);
     const open = opener(user.id);
     const entries: RecordEntry[] = [];
-    for (const approval of await store.listApprovals(user.id, null, { limit })) {
+    for (const approval of await store.listApprovals(user.id, null, {
+      limit,
+      taskId: only ?? null
+    })) {
       const opened = await open(String(approval.taskId));
       const preview = opened ? approvalPreview(approval, opened.key) : {};
       const status = String(approval.status);
@@ -186,7 +189,7 @@ export const registerMoveRoutes = (context: RouteContext): void => {
         sideEffect: approval.sideEffect as RecordEntry['sideEffect']
       });
     }
-    for (const audit of await store.listConnectorAudit(user.id, limit)) {
+    for (const audit of await store.listConnectorAudit(user.id, limit, only ?? null)) {
       if (!CONNECTOR_WRITE.test(audit.operation)) continue;
       const opened = audit.taskId ? await open(audit.taskId) : null;
       entries.push({
@@ -201,9 +204,6 @@ export const registerMoveRoutes = (context: RouteContext): void => {
         verdict: audit.outcome === 'denied' ? 'refused' : audit.outcome
       });
     }
-    return entries
-      .filter((entry) => !only || entry.taskId === only)
-      .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
-      .slice(0, limit);
+    return entries.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, limit);
   });
 };

@@ -8,7 +8,7 @@ import { isNativeClient } from '../client';
 import { growth } from '../app/derive';
 import { answer as answerQuestion } from '../app/actions';
 import { onAskText, watchSent } from './ask-bus';
-import { setDirection, useDirection } from './direction';
+import { NEW_GOAL, seedDirection, setDirection, useDirection } from './direction';
 import './ask.css';
 
 const DictationSetup = lazy(() => import('../DictationSetup'));
@@ -25,12 +25,15 @@ export default function AskBar({
   bootstrap,
   workspace,
   goal,
-  moves
+  moves,
+  away
 }: {
   bootstrap: Bootstrap;
   workspace: Workspace;
   goal: Task | null;
   moves: readonly OwnerMove[];
+  /** True while a sheet is open over everything; the bar keeps its draft but cannot be reached. */
+  away?: true | undefined;
 }) {
   const [fresh, setFresh] = useState(false);
   const task = fresh ? null : goal;
@@ -44,6 +47,7 @@ export default function AskBar({
   return (
     <AskForm
       key={task?.id ?? 'new'}
+      away={away}
       bootstrap={bootstrap}
       workspace={workspace}
       task={task}
@@ -64,8 +68,10 @@ function AskForm({
   canFresh,
   onFresh,
   onBack,
-  running
+  running,
+  away
 }: {
+  away: true | undefined;
   bootstrap: Bootstrap;
   workspace: Workspace;
   task: Task | null;
@@ -78,18 +84,20 @@ function AskForm({
   const initialDraft = bootstrap.drafts.find(
     (draft) => draft.workspaceId === workspace.id && (draft.taskId ?? null) === (task?.id ?? null)
   );
-  const context = useDirection(task?.id ?? null);
+  const scope = task?.id ?? NEW_GOAL;
+  seedDirection(scope, initialDraft?.controls?.context);
+  const context = useDirection(scope);
   const composer = useComposer({
     workspace,
     bootstrap,
     task,
     context,
-    onContextChange: (next) => task && setDirection(task.id, next),
+    onContextChange: (next) => setDirection(scope, next),
     ...(initialDraft ? { initialDraft } : {}),
     onDraft: () => undefined,
     onSent: (sent) => {
       putTask(sent);
-      if (task) setDirection(task.id, null);
+      setDirection(scope, null);
       if (!task) watchSent(sent.id);
       refreshSoon(800);
     },
@@ -128,9 +136,20 @@ function AskForm({
     setDictationSetup,
     cancelUpload,
     cancelDictation,
-    recoverAsDraft
+    recoverAsDraft,
+    saved,
+    draftConflict,
+    resolveDraft,
+    retryDraftSync
   } = composer;
+  // A synced draft is the normal state and is only announced; trouble is shown.
+  const quiet = saved === 'Draft synced' || saved === 'Saving draft…';
 
+  useEffect(() => {
+    const focus = () => input.current?.focus();
+    addEventListener('garden:rerun-analysis', focus);
+    return () => removeEventListener('garden:rerun-analysis', focus);
+  }, [input]);
   useEffect(() => {
     const stop = onAskText((text) => {
       changeBody(text);
@@ -149,6 +168,7 @@ function AskForm({
   return (
     <form
       className={`ask ${typing ? 'is-typing' : ''}`}
+      inert={away}
       onSubmit={(event) => {
         event.preventDefault();
         void send();
@@ -182,13 +202,23 @@ function AskForm({
             Back to this goal
           </button>
         )}
-        {context?.kind === 'notes' && (
+        {context && (
           <span className="hint">
-            {context.notes.length} comment{context.notes.length === 1 ? '' : 's'} will go with this
+            {context.kind === 'analysis'
+              ? `Rerun “${context.name || 'this analysis'}” with your changes`
+              : context.kind === 'notes'
+                ? `${context.notes.length} comment${context.notes.length === 1 ? '' : 's'} will go with this`
+                : `“${context.text.replace(/\s+/g, ' ').slice(0, 48)}${context.text.length > 48 ? '…' : ''}” will go with this`}
             <button
               type="button"
-              aria-label="Drop the comments"
-              onClick={() => task && setDirection(task.id, null)}
+              aria-label={
+                context.kind === 'analysis'
+                  ? 'Do not rerun it'
+                  : context.kind === 'notes'
+                    ? 'Drop the comments'
+                    : 'Drop the passage'
+              }
+              onClick={() => setDirection(scope, null)}
             >
               <Close />
             </button>
@@ -233,6 +263,40 @@ function AskForm({
             <button type="button" className="hint-link" onClick={() => void recoverAsDraft()}>
               Keep as a draft
             </button>
+          </span>
+        )}
+        {draftConflict && (
+          <span className="hint is-warn" title={draftConflict.body || '(No text)'}>
+            A newer draft exists on another device.{' '}
+            <button
+              type="button"
+              className="hint-link"
+              disabled={busy}
+              onClick={() => void resolveDraft('device')}
+            >
+              Keep mine
+            </button>{' '}
+            <button
+              type="button"
+              className="hint-link"
+              disabled={busy}
+              onClick={() => void resolveDraft('server')}
+            >
+              Use other draft
+            </button>
+          </span>
+        )}
+        {pendingTask && (
+          <span className="hint">
+            Sent, but the draft did not clear.{' '}
+            <button type="button" className="hint-link" disabled={busy} onClick={retryDraftSync}>
+              Retry and open it
+            </button>
+          </span>
+        )}
+        {saved && !draftConflict && !pendingTask && (
+          <span className={`hint${quiet ? ' sr-only' : ''}`} role="status" aria-label={saved}>
+            {saved}
           </span>
         )}
         {error ? (

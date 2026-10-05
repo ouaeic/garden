@@ -69,7 +69,7 @@ beforeAll(async () => {
         resolveId: (id) => (id === 'virtual:pdf-proof' ? '\0pdf-proof.js' : null),
         load: (id) =>
           id === '\0pdf-proof.js'
-            ? `import ${JSON.stringify(path.resolve(import.meta.dirname, '../apps/web/src/styles.css'))};import React from 'react';import {createRoot} from 'react-dom/client';import PdfPreview from ${JSON.stringify(path.resolve(import.meta.dirname, '../apps/web/src/computer/PdfPreview.tsx'))};const root=createRoot(document.getElementById('root'));root.render(React.createElement(PdfPreview,{url:'/fixture.pdf',name:'Garden proof'}));window.closePdf=()=>root.unmount();window.showPdf=(url,name='Garden proof')=>root.render(React.createElement(PdfPreview,{url,name}));`
+            ? `import ${JSON.stringify(path.resolve(import.meta.dirname, '../apps/web/src/styles/index.css'))};import React from 'react';import {createRoot} from 'react-dom/client';import PdfPreview from ${JSON.stringify(path.resolve(import.meta.dirname, '../apps/web/src/computer/PdfPreview.tsx'))};const root=createRoot(document.getElementById('root'));root.render(React.createElement(PdfPreview,{url:'/fixture.pdf',name:'Garden proof'}));window.closePdf=()=>root.unmount();window.showPdf=(url,name='Garden proof')=>root.render(React.createElement(PdfPreview,{url,name}));`
             : null
       }
     ],

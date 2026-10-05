@@ -101,7 +101,7 @@
 
 .notebook-toolbar .button[aria-pressed='true'] {
   background: var(--paper);
-  color: var(--ink);
+  color: var(--paper-ink);
   border-color: var(--paper);
 }
 

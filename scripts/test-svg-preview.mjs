@@ -35,7 +35,7 @@ test(
             resolveId: (id) => (id === 'virtual:svg-proof' ? '\0svg-proof.js' : null),
             load: (id) =>
               id === '\0svg-proof.js'
-                ? `import ${JSON.stringify(path.join(root, 'src/styles.css'))};import React from 'react';import {createRoot} from 'react-dom/client';import {ResultPreview} from ${JSON.stringify(path.join(root, 'src/computer/ResultPreview.tsx'))};const root=createRoot(document.getElementById('root'));window.show=(id,size=100,mime='image/svg+xml')=>root.render(React.createElement(ResultPreview,{artifact:{id,name:id+'.svg',mimeType:mime,sizeBytes:size}}));window.show('valid');`
+                ? `import ${JSON.stringify(path.join(root, 'src/styles/index.css'))};import React from 'react';import {createRoot} from 'react-dom/client';import {ResultPreview} from ${JSON.stringify(path.join(root, 'src/computer/ResultPreview.tsx'))};const root=createRoot(document.getElementById('root'));window.show=(id,size=100,mime='image/svg+xml')=>root.render(React.createElement(ResultPreview,{artifact:{id,name:id+'.svg',mimeType:mime,sizeBytes:size}}));window.show('valid');`
                 : null
           }
         ],

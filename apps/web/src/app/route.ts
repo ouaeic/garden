@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { fileNavigationBlocked } from '../file-navigation';
 
 /**
  * Where the owner is, kept in the address bar so a link, a reload and the back button all agree.
@@ -57,12 +58,21 @@ const format = (route: Route): string => {
 };
 
 let current = parse(location.search);
+let shown = format(current);
 const listeners = new Set<() => void>();
 const publish = () => {
   current = parse(location.search);
+  shown = format(current);
   listeners.forEach((listener) => listener());
 };
-addEventListener('popstate', publish);
+/** Leaving the place an unsaved edit lives waits for the owner to save or discard it. */
+const leaving = (next: Route) =>
+  format({ ...next, sheet: null }) !== format({ ...current, sheet: null }) &&
+  fileNavigationBlocked();
+addEventListener('popstate', () => {
+  if (leaving(parse(location.search))) history.pushState(history.state, '', shown);
+  else publish();
+});
 addEventListener(CHANGE, publish);
 
 export const currentRoute = (): Route => current;
@@ -77,7 +87,7 @@ export function go(patch: Partial<Route>, options: { replace?: boolean } = {}): 
   };
   if (next.view !== 'goal' && !next.sheet) next.goal = null;
   const url = format(next);
-  if (url === `${location.pathname}${location.search}`) return;
+  if (url === `${location.pathname}${location.search}` || leaving(next)) return;
   history[options.replace ? 'replaceState' : 'pushState'](history.state, '', url);
   dispatchEvent(new Event(CHANGE));
 }

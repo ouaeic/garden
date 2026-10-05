@@ -19,19 +19,29 @@ import {
  */
 export default function Moves({ moves }: { moves: readonly OwnerMove[] }) {
   const [gone, setGone] = useState<ReadonlySet<string>>(new Set());
+  const [turn, setTurn] = useState(0);
   const keyOf = (move: OwnerMove) =>
     move.kind === 'approval'
       ? move.approvalId
       : move.kind === 'spend'
         ? `spend:${move.taskId}`
         : move.questionId;
-  const live = moves.filter((move) => !gone.has(keyOf(move)));
+  const waiting = moves.filter((move) => !gone.has(keyOf(move)));
+  // "Not this one yet" moves the top card to the back, so nothing waits behind a harder choice.
+  const shift = waiting.length ? turn % waiting.length : 0;
+  const live = [...waiting.slice(shift), ...waiting.slice(0, shift)];
   const done = (move: OwnerMove) => setGone((set) => new Set(set).add(keyOf(move)));
   return (
     <section className="pane moves" aria-labelledby="moves-title">
       <div className="pane-head">
         <h2 id="moves-title">Your move</h2>
-        <span className="count">{live.length ? `${live.length} waiting` : ''}</span>
+        {live.length > 1 ? (
+          <button type="button" className="count link" onClick={() => setTurn((at) => at + 1)}>
+            {live.length} waiting · next
+          </button>
+        ) : (
+          <span className="count">{live.length ? '1 waiting' : ''}</span>
+        )}
       </div>
       {live.length ? (
         <div className="deck">
@@ -128,7 +138,7 @@ function MoveCard({ move, top, onDone }: { move: OwnerMove; top: boolean; onDone
             }}
           >
             <input
-              className="field"
+              className="input"
               value={reply}
               onChange={(event) => setReply(event.target.value)}
               placeholder={move.options.length ? 'Or say it in your words' : 'Your answer'}
@@ -224,7 +234,7 @@ function MoveCard({ move, top, onDone }: { move: OwnerMove; top: boolean; onDone
               }}
             >
               <input
-                className="field"
+                className="input"
                 value={reply}
                 maxLength={APPROVAL_NOTE_MAX_CHARS}
                 onChange={(event) => setReply(event.target.value)}

@@ -1,6 +1,7 @@
 import { useAuthEntry } from './auth-entry';
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, Check, Moon, Sun } from './icons';
+import { Check, Theme } from './app/icons';
+import Light from './app/Light';
 import { get } from './client';
 import {
   devSignIn,
@@ -14,7 +15,7 @@ import {
 } from './auth';
 import type { AuthResult } from './auth';
 import { Button, ErrorNotice, Field } from './ui';
-import Brand from './Brand';
+import './login.css';
 
 export default function Login({
   pairingCode,
@@ -117,26 +118,23 @@ export default function Login({
   }
   return (
     <main className="welcome">
-      <div className="welcome-top">
-        <Brand />
-        <Button
-          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+      <Light />
+      <header className="welcome-top">
+        <span className="brand">garden</span>
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label={`Switch to ${theme === 'dark' ? 'day' : 'night'}`}
           onClick={toggleTheme}
         >
-          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-        </Button>
-      </div>
-      <section className="welcome-content">
-        <div className="eyebrow">Your own space to think and make</div>
-        <h1>
-          Good things
-          <br />
-          begin here.
-        </h1>
-        <p>A persistent computer for your ideas, your questions, and the work you want done.</p>
+          <Theme />
+        </button>
+      </header>
+      <section className="welcome-card rise">
+        <p className="eyebrow">Your own computer, anywhere</p>
         {recovery ? (
           <div className="recovery-record">
-            <h2>Save your recovery code.</h2>
+            <h1 className="display">Save your recovery code.</h1>
             <p>
               This is how you regain access if you forget your password or lose your passkeys. It is
               shown once.
@@ -152,7 +150,7 @@ export default function Login({
                 onAuthenticated();
               }}
             >
-              <Check size={16} />I have saved it
+              <Check />I have saved it
             </Button>
           </div>
         ) : (
@@ -163,7 +161,7 @@ export default function Login({
               void run();
             }}
           >
-            <h2>
+            <h1 className="display">
               {mode === 'register'
                 ? 'Make this space yours.'
                 : mode === 'recover'
@@ -171,7 +169,7 @@ export default function Login({
                   : mode === 'enroll'
                     ? 'Connect this device.'
                     : 'Welcome back.'}
-            </h2>
+            </h1>
             {(mode === 'register' || mode === 'enroll') && (
               <Field label="Your name">
                 <input
@@ -255,16 +253,17 @@ export default function Login({
                     : mode === 'enroll'
                       ? 'Add this device'
                       : 'Continue with your passkey'}
-              <ArrowUpRight size={18} />
             </Button>
             {(method === 'passkey' || mode === 'enroll') && legal.passkeysUsable === false && (
               <p className="error">
                 Open this computer through its configured HTTPS hostname to use passkeys.
               </p>
             )}
-            <div className="row login-links">
+            <nav className="welcome-links" aria-label="Other ways in">
               {mode !== 'enroll' && (
-                <Button
+                <button
+                  type="button"
+                  className="link-button"
                   onClick={() => {
                     setMethod(method === 'password' ? 'passkey' : 'password');
                     setPassword('');
@@ -272,10 +271,12 @@ export default function Login({
                   }}
                 >
                   {method === 'password' ? 'Use a passkey instead' : 'Use a password instead'}
-                </Button>
+                </button>
               )}
               {mode !== 'login' && (
-                <Button
+                <button
+                  type="button"
+                  className="link-button"
                   onClick={() => {
                     setMode('login');
                     setMethod('password');
@@ -284,10 +285,12 @@ export default function Login({
                   }}
                 >
                   Sign in
-                </Button>
+                </button>
               )}
               {mode !== 'recover' && (
-                <Button
+                <button
+                  type="button"
+                  className="link-button"
                   onClick={() => {
                     setMode('recover');
                     setError(null);
@@ -295,19 +298,21 @@ export default function Login({
                   }}
                 >
                   Recover access
-                </Button>
+                </button>
               )}
               {mode !== 'enroll' && (
-                <Button
+                <button
+                  type="button"
+                  className="link-button"
                   onClick={() => {
                     setMode('enroll');
                     setCode('');
                   }}
                 >
                   Enroll a device
-                </Button>
+                </button>
               )}
-            </div>
+            </nav>
             {import.meta.env.DEV && (
               <Button onClick={() => run(true)} busy={busy}>
                 Development sign-in
@@ -317,7 +322,7 @@ export default function Login({
         )}
         <ErrorNotice error={error} />
       </section>
-      <footer>Self-hosted · AGPL · Your credentials, used directly</footer>
+      <footer className="welcome-foot">Self-hosted · AGPL · Your credentials, used directly</footer>
     </main>
   );
 }

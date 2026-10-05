@@ -102,7 +102,7 @@ export default function Look({
         <section>
           <h2 className="look-h">
             Deliverables{' '}
-            <span className="faint">
+            <span className="count">
               {steps.length
                 ? `${steps.filter((s) => s.status === 'completed').length} of ${steps.length}`
                 : ''}

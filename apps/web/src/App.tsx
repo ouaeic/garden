@@ -9,8 +9,7 @@ import { openGoal } from './app/route';
 import { refresh, signedIn, startGarden, useGarden } from './app/store';
 import Shell from './app/Shell';
 import Light from './app/Light';
-import './styles/foundation.css';
-import './styles/kept.css';
+import './styles/index.css';
 import './app/shell.css';
 
 const Login = lazy(() => import('./Login'));

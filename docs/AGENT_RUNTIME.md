@@ -174,7 +174,7 @@ cell; the page and the text near the pin; or, on a picture, the place within it.
 The same anchoring code runs inside a view's frame and inside a live app, where the preview gateway
 adds it to pages that garden itself frames, so each pin is drawn by the content it points at and
 stays on it through scrolling, resizing and re-rendering. Comments are numbered as their pins are,
-wait in the composer, and go with the next message, which may consist of the comments alone.
+wait in the ask bar, and go with the next message, which may consist of the comments alone.
 
 ## Long work
 

@@ -159,7 +159,7 @@ export class ConnectorStore {
   async listApprovals(
     userId: string,
     status: string | null = 'pending',
-    options: { limit?: number; cursor?: string | null } = {}
+    options: { limit?: number; cursor?: string | null; taskId?: string | null } = {}
   ): Promise<Array<Record<string, unknown>>> {
     const limit = Math.max(
       1,
@@ -172,9 +172,17 @@ export class ConnectorStore {
       `SELECT *, created_at::text AS cursor_at FROM approvals
        WHERE user_id = $1 AND ($2::text IS NULL OR status = $2)
          AND ($3::timestamptz IS NULL OR (created_at, id) < ($3::timestamptz, $4::uuid))
+         AND ($6::uuid IS NULL OR task_id = $6)
        ORDER BY created_at DESC, id DESC
        LIMIT $5`,
-      [userId, status, position?.createdAt ?? null, position?.id ?? null, limit]
+      [
+        userId,
+        status,
+        position?.createdAt ?? null,
+        position?.id ?? null,
+        limit,
+        options.taskId ?? null
+      ]
     );
     return result.rows.map((row) => ({
       id: String(row.id),
@@ -710,11 +718,15 @@ export class ConnectorStore {
     return mapConnectorAudit(result.rows[0]!);
   }
 
-  async listConnectorAudit(userId: string, limit = 100): Promise<ConnectorAuditRecord[]> {
+  async listConnectorAudit(
+    userId: string,
+    limit = 100,
+    taskId: string | null = null
+  ): Promise<ConnectorAuditRecord[]> {
     const result = await this.database.query(
-      `SELECT * FROM connector_audit_events WHERE user_id=$1
+      `SELECT * FROM connector_audit_events WHERE user_id=$1 AND ($3::uuid IS NULL OR task_id=$3)
        ORDER BY created_at DESC, id DESC LIMIT $2`,
-      [userId, Math.max(1, Math.min(500, limit))]
+      [userId, Math.max(1, Math.min(500, limit)), taskId]
     );
     return result.rows.map(mapConnectorAudit);
   }

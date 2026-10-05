@@ -88,7 +88,7 @@ test(
                   : null,
             load: (id) =>
               id === '\0proof.js'
-                ? `import ${JSON.stringify(path.join(root, 'src/styles.css'))};import ${JSON.stringify(path.join(root, 'src/garden.css'))};import React from 'react';import{createRoot}from'react-dom/client';import Voice from ${JSON.stringify(path.join(root, 'src/voice/VoiceSession.tsx'))};createRoot(document.getElementById('root')).render(React.createElement(Voice,{task:${JSON.stringify(task)},onClose:()=>{},onTaskChanged:()=>{}}));`
+                ? `import ${JSON.stringify(path.join(root, 'src/styles/index.css'))};import React from 'react';import{createRoot}from'react-dom/client';import Voice from ${JSON.stringify(path.join(root, 'src/voice/VoiceSession.tsx'))};createRoot(document.getElementById('root')).render(React.createElement(Voice,{task:${JSON.stringify(task)},onClose:()=>{},onTaskChanged:()=>{}}));`
                 : id === '\0audio.js'
                   ? `globalThis.voiceFixture={enabled:false,stops:0};export function createVoiceAudio(callbacks,unused,admission){return{ready:admission,stop(){voiceFixture.stops++;voiceFixture.enabled=false;},setInput(epoch,enabled){voiceFixture.epoch=epoch;voiceFixture.enabled=enabled;},startOutput(){},enqueue(){},done(){},flush(){return 0;}}}`
                   : null

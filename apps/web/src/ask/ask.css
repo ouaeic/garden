@@ -37,6 +37,9 @@
   height: 13px;
   color: var(--leaf);
 }
+.hint.is-warn {
+  color: var(--dew);
+}
 .hint.is-error {
   color: var(--rose);
 }
@@ -65,7 +68,7 @@
   gap: 8px;
   padding: 8px 8px 8px 18px;
   border-radius: 28px;
-  background: var(--pane-2);
+  background: var(--pane-solid);
   border: 1px solid var(--line-2);
   backdrop-filter: blur(30px) saturate(160%);
   -webkit-backdrop-filter: blur(30px) saturate(160%);

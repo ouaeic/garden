@@ -6,9 +6,12 @@
 **One private AI computer, available from every device.**
 
 garden is free, open-source software that turns a Linux computer into a persistent AI
-agent. The owner works with task results, recorded progress, and direct controls; the agent can use the machine’s files, terminal,
-browser, installed GUI applications, long-running processes, and hosted previews. The computer view
-stays out of the way until the user or agent needs it.
+agent. You hand it goals. Anything substantial comes back first as a deal: what it will make, how
+you will know it is done, what it should cost, and which keys it may hold, such as acting as you or
+spending up to a cap. Once you plant it, the work goes on quietly with the machine’s files,
+terminal, browser, installed GUI applications, long-running processes and hosted previews, and
+comes back to you only for what it was not lent. One record keeps everything that left the
+computer, and the computer itself stays out of the way until you want to watch it.
 
 garden has no hosted account, paid tier, VPS marketplace, telemetry service, model server, or local
 inference fallback. Model access belongs to the owner: use OpenRouter, a key from Anthropic, OpenAI,

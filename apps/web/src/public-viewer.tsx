@@ -10,7 +10,6 @@ import { loadShare, loadShareArtifact } from './share-crypto.js';
 import type { OpenedShare } from './share-crypto.js';
 import { shareArtifactDocument } from './share-html.js';
 import './share.css';
-import './wordmark.css';
 
 const friendlyDate = (value: string) =>
   new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
@@ -188,16 +187,14 @@ function ShareViewer() {
   return (
     <div className="share-page">
       <header className="share-masthead">
-        <a className="share-wordmark" href="/" aria-label="garden home">
-          <span className="garden-wordmark" aria-hidden="true" />
+        <a className="share-wordmark" href="/">
+          garden
         </a>
         <span>Shared work</span>
       </header>
       {!snapshot ? (
         <main className="share-state" aria-live="polite">
-          <span className="share-orbit" aria-hidden="true">
-            ✳
-          </span>
+          <span className="share-orbit" aria-hidden="true" />
           <h1>{error ? 'This link could not be opened' : 'Opening a shared work'}</h1>
           <p>{error || 'Decrypting the snapshot in your browser.'}</p>
           {error && (

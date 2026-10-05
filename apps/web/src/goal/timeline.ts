@@ -159,3 +159,12 @@ export function doneWhen(events: readonly TaskEvent[]): string | null {
   }
   return null;
 }
+
+/** What came of a finished goal, as its last completion said it. */
+export function outcome(events: readonly TaskEvent[]): string | null {
+  for (let at = events.length - 1; at >= 0; at--) {
+    const event = events[at]!;
+    if (event.kind === 'completed') return words(record(event.payload).summary) || null;
+  }
+  return null;
+}

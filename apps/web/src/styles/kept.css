@@ -20,6 +20,30 @@
   --font-display: var(--display);
 }
 
+/*
+ * Work shown as it is sits on paper in either theme, so whatever a surface on paper holds - a
+ * loading line, a table, a control - reads in paper ink rather than the night's.
+ */
+.answer,
+.garden-artifact-view {
+  --ink: var(--paper-ink);
+  --ink-2: var(--paper-2);
+  --ink-3: var(--paper-2);
+  --line: var(--paper-line);
+  --line-2: rgba(22, 35, 28, 0.22);
+  --pane: rgba(22, 35, 28, 0.04);
+  --pane-2: rgba(22, 35, 28, 0.07);
+  --leaf: var(--paper-leaf);
+  --text: var(--ink);
+  --muted: var(--ink-2);
+  --dim: var(--ink-3);
+  --panel: var(--pane);
+  --raised-fill: var(--pane-2);
+  --line-strong: var(--line-2);
+  --border: var(--line);
+  --accent: var(--leaf);
+}
+
 .button {
   display: inline-flex;
   align-items: center;
@@ -87,7 +111,7 @@ a.button.primary {
   background: none;
   padding: 0;
   font: inherit;
-  color: var(--ink-2);
+  color: var(--ink);
   text-decoration: underline;
   text-underline-offset: 3px;
 }

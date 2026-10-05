@@ -86,7 +86,8 @@ function DealBody({ move }: { move: DealMove }) {
     () =>
       deal.goals
         .filter((_, index) => planted[index])
-        .map((goal) => goal.estimate)
+        // The footer already says "About"; a model's own "about" or "~" would say it twice.
+        .map((goal) => goal.estimate?.replace(/^\s*(?:about|around|roughly|~)\s*/i, ''))
         .filter(Boolean),
     [deal.goals, planted]
   );
@@ -216,7 +217,7 @@ function DealBody({ move }: { move: DealMove }) {
             <label className="deal-note reveal" style={{ '--i': 9 } as React.CSSProperties}>
               <span className="deal-h">Anything to change</span>
               <textarea
-                className="field"
+                className="input"
                 rows={2}
                 value={note}
                 maxLength={2000}
