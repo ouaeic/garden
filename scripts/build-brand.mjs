@@ -1,9 +1,10 @@
 /**
- * The mark and every icon made from it: the word's own italic "g", in leaf on the night garden.
+ * Every icon, cut from the wordmark's own g, in leaf on the night garden.
  *
- * Rendered by a real browser from the bundled Fraunces with the axes the interface sets on the
- * word, so the icon and the header are one letterform. Writes the web icons, the native sources,
- * and then runs the native icon generator over them.
+ * The outline comes from apps/web/src/app/wordmark-outline.ts, the same one the header draws, so
+ * the icon and the word are one letterform. The g is a fine monoline, so small icons get a little
+ * of its own colour stroked around it to stay a g at tab size. Writes the web icons, the native
+ * sources, and then runs the native icon generator over them.
  *
  *   node scripts/build-brand.mjs
  */
@@ -20,9 +21,13 @@ const night = token('--bg');
 const card = token('--card');
 const leaf = token('--leaf');
 assert(night && card && leaf, 'The mark takes its colours from the night theme');
-const font = (await readFile(root + 'apps/web/public/fonts/Fraunces-Italic.woff2')).toString(
-  'base64'
-);
+const outline = await readFile(root + 'apps/web/src/app/wordmark-outline.ts', 'utf8');
+const field = (name) => outline.match(new RegExp(`${name}: '([^']+)'`))?.[1];
+const g = field('g');
+const gViewBox = field('gViewBox');
+assert(g && gViewBox, 'The wordmark outline must carry its g');
+const [viewBox, word, tendril, cut] = ['viewBox', 'word', 'tendril', 'cut'].map(field);
+assert(viewBox && word && tendril && cut, 'The wordmark outline must carry the whole word');
 
 const runner = createRequire(new URL('../services/workspace-runner/package.json', import.meta.url));
 const { chromium } = runner('playwright-core');
@@ -32,24 +37,21 @@ const browser = await chromium.launch({ headless: true });
  * One rendering of the mark. `inset` is the share of the canvas left around the tile, `radius` the
  * tile's corner as a share of the tile, `scale` the letter's height as a share of the tile.
  */
-async function render(size, { ink = leaf, tile = true, inset = 0, radius = 0, scale = 0.78 } = {}) {
+async function render(
+  size,
+  { ink = leaf, tile = true, inset = 0, radius = 0, scale = 0.74, weight = 0.6 } = {}
+) {
   const page = await browser.newPage({ viewport: { width: size, height: size } });
   try {
     const box = size * (1 - 2 * inset);
     await page.setContent(`<!doctype html><style>
-      @font-face { font-family: Mark; src: url(data:font/woff2;base64,${font}) format('woff2'); font-style: italic; font-weight: 100 900; }
       html, body { margin: 0; background: transparent; }
       .tile { position: absolute; left: ${size * inset}px; top: ${size * inset}px; width: ${box}px; height: ${box}px;
         border-radius: ${box * radius}px; display: grid; place-items: center; overflow: hidden;
         background: ${tile ? `radial-gradient(120% 90% at 30% 15%, ${card}, ${night} 70%)` : 'transparent'}; }
-      .g { font: italic 520 ${box * scale}px/1 Mark; color: ${ink}; letter-spacing: 0;
-        font-variation-settings: 'SOFT' 100, 'opsz' 144; transform: translateY(-${box * 0.2}px); }
-    </style><div class="tile"><span class="g">g</span></div>`);
-    await page.evaluate(() => document.fonts.ready);
-    assert.ok(
-      await page.evaluate(() => document.fonts.check(`italic 520 40px Mark`)),
-      'The bundled Fraunces must load'
-    );
+      svg { height: ${box * scale}px; width: auto; overflow: visible; }
+    </style><div class="tile"><svg viewBox="${gViewBox}"><path d="${g}" fill="${ink}" stroke="${ink}"
+      stroke-width="${weight}" stroke-linejoin="round"/></svg></div>`);
     return await page.screenshot({ omitBackground: true, type: 'png' });
   } finally {
     await page.close();
@@ -60,11 +62,17 @@ const write = (path, bytes) => writeFile(root + path, bytes);
 try {
   // Installed web icons fill their square; the system rounds them. The maskable one keeps the
   // letter inside the safe circle, and the favicon is a rounded tile small enough for a tab.
-  await write('apps/web/public/brand/garden-icon-192.png', await render(192));
+  await write('apps/web/public/brand/garden-icon-192.png', await render(192, { weight: 1.2 }));
   await write('apps/web/public/brand/garden-icon-512.png', await render(512));
-  await write('apps/web/public/brand/garden-maskable-512.png', await render(512, { scale: 0.6 }));
-  await write('apps/web/public/brand/garden-apple-touch.png', await render(180));
-  await write('apps/web/public/brand/garden-favicon.png', await render(64, { radius: 0.24 }));
+  await write(
+    'apps/web/public/brand/garden-maskable-512.png',
+    await render(512, { scale: 0.6, weight: 0.9 })
+  );
+  await write('apps/web/public/brand/garden-apple-touch.png', await render(180, { weight: 1.2 }));
+  await write(
+    'apps/web/public/brand/garden-favicon.png',
+    await render(64, { radius: 0.24, scale: 0.8, weight: 2.2 })
+  );
   // A desktop icon sits on the platform's grid: a rounded tile inset from the canvas edge.
   await write(
     'apps/desktop/src-tauri/icons/garden-logo.png',
@@ -77,6 +85,12 @@ try {
 } finally {
   await browser.close();
 }
+// The word itself, for screens drawn outside the web client: one colour, used there as a mask so
+// it takes whatever colour the screen's text is.
+await write(
+  'apps/web/public/brand/garden-wordmark.svg',
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}"><clipPath id="c"><path clip-rule="evenodd" d="${cut}"/></clipPath><path clip-path="url(#c)" d="${word}"/><path d="${tendril}"/></svg>\n`
+);
 await write(
   'apps/desktop/src-tauri/icons/garden-android-background.svg',
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108"><rect width="108" height="108" fill="${night}"/></svg>\n`

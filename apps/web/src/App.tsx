@@ -9,6 +9,7 @@ import { openGoal } from './app/route';
 import { refresh, signedIn, startGarden, useGarden } from './app/store';
 import Shell from './app/Shell';
 import Light from './app/Light';
+import Wordmark from './app/Wordmark';
 import './styles/index.css';
 import './app/shell.css';
 
@@ -42,7 +43,7 @@ function Gate({ title, children }: { title: string; children?: ReactNode }) {
     <main className="gate">
       <Light />
       <div className="gate-card">
-        <div className="brand">garden</div>
+        <Wordmark className="brand" />
         <h1 className="display">{title}</h1>
         {children}
       </div>

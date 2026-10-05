@@ -5,7 +5,7 @@ import { Check, Sprout } from '../app/icons';
 import { go, openGoal } from '../app/route';
 import { primaryWorkspace, useGarden } from '../app/store';
 import { toast } from '../app/toast';
-import GoalCard from './GoalCard';
+import GoalRow from './GoalRow';
 import Moves from './Moves';
 import Plant from './Plant';
 import Rhythms from './Rhythms';
@@ -53,11 +53,11 @@ export default function Today({ catchUp }: { catchUp: boolean }) {
             <span className="count">{growing.length ? `${growing.length}` : ''}</span>
           </div>
           {growing.length ? (
-            <div className="goal-grid">
-              {growing.map((task, index) => (
-                <GoalCard key={task.id} task={task} moves={moves} index={index} />
+            <ul className="goal-rows rise" style={{ '--i': 2 } as React.CSSProperties}>
+              {growing.map((task) => (
+                <GoalRow key={task.id} task={task} moves={moves} />
               ))}
-            </div>
+            </ul>
           ) : (
             <div className="seedbed rise" style={{ '--i': 2 } as React.CSSProperties}>
               <Sprout />

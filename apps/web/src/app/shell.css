@@ -378,10 +378,23 @@
   }
 }
 @media (max-width: 420px) {
-  .brand {
-    font-size: 24px;
+  .wordmark {
+    height: 40px;
+    margin: -5px 0 -14px;
   }
   .views button {
     padding: 6px 8px;
+  }
+}
+@media (max-width: 360px) {
+  .top {
+    gap: 8px;
+  }
+  .wordmark {
+    height: 34px;
+    margin: -4px 0 -12px;
+  }
+  .views button {
+    padding: 6px 6px;
   }
 }

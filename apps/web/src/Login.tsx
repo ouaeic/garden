@@ -2,6 +2,7 @@ import { useAuthEntry } from './auth-entry';
 import { useEffect, useState } from 'react';
 import { Check, Theme } from './app/icons';
 import Light from './app/Light';
+import Wordmark from './app/Wordmark';
 import { get } from './client';
 import {
   devSignIn,
@@ -120,7 +121,7 @@ export default function Login({
     <main className="welcome">
       <Light />
       <header className="welcome-top">
-        <span className="brand">garden</span>
+        <Wordmark className="brand" />
         <button
           type="button"
           className="icon-btn"

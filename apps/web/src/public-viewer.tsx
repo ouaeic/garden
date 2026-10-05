@@ -10,6 +10,7 @@ import { loadShare, loadShareArtifact } from './share-crypto.js';
 import type { OpenedShare } from './share-crypto.js';
 import { shareArtifactDocument } from './share-html.js';
 import './share.css';
+import Wordmark from './app/Wordmark';
 
 const friendlyDate = (value: string) =>
   new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
@@ -187,8 +188,8 @@ function ShareViewer() {
   return (
     <div className="share-page">
       <header className="share-masthead">
-        <a className="share-wordmark" href="/">
-          garden
+        <a className="share-wordmark" href="/" aria-label="garden">
+          <Wordmark />
         </a>
         <span>Shared work</span>
       </header>

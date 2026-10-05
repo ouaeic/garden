@@ -31,12 +31,13 @@ main {
   box-shadow: var(--shadow);
 }
 .brand {
-  font-family: var(--display);
-  font-style: italic;
-  font-weight: 520;
-  font-size: 34px;
-  line-height: 1;
-  margin-bottom: 28px;
+  /* The wordmark the web client draws, as a mask, so it is the text colour in either theme. */
+  width: 120px;
+  height: 64px;
+  margin-bottom: 20px;
+  background: currentColor;
+  -webkit-mask: url('/__garden/theme/wordmark.svg') left center / contain no-repeat;
+  mask: url('/__garden/theme/wordmark.svg') left center / contain no-repeat;
 }
 .eyebrow {
   font: 12px var(--mono);
