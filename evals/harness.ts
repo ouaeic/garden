@@ -3099,6 +3099,8 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
       choicesCiphertext: null
     }),
     getWorkspaceById: async () => workspace,
+    // The owner has allowed nothing in any eval conversation, so every card the floor raises shows.
+    listActiveTaskApprovalGrants: async () => [],
     listConnectors: async () => [],
     listModels: async () => (fixture.visionSpecialist ? [model, visionRelease] : [model]),
     getManagedProviderCredential: async () => null,

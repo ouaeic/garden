@@ -78,14 +78,16 @@ export default function TaskPermissions({ taskId }: { taskId: string }) {
     }
   }
   return (
-    <section className="stack task-permissions" aria-label="Run permissions">
-      <h3>Run permissions</h3>
+    <section className="stack task-permissions" aria-label="Conversation permissions">
+      <h3>Conversation permissions</h3>
       <p className="muted">
-        Permissions you allowed for this run. Revoke stops reuse; actions already approved or
+        What you allowed in this conversation. Revoke stops reuse; actions already approved or
         running can finish.
       </p>
       {permissions === null && !error && <Spinner label="Loading permissions…" />}
-      {permissions?.length === 0 && <p className="muted">No reusable permissions in this run.</p>}
+      {permissions?.length === 0 && (
+        <p className="muted">Nothing allowed in this conversation yet.</p>
+      )}
       {permissions?.map((permission) => (
         <div className="task-permission" key={permission.id}>
           <p>{permission.description}</p>

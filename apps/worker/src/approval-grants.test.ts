@@ -1,7 +1,6 @@
-import { createHmac } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { canonicalApprovalScope } from '@garden/contracts';
-import { wrapDataKey } from '@garden/core';
+import { encryptJson, wrapDataKey } from '@garden/core';
 import type { DataStore, TaskRecord } from '@garden/data';
 import { approvalRequirement } from './approval-policy.js';
 import { approvalForCall, type ApprovalFloorDeps } from './approval-floor.js';
@@ -98,6 +97,22 @@ describe('reusable approval scope', () => {
         ?.taskGrant
     ).toBeUndefined();
   });
+  it('offers a push permission for an ordinary push and none for a forced one', () => {
+    const push = approvalRequirement(
+      'shell',
+      { executable: 'git', args: ['push', 'origin', 'main'], network: true },
+      'balanced'
+    );
+    expect(push?.action).toBe('Push Git changes');
+    expect(push?.taskGrant?.permissions).toContain('push');
+    expect(
+      approvalRequirement(
+        'shell',
+        { executable: 'git', args: ['push', '--force', 'origin', 'main'], network: true },
+        'balanced'
+      )?.taskGrant
+    ).toBeUndefined();
+  });
   it('limits file permissions to the same project directory and keeps durable instructions separate', () => {
     const first = approvalRequirement(
       'file_write',
@@ -132,15 +147,15 @@ describe('reusable approval scope', () => {
       )?.taskGrant?.permissions
     ).not.toEqual(['commands']);
   });
-  it('consults durable authority for each new call and does not inherit it into a child or stronger effect', async () => {
+  it("consults the conversation's permissions for each call, holds them across replies and keeps them out of children and stronger effects", async () => {
     const key = Buffer.alloc(32, 7),
       master = Buffer.alloc(32, 9);
     const granted = scope(download)!;
-    const hash = createHmac('sha256', key).update(canonicalApprovalScope(granted)).digest('hex');
     let active = true;
-    const lookup = vi.fn(
-      async (_user: string, _task: string, turn: number, _mode: string, scopeHash: string) =>
-        active && turn === 2 && scopeHash === hash
+    // The store answers for any conversation; the seal is what ties a permission to its own.
+    const sealed = encryptJson(granted, key, 'task-approval:task:grant');
+    const lookup = vi.fn(async (_user: string, _task: string, mode: string) =>
+      active && mode === 'balanced' ? [{ id: 'grant', scopeCiphertext: sealed }] : []
     );
     const task = {
       id: 'task',
@@ -155,47 +170,31 @@ describe('reusable approval scope', () => {
           id: 'workspace',
           wrappedKey: wrapDataKey(key, master, 'workspace')
         }),
-        hasTaskApprovalGrant: lookup
+        listActiveTaskApprovalGrants: lookup
       } as unknown as DataStore,
       destinationContext: () => ({ ...tainted, knownOrigins: [] })
     } as unknown as ApprovalFloorDeps;
     const state = { turn: 2, taint: { sources: tainted.taintSources } } as AgentState;
+    const call = (id: string, args: Record<string, unknown>, at = state, on = task) =>
+      approvalForCall(deps, on, { id, name: 'shell', arguments: args }, at);
+    expect(await call('1', download)).toBeNull();
+    // A later reply in the same conversation keeps what the owner allowed.
+    expect(await call('2', download, { ...state, turn: 3 })).toBeNull();
+    // Reaching the same site is covered whichever program does it; another site is not.
     expect(
-      await approvalForCall(deps, task, { id: '1', name: 'shell', arguments: download }, state)
+      await call('3', { ...download, executable: 'wget', args: ['https://unpkg.com/pkg/c.js'] })
     ).toBeNull();
+    expect(await call('4', { ...download, args: ['https://other.example/pkg'] })).not.toBeNull();
     active = false;
-    expect(
-      await approvalForCall(deps, task, { id: '2', name: 'shell', arguments: download }, state)
-    ).not.toBeNull();
+    expect(await call('5', download)).not.toBeNull();
     active = true;
-    expect(
-      await approvalForCall(
-        deps,
-        task,
-        { id: '3', name: 'shell', arguments: download },
-        { ...state, turn: 3 }
-      )
-    ).not.toBeNull();
-    expect(
-      await approvalForCall(
-        deps,
-        { ...task, parentMissionId: 'child' },
-        { id: '4', name: 'shell', arguments: download },
-        state
-      )
-    ).not.toBeNull();
+    expect(await call('6', download, state, { ...task, parentMissionId: 'child' })).not.toBeNull();
+    // A permission sealed for another conversation does not open here.
+    expect(await call('7', download, state, { ...task, id: 'other' })).not.toBeNull();
+    // A consequential effect is never answered from a permission, so the store is not asked.
     const calls = lookup.mock.calls.length;
     expect(
-      await approvalForCall(
-        deps,
-        task,
-        {
-          id: '5',
-          name: 'shell',
-          arguments: { ...download, args: ['-T', 'workspace/private', 'https://unpkg.com/upload'] }
-        },
-        state
-      )
+      await call('8', { executable: 'git', args: ['push', '--force', 'origin', 'main'] })
     ).not.toBeNull();
     expect(lookup.mock.calls.length).toBe(calls);
   });

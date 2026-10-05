@@ -253,7 +253,7 @@ export class ConnectorStore {
       const changed = await tx.query(
         `UPDATE approvals SET status=$3,resolved_at=NOW(),decision_scope=$4
          WHERE id=$1 AND user_id=$2 AND status='pending' AND expires_at > NOW()`,
-        [id, userId, decision, grant ? 'run' : 'once']
+        [id, userId, decision, grant ? 'conversation' : 'once']
       );
       if (changed.rowCount !== 1) return null;
       if (grant) {
@@ -326,32 +326,31 @@ export class ConnectorStore {
       : null;
   }
 
-  async hasTaskApprovalGrant(
-    userId: string,
-    taskId: string,
-    turn: number,
-    securityMode: string,
-    scopeHash: string
-  ): Promise<boolean> {
+  /** The conversation's permissions that hold in its current approval mode, newest first. */
+  async listActiveTaskApprovalGrants(userId: string, taskId: string, securityMode: string) {
     const result = await this.database.query(
-      `SELECT 1 FROM task_approval_grants g JOIN tasks t ON t.id=g.task_id
-       WHERE g.user_id=$1 AND g.task_id=$2 AND g.turn=$3 AND g.security_mode=$4 AND g.scope_hash=$5
-         AND g.revoked_at IS NULL AND t.user_id=$1 AND t.security_mode=$4
-         AND t.status NOT IN ('completed','failed','cancelled') LIMIT 1`,
-      [userId, taskId, turn, securityMode, scopeHash]
+      `SELECT g.id,g.scope_ciphertext FROM task_approval_grants g JOIN tasks t ON t.id=g.task_id
+       WHERE g.user_id=$1 AND g.task_id=$2 AND g.security_mode=$3 AND g.revoked_at IS NULL
+         AND t.user_id=$1 AND t.security_mode=$3 AND t.status <> 'cancelled' AND t.archived_at IS NULL
+       ORDER BY g.created_at DESC,g.id DESC LIMIT 200`,
+      [userId, taskId, securityMode]
     );
-    return result.rows.length > 0;
+    return result.rows.map((row) => ({
+      id: String(row.id),
+      scopeCiphertext: json<EncryptedEnvelope>(row.scope_ciphertext)
+    }));
   }
 
-  async listTaskApprovalGrants(userId: string, taskId: string, turn: number, before?: string) {
+  async listTaskApprovalGrants(userId: string, taskId: string, before?: string) {
     const result = await this.database.query(
       `SELECT g.* FROM task_approval_grants g JOIN tasks t ON t.id=g.task_id
-       WHERE g.user_id=$1 AND g.task_id=$2 AND g.turn=$3 AND g.revoked_at IS NULL
-         AND t.user_id=$1 AND t.security_mode=g.security_mode AND t.status NOT IN ('completed','failed','cancelled')
-         AND ($4::uuid IS NULL OR (g.created_at,g.id) <
-           (SELECT created_at,id FROM task_approval_grants WHERE id=$4 AND user_id=$1 AND task_id=$2))
+       WHERE g.user_id=$1 AND g.task_id=$2 AND g.revoked_at IS NULL
+         AND t.user_id=$1 AND t.security_mode=g.security_mode AND t.status <> 'cancelled'
+         AND t.archived_at IS NULL
+         AND ($3::uuid IS NULL OR (g.created_at,g.id) <
+           (SELECT created_at,id FROM task_approval_grants WHERE id=$3 AND user_id=$1 AND task_id=$2))
        ORDER BY g.created_at DESC,g.id DESC LIMIT 200`,
-      [userId, taskId, turn, before ?? null]
+      [userId, taskId, before ?? null]
     );
     return result.rows.map((row) => ({
       id: String(row.id),

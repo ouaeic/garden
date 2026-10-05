@@ -99,17 +99,18 @@ async function fixture() {
   const list = () =>
     app.inject({ method: 'GET', url: `/v1/approvals/tasks/${task.id}/permissions` });
   const hash = createHmac('sha256', key).update(canonicalApprovalScope(offer.scope)).digest('hex');
-  const matches = () => store.hasTaskApprovalGrant(user.id, task.id, 2, 'balanced', hash);
+  const matches = async (owner = user.id, conversation = task.id, mode = 'balanced') =>
+    (await store.listActiveTaskApprovalGrants(owner, conversation, mode)).length > 0;
   return { app, user, foreign, task, id, send, list, matches, hash };
 }
 
-describe('owner permissions for one run', () => {
+describe('owner permissions for a conversation', () => {
   it('refuses reusable authority for a consequential or mismatched action even if its preview contains an offer', async () => {
     const f = await fixture();
     await database.query("UPDATE approvals SET side_effect='external_consequential' WHERE id=$1", [
       f.id
     ]);
-    expect((await f.send({ scope: 'run' })).statusCode).toBe(409);
+    expect((await f.send({ scope: 'conversation' })).statusCode).toBe(409);
     expect(
       (await f.app.inject({ method: 'GET', url: '/v1/approvals' })).json<
         Array<{ preview: { taskGrant?: unknown } }>
@@ -124,7 +125,7 @@ describe('owner permissions for one run', () => {
         )
       ]
     );
-    expect((await f.send({ scope: 'run' })).statusCode).toBe(409);
+    expect((await f.send({ scope: 'conversation' })).statusCode).toBe(409);
     expect(await f.matches()).toBe(false);
   });
   it('keeps approve once as the default without creating a reusable permission', async () => {
@@ -141,8 +142,8 @@ describe('owner permissions for one run', () => {
     expect(cards).toHaveLength(1);
     expect(cards[0]?.preview.taskGrant.description).toContain('https://unpkg.com');
     const headers = { 'idempotency-key': randomUUID() };
-    expect((await f.send({ scope: 'run' }, headers)).statusCode).toBe(200);
-    expect((await f.send({ scope: 'run' }, headers)).statusCode).toBe(200);
+    expect((await f.send({ scope: 'conversation' }, headers)).statusCode).toBe(200);
+    expect((await f.send({ scope: 'conversation' }, headers)).statusCode).toBe(200);
     expect(await f.matches()).toBe(true);
     expect((await store.getTask(f.user.id, f.task.id))?.status).toBe('queued');
     const rows = (
@@ -166,49 +167,45 @@ describe('owner permissions for one run', () => {
         })
       ).json()
     ).toEqual([]);
-    expect(await store.hasTaskApprovalGrant(f.foreign.id, f.task.id, 2, 'balanced', f.hash)).toBe(
-      false
-    );
-    expect(await store.hasTaskApprovalGrant(f.user.id, f.task.id, 3, 'balanced', f.hash)).toBe(
-      false
-    );
-    expect(await store.hasTaskApprovalGrant(f.user.id, randomUUID(), 2, 'balanced', f.hash)).toBe(
-      false
-    );
+    expect(await f.matches(f.foreign.id)).toBe(false);
+    expect(await f.matches(f.user.id, randomUUID())).toBe(false);
+    expect(await f.matches(f.user.id, f.task.id, 'review')).toBe(false);
   });
   it('rejects forged scope bodies, other owners, API tokens and expired decisions', async () => {
     const f = await fixture();
-    expect((await f.send({ scope: 'run', programs: ['anything'] })).statusCode).toBe(400);
-    expect((await f.send({ scope: 'run' }, { 'x-other': '1' })).statusCode).not.toBe(200);
-    expect((await f.send({ scope: 'run' }, { 'x-token': '1' })).statusCode).toBe(403);
+    expect((await f.send({ scope: 'conversation', programs: ['anything'] })).statusCode).toBe(400);
+    expect((await f.send({ scope: 'conversation' }, { 'x-other': '1' })).statusCode).not.toBe(200);
+    expect((await f.send({ scope: 'conversation' }, { 'x-token': '1' })).statusCode).toBe(403);
     await database.query("UPDATE approvals SET expires_at=NOW()-INTERVAL '1 second' WHERE id=$1", [
       f.id
     ]);
-    expect((await f.send({ scope: 'run' })).statusCode).not.toBe(200);
+    expect((await f.send({ scope: 'conversation' })).statusCode).not.toBe(200);
     expect(await f.matches()).toBe(false);
   });
-  it('rejects a stale run and offers no reusable approval for a card without a scope', async () => {
+  it('holds across later replies and offers no reusable approval for a card without a scope', async () => {
     const f = await fixture();
     await database.query('UPDATE tasks SET agent_state_ciphertext=$2::jsonb WHERE id=$1', [
       f.task.id,
       JSON.stringify(encryptJson({ turn: 3 }, key, `task-state:${f.task.id}`))
     ]);
-    expect((await f.send({ scope: 'run' })).statusCode).toBe(409);
+    expect((await f.send({ scope: 'conversation' })).statusCode).toBe(200);
+    expect(await f.matches()).toBe(true);
+    const bare = await fixture();
     await database.query('UPDATE approvals SET preview_ciphertext=$2::jsonb WHERE id=$1', [
-      f.id,
-      JSON.stringify(encryptJson({ tool: 'shell' }, key, `approval:${f.task.id}`))
+      bare.id,
+      JSON.stringify(encryptJson({ tool: 'shell' }, key, `approval:${bare.task.id}`))
     ]);
-    expect((await f.send({ scope: 'run' })).statusCode).toBe(409);
-    expect(await f.matches()).toBe(false);
+    expect((await bare.send({ scope: 'conversation' })).statusCode).toBe(409);
+    expect(await bare.matches()).toBe(false);
   });
   it('survives pause and restart reads, and revokes only the selected owner permission', async () => {
     const f = await fixture();
-    expect((await f.send({ scope: 'run' })).statusCode).toBe(200);
+    expect((await f.send({ scope: 'conversation' })).statusCode).toBe(200);
     await database.query("UPDATE tasks SET status='paused' WHERE id=$1", [f.task.id]);
     const reconnected = new DataStore(database);
     expect(
-      await reconnected.hasTaskApprovalGrant(f.user.id, f.task.id, 2, 'balanced', f.hash)
-    ).toBe(true);
+      (await reconnected.listActiveTaskApprovalGrants(f.user.id, f.task.id, 'balanced')).length
+    ).toBe(1);
     expect(await reconnected.revokeTaskApprovalGrant(f.foreign.id, f.task.id, f.id)).toBe(false);
     const reply = await f.app.inject({
       method: 'POST',
@@ -220,16 +217,25 @@ describe('owner permissions for one run', () => {
     expect(await f.matches()).toBe(false);
     expect((await store.getApproval(f.id))?.status).toBe('approved');
   });
-  it('ends permissions on a mode change or terminal transition without resurrecting them later', async () => {
+  it('keeps permissions while replies end and resume, and ends them on a mode change, a stop or archiving', async () => {
     const f = await fixture();
-    expect((await f.send({ scope: 'run' })).statusCode).toBe(200);
+    expect((await f.send({ scope: 'conversation' })).statusCode).toBe(200);
+    await database.query("UPDATE tasks SET status='completed' WHERE id=$1", [f.task.id]);
+    await database.query("UPDATE tasks SET status='queued' WHERE id=$1", [f.task.id]);
+    expect(await f.matches()).toBe(true);
+    expect((await f.list()).json()).toHaveLength(1);
     await database.query("UPDATE tasks SET security_mode='review' WHERE id=$1", [f.task.id]);
     await database.query("UPDATE tasks SET security_mode='balanced' WHERE id=$1", [f.task.id]);
     expect(await f.matches()).toBe(false);
-    const next = await fixture();
-    expect((await next.send({ scope: 'run' })).statusCode).toBe(200);
-    await database.query("UPDATE tasks SET status='completed' WHERE id=$1", [next.task.id]);
-    await database.query("UPDATE tasks SET status='queued' WHERE id=$1", [next.task.id]);
-    expect(await next.matches()).toBe(false);
+    const stopped = await fixture();
+    expect((await stopped.send({ scope: 'conversation' })).statusCode).toBe(200);
+    await database.query("UPDATE tasks SET status='cancelled' WHERE id=$1", [stopped.task.id]);
+    await database.query("UPDATE tasks SET status='queued' WHERE id=$1", [stopped.task.id]);
+    expect(await stopped.matches()).toBe(false);
+    const archived = await fixture();
+    expect((await archived.send({ scope: 'conversation' })).statusCode).toBe(200);
+    await database.query('UPDATE tasks SET archived_at=NOW() WHERE id=$1', [archived.task.id]);
+    await database.query('UPDATE tasks SET archived_at=NULL WHERE id=$1', [archived.task.id]);
+    expect(await archived.matches()).toBe(false);
   });
 });

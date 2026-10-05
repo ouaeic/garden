@@ -4005,5 +4005,31 @@ CREATE TABLE IF NOT EXISTS model_throughput_ceiling (
         attempts INTEGER NOT NULL,
         resets_at TIMESTAMPTZ NOT NULL
       );`
+  },
+  {
+    version: 113,
+    name: 'conversation_approval_grants',
+    // A permission lasts as long as the conversation it was given in: replies end and resume it,
+    // so only stopping it, archiving it or changing how it asks takes its permissions away.
+    sql: `
+      ALTER TABLE approvals DROP CONSTRAINT IF EXISTS approvals_decision_scope_check;
+      ALTER TABLE approvals ADD CONSTRAINT approvals_decision_scope_check
+        CHECK(decision_scope IN ('once','run','conversation'));
+      CREATE INDEX IF NOT EXISTS task_approval_grant_active_idx
+        ON task_approval_grants(task_id,security_mode) WHERE revoked_at IS NULL;
+      CREATE OR REPLACE FUNCTION revoke_ended_task_approvals() RETURNS trigger LANGUAGE plpgsql AS $grant$
+      BEGIN
+        IF NEW.security_mode IS DISTINCT FROM OLD.security_mode OR
+          (NEW.status = 'cancelled' AND NEW.status IS DISTINCT FROM OLD.status) OR
+          (NEW.archived_at IS NOT NULL AND OLD.archived_at IS NULL) THEN
+          UPDATE task_approval_grants SET revoked_at=NOW() WHERE task_id=NEW.id AND revoked_at IS NULL;
+        END IF;
+        RETURN NEW;
+      END;
+      $grant$;
+      DROP TRIGGER IF EXISTS task_approval_grants_expire ON tasks;
+      CREATE TRIGGER task_approval_grants_expire AFTER UPDATE OF status,security_mode,archived_at ON tasks
+        FOR EACH ROW EXECUTE FUNCTION revoke_ended_task_approvals();
+    `
   }
 ] as const;

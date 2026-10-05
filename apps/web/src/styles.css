@@ -1417,6 +1417,9 @@ canvas {
     white-space: pre-wrap;
   }
 }
+.decision-addresses > span {
+  color: var(--muted);
+}
 .decision-permission {
   padding: 0.65rem 1rem;
   border-left: 2px solid var(--line-strong);

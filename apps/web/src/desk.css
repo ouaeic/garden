@@ -697,9 +697,52 @@ body:has(.desk-shell),
 .desk-shell .garden-output-downloads > .button {
   flex: 0 0 auto;
 }
+/*
+ * A request docked above the composer is read at a glance and answered at once. The dock and the
+ * composer scroll as one box, which grows while something waits on the owner, so no scroll nests
+ * inside another and the card's buttons stay in view.
+ */
 .desk-shell .work-attention {
   margin: 0;
-  padding: 16px;
+  padding: 12px 0 10px;
+  gap: 10px;
+  max-height: none;
+  overflow: visible;
+}
+.desk-shell .work-attention .decision-card {
+  padding: 14px 16px;
+}
+.desk-shell .work-attention .decision-card > h3 {
+  font-size: 20px;
+  margin: 8px 0 6px;
+}
+.desk-shell .work-attention .decision-card > p {
+  margin: 4px 0;
+}
+.desk-shell .work-attention .decision-actions {
+  margin: 12px 0 8px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.desk-shell .work-attention .decision-permission {
+  margin: 0 0 4px;
+  padding: 2px 10px;
+}
+.desk-shell .work-attention .decision-permission p {
+  margin: 2px 0;
+}
+.desk-shell .work-attention .decision-card details summary {
+  padding: 6px 0;
+}
+.desk-shell .work-attention .decision-note {
+  margin-top: 0;
+}
+.desk-shell .desk-project .garden-task-composer:has(> .work-attention),
+html[data-workspace-short='true']
+  .desk-shell
+  .desk-project
+  .garden-task-composer:has(> .work-attention) {
+  max-height: min(calc(var(--garden-viewport-height, 100dvh) * 0.62), 62dvh, 640px);
 }
 .desk-shell .resource-wait-note {
   flex-shrink: 0;

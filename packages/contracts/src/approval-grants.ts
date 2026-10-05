@@ -25,9 +25,9 @@ export const TaskApprovalScope = z
   .object({
     tool: z.enum(['shell', 'parallel_web_read', 'file_write', 'file_patch', 'code_diagnostics']),
     permissions: z
-      .array(z.enum(['network', 'commands', 'files', 'install', 'analysis']))
+      .array(z.enum(['network', 'push', 'commands', 'files', 'install', 'analysis']))
       .min(1)
-      .max(5),
+      .max(6),
     programs: entries,
     origins: entries,
     directories: entries
@@ -51,6 +51,7 @@ export const describeApprovalScope = (scope: TaskApprovalScope): string =>
         ? 'Network commands'
         : 'Web reads'
       : '',
+    scope.permissions.includes('push') ? 'Pushing Git changes' : '',
     scope.permissions.includes('commands') ? 'Local commands' : '',
     scope.permissions.includes('install') ? 'Install or update software' : '',
     scope.permissions.includes('files')
@@ -74,3 +75,30 @@ export const TaskApprovalOffer = z
   })
   .strict();
 export type TaskApprovalOffer = z.infer<typeof TaskApprovalOffer>;
+
+/**
+ * Whether a permission the owner gave covers a call asking for `requested`: the same tool, and
+ * nothing beyond what was allowed - no permission, site or program it did not name, and only
+ * folders inside the ones it did. Reaching a site is about the site, so a grant that is only for
+ * network access holds whichever program makes the request; every other kind holds only the
+ * programs it was given for.
+ */
+export const approvalScopeCovers = (
+  granted: TaskApprovalScope,
+  requested: TaskApprovalScope
+): boolean => {
+  if (granted.tool !== requested.tool) return false;
+  const within = (inner: readonly string[], outer: readonly string[]) =>
+    inner.every((entry) => outer.includes(entry));
+  const onlyNetwork = requested.permissions.every((permission) => permission === 'network');
+  return (
+    within(requested.permissions, granted.permissions) &&
+    within(requested.origins, granted.origins) &&
+    (onlyNetwork || within(requested.programs, granted.programs)) &&
+    requested.directories.every((directory) =>
+      granted.directories.some(
+        (allowed) => directory === allowed || directory.startsWith(`${allowed}/`)
+      )
+    )
+  );
+};

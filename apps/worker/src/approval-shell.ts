@@ -310,11 +310,16 @@ export const shellApprovalRequirement = (
         ([command = '', ...rest]) => command === 'git' && gitSubcommand(rest) === 'push'
       )
     )
-      return {
-        sideEffect: 'external_reversible',
-        action: 'Push Git changes',
-        preview: `Run ${invocation}`
-      };
+      return withTaskApproval(
+        {
+          sideEffect: 'external_reversible',
+          action: 'Push Git changes',
+          preview: `Run ${invocation}`
+        },
+        name,
+        args,
+        'push'
+      );
     const sender = commands.find(([command = '', ...rest]) => sendsDataOverNetwork(command, rest));
     if (sender)
       return {

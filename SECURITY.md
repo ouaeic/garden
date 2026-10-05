@@ -291,20 +291,25 @@ against the page the owner reads by `scripts/check-repository.mjs`. It is delibe
 here in full: three descriptions of this behaviour once existed in three files and had drifted
 apart, and a fourth copy in a document no check reads is how that happens again.
 
-**Permissions for the current run.** Eligible cards offer approval once or a reusable permission
-whose programs, referenced network origins, or project directories are shown before selection.
-The owner session can grant only the scope sealed by the worker; API tokens cannot create reusable
-permissions. Grant creation and approval settlement share a transaction. Scope bodies are encrypted,
-and matching uses a keyed digest bound to the owner, task, turn and approval mode. Each new proposal
-still passes the complete approval floor; an additional requirement without a reusable scope keeps
-its individual decision. Referenced origins are a static command constraint, not a per-host runtime
-firewall for arbitrary interpreter code.
+**Permissions for a conversation.** Eligible cards offer approval once or a permission for the
+rest of the conversation whose programs, referenced network origins, or project directories are
+shown before selection. Destructive, publishing, deploying and other consequential actions never
+offer one, and neither do uploads or other commands that send data. The owner session can grant only
+the scope sealed by the worker; API tokens cannot create permissions. Grant creation and approval
+settlement share a transaction. Scope bodies are encrypted to the conversation they were given in,
+and are bound to the owner and the approval mode. A permission covers a later call only when that
+call asks for nothing outside it: the same tool, no permission, origin or program it does not name
+(a permission only to reach the network holds whichever program reaches a named origin), and only
+directories inside the ones it does. Each new proposal still passes the complete approval floor; an
+additional requirement without a reusable scope, such as one raised because the turn has read
+untrusted content, keeps its individual decision. Referenced origins are a static command
+constraint, not a per-host runtime firewall for arbitrary interpreter code.
 
-Permissions survive pauses and reconnects. A new owner direction does not inherit the preceding
-turn's permissions, and completing or stopping a run or changing its approval mode revokes them.
-They do not transfer into forks or specialist tasks. Work options lists the current permissions and
-allows revocation. Revocation stops future reuse; it does not undo an action already approved or
-interrupt a process already running.
+Permissions survive pauses, reconnects and the end of each reply, because a conversation resumes
+where it stopped. Stopping or archiving the conversation, or changing its approval mode, revokes
+them. They do not transfer into forks or specialist tasks. Work options lists the current
+permissions and allows revocation. Revocation stops future reuse; it does not undo an action
+already approved or interrupt a process already running.
 
 ### Why two dials and not one
 

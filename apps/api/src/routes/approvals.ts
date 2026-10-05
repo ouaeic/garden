@@ -92,7 +92,7 @@ export const registerApprovalRoutes = (context: RouteContext): void => {
         const input = (
           decision === 'deny'
             ? z.object({ note: z.string().max(APPROVAL_NOTE_MAX_CHARS).optional() }).strict()
-            : z.object({ scope: z.enum(['once', 'run']).optional() }).strict()
+            : z.object({ scope: z.enum(['once', 'conversation']).optional() }).strict()
         ).parse(request.body ?? {});
         const approval = await store.getApproval(request.params.approvalId);
         if (!approval || approval.userId !== user.id)
@@ -112,7 +112,7 @@ export const registerApprovalRoutes = (context: RouteContext): void => {
         });
         let correction: Parameters<typeof store.resolveApproval>[3];
         let grant: Parameters<typeof store.resolveApproval>[4];
-        if ('scope' in input && input.scope === 'run') {
+        if ('scope' in input && input.scope === 'conversation') {
           if (request.apiToken)
             throw new GardenError(
               'approval_grant_owner_required',
@@ -140,20 +140,14 @@ export const registerApprovalRoutes = (context: RouteContext): void => {
             `approval:${task.id}`
           );
           const offer = TaskApprovalOffer.safeParse(preview.taskGrant);
-          const state = decryptJson<{ turn?: number }>(
-            task.agentStateCiphertext,
-            key,
-            `task-state:${task.id}`
-          );
           if (
             !offer.success ||
             offer.data.scope.tool !== preview.tool ||
-            offer.data.turn !== (state.turn ?? 0) ||
             offer.data.securityMode !== task.securityMode
           )
             throw new GardenError(
               'approval_grant_unavailable',
-              'This permission no longer matches the current run',
+              'This permission no longer matches this conversation',
               409
             );
           grant = {
@@ -261,14 +255,9 @@ export const registerApprovalRoutes = (context: RouteContext): void => {
       const task = await store.getTask(user.id, request.params.taskId);
       if (!task) throw new GardenError('task_not_found', 'Work not found', 404);
       const workspace = await store.getWorkspace(user.id, task.workspaceId);
-      if (!workspace?.wrappedKey || !task.agentStateCiphertext) return [];
+      if (!workspace?.wrappedKey) return [];
       const key = unwrapDataKey(workspace.wrappedKey, masterKey, workspace.id);
-      const state = decryptJson<{ turn?: number }>(
-        task.agentStateCiphertext,
-        key,
-        `task-state:${task.id}`
-      );
-      const grants = await store.listTaskApprovalGrants(user.id, task.id, state.turn ?? 0, before);
+      const grants = await store.listTaskApprovalGrants(user.id, task.id, before);
       return grants.map((grant) => {
         const scope = decryptJson<TaskApprovalOffer['scope']>(
           grant.scopeCiphertext,
