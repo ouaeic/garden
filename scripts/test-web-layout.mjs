@@ -186,7 +186,31 @@ const buriedUnderAsk = (page) =>
  * made transparent for one screenshot, so whatever sits under a line of text - a pane, a sliding
  * tab thumb, the light canvas - is measured as painted, at points along each line box.
  */
+/** Where every line of text sits; two equal readings mean nothing moved in between. */
+const textLayout = (page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('body *')]
+      .filter((element) => element.childElementCount === 0 && element.textContent?.trim())
+      .map((element) => {
+        const box = element.getBoundingClientRect();
+        return `${Math.round(box.left)},${Math.round(box.top)},${Math.round(box.width)}`;
+      })
+      .join(';')
+  );
+
+/** Measures once the page has stopped changing, so the pixels and the positions are one moment. */
 async function contrastFailures(page) {
+  await page.waitForFunction(() => [...document.images].every((image) => image.complete));
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const before = await textLayout(page);
+    const failures = await measureContrast(page);
+    if ((await textLayout(page)) === before) return failures;
+    await page.waitForTimeout(400);
+  }
+  return ['The page never held still long enough to measure'];
+}
+
+async function measureContrast(page) {
   const runs = await page.evaluate(() => {
     for (const animation of document.getAnimations()) {
       try {

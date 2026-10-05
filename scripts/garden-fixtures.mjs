@@ -958,8 +958,9 @@ export function createGardenFixtures(now = Date.now()) {
       const input = await body(request);
       const current = state.drafts.get(scope(input));
       const revision = (current?.revision ?? 0) + 1;
-      const { expectedRevision: _expected, ...draft } = input;
-      state.drafts.set(scope(input), { ...draft, revision, updatedAt: at(0) });
+      const draft = { ...input, revision, updatedAt: at(0) };
+      delete draft.expectedRevision;
+      state.drafts.set(scope(input), draft);
       return (json(response, { revision, updatedAt: at(0) }), true);
     }
     if (path === '/v1/tasks' && method === 'POST') {
