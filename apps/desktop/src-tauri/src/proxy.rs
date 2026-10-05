@@ -1104,7 +1104,7 @@ fn gateway_error(
         headers.insert(
             HeaderName::from_static("content-security-policy"),
             HeaderValue::from_static(
-                "default-src 'none'; connect-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+                "default-src 'none'; connect-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
             ),
         );
         headers.insert(
@@ -1484,7 +1484,7 @@ fn offline_page(
 <link rel="stylesheet" href="/__garden/theme/foundation.css">
 <link rel="stylesheet" href="/__garden/theme/setup.css">
 <main>
-  <div class="brand">garden</div>
+  <div class="brand" role="img" aria-label="garden"></div>
   <div class="eyebrow">Private server connection</div>
   <h1>Connect your AI computer</h1>
   <p id="address-help">Enter your server address, then sign in with the same password you use in your browser. This device will remember your connection.</p>

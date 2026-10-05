@@ -235,19 +235,21 @@ a {
   filter: blur(18px);
 }
 .brand {
+  display: inline-flex;
   border: 0;
   background: none;
   padding: 0;
-  font-family: var(--display);
-  font-style: italic;
-  font-weight: 520;
-  font-size: 28px;
-  line-height: 1;
-  letter-spacing: -0.03em;
-  font-variation-settings:
-    'SOFT' 100,
-    'opsz' 96;
+  line-height: 0;
   color: var(--ink);
+}
+/* The g's loop hangs well below the line, so the mark is sized by height and the hanging part is
+   given back to the layout: what sits centred beside it lines up with the letters, not the loop. */
+.wordmark {
+  display: block;
+  width: auto;
+  height: 58px;
+  margin: -7px 0 -21px;
+  overflow: visible;
 }
 
 /* Surfaces. */

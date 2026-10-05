@@ -49,91 +49,85 @@
   gap: 12px;
 }
 
-/* Goal cards. */
-.goal-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 16px;
-}
-.goal-card {
-  position: relative;
-  display: block;
-  width: 100%;
-  padding: 0 0 18px;
-  overflow: hidden;
-  text-align: left;
-  color: inherit;
-  border-radius: 28px;
+/* Growing goals, a line each. */
+.goal-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-radius: 22px;
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, var(--pane-2), var(--pane) 70%);
-  transition:
-    transform 0.6s var(--ease),
-    border-color 0.4s,
-    box-shadow 0.6s var(--ease);
+  background: var(--pane);
+  overflow: hidden;
 }
-.goal-card:hover {
-  transform: translateY(-4px);
-  border-color: var(--line-2);
-  box-shadow: var(--shadow);
-}
-.goal-tag {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  --c: var(--glow);
-}
-.goal-plant {
-  position: relative;
-  height: 178px;
+.goal-row {
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding-right: 16px;
 }
-.goal-plant::before {
-  content: '';
-  position: absolute;
-  left: 12%;
-  right: 12%;
-  bottom: -10px;
-  height: 88%;
-  background: radial-gradient(closest-side, var(--glow), transparent);
-  opacity: 0.22;
-  pointer-events: none;
-  transition: background 0.9s;
+.goal-row + .goal-row {
+  border-top: 1px solid var(--line);
 }
-.goal-body {
+.goal-row-open {
+  flex: 1;
+  min-width: 0;
   display: grid;
-  gap: 9px;
-  padding: 2px 18px 0;
+  grid-template-columns: 18px minmax(0, 1.6fr) minmax(0, 1.4fr) 80px 104px;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0 14px 18px;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  font: inherit;
 }
-.goal-body h3 {
-  margin: 0;
+.goal-row-open:hover .goal-row-title {
+  color: var(--leaf);
+}
+.goal-row-mark {
+  width: 18px;
+  height: 18px;
+  color: var(--glow);
+}
+.goal-row-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--display);
+  font-size: 18px;
   font-weight: 420;
-  font-size: 23px;
-  line-height: 1.08;
-  letter-spacing: -0.015em;
-  font-variation-settings:
-    'SOFT' 60,
-    'opsz' 40;
+  letter-spacing: -0.01em;
+  transition: color 0.3s;
 }
-.goal-line {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  min-height: 38px;
-  margin: 0;
+.goal-row-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 13.5px;
-  line-height: 1.4;
   color: var(--ink-2);
 }
-.goal-line .dot {
-  --c: var(--glow);
-  margin-top: 6px;
-}
-.pips {
+.goal-row-pips {
   display: flex;
-  gap: 4px;
+  gap: 3px;
+}
+.goal-row-spend {
+  text-align: right;
+  font: 12px var(--mono);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.goal-row-act {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  min-width: 112px;
+}
+.goal-row-state {
+  font: 500 11px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--glow);
 }
 .pip {
   position: relative;
@@ -158,13 +152,6 @@
 }
 .pip.is-done::after {
   transform: scaleX(1);
-}
-.goal-meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  font: 12px var(--mono);
-  color: var(--ink-3);
 }
 .seedbed {
   display: grid;
@@ -702,5 +689,46 @@
   }
   .seedbed .btn {
     grid-column: 1;
+  }
+}
+@media (max-width: 760px) {
+  .goal-row-open {
+    grid-template-columns: 18px minmax(0, 1fr);
+    row-gap: 3px;
+    padding: 12px 0 12px 14px;
+  }
+  .goal-row-line {
+    grid-column: 2;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .goal-row-pips,
+  .goal-row-spend {
+    display: none;
+  }
+  .goal-row {
+    flex-wrap: wrap;
+    gap: 0;
+    padding-right: 14px;
+  }
+  .goal-row-open {
+    flex-basis: 100%;
+  }
+  .goal-row-title {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.2;
+  }
+  .goal-row-act {
+    min-width: 0;
+    justify-content: flex-start;
+    margin: -4px 0 12px 46px;
+  }
+  .goal-row-act:has(.goal-row-state) {
+    display: none;
   }
 }

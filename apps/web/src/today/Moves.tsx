@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { OwnerMove } from '@garden/contracts';
 import { answer, approve, deny, raiseCapAndResume } from '../app/actions';
-import { money, until } from '../app/derive';
+import { money, raisedCap, until } from '../app/derive';
 import { Key, Question, Speak, Spend, Sprout } from '../app/icons';
 import { go, openDeal, openGoal } from '../app/route';
 import { toast } from '../app/toast';
@@ -251,7 +251,7 @@ function MoveCard({ move, top, onDone }: { move: OwnerMove; top: boolean; onDone
       );
       break;
     case 'spend': {
-      const raised = Math.max(move.spentUsd * 1.5, (move.maxSpendUsd ?? 0) + 5);
+      const raised = raisedCap(move.spentUsd, move.maxSpendUsd);
       body = (
         <>
           <span className="move-kind">

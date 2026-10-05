@@ -126,7 +126,15 @@ const overflowing = (page) =>
       const box = element.getBoundingClientRect();
       if (box.width === 0 || box.height === 0) continue;
       if (box.right <= innerWidth + 1 && box.left >= -1) continue;
-      if (clips(element)) continue;
+      // A control cut off at the edge cannot be pressed, whatever clips it, unless it sits in a
+      // strip the owner can scroll sideways.
+      const control = element.matches('button, a[href], input, select, textarea');
+      const scrollable = (() => {
+        for (let parent = element.parentElement; parent; parent = parent.parentElement)
+          if (/(auto|scroll)/.test(getComputedStyle(parent).overflowX)) return true;
+        return false;
+      })();
+      if (control ? scrollable : clips(element)) continue;
       found.push(
         `${element.tagName.toLowerCase()}.${[...element.classList].join('.')} ${Math.round(box.left)}..${Math.round(box.right)} "${(element.textContent ?? '').trim().slice(0, 40)}"`
       );
@@ -575,7 +583,8 @@ const journeys = {
   /** A proposed deal opens from the deck, and planting it sends the owner's choices once. */
   async deal({ page, origin, server }) {
     await page.goto(`${origin}/?view=today`);
-    await page.getByRole('button', { name: 'Review the deal' }).click();
+    const deck = page.getByRole('region', { name: 'Your move' });
+    await deck.getByRole('button', { name: 'Review the deal' }).click();
     const sheet = page.getByRole('dialog');
     await sheet.waitFor();
     await shot(page, 'deal');
@@ -598,7 +607,12 @@ const journeys = {
     await sheet.waitFor({ state: 'detached' });
     const planted = server.writes.filter((write) => /\/deal$/.test(write.path));
     assert.equal(planted.length, 1, 'One press plants once');
-    await page.getByRole('button', { name: 'Review the deal' }).waitFor({ state: 'detached' });
+    await deck.getByRole('button', { name: 'Review the deal' }).waitFor({ state: 'detached' });
+    assert.equal(
+      await page.getByRole('button', { name: 'Review the deal' }).count(),
+      0,
+      'A planted deal leaves the goal rows as well as the deck'
+    );
   },
 
   /** A goal asked for from the desk is sent once, and a retry after a lost reply reuses its key. */

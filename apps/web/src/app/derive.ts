@@ -28,6 +28,10 @@ export const GROWTH_COLOR: Record<Growth, string> = {
   stopped: 'var(--ink-3)'
 };
 
+/** The cap a spend-paused goal is offered: half again what it spent, and never less than five more. */
+export const raisedCap = (spentUsd: number, maxSpendUsd: number | null) =>
+  Math.max(spentUsd * 1.5, (maxSpendUsd ?? 0) + 5);
+
 export const movesFor = (moves: readonly OwnerMove[], taskId: string) =>
   moves.filter((move) => move.taskId === taskId);
 
@@ -126,8 +130,9 @@ export function goalLine(task: Task, moves: readonly OwnerMove[]): string {
   return task.activity?.currentStep || task.activity?.latest || 'Working';
 }
 
+/** Dollars as a person writes them: whole amounts bare, cents only when there are some. */
 export const money = (usd: number): string =>
-  usd >= 100 ? `$${Math.round(usd)}` : `$${usd.toFixed(usd >= 10 ? 1 : 2)}`;
+  usd >= 100 || Number.isInteger(usd) ? `$${Math.round(usd)}` : `$${usd.toFixed(2)}`;
 
 export function ago(iso: string | null | undefined, now = Date.now()): string {
   if (!iso) return '';

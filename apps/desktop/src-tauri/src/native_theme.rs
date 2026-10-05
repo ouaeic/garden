@@ -12,6 +12,10 @@ pub(crate) async fn asset(Path(name): Path<String>) -> Response {
             "text/css; charset=utf-8",
             include_bytes!("setup.css").to_vec(),
         ),
+        "wordmark.svg" => (
+            "image/svg+xml",
+            include_bytes!("../../../web/public/brand/garden-wordmark.svg").to_vec(),
+        ),
         "Fraunces.woff2" => (
             "font/woff2",
             include_bytes!("../../../web/public/fonts/Fraunces.woff2").to_vec(),
@@ -51,6 +55,7 @@ mod tests {
         for (name, mime) in [
             ("foundation.css", "text/css; charset=utf-8"),
             ("setup.css", "text/css; charset=utf-8"),
+            ("wordmark.svg", "image/svg+xml"),
             ("Fraunces.woff2", "font/woff2"),
             ("Fraunces-Italic.woff2", "font/woff2"),
             ("Geist.woff2", "font/woff2"),

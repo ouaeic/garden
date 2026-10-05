@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowUpRight, RefreshCw } from './icons';
+import Wordmark from './app/Wordmark';
 import { nativeBootstrap, nativeStatus, pairNative, previewConnectionTicket } from './native.js';
 import type { NativeBootstrap, NativeStatus, NetworkPreference } from './native.js';
 import { Button, ErrorNotice, Field } from './ui.js';
@@ -71,7 +72,7 @@ export default function NativeSetup({
   return (
     <main className="native-setup">
       <header>
-        <span className="brand">garden</span>
+        <Wordmark className="brand" />
         <span className="muted">Your computer, anywhere</span>
       </header>
       <div className="native-setup-columns">

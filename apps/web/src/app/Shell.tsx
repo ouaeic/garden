@@ -16,6 +16,7 @@ import { markLooked } from './actions';
 import { beds, GROWTH_COLOR, growth, money } from './derive';
 import { More, Screen, Search as SearchIcon, Settings, Theme } from './icons';
 import Light from './Light';
+import Wordmark from './Wordmark';
 import { closeSheet, go, openDeal, openGoal, useRoute, type View } from './route';
 import { primaryWorkspace, useGarden } from './store';
 import { Toasts } from './toast';
@@ -111,9 +112,13 @@ export default function Shell() {
       <div className="vignette" aria-hidden="true" />
       <div className="grain" aria-hidden="true" />
       <header className="top" inert={away}>
-        <button type="button" className="brand" onClick={() => go({ view: 'today', sheet: null })}>
-          <span className="sr-only">garden, back to Today</span>
-          <span aria-hidden="true">garden</span>
+        <button
+          type="button"
+          className="brand"
+          aria-label="garden, back to Today"
+          onClick={() => go({ view: 'today', sheet: null })}
+        >
+          <Wordmark />
         </button>
         <nav className="views" aria-label="Views">
           {NAV.map((item) => (

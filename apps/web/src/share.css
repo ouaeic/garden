@@ -76,17 +76,11 @@ details[open] > summary {
   text-transform: uppercase;
 }
 .share-wordmark {
-  font-family: var(--display);
-  font-style: italic;
-  font-weight: 520;
-  font-size: 28px;
-  letter-spacing: -0.03em;
-  font-variation-settings:
-    'SOFT' 100,
-    'opsz' 96;
-  text-transform: none;
+  display: inline-flex;
   color: var(--ink);
-  text-decoration: none;
+}
+.share-wordmark .wordmark {
+  height: 46px;
 }
 .share-heading {
   padding: 64px 0 32px;
