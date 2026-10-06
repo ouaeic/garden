@@ -296,6 +296,8 @@ export interface LiveProvider {
   readonly provider: 'openrouter' | 'openai-compatible';
   readonly providerModelId: string;
   readonly contextTokens: number;
+  /** Whether the live model reads images, as its provider publishes. */
+  readonly vision?: boolean;
 }
 
 const sse = (payload: unknown): string => `data: ${JSON.stringify(payload)}\n\n`;
@@ -2692,7 +2694,12 @@ const modelFor = (contextTokens?: number, live?: LiveProvider): ModelRelease => 
         ...shaped,
         provider: live.provider === 'openrouter' ? 'openrouter' : 'custom',
         providerModelId: live.providerModelId,
-        contextTokens: contextTokens ?? live.contextTokens
+        contextTokens: contextTokens ?? live.contextTokens,
+        // Production reads this from the provider's own catalogue; a live rig has to be told, or
+        // every image is routed away from a model that could have looked at it.
+        ...(live.vision
+          ? { modalities: ['text', 'image'], capabilities: [...shaped.capabilities, 'vision'] }
+          : {})
       };
 };
 

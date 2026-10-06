@@ -141,7 +141,8 @@ export const runTerminalBench = async (options: TerminalBenchOptions): Promise<n
     apiKey: credential.apiKey,
     provider: credential.provider,
     providerModelId: providerModelIdOf(options.model),
-    contextTokens: 1_000_000
+    contextTokens: 1_000_000,
+    vision: process.env.AI_VISION === '1'
   };
   const identity = runIdentity();
   const openedAt = await spentOnKey(credential, 0);
