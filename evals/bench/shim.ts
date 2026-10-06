@@ -485,8 +485,12 @@ export const createShim = (options: ShimOptions): Shim => {
         const session = sessions.get(url.pathname.split('/').pop() ?? '');
         if (!session)
           return json({ error: { code: 'not_found', message: 'No such session' } }, 404);
+        // The runner's session view: `startedAt` and `command` are read by the worker's wait, which
+        // failed on every call while they were missing.
         return json({
           sessionId: session.id,
+          startedAt: session.startedAt,
+          command: session.command,
           status: session.done ? 'exited' : 'running',
           exitCode: session.exitCode,
           stdout: session.stdout,
