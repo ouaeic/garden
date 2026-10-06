@@ -26,6 +26,15 @@ describe('a shell call written as a command line', () => {
     );
   });
 
+  it('reads an argument list sent as the JSON text of a list', () => {
+    expect(shellCommandCall(shell({ executable: 'bash', args: '["-lc", "make test"]' }))).toEqual(
+      shell({ executable: 'bash', args: ['-lc', 'make test'] })
+    );
+    // Text that is not a list of strings is left for the tool to refuse in its own words.
+    const odd = shell({ executable: 'bash', args: 'make test' });
+    expect(shellCommandCall(odd)).toBe(odd);
+  });
+
   it('touches no other tool', () => {
     const call = { id: 'call-2', name: 'file_read', arguments: { command: 'rm -rf /' } };
     expect(shellCommandCall(call)).toBe(call);

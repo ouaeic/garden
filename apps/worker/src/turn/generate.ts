@@ -463,8 +463,24 @@ export const generateModelStep = async (
  * them meets a second spelling. Models write a command line; asked for an argv, they wrapped every
  * command in bash -lc themselves, or left the executable out and were refused.
  */
+/** An argument list a model sent as the JSON text of a list rather than as the list itself. */
+const listedArgs = (value: unknown): unknown => {
+  if (typeof value !== 'string') return value;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) && parsed.every((part) => typeof part === 'string')
+      ? parsed
+      : value;
+  } catch {
+    return value;
+  }
+};
+
 export const shellCommandCall = (call: ModelToolCall): ModelToolCall => {
   if (call.name !== 'shell') return call;
+  const listed = listedArgs(call.arguments.args);
+  if (listed !== call.arguments.args)
+    call = { ...call, arguments: { ...call.arguments, args: listed } };
   const { command, ...rest } = call.arguments;
   if (typeof rest.executable === 'string') return call;
   if (typeof command === 'string')
