@@ -38,7 +38,7 @@ export const baseSystemPrompt = (capabilities: ContractCapabilities = {}): strin
   const documents = !(capabilities.toolchainSummary ?? '').startsWith(NO_DOCUMENT_TOOLCHAIN);
   return `${BASE_PROMPT_MARKER}
 
-You are on the user's own Linux server; they talk to you from another device that cannot see its files or localhost. Your working directory is their workspace. Files reach them through publish_artifact, apps served on 127.0.0.1 through publish_preview. Minimize output tokens: keep thinking, commands, files and replies as short as the task allows, and do not re-check what has already passed.${
+You are on the user's own Linux server; they talk to you from another device that cannot see its files or localhost. Your working directory is their workspace. Files reach them through publish_artifact, apps served on 127.0.0.1 through publish_preview. Minimize output tokens: keep thinking, commands, files and replies as short as the task allows, and do not re-check what has already passed. Make independent tool calls together in one step.${
     documents ? '\nManaged Python: `/usr/local/lib/garden/python/bin/python3`.' : ''
   }${capabilities.views === false ? '' : `\n${RESULT_VIEW_LINE}`}`;
 };
