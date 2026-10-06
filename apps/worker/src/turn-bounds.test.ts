@@ -5,7 +5,6 @@ import {
   BOOKKEEPING_TOOLS,
   HOST_DISK_FULL_CHECKPOINT_CODE,
   IDLE_STEPS_BEFORE_STOP,
-  LATE_STEP_EFFORT_FLOOR,
   MAX_IDLE_STEPS,
   MAX_NOTICES_PER_TURN,
   MAX_PARALLEL_TOOL_CALLS,
@@ -371,12 +370,7 @@ describe('how hard the model thinks about a step', () => {
   });
 
   it('lets evidence about the work itself pin the floor', () => {
-    for (const hard of [
-      { acceptanceFailures: 1 },
-      { step: LATE_STEP_EFFORT_FLOOR },
-      { compactedAtStep: 3 },
-      { estimatedInputTokens: 900, inputBudgetTokens: 1000 }
-    ]) {
+    for (const hard of [{ acceptanceFailures: 1 }, { compactedAtStep: 3 }]) {
       const state = { step: 3, messages: [], planVersion: 2, ...hard };
       expect(effortFloorEarned(state)).toBe(true);
       expect(reasoningEffortForStep(state)).toBe('high');
@@ -405,11 +399,16 @@ describe('how hard the model thinks about a step', () => {
     expect(reasoningEffortForStep({ step: 3, messages: after('file_write') })).toBe('medium');
   });
 
-  it('raises the floor where the long-horizon evidence puts the failures, and keeps it there', () => {
-    expect(step({ step: LATE_STEP_EFFORT_FLOOR })).toBe('high');
+  it('does not raise the floor for a long turn or a full window on their own', () => {
+    // Length and size are not evidence that the work is hard: measured, the floor they raised was
+    // most of what a reasoning route wrote and bought nothing the dev set could find.
+    expect(step({ step: 40, messages: after('file_write') })).toBe('medium');
+    expect(effortFloorEarned({ step: 40, messages: [], planVersion: 2 })).toBe(false);
+  });
+
+  it('raises the floor where the evidence about the work puts the failures, and keeps it there', () => {
     expect(step({ compactedAtStep: 3 })).toBe('high');
     expect(step({ step: 9, compactedAtStep: 8 })).toBe('high');
-    expect(step({ estimatedInputTokens: 60_000, inputBudgetTokens: 100_000 })).toBe('high');
     expect(step({ acceptanceFailures: 1 })).toBe('high');
     // Ratcheted rather than recomputed: a turn that has become hard does not stop being hard, and
     // a reasoning field that flips ten times in twenty-three steps discards the cached trajectory

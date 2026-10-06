@@ -33,6 +33,7 @@ import { UNTRUSTED_NOTICE_MARKER } from './provenance.js';
 import {
   DELEGATE_MAX_STEPS,
   MAX_NOTICES_PER_TURN,
+  MAX_OUTPUT_TOKENS,
   MAX_TRUNCATED_CONTINUATIONS,
   WORKSPACE_BRIEF_MARKER
 } from './turn-bounds.js';
@@ -7292,9 +7293,9 @@ describe('what a tainted turn is charged for sending', () => {
  */
 describe('a generation the box cut short', () => {
   /**
-   * An answer that runs past the ceiling `maxTokens` implies - eight characters a token against a
-   * 16,384-token cap - which is the one cutoff a test can provoke without spending the wall time
-   * the other two are measured in.
+   * An answer that runs past the ceiling `maxTokens` implies - eight characters a token against
+   * `MAX_OUTPUT_TOKENS`, the most a request can declare - which is the one cutoff a test can provoke
+   * without spending the wall time the other two are measured in.
    *
    * Every line differs, so what is measured is the ceiling rather than the repetition watch: a
    * hundred thousand characters of the same sentence is a degenerate repeat and would be stopped
@@ -7302,7 +7303,7 @@ describe('a generation the box cut short', () => {
    */
   const overrunningAnswer = ((): string => {
     const lines: string[] = [];
-    for (let index = 0, length = 0; length < 140_000; index += 1) {
+    for (let index = 0, length = 0; length < MAX_OUTPUT_TOKENS * 8 + 10_000; index += 1) {
       const line = `Point ${index}: workspace/notes/${index}.md still wants a heading and a date.`;
       lines.push(line);
       length += line.length + 1;
@@ -7472,7 +7473,7 @@ describe('a generation the repetition watch stopped', () => {
    * which is the difference this test is entirely about.
    */
   const repeatingStream =
-    (frames = 40) =>
+    (frames = 40, channel: 'content' | 'reasoning' = 'content', sentence = repeatedSentence) =>
     (init?: RequestInit): BodyInit =>
       new ReadableStream<Uint8Array>({
         start(controller) {
@@ -7492,7 +7493,7 @@ describe('a generation the repetition watch stopped', () => {
             controller.enqueue(
               encode(
                 `data: ${JSON.stringify({
-                  choices: [{ delta: { content: repeatedSentence } }]
+                  choices: [{ delta: { [channel]: sentence } }]
                 })}\n\n`
               )
             );
@@ -7552,6 +7553,26 @@ describe('a generation the repetition watch stopped', () => {
     expect(
       Number((cost?.payload as { cumulativeCredits?: number } | undefined)?.cumulativeCredits)
     ).toBeGreaterThan(0);
+  });
+
+  it('stops a loop in the thinking as it stops one in the answer', async () => {
+    // The live shape: a reasoning route that thought one short sentence until its ceiling.
+    const task = makeTask();
+    const probe = probeStore(() => task);
+    const log: FetchLog = { calls: [], modelRequests: [] };
+    installFetch(
+      [repeatingStream(40, 'reasoning', 'Let me write the file now.\n\n'), textFrame('Written.')],
+      log
+    );
+    await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 3 }), masterKey, runnerSecret)
+      .run(task)
+      .catch(() => undefined);
+    const stopped = probe.events.find((entry) => entry.summary === 'Stopped a repeating answer');
+    expect(stopped?.kind).toBe('warning');
+    expect((stopped?.payload as { repeated?: string } | undefined)?.repeated).toContain(
+      'Let me write the file now.'
+    );
+    expect(log.modelRequests.length).toBeGreaterThanOrEqual(2);
   });
 
   it('supersedes the frames the owner watched arrive with one row that carries them', async () => {

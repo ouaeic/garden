@@ -29,6 +29,25 @@ const artifact = {
   minBytes: 20_000
 };
 
+describe('the file an artifact check names', () => {
+  it('is named in the workspace frame both the listing and the proof read', () => {
+    const parsed = parse({ ...artifact, path: 'brief.json', json: { equals: { '/a': 1 } } });
+    // A bare name was listed in workspace/ and read from the home above it: found, then missing.
+    expect(parsed.ok && parsed.checks[0]).toMatchObject({ path: 'workspace/brief.json' });
+    expect(parse(artifact).ok && parse(artifact)).toMatchObject({
+      checks: [{ path: 'workspace/board/deck.pptx' }]
+    });
+  });
+
+  it('refuses a file outside the workspace when it is declared, in words the model can act on', () => {
+    for (const path of ['/app/brief.json', '../brief.json', 'workspace/../etc/passwd']) {
+      const parsed = parse({ ...artifact, path });
+      expect(parsed.ok).toBe(false);
+      expect(!parsed.ok && parsed.reason).toContain('with a command check');
+    }
+  });
+});
+
 describe('an artifact check that is about the pages rather than the bytes', () => {
   it('keeps what the job asked for and defaults the margin to the page edge itself', () => {
     const parsed = parse({ ...artifact, render: { expectPages: 12 } });

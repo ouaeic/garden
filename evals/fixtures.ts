@@ -25,6 +25,7 @@ import { readdirSync, readFileSync, type Dirent } from 'node:fs';
 import path from 'node:path';
 
 import { COMPACT_CONTEXT_TOOL } from '../apps/worker/src/context.js';
+import { MAX_OUTPUT_TOKENS } from '../apps/worker/src/turn-bounds.js';
 import { requestToolsFor } from '../apps/worker/src/request-tools.js';
 import { UNKNOWN_SURFACES } from '../packages/contracts/src/index.js';
 import { agentToolsFor } from '../apps/worker/src/tool-catalogue.js';
@@ -91,16 +92,16 @@ const scanPlan: ReadonlyArray<number | 'phase-done'> = Array.from(
 const BUDGET_BATCHES = 16;
 
 /**
- * More than a route is allowed to write in one answer: eight characters to the token against the
- * 16,384-token ceiling every request here declares, which is the ceiling this side cuts a runaway
- * generation at.
+ * More than a route is allowed to write in one answer: eight characters to the token against
+ * `MAX_OUTPUT_TOKENS`, the most any request here can declare, which is the ceiling this side cuts a
+ * runaway generation at.
  *
  * No two lines are alike, for the same reason the log batches differ from each other: a hundred
  * thousand characters of one sentence is a degenerate repeat, and the watch would stop it several
  * steps before the generation budget noticed anything, which would make this fixture green for the
  * wrong reason.
  */
-const overrunningAnswer = (characters = 140_000): string => {
+const overrunningAnswer = (characters = MAX_OUTPUT_TOKENS * 8 + 10_000): string => {
   const lines: string[] = [];
   for (let index = 0, length = 0; length < characters; index += 1) {
     const line = `${index}. workspace/notes/${index}.md still wants a heading, a date and an owner.`;

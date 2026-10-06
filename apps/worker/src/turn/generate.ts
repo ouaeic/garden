@@ -143,6 +143,7 @@ export const generateModelStep = async (
    * model what it did, which is a correction it can act on rather than a dead turn.
    */
   let loopedOn = '';
+  let thought = '';
   /**
    * The route's refusal of an oversized window, held for the repair below rather than thrown.
    * A holder rather than a bare `let` for the reason `firstToken` above is one: the assignment
@@ -251,6 +252,16 @@ export const generateModelStep = async (
           onReasoningDelta: (delta) => {
             const frame = channel.reasoningFlusher.push(delta);
             if (frame !== null) channel.emitReasoningFrame(frame);
+            // The same watch over the thinking. A reasoning route loops there as surely as in the
+            // answer, and there nobody sees it: measured on live runs, one reply thought "Let me
+            // write." 13,438 times - 63,000 tokens and six minutes - before it made its call.
+            if (loopedOn) return;
+            thought = (thought + delta).slice(-4_000);
+            const repeat = degenerateRepeat(thought);
+            if (repeat) {
+              loopedOn = repeat;
+              looping.abort();
+            }
           }
         })
       )

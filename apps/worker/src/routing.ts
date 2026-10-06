@@ -9,6 +9,7 @@
  */
 import type { MediaModelOption, ModelRelease } from '@garden/contracts';
 import { readRoutingMetadata, type RoutingMetadata } from '@garden/core';
+import { promptCacheStyle } from '@garden/model-gateway';
 
 /**
  * Which route a request is going to, and how that route caches a repeated prefix.
@@ -61,6 +62,16 @@ export const routeTo = (
     ...(typeof supportsReasoningEffort === 'boolean' ? { supportsReasoningEffort } : {})
   };
 };
+
+/**
+ * How the window for a request to this model should be prepared for its route's cache: what the
+ * catalogue stored, or the same slug fallback the provider adapter applies when it stored nothing,
+ * so the window and the adapter never disagree about which kind of route this is.
+ */
+export const windowCacheStyle = (
+  model: { providerModelId: string } & Record<string, unknown>
+): 'explicit' | 'automatic' | 'none' =>
+  routeTo(model).promptCacheStyle ?? promptCacheStyle(model.providerModelId);
 
 export type ModelCapability = ModelRelease['capabilities'][number];
 

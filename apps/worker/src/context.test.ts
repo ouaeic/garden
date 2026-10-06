@@ -1180,6 +1180,65 @@ describe('compaction and prompt caching', () => {
     expect(step.messages[2]?.content).toBe('Keep this original goal.');
   });
 
+  it('rewrites nothing already sent on a prefix-caching route, and rewrites behind the line elsewhere', () => {
+    // Steps of one assistant call with reasoning and one result each, on a million-token window:
+    // nothing but the recency rules and the pressure squeeze can rewrite earlier bytes.
+    const head: ModelMessage[] = [
+      { role: 'system', content: 'contract' },
+      { role: 'user', content: 'Keep this original goal.' }
+    ];
+    const stepMessages = (index: number, resultChars: number): ModelMessage[] => [
+      {
+        role: 'assistant',
+        content: '',
+        reasoning: `thinking about step ${index} `.repeat(40),
+        toolCalls: [
+          { id: `c${index}`, name: 'shell', arguments: { command: `run ${index} `.repeat(60) } }
+        ]
+      },
+      {
+        role: 'tool',
+        toolCallId: `c${index}`,
+        content: `result ${index} `.repeat(resultChars / 10)
+      }
+    ];
+    const rewrites = (style: 'automatic' | 'explicit', steps: number, resultChars: number) => {
+      let window = [...head];
+      let previous: string[] | null = null;
+      let rewritten = 0;
+      for (let index = 0; index < steps; index += 1) {
+        window = [...window, ...stepMessages(index, resultChars)];
+        const prepared = prepareModelContext(window, 1_000_000, 16_000, {
+          promptCacheStyle: style
+        }).messages;
+        // The newest eight are whole on every step, whichever way the line moves.
+        for (const message of prepared.slice(-8)) {
+          if (message.role === 'assistant') expect(message.reasoning).toBeTruthy();
+          if (message.role === 'tool') expect(message.content).not.toContain('earlier tool output');
+        }
+        // Compared as the wire carries them: a breakpoint flag is a hint the adapter drops on a
+        // route that caches by itself, so it is not a byte the provider sees.
+        const wire = prepared.map(({ cacheBreakpoint: _hint, ...message }) =>
+          JSON.stringify(message)
+        );
+        if (previous) {
+          const sent = previous;
+          if (sent.some((bytes, at) => bytes !== wire[at])) rewritten += 1;
+        }
+        previous = wire;
+      }
+      return rewritten;
+    };
+    // An ordinary turn: one message at a time on an explicit route, which rewrites behind the line
+    // on almost every step once it is moving, and never on a caching one.
+    expect(rewrites('explicit', 30, 3_000)).toBeGreaterThanOrEqual(30 - 1 - 8);
+    expect(rewrites('automatic', 30, 3_000)).toBe(0);
+    // A turn that fills the window past where the tool-output squeeze starts: the explicit route
+    // squeezes and moves its line, and the caching route still rewrites nothing.
+    expect(rewrites('explicit', 40, 20_000)).toBeGreaterThan(0);
+    expect(rewrites('automatic', 40, 20_000)).toBe(0);
+  });
+
   it('keeps the cacheable system preamble outside the region compaction rewrites', async () => {
     const outcome = await compactContext({
       messages: trajectory(16),

@@ -14,7 +14,7 @@ import { assessEvidenceReport, unverifiedNotice } from './delegate-evidence.js';
 import type { ClaimReview } from './claim-review.js';
 import { DirectClaims } from './claim-input.js';
 import { originsFromResult, providerWebProvenance, untrustedOriginOfResult } from './provenance.js';
-import { routeTo } from './routing.js';
+import { routeTo, windowCacheStyle } from './routing.js';
 import { resolveTaskPurposeModel } from './purpose-model.js';
 import { DELEGATE_MAX_STEPS } from './turn-bounds.js';
 import { startStopWatch, withRequestDeadline } from './turn-lifecycle.js';
@@ -277,6 +277,7 @@ ${clockLine(runtimeDate(), timeZone)}
     const prepared = prepareModelContext(messages, model.contextTokens, maxTokens, {
       precedingTokens: reservedTokens,
       reservedTokens,
+      promptCacheStyle: windowCacheStyle(model),
       ...(toolOutputFloor === undefined ? {} : { toolOutputFloor })
     });
     toolOutputFloor = prepared.olderToolOutputChars;

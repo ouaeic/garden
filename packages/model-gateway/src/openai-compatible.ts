@@ -980,6 +980,13 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
         ? await this.#zeroRetentionParameters(input.model)
         : null;
     const sends = (parameter: string): boolean => !declared || declared.has(parameter);
+    // Whether this request asks the route to think, which decides the effort field and the
+    // temperature together.
+    const thinking = Boolean(
+      input.reasoningEffort &&
+      input.supportsReasoningEffort !== false &&
+      sends(this.provider === 'openrouter' ? 'reasoning' : 'reasoning_effort')
+    );
     /**
      * The same cap under whichever name the route declared. A route that takes only
      * `max_completion_tokens` still gets an output ceiling rather than none, which is what keeps a
@@ -1065,10 +1072,15 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
           ...input.tools.map((tool) => ({ type: 'function', function: tool })),
           ...serverTools
         ],
-        ...(sends('temperature') ? { temperature: input.temperature } : {}),
-        ...(input.reasoningEffort &&
-        input.supportsReasoningEffort !== false &&
-        sends(this.provider === 'openrouter' ? 'reasoning' : 'reasoning_effort')
+        /*
+         * A thinking request is sent no temperature, as the Responses adapter and the Anthropic
+         * bridge already send none: the route's own default is what its thinking was tuned at.
+         * Well below it, reasoning models fall into loops - DeepSeek's guidance for its own names
+         * endless repetition as the reason - and measured on live runs the thinking channel looped
+         * on one short sentence until the output ceiling.
+         */
+        ...(sends('temperature') && !thinking ? { temperature: input.temperature } : {}),
+        ...(thinking
           ? this.provider === 'openrouter'
             ? { reasoning: { effort: input.reasoningEffort } }
             : { reasoning_effort: input.reasoningEffort }

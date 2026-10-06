@@ -22,9 +22,9 @@ import {
   stepUsageKey,
   usageCredit
 } from './billing.js';
-import { modelInputBudget, prepareModelContext } from './context.js';
+import { prepareModelContext } from './context.js';
 import type { CompletionVerification } from './completion.js';
-import { routeTo } from './routing.js';
+import { routeTo, windowCacheStyle } from './routing.js';
 import { createStreamFlusher, normalizeAssistantText } from './streaming.js';
 import { event } from './tool-recording.js';
 import {
@@ -356,6 +356,7 @@ export const handOffAtStepLimit = async (
     {
       precedingTokens: reservedTokens,
       reservedTokens,
+      promptCacheStyle: windowCacheStyle(model),
       ...(state.toolOutputFloor === undefined ? {} : { toolOutputFloor: state.toolOutputFloor })
     }
   );
@@ -379,11 +380,7 @@ export const handOffAtStepLimit = async (
    * changing it re-bills the entire prefix at the write price. Keeping it is the cheaper of the two
    * even on the arm where the turn is ending because the money ran out.
    */
-  const automaticEffort = reasoningEffortForStep({
-    ...state,
-    estimatedInputTokens: preparedContext.estimatedInputTokens,
-    inputBudgetTokens: modelInputBudget(model.contextTokens, maxOutputTokens, reservedTokens)
-  });
+  const automaticEffort = reasoningEffortForStep(state);
   const reasoningEffort = taskReasoningEffort(
     state.ownerReasoningEffort,
     automaticEffort,

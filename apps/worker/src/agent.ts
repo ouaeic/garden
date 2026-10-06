@@ -96,6 +96,7 @@ import { buildIdentity } from './build-identity.js';
 import {
   CHECKPOINT_EXEMPT_TOOLS,
   MAX_NOTICES_PER_TURN,
+  MAX_OUTPUT_TOKENS,
   ownerFixableCheckpointFailure,
   spendHalt,
   spendWarning
@@ -2009,9 +2010,17 @@ export class AgentWorker {
      * It is a pure function of the chosen model's window and nothing in the loop can move it, and
      * it was recomputed - identically, from the same two constants - in five places: once per step
      * and once in each of the three closing handoffs.
+     *
+     * On a reasoning route the ceiling covers the thinking and the reply together, so it has to
+     * hold both: a step that writes a file is a long reasoning block followed by the whole file as
+     * one call argument. A ceiling sized for the reply alone cuts that call off mid-argument, the
+     * route bills every token of it, nothing in it is usable, and the next step attempts the same
+     * write. Measured on live Terminal-Bench runs, that was nine requests of one task's 39. A
+     * ceiling is not a charge - the route bills what it writes - and the adapter clamps the ask to
+     * what the route publishes, so a large one only costs anything on a reply that needed it.
      */
     const maxOutputTokens = Math.min(
-      16_384,
+      MAX_OUTPUT_TOKENS,
       Math.max(2_048, Math.floor(model.contextTokens * 0.2))
     );
     /**

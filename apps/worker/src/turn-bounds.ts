@@ -911,6 +911,13 @@ export const MAX_QUESTIONS_PER_TURN = 2;
 export const MAX_TRUNCATED_CONTINUATIONS = 3;
 
 /**
+ * The most one reply may write, reasoning included, on a model whose window allows it. A fifth of
+ * the window still bounds a small model; this bounds a large one. @see `maxOutputTokens` in
+ * `agent.ts` for why it has to hold a long thought and a whole file together.
+ */
+export const MAX_OUTPUT_TOKENS = 65_536;
+
+/**
  * How many times a turn may condense itself because the route refused its window as too large.
  *
  * Two, because the first repair is aimed at a number this side had never been told before - the
@@ -1068,18 +1075,6 @@ export const stepBudgetNotice = (step: number, maxSteps: number): string | null 
 };
 
 /**
- * Past this step of a turn, the work is integration rather than orientation.
- *
- * Per-step accuracy falls with step count on long tasks, and the measured cause is self-conditioning
- * on the model's own earlier errors; raising the thinking budget is the intervention that mitigates
- * it. Twenty is where a turn stops being "look at the request and start" and becomes "hold what has
- * already happened in mind and decide what to change".
- */
-export const LATE_STEP_EFFORT_FLOOR = 20;
-/** The share of the input budget past which no step is a cheap one, whatever it just did. */
-export const CONTEXT_EFFORT_FLOOR_SHARE = 0.5;
-
-/**
  * How hard the model should think about this particular step.
  *
  * This used to key off `REPEATABLE_TOOLS`, and that set is documented in its own comment as a
@@ -1092,12 +1087,17 @@ export const CONTEXT_EFFORT_FLOOR_SHARE = 0.5;
  *
  * It now ratchets in one direction only. A turn opens at 'high' because that is where the request
  * is read and the approach chosen, settles to 'medium' for ordinary progress, and rises back to
- * 'high' - permanently, for the rest of the turn - on any evidence that this turn has become hard:
- * something failed, a check failed, the window was just compacted, the trajectory is long, or
- * the context is over half the input budget. Two consequences, both wanted. The model thinks most
- * where the measured failures are. And `reasoning` becomes a nearly byte-stable request field
+ * 'high' - permanently, for the rest of the turn - on evidence that this turn has become hard: a
+ * check failed, or the window was just compacted. Two consequences, both wanted. The model thinks
+ * most where the measured failures are. And `reasoning` becomes a nearly byte-stable request field
  * instead of flipping ten times in twenty-three steps, each flip discarding the provider's cached
  * trajectory below the system prefix.
+ *
+ * A turn's length and the size of its window are deliberately not evidence. Raising the thinking
+ * budget late is the published mitigation for accuracy falling with step count, and measured on
+ * live Terminal-Bench runs it bought nothing here: with it, 'high' was 42% of a reasoning route's
+ * calls and 58% of what it wrote, and the same dev set without it passed every task it had passed
+ * and cost 39% less - less thinking written is also less appended to every later request.
  */
 interface EffortState {
   step: number;
@@ -1106,8 +1106,6 @@ interface EffortState {
   acceptanceFailures?: number;
   reasoningFloor?: 'medium' | 'high';
   compactedAtStep?: number;
-  estimatedInputTokens?: number;
-  inputBudgetTokens?: number;
 }
 
 /**
@@ -1120,19 +1118,15 @@ interface EffortState {
  * verse. That is a fact about the network. The step after it is still worth thinking about, and it
  * still gets `high` below; what it no longer does is decide that the turn is hard for ever.
  *
- * The conditions kept here are all statements about the turn itself: the harness refused a finish,
- * an acceptance check failed, the window was just compacted and the model is working from a summary
- * of its own work, the turn has run long, or the context is over half the input budget.
+ * The conditions kept here are all statements about the turn itself: the harness refused a finish or
+ * an acceptance check failed, or the window was just compacted and the model is working from a
+ * summary of its own work.
  */
 export const effortFloorEarned = (state: EffortState): boolean =>
   Boolean(state.acceptanceFailures) ||
-  state.step >= LATE_STEP_EFFORT_FLOOR ||
   // The step immediately after a compaction is the one most likely to make a wrong call: the model
   // has just lost the detail it was working from and is holding a summary of its own work instead.
-  (state.compactedAtStep !== undefined && state.step - state.compactedAtStep <= 1) ||
-  (state.estimatedInputTokens !== undefined &&
-    state.inputBudgetTokens !== undefined &&
-    state.estimatedInputTokens > state.inputBudgetTokens * CONTEXT_EFFORT_FLOOR_SHARE);
+  (state.compactedAtStep !== undefined && state.step - state.compactedAtStep <= 1);
 
 export const reasoningEffortForStep = (state: EffortState): 'medium' | 'high' => {
   if (state.step === 0) return 'high';

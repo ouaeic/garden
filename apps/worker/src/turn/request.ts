@@ -38,6 +38,7 @@ import {
   type PreparedContext
 } from '../context.js';
 import { effortFloorEarned, reasoningEffortForStep } from '../turn-bounds.js';
+import { windowCacheStyle } from '../routing.js';
 import type { TurnRun } from './claim.js';
 import type { CompactContext, TurnLoopControl, TurnStepBudget } from './loop-context.js';
 
@@ -117,6 +118,7 @@ export const prepareStepRequest = async (
   const windowOptions = {
     precedingTokens: reservedTokens,
     reservedTokens,
+    promptCacheStyle: windowCacheStyle(model),
     ...(state.toolOutputFloor === undefined ? {} : { toolOutputFloor: state.toolOutputFloor })
   };
   const preparedContext = prepareModelContext(
@@ -127,11 +129,7 @@ export const prepareStepRequest = async (
   );
   state.toolOutputFloor = preparedContext.olderToolOutputChars;
   state.preparedInputTokens = preparedContext.estimatedInputTokens;
-  const automaticEffort = reasoningEffortForStep({
-    ...state,
-    estimatedInputTokens: preparedContext.estimatedInputTokens,
-    inputBudgetTokens: modelInputBudget(model.contextTokens, maxOutputTokens, reservedTokens)
-  });
+  const automaticEffort = reasoningEffortForStep(state);
   const reasoningEffort = taskReasoningEffort(
     state.ownerReasoningEffort,
     automaticEffort,

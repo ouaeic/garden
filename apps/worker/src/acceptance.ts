@@ -27,7 +27,7 @@ import {
   isDestructiveScript
 } from './command-classification.js';
 import { textValue } from './values.js';
-import { JsonProof } from '@garden/contracts';
+import { deliveryFilePath, JsonProof } from '@garden/contracts';
 
 /** A command the harness runs itself, with the arguments fixed before the work started. */
 export interface AcceptanceCommandCheck {
@@ -605,8 +605,21 @@ export const parseAcceptanceChecks = (
       continue;
     }
     if (kind === 'artifact') {
-      const path = textValue(record.path).trim().slice(0, 400);
-      if (!path) return { ok: false, reason: `Check ${index + 1} needs the path it expects.` };
+      const given = textValue(record.path).trim().slice(0, 400);
+      if (!given) return { ok: false, reason: `Check ${index + 1} needs the path it expects.` };
+      /*
+       * Named once, in the frame both halves of the check read: the listing that proves the file
+       * is there and the proof that reads it. A bare name was listed in workspace/ and read from
+       * the home above it, so the file was found and then reported missing; a path outside the
+       * workspace was accepted here and refused only when the check ran, as a schema error. Both
+       * left a model spending its steps searching a disk for a file that was where it said.
+       */
+      const path = deliveryFilePath(given);
+      if (!path)
+        return {
+          ok: false,
+          reason: `Check ${index + 1}: an artifact check reads a file inside the workspace, named from it (report.pdf or workspace/report.pdf), and "${given}" is not one. Check a file anywhere else with a command check.`
+        };
       const render = parseRenderClause(record.render, path);
       if (!render.ok) return { ok: false, reason: `Check ${index + 1}: ${render.reason}` };
       const json = record.json === undefined ? undefined : JsonProof.safeParse(record.json);

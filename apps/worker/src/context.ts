@@ -2711,6 +2711,12 @@ export interface PrepareContextOptions {
   precedingTokens?: number;
   /** The tightest older-result floor this task has already applied. */
   toolOutputFloor?: number;
+  /**
+   * How the route caches. On a route that caches every prefix by itself nothing is reduced for age
+   * (see `reducesForAge`); anywhere else the recency rules apply one message at a time, which is
+   * what explicit breakpoints are placed against.
+   */
+  promptCacheStyle?: 'explicit' | 'automatic' | 'none';
 }
 
 /**
@@ -2720,6 +2726,30 @@ export interface PrepareContextOptions {
 const RECENT_TOOL_OUTPUT_MESSAGES = 8;
 const RECENT_IMAGE_MESSAGES = 4;
 const RECENT_DETAIL_MESSAGES = 8;
+/**
+ * Whether the recency rules above apply at all, from how the route caches.
+ *
+ * Each rule keeps the newest N messages whole and reduces the rest, and a reduction rewrites the
+ * message it lands on - and, on a route that caches whatever prefix it has seen, re-bills
+ * everything behind it at the full price. So on such a route nothing is reduced for age: the window
+ * is append-only between compactions, and compaction, which rewrites once and condenses for good,
+ * is what holds its size. A reduction only pays for itself once the bytes it saves have been
+ * carried for as many steps as the full and cached prices differ by - fifty on the routes this was
+ * measured on - which is longer than most turns run.
+ *
+ * Measured on live Terminal-Bench runs on a prefix-caching route with the line moving one message
+ * per step: consecutive requests shared 70% of their bytes, and 84 of 113 divergences were an
+ * assistant message losing its reasoning at the line. The tool-output squeeze is a reduction too,
+ * and on such a route it is not the cheap mechanism it is everywhere else.
+ *
+ * Not on an explicit route, where a byte is read only behind a mark and the marks are placed
+ * against a line that settles one message at a time.
+ */
+const reducesForAge = (style: PrepareContextOptions['promptCacheStyle']): boolean =>
+  style !== 'automatic';
+/** The first index a recency rule keeps whole: `keep` back from `end`, or every index when none is reduced. */
+const recencyBoundary = (end: number, keep: number, reduces: boolean): number =>
+  reduces ? end - keep : 0;
 
 /**
  * The last index whose prepared bytes can no longer change, derived from the recency rules above
@@ -2741,8 +2771,11 @@ const RECENT_DETAIL_MESSAGES = 8;
  */
 const stablePrefixEnd = (
   messages: ModelMessage[],
-  olderFloor = OLDER_TOOL_OUTPUT_CHARS
+  olderFloor = OLDER_TOOL_OUTPUT_CHARS,
+  reduces = true
 ): number => {
+  // A window nothing is reduced in never rewrites a byte it has prepared.
+  if (!reduces) return messages.length - 1;
   let lastToolIndex = -1;
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     if (messages[index]?.role === 'tool') {
@@ -2750,9 +2783,9 @@ const stablePrefixEnd = (
       break;
     }
   }
-  const toolBoundary = lastToolIndex - RECENT_TOOL_OUTPUT_MESSAGES;
-  const imageBoundary = messages.length - RECENT_IMAGE_MESSAGES;
-  const detailBoundary = messages.length - RECENT_DETAIL_MESSAGES;
+  const toolBoundary = recencyBoundary(lastToolIndex, RECENT_TOOL_OUTPUT_MESSAGES, reduces);
+  const imageBoundary = recencyBoundary(messages.length, RECENT_IMAGE_MESSAGES, reduces);
+  const detailBoundary = recencyBoundary(messages.length, RECENT_DETAIL_MESSAGES, reduces);
   for (let index = 0; index < messages.length; index += 1) {
     const message = messages[index];
     if (!message) continue;
@@ -2889,7 +2922,8 @@ const cacheEligible = (message: ModelMessage | undefined): boolean =>
 export const markCacheBreakpoints = (
   messages: ModelMessage[],
   precedingTokens = 0,
-  olderFloor = OLDER_TOOL_OUTPUT_CHARS
+  olderFloor = OLDER_TOOL_OUTPUT_CHARS,
+  reduces = true
 ): number => {
   for (const message of messages) delete message.cacheBreakpoint;
   if (estimatedTokens(messages) + precedingTokens < MIN_CACHEABLE_TOKENS) return 0;
@@ -2908,7 +2942,7 @@ export const markCacheBreakpoints = (
     }
     return -1;
   };
-  const edge = stablePrefixEnd(messages, olderFloor);
+  const edge = stablePrefixEnd(messages, olderFloor, reduces);
   // Measured from the first trajectory message rather than from index 0, so the grid lands in the
   // same places whatever the preamble happens to contain on this run.
   const checkpoint =
@@ -3082,13 +3116,18 @@ export const prepareModelContext = (
 ): PreparedContext => {
   const inputBudget = modelInputBudget(contextTokens, maxOutputTokens, options.reservedTokens ?? 0);
   const precedingTokens = options.precedingTokens ?? 0;
+  const reduces = reducesForAge(options.promptCacheStyle);
   // Measured before anything is bounded, so the floor answers the size of the work the model has
-  // actually done rather than the size of the window after a previous step already shrank it.
-  const olderFloor = olderToolOutputChars(
-    estimatedTokens(input) + precedingTokens,
-    inputBudget,
-    options.toolOutputFloor
-  );
+  // actually done rather than the size of the window after a previous step already shrank it. A
+  // window that is not reduced for age is not squeezed either, and says so: the floor it reports
+  // is the one every result is actually held to.
+  const olderFloor = reduces
+    ? olderToolOutputChars(
+        estimatedTokens(input) + precedingTokens,
+        inputBudget,
+        options.toolOutputFloor
+      )
+    : RECENT_TOOL_OUTPUT_CHARS;
   let omittedCharacters = 0;
   const lastToolIndex = input.reduce(
     (found, message, index) => (message.role === 'tool' ? index : found),
@@ -3098,7 +3137,7 @@ export const prepareModelContext = (
     const copy: ModelMessage = { ...message };
     if (message.role === 'tool') {
       const maximum =
-        index >= lastToolIndex - RECENT_TOOL_OUTPUT_MESSAGES
+        index >= recencyBoundary(lastToolIndex, RECENT_TOOL_OUTPUT_MESSAGES, reduces)
           ? RECENT_TOOL_OUTPUT_CHARS
           : olderFloor;
       const bounded = truncateMiddle(
@@ -3123,15 +3162,16 @@ export const prepareModelContext = (
       omittedCharacters += message.content.length - bounded.length;
       copy.content = bounded;
     }
-    if (message.images && index < input.length - RECENT_IMAGE_MESSAGES) {
+    if (message.images && index < recencyBoundary(input.length, RECENT_IMAGE_MESSAGES, reduces)) {
       omittedCharacters += message.images.reduce((sum, image) => sum + image.length, 0);
       delete copy.images;
       copy.content +=
         '\n[Earlier image omitted from the live model window; its encrypted event remains available.]';
     }
-    if (message.toolCalls && index < input.length - RECENT_DETAIL_MESSAGES)
+    const detailed = recencyBoundary(input.length, RECENT_DETAIL_MESSAGES, reduces);
+    if (message.toolCalls && index < detailed)
       copy.toolCalls = message.toolCalls.map(compactToolCall);
-    if (message.role === 'assistant' && index < input.length - RECENT_DETAIL_MESSAGES) {
+    if (message.role === 'assistant' && index < detailed) {
       omittedCharacters +=
         (message.reasoning?.length ?? 0) +
         (message.reasoningDetails ? json(message.reasoningDetails).length : 0) +
@@ -3367,7 +3407,7 @@ export const prepareModelContext = (
   // Breakpoints are chosen after every bound and compaction pass so they mark the text that is
   // actually sent. Marking earlier would pin a prefix that later truncation rewrites, which
   // costs a cache write on every step and never produces a read.
-  const cacheBreakpoints = markCacheBreakpoints(messages, precedingTokens, olderFloor);
+  const cacheBreakpoints = markCacheBreakpoints(messages, precedingTokens, olderFloor, reduces);
   /*
    * And the notice goes on AFTER the marking, which is not a tidiness choice - it is the whole
    * difference between free and expensive.
