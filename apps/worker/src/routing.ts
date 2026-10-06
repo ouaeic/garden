@@ -142,12 +142,6 @@ export const COMPACTION_REQUEST_TIMEOUT_MS = 120_000;
 export const WEB_SEARCH_REQUEST_TIMEOUT_MS = 120_000;
 
 /**
- * Enough for ten titles and ten addresses, and nothing like enough to be tempted into answering.
- * The reply text is discarded unread - only the sources attached to it are wanted.
- */
-export const WEB_SEARCH_MAX_OUTPUT_TOKENS = 2_048;
-
-/**
  * The cheapest model that can still write a faithful brief.
  *
  * Compaction reads the very window the lead model is about to overflow, so charging it at lead

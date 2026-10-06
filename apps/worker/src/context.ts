@@ -1105,7 +1105,49 @@ export const perPartOutputChars = (parts: number): number =>
  * be cut at all, and so whether the omitted middle is worth parking somewhere retrievable - can
  * ask that question without serialising the same object twice.
  */
-export const toolResultText = (result: unknown): string => json(result);
+export const toolResultText = (result: unknown): string =>
+  commandResultText(result) ?? listingText(result) ?? json(result);
+
+/**
+ * A command's result as the terminal printed it, not as a JSON string of it.
+ *
+ * Serialised, every newline in the output became `\n` and every quote `\"`, the model read its
+ * own command's output through a layer of escaping, and the escapes were billed on every later
+ * request. The exit status and duration lead, the streams follow verbatim, and anything else the
+ * runner answered rides one compact line after them so nothing it said is dropped.
+ */
+const commandResultText = (result: unknown): string | null => {
+  if (!result || typeof result !== 'object' || Array.isArray(result)) return null;
+  const { exitCode, stdout, stderr, durationMs, timedOut, ...rest } = result as Record<
+    string,
+    unknown
+  >;
+  if (typeof stdout !== 'string' || !('exitCode' in result)) return null;
+  const seconds = typeof durationMs === 'number' ? ` in ${(durationMs / 1000).toFixed(1)}s` : '';
+  const head = `${timedOut === true ? 'timed out' : `exit ${String(exitCode)}`}${seconds}`;
+  const parts = [head];
+  if (stdout) parts.push(stdout.replace(/\n$/, ''));
+  if (typeof stderr === 'string' && stderr.trim())
+    parts.push(`[stderr]\n${stderr.replace(/\n$/, '')}`);
+  const extra = Object.fromEntries(Object.entries(rest).filter(([, value]) => value !== undefined));
+  if (Object.keys(extra).length) parts.push(json(extra));
+  return parts.join('\n');
+};
+
+/** A directory listing as one line an entry: a name, a trailing slash for a folder, a size. */
+const listingText = (result: unknown): string | null => {
+  if (!result || typeof result !== 'object' || Array.isArray(result)) return null;
+  const { path, entries, ...rest } = result as Record<string, unknown>;
+  if (typeof path !== 'string' || !Array.isArray(entries)) return null;
+  const lines = entries.map((entry) => {
+    const { name, type, sizeBytes } = (entry ?? {}) as Record<string, unknown>;
+    return type === 'directory'
+      ? `${String(name)}/`
+      : `${String(name)}${typeof sizeBytes === 'number' ? `  ${sizeBytes}` : ''}`;
+  });
+  const extra = Object.keys(rest).length ? `\n${json(rest)}` : '';
+  return `${path}/ (${entries.length})\n${lines.join('\n')}${extra}`;
+};
 
 /**
  * What a cut tool result says when there is no file to point at.
@@ -1137,12 +1179,11 @@ export const toolResultText = (result: unknown): string => json(result);
  * Every recovery named is one this harness actually performs, checked against `tool-catalogue.ts`
  * rather than carried over from mini-swe-agent's bash-only advice: file_read takes `startLine` and
  * `endLine`, code_search takes `path` and `glob`, document_read takes `startPage` and `endPage`.
- * `bash -lc` is named rather than a bare pipe because `shell` runs one executable directly and its
- * own description says "There is no shell here, so nothing expands" - advice that names a
- * capability this harness does not have is worse than silence, and `cmd | head` is that advice.
+ * The shell's `command` field is named because that is where a pipe runs: an `executable` is run
+ * directly and nothing in its arguments expands.
  */
 export const CUT_TOOL_OUTPUT_ADVICE =
-  'nothing of the middle was kept: ask again for just the part you need - a file_read line range, a code_search narrowed by path or glob, a document_read page range - and bound output where it is made, piping to head, tail or grep through `bash -lc` or writing it to a file you then read in ranges';
+  'nothing of the middle was kept: ask again for just the part you need - a file_read line range, a code_search narrowed by path or glob, a document_read page range - and bound output where it is made, piping to head, tail or grep in a shell `command` or writing it to a file you then read in ranges';
 
 /**
  * The ceiling on that sentence, and the measurement that put it there.

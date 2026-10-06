@@ -22,6 +22,7 @@ import {
   wrapDataKey
 } from '@garden/core';
 import type { DataStore, TaskEventRecord, TaskRecord, WorkspaceRecord } from '@garden/data';
+import { DEFAULT_GENERATION_MAX_CHARS } from '@garden/model-gateway';
 import type { ModelRelease } from '@garden/contracts';
 import { MIN_TOKEN_BYTES } from './egress.js';
 import { AgentWorker } from './agent.js';
@@ -33,7 +34,6 @@ import { UNTRUSTED_NOTICE_MARKER } from './provenance.js';
 import {
   DELEGATE_MAX_STEPS,
   MAX_NOTICES_PER_TURN,
-  MAX_OUTPUT_TOKENS,
   MAX_TRUNCATED_CONTINUATIONS,
   WORKSPACE_BRIEF_MARKER
 } from './turn-bounds.js';
@@ -7293,8 +7293,8 @@ describe('what a tainted turn is charged for sending', () => {
  */
 describe('a generation the box cut short', () => {
   /**
-   * An answer that runs past the ceiling `maxTokens` implies - eight characters a token against
-   * `MAX_OUTPUT_TOKENS`, the most a request can declare - which is the one cutoff a test can provoke
+   * An answer that runs past the backstop a request with no declared ceiling is held to - a turn
+   * names no output length - which is the one cutoff a test can provoke
    * without spending the wall time the other two are measured in.
    *
    * Every line differs, so what is measured is the ceiling rather than the repetition watch: a
@@ -7303,7 +7303,7 @@ describe('a generation the box cut short', () => {
    */
   const overrunningAnswer = ((): string => {
     const lines: string[] = [];
-    for (let index = 0, length = 0; length < MAX_OUTPUT_TOKENS * 8 + 10_000; index += 1) {
+    for (let index = 0, length = 0; length < DEFAULT_GENERATION_MAX_CHARS + 10_000; index += 1) {
       const line = `Point ${index}: workspace/notes/${index}.md still wants a heading and a date.`;
       lines.push(line);
       length += line.length + 1;
@@ -7361,6 +7361,15 @@ describe('a generation the box cut short', () => {
     // not a rounding error: it filed the prompt at nothing and the output at the provider's silence.
     expect(billed[0]?.unit).toBe('tokens');
     expect(Number(billed[0]?.credits)).toBeGreaterThan(0);
+  });
+
+  it('names no output length, so the route writes up to its own maximum', async () => {
+    const { log } = await run([cutOffStream, finishFrame]);
+    expect(log.modelRequests.length).toBeGreaterThan(0);
+    for (const request of log.modelRequests) {
+      expect(request).not.toHaveProperty('max_tokens');
+      expect(request).not.toHaveProperty('max_completion_tokens');
+    }
   });
 
   it('says why the answer stops there, and does not ask for the rest of it', async () => {

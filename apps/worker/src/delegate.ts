@@ -213,7 +213,8 @@ ${clockLine(runtimeDate(), timeZone)}
       }`
     }
   ];
-  const maxTokens = Math.min(8_192, Math.max(2_048, Math.floor(model.contextTokens * 0.1)));
+  // Room the window keeps free for a reply. It is not sent: the route writes up to its own maximum.
+  const replyRoom = Math.min(8_192, Math.max(2_048, Math.floor(model.contextTokens * 0.1)));
   let usageCredits = 0;
   announceLane('started', { allocatedCredits: budget });
   const untrusted = new Set<string>();
@@ -274,7 +275,7 @@ ${clockLine(runtimeDate(), timeZone)}
       };
     }
     await context.assertProviderConfigured(task);
-    const prepared = prepareModelContext(messages, model.contextTokens, maxTokens, {
+    const prepared = prepareModelContext(messages, model.contextTokens, replyRoom, {
       precedingTokens: reservedTokens,
       reservedTokens,
       promptCacheStyle: windowCacheStyle(model),
@@ -294,7 +295,6 @@ ${clockLine(runtimeDate(), timeZone)}
         messages: prepared.messages,
         tools,
         temperature: 0.1,
-        maxTokens,
         reasoningEffort: 'high',
         sessionId: window,
         signal: AbortSignal.any([signal, stopWatch.signal])

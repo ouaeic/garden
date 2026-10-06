@@ -587,14 +587,15 @@ describe('what a cut result says when nothing was kept', () => {
     /*
      * The counter-direction: a bound that teaches must not start teaching about work that was
      * never cut. `stdout` is sized so the SERIALISED result lands exactly on the bound, since that
-     * is what `boundToolResultText` measures - `toolResultText` adds the JSON envelope and escapes.
+     * is what `boundToolResultText` measures - `toolResultText` adds the exit line.
      */
     const at = recording();
     await recordToolResult(at.deps, task, Buffer.from(dataKey), at.state, shell, {
       exitCode: 0,
       stdout: ''
     });
-    const envelope = toolResultText({ exitCode: 0, stdout: '' }).length;
+    // The exit line and the newline after it, which a non-empty stdout always carries.
+    const envelope = toolResultText({ exitCode: 0, stdout: 'x' }).length - 1;
     const exact = {
       exitCode: 0,
       stdout: body(RECENT_TOOL_OUTPUT_CHARS - envelope, 'fit')
@@ -711,11 +712,10 @@ describe('what a cut result says when nothing was kept', () => {
       expect(advice).toContain(phrase);
       for (const field of fields) expect(shapeOf(tool)).toContain(field);
     }
-    // A pipe character would be advice `shell` cannot take: it runs one executable directly, and
-    // its own description says there is no shell here and nothing expands. So the only honest way
-    // to say it is the one the catalogue itself names.
-    expect(shapeOf('shell')).toContain('bash -lc');
-    expect(advice).toContain('bash -lc');
+    // A pipe runs in the shell's `command` field and nowhere else - an `executable` runs directly
+    // and nothing in its arguments expands - so the advice names that field, and the tool has it.
+    expect(shapeOf('shell')).toContain('"command"');
+    expect(advice).toContain('shell `command`');
     expect(advice).not.toContain('|');
   };
 
@@ -762,9 +762,12 @@ describe('what a cut result says when nothing was kept', () => {
     expect(promisesAParameterNoToolTakes).not.toBe(CUT_TOOL_OUTPUT_ADVICE);
     expect(() => auditAdvice(promisesAParameterNoToolTakes)).toThrow(/a file_read line range/);
 
-    const dropsTheOneShellFormThatWorks = CUT_TOOL_OUTPUT_ADVICE.replace('`bash -lc`', 'a shell');
+    const dropsTheOneShellFormThatWorks = CUT_TOOL_OUTPUT_ADVICE.replace(
+      'shell `command`',
+      'shell'
+    );
     expect(dropsTheOneShellFormThatWorks).not.toBe(CUT_TOOL_OUTPUT_ADVICE);
-    expect(() => auditAdvice(dropsTheOneShellFormThatWorks)).toThrow(/bash -lc/);
+    expect(() => auditAdvice(dropsTheOneShellFormThatWorks)).toThrow(/command/);
 
     const pipes = `${CUT_TOOL_OUTPUT_ADVICE}, or just run cmd | head -c 4000`;
     expect(() => auditAdvice(pipes)).toThrow(/not to contain/);

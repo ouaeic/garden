@@ -31,7 +31,11 @@ import type { ReasoningEffort } from '@garden/contracts';
 import { GardenError, sha256 } from '@garden/core';
 import type { ModelRelease } from '@garden/contracts';
 import type { DataStore, TaskRecord } from '@garden/data';
-import { interruptedResponseOf, type ModelResponse } from '@garden/model-gateway';
+import {
+  interruptedResponseOf,
+  type ModelResponse,
+  type ModelToolCall
+} from '@garden/model-gateway';
 import type { AgentState, AgentWorkerConfig } from '../agent-state.js';
 import type { AgentRunnerClient } from '../runner-client.js';
 import { materializeNativeInputs } from '../native-input.js';
@@ -233,7 +237,6 @@ export const generateModelStep = async (
           // name only the provider can - and which one answered would depend on the model's mood.
           tools: requestTools,
           temperature: 0.2,
-          maxTokens: maxOutputTokens,
           reasoningEffort,
           ...(model.reasoning ? { reasoningOptions: model.reasoning } : {}),
           sessionId,
@@ -446,5 +449,27 @@ export const generateModelStep = async (
     await deps.checkpoint(task, key, state);
     throw interruptedFailure.error;
   }
-  return { outcome: 'generated', response };
+  return {
+    outcome: 'generated',
+    response: { ...response, toolCalls: response.toolCalls.map(shellCommandCall) }
+  };
+};
+
+/**
+ * A shell call written as a command line, in the executable-and-arguments shape every later reader
+ * of a call expects - the approval floor, the write classifier, the checkpoint set - so none of
+ * them meets a second spelling. Models write a command line; asked for an argv, they wrapped every
+ * command in bash -lc themselves, or left the executable out and were refused.
+ */
+const shellCommandCall = (call: ModelToolCall): ModelToolCall => {
+  if (call.name !== 'shell') return call;
+  const { command, ...rest } = call.arguments;
+  if (typeof rest.executable === 'string') return call;
+  if (typeof command === 'string')
+    return { ...call, arguments: { ...rest, executable: 'bash', args: ['-lc', command] } };
+  // A script with its interpreter left out: `args: ["-lc", script]` can only mean bash.
+  const args = Array.isArray(rest.args) ? rest.args : [];
+  if (args[0] === '-lc' || args[0] === '-c')
+    return { ...call, arguments: { ...rest, executable: 'bash' } };
+  return call;
 };

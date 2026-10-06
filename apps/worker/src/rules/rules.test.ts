@@ -85,7 +85,9 @@ describe('the sleep-poll rule', () => {
     );
     expect(properties).toContain('executable');
     expect(properties).toContain('args');
-    expect(properties).not.toContain('command');
+    // A `command` is rewritten to bash -lc as the call arrives (`shellCommandCall` in
+    // turn/generate.ts), so by the time a rule reads the window every shell call has these two.
+    expect(properties).toContain('command');
   });
 
   it('fires on a shell that waits by the clock', () => {

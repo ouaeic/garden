@@ -480,10 +480,12 @@ const namedNumbers = (numbers: readonly string[]): string =>
     : `${numbers.slice(0, -1).join(', ')} and ${numbers[numbers.length - 1]}`;
 
 /**
- * Why a command check's label cannot stand, or null when every number in it is one the command
- * tests. Returned at declaration, where a correction costs a sentence, rather than at finish.
+ * The mark a command check's label carries for the numbers in it the command never tests, or null
+ * when it tests every one. The label is what the owner is shown as proved, so an untested number
+ * in it is shown as untested rather than refused at declaration: a refusal cost a model step a
+ * time and fired on dates and day counts the rule cannot tell from a claimed count.
  */
-export const acceptanceLabelRefusal = (
+export const acceptanceUntestedNote = (
   label: string,
   check: Pick<AcceptanceCommandCheck, 'executable' | 'args' | 'expectExit' | 'expectStdoutContains'>
 ): string | null => {
@@ -493,8 +495,7 @@ export const acceptanceLabelRefusal = (
     `exit ${check.expectExit}`
   ].join('\n');
   const untested = untestedLabelNumbers(label, tested);
-  if (!untested.length) return null;
-  return `the label claims ${namedNumbers(untested)} and the command never tests ${untested.length === 1 ? 'it' : 'them'}. Either make the command test the number - compare a count against it, or put it in expectStdoutContains - or drop it from the label. The label is what the user is shown as proved, so it may claim only what the command checks.`;
+  return untested.length ? `[not tested: ${namedNumbers(untested)}]` : null;
 };
 
 /** The largest page count worth naming; past it the number is a mistake rather than a document. */
@@ -559,15 +560,27 @@ export const parseAcceptanceChecks = (
     if (!raw || typeof raw !== 'object')
       return { ok: false, reason: `Check ${index + 1} is not an object.` };
     const record = raw as Record<string, unknown>;
-    const kind = textValue(record.kind);
+    // The kind is what the fields already say when it is left out: something to run, or a file.
+    const kind =
+      textValue(record.kind) ||
+      (record.command !== undefined || record.executable !== undefined
+        ? 'command'
+        : record.path !== undefined
+          ? 'artifact'
+          : '');
     const label = textValue(record.label).trim().slice(0, MAX_LABEL_CHARS);
     if (!label)
       return { ok: false, reason: `Check ${index + 1} needs a label saying what it proves.` };
     if (kind === 'command') {
-      const executable = textValue(record.executable).trim();
-      const args = Array.isArray(record.args)
+      // A command line is run the way the shell tool runs one: through bash.
+      const commandLine = textValue(record.command).trim();
+      const given = Array.isArray(record.args)
         ? record.args.slice(0, MAX_ARGS).map((argument) => textValue(argument))
         : [];
+      const named = textValue(record.executable).trim();
+      const executable =
+        named || (commandLine || given[0] === '-lc' || given[0] === '-c' ? 'bash' : '');
+      const args = !named && commandLine ? ['-lc', commandLine] : given;
       // Two questions, asked in cost order: whether this command may be run at all, and whether
       // running it could tell anybody anything. The second is here rather than at finish for the
       // same reason the render clause is - a refusal at declaration costs a sentence, and the same
@@ -581,17 +594,18 @@ export const parseAcceptanceChecks = (
       const contains = textValue(record.expectStdoutContains).trim().slice(0, 400);
       // Third question, asked last because it is about the label rather than the command: a
       // number the label claims is a number the owner will read as proved.
-      const labelRefusal = acceptanceLabelRefusal(label, {
+      const untested = acceptanceUntestedNote(label, {
         executable,
         args,
         expectExit,
         ...(contains ? { expectStdoutContains: contains } : {})
       });
-      if (labelRefusal) return { ok: false, reason: `Check ${index + 1}: ${labelRefusal}` };
       checks.push({
         id: checkId(index, 'check'),
         kind: 'command',
-        label,
+        // Marked rather than refused: the owner still never reads an untested number as proved,
+        // and the model is not sent back to rephrase a label it would only have to declare again.
+        label: untested ? `${label} ${untested}` : label,
         executable,
         args,
         cwd: normalisedCwd(record.cwd),

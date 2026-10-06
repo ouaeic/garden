@@ -517,76 +517,69 @@ describe('a label that claims a number the command never tests', () => {
   const command = (label: string, script: string, extra: Record<string, unknown> = {}) =>
     parse({ kind: 'command', label, executable: 'bash', args: ['-lc', script], ...extra });
   const countsRows = '[ "$(tail -n +2 workspace/data.csv | wc -l)" -eq 54 ]';
-  const reasonOf = (parsed: ReturnType<typeof parse>): string => (parsed.ok ? '' : parsed.reason);
+  // The numbers marked untested on the label the owner reads, or '' when it carries no mark.
+  const noted = (parsed: ReturnType<typeof parse>): string =>
+    parsed.ok ? (/\[not tested: ([^\]]*)\]$/.exec(parsed.checks[0]!.label)?.[1] ?? '') : 'refused';
 
-  it('refuses the label that was stamped verified over a command testing one of its three numbers', () => {
+  it('marks the label that was stamped verified over a command testing one of its three numbers', () => {
     const parsed = command(
       'data.csv has header plus exactly 54 data rows (30 months \u00d7 3 products)',
       countsRows
     );
-    expect(parsed.ok).toBe(false);
-    const reason = reasonOf(parsed);
-    // Names the numbers the command does not test, and only those.
-    expect(reason).toContain('claims 30 and 3');
-    expect(reason).not.toMatch(/\b54\b/);
-    // And says what to do about it: test it, or take it out of the label.
-    expect(reason).toContain('test');
-    expect(reason).toContain('drop it from the label');
+    // Accepted, so the model is not sent back, and the owner reads the two numbers as untested.
+    expect(parsed.ok).toBe(true);
+    expect(noted(parsed)).toBe('30 and 3');
   });
 
   it('accepts a label whose every number the command tests, and a label with none', () => {
-    expect(command('data.csv has header plus exactly 54 data rows', countsRows).ok).toBe(true);
-    expect(command('the data file has the rows the report describes', countsRows).ok).toBe(true);
+    expect(noted(command('data.csv has header plus exactly 54 data rows', countsRows))).toBe('');
+    expect(noted(command('the data file has the rows the report describes', countsRows))).toBe('');
   });
 
   it('matches by value, so 3 is not inside 30, 1.5 is not inside 11.5 and -5 is not 5', () => {
-    expect(reasonOf(command('3 products', '[ "$(wc -l < x)" -eq 30 ]'))).toContain('claims 3');
-    expect(command('30 products', '[ "$(wc -l < x)" -eq 30 ]').ok).toBe(true);
+    expect(noted(command('3 products', '[ "$(wc -l < x)" -eq 30 ]'))).toBe('3');
+    expect(noted(command('30 products', '[ "$(wc -l < x)" -eq 30 ]'))).toBe('');
     for (const seen of ['11.5', '1', '15'])
-      expect(reasonOf(command('1.5 seconds', `[ "$(cat t)" = ${seen} ]`)), seen).toContain(
-        'claims 1.5'
-      );
+      expect(noted(command('1.5 seconds', `[ "$(cat t)" = ${seen} ]`)), seen).toBe('1.5');
     // The same quantity in another spelling is the same quantity.
     for (const seen of ['1.5', '1.50'])
-      expect(command('1.5 seconds', `[ "$(cat t)" = ${seen} ]`).ok).toBe(true);
+      expect(noted(command('1.5 seconds', `[ "$(cat t)" = ${seen} ]`))).toBe('');
     for (const seen of ['5', '-50', '15'])
-      expect(reasonOf(command('-5 degrees', `[ "$(cat t)" = ${seen} ]`)), seen).toContain(
-        'claims -5'
-      );
-    expect(command('-5 degrees', '[ "$(cat t)" = -5 ]').ok).toBe(true);
+      expect(noted(command('-5 degrees', `[ "$(cat t)" = ${seen} ]`)), seen).toBe('-5');
+    expect(noted(command('-5 degrees', '[ "$(cat t)" = -5 ]'))).toBe('');
   });
 
   it('reads a count by value, so 3 is found in 3.0 and in 3s, and 1,000 in 1000', () => {
-    expect(command('3 seconds', 'sleep 3.0').ok).toBe(true);
-    expect(command('3 seconds', 'sleep 3s').ok).toBe(true);
-    expect(command('1,000 rows', '[ "$(wc -l < x)" -eq 1000 ]').ok).toBe(true);
+    expect(noted(command('3 seconds', 'sleep 3.0'))).toBe('');
+    expect(noted(command('3 seconds', 'sleep 3s'))).toBe('');
+    expect(noted(command('1,000 rows', '[ "$(wc -l < x)" -eq 1000 ]'))).toBe('');
   });
 
   it('leaves a date, a percentage, an issue number, a fraction, a multiplier and a time alone, because none is a count', () => {
-    expect(command('report dated 2026-09-03 exists', 'test -f workspace/report.pdf').ok).toBe(true);
-    expect(command('100% of tests pass', 'pytest -q').ok).toBe(true);
-    expect(command('issue #3 is fixed', 'pytest -q').ok).toBe(true);
-    expect(command('3/4 of the fixtures pass', 'pytest -q').ok).toBe(true);
-    expect(command('the run starts at 12:30', 'make check').ok).toBe(true);
+    expect(noted(command('report dated 2026-09-03 exists', 'test -f workspace/report.pdf'))).toBe(
+      ''
+    );
+    expect(noted(command('100% of tests pass', 'pytest -q'))).toBe('');
+    expect(noted(command('issue #3 is fixed', 'pytest -q'))).toBe('');
+    expect(noted(command('3/4 of the fixtures pass', 'pytest -q'))).toBe('');
+    expect(noted(command('the run starts at 12:30', 'make check'))).toBe('');
     // One reading for the letter and the sign: a multiplier is a measurement in either spelling.
-    expect(command('3x faster than the baseline', './bench.sh').ok).toBe(true);
-    expect(command('3\u00d7 faster than the baseline', './bench.sh').ok).toBe(true);
+    expect(noted(command('3x faster than the baseline', './bench.sh'))).toBe('');
+    expect(noted(command('3\u00d7 faster than the baseline', './bench.sh'))).toBe('');
     // A misprint is not a claim of 0000.
-    expect(command('1,0000 rows', '[ "$(wc -l < x)" -eq 1000 ]').ok).toBe(true);
+    expect(noted(command('1,0000 rows', '[ "$(wc -l < x)" -eq 1000 ]'))).toBe('');
   });
 
   it('does not let a name in the command stand for a count in the label', () => {
     const named = (label: string, executable: string, args: string[]) =>
-      reasonOf(parse({ kind: 'command', label, executable, args }));
+      noted(parse({ kind: 'command', label, executable, args }));
     const countsRowsInPython = ['-c', 'import sys; sys.exit(open("x").read().count("\\n") != 54)'];
     // The interpreter's own name is not the command testing 3; the 54 it does test is not named.
     const refusal = named('54 data rows (3 products)', 'python3', countsRowsInPython);
-    expect(refusal).toContain('claims 3');
+    expect(refusal).toBe('3');
     expect(refusal).not.toMatch(/\b54\b/);
-    expect(named('256 hashes match', 'sha256sum', ['-c', 'sums'])).toContain('claims 256');
-    expect(named('run 3 finished', 'grep', ['-q', 'done', 'workspace/run3/log'])).toContain(
-      'claims 3'
-    );
+    expect(named('256 hashes match', 'sha256sum', ['-c', 'sums'])).toBe('256');
+    expect(named('run 3 finished', 'grep', ['-q', 'done', 'workspace/run3/log'])).toBe('3');
     // A number behind a short option is the tool being told it, and counts.
     expect(
       parse({ kind: 'command', label: '54 lines', executable: 'head', args: ['-n54', 'f'] }).ok
@@ -615,8 +608,8 @@ describe('a label that claims a number the command never tests', () => {
   });
 
   it('reads a number glued to a word as a name, not a claim, and a thousands separator as one number', () => {
-    expect(command('the utf8 build of v2.1 on py3 passes', 'make check').ok).toBe(true);
-    expect(command('1,000 rows', '[ "$(wc -l < x)" -eq 1000 ]').ok).toBe(true);
+    expect(noted(command('the utf8 build of v2.1 on py3 passes', 'make check'))).toBe('');
+    expect(noted(command('1,000 rows', '[ "$(wc -l < x)" -eq 1000 ]'))).toBe('');
   });
 
   it('leaves artifact checks alone, because a path and a size are not a command', () => {

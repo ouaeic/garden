@@ -632,7 +632,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'set_acceptance',
     description:
-      "Declare checks that prove the work. The harness runs them when you answer and sends failures back to you; revisions stay visible to the user. command runs an executable. artifact checks a file: minBytes, json assertions by JSON Pointer (equals, lengths, uniqueBy), or render for a PDF or Office document's page count and clipping.",
+      "Declare checks that prove the work. The harness runs them when you answer and sends failures back to you; revisions stay visible to the user. command runs a command line, or an executable with args. artifact checks a file: minBytes, json assertions by JSON Pointer (equals, lengths, uniqueBy), or render for a PDF or Office document's page count and clipping.",
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -645,10 +645,11 @@ export const agentTools: ModelTool[] = [
           items: {
             type: 'object',
             additionalProperties: false,
-            required: ['kind', 'label'],
+            required: ['label'],
             properties: {
               kind: { type: 'string', enum: ['command', 'artifact'] },
               label: { type: 'string', description: 'What passing proves, in the user’s terms.' },
+              command: { type: 'string' },
               executable: { type: 'string' },
               args: { type: 'array', items: { type: 'string' } },
               cwd: { type: 'string', default: 'workspace' },
@@ -725,12 +726,12 @@ export const agentTools: ModelTool[] = [
   {
     name: 'shell',
     description:
-      'Run an executable with literal args; run a script with bash -lc, as {executable:"bash",args:["-lc",script]}. background=true returns a session: name a job for finite work (kept across restarts, never rerun after success) or a service for a server (restarted on exit). Manage sessions with process. System package managers run directly, without a shell wrapper, PTY or background.',
+      'Run a command line with bash: {command:"ls -la | head"}. Or one executable with literal args: {executable, args}. background=true returns a session: name a job for finite work (kept across restarts, never rerun after success) or a service for a server (restarted on exit). Manage sessions with process. System package managers run directly, without a shell wrapper, PTY or background.',
     parameters: {
       type: 'object',
       additionalProperties: false,
-      required: ['executable'],
       properties: {
+        command: { type: 'string' },
         executable: { type: 'string' },
         args: { type: 'array', items: { type: 'string' } },
         cwd: {

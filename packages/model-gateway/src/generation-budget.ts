@@ -23,13 +23,11 @@
  * is the wait for the first token, which on a reasoning route is most of the wait - though not much
  * of it, because a route that holds its tongue for two minutes together trips the idle clock first.
  *
- * Ten minutes against a caller deadline of fifteen. The largest single answer this product ever
- * asks for is bounded by the request's own `maxTokens`, which on this box is at most 16,384; the
- * caller's fifteen-minute deadline therefore already demands about eighteen tokens a second of any
- * route writing a full-length answer, and this asks for twenty-seven. That is a small tightening of
- * a floor the owner's box has always had, and it comes with a large loosening of the consequence:
- * passing this deadline no longer throws away the turn. What was generated comes back marked, and
- * the caller decides. A genuine long answer that trips it loses one step, not the task.
+ * Ten minutes against a caller deadline of fifteen. A turn names no output length, so the route
+ * writes up to its own maximum and a full-length answer can outlast this deadline; passing it does not
+ * throw away the turn. What was generated comes back marked, and the caller decides: an answer that
+ * was arriving at a working pace is continued (`worthContinuing`), so a genuine long answer loses
+ * one request boundary, not the task.
  */
 export const DEFAULT_GENERATION_TIMEOUT_MS = 600_000;
 

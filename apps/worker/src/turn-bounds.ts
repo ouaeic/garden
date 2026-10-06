@@ -911,13 +911,6 @@ export const MAX_QUESTIONS_PER_TURN = 2;
 export const MAX_TRUNCATED_CONTINUATIONS = 3;
 
 /**
- * The most one reply may write, reasoning included, on a model whose window allows it. A fifth of
- * the window still bounds a small model; this bounds a large one. @see `maxOutputTokens` in
- * `agent.ts` for why it has to hold a long thought and a whole file together.
- */
-export const MAX_OUTPUT_TOKENS = 65_536;
-
-/**
  * How many times a turn may condense itself because the route refused its window as too large.
  *
  * Two, because the first repair is aimed at a number this side had never been told before - the

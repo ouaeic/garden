@@ -89,14 +89,13 @@ import {
   type BotWall
 } from './provenance.js';
 import { providerWebSearch, type WebSearchAnswer } from './provider-search.js';
-import { WEB_SEARCH_MAX_OUTPUT_TOKENS, WEB_SEARCH_REQUEST_TIMEOUT_MS, routeTo } from './routing.js';
+import { WEB_SEARCH_REQUEST_TIMEOUT_MS, routeTo } from './routing.js';
 import { executeToolCall } from './tool-dispatch.js';
 import { AgentRunnerClient, withRunnerAbort } from './runner-client.js';
 import { buildIdentity } from './build-identity.js';
 import {
   CHECKPOINT_EXEMPT_TOOLS,
   MAX_NOTICES_PER_TURN,
-  MAX_OUTPUT_TOKENS,
   ownerFixableCheckpointFailure,
   spendHalt,
   spendWarning
@@ -1479,7 +1478,6 @@ export class AgentWorker {
                 tools: [],
                 serverTools: webPlan.serverTools,
                 temperature: 0,
-                maxTokens: WEB_SEARCH_MAX_OUTPUT_TOKENS,
                 // The judgement in this call is the search engine's, not the model's. Thinking
                 // harder about which words to retrieve is the caller's job and it already did it.
                 reasoningEffort: 'low',
@@ -2005,22 +2003,13 @@ export class AgentWorker {
     });
     const turn = state.turn ?? 0;
     /*
-     * The output ceiling every request this turn makes is written against, worked out once.
-     *
-     * It is a pure function of the chosen model's window and nothing in the loop can move it, and
-     * it was recomputed - identically, from the same two constants - in five places: once per step
-     * and once in each of the three closing handoffs.
-     *
-     * On a reasoning route the ceiling covers the thinking and the reply together, so it has to
-     * hold both: a step that writes a file is a long reasoning block followed by the whole file as
-     * one call argument. A ceiling sized for the reply alone cuts that call off mid-argument, the
-     * route bills every token of it, nothing in it is usable, and the next step attempts the same
-     * write. Measured on live Terminal-Bench runs, that was nine requests of one task's 39. A
-     * ceiling is not a charge - the route bills what it writes - and the adapter clamps the ask to
-     * what the route publishes, so a large one only costs anything on a reply that needed it.
+     * The room this turn keeps free for replies when it decides how much conversation the window
+     * may hold and when to compact. Worked out once: it is a pure function of the model's window.
+     * It is not sent and limits no reply - a request names no output length, and the route writes
+     * up to its own maximum - it is only what the input side leaves alone.
      */
     const maxOutputTokens = Math.min(
-      MAX_OUTPUT_TOKENS,
+      65_536,
       Math.max(2_048, Math.floor(model.contextTokens * 0.2))
     );
     /**

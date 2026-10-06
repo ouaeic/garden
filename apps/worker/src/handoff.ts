@@ -425,7 +425,6 @@ export const handOffAtStepLimit = async (
           messages: preparedContext.messages,
           tools,
           temperature: 0.2,
-          maxTokens: maxOutputTokens,
           reasoningEffort,
           ...(model.reasoning ? { reasoningOptions: model.reasoning } : {}),
           sessionId,
