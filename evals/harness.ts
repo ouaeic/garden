@@ -3304,6 +3304,8 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
       return true;
     },
     getApproval: async (id: string) => approvalRows.get(id) ?? null,
+    // No fixture grants a permission for the rest of a conversation, so none is ever held.
+    hasTaskApprovalGrant: async () => false,
     recordUsage: async (input: {
       kind?: unknown;
       costUsd?: unknown;

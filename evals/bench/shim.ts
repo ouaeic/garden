@@ -44,6 +44,10 @@ import {
   WORKSPACE_PREFIX
 } from './files.js';
 import { ABSENT_ROUTES, canonicalRoute, isAbsent, isImplemented } from './routes.js';
+import { inspectAcceptanceCommand } from '../../services/workspace-runner/src/acceptance-inspection.js';
+import { summariseToolchain } from '../../services/workspace-runner/src/toolchain.js';
+import { compareJson } from '../../services/workspace-runner/src/json-proof.js';
+import { JsonProofRequest } from '../../packages/contracts/src/json-proof.js';
 
 /** What a background process this shim started looks like while it runs. */
 interface Session {
@@ -389,8 +393,13 @@ export const createShim = (options: ShimOptions): Shim => {
           })),
           ready: [...toolchain],
           missing: [],
+          // The runner's own sentence for a box with none, which is what the contract reads to
+          // decide whether to name the managed Python: an empty summary told a bare benchmark box
+          // it had an interpreter that is not there, and the model spent a step finding out.
           summary:
-            toolchain.length === 0 ? '' : `Available on this computer: ${toolchain.join(', ')}.`
+            toolchain.length === 0
+              ? summariseToolchain([])
+              : `Available on this computer: ${toolchain.join(', ')}.`
         });
       case 'POST /v1/workspaces/:workspaceId/toolchain/probe':
         return json(
@@ -399,6 +408,29 @@ export const createShim = (options: ShimOptions): Shim => {
             Array.isArray(parsed.binaries) ? parsed.binaries.map(String) : []
           )
         );
+      case 'POST /v1/workspaces/:workspaceId/json-proof': {
+        // The runner's own comparison over the file as the box holds it, so an acceptance check
+        // declared as JSON assertions is judged by the same code it is judged by in production.
+        const request = JsonProofRequest.parse(parsed);
+        const content = await readFile(backend, request.path);
+        if (content === null)
+          return json(
+            { error: { code: 'file_not_found', message: 'Workspace file not found' } },
+            404
+          );
+        const sha256 = createHash('sha256').update(content).digest('hex');
+        const result = compareJson(JSON.parse(content.toString('utf8')), request.json);
+        return json({
+          ...result,
+          sha256,
+          passed: result.failures.length === 0,
+          detail:
+            `${result.assertions - result.failures.length}/${result.assertions} JSON assertions passed; sha256 ${sha256}` +
+            (result.failures.length ? `; ${result.failures.slice(0, 8).join('; ')}` : '')
+        });
+      }
+      case 'POST /v1/workspaces/:workspaceId/acceptance/inspect':
+        return json(await inspectAcceptanceCommand(parsed));
       case 'GET /v1/workspaces/:workspaceId/machine':
         return json(await machineReport(backend));
       case 'GET /v1/workspaces/:workspaceId/surfaces':

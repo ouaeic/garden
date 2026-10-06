@@ -171,6 +171,21 @@ const EXERCISE: ReadonlyArray<{
     url: `/v1/workspaces/${WORKSPACE}/checkpoints`
   },
   {
+    route: 'POST /v1/workspaces/:workspaceId/json-proof',
+    method: 'POST',
+    url: `/v1/workspaces/${WORKSPACE}/json-proof`,
+    // A file the exercise wrote earlier in this list is not guaranteed to be JSON, so the honest
+    // answer for a path that is not there is the runner's own 404.
+    body: { path: 'workspace/proof-not-there.json', json: { equals: { '/a': 1 } } }
+  },
+  {
+    route: 'POST /v1/workspaces/:workspaceId/acceptance/inspect',
+    method: 'POST',
+    url: `/v1/workspaces/${WORKSPACE}/acceptance/inspect`,
+    // An assertion that cannot fail, which is the one thing the inspection exists to name.
+    body: { executable: 'python3', args: ['-c', 'assert True'] }
+  },
+  {
     route: 'GET /v1/workspaces/:workspaceId/image',
     method: 'GET',
     url: `/v1/workspaces/${WORKSPACE}/image?path=${encodeURIComponent('workspace/logo.png')}`

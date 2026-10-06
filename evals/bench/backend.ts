@@ -270,8 +270,20 @@ export const dockerBackend = (options: {
         sudo: options.sudo,
         workspaceRoot,
         call: {
-          executable: 'mkdir',
-          args: ['-p', workspaceRoot],
+          /*
+           * The runner's protocol names everything from one directory above `workspace/`: a call's
+           * default cwd is `workspace` and every file path starts with it. A task whose root has
+           * another name - Terminal-Bench's `/app` - would resolve both to a `/workspace` that does
+           * not exist, and the agent's first command on every task failed to start until the model
+           * worked around it. So `workspace` beside the root is made to name the root.
+           */
+          executable: 'sh',
+          args: [
+            '-c',
+            'mkdir -p "$1" && { [ "$(basename "$1")" = workspace ] || [ -e workspace ] || ln -s "$1" workspace; }',
+            'sh',
+            workspaceRoot
+          ],
           cwd: '.',
           env: {},
           timeoutSeconds: 30,

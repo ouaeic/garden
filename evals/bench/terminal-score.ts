@@ -59,6 +59,20 @@ const accountSpend = async (apiKey: string): Promise<number> => {
   return typeof body.data?.usage === 'number' ? body.data.usage : 0;
 };
 
+/**
+ * The key's spend, where the route publishes one.
+ *
+ * Only OpenRouter answers for a key as a whole. Any other OpenAI-compatible endpoint - a vendor's
+ * own API, a subscription plan, a local server - has no such route, and asking OpenRouter about its
+ * key fails the run before the first task. There the per-call figures this process has summed are
+ * the whole of what is known, and the ceiling is held to them instead.
+ */
+const spentOnKey = async (
+  credential: { readonly provider: string; readonly apiKey: string },
+  perCallCost: number
+): Promise<number> =>
+  credential.provider === 'openrouter' ? accountSpend(credential.apiKey) : perCallCost;
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const PARITY_CSV = path.join(here, 'parity.csv');
 
@@ -130,7 +144,7 @@ export const runTerminalBench = async (options: TerminalBenchOptions): Promise<n
     contextTokens: 1_000_000
   };
   const identity = runIdentity();
-  const openedAt = await accountSpend(credential.apiKey);
+  const openedAt = await spentOnKey(credential, 0);
   out(
     `Model ${options.model} via ${live.providerModelId} at ${live.baseUrl}. Ceiling $${options.maxSpendUsd.toFixed(2)} on the key as a whole; it has spent $${openedAt.toFixed(4)} so far.`
   );
@@ -216,7 +230,7 @@ export const runTerminalBench = async (options: TerminalBenchOptions): Promise<n
      * without corrupting the number it exists to protect. It is the KEY's spend, so with several
      * processes on one key every one of them stops here when the key as a whole reaches it.
      */
-    const now = await accountSpend(credential.apiKey);
+    const now = await spentOnKey(credential, perCallCost);
     out(
       `      account moved $${(now - spentBefore).toFixed(4)} over this task (shared key; the per-call figure above is this task's own)`
     );
@@ -230,7 +244,7 @@ export const runTerminalBench = async (options: TerminalBenchOptions): Promise<n
     }
   }
 
-  const closedAt = await accountSpend(credential.apiKey);
+  const closedAt = await spentOnKey(credential, perCallCost);
   const accountDelta = closedAt - openedAt;
   out('');
   out(
