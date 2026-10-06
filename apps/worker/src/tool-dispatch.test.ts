@@ -885,6 +885,46 @@ describe('the workspace arms', () => {
     expect(executed.result).toMatchObject({ exitCode: 0, stdout: 'notes.md' });
   });
 
+  it('waits out a command the runner yielded, and hands back what it finished with', async () => {
+    // Past five seconds the runner keeps a command as a durable job and answers with its session.
+    // The model asked for the result: the worker reads the job until it ends.
+    let reads = 0;
+    const executed = await dispatch(
+      { name: 'shell', arguments: { executable: 'make', args: ['test'], timeoutSeconds: 30 } },
+      {
+        route: (url) => {
+          if (url.endsWith(`${root}/exec`))
+            return observation({ yielded: true, sessionId: 'proc_1', status: 'running' });
+          if (url.endsWith(`${root}/processes/proc_1`)) {
+            reads += 1;
+            return json(
+              reads < 2
+                ? { sessionId: 'proc_1', status: 'running' }
+                : {
+                    sessionId: 'proc_1',
+                    status: 'exited',
+                    exitCode: 0,
+                    stdout: 'all 12 passed',
+                    stderr: '',
+                    ranForMs: 7_200,
+                    ownerTaskId: 'task'
+                  }
+            );
+          }
+          return undefined;
+        }
+      }
+    );
+
+    expect(reads).toBe(2);
+    expect(executed.result).toEqual({
+      exitCode: 0,
+      stdout: 'all 12 passed',
+      stderr: '',
+      durationMs: 7_200
+    });
+  });
+
   /*
    * The one sentence the runner cannot say and the model cannot see: that its shell already runs in
    * workspace/. A command naming `workspace/probe` from there reaches `workspace/workspace/probe`,

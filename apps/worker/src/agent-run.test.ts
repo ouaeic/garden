@@ -8293,52 +8293,6 @@ describe('the build that priced a step', () => {
 });
 
 /**
- * The tier that costs nothing until it fires, driven end to end.
- *
- * `rules/rules.test.ts` proves the matchers and `rules/wiring.test.ts` proves where the loop asks.
- * Neither proves the only thing that decides whether this mechanism is worth having: that the
- * correction actually reaches the provider when a rule fires, and that the request is byte-for-byte
- * what it would have been when none does. That is asserted here against the requests the run really
- * sent, on two turns that differ in one character of one path.
- */
-describe('dormant rules on a real turn', () => {
-  const messagesOf = (request: Record<string, unknown> | undefined): { content: string }[] =>
-    (request?.messages ?? []) as { content: string }[];
-
-  /** The same turn twice, differing only in the extension of the file it writes. */
-  const turnWriting = async (path: string): Promise<FetchLog> => {
-    const task = makeTask();
-    const probe = probeStore(() => task);
-    const log: FetchLog = { calls: [], modelRequests: [] };
-    installFetch(
-      [
-        toolFrame('call-1', 'file_write', { path, content: 'Some words.\n' }),
-        toolFrame('call-2', 'files_list', { path: 'workspace' }),
-        textFrame('Written.')
-      ],
-      log
-    );
-    await new AgentWorker(probe.store, config({ TASK_MAX_STEPS: 3 }), masterKey, runnerSecret)
-      .run(task)
-      .catch(() => undefined);
-    return log;
-  };
-
-  it('sends a request with no rule byte in it when nothing fired', async () => {
-    const log = await turnWriting('workspace/quarterly.md');
-    // A turn that made no request has no bytes in it to be clean of, and the loops below would
-    // report that as a pass. The count is what the empty case has to answer for.
-    let read = 0;
-    for (const request of log.modelRequests)
-      for (const message of messagesOf(request)) {
-        read += 1;
-        expect(message.content).not.toContain('HARNESS CORRECTION');
-      }
-    expect(read).toBeGreaterThan(0);
-  });
-});
-
-/**
  * The conditional contract, proved where it is actually paid for.
  *
  * `context.test.ts` proves `baseSystemPrompt` gates on the capabilities it is handed, and that is a

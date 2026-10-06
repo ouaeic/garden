@@ -667,8 +667,8 @@ describe('a compaction that eats the prose leaves the block standing', () => {
  *
  * Driven through `openStep` rather than read off the source, because what is being claimed is
  * behavioural: a step that opens carries the block whatever the last step did to the window. The
- * ORDER against the runtime block is read from the source as well, following
- * `rules/wiring.test.ts`, because that is a claim about which statement precedes which and a
+ * ORDER against the runtime block is read from the source as well, because that is a claim about
+ * which statement precedes which and a
  * turn-level probe observes it only by arranging a step boundary at exactly the right instant.
  */
 describe('every step opens with the block re-rendered at the tail', () => {

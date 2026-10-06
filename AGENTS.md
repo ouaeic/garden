@@ -92,17 +92,16 @@ Changing any of these is a design decision, not a refactor. Raise it before writ
 
 ## Where things are
 
-| Looking for                                   | Read                                         |
-| --------------------------------------------- | -------------------------------------------- |
-| the turn loop, its gates and its bounds       | `apps/worker/src/agent.ts`, `turn-bounds.ts` |
-| what reaches the model, and in what order     | `apps/worker/src/context.ts`, `window.ts`    |
-| the tool catalogue and its ceiling            | `apps/worker/src/tool-catalogue.ts`          |
-| the approval floor                            | `apps/worker/src/approval-policy.ts`         |
-| corrections that cost nothing until they fire | `apps/worker/src/rules/`                     |
-| the runtime as a whole, in prose              | `docs/AGENT_RUNTIME.md`                      |
-| what the evals measure and how to read them   | `docs/EVALUATION.md`                         |
-| the security invariants                       | `SECURITY.md`                                |
-| everything TypeScript never compiles          | `scripts/check-repository.mjs`               |
+| Looking for                                 | Read                                         |
+| ------------------------------------------- | -------------------------------------------- |
+| the turn loop, its gates and its bounds     | `apps/worker/src/agent.ts`, `turn-bounds.ts` |
+| what reaches the model, and in what order   | `apps/worker/src/context.ts`, `window.ts`    |
+| the tool catalogue and its ceiling          | `apps/worker/src/tool-catalogue.ts`          |
+| the approval floor                          | `apps/worker/src/approval-policy.ts`         |
+| the runtime as a whole, in prose            | `docs/AGENT_RUNTIME.md`                      |
+| what the evals measure and how to read them | `docs/EVALUATION.md`                         |
+| the security invariants                     | `SECURITY.md`                                |
+| everything TypeScript never compiles        | `scripts/check-repository.mjs`               |
 
 A brief the agent finds inside a workspace — `GARDEN.md`, `AGENTS.md`, `OPEN_CLOUD.md` — is read
 into the window at run time by `apps/worker/src/window.ts`. That is a different mechanism from this

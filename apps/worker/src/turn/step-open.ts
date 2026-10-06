@@ -3,7 +3,6 @@ import { encryptJson } from '@garden/core';
 import type { AgentState } from '../agent-state.js';
 import { refreshArtifactLedger } from '../context.js';
 import { noteStepBudget, stepCeiling, turnWallClockReached, type HandoffDeps } from '../handoff.js';
-import { applyDormantRules, toolsRunThisTurn } from '../rules/index.js';
 import { closeTurnAtCeiling, type TurnCloseContext } from './close.js';
 import type { TurnLoopControl } from './loop-context.js';
 
@@ -42,22 +41,6 @@ export const openStep = async (
   await drainCorrection();
   await refreshActivePlan();
   await noteStepBudget(deps.handoff, task, key, state, stepCeiling(deps.handoff, state));
-  /*
-   * The dormant rules, read against the step the model just produced.
-   *
-   * Here rather than where the assistant message is pushed, for two reasons that are both about
-   * shape. At a step boundary every tool call has been answered, so a correction appended now
-   * cannot land between a call and its result - which is the malformed request the cut-off-reply
-   * branch below refuses for the same reason. And a rule's view of the turn includes what the
-   * step's own calls *did*, which is not known until they have run: the render-proof rule asks
-   * whether this turn has looked at a rendered page, and the answer arrives with the tool result
-   * rather than with the request for it.
-   *
-   * Ahead of the runtime block deliberately, so the block that carries the clock stays last and
-   * keeps costing nothing. @see rules/index.ts for why this is a tier of its own and why the
-   * firing rate is instrumented from the first commit.
-   */
-  applyDormantRules(state.messages, toolsRunThisTurn(state.turnToolResults));
   /*
    * What this turn has changed, re-rendered from the durable record rather than appended.
    *

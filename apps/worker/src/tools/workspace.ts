@@ -657,6 +657,55 @@ const armPostEditChecks = (context: ToolContext, paths: readonly string[]): void
  * for the next call rather than being thrown away against a shape it could not ride on - and a
  * result that already has a `diagnostics` key is left exactly as the arm wrote it.
  */
+/**
+ * A foreground command that outlives the runner's five-second yield becomes a durable job, so a
+ * worker restart cannot lose it. The model asked for the command's result, not for a session to
+ * poll: the worker reads the job until it ends - within the command's own timeout, and only while
+ * the task is still running - and returns what it finished with.
+ */
+const awaitYieldedCommand = async (
+  context: ToolContext,
+  root: string,
+  launched: unknown,
+  timeoutSeconds: unknown
+): Promise<unknown> => {
+  const view = launched as { yielded?: unknown; sessionId?: unknown } | null;
+  if (view?.yielded !== true || typeof view.sessionId !== 'string') return launched;
+  const path = `${root}/processes/${encodeURIComponent(view.sessionId)}`;
+  const seconds = typeof timeoutSeconds === 'number' && timeoutSeconds > 0 ? timeoutSeconds : 600;
+  const deadline = Date.now() + seconds * 1_000;
+  let latest = launched;
+  for (let pause = 250; Date.now() < deadline; pause = Math.min(pause * 2, 4_000)) {
+    await new Promise((resolve) => setTimeout(resolve, pause));
+    latest = await context.runner.call(context.task.workspaceId, context.task.id, 'exec', path, {
+      action: 'log'
+    });
+    const job = latest as {
+      status?: unknown;
+      exitCode?: unknown;
+      signal?: unknown;
+      stdout?: unknown;
+      stderr?: unknown;
+      ranForMs?: unknown;
+    } | null;
+    // Finished: the same shape a command that ended inside the yield returns, without the job's
+    // own bookkeeping.
+    if (job && job.status !== 'running')
+      return {
+        exitCode: job.exitCode ?? null,
+        stdout: typeof job.stdout === 'string' ? job.stdout : '',
+        stderr: typeof job.stderr === 'string' ? job.stderr : '',
+        ...(typeof job.ranForMs === 'number' ? { durationMs: job.ranForMs } : {}),
+        ...(job.signal === undefined ? {} : { signal: job.signal })
+      };
+    const claim = await Promise.resolve()
+      .then(() => context.store.taskClaim(context.task.id))
+      .catch(() => null);
+    if (claim && claim.status !== 'running') return latest;
+  }
+  return latest;
+};
+
 export async function executeWorkspaceTool(
   context: ToolContext,
   call: ModelToolCall
@@ -744,7 +793,7 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
             PACKAGE_VERBS.has(value) || (executable === 'pacman' && /^-[a-z]*s[a-z]*$/.test(value))
           );
         });
-      const result = await context.runner.call(
+      const launched = await context.runner.call(
         task.workspaceId,
         task.id,
         systemPackageCommand ? ['exec', 'system.packages'] : 'exec',
@@ -753,6 +802,9 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
           ? { ...execution, yieldAfterMs: 5000, requestId: call.id }
           : execution
       );
+      const result = background
+        ? launched
+        : await awaitYieldedCommand(context, root, launched, execution.timeoutSeconds);
       try {
         const usage = await context.runner.call<{ storageBytes: number }>(
           task.workspaceId,

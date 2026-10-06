@@ -2119,7 +2119,7 @@ export class AgentWorker {
       state.step += 1
     ) {
       /*
-       * The owner, a correction, the plan, the dormant rules, the clock, the credits and the spend
+       * The owner, a correction, the plan, the clock, the credits and the spend
        * caps. @see openStep in `turn/step-open.ts`, where the sixty-two lines that asked all of
        * that - including two of the three closing handoffs - now live.
        */
