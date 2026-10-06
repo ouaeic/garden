@@ -1,0 +1,33 @@
+import { describe, expect, it } from 'vitest';
+import { shellCommandCall } from './generate.js';
+
+const shell = (args: Record<string, unknown>) => ({ id: 'call-1', name: 'shell', arguments: args });
+
+/**
+ * Every reader after generation - the approval floor, the write classifier, the checkpoint set -
+ * knows one spelling of a shell call. A command line has to arrive in it, or it reaches them as a
+ * call with no executable at all.
+ */
+describe('a shell call written as a command line', () => {
+  it('arrives as bash -lc with the line as one argument', () => {
+    expect(shellCommandCall(shell({ command: 'ls -la | head', cwd: 'workspace' }))).toEqual(
+      shell({ executable: 'bash', args: ['-lc', 'ls -la | head'], cwd: 'workspace' })
+    );
+  });
+
+  it('leaves an executable-and-arguments call exactly as written', () => {
+    const call = shell({ executable: 'python3', args: ['-m', 'pytest'] });
+    expect(shellCommandCall(call)).toBe(call);
+  });
+
+  it('names bash for a script whose interpreter was left out', () => {
+    expect(shellCommandCall(shell({ args: ['-lc', 'make test'] }))).toEqual(
+      shell({ args: ['-lc', 'make test'], executable: 'bash' })
+    );
+  });
+
+  it('touches no other tool', () => {
+    const call = { id: 'call-2', name: 'file_read', arguments: { command: 'rm -rf /' } };
+    expect(shellCommandCall(call)).toBe(call);
+  });
+});

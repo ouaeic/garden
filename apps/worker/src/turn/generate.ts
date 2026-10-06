@@ -461,7 +461,7 @@ export const generateModelStep = async (
  * them meets a second spelling. Models write a command line; asked for an argv, they wrapped every
  * command in bash -lc themselves, or left the executable out and were refused.
  */
-const shellCommandCall = (call: ModelToolCall): ModelToolCall => {
+export const shellCommandCall = (call: ModelToolCall): ModelToolCall => {
   if (call.name !== 'shell') return call;
   const { command, ...rest } = call.arguments;
   if (typeof rest.executable === 'string') return call;
