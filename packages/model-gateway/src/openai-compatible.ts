@@ -1079,7 +1079,9 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
          * endless repetition as the reason - and measured on live runs the thinking channel looped
          * on one short sentence until the output ceiling.
          */
-        ...(sends('temperature') && !thinking ? { temperature: input.temperature } : {}),
+        ...(sends('temperature') && !thinking && input.temperature !== undefined
+          ? { temperature: input.temperature }
+          : {}),
         ...(thinking
           ? this.provider === 'openrouter'
             ? { reasoning: { effort: input.reasoningEffort } }

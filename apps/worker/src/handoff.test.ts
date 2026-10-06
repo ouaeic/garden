@@ -286,13 +286,12 @@ describe('the effort the closing call thinks at', () => {
     return { requests, costs, state };
   };
 
-  it('sends the effort the turn had earned, not a literal', async () => {
+  it('names no effort of its own on the closing call either', async () => {
     const { requests } = await drive();
 
-    // The turn latched 'high' before it reached its ceiling, and the closing call keeps it.
-    expect(reasoningEffortForStep(exhausted())).toBe('high');
+    expect(reasoningEffortForStep()).toBeUndefined();
     expect(requests).toHaveLength(1);
-    expect(requests[0]?.reasoningEffort).toBe('high');
+    expect(requests[0]?.reasoningEffort).toBeUndefined();
   });
 
   it('reports on the cost line the effort it actually sent', async () => {

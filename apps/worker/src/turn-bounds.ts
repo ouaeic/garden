@@ -1092,57 +1092,11 @@ export const stepBudgetNotice = (step: number, maxSteps: number): string | null 
  * calls and 58% of what it wrote, and the same dev set without it passed every task it had passed
  * and cost 39% less - less thinking written is also less appended to every later request.
  */
-interface EffortState {
-  step: number;
-  messages: ModelMessage[];
-  planVersion?: number;
-  acceptanceFailures?: number;
-  reasoningFloor?: 'medium' | 'high';
-  compactedAtStep?: number;
-}
-
 /**
- * Whether this step's `high` is evidence about the *work* rather than about one call going wrong.
- *
- * Only these conditions may pin the floor for the rest of the turn. The distinction was missing and
- * it is expensive: `Tool failed:` is written when a tool *threw* - the runner briefly unreachable,
- * a socket closed - and on a measured run one such shell call on step 4 pinned every one of the
- * sixteen remaining steps to maximum reasoning on a task whose entire output was two lines of
- * verse. That is a fact about the network. The step after it is still worth thinking about, and it
- * still gets `high` below; what it no longer does is decide that the turn is hard for ever.
- *
- * The conditions kept here are all statements about the turn itself: the harness refused a finish or
- * an acceptance check failed, or the window was just compacted and the model is working from a
- * summary of its own work.
+ * No effort of garden's own: unless the owner chose one, the route applies its model's default, and
+ * the same request field on every step keeps the provider's cached prefix.
  */
-export const effortFloorEarned = (state: EffortState): boolean =>
-  Boolean(state.acceptanceFailures) ||
-  // The step immediately after a compaction is the one most likely to make a wrong call: the model
-  // has just lost the detail it was working from and is holding a summary of its own work instead.
-  (state.compactedAtStep !== undefined && state.step - state.compactedAtStep <= 1);
-
-export const reasoningEffortForStep = (state: EffortState): 'medium' | 'high' => {
-  if (state.step === 0) return 'high';
-  if (state.reasoningFloor === 'high') return 'high';
-  if (effortFloorEarned(state)) return 'high';
-  let lastAssistant = -1;
-  for (let index = state.messages.length - 1; index >= 0; index -= 1) {
-    if (state.messages[index]?.role === 'assistant') {
-      lastAssistant = index;
-      break;
-    }
-  }
-  const results = state.messages
-    .slice(lastAssistant + 1)
-    .filter((message) => message.role === 'tool');
-  if (
-    results.some((result) =>
-      /^(Tool failed|Refused|Interrupted|Finish rejected|Skipped)/.test(result.content)
-    )
-  )
-    return 'high';
-  return 'medium';
-};
+export const reasoningEffortForStep = (): undefined => undefined;
 
 /**
  * Two decimals for money anyone recognises, four for the sub-cent step a cheap route bills.

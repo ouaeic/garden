@@ -3,7 +3,7 @@ import { encryptJson, inferenceCredentialAad, type RoutableModel } from '@garden
 import { seedModels } from '@garden/model-gateway';
 import type { ServerBase } from './http/server-context.js';
 import { createServerSupport } from './routes/support.js';
-import { selectTitleRoute, TITLE_MAX_COST_USD, TITLE_OUTPUT_TOKENS } from './title-route.js';
+import { selectTitleRoute, TITLE_MAX_COST_USD } from './title-route.js';
 
 const model = (overrides: Partial<RoutableModel> = {}): RoutableModel => ({
   ...seedModels()[0]!,
@@ -79,7 +79,6 @@ describe('bounded auxiliary title route', () => {
     const selected = select([expensive, mandatory, model()]);
     expect(selected?.model.id).toBe('openrouter/title');
     expect(selected?.reasoningEffort).toBeUndefined();
-    expect(selected?.maxTokens).toBe(TITLE_OUTPUT_TOKENS);
     expect(selected!.maxCostUsd).toBeLessThanOrEqual(TITLE_MAX_COST_USD);
     expect(
       select([
@@ -193,15 +192,14 @@ describe('bounded auxiliary title route', () => {
       expect(calls).toHaveLength(1);
       if (native) {
         expect(calls[0]).toMatchObject({
-          max_output_tokens: TITLE_OUTPUT_TOKENS,
           reasoning: { effort: 'none' },
           store: false
         });
+        expect(calls[0]).not.toHaveProperty('max_output_tokens');
         expect(calls[0]).not.toHaveProperty('max_tokens');
         expect(calls[0]).not.toHaveProperty('provider');
       } else
         expect(calls[0]).toMatchObject({
-          max_tokens: TITLE_OUTPUT_TOKENS,
           reasoning: { effort: 'none' },
           provider: {
             zdr: true,
@@ -230,7 +228,8 @@ describe('bounded auxiliary title route', () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(beforeSubmit).not.toHaveBeenCalled();
   });
-  it.each([{ parameters: ['reasoning'] }, { parameters: ['max_tokens'] }])(
+  // A title names no output length, so only the reasoning control is required of the endpoint.
+  it.each([{ parameters: ['max_tokens'] }])(
     'refuses an endpoint missing a required title control: %j',
     async ({ parameters }) => {
       const beforeSubmit = vi.fn();

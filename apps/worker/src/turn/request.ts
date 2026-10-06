@@ -37,7 +37,7 @@ import {
   prepareModelContext,
   type PreparedContext
 } from '../context.js';
-import { effortFloorEarned, reasoningEffortForStep } from '../turn-bounds.js';
+import { reasoningEffortForStep } from '../turn-bounds.js';
 import { windowCacheStyle } from '../routing.js';
 import type { TurnRun } from './claim.js';
 import type { CompactContext, TurnLoopControl, TurnStepBudget } from './loop-context.js';
@@ -129,25 +129,12 @@ export const prepareStepRequest = async (
   );
   state.toolOutputFloor = preparedContext.olderToolOutputChars;
   state.preparedInputTokens = preparedContext.estimatedInputTokens;
-  const automaticEffort = reasoningEffortForStep(state);
+  const automaticEffort = reasoningEffortForStep();
   const reasoningEffort = taskReasoningEffort(
     state.ownerReasoningEffort,
     automaticEffort,
     model.reasoning
   );
-  // The ratchet, recorded rather than recomputed: once a turn has become the kind of turn that
-  // needs the full budget it does not stop being one, and pinning the field is also what keeps
-  // the provider's cached trajectory from being discarded on the next flip. The opening step is
-  // deliberately excluded - it is high because it is the opening step, not because the work is
-  // hard, and letting it set the floor would make every task high for its whole length. A tool
-  // that threw is excluded for the same reason: it raises this step and not the turn.
-  if (
-    (!state.ownerReasoningEffort || state.ownerReasoningEffort === 'auto') &&
-    state.step > 0 &&
-    reasoningEffort === 'high' &&
-    effortFloorEarned(state)
-  )
-    state.reasoningFloor = 'high';
   await deps.assertProviderConfigured(task);
   return { preparedContext, reasoningEffort, windowOptions };
 };

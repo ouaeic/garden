@@ -4,11 +4,11 @@ import type { DataStore, TaskRecord } from '@garden/data';
 import { nativeInputBlocks, type ModelAdapter, type ModelRequest } from '@garden/model-gateway';
 import { estimatedInferenceCostUsd, usageCredit } from './billing.js';
 
-export const nativeInputBound = (
-  model: ModelRelease,
-  kinds: readonly ('audio' | 'video')[],
-  maxTokens = 8192
-) => {
+/**
+ * What a native reading is held to before it is sent: the whole window at the dearest input rate.
+ * The reply names no length, so its output is not held; the receipt settles it.
+ */
+export const nativeInputBound = (model: ModelRelease, kinds: readonly ('audio' | 'video')[]) => {
   if (
     model.provider === 'openrouter' &&
     ['openrouter/auto', 'openrouter/free', 'openrouter/bodybuilder'].includes(model.providerModelId)
@@ -45,10 +45,10 @@ export const nativeInputBound = (
     inputUsdPerMillionTokens: Math.max(maxInputRate, model.inputUsdPerMillionTokens!)
   };
   const usd = Math.max(
-    estimatedInferenceCostUsd(priced, model.contextTokens, maxTokens, {
+    estimatedInferenceCostUsd(priced, model.contextTokens, 0, {
       cacheWriteTokens: model.contextTokens
     }),
-    (model.contextTokens * maxInputRate * 1.25 + maxTokens * outputRate) / 1_000_000
+    (model.contextTokens * maxInputRate * 1.25) / 1_000_000
   );
   if (!Number.isFinite(usd))
     throw new GardenError(
@@ -58,7 +58,7 @@ export const nativeInputBound = (
     );
   return {
     usd,
-    credits: usageCredit(model, model.contextTokens, maxTokens),
+    credits: usageCredit(model, model.contextTokens, 0),
     model: priced,
     inputRate: maxInputRate,
     outputRate
@@ -125,20 +125,13 @@ export const nativeInputAdapter = (
         'This worker no longer owns the recording request',
         409
       );
-    const maxTokens = Math.min(
-      8192,
-      request.maxTokens ?? 8192,
-      request.maxOutputTokens ?? Infinity
-    );
     const bound = nativeInputBound(
       model,
-      parts.map((part) => part.kind),
-      maxTokens
+      parts.map((part) => part.kind)
     );
     const liveBound = nativeInputBound(
       current as unknown as ModelRelease,
-      parts.map((part) => part.kind),
-      maxTokens
+      parts.map((part) => part.kind)
     );
     if (
       liveBound.usd !== bound.usd ||
@@ -171,7 +164,6 @@ export const nativeInputAdapter = (
       );
     const prepared = {
       ...request,
-      maxTokens,
       inputModalities: model.modalities,
       nativeInputMaxPrice: { prompt: bound.inputRate, completion: bound.outputRate }
     };
@@ -188,7 +180,7 @@ export const nativeInputAdapter = (
       workspaceId: task.workspaceId,
       kind: 'model_inference',
       resourceClass: 'media:native-input',
-      quantity: model.contextTokens + maxTokens,
+      quantity: model.contextTokens,
       unit: 'tokens',
       credits: bound.credits,
       costUsd: bound.usd,

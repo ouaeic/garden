@@ -74,6 +74,7 @@ const Config = z.object({
   WEBAUTHN_ORIGIN: z.string().url().default('http://localhost:5173'),
   ALLOW_INSECURE_DEV_AUTH: bool,
   WORKER_ID: z.string().default(`embedded-worker-${process.pid}`),
+  OPENING_READS: sharedEnv.OPENING_READS,
   /**
    * Whether the agent runs inside this process. On by default for the embedded database, which is
    * the shape with no separate worker unit to run it; the packaged install runs PostgreSQL and its

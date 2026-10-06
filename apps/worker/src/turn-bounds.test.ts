@@ -24,7 +24,6 @@ import {
   WORKSPACE_TOO_LARGE_CHECKPOINT_CODE,
   approvalOrigin,
   cancelConfirmation,
-  effortFloorEarned,
   failingCallKey,
   failureSignature,
   idleStepsAfter,
@@ -347,122 +346,8 @@ describe('spending limits the owner can read', () => {
 });
 
 describe('how hard the model thinks about a step', () => {
-  const step = (over: Partial<Parameters<typeof reasoningEffortForStep>[0]>) =>
-    reasoningEffortForStep({ step: 3, messages: [], planVersion: 2, ...over });
-
-  const after = (name: string, result = 'ok'): ModelMessage[] => [
-    { role: 'assistant', content: '', toolCalls: [{ id: 'c1', name, arguments: {} }] },
-    { role: 'tool', toolCallId: 'c1', content: result }
-  ];
-
-  it('spends the full budget on the opening step', () => {
-    expect(step({ step: 0 })).toBe('high');
-  });
-
-  it('does not let a call that threw decide the whole turn is hard', () => {
-    const threw = { step: 3, messages: after('shell', 'Tool failed: runner unreachable') };
-    // Worth thinking about on the step that recovers from it...
-    expect(reasoningEffortForStep(threw)).toBe('high');
-    // ...but `Tool failed:` is written when a tool threw, which is a fact about the network. One
-    // such shell call on step 4 of a measured run pinned all sixteen remaining steps to maximum
-    // reasoning on a task whose entire output was two lines of verse.
-    expect(effortFloorEarned(threw)).toBe(false);
-  });
-
-  it('lets evidence about the work itself pin the floor', () => {
-    for (const hard of [{ acceptanceFailures: 1 }, { compactedAtStep: 3 }]) {
-      const state = { step: 3, messages: [], planVersion: 2, ...hard };
-      expect(effortFloorEarned(state)).toBe(true);
-      expect(reasoningEffortForStep(state)).toBe('high');
-    }
-  });
-
-  it('spends it again when the last step went wrong', () => {
-    expect(step({ messages: after('shell', 'Tool failed: no such file') })).toBe('high');
-    expect(step({ acceptanceFailures: 1, messages: after('code_search') })).toBe('high');
-  });
-
-  it('does not spend less on the step that has to interpret what it just read', () => {
-    // This is the inversion the effort rule used to have. `REPEATABLE_TOOLS` is a replay-safety
-    // set - tools whose second run after a restart cannot surprise anyone - and effort was taken
-    // from it, so the step after a file_read, an image_read or a parallel_web_read ran at 'low':
-    // the cheapest thinking in the task landed on the step holding the material it had just
-    // fetched.
-    expect(step({ messages: after('code_search') })).toBe('medium');
-    expect(step({ messages: after('file_read') })).toBe('medium');
-    expect(step({ messages: after('parallel_web_read') })).toBe('medium');
-    expect(step({ messages: after('set_plan') })).toBe('medium');
-  });
-
-  it('settles at medium once work is underway', () => {
-    expect(step({ messages: after('file_write') })).toBe('medium');
-    expect(reasoningEffortForStep({ step: 3, messages: after('file_write') })).toBe('medium');
-  });
-
-  it('does not raise the floor for a long turn or a full window on their own', () => {
-    // Length and size are not evidence that the work is hard: measured, the floor they raised was
-    // most of what a reasoning route wrote and bought nothing the dev set could find.
-    expect(step({ step: 40, messages: after('file_write') })).toBe('medium');
-    expect(effortFloorEarned({ step: 40, messages: [], planVersion: 2 })).toBe(false);
-  });
-
-  it('raises the floor where the evidence about the work puts the failures, and keeps it there', () => {
-    expect(step({ compactedAtStep: 3 })).toBe('high');
-    expect(step({ step: 9, compactedAtStep: 8 })).toBe('high');
-    expect(step({ acceptanceFailures: 1 })).toBe('high');
-    // Ratcheted rather than recomputed: a turn that has become hard does not stop being hard, and
-    // a reasoning field that flips ten times in twenty-three steps discards the cached trajectory
-    // under it on every flip.
-    expect(step({ reasoningFloor: 'high', messages: after('file_write') })).toBe('high');
-  });
-
-  it('stops spending on a compaction two steps after it happened', () => {
-    expect(step({ step: 12, compactedAtStep: 8 })).toBe('medium');
-  });
-
-  /**
-   * The second half of why the ratchet exists, and the half a per-step assertion cannot see.
-   *
-   * Replayed over a trajectory shaped like a real research task, the rule this replaced changed the
-   * `reasoning` field six times in seventeen steps - every change discarding the provider's cached
-   * trajectory below the system prefix, on a window that only grows. The field now moves at most
-   * twice: down once when the opening step is over, and up if the turn becomes hard.
-   */
-  it('keeps the request field steady across a whole trajectory', () => {
-    const trajectory = [
-      'set_plan',
-      'web_search',
-      'parallel_web_read',
-      'document_read',
-      'file_write',
-      'shell',
-      'image_read',
-      'file_write',
-      'publish_file',
-      'finish'
-    ];
-    const messages: ModelMessage[] = [{ role: 'user', content: 'Write me the report' }];
-    let floor: 'medium' | 'high' | undefined;
-    const efforts = trajectory.map((tool, index) => {
-      const effort = reasoningEffortForStep({
-        step: index,
-        messages,
-        planVersion: 1,
-        ...(floor ? { reasoningFloor: floor } : {})
-      });
-      if (index > 0 && effort === 'high') floor = 'high';
-      messages.push({
-        role: 'assistant',
-        content: '',
-        toolCalls: [{ id: `c${index}`, name: tool, arguments: {} }]
-      });
-      messages.push({ role: 'tool', toolCallId: `c${index}`, content: `${tool} ok` });
-      return effort;
-    });
-    const changes = efforts.filter((effort, index) => index > 0 && effort !== efforts[index - 1]);
-    expect(changes).toHaveLength(1);
-    expect(efforts[0]).toBe('high');
-    expect(efforts.filter((effort) => effort === 'medium')).toHaveLength(trajectory.length - 1);
+  it('names no effort of its own, so the route applies its default on every step', () => {
+    expect(reasoningEffortForStep()).toBeUndefined();
   });
 });
 

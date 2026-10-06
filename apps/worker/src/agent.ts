@@ -144,6 +144,7 @@ import { resolveAnswerHolds } from './turn/answer-holds.js';
 import type { TurnCompleteDeps } from './turn/complete.js';
 import { resumeParkedTurn, type TurnResumeDeps } from './turn/resume.js';
 import { enforceStepBounds, type StepBoundsDeps } from './turn/step-bounds.js';
+import { openingCalls } from './turn/opening.js';
 import { dispatchToolCalls, type TurnDispatchDeps } from './turn/dispatch.js';
 import { generateModelStep, type TurnGenerateDeps } from './turn/generate.js';
 import { nativeInputAdapter } from './native-input-gateway.js';
@@ -1989,9 +1990,6 @@ export class AgentWorker {
         modelRoster
       });
     };
-    // Called here as well as in the step loop so a window saved when this block lived at index 1
-    // is migrated before the preamble blocks below choose where they go.
-    refreshRuntimeContext();
     // The preamble: the two frozen blocks, the recalled pack and the workspace brief, in the order
     // a provider's cache charges for. @see assemblePreamble in `window.ts`.
     await assemblePreamble(this.#window, {
@@ -2130,6 +2128,39 @@ export class AgentWorker {
         'closed'
       )
         return;
+      // The reads every turn opens with, made here rather than by a model round trip. They run
+      // through the same dispatch as any reply, so they are recorded and bounded the same way.
+      if (this.config.OPENING_READS !== false && state.openedTurn !== turn) {
+        state.openedTurn = turn;
+        const opening: ModelResponse = {
+          text: '',
+          toolCalls: openingCalls(state.messages, turn),
+          finishReason: 'tool_calls',
+          usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          metadata: {
+            provider: 'garden',
+            model: 'opening',
+            latencyMs: 0,
+            privacyRoute: task.privacyRoute
+          }
+        };
+        await recordAssistantStep(this.#recordStep, task, key, state, opening);
+        if (
+          (await dispatchToolCalls(
+            this.#dispatch,
+            task,
+            key,
+            state,
+            opening,
+            run,
+            budget,
+            control
+          )) === 'returned'
+        )
+          return;
+        sealUnansweredToolCalls(state.messages, 'the step ended before this call ran');
+        continue;
+      }
       /*
        * Everything that has to be true, and everything that has to be measured, before a request is
        * sent: the spend counter cleared, the window checked against the model, compaction, and the

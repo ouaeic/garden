@@ -147,7 +147,7 @@ export const DORMANT_RULES: readonly DormantRule[] = [
     matches: ({ toolCalls }) =>
       toolCalls.some((call) => call.name === 'shell' && SHELL_SLEEP.test(commandLine(call))),
     correction:
-      "A shell that sleeps spends this turn's wall-clock budget doing nothing, and that budget is a real ceiling: a turn is stopped on the clock as well as on steps and on credits, and the step that pays is not the one that slept. Start long work with shell(background=true) and look in on it with process. Wait for a page with browser_action wait_for, which returns the moment the condition holds rather than at the end of a fixed timer."
+      'Sleeping spends the turn clock. Start long work with shell(background=true) and process wait; wait for a page with browser_action wait_for.'
   }
 ];
 

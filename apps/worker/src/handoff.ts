@@ -380,7 +380,7 @@ export const handOffAtStepLimit = async (
    * changing it re-bills the entire prefix at the write price. Keeping it is the cheaper of the two
    * even on the arm where the turn is ending because the money ran out.
    */
-  const automaticEffort = reasoningEffortForStep(state);
+  const automaticEffort = reasoningEffortForStep();
   const reasoningEffort = taskReasoningEffort(
     state.ownerReasoningEffort,
     automaticEffort,
@@ -424,7 +424,6 @@ export const handOffAtStepLimit = async (
           ...routeTo(model),
           messages: preparedContext.messages,
           tools,
-          temperature: 0.2,
           reasoningEffort,
           ...(model.reasoning ? { reasoningOptions: model.reasoning } : {}),
           sessionId,

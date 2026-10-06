@@ -25,7 +25,6 @@ import { readdirSync, readFileSync, type Dirent } from 'node:fs';
 import path from 'node:path';
 
 import { COMPACT_CONTEXT_TOOL } from '../apps/worker/src/context.js';
-import { DEFAULT_GENERATION_MAX_CHARS } from '../packages/model-gateway/src/generation-budget.js';
 import { requestToolsFor } from '../apps/worker/src/request-tools.js';
 import { UNKNOWN_SURFACES } from '../packages/contracts/src/index.js';
 import { agentToolsFor } from '../apps/worker/src/tool-catalogue.js';
@@ -90,25 +89,6 @@ const scanPlan: ReadonlyArray<number | 'phase-done'> = Array.from(
  * for itself. Sixteen batches is where the plateau below is unmistakable and no longer moving.
  */
 const BUDGET_BATCHES = 16;
-
-/**
- * More than a route is allowed to write in one answer: past the backstop this side cuts a runaway
- * generation at when the request declared no ceiling, which a turn never does.
- *
- * No two lines are alike, for the same reason the log batches differ from each other: a hundred
- * thousand characters of one sentence is a degenerate repeat, and the watch would stop it several
- * steps before the generation budget noticed anything, which would make this fixture green for the
- * wrong reason.
- */
-const overrunningAnswer = (characters = DEFAULT_GENERATION_MAX_CHARS + 10_000): string => {
-  const lines: string[] = [];
-  for (let index = 0, length = 0; length < characters; index += 1) {
-    const line = `${index}. workspace/notes/${index}.md still wants a heading, a date and an owner.`;
-    lines.push(line);
-    length += line.length + 1;
-  }
-  return lines.join('\n');
-};
 
 /**
  * The two documents the proof job goes through, and the reason it is two rather than one.
@@ -2066,40 +2046,6 @@ export const fixtures: readonly Fixture[] = [
     }
   },
   {
-    id: 'small-a-cut-off-answer-is-not-asked-for-again',
-    shape: 'small',
-    request: 'Go through the notes and tell me everything in them that still needs doing.',
-    why: 'A route that keeps writing past the ceiling is cut here, and what it wrote is kept. The turn then has to end: the gateway has already judged that carrying on could not finish this answer, so continuing buys the same cut-off reply again at the same price. Two calls - the answer, and the completion check that ends it. If this ever grows a third, the ten-minutes-at-a-time is back.',
-    model: ({ index }) =>
-      index === 0
-        ? { text: overrunningAnswer(), cut: true }
-        : {
-            text: 'The list was cut off part way; what arrived stands in the reply above.'
-          },
-    expect: {
-      modelCalls: 1,
-      tools: [],
-      status: 'completed',
-      verification: 'not_applicable',
-      /*
-       * The cut, and then the completion check. `output_limit_continued` here would mean the loop
-       * read a cutoff nobody could finish as an answer worth paying for the rest of - the two
-       * markers are the difference between "carry on" and "that is what you get", and the second
-       * is the one this fixture is about.
-       *
-       * `reply_cut_off` is new to this list and the loop has always pushed it. The comment that
-       * used to sit here said `YOUR REPLY WAS CUT OFF` was a pushback with no marker in the table,
-       * so the fixture's own subject could only be asserted through the warning below. The table
-       * now comes from `agent.ts`, which has always had it.
-       */
-      holds: [],
-      // The owner-visible half of the same statement, kept because a hold is what the model was
-      // told and a warning is what the owner reads, and this turn is worth both.
-      warnings: ['The answer was cut off before it finished'],
-      replies: 1
-    }
-  },
-  {
     id: 'small-deliberation-without-action-is-broken-out-of',
     shape: 'small',
     request: 'Read the note and tell me which of the two cut-out approaches you are taking.',
@@ -2364,12 +2310,11 @@ export const fixtures: readonly Fixture[] = [
       // Bound all fresh input, including compaction-induced prefix loss. The assertions below
       // separately require both budget compactions and preservation of the owner's request.
       minCompactions: 1,
-      // Two, and both on the budget rather than on a declaration this fixture never makes. It read
-      // one, and the second was missing for the reason the pending note gives: the soft pass fired
-      // first and reported the size it had just shredded to the trigger. Condensing twice in
-      // nineteen requests on a 128,000-token window is the mechanism working, not running hot - it
-      // is what this row is named for.
-      compactionTriggers: ['budget', 'budget'],
+      // Every one on the budget rather than on a declaration this fixture never makes. It once read
+      // one, because the soft pass fired first and reported the size it had just shredded to the
+      // trigger. Condensing three times in twenty requests on a 128,000-token window is the
+      // mechanism working, not running hot - it is what this row is named for.
+      compactionTriggers: ['budget', 'budget', 'budget'],
       minModelWrittenBriefs: 1,
       // Zero, not one. This was written as 1 with a comment reading "one soft-pass window at most",
       // which is the target; the exact number the design predicts once the tiers are separated is

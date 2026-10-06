@@ -72,12 +72,16 @@ export const openStep = async (
    * `state.artifactLedger`, which `executeWorkspaceTool` has already bounded. @see
    * refreshArtifactLedger in `context.ts`.
    */
-  refreshArtifactLedger(state.messages, state.artifactLedger);
-  // Last of the tail blocks, and re-pushed on every step rather than once per turn: a block
-  // left where the next step's tool results bury it stops being free to change. At a step
-  // boundary every tool call has been answered, so nothing here can split a call from its
-  // result.
-  await refreshRuntimeContext();
+  // Only once a compaction has condensed the calls that wrote the files: before that the model
+  // can read every write in its own window, and the block would repeat it on every step.
+  refreshArtifactLedger(state.messages, state.compactions ? state.artifactLedger : undefined);
+  // The runtime block is written once per turn, behind the turn's own request, and then left where
+  // it is: moving it on every step, or taking an earlier turn's copy out, costs the provider's
+  // cached prefix behind it.
+  if (state.runtimeTurn !== (state.turn ?? 0)) {
+    state.runtimeTurn = state.turn ?? 0;
+    await refreshRuntimeContext();
+  }
   if (state.credits >= task.maxComputeCredits) {
     // The same closing call the step ceiling gets. A turn that stops because it ran out of
     // money has exactly as much to hand over as one that ran out of steps, and the owner is

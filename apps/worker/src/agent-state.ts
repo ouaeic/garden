@@ -61,6 +61,10 @@ export interface AgentState {
   contextBrief?: ContextBrief;
   /** Counts summarisation calls so each one bills under its own idempotency key. */
   compactions?: number;
+  /** The turn whose runtime block has already been written. */
+  runtimeTurn?: number;
+  /** The turn whose opening reads have already been made. */
+  openedTurn?: number;
   /** Observed provider cost per minute, retained for reporting; never bounds a later request. */
   transcriptionRates?: Record<string, number>;
   /**

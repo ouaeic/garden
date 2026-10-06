@@ -133,7 +133,7 @@ export const ModelRequest = z.object({
    * which is every caller on a zero-retention route - says nothing about them at all.
    */
   serverTools: z.array(ModelServerTool).readonly().optional(),
-  temperature: z.number().min(0).max(2).default(0.2),
+  temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().int().positive().max(262_144).optional(),
   /**
    * The most the route will write in one response, from the catalogue. `maxTokens` is clamped to it

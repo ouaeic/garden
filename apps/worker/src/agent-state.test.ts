@@ -47,6 +47,8 @@ const FIELDS: ReadonlyArray<keyof AgentState> = [
   'planVersion',
   'contextBrief',
   'compactions',
+  'openedTurn',
+  'runtimeTurn',
   'transcriptionRates',
   'toolOutputFloor',
   'openedSkills',
@@ -204,6 +206,8 @@ const FULL: Required<AgentState> = {
     condensedMessages: 22
   },
   compactions: 2,
+  openedTurn: 0,
+  runtimeTurn: 0,
   transcriptionRates: { 'openai/whisper-1': 0.006 },
   toolOutputFloor: 1_200,
   openedSkills: ['code-change', 'deployment'],
@@ -419,6 +423,10 @@ describe('what a new turn inherits', () => {
       'planVersion',
       'contextBrief',
       'compactions',
+      // Keyed by the turn they were done in, so carrying them is what lets a new turn see they
+      // are not its own yet.
+      'openedTurn',
+      'runtimeTurn',
       'transcriptionRates',
       'toolOutputFloor',
       'openedSkills',

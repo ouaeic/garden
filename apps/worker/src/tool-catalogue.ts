@@ -581,8 +581,7 @@ export const agentTools: ModelTool[] = [
   LOAD_TOOLS,
   {
     name: 'set_plan',
-    description:
-      "Show the user a plan for multi-step work and keep each step's status current. A step sent as a plain string keeps its existing status.",
+    description: 'Show the user your plan and the status of each step.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -632,7 +631,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'set_acceptance',
     description:
-      "Declare checks that prove the work. The harness runs them when you answer and sends failures back to you; revisions stay visible to the user. command runs a command line, or an executable with args. artifact checks a file: minBytes, json assertions by JSON Pointer (equals, lengths, uniqueBy), or render for a PDF or Office document's page count and clipping.",
+      'Declare checks that prove the work; they run when you answer and failures come back to you. A command check runs a command line; an artifact check tests a file (minBytes, JSON Pointer assertions, or render for PDF/Office pages).',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -648,24 +647,20 @@ export const agentTools: ModelTool[] = [
             required: ['label'],
             properties: {
               kind: { type: 'string', enum: ['command', 'artifact'] },
-              label: { type: 'string', description: 'What passing proves, in the user’s terms.' },
+              label: { type: 'string' },
               command: { type: 'string' },
               executable: { type: 'string' },
               args: { type: 'array', items: { type: 'string' } },
-              cwd: { type: 'string', default: 'workspace' },
+              cwd: { type: 'string' },
               expectExit: { type: 'integer', default: 0 },
-              expectStdoutContains: {
-                type: 'string',
-                description: 'Exact text that stdout or stderr must contain.'
-              },
+              expectStdoutContains: { type: 'string' },
               timeoutSeconds: { type: 'integer', minimum: 1, maximum: 900 },
               path: { type: 'string' },
               minBytes: { type: 'integer', minimum: 1 },
               json: {
                 type: 'object',
                 additionalProperties: false,
-                description:
-                  'Keys are JSON Pointers. uniqueBy maps an array to the field its records must not repeat.',
+                description: 'Keys are JSON Pointers.',
                 properties: {
                   equals: { type: 'object', additionalProperties: true },
                   lengths: {
@@ -678,8 +673,6 @@ export const agentTools: ModelTool[] = [
               render: {
                 type: 'object',
                 additionalProperties: false,
-                description:
-                  'Renders the document and checks the page count, blank pages and text clipped at the page edge.',
                 properties: {
                   expectPages: { type: 'integer', minimum: 1 },
                   marginPoints: { type: 'number', minimum: 0 }
@@ -726,7 +719,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'shell',
     description:
-      'Run a command line with bash: {command:"ls -la | head"}. Or one executable with literal args: {executable, args}. background=true returns a session: name a job for finite work (kept across restarts, never rerun after success) or a service for a server (restarted on exit). Manage sessions with process. System package managers run directly, without a shell wrapper, PTY or background.',
+      'Run a bash command line, or an executable with args. background=true starts a job (finite work) or a service (a server); manage it with process.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -736,28 +729,15 @@ export const agentTools: ModelTool[] = [
         args: { type: 'array', items: { type: 'string' } },
         cwd: {
           type: 'string',
-          default: 'workspace',
-          // A command already runs inside workspace/, so repeating the prefix lands in
-          // workspace/workspace/; trying it answers only with ENOENT.
-          description: 'Relative to workspace/: use probe/x, not workspace/probe/x.'
+          description: 'Relative to the working directory.'
         },
-        timeoutSeconds: {
-          type: 'integer',
-          minimum: 1,
-          description: 'Foreground limit; a named job may omit it and services have none.'
-        },
+        timeoutSeconds: { type: 'integer', minimum: 1 },
         background: { type: 'boolean', default: false },
-        service: { type: 'string', description: 'Name a server; needs background=true.' },
-        job: { type: 'string', description: 'Name finite durable work; needs background=true.' },
-        checkpointResumeCommand: {
-          type: 'string',
-          description: 'For a job: the command that safely resumes saved work after interruption.'
-        },
+        service: { type: 'string' },
+        job: { type: 'string' },
+        checkpointResumeCommand: { type: 'string' },
         stdin: { type: 'string' },
-        pty: {
-          type: 'boolean',
-          description: 'A terminal for interactive programs; send input with process write.'
-        },
+        pty: { type: 'boolean' },
         maxOutputBytes: { type: 'integer', minimum: 4096, maximum: 20971520, default: 1048576 }
       }
     }
@@ -765,7 +745,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'process',
     description:
-      'Manage background sessions: list, poll, log, write (stdin), resize, kill, or resume a job from its checkpoint. wait releases this turn until the named jobs finish and resumes it automatically, so never poll with sleep. describe lists the compute, debug and workflow actions, which take options.',
+      'Manage background sessions. wait pauses the turn until the named jobs finish; describe lists the compute, debug and workflow actions.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -789,31 +769,24 @@ export const agentTools: ModelTool[] = [
           ]
         },
         sessionId: { type: 'string' },
-        sessionIds: {
-          type: 'array',
-          items: { type: 'string' },
-          maxItems: 32,
-          description: 'Sessions to await together with wait.'
-        },
-        data: { type: 'string', description: 'Input when action=write.' },
+        sessionIds: { type: 'array', items: { type: 'string' }, maxItems: 32 },
+        data: { type: 'string' },
         options: { type: 'object' }
       }
     }
   },
   {
     name: 'files_list',
-    description:
-      'List one directory of the workspace (not recursive): name, path, type, size and modification time.',
+    description: 'List a directory.',
     parameters: {
       type: 'object',
       additionalProperties: false,
-      properties: { path: { type: 'string', default: 'workspace' } }
+      properties: { path: { type: 'string' } }
     }
   },
   {
     name: 'file_read',
-    description:
-      'Read a UTF-8 text file, or a line range of it; lines are shown as N:text. Use document_read for PDF and Office files.',
+    description: 'Read a text file or a line range of it, as N:text lines.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -1021,13 +994,13 @@ export const agentTools: ModelTool[] = [
   },
   {
     name: 'file_patch',
-    description:
-      'Replace exact text in files. Each oldText must match the current file exactly once (include enough context), or set replaceAll. Entries for one path apply in order as one atomic write.',
+    description: 'Replace exact text in files; each oldText must match once unless replaceAll.',
     parameters: {
       type: 'object',
       additionalProperties: false,
       required: ['patches'],
       properties: {
+        path: { type: 'string', description: 'For every entry that names none.' },
         patches: {
           type: 'array',
           minItems: 1,
@@ -1035,7 +1008,7 @@ export const agentTools: ModelTool[] = [
           items: {
             type: 'object',
             additionalProperties: false,
-            required: ['path', 'oldText', 'newText'],
+            required: ['oldText', 'newText'],
             properties: {
               path: { type: 'string' },
               oldText: { type: 'string' },
@@ -1172,26 +1145,14 @@ export const agentTools: ModelTool[] = [
      * which spends a navigate, a snapshot and a page of markup on a query, and lands on the pages
      * most likely to raise an anti-bot challenge - which then costs the rest of the task.
      */
-    description:
-      'Search the web for one page of ranked results: title, url, site and snippet. Snippets are pointers, not sources: read the pages you rely on with parallel_web_read. Operators such as site: and quoted phrases work.',
+    description: 'Search the web: one page of results with title, url and snippet.',
     parameters: {
       type: 'object',
       additionalProperties: false,
       required: ['query'],
       properties: {
-        query: {
-          type: 'string',
-          maxLength: 500,
-          description:
-            'What to search for, in the words a person would use. Search operators such as site: and quoted phrases work.'
-        },
-        limit: {
-          type: 'integer',
-          minimum: 1,
-          maximum: 10,
-          default: 10,
-          description: 'How many results to return. Ten is one page; there is no second page.'
-        }
+        query: { type: 'string', maxLength: 500 },
+        limit: { type: 'integer', minimum: 1, maximum: 10, default: 10 }
       }
     }
   },
@@ -1202,8 +1163,7 @@ export const agentTools: ModelTool[] = [
      * finished" line whether or not anything had happened, so a fifteen-minute page monitor woke
      * the owner ninety-six times a day and the agent had no way to say either more or less.
      */
-    description:
-      "Push a message to the user's devices now, when work running while they are away finds something they would want to know immediately. Not for routine progress or a turn they are reading. At most 3 per turn and 10 per conversation.",
+    description: "Push a message to the user's devices now.",
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -1222,8 +1182,7 @@ export const agentTools: ModelTool[] = [
   },
   {
     name: 'ask',
-    description:
-      'Ask the user something only they can decide or know. It reaches their devices and pauses this turn until they answer.',
+    description: 'Ask the user; the turn pauses until they answer.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -1234,14 +1193,13 @@ export const agentTools: ModelTool[] = [
           type: 'array',
           minItems: 2,
           maxItems: 5,
-          items: { type: 'string', maxLength: 80 },
-          description: 'Answers to offer when there is a fixed set; any reply is accepted.'
+          items: { type: 'string', maxLength: 80 }
         },
-        why: { type: 'string', maxLength: 240, description: 'What waits on the answer.' },
+        why: { type: 'string', maxLength: 240 },
         default: {
           type: 'string',
           maxLength: 80,
-          description: 'The safe choice taken if no answer comes within waitHours.'
+          description: 'Taken if no answer comes within waitHours.'
         },
         waitHours: { type: 'number', minimum: 1, maximum: 168 }
       }
@@ -1250,7 +1208,7 @@ export const agentTools: ModelTool[] = [
   {
     name: 'propose_deal',
     description:
-      'Agree the job before substantial work (more than a few minutes, several deliverables, spending, or acting outside this computer). Ask now every question you can foresee so the run needs nobody later; split independent asks into goals. Not for quick answers, nor once agreed. Pauses the turn until the user agrees.',
+      'Agree goals, spending caps and open questions with the user before a long job; the turn pauses until they agree.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -1481,8 +1439,7 @@ export const agentTools: ModelTool[] = [
   },
   {
     name: 'file_write',
-    description:
-      'Create or replace a whole UTF-8 file. Use file_patch to change part of an existing file. A workspace file reaches the user only when published.',
+    description: 'Create or replace a file.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -1530,8 +1487,7 @@ export const agentTools: ModelTool[] = [
   },
   {
     name: 'publish_artifact',
-    description:
-      'Deliver a finished workspace file to the user as a versioned result. Office files also get a PDF review copy, so publish the editable original.',
+    description: 'Send a workspace file to the user.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -1747,8 +1703,6 @@ export const agentTools: ModelTool[] = [
 
 const coreToolNames = new Set([
   'load_tools',
-  'set_plan',
-  'set_acceptance',
   'shell',
   'process',
   'files_list',
@@ -1757,7 +1711,6 @@ const coreToolNames = new Set([
   'file_patch',
   'web_search',
   'ask',
-  'propose_deal',
   'publish_artifact'
 ]);
 

@@ -111,6 +111,7 @@ type TestConfig = Omit<WorkerConfig, 'WORKER_HEALTH_PORT' | 'WORKER_HEALTH_HOST'
 
 const config = (overrides: Partial<WorkerConfig> = {}): TestConfig => ({
   WORKER_ID: 'worker-test',
+  OPENING_READS: false,
   DATABASE_DRIVER: 'pglite',
   DATABASE_URL: 'postgres://localhost/garden',
   PGLITE_PATH: ':memory:',

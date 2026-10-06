@@ -42,9 +42,6 @@ export const DEFAULT_GENERATION_TIMEOUT_MS = 600_000;
  */
 export const GENERATION_CHARS_PER_TOKEN = 8;
 
-/** Where the ceiling lands when a caller declared no output cap at all: far past any real answer. */
-export const DEFAULT_GENERATION_MAX_CHARS = 400_000;
-
 /**
  * Why this side ended a generation the model had not finished.
  *
@@ -56,9 +53,10 @@ export const DEFAULT_GENERATION_MAX_CHARS = 400_000;
  */
 export type GenerationCutoff = 'stalled' | 'timeout' | 'overrun' | 'cancelled' | 'framing';
 
+/** A request that names no length is held to none here; the clocks and the repetition watch remain. */
 export const generationCharCeiling = (maxTokens: number | undefined): number =>
   maxTokens === undefined
-    ? DEFAULT_GENERATION_MAX_CHARS
+    ? Number.POSITIVE_INFINITY
     : Math.max(maxTokens * GENERATION_CHARS_PER_TOKEN, GENERATION_CHARS_PER_TOKEN);
 
 /**

@@ -495,9 +495,19 @@ const errorResponse = async (response: Response): Promise<Response> => {
  * The `fetch` a chat-completions adapter is given for an Anthropic endpoint. It answers the two
  * routes the adapter calls - `/models` and `/chat/completions` - and passes anything else through.
  */
-export const anthropicBridge =
-  (inner: typeof fetch = fetch): typeof fetch =>
-  async (resource, init = {}) => {
+export const anthropicBridge = (inner: typeof fetch = fetch): typeof fetch => {
+  const maxima = new Map<string, number>();
+  const publishedMaxTokens = async (
+    model: string,
+    read: () => Promise<number | null>
+  ): Promise<number | null> => {
+    const known = maxima.get(model);
+    if (known) return known;
+    const value = await read().catch(() => null);
+    if (value) maxima.set(model, value);
+    return value;
+  };
+  return async (resource, init = {}) => {
     const url = new URL(resource instanceof Request ? resource.url : String(resource));
     const incoming = new Headers(init.headers);
     const key =
@@ -546,6 +556,23 @@ export const anthropicBridge =
     }
     if (url.pathname.endsWith('/chat/completions') && init.method === 'POST') {
       const request = JSON.parse(typeof init.body === 'string' ? init.body : '{}') as Json;
+      // The Messages API requires a length. Where the caller named none, it is the model's own
+      // maximum, as Anthropic publishes it for that model.
+      if (
+        typeof request.max_tokens !== 'number' &&
+        typeof request.max_completion_tokens !== 'number' &&
+        typeof request.model === 'string'
+      ) {
+        const published = await publishedMaxTokens(request.model, async () => {
+          const response = await inner(
+            `${url.origin}${base}/models/${encodeURIComponent(String(request.model))}`,
+            { headers, ...passthrough }
+          );
+          const body: unknown = response.ok ? await response.json() : null;
+          return isRecord(body) && typeof body.max_tokens === 'number' ? body.max_tokens : null;
+        });
+        if (published) request.max_tokens = published;
+      }
       const response = await inner(`${url.origin}${base}/messages`, {
         method: 'POST',
         headers,
@@ -565,3 +592,4 @@ export const anthropicBridge =
     }
     return inner(resource, init);
   };
+};

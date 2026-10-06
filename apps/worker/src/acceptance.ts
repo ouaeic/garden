@@ -750,7 +750,7 @@ export const acceptanceAcceptedResult = (record: AcceptanceRecord): string =>
     accepted: true,
     revision: record.revisions,
     checks: record.checks.map(describeAcceptanceCheck),
-    note: 'The harness runs these itself when you call finish. finish is refused while any of them fails, so a check you cannot pass has to be changed in front of the user rather than ignored.'
+    note: 'These run when you answer.'
   });
 
 /**

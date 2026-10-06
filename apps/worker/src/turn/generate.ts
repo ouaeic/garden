@@ -236,7 +236,6 @@ export const generateModelStep = async (
           // mean the same capability twice - once under a name the model can use and once under a
           // name only the provider can - and which one answered would depend on the model's mood.
           tools: requestTools,
-          temperature: 0.2,
           reasoningEffort,
           ...(model.reasoning ? { reasoningOptions: model.reasoning } : {}),
           sessionId,
@@ -451,7 +450,10 @@ export const generateModelStep = async (
   }
   return {
     outcome: 'generated',
-    response: { ...response, toolCalls: response.toolCalls.map(shellCommandCall) }
+    response: {
+      ...response,
+      toolCalls: response.toolCalls.map(shellCommandCall).map(filePatchCall)
+    }
   };
 };
 
@@ -472,4 +474,22 @@ export const shellCommandCall = (call: ModelToolCall): ModelToolCall => {
   if (args[0] === '-lc' || args[0] === '-c')
     return { ...call, arguments: { ...rest, executable: 'bash' } };
   return call;
+};
+
+/**
+ * A patch written with its path once at the top, or as one edit with no list, in the per-entry
+ * shape every later reader of the call expects.
+ */
+export const filePatchCall = (call: ModelToolCall): ModelToolCall => {
+  if (call.name !== 'file_patch') return call;
+  const { path, oldText, newText, replaceAll, patches, ...rest } = call.arguments;
+  const listed = Array.isArray(patches) ? (patches as Array<Record<string, unknown>>) : [];
+  const entries = listed.length
+    ? listed.map((entry) =>
+        entry.path === undefined && path !== undefined ? { path, ...entry } : entry
+      )
+    : typeof oldText === 'string'
+      ? [{ path, oldText, newText, ...(replaceAll === undefined ? {} : { replaceAll }) }]
+      : listed;
+  return { ...call, arguments: { ...rest, patches: entries } };
 };
