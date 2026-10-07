@@ -179,7 +179,12 @@ export const runTerminalBench = async (options: TerminalBenchOptions): Promise<n
       task,
       {
         sudo: options.sudo,
-        lifetimeSeconds: (task.maxAgentTimeoutSeconds ?? 900) + 600,
+        // The verifier runs twice - once before the turn, to refuse a task that is already solved,
+        // and once after it - each under the task's own test ceiling, so the box has to outlive
+        // the agent's ceiling and both of those. A shorter life stops the container mid-check and
+        // a task the agent solved is scored as failed.
+        lifetimeSeconds:
+          (task.maxAgentTimeoutSeconds ?? 900) + 2 * (task.maxTestTimeoutSeconds ?? 600) + 300,
         // The (arm, run-index) pair IS this process's identity on the box; see `DockerOptions.label`.
         label: `${arm}-r${String(options.runIndex)}`
       },
