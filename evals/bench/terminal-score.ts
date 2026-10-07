@@ -25,6 +25,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { ReasoningEffort } from '../../packages/contracts/src/index.js';
 import { runIdentity, type LiveProvider } from '../harness.js';
 
 import { benchmarkBoxCatalogueBytes } from './catalogue.js';
@@ -136,13 +137,20 @@ export const runTerminalBench = async (options: TerminalBenchOptions): Promise<n
     out('No provider key. This path bills a real account, so it does not start without one.');
     return 2;
   }
+  const effort = process.env.AI_REASONING_EFFORT;
+  const reasoningEffort = ReasoningEffort.safeParse(effort).data;
+  if (effort && !reasoningEffort) {
+    out(`AI_REASONING_EFFORT=${effort} is not a reasoning effort.`);
+    return 2;
+  }
   const live: LiveProvider = {
     baseUrl: credential.baseUrl,
     apiKey: credential.apiKey,
     provider: credential.provider,
     providerModelId: providerModelIdOf(options.model),
     contextTokens: 1_000_000,
-    vision: process.env.AI_VISION === '1'
+    vision: process.env.AI_VISION === '1',
+    ...(reasoningEffort ? { reasoningEffort } : {})
   };
   const identity = runIdentity();
   const openedAt = await spentOnKey(credential, 0);
