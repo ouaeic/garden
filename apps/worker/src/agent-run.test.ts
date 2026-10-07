@@ -8419,8 +8419,7 @@ describe('the machine the run tells the model it is on', () => {
   };
 
   /** The owner's box, as `machineReport` words it. */
-  const OWNER =
-    '16 cores, 21.9 GiB memory per command, 730.1 GiB free disk. Size parallel work, memory and output to these rather than to a default.';
+  const OWNER = '16 cores, 21.9 GiB memory per command, 730.1 GiB free disk';
 
   it('carries the numbers, on the same request as the disk sentence they belong beside', async () => {
     const block = runtimeBlockOf(await turn(OWNER));

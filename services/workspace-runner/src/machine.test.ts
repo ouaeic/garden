@@ -472,16 +472,14 @@ describe('the three numbers the runtime block states', () => {
     expect(report.summary).toBe('');
   });
 
-  /** Three numbers and their units, and the sentence that says what they are for. */
-  it('is one line, and it says why the numbers are there', () => {
+  /** Three numbers and their units. */
+  it('is one line', () => {
     const line = machineSummary({
       cores: 16,
       memoryBytes: OWNER_COMMAND_MEMORY,
       diskBytes: 730 * GIB
     });
-    expect(line).toBe(
-      '16 cores, 21.9 GiB memory per command, 730.0 GiB free disk. Size parallel work, memory and output to these rather than to a default.'
-    );
+    expect(line).toBe('16 cores, 21.9 GiB memory per command, 730.0 GiB free disk');
     expect(line.split('\n')).toHaveLength(1);
   });
 });
