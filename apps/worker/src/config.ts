@@ -3,6 +3,11 @@ import { DATA_MASTER_KEY_REQUIRED } from '@garden/core';
 
 const Config = z.object({
   WORKER_ID: z.string().default(`worker-${process.pid}`),
+  /** Whether a turn opens with the harness's own reads. @see openingCalls in `turn/opening.ts`. */
+  OPENING_READS: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional(),
   DATABASE_DRIVER: z.enum(['pglite', 'postgres']).default('pglite'),
   DATABASE_URL: z.string().default('postgres://garden:garden@localhost:5432/garden'),
   PGLITE_PATH: z.string().default('.garden/postgres'),

@@ -43,6 +43,11 @@ import {
   writeFile,
   WORKSPACE_PREFIX
 } from './files.js';
+import {
+  COMMON_COMMANDS,
+  DOCUMENT_TOOLCHAIN,
+  summariseToolchain
+} from '../../services/workspace-runner/src/toolchain.js';
 import { ABSENT_ROUTES, canonicalRoute, isAbsent, isImplemented } from './routes.js';
 
 /** What a background process this shim started looks like while it runs. */
@@ -378,7 +383,9 @@ export const createShim = (options: ShimOptions): Shim => {
       }
       case 'GET /v1/workspaces/:workspaceId/usage':
         return json({ storageBytes: await storageBytes(backend) });
-      case 'GET /v1/workspaces/:workspaceId/toolchain':
+      case 'GET /v1/workspaces/:workspaceId/toolchain': {
+        // The runner's own sentence, with the everyday commands probed in the task's box.
+        const { present } = await probeBinaries(backend, COMMON_COMMANDS);
         return json({
           capabilities: toolchain.map((id) => ({
             id,
@@ -390,8 +397,11 @@ export const createShim = (options: ShimOptions): Shim => {
           ready: [...toolchain],
           missing: [],
           summary:
-            toolchain.length === 0 ? '' : `Available on this computer: ${toolchain.join(', ')}.`
+            toolchain.length === 0
+              ? summariseToolchain([], DOCUMENT_TOOLCHAIN, present)
+              : `Available on this computer: ${toolchain.join(', ')}.${present.length ? ` Commands: ${present.join(', ')}.` : ''}`
         });
+      }
       case 'POST /v1/workspaces/:workspaceId/toolchain/probe':
         return json(
           await probeBinaries(

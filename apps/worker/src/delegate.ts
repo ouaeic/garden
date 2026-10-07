@@ -14,7 +14,7 @@ import { assessEvidenceReport, unverifiedNotice } from './delegate-evidence.js';
 import type { ClaimReview } from './claim-review.js';
 import { DirectClaims } from './claim-input.js';
 import { originsFromResult, providerWebProvenance, untrustedOriginOfResult } from './provenance.js';
-import { routeTo } from './routing.js';
+import { routeTo, windowCacheStyle } from './routing.js';
 import { resolveTaskPurposeModel } from './purpose-model.js';
 import { DELEGATE_MAX_STEPS } from './turn-bounds.js';
 import { startStopWatch, withRequestDeadline } from './turn-lifecycle.js';
@@ -213,7 +213,8 @@ ${clockLine(runtimeDate(), timeZone)}
       }`
     }
   ];
-  const maxTokens = Math.min(8_192, Math.max(2_048, Math.floor(model.contextTokens * 0.1)));
+  // Room the window keeps free for a reply. It is not sent: the route writes up to its own maximum.
+  const replyRoom = Math.min(8_192, Math.max(2_048, Math.floor(model.contextTokens * 0.1)));
   let usageCredits = 0;
   announceLane('started', { allocatedCredits: budget });
   const untrusted = new Set<string>();
@@ -274,9 +275,10 @@ ${clockLine(runtimeDate(), timeZone)}
       };
     }
     await context.assertProviderConfigured(task);
-    const prepared = prepareModelContext(messages, model.contextTokens, maxTokens, {
+    const prepared = prepareModelContext(messages, model.contextTokens, replyRoom, {
       precedingTokens: reservedTokens,
       reservedTokens,
+      promptCacheStyle: windowCacheStyle(model),
       ...(toolOutputFloor === undefined ? {} : { toolOutputFloor })
     });
     toolOutputFloor = prepared.olderToolOutputChars;
@@ -293,7 +295,6 @@ ${clockLine(runtimeDate(), timeZone)}
         messages: prepared.messages,
         tools,
         temperature: 0.1,
-        maxTokens,
         reasoningEffort: 'high',
         sessionId: window,
         signal: AbortSignal.any([signal, stopWatch.signal])

@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_GENERATION_MAX_CHARS,
   DEFAULT_GENERATION_TIMEOUT_MS,
   HUGE_REQUEST_TOKENS,
   LARGE_REQUEST_TOKENS,
   MIN_CONTINUABLE_CHARS_PER_SECOND,
   describeCutoff,
-  estimatedOutputTokens,
   generationCharCeiling,
   startGenerationBudget,
   streamIdleTimeoutFor,
@@ -35,9 +33,8 @@ describe('generation budget', () => {
     expect(ceiling / 4).toBeLessThan(40_000);
   });
 
-  it('falls back to a ceiling past any real answer when the caller declared no cap', () => {
-    expect(generationCharCeiling(undefined)).toBe(DEFAULT_GENERATION_MAX_CHARS);
-    expect(estimatedOutputTokens(DEFAULT_GENERATION_MAX_CHARS)).toBe(100_000);
+  it('holds a request that named no length to no length', () => {
+    expect(generationCharCeiling(undefined)).toBe(Number.POSITIVE_INFINITY);
   });
 
   /*

@@ -9,7 +9,7 @@ import { GardenError } from '@garden/core';
 /** Owner settings are stable; automatic settings stay inside the model's advertised vocabulary. */
 export const taskReasoningEffort = (
   preference: TaskReasoningEffort | undefined,
-  automatic: ReasoningEffort,
+  automatic: ReasoningEffort | undefined,
   options?: ReasoningOptions
 ): ReasoningEffort | undefined => {
   if (preference && preference !== 'auto') {
@@ -21,6 +21,8 @@ export const taskReasoningEffort = (
     assertReasoningEffort(preference, options);
     return preference;
   }
+  // Left to the route unless the owner chose: it knows its own model's levels and default.
+  if (automatic === undefined) return undefined;
   const supported = options?.supportedEfforts;
   if (!options || !Array.isArray(supported)) return automatic;
   const allowed = supported.filter((effort) => !(options.mandatory && effort === 'none'));

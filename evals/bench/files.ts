@@ -315,10 +315,7 @@ printf '%s|%s|%s\\n' "$cores" "$mem" "$disk"
   if (report.diskBytes !== null) parts.push(`${gib(report.diskBytes)} GiB free disk`);
   return {
     ...report,
-    summary:
-      parts.length === 0
-        ? ''
-        : `${parts.join(', ')}. Size parallel work, memory and output to these rather than to a default.`
+    summary: parts.join(', ')
   };
 };
 

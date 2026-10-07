@@ -3,7 +3,6 @@ import { encryptJson } from '@garden/core';
 import type { AgentState } from '../agent-state.js';
 import { refreshArtifactLedger } from '../context.js';
 import { noteStepBudget, stepCeiling, turnWallClockReached, type HandoffDeps } from '../handoff.js';
-import { applyDormantRules, toolsRunThisTurn } from '../rules/index.js';
 import { closeTurnAtCeiling, type TurnCloseContext } from './close.js';
 import type { TurnLoopControl } from './loop-context.js';
 
@@ -43,22 +42,6 @@ export const openStep = async (
   await refreshActivePlan();
   await noteStepBudget(deps.handoff, task, key, state, stepCeiling(deps.handoff, state));
   /*
-   * The dormant rules, read against the step the model just produced.
-   *
-   * Here rather than where the assistant message is pushed, for two reasons that are both about
-   * shape. At a step boundary every tool call has been answered, so a correction appended now
-   * cannot land between a call and its result - which is the malformed request the cut-off-reply
-   * branch below refuses for the same reason. And a rule's view of the turn includes what the
-   * step's own calls *did*, which is not known until they have run: the render-proof rule asks
-   * whether this turn has looked at a rendered page, and the answer arrives with the tool result
-   * rather than with the request for it.
-   *
-   * Ahead of the runtime block deliberately, so the block that carries the clock stays last and
-   * keeps costing nothing. @see rules/index.ts for why this is a tier of its own and why the
-   * firing rate is instrumented from the first commit.
-   */
-  applyDormantRules(state.messages, toolsRunThisTurn(state.turnToolResults));
-  /*
    * What this turn has changed, re-rendered from the durable record rather than appended.
    *
    * Here, and not where the write happens, because the point of the block is that it is rebuilt:
@@ -72,12 +55,16 @@ export const openStep = async (
    * `state.artifactLedger`, which `executeWorkspaceTool` has already bounded. @see
    * refreshArtifactLedger in `context.ts`.
    */
-  refreshArtifactLedger(state.messages, state.artifactLedger);
-  // Last of the tail blocks, and re-pushed on every step rather than once per turn: a block
-  // left where the next step's tool results bury it stops being free to change. At a step
-  // boundary every tool call has been answered, so nothing here can split a call from its
-  // result.
-  await refreshRuntimeContext();
+  // Only once a compaction has condensed the calls that wrote the files: before that the model
+  // can read every write in its own window, and the block would repeat it on every step.
+  refreshArtifactLedger(state.messages, state.compactions ? state.artifactLedger : undefined);
+  // The runtime block is written once per turn, behind the turn's own request, and then left where
+  // it is: moving it on every step, or taking an earlier turn's copy out, costs the provider's
+  // cached prefix behind it.
+  if (state.runtimeTurn !== (state.turn ?? 0)) {
+    state.runtimeTurn = state.turn ?? 0;
+    await refreshRuntimeContext();
+  }
   if (state.credits >= task.maxComputeCredits) {
     // The same closing call the step ceiling gets. A turn that stops because it ran out of
     // money has exactly as much to hand over as one that ran out of steps, and the owner is

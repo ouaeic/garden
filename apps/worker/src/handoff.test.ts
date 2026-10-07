@@ -12,7 +12,7 @@ import {
   type HandoffDeps
 } from './handoff.js';
 import { buildIdentity } from './build-identity.js';
-import { LATE_STEP_EFFORT_FLOOR, reasoningEffortForStep } from './turn-bounds.js';
+import { reasoningEffortForStep } from './turn-bounds.js';
 import { MODEL_REQUEST_TIMEOUT_MS } from './turn-lifecycle.js';
 
 /**
@@ -210,7 +210,9 @@ describe('the effort the closing call thinks at', () => {
   /** A turn at its step ceiling, which is the only way this call is ever reached. */
   const exhausted = (): AgentState =>
     ({
-      step: LATE_STEP_EFFORT_FLOOR + 4,
+      step: 24,
+      // A turn that latched 'high' on the way here, which is what this call has to keep.
+      reasoningFloor: 'high',
       turn: 0,
       credits: 40,
       messages: [
@@ -284,13 +286,12 @@ describe('the effort the closing call thinks at', () => {
     return { requests, costs, state };
   };
 
-  it('sends the effort the turn had earned, not a literal', async () => {
+  it('names no effort of its own on the closing call either', async () => {
     const { requests } = await drive();
 
-    // The turn is at its ceiling, so `effortFloorEarned` is true on the step count alone.
-    expect(reasoningEffortForStep(exhausted())).toBe('high');
+    expect(reasoningEffortForStep()).toBeUndefined();
     expect(requests).toHaveLength(1);
-    expect(requests[0]?.reasoningEffort).toBe('high');
+    expect(requests[0]?.reasoningEffort).toBeUndefined();
   });
 
   it('reports on the cost line the effort it actually sent', async () => {
