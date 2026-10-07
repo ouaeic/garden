@@ -452,10 +452,28 @@ export const generateModelStep = async (
     outcome: 'generated',
     response: {
       ...response,
-      toolCalls: response.toolCalls.map(shellCommandCall).map(filePatchCall)
+      toolCalls: response.toolCalls
+        .map(knownToolCall(requestTools.map((tool) => tool.name)))
+        .map(shellCommandCall)
+        .map(filePatchCall)
     }
   };
 };
+
+/**
+ * A call whose tool name a model wrote with stray characters after it - `file_patch活了` - is the
+ * offered tool it starts with, when what follows could not be part of a name. Answered as unknown,
+ * the model spends a whole step sending the same call again.
+ */
+export const knownToolCall =
+  (names: readonly string[]) =>
+  (call: ModelToolCall): ModelToolCall => {
+    if (names.includes(call.name)) return call;
+    const match = names
+      .filter((name) => call.name.startsWith(name) && !/^[\w-]/.test(call.name.slice(name.length)))
+      .sort((a, b) => b.length - a.length)[0];
+    return match ? { ...call, name: match } : call;
+  };
 
 /**
  * A shell call written as a command line, in the executable-and-arguments shape every later reader

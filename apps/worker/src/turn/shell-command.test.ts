@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { shellCommandCall } from './generate.js';
+import { knownToolCall, shellCommandCall } from './generate.js';
 
 const shell = (args: Record<string, unknown>) => ({ id: 'call-1', name: 'shell', arguments: args });
 
@@ -38,5 +38,22 @@ describe('a shell call written as a command line', () => {
   it('touches no other tool', () => {
     const call = { id: 'call-2', name: 'file_read', arguments: { command: 'rm -rf /' } };
     expect(shellCommandCall(call)).toBe(call);
+  });
+});
+
+describe('a tool name with stray characters after it', () => {
+  const offered = ['file_patch', 'file_read', 'shell'];
+  const named = (name: string) => ({ id: 'c1', name, arguments: {} });
+
+  it('is the offered tool it starts with', () => {
+    expect(knownToolCall(offered)(named('file_patch活了')).name).toBe('file_patch');
+    expect(knownToolCall(offered)(named('shell<|end|>')).name).toBe('shell');
+  });
+
+  it('leaves a name that could be a different tool, or an offered one, alone', () => {
+    expect(knownToolCall(offered)(named('file_patches')).name).toBe('file_patches');
+    expect(knownToolCall(offered)(named('shell_v2')).name).toBe('shell_v2');
+    expect(knownToolCall(offered)(named('file_read')).name).toBe('file_read');
+    expect(knownToolCall(offered)(named('unknown')).name).toBe('unknown');
   });
 });
