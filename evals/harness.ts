@@ -36,6 +36,7 @@ import { fileURLToPath } from 'node:url';
 import {
   DesktopAction,
   type ModelRelease,
+  type ReasoningEffort,
   type SpendDecision
 } from '../packages/contracts/src/index.js';
 import {
@@ -296,6 +297,10 @@ export interface LiveProvider {
   readonly provider: 'openrouter' | 'openai-compatible';
   readonly providerModelId: string;
   readonly contextTokens: number;
+  /** Whether the live model reads images, as its provider publishes. */
+  readonly vision?: boolean;
+  /** The effort the owner chose for the task, sent as the owner's own setting would be. */
+  readonly reasoningEffort?: ReasoningEffort;
 }
 
 const sse = (payload: unknown): string => `data: ${JSON.stringify(payload)}\n\n`;
@@ -2692,7 +2697,21 @@ const modelFor = (contextTokens?: number, live?: LiveProvider): ModelRelease => 
         ...shaped,
         provider: live.provider === 'openrouter' ? 'openrouter' : 'custom',
         providerModelId: live.providerModelId,
-        contextTokens: contextTokens ?? live.contextTokens
+        contextTokens: contextTokens ?? live.contextTokens,
+        // Production reads this from the provider's own catalogue; a live rig has to be told, or
+        // every image is routed away from a model that could have looked at it.
+        ...(live.vision
+          ? { modalities: ['text', 'image'], capabilities: [...shaped.capabilities, 'vision'] }
+          : {}),
+        // The levels the catalogue gives an Ollama thinking model, so an owner's choice is valid.
+        ...(live.reasoningEffort
+          ? {
+              reasoning: {
+                mandatory: false,
+                supportedEfforts: ['none', 'low', 'medium', 'high', 'max'] as ReasoningEffort[]
+              }
+            }
+          : {})
       };
 };
 
@@ -2969,6 +2988,8 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
    * leaves `autoApprove` off, and for those `updateTask` never touches this binding.
    */
   let task = taskFor(fixture.request, fixture.maxCredits ?? 50, fixture.securityMode ?? 'balanced');
+  if (fixture.live?.reasoningEffort)
+    task = { ...task, reasoningEffort: fixture.live.reasoningEffort };
   const events: Array<{ kind: string; summary: string; payload: unknown }> = [];
   const artifacts: Array<Record<string, unknown>> = [];
   // Direction-aware reads see the owner's initial message and the same sealed rows writers append.
@@ -3304,6 +3325,8 @@ export const runFixture = async (fixture: Fixture): Promise<RunOutcome> => {
       return true;
     },
     getApproval: async (id: string) => approvalRows.get(id) ?? null,
+    // No fixture grants a permission for the rest of a conversation, so none is ever held.
+    hasTaskApprovalGrant: async () => false,
     recordUsage: async (input: {
       kind?: unknown;
       costUsd?: unknown;
