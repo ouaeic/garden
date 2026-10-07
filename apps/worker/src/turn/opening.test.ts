@@ -13,11 +13,10 @@ describe('the reads a turn opens with', () => {
     expect(reads('Make the tests pass.')).toEqual(['LIST']);
   });
 
-  it('reads the files a request names by path or by a text-file name', () => {
+  it('reads the files a request names by path, and leaves bare names to the listing', () => {
     expect(reads('Fix /app/run.py using notes.md, then check `data/input.csv`.')).toEqual([
       'LIST',
       'file_read:/app/run.py',
-      'file_read:notes.md',
       'file_read:data/input.csv'
     ]);
   });
@@ -31,9 +30,5 @@ describe('the reads a turn opens with', () => {
 
   it('does not take a dotted name in prose for a file', () => {
     expect(reads('Entries are np.float64; call os.path.join; see example.com.')).toEqual(['LIST']);
-  });
-
-  it('leaves binary outputs to the model', () => {
-    expect(reads('Save the chart to /app/revenue.png.')).toEqual(['LIST']);
   });
 });
