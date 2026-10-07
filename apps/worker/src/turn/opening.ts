@@ -19,6 +19,13 @@ const DIRECTORY = /(?:^|[\s`'"([])((?:~|\.{1,2})?\/(?:[\w.-]+\/)+)(?=$|[\s`'")>\
 /** Files a text read cannot show, which a request usually names as something to produce. */
 const BINARY = /\.(png|jpe?g|gif|webp|pdf|zip|gz|tar|docx?|xlsx?|pptx?|mp[34]|wav|bin|so|o)$/i;
 
+/**
+ * What a bare name has to end in to be taken for a file: `np.float64` and `os.path` read like file
+ * names, and a request names files by path or by one of these.
+ */
+const TEXT_FILE =
+  /\.(py|ipynb|js|mjs|cjs|ts|tsx|jsx|json|jsonl|md|txt|csv|tsv|ya?ml|toml|ini|cfg|conf|sh|bash|c|h|cc|cpp|hpp|rs|go|java|kt|rb|php|pl|r|sql|html?|css|xml|log|tex|cbl|cob|dat|env|lock)$/i;
+
 const requestText = (messages: readonly ModelMessage[]): string => {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
@@ -34,8 +41,7 @@ export const openingCalls = (messages: readonly ModelMessage[], turn: number): M
   const text = requestText(messages);
   const files = unique([...text.matchAll(PATH)].map((match) => match[1]!)).filter(
     // A domain or a version number looks like a file name; a file has a slash or a short name.
-    (path) =>
-      !BINARY.test(path) && (path.includes('/') || !/\.(com|org|net|io|dev|ai|co|uk)$/i.test(path))
+    (path) => !BINARY.test(path) && (path.includes('/') || TEXT_FILE.test(path))
   );
   const directories = unique([...text.matchAll(DIRECTORY)].map((match) => match[1]!)).filter(
     (directory) => !files.some((file) => file.startsWith(directory))
