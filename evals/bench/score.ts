@@ -76,6 +76,8 @@ export interface ScoredTask {
   /** What the box said when the verifier ran, for a reader asking why a task scored 0. */
   readonly verifierExit: number | null;
   readonly verifierStderr: string;
+  /** The end of the verifier's report, which names the check that failed. */
+  readonly verifierStdout?: string;
   readonly status: string;
   /**
    * What the turn said about its own evidence, from the completion event.
@@ -414,6 +416,7 @@ export const scoreTask = async (
       },
       verifierExit: verified.exitCode,
       verifierStderr: verified.stderr.trim().slice(0, 400),
+      verifierStdout: verified.stdout.trim().slice(-3_000),
       status: outcome.status,
       verification: outcome.verification,
       commandsRun: outcome.commandsRun,

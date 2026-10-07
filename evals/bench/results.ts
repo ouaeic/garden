@@ -82,6 +82,7 @@ export interface TaskRecordFile {
   readonly verification: string;
   readonly verifierExit: number | null;
   readonly verifierStderr: string;
+  readonly verifierStdout?: string;
   readonly commandsRun: number;
   readonly catalogue: readonly string[];
   readonly holds: readonly string[];

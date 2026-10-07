@@ -214,6 +214,7 @@ export const runTerminalBench = async (options: TerminalBenchOptions): Promise<n
       verification: scored.verification,
       verifierExit: scored.verifierExit,
       verifierStderr: scored.verifierStderr,
+      ...(scored.verifierStdout ? { verifierStdout: scored.verifierStdout } : {}),
       commandsRun: scored.commandsRun,
       catalogue: scored.catalogue,
       holds: scored.holds,
