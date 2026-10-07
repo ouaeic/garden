@@ -17,7 +17,8 @@ const PATH =
 const DIRECTORY = /(?:^|[\s`'"([])((?:~|\.{1,2})?\/(?:[\w.-]+\/)+)(?=$|[\s`'")>\].,;:!?])/g;
 
 /** Files a text read cannot show, which a request usually names as something to produce. */
-const BINARY = /\.(png|jpe?g|gif|webp|pdf|zip|gz|tar|docx?|xlsx?|pptx?|mp[34]|wav|bin|so|o)$/i;
+const BINARY =
+  /\.(png|jpe?g|gif|webp|pdf|zip|gz|7z|tar|docx?|xlsx?|pptx?|mp[34]|wav|bin|so|o|db|sqlite3?|parquet|pkl|npy|npz|class|jar|exe|wasm)$/i;
 
 /**
  * What a bare name has to end in to be taken for a file: `np.float64` and `os.path` read like file

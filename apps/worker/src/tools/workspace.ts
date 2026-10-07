@@ -278,6 +278,18 @@ const ledgerFor = (taskId: string): PostEditLedger => {
 };
 
 /** Drops every armed check. Only a test that wants a cold store has any business calling it. */
+/**
+ * A file with NUL bytes in it is not text, and shown as text it is kilobytes of escapes the model
+ * then tries to decode by hand: a truncated SQLite file read this way cost a 76K-token step. The
+ * answer says what it is, so the next move is a command that can read it.
+ */
+const isBinaryText = (content: string): boolean => content.includes('\u0000');
+const binaryFile = (path: string) => ({
+  path,
+  binary: true,
+  note: 'Not text. Inspect it with a command that reads its format (file, xxd, sqlite3, ...).'
+});
+
 export const forgetPostEditChecks = (): void => armed.clear();
 
 /**
@@ -929,6 +941,7 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
          * `evals/report.ts` delivers line 337 and recorded 1-336 - and the whole-file write the
          * paging had earned was refused, naming a line the model had already been shown.
          */
+        if (isBinaryText(read.content)) return binaryFile(path);
         const shownLines = toLines(read.content);
         const whole = read.partialLine ? shownLines.slice(0, -1) : shownLines;
         if (whole.length) recordRead(reader, path, read.startLine, whole.join('\n'));
@@ -997,6 +1010,7 @@ async function runWorkspaceTool(context: ToolContext, call: ModelToolCall): Prom
         maxBytes: FILE_READ_DISPLAY_BYTES,
         maxLines: FILE_READ_DISPLAY_LINES
       });
+      if (isBinaryText(read.content)) return binaryFile(path);
       const shown = toLines(read.content);
       // The same rule the windowed arm above draws: a line cut short by the byte budget is shown,
       // because an answer of no lines is a dead end, and is not recorded, because it did not arrive.
