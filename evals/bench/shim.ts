@@ -240,6 +240,41 @@ export const createShim = (options: ShimOptions): Shim => {
   const backend = options.backend;
   const surfaces = options.surfaces ?? { browser: 'absent', desktop: 'absent' };
   const toolchain = options.toolchain ?? [];
+  /**
+   * A command run as a session the worker can poll. Started and not awaited by the caller; the
+   * rejection is caught into the session rather than left to become an unhandled rejection that
+   * kills the run - a background command that could not start is a fact the agent should read.
+   */
+  const startSession = (call: ExecCall) => {
+    const id = `proc_${createHash('sha256').update(`${Date.now()}${sessions.size}`).digest('hex').slice(0, 32)}`;
+    const session: Session = {
+      id,
+      startedAt: new Date().toISOString(),
+      command: [call.executable, ...call.args].join(' '),
+      exitCode: null,
+      stdout: '',
+      stderr: '',
+      done: false
+    };
+    sessions.set(id, session);
+    const finished = backend
+      .exec(call)
+      .then((result) => {
+        session.exitCode = result.exitCode;
+        session.stdout = result.stdout;
+        session.stderr = result.stderr;
+        return result;
+      })
+      .catch((cause: unknown) => {
+        session.stderr = cause instanceof Error ? cause.message : String(cause);
+        session.exitCode = null;
+        return null;
+      })
+      .finally(() => {
+        session.done = true;
+      });
+    return { session, finished };
+  };
   const seen: string[] = [];
   const misses: string[] = [];
   const absentAsked: string[] = [];
@@ -260,8 +295,30 @@ export const createShim = (options: ShimOptions): Shim => {
         await backend.ensure();
         return json({ id: url.pathname.split('/')[3], status: 'ready', runnerRef: backend.name });
       }
-      case 'POST /v1/workspaces/:workspaceId/exec':
-        return json(await backend.exec(execCallOf(parsed)));
+      case 'POST /v1/workspaces/:workspaceId/exec': {
+        const call = execCallOf(parsed);
+        const yieldAfterMs = typeof parsed.yieldAfterMs === 'number' ? parsed.yieldAfterMs : 0;
+        if (yieldAfterMs <= 0) return json(await backend.exec(call));
+        // As the runner does: a command still running when the yield window closes comes back as
+        // a session the worker then waits on. Answered in one request instead, a command longer
+        // than the client's header timeout broke mid-call on the bench and nowhere else.
+        const { session, finished } = startSession(call);
+        let timer: NodeJS.Timeout | undefined;
+        const outcome = await Promise.race([
+          finished,
+          new Promise<null>((resolve) => {
+            timer = setTimeout(() => resolve(null), yieldAfterMs);
+          })
+        ]).finally(() => clearTimeout(timer));
+        if (outcome) return json(outcome);
+        return json({
+          sessionId: session.id,
+          startedAt: session.startedAt,
+          command: session.command,
+          status: 'running',
+          yielded: true
+        });
+      }
       case 'GET /v1/workspaces/:workspaceId/files':
         return json({
           path: wanted,
@@ -440,36 +497,8 @@ export const createShim = (options: ShimOptions): Shim => {
       case 'GET /v1/workspaces/:workspaceId/checkpoints':
         return json({ checkpoints: await listCheckpoints(backend) });
       case 'POST /v1/workspaces/:workspaceId/processes/start': {
-        const call = execCallOf(parsed);
-        const id = `proc_${createHash('sha256').update(`${Date.now()}${sessions.size}`).digest('hex').slice(0, 32)}`;
-        const session: Session = {
-          id,
-          startedAt: new Date().toISOString(),
-          command: [call.executable, ...call.args].join(' '),
-          exitCode: null,
-          stdout: '',
-          stderr: '',
-          done: false
-        };
-        sessions.set(id, session);
-        // Started and not awaited, which is the whole point of the route. The rejection is caught
-        // into the session rather than left to become an unhandled rejection that kills the run:
-        // a background command that could not start is a fact the agent should read, not a crash.
-        void backend
-          .exec(call)
-          .then((result) => {
-            session.exitCode = result.exitCode;
-            session.stdout = result.stdout;
-            session.stderr = result.stderr;
-          })
-          .catch((cause: unknown) => {
-            session.stderr = cause instanceof Error ? cause.message : String(cause);
-            session.exitCode = null;
-          })
-          .finally(() => {
-            session.done = true;
-          });
-        return json({ sessionId: id, startedAt: session.startedAt, status: 'running' });
+        const { session } = startSession(execCallOf(parsed));
+        return json({ sessionId: session.id, startedAt: session.startedAt, status: 'running' });
       }
       case 'GET /v1/workspaces/:workspaceId/processes':
         return json({
