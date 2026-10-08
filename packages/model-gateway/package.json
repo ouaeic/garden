@@ -18,9 +18,9 @@
   "dependencies": {
     "@garden/contracts": "workspace:*",
     "@garden/core": "workspace:*",
-    "image-dimensions": "2.5.1",
+    "image-dimensions": "2.6.0",
     "pngjs": "7.0.0",
-    "zod": "4.4.3"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@types/pngjs": "6.0.5"
